@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect } from 'react';
 import { db } from './firebase';
-import { addDoc, collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 
+import { doc, getDoc, setDoc, addDoc, collection, query, where, getDocs, orderBy, limit, updateDoc } from 'firebase/firestore';
 export default function AparejadosGame({ recurso, usuario, alTerminar }) {
     const [fase, setFase] = useState('SETUP');
     const [hojaSeleccionada, setHojaSeleccionada] = useState('General');

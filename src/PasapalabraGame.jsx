@@ -1,8 +1,8 @@
 ﻿import { useState, useEffect } from 'react';
 import { db } from './firebase';
-import { addDoc, collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, addDoc, collection, query, where, getDocs, orderBy, limit, updateDoc } from 'firebase/firestore';
 
-// ESTILOS CSS
+// --- ESTILOS CSS ---
 const STYLES = `
   :root { --azul: #273c75; --naranja: #e67e22; --verde: #2ecc71; --rojo: #e74c3c; --amarillo: #f1c40f; --violeta: #9b59b6; }
   .game-wrapper { font-family: 'Segoe UI', sans-serif; background: radial-gradient(circle, #2f3640, #1e272e); height: 100vh; width: 100vw; display: flex; justify-content: center; align-items: center; color: white; overflow: hidden; position: relative; }
@@ -46,7 +46,7 @@ export default function PasapalabraGame({ recurso, usuario, alTerminar }) {
     const [hojaSeleccionada, setHojaSeleccionada] = useState('General');
     const [jugadores, setJugadores] = useState([]);
     const [turno, setTurno] = useState(0);
-    const [verRanking, setVerRanking] = useState(false); // Estado para mostrar modal ranking
+    const [verRanking, setVerRanking] = useState(false);
 
     const iniciar = (duelo, hoja) => {
         setModoDuelo(duelo);
@@ -55,12 +55,8 @@ export default function PasapalabraGame({ recurso, usuario, alTerminar }) {
         // 1. FILTRADO DE PREGUNTAS POR HOJA
         let pool = [];
         if (hoja === 'General') {
-            // En Pasapalabra General, idealmente cogemos 1 pregunta por cada letra mezclando hojas
-            // Para simplificar, cogemos la primera hoja completa o mezclamos (aquí usaremos la hoja 0 como base y rellenamos si hay huecos, o un merge inteligente)
-            // Estrategia simple: Usar todas las preguntas de todas las hojas y filtrar por letra única (la primera que encuentre)
             const todas = [];
             recurso.hojas.forEach(h => todas.push(...h.preguntas));
-            // Unificar por letra (A, B, C...)
             const unicas = {};
             todas.forEach(p => { if (!unicas[p.letra]) unicas[p.letra] = p; });
             pool = Object.values(unicas).sort((a, b) => a.letra.localeCompare(b.letra));
@@ -69,7 +65,6 @@ export default function PasapalabraGame({ recurso, usuario, alTerminar }) {
             if (hObj) pool = [...hObj.preguntas];
         }
 
-        // Inicializar estado de preguntas
         const roscoInicial = pool.map(p => ({ ...p, estado: null }));
         const tiempo = parseInt(recurso.config?.tiempoTotal) || 150;
 
@@ -145,7 +140,6 @@ const PantallaSetup = ({ recurso, onStart, onRanking, onExit }) => {
             <h1 style={{ color: '#f1c40f', fontFamily: 'sans-serif', margin: 0 }}>Pasapalabra</h1>
             <h2 style={{ color: 'white', fontSize: '1.2rem', marginBottom: '20px', fontWeight: 'normal' }}>{recurso.titulo}</h2>
 
-            {/* DESPLEGABLE HOJAS */}
             {hojasDisponibles.length > 0 && (
                 <div style={{ marginBottom: '20px', textAlign: 'left' }}>
                     <label style={{ display: 'block', marginBottom: '5px', color: '#ccc' }}>Selecciona Modalidad:</label>
@@ -164,13 +158,12 @@ const PantallaSetup = ({ recurso, onStart, onRanking, onExit }) => {
     );
 };
 
-// --- PANTALLA RANKING (Reutilizable) ---
+// --- PANTALLA RANKING ---
 const PantallaRanking = ({ recurso, usuario, onBack }) => {
     const [hoja, setHoja] = useState('General');
     const [top10, setTop10] = useState([]);
     const [miMejor, setMiMejor] = useState(null);
     const [cargando, setCargando] = useState(false);
-
     const hojasDisponibles = recurso.hojas ? recurso.hojas.map(h => h.nombreHoja) : [];
 
     useEffect(() => {
@@ -188,7 +181,7 @@ const PantallaRanking = ({ recurso, usuario, onBack }) => {
                 ref,
                 where('recursoId', '==', recurso.id),
                 where('categoria', '==', hoja),
-                where('juego', '==', 'Pasapalabra'),
+                where('tipoJuego', '==', 'PASAPALABRA'), // Actualizado a tipoJuego
                 orderBy('aciertos', 'desc'),
                 limit(10)
             );
@@ -200,8 +193,8 @@ const PantallaRanking = ({ recurso, usuario, onBack }) => {
                 ref,
                 where('recursoId', '==', recurso.id),
                 where('categoria', '==', hoja),
-                where('juego', '==', 'Pasapalabra'),
-                where('jugador', '==', usuario.displayName),
+                where('tipoJuego', '==', 'PASAPALABRA'),
+                where('email', '==', usuario.email), // Filtrar por email es más seguro
                 orderBy('aciertos', 'desc'),
                 limit(1)
             );
@@ -209,7 +202,11 @@ const PantallaRanking = ({ recurso, usuario, onBack }) => {
             if (!snapMejor.empty) setMiMejor(snapMejor.docs[0].data().aciertos);
 
         } catch (error) {
-            console.error("Error ranking (Falta índice en Firebase):", error);
+            console.error("Error ranking:", error);
+            // Fallback para datos antiguos que usaban 'juego' en vez de 'tipoJuego'
+            if (top10.length === 0) {
+                // Puedes implementar un segundo intento aquí si es crítico
+            }
         }
         setCargando(false);
     };
@@ -224,13 +221,10 @@ const PantallaRanking = ({ recurso, usuario, onBack }) => {
     return (
         <div className="card-menu" style={{ maxWidth: '500px' }}>
             <h2 style={{ color: '#f1c40f' }}>🏆 Ranking Top 10</h2>
-
-            {/* Selector dentro del ranking */}
             <select value={hoja} onChange={e => setHoja(e.target.value)} style={{ width: '100%', padding: '8px', marginBottom: '15px', borderRadius: '5px' }}>
                 <option value="General">General</option>
                 {hojasDisponibles.map(h => <option key={h} value={h}>{h}</option>)}
             </select>
-
             <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '10px', height: '250px', overflowY: 'auto', marginBottom: '15px' }}>
                 {cargando ? <p>Cargando...</p> : top10.length === 0 ? <p>No hay puntuaciones aún.</p> : (
                     top10.map((fila, i) => (
@@ -242,19 +236,13 @@ const PantallaRanking = ({ recurso, usuario, onBack }) => {
                     ))
                 )}
             </div>
-
-            {miMejor !== null && (
-                <div className="personal-best">
-                    Tu Mejor Puntuación: {miMejor} pts
-                </div>
-            )}
-
+            {miMejor !== null && <div className="personal-best">Tu Mejor Puntuación: {miMejor} pts</div>}
             <button className="btn-back" onClick={onBack}>Cerrar Ranking</button>
         </div>
     );
 };
 
-// --- LOGICA DE JUEGO (Tablero) ---
+// --- LOGICA JUEGO ---
 const Tablero = ({ jugadores, setJugadores, turno, setTurno, modoDuelo, onFinish }) => {
     const [input, setInput] = useState('');
     const jugador = jugadores[turno];
@@ -337,6 +325,7 @@ const Tablero = ({ jugadores, setJugadores, turno, setTurno, modoDuelo, onFinish
     );
 };
 
+// --- PANTALLA FIN (Con lógica de guardado corregida) ---
 const PantallaFin = ({ jugadores, recurso, hoja, usuario, onExit }) => {
     const [guardando, setGuardando] = useState(false);
 
@@ -350,12 +339,15 @@ const PantallaFin = ({ jugadores, recurso, hoja, usuario, onExit }) => {
             const q = query(
                 rankingRef,
                 where('recursoId', '==', recurso.id),
-                where('categoria', '==', hoja), // Importante: Hoja específica
-                where('jugador', '==', usuario.displayName),
-                where('juego', '==', 'Pasapalabra')
+                where('categoria', '==', hoja),
+                where('email', '==', usuario.email), // Filtrar por email es más robusto
+                where('tipoJuego', '==', 'PASAPALABRA') // Usar el nuevo identificador
             );
 
             const querySnapshot = await getDocs(q);
+
+            // Calculamos medalla al vuelo
+            const medallaCalc = score >= 20 ? '🥇' : (score >= 10 ? '🥈' : (score > 0 ? '🥉' : ''));
 
             if (!querySnapshot.empty) {
                 // YA EXISTE -> COMPARAR
@@ -363,30 +355,33 @@ const PantallaFin = ({ jugadores, recurso, hoja, usuario, onExit }) => {
                 const oldScore = docExistente.data().aciertos;
 
                 if (score > oldScore) {
-                    // Nuevo record! Actualizamos
                     await updateDoc(doc(db, 'ranking', docExistente.id), {
                         aciertos: score,
-                        fecha: new Date()
+                        fecha: new Date(),
+                        medalla: medallaCalc,
+                        recursoTitulo: recurso.titulo // Actualizar título por si cambió
                     });
                     alert("🚀 ¡Nuevo Récord Personal! Guardado.");
                 } else {
-                    // No superado
-                    alert(`⚠️ No has superado tu mejor registro en ${hoja} de ${recurso.titulo}. (Tu récord: ${oldScore})`);
+                    alert(`⚠️ No has superado tu mejor registro en ${hoja}. (Tu récord: ${oldScore})`);
                 }
             } else {
-                // NO EXISTE -> CREAR NUEVO
+                // NO EXISTE -> CREAR NUEVO CON TODOS LOS CAMPOS
                 await addDoc(rankingRef, {
                     recursoId: recurso.id,
-                    tituloJuego: recurso.titulo,
-                    juego: 'Pasapalabra',
+                    recursoTitulo: recurso.titulo, // VITAL PARA LA TABLA
+                    tipoJuego: 'PASAPALABRA',      // VITAL PARA EL COLOR
+                    juego: 'Pasapalabra',          // (Legacy)
                     categoria: hoja,
-                    jugador: usuario.displayName,
+                    email: usuario.email,          // VITAL PARA EL FILTRO
+                    jugador: usuario.displayName || "Anónimo",
                     aciertos: score,
-                    fecha: new Date()
+                    fecha: new Date(),
+                    medalla: medallaCalc
                 });
                 alert("✅ Puntuación Guardada.");
             }
-            onExit(); // Volver al inicio
+            onExit();
         } catch (e) {
             console.error(e);
             alert("Error al guardar. Intenta de nuevo.");
@@ -405,32 +400,3 @@ const PantallaFin = ({ jugadores, recurso, hoja, usuario, onExit }) => {
         </div>
     );
 };
-
-
-
-
-/*
-const PantallaFin = ({ jugadores, recurso, hoja, usuario, onExit }) => {
-    const [guardado, setGuardado] = useState(false);
-    const guardar = async () => {
-        try {
-            await addDoc(collection(db, 'ranking'), {
-                recursoId: recurso.id,
-                juego: 'Pasapalabra',
-                categoria: hoja,
-                jugador: usuario.displayName,
-                aciertos: jugadores[0].aciertos,
-                fecha: new Date()
-            });
-            alert("¡Guardado!"); setGuardado(true);
-        } catch (e) { alert("Error guardando"); }
-    };
-    return (
-        <div className="card-menu">
-            <h1>¡Finalizado!</h1>
-            {jugadores.map((j, i) => <h2 key={i} style={{ color: j.color }}>{j.nombre}: {j.aciertos} aciertos</h2>)}
-            {!guardado ? <button className="btn-primary" onClick={guardar} style={{ marginTop: '20px' }}>💾 GUARDAR RESULTADO</button> : <p style={{ color: 'lime' }}>Resultado Guardado</p>}
-            <button className="btn-back" onClick={onExit}>Salir</button>
-        </div>
-    );
-};*/

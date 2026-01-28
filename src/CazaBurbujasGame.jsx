@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect, useRef } from 'react';
 import { db } from './firebase';
-import { addDoc, collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, addDoc, collection, query, where, getDocs, orderBy, limit, updateDoc } from 'firebase/firestore';
 
 export default function CazaBurbujasGame({ recurso, usuario, alTerminar }) {
     const [fase, setFase] = useState('SETUP');
@@ -8,6 +8,7 @@ export default function CazaBurbujasGame({ recurso, usuario, alTerminar }) {
     const [modo, setModo] = useState('Burbujas');
     const [hojaSeleccionada, setHojaSeleccionada] = useState('General');
     const [verRanking, setVerRanking] = useState(false);
+    const [guardando, setGuardando] = useState(false); // Estado para evitar doble click
 
     const iniciar = (modoJuego, hoja) => {
         setModo(modoJuego);
@@ -16,60 +17,66 @@ export default function CazaBurbujasGame({ recurso, usuario, alTerminar }) {
         setFase('JUEGO');
     };
 
-   /* const guardarRanking = async () => {
-        try {
-            await addDoc(collection(db, 'ranking'), {
-                recursoId: recurso.id,
-                juego: 'CazaBurbujas',
-                modo: modo,
-                categoria: hojaSeleccionada,
-                jugador: usuario.displayName,
-                aciertos: puntuacion,
-                fecha: new Date()
-            });
-            alert("¡Puntuación Guardada!");
-            alTerminar();
-        } catch (e) { console.error(e); alert("Error al guardar"); }
-    };*/
-
     const guardarRanking = async () => {
+        if (guardando) return;
+        setGuardando(true);
         try {
             const rankingRef = collection(db, 'ranking');
+
+            // 1. BUSCAR SI YA EXISTE UN RECORD
             const q = query(
                 rankingRef,
                 where('recursoId', '==', recurso.id),
                 where('categoria', '==', hojaSeleccionada),
-                where('jugador', '==', usuario.displayName),
-                where('juego', '==', 'CazaBurbujas')
+                where('email', '==', usuario.email), // Filtrar por email es más seguro
+                where('tipoJuego', '==', 'CAZABURBUJAS') // Nuevo identificador estándar
             );
+
             const snap = await getDocs(q);
 
+            // Calcular medalla
+            const medallaCalc = puntuacion >= 20 ? '🥇' : (puntuacion >= 10 ? '🥈' : (puntuacion > 0 ? '🥉' : ''));
+
             if (!snap.empty) {
+                // YA EXISTE -> ACTUALIZAR SI ES MEJOR
                 const docRef = snap.docs[0];
                 const oldScore = docRef.data().aciertos;
+
                 if (puntuacion > oldScore) {
-                    await updateDoc(doc(db, 'ranking', docRef.id), { aciertos: puntuacion, fecha: new Date() });
-                    alert("🚀 ¡Nuevo Récord Personal!");
+                    await updateDoc(doc(db, 'ranking', docRef.id), {
+                        aciertos: puntuacion,
+                        fecha: new Date(),
+                        medalla: medallaCalc,
+                        recursoTitulo: recurso.titulo // Actualizar título por si cambió
+                    });
+                    alert("🚀 ¡Nuevo Récord Personal! Guardado.");
                 } else {
-                    alert(`⚠️ No has superado tu mejor registro en ${hojaSeleccionada} de ${recurso.titulo}.`);
+                    alert(`⚠️ No has superado tu mejor registro en ${hojaSeleccionada}. (Tu récord: ${oldScore})`);
                 }
             } else {
+                // NO EXISTE -> CREAR NUEVO
                 await addDoc(rankingRef, {
                     recursoId: recurso.id,
-                    tituloJuego: recurso.titulo,
-                    juego: 'CazaBurbujas',
+                    recursoTitulo: recurso.titulo,   // VITAL PARA DASHBOARD
+                    tipoJuego: 'CAZABURBUJAS',       // VITAL PARA COLOR/ICONO
+                    juego: 'CazaBurbujas',           // (Legacy)
                     modo: modo,
                     categoria: hojaSeleccionada,
-                    jugador: usuario.displayName,
+                    email: usuario.email,            // VITAL PARA MIS RECORDS
+                    jugador: usuario.displayName || "Anónimo",
                     aciertos: puntuacion,
-                    fecha: new Date()
+                    fecha: new Date(),
+                    medalla: medallaCalc
                 });
                 alert("✅ Puntuación Guardada.");
             }
             alTerminar();
-        } catch (e) { console.error(e); alert("Error al guardar"); }
+        } catch (e) {
+            console.error(e);
+            alert("Error al guardar. Inténtalo de nuevo.");
+            setGuardando(false);
+        }
     };
-
 
     if (fase === 'SETUP' && !verRanking) return <PantallaSetup recurso={recurso} onStart={iniciar} onRanking={() => setVerRanking(true)} onExit={alTerminar} />;
 
@@ -80,8 +87,10 @@ export default function CazaBurbujasGame({ recurso, usuario, alTerminar }) {
             <div className="card-menu">
                 <h1>¡Juego Terminado!</h1>
                 <h2 style={{ color: '#f1c40f', fontSize: '3rem' }}>{puntuacion} pts</h2>
-                <button className="btn-success" onClick={guardarRanking}>💾 GUARDAR</button>
-                <button className="btn-back" onClick={alTerminar}>Salir</button>
+                <button className="btn-success" onClick={guardarRanking} disabled={guardando}>
+                    {guardando ? 'Procesando...' : '💾 GUARDAR RESULTADO'}
+                </button>
+                <button className="btn-back" onClick={alTerminar}>Salir sin guardar</button>
                 <EstilosComunes />
             </div>
         );
@@ -91,6 +100,8 @@ export default function CazaBurbujasGame({ recurso, usuario, alTerminar }) {
         <EngineBurbujas recurso={recurso} modo={modo} hoja={hojaSeleccionada} setPuntuacionTotal={setPuntuacion} onFinish={() => setFase('FIN')} onExit={alTerminar} />
     );
 }
+
+// --- PANTALLAS AUXILIARES ---
 
 const PantallaSetup = ({ recurso, onStart, onRanking, onExit }) => {
     const [hoja, setHoja] = useState('General');
@@ -122,20 +133,41 @@ const PantallaRanking = ({ recurso, usuario, onBack }) => {
     const [hoja, setHoja] = useState('General');
     const [top10, setTop10] = useState([]);
     const [miMejor, setMiMejor] = useState(null);
+    const [cargando, setCargando] = useState(false);
     const hojas = recurso.hojas ? recurso.hojas.map(h => h.nombreHoja) : [];
 
     useEffect(() => {
         const fetchRanking = async () => {
+            setCargando(true);
             try {
                 const ref = collection(db, 'ranking');
-                const qTop = query(ref, where('recursoId', '==', recurso.id), where('juego', '==', 'CazaBurbujas'), where('categoria', '==', hoja), orderBy('aciertos', 'desc'), limit(10));
+
+                // Query Top 10
+                const qTop = query(
+                    ref,
+                    where('recursoId', '==', recurso.id),
+                    where('tipoJuego', '==', 'CAZABURBUJAS'),
+                    where('categoria', '==', hoja),
+                    orderBy('aciertos', 'desc'),
+                    limit(10)
+                );
                 const snapTop = await getDocs(qTop);
                 setTop10(snapTop.docs.map(d => d.data()));
 
-                const qMejor = query(ref, where('recursoId', '==', recurso.id), where('juego', '==', 'CazaBurbujas'), where('categoria', '==', hoja), where('jugador', '==', usuario.displayName), orderBy('aciertos', 'desc'), limit(1));
+                // Query Personal Best (Por email)
+                const qMejor = query(
+                    ref,
+                    where('recursoId', '==', recurso.id),
+                    where('tipoJuego', '==', 'CAZABURBUJAS'),
+                    where('categoria', '==', hoja),
+                    where('email', '==', usuario.email),
+                    orderBy('aciertos', 'desc'),
+                    limit(1)
+                );
                 const snapMejor = await getDocs(qMejor);
                 if (!snapMejor.empty) setMiMejor(snapMejor.docs[0].data().aciertos);
             } catch (e) { console.log(e); }
+            setCargando(false);
         };
         fetchRanking();
     }, [hoja]);
@@ -146,15 +178,21 @@ const PantallaRanking = ({ recurso, usuario, onBack }) => {
         <div className="card-menu">
             <h2 style={{ color: '#f1c40f' }}>🏆 Ranking</h2>
             <select value={hoja} onChange={e => setHoja(e.target.value)} style={{ width: '100%', padding: '8px', marginBottom: '15px', borderRadius: '5px' }}><option value="General">General</option>{hojas.map(h => <option key={h} value={h}>{h}</option>)}</select>
+
             <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '10px', height: '200px', overflowY: 'auto', marginBottom: '15px' }}>
-                {top10.map((f, i) => <div key={i} className="ranking-row"><span className="rank-pos">{getMedalla(i)}</span><span className="rank-name">{f.jugador}</span><span className="rank-score">{f.aciertos}</span></div>)}
+                {cargando ? <p>Cargando...</p> : top10.length === 0 ? <p>No hay puntuaciones.</p> : (
+                    top10.map((f, i) => <div key={i} className="ranking-row"><span className="rank-pos">{getMedalla(i)}</span><span className="rank-name">{f.jugador}</span><span className="rank-score">{f.aciertos}</span></div>)
+                )}
             </div>
+
             {miMejor !== null && <div className="personal-best">Tu Record: {miMejor}</div>}
             <button className="btn-back" onClick={onBack}>Cerrar</button>
             <EstilosComunes />
         </div>
     );
 };
+
+// --- MOTOR DEL JUEGO (Engine) ---
 
 const EngineBurbujas = ({ recurso, modo, hoja, setPuntuacionTotal, onFinish, onExit }) => {
     const [preguntaActual, setPreguntaActual] = useState(null);
@@ -338,5 +376,5 @@ const EstilosComunes = () => (
     .rank-name { flex: 1; text-align: left; }
     .rank-score { font-weight: bold; color: #f1c40f; }
     .personal-best { margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.1); border-radius: 10px; border: 1px solid #f1c40f; color: #f1c40f; font-weight: bold; }
-  `}</style>
+    `}</style>
 );

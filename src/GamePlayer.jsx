@@ -1,8 +1,10 @@
 ﻿import { useState } from 'react';
-import { Home } from 'lucide-react'; // Asegúrate de tener lucide-react instalado
+import { Home } from 'lucide-react';
 import PasapalabraGame from './PasapalabraGame';
 import CazaBurbujasGame from './CazaBurbujasGame';
 import AparejadosGame from './AparejadosGame';
+import ThinkHootGame from './ThinkHootGame'; // Asegúrate de tener este archivo creado
+import RuletaGame from './RuletaGame';       // 👈 1. NUEVO IMPORT
 
 export default function GamePlayer({ recurso, usuario, alTerminar }) {
 
@@ -23,7 +25,6 @@ export default function GamePlayer({ recurso, usuario, alTerminar }) {
     );
 
     // Renderizamos el juego seleccionado y le pasamos las props
-    // Nota: El botón Casa se renderiza FUERA del juego para estar siempre encima
     return (
         <>
             <BotonCasa />
@@ -40,6 +41,11 @@ export default function GamePlayer({ recurso, usuario, alTerminar }) {
                 <AparejadosGame recurso={recurso} usuario={usuario} alTerminar={alTerminar} />
             )}
 
+            {/* 👈 2. NUEVO BLOQUE PARA LA RULETA */}
+            {recurso.tipoJuego === 'RULETA' && (
+                <RuletaGame recurso={recurso} usuario={usuario} alTerminar={alTerminar} />
+            )}
+
             {recurso.tipoJuego === 'THINKHOOT' && (
                 <ThinkHootGame
                     isHost={false} // Si entra por aquí es modo prueba
@@ -48,9 +54,6 @@ export default function GamePlayer({ recurso, usuario, alTerminar }) {
                     onExit={alTerminar}
                 />
             )}
-
-
-
         </>
     );
 }

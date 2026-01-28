@@ -1,9 +1,10 @@
 ﻿import { useState, useEffect } from 'react';
 import { db } from './firebase';
-import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
-import { Search, MapPin, User, Globe, ArrowLeft, Play, Medal, Trophy, Gamepad2 } from 'lucide-react';
+import { collection, query, where, getDocs, orderBy, getCountFromServer } from 'firebase/firestore';
+import { Search, MapPin, User, Globe, ArrowLeft, Play } from 'lucide-react';
 import GamePlayer from './GamePlayer';
 import ThinkHootGame from './ThinkHootGame';
+import RuletaGame from './RuletaGame'; // Importamos el juego
 
 // --- ESTILOS GLOBALES ---
 const ESTILO_FONDO = {
@@ -25,10 +26,9 @@ const TARJETA_ESTILO = {
     margin: '0 auto'
 };
 
-// Helper para limpiar texto
+// Helpers
 const cleanText = (text) => text ? text.toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
 
-// Helper para obtener color según juego
 const getColor = (t) => {
     if (!t) return '#999';
     const tipo = t.toUpperCase();
@@ -36,10 +36,10 @@ const getColor = (t) => {
     if (tipo === 'THINKHOOT') return '#9C27B0';
     if (tipo === 'APAREJADOS') return '#FF9800';
     if (tipo === 'CAZABURBUJAS') return '#E91E63';
+    if (tipo === 'RULETA') return '#f1c40f';
     return '#E91E63';
 };
 
-// Helper para mostrar nombre bonito del juego
 const getNombreJuego = (tipo) => {
     if (!tipo) return 'Juego';
     const t = tipo.toUpperCase();
@@ -47,14 +47,14 @@ const getNombreJuego = (tipo) => {
     if (t === 'CAZABURBUJAS') return 'CazaBurbujas';
     if (t === 'APAREJADOS') return 'Aparejados';
     if (t === 'THINKHOOT') return 'ThinkHoot';
+    if (t === 'RULETA') return 'La Ruleta';
     return t;
 };
 
 export default function StudentDashboard({ usuario }) {
     // --- ESTADOS ---
-    const [cargando, setCargando] = useState(false); // Estado general
-    const [vistaActual, setVistaActual] = useState('JUEGOS'); // 'JUEGOS' | 'RECORDS'
-    const [fase, setFase] = useState('SELECCION'); // 'SELECCION', 'BUSQUEDA', 'JUGANDO', 'EN_VIVO'
+    const [vistaActual, setVistaActual] = useState('JUEGOS');
+    const [fase, setFase] = useState('SELECCION');
     const [juegoElegido, setJuegoElegido] = useState(null);
 
     // Búsqueda
@@ -74,40 +74,56 @@ export default function StudentDashboard({ usuario }) {
 
     // --- 1. CARGAR RÉCORDS ---
     const cargarMisRecords = async () => {
-        if (!usuario || !usuario.email) {
-            console.log("Esperando usuario...");
-            return;
-        }
+        if (!usuario || !usuario.email) return;
 
         setCargandoRecords(true);
         try {
-            // Requiere índice: email (Asc) + fecha (Desc)
             const q = query(
                 collection(db, "ranking"),
                 where("email", "==", usuario.email),
                 orderBy("fecha", "desc")
             );
-
             const snapshot = await getDocs(q);
 
             if (snapshot.empty) {
                 setMisRecords([]);
             } else {
-                setMisRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                const recordsCalculados = await Promise.all(snapshot.docs.map(async (docSnapshot) => {
+                    const data = docSnapshot.data();
+                    const misPuntos = data.aciertos !== undefined ? data.aciertos : data.puntuacion;
+                    const juegoId = data.recursoId;
+                    const categoria = data.categoria;
+                    const tipoJuego = data.tipoJuego || data.juego;
+
+                    const qMejores = query(
+                        collection(db, "ranking"),
+                        where("recursoId", "==", juegoId),
+                        where("categoria", "==", categoria),
+                        where("tipoJuego", "==", tipoJuego),
+                        where("aciertos", ">", misPuntos)
+                    );
+
+                    const snapshotMejores = await getCountFromServer(qMejores);
+                    const genteDelante = snapshotMejores.data().count;
+                    const ranking = genteDelante + 1;
+
+                    let medallaReal = '❌';
+                    if (ranking === 1) medallaReal = '🥇';
+                    if (ranking === 2) medallaReal = '🥈';
+                    if (ranking === 3) medallaReal = '🥉';
+
+                    return { id: docSnapshot.id, ...data, medallaCalculada: medallaReal, posicion: ranking };
+                }));
+                setMisRecords(recordsCalculados);
             }
         } catch (error) {
             console.error("Error records:", error);
-            if (error.message.includes("index")) {
-                alert("⚠️ FALTA ÍNDICE: Abre la consola (F12) y haz clic en el enlace de Firebase.");
-            }
+            if (error.message.includes("index")) alert("⚠️ FALTA ÍNDICE EN FIREBASE");
         }
         setCargandoRecords(false);
     };
 
-    // Carga inicial automática
-    useEffect(() => {
-        if (usuario?.email) cargarMisRecords();
-    }, [usuario]);
+    useEffect(() => { if (usuario?.email) cargarMisRecords(); }, [usuario]);
 
     // --- 2. BUSCAR RECURSOS ---
     const buscar = async () => {
@@ -131,12 +147,9 @@ export default function StudentDashboard({ usuario }) {
                     }
                 }
             } else {
-                // Filtros
                 const q = query(ref, where("tipoJuego", "==", juegoElegido), orderBy("fechaCreacion", "desc"));
                 const snap = await getDocs(q);
                 const raw = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-                // Filtrado en cliente
                 const docs = raw.filter(r => {
                     const f = filtros;
                     const check = (d, f) => !f || cleanText(d).includes(cleanText(f));
@@ -147,7 +160,6 @@ export default function StudentDashboard({ usuario }) {
                     };
                     return check(r.profesorNombre, f.profesor) && check(r.pais, f.pais) && check(r.region, f.region) && check(r.poblacion, f.poblacion) && checkTema();
                 });
-
                 if (docs.length === 0) alert("❌ No se encontraron recursos.");
                 else setResultados(docs);
             }
@@ -161,43 +173,30 @@ export default function StudentDashboard({ usuario }) {
         setFase('EN_VIVO');
     };
 
-    // --- RENDERIZADO DE JUEGO ACTIVO ---
+    // --- RENDERIZADO ---
     if (fase === 'EN_VIVO') {
         return <ThinkHootGame isHost={false} codigoSala={joinData.codigo} usuario={{ ...usuario, displayName: joinData.alias || usuario.displayName }} onExit={() => setFase('SELECCION')} />;
     }
 
     if (fase === 'JUGANDO') {
+        // DETECTAR RULETA
+        if (juegoElegido === 'RULETA' || recursoActivo.tipoJuego === 'RULETA') {
+            return <RuletaGame recurso={recursoActivo} usuario={usuario} alTerminar={() => setFase('BUSQUEDA')} />;
+        }
         return <GamePlayer recurso={recursoActivo} usuario={usuario} alTerminar={() => setFase('BUSQUEDA')} />;
     }
 
-    // --- DASHBOARD ---
     return (
         <div style={ESTILO_FONDO}>
-
-            {/* HEADER DE NAVEGACIÓN */}
             <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginBottom: '30px' }}>
-                <button
-                    onClick={() => { setVistaActual('JUEGOS'); setFase('SELECCION'); }}
-                    style={{ ...BtnNavStyle, background: vistaActual === 'JUEGOS' ? '#f1c40f' : 'rgba(255,255,255,0.1)', color: vistaActual === 'JUEGOS' ? '#000' : '#fff' }}
-                >
-                    🎮 Zona de Juegos
-                </button>
-
-                {/* BOTÓN MIS RÉCORDS CORREGIDO */}
-                <button
-                    onClick={() => { setVistaActual('RECORDS'); cargarMisRecords(); }}
-                    style={{ ...BtnNavStyle, background: vistaActual === 'RECORDS' ? '#f1c40f' : 'rgba(255,255,255,0.1)', color: vistaActual === 'RECORDS' ? '#000' : '#fff' }}
-                >
-                    🏅 Mis Récords
-                </button>
+                <button onClick={() => { setVistaActual('JUEGOS'); setFase('SELECCION'); }} style={{ ...BtnNavStyle, background: vistaActual === 'JUEGOS' ? '#f1c40f' : 'rgba(255,255,255,0.1)', color: vistaActual === 'JUEGOS' ? '#000' : '#fff' }}>🎮 Zona de Juegos</button>
+                <button onClick={() => { setVistaActual('RECORDS'); cargarMisRecords(); }} style={{ ...BtnNavStyle, background: vistaActual === 'RECORDS' ? '#f1c40f' : 'rgba(255,255,255,0.1)', color: vistaActual === 'RECORDS' ? '#000' : '#fff' }}>🏅 Mis Récords</button>
             </div>
 
-            {/* VISTA: MIS RÉCORDS */}
             {vistaActual === 'RECORDS' && (
                 <div style={TARJETA_ESTILO}>
                     <h2 style={{ color: '#f1c40f', textAlign: 'center', marginBottom: '20px', fontFamily: 'sans-serif' }}>Mis Mejores Puntuaciones</h2>
-
-                    {cargandoRecords ? <p style={{ textAlign: 'center' }}>Cargando...</p> : (
+                    {cargandoRecords ? <p style={{ textAlign: 'center' }}>Calculando ranking global...</p> : (
                         <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
                             <table style={{ width: '100%', borderCollapse: 'collapse', color: 'white' }}>
                                 <thead>
@@ -206,31 +205,17 @@ export default function StudentDashboard({ usuario }) {
                                         <th style={{ padding: '10px' }}>Recurso</th>
                                         <th style={{ padding: '10px' }}>Modo</th>
                                         <th style={{ padding: '10px' }}>Puntos</th>
-                                        <th style={{ padding: '10px' }}>Medalla</th>
+                                        <th style={{ padding: '10px', textAlign: 'center' }}>Posición</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {misRecords.map((r, i) => (
                                         <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                                            <td style={{ padding: '10px', color: getColor(r.tipoJuego || r.juego || 'GENERICO') }}>
-                                                {getNombreJuego(r.tipoJuego || r.juego)}
-                                            </td>
-                                            <td style={{ padding: '10px', fontWeight: 'bold' }}>
-                                                {r.recursoTitulo || "Sin Título (Antiguo)"}
-                                            </td>
-                                            <td style={{ padding: '10px', fontStyle: 'italic' }}>
-                                                {r.categoria || "General"}
-                                            </td>
-                                            <td style={{ padding: '10px', color: '#f1c40f', fontWeight: 'bold' }}>
-                                                {r.aciertos !== undefined ? r.aciertos : r.puntuacion}
-                                            </td>
-                                            <td style={{ padding: '10px', fontSize: '1.5rem' }}>
-                                                {r.medalla || (
-                                                    (r.aciertos >= 10) ? '🥇' :
-                                                        (r.aciertos >= 5) ? '🥈' :
-                                                            (r.aciertos > 0) ? '🥉' : ''
-                                                )}
-                                            </td>
+                                            <td style={{ padding: '10px', color: getColor(r.tipoJuego || r.juego) }}>{getNombreJuego(r.tipoJuego || r.juego)}</td>
+                                            <td style={{ padding: '10px', fontWeight: 'bold' }}>{r.recursoTitulo || "Sin Título"}</td>
+                                            <td style={{ padding: '10px', fontStyle: 'italic' }}>{r.categoria || "General"}</td>
+                                            <td style={{ padding: '10px', color: '#f1c40f', fontWeight: 'bold' }}>{r.aciertos !== undefined ? r.aciertos : r.puntuacion}</td>
+                                            <td style={{ padding: '10px', fontSize: '1.5rem', textAlign: 'center' }}>{r.medallaCalculada}</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -241,7 +226,6 @@ export default function StudentDashboard({ usuario }) {
                 </div>
             )}
 
-            {/* VISTA: SELECCIÓN DE JUEGO */}
             {vistaActual === 'JUEGOS' && fase === 'SELECCION' && (
                 <div style={{ ...TARJETA_ESTILO, textAlign: 'center' }}>
                     <h1 style={{ fontFamily: 'sans-serif', color: '#f1c40f', fontSize: '3rem', marginBottom: '40px' }}>Elige un Juego</h1>
@@ -249,20 +233,18 @@ export default function StudentDashboard({ usuario }) {
                         <BotonJuego color="#3F51B5" titulo="Pasapalabra" icon="🅰️" onClick={() => { setJuegoElegido('PASAPALABRA'); setFase('BUSQUEDA'); setResultados([]); setFiltros({ profesor: '', pais: '', region: '', poblacion: '', tema: '' }); }} />
                         <BotonJuego color="#E91E63" titulo="CazaBurbujas" icon="🫧" onClick={() => { setJuegoElegido('CAZABURBUJAS'); setFase('BUSQUEDA'); setResultados([]); setFiltros({ profesor: '', pais: '', region: '', poblacion: '', tema: '' }); }} />
                         <BotonJuego color="#27ae60" titulo="Aparejados" icon="🃏" onClick={() => { setJuegoElegido('APAREJADOS'); setFase('BUSQUEDA'); setResultados([]); setFiltros({ profesor: '', pais: '', region: '', poblacion: '', tema: '' }); }} />
+                        <BotonJuego color="#f1c40f" titulo="La Ruleta" icon="🎡" onClick={() => { setJuegoElegido('RULETA'); setFase('BUSQUEDA'); setResultados([]); setFiltros({ profesor: '', pais: '', region: '', poblacion: '', tema: '' }); }} />
                         <BotonJuego color="#9C27B0" titulo="ThinkHoot" icon="🦉" onClick={() => { setJuegoElegido('THINKHOOT'); setFase('BUSQUEDA'); }} />
                     </div>
                 </div>
             )}
 
-            {/* VISTA: BÚSQUEDA Y UNIRSE */}
             {vistaActual === 'JUEGOS' && fase === 'BUSQUEDA' && (
                 <div style={TARJETA_ESTILO}>
                     <button onClick={() => setFase('SELECCION')} style={{ background: 'none', border: 'none', color: '#ccc', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '10px' }}><ArrowLeft size={16} /> Volver</button>
-
                     <h2 style={{ color: getColor(juegoElegido), textAlign: 'center', marginBottom: '30px', fontFamily: 'sans-serif', fontWeight: 'bold' }}>
                         {juegoElegido === 'THINKHOOT' ? 'Unirse a Partida en Vivo' : `Buscar Recursos de ${getNombreJuego(juegoElegido)}`}
                     </h2>
-
                     {juegoElegido === 'THINKHOOT' ? (
                         <div style={{ textAlign: 'center', padding: '20px' }}>
                             <p style={{ marginBottom: '10px' }}>Código de Sala:</p>
@@ -279,7 +261,6 @@ export default function StudentDashboard({ usuario }) {
                                     <BotonTab activo={modoBusqueda === 'FILTROS'} onClick={() => setModoBusqueda('FILTROS')}>🔍 Filtros</BotonTab>
                                     <BotonTab activo={modoBusqueda === 'CODIGO'} onClick={() => setModoBusqueda('CODIGO')}>🔑 Código</BotonTab>
                                 </div>
-
                                 {modoBusqueda === 'CODIGO' ? (
                                     <div style={{ textAlign: 'center', padding: '20px' }}><p>Código del recurso:</p><input placeholder="X9B2A" value={codigo} onChange={e => setCodigo(e.target.value.toUpperCase())} style={{ ...InputEstilo, fontSize: '24px', letterSpacing: '5px', width: '200px', textTransform: 'uppercase', textAlign: 'center' }} maxLength={5} /></div>
                                 ) : (
@@ -291,9 +272,7 @@ export default function StudentDashboard({ usuario }) {
                                             <InputFiltro icon={<MapPin size={16} />} ph="Población" val={filtros.poblacion} set={v => setFiltros({ ...filtros, poblacion: v })} />
                                         </div>
                                     )}
-
                                 <button onClick={buscar} style={BotonAccionStyle} disabled={buscando}>{buscando ? 'BUSCANDO...' : 'BUSCAR RECURSOS'}</button>
-
                                 <div style={{ marginTop: '30px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '15px' }}>
                                     {resultados.map(r => (
                                         <div key={r.id} onClick={() => { setRecursoActivo(r); setFase('JUGANDO') }} style={{ background: 'rgba(255,255,255,0.95)', padding: '15px', borderRadius: '12px', cursor: 'pointer', borderLeft: `6px solid ${getColor(juegoElegido)}`, color: '#333', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'transform 0.2s' }}>

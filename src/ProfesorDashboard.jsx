@@ -15,7 +15,7 @@ import EditorManual from './components/EditorManual'; // <--- IMPORTAMOS EL EDIT
 
 const GEMINI_API_KEY = "AIzaSyCpap7E3iSXVYyfm8cEFqa-StlPUAfFpfY";
 const GOOGLE_CLIENT_ID = "544528054442-j4bijvccdnk8gbbmhe1am6bgkubp62m0.apps.googleusercontent.com";
-const GOOGLE_DEVELOPER_KEY = "AIzaSyBzPXY7_iFaMjiw824Pa8HnO4nFBtK0r9s";
+const GOOGLE_DEVELOPER_KEY = "AIzaSyDOFNi_V_HbCKS8bQWAsFqQKBEiBrBYQCw";
 // ==============================================================================
 
 const TIPOS_JUEGOS = {
@@ -240,15 +240,30 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             {mostrandoCrear && (
                 <ModalOverlay onClose={() => setMostrandoCrear(false)}>
                     <h2>Nuevo {TIPOS_JUEGOS[juegoSeleccionado].label}</h2>
+
+                    {/* ... (Inputs de Título, Profesor, Temas siguen igual) ... */}
                     <div style={{ marginBottom: '10px' }}><label style={lbl}>Título</label><input value={datosEditor.titulo} onChange={e => setDatosEditor({ ...datosEditor, titulo: e.target.value })} style={inputStyle} /></div>
                     <div style={{ marginBottom: '10px' }}><label style={lbl}>Profesor</label><input value={datosEditor.profesorNombre} onChange={e => setDatosEditor({ ...datosEditor, profesorNombre: e.target.value })} style={inputStyle} /></div>
                     <div style={{ marginBottom: '10px' }}><label style={lbl}>Temas</label><input value={datosEditor.temas} onChange={e => setDatosEditor({ ...datosEditor, temas: e.target.value })} style={inputStyle} /></div>
+
                     <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
                         <button onClick={() => { setMostrandoCrear(false); setMostrandoEditorManual(true); }} style={{ ...actionBtnStyle('#2196F3'), flex: 1 }}><Edit3 size={18} /> Manual</button>
                         <button onClick={procesarCreacionIA} style={{ ...actionBtnStyle('#673AB7'), flex: 1 }}><Bot size={18} /> IA</button>
                         <button onClick={handleFileUpload} style={{ ...actionBtnStyle('#107C41'), flex: 1 }}><FileSpreadsheet size={18} /> Excel</button>
                     </div>
-                    <div style={{ marginTop: '10px' }}><button onClick={handleOpenPicker} style={{ ...actionBtnStyle('#FFC107'), width: '100%', color: 'black' }}>Drive</button></div>
+
+                    <div style={{ marginTop: '10px' }}>
+                        {/* 🔴 AQUÍ ESTÁ EL ARREGLO DEL BOTÓN DRIVE 🔴 */}
+                        <button
+                            onClick={handleOpenPicker}
+                            className="notranslate" // Clase para evitar traducción
+                            translate="no"          // Atributo estándar HTML5
+                            style={{ ...actionBtnStyle('#FFC107'), width: '100%', color: 'black', display: 'flex', justifyContent: 'center', gap: '10px' }}
+                        >
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/1/12/Google_Drive_icon_%282020%29.svg" width="20" alt="Drive" />
+                            Google Drive
+                </button>
+                    </div>
                 </ModalOverlay>
             )}
 

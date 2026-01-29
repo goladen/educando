@@ -1,10 +1,11 @@
 ﻿import { useState, useEffect } from 'react';
 import { db } from './firebase';
 import { collection, query, where, getDocs, orderBy, getCountFromServer } from 'firebase/firestore';
-import { Search, MapPin, User, Globe, ArrowLeft, Play } from 'lucide-react';
+import { Search, MapPin, User, Globe, ArrowLeft, Play, Users } from 'lucide-react';
 import GamePlayer from './GamePlayer';
 import ThinkHootGame from './ThinkHootGame';
-import RuletaGame from './RuletaGame'; // Importamos el juego
+import RuletaGame from './RuletaGame';
+import QuestionSenderClient from './QuestionSenderClient';
 
 // --- ESTILOS GLOBALES ---
 const ESTILO_FONDO = {
@@ -26,7 +27,6 @@ const TARJETA_ESTILO = {
     margin: '0 auto'
 };
 
-// Helpers
 const cleanText = (text) => text ? text.toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
 
 const getColor = (t) => {
@@ -37,6 +37,7 @@ const getColor = (t) => {
     if (tipo === 'APAREJADOS') return '#FF9800';
     if (tipo === 'CAZABURBUJAS') return '#E91E63';
     if (tipo === 'RULETA') return '#f1c40f';
+    if (tipo === 'QUESTION_SENDER') return '#2c3e50';
     return '#E91E63';
 };
 
@@ -48,87 +49,60 @@ const getNombreJuego = (tipo) => {
     if (t === 'APAREJADOS') return 'Aparejados';
     if (t === 'THINKHOOT') return 'ThinkHoot';
     if (t === 'RULETA') return 'La Ruleta';
+    if (t === 'QUESTION_SENDER') return 'Question Sender';
     return t;
 };
 
 export default function StudentDashboard({ usuario }) {
-    // --- ESTADOS ---
     const [vistaActual, setVistaActual] = useState('JUEGOS');
     const [fase, setFase] = useState('SELECCION');
     const [juegoElegido, setJuegoElegido] = useState(null);
+    const [senderMode, setSenderMode] = useState(false);
 
-    // Búsqueda
     const [modoBusqueda, setModoBusqueda] = useState('FILTROS');
     const [filtros, setFiltros] = useState({ profesor: '', pais: '', region: '', poblacion: '', tema: '' });
     const [codigo, setCodigo] = useState('');
     const [resultados, setResultados] = useState([]);
     const [buscando, setBuscando] = useState(false);
 
-    // Juego Activo
     const [recursoActivo, setRecursoActivo] = useState(null);
     const [joinData, setJoinData] = useState({ codigo: '', alias: '' });
 
-    // Récords
     const [misRecords, setMisRecords] = useState([]);
     const [cargandoRecords, setCargandoRecords] = useState(false);
 
-    // --- 1. CARGAR RÉCORDS ---
     const cargarMisRecords = async () => {
         if (!usuario || !usuario.email) return;
-
         setCargandoRecords(true);
         try {
-            const q = query(
-                collection(db, "ranking"),
-                where("email", "==", usuario.email),
-                orderBy("fecha", "desc")
-            );
+            const q = query(collection(db, "ranking"), where("email", "==", usuario.email), orderBy("fecha", "desc"));
             const snapshot = await getDocs(q);
-
-            if (snapshot.empty) {
-                setMisRecords([]);
-            } else {
+            if (snapshot.empty) { setMisRecords([]); } else {
                 const recordsCalculados = await Promise.all(snapshot.docs.map(async (docSnapshot) => {
                     const data = docSnapshot.data();
                     const misPuntos = data.aciertos !== undefined ? data.aciertos : data.puntuacion;
                     const juegoId = data.recursoId;
                     const categoria = data.categoria;
                     const tipoJuego = data.tipoJuego || data.juego;
-
-                    const qMejores = query(
-                        collection(db, "ranking"),
-                        where("recursoId", "==", juegoId),
-                        where("categoria", "==", categoria),
-                        where("tipoJuego", "==", tipoJuego),
-                        where("aciertos", ">", misPuntos)
-                    );
-
+                    const qMejores = query(collection(db, "ranking"), where("recursoId", "==", juegoId), where("categoria", "==", categoria), where("tipoJuego", "==", tipoJuego), where("aciertos", ">", misPuntos));
                     const snapshotMejores = await getCountFromServer(qMejores);
-                    const genteDelante = snapshotMejores.data().count;
-                    const ranking = genteDelante + 1;
-
+                    const ranking = snapshotMejores.data().count + 1;
                     let medallaReal = '❌';
                     if (ranking === 1) medallaReal = '🥇';
                     if (ranking === 2) medallaReal = '🥈';
                     if (ranking === 3) medallaReal = '🥉';
-
                     return { id: docSnapshot.id, ...data, medallaCalculada: medallaReal, posicion: ranking };
                 }));
                 setMisRecords(recordsCalculados);
             }
-        } catch (error) {
-            console.error("Error records:", error);
-            if (error.message.includes("index")) alert("⚠️ FALTA ÍNDICE EN FIREBASE");
-        }
+        } catch (error) { console.error("Error records:", error); }
         setCargandoRecords(false);
     };
 
     useEffect(() => { if (usuario?.email) cargarMisRecords(); }, [usuario]);
 
-    // --- 2. BUSCAR RECURSOS ---
     const buscar = async () => {
-        setBuscando(true);
-        setResultados([]);
+        setBuscando(true); setResultados([]);
         const ref = collection(db, 'resources');
         try {
             if (modoBusqueda === 'CODIGO') {
@@ -136,15 +110,10 @@ export default function StudentDashboard({ usuario }) {
                 const q = query(ref, where("accessCode", "==", codigo.toUpperCase().trim()));
                 const snap = await getDocs(q);
                 const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-
                 if (docs.length === 0) alert("Código no encontrado.");
                 else {
-                    if (docs[0].tipoJuego === 'THINKHOOT') {
-                        alert("Este es un código de ThinkHoot. Usa 'Unirse' en el menú principal.");
-                        setFase('SELECCION');
-                    } else {
-                        setResultados(docs);
-                    }
+                    if (docs[0].tipoJuego === 'THINKHOOT') { alert("Este es un código de ThinkHoot. Usa 'Unirse' en el menú principal."); setFase('SELECCION'); }
+                    else { setResultados(docs); }
                 }
             } else {
                 const q = query(ref, where("tipoJuego", "==", juegoElegido), orderBy("fechaCreacion", "desc"));
@@ -153,36 +122,21 @@ export default function StudentDashboard({ usuario }) {
                 const docs = raw.filter(r => {
                     const f = filtros;
                     const check = (d, f) => !f || cleanText(d).includes(cleanText(f));
-                    const checkTema = () => {
-                        if (!f.tema) return true;
-                        const busqueda = cleanText(f.tema);
-                        return cleanText(r.titulo).includes(busqueda) || (r.temas && cleanText(r.temas).includes(busqueda));
-                    };
+                    const checkTema = () => !f.tema || cleanText(r.titulo).includes(cleanText(f.tema)) || (r.temas && cleanText(r.temas).includes(cleanText(f.tema)));
                     return check(r.profesorNombre, f.profesor) && check(r.pais, f.pais) && check(r.region, f.region) && check(r.poblacion, f.poblacion) && checkTema();
                 });
-                if (docs.length === 0) alert("❌ No se encontraron recursos.");
-                else setResultados(docs);
+                if (docs.length === 0) alert("❌ No se encontraron recursos."); else setResultados(docs);
             }
         } catch (error) { console.error(error); alert("Error buscando."); }
         finally { setBuscando(false); }
     };
 
-    // --- 3. UNIRSE A THINKHOOT ---
-    const unirsePartidaEnVivo = () => {
-        if (!joinData.codigo) return alert("Introduce el código.");
-        setFase('EN_VIVO');
-    };
+    const unirsePartidaEnVivo = () => { if (!joinData.codigo) return alert("Introduce el código."); setFase('EN_VIVO'); };
 
-    // --- RENDERIZADO ---
-    if (fase === 'EN_VIVO') {
-        return <ThinkHootGame isHost={false} codigoSala={joinData.codigo} usuario={{ ...usuario, displayName: joinData.alias || usuario.displayName }} onExit={() => setFase('SELECCION')} />;
-    }
-
+    if (senderMode) return <QuestionSenderClient usuario={usuario} onBack={() => setSenderMode(false)} />;
+    if (fase === 'EN_VIVO') return <ThinkHootGame isHost={false} codigoSala={joinData.codigo} usuario={{ ...usuario, displayName: joinData.alias || usuario.displayName }} onExit={() => setFase('SELECCION')} />;
     if (fase === 'JUGANDO') {
-        // DETECTAR RULETA
-        if (juegoElegido === 'RULETA' || recursoActivo.tipoJuego === 'RULETA') {
-            return <RuletaGame recurso={recursoActivo} usuario={usuario} alTerminar={() => setFase('BUSQUEDA')} />;
-        }
+        if (juegoElegido === 'RULETA' || recursoActivo.tipoJuego === 'RULETA') return <RuletaGame recurso={recursoActivo} usuario={usuario} alTerminar={() => setFase('BUSQUEDA')} />;
         return <GamePlayer recurso={recursoActivo} usuario={usuario} alTerminar={() => setFase('BUSQUEDA')} />;
     }
 
@@ -199,26 +153,8 @@ export default function StudentDashboard({ usuario }) {
                     {cargandoRecords ? <p style={{ textAlign: 'center' }}>Calculando ranking global...</p> : (
                         <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
                             <table style={{ width: '100%', borderCollapse: 'collapse', color: 'white' }}>
-                                <thead>
-                                    <tr style={{ borderBottom: '2px solid #555', textAlign: 'left' }}>
-                                        <th style={{ padding: '10px' }}>Juego</th>
-                                        <th style={{ padding: '10px' }}>Recurso</th>
-                                        <th style={{ padding: '10px' }}>Modo</th>
-                                        <th style={{ padding: '10px' }}>Puntos</th>
-                                        <th style={{ padding: '10px', textAlign: 'center' }}>Posición</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {misRecords.map((r, i) => (
-                                        <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                                            <td style={{ padding: '10px', color: getColor(r.tipoJuego || r.juego) }}>{getNombreJuego(r.tipoJuego || r.juego)}</td>
-                                            <td style={{ padding: '10px', fontWeight: 'bold' }}>{r.recursoTitulo || "Sin Título"}</td>
-                                            <td style={{ padding: '10px', fontStyle: 'italic' }}>{r.categoria || "General"}</td>
-                                            <td style={{ padding: '10px', color: '#f1c40f', fontWeight: 'bold' }}>{r.aciertos !== undefined ? r.aciertos : r.puntuacion}</td>
-                                            <td style={{ padding: '10px', fontSize: '1.5rem', textAlign: 'center' }}>{r.medallaCalculada}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
+                                <thead><tr style={{ borderBottom: '2px solid #555', textAlign: 'left' }}><th style={{ padding: '10px' }}>Juego</th><th style={{ padding: '10px' }}>Recurso</th><th style={{ padding: '10px' }}>Modo</th><th style={{ padding: '10px' }}>Puntos</th><th style={{ padding: '10px', textAlign: 'center' }}>Posición</th></tr></thead>
+                                <tbody>{misRecords.map((r, i) => (<tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}><td style={{ padding: '10px', color: getColor(r.tipoJuego || r.juego) }}>{getNombreJuego(r.tipoJuego || r.juego)}</td><td style={{ padding: '10px', fontWeight: 'bold' }}>{r.recursoTitulo || "Sin Título"}</td><td style={{ padding: '10px', fontStyle: 'italic' }}>{r.categoria || "General"}</td><td style={{ padding: '10px', color: '#f1c40f', fontWeight: 'bold' }}>{r.aciertos !== undefined ? r.aciertos : r.puntuacion}</td><td style={{ padding: '10px', fontSize: '1.5rem', textAlign: 'center' }}>{r.medallaCalculada}</td></tr>))}</tbody>
                             </table>
                             {misRecords.length === 0 && <p style={{ textAlign: 'center', padding: '20px' }}>Aún no tienes partidas guardadas.</p>}
                         </div>
@@ -235,6 +171,7 @@ export default function StudentDashboard({ usuario }) {
                         <BotonJuego color="#27ae60" titulo="Aparejados" icon="🃏" onClick={() => { setJuegoElegido('APAREJADOS'); setFase('BUSQUEDA'); setResultados([]); setFiltros({ profesor: '', pais: '', region: '', poblacion: '', tema: '' }); }} />
                         <BotonJuego color="#f1c40f" titulo="La Ruleta" icon="🎡" onClick={() => { setJuegoElegido('RULETA'); setFase('BUSQUEDA'); setResultados([]); setFiltros({ profesor: '', pais: '', region: '', poblacion: '', tema: '' }); }} />
                         <BotonJuego color="#9C27B0" titulo="ThinkHoot" icon="🦉" onClick={() => { setJuegoElegido('THINKHOOT'); setFase('BUSQUEDA'); }} />
+                        <BotonJuego color="#2c3e50" titulo="Question Sender" icon="📮" onClick={() => setSenderMode(true)} />
                     </div>
                 </div>
             )}
@@ -242,18 +179,14 @@ export default function StudentDashboard({ usuario }) {
             {vistaActual === 'JUEGOS' && fase === 'BUSQUEDA' && (
                 <div style={TARJETA_ESTILO}>
                     <button onClick={() => setFase('SELECCION')} style={{ background: 'none', border: 'none', color: '#ccc', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '10px' }}><ArrowLeft size={16} /> Volver</button>
-                    <h2 style={{ color: getColor(juegoElegido), textAlign: 'center', marginBottom: '30px', fontFamily: 'sans-serif', fontWeight: 'bold' }}>
-                        {juegoElegido === 'THINKHOOT' ? 'Unirse a Partida en Vivo' : `Buscar Recursos de ${getNombreJuego(juegoElegido)}`}
-                    </h2>
+                    <h2 style={{ color: getColor(juegoElegido), textAlign: 'center', marginBottom: '30px', fontFamily: 'sans-serif', fontWeight: 'bold' }}>{juegoElegido === 'THINKHOOT' ? 'Unirse a Partida en Vivo' : `Buscar Recursos de ${getNombreJuego(juegoElegido)}`}</h2>
                     {juegoElegido === 'THINKHOOT' ? (
                         <div style={{ textAlign: 'center', padding: '20px' }}>
                             <p style={{ marginBottom: '10px' }}>Código de Sala:</p>
                             <input placeholder="123456" value={joinData.codigo} onChange={e => setJoinData({ ...joinData, codigo: e.target.value })} style={{ ...InputEstilo, fontSize: '24px', letterSpacing: '5px', textAlign: 'center', width: '200px', marginBottom: '15px' }} maxLength={6} />
-                            <br />
-                            <p style={{ marginBottom: '10px' }}>Tu Alias:</p>
+                            <br /><p style={{ marginBottom: '10px' }}>Tu Alias:</p>
                             <input placeholder={usuario.displayName || "Nombre"} value={joinData.alias} onChange={e => setJoinData({ ...joinData, alias: e.target.value })} style={{ ...InputEstilo, width: '300px', textAlign: 'center', marginBottom: '20px' }} />
-                            <br />
-                            <button onClick={unirsePartidaEnVivo} style={{ ...BotonAccionStyle, background: '#9C27B0' }}>🚀 UNIRSE</button>
+                            <br /><button onClick={unirsePartidaEnVivo} style={{ ...BotonAccionStyle, background: '#9C27B0' }}>🚀 UNIRSE</button>
                         </div>
                     ) : (
                             <>
@@ -275,13 +208,18 @@ export default function StudentDashboard({ usuario }) {
                                 <button onClick={buscar} style={BotonAccionStyle} disabled={buscando}>{buscando ? 'BUSCANDO...' : 'BUSCAR RECURSOS'}</button>
                                 <div style={{ marginTop: '30px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '15px' }}>
                                     {resultados.map(r => (
-                                        <div key={r.id} onClick={() => { setRecursoActivo(r); setFase('JUGANDO') }} style={{ background: 'rgba(255,255,255,0.95)', padding: '15px', borderRadius: '12px', cursor: 'pointer', borderLeft: `6px solid ${getColor(juegoElegido)}`, color: '#333', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'transform 0.2s' }}>
+                                        <div key={r.id} onClick={() => { setRecursoActivo(r); setFase('JUGANDO') }} style={{ background: 'rgba(255,255,255,0.95)', padding: '15px', borderRadius: '12px', cursor: 'pointer', borderLeft: `6px solid ${getColor(juegoElegido)}`, color: '#333', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'transform 0.2s', position: 'relative' }}>
+                                            {juegoElegido !== 'QUESTION_SENDER' && (
+                                                <div style={{ position: 'absolute', top: '10px', right: '10px', background: '#f1c40f', padding: '2px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                    <Users size={12} /> {r.playCount || 0}
+                                                </div>
+                                            )}
                                             <div>
                                                 <h3 style={{ margin: '0 0 5px 0', fontSize: '16px' }}>{r.titulo}</h3>
                                                 <small style={{ color: '#666', display: 'block' }}>👨‍🏫 {r.profesorNombre}</small>
                                                 <small style={{ color: '#888', fontSize: '11px' }}>📍 {r.poblacion || '-'} | {r.pais || '-'}</small>
                                             </div>
-                                            <Play size={20} fill="#333" />
+                                            <Play size={20} fill="#333" style={{ marginTop: '20px' }} />
                                         </div>
                                     ))}
                                 </div>

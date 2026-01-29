@@ -21,7 +21,7 @@ export default function ThinkHootGame({ isHost, codigoSala, usuario, onExit }) {
     // --- UTILS: CONFETI EN CSS/JS PURO ---
     const lanzarConfeti = () => {
         setConfettiActive(true);
-        setTimeout(() => setConfettiActive(false), 5000); // 5 segundos de fiesta
+        setTimeout(() => setConfettiActive(false), 6000); // 5 segundos de fiesta
     };
 
     // --- FUNCIONES HOST ---

@@ -84,6 +84,10 @@ export default function StudentDashboard({ usuario }) {
                     const juegoId = data.recursoId;
                     const categoria = data.categoria;
                     const tipoJuego = data.tipoJuego || data.juego;
+
+                    // Si falta info crítica, no calculamos ranking para evitar errores
+                    if (!juegoId) return { id: docSnapshot.id, ...data, medallaCalculada: '-', posicion: '-' };
+
                     const qMejores = query(collection(db, "ranking"), where("recursoId", "==", juegoId), where("categoria", "==", categoria), where("tipoJuego", "==", tipoJuego), where("aciertos", ">", misPuntos));
                     const snapshotMejores = await getCountFromServer(qMejores);
                     const ranking = snapshotMejores.data().count + 1;
@@ -109,7 +113,11 @@ export default function StudentDashboard({ usuario }) {
                 if (!codigo.trim()) { setBuscando(false); return alert("Escribe un código."); }
                 const q = query(ref, where("accessCode", "==", codigo.toUpperCase().trim()));
                 const snap = await getDocs(q);
-                const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+                // --- CORRECCIÓN CRÍTICA 1: ID AL FINAL ---
+                // Esto asegura que el ID real de Firestore sobrescriba cualquier "id: null" guardado por error
+                const docs = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+
                 if (docs.length === 0) alert("Código no encontrado.");
                 else {
                     if (docs[0].tipoJuego === 'THINKHOOT') { alert("Este es un código de ThinkHoot. Usa 'Unirse' en el menú principal."); setFase('SELECCION'); }
@@ -118,7 +126,10 @@ export default function StudentDashboard({ usuario }) {
             } else {
                 const q = query(ref, where("tipoJuego", "==", juegoElegido), orderBy("fechaCreacion", "desc"));
                 const snap = await getDocs(q);
-                const raw = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+                // --- CORRECCIÓN CRÍTICA 2: ID AL FINAL ---
+                const raw = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+
                 const docs = raw.filter(r => {
                     const f = filtros;
                     const check = (d, f) => !f || cleanText(d).includes(cleanText(f));

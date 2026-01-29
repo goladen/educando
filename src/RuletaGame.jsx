@@ -253,12 +253,30 @@ export default function RuletaGame({ recurso, usuario, alTerminar }) {
         procesandoRef.current = false;
     };
 
+    // --- GUARDADO SEGURO ---
     const guardarRecord = async () => {
         if (jugadores.length > 1) return;
+
+        // 1. VALIDACIÓN DE SEGURIDAD
+        if (!recurso || !recurso.id) {
+            console.error("Error crítico: Falta el ID del recurso", recurso);
+            alert("No se puede guardar el récord porque falta información del juego.");
+            alTerminar();
+            return;
+        }
+
         try {
             const pts = jugadores[0].puntos;
             const rankingRef = collection(db, 'ranking');
-            const qRanking = query(rankingRef, where('recursoId', '==', recurso.id), where('tipoJuego', '==', 'RULETA'), where('aciertos', '>', pts));
+
+            // 2. Calcular Ranking Real (Con ID validado)
+            const qRanking = query(
+                rankingRef,
+                where('recursoId', '==', recurso.id), // Aquí es donde fallaba antes
+                where('tipoJuego', '==', 'RULETA'),
+                where('aciertos', '>', pts)
+            );
+
             const snapshotRanking = await getCountFromServer(qRanking);
             const miPosicion = snapshotRanking.data().count + 1;
 
@@ -267,23 +285,51 @@ export default function RuletaGame({ recurso, usuario, alTerminar }) {
             else if (miPosicion === 2) medallaReal = '🥈';
             else if (miPosicion === 3) medallaReal = '🥉';
 
-            const qExistente = query(rankingRef, where('recursoId', '==', recurso.id), where('tipoJuego', '==', 'RULETA'), where('email', '==', usuario.email));
+            // 3. Guardar o Actualizar
+            const qExistente = query(
+                rankingRef,
+                where('recursoId', '==', recurso.id),
+                where('tipoJuego', '==', 'RULETA'),
+                where('email', '==', usuario.email)
+            );
             const snapExistente = await getDocs(qExistente);
 
             if (!snapExistente.empty) {
                 const docRef = snapExistente.docs[0];
                 if (pts > docRef.data().aciertos) {
-                    await updateDoc(doc(db, 'ranking', docRef.id), { aciertos: pts, fecha: new Date(), medalla: medallaReal });
+                    await updateDoc(doc(db, 'ranking', docRef.id), {
+                        aciertos: pts,
+                        fecha: new Date(),
+                        medalla: medallaReal
+                    });
                     alert(`🚀 ¡Nuevo Récord! Posición: ${miPosicion} ${medallaReal}`);
-                } else alert(`⚠️ No superaste tu récord.`);
+                } else {
+                    alert(`⚠️ No superaste tu récord.`);
+                }
             } else {
                 await addDoc(rankingRef, {
-                    recursoId: recurso.id, recursoTitulo: recurso.titulo, tipoJuego: 'RULETA', juego: 'Ruleta', categoria: 'General', email: usuario.email, jugador: usuario.displayName, aciertos: pts, fecha: new Date(), medalla: medallaReal
+                    recursoId: recurso.id,
+                    recursoTitulo: recurso.titulo || 'Ruleta',
+                    tipoJuego: 'RULETA',
+                    juego: 'Ruleta',
+                    categoria: 'General',
+                    email: usuario.email,
+                    jugador: usuario.displayName || 'Anónimo',
+                    aciertos: pts,
+                    fecha: new Date(),
+                    medalla: medallaReal
                 });
                 alert(`✅ Guardado. ¡Posición ${miPosicion}! ${medallaReal}`);
             }
             alTerminar();
-        } catch (e) { alert("Error guardando."); }
+        } catch (e) {
+            console.error("Error al guardar en Firebase:", e);
+            // Si el error es de índice, mostramos el link en consola para facilitarlo
+            if (e.message.includes("requires an index")) {
+                console.log("Haga clic en el enlace de error arriba para crear el índice que falta.");
+            }
+            alert("Error al guardar. Revisa la consola.");
+        }
     };
 
     if (fase === 'SETUP') return <SetupScreen recurso={recurso} onStart={iniciar} onExit={alTerminar} usuario={usuario} />;

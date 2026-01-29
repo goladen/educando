@@ -2,7 +2,7 @@
 import { db } from './firebase';
 import { collection, query, where, getDocs, doc, updateDoc, arrayUnion, getDoc } from 'firebase/firestore';
 import { Send, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
-
+import Confetti from 'react-confetti';
 export default function QuestionSenderClient({ usuario, onBack }) {
     const [codigo, setCodigo] = useState('');
     const [fase, setFase] = useState('CODIGO'); // CODIGO, FORMULARIO, EXITO, COMPLETADO
@@ -165,14 +165,15 @@ export default function QuestionSenderClient({ usuario, onBack }) {
         </div>
     );
 
-    if (fase === 'COMPLETADO') return (
+    if(fase === 'COMPLETADO') return (
         <div style={estiloContenedor}>
             <div style={cardStyle}>
                 <CheckCircle size={60} color="#2ecc71" style={{ margin: '0 auto' }} />
                 <h2 style={{ color: '#27ae60' }}>¡Tarea Completada!</h2>
-                <p>Ya has enviado tus preguntas para este reto.</p>
-                <p>¡Enhorabuena!</p>
-                <button onClick={onBack} style={btnVolver}>Salir</button>
+                <p>Ya has enviado tus preguntas para este reto anteriormente.</p>
+                <p>¡Gracias por participar!</p>
+                {/* BOTÓN AÑADIDO AQUÍ 👇 */}
+                <button onClick={onBack} style={btnPrincipal}>Volver al Inicio</button>
             </div>
         </div>
     );
@@ -183,7 +184,9 @@ export default function QuestionSenderClient({ usuario, onBack }) {
             <div style={cardStyle}>
                 <CheckCircle size={60} color="#2ecc71" style={{ margin: '0 auto' }} />
                 <h2 style={{ color: '#27ae60' }}>¡Muy bien!</h2>
-                <p>Has completado el reto correctamente.</p>
+                <p>Tus preguntas han sido enviadas correctamente.</p>
+                <p>Has completado el reto.</p>
+                {/* BOTÓN VOLVER A INICIO AÑADIDO */}
                 <button onClick={onBack} style={btnPrincipal}>Volver al Inicio</button>
             </div>
         </div>

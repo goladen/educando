@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect } from 'react';
 import { db } from './firebase';
 import { collection, query, where, getDocs, deleteDoc, doc, addDoc, updateDoc, getDoc, setDoc, orderBy } from 'firebase/firestore';
-import { Trash2, Plus, FileSpreadsheet, Bot, BarChart2, Save, X, Pencil, Key, Gamepad2, Edit3, Globe, Search, Copy, Eye, Users, RotateCcw, Send } from 'lucide-react';
+import { Trash2, Plus, FileSpreadsheet, Bot, BarChart2, Save, X, Pencil, Key, Gamepad2, Edit3, Globe, Search, Copy, Eye, Users, RotateCcw, Send, Zap } from 'lucide-react';
 import useDrivePicker from 'react-google-drive-picker';
 import { procesarArchivoExcel } from './ExcelParser';
 import { generarPreguntasGemini } from './GeminiGenerator';
@@ -13,9 +13,9 @@ import RuletaGame from './RuletaGame';
 // ==============================================================================
 //  ZONA DE CLAVES
 // ==============================================================================
-const GEMINI_API_KEY = "TU_CLAVE_GEMINI";
-const GOOGLE_CLIENT_ID = "TU_CLIENT_ID";
-const GOOGLE_DEVELOPER_KEY = "TU_DEV_KEY";
+const GEMINI_API_KEY = "AIzaSyCpap7E3iSXVYyfm8cEFqa-StlPUAfFpfY";
+const GOOGLE_CLIENT_ID = "544528054442-j4bijvccdnk8gbbmhe1am6bgkubp62m0.apps.googleusercontent.com";
+const GOOGLE_DEVELOPER_KEY = "AIzaSyDOFNi_V_HbCKS8bQWAsFqQKBEiBrBYQCw";
 // ==============================================================================
 
 const TIPOS_JUEGOS = {
@@ -50,10 +50,8 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
     useEffect(() => {
         if (usuario) {
             cargarPerfilProfesor();
-            // Limpiamos recursos al cambiar de juego para evitar duplicados visuales
             setRecursos([]);
             setBibliotecaRecursos([]);
-
             if (vista === 'MIS_RECURSOS') cargarRecursosPropios();
             else cargarBiblioteca();
         }
@@ -66,11 +64,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
         try {
             const q = query(collection(db, "resources"), where("profesorUid", "==", usuario.uid), where("tipoJuego", "==", juegoSeleccionado));
             const s = await getDocs(q);
-            // CORRECCIÓN: Aseguramos que el ID del documento prevalezca y no se sobrescriba con null
-            setRecursos(s.docs.map(d => {
-                const data = d.data();
-                return { ...data, id: d.id }; // ID del documento manda
-            }));
+            setRecursos(s.docs.map(d => ({ ...d.data(), id: d.id })));
         } catch (e) { console.error(e) }
         setCargando(false);
     };
@@ -87,7 +81,6 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
 
     const getRecursosFiltrados = () => {
         return bibliotecaRecursos.filter(r => {
-            // CORRECCIÓN: toString() para evitar error en números
             const clean = (t) => t ? t.toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
             const f = filtrosActivos;
             return (!f.pais || clean(r.pais).includes(clean(f.pais))) &&
@@ -149,7 +142,6 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
 
         try {
             const dataToSave = { ...datosEditor, profesorUid: usuario.uid, tipoJuego: juegoSeleccionado, fechaCreacion: new Date() };
-            // CORRECCIÓN CRÍTICA: Eliminar ID del objeto data para no guardar "id: null" en Firestore
             delete dataToSave.id;
 
             if (juegoSeleccionado === 'QUESTION_SENDER') {
@@ -193,8 +185,34 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
         alert(`Recurso creado en ${app}`); setModalCopiarApp(null); setJuegoSeleccionado(app);
     };
 
-    const prepararJuegoEnVivo = (r) => { incrementarPopularidad(r); const h = r.hojas.map(x => x.nombreHoja); h.unshift("General"); setHostGameData({ recurso: r, fase: 'CONFIG_HOST', hojasDisponibles: h, hojaElegida: 'General' }); };
-    const confirmarLanzamientoHost = async () => { const sala = Math.floor(100000 + Math.random() * 900000).toString(); const r = hostGameData.recurso; let pool = []; if (hostGameData.hojaElegida === 'General') r.hojas.forEach(h => pool.push(...h.preguntas)); else { const h = r.hojas.find(x => x.nombreHoja === hostGameData.hojaElegida); if (h) pool = [...h.preguntas]; } pool.sort(() => Math.random() - 0.5); const pFin = pool.slice(0, parseInt(r.config?.numPreguntas) || 10).map(p => ({ q: p.pregunta, a: p.correcta || p.respuesta, tipo: (p.incorrectas?.length > 0) ? 'opciones' : 'texto', opcionesFijas: (p.incorrectas?.length > 0) ? [p.correcta || p.respuesta, ...p.incorrectas].sort(() => Math.random() - 0.5) : [] })); if (pFin.length === 0) return alert("Sin preguntas"); await setDoc(doc(db, "live_games", sala), { hostId: usuario.uid, recursoId: r.id, recursoTitulo: r.titulo, profesorNombre: r.profesorNombre, config: r.config, preguntas: pFin, estado: 'LOBBY', indicePregunta: 0, jugadores: {}, respuestasRonda: {}, timestamp: new Date() }); setHostGameData({ ...hostGameData, codigoSala: sala, fase: 'LIVE' }); };
+    const prepararJuegoEnVivo = (r) => {
+        incrementarPopularidad(r);
+        const hojas = (r.hojas && r.hojas.length > 0) ? r.hojas.map(x => x.nombreHoja) : ["Por defecto"];
+        hojas.unshift("General");
+        setHostGameData({ recurso: r, fase: 'CONFIG_HOST', hojasDisponibles: hojas, hojaElegida: 'General' });
+    };
+
+    const confirmarLanzamientoHost = async () => {
+        const sala = Math.floor(100000 + Math.random() * 900000).toString();
+        const r = hostGameData.recurso;
+        let pool = [];
+
+        if (hostGameData.hojaElegida === 'General') {
+            if (r.hojas) r.hojas.forEach(h => pool.push(...h.preguntas));
+        } else {
+            const h = r.hojas ? r.hojas.find(x => x.nombreHoja === hostGameData.hojaElegida) : null;
+            if (h) pool = [...h.preguntas];
+        }
+
+        if (!pool || pool.length === 0) return alert("No hay preguntas disponibles en este recurso.");
+
+        pool.sort(() => Math.random() - 0.5);
+        const pFin = pool.slice(0, parseInt(r.config?.numPreguntas) || 10).map(p => ({ q: p.pregunta, a: p.correcta || p.respuesta, tipo: (p.incorrectas?.length > 0) ? 'opciones' : 'texto', opcionesFijas: (p.incorrectas?.length > 0) ? [p.correcta || p.respuesta, ...p.incorrectas].sort(() => Math.random() - 0.5) : [] }));
+
+        await setDoc(doc(db, "live_games", sala), { hostId: usuario.uid, recursoId: r.id, recursoTitulo: r.titulo, profesorNombre: r.profesorNombre, config: r.config, preguntas: pFin, estado: 'LOBBY', indicePregunta: 0, jugadores: {}, respuestasRonda: {}, timestamp: new Date() });
+        setHostGameData({ ...hostGameData, codigoSala: sala, fase: 'LIVE' });
+    };
+
     const abrirResultados = async (r) => { setRecursoResultados(r); setListaResultados([]); const q = query(collection(db, "ranking"), where("recursoId", "==", r.id)); const s = await getDocs(q); setListaResultados(s.docs.map(d => d.data())); };
     const descargarCSV = () => { let csv = "Jugador,Puntos\n" + listaResultados.map(r => `${r.jugador},${r.aciertos || r.puntuacion}`).join("\n"); const l = document.createElement("a"); l.href = encodeURI("data:text/csv;charset=utf-8," + csv); l.download = "notas.csv"; l.click(); };
     const probarJuego = (r) => { incrementarPopularidad(r); setRecursoProbando(r); };
@@ -213,11 +231,22 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                 </div>
             </div>
 
-            {vista === 'BIBLIOTECA' && <div style={{ background: '#f9f9f9', padding: '15px', borderRadius: '10px', marginBottom: '20px', display: 'flex', gap: '10px' }}><input placeholder="Tema..." value={filtrosInput.tema} onChange={e => setFiltrosInput({ ...filtrosInput, tema: e.target.value })} style={inputFilter} /><button onClick={ejecutarBusqueda} style={{ background: '#2980b9', color: 'white', border: 'none', padding: '8px', borderRadius: '5px' }}><Search /></button><button onClick={limpiarBusqueda} style={{ background: '#bdc3c7', padding: '8px', borderRadius: '5px', border: 'none' }}><RotateCcw /></button></div>}
+            {/* --- RESTAURADA: BARRA DE FILTROS COMPLETA --- */}
+            {vista === 'BIBLIOTECA' && (
+                <div style={{ background: '#f9f9f9', padding: '15px', borderRadius: '10px', marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 'bold', color: '#666' }}><Search size={16} /> Filtros:</span>
+                    <input placeholder="Tema..." value={filtrosInput.tema} onChange={e => setFiltrosInput({ ...filtrosInput, tema: e.target.value })} style={inputFilter} />
+                    <input placeholder="País" value={filtrosInput.pais} onChange={e => setFiltrosInput({ ...filtrosInput, pais: e.target.value })} style={inputFilter} />
+                    <input placeholder="Región" value={filtrosInput.region} onChange={e => setFiltrosInput({ ...filtrosInput, region: e.target.value })} style={inputFilter} />
+                    <input placeholder="Población" value={filtrosInput.poblacion} onChange={e => setFiltrosInput({ ...filtrosInput, poblacion: e.target.value })} style={inputFilter} />
+
+                    <button onClick={ejecutarBusqueda} style={{ background: '#2980b9', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '5px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}><Search size={16} /> Buscar</button>
+                    <button onClick={limpiarBusqueda} style={{ background: '#bdc3c7', padding: '8px', borderRadius: '5px', border: 'none', cursor: 'pointer' }} title="Limpiar"><RotateCcw size={16} /></button>
+                </div>
+            )}
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
                 {(vista === 'MIS_RECURSOS' ? recursos : getRecursosFiltrados()).map((r, i) => (
-                    // CORRECCIÓN: Usamos rec.id o índice para la key, evitando el error de duplicados
                     <div key={r.id || i} style={{ background: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', borderLeft: `6px solid ${TIPOS_JUEGOS[juegoSeleccionado].color}`, position: 'relative' }}>
                         {juegoSeleccionado !== 'QUESTION_SENDER' && <div style={{ position: 'absolute', top: '10px', right: '10px', background: '#f1c40f', padding: '2px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: 'bold' }}><Users size={12} /> {r.playCount || 0}</div>}
                         <h3 style={{ margin: '0 0 5px 0' }}>{r.titulo}</h3>
@@ -227,7 +256,12 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                             ) : (
                                     vista === 'MIS_RECURSOS' ? (
                                         <>
-                                            <button onClick={() => probarJuego(r)} style={btnStyle('#E1BEE7', '#8E24AA')}><Gamepad2 size={18} /></button>
+                                            {juegoSeleccionado === 'THINKHOOT' ? (
+                                                <button title="Lanzar en Vivo" onClick={() => prepararJuegoEnVivo(r)} style={{ ...btnStyle('#9C27B0', 'white'), fontWeight: 'bold' }}><Zap size={18} /></button>
+                                            ) : (
+                                                    <button onClick={() => probarJuego(r)} style={btnStyle('#E1BEE7', '#8E24AA')}><Gamepad2 size={18} /></button>
+                                                )}
+
                                             <button onClick={() => mostrarCodigo(r)} style={btnStyle('#FFF3E0', '#FF9800')}><Key size={18} /></button>
                                             <button onClick={() => abrirEdicion(r)} style={btnStyle('#E3F2FD', '#1565C0')}><Pencil size={18} /></button>
                                             <button onClick={() => abrirResultados(r)} style={btnStyle('#E8F5E9', '#2E7D32')}><BarChart2 size={18} /></button>
@@ -246,7 +280,17 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             {mostrandoEditorManual && <EditorManual datos={datosEditor} setDatos={setDatosEditor} configJuego={TIPOS_JUEGOS[juegoSeleccionado]} onClose={() => setMostrandoEditorManual(false)} onSave={guardarRecursoFinal} />}
             {recursoResultados && <ModalOverlay onClose={() => setRecursoResultados(null)}><h2>Resultados</h2><button onClick={descargarCSV} style={{ background: '#4CAF50', color: 'white', padding: '10px', border: 'none', marginBottom: '10px' }}>Descargar CSV</button><div style={{ maxHeight: '300px', overflowY: 'auto' }}><table style={{ width: '100%' }}><thead><tr><th>Alumno</th><th>Nota</th></tr></thead><tbody>{listaResultados.map((r, i) => <tr key={i}><td>{r.jugador}</td><td>{r.aciertos || r.puntuacion}</td></tr>)}</tbody></table></div></ModalOverlay>}
             {modalCopiarApp && <ModalOverlay onClose={() => setModalCopiarApp(null)}><h2>Mandar a App</h2><p>Crear recurso en <b>{TIPOS_JUEGOS[modalCopiarApp.targetGame]?.label}</b></p><button onClick={confirmarCopiaAplicacion} style={actionBtnStyle('#27ae60')}>Confirmar</button></ModalOverlay>}
-            {recursoInspeccionando && <ModalOverlay onClose={() => setRecursoInspeccionando(null)}><h2>{recursoInspeccionando.titulo}</h2><div style={{ maxHeight: '400px', overflowY: 'auto' }}>{recursoInspeccionando.hojas.map((h, i) => <div key={i}><h4>{h.nombreHoja}</h4><ul>{h.preguntas.map((p, j) => <li key={j}><b>{p.letra ? `Letra ${p.letra}: ` : ''}{p.pregunta}</b> -> {p.respuesta || p.correcta}</li>)}</ul></div>)}</div><button onClick={() => { copiarRecurso(recursoInspeccionando); setRecursoInspeccionando(null) }} style={actionBtnStyle('#27ae60')}>Copiar</button></ModalOverlay>}
+
+            {/* Modal de lanzamiento de ThinkHoot */}
+            {hostGameData?.fase === 'CONFIG_HOST' && (
+                <ModalOverlay onClose={() => setHostGameData(null)}>
+                    <h2>📡 Lanzar en Vivo</h2>
+                    <select value={hostGameData.hojaElegida} onChange={e => setHostGameData({ ...hostGameData, hojaElegida: e.target.value })} style={{ width: '100%', padding: '10px', marginBottom: '20px' }}>{hostGameData.hojasDisponibles.map(h => <option key={h} value={h}>{h}</option>)}</select>
+                    <button onClick={confirmarLanzamientoHost} style={{ width: '100%', padding: '15px', background: '#9C27B0', color: 'white', border: 'none', borderRadius: '5px' }}>🚀 GENERAR CÓDIGO</button>
+                </ModalOverlay>
+            )}
+
+            {recursoInspeccionando && <ModalOverlay onClose={() => setRecursoInspeccionando(null)}><h2>{recursoInspeccionando.titulo}</h2><div style={{ maxHeight: '400px', overflowY: 'auto' }}>{recursoInspeccionando.hojas.map((h, i) => <div key={i}><h4>{h.nombreHoja}</h4><ul>{h.preguntas.map((p, j) => <li key={j}><b>{p.letra ? `Letra ${p.letra}: ` : ''}{p.pregunta}</b> &rarr; {p.respuesta || p.correcta}</li>)}</ul></div>)}</div><button onClick={() => { copiarRecurso(recursoInspeccionando); setRecursoInspeccionando(null) }} style={actionBtnStyle('#27ae60')}>Copiar</button></ModalOverlay>}
 
             <input type="file" id="input-excel-oculto" accept=".xlsx" style={{ display: 'none' }} onChange={handleFileUpload} />
         </div>

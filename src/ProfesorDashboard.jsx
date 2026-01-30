@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect } from 'react';
 import { db } from './firebase';
 import { collection, query, where, getDocs, deleteDoc, doc, addDoc, updateDoc, getDoc, setDoc, orderBy } from 'firebase/firestore';
-import { Trash2, Plus, FileSpreadsheet, Bot, BarChart2, Save, X, Pencil, Key, Gamepad2, Edit3, Globe, Search, Copy, Eye, Users, RotateCcw, Send, Zap } from 'lucide-react';
+import { Trash2, Plus, FileSpreadsheet, Bot, BarChart2, Save, X, Pencil, Key, Gamepad2, Edit3, Globe, Search, Copy, Eye, Users, RotateCcw, Send, Zap, UserCircle, LogOut } from 'lucide-react';
 import useDrivePicker from 'react-google-drive-picker';
 import { procesarArchivoExcel } from './ExcelParser';
 import { generarPreguntasGemini } from './GeminiGenerator';
@@ -9,6 +9,8 @@ import GamePlayer from './GamePlayer';
 import ThinkHootGame from './ThinkHootGame';
 import EditorManual from './components/EditorManual';
 import RuletaGame from './RuletaGame';
+import UserProfile from './components/UserProfile';
+import StudentDashboard from './StudentDashboard';
 
 // ==============================================================================
 //  ZONA DE CLAVES
@@ -45,6 +47,11 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
     const [hostGameData, setHostGameData] = useState(null);
     const [modalCopiarApp, setModalCopiarApp] = useState(null);
     const [datosEditor, setDatosEditor] = useState({ id: null, titulo: '', temas: '', profesorNombre: '', pais: '', region: '', poblacion: '', config: {}, hojas: [], isPrivate: false });
+
+    // --- NUEVOS ESTADOS ---
+    const [modoVista, setModoVista] = useState('PROFESOR');
+    const [mostrandoPerfil, setMostrandoPerfil] = useState(false);
+
     const [openPicker] = useDrivePicker();
 
     useEffect(() => {
@@ -220,8 +227,47 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
     if (hostGameData?.fase === 'LIVE') return <ThinkHootGame isHost={true} codigoSala={hostGameData.codigoSala} usuario={usuario} onExit={() => setHostGameData(null)} />;
     if (recursoProbando) return <div style={{ background: '#2f3640', minHeight: '100vh' }}><div style={{ background: '#f1c40f', padding: '10px', textAlign: 'center' }}>MODO PRUEBA <button onClick={() => setRecursoProbando(null)} style={{ marginLeft: 20 }}>Cerrar</button></div><GamePlayer recurso={recursoProbando} usuario={usuario} alTerminar={() => setRecursoProbando(null)} /></div>;
 
+    // ==============================================================================
+    //  RENDERIZADO PRINCIPAL (AQUÍ ESTÁ LO NUEVO)
+    // ==============================================================================
+
+    // 1. MODO VISTA ALUMNO
+    if (modoVista === 'ALUMNO') {
+        return (
+            <div style={{ position: 'relative' }}>
+                <div style={{ position: 'fixed', top: 20, right: 20, zIndex: 9999 }}>
+                    <button
+                        onClick={() => setModoVista('PROFESOR')}
+                        style={{ background: '#e74c3c', color: 'white', padding: '10px 20px', borderRadius: '30px', border: 'none', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
+                    >
+                        <LogOut size={20} /> SALIR MODO ALUMNO
+                    </button>
+                </div>
+                <StudentDashboard usuario={usuario} />
+            </div>
+        );
+    }
+
+    // 2. MODO PROFESOR (NORMAL)
     return (
         <div style={{ padding: '20px', maxWidth: '1000px', margin: '0 auto', fontFamily: 'Arial' }}>
+
+            {/* CABECERA NUEVA CON LOS BOTONES */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '15px', marginBottom: '30px', borderBottom: '1px solid #eee', paddingBottom: '15px' }}>
+                <button
+                    onClick={() => setModoVista('ALUMNO')}
+                    style={{ background: '#e3f2fd', color: '#1565C0', border: 'none', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}
+                >
+                    <Eye size={18} /> Vista Alumno
+                </button>
+                <button
+                    onClick={() => setMostrandoPerfil(true)}
+                    style={{ background: '#f3e5f5', color: '#8E24AA', border: 'none', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}
+                >
+                    <UserCircle size={18} /> Mi Perfil
+                </button>
+            </div>
+
             <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>{Object.values(TIPOS_JUEGOS).map(j => <button key={j.id} onClick={() => setJuegoSeleccionado(j.id)} style={{ padding: '8px 16px', borderRadius: '20px', border: 'none', background: juegoSeleccionado === j.id ? j.color : '#eee', color: juegoSeleccionado === j.id ? 'white' : '#555', cursor: 'pointer', fontWeight: 'bold' }}>{j.label}</button>)}</div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
                 <h2>{vista === 'MIS_RECURSOS' ? `Mis Recursos` : `Biblioteca`}</h2>
@@ -231,7 +277,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                 </div>
             </div>
 
-            {/* --- RESTAURADA: BARRA DE FILTROS COMPLETA --- */}
+            {/* BARRA DE FILTROS COMPLETA */}
             {vista === 'BIBLIOTECA' && (
                 <div style={{ background: '#f9f9f9', padding: '15px', borderRadius: '10px', marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
                     <span style={{ fontWeight: 'bold', color: '#666' }}><Search size={16} /> Filtros:</span>
@@ -281,7 +327,6 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             {recursoResultados && <ModalOverlay onClose={() => setRecursoResultados(null)}><h2>Resultados</h2><button onClick={descargarCSV} style={{ background: '#4CAF50', color: 'white', padding: '10px', border: 'none', marginBottom: '10px' }}>Descargar CSV</button><div style={{ maxHeight: '300px', overflowY: 'auto' }}><table style={{ width: '100%' }}><thead><tr><th>Alumno</th><th>Nota</th></tr></thead><tbody>{listaResultados.map((r, i) => <tr key={i}><td>{r.jugador}</td><td>{r.aciertos || r.puntuacion}</td></tr>)}</tbody></table></div></ModalOverlay>}
             {modalCopiarApp && <ModalOverlay onClose={() => setModalCopiarApp(null)}><h2>Mandar a App</h2><p>Crear recurso en <b>{TIPOS_JUEGOS[modalCopiarApp.targetGame]?.label}</b></p><button onClick={confirmarCopiaAplicacion} style={actionBtnStyle('#27ae60')}>Confirmar</button></ModalOverlay>}
 
-            {/* Modal de lanzamiento de ThinkHoot */}
             {hostGameData?.fase === 'CONFIG_HOST' && (
                 <ModalOverlay onClose={() => setHostGameData(null)}>
                     <h2>📡 Lanzar en Vivo</h2>
@@ -291,6 +336,16 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             )}
 
             {recursoInspeccionando && <ModalOverlay onClose={() => setRecursoInspeccionando(null)}><h2>{recursoInspeccionando.titulo}</h2><div style={{ maxHeight: '400px', overflowY: 'auto' }}>{recursoInspeccionando.hojas.map((h, i) => <div key={i}><h4>{h.nombreHoja}</h4><ul>{h.preguntas.map((p, j) => <li key={j}><b>{p.letra ? `Letra ${p.letra}: ` : ''}{p.pregunta}</b> &rarr; {p.respuesta || p.correcta}</li>)}</ul></div>)}</div><button onClick={() => { copiarRecurso(recursoInspeccionando); setRecursoInspeccionando(null) }} style={actionBtnStyle('#27ae60')}>Copiar</button></ModalOverlay>}
+
+            {/* --- MODAL DE PERFIL (NUEVO) --- */}
+            {mostrandoPerfil && (
+                <UserProfile
+                    usuario={usuario}
+                    perfil={perfilProfesor}
+                    onClose={() => setMostrandoPerfil(false)}
+                    onUpdate={() => cargarPerfilProfesor()}
+                />
+            )}
 
             <input type="file" id="input-excel-oculto" accept=".xlsx" style={{ display: 'none' }} onChange={handleFileUpload} />
         </div>

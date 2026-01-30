@@ -1,11 +1,12 @@
 ﻿import { useState, useEffect } from 'react';
 import { db } from './firebase';
-import { collection, query, where, getDocs, orderBy, getCountFromServer } from 'firebase/firestore';
-import { Search, MapPin, User, Globe, ArrowLeft, Play, Users } from 'lucide-react';
+import { collection, query, where, getDocs, orderBy, getCountFromServer, doc, getDoc } from 'firebase/firestore'; // AÑADIDO: doc, getDoc
+import { Search, MapPin, User, Globe, ArrowLeft, Play, Users, UserCircle } from 'lucide-react'; // AÑADIDO: UserCircle
 import GamePlayer from './GamePlayer';
 import ThinkHootGame from './ThinkHootGame';
 import RuletaGame from './RuletaGame';
 import QuestionSenderClient from './QuestionSenderClient';
+import UserProfile from './components/UserProfile'; // AÑADIDO: Importar UserProfile
 
 // --- ESTILOS GLOBALES ---
 const ESTILO_FONDO = {
@@ -71,6 +72,26 @@ export default function StudentDashboard({ usuario }) {
     const [misRecords, setMisRecords] = useState([]);
     const [cargandoRecords, setCargandoRecords] = useState(false);
 
+    // --- NUEVOS ESTADOS PARA PERFIL ---
+    const [mostrandoPerfil, setMostrandoPerfil] = useState(false);
+    const [perfilAlumno, setPerfilAlumno] = useState(null);
+
+    // --- CARGAR DATOS DEL ALUMNO (País, región, etc.) ---
+    const cargarPerfilAlumno = async () => {
+        if (!usuario) return;
+        try {
+            const d = await getDoc(doc(db, "users", usuario.uid));
+            if (d.exists()) setPerfilAlumno(d.data());
+        } catch (e) { console.error(e); }
+    };
+
+    useEffect(() => {
+        if (usuario) {
+            cargarPerfilAlumno();
+            if (usuario.email) cargarMisRecords();
+        }
+    }, [usuario]);
+
     const cargarMisRecords = async () => {
         if (!usuario || !usuario.email) return;
         setCargandoRecords(true);
@@ -85,7 +106,6 @@ export default function StudentDashboard({ usuario }) {
                     const categoria = data.categoria;
                     const tipoJuego = data.tipoJuego || data.juego;
 
-                    // Si falta info crítica, no calculamos ranking para evitar errores
                     if (!juegoId) return { id: docSnapshot.id, ...data, medallaCalculada: '-', posicion: '-' };
 
                     const qMejores = query(collection(db, "ranking"), where("recursoId", "==", juegoId), where("categoria", "==", categoria), where("tipoJuego", "==", tipoJuego), where("aciertos", ">", misPuntos));
@@ -103,8 +123,6 @@ export default function StudentDashboard({ usuario }) {
         setCargandoRecords(false);
     };
 
-    useEffect(() => { if (usuario?.email) cargarMisRecords(); }, [usuario]);
-
     const buscar = async () => {
         setBuscando(true); setResultados([]);
         const ref = collection(db, 'resources');
@@ -114,8 +132,6 @@ export default function StudentDashboard({ usuario }) {
                 const q = query(ref, where("accessCode", "==", codigo.toUpperCase().trim()));
                 const snap = await getDocs(q);
 
-                // --- CORRECCIÓN CRÍTICA 1: ID AL FINAL ---
-                // Esto asegura que el ID real de Firestore sobrescriba cualquier "id: null" guardado por error
                 const docs = snap.docs.map(d => ({ ...d.data(), id: d.id }));
 
                 if (docs.length === 0) alert("Código no encontrado.");
@@ -127,7 +143,6 @@ export default function StudentDashboard({ usuario }) {
                 const q = query(ref, where("tipoJuego", "==", juegoElegido), orderBy("fechaCreacion", "desc"));
                 const snap = await getDocs(q);
 
-                // --- CORRECCIÓN CRÍTICA 2: ID AL FINAL ---
                 const raw = snap.docs.map(d => ({ ...d.data(), id: d.id }));
 
                 const docs = raw.filter(r => {
@@ -153,11 +168,24 @@ export default function StudentDashboard({ usuario }) {
 
     return (
         <div style={ESTILO_FONDO}>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginBottom: '30px' }}>
-                <button onClick={() => { setVistaActual('JUEGOS'); setFase('SELECCION'); }} style={{ ...BtnNavStyle, background: vistaActual === 'JUEGOS' ? '#f1c40f' : 'rgba(255,255,255,0.1)', color: vistaActual === 'JUEGOS' ? '#000' : '#fff' }}>🎮 Zona de Juegos</button>
-                <button onClick={() => { setVistaActual('RECORDS'); cargarMisRecords(); }} style={{ ...BtnNavStyle, background: vistaActual === 'RECORDS' ? '#f1c40f' : 'rgba(255,255,255,0.1)', color: vistaActual === 'RECORDS' ? '#000' : '#fff' }}>🏅 Mis Récords</button>
+
+            {/* --- CABECERA SUPERIOR --- */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
+                <div style={{ display: 'flex', gap: '20px' }}>
+                    <button onClick={() => { setVistaActual('JUEGOS'); setFase('SELECCION'); }} style={{ ...BtnNavStyle, background: vistaActual === 'JUEGOS' ? '#f1c40f' : 'rgba(255,255,255,0.1)', color: vistaActual === 'JUEGOS' ? '#000' : '#fff' }}>🎮 Juegos</button>
+                    <button onClick={() => { setVistaActual('RECORDS'); cargarMisRecords(); }} style={{ ...BtnNavStyle, background: vistaActual === 'RECORDS' ? '#f1c40f' : 'rgba(255,255,255,0.1)', color: vistaActual === 'RECORDS' ? '#000' : '#fff' }}>🏅 Récords</button>
+                </div>
+
+                {/* BOTÓN MI PERFIL */}
+                <button
+                    onClick={() => setMostrandoPerfil(true)}
+                    style={{ background: 'rgba(255,255,255,0.2)', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}
+                >
+                    <UserCircle size={18} /> Mi Perfil
+                </button>
             </div>
 
+            {/* --- CONTENIDO PRINCIPAL --- */}
             {vistaActual === 'RECORDS' && (
                 <div style={TARJETA_ESTILO}>
                     <h2 style={{ color: '#f1c40f', textAlign: 'center', marginBottom: '20px', fontFamily: 'sans-serif' }}>Mis Mejores Puntuaciones</h2>
@@ -237,6 +265,17 @@ export default function StudentDashboard({ usuario }) {
                             </>
                         )}
                 </div>
+            )}
+
+            {/* --- MODAL DE PERFIL (ALUMNO) --- */}
+            {mostrandoPerfil && (
+                <UserProfile
+                    usuario={usuario}
+                    perfil={perfilAlumno}
+                    onClose={() => setMostrandoPerfil(false)}
+                    onUpdate={() => cargarPerfilAlumno()}
+                    showSupport={false} // IMPORTANTE: OCULTAMOS SOPORTE
+                />
             )}
         </div>
     );

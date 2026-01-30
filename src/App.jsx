@@ -18,7 +18,7 @@ function App() {
     const [pais, setPais] = useState("");
     const [region, setRegion] = useState("");
     const [poblacion, setPoblacion] = useState("");
-
+    const [temas, setTemas] = useState("");
     // 1. ESCUCHAR SI EL USUARIO YA ESTABA LOGUEADO
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -53,7 +53,7 @@ function App() {
     const completarRegistro = async (rolElegido) => {
         if (!usuario) return;
         if (!pais || !region || !poblacion) {
-            alert("Por favor, completa País, Región y Población antes de continuar.");
+            alert("Por favor, completa todos los campos de ubicación.");
             return;
         }
 
@@ -67,6 +67,7 @@ function App() {
                 pais: pais,
                 region: region,
                 poblacion: poblacion,
+                temasPreferidos: temas, // <--- NUEVO CAMPO AÑADIDO
                 createdAt: new Date()
             });
 
@@ -105,6 +106,8 @@ function App() {
                         <input type="text" placeholder="País (ej: España)" value={pais} onChange={(e) => setPais(e.target.value)} style={{ padding: '10px', borderRadius: '5px', border: '1px solid #ccc' }} />
                         <input type="text" placeholder="Región / Provincia" value={region} onChange={(e) => setRegion(e.target.value)} style={{ padding: '10px', borderRadius: '5px', border: '1px solid #ccc' }} />
                         <input type="text" placeholder="Población / Ciudad" value={poblacion} onChange={(e) => setPoblacion(e.target.value)} style={{ padding: '10px', borderRadius: '5px', border: '1px solid #ccc' }} />
+                        <input type="text" placeholder="Temas Preferidos (ej: Historia, Mates...)" value={temas} onChange={(e) => setTemas(e.target.value)} style={{ padding: '10px', borderRadius: '5px', border: '1px solid #ccc' }} />
+
                     </div>
 
                     <p style={{ fontWeight: 'bold' }}>¿Cómo vas a usar la app?</p>

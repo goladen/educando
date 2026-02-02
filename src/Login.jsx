@@ -2,7 +2,9 @@
 import { auth } from './firebase';
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { Gamepad2 } from 'lucide-react';
-import LandingGames from './components/LandingGames'; // IMPORTAR AQUÍ
+
+
+import LandingGames from './components/LandingGames2';
 
 export default function Login({ setGoogleToken }) {
     const [error, setError] = useState(null);
@@ -29,7 +31,8 @@ export default function Login({ setGoogleToken }) {
     return (
         <div style={styles.container}>
             <div style={styles.scrollWrapper}>
-                {/* TARJETA DE LOGIN PRINCIPAL */}
+
+                {/* --- 1. TU TARJETA DE LOGIN ORIGINAL (MANTENIDA) --- */}
                 <div style={styles.card} id="login-card">
                     <div style={styles.logoArea}>
                         <div style={styles.iconWrapper}>
@@ -56,8 +59,10 @@ export default function Login({ setGoogleToken }) {
                     <p style={styles.footer}>Gestión Docente & Gamificación</p>
                 </div>
 
-                {/* NUEVA SECCIÓN DE JUEGOS PÚBLICOS */}
+                {/* --- 2. NUEVA SECCIÓN DE JUEGOS PÚBLICOS (AÑADIDA) --- */}
+                {/* Le pasamos handleLogin para que el botón "Unirse" de Live force el login si es necesario */}
                 <LandingGames onLoginRequest={handleLogin} />
+
             </div>
         </div>
     );
@@ -71,12 +76,13 @@ const styles = {
         fontFamily: "'Segoe UI', Roboto, sans-serif",
         display: 'flex',
         justifyContent: 'center',
-        padding: '40px 20px', // Espacio arriba y abajo para hacer scroll
-        boxSizing: 'border-box'
+        padding: '40px 20px', // Espacio para que no se pegue a los bordes
+        boxSizing: 'border-box',
+        overflowY: 'auto' // Permite scroll en toda la página
     },
     scrollWrapper: {
         width: '100%',
-        maxWidth: '500px',
+        maxWidth: '600px', // Un poco más ancho para que el buscador se vea bien
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -90,7 +96,8 @@ const styles = {
         width: '100%',
         textAlign: 'center',
         backdropFilter: 'blur(10px)',
-        marginBottom: '20px' // Separación con los juegos
+        marginBottom: '20px', // Separación entre Login y Buscador
+        boxSizing: 'border-box'
     },
     logoArea: { display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '10px' },
     iconWrapper: { background: 'linear-gradient(45deg, #FF9800, #F44336)', padding: '15px', borderRadius: '20px', marginBottom: '15px', boxShadow: '0 10px 20px rgba(244, 67, 54, 0.3)', display: 'flex', justifyContent: 'center', alignItems: 'center' },

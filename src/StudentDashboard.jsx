@@ -1,12 +1,12 @@
 ﻿import { useState, useEffect } from 'react';
 import { db } from './firebase';
-import { collection, query, where, getDocs, orderBy, getCountFromServer, doc, getDoc } from 'firebase/firestore'; // AÑADIDO: doc, getDoc
-import { Search, MapPin, User, Globe, ArrowLeft, Play, Users, UserCircle } from 'lucide-react'; // AÑADIDO: UserCircle
+import { collection, query, where, getDocs, orderBy, getCountFromServer, doc, getDoc } from 'firebase/firestore';
+import { Search, MapPin, User, Globe, ArrowLeft, Play, Users, UserCircle, Share2, Copy } from 'lucide-react'; // AÑADIDO: Share2, Copy
 import GamePlayer from './GamePlayer';
 import ThinkHootGame from './ThinkHootGame';
 import RuletaGame from './RuletaGame';
 import QuestionSenderClient from './QuestionSenderClient';
-import UserProfile from './components/UserProfile'; // AÑADIDO: Importar UserProfile
+import UserProfile from './components/UserProfile';
 
 // --- ESTILOS GLOBALES ---
 const ESTILO_FONDO = {
@@ -72,11 +72,9 @@ export default function StudentDashboard({ usuario }) {
     const [misRecords, setMisRecords] = useState([]);
     const [cargandoRecords, setCargandoRecords] = useState(false);
 
-    // --- NUEVOS ESTADOS PARA PERFIL ---
     const [mostrandoPerfil, setMostrandoPerfil] = useState(false);
     const [perfilAlumno, setPerfilAlumno] = useState(null);
 
-    // --- CARGAR DATOS DEL ALUMNO (País, región, etc.) ---
     const cargarPerfilAlumno = async () => {
         if (!usuario) return;
         try {
@@ -159,6 +157,23 @@ export default function StudentDashboard({ usuario }) {
 
     const unirsePartidaEnVivo = () => { if (!joinData.codigo) return alert("Introduce el código."); setFase('EN_VIVO'); };
 
+    // --- FUNCIÓN COMPARTIR ---
+    const compartirRecurso = (e, recurso) => {
+        e.stopPropagation(); // Evitar que se abra el juego
+        const texto = `¡Juega a ${recurso.titulo} en LearnJoy! Código: ${recurso.accessCode}`;
+
+        if (navigator.share) {
+            navigator.share({
+                title: recurso.titulo,
+                text: texto,
+                url: window.location.href // O la URL específica si la tienes
+            }).catch(console.error);
+        } else {
+            // Fallback: Copiar al portapapeles
+            navigator.clipboard.writeText(texto).then(() => alert("¡Código copiado al portapapeles!"));
+        }
+    };
+
     if (senderMode) return <QuestionSenderClient usuario={usuario} onBack={() => setSenderMode(false)} />;
     if (fase === 'EN_VIVO') return <ThinkHootGame isHost={false} codigoSala={joinData.codigo} usuario={{ ...usuario, displayName: joinData.alias || usuario.displayName }} onExit={() => setFase('SELECCION')} />;
     if (fase === 'JUGANDO') {
@@ -176,7 +191,6 @@ export default function StudentDashboard({ usuario }) {
                     <button onClick={() => { setVistaActual('RECORDS'); cargarMisRecords(); }} style={{ ...BtnNavStyle, background: vistaActual === 'RECORDS' ? '#f1c40f' : 'rgba(255,255,255,0.1)', color: vistaActual === 'RECORDS' ? '#000' : '#fff' }}>🏅 Récords</button>
                 </div>
 
-                {/* BOTÓN MI PERFIL */}
                 <button
                     onClick={() => setMostrandoPerfil(true)}
                     style={{ background: 'rgba(255,255,255,0.2)', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}
@@ -247,18 +261,44 @@ export default function StudentDashboard({ usuario }) {
                                 <button onClick={buscar} style={BotonAccionStyle} disabled={buscando}>{buscando ? 'BUSCANDO...' : 'BUSCAR RECURSOS'}</button>
                                 <div style={{ marginTop: '30px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '15px' }}>
                                     {resultados.map(r => (
-                                        <div key={r.id} onClick={() => { setRecursoActivo(r); setFase('JUGANDO') }} style={{ background: 'rgba(255,255,255,0.95)', padding: '15px', borderRadius: '12px', cursor: 'pointer', borderLeft: `6px solid ${getColor(juegoElegido)}`, color: '#333', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'transform 0.2s', position: 'relative' }}>
-                                            {juegoElegido !== 'QUESTION_SENDER' && (
-                                                <div style={{ position: 'absolute', top: '10px', right: '10px', background: '#f1c40f', padding: '2px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                    <Users size={12} /> {r.playCount || 0}
+                                        <div key={r.id} onClick={() => { setRecursoActivo(r); setFase('JUGANDO') }} style={{ background: 'rgba(255,255,255,0.95)', padding: '15px', borderRadius: '12px', cursor: 'pointer', borderLeft: `6px solid ${getColor(juegoElegido)}`, color: '#333', display: 'flex', flexDirection: 'column', gap: '10px', transition: 'transform 0.2s', position: 'relative' }}>
+
+                                            {/* CABECERA: TÍTULO Y CÓDIGO */}
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                                                <div>
+                                                    <h3 style={{ margin: '0 0 5px 0', fontSize: '16px' }}>{r.titulo}</h3>
+                                                    <div style={{ display: 'flex', gap: '5px' }}>
+                                                        <span style={{ background: '#eee', padding: '2px 6px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', color: '#333', border: '1px solid #ccc' }}>
+                                                            🔑 {r.accessCode || '----'}
+                                                        </span>
+                                                    </div>
                                                 </div>
-                                            )}
+
+                                                {/* Botón COMPARTIR */}
+                                                <button
+                                                    onClick={(e) => compartirRecurso(e, r)}
+                                                    title="Compartir Código"
+                                                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#555' }}
+                                                >
+                                                    <Share2 size={20} />
+                                                </button>
+                                            </div>
+
+                                            {/* INFO PROFESOR */}
                                             <div>
-                                                <h3 style={{ margin: '0 0 5px 0', fontSize: '16px' }}>{r.titulo}</h3>
                                                 <small style={{ color: '#666', display: 'block' }}>👨‍🏫 {r.profesorNombre}</small>
                                                 <small style={{ color: '#888', fontSize: '11px' }}>📍 {r.poblacion || '-'} | {r.pais || '-'}</small>
                                             </div>
-                                            <Play size={20} fill="#333" style={{ marginTop: '20px' }} />
+
+                                            {/* PLAY Y CONTADOR JUGADORES */}
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginTop: '5px' }}>
+                                                <Play size={24} fill={getColor(juegoElegido)} color={getColor(juegoElegido)} />
+                                                {juegoElegido !== 'QUESTION_SENDER' && (
+                                                    <div style={{ background: '#f1c40f', padding: '2px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px', color: '#333' }}>
+                                                        <Users size={12} /> {r.playCount || 0}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
@@ -274,7 +314,7 @@ export default function StudentDashboard({ usuario }) {
                     perfil={perfilAlumno}
                     onClose={() => setMostrandoPerfil(false)}
                     onUpdate={() => cargarPerfilAlumno()}
-                    showSupport={false} // IMPORTANTE: OCULTAMOS SOPORTE
+                    showSupport={false}
                 />
             )}
         </div>

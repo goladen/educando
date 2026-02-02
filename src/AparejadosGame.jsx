@@ -1,7 +1,12 @@
-﻿import { useState, useEffect } from 'react';
+﻿import { useState, useEffect, useRef } from 'react';
 import { db } from './firebase';
-import { doc, getDoc, setDoc, addDoc, collection, query, where, getDocs, orderBy, limit, updateDoc } from 'firebase/firestore';
-import Confetti from 'react-confetti';
+import { doc, getDoc, setDoc, addDoc, collection, query, where, getDocs, orderBy, limit, updateDoc, getCountFromServer } from 'firebase/firestore';
+import confetti from 'canvas-confetti';
+
+// --- IMPORTACIÓN DE AUDIOS ---
+import startSoundFile from './assets/inicio juego.mp3';
+import correctSoundFile from './assets/correct-choice-43861.mp3';
+import winSoundFile from './assets/applause-small-audience-97257.mp3';
 
 export default function AparejadosGame({ recurso, usuario, alTerminar }) {
     const [fase, setFase] = useState('SETUP');
@@ -11,28 +16,48 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
     // Estados del Juego
     const [cartas, setCartas] = useState([]);
     const [flipped, setFlipped] = useState([]);
-    const [matched, setMatched] = useState([]); // Array de uniqueIds que ya han sido emparejados
+    const [matched, setMatched] = useState([]);
 
     // Puntuación
-    const [puntos, setPuntos] = useState(0); // Para modo Solitario
-    const [puntosDuelo, setPuntosDuelo] = useState([0, 0]); // [Jugador1, Jugador2]
-    const [turno, setTurno] = useState(0); // 0 = Azul, 1 = Naranja
+    const [puntos, setPuntos] = useState(0);
+    const [puntosDuelo, setPuntosDuelo] = useState([0, 0]);
+    const [turno, setTurno] = useState(0);
 
     const [tiempo, setTiempo] = useState(60);
     const [verRanking, setVerRanking] = useState(false);
     const [guardando, setGuardando] = useState(false);
+
+    // Detectar si es invitado (sin usuario logueado)
+    const esInvitado = !usuario || !usuario.email;
+
+    // --- SONIDOS ---
+    const playSound = (type) => {
+        let file = null;
+        if (type === 'START') file = startSoundFile;
+        else if (type === 'CORRECT') file = correctSoundFile;
+        else if (type === 'WIN') file = winSoundFile;
+
+        if (file) {
+            const audio = new Audio(file);
+            audio.volume = 0.6;
+            audio.play().catch(e => { });
+
+            if (type === 'CORRECT') {
+                setTimeout(() => { audio.pause(); audio.currentTime = 0; }, 1000);
+            }
+        }
+    };
 
     // --- INICIAR PARTIDA ---
     const iniciar = (esDuelo, hoja) => {
         setModoDuelo(esDuelo);
         setHojaSeleccionada(hoja);
 
-        // Preparar cartas
         let pool = [];
         if (hoja === 'General') {
-            recurso.hojas.forEach(h => { h.preguntas.forEach((p, i) => pool.push({ ...p, idOriginal: i })); });
+            recurso.hojas?.forEach(h => { h.preguntas.forEach((p, i) => pool.push({ ...p, idOriginal: i })); });
         } else {
-            const hObj = recurso.hojas.find(h => h.nombreHoja === hoja);
+            const hObj = recurso.hojas?.find(h => h.nombreHoja === hoja);
             if (hObj) hObj.preguntas.forEach((p, i) => pool.push({ ...p, idOriginal: i }));
         }
 
@@ -56,12 +81,14 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
         setPuntosDuelo([0, 0]);
         setTurno(0);
         setTiempo(parseInt(recurso.config?.tiempoTotal) || 60);
-        setFase('JUEGO');
+
+        // IR A CUENTA ATRÁS PRIMERO
+        setFase('COUNTDOWN');
     };
 
-    // --- CRONÓMETRO (Solo Solitario) ---
+    // --- CRONÓMETRO ---
     useEffect(() => {
-        if (fase !== 'JUEGO' || modoDuelo) return; // En duelo no hay tiempo límite por ahora
+        if (fase !== 'JUEGO' || modoDuelo) return;
         const t = setInterval(() => {
             setTiempo(prev => {
                 if (prev <= 1) {
@@ -74,26 +101,24 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
         return () => clearInterval(t);
     }, [fase, modoDuelo]);
 
-    // --- LÓGICA AL CLICKAR CARTA ---
+    // --- LÓGICA JUEGO ---
     const handleClick = (carta) => {
-        // Bloqueos: Si ya hay 2 levantadas, o si la carta ya está emparejada o levantada
         if (flipped.length >= 2 || flipped.includes(carta.uniqueId) || matched.includes(carta.uniqueId)) return;
 
         const newFlipped = [...flipped, carta.uniqueId];
         setFlipped(newFlipped);
 
         if (newFlipped.length === 2) {
-            // Verificar Pareja
             const carta1 = cartas.find(c => c.uniqueId === newFlipped[0]);
             const carta2 = cartas.find(c => c.uniqueId === newFlipped[1]);
 
             if (carta1.pairId === carta2.pairId) {
-                // ¡ACIERTO!
+                // ACIERTO
+                playSound('CORRECT');
                 const newMatched = [...matched, carta1.uniqueId, carta2.uniqueId];
                 setMatched(newMatched);
-                setFlipped([]); // Limpiamos flipped inmediatamente para que pueda seguir jugando
+                setFlipped([]);
 
-                // Puntuación
                 const ptsPareja = parseInt(recurso.config?.puntosPareja) || 10;
                 if (modoDuelo) {
                     setPuntosDuelo(prev => {
@@ -101,12 +126,10 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
                         copy[turno] += ptsPareja;
                         return copy;
                     });
-                    // En duelo, si acierta REPITE TURNO (no cambiamos setTurno)
                 } else {
                     setPuntos(p => p + ptsPareja);
                 }
 
-                // Fin del juego?
                 if (newMatched.length === cartas.length) {
                     setTimeout(() => setFase('FIN'), 500);
                 }
@@ -115,7 +138,6 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
                 // FALLO
                 setTimeout(() => {
                     setFlipped([]);
-                    // En duelo, si falla CAMBIA TURNO
                     if (modoDuelo) {
                         setTurno(prev => prev === 0 ? 1 : 0);
                     }
@@ -124,35 +146,72 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
         }
     };
 
-    // --- GUARDADO (Solo Solitario) ---
-    const guardarRanking = async () => {
+    // --- GUARDADO RANKING (ADAPTADO PARA INVITADOS) ---
+    const guardarRanking = async (nombreJugadorManual = null) => {
         if (guardando) return;
+
+        // Si es invitado y no ha puesto nombre, error
+        if (esInvitado && !nombreJugadorManual) {
+            alert("Por favor, escribe tu nombre para guardar el récord.");
+            return;
+        }
+
         setGuardando(true);
         try {
             const rankingRef = collection(db, 'ranking');
-            const q = query(
+            const emailUsuario = esInvitado ? 'invitado' : usuario.email;
+            const nombreJugador = esInvitado ? nombreJugadorManual : (usuario.displayName || "Anónimo");
+
+            // 1. Calcular POSICIÓN REAL
+            const qBetter = query(
                 rankingRef,
                 where('recursoId', '==', recurso.id),
                 where('categoria', '==', hojaSeleccionada),
-                where('email', '==', usuario.email),
-                where('tipoJuego', '==', 'APAREJADOS')
+                where('tipoJuego', '==', 'APAREJADOS'),
+                where('aciertos', '>', puntos)
             );
-            const snap = await getDocs(q);
 
-            const medallaCalc = puntos >= 50 ? '🥇' : (puntos >= 30 ? '🥈' : (puntos > 0 ? '🥉' : ''));
+            let rank = 1;
+            try {
+                const snapBetter = await getCountFromServer(qBetter);
+                rank = snapBetter.data().count + 1;
+            } catch (err) { console.warn("Falta índice Firebase", err); }
 
-            if (!snap.empty) {
-                const old = snap.docs[0].data().aciertos;
-                if (puntos > old) {
-                    await updateDoc(doc(db, 'ranking', snap.docs[0].id), {
+            let medallaCalc = '';
+            if (rank === 1) medallaCalc = '🥇';
+            if (rank === 2) medallaCalc = '🥈';
+            if (rank === 3) medallaCalc = '🥉';
+
+            // 2. Guardar (Si es invitado siempre crea nuevo, si es user actualiza su record)
+            let docExistenteId = null;
+            let oldScore = 0;
+
+            if (!esInvitado) {
+                const q = query(
+                    rankingRef,
+                    where('recursoId', '==', recurso.id),
+                    where('categoria', '==', hojaSeleccionada),
+                    where('email', '==', emailUsuario),
+                    where('tipoJuego', '==', 'APAREJADOS')
+                );
+                const snap = await getDocs(q);
+                if (!snap.empty) {
+                    docExistenteId = snap.docs[0].id;
+                    oldScore = snap.docs[0].data().aciertos;
+                }
+            }
+
+            if (docExistenteId) {
+                if (puntos > oldScore) {
+                    await updateDoc(doc(db, 'ranking', docExistenteId), {
                         aciertos: puntos,
                         fecha: new Date(),
                         medalla: medallaCalc,
                         recursoTitulo: recurso.titulo
                     });
-                    alert("🚀 ¡Nuevo Récord Personal!");
+                    alert(`🚀 ¡Nuevo Récord Personal! Estás en la posición #${rank}`);
                 } else {
-                    alert(`⚠️ No has superado tu récord (${old}).`);
+                    alert(`⚠️ No has superado tu récord (${oldScore}). Posición actual: #${rank}`);
                 }
             } else {
                 await addDoc(rankingRef, {
@@ -161,13 +220,13 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
                     tipoJuego: 'APAREJADOS',
                     juego: 'Aparejados',
                     categoria: hojaSeleccionada,
-                    email: usuario.email,
-                    jugador: usuario.displayName || "Anónimo",
+                    email: emailUsuario,
+                    jugador: nombreJugador,
                     aciertos: puntos,
                     fecha: new Date(),
                     medalla: medallaCalc
                 });
-                alert("✅ Guardado");
+                alert(`✅ Puntuación Guardada. Posición #${rank}`);
             }
             alTerminar();
         } catch (e) { console.error(e); alert("Error guardando"); }
@@ -187,34 +246,31 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
 
     if (verRanking) return <PantallaRanking recurso={recurso} usuario={usuario} onBack={() => setVerRanking(false)} />;
 
-    if (fase === 'FIN') {
-        const ganadorDuelo = puntosDuelo[0] > puntosDuelo[1] ? 0 : (puntosDuelo[1] > puntosDuelo[0] ? 1 : -1); // -1 empate
+    if (fase === 'COUNTDOWN') {
         return (
-            <div className="card-menu">
-                <Confetti numberOfPieces={300} recycle={false} />
-                <h1>¡Fin de Partida!</h1>
+            <PantallaCuentaAtras
+                hoja={hojaSeleccionada}
+                profesor={recurso.profesorNombre || "Tu Profesor"}
+                instrucciones={recurso.instrucciones} // PASAMOS INSTRUCCIONES
+                playSound={playSound}
+                onFinished={() => setFase('JUEGO')}
+            />
+        );
+    }
 
-                {modoDuelo ? (
-                    <>
-                        <h2 style={{ color: '#3498db' }}>AZUL: {puntosDuelo[0]}</h2>
-                        <h2 style={{ color: '#e67e22' }}>NARANJA: {puntosDuelo[1]}</h2>
-                        <h3 style={{ marginTop: '20px', color: '#f1c40f', fontSize: '1.5rem' }}>
-                            {ganadorDuelo === -1 ? "¡EMPATE!" : `¡GANA JUGADOR ${ganadorDuelo === 0 ? 'AZUL' : 'NARANJA'}!`}
-                        </h3>
-                        <button className="btn-back" onClick={alTerminar} style={{ marginTop: '20px' }}>Salir</button>
-                    </>
-                ) : (
-                        <>
-                            <h2>Puntos: {puntos}</h2>
-                            <button className="btn-success" onClick={guardarRanking} disabled={guardando}>
-                                {guardando ? 'Guardando...' : '💾 Guardar Récord'}
-                            </button>
-                            <button className="btn-back" onClick={alTerminar}>Salir sin guardar</button>
-                        </>
-                    )}
-                <EstilosComunes />
-            </div>
-        )
+    if (fase === 'FIN') {
+        return (
+            <PantallaFin
+                puntos={puntos}
+                puntosDuelo={puntosDuelo}
+                modoDuelo={modoDuelo}
+                esInvitado={esInvitado}
+                guardarRanking={guardarRanking}
+                guardando={guardando}
+                alTerminar={alTerminar}
+                playSound={playSound}
+            />
+        );
     }
 
     return (
@@ -245,14 +301,15 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
                         const isFlipped = flipped.includes(carta.uniqueId);
 
                         return (
-                            <div
-                                key={carta.uniqueId}
-                                className={`card ${isFlipped || isMatched ? 'flipped' : ''}`}
-                                onClick={() => handleClick(carta)}
-                                style={{ visibility: isMatched ? 'hidden' : 'visible', opacity: isMatched ? 0 : 1, transition: 'opacity 0.5s' }}
-                            >
-                                <div className="face front">{carta.content}</div>
-                                <div className="face back">?</div>
+                            <div key={carta.uniqueId} className="card-wrapper">
+                                <div
+                                    className={`card ${isFlipped || isMatched ? 'flipped' : ''}`}
+                                    onClick={() => handleClick(carta)}
+                                    style={{ visibility: isMatched ? 'hidden' : 'visible', opacity: isMatched ? 0 : 1, transition: 'opacity 0.5s' }}
+                                >
+                                    <div className="face front">{carta.content}</div>
+                                    <div className="face back">?</div>
+                                </div>
                             </div>
                         );
                     })}
@@ -260,7 +317,7 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
             </div>
 
             <EstilosComunes />
-            {/* ESTILOS ESPECÍFICOS DEL TABLERO */}
+
             <style>{`
                 #game-ui { display: flex; flex-direction: column; height: 100vh; width: 100%; position:fixed; top:0; left:0; background: #2c3e50; }
                 header { height: 60px; background: rgba(0,0,0,0.4); display: flex; justify-content: space-between; align-items: center; padding: 0 20px; color: white; }
@@ -277,12 +334,34 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
 
                 /* TAPETE */
                 .table-container { flex: 1; background-color: #27ae60; border: 8px solid #196f3d; border-radius: 15px; margin: 20px; box-shadow: inset 0 0 80px rgba(0,0,0,0.6); padding: 20px; display: flex; justify-content: center; align-items: center; overflow: hidden; }
-                .game-board { display: grid; gap: 15px; width: 100%; height: 100%; justify-items: center; align-items: center; max-width: 1000px; max-height: 800px; }
                 
-                /* CARTAS */
-                .card { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform 0.4s; cursor: pointer; aspect-ratio: 3/4; max-width: 150px; }
+                .game-board { 
+                    display: grid; 
+                    gap: 20px; 
+                    width: 100%; height: 100%; 
+                    justify-items: center; align-items: center; 
+                    max-width: 1000px; max-height: 800px; 
+                    padding: 10px;
+                }
+                
+                .card-wrapper {
+                    width: 100%; height: 100%;
+                    display: flex; justify-content: center; align-items: center;
+                }
+
+                .card { 
+                    position: relative; 
+                    width: 100%; 
+                    height: 100%; 
+                    transform-style: preserve-3d; 
+                    transition: transform 0.4s; 
+                    cursor: pointer; 
+                    aspect-ratio: 3/4; 
+                    max-width: 120px; 
+                    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+                }
                 .card.flipped { transform: rotateY(180deg); }
-                .face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; display: flex; align-items: center; justify-content: center; border-radius: 10px; font-weight: bold; font-size: clamp(12px, 2.5vmin, 20px); padding: 5px; text-align: center; box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
+                .face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; display: flex; align-items: center; justify-content: center; border-radius: 10px; font-weight: bold; font-size: clamp(12px, 2.5vmin, 18px); padding: 5px; text-align: center; }
                 
                 .face.back { background: repeating-linear-gradient(45deg, #c0392b, #c0392b 10px, #e74c3c 10px, #e74c3c 20px); border: 3px solid white; color: white; font-size: 2.5rem; text-shadow: 2px 2px 0 rgba(0,0,0,0.3); }
                 .face.front { background: #ecf0f1; color: #2c3e50; transform: rotateY(180deg); border: 2px solid #bdc3c7; }
@@ -293,7 +372,7 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
 
 // --- PANTALLAS AUXILIARES ---
 
-const PantallaSetup = ({ recurso, onStart, onRanking, onExit }) => {
+function PantallaSetup({ recurso, onStart, onRanking, onExit }) {
     const [hoja, setHoja] = useState('General');
     const hojasDisponibles = recurso.hojas ? recurso.hojas.map(h => h.nombreHoja) : [];
 
@@ -319,7 +398,7 @@ const PantallaSetup = ({ recurso, onStart, onRanking, onExit }) => {
     );
 }
 
-const PantallaRanking = ({ recurso, usuario, onBack }) => {
+function PantallaRanking({ recurso, usuario, onBack }) {
     const [hoja, setHoja] = useState('General');
     const [top10, setTop10] = useState([]);
     const [miMejor, setMiMejor] = useState(null);
@@ -329,12 +408,10 @@ const PantallaRanking = ({ recurso, usuario, onBack }) => {
         const fetchRanking = async () => {
             try {
                 const ref = collection(db, 'ranking');
-
-                // 🛠️ CORRECCIÓN AQUÍ: Usamos 'juego' == 'Aparejados' para que salgan los viejos y los nuevos
                 const qTop = query(
                     ref,
                     where('recursoId', '==', recurso.id),
-                    where('juego', '==', 'Aparejados'), // <--- CAMBIO CLAVE
+                    where('tipoJuego', '==', 'APAREJADOS'),
                     where('categoria', '==', hoja),
                     orderBy('aciertos', 'desc'),
                     limit(10)
@@ -342,21 +419,20 @@ const PantallaRanking = ({ recurso, usuario, onBack }) => {
                 const snapTop = await getDocs(qTop);
                 setTop10(snapTop.docs.map(d => d.data()));
 
-                // 🛠️ CORRECCIÓN TAMBIÉN AQUÍ
-                const qMejor = query(
-                    ref,
-                    where('recursoId', '==', recurso.id),
-                    where('juego', '==', 'Aparejados'), // <--- CAMBIO CLAVE
-                    where('categoria', '==', hoja),
-                    where('email', '==', usuario.email),
-                    orderBy('aciertos', 'desc'),
-                    limit(1)
-                );
-                const snapMejor = await getDocs(qMejor);
-                if (!snapMejor.empty) setMiMejor(snapMejor.docs[0].data().aciertos);
-            } catch (e) {
-                console.log("Error cargando ranking:", e);
-            }
+                if (usuario && usuario.email) {
+                    const qMejor = query(
+                        ref,
+                        where('recursoId', '==', recurso.id),
+                        where('tipoJuego', '==', 'APAREJADOS'),
+                        where('categoria', '==', hoja),
+                        where('email', '==', usuario.email),
+                        orderBy('aciertos', 'desc'),
+                        limit(1)
+                    );
+                    const snapMejor = await getDocs(qMejor);
+                    if (!snapMejor.empty) setMiMejor(snapMejor.docs[0].data().aciertos);
+                }
+            } catch (e) { console.log("Error ranking:", e); }
         };
         fetchRanking();
     }, [hoja]);
@@ -366,29 +442,120 @@ const PantallaRanking = ({ recurso, usuario, onBack }) => {
     return (
         <div className="card-menu">
             <h2 style={{ color: '#f1c40f' }}>🏆 Ranking</h2>
-            <select value={hoja} onChange={e => setHoja(e.target.value)} style={{ width: '100%', padding: '8px', marginBottom: '15px', borderRadius: '5px' }}>
-                <option value="General">General</option>
-                {hojas.map(h => <option key={h} value={h}>{h}</option>)}
-            </select>
-
+            <select value={hoja} onChange={e => setHoja(e.target.value)} style={{ width: '100%', padding: '8px', marginBottom: '15px', borderRadius: '5px' }}><option value="General">General</option>{hojas.map(h => <option key={h} value={h}>{h}</option>)}</select>
             <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '10px', height: '200px', overflowY: 'auto', marginBottom: '15px' }}>
                 {top10.length === 0 ? <p>No hay datos aún.</p> : (
                     top10.map((f, i) => (
-                        <div key={i} className="ranking-row">
-                            <span className="rank-pos">{getMedalla(i)}</span>
-                            <span className="rank-name">{f.jugador}</span>
-                            <span className="rank-score">{f.aciertos}</span>
-                        </div>
+                        <div key={i} className="ranking-row"><span className="rank-pos">{getMedalla(i)}</span><span className="rank-name">{f.jugador}</span><span className="rank-score">{f.aciertos}</span></div>
                     ))
                 )}
             </div>
-
             {miMejor !== null && <div className="personal-best">Tu Récord: {miMejor}</div>}
             <button className="btn-back" onClick={onBack}>Cerrar</button>
             <EstilosComunes />
         </div>
     );
-};
+}
+
+function PantallaCuentaAtras({ hoja, profesor, instrucciones, playSound, onFinished }) {
+    const [count, setCount] = useState(3);
+    const [texto, setTexto] = useState('3');
+
+    useEffect(() => {
+        playSound('START');
+        const run = async () => {
+            setTexto("3"); setCount(3); await new Promise(r => setTimeout(r, 1000));
+            setTexto("2"); setCount(2); await new Promise(r => setTimeout(r, 1000));
+            setTexto("1"); setCount(1); await new Promise(r => setTimeout(r, 1000));
+            setTexto("¡YA!"); setCount(0); await new Promise(r => setTimeout(r, 1000));
+            onFinished();
+        };
+        run();
+    }, []);
+
+    return (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'radial-gradient(circle, #2f3640, #1e272e)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', color: 'white', zIndex: 9999 }}>
+            <div style={{ textAlign: 'center', marginBottom: '30px', animation: 'fadeIn 1s' }}>
+                <h3 style={{ fontSize: '1.2rem', color: '#aaa', margin: 0 }}>JUGANDO A</h3>
+                <h1 style={{ fontSize: '2.5rem', color: '#f1c40f', margin: '10px 0' }}>{hoja}</h1>
+                <h3 style={{ fontSize: '1.2rem', color: '#aaa', margin: 0 }}>de <span style={{ color: '#2ecc71' }}>{profesor}</span></h3>
+
+                {/* INSTRUCCIONES AQUÍ */}
+                {instrucciones && (
+                    <div style={{ marginTop: '20px', padding: '15px', background: 'rgba(255,255,255,0.1)', borderRadius: '10px', maxWidth: '80%', margin: '20px auto' }}>
+                        <p style={{ fontSize: '1.1rem', color: '#eee', fontStyle: 'italic' }}>"{instrucciones}"</p>
+                    </div>
+                )}
+            </div>
+            <div style={{ fontSize: '8rem', fontWeight: 'bold', color: count === 0 ? '#2ecc71' : 'white', animation: 'popIn 0.5s' }}>{texto}</div>
+            <style>{`@keyframes popIn { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } } @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }`}</style>
+        </div>
+    );
+}
+
+function PantallaFin({ puntos, puntosDuelo, modoDuelo, esInvitado, guardarRanking, guardando, alTerminar, playSound }) {
+    const [nombreInvitado, setNombreInvitado] = useState('');
+
+    useEffect(() => {
+        playSound('WIN');
+        // Confeti automático
+        const duration = 3000;
+        const animationEnd = Date.now() + duration;
+        const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 9999 };
+        const randomInRange = (min, max) => Math.random() * (max - min) + min;
+        const interval = setInterval(function () {
+            const timeLeft = animationEnd - Date.now();
+            if (timeLeft <= 0) return clearInterval(interval);
+            if (window.confetti) {
+                window.confetti(Object.assign({}, defaults, { particleCount: 50, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } }));
+                window.confetti(Object.assign({}, defaults, { particleCount: 50, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } }));
+            }
+        }, 250);
+        return () => clearInterval(interval);
+    }, []);
+
+    const ganadorDuelo = puntosDuelo[0] > puntosDuelo[1] ? 0 : (puntosDuelo[1] > puntosDuelo[0] ? 1 : -1);
+
+    return (
+        <div className="card-menu">
+            <h1>¡Fin de Partida!</h1>
+            {modoDuelo ? (
+                <>
+                    <h2 style={{ color: '#3498db' }}>AZUL: {puntosDuelo[0]}</h2>
+                    <h2 style={{ color: '#e67e22' }}>NARANJA: {puntosDuelo[1]}</h2>
+                    <h3 style={{ marginTop: '20px', color: '#f1c40f', fontSize: '1.5rem' }}>
+                        {ganadorDuelo === -1 ? "¡EMPATE!" : `¡GANA JUGADOR ${ganadorDuelo === 0 ? 'AZUL' : 'NARANJA'}!`}
+                    </h3>
+                    <button className="btn-back" onClick={alTerminar} style={{ marginTop: '20px' }}>Salir</button>
+                </>
+            ) : (
+                    <>
+                        <h2>Puntos: {puntos}</h2>
+
+                        {/* SI ES INVITADO, CAMPO PARA NOMBRE */}
+                        {esInvitado && (
+                            <div style={{ margin: '15px 0' }}>
+                                <p style={{ marginBottom: '5px', color: '#ccc' }}>Introduce tu nombre para el ranking:</p>
+                                <input
+                                    type="text"
+                                    value={nombreInvitado}
+                                    onChange={(e) => setNombreInvitado(e.target.value)}
+                                    placeholder="Tu nombre aquí..."
+                                    style={{ padding: '10px', borderRadius: '5px', border: 'none', width: '80%', textAlign: 'center', fontSize: '1rem' }}
+                                />
+                            </div>
+                        )}
+
+                        <button className="btn-success" onClick={() => guardarRanking(nombreInvitado)} disabled={guardando}>
+                            {guardando ? 'Guardando...' : '💾 Guardar Récord'}
+                        </button>
+                        <button className="btn-back" onClick={alTerminar}>Salir sin guardar</button>
+                    </>
+                )}
+            <EstilosComunes />
+        </div>
+    )
+}
 
 const EstilosComunes = () => (
     <style>{`

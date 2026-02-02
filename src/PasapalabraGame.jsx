@@ -7,6 +7,7 @@ import confetti from 'canvas-confetti';
 import correctSoundFile from './assets/correct-choice-43861.mp3';
 import wrongSoundFile from './assets/negative_beeps-6008.mp3';
 import winSoundFile from './assets/applause-small-audience-97257.mp3';
+import startSoundFile from './assets/inicio juego.mp3'; // NUEVO
 
 // URL externa para el reloj (Tic-Tac)
 const TICK_SOUND_URL = 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_73686360b7.mp3?filename=clock-ticking-2-106637.mp3';
@@ -146,19 +147,26 @@ const STYLES = `
       transform: scale(1.05); 
   }
 
+  /* BOTÓN MARKETING (Para no registrados) */
+  .btn-marketing { width: 100%; padding: 15px; margin-top: 15px; border: none; border-radius: 30px; font-weight: bold; cursor: pointer; background: linear-gradient(45deg, #FF9800, #F44336); color: white; font-size: 1.1rem; box-shadow: 0 4px 15px rgba(244, 67, 54, 0.4); animation: pulse 2s infinite; }
+
   @keyframes blink { 50% { opacity: 0.5; } }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
   @media (max-width: 700px) { #game-container { transform: scale(0.6); } }
 `;
 
-export default function GamePlayer({ recurso, usuario, alTerminar }) {
+export default function PasapalabraGame({ recurso, usuario, alTerminar }) {
     const [fase, setFase] = useState('SETUP');
     const [modoDuelo, setModoDuelo] = useState(false);
     const [hojaSeleccionada, setHojaSeleccionada] = useState('General');
     const [jugadores, setJugadores] = useState([]);
     const [turno, setTurno] = useState(0);
     const [verRanking, setVerRanking] = useState(false);
+
+    // Detectar si es invitado
+    const esInvitado = !usuario || !usuario.email;
 
     // --- REPRODUCCIÓN DE SONIDO ---
     const playSound = (type) => {
@@ -167,13 +175,13 @@ export default function GamePlayer({ recurso, usuario, alTerminar }) {
         else if (type === 'WRONG') file = wrongSoundFile;
         else if (type === 'WIN') file = winSoundFile;
         else if (type === 'TICK') file = TICK_SOUND_URL;
+        else if (type === 'START') file = startSoundFile;
 
         if (file) {
             const audio = new Audio(file);
             audio.volume = 0.6;
             audio.play().catch(e => console.warn("Audio play prevented:", e));
 
-            // CORTAR EL SONIDO DE ACIERTO SI ES LARGO
             if (type === 'CORRECT') {
                 setTimeout(() => {
                     audio.pause();
@@ -235,8 +243,12 @@ export default function GamePlayer({ recurso, usuario, alTerminar }) {
     const iniciar = (duelo, hoja) => {
         setModoDuelo(duelo);
         setHojaSeleccionada(hoja);
+
         const { rosco1, rosco2 } = generarRoscos(duelo, hoja);
         const tiempo = parseInt(recurso.config?.tiempoTotal) || 150;
+
+        // Nombre del jugador 1 (Usuario o Invitado)
+        const nombreP1 = esInvitado ? "Invitado" : (usuario.displayName || "Jugador 1");
 
         if (duelo) {
             setJugadores([
@@ -245,11 +257,12 @@ export default function GamePlayer({ recurso, usuario, alTerminar }) {
             ]);
         } else {
             setJugadores([
-                { nombre: usuario.displayName, color: '#273c75', rosco: rosco1, aciertos: 0, fallos: 0, indice: 0, tiempo, terminado: false }
+                { nombre: nombreP1, color: '#273c75', rosco: rosco1, aciertos: 0, fallos: 0, indice: 0, tiempo, terminado: false }
             ]);
         }
         setTurno(0);
-        setFase('JUEGO');
+        // CAMBIO: Ir a cuenta atrás antes de JUEGO
+        setFase('COUNTDOWN');
     };
 
     return (
@@ -262,6 +275,17 @@ export default function GamePlayer({ recurso, usuario, alTerminar }) {
 
             {verRanking && (
                 <PantallaRanking recurso={recurso} usuario={usuario} onBack={() => setVerRanking(false)} />
+            )}
+
+            {/* FASE CUENTA ATRÁS */}
+            {fase === 'COUNTDOWN' && (
+                <PantallaCuentaAtras
+                    hoja={hojaSeleccionada}
+                    profesor={recurso.profesorNombre || recurso.nombreProfesor || "Tu Profesor"}
+                    instrucciones={recurso.instrucciones} // Instrucciones
+                    playSound={playSound}
+                    onFinished={() => setFase('JUEGO')}
+                />
             )}
 
             {fase === 'JUEGO' && (
@@ -283,6 +307,7 @@ export default function GamePlayer({ recurso, usuario, alTerminar }) {
                     hoja={hojaSeleccionada}
                     usuario={usuario}
                     modoDuelo={modoDuelo}
+                    esInvitado={esInvitado} // Pasar estado invitado
                     playSound={playSound}
                     onExit={alTerminar}
                 />
@@ -321,6 +346,7 @@ const PantallaRanking = ({ recurso, usuario, onBack }) => {
     const [top10, setTop10] = useState([]);
     const [miMejor, setMiMejor] = useState(null);
     const [cargando, setCargando] = useState(false);
+    const hojasDisponibles = recurso.hojas ? recurso.hojas.map(h => h.nombreHoja) : [];
 
     useEffect(() => {
         const cargar = async () => {
@@ -331,9 +357,11 @@ const PantallaRanking = ({ recurso, usuario, onBack }) => {
                 const sTop = await getDocs(qTop);
                 setTop10(sTop.docs.map(d => d.data()));
 
-                const qMejor = query(ref, where('recursoId', '==', recurso.id), where('categoria', '==', hoja), where('tipoJuego', '==', 'PASAPALABRA'), where('email', '==', usuario.email), orderBy('aciertos', 'desc'), limit(1));
-                const sMejor = await getDocs(qMejor);
-                if (!sMejor.empty) setMiMejor(sMejor.docs[0].data().aciertos);
+                if (usuario && usuario.email) {
+                    const qMejor = query(ref, where('recursoId', '==', recurso.id), where('categoria', '==', hoja), where('tipoJuego', '==', 'PASAPALABRA'), where('email', '==', usuario.email), orderBy('aciertos', 'desc'), limit(1));
+                    const sMejor = await getDocs(qMejor);
+                    if (!sMejor.empty) setMiMejor(sMejor.docs[0].data().aciertos);
+                }
             } catch (e) { console.error(e); }
             setCargando(false);
         };
@@ -345,7 +373,7 @@ const PantallaRanking = ({ recurso, usuario, onBack }) => {
             <h2 style={{ color: '#f1c40f' }}>🏆 Ranking Top 10</h2>
             <select value={hoja} onChange={e => setHoja(e.target.value)} style={{ width: '100%', padding: '10px', marginBottom: '20px', borderRadius: '5px' }}>
                 <option value="General">General</option>
-                {recurso.hojas?.map(h => <option key={h.nombreHoja} value={h.nombreHoja}>{h.nombreHoja}</option>)}
+                {hojasDisponibles.map(h => <option key={h} value={h}>{h}</option>)}
             </select>
             <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '10px', height: '300px', overflowY: 'auto', marginBottom: '20px' }}>
                 {cargando ? <p>Cargando...</p> : top10.length === 0 ? <p style={{ padding: '20px' }}>No hay puntuaciones aún.</p> : top10.map((f, i) => (
@@ -358,24 +386,60 @@ const PantallaRanking = ({ recurso, usuario, onBack }) => {
     );
 };
 
+// --- PANTALLA CUENTA ATRÁS (NUEVA) ---
+const PantallaCuentaAtras = ({ hoja, profesor, instrucciones, playSound, onFinished }) => {
+    const [count, setCount] = useState(3);
+    const [texto, setTexto] = useState('3');
+
+    useEffect(() => {
+        playSound('START');
+        const run = async () => {
+            setTexto("3"); setCount(3); await new Promise(r => setTimeout(r, 1000));
+            setTexto("2"); setCount(2); await new Promise(r => setTimeout(r, 1000));
+            setTexto("1"); setCount(1); await new Promise(r => setTimeout(r, 1000));
+            setTexto("¡YA!"); setCount(0); await new Promise(r => setTimeout(r, 1000));
+            onFinished();
+        };
+        run();
+    }, []);
+
+    return (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'radial-gradient(circle, #2f3640, #1e272e)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', color: 'white', zIndex: 9999 }}>
+            <div style={{ textAlign: 'center', marginBottom: '30px', animation: 'fadeIn 1s' }}>
+                <h3 style={{ fontSize: '1.2rem', color: '#aaa', margin: 0 }}>JUGANDO A</h3>
+                <h1 style={{ fontSize: '2.5rem', color: '#f1c40f', margin: '10px 0' }}>{hoja}</h1>
+                <h3 style={{ fontSize: '1.2rem', color: '#aaa', margin: 0 }}>de <span style={{ color: '#2ecc71' }}>{profesor}</span></h3>
+
+                {/* INSTRUCCIONES */}
+                {instrucciones && (
+                    <div style={{ marginTop: '20px', padding: '15px', background: 'rgba(255,255,255,0.1)', borderRadius: '10px', maxWidth: '80%', margin: '20px auto' }}>
+                        <p style={{ fontSize: '1.1rem', color: '#eee', fontStyle: 'italic' }}>"{instrucciones}"</p>
+                    </div>
+                )}
+            </div>
+            <div style={{ fontSize: '8rem', fontWeight: 'bold', color: count === 0 ? '#2ecc71' : 'white', animation: 'popIn 0.5s' }}>{texto}</div>
+            <style>{`@keyframes popIn { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } } @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }`}</style>
+        </div>
+    );
+};
+
 // --- MOTOR DEL JUEGO (Tablero) ---
 const Tablero = ({ jugadores, setJugadores, turno, setTurno, modoDuelo, playSound, onFinish }) => {
     const [input, setInput] = useState('');
     const [pausado, setPausado] = useState(false);
     const [datosError, setDatosError] = useState(null);
-    const inputRef = useRef(null); // REFERENCIA AL INPUT PARA EL FOCO AUTOMÁTICO
+    const inputRef = useRef(null);
 
     const jugador = jugadores[turno];
     const preguntaActual = jugador.rosco[jugador.indice];
 
-    // FOCO AUTOMÁTICO AL CAMBIAR PREGUNTA O CERRAR MODAL
+    // Foco automático
     useEffect(() => {
         if (!pausado && inputRef.current) {
             setTimeout(() => inputRef.current.focus(), 50);
         }
     }, [preguntaActual, pausado, turno]);
 
-    // Timer con soporte de pausa
     useEffect(() => {
         if (jugador.terminado || pausado) return;
         const interval = setInterval(() => {
@@ -455,7 +519,6 @@ const Tablero = ({ jugadores, setJugadores, turno, setTurno, modoDuelo, playSoun
 
         if (esFalloReal) {
             setPausado(true);
-            // CORRECCIÓN: Aseguramos que siempre haya un texto para mostrar
             const textoCorrecto = item.respuesta || item.correcta || item.solucion || "ERROR EN DATOS";
             setDatosError({ correcta: textoCorrecto });
         } else {
@@ -497,7 +560,7 @@ const Tablero = ({ jugadores, setJugadores, turno, setTurno, modoDuelo, playSoun
                     <div id="pregunta-box">{preguntaActual.pregunta}</div>
 
                     <input
-                        ref={inputRef} // REFERENCIA AÑADIDA
+                        ref={inputRef}
                         id="respuesta-usuario"
                         autoComplete="off"
                         placeholder="Respuesta..."
@@ -515,7 +578,7 @@ const Tablero = ({ jugadores, setJugadores, turno, setTurno, modoDuelo, playSoun
                 </div>
             </div>
 
-            {/* MODAL ERROR (Fuera del contenedor del juego para evitar z-index issues) */}
+            {/* MODAL ERROR NEÓN */}
             {pausado && datosError && (
                 <div className="modal-overlay">
                     <div className="neon-card">
@@ -531,7 +594,7 @@ const Tablero = ({ jugadores, setJugadores, turno, setTurno, modoDuelo, playSoun
 };
 
 // --- PANTALLA FIN ---
-const PantallaFin = ({ jugadores, recurso, hoja, usuario, modoDuelo, playSound, onExit }) => {
+const PantallaFin = ({ jugadores, recurso, hoja, usuario, modoDuelo, esInvitado, playSound, onExit }) => {
     const [guardando, setGuardando] = useState(false);
 
     useEffect(() => {
@@ -555,7 +618,7 @@ const PantallaFin = ({ jugadores, recurso, hoja, usuario, modoDuelo, playSound, 
     };
 
     const guardar = async () => {
-        if (modoDuelo) return;
+        if (modoDuelo || esInvitado) return; // Invitados no guardan aquí
         setGuardando(true);
         try {
             const score = jugadores[0].aciertos;
@@ -620,7 +683,19 @@ const PantallaFin = ({ jugadores, recurso, hoja, usuario, modoDuelo, playSound, 
                 ))}
             </div>
 
-            {!modoDuelo && (
+            {/* SI ES INVITADO -> MENSAJE MARKETING */}
+            {esInvitado && (
+                <div style={{ margin: '20px 0', padding: '15px', background: 'rgba(255,255,255,0.1)', borderRadius: '15px' }}>
+                    <p style={{ color: '#eee', lineHeight: '1.5' }}>
+                        Regístrate para <b>guardar tus resultados</b> y descubrir muchos más juegos.
+                    </p>
+                    <p style={{ color: 'white', fontWeight: 'bold' }}>¡Únete a LearnJoy!</p>
+                    {/* El botón de login lo gestionará el componente padre si se quiere, o simplemente vuelve a Home */}
+                </div>
+            )}
+
+            {/* SI ES REGISTRADO Y NO DUELO -> BOTÓN GUARDAR */}
+            {!modoDuelo && !esInvitado && (
                 <button className="btn-primary" onClick={guardar} disabled={guardando}>
                     {guardando ? 'Procesando...' : '💾 GUARDAR RESULTADO'}
                 </button>

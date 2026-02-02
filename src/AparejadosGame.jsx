@@ -146,11 +146,10 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
         }
     };
 
-    // --- GUARDADO RANKING (ADAPTADO PARA INVITADOS) ---
+    // --- GUARDADO RANKING ---
     const guardarRanking = async (nombreJugadorManual = null) => {
         if (guardando) return;
 
-        // Si es invitado y no ha puesto nombre, error
         if (esInvitado && !nombreJugadorManual) {
             alert("Por favor, escribe tu nombre para guardar el récord.");
             return;
@@ -162,7 +161,6 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
             const emailUsuario = esInvitado ? 'invitado' : usuario.email;
             const nombreJugador = esInvitado ? nombreJugadorManual : (usuario.displayName || "Anónimo");
 
-            // 1. Calcular POSICIÓN REAL
             const qBetter = query(
                 rankingRef,
                 where('recursoId', '==', recurso.id),
@@ -182,7 +180,6 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
             if (rank === 2) medallaCalc = '🥈';
             if (rank === 3) medallaCalc = '🥉';
 
-            // 2. Guardar (Si es invitado siempre crea nuevo, si es user actualiza su record)
             let docExistenteId = null;
             let oldScore = 0;
 
@@ -233,6 +230,17 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
         setGuardando(false);
     };
 
+    // --- CÁLCULO DE COLUMNAS Y FILAS PARA CSS GRID ---
+    const calcularGrid = () => {
+        const total = cartas.length;
+        if (total === 0) return { cols: 1, rows: 1 };
+        // Calculamos para que quede lo más cuadrado posible
+        const cols = Math.ceil(Math.sqrt(total));
+        const rows = Math.ceil(total / cols);
+        return { cols, rows };
+    };
+    const { cols, rows } = calcularGrid();
+
     // --- RENDERIZADO PANTALLAS ---
 
     if (fase === 'SETUP' && !verRanking) return (
@@ -251,7 +259,7 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
             <PantallaCuentaAtras
                 hoja={hojaSeleccionada}
                 profesor={recurso.profesorNombre || "Tu Profesor"}
-                instrucciones={recurso.instrucciones} // PASAMOS INSTRUCCIONES
+                instrucciones={recurso.instrucciones}
                 playSound={playSound}
                 onFinished={() => setFase('JUEGO')}
             />
@@ -286,28 +294,36 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
                         <div className={`marcador ${turno === 1 ? 'activo naranja' : ''}`}>NARANJA: {puntosDuelo[1]}</div>
                     </div>
                 ) : (
-                        <>
+                        <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
                             <div className="stat-box">⏱ {tiempo}</div>
                             <div className="stat-box">⭐ {puntos}</div>
-                        </>
+                        </div>
                     )}
             </header>
 
-            {/* TABLERO */}
+            {/* TABLERO RESPONSIVE */}
             <div className="table-container">
-                <div className="game-board" style={{ gridTemplateColumns: `repeat(${Math.ceil(Math.sqrt(cartas.length))}, 1fr)` }}>
+                <div
+                    className="game-board"
+                    style={{
+                        gridTemplateColumns: `repeat(${cols}, 1fr)`,
+                        gridTemplateRows: `repeat(${rows}, 1fr)` // IMPORTANTE: Define filas para ocupar el alto exacto
+                    }}
+                >
                     {cartas.map(carta => {
                         const isMatched = matched.includes(carta.uniqueId);
                         const isFlipped = flipped.includes(carta.uniqueId);
 
                         return (
-                            <div key={carta.uniqueId} className="card-wrapper">
+                            <div key={carta.uniqueId} className="card-cell">
                                 <div
                                     className={`card ${isFlipped || isMatched ? 'flipped' : ''}`}
                                     onClick={() => handleClick(carta)}
-                                    style={{ visibility: isMatched ? 'hidden' : 'visible', opacity: isMatched ? 0 : 1, transition: 'opacity 0.5s' }}
+                                    style={{ visibility: isMatched ? 'hidden' : 'visible', opacity: isMatched ? 0 : 1 }}
                                 >
-                                    <div className="face front">{carta.content}</div>
+                                    <div className="face front">
+                                        <span>{carta.content}</span>
+                                    </div>
                                     <div className="face back">?</div>
                                 </div>
                             </div>
@@ -319,52 +335,138 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
             <EstilosComunes />
 
             <style>{`
-                #game-ui { display: flex; flex-direction: column; height: 100vh; width: 100%; position:fixed; top:0; left:0; background: #2c3e50; }
-                header { height: 60px; background: rgba(0,0,0,0.4); display: flex; justify-content: space-between; align-items: center; padding: 0 20px; color: white; }
-                .stat-box { font-family: 'Fredoka One'; font-size: 1.5rem; color: #f1c40f; margin: 0 10px; }
-                .btn-back-small { background: rgba(0,0,0,0.5); border: 1px solid #777; color: white; padding: 5px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+                /* CONTENEDOR PRINCIPAL 100% RESPONSIVE */
+                #game-ui { 
+                    display: flex; 
+                    flex-direction: column; 
+                    height: 100vh; 
+                    height: 100dvh; /* Adapta a móviles con barra navegación */
+                    width: 100%; 
+                    position: fixed; 
+                    top: 0; left: 0; 
+                    background: #2c3e50; 
+                    overflow: hidden;
+                }
+
+                /* HEADER COMPACTO */
+                header { 
+                    flex: 0 0 auto; /* No encoger ni crecer */
+                    height: 50px; 
+                    background: rgba(0,0,0,0.4); 
+                    display: flex; 
+                    justify-content: space-between; 
+                    align-items: center; 
+                    padding: 0 15px; 
+                    color: white; 
+                    z-index: 10;
+                }
                 
-                /* DUELO STYLES */
-                .duelo-header { display: flex; align-items: center; gap: 15px; font-weight: bold; }
-                .marcador { padding: 5px 15px; border-radius: 15px; background: #555; opacity: 0.6; transition: 0.3s; }
+                .stat-box { font-family: 'Fredoka One'; font-size: 1.2rem; color: #f1c40f; font-weight: bold; }
+                .btn-back-small { background: rgba(0,0,0,0.5); border: 1px solid #777; color: white; padding: 5px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 0.8rem; }
+                
+                .duelo-header { display: flex; align-items: center; gap: 10px; font-weight: bold; font-size: 0.9rem; }
+                .marcador { padding: 4px 10px; border-radius: 12px; background: #555; opacity: 0.6; transition: 0.3s; white-space: nowrap; }
                 .marcador.azul { background: #3498db; }
                 .marcador.naranja { background: #e67e22; }
-                .marcador.activo { opacity: 1; transform: scale(1.1); box-shadow: 0 0 15px rgba(255,255,255,0.5); border: 2px solid white; }
+                .marcador.activo { opacity: 1; transform: scale(1.1); box-shadow: 0 0 10px rgba(255,255,255,0.5); border: 2px solid white; }
                 .vs { font-style: italic; color: #888; }
 
-                /* TAPETE */
-                .table-container { flex: 1; background-color: #27ae60; border: 8px solid #196f3d; border-radius: 15px; margin: 20px; box-shadow: inset 0 0 80px rgba(0,0,0,0.6); padding: 20px; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+                /* TAPETE FLEXIBLE */
+                .table-container { 
+                    flex: 1 1 auto; /* Ocupa todo el espacio restante */
+                    background-color: #27ae60; 
+                    border: 5px solid #196f3d; 
+                    border-radius: 10px; 
+                    margin: 10px; 
+                    box-shadow: inset 0 0 40px rgba(0,0,0,0.6); 
+                    padding: 10px; 
+                    display: flex; 
+                    justify-content: center; 
+                    align-items: center; 
+                    overflow: hidden; /* Clave: nada sale de aquí */
+                    position: relative;
+                }
                 
+                /* GRID AJUSTABLE */
                 .game-board { 
                     display: grid; 
-                    gap: 20px; 
-                    width: 100%; height: 100%; 
-                    justify-items: center; align-items: center; 
-                    max-width: 1000px; max-height: 800px; 
-                    padding: 10px;
-                }
-                
-                .card-wrapper {
-                    width: 100%; height: 100%;
-                    display: flex; justify-content: center; align-items: center;
-                }
-
-                .card { 
-                    position: relative; 
+                    gap: 2vmin; /* Espacio relativo al tamaño de pantalla */
                     width: 100%; 
                     height: 100%; 
-                    transform-style: preserve-3d; 
-                    transition: transform 0.4s; 
-                    cursor: pointer; 
-                    aspect-ratio: 3/4; 
-                    max-width: 120px; 
-                    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+                    /* Centrar contenido */
+                    justify-content: center;
+                    align-content: center;
+                    box-sizing: border-box;
                 }
-                .card.flipped { transform: rotateY(180deg); }
-                .face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; display: flex; align-items: center; justify-content: center; border-radius: 10px; font-weight: bold; font-size: clamp(12px, 2.5vmin, 18px); padding: 5px; text-align: center; }
                 
-                .face.back { background: repeating-linear-gradient(45deg, #c0392b, #c0392b 10px, #e74c3c 10px, #e74c3c 20px); border: 3px solid white; color: white; font-size: 2.5rem; text-shadow: 2px 2px 0 rgba(0,0,0,0.3); }
-                .face.front { background: #ecf0f1; color: #2c3e50; transform: rotateY(180deg); border: 2px solid #bdc3c7; }
+                /* CELDA DE CARTA */
+                .card-cell {
+                    width: 100%;
+                    height: 100%;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    min-width: 0; 
+                    min-height: 0;
+                }
+
+                /* CARTA RESPONSIVA DEFINITIVA */
+                .card { 
+                    position: relative; 
+                    /* La carta intenta ocupar todo lo que pueda de su celda pero... */
+                    width: 100%; 
+                    height: 100%; 
+                    
+                    /* ...jamás crecerá más allá de su relación de aspecto */
+                    aspect-ratio: 3/4; 
+                    
+                    /* ...y jamás se saldrá de la celda */
+                    max-width: 100%;
+                    max-height: 100%;
+
+                    transform-style: preserve-3d; 
+                    transition: transform 0.4s, opacity 0.5s; 
+                    cursor: pointer; 
+                    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+                }
+                
+                .card.flipped { transform: rotateY(180deg); }
+                
+                /* CARAS DE LA CARTA */
+                .face { 
+                    position: absolute; width: 100%; height: 100%; 
+                    backface-visibility: hidden; 
+                    display: flex; align-items: center; justify-content: center; 
+                    border-radius: 8px; 
+                    padding: 5px; 
+                    text-align: center;
+                    box-sizing: border-box;
+                    overflow: hidden;
+                }
+                
+                /* TEXTO RESPONSIVO DENTRO DE LA CARTA */
+                .face span {
+                    /* El texto escala entre 10px y 24px según el tamaño del viewport */
+                    font-size: clamp(10px, 4vmin, 24px); 
+                    font-weight: bold;
+                    line-height: 1.2;
+                    word-wrap: break-word;
+                }
+                
+                .face.back { 
+                    background: repeating-linear-gradient(45deg, #c0392b, #c0392b 10px, #e74c3c 10px, #e74c3c 20px); 
+                    border: 2px solid white; 
+                    color: white; 
+                    font-size: 2.5rem; /* Interrogación grande */
+                    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+                }
+                
+                .face.front { 
+                    background: #ecf0f1; 
+                    color: #2c3e50; 
+                    transform: rotateY(180deg); 
+                    border: 2px solid #bdc3c7; 
+                }
             `}</style>
         </div>
     );
@@ -480,7 +582,6 @@ function PantallaCuentaAtras({ hoja, profesor, instrucciones, playSound, onFinis
                 <h1 style={{ fontSize: '2.5rem', color: '#f1c40f', margin: '10px 0' }}>{hoja}</h1>
                 <h3 style={{ fontSize: '1.2rem', color: '#aaa', margin: 0 }}>de <span style={{ color: '#2ecc71' }}>{profesor}</span></h3>
 
-                {/* INSTRUCCIONES AQUÍ */}
                 {instrucciones && (
                     <div style={{ marginTop: '20px', padding: '15px', background: 'rgba(255,255,255,0.1)', borderRadius: '10px', maxWidth: '80%', margin: '20px auto' }}>
                         <p style={{ fontSize: '1.1rem', color: '#eee', fontStyle: 'italic' }}>"{instrucciones}"</p>
@@ -498,7 +599,6 @@ function PantallaFin({ puntos, puntosDuelo, modoDuelo, esInvitado, guardarRankin
 
     useEffect(() => {
         playSound('WIN');
-        // Confeti automático
         const duration = 3000;
         const animationEnd = Date.now() + duration;
         const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 9999 };
@@ -532,7 +632,6 @@ function PantallaFin({ puntos, puntosDuelo, modoDuelo, esInvitado, guardarRankin
                     <>
                         <h2>Puntos: {puntos}</h2>
 
-                        {/* SI ES INVITADO, CAMPO PARA NOMBRE */}
                         {esInvitado && (
                             <div style={{ margin: '15px 0' }}>
                                 <p style={{ marginBottom: '5px', color: '#ccc' }}>Introduce tu nombre para el ranking:</p>

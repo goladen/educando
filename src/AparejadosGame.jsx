@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect, useRef } from 'react';
 import { db } from './firebase';
-import { doc, getDoc, setDoc, addDoc, collection, query, where, getDocs, orderBy, limit, updateDoc, getCountFromServer } from 'firebase/firestore';
+// AÑADIDO: 'increment' para sumar 1 al playCount
+import { doc, getDoc, setDoc, addDoc, collection, query, where, getDocs, orderBy, limit, updateDoc, getCountFromServer, increment } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
 
 // --- IMPORTACIÓN DE AUDIOS ---
@@ -45,6 +46,18 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
             if (type === 'CORRECT') {
                 setTimeout(() => { audio.pause(); audio.currentTime = 0; }, 1000);
             }
+        }
+    };
+
+    // --- INCREMENTAR CONTADOR DE PARTIDAS ---
+    const incrementarPlayCount = async () => {
+        try {
+            const ref = doc(db, 'resources', recurso.id);
+            await updateDoc(ref, {
+                playCount: increment(1)
+            });
+        } catch (error) {
+            console.error("Error al incrementar playCount:", error);
         }
     };
 
@@ -234,7 +247,6 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
     const calcularGrid = () => {
         const total = cartas.length;
         if (total === 0) return { cols: 1, rows: 1 };
-        // Calculamos para que quede lo más cuadrado posible
         const cols = Math.ceil(Math.sqrt(total));
         const rows = Math.ceil(total / cols);
         return { cols, rows };
@@ -261,7 +273,10 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
                 profesor={recurso.profesorNombre || "Tu Profesor"}
                 instrucciones={recurso.instrucciones}
                 playSound={playSound}
-                onFinished={() => setFase('JUEGO')}
+                onFinished={() => {
+                    incrementarPlayCount(); // Sumar +1 partida al terminar la cuenta atrás
+                    setFase('JUEGO');
+                }}
             />
         );
     }
@@ -307,7 +322,7 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
                     className="game-board"
                     style={{
                         gridTemplateColumns: `repeat(${cols}, 1fr)`,
-                        gridTemplateRows: `repeat(${rows}, 1fr)` // IMPORTANTE: Define filas para ocupar el alto exacto
+                        gridTemplateRows: `repeat(${rows}, 1fr)`
                     }}
                 >
                     {cartas.map(carta => {
@@ -340,7 +355,7 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
                     display: flex; 
                     flex-direction: column; 
                     height: 100vh; 
-                    height: 100dvh; /* Adapta a móviles con barra navegación */
+                    height: 100dvh; 
                     width: 100%; 
                     position: fixed; 
                     top: 0; left: 0; 
@@ -350,7 +365,7 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
 
                 /* HEADER COMPACTO */
                 header { 
-                    flex: 0 0 auto; /* No encoger ni crecer */
+                    flex: 0 0 auto; 
                     height: 50px; 
                     background: rgba(0,0,0,0.4); 
                     display: flex; 
@@ -373,7 +388,7 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
 
                 /* TAPETE FLEXIBLE */
                 .table-container { 
-                    flex: 1 1 auto; /* Ocupa todo el espacio restante */
+                    flex: 1 1 auto; 
                     background-color: #27ae60; 
                     border: 5px solid #196f3d; 
                     border-radius: 10px; 
@@ -383,17 +398,16 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
                     display: flex; 
                     justify-content: center; 
                     align-items: center; 
-                    overflow: hidden; /* Clave: nada sale de aquí */
+                    overflow: hidden; 
                     position: relative;
                 }
                 
                 /* GRID AJUSTABLE */
                 .game-board { 
                     display: grid; 
-                    gap: 2vmin; /* Espacio relativo al tamaño de pantalla */
+                    gap: 2vmin; 
                     width: 100%; 
                     height: 100%; 
-                    /* Centrar contenido */
                     justify-content: center;
                     align-content: center;
                     box-sizing: border-box;
@@ -410,20 +424,14 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
                     min-height: 0;
                 }
 
-                /* CARTA RESPONSIVA DEFINITIVA */
+                /* CARTA RESPONSIVA */
                 .card { 
                     position: relative; 
-                    /* La carta intenta ocupar todo lo que pueda de su celda pero... */
                     width: 100%; 
                     height: 100%; 
-                    
-                    /* ...jamás crecerá más allá de su relación de aspecto */
                     aspect-ratio: 3/4; 
-                    
-                    /* ...y jamás se saldrá de la celda */
                     max-width: 100%;
                     max-height: 100%;
-
                     transform-style: preserve-3d; 
                     transition: transform 0.4s, opacity 0.5s; 
                     cursor: pointer; 
@@ -444,9 +452,8 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
                     overflow: hidden;
                 }
                 
-                /* TEXTO RESPONSIVO DENTRO DE LA CARTA */
+                /* TEXTO RESPONSIVO */
                 .face span {
-                    /* El texto escala entre 10px y 24px según el tamaño del viewport */
                     font-size: clamp(10px, 4vmin, 24px); 
                     font-weight: bold;
                     line-height: 1.2;
@@ -457,7 +464,7 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
                     background: repeating-linear-gradient(45deg, #c0392b, #c0392b 10px, #e74c3c 10px, #e74c3c 20px); 
                     border: 2px solid white; 
                     color: white; 
-                    font-size: 2.5rem; /* Interrogación grande */
+                    font-size: 2.5rem; 
                     text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
                 }
                 
@@ -632,22 +639,20 @@ function PantallaFin({ puntos, puntosDuelo, modoDuelo, esInvitado, guardarRankin
                     <>
                         <h2>Puntos: {puntos}</h2>
 
-                        {esInvitado && (
-                            <div style={{ margin: '15px 0' }}>
-                                <p style={{ marginBottom: '5px', color: '#ccc' }}>Introduce tu nombre para el ranking:</p>
-                                <input
-                                    type="text"
-                                    value={nombreInvitado}
-                                    onChange={(e) => setNombreInvitado(e.target.value)}
-                                    placeholder="Tu nombre aquí..."
-                                    style={{ padding: '10px', borderRadius: '5px', border: 'none', width: '80%', textAlign: 'center', fontSize: '1rem' }}
-                                />
+                        {/* SI ES INVITADO MOSTRAR MARKETING, SI NO BOTÓN DE GUARDAR */}
+                        {esInvitado ? (
+                            <div style={{ margin: '20px 0', padding: '15px', background: 'rgba(255,255,255,0.1)', borderRadius: '15px' }}>
+                                <p style={{ color: '#eee', lineHeight: '1.5' }}>
+                                    Regístrate para <b>guardar tus resultados</b> y descubrir muchos más juegos.
+                            </p>
+                                <p style={{ color: 'white', fontWeight: 'bold' }}>¡Únete a LearnJoy!</p>
                             </div>
-                        )}
+                        ) : (
+                                <button className="btn-success" onClick={() => guardarRanking(nombreInvitado)} disabled={guardando}>
+                                    {guardando ? 'Guardando...' : '💾 Guardar Récord'}
+                                </button>
+                            )}
 
-                        <button className="btn-success" onClick={() => guardarRanking(nombreInvitado)} disabled={guardando}>
-                            {guardando ? 'Guardando...' : '💾 Guardar Récord'}
-                        </button>
                         <button className="btn-back" onClick={alTerminar}>Salir sin guardar</button>
                     </>
                 )}

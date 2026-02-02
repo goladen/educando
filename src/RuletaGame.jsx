@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect, useRef } from 'react';
 import { db } from './firebase';
-import { doc, addDoc, collection, query, where, getDocs, updateDoc, getCountFromServer } from 'firebase/firestore';
+// AÑADIDO: 'increment' para el contador de partidas
+import { doc, addDoc, collection, query, where, getDocs, updateDoc, getCountFromServer, increment } from 'firebase/firestore';
 import Confetti from 'react-confetti';
 import { Save, CircleDollarSign, Mic, Type, Skull, Trophy, Crown, Medal, User } from 'lucide-react';
 
@@ -8,11 +9,12 @@ import { Save, CircleDollarSign, Mic, Type, Skull, Trophy, Crown, Medal, User } 
 import correctSoundFile from './assets/correct-choice-43861.mp3';
 import wrongSoundFile from './assets/negative_beeps-6008.mp3';
 import winSoundFile from './assets/applause-small-audience-97257.mp3';
+
 import SPIN from './assets/girala.mp3';
 // --- AUDIOS EXTERNOS RULETA ---
 const SOUNDS = {
     INTRO: 'https://www.myinstants.com/media/sounds/ruleta-de-la-suerte-entrada.mp3',
-   // SPIN: 'https://www.myinstants.com/media/sounds/gira-la-ruleta.mp3',
+    SPIN: 'https://www.myinstants.com/media/sounds/gira-la-ruleta.mp3',
     PANEL_HIT: 'https://www.myinstants.com/media/sounds/la-ruleta-panel.mp3',
     PANEL_MISS: 'https://www.myinstants.com/media/sounds/la-ruleta-fallo.mp3'
 };
@@ -37,7 +39,7 @@ const SEGMENTOS = [
 const NUM_SEGMENTOS = SEGMENTOS.length;
 const ANGLE_PER_SEGMENT = 360 / NUM_SEGMENTOS;
 const PRECIO_VOCAL = 50;
-const BONO_RESOLVER = 250; 
+const BONO_RESOLVER = 250;
 
 // --- UTILS ---
 const clean = (t) => t ? t.toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "") : "";
@@ -58,10 +60,10 @@ export default function RuletaGame({ recurso, usuario, alTerminar }) {
     const [valorActual, setValorActual] = useState(0);
 
     // Datos del Juego (Hoja específica)
-    const [pista, setPista] = useState(''); // Nombre de la hoja (PISTA)
+    const [pista, setPista] = useState('');
     const [fraseOculta, setFraseOculta] = useState('');
     const [todasLasPreguntas, setTodasLasPreguntas] = useState([]);
-    
+
     // Pregunta Activa
     const [preguntaActual, setPreguntaActual] = useState(null);
     const [colaPreguntas, setColaPreguntas] = useState([]);
@@ -75,12 +77,12 @@ export default function RuletaGame({ recurso, usuario, alTerminar }) {
     const [inputResolver, setInputResolver] = useState('');
 
     const procesandoRef = useRef(false);
-    const audioRef = useRef(new Audio()); 
+    const audioRef = useRef(new Audio());
 
     // --- REPRODUCCIÓN DE SONIDO ---
     const playSound = (type, customUrl = null) => {
         let file = customUrl;
-        
+
         if (!file) {
             if (type === 'CORRECT') file = correctSoundFile;
             else if (type === 'WRONG') file = wrongSoundFile;
@@ -95,11 +97,11 @@ export default function RuletaGame({ recurso, usuario, alTerminar }) {
                 audioRef.current.src = file;
                 audioRef.current.loop = true;
                 audioRef.current.volume = 0.5;
-                audioRef.current.play().catch(e => {});
+                audioRef.current.play().catch(e => { });
             } else {
                 const audio = new Audio(file);
                 audio.volume = 0.6;
-                audio.play().catch(e => {});
+                audio.play().catch(e => { });
             }
         }
     };
@@ -109,13 +111,23 @@ export default function RuletaGame({ recurso, usuario, alTerminar }) {
         audioRef.current.currentTime = 0;
     };
 
+    // --- INCREMENTAR CONTADOR DE PARTIDAS ---
+    const incrementarPlayCount = async () => {
+        try {
+            const ref = doc(db, 'resources', recurso.id);
+            await updateDoc(ref, {
+                playCount: increment(1)
+            });
+        } catch (error) {
+            console.error("Error al incrementar playCount:", error);
+        }
+    };
+
     // --- SETUP ---
     const iniciar = (nombres, hojaNombre) => {
         let hojaSeleccionada = null;
 
-        // 1. Seleccionar la hoja correcta
         if (hojaNombre === 'General') {
-            // Si es General, elegimos una hoja al azar para jugar su panel
             const hojasDisponibles = recurso.hojas || [];
             if (hojasDisponibles.length > 0) {
                 hojaSeleccionada = hojasDisponibles[Math.floor(Math.random() * hojasDisponibles.length)];
@@ -129,19 +141,16 @@ export default function RuletaGame({ recurso, usuario, alTerminar }) {
             return;
         }
 
-        // 2. Cargar datos de ESA hoja
         const frase = hojaSeleccionada.fraseOculta || hojaSeleccionada.frase || "PANEL DE EJEMPLO";
         setFraseOculta(frase.toUpperCase());
-        setPista(hojaSeleccionada.nombreHoja || "General"); // La Pista es el nombre de la hoja
+        setPista(hojaSeleccionada.nombreHoja || "General");
 
-        // Cargar preguntas SOLO de esa hoja
         const poolPreguntas = hojaSeleccionada.preguntas || [];
         setTodasLasPreguntas(poolPreguntas);
         setColaPreguntas([...poolPreguntas].sort(() => Math.random() - 0.5));
 
         setLetrasDichas([]);
 
-        // 3. Configurar Jugadores
         const colors = ['#3498db', '#e74c3c', '#2ecc71'];
         const nuevosJugadores = nombres.map((nombre, i) => ({
             nombre: nombre,
@@ -152,7 +161,7 @@ export default function RuletaGame({ recurso, usuario, alTerminar }) {
         setJugadores(nuevosJugadores);
         setTurno(0);
         setRotacion(0);
-        
+
         setFase('COUNTDOWN');
         procesandoRef.current = false;
     };
@@ -163,8 +172,8 @@ export default function RuletaGame({ recurso, usuario, alTerminar }) {
         setGirando(true);
         procesandoRef.current = true;
         setMensajeCentral('');
-        
-        playSound('SPIN'); 
+
+        playSound('SPIN');
 
         const indexGanador = Math.floor(Math.random() * NUM_SEGMENTOS);
         const segmentoGanador = SEGMENTOS[indexGanador];
@@ -183,7 +192,7 @@ export default function RuletaGame({ recurso, usuario, alTerminar }) {
 
         setTimeout(() => {
             setGirando(false);
-            stopSpinSound(); 
+            stopSpinSound();
             procesandoRef.current = false;
             procesarTirada(segmentoGanador);
         }, 4000);
@@ -205,7 +214,6 @@ export default function RuletaGame({ recurso, usuario, alTerminar }) {
     // --- PREGUNTAS ---
     const cargarNuevaPregunta = () => {
         let nuevaCola = [...colaPreguntas];
-        // Si se acaban las preguntas de la hoja, recargamos y barajamos
         if (nuevaCola.length === 0) nuevaCola = [...todasLasPreguntas].sort(() => Math.random() - 0.5);
 
         const p = nuevaCola[0] || { pregunta: "¿Listo para resolver?", respuesta: "si", incorrectas: [] };
@@ -305,7 +313,7 @@ export default function RuletaGame({ recurso, usuario, alTerminar }) {
         procesandoRef.current = true;
 
         if (clean(inputResolver) === clean(fraseOculta)) {
-            playSound('WIN'); 
+            playSound('WIN');
             setLetrasDichas("abcdefghijklmnñopqrstuvwxyz".split(''));
             setJugadores(prev => prev.map((j, i) => {
                 if (i === turno) return { ...j, puntos: j.puntos + BONO_RESOLVER };
@@ -360,7 +368,7 @@ export default function RuletaGame({ recurso, usuario, alTerminar }) {
             try {
                 const snapshotRanking = await getCountFromServer(qRanking);
                 miPosicion = snapshotRanking.data().count + 1;
-            } catch(e) { console.warn("Index needed", e); }
+            } catch (e) { console.warn("Index needed", e); }
 
             let medallaReal = '';
             if (miPosicion === 1) medallaReal = '🥇';
@@ -404,7 +412,7 @@ export default function RuletaGame({ recurso, usuario, alTerminar }) {
 
     // --- ALGORITMO ORGANIZAR FRASE ---
     const organizarFraseEnFilas = (frase) => {
-        const MAX_CHARS = 14; 
+        const MAX_CHARS = 14;
         const palabras = frase.toUpperCase().split(' ');
         const filas = [];
         let filaActual = [];
@@ -412,7 +420,7 @@ export default function RuletaGame({ recurso, usuario, alTerminar }) {
 
         palabras.forEach(palabra => {
             const espacioNecesario = palabra.length + (filaActual.length > 0 ? 1 : 0);
-            
+
             if (longitudActual + espacioNecesario <= MAX_CHARS) {
                 if (filaActual.length > 0) {
                     filaActual.push(' ');
@@ -424,9 +432,9 @@ export default function RuletaGame({ recurso, usuario, alTerminar }) {
                 });
             } else {
                 if (palabra.length > MAX_CHARS) {
-                     filas.push(filaActual);
-                     filaActual = palabra.split('');
-                     longitudActual = palabra.length;
+                    filas.push(filaActual);
+                    filaActual = palabra.split('');
+                    longitudActual = palabra.length;
                 } else {
                     filas.push(filaActual);
                     filaActual = palabra.split('');
@@ -446,10 +454,13 @@ export default function RuletaGame({ recurso, usuario, alTerminar }) {
 
     if (fase === 'COUNTDOWN') {
         return (
-            <PantallaCuentaAtras 
-                profesor={recurso.profesorNombre || recurso.nombreProfesor || "Tu Profesor"} 
+            <PantallaCuentaAtras
+                profesor={recurso.profesorNombre || recurso.nombreProfesor || "Tu Profesor"}
                 instrucciones={recurso.instrucciones}
-                onFinished={() => setFase('GIRO')} 
+                onFinished={() => {
+                    incrementarPlayCount(); // Sumar +1 partida al terminar cuenta atrás
+                    setFase('GIRO');
+                }}
             />
         );
     }
@@ -478,7 +489,7 @@ export default function RuletaGame({ recurso, usuario, alTerminar }) {
                         </div>
                     ))}
                 </div>
-                
+
                 {/* PISTA DEBAJO DEL PANEL */}
                 <div className="pista-panel">
                     <strong>PISTA:</strong> {pista}
@@ -614,16 +625,16 @@ export default function RuletaGame({ recurso, usuario, alTerminar }) {
                         <div className="botones-fin">
                             {esInvitado ? (
                                 <div style={{ margin: '15px 0', padding: '10px', background: 'rgba(0,0,0,0.05)', borderRadius: '10px' }}>
-                                    <p style={{ color: '#555', fontSize: '0.9rem', marginBottom:'5px' }}>Regístrate para guardar tus resultados.</p>
+                                    <p style={{ color: '#555', fontSize: '0.9rem', marginBottom: '5px' }}>Regístrate para guardar tus resultados.</p>
                                     <p style={{ color: '#2ecc71', fontWeight: 'bold' }}>¡Únete a LearnJoy!</p>
                                 </div>
                             ) : (
-                                jugadores.length === 1 && (
-                                    <button className="btn-save-premium" onClick={guardarRecord}>
-                                        <Save size={20} /> Guardar mi Récord
+                                    jugadores.length === 1 && (
+                                        <button className="btn-save-premium" onClick={guardarRecord}>
+                                            <Save size={20} /> Guardar mi Récord
                                     </button>
-                                )
-                            )}
+                                    )
+                                )}
                             <button className="btn-salir-premium" onClick={alTerminar}>Salir</button>
                         </div>
                     </div>
@@ -643,7 +654,7 @@ const PantallaCuentaAtras = ({ profesor, instrucciones, onFinished }) => {
         // Reproducir sonido intro ruleta y guardarlo en ref para pararlo
         audioRef.current = new Audio(SOUNDS.INTRO);
         audioRef.current.volume = 0.5;
-        audioRef.current.play().catch(e => {});
+        audioRef.current.play().catch(e => { });
 
         const sequence = async () => {
             setTexto("3"); setCount(3); await new Promise(r => setTimeout(r, 1000));
@@ -669,10 +680,10 @@ const PantallaCuentaAtras = ({ profesor, instrucciones, onFinished }) => {
                 <h3 style={{ fontSize: '1.2rem', color: '#aaa', margin: 0 }}>¡PREPÁRATE PARA TIRAR!</h3>
                 <h1 style={{ fontSize: '2.5rem', color: '#f1c40f', margin: '10px 0' }}>La Ruleta</h1>
                 <h3 style={{ fontSize: '1.2rem', color: '#aaa', margin: 0 }}>de <span style={{ color: '#2ecc71' }}>{profesor}</span></h3>
-                
+
                 {instrucciones && (
-                    <div style={{ marginTop: '20px', padding: '15px', background: 'rgba(255,255,255,0.1)', borderRadius: '10px', maxWidth:'80%', margin:'20px auto' }}>
-                        <p style={{fontSize:'1.1rem', color:'#eee', fontStyle:'italic'}}>"{instrucciones}"</p>
+                    <div style={{ marginTop: '20px', padding: '15px', background: 'rgba(255,255,255,0.1)', borderRadius: '10px', maxWidth: '80%', margin: '20px auto' }}>
+                        <p style={{ fontSize: '1.1rem', color: '#eee', fontStyle: 'italic' }}>"{instrucciones}"</p>
                     </div>
                 )}
             </div>
@@ -687,12 +698,12 @@ const SetupScreen = ({ recurso, onStart, onExit, usuario, esInvitado }) => {
     const [nombres, setNombres] = useState(['Jugador 1', 'Jugador 2', 'Jugador 3']);
     const [num, setNum] = useState(1);
     const [hoja, setHoja] = useState('General'); // Selección de hoja
-    
+
     const hojasDisponibles = recurso.hojas ? recurso.hojas.map(h => h.nombreHoja) : [];
     const nombreJugador1 = esInvitado ? "Invitado" : (usuario.displayName || "Jugador 1");
 
     const arrancar = () => onStart(num === 1 ? [nombreJugador1] : nombres.slice(0, num), hoja);
-    
+
     return (
         <div className="setup-overlay">
             <div className="setup-card">
@@ -702,7 +713,7 @@ const SetupScreen = ({ recurso, onStart, onExit, usuario, esInvitado }) => {
                 {/* SELECTOR DE HOJA (NUEVO) */}
                 {hojasDisponibles.length > 0 && (
                     <div style={{ marginBottom: '20px', textAlign: 'left' }}>
-                        <label style={{ display: 'block', marginBottom: '5px', color: '#666', fontSize: '0.9rem', fontWeight:'bold' }}>Tema del Panel:</label>
+                        <label style={{ display: 'block', marginBottom: '5px', color: '#666', fontSize: '0.9rem', fontWeight: 'bold' }}>Tema del Panel:</label>
                         <select value={hoja} onChange={e => setHoja(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ccc' }}>
                             <option value="General">Aleatorio</option>
                             {hojasDisponibles.map(h => <option key={h} value={h}>{h}</option>)}

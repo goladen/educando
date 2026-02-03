@@ -2,7 +2,7 @@
 import { auth } from './firebase';
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { Gamepad2 } from 'lucide-react';
-import logoPikt from './assets/icono.png';
+import logoPikt from './assets/icono2.png';
 
 import LandingGames from './components/LandingGames2';
 

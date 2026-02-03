@@ -2,7 +2,7 @@
 import { auth } from './firebase';
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { Gamepad2 } from 'lucide-react';
-
+import logoPikt from './assets/icono.png';
 
 import LandingGames from './components/LandingGames2';
 
@@ -35,13 +35,22 @@ export default function Login({ setGoogleToken }) {
                 {/* --- 1. TU TARJETA DE LOGIN ORIGINAL (MANTENIDA) --- */}
                 <div style={styles.card} id="login-card">
                     <div style={styles.logoArea}>
-                        <div style={styles.iconWrapper}>
-                            <Gamepad2 size={40} color="white" />
+                        {/* AQUÍ ESTÁ EL CAMBIO:
+                           Quitamos el Gamepad2 y ponemos la imagen.
+                           Quitamos también el 'iconWrapper' con fondo naranja/rojo 
+                           para que el logo se vea limpio, o lo ajustamos.
+                        */}
+                        <div style={styles.logoImageContainer}>
+                            <img src={logoPikt} alt="PiKT Logo" style={styles.logoImage} />
                         </div>
-                        <h1 style={styles.title}>LEARNJOY</h1>
+
+
+
+
+                        <h1 style={styles.title}>PiKT</h1>
                     </div>
 
-                    <p style={styles.slogan}>Learn, enjoy and repeat</p>
+                    <p style={styles.slogan}>Juega, aprende y repite</p>
                     <div style={styles.divider}></div>
                     <p style={styles.welcomeText}>Bienvenido a tu plataforma de aprendizaje gamificado.</p>
 
@@ -100,6 +109,28 @@ const styles = {
         boxSizing: 'border-box'
     },
     logoArea: { display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '10px' },
+
+   
+
+    // NUEVOS ESTILOS PARA LA IMAGEN
+    logoImageContainer: {
+        marginBottom: '15px',
+        // Si quieres mantener el brillo/sombra detrás del logo redondo:
+        filter: 'drop-shadow(0 10px 20px rgba(0,0,0,0.2))'
+    },
+    logoImage: {
+        width: '120px', // Ajusta el tamaño aquí
+        height: '120px',
+        borderRadius: '50%', // Asegura que se vea redondo si la imagen es cuadrada
+        objectFit: 'cover'
+    },
+
+
+
+
+
+
+
     iconWrapper: { background: 'linear-gradient(45deg, #FF9800, #F44336)', padding: '15px', borderRadius: '20px', marginBottom: '15px', boxShadow: '0 10px 20px rgba(244, 67, 54, 0.3)', display: 'flex', justifyContent: 'center', alignItems: 'center' },
     title: { margin: 0, color: '#2c3e50', fontSize: '2.5rem', fontWeight: '800', letterSpacing: '-1px', background: '-webkit-linear-gradient(45deg, #2c3e50, #3498db)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' },
     slogan: { margin: '5px 0 20px 0', color: '#7f8c8d', fontSize: '1.2rem', fontWeight: '500', fontStyle: 'italic', letterSpacing: '1px' },

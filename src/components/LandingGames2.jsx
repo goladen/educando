@@ -163,7 +163,7 @@ export default function LandingGames({ onLoginRequest }) {
 
     const compartir = (e, r) => {
         e.stopPropagation();
-        const texto = `¡Juega a ${r.titulo} en LearnJoy! Código: ${r.accessCode}`;
+        const texto = `¡Juega a ${r.titulo} en PiKT! Código: ${r.accessCode}`;
         if (navigator.share) navigator.share({ title: r.titulo, text: texto, url: window.location.href }).catch(() => { });
         else { navigator.clipboard.writeText(texto); alert("¡Código copiado!"); }
     };
@@ -180,7 +180,7 @@ export default function LandingGames({ onLoginRequest }) {
 
             {/* BUSCADOR */}
             <div style={styles.card}>
-                <h3 style={{ color: '#333', textAlign: 'center', margin: '0 0 20px 0' }}>🔍 Encuentra tu Juego</h3>
+                <h3 style={{ color: '#333', textAlign: 'center', margin: '0 0 20px 0' }}>🔍 Encuentra un Juego</h3>
                 <div style={styles.tabContainer}>
                     <button style={styles.tabButton(modoBusqueda === 'FILTROS')} onClick={() => setModoBusqueda('FILTROS')}><Search size={16} /> Filtros</button>
                     <button style={styles.tabButton(modoBusqueda === 'CODIGO')} onClick={() => setModoBusqueda('CODIGO')}><Key size={16} /> Código</button>
@@ -199,7 +199,7 @@ export default function LandingGames({ onLoginRequest }) {
                         </div>
                     )}
 
-                <button style={styles.searchButton} onClick={buscar} disabled={buscando}>{buscando ? 'BUSCANDO...' : 'JUGAR AHORA'}</button>
+                <button style={styles.searchButton} onClick={buscar} disabled={buscando}>{buscando ? 'BUSCANDO...' : 'Busca un juego'}</button>
 
                 {/* RESULTADOS DE BÚSQUEDA - LISTA VERTICAL */}
                 {resultados.length > 0 && (

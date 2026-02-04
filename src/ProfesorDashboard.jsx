@@ -1,13 +1,14 @@
 ﻿import { useState, useEffect } from 'react';
 import { db } from './firebase';
 import { collection, query, where, getDocs, deleteDoc, doc, addDoc, updateDoc, getDoc, setDoc, orderBy } from 'firebase/firestore';
-import { Trash2, Plus, FileSpreadsheet, Bot, BarChart2, Save, X, Pencil, Key, Gamepad2, Edit3, Globe, Search, Copy, Eye, Users, RotateCcw, Send, Zap, UserCircle, LogOut } from 'lucide-react';
+import { Trash2, Plus, FileSpreadsheet, Bot, BarChart2, Save, X, Pencil, Key, Gamepad2, Edit3, Globe, Search, Copy, Eye, Users, RotateCcw, Send, Zap, UserCircle, LogOut, Menu } from 'lucide-react';
 import useDrivePicker from 'react-google-drive-picker';
 import { procesarArchivoExcel } from './ExcelParser';
 import { generarPreguntasGemini } from './GeminiGenerator';
 import GamePlayer from './GamePlayer';
 import ThinkHootGame from './ThinkHootGame';
 import EditorManual from './components/EditorManual';
+import EditorPro from './components/EditorPro'; // <--- IMPORTAMOS EL NUEVO EDITOR
 import RuletaGame from './RuletaGame';
 import UserProfile from './components/UserProfile';
 import StudentDashboard from './StudentDashboard';
@@ -38,8 +39,12 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
     const [filtrosActivos, setFiltrosActivos] = useState({ pais: '', region: '', poblacion: '', tema: '' });
     const [cargando, setCargando] = useState(false);
     const [perfilProfesor, setPerfilProfesor] = useState(null);
+
+    // Modales y Editores
     const [mostrandoCrear, setMostrandoCrear] = useState(false);
     const [mostrandoEditorManual, setMostrandoEditorManual] = useState(false);
+    const [mostrandoEditorPro, setMostrandoEditorPro] = useState(false); // <--- NUEVO
+
     const [recursoResultados, setRecursoResultados] = useState(null);
     const [recursoProbando, setRecursoProbando] = useState(null);
     const [recursoInspeccionando, setRecursoInspeccionando] = useState(null);
@@ -48,9 +53,12 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
     const [modalCopiarApp, setModalCopiarApp] = useState(null);
     const [datosEditor, setDatosEditor] = useState({ id: null, titulo: '', temas: '', profesorNombre: '', pais: '', region: '', poblacion: '', config: {}, hojas: [], isPrivate: false });
 
-    // --- NUEVOS ESTADOS ---
     const [modoVista, setModoVista] = useState('PROFESOR');
     const [mostrandoPerfil, setMostrandoPerfil] = useState(false);
+
+    // --- NUEVOS ESTADOS PARA MENÚ Y MODO DASHBOARD ---
+    const [menuOpen, setMenuOpen] = useState(false);
+    const [modoDashboard, setModoDashboard] = useState('CLASICO'); // 'CLASICO' | 'PRO'
 
     const [openPicker] = useDrivePicker();
 
@@ -62,7 +70,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             if (vista === 'MIS_RECURSOS') cargarRecursosPropios();
             else cargarBiblioteca();
         }
-    }, [usuario, juegoSeleccionado, vista]);
+    }, [usuario, juegoSeleccionado, vista, modoDashboard]); // Añadido modoDashboard a dependencias
 
     const cargarPerfilProfesor = async () => { try { const d = await getDoc(doc(db, "users", usuario.uid)); if (d.exists()) setPerfilProfesor(d.data()); } catch (e) { console.error(e) } };
 
@@ -71,7 +79,12 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
         try {
             const q = query(collection(db, "resources"), where("profesorUid", "==", usuario.uid), where("tipoJuego", "==", juegoSeleccionado));
             const s = await getDocs(q);
-            setRecursos(s.docs.map(d => ({ ...d.data(), id: d.id })));
+            // Filtramos en cliente por tipo (PRO o no PRO)
+            const docs = s.docs.map(d => ({ ...d.data(), id: d.id })).filter(r => {
+                if (modoDashboard === 'PRO') return r.tipo === 'PRO';
+                return !r.tipo || r.tipo !== 'PRO';
+            });
+            setRecursos(docs);
         } catch (e) { console.error(e) }
         setCargando(false);
     };
@@ -81,7 +94,11 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
         try {
             const q = query(collection(db, "resources"), where("tipoJuego", "==", juegoSeleccionado), where("isPrivate", "==", false), orderBy("playCount", "desc"));
             const s = await getDocs(q);
-            setBibliotecaRecursos(s.docs.map(d => ({ ...d.data(), id: d.id })).filter(d => d.profesorUid !== usuario.uid));
+            const docs = s.docs.map(d => ({ ...d.data(), id: d.id })).filter(d => d.profesorUid !== usuario.uid).filter(r => {
+                if (modoDashboard === 'PRO') return r.tipo === 'PRO';
+                return !r.tipo || r.tipo !== 'PRO';
+            });
+            setBibliotecaRecursos(docs);
         } catch (e) { console.error(e); }
         setCargando(false);
     };
@@ -97,6 +114,18 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
         });
     };
 
+    // --- MENÚ LATERAL ---
+    const toggleMenu = () => setMenuOpen(!menuOpen);
+    const cambiarModoDashboard = (modo) => {
+        setModoDashboard(modo);
+        setMenuOpen(false);
+        if (modo === 'PRO') {
+            setJuegoSeleccionado('THINKHOOT');
+        } else {
+            setJuegoSeleccionado('PASAPALABRA'); // O el que prefieras por defecto
+        }
+    };
+
     const ejecutarBusqueda = () => setFiltrosActivos(filtrosInput);
     const limpiarBusqueda = () => { const v = { pais: '', region: '', poblacion: '', tema: '' }; setFiltrosInput(v); setFiltrosActivos(v); };
     const incrementarPopularidad = async (r) => { try { await updateDoc(doc(db, "resources", r.id), { playCount: (r.playCount || 0) + 1 }); } catch (e) { } };
@@ -108,8 +137,17 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
 
     const iniciarCreacion = () => {
         const conf = {}; TIPOS_JUEGOS[juegoSeleccionado].camposConfig.forEach(c => conf[c.key] = c.default);
-        setDatosEditor({ id: null, titulo: '', temas: '', profesorNombre: (perfilProfesor && perfilProfesor.nombre) || usuario.displayName, pais: perfilProfesor?.pais || '', region: perfilProfesor?.region || '', poblacion: perfilProfesor?.poblacion || '', config: conf, hojas: [{ nombreHoja: 'Hoja 1', preguntas: [] }], isPrivate: juegoSeleccionado === 'QUESTION_SENDER' });
-        setMostrandoCrear(true);
+        const nuevoRecurso = { id: null, titulo: '', temas: '', profesorNombre: (perfilProfesor && perfilProfesor.nombre) || usuario.displayName, pais: perfilProfesor?.pais || '', region: perfilProfesor?.region || '', poblacion: perfilProfesor?.poblacion || '', config: conf, hojas: [{ nombreHoja: 'Hoja 1', preguntas: [] }], isPrivate: juegoSeleccionado === 'QUESTION_SENDER' };
+
+        setDatosEditor(nuevoRecurso);
+
+        if (modoDashboard === 'PRO') {
+            // En modo PRO vamos directo al EditorPro
+            setMostrandoEditorPro(true);
+        } else {
+            // En modo Clásico abrimos el modal de elección (IA, Manual, Excel)
+            setMostrandoCrear(true);
+        }
     };
 
     const abrirEdicion = async (recursoLocal) => {
@@ -121,14 +159,21 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                 if (!dataFresca.hojas) dataFresca.hojas = [{ nombreHoja: 'General', preguntas: [] }];
                 if (!dataFresca.config) dataFresca.config = {};
                 setDatosEditor(dataFresca);
-                setMostrandoEditorManual(true);
+
+                // Detectar si es PRO o Clásico para abrir el editor correcto
+                if (dataFresca.tipo === 'PRO') {
+                    setMostrandoEditorPro(true);
+                } else {
+                    setMostrandoEditorManual(true);
+                }
             } else {
                 alert("El recurso no existe.");
             }
         } catch (error) {
             console.error(error);
             setDatosEditor(JSON.parse(JSON.stringify(recursoLocal)));
-            setMostrandoEditorManual(true);
+            if (recursoLocal.tipo === 'PRO') setMostrandoEditorPro(true);
+            else setMostrandoEditorManual(true);
         }
     };
 
@@ -167,6 +212,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                 alert("Creado");
             }
             setMostrandoEditorManual(false);
+            setMostrandoEditorPro(false);
             cargarRecursosPropios();
         } catch (e) { alert(e.message); }
     };
@@ -213,8 +259,21 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
 
         if (!pool || pool.length === 0) return alert("No hay preguntas disponibles en este recurso.");
 
-        pool.sort(() => Math.random() - 0.5);
-        const pFin = pool.slice(0, parseInt(r.config?.numPreguntas) || 10).map(p => ({ q: p.pregunta, a: p.correcta || p.respuesta, tipo: (p.incorrectas?.length > 0) ? 'opciones' : 'texto', opcionesFijas: (p.incorrectas?.length > 0) ? [p.correcta || p.respuesta, ...p.incorrectas].sort(() => Math.random() - 0.5) : [] }));
+        // Preparar preguntas (si es PRO ya tienen estructura, si no, se adaptan)
+        let pFin = [];
+        if (r.tipo === 'PRO') {
+            if (r.config?.aleatorio) pool.sort(() => Math.random() - 0.5);
+            pFin = pool.slice(0, parseInt(r.config?.numPreguntas) || 10);
+        } else {
+            // Lógica Clásica
+            pool.sort(() => Math.random() - 0.5);
+            pFin = pool.slice(0, parseInt(r.config?.numPreguntas) || 10).map(p => ({
+                q: p.pregunta,
+                a: p.correcta || p.respuesta,
+                tipo: (p.incorrectas?.length > 0) ? 'opciones' : 'texto',
+                opcionesFijas: (p.incorrectas?.length > 0) ? [p.correcta || p.respuesta, ...p.incorrectas].sort(() => Math.random() - 0.5) : []
+            }));
+        }
 
         await setDoc(doc(db, "live_games", sala), { hostId: usuario.uid, recursoId: r.id, recursoTitulo: r.titulo, profesorNombre: r.profesorNombre, config: r.config, preguntas: pFin, estado: 'LOBBY', indicePregunta: 0, jugadores: {}, respuestasRonda: {}, timestamp: new Date() });
         setHostGameData({ ...hostGameData, codigoSala: sala, fase: 'LIVE' });
@@ -228,18 +287,14 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
     if (recursoProbando) return <div style={{ background: '#2f3640', minHeight: '100vh' }}><div style={{ background: '#f1c40f', padding: '10px', textAlign: 'center' }}>MODO PRUEBA <button onClick={() => setRecursoProbando(null)} style={{ marginLeft: 20 }}>Cerrar</button></div><GamePlayer recurso={recursoProbando} usuario={usuario} alTerminar={() => setRecursoProbando(null)} /></div>;
 
     // ==============================================================================
-    //  RENDERIZADO PRINCIPAL (AQUÍ ESTÁ LO NUEVO)
+    //  RENDERIZADO
     // ==============================================================================
 
-    // 1. MODO VISTA ALUMNO
     if (modoVista === 'ALUMNO') {
         return (
             <div style={{ position: 'relative' }}>
                 <div style={{ position: 'fixed', top: 20, right: 20, zIndex: 9999 }}>
-                    <button
-                        onClick={() => setModoVista('PROFESOR')}
-                        style={{ background: '#e74c3c', color: 'white', padding: '10px 20px', borderRadius: '30px', border: 'none', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
-                    >
+                    <button onClick={() => setModoVista('PROFESOR')} style={{ background: '#e74c3c', color: 'white', padding: '10px 20px', borderRadius: '30px', border: 'none', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
                         <LogOut size={20} /> SALIR MODO ALUMNO
                     </button>
                 </div>
@@ -248,31 +303,61 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
         );
     }
 
-    // 2. MODO PROFESOR (NORMAL)
+    // MODO PROFESOR (DASHBOARD)
     return (
-        <div style={{ padding: '20px', maxWidth: '1000px', margin: '0 auto', fontFamily: 'Arial' }}>
+        <div style={{ padding: '20px', maxWidth: '1000px', margin: '0 auto', fontFamily: 'Arial', position: 'relative' }}>
 
-            {/* CABECERA NUEVA CON LOS BOTONES */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '15px', marginBottom: '30px', borderBottom: '1px solid #eee', paddingBottom: '15px' }}>
-                <button
-                    onClick={() => setModoVista('ALUMNO')}
-                    style={{ background: '#e3f2fd', color: '#1565C0', border: 'none', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}
-                >
+            {/* --- MENÚ HAMBURGUESA --- */}
+            <button onClick={toggleMenu} style={styles.menuButton}>
+                <Menu size={32} color="#2c3e50" />
+            </button>
+
+            {menuOpen && (
+                <div style={styles.menuOverlay} onClick={toggleMenu}>
+                    <div style={styles.menuPanel} onClick={(e) => e.stopPropagation()}>
+                        <div style={styles.menuHeader}>
+                            <h2 style={styles.menuTitle}>Menú</h2>
+                            <button onClick={toggleMenu} style={styles.closeButton}><X size={28} color="#2c3e50" /></button>
+                        </div>
+                        <ul style={styles.menuList}>
+                            <li style={styles.menuItem} onClick={() => cambiarModoDashboard('CLASICO')}>Recursos Clásicos</li>
+                            <li style={styles.menuItem} onClick={() => cambiarModoDashboard('PRO')}>Recursos PRO</li>
+                        </ul>
+                        <div style={styles.menuFooter}>PiKT © 2024</div>
+                    </div>
+                </div>
+            )}
+
+            {/* CABECERA */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '15px', marginBottom: '30px', borderBottom: '1px solid #eee', paddingBottom: '15px', marginTop: '60px' }}>
+                <button onClick={() => setModoVista('ALUMNO')} style={{ background: '#e3f2fd', color: '#1565C0', border: 'none', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}>
                     <Eye size={18} /> Vista Alumno
                 </button>
-                <button
-                    onClick={() => setMostrandoPerfil(true)}
-                    style={{ background: '#f3e5f5', color: '#8E24AA', border: 'none', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}
-                >
+                <button onClick={() => setMostrandoPerfil(true)} style={{ background: '#f3e5f5', color: '#8E24AA', border: 'none', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}>
                     <UserCircle size={18} /> Mi Perfil
                 </button>
             </div>
 
-            <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>{Object.values(TIPOS_JUEGOS).map(j => <button key={j.id} onClick={() => setJuegoSeleccionado(j.id)} style={{ padding: '8px 16px', borderRadius: '20px', border: 'none', background: juegoSeleccionado === j.id ? j.color : '#eee', color: juegoSeleccionado === j.id ? 'white' : '#555', cursor: 'pointer', fontWeight: 'bold' }}>{j.label}</button>)}</div>
+            {/* SELECTOR DE JUEGOS (SOLO EN MODO CLÁSICO) */}
+            {modoDashboard === 'CLASICO' && (
+                <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    {Object.values(TIPOS_JUEGOS).map(j => <button key={j.id} onClick={() => setJuegoSeleccionado(j.id)} style={{ padding: '8px 16px', borderRadius: '20px', border: 'none', background: juegoSeleccionado === j.id ? j.color : '#eee', color: juegoSeleccionado === j.id ? 'white' : '#555', cursor: 'pointer', fontWeight: 'bold' }}>{j.label}</button>)}
+                </div>
+            )}
+
+            {/* TÍTULO MODO PRO */}
+            {modoDashboard === 'PRO' && (
+                <div style={{ marginBottom: '20px', textAlign: 'center' }}>
+                    <h1 style={{ color: '#9C27B0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+                        <Zap size={32} /> ThinkHoot PRO
+                    </h1>
+                </div>
+            )}
+
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
                 <h2>{vista === 'MIS_RECURSOS' ? `Mis Recursos` : `Biblioteca`}</h2>
                 <div style={{ display: 'flex', gap: '10px' }}>
-                    {juegoSeleccionado !== 'QUESTION_SENDER' && <button onClick={() => setVista(vista === 'MIS_RECURSOS' ? 'BIBLIOTECA' : 'MIS_RECURSOS')} style={{ background: '#27ae60', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer' }}><Globe size={18} /> {vista === 'MIS_RECURSOS' ? "Ir a Biblioteca" : "Mis Recursos"}</button>}
+                    {(juegoSeleccionado !== 'QUESTION_SENDER' && modoDashboard === 'CLASICO') && <button onClick={() => setVista(vista === 'MIS_RECURSOS' ? 'BIBLIOTECA' : 'MIS_RECURSOS')} style={{ background: '#27ae60', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer' }}><Globe size={18} /> {vista === 'MIS_RECURSOS' ? "Ir a Biblioteca" : "Mis Recursos"}</button>}
                     {vista === 'MIS_RECURSOS' && <button onClick={iniciarCreacion} style={{ display: 'flex', alignItems: 'center', gap: '5px', background: '#2196F3', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer' }}><Plus size={18} /> Crear Nuevo</button>}
                 </div>
             </div>
@@ -322,8 +407,11 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                 ))}
             </div>
 
+            {/* MODALES EDITORES */}
             {mostrandoCrear && <ModalOverlay onClose={() => setMostrandoCrear(false)}><h2>Nuevo {TIPOS_JUEGOS[juegoSeleccionado].label}</h2><input value={datosEditor.titulo} onChange={e => setDatosEditor({ ...datosEditor, titulo: e.target.value })} style={inputStyle} placeholder="Título" /><div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}><button onClick={() => { setMostrandoCrear(false); setMostrandoEditorManual(true); }} style={{ ...actionBtnStyle('#2196F3'), flex: 1 }}><Edit3 /> Manual</button>{juegoSeleccionado !== 'QUESTION_SENDER' && <><button onClick={procesarCreacionIA} style={{ ...actionBtnStyle('#673AB7'), flex: 1 }}><Bot /> IA</button><button onClick={handleFileUpload} style={{ ...actionBtnStyle('#107C41'), flex: 1 }}><FileSpreadsheet /> Excel</button><button onClick={handleOpenPicker} style={{ ...actionBtnStyle('#FFC107'), flex: 1, color: 'black' }}>Drive</button></>}</div></ModalOverlay>}
             {mostrandoEditorManual && <EditorManual datos={datosEditor} setDatos={setDatosEditor} configJuego={TIPOS_JUEGOS[juegoSeleccionado]} onClose={() => setMostrandoEditorManual(false)} onSave={guardarRecursoFinal} />}
+            {mostrandoEditorPro && <EditorPro datos={datosEditor} setDatos={setDatosEditor} onClose={() => setMostrandoEditorPro(false)} onSave={guardarRecursoFinal} />}
+
             {recursoResultados && <ModalOverlay onClose={() => setRecursoResultados(null)}><h2>Resultados</h2><button onClick={descargarCSV} style={{ background: '#4CAF50', color: 'white', padding: '10px', border: 'none', marginBottom: '10px' }}>Descargar CSV</button><div style={{ maxHeight: '300px', overflowY: 'auto' }}><table style={{ width: '100%' }}><thead><tr><th>Alumno</th><th>Nota</th></tr></thead><tbody>{listaResultados.map((r, i) => <tr key={i}><td>{r.jugador}</td><td>{r.aciertos || r.puntuacion}</td></tr>)}</tbody></table></div></ModalOverlay>}
             {modalCopiarApp && <ModalOverlay onClose={() => setModalCopiarApp(null)}><h2>Mandar a App</h2><p>Crear recurso en <b>{TIPOS_JUEGOS[modalCopiarApp.targetGame]?.label}</b></p><button onClick={confirmarCopiaAplicacion} style={actionBtnStyle('#27ae60')}>Confirmar</button></ModalOverlay>}
 
@@ -337,7 +425,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
 
             {recursoInspeccionando && <ModalOverlay onClose={() => setRecursoInspeccionando(null)}><h2>{recursoInspeccionando.titulo}</h2><div style={{ maxHeight: '400px', overflowY: 'auto' }}>{recursoInspeccionando.hojas.map((h, i) => <div key={i}><h4>{h.nombreHoja}</h4><ul>{h.preguntas.map((p, j) => <li key={j}><b>{p.letra ? `Letra ${p.letra}: ` : ''}{p.pregunta}</b> &rarr; {p.respuesta || p.correcta}</li>)}</ul></div>)}</div><button onClick={() => { copiarRecurso(recursoInspeccionando); setRecursoInspeccionando(null) }} style={actionBtnStyle('#27ae60')}>Copiar</button></ModalOverlay>}
 
-            {/* --- MODAL DE PERFIL (NUEVO) --- */}
+            {/* --- MODAL DE PERFIL --- */}
             {mostrandoPerfil && (
                 <UserProfile
                     usuario={usuario}
@@ -357,4 +445,21 @@ const btnStyle = (bg, color) => ({ flex: 1, padding: '8px', background: bg, colo
 const actionBtnStyle = (bg) => ({ padding: '10px 20px', background: bg, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', fontWeight: 'bold' });
 const inputStyle = { width: '100%', padding: '10px', borderRadius: '5px', border: '1px solid #ccc', boxSizing: 'border-box', marginBottom: '10px' };
 const inputFilter = { padding: '8px', borderRadius: '5px', border: '1px solid #ccc', fontSize: '13px', width: '120px' };
-const lbl = { fontSize: '12px', color: '#666' };
+
+// ESTILOS DEL MENÚ HAMBURGUESA
+const styles = {
+    menuButton: { position: 'absolute', top: '20px', left: '20px', background: '#ecf0f1', border: '1px solid #bdc3c7', borderRadius: '8px', padding: '8px', cursor: 'pointer', zIndex: 50 },
+    menuOverlay: { position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.5)', zIndex: 9999, display: 'flex', justifyContent: 'flex-start' },
+    menuPanel: { width: '80%', maxWidth: '300px', height: '100%', backgroundColor: 'white', boxShadow: '2px 0 10px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', animation: 'slideIn 0.3s ease-out' },
+    menuHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px', borderBottom: '1px solid #eee' },
+    menuTitle: { margin: 0, color: '#2c3e50', fontSize: '1.5rem', fontWeight: 'bold' },
+    closeButton: { background: 'transparent', border: 'none', cursor: 'pointer' },
+    menuList: { listStyle: 'none', padding: '0', margin: '0', flex: 1 },
+    menuItem: { padding: '20px', borderBottom: '1px solid #f0f0f0', color: '#34495e', fontSize: '1.1rem', fontWeight: '500', cursor: 'pointer' },
+    menuFooter: { padding: '20px', textAlign: 'center', color: '#bdc3c7', fontSize: '0.8rem', borderTop: '1px solid #eee' }
+};
+
+// Animación Menu
+const styleSheet = document.createElement("style");
+styleSheet.innerText = `@keyframes slideIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }`;
+document.head.appendChild(styleSheet);

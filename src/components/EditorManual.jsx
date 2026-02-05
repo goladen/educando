@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { Save, X, Trash2, Plus, Settings, RotateCcw } from 'lucide-react';
+import { Save, X, Trash2, Plus, Settings, RotateCcw, HelpCircle } from 'lucide-react'; // <--- AÑADIDO HelpCircle
 
 const JUEGOS_DESTINO = [
     { id: 'PASAPALABRA', label: 'Pasapalabra' },
@@ -9,9 +9,20 @@ const JUEGOS_DESTINO = [
     { id: 'APAREJADOS', label: 'Aparejados' }
 ];
 
+// --- TEXTOS DE AYUDA POR JUEGO ---
+const HELP_CONTENT = {
+    PASAPALABRA: "En Pasapalabra, cada pregunta corresponde a una letra del rosco. Rellena la 'Pregunta/Definición' y la 'Respuesta Correcta'. El sistema asigna las letras automáticamente (A, B, C...).",
+    CAZABURBUJAS: "Crea preguntas con una respuesta correcta y varias incorrectas. En el juego, los alumnos deben 'explotar' la burbuja con la respuesta correcta antes de que se acabe el tiempo.",
+    THINKHOOT: "Juego tipo Quiz. Añade una pregunta, la respuesta correcta y hasta 3 incorrectas. Los alumnos compiten por puntos y velocidad.",
+    RULETA: "Define una 'Frase Oculta' en la configuración de la hoja. Luego, añade preguntas cuyas respuestas den pistas o letras para resolver esa frase.",
+    APAREJADOS: "Crea parejas de conceptos (A y B). En el juego, los elementos de la columna A y B aparecerán desordenados y el alumno debe unirlos.",
+    QUESTION_SENDER: "Esta herramienta no es un juego en sí, sino un 'Buzón'. Comparte el Código de Acceso con tus alumnos para que ellos te envíen preguntas desde sus dispositivos."
+};
+
 export default function EditorManual({ datos, setDatos, configJuego, onClose, onSave }) {
     const [indiceHojaActiva, setIndiceHojaActiva] = useState(0);
     const [mostrandoConfig, setMostrandoConfig] = useState(false);
+    const [mostrandoAyuda, setMostrandoAyuda] = useState(false); // <--- ESTADO NUEVO
 
     useEffect(() => {
         if (!datos.hojas || datos.hojas.length === 0) {
@@ -102,6 +113,8 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
     // --- TOGGLES ---
     const togglePermitirCopia = () => setDatos(prev => ({ ...prev, isPrivate: !prev.isPrivate }));
     const toggleTerminado = () => setDatos(prev => ({ ...prev, isFinished: !prev.isFinished }));
+    // NUEVO TOGGLE: ORDEN ALEATORIO
+    const toggleAleatorio = () => setDatos(prev => ({ ...prev, config: { ...prev.config, aleatorio: !prev.config?.aleatorio } }));
 
     const hojaActual = datos.hojas[indiceHojaActiva] || { preguntas: [] };
     const esQuestionSender = configJuego.id === 'QUESTION_SENDER';
@@ -180,7 +193,10 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
                         <h2 style={{ margin: 0, fontSize: '18px', color: 'white' }}>{configJuego.label}</h2>
                         <input value={datos.titulo} onChange={(e) => setDatos({ ...datos, titulo: e.target.value })} style={styles.titleInput} placeholder="Título del Recurso" />
                     </div>
-                    <div style={{ display: 'flex', gap: '10px' }}>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        {/* --- NUEVO BOTÓN DE AYUDA --- */}
+                        <button onClick={() => setMostrandoAyuda(true)} style={styles.iconBtn} title="Ayuda"><HelpCircle size={24} /></button>
+
                         <button onClick={() => setMostrandoConfig(true)} style={styles.iconBtn} title="Configuración"><Settings size={24} /></button>
                         <button onClick={onSave} style={styles.saveBtn}><Save size={20} /> <span className="hide-mobile">Guardar</span></button>
                         <button onClick={onClose} style={styles.iconBtn}><X size={24} /></button>
@@ -310,6 +326,12 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
                                     </div>
                                 ))}
 
+                                {/* --- NUEVA OPCIÓN: ORDEN ALEATORIO --- */}
+                                <div style={styles.toggleRow}>
+                                    <div><div style={{ fontWeight: 'bold' }}>Orden Aleatorio</div><div style={{ fontSize: '12px', color: '#666' }}>Mezclar preguntas al jugar.</div></div>
+                                    <button onClick={toggleAleatorio} style={{ ...styles.toggleBtn, background: datos.config?.aleatorio ? '#2196F3' : '#ccc', justifyContent: datos.config?.aleatorio ? 'flex-end' : 'flex-start' }}><div style={styles.toggleCircle}></div></button>
+                                </div>
+
                                 <h4 style={styles.sectionTitle}>Opciones</h4>
                                 <div style={styles.toggleRow}>
                                     <div><div style={{ fontWeight: 'bold' }}>Permitir Copia</div><div style={{ fontSize: '12px', color: '#666' }}>Público para otros profes.</div></div>
@@ -324,6 +346,23 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
                         </div>
                     </div>
                 )}
+
+                {/* MODAL DE AYUDA (NUEVO) */}
+                {mostrandoAyuda && (
+                    <div style={styles.configOverlay}>
+                        <div style={styles.configModal}>
+                            <div style={styles.configHeader}>
+                                <h3>Ayuda: {configJuego.label}</h3>
+                                <button onClick={() => setMostrandoAyuda(false)} style={styles.iconBtnBlack}><X /></button>
+                            </div>
+                            <div style={{ padding: '20px', lineHeight: '1.6', color: '#444' }}>
+                                <p>{HELP_CONTENT[configJuego.id] || "Rellena los campos para crear tu recurso."}</p>
+                            </div>
+                            <button onClick={() => setMostrandoAyuda(false)} style={styles.closeConfigBtn}>Entendido</button>
+                        </div>
+                    </div>
+                )}
+
             </div>
             <style>{`.hide-mobile { display: inline; } @media (max-width: 600px) { .hide-mobile { display: none; } }`}</style>
         </div>

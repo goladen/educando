@@ -1,15 +1,16 @@
 ﻿import { useState, useEffect } from 'react';
-import { Save, X, Trash2, FolderPlus, ArrowUp, ArrowDown, Clock, Trophy, GripVertical, Image as ImageIcon, Type, List, AlignCenter, MoreHorizontal } from 'lucide-react';
+import { Save, X, Trash2, FolderPlus, ArrowUp, ArrowDown, Clock, Trophy, GripVertical, Image as ImageIcon, Type, List, AlignCenter, MoreHorizontal, Settings } from 'lucide-react';
 
 export default function EditorPro({ datos, setDatos, onClose, onSave }) {
     const [hojaActiva, setHojaActiva] = useState(0);
+    const [mostrandoConfig, setMostrandoConfig] = useState(false);
 
     // Asegurar que el recurso se marca como PRO y tiene configuración base
     useEffect(() => {
         if (datos && (!datos.tipo || datos.tipo !== 'PRO')) {
             setDatos(prev => ({
                 ...prev,
-                tipo: 'PRO', // Marca fundamental para ThinkHootGame
+                tipo: 'PRO',
                 config: {
                     ...prev.config,
                     aleatorio: true,
@@ -43,18 +44,16 @@ export default function EditorPro({ datos, setDatos, onClose, onSave }) {
     // Gestión Preguntas
     const addPregunta = () => {
         const nuevas = [...datos.hojas];
-        // Estructura base de una pregunta PRO
         const nuevaP = {
-            tipo: 'SIMPLE', // Por defecto
+            tipo: 'SIMPLE',
             pregunta: '',
             tiempo: 20,
             puntosMax: 100,
             puntosMin: 10,
-            // Campos específicos inicializados
-            respuesta: '', // Para simple
-            correcta: '', incorrectas: ['', '', ''], // Para multiple
-            bloques: [], // Para ordenar/rellenar/presentacion
-            numBloques: 4 // Auxiliar para ordenar
+            respuesta: '',
+            correcta: '', incorrectas: ['', '', ''],
+            bloques: [],
+            numBloques: 4
         };
         nuevas[hojaActiva].preguntas.push(nuevaP);
         setDatos({ ...datos, hojas: nuevas });
@@ -66,7 +65,6 @@ export default function EditorPro({ datos, setDatos, onClose, onSave }) {
         setDatos({ ...datos, hojas: nuevas });
     };
 
-    // Actualización especial para arrays (bloques, incorrectas)
     const updatePreguntaArray = (idx, arrayField, arrayIdx, val) => {
         const nuevas = [...datos.hojas];
         const arr = [...(nuevas[hojaActiva].preguntas[idx][arrayField] || [])];
@@ -89,6 +87,10 @@ export default function EditorPro({ datos, setDatos, onClose, onSave }) {
         setDatos({ ...datos, hojas: nuevas });
     };
 
+    // --- TOGGLES DE CONFIGURACIÓN ---
+    const togglePermitirCopia = () => setDatos(prev => ({ ...prev, isPrivate: !prev.isPrivate }));
+    const toggleTerminado = () => setDatos(prev => ({ ...prev, isFinished: !prev.isFinished }));
+
     // --- RENDERIZADO DE CAMPOS ESPECÍFICOS SEGÚN TIPO ---
     const renderCamposPro = (p, i) => {
         const tipo = p.tipo || 'SIMPLE';
@@ -96,12 +98,12 @@ export default function EditorPro({ datos, setDatos, onClose, onSave }) {
         return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
 
-                {/* 1. SELECTOR DE TIPO Y CONFIGURACIÓN BÁSICA (Tiempo/Puntos) */}
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', background: '#f0f4f8', padding: '8px', borderRadius: '5px' }}>
+                {/* 1. SELECTOR DE TIPO Y CONFIGURACIÓN BÁSICA */}
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', background: '#f0f4f8', padding: '8px', borderRadius: '5px', flexWrap: 'wrap' }}>
                     <select
                         value={tipo}
                         onChange={(e) => updatePregunta(i, 'tipo', e.target.value)}
-                        style={{ ...inputStyleSmall, fontWeight: 'bold', width: '150px', border: '1px solid #3498db', color: '#3498db' }}
+                        style={{ ...inputStyleSmall, fontWeight: 'bold', minWidth: '140px', border: '1px solid #3498db', color: '#3498db' }}
                     >
                         <option value="SIMPLE">Respuesta Corta</option>
                         <option value="MULTIPLE">Selección Múltiple</option>
@@ -110,7 +112,6 @@ export default function EditorPro({ datos, setDatos, onClose, onSave }) {
                         <option value="PRESENTATION">Presentación</option>
                     </select>
 
-                    {/* Si NO es presentación, mostramos config de puntos y tiempo */}
                     {tipo !== 'PRESENTATION' && (
                         <>
                             <div style={statBox} title="Tiempo (segundos)">
@@ -133,7 +134,6 @@ export default function EditorPro({ datos, setDatos, onClose, onSave }) {
 
                 {/* 2. CAMPOS ESPECÍFICOS SEGÚN TIPO */}
 
-                {/* --- RESPUESTA CORTA --- */}
                 {tipo === 'SIMPLE' && (
                     <>
                         <input placeholder="Escribe la pregunta..." value={p.pregunta} onChange={e => updatePregunta(i, 'pregunta', e.target.value)} className="inp" style={{ fontWeight: 'bold' }} />
@@ -141,7 +141,6 @@ export default function EditorPro({ datos, setDatos, onClose, onSave }) {
                     </>
                 )}
 
-                {/* --- SELECCIÓN MÚLTIPLE --- */}
                 {tipo === 'MULTIPLE' && (
                     <>
                         <input placeholder="Escribe la pregunta..." value={p.pregunta} onChange={e => updatePregunta(i, 'pregunta', e.target.value)} className="inp" style={{ fontWeight: 'bold' }} />
@@ -154,11 +153,9 @@ export default function EditorPro({ datos, setDatos, onClose, onSave }) {
                     </>
                 )}
 
-                {/* --- ORDENAR --- */}
                 {tipo === 'ORDENAR' && (
                     <>
                         <input placeholder="Enunciado (Ej: Ordena la frase...)" value={p.pregunta} onChange={e => updatePregunta(i, 'pregunta', e.target.value)} className="inp" style={{ fontWeight: 'bold' }} />
-
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '5px' }}>
                             <label style={{ fontSize: '12px', color: '#666' }}>Nº Bloques:</label>
                             <select
@@ -166,7 +163,6 @@ export default function EditorPro({ datos, setDatos, onClose, onSave }) {
                                 onChange={e => {
                                     const num = parseInt(e.target.value);
                                     updatePregunta(i, 'numBloques', num);
-                                    // Ajustar array de bloques
                                     const currentBloques = p.bloques || [];
                                     const newBloques = Array(num).fill('').map((_, idx) => currentBloques[idx] || '');
                                     updatePregunta(i, 'bloques', newBloques);
@@ -176,23 +172,14 @@ export default function EditorPro({ datos, setDatos, onClose, onSave }) {
                                 {[2, 3, 4, 5, 6, 7, 8].map(n => <option key={n} value={n}>{n}</option>)}
                             </select>
                         </div>
-
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
                             {(p.bloques || Array(p.numBloques || 4).fill('')).map((b, k) => (
-                                <input
-                                    key={k}
-                                    placeholder={`Parte ${k + 1}`}
-                                    value={b}
-                                    onChange={e => updatePreguntaArray(i, 'bloques', k, e.target.value)}
-                                    className="inp"
-                                    style={{ flex: '1 1 45%', minWidth: '100px' }}
-                                />
+                                <input key={k} placeholder={`Parte ${k + 1}`} value={b} onChange={e => updatePreguntaArray(i, 'bloques', k, e.target.value)} className="inp" style={{ flex: '1 1 45%', minWidth: '100px' }} />
                             ))}
                         </div>
                     </>
                 )}
 
-                {/* --- RELLENAR --- */}
                 {tipo === 'RELLENAR' && (
                     <>
                         <input placeholder="Enunciado (Ej: Completa la frase...)" value={p.pregunta} onChange={e => updatePregunta(i, 'pregunta', e.target.value)} className="inp" style={{ fontWeight: 'bold' }} />
@@ -204,7 +191,6 @@ export default function EditorPro({ datos, setDatos, onClose, onSave }) {
                     </>
                 )}
 
-                {/* --- PRESENTACIÓN --- */}
                 {tipo === 'PRESENTATION' && (
                     <div style={{ border: '2px dashed #95a5a6', padding: '10px', borderRadius: '5px' }}>
                         <div style={{ textAlign: 'center', color: '#95a5a6', fontSize: '12px', marginBottom: '5px' }}><ImageIcon size={16} style={{ verticalAlign: 'middle' }} /> Pantalla Informativa (Sin puntos)</div>
@@ -213,13 +199,11 @@ export default function EditorPro({ datos, setDatos, onClose, onSave }) {
                         <input placeholder="Enunciado Inferior" value={p.bloques?.[2] || ''} onChange={e => updatePreguntaArray(i, 'bloques', 2, e.target.value)} className="inp" />
                     </div>
                 )}
-
             </div>
         );
     };
 
     // Estilos locales
-    const inputStyle = { width: '100%', padding: '10px', borderRadius: '5px', border: '1px solid #ccc', boxSizing: 'border-box' };
     const inputStyleSmall = { padding: '5px', borderRadius: '5px', border: '1px solid #ccc', fontSize: '12px' };
     const arrowBtn = { background: '#eee', border: 'none', cursor: 'pointer', fontSize: '10px', padding: '4px', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center' };
     const statBox = { display: 'flex', alignItems: 'center', gap: '3px', background: 'white', padding: '3px 8px', borderRadius: '15px', border: '1px solid #ddd' };
@@ -227,65 +211,66 @@ export default function EditorPro({ datos, setDatos, onClose, onSave }) {
     const miniSelect = { padding: '2px', borderRadius: '3px', border: '1px solid #ccc' };
 
     return (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.8)', zIndex: 2000, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <div style={styles.overlay}>
             <style>{`.inp { padding: 8px; border: 1px solid #ddd; borderRadius: 4px; outline: none; width: 100%; box-sizing: border-box; } .inp:focus { border-color: #2196F3; }`}</style>
 
-            <div style={{ background: 'white', width: '95%', height: '95%', borderRadius: '15px', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 0 20px rgba(0,0,0,0.5)' }}>
+            <div style={styles.container}>
 
-                {/* HEADER */}
-                <div style={{ padding: '15px', background: '#2c3e50', color: 'white', borderBottom: '1px solid #34495e', display: 'flex', gap: '20px', alignItems: 'center' }}>
-                    <h2 style={{ margin: 0, color: '#f1c40f', display: 'flex', alignItems: 'center', gap: '10px' }}><Save size={24} /> Editor PRO</h2>
-                    <input placeholder="Título del Recurso PRO" value={datos.titulo} onChange={e => setDatos({ ...datos, titulo: e.target.value })} style={{ ...inputStyle, width: '300px', marginBottom: 0, background: 'rgba(255,255,255,0.1)', color: 'white', border: 'none' }} />
-
-                    {/* Configuración Global Rápida */}
-                    <div style={{ display: 'flex', gap: '15px', alignItems: 'center', marginLeft: 'auto', marginRight: '20px' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', fontSize: '13px' }}>
-                            <input type="checkbox" checked={datos.config?.aleatorio || false} onChange={e => updateGlobalConfig('aleatorio', e.target.checked)} />
-                            Orden Aleatorio
-                        </label>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px' }}>
-                            <span>Nº Preguntas:</span>
-                            <input type="number" value={datos.config?.numPreguntas || 10} onChange={e => updateGlobalConfig('numPreguntas', e.target.value)} style={{ width: '50px', padding: '3px', borderRadius: '3px', border: 'none', color: 'black' }} />
-                        </div>
+                {/* HEADER RESPONSIVE */}
+                <div style={styles.header}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+                        <h2 style={{ margin: 0, color: '#f1c40f', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <Save size={24} /> <span className="hide-mobile-xs">Editor PRO</span>
+                        </h2>
+                        <input
+                            placeholder="Título..."
+                            value={datos.titulo}
+                            onChange={e => setDatos({ ...datos, titulo: e.target.value })}
+                            style={styles.titleInput}
+                        />
                     </div>
 
-                    <button onClick={onSave} style={{ background: '#27ae60', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px' }}>GUARDAR</button>
-                    <button onClick={onClose} style={{ background: '#c0392b', color: 'white', border: 'none', padding: '10px', borderRadius: '5px', cursor: 'pointer' }}><X size={18} /></button>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <button onClick={() => setMostrandoConfig(true)} style={styles.iconBtn} title="Configuración">
+                            <Settings size={22} />
+                        </button>
+                        <button onClick={onSave} style={styles.saveBtn}>
+                            <Save size={18} /> <span className="hide-mobile">Guardar</span>
+                        </button>
+                        <button onClick={onClose} style={styles.iconBtn}>
+                            <X size={22} />
+                        </button>
+                    </div>
                 </div>
 
                 {/* TABS HOJAS */}
-                <div style={{ background: '#ecf0f1', padding: '10px 10px 0 10px', display: 'flex', gap: '5px', overflowX: 'auto', borderBottom: '1px solid #bdc3c7' }}>
+                <div style={styles.tabsContainer}>
                     {datos.hojas.map((h, i) => (
                         <div key={i} onClick={() => setHojaActiva(i)} style={{
-                            padding: '10px 20px',
+                            ...styles.tab,
                             background: i === hojaActiva ? 'white' : '#bdc3c7',
                             color: i === hojaActiva ? '#2c3e50' : '#555',
-                            borderRadius: '8px 8px 0 0',
-                            cursor: 'pointer',
-                            fontWeight: 'bold',
-                            display: 'flex', alignItems: 'center', gap: '8px',
-                            minWidth: '100px',
                             boxShadow: i === hojaActiva ? '0 -2px 5px rgba(0,0,0,0.05)' : 'none'
                         }}>
-                            <input value={h.nombreHoja} onChange={(e) => renameHoja(i, e.target.value)} style={{ border: 'none', background: 'transparent', fontWeight: 'bold', width: '80px', outline: 'none', color: 'inherit' }} onClick={e => e.stopPropagation()} />
+                            <input value={h.nombreHoja} onChange={(e) => renameHoja(i, e.target.value)} style={styles.tabInput} onClick={e => e.stopPropagation()} />
                             {datos.hojas.length > 1 && <Trash2 size={14} onClick={(e) => { e.stopPropagation(); deleteHoja(i) }} style={{ cursor: 'pointer' }} />}
                         </div>
                     ))}
-                    <button onClick={addHoja} style={{ padding: '8px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#2c3e50' }} title="Añadir Grupo"><FolderPlus size={24} /></button>
+                    <button onClick={addHoja} style={styles.addTabBtn} title="Añadir Grupo"><FolderPlus size={24} /></button>
                 </div>
 
                 {/* AREA PREGUNTAS */}
-                <div style={{ flex: 1, overflowY: 'auto', padding: '30px', background: '#f4f6f7' }}>
+                <div style={styles.body}>
                     {datos.hojas[hojaActiva]?.preguntas.length === 0 ? (
                         <div style={{ textAlign: 'center', color: '#95a5a6', marginTop: '50px' }}>
                             <div style={{ fontSize: '3rem', marginBottom: '10px' }}>📭</div>
                             <p style={{ fontSize: '1.2rem' }}>Este grupo no tiene preguntas aún.</p>
-                            <button onClick={addPregunta} style={{ marginTop: '20px', padding: '12px 25px', background: '#3498db', color: 'white', border: 'none', borderRadius: '30px', cursor: 'pointer', fontSize: '1rem', boxShadow: '0 4px 10px rgba(52, 152, 219, 0.3)' }}>+ Añadir Primera Pregunta</button>
+                            <button onClick={addPregunta} style={styles.addFirstBtn}>+ Añadir Primera Pregunta</button>
                         </div>
                     ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', maxWidth: '800px', margin: '0 auto' }}>
                                 {datos.hojas[hojaActiva]?.preguntas.map((p, i) => (
-                                    <div key={i} style={{ background: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'flex-start', gap: '15px', borderLeft: `5px solid ${p.tipo === 'PRESENTATION' ? '#95a5a6' : '#3498db'}` }}>
+                                    <div key={i} style={{ background: 'white', padding: '15px', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'flex-start', gap: '10px', borderLeft: `5px solid ${p.tipo === 'PRESENTATION' ? '#95a5a6' : '#3498db'}` }}>
 
                                         {/* Controles Izquierda */}
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', alignItems: 'center', paddingTop: '5px' }}>
@@ -296,19 +281,102 @@ export default function EditorPro({ datos, setDatos, onClose, onSave }) {
                                         </div>
 
                                         {/* Contenido Pregunta */}
-                                        <div style={{ flex: 1 }}>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
                                             {renderCamposPro(p, i)}
                                         </div>
                                     </div>
                                 ))}
 
-                                <button onClick={addPregunta} style={{ width: '100%', padding: '15px', border: '2px dashed #bdc3c7', background: 'transparent', borderRadius: '10px', color: '#7f8c8d', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px', fontSize: '1rem' }}>
+                                <button onClick={addPregunta} style={styles.addMoreBtn}>
                                     + AÑADIR OTRA PREGUNTA
                             </button>
                             </div>
                         )}
                 </div>
+
+                {/* MODAL CONFIGURACIÓN (RUEDA DENTADA) */}
+                {mostrandoConfig && (
+                    <div style={styles.configOverlay}>
+                        <div style={styles.configModal}>
+                            <div style={styles.configHeader}>
+                                <h3>Configuración</h3>
+                                <button onClick={() => setMostrandoConfig(false)} style={styles.iconBtnBlack}><X /></button>
+                            </div>
+                            <div style={styles.configBody}>
+                                <h4 style={styles.sectionTitle}>Ubicación</h4>
+                                <InputConfig label="País" val={datos.pais} set={v => setDatos({ ...datos, pais: v })} />
+                                <InputConfig label="Región" val={datos.region} set={v => setDatos({ ...datos, region: v })} />
+                                <InputConfig label="Población" val={datos.poblacion} set={v => setDatos({ ...datos, poblacion: v })} />
+                                <InputConfig label="Temas" val={datos.temas} set={v => setDatos({ ...datos, temas: v })} />
+
+                                <h4 style={styles.sectionTitle}>Ajustes de Juego (Global)</h4>
+                                <div style={{ marginBottom: '10px' }}>
+                                    <label style={styles.label}>Nº de Preguntas a Jugar</label>
+                                    <input
+                                        type="number"
+                                        value={datos.config?.numPreguntas || 10}
+                                        onChange={e => updateGlobalConfig('numPreguntas', e.target.value)}
+                                        style={styles.input}
+                                    />
+                                </div>
+                                <div style={styles.toggleRow}>
+                                    <div><div style={{ fontWeight: 'bold' }}>Orden Aleatorio</div></div>
+                                    <button onClick={() => updateGlobalConfig('aleatorio', !datos.config?.aleatorio)} style={{ ...styles.toggleBtn, background: datos.config?.aleatorio ? '#2196F3' : '#ccc', justifyContent: datos.config?.aleatorio ? 'flex-end' : 'flex-start' }}><div style={styles.toggleCircle}></div></button>
+                                </div>
+
+                                <h4 style={styles.sectionTitle}>Opciones</h4>
+                                <div style={styles.toggleRow}>
+                                    <div><div style={{ fontWeight: 'bold' }}>Permitir Copia</div><div style={{ fontSize: '12px', color: '#666' }}>Público para otros profes.</div></div>
+                                    <button onClick={togglePermitirCopia} style={{ ...styles.toggleBtn, background: !datos.isPrivate ? '#4CAF50' : '#ccc', justifyContent: !datos.isPrivate ? 'flex-end' : 'flex-start' }}><div style={styles.toggleCircle}></div></button>
+                                </div>
+                                <div style={styles.toggleRow}>
+                                    <div><div style={{ fontWeight: 'bold' }}>Terminado</div><div style={{ fontSize: '12px', color: '#666' }}>Visible para alumnos.</div></div>
+                                    <button onClick={toggleTerminado} style={{ ...styles.toggleBtn, background: datos.isFinished ? '#2196F3' : '#ccc', justifyContent: datos.isFinished ? 'flex-end' : 'flex-start' }}><div style={styles.toggleCircle}></div></button>
+                                </div>
+                            </div>
+                            <button onClick={() => setMostrandoConfig(false)} style={styles.closeConfigBtn}>Aceptar</button>
+                        </div>
+                    </div>
+                )}
+
             </div>
+            <style>{`.hide-mobile { display: inline; } .hide-mobile-xs { display: inline; } @media (max-width: 600px) { .hide-mobile { display: none; } .hide-mobile-xs { display: none; } }`}</style>
         </div>
     );
 }
+
+const InputConfig = ({ label, val, set }) => (<div style={{ marginBottom: '10px' }}><label style={{ display: 'block', fontSize: '12px', color: '#666', fontWeight: 'bold' }}>{label}</label><input value={val || ''} onChange={(e) => set(e.target.value)} style={styles.input} /></div>);
+
+const styles = {
+    overlay: { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: '#f0f2f5', zIndex: 3000, display: 'flex', flexDirection: 'column' },
+    container: { display: 'flex', flexDirection: 'column', height: '100%', width: '100%', maxWidth: '1000px', margin: '0 auto', background: 'white', boxShadow: '0 0 20px rgba(0,0,0,0.1)' },
+
+    header: { background: '#2c3e50', padding: '10px 15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'white', gap: '10px' },
+    titleInput: { background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', fontSize: '16px', padding: '5px 10px', borderRadius: '4px', flex: 1, minWidth: 0, outline: 'none' },
+    iconBtn: { background: 'none', border: 'none', color: 'white', cursor: 'pointer', padding: '5px', display: 'flex', alignItems: 'center' },
+    saveBtn: { background: '#27ae60', border: 'none', color: 'white', padding: '8px 15px', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', fontWeight: 'bold', whiteSpace: 'nowrap' },
+
+    tabsContainer: { background: '#ecf0f1', padding: '10px 10px 0 10px', display: 'flex', gap: '5px', overflowX: 'auto', borderBottom: '1px solid #bdc3c7' },
+    tab: { padding: '10px 20px', borderRadius: '8px 8px 0 0', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', minWidth: '100px' },
+    tabInput: { border: 'none', background: 'transparent', fontWeight: 'bold', width: '80px', outline: 'none', color: 'inherit' },
+    addTabBtn: { padding: '8px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#2c3e50' },
+
+    body: { flex: 1, padding: '15px', overflowY: 'auto', background: '#f4f6f7' },
+    addFirstBtn: { marginTop: '20px', padding: '12px 25px', background: '#3498db', color: 'white', border: 'none', borderRadius: '30px', cursor: 'pointer', fontSize: '1rem', boxShadow: '0 4px 10px rgba(52, 152, 219, 0.3)' },
+    addMoreBtn: { width: '100%', padding: '15px', border: '2px dashed #bdc3c7', background: 'transparent', borderRadius: '10px', color: '#7f8c8d', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px', fontSize: '1rem' },
+
+    label: { display: 'block', marginBottom: '5px', fontWeight: 'bold', fontSize: '13px', color: '#333' },
+    input: { width: '100%', padding: '10px', borderRadius: '5px', border: '1px solid #ddd', boxSizing: 'border-box', fontSize: '14px' },
+
+    // Config Modal Styles (Igual que Manual)
+    configOverlay: { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 4000 },
+    configModal: { background: 'white', width: '90%', maxWidth: '400px', borderRadius: '15px', maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' },
+    configHeader: { padding: '15px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+    iconBtnBlack: { background: 'none', border: 'none', cursor: 'pointer', padding: '5px' },
+    configBody: { padding: '20px', overflowY: 'auto', flex: 1 },
+    sectionTitle: { margin: '20px 0 10px 0', color: '#3F51B5', borderBottom: '2px solid #eee', paddingBottom: '5px' },
+    closeConfigBtn: { width: '100%', padding: '15px', background: '#333', color: 'white', border: 'none', borderBottomLeftRadius: '15px', borderBottomRightRadius: '15px', fontSize: '16px', cursor: 'pointer' },
+    toggleRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', padding: '10px', background: '#f5f5f5', borderRadius: '8px' },
+    toggleBtn: { width: '50px', height: '26px', borderRadius: '13px', border: 'none', padding: '2px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.3s' },
+    toggleCircle: { width: '22px', height: '22px', background: 'white', borderRadius: '50%', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }
+};

@@ -25,6 +25,18 @@ export default function ThinkHootGame(props) {
     return <ThinkHootLocal {...props} />;
 }
 
+// --- UTILIDADES ---
+const clean = (s) => s ? String(s).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : "";
+
+const parseText = (text) => {
+    if (!text) return "";
+    // Reemplazo de superíndices (ej: (base)^(exp))
+    let p = String(text).replace(/\((.*?)\)\^\((.*?)\)/g, '<span>$1<sup>$2</sup></span>');
+    // Reemplazo de fracciones (ej: (num)/(den))
+    p = p.replace(/\((.*?)\)\/\((.*?)\)/g, '<span class="fraction"><span class="numer">$1</span><span class="denom">$2</span></span>');
+    return <span dangerouslySetInnerHTML={{ __html: p }} />;
+};
+
 // ============================================================================
 // 1. MODO HOST (PROFESOR)
 // ============================================================================
@@ -338,9 +350,9 @@ function ThinkHootHost({ codigoSala, onExit }) {
                             <div className="host-question-view centered">
                                 {isPresentation ? (
                                     <div className="question-card presentation-card">
-                                        <h2 className="p-top">{currentP.bloques?.[0]}</h2>
+                                        <h2 className="p-top">{parseText(currentP.bloques?.[0])}</h2>
                                         {currentP.bloques?.[1] && <img src={currentP.bloques[1]} className="presentation-img-large" />}
-                                        <div className="p-bottom">{currentP.bloques?.[2]}</div>
+                                        <div className="p-bottom">{parseText(currentP.bloques?.[2])}</div>
 
                                         <div className="host-controls">
                                             <button className="btn-next-floating" onClick={siguientePregunta}>
@@ -350,7 +362,7 @@ function ThinkHootHost({ codigoSala, onExit }) {
                                     </div>
                                 ) : (
                                         <div className="question-card">
-                                            <h2>{currentP.q}</h2>
+                                            <h2>{parseText(currentP.q)}</h2>
                                             {currentP.imagenUrl && <img src={currentP.imagenUrl} className="question-img-small" />}
                                             <div className="host-waiting">
                                                 <Loader className="spin-icon" size={64} />
@@ -370,10 +382,10 @@ function ThinkHootHost({ codigoSala, onExit }) {
 
                                     {currentP.tipo === 'ORDENAR' ? (
                                         <div className="ordered-solution">
-                                            {currentP.bloques.map((b, i) => <span key={i} className="order-chip">{b}</span>)}
+                                            {currentP.bloques.map((b, i) => <span key={i} className="order-chip">{parseText(b)}</span>)}
                                         </div>
                                     ) : (
-                                            <div className="reveal-text">{correctStr}</div>
+                                            <div className="reveal-text">{parseText(correctStr)}</div>
                                         )}
                                 </div>
                             </div>
@@ -658,7 +670,7 @@ function ClientQuestionEngine({ data, config, startTime, subFase, myResult, corr
                         {correctAnswerText && (
                             <>
                                 <div className="neon-label">La respuesta correcta era:</div>
-                                <div className="neon-answer">{correctAnswerText}</div>
+                                <div className="neon-answer">{parseText(correctAnswerText)}</div>
                             </>
                         )}
                     </div>
@@ -822,14 +834,9 @@ function QuestionDisplay({ data, onAnswer, disabled, feedback, isHostView, showA
     const [texto, setTexto] = useState('');
 
     useEffect(() => {
-        // Inicializar orden (shuffled para alumno, normal para host)
-        if (data.tipo === 'ORDENAR' && data.bloques) {
-            setOrden(isHostView ? data.bloques : [...data.bloques].sort(() => Math.random() - 0.5));
-        }
+        if (data.tipo === 'ORDENAR' && data.bloques) setOrden(isHostView ? data.bloques : [...data.bloques].sort(() => Math.random() - 0.5));
         setTexto('');
     }, [data, isHostView]);
-
-    const clean = (s) => s ? String(s).trim().toLowerCase() : "";
 
     const responderSimple = (op) => {
         if (!isHostView) {
@@ -838,109 +845,67 @@ function QuestionDisplay({ data, onAnswer, disabled, feedback, isHostView, showA
             onAnswer(ok);
         }
     };
+    const responderOrdenar = () => { if (!isHostView) onAnswer(JSON.stringify(data.bloques) === JSON.stringify(orden)); };
+    const responderCompletar = () => { if (!isHostView) onAnswer(clean(texto) === clean(data.bloques?.[1])); };
 
-    // ORDENAR: Alumno selecciona en orden
-    // IMPLEMENTACIÓN: Ranuras vacías abajo
-    const [slots, setSlots] = useState([]); // Array de índices de 'orden' que han sido colocados
-
-    // Efecto para inicializar slots vacíos
+    // Logic Ordenar
+    const [slots, setSlots] = useState([]);
     useEffect(() => {
         if (!isHostView && data.tipo === 'ORDENAR' && data.bloques) {
             setSlots(new Array(data.bloques.length).fill(null));
         }
-    }, [data]);
+    }, [data, isHostView]);
 
-    const addToSlot = (block, originalIndex) => {
-        if (isHostView || disabled) return;
-        const firstEmpty = slots.findIndex(s => s === null);
-        if (firstEmpty !== -1) {
-            const newSlots = [...slots];
-            newSlots[firstEmpty] = block;
-            setSlots(newSlots);
-        }
-    };
-
-    const removeFromSlot = (index) => {
-        if (isHostView || disabled) return;
-        const newSlots = [...slots];
-        newSlots[index] = null;
-        setSlots(newSlots);
-    };
-
-    const confirmarOrden = () => {
-        // Verificar si está lleno
-        if (slots.some(s => s === null)) return;
-        const ordenAlumno = JSON.stringify(slots);
-        const ordenCorrecto = JSON.stringify(data.bloques); // data.bloques viene en orden correcto del editor
-        onAnswer(ordenAlumno === ordenCorrecto);
-    };
-
-    const responderCompletar = () => { if (!isHostView) onAnswer(clean(texto) === clean(data.bloques?.[1])); };
+    const addToSlot = (block, i) => { if (isHostView || disabled) return; const firstEmpty = slots.findIndex(s => s === null); if (firstEmpty !== -1) { const n = [...slots]; n[firstEmpty] = block; setSlots(n); } };
+    const removeFromSlot = (i) => { if (isHostView || disabled) return; const n = [...slots]; n[i] = null; setSlots(n); };
+    const confirmarOrden = () => { if (slots.some(s => s === null)) return; onAnswer(JSON.stringify(slots) === JSON.stringify(data.bloques)); };
 
     return (
         <div className="question-card">
-            <h2>{data.q || data.pregunta}</h2>
+            <h2>{parseText(data.q || data.pregunta)}</h2>
             {data.imagenUrl && <img src={data.imagenUrl} className="question-img-small" alt="" />}
+            {data.tipo === 'PRESENTATION' && <div className="info-text">Presentación</div>}
 
-            {/* TIPO ORDENAR (NUEVO SISTEMA SLOT) */}
             {data.tipo === 'ORDENAR' && !isHostView && (
                 <div className="sort-wrapper">
-                    <div className="source-blocks">
-                        {orden.map((bloque, i) => (
-                            <button
-                                key={i}
-                                className="block-chip"
-                                onClick={() => addToSlot(bloque, i)}
-                                disabled={slots.includes(bloque) || disabled}
-                                style={{ opacity: slots.includes(bloque) ? 0.3 : 1 }}
-                            >
-                                {bloque}
-                            </button>
-                        ))}
-                    </div>
-                    <div className="target-slots">
-                        {slots.map((s, i) => (
-                            <div key={i} className="slot-box" onClick={() => removeFromSlot(i)}>
-                                {s || <span className="slot-num">{i + 1}</span>}
-                            </div>
-                        ))}
-                    </div>
+                    <div className="source-blocks">{orden.map((b, i) => (<button key={i} className="block-chip" onClick={() => addToSlot(b, i)} disabled={slots.includes(b) || disabled} style={{ opacity: slots.includes(b) ? 0.3 : 1 }}>{parseText(b)}</button>))}</div>
+                    <div className="target-slots">{slots.map((s, i) => (<div key={i} className="slot-box" onClick={() => removeFromSlot(i)}>{s ? parseText(s) : <span className="slot-num">{i + 1}</span>}</div>))}</div>
                     <button className="btn-confirmar" onClick={confirmarOrden} disabled={disabled || slots.includes(null)}>ENVIAR</button>
                 </div>
             )}
 
-            {/* TIPO ORDENAR (HOST VIEW) */}
             {data.tipo === 'ORDENAR' && isHostView && (
                 <div className="ordered-solution">
-                    {data.bloques.map((b, i) => <span key={i} className="order-chip">{b}</span>)}
+                    {data.bloques.map((b, i) => <span key={i} className="order-chip">{parseText(b)}</span>)}
                 </div>
             )}
 
-            {/* TIPO COMPLETAR */}
             {data.tipo === 'RELLENAR' && (
                 <div className="completar-box">
-                    <span>{data.bloques?.[0]}</span>
-                    {isHostView ? (
-                        <span className="respuesta-host">[{data.bloques?.[1]}]</span>
-                    ) : (
-                            <input value={texto} onChange={e => setTexto(e.target.value)} className="input-hueco" disabled={disabled} />
-                        )}
-                    <span>{data.bloques?.[2]}</span>
+                    <div className="bloque-azul">{parseText(data.bloques?.[0])}</div>
+                    {isHostView ? <span className="respuesta-host">[{data.bloques?.[1]}]</span> : <input value={texto} onChange={e => setTexto(e.target.value)} className="input-hueco-amarillo" disabled={disabled} />}
+                    <div className="bloque-azul">{parseText(data.bloques?.[2])}</div>
                     {!isHostView && <button className="btn-confirmar" onClick={responderCompletar} disabled={disabled}>Enviar</button>}
                 </div>
             )}
 
-            {/* TIPO STANDARD */}
-            {(!data.tipo || ['MULTIPLE', 'SIMPLE', 'opciones', 'texto'].includes(data.tipo)) && (
-                <div className="options-grid">
-                    {(data.opcionesFijas || data.incorrectas) ?
-                        (data.opcionesFijas || [data.respuesta || data.correcta, ...data.incorrectas].sort(() => Math.random() - 0.5)).map((op, k) => (
-                            <button key={k} className={`btn-option ${feedback === 'correct' && clean(op) === clean(data.respuesta || data.correcta || data.a) ? 'correct' : ''} ${feedback === 'incorrect' ? 'dimmed' : ''} ${showAnswer && clean(op) === clean(data.respuesta || data.correcta || data.a) ? 'host-correct' : ''}`} onClick={() => responderSimple(op)} disabled={disabled || isHostView}>{op}</button>
-                        )) :
-                        (!isHostView && <div className="short-answer-box"><input placeholder="Respuesta..." onKeyDown={e => { if (e.key === 'Enter') responderSimple(e.target.value) }} disabled={disabled} /><p>Enter</p></div>)
-                    }
+            {/* RESPUESTA CORTA CLIENTE: INPUT + BOTON */}
+            {(!data.tipo || data.tipo === 'SIMPLE' || data.tipo === 'texto') && !isHostView && !data.incorrectas && !data.opcionesFijas && (
+                <div className="short-answer-client">
+                    <input placeholder="Tu respuesta..." value={texto} onChange={e => setTexto(e.target.value)} className="input-grande" disabled={disabled} />
+                    <button className="btn-confirmar" onClick={() => onAnswer(clean(texto) === clean(data.a || data.respuesta))} disabled={disabled}>ENVIAR</button>
                 </div>
             )}
+
+            {/* OPCIONES MÚLTIPLES */}
+            {(data.opcionesFijas || data.incorrectas) && (
+                <div className="options-grid">
+                    {(data.opcionesFijas || [data.respuesta || data.correcta, ...data.incorrectas].sort(() => Math.random() - 0.5)).map((op, k) => (
+                        <button key={k} className={`btn-option ${feedback === 'correct' && clean(op) === clean(data.respuesta || data.correcta || data.a) ? 'correct' : ''} ${feedback === 'incorrect' ? 'dimmed' : ''} ${showAnswer && clean(op) === clean(data.respuesta || data.correcta || data.a) ? 'host-correct' : ''}`} onClick={() => responderSimple(op)} disabled={disabled || isHostView}>{parseText(op)}</button>
+                    ))}
+                </div>
+            )}
+            {feedback && <div className={`feedback-overlay ${feedback}`}>{feedback === 'correct' ? '¡BIEN!' : '¡MAL!'}</div>}
         </div>
     );
 }
@@ -997,6 +962,18 @@ const EstilosThinkHoot = () => (
         .slot-num { color: #555; }
         .ordered-solution { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
         .order-chip { background: #27ae60; color: white; padding: 10px; border-radius: 5px; font-weight: bold; }
+
+        .completar-box { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; font-size: 1.5rem; color: white; }
+        .bloque-azul { background: #3498db; padding: 10px 20px; border-radius: 10px; font-weight: bold; }
+        .input-hueco-amarillo { background: #f1c40f; color: #2c3e50; border: none; padding: 10px; border-radius: 10px; font-weight: bold; font-size: 1.5rem; width: 150px; text-align: center; }
+        
+        .presentation-card { background: #2c3e50; border: 4px solid #3498db; padding: 20px; border-radius: 20px; text-align: center; }
+        .p-top { font-family: 'Righteous'; color: #f1c40f; font-size: 2.5rem; margin-bottom: 20px; }
+        .p-bottom { font-family: 'Roboto'; color: white; font-size: 1.5rem; margin-top: 20px; font-weight: bold; }
+        .presentation-img-large { border: 5px solid white; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); max-height: 50vh; }
+
+        .short-answer-client { display: flex; flex-direction: column; gap: 15px; width: 100%; align-items: center; }
+        .input-grande { width: 100%; padding: 20px; font-size: 1.5rem; border-radius: 15px; border: none; text-align: center; }
 
         /* PODIUM STYLES */
         .podium-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; width: 100%; color: white; overflow-y: auto; padding-top: 60px; padding-bottom: 100px; }
@@ -1064,54 +1041,11 @@ const EstilosThinkHoot = () => (
         .btn-option.dimmed { opacity: 0.3; }
         .host-correct { border: 4px solid #27ae60; transform: scale(1.05); }
         
-        .presentation-card { background: #f0f8ff; border: 2px solid #3498db; }
-        .presentation-img-large { max-width: 100%; max-height: 400px; border-radius: 10px; margin: 20px 0; }
-        .p-top { font-size: 1.8rem; color: #2c3e50; font-weight: bold; }
-        .p-bottom { font-size: 1.5rem; color: #555; }
-
-        .presentation-img { max-width: 100%; max-height: 50vh; border-radius: 10px; }
-        .sort-container { display: flex; flex-direction: column; gap: 10px; margin: 20px 0; }
-        .sort-item { background: #f9f9f9; padding: 10px; border-radius: 8px; display: flex; align-items: center; border: 1px solid #eee; }
-        .completar-box { font-size: 1.5rem; margin: 30px 0; color: #333; display: flex; align-items: center; justify-content: center; gap: 10px; }
-        .input-hueco { border: none; border-bottom: 3px solid #3498db; font-size: 1.5rem; text-align: center; width: 150px; outline: none; background: #f0f8ff; color: #2980b9; font-weight: bold; }
-        .respuesta-host { color: #27ae60; font-weight: bold; text-decoration: underline; }
-        .btn-confirmar { background: #2c3e50; color: white; padding: 12px 30px; border-radius: 30px; border: none; font-size: 1.1rem; cursor: pointer; font-weight: bold; margin-top: 20px; }
-        .short-answer-box input { padding: 15px; font-size: 1.2rem; width: 80%; border: 2px solid #34495e; border-radius: 10px; text-align: center; }
-        .host-answer { grid-column: 1 / -1; background: #2ecc71; color: white; padding: 10px; border-radius: 5px; font-weight: bold; margin-top: 10px; }
-
-        /* MODAL CLIENTE */
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center; z-index: 200; }
-        .modal-content { background: white; padding: 20px; border-radius: 10px; width: 90%; max-width: 400px; }
-        .modal-content h3 { color: #333; margin-top: 0; }
-        .modal-content textarea { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 5px; font-family: inherit; }
-        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
-        .btn-cancel { background: #999; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; }
-        .btn-confirm { background: #3498db; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; }
-
-        /* NEON ERROR (PASAPALABRA STYLE) */
-        .neon-card { background: #1a1a1a; padding: 25px; border-radius: 15px; text-align: center; color: white; width: 90%; max-width: 400px; animation: popIn 0.3s; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
-        .neon-card.error { border: 3px solid #ff003c; box-shadow: 0 0 20px #ff003c, inset 0 0 10px #ff003c; }
-        .neon-card.success { border: 3px solid #2ecc71; box-shadow: 0 0 20px #2ecc71, inset 0 0 10px #2ecc71; }
-        .neon-card.neutral { border: 3px solid #f1c40f; box-shadow: 0 0 20px #f1c40f, inset 0 0 10px #f1c40f; }
-        .neon-title { font-size: 1.8rem; font-weight: bold; margin-bottom: 10px; }
-        .neon-card.error .neon-title { color: #ff003c; text-shadow: 0 0 10px #ff003c; }
-        .neon-card.success .neon-title { color: #2ecc71; text-shadow: 0 0 10px #2ecc71; }
-        .neon-card.neutral .neon-title { color: #f1c40f; text-shadow: 0 0 10px #f1c40f; }
-        .neon-label { color: #ccc; margin-bottom: 10px; }
-        .neon-answer { font-size: 1.5rem; font-weight: bold; background: rgba(255,0,60,0.1); padding: 10px; border-radius: 8px; border: 1px solid #ff003c; width: 100%; }
-        .check-icon { font-size: 4rem; color: #2ecc71; text-shadow: 0 0 10px #2ecc71; }
-        .points-added { font-size: 2rem; font-weight: bold; color: #f1c40f; animation: bounce 1s infinite; }
-        .points-added.big { font-size: 3rem; }
-        .final-rank-badge { font-size: 1.5rem; color: #f1c40f; margin-top: 10px; font-weight: bold; }
-
-        /* TIMER BAR */
-        .timer-bar-container { width: 100%; height: 10px; background: #444; border-radius: 5px; margin-bottom: 20px; overflow: hidden; }
-        .timer-bar-fill { height: 100%; transition: width 0.1s linear; }
-        .blinking { animation: flashRed 0.5s infinite; }
-        .waiting-others { text-align: center; color: #ccc; margin-top: 50px; display: flex; flex-direction: column; align-items: center; gap: 15px; }
-        .spin-icon { animation: spin 2s linear infinite; }
-        .host-waiting { display: flex; flex-direction: column; align-items: center; gap: 20px; color: #bdc3c7; font-size: 1.2rem; margin-top: 30px; }
-        .timer-big { font-size: 4rem; font-weight: bold; color: #f1c40f; font-family: 'Righteous'; animation: pulse 1s infinite; }
+        /* Matemáticas */
+        sup { vertical-align: super; font-size: smaller; }
+        .fraction { display: inline-block; text-align: center; vertical-align: middle; margin: 0 5px; font-size: 0.9em; }
+        .numer { border-bottom: 2px solid white; display: block; padding: 0 2px; }
+        .denom { display: block; padding: 0 2px; }
 
         @keyframes popIn { from { transform: scale(0); } to { transform: scale(1); } }
         @keyframes bounceIn { 0% { transform: scale(0.3); opacity: 0; } 50% { transform: scale(1.05); } 70% { transform: scale(0.9); } 100% { transform: scale(1); opacity: 1; } }

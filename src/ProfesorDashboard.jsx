@@ -313,8 +313,14 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                     <li style={styles.menuItem} onClick={() => navegar('PRO')}>Recursos PRO</li>
                     <li style={styles.menuItem} onClick={() => navegar('BUSCADOR_GLOBAL')}>Buscador de Recursos</li>
                     <li style={styles.menuItem} onClick={() => navegar('HERRAMIENTAS')}>Herramientas del Profesor</li>
-                    <li style={styles.menuItem} onClick={() => navegar('LEGAL')}>Privacidad y Datos</li>
-                    <li style={styles.menuItem} onClick={() => navegar('INFO')}>Más Información</li>
+
+                    {/* --- CAMBIA ESTAS DOS LÍNEAS PARA LOS ENLACES EXTERNOS --- */}
+                    <li style={styles.menuItem} onClick={() => { setMenuOpen(false); window.open('https://goladen.wixsite.com/matematicas/copia-de-copia-de-pikt-web', '_blank'); }}>
+                        Privacidad y Datos
+                    </li>
+                    <li style={styles.menuItem} onClick={() => { setMenuOpen(false); window.open('https://goladen.wixsite.com/matematicas/copia-de-pikt', '_blank'); }}>
+                        Más Información
+                    </li>
                 </ul>
                 <div style={styles.menuFooter}>PiKT © 2024</div></div></div>)}
 

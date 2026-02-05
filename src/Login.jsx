@@ -50,11 +50,11 @@ export default function Login({ setGoogleToken }) {
         }
         else if (opcion === 'que-hacer') {
             // --- AQUÍ PONES TU URL DE AYUDA ---
-            window.open('https://www.google.com', '_blank');
+            window.open('https://goladen.wixsite.com/matematicas/copia-de-pikt', '_blank');
         }
         else if (opcion === 'privacidad') {
             // --- AQUÍ PONES TU URL DE PRIVACIDAD ---
-            window.open('https://www.google.com', '_blank');
+            window.open('https://goladen.wixsite.com/matematicas/copia-de-copia-de-pikt-web', '_blank');
         }
 
 

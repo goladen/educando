@@ -5,6 +5,7 @@ import { Search, MapPin, User, Globe, Play, Share2, Users, Gamepad2, Key, Filter
 import GamePlayer from '../GamePlayer';
 import ThinkHootGame from '../ThinkHootGame'; // Importante para el modo Host
 import RuletaGame from '../RuletaGame';
+import MathLive from '../MathLive';
 
 // --- ESTILOS ---
 const styles = {
@@ -74,6 +75,7 @@ export default function LandingGames({ onLoginRequest }) {
     // ESTADOS PARA JUGAR EN VIVO (HOST / GESTOR)
     const [liveModeHost, setLiveModeHost] = useState(false);
     const [hostRoomCode, setHostRoomCode] = useState(null);
+    const [isMathLive, setIsMathLive] = useState(false); // <--- AÑADIR ESTE ESTADO
 
     const [topGames, setTopGames] = useState([]);
 
@@ -231,6 +233,8 @@ export default function LandingGames({ onLoginRequest }) {
 
             // 5. Activar modo Host
             setHostRoomCode(sala);
+            // Detectamos si es MathLive mirando la configuración
+            setIsMathLive(r.config?.isMathLive === true);
             setLiveModeHost(true);
 
         } catch (error) {
@@ -253,11 +257,25 @@ export default function LandingGames({ onLoginRequest }) {
 
     // 1. Modo Host (Profesor Invitado)
     if (liveModeHost && hostRoomCode) {
+        // Usuario invitado temporal para que no falle
+        const tempUser = { uid: "host_invitado_" + Date.now(), displayName: "Profe Invitado", email: null };
+
+        if (isMathLive) {
+            return (
+                <MathLive
+                    isHost={true}
+                    codigoSala={hostRoomCode}
+                    usuario={tempUser}
+                    onExit={() => setLiveModeHost(false)}
+                />
+            );
+        }
+
         return (
             <ThinkHootGame
                 isHost={true}
                 codigoSala={hostRoomCode}
-                usuario={{ uid: "host_invitado_" + Date.now(), displayName: "Profe Invitado", email: null }}
+                usuario={tempUser}
                 onExit={() => setLiveModeHost(false)}
             />
         );

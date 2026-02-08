@@ -2,8 +2,7 @@
 import { db } from './firebase';
 import { doc, updateDoc, onSnapshot, increment, deleteField, collection, writeBatch } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
-import { MessageSquare, X, UserX, ThumbsUp, ThumbsDown, ArrowUp, Users, Play, Send, Loader, Trophy, CheckCircle, XCircle, Medal, Save, Monitor } from 'lucide-react';
-import MathLive from './MathLive';
+import { MessageSquare, X, UserX, ThumbsUp, ThumbsDown, ArrowUp, Users, Play, Send, Loader, Trophy, CheckCircle, XCircle, Medal, Save, Monitor, Delete, ArrowLeftRight } from 'lucide-react';
 // --- AUDIOS ---
 import correctSoundFile from './assets/correct-choice-43861.mp3';
 import wrongSoundFile from './assets/negative_beeps-6008.mp3';
@@ -32,10 +31,10 @@ const safePlay = (audioObj) => {
 
 
 
-export default function ThinkHootGame(props) {
-    if (props.isHost) return <ThinkHootHost {...props} />;
-    if (props.codigoSala) return <ThinkHootClient {...props} />;
-    return <ThinkHootLocal {...props} />;
+export default function MathLive(props) {
+    if (props.isHost) return <MathLiveHost {...props} />;
+    if (props.codigoSala) return <MathLiveClient {...props} />;
+    return <MathLiveLocal {...props} />; // Placeholder para local si se usa
 }
 
 // --- UTILIDADES ---
@@ -48,11 +47,78 @@ const parseText = (text) => {
     return <span dangerouslySetInnerHTML={{ __html: p }} />;
 };
 
+
+const generarOperacionesMathLive = (config) => {
+    const questions = [];
+    const count = parseInt(config.mathCount || 0);
+    if (count <= 0) return [];
+
+    const types = config.mathTypes || ['POSITIVOS'];
+    const ops = config.mathOps || ['SUMA'];
+    const min = parseInt(config.mathMin || 1);
+    const max = parseInt(config.mathMax || 10);
+
+    const getRandomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+    const getRandomFloat = (min, max) => (Math.random() * (max - min) + min).toFixed(1);
+    const gcd = (a, b) => b === 0 ? a : gcd(b, a % b);
+    const simplify = (n, d) => { const common = gcd(Math.abs(n), Math.abs(d)); return { n: n / common, d: d / common }; };
+
+    for (let i = 0; i < count; i++) {
+        const type = types[i % types.length];
+        const op = ops[i % ops.length];
+        let qObj = { tipo: 'MATH', tiempo: config.mathTime || 30, puntosMax: config.mathPuntosMax || 100, puntosMin: config.mathPuntosMin || 50, subtipo: 'STANDARD' };
+        let a, b, res, operatorSymbol;
+
+        if (type === 'FRACCIONES') {
+            qObj.subtipo = 'FRACTION';
+            const n1 = getRandomInt(min, max); const d1 = getRandomInt(min, max);
+            const n2 = getRandomInt(min, max); const d2 = getRandomInt(min, max);
+            qObj.f1 = { n: n1, d: d1 }; qObj.f2 = { n: n2, d: d2 };
+            let resN, resD;
+            if (op === 'SUMA') { operatorSymbol = '+'; resN = n1 * d2 + n2 * d1; resD = d1 * d2; }
+            else if (op === 'RESTA') { operatorSymbol = '-'; resN = n1 * d2 - n2 * d1; resD = d1 * d2; }
+            else if (op === 'MULT') { operatorSymbol = '·'; resN = n1 * n2; resD = d1 * d2; }
+            else if (op === 'DIV') { operatorSymbol = ':'; resN = n1 * d2; resD = d1 * n2; }
+            const simple = simplify(resN, resD);
+            if (simple.d < 0) { simple.n = -simple.n; simple.d = -simple.d; }
+            qObj.operator = operatorSymbol; qObj.respuesta = { n: simple.n, d: simple.d }; qObj.q = "Calcula";
+        } else {
+            qObj.subtipo = 'STANDARD';
+            const isDecimal = type === 'DECIMALES';
+            const isNegative = type === 'NEGATIVOS';
+            const getVal = () => { let v = isDecimal ? parseFloat(getRandomFloat(min, max)) : getRandomInt(min, max); if (isNegative && Math.random() > 0.5) v = -v; return v; };
+            a = getVal(); b = getVal();
+            if (op === 'DIV') {
+                if (b === 0) b = 1;
+                if (!isDecimal) { const resTemp = isNegative ? (Math.random() > 0.5 ? -getRandomInt(min, max) : getRandomInt(min, max)) : getRandomInt(min, max); a = b * resTemp; }
+            }
+            if (op === 'SUMA') { operatorSymbol = '+'; res = a + b; }
+            else if (op === 'RESTA') { operatorSymbol = '-'; res = a - b; }
+            else if (op === 'MULT') { operatorSymbol = '·'; res = a * b; }
+            else if (op === 'DIV') { operatorSymbol = ':'; res = a / b; }
+
+            if (isDecimal || !Number.isInteger(res)) {
+                res = parseFloat(res.toFixed(1));
+                qObj.respuesta = String(res).replace('.', ',');
+            } else {
+                qObj.respuesta = String(res);
+            }
+            qObj.displayA = String(a).replace('.', ','); qObj.displayB = String(b).replace('.', ',');
+            if (b < 0) qObj.displayB = `(${qObj.displayB})`; if (a < 0 && op !== '') qObj.displayA = `${qObj.displayA}`;
+            qObj.operator = operatorSymbol; qObj.q = "Calcula";
+        }
+        questions.push(qObj);
+    }
+    return questions;
+};
+
+
+
 // ============================================================================
 // 1. MODO HOST (PROFESOR)
 // ============================================================================
-function ThinkHootHost({ codigoSala, onExit, usuario }) {
-
+function MathLiveHost({ codigoSala, onExit, usuario }) {
+    // 1. GENERAR ID SI ES INVITADO
     const hostId = useMemo(() => {
         return usuario?.uid || 'host_guest_' + Math.random().toString(36).substr(2, 9);
     }, [usuario]);
@@ -91,79 +157,70 @@ function ThinkHootHost({ codigoSala, onExit, usuario }) {
         const unsubscribe = onSnapshot(doc(db, "live_games", codigoSala), async (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
-                setGameData(data);
 
-               // setCargandoSiguiente(false);
+                // GENERACIÓN AUTOMÁTICA DE MATES (Mezclando con preguntas normales si las hay)
+                if (data.config?.isMathLive && !data.mathGenerated && !generationProcessed.current) {
+                    generationProcessed.current = true;
+                    const mathQuestions = generarOperacionesMathLive(data.config);
+                    // Si el profesor ya tenía preguntas normales (ej. orden, selección) las mezclamos
+                    const standardQuestions = data.preguntas || [];
+                    const combined = [...mathQuestions, ...standardQuestions].sort(() => Math.random() - 0.5); // Mezcla simple
+
+                    await updateDoc(doc(db, "live_games", codigoSala), { preguntas: combined, mathGenerated: true });
+                    return;
+                }
+
+                setGameData(data);
                 setFaseHost(data.estado || 'LOBBY');
                 setSubFase(data.fasePregunta || 'RESPONDING');
-
-                const listaJugadores = data.jugadores ? Object.values(data.jugadores) : [];
-                setJugadores(listaJugadores);
-
+                setJugadores(data.jugadores ? Object.values(data.jugadores) : []);
                 if (data.mensajes) setMensajes(Object.entries(data.mensajes).map(([k, v]) => ({ id: k, ...v })));
-                else setMensajes([]);
 
-                // DETECCIÓN Y PROCESAMIENTO DE RESPUESTAS (LÓGICA SERVIDOR)
+                // PROCESAMIENTO DE RESPUESTAS (Protegido para 30+ alumnos)
                 if (data.estado === 'JUEGO' && data.fasePregunta === 'RESPONDING') {
                     const respuestas = data.respuestasRonda || {};
                     const updates = {};
                     let hayCambios = false;
-
-                    // Procesar respuestas pendientes de calcular puntos
                     Object.entries(respuestas).forEach(([uid, resp]) => {
                         if (!resp.processed) {
                             hayCambios = true;
-                            // 1. Calcular Puntos en el HOST (Reloj fiable)
                             let puntos = 0;
-                            const isPresentation = data.preguntas[data.indicePregunta]?.tipo === 'PRESENTATION';
-
-                            if (resp.correct && !isPresentation) {
+                            // Lógica de puntos (igual que ThinkHoot)
+                            if (resp.correct && data.preguntas[data.indicePregunta]?.tipo !== 'PRESENTATION') {
                                 const p = data.preguntas[data.indicePregunta];
-                                const max = parseInt(p.puntosMax || data.config?.puntosMax || 100);
-                                const min = parseInt(p.puntosMin || data.config?.puntosMin || 50);
-                                const tiempoTotal = parseInt(p.tiempo || data.config?.tiempoPregunta || 20);
-
+                                const max = parseInt(p.puntosMax || 100);
+                                const min = parseInt(p.puntosMin || 50);
+                                const tiempoTotal = parseInt(p.tiempo || 30);
                                 const ahora = Date.now();
                                 const inicio = data.questionStartTime || ahora;
                                 const transcurrido = (ahora - inicio) / 1000;
-
                                 const factor = Math.max(0, Math.min(1, (tiempoTotal - transcurrido) / tiempoTotal));
                                 puntos = Math.round(min + (max - min) * factor);
                             }
-
-                            // 2. Preparar Updates
                             updates[`respuestasRonda.${uid}.puntosGanados`] = puntos;
                             updates[`respuestasRonda.${uid}.processed`] = true;
-                            // CORRECCIÓN: Solo damos puntos si el jugador está registrado correctamente
+
+                            // Protección: solo sumar si el jugador existe
                             if (puntos > 0 && data.jugadores && data.jugadores[uid]) {
                                 updates[`jugadores.${uid}.puntos`] = increment(puntos);
                             }
                         }
                     });
+                    if (hayCambios) await updateDoc(doc(db, "live_games", codigoSala), updates);
 
-                    if (hayCambios) {
-                        await updateDoc(doc(db, "live_games", codigoSala), updates);
-                    }
-
-                    // Auto-avance
                     const numRespuestas = Object.keys(respuestas).length;
-                    const numJugadores = listaJugadores.length;
-                    const esPresentacion = data.preguntas?.[data.indicePregunta]?.tipo === 'PRESENTATION';
-
-                    if (!esPresentacion && numJugadores > 0 && numRespuestas >= numJugadores) {
-                        revelarRespuestas(data);
-                    }
+                    const numJugadores = Object.values(data.jugadores || {}).length;
+                    const isPres = data.preguntas?.[data.indicePregunta]?.tipo === 'PRESENTATION';
+                    if (!isPres && numJugadores > 0 && numRespuestas >= numJugadores) revelarRespuestas(data);
                 }
             }
         });
         return () => unsubscribe();
     }, [codigoSala]);
 
-    useEffect(() => {
-        setCargandoSiguiente(false);
-    }, [gameData?.indicePregunta, gameData?.fasePregunta, gameData?.estado]);
+    useEffect(() => { setCargandoSiguiente(false); }, [gameData?.indicePregunta, gameData?.fasePregunta, gameData?.estado]);
 
-
+    // Timer Blindado (Usa gameDataRef)
     // Timer del Host
     useEffect(() => {
         if (faseHost === 'JUEGO' && subFase === 'RESPONDING' && gameData) {
@@ -219,61 +276,35 @@ function ThinkHootHost({ codigoSala, onExit, usuario }) {
 
     const revelarRespuestas = async (dataActual) => {
         if (dataActual.fasePregunta !== 'RESPONDING') return;
-
         const respuestas = Object.values(dataActual.respuestasRonda || {});
         const totalR = respuestas.length;
         const aciertos = respuestas.filter(r => r.correct).length;
         const pct = totalR > 0 ? Math.round((aciertos / totalR) * 100) : 0;
-
         setStats({ aciertos, total: totalR, pct });
         let newMood = 'neutral';
-        if (totalR > 0) {
-            if (pct < 30) newMood = 'angry';
-            else if (pct >= 60) newMood = 'happy';
-        }
+        if (totalR > 0) { if (pct < 30) newMood = 'angry'; else if (pct >= 60) newMood = 'happy'; }
         setAvatarMood(newMood);
-
         await updateDoc(doc(db, "live_games", codigoSala), { fasePregunta: 'REVEAL' });
-
-        setTimeout(async () => {
-            await updateDoc(doc(db, "live_games", codigoSala), { fasePregunta: 'LEADERBOARD' });
-        }, 5000);
+        setTimeout(async () => await updateDoc(doc(db, "live_games", codigoSala), { fasePregunta: 'LEADERBOARD' }), 5000);
     };
 
-    const siguientePregunta = async (e) => { // <--- 1. Añadimos 'e' aquí
+    const siguientePregunta = async (e) => {
         if (cargandoSiguiente) return;
-
-        // 2. ESTO ES LO IMPORTANTE: Quita el foco del botón para que no se quede "pegado"
-        if (e && e.target) {
-            e.target.blur();
-        }
-
+        if (e && e.target) e.target.blur(); // Fix foco botón
         setCargandoSiguiente(true);
-
         try {
-            const nextIdx = (gameData.indicePregunta || 0) + 1;
-
-            // CASO 1: Si estamos respondiendo, forzamos mostrar solución
-            if (gameData.estado === 'JUEGO' && gameData.fasePregunta === 'RESPONDING' && !isPresentation) {
-                await revelarRespuestas(gameData);
-            }
-            // CASO 2: Si ya estamos en solución, ranking o es presentación, avanzamos
-            else if (nextIdx < gameData.preguntas.length) {
-                await updateDoc(doc(db, "live_games", codigoSala), {
-                    indicePregunta: nextIdx,
-                    respuestasRonda: {},
-                    fasePregunta: 'RESPONDING',
-                    questionStartTime: Date.now()
-                });
+            const currentData = gameData || gameDataRef.current;
+            const nextIdx = (currentData.indicePregunta || 0) + 1;
+            if (currentData.estado === 'JUEGO' && currentData.fasePregunta === 'RESPONDING' && currentData.preguntas[currentData.indicePregunta].tipo !== 'PRESENTATION') {
+                await revelarRespuestas(currentData);
+            } else if (nextIdx < currentData.preguntas.length) {
+                await updateDoc(doc(db, "live_games", codigoSala), { indicePregunta: nextIdx, respuestasRonda: {}, fasePregunta: 'RESPONDING', questionStartTime: Date.now() });
                 setAvatarMood('neutral');
             } else {
                 await updateDoc(doc(db, "live_games", codigoSala), { estado: 'FIN' });
                 playSound('WIN');
             }
-        } catch (error) {
-            console.error("Error al pasar pregunta:", error);
-            setCargandoSiguiente(false);
-        }
+        } catch (error) { console.error(error); setCargandoSiguiente(false); }
     };
 
     const guardarResultadosGlobales = async () => {
@@ -329,9 +360,13 @@ function ThinkHootHost({ codigoSala, onExit, usuario }) {
     const currentP = gameData.preguntas?.[gameData.indicePregunta];
     let correctStr = "";
     if (currentP) {
-        if (currentP.tipo === 'RELLENAR' && currentP.bloques) correctStr = currentP.bloques[1];
-        else if (currentP.tipo === 'ORDENAR') correctStr = "";
-        else correctStr = (currentP.correcta || currentP.respuesta || currentP.a) || "";
+        if (currentP.tipo === 'MATH') {
+            correctStr = currentP.subtipo === 'FRACTION' ? `<span class="fraction"><span class="numer">${currentP.respuesta.n}</span><span class="denom">${currentP.respuesta.d}</span></span>` : currentP.respuesta;
+        } else if (currentP.tipo === 'RELLENAR' && currentP.bloques) {
+            correctStr = currentP.bloques[1];
+        } else {
+            correctStr = currentP.correcta || currentP.respuesta || currentP.a || "";
+        }
     }
 
     const isPresentation = currentP?.tipo === 'PRESENTATION';
@@ -424,7 +459,7 @@ function ThinkHootHost({ codigoSala, onExit, usuario }) {
                                         <div className="host-controls">
 
 
-                                            
+
 
                                             <button
                                                 className="btn-next-floating"
@@ -437,18 +472,43 @@ function ThinkHootHost({ codigoSala, onExit, usuario }) {
                                                     justifyContent: 'center'  // <--- CENTRA EL CONTENIDO
                                                 }}
                                             >
-                                                    {cargandoSiguiente ? "Procesando..." : (isLastQuestion ? "🏆 Ranking Final" : "Siguiente")}
-                                                    {!cargandoSiguiente && <ArrowUp className="rotate-90" />}
-                                                </button>
+                                                {cargandoSiguiente ? "Procesando..." : (isLastQuestion ? "🏆 Ranking Final" : "Siguiente")}
+                                                {!cargandoSiguiente && <ArrowUp className="rotate-90" />}
+                                            </button>
 
 
-                                               
+
                                         </div>
                                     </div>
                                 ) : (
                                         <div className="question-card">
                                             <h2>{parseText(currentP.q)}</h2>
                                             {currentP.imagenUrl && <img src={currentP.imagenUrl} className="question-img-small" />}
+                                            {/* VISUALIZADOR MATEMÁTICO HOST */}
+                                            {currentP.tipo === 'MATH' && (
+                                                <div className="math-operation-display">
+                                                    {currentP.subtipo === 'FRACTION' ? (
+                                                        <div className="fraction-layout">
+                                                            <div className="frac"><span>{currentP.f1.n}</span><span className="symbol">/</span><span>{currentP.f1.d}</span></div>
+                                                            <div className="op-symbol">{currentP.operator}</div>
+                                                            <div className="frac"><span>{currentP.f2.n}</span><span className="symbol">/</span><span>{currentP.f2.d}</span></div>
+                                                            <div className="op-symbol">=</div>
+                                                            <div className="frac-result">?</div>
+                                                        </div>
+                                                    ) : (
+                                                            <div className="standard-layout">
+                                                                <span>{currentP.displayA}</span>
+                                                                <span className="op-symbol">{currentP.operator}</span>
+                                                                <span>{currentP.displayB}</span>
+                                                                <span className="op-symbol">=</span>
+                                                                <span className="result-placeholder">?</span>
+                                                            </div>
+                                                        )}
+                                                </div>
+                                            )}
+
+
+
                                             <div className="host-waiting">
                                                 <Loader className="spin-icon" size={64} />
                                                 <p>Esperando respuestas...</p>
@@ -485,18 +545,18 @@ function ThinkHootHost({ codigoSala, onExit, usuario }) {
                                 <PodiumDisplay jugadores={jugadores} />
 
                                 <div className="host-controls">
-                                 
-                                        <button
-                                            className="btn-next-floating"
-                                            onClick={siguientePregunta}
-                                            disabled={cargandoSiguiente}
-                                            style={{ opacity: cargandoSiguiente ? 0.7 : 1, cursor: cargandoSiguiente ? 'wait' : 'pointer' }}
-                                        >
-                                            {cargandoSiguiente ? "Procesando..." : (isLastQuestion ? "🏆 Ranking Final" : "Siguiente")}
-                                            {!cargandoSiguiente && <ArrowUp className="rotate-90" />}
-                                        </button>
 
-                                       
+                                    <button
+                                        className="btn-next-floating"
+                                        onClick={siguientePregunta}
+                                        disabled={cargandoSiguiente}
+                                        style={{ opacity: cargandoSiguiente ? 0.7 : 1, cursor: cargandoSiguiente ? 'wait' : 'pointer' }}
+                                    >
+                                        {cargandoSiguiente ? "Procesando..." : (isLastQuestion ? "🏆 Ranking Final" : "Siguiente")}
+                                        {!cargandoSiguiente && <ArrowUp className="rotate-90" />}
+                                    </button>
+
+
                                 </div>
                             </div>
                         )}
@@ -523,7 +583,7 @@ function ThinkHootHost({ codigoSala, onExit, usuario }) {
 // ============================================================================
 // 2. MODO CLIENTE (ALUMNO)
 // ============================================================================
-function ThinkHootClient({ codigoSala, usuario, onExit }) {
+function MathLiveClient({ codigoSala, usuario, onExit }) {
     const [gameData, setGameData] = useState(null);
     const [fase, setFase] = useState('LOBBY');
     const [subFase, setSubFase] = useState('RESPONDING');
@@ -601,16 +661,17 @@ function ThinkHootClient({ codigoSala, usuario, onExit }) {
     };
 
     if (!gameData) return <div style={{ color: 'white', padding: 20 }}>Conectando...</div>;
-    if (gameData.config?.isMathLive) {
-        return <MathLive codigoSala={codigoSala} usuario={usuario} onExit={onExit} />;
-    }
 
     const preguntaActual = gameData.preguntas?.[gameData.indicePregunta];
     let textoRespuestaCorrecta = "";
     if (preguntaActual) {
-        if (preguntaActual.tipo === 'RELLENAR' && preguntaActual.bloques) textoRespuestaCorrecta = preguntaActual.bloques[1];
-        else if (preguntaActual.tipo === 'ORDENAR') textoRespuestaCorrecta = "Orden Incorrecto";
-        else textoRespuestaCorrecta = (preguntaActual.correcta || preguntaActual.respuesta || preguntaActual.a || "");
+        if (preguntaActual.tipo === 'MATH') {
+            textoRespuestaCorrecta = preguntaActual.subtipo === 'FRACTION' ? `${preguntaActual.respuesta.n}/${preguntaActual.respuesta.d}` : preguntaActual.respuesta;
+        } else if (preguntaActual.tipo === 'RELLENAR' && preguntaActual.bloques) {
+            textoRespuestaCorrecta = preguntaActual.bloques[1];
+        } else {
+            textoRespuestaCorrecta = preguntaActual.correcta || preguntaActual.respuesta || preguntaActual.a || "";
+        }
     }
 
     const currentQ = (gameData.indicePregunta || 0) + 1;
@@ -643,21 +704,21 @@ function ThinkHootClient({ codigoSala, usuario, onExit }) {
             {fase === 'COUNTDOWN' && <div className="lobby-wait"><h1>¡ATENTOS!</h1></div>}
 
             {fase === 'JUEGO' && (
-    <div className="client-question-area">
-        {preguntaActual ? (
-            <ClientQuestionEngine
-                key={gameData.indicePregunta} // <--- ¡AÑADE ESTO OBLIGATORIAMENTE!
-                data={preguntaActual}
-                config={gameData.config}
-                startTime={gameData.questionStartTime}
-                subFase={subFase}
-                myResult={myResult}
-                correctAnswerText={textoRespuestaCorrecta}
-                currentTotalScore={puntuacion}
-                onResponded={notificarRespuesta}
-            />
-        ) : <div>Cargando...</div>}
-    </div>
+                <div className="client-question-area">
+                    {preguntaActual ? (
+                        <ClientQuestionEngine
+                            key={gameData.indicePregunta} /* <--- ¡ESTO ES LO QUE ARREGLA QUE NO SE VEA! */
+                            data={preguntaActual}
+                            config={gameData.config}
+                            startTime={gameData.questionStartTime}
+                            subFase={subFase}
+                            myResult={myResult}
+                            correctAnswerText={textoRespuestaCorrecta}
+                            currentTotalScore={puntuacion}
+                            onResponded={notificarRespuesta}
+                        />
+                    ) : <div>Cargando...</div>}
+                </div>
             )}
 
             {fase === 'FIN' && (
@@ -794,116 +855,131 @@ function ClientQuestionEngine({ data, config, startTime, subFase, myResult, corr
 }
 
 // --- VISUALIZADOR DE PREGUNTA ---
+// --- VISUALIZADOR DE PREGUNTA UNIVERSAL (SIN MEMO PARA EVITAR ERRORES) ---
+
+// --- VISUALIZADOR DE PREGUNTA (CORREGIDO: AHORA INCLUYE LA INTERFAZ MATEMÁTICA) ---
+// --- VISUALIZADOR DE PREGUNTA (OPTIMIZADO CON MEMO) ---
 const QuestionDisplay = memo(function QuestionDisplay({ data, onAnswer, disabled, feedback, isHostView, showAnswer }) {
+    // ESTADOS
+    const [valNum, setValNum] = useState('');
+    const [valDen, setValDen] = useState('');
+    const [focusField, setFocusField] = useState('NUM');
     const [orden, setOrden] = useState([]);
     const [texto, setTexto] = useState('');
     const [slots, setSlots] = useState([]);
     const [opcionesMezcladas, setOpcionesMezcladas] = useState([]);
+
     useEffect(() => {
-        // Ordenar
+        // RESETEO COMPLETO
+        setValNum(''); setValDen(''); setFocusField('NUM'); setTexto('');
+
         if (data.tipo === 'ORDENAR' && data.bloques) {
             setOrden(isHostView ? data.bloques : [...data.bloques].sort(() => Math.random() - 0.5));
             if (!isHostView) setSlots(new Array(data.bloques.length).fill(null));
         }
 
-        // Selección Múltiple - Barajado inicial único
         const rawOptions = data.opcionesFijas || [data.respuesta || data.correcta, ...(data.incorrectas || [])];
         const validOptions = rawOptions.filter(opt => opt && String(opt).trim() !== "");
-        setOpcionesMezcladas([...validOptions].sort(() => Math.random() - 0.5));
+        if (validOptions.length > 0) setOpcionesMezcladas([...validOptions].sort(() => Math.random() - 0.5));
+    }, [data, isHostView]);
 
-        // Resets
-        setTexto('');
-       
-
-        // CAMBIO CLAVE: Usamos 'data.q' y 'data.pregunta' como "huella digital". 
-        // Si Firebase actualiza puntos, estos textos no cambian, así que no se re-baraja.
-    }, [data.q, data.pregunta, data.tipo, isHostView]);
-
-    const responderSimple = (op) => {
-        if (!isHostView) {
-            const correctStr = data.correcta || data.respuesta || data.a;
-            const ok = clean(op) === clean(correctStr);
-            onAnswer(ok);
+    // MANEJADORES
+    const handleKeypad = (char) => {
+        if (char === 'DEL') {
+            if (focusField === 'NUM') setValNum(v => v.slice(0, -1)); else setValDen(v => v.slice(0, -1));
+        } else if (char === 'SWITCH') {
+            setFocusField(prev => prev === 'NUM' ? 'DEN' : 'NUM');
+        } else {
+            if (focusField === 'NUM') setValNum(v => v + char); else setValDen(v => v + char);
         }
     };
+    const enviarMath = () => {
+        if (data.subtipo === 'FRACTION') onAnswer(parseInt(valNum) === parseInt(data.respuesta.n) && parseInt(valDen) === parseInt(data.respuesta.d));
+        else onAnswer(clean(valNum) === clean(data.respuesta));
+    };
 
-    // FUNCIONES ORDENAR
+    // FUNCIONES STANDARD
     const addToSlot = (block, i) => { if (isHostView || disabled) return; const firstEmpty = slots.findIndex(s => s === null); if (firstEmpty !== -1) { const n = [...slots]; n[firstEmpty] = block; setSlots(n); } };
     const removeFromSlot = (i) => { if (isHostView || disabled) return; const n = [...slots]; n[i] = null; setSlots(n); };
     const confirmarOrden = () => { if (slots.some(s => s === null)) return; onAnswer(JSON.stringify(slots) === JSON.stringify(data.bloques)); };
-
     const responderCompletar = () => { if (!isHostView) onAnswer(clean(texto) === clean(data.bloques?.[1])); };
+    const responderSimple = (op) => { if (!isHostView) { const correctStr = data.correcta || data.respuesta || data.a; onAnswer(clean(op) === clean(correctStr)); } };
 
-    // --- LÓGICA EXCLUSIVA DE RENDERIZADO ---
+    // LÓGICA DE RENDERIZADO
+    const isMath = data.tipo === 'MATH' || (data.subtipo === 'STANDARD' || data.subtipo === 'FRACTION');
     const isOrdenar = data.tipo === 'ORDENAR';
     const isRellenar = data.tipo === 'RELLENAR';
-    const isPresentation = data.tipo === 'PRESENTATION';
-    const validIncorrectas = data.incorrectas ? data.incorrectas.filter(opt => opt && String(opt).trim() !== "") : [];
-    const hasOptions = (data.opcionesFijas && data.opcionesFijas.length > 0) || (validIncorrectas.length > 0);
-
-    const isMultiple = hasOptions && !isOrdenar && !isRellenar;
-    // Si no es ninguno de los anteriores, FORZAMOS que sea Respuesta Corta
-    const isShortAnswer = !isMultiple && !isOrdenar && !isRellenar && !isPresentation;
+    const isMultiple = (opcionesMezcladas.length > 0) && !isOrdenar && !isRellenar && !isMath;
+    const isShortAnswer = !isMultiple && !isOrdenar && !isRellenar && !isMath;
 
     return (
         <div className="question-card">
             <h2>{parseText(data.q || data.pregunta)}</h2>
-            {data.imagenUrl && <img src={data.imagenUrl} className="question-img-small" alt="" />}
+            {data.imagenUrl && !isMath && <img src={data.imagenUrl} className="question-img-small" alt="" />}
 
-            {/* 1. TIPO ORDENAR */}
+            {/* INTERFAZ MATEMÁTICA */}
+            {isMath && (
+                <>
+                    <div className="math-operation-display large">
+                        {data.subtipo === 'FRACTION' ? (
+                            <div className="fraction-layout">
+                                <div className="frac"><span>{data.f1.n}</span><span className="symbol">/</span><span>{data.f1.d}</span></div>
+                                <div className="op-symbol">{data.operator}</div>
+                                <div className="frac"><span>{data.f2.n}</span><span className="symbol">/</span><span>{data.f2.d}</span></div>
+                                <div className="op-symbol">=</div>
+                            </div>
+                        ) : (
+                                <div className="standard-layout"><span>{data.displayA}</span><span className="op-symbol">{data.operator}</span><span>{data.displayB}</span><span className="op-symbol">=</span></div>
+                            )}
+                    </div>
+                    {!isHostView && (
+                        <>
+                            <div className="math-inputs-area">
+                                {data.subtipo === 'FRACTION' ? (
+                                    <div className="fraction-input-group">
+                                        <div className={`input-box ${focusField === 'NUM' ? 'focused' : ''}`} onClick={() => setFocusField('NUM')}>{valNum || '?'}</div>
+                                        <div className="fraction-bar"></div>
+                                        <div className={`input-box ${focusField === 'DEN' ? 'focused' : ''}`} onClick={() => setFocusField('DEN')}>{valDen || '?'}</div>
+                                    </div>
+                                ) : (
+                                        <div className={`input-box single ${focusField === 'NUM' ? 'focused' : ''}`} onClick={() => setFocusField('NUM')}>{valNum || '?'}</div>
+                                    )}
+                                <button className="btn-send-math" onClick={enviarMath} disabled={disabled}>ENVIAR</button>
+                            </div>
+                            <div className="virtual-keypad">
+                                {[7, 8, 9, 4, 5, 6, 1, 2, 3].map(n => <button key={n} className="btn-key" onClick={() => handleKeypad(String(n))}>{n}</button>)}
+                                <button className="btn-key" onClick={() => handleKeypad('-')}>-</button>
+                                <button className="btn-key" onClick={() => handleKeypad('0')}>0</button>
+                                <button className="btn-key" onClick={() => handleKeypad(',')}>,</button>
+                                <button className="btn-key danger" onClick={() => handleKeypad('DEL')}><Delete size={24} /></button>
+                                {data.subtipo === 'FRACTION' ? <button className="btn-key special" onClick={() => handleKeypad('SWITCH')}><ArrowLeftRight size={24} /></button> : <div className="btn-key empty"></div>}
+                            </div>
+                        </>
+                    )}
+                </>
+            )}
+
+            {/* RESTO DE MODOS */}
             {isOrdenar && !isHostView && (
                 <div className="sort-wrapper">
-                    <div className="target-slots">
-                        {slots.map((s, i) => (
-                            <div key={i} className="slot-box" onClick={() => removeFromSlot(i)}>
-                                {s ? <span className="slot-content">{parseText(s)}</span> : <span className="slot-num">{i + 1}</span>}
-                            </div>
-                        ))}
-                    </div>
-                    <div className="source-blocks">
-                        {orden.map((bloque, i) => (
-                            <button
-                                key={i}
-                                className="block-chip"
-                                onClick={() => addToSlot(bloque, i)}
-                                disabled={slots.includes(bloque) || disabled}
-                                style={{
-                                    opacity: slots.includes(bloque) ? 0 : 1,
-                                    pointerEvents: slots.includes(bloque) ? 'none' : 'auto'
-                                }}
-                            >
-                                {parseText(bloque)}
-                            </button>
-                        ))}
-                    </div>
+                    <div className="target-slots">{slots.map((s, i) => (<div key={i} className="slot-box" onClick={() => removeFromSlot(i)}>{s ? <span className="slot-content">{parseText(s)}</span> : <span className="slot-num">{i + 1}</span>}</div>))}</div>
+                    <div className="source-blocks">{orden.map((bloque, i) => (<button key={i} className="block-chip" onClick={() => addToSlot(bloque, i)} disabled={slots.includes(bloque) || disabled} style={{ opacity: slots.includes(bloque) ? 0 : 1, pointerEvents: slots.includes(bloque) ? 'none' : 'auto' }}>{parseText(bloque)}</button>))}</div>
                     <button className="btn-confirmar-amarillo" onClick={confirmarOrden} disabled={disabled || slots.includes(null)}>ENVIAR</button>
                 </div>
             )}
+            {isOrdenar && isHostView && <div className="ordered-solution">{data.bloques.map((b, i) => <span key={i} className="order-chip">{parseText(b)}</span>)}</div>}
 
-            {/* TIPO ORDENAR (HOST) */}
-            {isOrdenar && isHostView && (
-                <div className="ordered-solution">
-                    {data.bloques.map((b, i) => <span key={i} className="order-chip">{parseText(b)}</span>)}
-                </div>
-            )}
-
-            {/* 2. TIPO RELLENAR */}
             {isRellenar && (
                 <div className="completar-wrapper">
                     <div className="completar-box">
                         <div className="bloque-azul">{parseText(data.bloques?.[0])}</div>
-                        {isHostView ? (
-                            <span className="respuesta-host">[{parseText(data.bloques?.[1])}]</span>
-                        ) : (
-                                <input value={texto} onChange={e => setTexto(e.target.value)} className="input-hueco-amarillo" disabled={disabled} />
-                            )}
+                        {isHostView ? <span className="respuesta-host">[{parseText(data.bloques?.[1])}]</span> : <input value={texto} onChange={e => setTexto(e.target.value)} className="input-hueco-amarillo" disabled={disabled} />}
                         <div className="bloque-azul">{parseText(data.bloques?.[2])}</div>
                     </div>
                     {!isHostView && <button className="btn-confirmar-amarillo" onClick={responderCompletar} disabled={disabled}>ENVIAR</button>}
                 </div>
             )}
 
-            {/* 3. RESPUESTA CORTA CLIENTE: ESTILO RULETA */}
             {isShortAnswer && !isHostView && (
                 <div className="short-answer-ruleta">
                     <input placeholder="Escribe tu respuesta..." value={texto} onChange={e => setTexto(e.target.value)} disabled={disabled} onKeyDown={(e) => { if (e.key === 'Enter') onAnswer(clean(texto) === clean(data.a || data.respuesta)) }} />
@@ -911,10 +987,8 @@ const QuestionDisplay = memo(function QuestionDisplay({ data, onAnswer, disabled
                 </div>
             )}
 
-            {/* 4. SELECCIÓN MÚLTIPLE (SÓLO SI ES MÚLTIPLE) */}
             {isMultiple && (
                 <div className="options-grid">
-                    {/* USAMOS opcionesMezcladas EN LUGAR DE CALCULARLO AQUÍ */}
                     {opcionesMezcladas.map((op, k) => (
                         <button key={k} className={`btn-option ${feedback === 'correct' && clean(op) === clean(data.respuesta || data.correcta || data.a) ? 'correct' : ''} ${feedback === 'incorrect' ? 'dimmed' : ''} ${showAnswer && clean(op) === clean(data.respuesta || data.correcta || data.a) ? 'host-correct' : ''}`} onClick={() => responderSimple(op)} disabled={disabled || isHostView}>{parseText(op)}</button>
                     ))}
@@ -924,21 +998,25 @@ const QuestionDisplay = memo(function QuestionDisplay({ data, onAnswer, disabled
             {feedback && <div className={`feedback-overlay ${feedback}`}>{feedback === 'correct' ? '¡BIEN!' : '¡MAL!'}</div>}
         </div>
     );
+}, (prev, next) => {
+    // FUNCIÓN DE COMPARACIÓN INTELIGENTE PARA MATHLIVE
+    // 1. Si el título cambia, renderiza.
+    if (prev.data.q !== next.data.q) return false;
 
-}, (prevProps, nextProps) => {
-    // ESTA FUNCIÓN DECIDE SI SE REPINTA (Devuelve true si NO debe cambiar)
-    // Solo repintamos si cambia la pregunta, el feedback, o si se deshabilita
-    return (
-        prevProps.data.q === nextProps.data.q &&
-        prevProps.data.pregunta === nextProps.data.pregunta &&
-        prevProps.feedback === nextProps.feedback &&
-        prevProps.disabled === nextProps.disabled &&
-        prevProps.showAnswer === nextProps.showAnswer &&
-        prevProps.isHostView === nextProps.isHostView
-    );
+    // 2. IMPORTANTE: Si la RESPUESTA o los NÚMEROS (displayA) cambian, renderiza.
+    // Esto es lo que fallaba antes. Ahora detectará que "Calcula" 6*8 es distinto de "Calcula" 5+5.
+    const respuestaIgual = JSON.stringify(prev.data.respuesta) === JSON.stringify(next.data.respuesta);
+    const displayIgual = prev.data.displayA === next.data.displayA;
+    if (!respuestaIgual || !displayIgual) return false;
+
+    // 3. Chequeos estándar de estado
+    if (prev.disabled !== next.disabled) return false;
+    if (prev.feedback !== next.feedback) return false;
+    if (prev.showAnswer !== next.showAnswer) return false;
+
+    // Si todo es igual, NO renderices (ahorra memoria)
+    return true;
 });
-
-
 
 
 
@@ -1007,6 +1085,9 @@ function EngineLocal({ recurso, esPro, setPuntuacionTotal, puntuacionActual, onF
 }
 
 // --- PANTALLAS EXTRA ---
+
+function MathLiveLocal(props) { return <div>Modo Local no implementado en esta versión.</div> }
+
 function PantallaSetup({ recurso, esPro, esInvitado, nombreInvitado, setNombreInvitado, onStart, onExit }) {
     return <div className="card-menu"><h1>ThinkHoot</h1><h2>{recurso.titulo}</h2><p style={{ color: '#ccc' }}>Modo: {esPro ? '🔥 PRO' : 'Estándar'}</p>{esInvitado && <div style={{ marginBottom: 20 }}><input value={nombreInvitado} onChange={e => setNombreInvitado(e.target.value)} placeholder="Tu nombre..." style={{ padding: 10, width: '80%', borderRadius: 5, textAlign: 'center' }} /></div>}<button className="btn-success" onClick={() => { if (esInvitado && !nombreInvitado) return alert("Nombre requerido"); onStart() }}>JUGAR</button><button className="btn-back" onClick={onExit}>Volver</button><EstilosComunes /></div>;
 }
@@ -1069,8 +1150,117 @@ const EstilosThinkHoot = () => (
         .pi-stats-badge { background: #f1c40f; color: #2c3e50; padding: 5px 10px; border-radius: 10px; font-weight: bold; font-family: 'Righteous'; margin-top: -10px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
         .pi-avatar-img.angry { animation: shake 0.5s; }
         .pi-avatar-img.happy { animation: bounce 1s infinite; }
+/* MATH STYLES */
+   
+.fraction-layout { display: flex; align-items: center; gap: 10px; }
+    .frac { display: flex; flex-direction: column; align-items: center; }
+   
+.op-symbol { color: #f1c40f; margin: 0 10px; }
+    
+    .math-inputs-area { display: flex; flex-direction: column; align-items: center; gap: 15px; width: 100%; margin-bottom: 20px; }
+    .fraction-input-group { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+   
 
-        /* FEEDBACK SCREEN CENTRADA (CLIENT - NEON) */
+/* --- CAMBIOS AQUI: NUMEROS AZULES --- */
+    .math-operation-display { 
+        font-family: 'Righteous'; 
+        color: #3498db; /* <--- AZUL (Antes era oscuro) */
+        font-size: 3.5rem; 
+        margin: 30px 0; 
+        display: flex; 
+        justify-content: center; 
+        align-items: center; 
+        width: 100%; 
+    }
+    
+    .standard-layout { display: flex; align-items: center; gap: 15px; }
+    .fraction-layout { display: flex; align-items: center; gap: 15px; }
+    
+    .frac { display: flex; flex-direction: column; align-items: center; }
+    .frac .symbol { 
+        border-top: 4px solid #3498db; /* <--- AZUL (Barra de fracción) */
+        width: 100%; 
+        display: block; 
+        margin: 5px 0; 
+    }
+    .op-symbol { color: #f1c40f; margin: 0 15px; font-weight: bold; } /* Amarillo se mantiene */
+    
+    .math-inputs-area { display: flex; flex-direction: column; align-items: center; gap: 15px; width: 100%; margin-bottom: 20px; }
+    .fraction-input-group { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    
+    .fraction-bar { 
+        width: 120px; 
+        height: 4px; 
+        background: #3498db; /* <--- AZUL (Barra del input) */
+        border-radius: 2px; 
+    }
+    
+    /* Input Boxes y Botones */
+    .input-box { width: 100px; height: 60px; background: #f8f9fa; color: #2c3e50; font-size: 2rem; font-weight: bold; display: flex; align-items: center; justify-content: center; border-radius: 12px; border: 3px solid #bdc3c7; cursor: pointer; transition: all 0.2s; }
+    .input-box.focused { border-color: #3498db; background: white; box-shadow: 0 0 15px rgba(52, 152, 219, 0.3); transform: scale(1.05); }
+    .input-box.single { width: 220px; height: 80px; font-size: 2.5rem; }
+    
+    .btn-send-math { background: #2ecc71; color: white; border: none; padding: 15px 50px; font-size: 1.5rem; border-radius: 50px; font-weight: bold; cursor: pointer; box-shadow: 0 6px 0 #27ae60; transition: transform 0.1s; margin-top: 10px; }
+    .btn-send-math:active { transform: translateY(6px); box-shadow: none; }
+
+   /* TECLADO VIRTUAL - VERSIÓN COMPACTA Y ESTÉTICA */
+    .virtual-keypad { 
+        display: grid; 
+        grid-template-columns: repeat(3, 1fr); 
+        gap: 8px; /* Menos espacio entre teclas (antes 12px) */
+        background: #34495e; 
+        padding: 12px; /* Menos relleno (antes 20px) */
+        border-radius: 16px; 
+        box-shadow: 0 8px 20px rgba(0,0,0,0.4); 
+        margin-top: 10px;
+        width: fit-content; /* Se ajusta al tamaño de las teclas, no estira */
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .btn-key { 
+        background: #ecf0f1; 
+        color: #2c3e50; 
+        border: none; 
+        height: 50px; /* Más pequeño (antes 65px) */
+        width: 55px;  /* Más estrecho (antes 75px) */
+        border-radius: 10px; 
+        font-size: 1.4rem; /* Fuente más pequeña (antes 1.8rem) */
+        font-weight: bold; 
+        cursor: pointer; 
+        box-shadow: 0 3px 0 #bdc3c7; /* Sombra más sutil (antes 5px) */
+        transition: transform 0.1s; 
+        font-family: 'Righteous'; 
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .btn-key:active { 
+        transform: translateY(3px); /* Ajustado a la nueva sombra */
+        box-shadow: none; 
+    }
+
+    .btn-key.danger { 
+        background: #e74c3c; 
+        color: white; 
+        box-shadow: 0 3px 0 #c0392b; 
+    }
+
+    .btn-key.special { 
+        background: #3498db; 
+        color: white; 
+        box-shadow: 0 3px 0 #2980b9; 
+    }
+
+    .btn-key.empty { 
+        background: transparent; 
+        box-shadow: none; 
+        cursor: default; 
+        pointer-events: none;
+    }
+
+/* FEEDBACK SCREEN CENTRADA (CLIENT - NEON) */
         .feedback-container { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 20px; width: 100%; position: fixed; top: 0; left: 0; z-index: 2000; background: rgba(44, 62, 80, 0.95); }
         .pi-feedback-wrapper { display: flex; justify-content: center; width: 100%; margin-bottom: 10px; }
         .pi-feedback { width: 150px; height: 150px; object-fit: contain; animation: popIn 0.5s; filter: drop-shadow(0 5px 15px rgba(0,0,0,0.5)); }

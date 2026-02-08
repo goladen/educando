@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect } from 'react';
 import { db } from './firebase';
 import { collection, query, where, getDocs, deleteDoc, doc, addDoc, updateDoc, getDoc, setDoc, orderBy } from 'firebase/firestore';
-import { Trash2, Plus, FileSpreadsheet, Bot, BarChart2, Save, X, Pencil, Key, Gamepad2, Edit3, Globe, Search, Copy, Eye, Users, RotateCcw, Send, Zap, UserCircle, LogOut, Menu, HelpCircle, Shield, Info, FileText } from 'lucide-react';
+import { Trash2, Plus, FileSpreadsheet, Bot, BarChart2, Save, X, Pencil, Key, Gamepad2, Edit3, Globe, Search, Copy, Eye, Users, RotateCcw, Send, Zap, UserCircle, LogOut, Menu, HelpCircle, Shield, Info, FileText, Calculator } from 'lucide-react';
 import useDrivePicker from 'react-google-drive-picker';
 import { procesarArchivoExcel } from './ExcelParser';
 import { generarPreguntasGemini } from './GeminiGenerator';
@@ -14,7 +14,8 @@ import UserProfile from './components/UserProfile';
 import StudentDashboard from './StudentDashboard';
 import GlobalSearch from './components/GlobalSearch'; // <--- NUEVO
 import TeacherTools from './components/TeacherTools'; // <--- NUEVO
-
+import EditorMathLive from './components/EditorMathLive';
+import MathLive from './MathLive';
 // ==============================================================================
 //  ZONA DE CLAVES
 // ==============================================================================
@@ -54,6 +55,8 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
     const [mostrandoCrear, setMostrandoCrear] = useState(false);
     const [mostrandoEditorManual, setMostrandoEditorManual] = useState(false);
     const [mostrandoEditorPro, setMostrandoEditorPro] = useState(false);
+    const [mostrandoEditorMathLive, setMostrandoEditorMathLive] = useState(false);
+
     const [recursoResultados, setRecursoResultados] = useState(null);
     const [recursoProbando, setRecursoProbando] = useState(null);
     const [recursoInspeccionando, setRecursoInspeccionando] = useState(null);
@@ -153,24 +156,63 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             setMostrandoCrear(true);
         }
     };
+    const iniciarCreacionMathLive = () => {
+        // Configuración inicial específica para MathLive
+        const conf = {
+            isMathLive: true,
+            mathCount: 8, mathTime: 30, mathPuntosMax: 30, mathPuntosMin: 20,
+            mathTypes: ['POSITIVOS'], mathOps: ['SUMA'], mathMin: 1, mathMax: 10,
+            aleatorio: true, numPreguntas: 4
+        };
+
+        const nuevoRecurso = {
+            id: null,
+            titulo: '',
+            temas: '',
+            profesorNombre: (perfilProfesor && perfilProfesor.nombre) || usuario.displayName,
+            pais: perfilProfesor?.pais || '',
+            region: perfilProfesor?.region || '',
+            poblacion: perfilProfesor?.poblacion || '',
+            config: conf,
+            hojas: [{ nombreHoja: 'Grupo 1', preguntas: [] }],
+            isPrivate: false,
+            tipo: 'PRO' // Se guarda como PRO para que el juego lo reconozca
+        };
+        setDatosEditor(nuevoRecurso);
+        setMostrandoEditorMathLive(true);
+    };
 
     const abrirEdicion = async (recursoLocal) => {
         try {
             const docRef = doc(db, "resources", recursoLocal.id);
             const docSnap = await getDoc(docRef);
+
+            let dataFresca;
             if (docSnap.exists()) {
-                const dataFresca = { ...docSnap.data(), id: docSnap.id };
-                if (!dataFresca.hojas) dataFresca.hojas = [{ nombreHoja: 'General', preguntas: [] }];
-                if (!dataFresca.config) dataFresca.config = {};
-                setDatosEditor(dataFresca);
-                if (dataFresca.tipo === 'PRO') setMostrandoEditorPro(true);
-                else setMostrandoEditorManual(true);
-            } else { alert("El recurso no existe."); }
+                dataFresca = { ...docSnap.data(), id: docSnap.id };
+            } else {
+                alert("El recurso no existe, usando copia local.");
+                dataFresca = JSON.parse(JSON.stringify(recursoLocal));
+            }
+
+            if (!dataFresca.hojas) dataFresca.hojas = [{ nombreHoja: 'General', preguntas: [] }];
+            if (!dataFresca.config) dataFresca.config = {};
+
+            setDatosEditor(dataFresca);
+
+            // LOGICA DE APERTURA SEGÚN TIPO
+            if (dataFresca.tipo === 'PRO') {
+                if (dataFresca.config?.isMathLive) {
+                    setMostrandoEditorMathLive(true); // <--- ABRE MATHLIVE
+                } else {
+                    setMostrandoEditorPro(true);      // <--- ABRE THINKHOOT PRO NORMAL
+                }
+            } else {
+                setMostrandoEditorManual(true);
+            }
+
         } catch (error) {
             console.error(error);
-            setDatosEditor(JSON.parse(JSON.stringify(recursoLocal)));
-            if (recursoLocal.tipo === 'PRO') setMostrandoEditorPro(true);
-            else setMostrandoEditorManual(true);
         }
     };
 
@@ -208,6 +250,8 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             }
             setMostrandoEditorManual(false);
             setMostrandoEditorPro(false);
+            setMostrandoEditorMathLive(false);
+
             cargarRecursosPropios();
         } catch (e) { alert(e.message); }
     };
@@ -285,7 +329,28 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             return p;
         });
 
-        await setDoc(doc(db, "live_games", sala), { hostId: usuario.uid, recursoId: r.id, recursoTitulo: r.titulo, profesorNombre: r.profesorNombre, config: r.config, preguntas: pFin, estado: 'LOBBY', indicePregunta: 0, jugadores: {}, respuestasRonda: {}, timestamp: new Date() });
+        // Si no hay usuario registrado, generamos un ID temporal y un nombre por defecto
+        const myHostId = usuario?.uid || "host_invitado_" + Date.now();
+        const myHostName = usuario?.displayName || "Profe Invitado";
+
+
+
+
+
+
+        await setDoc(doc(db, "live_games", sala), {
+            hostId: myHostId, // Usamos el ID seguro
+            recursoId: r.id || 'temp_id',
+            recursoTitulo: r.titulo,
+            profesorNombre: myHostName,
+            config: r.config,
+            preguntas: pFin,
+            estado: 'LOBBY',
+            indicePregunta: 0,
+            jugadores: {},
+            respuestasRonda: {},
+            timestamp: new Date()
+        });
         setHostGameData({ ...hostGameData, codigoSala: sala, fase: 'LIVE' });
     };
 
@@ -293,7 +358,24 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
     const descargarCSV = () => { let csv = "Jugador,Puntos\n" + listaResultados.map(r => `${r.jugador},${r.aciertos || r.puntuacion}`).join("\n"); const l = document.createElement("a"); l.href = encodeURI("data:text/csv;charset=utf-8," + csv); l.download = "notas.csv"; l.click(); };
     const probarJuego = (r) => { incrementarPopularidad(r); setRecursoProbando(r); };
 
-    if (hostGameData?.fase === 'LIVE') return <ThinkHootGame isHost={true} codigoSala={hostGameData.codigoSala} usuario={usuario} onExit={() => setHostGameData(null)} />;
+    
+    // --- LÓGICA DE SELECCIÓN DE JUEGO ---
+    if (hostGameData?.fase === 'LIVE') {
+        // Si el recurso tiene la marca de MathLive, cargamos ese archivo
+
+        if (hostGameData.recurso.config?.isMathLive) {
+            return <MathLive isHost={true} codigoSala={hostGameData.codigoSala} usuario={usuario} onExit={() => setHostGameData(null)} />;
+        }
+        // Si no, cargamos el ThinkHoot normal
+
+        return <ThinkHootGame isHost={true} codigoSala={hostGameData.codigoSala} usuario={usuario} onExit={() => setHostGameData(null)} />;
+    }
+
+
+
+
+
+
     if (recursoProbando) return <div style={{ background: '#2f3640', minHeight: '100vh' }}><div style={{ background: '#f1c40f', padding: '10px', textAlign: 'center' }}>MODO PRUEBA <button onClick={() => setRecursoProbando(null)} style={{ marginLeft: 20 }}>Cerrar</button></div><GamePlayer recurso={recursoProbando} usuario={usuario} alTerminar={() => setRecursoProbando(null)} /></div>;
 
     if (modoVista === 'ALUMNO') return (<div style={{ position: 'relative' }}><div style={{ position: 'fixed', top: 20, right: 20, zIndex: 9999 }}><button onClick={() => setModoVista('PROFESOR')} style={{ background: '#e74c3c', color: 'white', padding: '10px 20px', borderRadius: '30px', border: 'none', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}><LogOut size={20} /> SALIR MODO ALUMNO</button></div><StudentDashboard usuario={usuario} /></div>);
@@ -357,10 +439,29 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                     {modoDashboard === 'CLASICO' && (<div style={{ marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>{Object.values(TIPOS_JUEGOS).map(j => <button key={j.id} onClick={() => setJuegoSeleccionado(j.id)} style={{ padding: '8px 16px', borderRadius: '20px', border: 'none', background: juegoSeleccionado === j.id ? j.color : 'white', color: juegoSeleccionado === j.id ? 'white' : '#555', cursor: 'pointer', fontWeight: 'bold', boxShadow:'0 2px 5px rgba(0,0,0,0.1)' }}>{j.label}</button>)}</div>)}
                     {modoDashboard === 'PRO' && (<div style={{ marginBottom: '20px', textAlign: 'center' }}><h1 style={{ color: '#9C27B0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}><Zap size={32} /> ThinkHoot PRO</h1></div>)}
                     
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}><h2>{vista === 'MIS_RECURSOS' ? `Mis Recursos` : `Biblioteca`}</h2><div style={{ display: 'flex', gap: '10px' }}>{(juegoSeleccionado !== 'QUESTION_SENDER' && modoDashboard === 'CLASICO') && <button onClick={() => setVista(vista === 'MIS_RECURSOS' ? 'BIBLIOTECA' : 'MIS_RECURSOS')} style={{ background: '#27ae60', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer' }}><Globe size={18} /> {vista === 'MIS_RECURSOS' ? "Ir a Biblioteca" : "Mis Recursos"}</button>}{vista === 'MIS_RECURSOS' && <button onClick={iniciarCreacion} style={{ display: 'flex', alignItems: 'center', gap: '5px', background: '#2196F3', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer' }}><Plus size={18} /> Crear Nuevo</button>}</div></div>
-                    
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}><h2>{vista === 'MIS_RECURSOS' ? `Mis Recursos` : `Biblioteca`}</h2><div style={{ display: 'flex', gap: '10px' }}>{(juegoSeleccionado !== 'QUESTION_SENDER' && modoDashboard === 'CLASICO') && <button onClick={() => setVista(vista === 'MIS_RECURSOS' ? 'BIBLIOTECA' : 'MIS_RECURSOS')} style={{ background: '#27ae60', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer' }}><Globe size={18} /> {vista === 'MIS_RECURSOS' ? "Ir a Biblioteca" : "Mis Recursos"}</button>}
+
+                        {vista === 'MIS_RECURSOS' && (
+                            modoDashboard === 'PRO' ? (
+                                <div style={{ display: 'flex', gap: '10px' }}>
+                                    <button onClick={iniciarCreacion} style={{ display: 'flex', alignItems: 'center', gap: '5px', background: '#2196F3', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer' }}>
+                                        <Plus size={18} /> Crear ThinkHoot
+                                    </button>
+                                    <button onClick={iniciarCreacionMathLive} style={{ display: 'flex', alignItems: 'center', gap: '5px', background: '#9C27B0', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer' }}>
+                                        <Calculator size={18} /> Crear MathLive
+                                    </button>
+                                </div>
+                            ) : (
+                                    <button onClick={iniciarCreacion} style={{ display: 'flex', alignItems: 'center', gap: '5px', background: '#2196F3', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer' }}>
+                                        <Plus size={18} /> Crear Nuevo
+                                </button>
+                                )
+                        )}
+                    </div> {/* <--- FALTABA ESTE DIV (Cierra el grupo de botones) */}
+                    </div> {/* <--- FALTABA ESTE DIV (Cierra la barra de título) */}
+
+
                     {vista === 'BIBLIOTECA' && (<div style={{ background: '#f9f9f9', padding: '15px', borderRadius: '10px', marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}><span style={{ fontWeight: 'bold', color: '#666' }}><Search size={16} /> Filtros:</span><input placeholder="Tema..." value={filtrosInput.tema} onChange={e => setFiltrosInput({ ...filtrosInput, tema: e.target.value })} style={inputFilter} /><input placeholder="País" value={filtrosInput.pais} onChange={e => setFiltrosInput({ ...filtrosInput, pais: e.target.value })} style={inputFilter} /><input placeholder="Región" value={filtrosInput.region} onChange={e => setFiltrosInput({ ...filtrosInput, region: e.target.value })} style={inputFilter} /><input placeholder="Población" value={filtrosInput.poblacion} onChange={e => setFiltrosInput({ ...filtrosInput, poblacion: e.target.value })} style={inputFilter} /><button onClick={ejecutarBusqueda} style={{ background: '#2980b9', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '5px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}><Search size={16} /> Buscar</button><button onClick={limpiarBusqueda} style={{ background: '#bdc3c7', padding: '8px', borderRadius: '5px', border: 'none', cursor: 'pointer' }} title="Limpiar"><RotateCcw size={16} /></button></div>)}
-                    
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
                         {(vista === 'MIS_RECURSOS' ? recursos : getRecursosFiltrados()).map((r, i) => (<div key={r.id || i} style={{ background: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', borderLeft: `6px solid ${TIPOS_JUEGOS[juegoSeleccionado].color}`, position: 'relative' }}>{juegoSeleccionado !== 'QUESTION_SENDER' && <div style={{ position: 'absolute', top: '10px', right: '10px', background: '#f1c40f', padding: '2px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: 'bold' }}><Users size={12} /> {r.playCount || 0}</div>}<h3 style={{ margin: '0 0 5px 0' }}>{r.titulo}</h3><div style={{ display: 'flex', gap: '5px', marginTop: '10px' }}>{juegoSeleccionado === 'QUESTION_SENDER' ? (<><button onClick={() => abrirEdicion(r)} style={btnStyle('#E3F2FD', '#1565C0')}><Pencil size={18} /></button><button onClick={() => setModalCopiarApp(r)} style={btnStyle('#E8F5E9', '#2E7D32')}><Send size={18} /></button><button onClick={() => eliminarRecurso(r.id)} style={btnStyle('#FFEBEE', '#C62828')}><Trash2 size={18} /></button></>) : (vista === 'MIS_RECURSOS' ? (<>{juegoSeleccionado === 'THINKHOOT' ? (<button title="Lanzar en Vivo" onClick={() => prepararJuegoEnVivo(r)} style={{ ...btnStyle('#9C27B0', 'white'), fontWeight: 'bold' }}><Zap size={18} /></button>) : (<button onClick={() => probarJuego(r)} style={btnStyle('#E1BEE7', '#8E24AA')}><Gamepad2 size={18} /></button>)}<button onClick={() => mostrarCodigo(r)} style={btnStyle('#FFF3E0', '#FF9800')}><Key size={18} /></button><button onClick={() => abrirEdicion(r)} style={btnStyle('#E3F2FD', '#1565C0')}><Pencil size={18} /></button><button onClick={() => abrirResultados(r)} style={btnStyle('#E8F5E9', '#2E7D32')}><BarChart2 size={18} /></button><button onClick={() => eliminarRecurso(r.id)} style={btnStyle('#FFEBEE', '#C62828')}><Trash2 size={18} /></button></>) : (<><button onClick={() => probarJuego(r)} style={{ ...btnStyle('#E1BEE7', '#8E24AA'), flex: 2 }}>Probar</button><button onClick={() => setRecursoInspeccionando(r)} style={btnStyle('#eee', '#333')}><Eye size={18} /></button><button onClick={() => copiarRecurso(r)} style={{ ...btnStyle('#27ae60', 'white'), flex: 2 }}>Copiar</button></>))}</div></div>))}
                         
@@ -386,8 +487,11 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             {mostrandoCrear && <ModalOverlay onClose={() => setMostrandoCrear(false)}><h2>Nuevo {TIPOS_JUEGOS[juegoSeleccionado].label}</h2><input value={datosEditor.titulo} onChange={e => setDatosEditor({ ...datosEditor, titulo: e.target.value })} style={inputStyle} placeholder="Título" /><div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}><button onClick={() => { setMostrandoCrear(false); setMostrandoEditorManual(true); }} style={{ ...actionBtnStyle('#2196F3'), flex: 1 }}><Edit3 /> Manual</button>{juegoSeleccionado !== 'QUESTION_SENDER' && <><button onClick={procesarCreacionIA} style={{ ...actionBtnStyle('#673AB7'), flex: 1 }}><Bot /> IA</button><button onClick={handleFileUpload} style={{ ...actionBtnStyle('#107C41'), flex: 1 }}><FileSpreadsheet /> Excel</button><button onClick={handleOpenPicker} style={{ ...actionBtnStyle('#FFC107'), flex: 1, color: 'black' }}>Drive</button></>}</div></ModalOverlay>}
             {mostrandoEditorManual && <EditorManual datos={datosEditor} setDatos={setDatosEditor} configJuego={TIPOS_JUEGOS[juegoSeleccionado]} onClose={() => setMostrandoEditorManual(false)} onSave={guardarRecursoFinal} />}
             {mostrandoEditorPro && <EditorPro datos={datosEditor} setDatos={setDatosEditor} onClose={() => setMostrandoEditorPro(false)} onSave={guardarRecursoFinal} />}
-            
-            {/* MODAL AYUDA GLOBAL DASHBOARD */}
+
+                        {mostrandoEditorMathLive && <EditorMathLive datos={datosEditor} setDatos={setDatosEditor} onClose={() => setMostrandoEditorMathLive(false)} onSave={guardarRecursoFinal} />}
+
+
+                        {/* MODAL AYUDA GLOBAL DASHBOARD */}
             {mostrandoAyudaDashboard && (
                 <ModalOverlay onClose={() => setMostrandoAyudaDashboard(false)}>
                     <h2><Info style={{verticalAlign:'middle'}}/> ¿Qué puedo hacer aquí?</h2>

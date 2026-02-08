@@ -626,7 +626,7 @@ export default function RuletaGame({ recurso, usuario, alTerminar }) {
                             {esInvitado ? (
                                 <div style={{ margin: '15px 0', padding: '10px', background: 'rgba(0,0,0,0.05)', borderRadius: '10px' }}>
                                     <p style={{ color: '#555', fontSize: '0.9rem', marginBottom: '5px' }}>Regístrate para guardar tus resultados.</p>
-                                    <p style={{ color: '#2ecc71', fontWeight: 'bold' }}>¡Únete a LearnJoy!</p>
+                                    <p style={{ color: '#2ecc71', fontWeight: 'bold' }}>¡Únete a PiKT!</p>
                                 </div>
                             ) : (
                                     jugadores.length === 1 && (

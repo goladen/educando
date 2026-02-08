@@ -689,7 +689,7 @@ const PantallaFin = ({ jugadores, recurso, hoja, usuario, modoDuelo, esInvitado,
                     <p style={{ color: '#eee', lineHeight: '1.5' }}>
                         Regístrate para <b>guardar tus resultados</b> y descubrir muchos más juegos.
                     </p>
-                    <p style={{ color: 'white', fontWeight: 'bold' }}>¡Únete a LearnJoy!</p>
+                    <p style={{ color: 'white', fontWeight: 'bold' }}>¡Únete a PiKT!</p>
                     {/* El botón de login lo gestionará el componente padre si se quiere, o simplemente vuelve a Home */}
                 </div>
             )}

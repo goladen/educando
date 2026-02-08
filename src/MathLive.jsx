@@ -144,7 +144,7 @@ function MathLiveHost({ codigoSala, onExit, usuario }) {
     const [avatarMood, setAvatarMood] = useState('neutral');
 
     const timerRef = useRef(null);
-
+    const generationProcessed = useRef(false);
     const gameDataRef = useRef(gameData);
     useEffect(() => {
         gameDataRef.current = gameData;

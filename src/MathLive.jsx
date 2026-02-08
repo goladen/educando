@@ -909,7 +909,8 @@ const QuestionDisplay = memo(function QuestionDisplay({ data, onAnswer, disabled
     const isMath = data.tipo === 'MATH' || (data.subtipo === 'STANDARD' || data.subtipo === 'FRACTION');
     const isOrdenar = data.tipo === 'ORDENAR';
     const isRellenar = data.tipo === 'RELLENAR';
-    const isMultiple = (opcionesMezcladas.length > 0) && !isOrdenar && !isRellenar && !isMath;
+    // CORRECCIÓN: Solo es múltiple si hay MÁS DE 1 opción. Si solo hay 1, es respuesta corta.
+    const isMultiple = (opcionesMezcladas.length > 1) && !isOrdenar && !isRellenar && !isMath;
     const isShortAnswer = !isMultiple && !isOrdenar && !isRellenar && !isMath;
 
     return (

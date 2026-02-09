@@ -6,6 +6,7 @@ import GamePlayer from '../GamePlayer';
 import ThinkHootGame from '../ThinkHootGame'; // Importante para el modo Host
 import RuletaGame from '../RuletaGame';
 import MathLive from '../MathLive';
+import PikatronRun from '../PikatronRun';
 
 // --- ESTILOS ---
 const styles = {
@@ -76,6 +77,8 @@ export default function LandingGames({ onLoginRequest }) {
     const [liveModeHost, setLiveModeHost] = useState(false);
     const [hostRoomCode, setHostRoomCode] = useState(null);
     const [isMathLive, setIsMathLive] = useState(false); // <--- AÑADIR ESTE ESTADO
+    // NUEVO ESTADO: Para guardar el recurso mientras el usuario elige modo
+    const [recursoParaElegir, setRecursoParaElegir] = useState(null);
 
     const [topGames, setTopGames] = useState([]);
 
@@ -247,7 +250,20 @@ export default function LandingGames({ onLoginRequest }) {
         // Si es tipo Live (ThinkHoot o MathLive)
         if (r.tipoJuego === 'THINKHOOT' || r.tipo === 'PRO') {
             lanzarComoGestor(r);
-        } else {
+        }
+
+        // 2. NUEVO: Si es Cazaburbujas, preguntamos modo
+        else if (r.tipoJuego === 'CAZABURBUJAS') {
+            setRecursoParaElegir(r);
+        }
+
+
+
+
+
+
+
+        else {
             // Juego Normal Single Player
             setJuegoActivo(r);
         }
@@ -256,6 +272,14 @@ export default function LandingGames({ onLoginRequest }) {
     // --- RENDERIZADOS DE JUEGO ---
 
     // 1. Modo Host (Profesor Invitado)
+    // A. JUEGO PIKATRON (Modo Runner)
+    if (juegoActivo && juegoActivo.modoEspecial === 'PIKATRON') {
+        return <PikatronRun recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
+    }
+
+
+
+
     if (liveModeHost && hostRoomCode) {
         // Usuario invitado temporal para que no falle
         const tempUser = { uid: "host_invitado_" + Date.now(), displayName: "Profe Invitado", email: null };
@@ -302,6 +326,47 @@ export default function LandingGames({ onLoginRequest }) {
     // --- RENDERIZADO PRINCIPAL (LANDING) ---
     return (
         <div style={styles.container}>
+
+
+            {recursoParaElegir && (
+                <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.8)', zIndex: 5000, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                    <div style={{ background: 'white', padding: '30px', borderRadius: '20px', textAlign: 'center', maxWidth: '400px', width: '90%' }}>
+                        <h2 style={{ color: '#2c3e50', margin: '0 0 20px 0' }}>🚀 ¡Elige tu aventura!</h2>
+                        <p style={{ marginBottom: '25px', color: '#666' }}>Puedes jugar al modo clásico o probar el nuevo Pikatron Run.</p>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            <button
+                                onClick={() => { setJuegoActivo(recursoParaElegir); setRecursoParaElegir(null); }}
+                                style={{ padding: '15px', background: '#3498db', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}
+                            >
+                                🔵 Cazaburbujas Clásico
+                            </button>
+
+                            <button
+                                onClick={() => { setJuegoActivo({ ...recursoParaElegir, modoEspecial: 'PIKATRON' }); setRecursoParaElegir(null); }}
+                                style={{ padding: '15px', background: '#f1c40f', color: '#2c3e50', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}
+                            >
+                                ⚡ Pikatron Run (Runner)
+                            </button>
+
+                            <button
+                                onClick={() => setRecursoParaElegir(null)}
+                                style={{ marginTop: '10px', background: 'transparent', border: 'none', color: '#999', cursor: 'pointer' }}
+                            >
+                                Cancelar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+
+
+
+
+
+
+
 
             {/* TARJETA BUSCADOR */}
             <div style={styles.card}>

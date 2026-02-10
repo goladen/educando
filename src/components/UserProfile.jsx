@@ -15,7 +15,8 @@ export default function UserProfile({ usuario, perfil, onClose, onUpdate, showSu
         pais: perfil?.pais || '',
         region: perfil?.region || '',
         poblacion: perfil?.poblacion || '',
-        temasPreferidos: perfil?.temasPreferidos || ''
+        temasPreferidos: perfil?.temasPreferidos || '',
+        ciclo: perfil?.ciclo || 'Primaria',
     });
 
     const [guardando, setGuardando] = useState(false);
@@ -93,6 +94,27 @@ export default function UserProfile({ usuario, perfil, onClose, onUpdate, showSu
                         <Input label="Región" val={formData.region} set={v => setFormData({ ...formData, region: v })} />
                     </div>
                     <Input label="Población" val={formData.poblacion} set={v => setFormData({ ...formData, poblacion: v })} />
+
+                    <div style={{ marginBottom: 15 }}>
+                        <label style={{ display: 'block', fontSize: 12, fontWeight: 'bold', color: '#555', marginBottom: 5 }}>Ciclo Educativo</label>
+                        <select
+                            value={formData.ciclo}
+                            onChange={e => setFormData({ ...formData, ciclo: e.target.value })}
+                            style={styles.input}
+                        >
+                            <option value="Infantil">Infantil</option>
+                            <option value="Primaria">Primaria</option>
+                            <option value="Secundaria">Secundaria</option>
+                            <option value="Bachillerato">Bachillerato</option>
+                            <option value="FP">Formación Profesional</option>
+                            <option value="Universidad">Universidad</option>
+                            <option value="Otros">Otros</option>
+                        </select>
+                    </div>
+
+
+
+
 
                     <SectionTitle icon={<Heart size={18} />} title="Intereses" />
                     <Input label="Temas Preferidos" val={formData.temasPreferidos} set={v => setFormData({ ...formData, temasPreferidos: v })} placeholder="Ej: Matemáticas, Historia, Gamificación..." />

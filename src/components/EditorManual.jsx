@@ -19,15 +19,26 @@ const HELP_CONTENT = {
     QUESTION_SENDER: "Esta herramienta no es un juego en sí, sino un 'Buzón'. Comparte el Código de Acceso con tus alumnos para que ellos te envíen preguntas desde sus dispositivos."
 };
 
-export default function EditorManual({ datos, setDatos, configJuego, onClose, onSave }) {
+export default function EditorManual({ datos, setDatos, configJuego, onClose, onSave, usuario }) {
     const [indiceHojaActiva, setIndiceHojaActiva] = useState(0);
     const [mostrandoConfig, setMostrandoConfig] = useState(false);
     const [mostrandoAyuda, setMostrandoAyuda] = useState(false); // <--- ESTADO NUEVO
 
     useEffect(() => {
+        // Inicializar hojas si no existen
         if (!datos.hojas || datos.hojas.length === 0) {
             setDatos(prev => ({ ...prev, hojas: [{ nombreHoja: 'Hoja 1', preguntas: [] }] }));
         }
+
+        // Lógica de Autorrelleno de Datos de Búsqueda
+        setDatos(prev => ({
+            ...prev,
+            pais: prev.pais !== undefined ? prev.pais : (usuario?.pais || ''),
+            region: prev.region !== undefined ? prev.region : (usuario?.region || ''),
+            poblacion: prev.poblacion !== undefined ? prev.poblacion : (usuario?.poblacion || usuario?.localidad || ''),
+            ciclo: prev.ciclo !== undefined ? prev.ciclo : (usuario?.ciclo || 'Primaria'),
+            temas: prev.temas !== undefined ? prev.temas : (usuario?.temasPreferidos || '')
+        }));
     }, []);
 
     // --- MANEJO DE HOJAS ---
@@ -313,11 +324,28 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
                                 <button onClick={() => setMostrandoConfig(false)} style={styles.iconBtnBlack}><X /></button>
                             </div>
                             <div style={styles.configBody}>
-                                <h4 style={styles.sectionTitle}>Ubicación</h4>
-                                <InputConfig label="País" val={datos.pais} set={v => setDatos({ ...datos, pais: v })} />
-                                <InputConfig label="Región" val={datos.region} set={v => setDatos({ ...datos, region: v })} />
-                                <InputConfig label="Población" val={datos.poblacion} set={v => setDatos({ ...datos, poblacion: v })} />
-
+                                {/* --- SECCIÓN DATOS DE BÚSQUEDA ESTANDARIZADA --- */}
+                                <h4 style={styles.sectionTitle}>Datos de Búsqueda</h4>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                    <InputConfig label="País" val={datos.pais} set={v => setDatos({ ...datos, pais: v })} />
+                                    <InputConfig label="Región" val={datos.region} set={v => setDatos({ ...datos, region: v })} />
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                    <InputConfig label="Localidad" val={datos.poblacion} set={v => setDatos({ ...datos, poblacion: v })} />
+                                    <InputConfig label="Temas" val={datos.temasPreferidos} set={v => setDatos({ ...datos, temasPreferidos: v })} />
+                                </div>
+                                <div style={{ marginBottom: '15px' }}>
+                                    <label style={styles.label}>Ciclo Educativo</label>
+                                    <select value={datos.ciclo || 'Secundaria'} onChange={e => setDatos({ ...datos, ciclo: e.target.value })} style={styles.input}>
+                                        <option value="Infantil">Infantil</option>
+                                        <option value="Primaria">Primaria</option>
+                                        <option value="Secundaria">Secundaria</option>
+                                        <option value="Bachillerato">Bachillerato</option>
+                                        <option value="FP">Formación Profesional</option>
+                                        <option value="Universidad">Universidad</option>
+                                        <option value="Otros">Otros</option>
+                                    </select>
+                                </div>
                                 <h4 style={styles.sectionTitle}>Ajustes de Juego</h4>
                                 {configJuego.camposConfig.map(campo => (
                                     <div key={campo.key} style={{ marginBottom: '10px' }}>

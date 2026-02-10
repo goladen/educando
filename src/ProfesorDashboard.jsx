@@ -16,6 +16,7 @@ import GlobalSearch from './components/GlobalSearch'; // <--- NUEVO
 import TeacherTools from './components/TeacherTools'; // <--- NUEVO
 import EditorMathLive from './components/EditorMathLive';
 import MathLive from './MathLive';
+import EditorProBurbujasPikatron from './components/EditorProBurbujasPikatron';
 // ==============================================================================
 //  ZONA DE CLAVES
 // ==============================================================================
@@ -26,11 +27,16 @@ const GOOGLE_DEVELOPER_KEY = "AIzaSyDOFNi_V_HbCKS8bQWAsFqQKBEiBrBYQCw";
 
 const TIPOS_JUEGOS = {
     PASAPALABRA: { id: 'PASAPALABRA', label: 'Pasapalabra', color: '#3F51B5', camposConfig: [{ key: 'tiempoTotal', label: 'Tiempo Rosco (seg)', type: 'number', default: 150 }] },
-    CAZABURBUJAS: { id: 'CAZABURBUJAS', label: 'Caza Burbujas', color: '#E91E63', camposConfig: [{ key: 'tiempoPregunta', label: 'Tiempo/preg (seg)', type: 'number', default: 20 }, { key: 'numPreguntas', label: 'Nº Preguntas', type: 'number', default: 10 }, { key: 'puntosAcierto', label: 'Pts Acierto', type: 'number', default: 10 }, { key: 'puntosFallo', label: 'Pts Fallo', type: 'number', default: 2 }] },
-    APAREJADOS: { id: 'APAREJADOS', label: 'Aparejados', color: '#FF9800', camposConfig: [{ key: 'tiempoTotal', label: 'Tiempo Total (seg)', type: 'number', default: 60 }, { key: 'numParejas', label: 'Nº Parejas', type: 'number', default: 8 }, { key: 'puntosPareja', label: 'Pts Pareja', type: 'number', default: 10 }] },
-    THINKHOOT: { id: 'THINKHOOT', label: 'ThinkHoot', color: '#9C27B0', camposConfig: [{ key: 'tiempoPregunta', label: 'Tiempo/preg (seg)', type: 'number', default: 30 }, { key: 'numPreguntas', label: 'Nº Preguntas', type: 'number', default: 10 }, { key: 'puntosMax', label: 'Puntos Max', type: 'number', default: 120 }, { key: 'puntosMin', label: 'Puntos Min', type: 'number', default: 30 }] },
+    CAZABURBUJAS: { id: 'CAZABURBUJAS', label: 'Burbujas y Pikatron', color: '#E91E63', camposConfig: [{ key: 'tiempoPregunta', label: 'Tiempo/preg (seg)', type: 'number', default: 20 }, { key: 'numPreguntas', label: 'Nº Preguntas', type: 'number', default: 10 }, { key: 'puntosAcierto', label: 'Pts Acierto', type: 'number', default: 10 }, { key: 'puntosFallo', label: 'Pts Fallo', type: 'number', default: 2 }] },
+    
+
+    APAREJADOS: { id: 'APAREJADOS', label: 'AparejaDOS', color: '#FF9800', camposConfig: [{ key: 'tiempoTotal', label: 'Tiempo Total (seg)', type: 'number', default: 60 }, { key: 'numParejas', label: 'Nº Parejas', type: 'number', default: 8 }, { key: 'puntosPareja', label: 'Pts Pareja', type: 'number', default: 10 }] },
+    THINKHOOT: { id: 'THINKHOOT', label: 'Pi-Live', color: '#9C27B0', camposConfig: [{ key: 'tiempoPregunta', label: 'Tiempo/preg (seg)', type: 'number', default: 30 }, { key: 'numPreguntas', label: 'Nº Preguntas', type: 'number', default: 10 }, { key: 'puntosMax', label: 'Puntos Max', type: 'number', default: 120 }, { key: 'puntosMin', label: 'Puntos Min', type: 'number', default: 30 }] },
     RULETA: { id: 'RULETA', label: 'La Ruleta', color: '#f1c40f', camposConfig: [{ key: 'tiempoTurno', label: 'Tiempo Turno (s)', type: 'number', default: 20 }] },
     QUESTION_SENDER: { id: 'QUESTION_SENDER', label: 'Question Sender', color: '#2c3e50', camposConfig: [{ key: 'numPreguntas', label: 'Preguntas a pedir', type: 'number', default: 3 }] }
+
+
+
 };
 
 // MENSAJES DE AYUDA VACÍO
@@ -56,6 +62,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
     const [mostrandoEditorManual, setMostrandoEditorManual] = useState(false);
     const [mostrandoEditorPro, setMostrandoEditorPro] = useState(false);
     const [mostrandoEditorMathLive, setMostrandoEditorMathLive] = useState(false);
+    const [mostrandoEditorBurbujasPikatron, setMostrandoEditorBurbujasPikatron] = useState(false);
 
     const [recursoResultados, setRecursoResultados] = useState(null);
     const [recursoProbando, setRecursoProbando] = useState(null);
@@ -146,37 +153,64 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
         try { const c = { ...r, profesorUid: usuario.uid, profesorNombre: perfilProfesor?.nombre || usuario.displayName, titulo: `${r.titulo} (Copia)`, playCount: 0, isPrivate: true, origen: 'biblioteca', fechaCreacion: new Date(), accessCode: generarCodigoAcceso() }; delete c.id; await addDoc(collection(db, "resources"), c); alert("¡Copiado!"); setVista('MIS_RECURSOS'); } catch (e) { alert(e.message); }
     };
 
+    // --- FUNCIÓN PARA EL EDITOR CLÁSICO (NO TOCAR) ---
     const iniciarCreacion = () => {
-        const conf = {}; TIPOS_JUEGOS[juegoSeleccionado].camposConfig.forEach(c => conf[c.key] = c.default);
-        const nuevoRecurso = { id: null, titulo: '', temas: '', profesorNombre: (perfilProfesor && perfilProfesor.nombre) || usuario.displayName, pais: perfilProfesor?.pais || '', region: perfilProfesor?.region || '', poblacion: perfilProfesor?.poblacion || '', config: conf, hojas: [{ nombreHoja: 'Hoja 1', preguntas: [] }], isPrivate: juegoSeleccionado === 'QUESTION_SENDER' };
-        setDatosEditor(nuevoRecurso);
-        if (modoDashboard === 'PRO') {
-            setMostrandoEditorPro(true);
-        } else {
-            setMostrandoCrear(true);
+        const conf = {};
+        if (TIPOS_JUEGOS[juegoSeleccionado]) {
+            TIPOS_JUEGOS[juegoSeleccionado].camposConfig.forEach(c => conf[c.key] = c.default);
         }
+        const nuevoRecurso = {
+            id: null, titulo: '', temas: '', profesorNombre: (perfilProfesor?.nombre) || usuario.displayName,
+            pais: perfilProfesor?.pais || '', region: perfilProfesor?.region || '', poblacion: perfilProfesor?.poblacion || '',
+            config: conf, hojas: [{ nombreHoja: 'Nivel 1', preguntas: [] }], isPrivate: juegoSeleccionado === 'QUESTION_SENDER'
+        };
+        setDatosEditor(nuevoRecurso);
+        setMostrandoCrear(true); // Abre el modal de opciones clásico (Manual/IA/Excel)
     };
+
+    // --- NUEVAS FUNCIONES PARA LOS BOTONES PRO ---
+
+    // 1. CREAR PILIVE (THINKHOOT PRO)
+    const iniciarCreacionPiLive = () => {
+        const nuevoRecurso = {
+            id: null, titulo: '', temas: '', profesorNombre: usuario.displayName,
+            tipo: 'PRO', tipoJuego: 'THINKHOOT', // Forzamos ThinkHoot
+            config: { numPreguntas: 10, tiempoPregunta: 30, puntosMax: 100, puntosMin: 20, aleatorio: true },
+            hojas: [{ nombreHoja: 'Grupo 1', preguntas: [] }]
+        };
+        setDatosEditor(nuevoRecurso);
+        setMostrandoEditorPro(true);
+    };
+
+    // 2. CREAR BURBUJAS/PIKATRON PRO (TU NUEVO EDITOR)
+    const iniciarCreacionBurbujasPikatron = () => {
+        // Si el usuario tiene seleccionado PIKATRON, creamos un Pikatron. Si no, por defecto CAZABURBUJAS.
+        const tipoJuegoDestino = (juegoSeleccionado === 'PIKATRON') ? 'PIKATRON' : 'CAZABURBUJAS';
+
+        const nuevoRecurso = {
+            id: null, titulo: '', temas: '', profesorNombre: usuario.displayName,
+            tipo: 'PRO-BURBUJAS', tipoJuego: tipoJuegoDestino,
+            config: { numPreguntas: 10, tiempoPregunta: 20, puntosAcierto: 10, puntosFallo: 2, aleatorio: true },
+            hojas: [{ nombreHoja: 'Nivel 1', preguntas: [] }]
+        };
+        setDatosEditor(nuevoRecurso);
+        setMostrandoEditorBurbujasPikatron(true);
+    };
+
+    // 3. CREAR MATHLIVE (YA LO TIENES, PERO LO REPASAMOS)
     const iniciarCreacionMathLive = () => {
-        // Configuración inicial específica para MathLive
+        // ... (Tu código actual de iniciarCreacionMathLive) ...
+        // Asegúrate de que llame a setMostrandoEditorMathLive(true)
         const conf = {
             isMathLive: true,
             mathCount: 8, mathTime: 30, mathPuntosMax: 30, mathPuntosMin: 20,
             mathTypes: ['POSITIVOS'], mathOps: ['SUMA'], mathMin: 1, mathMax: 10,
             aleatorio: true, numPreguntas: 4
         };
-
         const nuevoRecurso = {
-            id: null,
-            titulo: '',
-            temas: '',
-            profesorNombre: (perfilProfesor && perfilProfesor.nombre) || usuario.displayName,
-            pais: perfilProfesor?.pais || '',
-            region: perfilProfesor?.region || '',
-            poblacion: perfilProfesor?.poblacion || '',
-            config: conf,
-            hojas: [{ nombreHoja: 'Grupo 1', preguntas: [] }],
-            isPrivate: false,
-            tipo: 'PRO' // Se guarda como PRO para que el juego lo reconozca
+            id: null, titulo: '', temas: '', profesorNombre: usuario.displayName,
+            tipo: 'PRO', tipoJuego: 'THINKHOOT', // MathLive corre sobre el motor de ThinkHoot
+            config: conf, hojas: [{ nombreHoja: 'Grupo 1', preguntas: [] }], isPrivate: false
         };
         setDatosEditor(nuevoRecurso);
         setMostrandoEditorMathLive(true);
@@ -199,17 +233,24 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             if (!dataFresca.config) dataFresca.config = {};
 
             setDatosEditor(dataFresca);
+            // ... dentro de abrirEdicion, después de setDatosEditor(dataFresca) ...
 
-            // LOGICA DE APERTURA SEGÚN TIPO
-            if (dataFresca.tipo === 'PRO') {
+            if (dataFresca.tipo === 'PRO-BURBUJAS') {
+                setMostrandoEditorBurbujasPikatron(true);
+            }
+            else if (dataFresca.tipo === 'PRO') {
                 if (dataFresca.config?.isMathLive) {
-                    setMostrandoEditorMathLive(true); // <--- ABRE MATHLIVE
+                    setMostrandoEditorMathLive(true);
                 } else {
-                    setMostrandoEditorPro(true);      // <--- ABRE THINKHOOT PRO NORMAL
+                    setMostrandoEditorPro(true);
                 }
             } else {
-                setMostrandoEditorManual(true);
+                setMostrandoEditorManual(true); // Clásico
             }
+
+
+                                 
+            
 
         } catch (error) {
             console.error(error);
@@ -251,7 +292,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             setMostrandoEditorManual(false);
             setMostrandoEditorPro(false);
             setMostrandoEditorMathLive(false);
-
+            setMostrandoEditorBurbujasPikatron(false);
             cargarRecursosPropios();
         } catch (e) { alert(e.message); }
     };
@@ -443,18 +484,28 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
 
                         {vista === 'MIS_RECURSOS' && (
                             modoDashboard === 'PRO' ? (
-                                <div style={{ display: 'flex', gap: '10px' }}>
-                                    <button onClick={iniciarCreacion} style={{ display: 'flex', alignItems: 'center', gap: '5px', background: '#2196F3', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer' }}>
-                                        <Plus size={18} /> Crear ThinkHoot
-                                    </button>
-                                    <button onClick={iniciarCreacionMathLive} style={{ display: 'flex', alignItems: 'center', gap: '5px', background: '#9C27B0', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer' }}>
-                                        <Calculator size={18} /> Crear MathLive
-                                    </button>
+                                // --- ZONA DE BOTONES PRO (3 EDITORES) ---
+                                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                                    {/* 1. Botón MathLive */}
+                                    <button onClick={iniciarCreacionMathLive} style={{ display: 'flex', alignItems: 'center', gap: '5px', background: '#9C27B0', color: 'white', border: 'none', padding: '10px 15px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+                                        <Calculator size={18} /> MathLive
+                                </button>
+
+                                    {/* 2. Botón PiLive (ThinkHoot) */}
+                                    <button onClick={iniciarCreacionPiLive} style={{ display: 'flex', alignItems: 'center', gap: '5px', background: '#E91E63', color: 'white', border: 'none', padding: '10px 15px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+                                        <Zap size={18} /> PiLive
+                                </button>
+
+                                    {/* 3. Botón Burbujas/Pikatron (NUEVO) */}
+                                    <button onClick={iniciarCreacionBurbujasPikatron} style={{ display: 'flex', alignItems: 'center', gap: '5px', background: '#F39C12', color: 'white', border: 'none', padding: '10px 15px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+                                        <Gamepad2 size={18} /> Burbujas/Pikatron
+                                </button>
                                 </div>
                             ) : (
-                                    <button onClick={iniciarCreacion} style={{ display: 'flex', alignItems: 'center', gap: '5px', background: '#2196F3', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer' }}>
+                                    // --- ZONA DE BOTÓN CLÁSICO ---
+                                    <button onClick={iniciarCreacion} style={{ display: 'flex', alignItems: 'center', gap: '5px', background: '#27ae60', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
                                         <Plus size={18} /> Crear Nuevo
-                                </button>
+                            </button>
                                 )
                         )}
                     </div> {/* <--- FALTABA ESTE DIV (Cierra el grupo de botones) */}
@@ -489,7 +540,14 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             {mostrandoEditorPro && <EditorPro datos={datosEditor} setDatos={setDatosEditor} onClose={() => setMostrandoEditorPro(false)} onSave={guardarRecursoFinal} />}
 
                         {mostrandoEditorMathLive && <EditorMathLive datos={datosEditor} setDatos={setDatosEditor} onClose={() => setMostrandoEditorMathLive(false)} onSave={guardarRecursoFinal} />}
-
+            {mostrandoEditorBurbujasPikatron && (
+                <EditorProBurbujasPikatron
+                    datos={datosEditor}
+                    setDatos={setDatosEditor}
+                    onClose={() => setMostrandoEditorBurbujasPikatron(false)}
+                    onSave={guardarRecursoFinal}
+                />
+            )}
 
                         {/* MODAL AYUDA GLOBAL DASHBOARD */}
             {mostrandoAyudaDashboard && (

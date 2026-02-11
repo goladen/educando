@@ -34,7 +34,7 @@ export default function EditorProBurbujasPikatron({ datos, setDatos, onClose, on
                     config: {
                         ...nuevaConfig,
                         aleatorio: true,
-                        numPreguntas: prev.config?.numPreguntas || 10,
+                        numPreguntas: prev.config?.numPreguntas !== undefined ? prev.config.numPreguntas : 5,
                         puntosAcierto: prev.config?.puntosAcierto || 10,
                         puntosFallo: prev.config?.puntosFallo || 2,
                         tiempoPregunta: prev.config?.tiempoPregunta || 20
@@ -186,33 +186,116 @@ export default function EditorProBurbujasPikatron({ datos, setDatos, onClose, on
         background: activo ? '#e8f4fc' : 'white', borderRadius: '8px', cursor: 'pointer',
         display: 'flex', justifyContent: 'center', alignItems: 'center', color: activo ? '#3498db' : '#888'
     });
+    // --- FUNCIONES PARA ACTUALIZAR CONFIGURACIÓN ESPECÍFICA DE LA HOJA ---
+    const updateHojaConfig = (key, val) => {
+        const nuevasHojas = [...datos.hojas];
+        if (!nuevasHojas[hojaActiva].mathConfig) nuevasHojas[hojaActiva].mathConfig = {};
+        nuevasHojas[hojaActiva].mathConfig[key] = val;
+        setDatos({ ...datos, hojas: nuevasHojas });
+    };
+
+    const toggleHojaConfigArray = (key, value) => {
+        const nuevasHojas = [...datos.hojas];
+        if (!nuevasHojas[hojaActiva].mathConfig) nuevasHojas[hojaActiva].mathConfig = {};
+
+        const currentArr = nuevasHojas[hojaActiva].mathConfig[key] || [];
+        let newArr;
+        if (currentArr.includes(value)) {
+            newArr = currentArr.filter(item => item !== value);
+        } else {
+            newArr = [...currentArr, value];
+        }
+        nuevasHojas[hojaActiva].mathConfig[key] = newArr;
+        setDatos({ ...datos, hojas: nuevasHojas });
+    };
+
+    // --- FUNCIONES PARA CONFIGURACIÓN MATEMÁTICA POR NIVEL ---
+    const updateHojaMathConfig = (key, val) => {
+        const nuevasHojas = [...datos.hojas];
+        // Aseguramos que existe el objeto mathConfig en la hoja actual
+        if (!nuevasHojas[hojaActiva].mathConfig) nuevasHojas[hojaActiva].mathConfig = {};
+
+        nuevasHojas[hojaActiva].mathConfig[key] = val;
+        setDatos({ ...datos, hojas: nuevasHojas });
+    };
+
+    const toggleHojaMathArray = (key, value) => {
+        const nuevasHojas = [...datos.hojas];
+        if (!nuevasHojas[hojaActiva].mathConfig) nuevasHojas[hojaActiva].mathConfig = {};
+
+        const currentArr = nuevasHojas[hojaActiva].mathConfig[key] || [];
+        let newArr;
+        if (currentArr.includes(value)) {
+            newArr = currentArr.filter(item => item !== value);
+        } else {
+            newArr = [...currentArr, value];
+        }
+        nuevasHojas[hojaActiva].mathConfig[key] = newArr;
+        setDatos({ ...datos, hojas: nuevasHojas });
+    };
+
+
 
     // --- COMPONENTE VISUAL GENERADOR (Estilo MathLive) ---
+    // --- COMPONENTE VISUAL GENERADOR (POR HOJA) ---
+
+
+
+
+
+
+    // --- COMPONENTE VISUAL GENERADOR (POR HOJA) ---
     const MathLiveBlock = () => {
-        const config = datos.config || {};
+        // Leemos la config de la HOJA ACTUAL (no la global)
+        // Si no tiene config, usamos valores por defecto visuales
+        const hojaConfig = datos.hojas[hojaActiva].mathConfig || {
+            mathCount: 8, mathTime: 30, mathPuntosMax: 30, mathPuntosMin: 20,
+            mathMin: 1, mathMax: 10, mathTypes: ['POSITIVOS'], mathOps: ['SUMA']
+        };
+
         return (
             <div style={styles.mathBlock}>
                 <div style={styles.mathHeader}>
-                    <Calculator size={24} /> Configuración de Operaciones (Generador)
+                    <Calculator size={24} /> Configuración de Operaciones (Nivel Actual)
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '15px', marginBottom: '15px' }}>
                     <div>
                         <label style={styles.label}>Cantidad a Generar</label>
-                        <input type="number" value={config.mathCount} onChange={e => updateGlobalConfig('mathCount', parseInt(e.target.value))} style={styles.input} />
+                        <input
+                            type="number"
+                            value={hojaConfig.mathCount}
+                            // PROTECCIÓN CONTRA NAN: Si está vacío, pone 0
+                            onChange={e => updateHojaMathConfig('mathCount', e.target.value === '' ? 0 : parseInt(e.target.value))}
+                            style={styles.input}
+                        />
                     </div>
                     <div>
                         <label style={styles.label}>Tiempo (s)</label>
-                        <input type="number" value={config.mathTime} onChange={e => updateGlobalConfig('mathTime', parseInt(e.target.value))} style={styles.input} />
+                        <input
+                            type="number"
+                            value={hojaConfig.mathTime}
+                            onChange={e => updateHojaMathConfig('mathTime', e.target.value === '' ? 0 : parseInt(e.target.value))}
+                            style={styles.input}
+                        />
                     </div>
-                    {/* Nota: En Pikatron los puntos suelen ser globales, pero si quieres específicos para mates: */}
                     <div>
                         <label style={styles.label}>Pts Max</label>
-                        <input type="number" value={config.mathPuntosMax} onChange={e => updateGlobalConfig('mathPuntosMax', parseInt(e.target.value))} style={styles.input} />
+                        <input
+                            type="number"
+                            value={hojaConfig.mathPuntosMax}
+                            onChange={e => updateHojaMathConfig('mathPuntosMax', e.target.value === '' ? 0 : parseInt(e.target.value))}
+                            style={styles.input}
+                        />
                     </div>
                     <div>
                         <label style={styles.label}>Pts Min</label>
-                        <input type="number" value={config.mathPuntosMin} onChange={e => updateGlobalConfig('mathPuntosMin', parseInt(e.target.value))} style={styles.input} />
+                        <input
+                            type="number"
+                            value={hojaConfig.mathPuntosMin}
+                            onChange={e => updateHojaMathConfig('mathPuntosMin', e.target.value === '' ? 0 : parseInt(e.target.value))}
+                            style={styles.input}
+                        />
                     </div>
                 </div>
 
@@ -220,19 +303,19 @@ export default function EditorProBurbujasPikatron({ datos, setDatos, onClose, on
                     <div style={{ flex: 1, minWidth: '200px' }}>
                         <label style={styles.label}>Tipos de Números</label>
                         <div style={styles.checkboxGroup}>
-                            <label><input type="checkbox" checked={config.mathTypes?.includes('POSITIVOS')} onChange={() => toggleConfigArray('mathTypes', 'POSITIVOS')} /> Positivos</label>
-                            <label><input type="checkbox" checked={config.mathTypes?.includes('NEGATIVOS')} onChange={() => toggleConfigArray('mathTypes', 'NEGATIVOS')} /> Negativos</label>
-                            <label><input type="checkbox" checked={config.mathTypes?.includes('DECIMALES')} onChange={() => toggleConfigArray('mathTypes', 'DECIMALES')} /> Decimales</label>
-                            <label><input type="checkbox" checked={config.mathTypes?.includes('FRACCIONES')} onChange={() => toggleConfigArray('mathTypes', 'FRACCIONES')} /> Fracciones</label>
+                            <label><input type="checkbox" checked={hojaConfig.mathTypes?.includes('POSITIVOS')} onChange={() => toggleHojaMathArray('mathTypes', 'POSITIVOS')} /> Positivos</label>
+                            <label><input type="checkbox" checked={hojaConfig.mathTypes?.includes('NEGATIVOS')} onChange={() => toggleHojaMathArray('mathTypes', 'NEGATIVOS')} /> Negativos</label>
+                            <label><input type="checkbox" checked={hojaConfig.mathTypes?.includes('DECIMALES')} onChange={() => toggleHojaMathArray('mathTypes', 'DECIMALES')} /> Decimales</label>
+                            <label><input type="checkbox" checked={hojaConfig.mathTypes?.includes('FRACCIONES')} onChange={() => toggleHojaMathArray('mathTypes', 'FRACCIONES')} /> Fracciones</label>
                         </div>
                     </div>
                     <div style={{ flex: 1, minWidth: '200px' }}>
                         <label style={styles.label}>Operaciones</label>
                         <div style={styles.checkboxGroup}>
-                            <label><input type="checkbox" checked={config.mathOps?.includes('SUMA')} onChange={() => toggleConfigArray('mathOps', 'SUMA')} /> <Plus size={14} /> Suma</label>
-                            <label><input type="checkbox" checked={config.mathOps?.includes('RESTA')} onChange={() => toggleConfigArray('mathOps', 'RESTA')} /> <Minus size={14} /> Resta</label>
-                            <label><input type="checkbox" checked={config.mathOps?.includes('MULT')} onChange={() => toggleConfigArray('mathOps', 'MULT')} /> <Multiply size={14} /> Multiplicación</label>
-                            <label><input type="checkbox" checked={config.mathOps?.includes('DIV')} onChange={() => toggleConfigArray('mathOps', 'DIV')} /> <Divide size={14} /> División</label>
+                            <label><input type="checkbox" checked={hojaConfig.mathOps?.includes('SUMA')} onChange={() => toggleHojaMathArray('mathOps', 'SUMA')} /> <Plus size={14} /> Suma</label>
+                            <label><input type="checkbox" checked={hojaConfig.mathOps?.includes('RESTA')} onChange={() => toggleHojaMathArray('mathOps', 'RESTA')} /> <Minus size={14} /> Resta</label>
+                            <label><input type="checkbox" checked={hojaConfig.mathOps?.includes('MULT')} onChange={() => toggleHojaMathArray('mathOps', 'MULT')} /> <Multiply size={14} /> Multiplicación</label>
+                            <label><input type="checkbox" checked={hojaConfig.mathOps?.includes('DIV')} onChange={() => toggleHojaMathArray('mathOps', 'DIV')} /> <Divide size={14} /> División</label>
                         </div>
                     </div>
                 </div>
@@ -240,9 +323,19 @@ export default function EditorProBurbujasPikatron({ datos, setDatos, onClose, on
                 <div>
                     <label style={styles.label}>Rango de Números (Min - Max)</label>
                     <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                        <input type="number" value={config.mathMin} onChange={e => updateGlobalConfig('mathMin', parseInt(e.target.value))} style={{ ...styles.input, width: '80px' }} />
+                        <input
+                            type="number"
+                            value={hojaConfig.mathMin}
+                            onChange={e => updateHojaMathConfig('mathMin', e.target.value === '' ? 0 : parseInt(e.target.value))}
+                            style={{ ...styles.input, width: '80px' }}
+                        />
                         <span>a</span>
-                        <input type="number" value={config.mathMax} onChange={e => updateGlobalConfig('mathMax', parseInt(e.target.value))} style={{ ...styles.input, width: '80px' }} />
+                        <input
+                            type="number"
+                            value={hojaConfig.mathMax}
+                            onChange={e => updateHojaMathConfig('mathMax', e.target.value === '' ? 0 : parseInt(e.target.value))}
+                            style={{ ...styles.input, width: '80px' }}
+                        />
                     </div>
                 </div>
             </div>
@@ -455,6 +548,20 @@ export default function EditorProBurbujasPikatron({ datos, setDatos, onClose, on
                                         <input type="number" value={datos.config?.tiempoPregunta || 20} onChange={e => updateGlobalConfig('tiempoPregunta', e.target.value)} style={styles.input} />
                                     </div>
                                 </div>
+                                {/* --- CAMBIO AQUÍ: SELECCIÓN DE CANTIDAD MANUAL --- */}
+                                <div style={{ marginBottom: '15px', background: '#f0f4c3', padding: '10px', borderRadius: '8px', border: '1px solid #dce775' }}>
+                                    <label style={{ ...styles.label, color: '#827717' }}>Preguntas Manuales a usar</label>
+                                    <input
+                                        type="number"
+                                        value={datos.config?.numPreguntas || 0}
+                                        onChange={e => updateGlobalConfig('numPreguntas', parseInt(e.target.value))}
+                                        style={styles.input}
+                                    />
+                                    <p style={{ fontSize: '11px', color: '#666', marginTop: '5px', lineHeight: '1.3' }}>
+                                        Si tienes 10 preguntas manuales y pones 2, el juego cogerá <strong>2 manuales al azar</strong> y las mezclará con las del generador.
+                                    </p>
+                                </div>
+
 
                                 {/* AQUI EL NUEVO SELECTOR DE VELOCIDAD */}
                                 <div style={{ marginBottom: '15px' }}>

@@ -1,10 +1,11 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
-import { X, RefreshCw, Play, Trophy, AlertTriangle, Layers, Map, Heart, Maximize } from 'lucide-react';
+import { X, RefreshCw, Play, Trophy, AlertTriangle, Layers, Map, Heart, Maximize, Save } from 'lucide-react';
 // IMPORTA AQUÍ TU IMAGEN SIN FONDO
 import pikatronImg from './assets/pikatron-sprite.png';
-
+import { db } from './firebase';
+import { collection, addDoc, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 // --- IMPORTACIÓN DE FONDOS ---
-import bg1 from './assets/pantalla1.jpeg';
+import bg1 from './assets/pantalla5.jpeg';
 import bg2 from './assets/pantalla2.jpeg';
 import bg3 from './assets/pantalla3.jpeg';
 import bg4 from './assets/pantalla4.jpeg';
@@ -152,7 +153,7 @@ const generarPreguntasMatematicas = (config) => {
     return questions;
 };
 
-export default function PikatronRun({ recurso, onExit }) {
+export default function PikatronRun({ recurso, onExit, usuario }) {
     const canvasRef = useRef(null);
 
     // ESTADOS
@@ -161,6 +162,14 @@ export default function PikatronRun({ recurso, onExit }) {
     const [lives, setLives] = useState(3);
     const [preguntaActual, setPreguntaActual] = useState(null);
     const [levelInfo, setLevelInfo] = useState({ current: 1, total: 1, name: '' });
+    // --- NUEVOS ESTADOS PARA RANKING Y GUARDADO ---
+    const [verRanking, setVerRanking] = useState(false);
+    const [nombreInvitado, setNombreInvitado] = useState('');
+    const [guardando, setGuardando] = useState(false);
+    const [yaGuardado, setYaGuardado] = useState(false);
+
+
+
 
     // Referencias mutables
     const gameRef = useRef({
@@ -176,7 +185,8 @@ export default function PikatronRun({ recurso, onExit }) {
         currentLevelIdx: 0,
         allQuestions: [],
         puntosAcierto: 10,
-        puntosFallo: 2
+        puntosFallo: 2,
+        bgX: 0
     });
 
     // --- LÓGICA DE INICIO ---
@@ -237,7 +247,13 @@ export default function PikatronRun({ recurso, onExit }) {
 
             // B) Preguntas Generadas (Solo si es PRO)
             if (esProBurbujas) {
-                const generated = generarPreguntasMatematicas(config);
+                // CAMBIO IMPORTANTE: 
+                // Usamos la config de la hoja si existe, si no, usamos la global como respaldo.
+                const configGenerador = hoja.mathConfig || config;
+
+                // Generar usando la config específica
+                const generated = generarPreguntasMatematicas(configGenerador);
+
                 // Las añadimos al pool
                 questionsPool = [...questionsPool, ...generated];
             }
@@ -315,6 +331,7 @@ export default function PikatronRun({ recurso, onExit }) {
     };
 
     // --- BUCLE PRINCIPAL ---
+    // --- BUCLE PRINCIPAL ---
     useEffect(() => {
         if (gameState !== 'PLAYING') return;
 
@@ -330,31 +347,52 @@ export default function PikatronRun({ recurso, onExit }) {
         canvas.height = 400;
         const groundLevel = canvas.height - 50;
 
+        // --- PREPARAR IMAGEN DE FONDO ---
+        const themeIndex = gameRef.current.currentLevelIdx % LEVEL_THEMES.length;
+        const currentTheme = LEVEL_THEMES[themeIndex];
+        const bgImg = new Image();
+        bgImg.src = currentTheme.img;
+        // --------------------------------
+
         if (gameRef.current.pikatron.groundY === 0) {
             gameRef.current.pikatron.groundY = groundLevel - gameRef.current.pikatron.height;
             gameRef.current.pikatron.y = gameRef.current.pikatron.groundY;
         }
 
         const loop = () => {
+            // No necesitamos clearRect completo porque el fondo lo tapará todo, 
+            // pero por seguridad lo dejamos o lo quitamos si parpadea.
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // 1. FONDO Y SUELO
-            const themeIndex = gameRef.current.currentLevelIdx % LEVEL_THEMES.length;
-            const currentTheme = LEVEL_THEMES[themeIndex];
+            // 1. DIBUJAR FONDO CON SCROLL (MOVIMIENTO)
+            // Velocidad del fondo: 0.5 veces la velocidad del juego (Parallax)
+            gameRef.current.bgX -= gameRef.current.speed * 0.5;
 
-            // Suelo temático
+            // Si la primera imagen sale por la izquierda, reseteamos
+            if (gameRef.current.bgX <= -canvas.width) {
+                gameRef.current.bgX = 0;
+            }
+
+            // Dibujamos dos imágenes: una en la posición actual y otra pegada a la derecha
+            // para que no se vea hueco negro al moverse.
+            if (bgImg.complete) { // Solo dibujar si cargó
+                ctx.drawImage(bgImg, gameRef.current.bgX, 0, canvas.width, canvas.height);
+                ctx.drawImage(bgImg, gameRef.current.bgX + canvas.width, 0, canvas.width, canvas.height);
+            }
+
+            // SUELO TEMÁTICO
             ctx.fillStyle = currentTheme.ground;
             ctx.fillRect(0, groundLevel, canvas.width, 50);
             ctx.fillStyle = 'rgba(0,0,0,0.2)';
             ctx.fillRect(0, groundLevel, canvas.width, 5);
 
-            // 2. PIKATRON
+            // 2. PIKATRON (Con gravedad adaptativa del paso anterior)
             const pika = gameRef.current.pikatron;
-            const gravity = gameRef.current.speed < 6 ? 0.25 : 0.4;
+            const gravity = gameRef.current.speed < 6 ? 0.25 : 0.4; // Tu ajuste de gravedad
 
             if (pika.y < pika.groundY || pika.vy < 0) {
                 pika.y += pika.vy;
-                pika.vy += gravity; // Usamos la variable dinámica
+                pika.vy += gravity;
             } else {
                 pika.y = pika.groundY;
                 pika.vy = 0;
@@ -377,10 +415,6 @@ export default function PikatronRun({ recurso, onExit }) {
             ctx.drawImage(sprite, pika.frameX * sW, pika.frameY * sH, sW, sH, pika.x, pika.y, pika.width, pika.height);
 
             // 3. OBSTÁCULOS
-            // Ajustar spawn timer según velocidad para que no salgan ni muy juntos ni muy separados
-            // A más velocidad, el timer debe ser menor para mantener distancia visual constante? No, al revés.
-            // Distancia = Velocidad * Tiempo. Si sube Velocidad, para mantener Distancia, bajamos Tiempo?
-            // Vamos a usar una fórmula simple basada en la velocidad actual.
             const spawnRate = Math.floor(1100 / gameRef.current.speed);
 
             gameRef.current.spawnTimer++;
@@ -407,7 +441,6 @@ export default function PikatronRun({ recurso, onExit }) {
                 ctx.strokeStyle = 'white'; ctx.lineWidth = 2;
                 ctx.strokeRect(obs.x, obs.y, obs.width, obs.height);
                 ctx.fillStyle = 'white'; ctx.font = 'bold 16px Arial'; ctx.textAlign = 'center';
-                // Cortar texto si es muy largo
                 let txt = obs.data.text;
                 if (txt.length > 10) txt = txt.substring(0, 9) + '..';
                 ctx.fillText(txt, obs.x + (obs.width / 2), obs.y + 26);
@@ -423,7 +456,7 @@ export default function PikatronRun({ recurso, onExit }) {
                 ) {
                     if (obs.data.isCorrect) {
                         playSound('CORRECT');
-                        setScore(s => s + gameRef.current.puntosAcierto); // Puntos dinámicos
+                        setScore(s => s + gameRef.current.puntosAcierto);
                         prepararSiguientePregunta(gameRef.current.qIndex + 1);
                     } else {
                         gameRef.current.obstacles = [];
@@ -431,7 +464,6 @@ export default function PikatronRun({ recurso, onExit }) {
                             const newLives = prevLives - 1;
                             if (newLives > 0) {
                                 playSound('LOSE_LIFE');
-                                // Restar puntos (sin bajar de 0)
                                 setScore(s => Math.max(0, s - gameRef.current.puntosFallo));
                                 return newLives;
                             } else {
@@ -475,9 +507,21 @@ export default function PikatronRun({ recurso, onExit }) {
     }, [gameState]);
 
     const reiniciarJuegoCompleto = () => { setLives(3); setScore(0); iniciarPartida('RETO'); };
+    // SI ESTAMOS EN SETUP, MOSTRAMOS EL MENÚ Y EL RANKING SI TOCA
+    if (gameState === 'SETUP') return (
+        <>
+            {/* Si se pulsó el botón, mostramos el ranking encima */}
+            {verRanking && <PantallaRanking recurso={recurso} onBack={() => setVerRanking(false)} />}
 
-    if (gameState === 'SETUP') return <PantallaSetup recurso={recurso} onStart={iniciarPartida} onExit={onExit} />;
-
+            {/* Pantalla de menú principal con la función onRanking conectada */}
+            <PantallaSetup
+                recurso={recurso}
+                onStart={iniciarPartida}
+                onExit={onExit}
+                onRanking={() => setVerRanking(true)}
+            />
+        </>
+    );
     // Calculamos fondo dinámico
     const bgImage = LEVEL_THEMES[(levelInfo.current - 1) % LEVEL_THEMES.length].img;
 
@@ -493,7 +537,39 @@ export default function PikatronRun({ recurso, onExit }) {
         }
     };
 
+    // --- FUNCIÓN PARA GUARDAR PUNTUACIÓN ---
+    const guardarPuntuacion = async () => {
+        if (guardando || yaGuardado) return;
 
+        // Si no hay usuario y no ha puesto nombre, avisar
+        const esInvitado = !usuario || !usuario.email;
+        const nombreFinal = esInvitado ? nombreInvitado.trim() : (usuario.displayName || "Jugador");
+
+        if (esInvitado && !nombreFinal) {
+            alert("Por favor, introduce un nombre para aparecer en el ranking.");
+            return;
+        }
+
+        setGuardando(true);
+        try {
+            await addDoc(collection(db, 'ranking'), {
+                recursoId: recurso.id,
+                recursoTitulo: recurso.titulo,
+                tipoJuego: 'PIKATRON',
+                jugador: nombreFinal,
+                email: esInvitado ? 'invitado' : usuario.email,
+                aciertos: score, // Usamos score como puntuación
+                fecha: new Date(),
+                categoria: levelInfo.name || 'General' // Guardamos el nivel o categoría
+            });
+            setYaGuardado(true);
+            alert("¡Puntuación guardada correctamente!");
+        } catch (error) {
+            console.error("Error guardando:", error);
+            alert("Hubo un error al guardar.");
+        }
+        setGuardando(false);
+    };
 
     return (
         <div style={{
@@ -569,12 +645,10 @@ export default function PikatronRun({ recurso, onExit }) {
 
             {/* 3. CANVAS (PANTALLA DE JUEGO) */}
             <canvas ref={canvasRef} style={{
-                background: `url(${bgImage})`, // IMAGEN DE FONDO
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
+                backgroundColor: '#87CEEB', // Un color base cielo por si tarda en cargar la imagen
                 borderRadius: 15,
                 maxWidth: '100%',
-                maxHeight: '70vh', // Limitamos altura para dejar espacio a la barra
+                maxHeight: '70vh',
                 border: '4px solid #34495e',
                 boxShadow: '0 0 50px rgba(0,0,0,0.5)',
                 zIndex: 10
@@ -630,6 +704,19 @@ export default function PikatronRun({ recurso, onExit }) {
             )}
 
             {/* PANTALLAS SUPERPUESTAS (INTRO, GAMEOVER, WIN) */}
+            {/* PANTALLA RANKING (ENCIMA DE TODO) */}
+            {verRanking && <PantallaRanking recurso={recurso} onBack={() => setVerRanking(false)} />}
+
+            {/* PANTALLAS ESTADO */}
+            {gameState === 'SETUP' && (
+                <PantallaSetup
+                    recurso={recurso}
+                    onStart={iniciarPartida}
+                    onExit={onExit}
+                    onRanking={() => setVerRanking(true)} // Pasamos la función
+                />
+            )}
+
             {gameState === 'LEVEL_INTRO' && (
                 <div style={overlayStyle}>
                     <h2 style={{ color: '#2ecc71', fontSize: '2rem', letterSpacing: '5px', textTransform: 'uppercase', marginBottom: 0 }}>PANTALLA {levelInfo.current}</h2>
@@ -641,33 +728,136 @@ export default function PikatronRun({ recurso, onExit }) {
                 </div>
             )}
 
-            {/* ... (Los bloques GAMEOVER y WIN se quedan igual que antes, usan overlayStyle así que taparán todo correctamente) ... */}
-            {gameState === 'GAMEOVER' && (
+            {(gameState === 'GAMEOVER' || gameState === 'WIN') && (
                 <div style={overlayStyle}>
-                    <AlertTriangle size={80} color="#e74c3c" style={{ marginBottom: 20 }} />
-                    <h1 style={{ color: '#e74c3c', fontSize: '4rem', fontFamily: 'monospace', textShadow: '3px 3px 0px #fff', margin: 0 }}>GAME OVER</h1>
-                    <p style={{ color: '#ccc', marginTop: 10 }}>Te has quedado sin vidas.</p>
-                    <div style={{ background: '#333', padding: '10px 20px', borderRadius: 10, marginTop: 20 }}>Puntuación: <span style={{ color: '#f1c40f' }}>{score}</span></div>
+                    {gameState === 'WIN' && <Trophy size={80} color="#f1c40f" style={{ marginBottom: 20 }} />}
+                    {gameState === 'GAMEOVER' && <AlertTriangle size={80} color="#e74c3c" style={{ marginBottom: 20 }} />}
+
+                    <h1 style={{ color: gameState === 'WIN' ? '#f1c40f' : '#e74c3c', fontSize: '3.5rem', fontFamily: 'monospace', textShadow: '3px 3px 0px #fff', margin: 0 }}>
+                        {gameState === 'WIN' ? '¡COMPLETADO!' : 'GAME OVER'}
+                    </h1>
+
+                    <div style={{ background: '#333', padding: '10px 30px', borderRadius: 10, margin: '20px 0', fontSize: '1.5rem', border: '2px solid #555' }}>
+                        Puntuación: <span style={{ color: '#f1c40f', fontWeight: 'bold' }}>{score}</span>
+                    </div>
+
+                    {/* --- ZONA DE GUARDADO --- */}
+                    {!yaGuardado ? (
+                        <div style={{ background: 'rgba(255,255,255,0.1)', padding: '20px', borderRadius: '15px', width: '90%', maxWidth: '350px', marginBottom: '20px' }}>
+                            {(!usuario || !usuario.email) ? (
+                                <>
+                                    <p style={{ margin: '0 0 10px 0', color: '#ccc', fontSize: '0.9rem' }}>Introduce tu nombre para el ranking:</p>
+                                    <input
+                                        value={nombreInvitado}
+                                        onChange={e => setNombreInvitado(e.target.value)}
+                                        placeholder="Tu Nombre"
+                                        maxLength={15}
+                                        style={{ padding: '10px', borderRadius: '5px', border: 'none', width: '100%', marginBottom: '10px', textAlign: 'center', fontWeight: 'bold', boxSizing: 'border-box' }}
+                                    />
+                                    <p style={{ fontSize: '0.8rem', color: '#f1c40f', margin: '5px 0 15px 0' }}>✨ Únete a PiKT y descubre más juegos ✨</p>
+                                </>
+                            ) : (
+                                    <p style={{ color: '#2ecc71', fontWeight: 'bold', marginBottom: '15px' }}>Usuario: {usuario.displayName}</p>
+                                )}
+
+                            <button onClick={guardarPuntuacion} style={{ ...btnStyle, marginTop: 0, background: '#3498db', fontSize: '1rem', padding: '10px' }} disabled={guardando}>
+                                {guardando ? 'Guardando...' : <><Save size={18} /> Guardar Puntuación</>}
+                            </button>
+                        </div>
+                    ) : (
+                            <div style={{ color: '#2ecc71', fontWeight: 'bold', marginBottom: '20px', fontSize: '1.2rem' }}>✅ ¡Puntuación Guardada!</div>
+                        )}
+                    {/* ------------------------- */}
+
                     <button onClick={reiniciarJuegoCompleto} style={{ ...btnStyle, background: '#e74c3c' }}><RefreshCw size={24} /> REINICIAR</button>
                     <button onClick={onExit} style={{ marginTop: 20, background: 'none', border: 'none', color: '#777', cursor: 'pointer' }}>Salir</button>
                 </div>
             )}
-            {gameState === 'WIN' && (
-                <div style={overlayStyle}>
-                    <h1 style={{ color: '#f1c40f', fontSize: '3rem' }}>¡JUEGO COMPLETADO!</h1>
-                    <Trophy size={80} color="#f1c40f" style={{ margin: 20 }} />
-                    <p style={{ fontSize: '1.5rem' }}>Puntuación Final: {score}</p>
-                    <button onClick={onExit} style={btnStyle}>VOLVER AL MENÚ</button>
-                </div>
-            )}
+
+            {/* ... (Los bloques GAMEOVER y WIN se quedan igual que antes, usan overlayStyle así que taparán todo correctamente) ... */}
+           
 
             {gameState === 'PLAYING' && <div style={{ color: '#777', marginTop: 10, fontFamily: 'monospace', fontSize: '12px' }}>[ ESPACIO ] o [ CLICK ] para saltar</div>}
         </div>
     );
 }
 
+// --- COMPONENTE RANKING ---
+// --- COMPONENTE RANKING MEJORADO ---
+function PantallaRanking({ recurso, onBack }) {
+    const [hoja, setHoja] = useState('General'); // Por defecto 'General'
+    const [top10, setTop10] = useState([]);
+    const [cargando, setCargando] = useState(true);
+
+    // Obtenemos las hojas para el desplegable
+    const hojasDisponibles = recurso.hojas || [];
+
+    useEffect(() => {
+        const cargarRanking = async () => {
+            setCargando(true);
+            try {
+                const ref = collection(db, 'ranking');
+                // AHORA FILTRAMOS TAMBIÉN POR 'categoria' (El nivel jugado)
+                const q = query(
+                    ref,
+                    where('recursoId', '==', recurso.id),
+                    where('tipoJuego', '==', 'PIKATRON'),
+                    where('categoria', '==', hoja), // <--- ESTO ES LO NUEVO
+                    orderBy('aciertos', 'desc'),
+                    limit(10)
+                );
+                const snap = await getDocs(q);
+                setTop10(snap.docs.map(d => d.data()));
+            } catch (e) {
+                console.error("Error cargando ranking:", e);
+            }
+            setCargando(false);
+        };
+        cargarRanking();
+    }, [recurso, hoja]); // Se recarga cuando cambias de hoja
+
+    return (
+        <div style={{ ...overlayStyle, zIndex: 3000 }}>
+            <div className="setup-card" style={{ maxWidth: '500px', width: '95%' }}>
+                <h2 style={{ color: '#f1c40f', marginBottom: '15px' }}>🏆 Ranking Top 10</h2>
+
+                {/* --- SELECTOR DE NIVEL (Igual que en CazaBurbujas) --- */}
+                {hojasDisponibles.length > 0 && (
+                    <div style={{ width: '100%', marginBottom: '15px' }}>
+                        <select
+                            value={hoja}
+                            onChange={e => setHoja(e.target.value)}
+                            style={{ width: '100%', padding: '10px', borderRadius: '10px', border: 'none', fontWeight: 'bold' }}
+                        >
+                            <option value="General">Mezcla General</option>
+                            {hojasDisponibles.map(h => (
+                                <option key={h.nombreHoja} value={h.nombreHoja}>{h.nombreHoja}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+
+                <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '10px', height: '300px', overflowY: 'auto', marginBottom: '20px', width: '100%', padding: '10px' }}>
+                    {cargando ? <p style={{ color: 'white' }}>Cargando...</p> : top10.length === 0 ? <p style={{ color: '#aaa' }}>Sin puntuaciones en este nivel.</p> : (
+                        top10.map((fila, i) => (
+                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', borderBottom: '1px solid rgba(255,255,255,0.1)', color: 'white' }}>
+                                <span style={{ fontWeight: 'bold', color: i < 3 ? '#f1c40f' : '#ccc', width: '30px' }}>#{i + 1}</span>
+                                <span style={{ flex: 1, textAlign: 'left', marginLeft: '10px' }}>{fila.jugador}</span>
+                                <span style={{ fontWeight: 'bold', color: '#2ecc71' }}>{fila.aciertos} pts</span>
+                            </div>
+                        ))
+                    )}
+                </div>
+
+                <button onClick={onBack} style={{ ...btnStyle, background: '#7f8c8d', marginTop: 0 }}>Cerrar Ranking</button>
+            </div>
+        </div>
+    );
+}
+
+
 // COMPONENTE SETUP
-function PantallaSetup({ recurso, onStart, onExit }) {
+function PantallaSetup({ recurso, onStart, onExit, onRanking }) {
     const [hoja, setHoja] = useState('General');
     const hojas = recurso.hojas || [];
     return (
@@ -683,10 +873,25 @@ function PantallaSetup({ recurso, onStart, onExit }) {
                     </select>
                 </div>
             )}
+
+
+
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', width: '100%' }}>
                 <button onClick={() => onStart('SIMPLE', hoja)} style={{ ...btnStyle, marginTop: 0, background: '#3498db', boxShadow: '0 5px 0 #2980b9' }}><Play size={20} /> JUGAR NIVEL</button>
                 <button onClick={() => onStart('RETO')} style={{ ...btnStyle, marginTop: 0, background: '#e74c3c', boxShadow: '0 5px 0 #c0392b', border: '2px solid white' }}><Map size={20} /> MODO RETO (Todas)</button>
+                {/* --- BOTÓN RANKING --- */}
+                <button onClick={onRanking} style={{ ...btnStyle, marginTop: 0, background: '#8e44ad', boxShadow: '0 5px 0 #6c3483' }}>
+                    <Trophy size={20} /> VER RANKING
+                </button>
+
+
+
             </div>
+
+
+
+
             <button onClick={onExit} style={{ marginTop: '30px', background: 'none', border: '1px solid #555', padding: '10px 20px', color: '#777', borderRadius: '20px', cursor: 'pointer' }}>Volver</button>
             <style>{`.setup-card { background: rgba(44, 62, 80, 0.95); padding: 40px; border-radius: 20px; width: 90%; max-width: 400px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.5); display: flex; flex-direction: column; alignItems: center; border: 1px solid rgba(255,255,255,0.1); }`}</style>
         </div>

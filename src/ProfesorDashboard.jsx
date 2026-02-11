@@ -16,6 +16,9 @@ import GlobalSearch from './components/GlobalSearch'; // <--- NUEVO
 import TeacherTools from './components/TeacherTools'; // <--- NUEVO
 import EditorMathLive from './components/EditorMathLive';
 import MathLive from './MathLive';
+import CazaBurbujasGame from './CazaBurbujasGame';
+import PikatronRun from './PikatronRun';
+import { MousePointer2, Rocket } from 'lucide-react';
 import EditorProBurbujasPikatron from './components/EditorProBurbujasPikatron';
 // ==============================================================================
 //  ZONA DE CLAVES
@@ -76,7 +79,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
     const [menuOpen, setMenuOpen] = useState(false);
     const [modoDashboard, setModoDashboard] = useState('CLASICO'); // 'CLASICO', 'PRO', 'BUSCADOR_GLOBAL', 'HERRAMIENTAS', 'LEGAL', 'INFO'
     const [mostrandoAyudaDashboard, setMostrandoAyudaDashboard] = useState(false); // <--- Ayuda Global
-
+    const [recursoParaElegirModo, setRecursoParaElegirModo] = useState(null);
     const [openPicker] = useDrivePicker();
 
     useEffect(() => {
@@ -100,8 +103,12 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             const q = query(collection(db, "resources"), where("profesorUid", "==", usuario.uid), where("tipoJuego", "==", juegoSeleccionado));
             const s = await getDocs(q);
             const docs = s.docs.map(d => ({ ...d.data(), id: d.id })).filter(r => {
-                if (modoDashboard === 'PRO') return r.tipo === 'PRO';
-                return !r.tipo || r.tipo !== 'PRO';
+                if (modoDashboard === 'PRO') {
+                    // CAMBIO AQUÍ: Aceptamos 'PRO' y 'PRO-BURBUJAS'
+                    return r.tipo === 'PRO' || r.tipo === 'PRO-BURBUJAS';
+                }
+                // En clásico mostramos los que NO sean de ningún tipo PRO
+                return !r.tipo || (r.tipo !== 'PRO' && r.tipo !== 'PRO-BURBUJAS');
             });
             setRecursos(docs);
         } catch (e) { console.error(e) }
@@ -114,8 +121,11 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             const q = query(collection(db, "resources"), where("tipoJuego", "==", juegoSeleccionado), where("isPrivate", "==", false), orderBy("playCount", "desc"));
             const s = await getDocs(q);
             const docs = s.docs.map(d => ({ ...d.data(), id: d.id })).filter(d => d.profesorUid !== usuario.uid).filter(r => {
-                if (modoDashboard === 'PRO') return r.tipo === 'PRO';
-                return !r.tipo || r.tipo !== 'PRO';
+                if (modoDashboard === 'PRO') {
+                    // CAMBIO AQUÍ TAMBIÉN
+                    return r.tipo === 'PRO' || r.tipo === 'PRO-BURBUJAS';
+                }
+                return !r.tipo || (r.tipo !== 'PRO' && r.tipo !== 'PRO-BURBUJAS');
             });
             setBibliotecaRecursos(docs);
         } catch (e) { console.error(e); }
@@ -155,6 +165,12 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
 
     // --- FUNCIÓN PARA EL EDITOR CLÁSICO (NO TOCAR) ---
     const iniciarCreacion = () => {
+        if (modoDashboard === 'PRO') {
+            if (juegoSeleccionado === 'CAZABURBUJAS') return iniciarCreacionBurbujasPikatron();
+            if (juegoSeleccionado === 'THINKHOOT') return iniciarCreacionPiLive();
+        }
+
+
         const conf = {};
         if (TIPOS_JUEGOS[juegoSeleccionado]) {
             TIPOS_JUEGOS[juegoSeleccionado].camposConfig.forEach(c => conf[c.key] = c.default);
@@ -184,12 +200,13 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
 
     // 2. CREAR BURBUJAS/PIKATRON PRO (TU NUEVO EDITOR)
     const iniciarCreacionBurbujasPikatron = () => {
-        // Si el usuario tiene seleccionado PIKATRON, creamos un Pikatron. Si no, por defecto CAZABURBUJAS.
-        const tipoJuegoDestino = (juegoSeleccionado === 'PIKATRON') ? 'PIKATRON' : 'CAZABURBUJAS';
+        // FORZAMOS LA VISTA DE CAZABURBUJAS PARA VER EL RECURSO AL TERMINAR
+        setJuegoSeleccionado('CAZABURBUJAS');
 
         const nuevoRecurso = {
             id: null, titulo: '', temas: '', profesorNombre: usuario.displayName,
-            tipo: 'PRO-BURBUJAS', tipoJuego: tipoJuegoDestino,
+            tipo: 'PRO-BURBUJAS',
+            tipoJuego: 'CAZABURBUJAS', // Siempre asociado a este ID de juego
             config: { numPreguntas: 10, tiempoPregunta: 20, puntosAcierto: 10, puntosFallo: 2, aleatorio: true },
             hojas: [{ nombreHoja: 'Nivel 1', preguntas: [] }]
         };
@@ -270,8 +287,19 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
     const guardarRecursoFinal = async () => {
         if (!datosEditor.titulo) return alert("Falta Título");
         if (datosEditor.hojas.length === 0) return alert("Falta Hoja");
-        if (juegoSeleccionado !== 'QUESTION_SENDER' && datosEditor.hojas.reduce((a, h) => a + h.preguntas.length, 0) === 0) return alert("Añade preguntas.");
+        // --- MODIFICACIÓN AQUÍ: VALIDACIÓN RELAJADA PARA PRO-BURBUJAS ---
+        const totalPreguntasManuales = datosEditor.hojas.reduce((a, h) => a + h.preguntas.length, 0);
+        const esProBurbujas = datosEditor.tipo === 'PRO-BURBUJAS';
+        const tieneGeneradorMath = datosEditor.config?.mathCount > 0;
 
+
+        if (juegoSeleccionado !== 'QUESTION_SENDER') {
+            if (esProBurbujas && tieneGeneradorMath) {
+                // Es válido aunque tenga 0 manuales, porque tiene generador matemático
+            } else if (totalPreguntasManuales === 0) {
+                return alert("Añade preguntas manuales o configura el generador.");
+            }
+        }
         try {
             const dataToSave = { ...datosEditor, profesorUid: usuario.uid, tipoJuego: juegoSeleccionado, fechaCreacion: new Date() };
             delete dataToSave.id;
@@ -416,9 +444,45 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
 
 
 
+    // --- LÓGICA DE RENDERIZADO DE JUEGOS ---
+    if (recursoProbando) {
+        // CASO 1: PIKATRON
+        if (recursoProbando.tipoJuego === 'PIKATRON') {
+            return (
+                <PikatronRun
+                    recurso={recursoProbando}
+                    usuario={perfilProfesor || usuario}
+                    onExit={() => setRecursoProbando(null)}
+                />
+            );
+        }
 
-    if (recursoProbando) return <div style={{ background: '#2f3640', minHeight: '100vh' }}><div style={{ background: '#f1c40f', padding: '10px', textAlign: 'center' }}>MODO PRUEBA <button onClick={() => setRecursoProbando(null)} style={{ marginLeft: 20 }}>Cerrar</button></div><GamePlayer recurso={recursoProbando} usuario={usuario} alTerminar={() => setRecursoProbando(null)} /></div>;
+        // CASO 2: CAZABURBUJAS PRO (Usamos el componente nuevo, no GamePlayer)
+        if (recursoProbando.tipo === 'PRO-BURBUJAS' && recursoProbando.tipoJuego === 'CAZABURBUJAS') {
+            return (
+                <CazaBurbujasGame
+                    recurso={recursoProbando}
+                    usuario={perfilProfesor || usuario}
+                    alTerminar={() => setRecursoProbando(null)}
+                />
+            );
+        }
 
+        // CASO 3: RECURSOS CLÁSICOS (Usa el reproductor antiguo GamePlayer)
+        return (
+            <div style={{ background: '#2f3640', minHeight: '100vh' }}>
+                <div style={{ background: '#f1c40f', padding: '10px', textAlign: 'center' }}>
+                    MODO PRUEBA
+                    <button onClick={() => setRecursoProbando(null)} style={{ marginLeft: 20 }}>Cerrar</button>
+                </div>
+                <GamePlayer
+                    recurso={recursoProbando}
+                    usuario={usuario}
+                    alTerminar={() => setRecursoProbando(null)}
+                />
+            </div>
+        );
+    }
     if (modoVista === 'ALUMNO') return (<div style={{ position: 'relative' }}><div style={{ position: 'fixed', top: 20, right: 20, zIndex: 9999 }}><button onClick={() => setModoVista('PROFESOR')} style={{ background: '#e74c3c', color: 'white', padding: '10px 20px', borderRadius: '30px', border: 'none', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}><LogOut size={20} /> SALIR MODO ALUMNO</button></div><StudentDashboard usuario={usuario} /></div>);
 
     // ==============================================================================
@@ -480,41 +544,92 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                     {modoDashboard === 'CLASICO' && (<div style={{ marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>{Object.values(TIPOS_JUEGOS).map(j => <button key={j.id} onClick={() => setJuegoSeleccionado(j.id)} style={{ padding: '8px 16px', borderRadius: '20px', border: 'none', background: juegoSeleccionado === j.id ? j.color : 'white', color: juegoSeleccionado === j.id ? 'white' : '#555', cursor: 'pointer', fontWeight: 'bold', boxShadow:'0 2px 5px rgba(0,0,0,0.1)' }}>{j.label}</button>)}</div>)}
                     {modoDashboard === 'PRO' && (<div style={{ marginBottom: '20px', textAlign: 'center' }}><h1 style={{ color: '#9C27B0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}><Zap size={32} /> ThinkHoot PRO</h1></div>)}
                     
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}><h2>{vista === 'MIS_RECURSOS' ? `Mis Recursos` : `Biblioteca`}</h2><div style={{ display: 'flex', gap: '10px' }}>{(juegoSeleccionado !== 'QUESTION_SENDER' && modoDashboard === 'CLASICO') && <button onClick={() => setVista(vista === 'MIS_RECURSOS' ? 'BIBLIOTECA' : 'MIS_RECURSOS')} style={{ background: '#27ae60', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer' }}><Globe size={18} /> {vista === 'MIS_RECURSOS' ? "Ir a Biblioteca" : "Mis Recursos"}</button>}
+                    {/* BARRA DE TÍTULO Y BOTONES DE ACCIÓN */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', alignItems: 'center' }}>
+                        <h2>{vista === 'MIS_RECURSOS' ? `Mis Recursos` : `Biblioteca`}</h2>
 
-                        {vista === 'MIS_RECURSOS' && (
-                            modoDashboard === 'PRO' ? (
-                                // --- ZONA DE BOTONES PRO (3 EDITORES) ---
-                                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                                    {/* 1. Botón MathLive */}
-                                    <button onClick={iniciarCreacionMathLive} style={{ display: 'flex', alignItems: 'center', gap: '5px', background: '#9C27B0', color: 'white', border: 'none', padding: '10px 15px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
-                                        <Calculator size={18} /> MathLive
-                                </button>
+                        <div style={{ display: 'flex', gap: '10px' }}>
 
-                                    {/* 2. Botón PiLive (ThinkHoot) */}
-                                    <button onClick={iniciarCreacionPiLive} style={{ display: 'flex', alignItems: 'center', gap: '5px', background: '#E91E63', color: 'white', border: 'none', padding: '10px 15px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
-                                        <Zap size={18} /> PiLive
+                            {/* --- BOTÓN CREAR NUEVO (AÑADIDO) --- */}
+                            {vista === 'MIS_RECURSOS' && (
+                                <button
+                                    onClick={iniciarCreacion}
+                                    style={{
+                                        background: '#2ecc71', color: 'white', border: 'none',
+                                        padding: '10px 20px', borderRadius: '8px', cursor: 'pointer',
+                                        fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px',
+                                        boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+                                    }}
+                                >
+                                    <Plus size={20} /> <span className="hide-mobile">Crear Nuevo</span>
                                 </button>
+                            )}
+                            {/* ----------------------------------- */}
 
-                                    {/* 3. Botón Burbujas/Pikatron (NUEVO) */}
-                                    <button onClick={iniciarCreacionBurbujasPikatron} style={{ display: 'flex', alignItems: 'center', gap: '5px', background: '#F39C12', color: 'white', border: 'none', padding: '10px 15px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
-                                        <Gamepad2 size={18} /> Burbujas/Pikatron
+                            {(juegoSeleccionado !== 'QUESTION_SENDER' && modoDashboard === 'CLASICO') && (
+                                <button onClick={() => setVista(vista === 'MIS_RECURSOS' ? 'BIBLIOTECA' : 'MIS_RECURSOS')} style={{ background: '#2980b9', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                    <Globe size={18} /> {vista === 'MIS_RECURSOS' ? "Ir a Biblioteca" : "Mis Recursos"}
                                 </button>
+                            )}
+
+                            {modoDashboard === 'PRO' && (
+                                <div style={{ display: 'flex', gap: '10px' }}>
+                                    <button
+                                        onClick={() => setJuegoSeleccionado('THINKHOOT')}
+                                        style={{
+                                            padding: '8px 20px', borderRadius: '20px', border: 'none',
+                                            background: juegoSeleccionado === 'THINKHOOT' ? '#9C27B0' : 'white',
+                                            color: juegoSeleccionado === 'THINKHOOT' ? 'white' : '#555',
+                                            cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
+                                            display: 'flex', alignItems: 'center', gap: '5px'
+                                        }}
+                                    >
+                                        <Zap size={16} /> Pi-Live
+                                    </button>
+
+                                    <button
+                                        onClick={() => setJuegoSeleccionado('CAZABURBUJAS')}
+                                        style={{
+                                            padding: '8px 20px', borderRadius: '20px', border: 'none',
+                                            background: juegoSeleccionado === 'CAZABURBUJAS' ? '#E91E63' : 'white',
+                                            color: juegoSeleccionado === 'CAZABURBUJAS' ? 'white' : '#555',
+                                            cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
+                                            display: 'flex', alignItems: 'center', gap: '5px'
+                                        }}
+                                    >
+                                        <Gamepad2 size={16} /> Burbujas / Pikatron
+                                    </button>
                                 </div>
-                            ) : (
-                                    // --- ZONA DE BOTÓN CLÁSICO ---
-                                    <button onClick={iniciarCreacion} style={{ display: 'flex', alignItems: 'center', gap: '5px', background: '#27ae60', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
-                                        <Plus size={18} /> Crear Nuevo
-                            </button>
-                                )
-                        )}
-                    </div> {/* <--- FALTABA ESTE DIV (Cierra el grupo de botones) */}
-                    </div> {/* <--- FALTABA ESTE DIV (Cierra la barra de título) */}
+                            )}
+                        </div>
+                    </div>
 
 
                     {vista === 'BIBLIOTECA' && (<div style={{ background: '#f9f9f9', padding: '15px', borderRadius: '10px', marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}><span style={{ fontWeight: 'bold', color: '#666' }}><Search size={16} /> Filtros:</span><input placeholder="Tema..." value={filtrosInput.tema} onChange={e => setFiltrosInput({ ...filtrosInput, tema: e.target.value })} style={inputFilter} /><input placeholder="País" value={filtrosInput.pais} onChange={e => setFiltrosInput({ ...filtrosInput, pais: e.target.value })} style={inputFilter} /><input placeholder="Región" value={filtrosInput.region} onChange={e => setFiltrosInput({ ...filtrosInput, region: e.target.value })} style={inputFilter} /><input placeholder="Población" value={filtrosInput.poblacion} onChange={e => setFiltrosInput({ ...filtrosInput, poblacion: e.target.value })} style={inputFilter} /><button onClick={ejecutarBusqueda} style={{ background: '#2980b9', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '5px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}><Search size={16} /> Buscar</button><button onClick={limpiarBusqueda} style={{ background: '#bdc3c7', padding: '8px', borderRadius: '5px', border: 'none', cursor: 'pointer' }} title="Limpiar"><RotateCcw size={16} /></button></div>)}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
-                        {(vista === 'MIS_RECURSOS' ? recursos : getRecursosFiltrados()).map((r, i) => (<div key={r.id || i} style={{ background: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', borderLeft: `6px solid ${TIPOS_JUEGOS[juegoSeleccionado].color}`, position: 'relative' }}>{juegoSeleccionado !== 'QUESTION_SENDER' && <div style={{ position: 'absolute', top: '10px', right: '10px', background: '#f1c40f', padding: '2px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: 'bold' }}><Users size={12} /> {r.playCount || 0}</div>}<h3 style={{ margin: '0 0 5px 0' }}>{r.titulo}</h3><div style={{ display: 'flex', gap: '5px', marginTop: '10px' }}>{juegoSeleccionado === 'QUESTION_SENDER' ? (<><button onClick={() => abrirEdicion(r)} style={btnStyle('#E3F2FD', '#1565C0')}><Pencil size={18} /></button><button onClick={() => setModalCopiarApp(r)} style={btnStyle('#E8F5E9', '#2E7D32')}><Send size={18} /></button><button onClick={() => eliminarRecurso(r.id)} style={btnStyle('#FFEBEE', '#C62828')}><Trash2 size={18} /></button></>) : (vista === 'MIS_RECURSOS' ? (<>{juegoSeleccionado === 'THINKHOOT' ? (<button title="Lanzar en Vivo" onClick={() => prepararJuegoEnVivo(r)} style={{ ...btnStyle('#9C27B0', 'white'), fontWeight: 'bold' }}><Zap size={18} /></button>) : (<button onClick={() => probarJuego(r)} style={btnStyle('#E1BEE7', '#8E24AA')}><Gamepad2 size={18} /></button>)}<button onClick={() => mostrarCodigo(r)} style={btnStyle('#FFF3E0', '#FF9800')}><Key size={18} /></button><button onClick={() => abrirEdicion(r)} style={btnStyle('#E3F2FD', '#1565C0')}><Pencil size={18} /></button><button onClick={() => abrirResultados(r)} style={btnStyle('#E8F5E9', '#2E7D32')}><BarChart2 size={18} /></button><button onClick={() => eliminarRecurso(r.id)} style={btnStyle('#FFEBEE', '#C62828')}><Trash2 size={18} /></button></>) : (<><button onClick={() => probarJuego(r)} style={{ ...btnStyle('#E1BEE7', '#8E24AA'), flex: 2 }}>Probar</button><button onClick={() => setRecursoInspeccionando(r)} style={btnStyle('#eee', '#333')}><Eye size={18} /></button><button onClick={() => copiarRecurso(r)} style={{ ...btnStyle('#27ae60', 'white'), flex: 2 }}>Copiar</button></>))}</div></div>))}
+                        {(vista === 'MIS_RECURSOS' ? recursos : getRecursosFiltrados()).map((r, i) => (<div key={r.id || i} style={{ background: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', borderLeft: `6px solid ${TIPOS_JUEGOS[juegoSeleccionado].color}`, position: 'relative' }}>{juegoSeleccionado !== 'QUESTION_SENDER' && <div style={{ position: 'absolute', top: '10px', right: '10px', background: '#f1c40f', padding: '2px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: 'bold' }}><Users size={12} /> {r.playCount || 0}</div>}<h3 style={{ margin: '0 0 5px 0' }}>{r.titulo}</h3><div style={{ display: 'flex', gap: '5px', marginTop: '10px' }}>{juegoSeleccionado === 'QUESTION_SENDER' ? (<><button onClick={() => abrirEdicion(r)} style={btnStyle('#E3F2FD', '#1565C0')}><Pencil size={18} /></button><button onClick={() => setModalCopiarApp(r)} style={btnStyle('#E8F5E9', '#2E7D32')}><Send size={18} /></button><button onClick={() => eliminarRecurso(r.id)} style={btnStyle('#FFEBEE', '#C62828')}><Trash2 size={18} /></button></>) : (vista === 'MIS_RECURSOS' ? (<>
+                            
+                            {juegoSeleccionado === 'THINKHOOT' ? (
+                                <button title="Lanzar en Vivo" onClick={() => prepararJuegoEnVivo(r)} style={{ ...btnStyle('#9C27B0', 'white'), fontWeight: 'bold' }}>
+                                    <Zap size={18} />
+                                </button>
+                            ) : (
+                                    <button
+                                        onClick={() => {
+                                            // AQUI ESTA LA CLAVE: Si es CAZABURBUJAS (da igual si es PRO o Manual), te deja elegir
+                                            if (r.tipoJuego === 'CAZABURBUJAS') {
+                                                setRecursoParaElegirModo(r);
+                                            } else {
+                                                probarJuego(r);
+                                            }
+                                        }}
+                                        style={btnStyle('#E1BEE7', '#8E24AA')}
+                                        title="Jugar / Probar"
+                                    >
+                                        <Gamepad2 size={18} />
+                                    </button>
+                                )}
+                            <button onClick={() => mostrarCodigo(r)} style={btnStyle('#FFF3E0', '#FF9800')}><Key size={18} /></button><button onClick={() => abrirEdicion(r)} style={btnStyle('#E3F2FD', '#1565C0')}><Pencil size={18} /></button><button onClick={() => abrirResultados(r)} style={btnStyle('#E8F5E9', '#2E7D32')}><BarChart2 size={18} /></button><button onClick={() => eliminarRecurso(r.id)} style={btnStyle('#FFEBEE', '#C62828')}><Trash2 size={18} /></button></>) : (<><button onClick={() => probarJuego(r)} style={{ ...btnStyle('#E1BEE7', '#8E24AA'), flex: 2 }}>Probar</button><button onClick={() => setRecursoInspeccionando(r)} style={btnStyle('#eee', '#333')}><Eye size={18} /></button><button onClick={() => copiarRecurso(r)} style={{ ...btnStyle('#27ae60', 'white'), flex: 2 }}>Copiar</button></>))}</div></div>))}
                         
                         {/* MENSAJE DE VACÍO + INSTRUCCIONES */}
                         {vista === 'MIS_RECURSOS' && recursos.length === 0 && !cargando && (
@@ -535,7 +650,40 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             )}
 
             {/* MODALES EDITORES */}
-            {mostrandoCrear && <ModalOverlay onClose={() => setMostrandoCrear(false)}><h2>Nuevo {TIPOS_JUEGOS[juegoSeleccionado].label}</h2><input value={datosEditor.titulo} onChange={e => setDatosEditor({ ...datosEditor, titulo: e.target.value })} style={inputStyle} placeholder="Título" /><div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}><button onClick={() => { setMostrandoCrear(false); setMostrandoEditorManual(true); }} style={{ ...actionBtnStyle('#2196F3'), flex: 1 }}><Edit3 /> Manual</button>{juegoSeleccionado !== 'QUESTION_SENDER' && <><button onClick={procesarCreacionIA} style={{ ...actionBtnStyle('#673AB7'), flex: 1 }}><Bot /> IA</button><button onClick={handleFileUpload} style={{ ...actionBtnStyle('#107C41'), flex: 1 }}><FileSpreadsheet /> Excel</button><button onClick={handleOpenPicker} style={{ ...actionBtnStyle('#FFC107'), flex: 1, color: 'black' }}>Drive</button></>}</div></ModalOverlay>}
+            {/* MODALES EDITORES */}
+            {mostrandoCrear && (
+                <ModalOverlay onClose={() => setMostrandoCrear(false)}>
+                    <h2>Nuevo {TIPOS_JUEGOS[juegoSeleccionado].label}</h2>
+                    <input
+                        value={datosEditor.titulo}
+                        onChange={e => setDatosEditor({ ...datosEditor, titulo: e.target.value })}
+                        style={inputStyle}
+                        placeholder="Título"
+                    />
+                    <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+
+                        <button onClick={() => { setMostrandoCrear(false); setMostrandoEditorManual(true); }} style={{ ...actionBtnStyle('#2196F3'), flex: 1 }}>
+                            <Edit3 /> Manual
+                        </button>
+
+                        {juegoSeleccionado !== 'QUESTION_SENDER' && (
+                            <>
+                                <button onClick={procesarCreacionIA} style={{ ...actionBtnStyle('#673AB7'), flex: 1 }}>
+                                    <Bot /> IA
+                                </button>
+
+                                {/* --- AQUÍ ESTABA EL BOTÓN DE EXCEL QUE HAS BORRADO --- */}
+
+                                <button onClick={handleOpenPicker} style={{ ...actionBtnStyle('#FFC107'), flex: 1, color: 'black' }}>
+                                    Drive
+                                </button>
+                            </>
+                        )}
+                    </div>
+                </ModalOverlay>
+            )}
+
+
             {mostrandoEditorManual && <EditorManual datos={datosEditor} setDatos={setDatosEditor} configJuego={TIPOS_JUEGOS[juegoSeleccionado]} onClose={() => setMostrandoEditorManual(false)} onSave={guardarRecursoFinal} usuario={perfilProfesor || usuario} />}
             {mostrandoEditorPro && <EditorPro datos={datosEditor} setDatos={setDatosEditor} onClose={() => setMostrandoEditorPro(false)} onSave={guardarRecursoFinal} usuario={perfilProfesor || usuario}/>}
 
@@ -571,6 +719,58 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             {hostGameData?.fase === 'CONFIG_HOST' && (<ModalOverlay onClose={() => setHostGameData(null)}><h2>📡 Lanzar en Vivo</h2><select value={hostGameData.hojaElegida} onChange={e => setHostGameData({ ...hostGameData, hojaElegida: e.target.value })} style={{ width: '100%', padding: '10px', marginBottom: '20px' }}>{hostGameData.hojasDisponibles.map(h => <option key={h} value={h}>{h}</option>)}</select><button onClick={confirmarLanzamientoHost} style={{ width: '100%', padding: '15px', background: '#9C27B0', color: 'white', border: 'none', borderRadius: '5px' }}>🚀 GENERAR CÓDIGO</button></ModalOverlay>)}
             {recursoInspeccionando && <ModalOverlay onClose={() => setRecursoInspeccionando(null)}><h2>{recursoInspeccionando.titulo}</h2><div style={{ maxHeight: '400px', overflowY: 'auto' }}>{recursoInspeccionando.hojas.map((h, i) => <div key={i}><h4>{h.nombreHoja}</h4><ul>{h.preguntas.map((p, j) => <li key={j}><b>{p.letra ? `Letra ${p.letra}: ` : ''}{p.pregunta}</b> &rarr; {p.respuesta || p.correcta}</li>)}</ul></div>)}</div><button onClick={() => { copiarRecurso(recursoInspeccionando); setRecursoInspeccionando(null) }} style={actionBtnStyle('#27ae60')}>Copiar</button></ModalOverlay>}
             {mostrandoPerfil && (<UserProfile usuario={usuario} perfil={perfilProfesor} onClose={() => setMostrandoPerfil(false)} onUpdate={() => cargarPerfilProfesor()} />)}
+            {/* --- MODAL SELECTOR DE JUEGO (PRO-BURBUJAS) --- */}
+            {recursoParaElegirModo && (
+                <ModalOverlay onClose={() => setRecursoParaElegirModo(null)}>
+                    <h2 style={{ textAlign: 'center', color: '#2c3e50' }}>Elige el Modo de Juego</h2>
+                    <p style={{ textAlign: 'center', color: '#666', marginBottom: '25px' }}>
+                        ¿Cómo quieres ejecutar <b>{recursoParaElegirModo.titulo}</b>?
+                    </p>
+
+                    <div style={{ display: 'grid', gap: '15px' }}>
+                        {/* OPCIÓN 1: CAZABURBUJAS */}
+                        <button
+                            onClick={() => {
+                                // Forzamos el tipo para que el renderizador sepa qué cargar
+                                probarJuego({ ...recursoParaElegirModo, tipoJuego: 'CAZABURBUJAS' });
+                                setRecursoParaElegirModo(null);
+                            }}
+                            style={{
+                                padding: '15px', borderRadius: '15px', border: 'none',
+                                background: 'linear-gradient(135deg, #FF4081 0%, #C2185B 100%)',
+                                color: 'white', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+                                boxShadow: '0 4px 15px rgba(233, 30, 99, 0.3)'
+                            }}
+                        >
+                            <MousePointer2 size={24} /> CazaBurbujas
+                        </button>
+
+                        {/* OPCIÓN 2: PIKATRON */}
+                        <button
+                            onClick={() => {
+                                // Forzamos el tipo PIKATRON para que entre en el IF correcto
+                                probarJuego({ ...recursoParaElegirModo, tipoJuego: 'PIKATRON' });
+                                setRecursoParaElegirModo(null);
+                            }}
+                            style={{
+                                padding: '15px', borderRadius: '15px', border: 'none',
+                                background: 'linear-gradient(135deg, #2196F3 0%, #1976D2 100%)',
+                                color: 'white', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+                                boxShadow: '0 4px 15px rgba(33, 150, 243, 0.3)'
+                            }}
+                        >
+                            <Rocket size={24} /> Pikatron Run
+                        </button>
+                    </div>
+                </ModalOverlay>
+            )}
+
+
+
+
+
             <input type="file" id="input-excel-oculto" accept=".xlsx" style={{ display: 'none' }} onChange={handleFileUpload} />
         </div>
     );

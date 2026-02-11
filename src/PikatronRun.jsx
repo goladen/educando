@@ -285,7 +285,7 @@ export default function PikatronRun({ recurso, onExit, usuario }) {
         gameRef.current.qIndex = 0;
         gameRef.current.obstacles = [];
         gameRef.current.pikatron.y = 0;
-
+        gameRef.current.bgX = 0;
         setLevelInfo({
             current: levelIndex + 1,
             total: gameRef.current.levelsQueue.length,
@@ -364,20 +364,27 @@ export default function PikatronRun({ recurso, onExit, usuario }) {
             // pero por seguridad lo dejamos o lo quitamos si parpadea.
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // 1. DIBUJAR FONDO CON SCROLL (MOVIMIENTO)
-            // Velocidad del fondo: 0.5 veces la velocidad del juego (Parallax)
+            // 1. DIBUJAR FONDO CON SCROLL (OPTIMIZADO PARA MÓVIL)
+            // Calculamos el desplazamiento
             gameRef.current.bgX -= gameRef.current.speed * 0.5;
 
-            // Si la primera imagen sale por la izquierda, reseteamos
-            if (gameRef.current.bgX <= -canvas.width) {
-                gameRef.current.bgX = 0;
-            }
+            // Forzamos que bgX se mantenga siempre dentro del rango del ancho del canvas
+            // Esto evita números negativos gigantes que fallan en móvil
+            const anchoCanvas = 800; // Ancho interno fijo
+            gameRef.current.bgX = gameRef.current.bgX % anchoCanvas;
 
-            // Dibujamos dos imágenes: una en la posición actual y otra pegada a la derecha
-            // para que no se vea hueco negro al moverse.
-            if (bgImg.complete) { // Solo dibujar si cargó
-                ctx.drawImage(bgImg, gameRef.current.bgX, 0, canvas.width, canvas.height);
-                ctx.drawImage(bgImg, gameRef.current.bgX + canvas.width, 0, canvas.width, canvas.height);
+            // Dibujamos el fondo solo si la imagen está cargada
+            if (bgImg.complete && bgImg.naturalWidth > 0) {
+                // Imagen 1 (Principal)
+                ctx.drawImage(bgImg, gameRef.current.bgX, 0, anchoCanvas, canvas.height);
+
+                // Imagen 2 (La que viene detrás para el bucle)
+                // Se dibuja exactamente un ancho por delante
+                ctx.drawImage(bgImg, gameRef.current.bgX + anchoCanvas, 0, anchoCanvas, canvas.height);
+            } else {
+                // Si la imagen no ha cargado aún, pintamos un color de cielo para que no se vea negro
+                ctx.fillStyle = "#87CEEB";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
             }
 
             // SUELO TEMÁTICO

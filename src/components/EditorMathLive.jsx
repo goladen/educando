@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect } from 'react';
 import { Save, X, Trash2, FolderPlus, ArrowUp, ArrowDown, Clock, Trophy, GripVertical, Image as ImageIcon, Calculator, Percent, Hash, Divide, Plus, Minus, Settings } from 'lucide-react';
-export default function EditorMathLive({ datos, setDatos, onClose, onSave }) {
+export default function EditorMathLive({ datos, setDatos, onClose, onSave, usuario }) {
     const [hojaActiva, setHojaActiva] = useState(0);
     const [mostrandoConfig, setMostrandoConfig] = useState(false);
 
@@ -28,7 +28,12 @@ export default function EditorMathLive({ datos, setDatos, onClose, onSave }) {
                 return {
                     ...prev,
                     tipo: 'PRO', // Se guarda como PRO pero con flag isMathLive en config
-                    config: nuevaConfig
+                    config: nuevaConfig,
+                    pais: prev.pais !== undefined ? prev.pais : (usuario?.pais || ''),
+                    region: prev.region !== undefined ? prev.region : (usuario?.region || ''),
+                    poblacion: prev.poblacion !== undefined ? prev.poblacion : (usuario?.poblacion || usuario?.localidad || ''),
+                    ciclo: prev.ciclo !== undefined ? prev.ciclo : (usuario?.ciclo || 'Primaria'),
+                    temas: prev.temas || usuario?.temasPreferidos || '',
                 };
             });
         }
@@ -291,12 +296,32 @@ export default function EditorMathLive({ datos, setDatos, onClose, onSave }) {
                                 <button onClick={() => setMostrandoConfig(false)} style={styles.iconBtnBlack}><X /></button>
                             </div>
                             <div style={styles.configBody}>
-                                <h4 style={styles.sectionTitle}>Ubicación</h4>
-                                <InputConfig label="País" val={datos.pais} set={v => setDatos({ ...datos, pais: v })} />
-                                <InputConfig label="Región" val={datos.region} set={v => setDatos({ ...datos, region: v })} />
-                                <InputConfig label="Población" val={datos.poblacion} set={v => setDatos({ ...datos, poblacion: v })} />
-                                <InputConfig label="Temas" val={datos.temas} set={v => setDatos({ ...datos, temas: v })} />
-
+                                {/* --- SECCIÓN DATOS DE BÚSQUEDA ESTANDARIZADA --- */}
+                                <h4 style={styles.sectionTitle}>Datos de Búsqueda</h4>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                    <InputConfig label="País" val={datos.pais} set={v => setDatos({ ...datos, pais: v })} />
+                                    <InputConfig label="Región" val={datos.region} set={v => setDatos({ ...datos, region: v })} />
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                    <InputConfig label="Localidad" val={datos.poblacion} set={v => setDatos({ ...datos, poblacion: v })} />
+                                    <InputConfig
+                                        label="Temas"
+                                        val={datos.temas} // <--- CAMBIADO (antes ponía datos.temasPreferidos)
+                                        set={v => setDatos({ ...datos, temas: v })} // <--- CAMBIADO
+                                    />
+                                </div>
+                                <div style={{ marginBottom: '15px' }}>
+                                    <label style={styles.label}>Ciclo Educativo</label>
+                                    <select value={datos.ciclo || 'Secundaria'} onChange={e => setDatos({ ...datos, ciclo: e.target.value })} style={styles.input}>
+                                        <option value="Infantil">Infantil</option>
+                                        <option value="Primaria">Primaria</option>
+                                        <option value="Secundaria">Secundaria</option>
+                                        <option value="Bachillerato">Bachillerato</option>
+                                        <option value="FP">Formación Profesional</option>
+                                        <option value="Universidad">Universidad</option>
+                                        <option value="Otros">Otros</option>
+                                    </select>
+                                </div>
                                 <h4 style={styles.sectionTitle}>Ajustes de Juego (Standard)</h4>
                                 <div style={{ marginBottom: '10px' }}>
                                     <label style={styles.label}>Nº de Preguntas Extra a coger</label>

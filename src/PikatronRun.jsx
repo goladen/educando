@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
-import { X, RefreshCw, Play, Trophy, AlertTriangle, Layers, Map, Heart } from 'lucide-react';
+import { X, RefreshCw, Play, Trophy, AlertTriangle, Layers, Map, Heart, Maximize } from 'lucide-react';
 // IMPORTA AQUÍ TU IMAGEN SIN FONDO
 import pikatronImg from './assets/pikatron-sprite.png';
 
@@ -40,6 +40,118 @@ const playSound = (type) => {
 
 const BLOCK_COLORS = ['#e74c3c', '#3498db', '#9b59b6', '#f1c40f', '#e67e22', '#1abc9c'];
 
+// --- MAPA DE VELOCIDADES ---
+const SPEED_MAP = {
+    'LENTO': 4,
+    'MODERADO': 7,
+    'RAPIDO': 11
+};
+
+// =================================================================================
+//  GENERADOR DE OPERACIONES (LOGICA MATHLIVE ADAPTADA A PIKATRON)
+// =================================================================================
+const generarPreguntasMatematicas = (config) => {
+    const questions = [];
+    const count = parseInt(config.mathCount || 0);
+    if (count <= 0) return [];
+
+    const types = config.mathTypes || ['POSITIVOS'];
+    const ops = config.mathOps || ['SUMA'];
+    const min = parseInt(config.mathMin || 1);
+    const max = parseInt(config.mathMax || 10);
+
+    const getRandomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+    const getRandomFloat = (min, max) => (Math.random() * (max - min) + min).toFixed(1);
+    const gcd = (a, b) => b === 0 ? a : gcd(b, a % b);
+    const simplify = (n, d) => { const common = gcd(Math.abs(n), Math.abs(d)); return { n: n / common, d: d / common }; };
+
+    for (let i = 0; i < count; i++) {
+        const type = types[i % types.length];
+        const op = ops[i % ops.length];
+        let pObj = { pregunta: '', respuesta: '', incorrectas: [] };
+
+        // Variables para cálculo
+        let a, b, res, labelA, labelB, operatorSymbol;
+        let isFraction = type === 'FRACCIONES';
+        let isDecimal = type === 'DECIMALES';
+        let isNegative = type === 'NEGATIVOS';
+
+        if (isFraction) {
+            const n1 = getRandomInt(min, max); const d1 = getRandomInt(min, max);
+            const n2 = getRandomInt(min, max); const d2 = getRandomInt(min, max);
+
+            let resN, resD;
+            if (op === 'SUMA') { operatorSymbol = '+'; resN = n1 * d2 + n2 * d1; resD = d1 * d2; }
+            else if (op === 'RESTA') { operatorSymbol = '-'; resN = n1 * d2 - n2 * d1; resD = d1 * d2; }
+            else if (op === 'MULT') { operatorSymbol = '·'; resN = n1 * n2; resD = d1 * d2; }
+            else if (op === 'DIV') { operatorSymbol = ':'; resN = n1 * d2; resD = d1 * n2; }
+
+            const simple = simplify(resN, resD);
+            if (simple.d < 0) { simple.n = -simple.n; simple.d = -simple.d; }
+
+            // Formatear pregunta y respuesta
+            pObj.pregunta = `${n1}/${d1} ${operatorSymbol} ${n2}/${d2}`;
+            pObj.respuesta = `${simple.n}/${simple.d}`;
+
+            // Generar incorrectas (Fracciones aleatorias cercanas o invertidas)
+            pObj.incorrectas = [
+                `${simple.n + 1}/${simple.d}`,
+                `${simple.n}/${simple.d + 1}`,
+                `${simple.d}/${simple.n}` // Inversa como trampa
+            ].filter(inc => inc !== pObj.respuesta); // Evitar duplicados con la correcta
+
+        } else {
+            // Enteros o Decimales
+            const getVal = () => {
+                let v = isDecimal ? parseFloat(getRandomFloat(min, max)) : getRandomInt(min, max);
+                if (isNegative && Math.random() > 0.5) v = -v;
+                return v;
+            };
+            a = getVal(); b = getVal();
+
+            if (op === 'DIV') {
+                if (b === 0) b = 1;
+                // Ajustar 'a' para que la división sea exacta si no es decimal
+                if (!isDecimal) {
+                    const resTemp = isNegative ? (Math.random() > 0.5 ? -getRandomInt(min, max) : getRandomInt(min, max)) : getRandomInt(min, max);
+                    a = b * resTemp;
+                }
+            }
+
+            if (op === 'SUMA') { operatorSymbol = '+'; res = a + b; }
+            else if (op === 'RESTA') { operatorSymbol = '-'; res = a - b; }
+            else if (op === 'MULT') { operatorSymbol = '·'; res = a * b; }
+            else if (op === 'DIV') { operatorSymbol = ':'; res = a / b; }
+
+            // Formatear
+            if (isDecimal || !Number.isInteger(res)) {
+                res = parseFloat(res.toFixed(1));
+                pObj.respuesta = String(res).replace('.', ',');
+                labelA = String(a).replace('.', ',');
+                labelB = String(b).replace('.', ',');
+            } else {
+                pObj.respuesta = String(res);
+                labelA = String(a);
+                labelB = String(b);
+            }
+
+            if (b < 0) labelB = `(${labelB})`;
+
+            pObj.pregunta = `${labelA} ${operatorSymbol} ${labelB}`;
+
+            // Generar Incorrectas
+            const step = isDecimal ? 0.1 : 1;
+            pObj.incorrectas = [
+                String(isDecimal ? (res + 1).toFixed(1).replace('.', ',') : res + 1),
+                String(isDecimal ? (res - 1).toFixed(1).replace('.', ',') : res - 1),
+                String(isDecimal ? (res + 10).toFixed(1).replace('.', ',') : res + 10)
+            ];
+        }
+        questions.push(pObj);
+    }
+    return questions;
+};
+
 export default function PikatronRun({ recurso, onExit }) {
     const canvasRef = useRef(null);
 
@@ -55,56 +167,92 @@ export default function PikatronRun({ recurso, onExit }) {
         pikatron: { x: 50, y: 0, vy: 0, width: 100, height: 100, frameX: 0, frameY: 0, speed: 0, jumping: false, groundY: 0 },
         obstacles: [],
         frame: 0,
-        speed: 6,
+        speed: 6, // Se actualizará al iniciar
         qIndex: 0,
         spawnTimer: 0,
         currentAnswers: [],
         nextAnswerIndex: 0,
         levelsQueue: [],
         currentLevelIdx: 0,
-        allQuestions: []
+        allQuestions: [],
+        puntosAcierto: 10,
+        puntosFallo: 2
     });
 
     // --- LÓGICA DE INICIO ---
     const iniciarPartida = (modo, nombreHoja = null) => {
         const config = recurso.config || {};
-        const limitPerSheet = parseInt(config.numPreguntas) || 10;
+
+        // 1. CONFIGURAR VELOCIDAD Y PUNTOS
+        const velocidadStr = config.velocidad || 'MODERADO';
+        gameRef.current.speed = SPEED_MAP[velocidadStr] || 7;
+        gameRef.current.puntosAcierto = parseInt(config.puntosAcierto) || 10;
+        gameRef.current.puntosFallo = parseInt(config.puntosFallo) || 2;
+
+        const manualLimit = parseInt(config.numPreguntas) || 10;
         const isAleatorio = config.aleatorio !== false;
 
+        // DETECTAR SI ES RECURSO PRO/MATHLIVE PARA GENERAR PREGUNTAS
+        const esProBurbujas = recurso.tipo === 'PRO-BURBUJAS' || config.mathCount > 0;
+
         let levels = [];
+        let hojasAProcesar = [];
+
+        // Definir qué hojas vamos a jugar
         if (modo === 'RETO') {
             if (recurso.hojas && recurso.hojas.length > 0) {
-                recurso.hojas.forEach(hoja => {
-                    let questions = [...(hoja.preguntas || [])];
-                    if (questions.length > 0) {
-                        if (isAleatorio) questions.sort(() => Math.random() - 0.5);
-                        questions = questions.slice(0, limitPerSheet);
-                        levels.push({ name: hoja.nombreHoja || "Nivel", questions: questions });
-                    }
-                });
+                hojasAProcesar = recurso.hojas;
             } else if (recurso.preguntas) {
-                levels.push({ name: "General", questions: recurso.preguntas });
+                hojasAProcesar = [{ nombreHoja: "General", preguntas: recurso.preguntas }];
             }
         } else {
-            let targetQuestions = [];
-            let sheetName = "General";
+            // Modo Simple (Nivel Específico)
             if (nombreHoja === 'General' || !recurso.hojas) {
-                if (recurso.preguntas) targetQuestions = [...recurso.preguntas];
-                if (recurso.hojas) recurso.hojas.forEach(h => targetQuestions.push(...(h.preguntas || [])));
+                hojasAProcesar = [{ nombreHoja: "General", preguntas: recurso.preguntas || [] }];
+                if (recurso.hojas) {
+                    // Si seleccionó "General" pero hay hojas, las juntamos todas en un solo nivel gigante
+                    let allQ = [];
+                    recurso.hojas.forEach(h => allQ.push(...(h.preguntas || [])));
+                    hojasAProcesar = [{ nombreHoja: "Mezcla General", preguntas: allQ }];
+                }
             } else {
                 const hObj = recurso.hojas.find(h => h.nombreHoja === nombreHoja);
-                if (hObj) {
-                    targetQuestions = [...(hObj.preguntas || [])];
-                    sheetName = hObj.nombreHoja;
-                }
+                if (hObj) hojasAProcesar = [hObj];
             }
-            if (isAleatorio) targetQuestions.sort(() => Math.random() - 0.5);
-            if (targetQuestions.length > limitPerSheet) targetQuestions = targetQuestions.slice(0, limitPerSheet);
-            levels.push({ name: sheetName, questions: targetQuestions });
         }
 
-        if (levels.length === 0 || levels[0].questions.length === 0) {
-            alert("No hay preguntas disponibles.");
+        // PROCESAR CADA HOJA PARA CREAR UN NIVEL
+        hojasAProcesar.forEach(hoja => {
+            let questionsPool = [];
+
+            // A) Preguntas Manuales (Limitadas por numPreguntas)
+            let manuales = [...(hoja.preguntas || [])];
+            if (isAleatorio) manuales.sort(() => Math.random() - 0.5);
+
+            // Si hay límite y es menor que las manuales disponibles, cortamos
+            if (manuales.length > manualLimit) {
+                manuales = manuales.slice(0, manualLimit);
+            }
+            questionsPool = [...manuales];
+
+            // B) Preguntas Generadas (Solo si es PRO)
+            if (esProBurbujas) {
+                const generated = generarPreguntasMatematicas(config);
+                // Las añadimos al pool
+                questionsPool = [...questionsPool, ...generated];
+            }
+
+            // Mezclar todo el pool final (Manuales + Generadas)
+            if (isAleatorio) questionsPool.sort(() => Math.random() - 0.5);
+
+            // Crear nivel si hay preguntas
+            if (questionsPool.length > 0) {
+                levels.push({ name: hoja.nombreHoja || "Nivel", questions: questionsPool });
+            }
+        });
+
+        if (levels.length === 0) {
+            alert("No hay preguntas disponibles con esta configuración.");
             return;
         }
 
@@ -149,11 +297,14 @@ export default function PikatronRun({ recurso, onExit }) {
         }
 
         const p = questions[index];
+        // Adaptar campos (puede venir como 'respuesta' o 'correcta' o 'a')
         const correcta = p.respuesta || p.correcta || p.a;
         const incorrectas = p.incorrectas || [];
+
+        // Crear respuestas mezcladas
         const mixedAnswers = [
-            { text: correcta, isCorrect: true },
-            ...incorrectas.map(txt => ({ text: txt, isCorrect: false }))
+            { text: String(correcta), isCorrect: true },
+            ...incorrectas.map(txt => ({ text: String(txt), isCorrect: false }))
         ].sort(() => Math.random() - 0.5);
 
         gameRef.current.currentAnswers = mixedAnswers;
@@ -199,9 +350,11 @@ export default function PikatronRun({ recurso, onExit }) {
 
             // 2. PIKATRON
             const pika = gameRef.current.pikatron;
+            const gravity = gameRef.current.speed < 6 ? 0.25 : 0.4;
+
             if (pika.y < pika.groundY || pika.vy < 0) {
                 pika.y += pika.vy;
-                pika.vy += 0.4;
+                pika.vy += gravity; // Usamos la variable dinámica
             } else {
                 pika.y = pika.groundY;
                 pika.vy = 0;
@@ -224,8 +377,14 @@ export default function PikatronRun({ recurso, onExit }) {
             ctx.drawImage(sprite, pika.frameX * sW, pika.frameY * sH, sW, sH, pika.x, pika.y, pika.width, pika.height);
 
             // 3. OBSTÁCULOS
+            // Ajustar spawn timer según velocidad para que no salgan ni muy juntos ni muy separados
+            // A más velocidad, el timer debe ser menor para mantener distancia visual constante? No, al revés.
+            // Distancia = Velocidad * Tiempo. Si sube Velocidad, para mantener Distancia, bajamos Tiempo?
+            // Vamos a usar una fórmula simple basada en la velocidad actual.
+            const spawnRate = Math.floor(1100 / gameRef.current.speed);
+
             gameRef.current.spawnTimer++;
-            if (gameRef.current.spawnTimer > 160) {
+            if (gameRef.current.spawnTimer > spawnRate) {
                 const list = gameRef.current.currentAnswers;
                 if (list.length > 0) {
                     const nextData = list[gameRef.current.nextAnswerIndex];
@@ -248,7 +407,10 @@ export default function PikatronRun({ recurso, onExit }) {
                 ctx.strokeStyle = 'white'; ctx.lineWidth = 2;
                 ctx.strokeRect(obs.x, obs.y, obs.width, obs.height);
                 ctx.fillStyle = 'white'; ctx.font = 'bold 16px Arial'; ctx.textAlign = 'center';
-                ctx.fillText(obs.data.text, obs.x + (obs.width / 2), obs.y + 26);
+                // Cortar texto si es muy largo
+                let txt = obs.data.text;
+                if (txt.length > 10) txt = txt.substring(0, 9) + '..';
+                ctx.fillText(txt, obs.x + (obs.width / 2), obs.y + 26);
                 ctx.textAlign = 'start';
 
                 // Colisiones
@@ -261,7 +423,7 @@ export default function PikatronRun({ recurso, onExit }) {
                 ) {
                     if (obs.data.isCorrect) {
                         playSound('CORRECT');
-                        setScore(s => s + 10);
+                        setScore(s => s + gameRef.current.puntosAcierto); // Puntos dinámicos
                         prepararSiguientePregunta(gameRef.current.qIndex + 1);
                     } else {
                         gameRef.current.obstacles = [];
@@ -269,6 +431,8 @@ export default function PikatronRun({ recurso, onExit }) {
                             const newLives = prevLives - 1;
                             if (newLives > 0) {
                                 playSound('LOSE_LIFE');
+                                // Restar puntos (sin bajar de 0)
+                                setScore(s => Math.max(0, s - gameRef.current.puntosFallo));
                                 return newLives;
                             } else {
                                 playSound('GAMEOVER');
@@ -296,7 +460,13 @@ export default function PikatronRun({ recurso, onExit }) {
                 gameRef.current.pikatron.jumping = true;
             }
         };
-        window.addEventListener('keydown', (e) => { if (e.code === 'Space' || e.code === 'ArrowUp') handleInput(); });
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' || e.code === 'ArrowUp') {
+                e.preventDefault(); // <--- ESTO EVITA QUE EL BOTÓN SE VUELVA A PULSAR O LA PANTALLA SE MUEVA
+                handleInput();
+            }
+        });
+
         window.addEventListener('touchstart', handleInput);
         return () => {
             window.removeEventListener('keydown', handleInput);
@@ -311,73 +481,155 @@ export default function PikatronRun({ recurso, onExit }) {
     // Calculamos fondo dinámico
     const bgImage = LEVEL_THEMES[(levelInfo.current - 1) % LEVEL_THEMES.length].img;
 
+    const toggleFullScreen = () => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(err => {
+                console.log(`Error al intentar pantalla completa: ${err.message}`);
+            });
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            }
+        }
+    };
+
+
+
     return (
-        <div style={{ width: '100%', height: '100vh', background: '#222', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+        <div style={{
+            width: '100%',
+            height: '100vh',
+            background: '#222',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            position: 'relative',
+            padding: '20px' // Un poco de margen general
+        }}>
 
             {gameState !== 'LEVEL_INTRO' && (
                 <>
-                    {/* BARRA SUPERIOR (HUD) COMPACTA Y ARRIBA */}
+                    {/* 1. VIDAS Y NIVEL (ESQUINA IZQUIERDA SUPERIOR) */}
                     <div style={{
-                        position: 'absolute', top: 5, width: '100%', display: 'flex', justifyContent: 'center', zIndex: 2000
-                    }}>
-                        <div style={{
-                            display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'space-between',
-                            background: 'rgba(44, 62, 80, 0.95)', padding: '5px 15px', borderRadius: '30px',
-                            color: 'white', boxShadow: '0 4px 10px rgba(0,0,0,0.5)', fontWeight: 'bold',
-                            maxWidth: '98%', border: '2px solid #f1c40f', minWidth: '300px'
-                        }}>
-                            {/* PUNTOS */}
-                            <div style={{ color: '#f1c40f', whiteSpace: 'nowrap', fontSize: '1rem' }}>⭐ {score}</div>
-
-                            {/* PREGUNTA FLEXIBLE */}
-                            {preguntaActual && (
-                                <div style={{
-                                    borderLeft: '1px solid rgba(255,255,255,0.3)', paddingLeft: '10px',
-                                    flex: 1, minWidth: 0, textAlign: 'center', lineHeight: '1.1',
-                                    // TEXTO QUE SE ADAPTA
-                                    fontSize: 'clamp(10px, 3vw, 18px)',
-                                    whiteSpace: 'normal'
-                                }}>
-                                    {preguntaActual}
-                                </div>
-                            )}
-
-                            {/* SALIR */}
-                            <button onClick={onExit} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}><X color="#e74c3c" size={20} /></button>
-                        </div>
-                    </div>
-
-                    {/* VIDAS Y NIVEL (A LA IZQUIERDA Y ABAJO) */}
-                    <div style={{
-                        position: 'absolute', top: 70, left: 20, zIndex: 2000,
-                        display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-start'
+                        position: 'absolute',
+                        top: 80,
+                        left: 20,
+                        zIndex: 2000,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 10,
+                        alignItems: 'flex-start'
                     }}>
                         {/* Corazones */}
                         <div style={{ display: 'flex', gap: '3px' }}>
                             {[...Array(3)].map((_, i) => (
-                                <Heart key={i} size={28} fill={i < lives ? "#e74c3c" : "#333"} color={i < lives ? "#c0392b" : "#555"}
-                                    style={{ filter: i < lives ? 'drop-shadow(0 0 2px #e74c3c)' : 'none', transform: i < lives ? 'scale(1)' : 'scale(0.9)', transition: 'all 0.3s' }} />
+                                <Heart key={i} size={32} fill={i < lives ? "#e74c3c" : "#333"} color={i < lives ? "#c0392b" : "#555"}
+                                    style={{
+                                        filter: i < lives ? 'drop-shadow(0 0 2px #e74c3c)' : 'none',
+                                        transform: i < lives ? 'scale(1)' : 'scale(0.9)',
+                                        transition: 'all 0.3s'
+                                    }} />
                             ))}
                         </div>
 
                         {/* Nivel */}
                         {gameRef.current.levelsQueue.length > 1 && (
-                            <div style={{ fontSize: '0.8rem', background: 'rgba(0,0,0,0.6)', padding: '4px 10px', borderRadius: '8px', color: '#ccc', fontWeight: 'bold' }}>
+                            <div style={{ fontSize: '1rem', background: 'rgba(0,0,0,0.6)', padding: '5px 12px', borderRadius: '8px', color: '#fff', fontWeight: 'bold', border: '1px solid #555' }}>
                                 Nivel {levelInfo.current} / {levelInfo.total}
                             </div>
                         )}
                     </div>
+
+                    {/* 2. BOTÓN PANTALLA COMPLETA (ESQUINA DERECHA SUPERIOR) */}
+                    <button
+                        onClick={toggleFullScreen}
+                        style={{
+                            position: 'absolute',
+                            top: 20,
+                            right: 20,
+                            zIndex: 2000,
+                            background: 'rgba(255,255,255,0.1)',
+                            border: '1px solid rgba(255,255,255,0.3)',
+                            color: 'white',
+                            padding: '10px',
+                            borderRadius: '50%',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'background 0.3s'
+                        }}
+                        title="Pantalla Completa"
+                    >
+                        <Maximize size={24} />
+                    </button>
                 </>
             )}
 
-            {/* CANVAS (Fondo Dinámico) */}
+            {/* 3. CANVAS (PANTALLA DE JUEGO) */}
             <canvas ref={canvasRef} style={{
                 background: `url(${bgImage})`, // IMAGEN DE FONDO
-                backgroundSize: 'cover', backgroundPosition: 'center',
-                borderRadius: 10, maxWidth: '100%', borderBottom: '5px solid #bdc3c7', boxShadow: '0 0 50px rgba(0,0,0,0.5)'
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                borderRadius: 15,
+                maxWidth: '100%',
+                maxHeight: '70vh', // Limitamos altura para dejar espacio a la barra
+                border: '4px solid #34495e',
+                boxShadow: '0 0 50px rgba(0,0,0,0.5)',
+                zIndex: 10
             }} />
 
-            {/* PANTALLAS ESTADO */}
+            {/* 4. BARRA DE PREGUNTA (AHORA DEBAJO DE LA PANTALLA) */}
+            {gameState !== 'LEVEL_INTRO' && (
+                <div style={{
+                    marginTop: '20px', // Separación del canvas
+                    width: '100%',
+                    maxWidth: '800px', // Mismo ancho que el canvas aprox
+                    display: 'flex',
+                    justifyContent: 'center',
+                    zIndex: 2000
+                }}>
+                    <div style={{
+                        display: 'flex', gap: 15, alignItems: 'center', justifyContent: 'space-between',
+                        background: 'white', padding: '10px 20px', borderRadius: '15px',
+                        color: '#2c3e50', boxShadow: '0 5px 15px rgba(0,0,0,0.2)', fontWeight: 'bold',
+                        width: '100%', borderBottom: '4px solid #bdc3c7'
+                    }}>
+                        {/* PUNTOS */}
+                        <div style={{
+                            background: '#f1c40f', color: '#2c3e50', padding: '5px 15px',
+                            borderRadius: '20px', whiteSpace: 'nowrap', fontSize: '1.2rem',
+                            boxShadow: 'inset 0 2px 5px rgba(0,0,0,0.1)'
+                        }}>
+                            ⭐ {score}
+                        </div>
+
+                        {/* PREGUNTA TEXTO */}
+                        {preguntaActual && (
+                            <div style={{
+                                flex: 1, minWidth: 0, textAlign: 'center', lineHeight: '1.2',
+                                fontSize: 'clamp(14px, 2.5vw, 20px)', // Texto responsivo
+                                whiteSpace: 'normal',
+                                color: '#333',
+                                padding: '0 10px'
+                            }}>
+                                {preguntaActual}
+                            </div>
+                        )}
+
+                        {/* SALIR */}
+                        <button onClick={onExit} style={{
+                            background: '#ffebee', border: '1px solid #ffcdd2', borderRadius: '8px',
+                            cursor: 'pointer', display: 'flex', padding: '8px', color: '#c62828'
+                        }} title="Salir del Juego">
+                            <X size={24} />
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* PANTALLAS SUPERPUESTAS (INTRO, GAMEOVER, WIN) */}
             {gameState === 'LEVEL_INTRO' && (
                 <div style={overlayStyle}>
                     <h2 style={{ color: '#2ecc71', fontSize: '2rem', letterSpacing: '5px', textTransform: 'uppercase', marginBottom: 0 }}>PANTALLA {levelInfo.current}</h2>
@@ -388,6 +640,8 @@ export default function PikatronRun({ recurso, onExit }) {
                     <button onClick={startLevelPlaying} style={btnStyle}><Play size={24} /> ¡VAMOS!</button>
                 </div>
             )}
+
+            {/* ... (Los bloques GAMEOVER y WIN se quedan igual que antes, usan overlayStyle así que taparán todo correctamente) ... */}
             {gameState === 'GAMEOVER' && (
                 <div style={overlayStyle}>
                     <AlertTriangle size={80} color="#e74c3c" style={{ marginBottom: 20 }} />
@@ -406,7 +660,8 @@ export default function PikatronRun({ recurso, onExit }) {
                     <button onClick={onExit} style={btnStyle}>VOLVER AL MENÚ</button>
                 </div>
             )}
-            {gameState === 'PLAYING' && <div style={{ color: '#777', marginTop: 10, fontFamily: 'monospace' }}>ESPACIO o TOQUE para saltar</div>}
+
+            {gameState === 'PLAYING' && <div style={{ color: '#777', marginTop: 10, fontFamily: 'monospace', fontSize: '12px' }}>[ ESPACIO ] o [ CLICK ] para saltar</div>}
         </div>
     );
 }

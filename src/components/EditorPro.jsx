@@ -1,21 +1,33 @@
 ﻿import { useState, useEffect } from 'react';
 import { Save, X, Trash2, FolderPlus, ArrowUp, ArrowDown, Clock, Trophy, GripVertical, Image as ImageIcon, Type, List, AlignCenter, MoreHorizontal, Settings } from 'lucide-react';
 
-export default function EditorPro({ datos, setDatos, onClose, onSave }) {
+export default function EditorPro({ datos, setDatos, onClose, onSave, usuario }) {
     const [hojaActiva, setHojaActiva] = useState(0);
     const [mostrandoConfig, setMostrandoConfig] = useState(false);
 
     // Asegurar que el recurso se marca como PRO y tiene configuración base
+    // Asegurar que el recurso se marca como PRO, tiene configuración y AUTORRELLENA el perfil
     useEffect(() => {
-        if (datos && (!datos.tipo || datos.tipo !== 'PRO')) {
+        if (datos) {
             setDatos(prev => ({
                 ...prev,
+                // Aseguramos el tipo siempre
                 tipo: 'PRO',
+
+                // Configuración base
                 config: {
                     ...prev.config,
-                    aleatorio: true,
-                    numPreguntas: 10
-                }
+                    aleatorio: prev.config?.aleatorio !== undefined ? prev.config.aleatorio : true,
+                    numPreguntas: prev.config?.numPreguntas || 10
+                },
+
+                // --- AUTORRELLENO CORREGIDO ---
+                // Usamos || para que si está vacío ("") coja el del usuario
+                pais: prev.pais || usuario?.pais || '',
+                region: prev.region || usuario?.region || '',
+                poblacion: prev.poblacion || usuario?.poblacion || usuario?.localidad || '',
+                ciclo: prev.ciclo || usuario?.ciclo || 'Secundaria',
+                temas: prev.temas || usuario?.temasPreferidos || '',
             }));
         }
     }, []);
@@ -303,12 +315,31 @@ export default function EditorPro({ datos, setDatos, onClose, onSave }) {
                                 <button onClick={() => setMostrandoConfig(false)} style={styles.iconBtnBlack}><X /></button>
                             </div>
                             <div style={styles.configBody}>
-                                <h4 style={styles.sectionTitle}>Ubicación</h4>
-                                <InputConfig label="País" val={datos.pais} set={v => setDatos({ ...datos, pais: v })} />
-                                <InputConfig label="Región" val={datos.region} set={v => setDatos({ ...datos, region: v })} />
-                                <InputConfig label="Población" val={datos.poblacion} set={v => setDatos({ ...datos, poblacion: v })} />
-                                <InputConfig label="Temas" val={datos.temas} set={v => setDatos({ ...datos, temas: v })} />
-
+                                <h4 style={styles.sectionTitle}>Datos de Búsqueda</h4>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                    <InputConfig label="País" val={datos.pais} set={v => setDatos({ ...datos, pais: v })} />
+                                    <InputConfig label="Región" val={datos.region} set={v => setDatos({ ...datos, region: v })} />
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                    <InputConfig label="Localidad" val={datos.poblacion} set={v => setDatos({ ...datos, poblacion: v })} />
+                                    <InputConfig
+                                        label="Temas"
+                                        val={datos.temas} // <--- CAMBIADO (antes ponía datos.temasPreferidos)
+                                        set={v => setDatos({ ...datos, temas: v })} // <--- CAMBIADO
+                                    />
+                                </div>
+                                <div style={{ marginBottom: '15px' }}>
+                                    <label style={styles.label}>Ciclo Educativo</label>
+                                    <select value={datos.ciclo || 'Secundaria'} onChange={e => setDatos({ ...datos, ciclo: e.target.value })} style={styles.input}>
+                                        <option value="Infantil">Infantil</option>
+                                        <option value="Primaria">Primaria</option>
+                                        <option value="Secundaria">Secundaria</option>
+                                        <option value="Bachillerato">Bachillerato</option>
+                                        <option value="FP">Formación Profesional</option>
+                                        <option value="Universidad">Universidad</option>
+                                        <option value="Otros">Otros</option>
+                                    </select>
+                                </div>
                                 <h4 style={styles.sectionTitle}>Ajustes de Juego (Global)</h4>
                                 <div style={{ marginBottom: '10px' }}>
                                     <label style={styles.label}>Nº de Preguntas a Jugar</label>

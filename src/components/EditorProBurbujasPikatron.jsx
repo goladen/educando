@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect } from 'react';
 import { Save, X, Trash2, FolderPlus, ArrowUp, ArrowDown, Clock, Trophy, Settings, Calculator, Plus, Minus, X as Multiply, Divide } from 'lucide-react';
 
-export default function EditorProBurbujasPikatron({ datos, setDatos, onClose, onSave, ususario }) {
+export default function EditorProBurbujasPikatron({ datos, setDatos, onClose, onSave, usuario }) {
     const [hojaActiva, setHojaActiva] = useState(0);
     const [mostrandoConfig, setMostrandoConfig] = useState(false);
 
@@ -50,8 +50,7 @@ export default function EditorProBurbujasPikatron({ datos, setDatos, onClose, on
                     poblacion: prev.poblacion !== undefined ? prev.poblacion : (usuario?.localidad || usuario?.poblacion || ''),
 
                     ciclo: prev.ciclo !== undefined ? prev.ciclo : (usuario?.ciclo || 'Secundaria'),
-
-                    temas: prev.temas !== undefined ? prev.temas : (usuario?.temas || ''),
+                    temas: prev.temas || usuario?.temasPreferidos || '',
                 };
             });
         }

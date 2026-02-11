@@ -16,7 +16,7 @@ export default function UserProfile({ usuario, perfil, onClose, onUpdate, showSu
         region: perfil?.region || '',
         poblacion: perfil?.poblacion || '',
         temasPreferidos: perfil?.temasPreferidos || '',
-        ciclo: perfil?.ciclo || 'Primaria',
+        ciclo: perfil?.ciclo || 'Secundaria',
     });
 
     const [guardando, setGuardando] = useState(false);

@@ -536,16 +536,17 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
 
             {/* MODALES EDITORES */}
             {mostrandoCrear && <ModalOverlay onClose={() => setMostrandoCrear(false)}><h2>Nuevo {TIPOS_JUEGOS[juegoSeleccionado].label}</h2><input value={datosEditor.titulo} onChange={e => setDatosEditor({ ...datosEditor, titulo: e.target.value })} style={inputStyle} placeholder="Título" /><div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}><button onClick={() => { setMostrandoCrear(false); setMostrandoEditorManual(true); }} style={{ ...actionBtnStyle('#2196F3'), flex: 1 }}><Edit3 /> Manual</button>{juegoSeleccionado !== 'QUESTION_SENDER' && <><button onClick={procesarCreacionIA} style={{ ...actionBtnStyle('#673AB7'), flex: 1 }}><Bot /> IA</button><button onClick={handleFileUpload} style={{ ...actionBtnStyle('#107C41'), flex: 1 }}><FileSpreadsheet /> Excel</button><button onClick={handleOpenPicker} style={{ ...actionBtnStyle('#FFC107'), flex: 1, color: 'black' }}>Drive</button></>}</div></ModalOverlay>}
-            {mostrandoEditorManual && <EditorManual datos={datosEditor} setDatos={setDatosEditor} configJuego={TIPOS_JUEGOS[juegoSeleccionado]} onClose={() => setMostrandoEditorManual(false)} onSave={guardarRecursoFinal} />}
-            {mostrandoEditorPro && <EditorPro datos={datosEditor} setDatos={setDatosEditor} onClose={() => setMostrandoEditorPro(false)} onSave={guardarRecursoFinal} />}
+            {mostrandoEditorManual && <EditorManual datos={datosEditor} setDatos={setDatosEditor} configJuego={TIPOS_JUEGOS[juegoSeleccionado]} onClose={() => setMostrandoEditorManual(false)} onSave={guardarRecursoFinal} usuario={perfilProfesor || usuario} />}
+            {mostrandoEditorPro && <EditorPro datos={datosEditor} setDatos={setDatosEditor} onClose={() => setMostrandoEditorPro(false)} onSave={guardarRecursoFinal} usuario={perfilProfesor || usuario}/>}
 
-                        {mostrandoEditorMathLive && <EditorMathLive datos={datosEditor} setDatos={setDatosEditor} onClose={() => setMostrandoEditorMathLive(false)} onSave={guardarRecursoFinal} />}
+            {mostrandoEditorMathLive && <EditorMathLive datos={datosEditor} setDatos={setDatosEditor} onClose={() => setMostrandoEditorMathLive(false)} onSave={guardarRecursoFinal} usuario={perfilProfesor || usuario}/>}
             {mostrandoEditorBurbujasPikatron && (
                 <EditorProBurbujasPikatron
                     datos={datosEditor}
                     setDatos={setDatosEditor}
                     onClose={() => setMostrandoEditorBurbujasPikatron(false)}
                     onSave={guardarRecursoFinal}
+                    usuario={perfilProfesor || usuario}
                 />
             )}
 

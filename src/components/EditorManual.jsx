@@ -30,14 +30,20 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
             setDatos(prev => ({ ...prev, hojas: [{ nombreHoja: 'Hoja 1', preguntas: [] }] }));
         }
 
+        if (configJuego.id === 'CAZABURBUJAS' && !datos.config?.velocidad) {
+            setDatos(prev => ({ ...prev, config: { ...prev.config, velocidad: 'MODERADO' } }));
+        }
+
         // Lógica de Autorrelleno de Datos de Búsqueda
         setDatos(prev => ({
             ...prev,
             pais: prev.pais !== undefined ? prev.pais : (usuario?.pais || ''),
             region: prev.region !== undefined ? prev.region : (usuario?.region || ''),
             poblacion: prev.poblacion !== undefined ? prev.poblacion : (usuario?.poblacion || usuario?.localidad || ''),
-            ciclo: prev.ciclo !== undefined ? prev.ciclo : (usuario?.ciclo || 'Primaria'),
-            temas: prev.temas !== undefined ? prev.temas : (usuario?.temasPreferidos || '')
+            ciclo: prev.ciclo !== undefined ? prev.ciclo : (usuario?.ciclo || 'Secundaria'),
+            temas: prev.temas || usuario?.temasPreferidos || '',
+
+
         }));
     }, []);
 
@@ -332,7 +338,11 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
                                 </div>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                                     <InputConfig label="Localidad" val={datos.poblacion} set={v => setDatos({ ...datos, poblacion: v })} />
-                                    <InputConfig label="Temas" val={datos.temasPreferidos} set={v => setDatos({ ...datos, temasPreferidos: v })} />
+                                    <InputConfig
+                                        label="Temas"
+                                        val={datos.temas} // <--- CAMBIADO (antes ponía datos.temasPreferidos)
+                                        set={v => setDatos({ ...datos, temas: v })} // <--- CAMBIADO
+                                    />
                                 </div>
                                 <div style={{ marginBottom: '15px' }}>
                                     <label style={styles.label}>Ciclo Educativo</label>
@@ -353,6 +363,22 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
                                         <input type={campo.type} value={datos.config?.[campo.key] || campo.default} onChange={(e) => setDatos({ ...datos, config: { ...datos.config, [campo.key]: e.target.value } })} style={styles.input} />
                                     </div>
                                 ))}
+
+                                {/* --- AÑADIR ESTO AQUÍ: SELECTOR DE VELOCIDAD (SOLO CAZABURBUJAS) --- */}
+                                {configJuego.id === 'CAZABURBUJAS' && (
+                                    <div style={{ marginBottom: '15px', background: '#e3f2fd', padding: '10px', borderRadius: '8px', border: '1px solid #bbdefb' }}>
+                                        <label style={styles.label}>Velocidad de Movimiento</label>
+                                        <select
+                                            value={datos.config?.velocidad || 'MODERADO'}
+                                            onChange={(e) => setDatos({ ...datos, config: { ...datos.config, velocidad: e.target.value } })}
+                                            style={{ ...styles.input, fontWeight: 'bold', color: '#1565C0' }}
+                                        >
+                                            <option value="LENTO">🐢 Lento</option>
+                                            <option value="MODERADO">🚶 Moderado</option>
+                                            <option value="RAPIDO">🐇 Rápido</option>
+                                        </select>
+                                    </div>
+                                )}
 
                                 {/* --- NUEVA OPCIÓN: ORDEN ALEATORIO --- */}
                                 <div style={styles.toggleRow}>

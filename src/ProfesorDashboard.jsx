@@ -527,7 +527,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
 
             {/* 2. HERRAMIENTAS */}
             {modoDashboard === 'HERRAMIENTAS' && (
-                <TeacherTools />
+                <TeacherTools usuario={usuario} googleToken={googleToken} />
             )}
 
             {/* 3. LEGAL / INFO */}

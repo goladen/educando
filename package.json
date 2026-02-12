@@ -18,7 +18,8 @@
         "react-confetti": "^6.4.0",
         "react-dom": "^18.2.0",
         "react-google-drive-picker": "^1.2.2",
-        "read-excel-file": "^6.0.1"
+        "read-excel-file": "^6.0.1",
+        "xlsx": "^0.18.5"
     },
     "devDependencies": {
         "@types/react": "^18.2.43",

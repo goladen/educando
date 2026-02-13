@@ -1,9 +1,80 @@
 ﻿import { useState, useEffect } from 'react';
-import { Save, X, Trash2, FolderPlus, ArrowUp, ArrowDown, Clock, Trophy, Settings, Calculator, Plus, Minus, X as Multiply, Divide } from 'lucide-react';
+import { Save, X, Trash2, FolderPlus, ArrowUp, ArrowDown, Clock, Trophy, Settings, Calculator, Plus, Minus, X as Multiply, Divide, Star, CheckCircle, AlertOctagon } from 'lucide-react';
+
 
 export default function EditorProBurbujasPikatron({ datos, setDatos, onClose, onSave, usuario }) {
     const [hojaActiva, setHojaActiva] = useState(0);
     const [mostrandoConfig, setMostrandoConfig] = useState(false);
+
+    // --- NUEVOS ESTADOS PARA PREGUNTA ESPECIAL ---
+    const [tempCorrecta, setTempCorrecta] = useState("");
+    const [tempIncorrecta, setTempIncorrecta] = useState("");
+
+    // --- LÓGICA DE PREGUNTA ESPECIAL ---
+    const ensureEspecialExists = (hojasCopy) => {
+        if (!hojasCopy[hojaActiva].preguntaEspecial) {
+            hojasCopy[hojaActiva].preguntaEspecial = {
+                activo: false,
+                enunciado: "",
+                correctas: [],
+                incorrectas: []
+            };
+        } else {
+            // Si ya existe el objeto, nos aseguramos de que tenga los arrays inicializados
+            if (!hojasCopy[hojaActiva].preguntaEspecial.correctas) {
+                hojasCopy[hojaActiva].preguntaEspecial.correctas = [];
+            }
+            if (!hojasCopy[hojaActiva].preguntaEspecial.incorrectas) {
+                hojasCopy[hojaActiva].preguntaEspecial.incorrectas = [];
+            }
+        }
+    };
+
+    const togglePreguntaEspecial = () => {
+        const n = [...datos.hojas];
+        ensureEspecialExists(n);
+        n[hojaActiva].preguntaEspecial.activo = !n[hojaActiva].preguntaEspecial.activo;
+        setDatos({ ...datos, hojas: n });
+    };
+
+    const updateEspecialField = (field, val) => {
+        const n = [...datos.hojas];
+        ensureEspecialExists(n);
+        n[hojaActiva].preguntaEspecial[field] = val;
+        setDatos({ ...datos, hojas: n });
+    };
+
+    const addEspecialItem = (tipo) => {
+        // 1. Cogemos el texto bruto del input
+        const valorRaw = tipo === 'correctas' ? tempCorrecta : tempIncorrecta;
+        if (!valorRaw.trim()) return;
+
+        const n = [...datos.hojas];
+        ensureEspecialExists(n);
+
+        if (!n[hojaActiva].preguntaEspecial.correctas) n[hojaActiva].preguntaEspecial.correctas = [];
+        if (!n[hojaActiva].preguntaEspecial.incorrectas) n[hojaActiva].preguntaEspecial.incorrectas = [];
+
+        // 2. MAGIA: Separamos por comas y limpiamos espacios
+        // Ejemplo: "3, 5,  7 " se convierte en ["3", "5", "7"]
+        const nuevosValores = valorRaw.split(',').map(v => v.trim()).filter(v => v !== "");
+
+        // 3. Añadimos todos los valores de golpe
+        n[hojaActiva].preguntaEspecial[tipo].push(...nuevosValores);
+        setDatos({ ...datos, hojas: n });
+
+        // 4. Limpiamos el input
+        if (tipo === 'correctas') setTempCorrecta("");
+        else setTempIncorrecta("");
+    };
+
+    const removeEspecialItem = (tipo, index) => {
+        const n = [...datos.hojas];
+        ensureEspecialExists(n);
+        n[hojaActiva].preguntaEspecial[tipo].splice(index, 1);
+        setDatos({ ...datos, hojas: n });
+    };
+
 
     // Inicialización de datos con estructura específica para Burbujas/Pikatron
     // Inicialización de datos
@@ -253,6 +324,10 @@ export default function EditorProBurbujasPikatron({ datos, setDatos, onClose, on
             mathMin: 1, mathMax: 10, mathTypes: ['POSITIVOS'], mathOps: ['SUMA']
         };
 
+
+
+
+
         return (
             <div style={styles.mathBlock}>
                 <div style={styles.mathHeader}>
@@ -343,7 +418,87 @@ export default function EditorProBurbujasPikatron({ datos, setDatos, onClose, on
     };
 
 
+    // --- COMPONENTE VISUAL: PREGUNTA ESPECIAL ---
+    const PreguntaEspecialBlock = () => {
+        const especial = datos.hojas[hojaActiva].preguntaEspecial || { activo: false, enunciado: "", correctas: [], incorrectas: [] };
 
+        if (!especial.activo) {
+            return (
+                <div onClick={togglePreguntaEspecial} style={{ ...styles.specialBlock, opacity: 0.7, cursor: 'pointer', display: 'flex', justifyContent: 'center', borderStyle: 'dashed' }}>
+                    <h3 style={{ color: '#d35400', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <Star size={20} /> Añadir Pregunta Especial (Opcional)
+                    </h3>
+                </div>
+            )
+        }
+
+        return (
+            <div style={styles.specialBlock}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '1px solid #e67e22', paddingBottom: '10px' }}>
+                    <h3 style={{ color: '#d35400', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <Star size={24} fill="#e67e22" /> Pregunta Especial
+                    </h3>
+                    <button onClick={togglePreguntaEspecial} style={{ background: 'none', border: 'none', color: '#c0392b', cursor: 'pointer', fontWeight: 'bold' }}>Quitar</button>
+                </div>
+
+                <div style={{ marginBottom: '20px' }}>
+                    <label style={styles.label}>Enunciado de la Pregunta</label>
+                    <input
+                        placeholder="Ej: Números Primos, Múltiplos de 5, Palabras Agudas..."
+                        value={especial.enunciado}
+                        onChange={e => updateEspecialField('enunciado', e.target.value)}
+                        style={{ ...styles.input, fontSize: '16px', fontWeight: 'bold', border: '2px solid #f39c12' }}
+                    />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                    {/* COLUMNA CORRECTAS */}
+                    <div style={{ background: '#eafaf1', padding: '15px', borderRadius: '10px', border: '1px solid #2ecc71' }}>
+                        <h4 style={{ margin: '0 0 10px 0', color: '#27ae60', display: 'flex', alignItems: 'center', gap: '5px' }}><CheckCircle size={16} /> Respuestas Correctas</h4>
+                        <div style={{ display: 'flex', gap: '5px', marginBottom: '10px' }}>
+                            <input
+                                placeholder="Añadir correcta..."
+                                value={tempCorrecta}
+                                onChange={e => setTempCorrecta(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && addEspecialItem('correctas')}
+                                style={styles.input}
+                            />
+                            <button onClick={() => addEspecialItem('correctas')} style={{ background: '#2ecc71', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', padding: '0 10px' }}><Plus size={20} /></button>
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                            {(especial.correctas || []).map((txt, i) => (
+                                <div key={i} style={{ background: 'white', padding: '5px 10px', borderRadius: '15px', fontSize: '13px', border: '1px solid #2ecc71', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                    {txt} <X size={14} style={{ cursor: 'pointer', color: '#aaa' }} onClick={() => removeEspecialItem('correctas', i)} />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* COLUMNA INCORRECTAS */}
+                    <div style={{ background: '#fdedec', padding: '15px', borderRadius: '10px', border: '1px solid #e74c3c' }}>
+                        <h4 style={{ margin: '0 0 10px 0', color: '#c0392b', display: 'flex', alignItems: 'center', gap: '5px' }}><AlertOctagon size={16} /> Respuestas Incorrectas</h4>
+                        <div style={{ display: 'flex', gap: '5px', marginBottom: '10px' }}>
+                            <input
+                                placeholder="Añadir incorrecta..."
+                                value={tempIncorrecta}
+                                onChange={e => setTempIncorrecta(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && addEspecialItem('incorrectas')}
+                                style={styles.input}
+                            />
+                            <button onClick={() => addEspecialItem('incorrectas')} style={{ background: '#e74c3c', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', padding: '0 10px' }}><Plus size={20} /></button>
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                            {(especial.incorrectas || []).map((txt, i) => (
+                                <div key={i} style={{ background: 'white', padding: '5px 10px', borderRadius: '15px', fontSize: '13px', border: '1px solid #e74c3c', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                    {txt} <X size={14} style={{ cursor: 'pointer', color: '#aaa' }} onClick={() => removeEspecialItem('incorrectas', i)} />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    };
 
     return (
         <div style={styles.overlay}>
@@ -399,9 +554,9 @@ export default function EditorProBurbujasPikatron({ datos, setDatos, onClose, on
 
                     {/* 1. SECCIÓN GENERADOR MATEMÁTICO */}
 
-                    <MathLiveBlock />
+                    {MathLiveBlock()}
 
-
+                    {PreguntaEspecialBlock()}
                              
 
                     {/* 2. LISTA PREGUNTAS MANUALES */}
@@ -667,5 +822,7 @@ const styles = {
     closeConfigBtn: { width: '100%', padding: '15px', background: '#34495e', color: 'white', border: 'none', borderBottomLeftRadius: '15px', borderBottomRightRadius: '15px', fontSize: '16px', cursor: 'pointer', fontWeight: 'bold' },
     toggleRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', padding: '12px', background: '#f8f9fa', borderRadius: '8px' },
     toggleBtn: { width: '50px', height: '28px', borderRadius: '14px', border: 'none', padding: '3px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.3s' },
-    toggleCircle: { width: '22px', height: '22px', background: 'white', borderRadius: '50%', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }
+    toggleCircle: { width: '22px', height: '22px', background: 'white', borderRadius: '50%', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' },
+    specialBlock: { background: '#fffcf0', borderRadius: '12px', padding: '20px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', border: '2px solid #ffe0b2', marginBottom: '20px' },
+
 };

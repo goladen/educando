@@ -1,7 +1,8 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
 import { X, RefreshCw, Play, Trophy, AlertTriangle, Layers, Map, Heart, Maximize, Save } from 'lucide-react';
-// IMPORTA AQUÍ TU IMAGEN SIN FONDO
+// ... otros imports ...
 import pikatronImg from './assets/pikatron-sprite.png';
+import coinImgFile from './assets/moneda.png'; // <--- AÑADE ESTO
 import { db } from './firebase';
 import { collection, addDoc, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 // --- IMPORTACIÓN DE FONDOS ---
@@ -175,15 +176,18 @@ export default function PikatronRun({ recurso, onExit, usuario }) {
     const gameRef = useRef({
         pikatron: { x: 50, y: 0, vy: 0, width: 100, height: 100, frameX: 0, frameY: 0, speed: 0, jumping: false, groundY: 0 },
         obstacles: [],
+        coins: [],     // <--- AÑADIR
         frame: 0,
-        speed: 6, // Se actualizará al iniciar
+        speed: 6,
         qIndex: 0,
         spawnTimer: 0,
+        coinSpawnTimer: 0, // <--- AÑADIR
         currentAnswers: [],
         nextAnswerIndex: 0,
         levelsQueue: [],
         currentLevelIdx: 0,
         allQuestions: [],
+        specialPool: null, // <--- AÑADIR
         puntosAcierto: 10,
         puntosFallo: 2,
         bgX: 0
@@ -219,11 +223,40 @@ export default function PikatronRun({ recurso, onExit, usuario }) {
             // Modo Simple (Nivel Específico)
             if (nombreHoja === 'General' || !recurso.hojas) {
                 hojasAProcesar = [{ nombreHoja: "General", preguntas: recurso.preguntas || [] }];
+
                 if (recurso.hojas) {
-                    // Si seleccionó "General" pero hay hojas, las juntamos todas en un solo nivel gigante
+                    // Si hay hojas, las juntamos todas
                     let allQ = [];
                     recurso.hojas.forEach(h => allQ.push(...(h.preguntas || [])));
-                    hojasAProcesar = [{ nombreHoja: "Mezcla General", preguntas: allQ }];
+
+                    // --- NUEVO: FUSIONAR PREGUNTAS ESPECIALES PARA MODO GENERAL ---
+                    let mergedCorrectas = [];
+                    let mergedIncorrectas = [];
+                    let primerEnunciado = "";
+                    let hayEspecial = false;
+
+                    recurso.hojas.forEach(h => {
+                        if (h.preguntaEspecial && h.preguntaEspecial.activo) {
+                            hayEspecial = true;
+                            if (!primerEnunciado) primerEnunciado = h.preguntaEspecial.enunciado;
+                            if (h.preguntaEspecial.correctas) mergedCorrectas.push(...h.preguntaEspecial.correctas);
+                            if (h.preguntaEspecial.incorrectas) mergedIncorrectas.push(...h.preguntaEspecial.incorrectas);
+                        }
+                    });
+
+                    const especialMix = hayEspecial ? {
+                        activo: true,
+                        enunciado: primerEnunciado || "Pregunta Especial",
+                        correctas: mergedCorrectas,
+                        incorrectas: mergedIncorrectas
+                    } : null;
+                    // -------------------------------------------------------------
+
+                    hojasAProcesar = [{
+                        nombreHoja: "Mezcla General",
+                        preguntas: allQ,
+                        preguntaEspecial: especialMix // Pasamos la mezcla
+                    }];
                 }
             } else {
                 const hObj = recurso.hojas.find(h => h.nombreHoja === nombreHoja);
@@ -263,7 +296,7 @@ export default function PikatronRun({ recurso, onExit, usuario }) {
 
             // Crear nivel si hay preguntas
             if (questionsPool.length > 0) {
-                levels.push({ name: hoja.nombreHoja || "Nivel", questions: questionsPool });
+                levels.push({ name: hoja.nombreHoja || "Nivel", questions: questionsPool, preguntaEspecial: hoja.preguntaEspecial });
             }
         });
 
@@ -286,6 +319,20 @@ export default function PikatronRun({ recurso, onExit, usuario }) {
         gameRef.current.obstacles = [];
         gameRef.current.pikatron.y = 0;
         gameRef.current.bgX = 0;
+        gameRef.current.coins = []; // Limpiar monedas viejas
+        if (levelData.preguntaEspecial && levelData.preguntaEspecial.activo) {
+            gameRef.current.specialPool = {
+                enunciado: levelData.preguntaEspecial.enunciado,
+                // Barajamos (.sort) las respuestas aquí, ANTES de jugar
+                correctas: [...(levelData.preguntaEspecial.correctas || [])].sort(() => Math.random() - 0.5),
+                incorrectas: [...(levelData.preguntaEspecial.incorrectas || [])].sort(() => Math.random() - 0.5)
+            };
+        } else {
+            gameRef.current.specialPool = null;
+        }
+
+
+
         setLevelInfo({
             current: levelIndex + 1,
             total: gameRef.current.levelsQueue.length,
@@ -332,6 +379,7 @@ export default function PikatronRun({ recurso, onExit, usuario }) {
 
     // --- BUCLE PRINCIPAL ---
     // --- BUCLE PRINCIPAL ---
+    // --- BUCLE PRINCIPAL ---
     useEffect(() => {
         if (gameState !== 'PLAYING') return;
 
@@ -340,6 +388,8 @@ export default function PikatronRun({ recurso, onExit, usuario }) {
         let animationFrameId;
         const sprite = new Image();
         sprite.src = pikatronImg;
+        const coinSprite = new Image();
+        coinSprite.src = coinImgFile;
 
         if (!canvas) return;
 
@@ -352,7 +402,6 @@ export default function PikatronRun({ recurso, onExit, usuario }) {
         const currentTheme = LEVEL_THEMES[themeIndex];
         const bgImg = new Image();
         bgImg.src = currentTheme.img;
-        // --------------------------------
 
         if (gameRef.current.pikatron.groundY === 0) {
             gameRef.current.pikatron.groundY = groundLevel - gameRef.current.pikatron.height;
@@ -360,29 +409,17 @@ export default function PikatronRun({ recurso, onExit, usuario }) {
         }
 
         const loop = () => {
-            // No necesitamos clearRect completo porque el fondo lo tapará todo, 
-            // pero por seguridad lo dejamos o lo quitamos si parpadea.
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // 1. DIBUJAR FONDO CON SCROLL (OPTIMIZADO PARA MÓVIL)
-            // Calculamos el desplazamiento
+            // 1. DIBUJAR FONDO
             gameRef.current.bgX -= gameRef.current.speed * 0.5;
-
-            // Forzamos que bgX se mantenga siempre dentro del rango del ancho del canvas
-            // Esto evita números negativos gigantes que fallan en móvil
-            const anchoCanvas = 800; // Ancho interno fijo
+            const anchoCanvas = 800;
             gameRef.current.bgX = gameRef.current.bgX % anchoCanvas;
 
-            // Dibujamos el fondo solo si la imagen está cargada
             if (bgImg.complete && bgImg.naturalWidth > 0) {
-                // Imagen 1 (Principal)
                 ctx.drawImage(bgImg, gameRef.current.bgX, 0, anchoCanvas, canvas.height);
-
-                // Imagen 2 (La que viene detrás para el bucle)
-                // Se dibuja exactamente un ancho por delante
                 ctx.drawImage(bgImg, gameRef.current.bgX + anchoCanvas, 0, anchoCanvas, canvas.height);
             } else {
-                // Si la imagen no ha cargado aún, pintamos un color de cielo para que no se vea negro
                 ctx.fillStyle = "#87CEEB";
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
             }
@@ -393,9 +430,28 @@ export default function PikatronRun({ recurso, onExit, usuario }) {
             ctx.fillStyle = 'rgba(0,0,0,0.2)';
             ctx.fillRect(0, groundLevel, canvas.width, 5);
 
-            // 2. PIKATRON (Con gravedad adaptativa del paso anterior)
+            // 2. DIBUJAR ENUNCIADO DE PREGUNTA ESPECIAL (FIJO Y ESTILO VIDEOJUEGO)
+            const special = gameRef.current.specialPool;
+            if (special && special.enunciado) {
+                ctx.save();
+                ctx.font = "900 28px monospace"; // Fuente tipo videojuego (negrita monoespaciada)
+                ctx.textAlign = "center";
+                ctx.textBaseline = "top";
+
+                // Borde Negro (Efecto Retro)
+                ctx.strokeStyle = "black";
+                ctx.lineWidth = 6;
+                ctx.strokeText(special.enunciado, canvas.width / 2, 20); // Posición fija arriba
+
+                // Relleno Amarillo
+                ctx.fillStyle = "#f1c40f";
+                ctx.fillText(special.enunciado, canvas.width / 2, 20);
+                ctx.restore();
+            }
+
+            // 3. PIKATRON
             const pika = gameRef.current.pikatron;
-            const gravity = gameRef.current.speed < 6 ? 0.25 : 0.4; // Tu ajuste de gravedad
+            const gravity = gameRef.current.speed < 6 ? 0.25 : 0.4;
 
             if (pika.y < pika.groundY || pika.vy < 0) {
                 pika.y += pika.vy;
@@ -421,9 +477,8 @@ export default function PikatronRun({ recurso, onExit, usuario }) {
             const sH = sprite.height / 2;
             ctx.drawImage(sprite, pika.frameX * sW, pika.frameY * sH, sW, sH, pika.x, pika.y, pika.width, pika.height);
 
-            // 3. OBSTÁCULOS
+            // 4. OBSTÁCULOS (CAJAS SUELO)
             const spawnRate = Math.floor(1100 / gameRef.current.speed);
-
             gameRef.current.spawnTimer++;
             if (gameRef.current.spawnTimer > spawnRate) {
                 const list = gameRef.current.currentAnswers;
@@ -440,7 +495,6 @@ export default function PikatronRun({ recurso, onExit, usuario }) {
 
             gameRef.current.obstacles.forEach((obs) => {
                 obs.x -= gameRef.current.speed;
-                // Dibujo bloque
                 ctx.fillStyle = 'rgba(0,0,0,0.2)';
                 ctx.fillRect(obs.x + 4, obs.y + 4, obs.width, obs.height);
                 ctx.fillStyle = obs.color || '#3498db';
@@ -453,7 +507,6 @@ export default function PikatronRun({ recurso, onExit, usuario }) {
                 ctx.fillText(txt, obs.x + (obs.width / 2), obs.y + 26);
                 ctx.textAlign = 'start';
 
-                // Colisiones
                 const paddingX = 25; const paddingY = 20;
                 if (
                     pika.x + pika.width - paddingX > obs.x &&
@@ -483,6 +536,95 @@ export default function PikatronRun({ recurso, onExit, usuario }) {
                 }
             });
             gameRef.current.obstacles = gameRef.current.obstacles.filter(obs => obs.x > -200);
+
+            // 5. LÓGICA DE MONEDAS (MODIFICADA: TEXTO GIGANTE Y ALTURA MAYOR)
+            gameRef.current.coinSpawnTimer++;
+
+            if (gameRef.current.coinSpawnTimer > 120 + Math.random() * 100) {
+                let coinData = { isCorrect: true, text: '' };
+
+                if (special && (special.correctas.length > 0 || special.incorrectas.length > 0)) {
+                    let sacarCorrecta = Math.random() < 0.5;
+                    if (!sacarCorrecta && special.incorrectas.length === 0) sacarCorrecta = true;
+                    if (sacarCorrecta && special.correctas.length === 0) sacarCorrecta = false;
+
+                    if (sacarCorrecta) {
+                        coinData.isCorrect = true;
+                        coinData.text = special.correctas[Math.floor(Math.random() * special.correctas.length)];
+                    } else {
+                        coinData.isCorrect = false;
+                        coinData.text = special.incorrectas[Math.floor(Math.random() * special.incorrectas.length)];
+                    }
+                } else {
+                    coinData.isCorrect = true;
+                    coinData.text = "";
+                }
+
+                gameRef.current.coins.push({
+                    x: canvas.width,
+                    // CAMBIO AQUÍ: groundLevel - 230 hace que salgan mucho más arriba (salto alto)
+                    y: groundLevel - 230 - (Math.random() * 60),
+                    width: 70,
+                    height: 70,
+                    data: coinData,
+                    active: true
+                });
+                gameRef.current.coinSpawnTimer = 0;
+            }
+
+            gameRef.current.coins.forEach(coin => {
+                if (!coin.active) return;
+
+                coin.x -= gameRef.current.speed * 0.5;
+
+                // Dibujar Moneda
+                if (coinSprite.complete) {
+                    ctx.drawImage(coinSprite, coin.x, coin.y, coin.width, coin.height);
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(coin.x + coin.width / 2, coin.y + coin.height / 2, coin.width / 2, 0, Math.PI * 2);
+                    ctx.fillStyle = '#f1c40f';
+                    ctx.fill();
+                }
+
+                // DIBUJAR TEXTO DENTRO DE LA MONEDA (GIGANTE)
+                if (coin.data.text) {
+                    ctx.save();
+                    ctx.fillStyle = 'black';
+                    // CAMBIO AQUÍ: Fuente mucho más grande
+                    ctx.font = 'bold 26px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+
+                    let txt = coin.data.text;
+                    // Recortamos a 3-4 caracteres para que quepa en tamaño gigante
+                    if (txt.length > 5) txt = txt.substring(0, 4) + '.';
+
+                    ctx.fillText(txt, coin.x + (coin.width / 2), coin.y + (coin.height / 2) + 2);
+                    ctx.restore();
+                }
+
+                // Colisiones Moneda
+                if (
+                    pika.x < coin.x + coin.width &&
+                    pika.x + pika.width > coin.x &&
+                    pika.y < coin.y + coin.height &&
+                    pika.y + pika.height > coin.y
+                ) {
+                    coin.active = false;
+
+                    if (coin.data.isCorrect) {
+                        setScore(s => s + 1);
+                        playSound('CORRECT');
+                    } else {
+                        setScore(s => Math.max(0, s - 1));
+                        playSound('LOSE_LIFE');
+                    }
+                }
+            });
+
+            gameRef.current.coins = gameRef.current.coins.filter(c => c.x > -100 && c.active);
+
             gameRef.current.frame++;
             animationFrameId = requestAnimationFrame(loop);
         };

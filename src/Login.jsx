@@ -3,14 +3,15 @@ import { auth } from './firebase';
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { Gamepad2, Menu, X } from 'lucide-react'; // Importamos Menu y X
 import logoPikt from './assets/icono2.png';
-
+import QuestionSenderClient from './QuestionSenderClient';
 import LandingGames from './components/LandingGames2';
 
 export default function Login({ setGoogleToken }) {
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false); // Estado para el menú
-
+    // ESTADO PARA LA VISTA
+    const [vistaActual, setVistaActual] = useState('LOGIN');
     const handleLogin = async () => {
         setLoading(true);
         setError(null);
@@ -64,7 +65,21 @@ export default function Login({ setGoogleToken }) {
 
     };
 
+    // SI LA VISTA ES QUESTION SENDER, MOSTRAMOS ESO EN LUGAR DEL LOGIN
+    if (vistaActual === 'QUESTION_SENDER') {
+        return (
+            <QuestionSenderClient
+                usuario={null}
+                onBack={() => setVistaActual('LOGIN')}
+            />
+        );
+    }
+
     return (
+
+
+
+
         <div style={styles.container}>
 
             {/* --- BOTÓN MENÚ HAMBURGUESA --- */}
@@ -139,7 +154,10 @@ export default function Login({ setGoogleToken }) {
                 </div>
 
                 {/* --- 2. SECCIÓN DE JUEGOS PÚBLICOS --- */}
-                <LandingGames onLoginRequest={handleLogin} />
+                <LandingGames
+                    onLoginRequest={handleLogin}
+                    onOpenQuestionSender={() => setVistaActual('QUESTION_SENDER')}
+                />
 
             </div>
         </div>

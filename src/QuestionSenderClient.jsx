@@ -1,7 +1,8 @@
 ﻿import { useState } from 'react';
 import { db } from './firebase';
-import { collection, query, where, getDocs, doc, updateDoc, arrayUnion, getDoc } from 'firebase/firestore';
-import { Send, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
+// Añade 'addDoc' a los imports
+import { collection, query, where, getDocs, doc, updateDoc, getDoc, addDoc } from 'firebase/firestore';
+import { Send, CheckCircle, AlertCircle, ArrowLeft, User, Info } from 'lucide-react';
 import Confetti from 'react-confetti';
 export default function QuestionSenderClient({ usuario, onBack }) {
     const [codigo, setCodigo] = useState('');
@@ -10,7 +11,9 @@ export default function QuestionSenderClient({ usuario, onBack }) {
     const [respuestas, setRespuestas] = useState([]); // Array de objetos { pregunta, respuesta, letra... }
     const [error, setError] = useState('');
     const [enviando, setEnviando] = useState(false);
-
+    // --- AÑADE ESTO ---
+    const [nombreGuest, setNombreGuest] = useState('');
+    const [letrasOcupadas, setLetrasOcupadas] = useState([]);
     // --- 1. ENTRAR EN LA HOJA ---
     const entrar = async () => {
         if (!codigo.trim()) return setError("Escribe el código.");
@@ -41,11 +44,14 @@ export default function QuestionSenderClient({ usuario, onBack }) {
             }
 
             // Preparar formulario
+
             const numPreguntas = parseInt(docData.config?.numPreguntas) || 3;
             // Inicializar respuestas vacías según el juego
             const plantillas = Array.from({ length: numPreguntas }, () => ({ pregunta: '', respuesta: '', letra: '' }));
 
             setRespuestas(plantillas);
+
+
             setDatosHoja({
                 recursoId,
                 hojaIndex,
@@ -55,6 +61,10 @@ export default function QuestionSenderClient({ usuario, onBack }) {
                 numPreguntas
             });
             setFase('FORMULARIO');
+
+
+
+
 
         } catch (e) {
             console.error(e);
@@ -72,66 +82,62 @@ export default function QuestionSenderClient({ usuario, onBack }) {
     };
 
     // --- 3. ENVIAR ---
+    // --- 3. ENVIAR (VERSIÓN BUZÓN / RESULTADO) ---
     const enviar = async () => {
-        // Validación
+        // 1. Validar Nombre
+        let nombreFinal = '';
+        let emailFinal = 'invitado';
+
+        if (usuario && usuario.email) {
+            nombreFinal = usuario.displayName || usuario.email.split('@')[0];
+            emailFinal = usuario.email;
+        } else {
+            if (!nombreGuest.trim()) return setError("Por favor, escribe tu nombre antes de enviar.");
+            nombreFinal = nombreGuest.trim();
+        }
+
+        // 2. Validar Preguntas (Igual que antes)
+        const tipo = datosHoja.targetGame;
         for (let i = 0; i < respuestas.length; i++) {
             const r = respuestas[i];
-            if (!r.pregunta.trim() || !r.respuesta.trim()) return setError(`Faltan datos en la pregunta #${i + 1}`);
-            if (datosHoja.targetGame === 'PASAPALABRA' && !r.letra.trim()) return setError(`Falta la Letra en la pregunta #${i + 1}`);
+            if (!r.pregunta.trim()) return setError(`Falta la Pregunta #${i + 1}`);
+            if (tipo === 'PASAPALABRA' && (!r.letra.trim() || !r.respuesta.trim())) return setError(`Falta Letra/Respuesta en #${i + 1}`);
+            if (tipo === 'CAZABURBUJAS' && (!r.respuesta.trim() || !r.incorrecta1.trim())) return setError(`Faltan respuestas en #${i + 1}`);
         }
 
         setEnviando(true);
         try {
-            const ref = doc(db, "resources", datosHoja.recursoId);
+            // 3. EN LUGAR DE TOCAR EL RECURSO, CREAMOS UN "RESULTADO" EN EL BUZÓN
+            // Preparamos las preguntas limpias
+            const preguntasParaEnviar = respuestas.map(r => {
+                const base = {
+                    pregunta: r.pregunta,
+                    studentName: nombreFinal,
+                    studentEmail: emailFinal,
+                    fecha: new Date().toISOString()
+                };
 
-            // Obtenemos el recurso fresco para no machacar datos
-            const snap = await getDoc(ref); // Necesitas importar getDoc arriba si no lo tienes, pero usaremos arrayUnion que es más seguro para concurrencia?
-            // Firestore arrayUnion no sirve para modificar objetos dentro de arrays complejos fácilmente.
-            // Para editar un objeto especifico dentro del array 'hojas', lo mejor es leer, modificar y escribir.
+                if (tipo === 'PASAPALABRA') {
+                    base.letra = r.letra.toUpperCase();
+                    base.respuesta = r.respuesta;
+                } else if (tipo === 'CAZABURBUJAS') {
+                    base.correcta = r.respuesta;
+                    base.incorrectas = [r.incorrecta1, r.incorrecta2, r.incorrecta3];
+                } else {
+                    base.respuesta = r.respuesta;
+                }
+                return base;
+            });
 
-            // ACTUALIZACIÓN SEGURA:
-            // 1. Leer todo el doc
-            // 2. Modificar el array hojas en memoria
-            // 3. Update doc
-
-            // Nota: En un entorno real con muchos alumnos a la vez, esto podría tener condiciones de carrera. 
-            // Para una clase es aceptable.
-
-            // IMPORTANTE: Como no tengo getDoc importado, lo simularé con la lógica que ya tenemos si el usuario lo acepta, 
-            // pero lo ideal es importar getDoc. Voy a asumir que puedo usar updateDoc con la lógica de reemplazo de array si es necesario,
-            // pero lo más seguro es leer y escribir.
-
-            // Vamos a hacerlo con la data que ya tenemos, asumiendo bajo tráfico.
-            // O mejor: leer de nuevo para asegurar.
-            // (Añado getDoc a los imports)
-
-            // Como no puedo editar imports arriba en este bloque, asumo que los tienes. Si no, añádelo.
-            // Voy a usar getDocs de nuevo con ID para leerlo.
-            const q = query(collection(db, "resources"), where("__name__", "==", datosHoja.recursoId));
-            const s = await getDocs(q);
-            const docSnapshot = s.docs[0];
-            const data = docSnapshot.data();
-
-            const nuevasHojas = [...data.hojas];
-            const hojaActual = nuevasHojas[datosHoja.hojaIndex];
-
-            // Añadir preguntas con email
-            const preguntasNuevas = respuestas.map(r => ({
-                ...r,
-                studentEmail: usuario.email,
-                fecha: new Date().toISOString()
-            }));
-
-            if (!hojaActual.preguntas) hojaActual.preguntas = [];
-            hojaActual.preguntas.push(...preguntasNuevas);
-
-            // Añadir a completados
-            if (!hojaActual.completedBy) hojaActual.completedBy = [];
-            hojaActual.completedBy.push(usuario.email);
-
-            nuevasHojas[datosHoja.hojaIndex] = hojaActual;
-
-            await updateDoc(doc(db, "resources", datosHoja.recursoId), { hojas: nuevasHojas });
+            // GUARDAMOS EN UNA COLECCIÓN NUEVA "mail_questions" (Como si fuera un ranking)
+            await addDoc(collection(db, "mail_questions"), {
+                recursoId: datosHoja.recursoId,     // Para saber a qué recurso pertenecen
+                hojaIndex: datosHoja.hojaIndex,     // Para saber a qué hoja van
+                nombreHoja: datosHoja.nombreHoja,
+                preguntas: preguntasParaEnviar,     // El paquete de preguntas
+                fechaEnvio: new Date(),
+                estado: 'PENDIENTE'                 // Para que el profe sepa que son nuevas
+            });
 
             setFase('EXITO');
 
@@ -203,47 +209,48 @@ export default function QuestionSenderClient({ usuario, onBack }) {
                     </p>
                 </div>
 
-                {respuestas.map((r, i) => (
-                    <div key={i} style={{ marginBottom: '20px', padding: '15px', border: '1px solid #ddd', borderRadius: '10px', textAlign: 'left' }}>
-                        <h4 style={{ margin: '0 0 10px 0', color: '#666' }}>Pregunta {i + 1}</h4>
-                        <div style={{ display: 'grid', gridTemplateColumns: datosHoja.targetGame === 'PASAPALABRA' ? '80px 1fr 1fr' : '1fr 1fr', gap: '10px' }}>
+            {respuestas.map((r, i) => (
+                <div key={i} style={{ marginBottom: '20px', padding: '15px', border: '1px solid #ddd', borderRadius: '10px', textAlign: 'left' }}>
+                    <h4 style={{ margin: '0 0 10px 0', color: '#666' }}>Pregunta {i + 1}</h4>
 
-                            {datosHoja.targetGame === 'PASAPALABRA' && (
-                                <div>
-                                    <label style={lbl}>Letra</label>
-                                    <input
-                                        maxLength={1}
-                                        value={r.letra}
-                                        onChange={e => updateRespuesta(i, 'letra', e.target.value.toUpperCase())}
-                                        style={{ ...inputForm, textAlign: 'center', fontWeight: 'bold' }}
-                                        placeholder="A"
-                                    />
-                                </div>
-                            )}
-
-                            <div>
-                                <label style={lbl}>Pregunta</label>
-                                <input
-                                    value={r.pregunta}
-                                    onChange={e => updateRespuesta(i, 'pregunta', e.target.value)}
-                                    style={inputForm}
-                                    placeholder="Escribe la definición..."
-                                />
-                            </div>
-
-                            <div>
-                                <label style={lbl}>Respuesta</label>
-                                <input
-                                    value={r.respuesta}
-                                    onChange={e => updateRespuesta(i, 'respuesta', e.target.value)}
-                                    style={inputForm}
-                                    placeholder="Respuesta correcta"
-                                />
+                    {/* CASO CAZABURBUJAS */}
+                    {datosHoja.targetGame === 'CAZABURBUJAS' ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            <div><label style={lbl}>Pregunta</label><input value={r.pregunta} onChange={e => updateRespuesta(i, 'pregunta', e.target.value)} style={inputForm} /></div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                <div><label style={{ ...lbl, color: 'green' }}>Correcta</label><input value={r.respuesta} onChange={e => updateRespuesta(i, 'respuesta', e.target.value)} style={{ ...inputForm, borderColor: 'green' }} /></div>
+                                <div><label style={{ ...lbl, color: 'red' }}>Incorrecta 1</label><input value={r.incorrecta1} onChange={e => updateRespuesta(i, 'incorrecta1', e.target.value)} style={{ ...inputForm, borderColor: 'red' }} /></div>
+                                <div><label style={{ ...lbl, color: 'red' }}>Incorrecta 2</label><input value={r.incorrecta2} onChange={e => updateRespuesta(i, 'incorrecta2', e.target.value)} style={{ ...inputForm, borderColor: 'red' }} /></div>
+                                <div><label style={{ ...lbl, color: 'red' }}>Incorrecta 3</label><input value={r.incorrecta3} onChange={e => updateRespuesta(i, 'incorrecta3', e.target.value)} style={{ ...inputForm, borderColor: 'red' }} /></div>
                             </div>
                         </div>
+                    ) : (
+                            /* CASO PASAPALABRA Y OTROS */
+                            <div style={{ display: 'grid', gridTemplateColumns: datosHoja.targetGame === 'PASAPALABRA' ? '60px 1fr 1fr' : '1fr 1fr', gap: '10px' }}>
+                                {datosHoja.targetGame === 'PASAPALABRA' && (
+                                    <div><label style={lbl}>Letra</label><input maxLength={1} value={r.letra} onChange={e => updateRespuesta(i, 'letra', e.target.value.toUpperCase())} style={{ ...inputForm, textAlign: 'center', fontWeight: 'bold' }} /></div>
+                                )}
+                                <div><label style={lbl}>Pregunta</label><input value={r.pregunta} onChange={e => updateRespuesta(i, 'pregunta', e.target.value)} style={inputForm} /></div>
+                                <div><label style={lbl}>Respuesta</label><input value={r.respuesta} onChange={e => updateRespuesta(i, 'respuesta', e.target.value)} style={inputForm} /></div>
+                            </div>
+                        )}
+                </div>
+            ))}
+                {/* CAMPO INVITADO */}
+                {!usuario && (
+                    <div style={{ marginBottom: '20px', padding: '15px', background: '#fff3cd', borderRadius: '10px', border: '1px solid #ffeeba', textAlign: 'left' }}>
+                        <label style={{ display: 'block', fontWeight: 'bold', color: '#856404', marginBottom: '5px' }}>Tu Nombre:</label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <User size={20} color="#856404" />
+                            <input
+                                value={nombreGuest}
+                                onChange={e => setNombreGuest(e.target.value)}
+                                placeholder="Nombre y Apellido"
+                                style={{ ...inputForm, border: '1px solid #856404' }}
+                            />
+                        </div>
                     </div>
-                ))}
-
+                )}
                 {error && <div style={{ color: '#e74c3c', fontWeight: 'bold', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '5px', justifyContent: 'center' }}><AlertCircle size={18} /> {error}</div>}
 
                 <button onClick={enviar} disabled={enviando} style={{ ...btnPrincipal, background: enviando ? '#ccc' : '#2ecc71' }}>

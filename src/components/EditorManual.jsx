@@ -1,6 +1,7 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { Save, X, Trash2, Plus, Settings, RotateCcw, HelpCircle } from 'lucide-react'; // <--- AÑADIDO HelpCircle
-
+import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore'; // Añade deleteDoc
+import { db } from '../firebase'; // Asegúrate de importar db
 const JUEGOS_DESTINO = [
     { id: 'PASAPALABRA', label: 'Pasapalabra' },
     { id: 'CAZABURBUJAS', label: 'CazaBurbujas' },
@@ -46,6 +47,50 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
 
         }));
     }, []);
+    // --- NUEVO: RECOGER PREGUNTAS DEL BUZÓN ---
+    useEffect(() => {
+        const cargarPreguntasDelBuzon = async () => {
+            if (!datos.id) return; // Si es nuevo no tiene ID aún
+
+            try {
+                // Buscamos correos pendientes para este recurso
+                const q = query(collection(db, "mail_questions"), where("recursoId", "==", datos.id));
+                const snap = await getDocs(q);
+
+                if (!snap.empty) {
+                    const nuevasHojas = [...datos.hojas];
+                    let seEncontraronCosas = false;
+
+                    // Procesamos cada paquete recibido
+                    for (const docMail of snap.docs) {
+                        const paquete = docMail.data();
+                        const idx = paquete.hojaIndex;
+
+                        if (nuevasHojas[idx]) {
+                            // Añadimos las preguntas al editor visual
+                            nuevasHojas[idx].preguntas.push(...paquete.preguntas);
+                            seEncontraronCosas = true;
+
+                            // Borramos el correo del buzón para no duplicarlo la próxima vez
+                            // (Solo el profesor puede borrar, así que esto es seguro)
+                            await deleteDoc(doc(db, "mail_questions", docMail.id));
+                        }
+                    }
+
+                    if (seEncontraronCosas) {
+                        setDatos(prev => ({ ...prev, hojas: nuevasHojas }));
+                        alert("📬 ¡Has recibido nuevas preguntas de alumnos! Se han añadido a la lista.");
+                    }
+                }
+            } catch (e) {
+                console.error("Error cargando buzón:", e);
+            }
+        };
+
+        cargarPreguntasDelBuzon();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [datos.id]); // Se ejecuta al abrir un recurso con ID
+
 
     // --- MANEJO DE HOJAS ---
     const cambiarHoja = (e) => setIndiceHojaActiva(parseInt(e.target.value));
@@ -155,17 +200,12 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
             );
         }
 
-        if (tipo === 'APAREJADOS') {
+        else if (tipo === 'APAREJADOS') {
             return (
-                <div style={styles.inputsGrid}>
-                    <div style={{ flex: 1 }}>
-                        <label style={styles.miniLabel}>Concepto A (Texto o URL Imagen)</label>
-                        <input value={p.pregunta} onChange={(e) => editarPregunta(i, 'pregunta', e.target.value)} style={styles.input} placeholder="Ej: Perro" />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                        <label style={styles.miniLabel}>Concepto B (Pareja)</label>
-                        <input value={p.respuesta || p.correcta} onChange={(e) => editarPregunta(i, 'respuesta', e.target.value)} style={{ ...styles.input, borderColor: '#FF9800' }} placeholder="Ej: Dog" />
-                    </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    <input style={{ flex: 1 }} placeholder="Término A" value={p.terminoA} onChange={e => updatePregunta(i, 'terminoA', e.target.value)} className="inp" />
+                    <span style={{ paddingTop: '5px' }}>↔️</span>
+                    <input style={{ flex: 1 }} placeholder="Término B" value={p.terminoB} onChange={e => updatePregunta(i, 'terminoB', e.target.value)} className="inp" />
                 </div>
             );
         }
@@ -257,9 +297,9 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
                         )}
                     </div>
 
-                    {/* === LOGICA DIFERENCIADA PARA QUESTION SENDER === */}
-                    {esQuestionSender ? (
-                        <div style={{ padding: '10px', background: '#e3f2fd', borderRadius: '10px', border: '1px solid #2196F3' }}>
+                    {/* 1. PANEL DE CONFIGURACIÓN (SOLO SI ES QUESTION SENDER) */}
+                    {esQuestionSender && (
+                        <div style={{ padding: '10px', background: '#e3f2fd', borderRadius: '10px', border: '1px solid #2196F3', marginBottom: '20px' }}>
                             <h3 style={{ color: '#1565C0', marginTop: 0 }}>Configuración de Envío</h3>
 
                             <div style={{ marginBottom: '20px' }}>
@@ -273,7 +313,6 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
                                 </select>
                                 <p style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
                                     Los alumnos verán el formulario adaptado para: <b>{JUEGOS_DESTINO.find(g => g.id === (datos.targetGame || 'PASAPALABRA'))?.label}</b>.
-                                    <br />(Ej: Si es Pasapalabra, se pedirá Letra, Pregunta y Respuesta).
                                 </p>
                             </div>
 
@@ -285,40 +324,61 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
                                 <button onClick={generarCodigoHoja} style={{ background: '#2196F3', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 auto' }}>
                                     <RotateCcw size={18} /> Generar Nuevo Código
                                 </button>
-                                <p style={{ fontSize: '13px', color: '#888', marginTop: '15px' }}>
-                                    Comparte este código con tus alumnos para que envíen sus preguntas a esta hoja.
-                                </p>
                             </div>
                         </div>
-                    ) : (
-                            // === LÓGICA NORMAL PARA OTROS JUEGOS ===
-                            <>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                                    <h3 style={{ margin: 0, color: '#333' }}>Preguntas ({hojaActual.preguntas.length})</h3>
-                                    <button onClick={agregarPregunta} style={styles.addQuestionBtn}><Plus size={18} /> Añadir Pregunta</button>
+                    )}
+
+                    {/* 2. LISTA DE PREGUNTAS (AHORA VISIBLE SIEMPRE DEBAJO) */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                        <h3 style={{ margin: 0, color: '#333' }}>
+                            {esQuestionSender ? 'Buzón de Respuestas' : 'Preguntas'} ({hojaActual.preguntas.length})
+                        </h3>
+                        <button onClick={agregarPregunta} style={styles.addQuestionBtn}><Plus size={18} /> Añadir Pregunta</button>
+                    </div>
+
+                    <div style={styles.questionsList}>
+                        {hojaActual.preguntas.map((p, i) => (
+                            <div key={i} style={styles.questionCard}>
+                                <div style={styles.questionHeader}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <span style={styles.qNumber}>#{i + 1}</span>
+
+                                        {/* VISUALIZADOR DE NOMBRE (Ahora sí se verá) */}
+                                        {p.studentName && (
+                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                                                <span style={{ fontSize: '11px', color: '#1565C0', background: '#E3F2FD', padding: '3px 8px', borderRadius: '12px', fontWeight: 'bold', border: '1px solid #BBDEFB' }}>
+                                                    👤 {p.studentName}
+                                                </span>
+                                                {p.fecha && (
+                                                    <span style={{ fontSize: '10px', color: '#999', marginTop: '2px', marginLeft: '5px' }}>
+                                                        {new Date(p.fecha).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                        {configJuego.id === 'PASAPALABRA' && (
+                                            <input value={p.letra} onChange={(e) => editarPregunta(i, 'letra', e.target.value.toUpperCase())} style={styles.letraInput} maxLength={1} />
+                                        )}
+                                        <button onClick={() => borrarPregunta(i)} style={styles.deleteBtn}><Trash2 size={16} /></button>
+                                    </div>
                                 </div>
 
-                                <div style={styles.questionsList}>
-                                    {hojaActual.preguntas.map((p, i) => (
-                                        <div key={i} style={styles.questionCard}>
-                                            <div style={styles.questionHeader}>
-                                                <span style={styles.qNumber}>#{i + 1}</span>
-                                                {configJuego.id === 'PASAPALABRA' && (
-                                                    <input value={p.letra} onChange={(e) => editarPregunta(i, 'letra', e.target.value.toUpperCase())} style={styles.letraInput} maxLength={1} />
-                                                )}
-                                                <button onClick={() => borrarPregunta(i)} style={styles.deleteBtn}><Trash2 size={16} /></button>
-                                            </div>
-                                            {renderCamposPregunta(p, i)}
-                                        </div>
-                                    ))}
-                                    {hojaActual.preguntas.length === 0 && (
-                                        <div style={{ textAlign: 'center', padding: '40px', color: '#999', border: '2px dashed #ccc', borderRadius: '10px' }}>
-                                            No hay preguntas. Pulsa "Añadir Pregunta".
-                                    </div>
-                                    )}
-                                </div>
-                            </>
+                                {renderCamposPregunta(p, i)}
+                            </div>
+                        ))}
+
+                        {hojaActual.preguntas.length === 0 && (
+                            <div style={{ textAlign: 'center', padding: '40px', color: '#999', border: '2px dashed #ccc', borderRadius: '10px' }}>
+                                {esQuestionSender
+                                    ? "Aún no has recibido preguntas de los alumnos."
+                                    : "No hay preguntas. Pulsa 'Añadir Pregunta'."}
+                            </div>
                         )}
+                    </div>
+
                 </div>
 
                 {/* MODAL CONFIGURACIÓN */}

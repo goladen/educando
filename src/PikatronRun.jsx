@@ -24,12 +24,16 @@ import jumpSoundFile from './assets/jump.mp3';
 import correctSoundFile from './assets/correct.mp3';
 import looseLifeSoundFile from './assets/wrong.mp3';
 import gameOverSoundFile from './assets/gameover.mp3';
-
+import respCorrecta from './assets/sonidorespcorrecta.mp3';
+import monedaIncorrecta from './assets/sonidomonedamal.mp3';
 // Pre-carga de audios
 const audioJump = new Audio(jumpSoundFile);
 const audioCorrect = new Audio(correctSoundFile);
 const audioLoseLife = new Audio(looseLifeSoundFile);
 const audioGameOver = new Audio(gameOverSoundFile);
+const audioRespCorrecta = new Audio(respCorrecta);
+const audioMonedaIncorrecta = new Audio(monedaIncorrecta);
+
 
 const playSound = (type) => {
     try {
@@ -37,6 +41,11 @@ const playSound = (type) => {
         if (type === 'CORRECT') { audioCorrect.currentTime = 0; audioCorrect.play().catch(() => { }); }
         if (type === 'LOSE_LIFE') { audioLoseLife.currentTime = 0; audioLoseLife.play().catch(() => { }); }
         if (type === 'GAMEOVER') { audioGameOver.currentTime = 0; audioGameOver.play().catch(() => { }); }
+        if (type === 'RES_COR') { audioRespCorrecta.currentTime = 0; audioRespCorrecta.play().catch(() => { }); }
+        if (type === 'MON_INC') { audioMonedaIncorrecta.currentTime = 0; audioMonedaIncorrecta.play().catch(() => { }); }
+        
+
+
     } catch (e) { console.log("Audio bloqueado"); }
 };
 
@@ -515,7 +524,7 @@ export default function PikatronRun({ recurso, onExit, usuario }) {
                     pika.y + paddingY < obs.y + obs.height
                 ) {
                     if (obs.data.isCorrect) {
-                        playSound('CORRECT');
+                        playSound('RES_COR');
                         setScore(s => s + gameRef.current.puntosAcierto);
                         prepararSiguientePregunta(gameRef.current.qIndex + 1);
                     } else {
@@ -618,7 +627,7 @@ export default function PikatronRun({ recurso, onExit, usuario }) {
                         playSound('CORRECT');
                     } else {
                         setScore(s => Math.max(0, s - 1));
-                        playSound('LOSE_LIFE');
+                        playSound('MON_INC');
                     }
                 }
             });

@@ -32,7 +32,9 @@ const TIPOS_JUEGOS = {
     PASAPALABRA: { id: 'PASAPALABRA', label: 'Pasapalabra', color: '#3F51B5', camposConfig: [{ key: 'tiempoTotal', label: 'Tiempo Rosco (seg)', type: 'number', default: 150 }] },
     CAZABURBUJAS: { id: 'CAZABURBUJAS', label: 'Burbujas y Pikatron', color: '#E91E63', camposConfig: [{ key: 'tiempoPregunta', label: 'Tiempo/preg (seg)', type: 'number', default: 20 }, { key: 'numPreguntas', label: 'Nº Preguntas', type: 'number', default: 10 }, { key: 'puntosAcierto', label: 'Pts Acierto', type: 'number', default: 10 }, { key: 'puntosFallo', label: 'Pts Fallo', type: 'number', default: 2 }] },
     
-
+    // --- AÑADE ESTA LÍNEA ---
+    MATHLIVE: { id: 'MATHLIVE', label: 'MathLive', color: '#009688', camposConfig: [] },
+    // --
     APAREJADOS: { id: 'APAREJADOS', label: 'AparejaDOS', color: '#FF9800', camposConfig: [{ key: 'tiempoTotal', label: 'Tiempo Total (seg)', type: 'number', default: 60 }, { key: 'numParejas', label: 'Nº Parejas', type: 'number', default: 8 }, { key: 'puntosPareja', label: 'Pts Pareja', type: 'number', default: 10 }] },
     THINKHOOT: { id: 'THINKHOOT', label: 'Pi-Live', color: '#9C27B0', camposConfig: [{ key: 'tiempoPregunta', label: 'Tiempo/preg (seg)', type: 'number', default: 30 }, { key: 'numPreguntas', label: 'Nº Preguntas', type: 'number', default: 10 }, { key: 'puntosMax', label: 'Puntos Max', type: 'number', default: 120 }, { key: 'puntosMin', label: 'Puntos Min', type: 'number', default: 30 }] },
     RULETA: { id: 'RULETA', label: 'La Ruleta', color: '#f1c40f', camposConfig: [{ key: 'tiempoTurno', label: 'Tiempo Turno (s)', type: 'number', default: 20 }] },
@@ -168,6 +170,9 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
         if (modoDashboard === 'PRO') {
             if (juegoSeleccionado === 'CAZABURBUJAS') return iniciarCreacionBurbujasPikatron();
             if (juegoSeleccionado === 'THINKHOOT') return iniciarCreacionPiLive();
+            if (juegoSeleccionado === 'MATHLIVE') return iniciarCreacionMathLive();
+        
+
         }
 
 
@@ -216,8 +221,6 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
 
     // 3. CREAR MATHLIVE (YA LO TIENES, PERO LO REPASAMOS)
     const iniciarCreacionMathLive = () => {
-        // ... (Tu código actual de iniciarCreacionMathLive) ...
-        // Asegúrate de que llame a setMostrandoEditorMathLive(true)
         const conf = {
             isMathLive: true,
             mathCount: 8, mathTime: 30, mathPuntosMax: 30, mathPuntosMin: 20,
@@ -226,7 +229,8 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
         };
         const nuevoRecurso = {
             id: null, titulo: '', temas: '', profesorNombre: usuario.displayName,
-            tipo: 'PRO', tipoJuego: 'THINKHOOT', // MathLive corre sobre el motor de ThinkHoot
+            tipo: 'PRO',
+            tipoJuego: 'MATHLIVE', // <--- CAMBIA ESTO (Antes ponía 'THINKHOOT')
             config: conf, hojas: [{ nombreHoja: 'Grupo 1', preguntas: [] }], isPrivate: false
         };
         setDatosEditor(nuevoRecurso);
@@ -490,7 +494,9 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
     // ==============================================================================
     return (
         <div style={{ padding: '20px', maxWidth: '1000px', margin: '0 auto', fontFamily: 'Arial', position: 'relative', minHeight: '100vh', background: '#e3f2fd' }}> {/* FONDO AZUL CLARO */}
-
+            {/* --- AÑADE ESTA LÍNEA O NO SE APLICARÁ NINGÚN DISEÑO --- */}
+            <ResponsiveStyles />
+            {/* -------------------------------------------------------- */}
             {/* --- MENÚ HAMBURGUESA --- */}
             <button onClick={toggleMenu} style={styles.menuButton}><Menu size={32} color="#2c3e50" /></button>
             {menuOpen && (<div style={styles.menuOverlay} onClick={toggleMenu}><div style={styles.menuPanel} onClick={(e) => e.stopPropagation()}>
@@ -540,76 +546,104 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
 
             {/* 4. MODOS CLÁSICO Y PRO (RECURSOS) */}
             {(modoDashboard === 'CLASICO' || modoDashboard === 'PRO') && (
-                <>
-                    {modoDashboard === 'CLASICO' && (<div style={{ marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>{Object.values(TIPOS_JUEGOS).map(j => <button key={j.id} onClick={() => setJuegoSeleccionado(j.id)} style={{ padding: '8px 16px', borderRadius: '20px', border: 'none', background: juegoSeleccionado === j.id ? j.color : 'white', color: juegoSeleccionado === j.id ? 'white' : '#555', cursor: 'pointer', fontWeight: 'bold', boxShadow:'0 2px 5px rgba(0,0,0,0.1)' }}>{j.label}</button>)}</div>)}
-                    {modoDashboard === 'PRO' && (<div style={{ marginBottom: '20px', textAlign: 'center' }}><h1 style={{ color: '#9C27B0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}><Zap size={32} /> ThinkHoot PRO</h1></div>)}
+                <>{modoDashboard === 'CLASICO' && (
+                    <div className="game-type-scroll" style={{ marginBottom: '20px' }}>
+                        {Object.values(TIPOS_JUEGOS)
+                            .filter(j => j.id !== 'MATHLIVE') // <--- FILTRO AÑADIDO
+                            .map(j => (
+                                <button key={j.id} onClick={() => setJuegoSeleccionado(j.id)} style={{ padding: '8px 16px', borderRadius: '20px', border: 'none', background: juegoSeleccionado === j.id ? j.color : 'white', color: juegoSeleccionado === j.id ? 'white' : '#555', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
+                                    {j.label}
+                                </button>
+                            ))}
+                    </div>
+                )}
+
+
+                    {modoDashboard === 'PRO' && (<div style={{ marginBottom: '20px', textAlign: 'center' }}><h1 style={{ color: '#9C27B0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}><Zap size={32} /> RECURSOS PRO</h1></div>)}
                     
                     {/* BARRA DE TÍTULO Y BOTONES DE ACCIÓN */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', alignItems: 'center' }}>
+                    {/* BARRA DE TÍTULO Y BOTONES DE ACCIÓN RESPONSIVA */}
+                    <div className="dashboard-header-row">
                         <h2>{vista === 'MIS_RECURSOS' ? `Mis Recursos` : `Biblioteca`}</h2>
 
-                        <div style={{ display: 'flex', gap: '10px' }}>
-
-                            {/* --- BOTÓN CREAR NUEVO (AÑADIDO) --- */}
+                        <div className="action-group">
+                            {/* BOTÓN CREAR (OVALADO) */}
                             {vista === 'MIS_RECURSOS' && (
                                 <button
                                     onClick={iniciarCreacion}
+                                    className="header-btn"
                                     style={{
-                                        background: '#2ecc71', color: 'white', border: 'none',
-                                        padding: '10px 20px', borderRadius: '8px', cursor: 'pointer',
-                                        fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px',
-                                        boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+                                        background: '#2ecc71', color: 'white',
+                                        padding: '10px 20px', borderRadius: '30px'
                                     }}
                                 >
-                                    <Plus size={20} /> <span className="hide-mobile">Crear Nuevo</span>
+                                    <Plus size={20} /> <span className="btn-text">Crear Nuevo</span>
                                 </button>
                             )}
-                            {/* ----------------------------------- */}
 
+                            {/* BOTÓN BIBLIOTECA (OVALADO) */}
                             {(juegoSeleccionado !== 'QUESTION_SENDER' && modoDashboard === 'CLASICO') && (
-                                <button onClick={() => setVista(vista === 'MIS_RECURSOS' ? 'BIBLIOTECA' : 'MIS_RECURSOS')} style={{ background: '#2980b9', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                    <Globe size={18} /> {vista === 'MIS_RECURSOS' ? "Ir a Biblioteca" : "Mis Recursos"}
+                                <button
+                                    onClick={() => setVista(vista === 'MIS_RECURSOS' ? 'BIBLIOTECA' : 'MIS_RECURSOS')}
+                                    className="header-btn"
+                                    style={{ background: '#2980b9', color: 'white', padding: '10px 20px', borderRadius: '30px' }}
+                                >
+                                    <Globe size={18} /> <span className="btn-text">{vista === 'MIS_RECURSOS' ? "Biblioteca" : "Mis Recursos"}</span>
                                 </button>
                             )}
 
+                            {/* BOTONES PRO (OVALADOS 20px) */}
                             {modoDashboard === 'PRO' && (
-                                <div style={{ display: 'flex', gap: '10px' }}>
+                                <>
                                     <button
                                         onClick={() => setJuegoSeleccionado('THINKHOOT')}
+                                        className="header-btn"
                                         style={{
-                                            padding: '8px 20px', borderRadius: '20px', border: 'none',
+                                            padding: '8px 20px', borderRadius: '20px',
                                             background: juegoSeleccionado === 'THINKHOOT' ? '#9C27B0' : 'white',
-                                            color: juegoSeleccionado === 'THINKHOOT' ? 'white' : '#555',
-                                            cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
-                                            display: 'flex', alignItems: 'center', gap: '5px'
+                                            color: juegoSeleccionado === 'THINKHOOT' ? 'white' : '#555'
                                         }}
                                     >
-                                        <Zap size={16} /> Pi-Live
+                                        <Zap size={16} /> <span className="btn-text">Pi-Live</span>
                                     </button>
 
                                     <button
                                         onClick={() => setJuegoSeleccionado('CAZABURBUJAS')}
+                                        className="header-btn"
                                         style={{
-                                            padding: '8px 20px', borderRadius: '20px', border: 'none',
+                                            padding: '8px 20px', borderRadius: '20px',
                                             background: juegoSeleccionado === 'CAZABURBUJAS' ? '#E91E63' : 'white',
-                                            color: juegoSeleccionado === 'CAZABURBUJAS' ? 'white' : '#555',
-                                            cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
-                                            display: 'flex', alignItems: 'center', gap: '5px'
+                                            color: juegoSeleccionado === 'CAZABURBUJAS' ? 'white' : '#555'
                                         }}
                                     >
-                                        <Gamepad2 size={16} /> Burbujas / Pikatron
+                                        <Gamepad2 size={16} /> <span className="btn-text">Burbujas</span>
                                     </button>
-                                </div>
+
+                                    <button
+                                        onClick={() => setJuegoSeleccionado('MATHLIVE')}
+                                        className="header-btn"
+                                        style={{
+                                            padding: '8px 20px', borderRadius: '20px',
+                                            background: juegoSeleccionado === 'MATHLIVE' ? '#009688' : 'white',
+                                            color: juegoSeleccionado === 'MATHLIVE' ? 'white' : '#555'
+                                        }}
+                                    >
+                                        <Calculator size={16} /> <span className="btn-text">MathLive</span>
+                                    </button>
+                                </>
                             )}
                         </div>
                     </div>
 
 
                     {vista === 'BIBLIOTECA' && (<div style={{ background: '#f9f9f9', padding: '15px', borderRadius: '10px', marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}><span style={{ fontWeight: 'bold', color: '#666' }}><Search size={16} /> Filtros:</span><input placeholder="Tema..." value={filtrosInput.tema} onChange={e => setFiltrosInput({ ...filtrosInput, tema: e.target.value })} style={inputFilter} /><input placeholder="País" value={filtrosInput.pais} onChange={e => setFiltrosInput({ ...filtrosInput, pais: e.target.value })} style={inputFilter} /><input placeholder="Región" value={filtrosInput.region} onChange={e => setFiltrosInput({ ...filtrosInput, region: e.target.value })} style={inputFilter} /><input placeholder="Población" value={filtrosInput.poblacion} onChange={e => setFiltrosInput({ ...filtrosInput, poblacion: e.target.value })} style={inputFilter} /><button onClick={ejecutarBusqueda} style={{ background: '#2980b9', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '5px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}><Search size={16} /> Buscar</button><button onClick={limpiarBusqueda} style={{ background: '#bdc3c7', padding: '8px', borderRadius: '5px', border: 'none', cursor: 'pointer' }} title="Limpiar"><RotateCcw size={16} /></button></div>)}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
-                        {(vista === 'MIS_RECURSOS' ? recursos : getRecursosFiltrados()).map((r, i) => (<div key={r.id || i} style={{ background: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', borderLeft: `6px solid ${TIPOS_JUEGOS[juegoSeleccionado].color}`, position: 'relative' }}>{juegoSeleccionado !== 'QUESTION_SENDER' && <div style={{ position: 'absolute', top: '10px', right: '10px', background: '#f1c40f', padding: '2px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: 'bold' }}><Users size={12} /> {r.playCount || 0}</div>}<h3 style={{ margin: '0 0 5px 0' }}>{r.titulo}</h3><div style={{ display: 'flex', gap: '5px', marginTop: '10px' }}>{juegoSeleccionado === 'QUESTION_SENDER' ? (<><button onClick={() => abrirEdicion(r)} style={btnStyle('#E3F2FD', '#1565C0')}><Pencil size={18} /></button><button onClick={() => setModalCopiarApp(r)} style={btnStyle('#E8F5E9', '#2E7D32')}><Send size={18} /></button><button onClick={() => eliminarRecurso(r.id)} style={btnStyle('#FFEBEE', '#C62828')}><Trash2 size={18} /></button></>) : (vista === 'MIS_RECURSOS' ? (<>
+                    <div className="resources-grid">
+                        {(vista === 'MIS_RECURSOS' ? recursos : getRecursosFiltrados()).map((r, i) => (<div key={r.id || i} style={{
+                            background: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', position: 'relative',
+                            display: 'flex',
+                            flexDirection: 'column', borderLeft: `6px solid ${TIPOS_JUEGOS[juegoSeleccionado].color}`, position: 'relative' }}>{juegoSeleccionado !== 'QUESTION_SENDER' && <div style={{ position: 'absolute', top: '10px', right: '10px', background: '#f1c40f', padding: '2px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: 'bold' }}><Users size={12} /> {r.playCount || 0}</div>}<h3 style={{ margin: '0 0 5px 0' }}>{r.titulo}</h3><div style={{ display: 'flex', gap: '5px', marginTop: '10px' }}>{juegoSeleccionado === 'QUESTION_SENDER' ? (<><button onClick={() => abrirEdicion(r)} style={btnStyle('#E3F2FD', '#1565C0')}><Pencil size={18} /></button><button onClick={() => setModalCopiarApp(r)} style={btnStyle('#E8F5E9', '#2E7D32')}><Send size={18} /></button><button onClick={() => eliminarRecurso(r.id)} style={btnStyle('#FFEBEE', '#C62828')}><Trash2 size={18} /></button></>) : (vista === 'MIS_RECURSOS' ? (<>
                             
-                            {juegoSeleccionado === 'THINKHOOT' ? (
+                            {juegoSeleccionado === 'THINKHOOT' || juegoSeleccionado === 'MATHLIVE' ? (
                                 <button title="Lanzar en Vivo" onClick={() => prepararJuegoEnVivo(r)} style={{ ...btnStyle('#9C27B0', 'white'), fontWeight: 'bold' }}>
                                     <Zap size={18} />
                                 </button>
@@ -783,3 +817,78 @@ const inputStyle = { width: '100%', padding: '10px', borderRadius: '5px', border
 const inputFilter = { padding: '8px', borderRadius: '5px', border: '1px solid #ccc', fontSize: '13px', width: '120px' };
 const styles = { menuButton: { position: 'absolute', top: '20px', left: '20px', background: '#ecf0f1', border: '1px solid #bdc3c7', borderRadius: '8px', padding: '8px', cursor: 'pointer', zIndex: 50 }, helpButtonTop: { background: 'white', border: 'none', borderRadius: '50%', width:'40px', height:'40px', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', boxShadow:'0 2px 5px rgba(0,0,0,0.1)' }, menuOverlay: { position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.5)', zIndex: 9999, display: 'flex', justifyContent: 'flex-start' }, menuPanel: { width: '80%', maxWidth: '300px', height: '100%', backgroundColor: 'white', boxShadow: '2px 0 10px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', animation: 'slideIn 0.3s ease-out' }, menuHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px', borderBottom: '1px solid #eee' }, menuTitle: { margin: 0, color: '#2c3e50', fontSize: '1.5rem', fontWeight: 'bold' }, closeButton: { background: 'transparent', border: 'none', cursor: 'pointer' }, menuList: { listStyle: 'none', padding: '0', margin: '0', flex: 1 }, menuItem: { padding: '20px', borderBottom: '1px solid #f0f0f0', color: '#34495e', fontSize: '1.1rem', fontWeight: '500', cursor: 'pointer' }, menuFooter: { padding: '20px', textAlign: 'center', color: '#bdc3c7', fontSize: '0.8rem', borderTop: '1px solid #eee' } };
 const styleSheet = document.createElement("style"); styleSheet.innerText = `@keyframes slideIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }`; document.head.appendChild(styleSheet);
+const ResponsiveStyles = () => (
+    <style>{`
+        /* --- CONTENEDOR PRINCIPAL --- */
+        .dashboard-main-container {
+             padding: 20px;
+             max-width: 1200px; 
+             margin: 0 auto;
+             font-family: Arial, sans-serif;
+             min-height: 100vh;
+        }
+
+        /* --- CABECERA --- */
+        .dashboard-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .action-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        /* --- BOTONES OVALADOS (RECUPERADOS) --- */
+        .header-btn {
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: transform 0.1s;
+            white-space: nowrap;
+        }
+        .header-btn:active { transform: scale(0.98); }
+
+        /* --- GRID DE RECURSOS CON LÍMITE --- */
+        .resources-grid {
+            display: grid;
+            /* Nunca más de 350px por tarjeta para que no se estiren */
+            grid-template-columns: repeat(auto-fill, minmax(350px, 400px));
+            gap: 20px;
+            justify-content: center; /* Centra las tarjetas si hay pocas */
+        }
+
+        .btn-text { display: inline; }
+
+        /* --- AJUSTE MÓVIL --- */
+        @media (max-width: 768px) {
+            .dashboard-header-row {
+                flex-direction: column; 
+                align-items: stretch;
+            }
+            .action-group {
+                justify-content: space-between;
+                width: 100%;
+            }
+            .header-btn {
+                flex: 1;
+                padding: 12px !important;
+            }
+            .btn-text { display: none; }
+            .resources-grid {
+                grid-template-columns: 1fr; /* Una columna en móvil */
+            }
+        }
+    `}</style>
+);

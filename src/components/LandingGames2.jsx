@@ -51,7 +51,7 @@ const getColor = (t) => {
 
 const cleanText = (text) => text ? text.toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
 
-export default function LandingGames({ onLoginRequest }) {
+export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
     // ESTADOS
     const [modoBusqueda, setModoBusqueda] = useState('FILTROS');
 
@@ -109,16 +109,22 @@ export default function LandingGames({ onLoginRequest }) {
     }, []);
 
     // --- LÓGICA DE BÚSQUEDA ---
+    // --- BÚSQUEDA ---
     const buscar = async () => {
         setBuscando(true); setResultados([]);
         const ref = collection(db, 'resources');
+
         try {
             if (modoBusqueda === 'CODIGO') {
                 if (!codigo.trim()) { alert("Escribe un código."); setBuscando(false); return; }
-                const q = query(ref, where("accessCode", "==", codigo.toUpperCase().trim()));
+                const codigoLimpio = codigo.toUpperCase().trim();
+
+                // 1. PRIMER INTENTO: BUSCAR JUEGO NORMAL (accessCode)
+                const q = query(ref, where("accessCode", "==", codigoLimpio));
                 const snap = await getDocs(q);
-                if (snap.empty) alert("Código no encontrado.");
-                else {
+
+                if (!snap.empty) {
+                    // ES UN JUEGO
                     const docs = snap.docs.map(d => ({ ...d.data(), id: d.id }));
                     const r = docs[0];
                     if (r.isFinished === true || r.config?.isFinished === true) {
@@ -126,49 +132,52 @@ export default function LandingGames({ onLoginRequest }) {
                     } else {
                         alert("Este recurso aún no está terminado.");
                     }
+                } else {
+                    // 2. SEGUNDO INTENTO: BUSCAR QUESTION SENDER (hojasCodes)
+                    // (Esta es la parte que te faltaba)
+                    const qSender = query(ref, where("hojasCodes", "array-contains", codigoLimpio));
+                    const snapSender = await getDocs(qSender);
+
+                    if (!snapSender.empty) {
+                        // ¡ENCONTRADO! Abrimos el formulario
+                        if (onOpenQuestionSender) {
+                            onOpenQuestionSender();
+                            setBuscando(false);
+                            return;
+                        }
+                    }
+
+                    // SI FALLAN LOS DOS
+                    alert("Código no encontrado.");
                 }
             } else {
-                // BÚSQUEDA POR FILTROS
-                // Traemos los últimos 100 recursos para filtrar en cliente (Firestore tiene limites con múltiples 'where')
+                // ... (Lógica de filtros igual que antes) ...
                 const q = query(ref, orderBy("fechaCreacion", "desc"), limit(100));
                 const snap = await getDocs(q);
                 const raw = snap.docs.map(d => ({ ...d.data(), id: d.id }));
 
                 const filtrados = raw.filter(r => {
                     const f = filtros;
-
-                    // 1. Filtro Tipo Juego
                     if (f.tipoJuego) {
                         if (f.tipoJuego === 'THINKHOOT') {
-                            // Si busca Live, aceptamos THINKHOOT o PRO (MathLive)
                             if (r.tipoJuego !== 'THINKHOOT' && r.tipo !== 'PRO') return false;
                         } else {
                             if (r.tipoJuego !== f.tipoJuego) return false;
                         }
                     }
-
-                    // 2. Filtro Terminado
                     const isTerminado = r.isFinished === true || r.config?.isFinished === true;
                     if (!isTerminado) return false;
-
-                    // 3. Filtro Tema (Búsqueda en título o campo temas)
                     const matchTema = !f.tema || cleanText(r.titulo).includes(cleanText(f.tema)) || (r.temas && cleanText(r.temas).includes(cleanText(f.tema)));
                     if (!matchTema) return false;
-
-                    // 4. Filtro Ciclo (Búsqueda en campo ciclo o dentro de temas/título si no existe campo específico)
-                    // Asumimos que 'ciclo' puede estar en r.ciclo, r.config.ciclo, o ser parte de los temas/etiquetas
                     if (f.ciclo) {
                         const cicloBusqueda = cleanText(f.ciclo);
                         const enCampo = r.ciclo && cleanText(r.ciclo) === cicloBusqueda;
                         const enConfig = r.config?.ciclo && cleanText(r.config.ciclo) === cicloBusqueda;
                         const enTemas = r.temas && cleanText(r.temas).includes(cicloBusqueda);
-
                         if (!enCampo && !enConfig && !enTemas) return false;
                     }
-
                     return true;
                 });
-
                 if (filtrados.length === 0) alert("No se encontraron recursos terminados con esos filtros.");
                 setResultados(filtrados);
             }

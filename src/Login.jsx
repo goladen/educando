@@ -55,8 +55,8 @@ export default function Login({ setGoogleToken }) {
             window.open('https://goladen.wixsite.com/matematicas/copia-de-pikt', '_blank');
         }
         else if (opcion === 'privacidad') {
-            // --- AQUÍ PONES TU URL DE PRIVACIDAD ---
-            window.open('https://goladen.wixsite.com/matematicas/copia-de-copia-de-pikt-web', '_blank');
+            // --- CAMBIA ESTO: Quita la url de Wix y pon la nueva ---
+            window.open('https://pikt.es/politica.html', '_blank');
         }
 
 
@@ -151,8 +151,21 @@ export default function Login({ setGoogleToken }) {
                     </button>
 
                     <p style={styles.footer}>Gestión Docente & Gamificación</p>
-                </div>
+                
+                    {/* --- CORRECCIÓN: EL ENLACE DEBE IR AQUÍ, DENTRO DE LA TARJETA --- */}
+                    <div style={{ marginTop: '15px', fontSize: '11px' }}>
+                        <a
+                            href="https://pikt.es/politica.html"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ color: '#7f8c8d', textDecoration: 'underline' }}
+                        >
+                            Política de Privacidad
+                        </a>
+                    </div>
+                    {/* --------------------------------------------------------------- */}
 
+                </div> {/* <--- ESTE ES EL CIERRE DE LA TARJETA (styles.card). EL ENLACE DEBE ESTAR ENCIMA DE ESTA LÍNEA */}
                 {/* --- 2. SECCIÓN DE JUEGOS PÚBLICOS --- */}
                 <LandingGames
                     onLoginRequest={handleLogin}

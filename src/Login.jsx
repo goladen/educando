@@ -56,7 +56,7 @@ export default function Login({ setGoogleToken }) {
         }
         else if (opcion === 'privacidad') {
             // --- CAMBIA ESTO: Quita la url de Wix y pon la nueva ---
-            window.open('https://pikt.es/politica.html', '_blank');
+            window.open('https://www.pikt.es/politica.html', '_blank');
         }
 
 
@@ -155,7 +155,7 @@ export default function Login({ setGoogleToken }) {
                     {/* --- CORRECCIÓN: EL ENLACE DEBE IR AQUÍ, DENTRO DE LA TARJETA --- */}
                     <div style={{ marginTop: '15px', fontSize: '11px' }}>
                         <a
-                            href="https://pikt.es/politica.html"
+                            href="https://www.pikt.es/politica.html"
                             target="_blank"
                             rel="noopener noreferrer"
                             style={{ color: '#7f8c8d', textDecoration: 'underline' }}

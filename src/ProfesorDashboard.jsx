@@ -21,13 +21,12 @@ import PikatronRun from './PikatronRun';
 import { MousePointer2, Rocket } from 'lucide-react';
 import EditorProBurbujasPikatron from './components/EditorProBurbujasPikatron';
 // ==============================================================================
-//  ZONA DE CLAVES
+//  ZONA DE CLAVES (SEGURA)
 // ==============================================================================
-const GEMINI_API_KEY = "AIzaSyCpap7E3iSXVYyfm8cEFqa-StlPUAfFpfY";
-const GOOGLE_CLIENT_ID = "544528054442-j4bijvccdnk8gbbmhe1am6bgkubp62m0.apps.googleusercontent.com";
-const GOOGLE_DEVELOPER_KEY = "AIzaSyDOFNi_V_HbCKS8bQWAsFqQKBEiBrBYQCw";
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+const GOOGLE_DEVELOPER_KEY = import.meta.env.VITE_GOOGLE_DEVELOPER_KEY;
 // ==============================================================================
-
 const TIPOS_JUEGOS = {
     PASAPALABRA: { id: 'PASAPALABRA', label: 'Pasapalabra', color: '#3F51B5', camposConfig: [{ key: 'tiempoTotal', label: 'Tiempo Rosco (seg)', type: 'number', default: 150 }] },
     CAZABURBUJAS: { id: 'CAZABURBUJAS', label: 'Burbujas y Pikatron', color: '#E91E63', camposConfig: [{ key: 'tiempoPregunta', label: 'Tiempo/preg (seg)', type: 'number', default: 20 }, { key: 'numPreguntas', label: 'Nº Preguntas', type: 'number', default: 10 }, { key: 'puntosAcierto', label: 'Pts Acierto', type: 'number', default: 10 }, { key: 'puntosFallo', label: 'Pts Fallo', type: 'number', default: 2 }] },

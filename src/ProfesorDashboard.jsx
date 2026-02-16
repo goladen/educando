@@ -20,6 +20,7 @@ import CazaBurbujasGame from './CazaBurbujasGame';
 import PikatronRun from './PikatronRun';
 import { MousePointer2, Rocket } from 'lucide-react';
 import EditorProBurbujasPikatron from './components/EditorProBurbujasPikatron';
+import EditorQuestionSender from './components/EditorQuestionSender';
 // ==============================================================================
 //  ZONA DE CLAVES (SEGURA)
 // ==============================================================================
@@ -334,16 +335,97 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
 
     const confirmarCopiaAplicacion = async () => {
         if (!modalCopiarApp) return;
-        const app = modalCopiarApp.targetGame || 'PASAPALABRA';
+
+        // 1. Detectamos el juego de destino y el origen
+        const appDestino = modalCopiarApp.targetGame || 'PASAPALABRA';
+
         let recursoFresco = modalCopiarApp;
         try {
             const snap = await getDoc(doc(db, "resources", modalCopiarApp.id));
             if (snap.exists()) recursoFresco = { ...snap.data(), id: snap.id };
         } catch (e) { console.error("Usando datos locales"); }
-        const conf = {}; TIPOS_JUEGOS[app].camposConfig.forEach(c => conf[c.key] = c.default);
-        const hojasL = recursoFresco.hojas.map(h => ({ nombreHoja: h.nombreHoja, preguntas: (h.preguntas || []).map(({ studentEmail, fecha, ...p }) => p) }));
-        await addDoc(collection(db, "resources"), { titulo: `[IMPORT] ${recursoFresco.titulo}`, temas: recursoFresco.temas, profesorUid: usuario.uid, profesorNombre: recursoFresco.profesorNombre, pais: recursoFresco.pais, region: recursoFresco.region, poblacion: recursoFresco.poblacion, tipoJuego: app, config: conf, hojas: hojasL, isPrivate: true, origen: 'question_sender', playCount: 0, fechaCreacion: new Date(), accessCode: generarCodigoAcceso() });
-        alert(`Recurso creado en ${app}`); setModalCopiarApp(null); setJuegoSeleccionado(app);
+
+        // Configuración por defecto
+        const conf = {};
+        if (TIPOS_JUEGOS[appDestino]) {
+            TIPOS_JUEGOS[appDestino].camposConfig.forEach(c => conf[c.key] = c.default);
+        }
+
+        // --- 2. TRANSFORMACIÓN SEGURA ---
+        const hojasL = recursoFresco.hojas.map(h => ({
+            nombreHoja: h.nombreHoja,
+            preguntas: (h.preguntas || []).map(p => {
+
+                // >>> SALVAGUARDA: Si NO es Question Sender, copiamos TODO intacto <<<
+                if (recursoFresco.tipoJuego !== 'QUESTION_SENDER') {
+                    return { ...p };
+                }
+
+                // >>> SOLO SI ES QUESTION SENDER: LIMPIAMOS Y ADAPTAMOS <<<
+
+                // CASO A: PASAPALABRA
+                if (appDestino === 'PASAPALABRA') {
+                    return {
+                        letra: p.letra || 'A',
+                        pregunta: p.pregunta || '',
+                        respuesta: p.respuesta || ''
+                    };
+                }
+
+                // CASO B: APAREJADOS (Transformamos a TerminoA/B)
+                else if (appDestino === 'APAREJADOS') {
+                    return {
+                        terminoA: p.pregunta || '',
+                        terminoB: p.respuesta || ''
+                    };
+                }
+
+                // CASO C: RESTO (Test: Burbujas, etc.)
+                else {
+                    return {
+                        pregunta: p.pregunta || '',
+                        correcta: p.respuesta || '',
+                        respuesta: p.respuesta || '',
+                        incorrectas: Array.isArray(p.incorrectas)
+                            ? p.incorrectas
+                            : [p.incorrecta1, p.incorrecta2, p.incorrecta3].filter(Boolean)
+                    };
+                }
+                // Al crear objetos nuevos aquí, los nombres de alumnos se eliminan.
+            })
+        }));
+
+        try {
+            await addDoc(collection(db, "resources"), {
+                titulo: `[IMPORT] ${recursoFresco.titulo}`,
+                temas: recursoFresco.temas || '',
+                profesorUid: usuario.uid,
+                profesorNombre: perfilProfesor?.nombre || usuario.displayName,
+                pais: perfilProfesor?.pais || '',
+                region: perfilProfesor?.region || '',
+                poblacion: perfilProfesor?.poblacion || '',
+                tipoJuego: appDestino,
+                config: conf,
+                hojas: hojasL,
+                isPrivate: true,
+                origen: 'question_sender',
+                playCount: 0,
+                fechaCreacion: new Date(),
+                accessCode: generarCodigoAcceso()
+            });
+
+            alert(`Recurso convertido exitosamente a ${TIPOS_JUEGOS[appDestino]?.label || appDestino}`);
+            setModalCopiarApp(null);
+
+            // Redirigimos
+            setJuegoSeleccionado(appDestino);
+            setVista('MIS_RECURSOS');
+            cargarRecursosPropios();
+
+        } catch (e) {
+            console.error(e);
+            alert("Error al copiar: " + e.message);
+        }
     };
 
     const prepararJuegoEnVivo = (r) => {
@@ -717,8 +799,30 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             )}
 
 
-            {mostrandoEditorManual && <EditorManual datos={datosEditor} setDatos={setDatosEditor} configJuego={TIPOS_JUEGOS[juegoSeleccionado]} onClose={() => setMostrandoEditorManual(false)} onSave={guardarRecursoFinal} usuario={perfilProfesor || usuario} />}
-            {mostrandoEditorPro && <EditorPro datos={datosEditor} setDatos={setDatosEditor} onClose={() => setMostrandoEditorPro(false)} onSave={guardarRecursoFinal} usuario={perfilProfesor || usuario}/>}
+            {mostrandoEditorManual && (
+                juegoSeleccionado === 'QUESTION_SENDER' ? (
+                    // CASO A: SI ES QUESTION SENDER, USAMOS EL NUEVO EDITOR ESPECÍFICO
+                    <EditorQuestionSender
+                        datos={datosEditor}
+                        setDatos={setDatosEditor}
+                        onClose={() => setMostrandoEditorManual(false)}
+                        onSave={guardarRecursoFinal}
+                    />
+                ) : (
+                        // CASO B: SI ES CUALQUIER OTRO JUEGO, USAMOS EL DE SIEMPRE
+                        <EditorManual
+                            datos={datosEditor}
+                            setDatos={setDatosEditor}
+                            configJuego={TIPOS_JUEGOS[juegoSeleccionado]}
+                            onClose={() => setMostrandoEditorManual(false)}
+                            onSave={guardarRecursoFinal}
+                            usuario={perfilProfesor || usuario}
+                        />
+                    )
+            )}
+
+
+            {mostrandoEditorPro && <EditorPro datos={datosEditor} setDatos={setDatosEditor} onClose={() => setMostrandoEditorPro(false)} onSave={guardarRecursoFinal} usuario={perfilProfesor || usuario} />}
 
             {mostrandoEditorMathLive && <EditorMathLive datos={datosEditor} setDatos={setDatosEditor} onClose={() => setMostrandoEditorMathLive(false)} onSave={guardarRecursoFinal} usuario={perfilProfesor || usuario}/>}
             {mostrandoEditorBurbujasPikatron && (

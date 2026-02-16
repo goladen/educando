@@ -44,8 +44,8 @@ export default function QuestionSenderClient({ usuario, onBack }) {
             }
 
             // Preparar formulario
-
-            const numPreguntas = parseInt(docData.config?.numPreguntas) || 3;
+            const numPreguntas = parseInt(hoja.numReq) || parseInt(docData.config?.numPreguntas) || 3;
+            
             // Inicializar respuestas vacías según el juego
             const plantillas = Array.from({ length: numPreguntas }, () => ({ pregunta: '', respuesta: '', letra: '' }));
 
@@ -95,14 +95,20 @@ export default function QuestionSenderClient({ usuario, onBack }) {
             if (!nombreGuest.trim()) return setError("Por favor, escribe tu nombre antes de enviar.");
             nombreFinal = nombreGuest.trim();
         }
-
-        // 2. Validar Preguntas (Igual que antes)
         const tipo = datosHoja.targetGame;
+        const esTipoTest = ['CAZABURBUJAS', 'PIKATRON', 'THINKHOOT', 'RULETA'].includes(tipo);
+        // -----------------------
+
         for (let i = 0; i < respuestas.length; i++) {
             const r = respuestas[i];
             if (!r.pregunta.trim()) return setError(`Falta la Pregunta #${i + 1}`);
+
             if (tipo === 'PASAPALABRA' && (!r.letra.trim() || !r.respuesta.trim())) return setError(`Falta Letra/Respuesta en #${i + 1}`);
-            if (tipo === 'CAZABURBUJAS' && (!r.respuesta.trim() || !r.incorrecta1.trim())) return setError(`Faltan respuestas en #${i + 1}`);
+
+            // VALIDACIÓN PARA TODOS LOS TIPO TEST
+            if (esTipoTest && (!r.respuesta.trim() || !r.incorrecta1.trim())) return setError(`Faltan respuestas (correcta o incorrectas) en #${i + 1}`);
+
+            if (tipo === 'APAREJADOS' && (!r.respuesta.trim())) return setError(`Falta la pareja en #${i + 1}`);
         }
 
         setEnviando(true);
@@ -199,43 +205,81 @@ export default function QuestionSenderClient({ usuario, onBack }) {
     );
 
     // FASE FORMULARIO
+    // FASE FORMULARIO
     return (
         <div style={{ ...estiloContenedor, justifyContent: 'flex-start', paddingTop: '20px' }}>
             <div style={{ ...cardStyle, maxWidth: '800px', width: '95%' }}>
                 <h2 style={{ color: '#3498db', margin: '0' }}>{datosHoja.targetGame}</h2>
+
+                {/* AQUI MOSTRAMOS CUANTAS PREGUNTAS SE PIDEN */}
                 <div style={{ background: '#e3f2fd', padding: '15px', borderRadius: '10px', margin: '20px 0', borderLeft: '5px solid #2196F3', textAlign: 'left' }}>
                     <p style={{ margin: 0, fontSize: '1.1rem' }}>
-                        Para superar este reto debes completar <b>{datosHoja.numPreguntas} preguntas</b> para <b>{datosHoja.nombreHoja}</b> del profesor <b>{datosHoja.profesor}</b>.
+                        Completa las <b>{datosHoja.numPreguntas} preguntas</b> para el grupo <b>{datosHoja.nombreHoja}</b>.
                     </p>
                 </div>
 
-            {respuestas.map((r, i) => (
-                <div key={i} style={{ marginBottom: '20px', padding: '15px', border: '1px solid #ddd', borderRadius: '10px', textAlign: 'left' }}>
-                    <h4 style={{ margin: '0 0 10px 0', color: '#666' }}>Pregunta {i + 1}</h4>
+                {respuestas.map((r, i) => {
+                    // --- LÓGICA DE AGRUPACIÓN DE JUEGOS ---
+                    const esTipoTest = ['CAZABURBUJAS', 'PIKATRON', 'THINKHOOT', 'RULETA'].includes(datosHoja.targetGame);
+                    const esPasapalabra = datosHoja.targetGame === 'PASAPALABRA';
+                    const esAparejados = datosHoja.targetGame === 'APAREJADOS';
+                    // ---------------------------------------
 
-                    {/* CASO CAZABURBUJAS */}
-                    {datosHoja.targetGame === 'CAZABURBUJAS' ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            <div><label style={lbl}>Pregunta</label><input value={r.pregunta} onChange={e => updateRespuesta(i, 'pregunta', e.target.value)} style={inputForm} /></div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                                <div><label style={{ ...lbl, color: 'green' }}>Correcta</label><input value={r.respuesta} onChange={e => updateRespuesta(i, 'respuesta', e.target.value)} style={{ ...inputForm, borderColor: 'green' }} /></div>
-                                <div><label style={{ ...lbl, color: 'red' }}>Incorrecta 1</label><input value={r.incorrecta1} onChange={e => updateRespuesta(i, 'incorrecta1', e.target.value)} style={{ ...inputForm, borderColor: 'red' }} /></div>
-                                <div><label style={{ ...lbl, color: 'red' }}>Incorrecta 2</label><input value={r.incorrecta2} onChange={e => updateRespuesta(i, 'incorrecta2', e.target.value)} style={{ ...inputForm, borderColor: 'red' }} /></div>
-                                <div><label style={{ ...lbl, color: 'red' }}>Incorrecta 3</label><input value={r.incorrecta3} onChange={e => updateRespuesta(i, 'incorrecta3', e.target.value)} style={{ ...inputForm, borderColor: 'red' }} /></div>
-                            </div>
-                        </div>
-                    ) : (
-                            /* CASO PASAPALABRA Y OTROS */
-                            <div style={{ display: 'grid', gridTemplateColumns: datosHoja.targetGame === 'PASAPALABRA' ? '60px 1fr 1fr' : '1fr 1fr', gap: '10px' }}>
-                                {datosHoja.targetGame === 'PASAPALABRA' && (
-                                    <div><label style={lbl}>Letra</label><input maxLength={1} value={r.letra} onChange={e => updateRespuesta(i, 'letra', e.target.value.toUpperCase())} style={{ ...inputForm, textAlign: 'center', fontWeight: 'bold' }} /></div>
+                    return (
+                        <div key={i} style={{ marginBottom: '20px', padding: '15px', border: '1px solid #ddd', borderRadius: '10px', textAlign: 'left', background: '#fafafa' }}>
+                            <h4 style={{ margin: '0 0 10px 0', color: '#666', borderBottom: '1px solid #eee', paddingBottom: '5px' }}>Pregunta {i + 1}</h4>
+
+                            {/* CASO 1: TIPO TEST (Burbujas, Pikatron, PiLive, Ruleta) */}
+                            {esTipoTest ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                    <div>
+                                        <label style={lbl}>Pregunta / Enunciado</label>
+                                        <input value={r.pregunta} onChange={e => updateRespuesta(i, 'pregunta', e.target.value)} style={inputForm} placeholder="Escribe la pregunta..." />
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                        <div>
+                                            <label style={{ ...lbl, color: '#2ecc71' }}>Respuesta Correcta</label>
+                                            <input value={r.respuesta} onChange={e => updateRespuesta(i, 'respuesta', e.target.value)} style={{ ...inputForm, borderColor: '#2ecc71', background: '#e8f5e9' }} placeholder="La solución" />
+                                        </div>
+                                        <div>
+                                            <label style={{ ...lbl, color: '#e74c3c' }}>Incorrecta 1</label>
+                                            <input value={r.incorrecta1} onChange={e => updateRespuesta(i, 'incorrecta1', e.target.value)} style={{ ...inputForm, borderColor: '#e74c3c' }} placeholder="Opción falsa" />
+                                        </div>
+                                        <div>
+                                            <label style={{ ...lbl, color: '#e74c3c' }}>Incorrecta 2</label>
+                                            <input value={r.incorrecta2} onChange={e => updateRespuesta(i, 'incorrecta2', e.target.value)} style={{ ...inputForm, borderColor: '#e74c3c' }} placeholder="Opción falsa" />
+                                        </div>
+                                        <div>
+                                            <label style={{ ...lbl, color: '#e74c3c' }}>Incorrecta 3</label>
+                                            <input value={r.incorrecta3} onChange={e => updateRespuesta(i, 'incorrecta3', e.target.value)} style={{ ...inputForm, borderColor: '#e74c3c' }} placeholder="Opción falsa" />
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                    /* CASO 2: PASAPALABRA Y APAREJADOS */
+                                    <div style={{ display: 'grid', gridTemplateColumns: esPasapalabra ? '60px 1fr 1fr' : '1fr 1fr', gap: '10px' }}>
+
+                                        {esPasapalabra && (
+                                            <div>
+                                                <label style={lbl}>Letra</label>
+                                                <input maxLength={1} value={r.letra} onChange={e => updateRespuesta(i, 'letra', e.target.value.toUpperCase())} style={{ ...inputForm, textAlign: 'center', fontWeight: 'bold', color: '#3F51B5' }} placeholder="A" />
+                                            </div>
+                                        )}
+
+                                        <div>
+                                            <label style={lbl}>{esAparejados ? 'Concepto A (Pregunta)' : 'Pregunta / Definición'}</label>
+                                            <input value={r.pregunta} onChange={e => updateRespuesta(i, 'pregunta', e.target.value)} style={inputForm} />
+                                        </div>
+
+                                        <div>
+                                            <label style={lbl}>{esAparejados ? 'Concepto B (Pareja)' : 'Respuesta'}</label>
+                                            <input value={r.respuesta} onChange={e => updateRespuesta(i, 'respuesta', e.target.value)} style={inputForm} />
+                                        </div>
+                                    </div>
                                 )}
-                                <div><label style={lbl}>Pregunta</label><input value={r.pregunta} onChange={e => updateRespuesta(i, 'pregunta', e.target.value)} style={inputForm} /></div>
-                                <div><label style={lbl}>Respuesta</label><input value={r.respuesta} onChange={e => updateRespuesta(i, 'respuesta', e.target.value)} style={inputForm} /></div>
-                            </div>
-                        )}
-                </div>
-            ))}
+                        </div>
+                    );
+                })}
                 {/* CAMPO INVITADO */}
                 {!usuario && (
                     <div style={{ marginBottom: '20px', padding: '15px', background: '#fff3cd', borderRadius: '10px', border: '1px solid #ffeeba', textAlign: 'left' }}>

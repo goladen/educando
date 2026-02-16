@@ -97,7 +97,7 @@ function App() {
             {/* Si aún no tiene rol, mostramos la pantalla de registro de datos */}
             {!rol && (
                 <div style={{ maxWidth: '500px', margin: '50px auto', backgroundColor: '#fff8e1', padding: '30px', borderRadius: '10px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', textAlign: 'center' }}>
-                    <h1 style={{ marginBottom: '20px' }}>Bienvenido a LEARNJOY</h1>
+                    <h1 style={{ marginBottom: '20px' }}>Bienvenido a PiKT</h1>
                     <img src={usuario.photoURL} alt="Perfil" style={{ borderRadius: '50%', width: '80px', marginBottom: '10px' }} />
                     <h3>Completa tu Perfil</h3>
                     <p>Necesitamos saber de dónde eres para configurar tu cuenta.</p>
@@ -112,8 +112,8 @@ function App() {
 
                     <p style={{ fontWeight: 'bold' }}>¿Cómo vas a usar la app?</p>
                     <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-                        <button onClick={() => completarRegistro('profesor')} style={{ padding: '12px 24px', background: '#2196F3', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}>👨‍🏫 Soy Profesor</button>
-                        <button onClick={() => completarRegistro('alumno')} style={{ padding: '12px 24px', background: '#FF9800', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}>🎓 Soy Alumno</button>
+                        <button onClick={() => completarRegistro('Profesor')} style={{ padding: '12px 24px', background: '#2196F3', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}>👨‍🏫 Soy Profesor</button>
+                        <button onClick={() => completarRegistro('Alumno')} style={{ padding: '12px 24px', background: '#FF9800', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}>🎓 Soy Alumno</button>
                     </div>
                     <button onClick={handleLogout} style={{ marginTop: '20px', background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer' }}>Cancelar</button>
                 </div>

@@ -91,9 +91,8 @@ export default function ToolGeneradorGoogleForms({ usuario, googleToken, onBack 
 
             // --- PROTECCIÓN CONTRA DATOS VACÍOS ---
             const cleanStr = (val) => (val === null || val === undefined || String(val).trim() === '') ? "" : String(val).trim();
-
-            let respuestaCorrecta = cleanStr(p.respuesta || p.correcta || p.a || p.textoB);
-            let tituloPregunta = cleanStr(p.pregunta || p.textoA || (p.letra ? `Empieza/Contiene ${p.letra}: ${p.pregunta}` : ""));
+            let respuestaCorrecta = cleanStr(p.respuesta || p.correcta || p.terminoB || p.textoB || p.a);
+            let tituloPregunta = cleanStr(p.pregunta || p.terminoA || p.textoA || (p.letra ? `Empieza/Contiene ${p.letra}: ${p.pregunta}` : ""));
 
             if (!tituloPregunta) tituloPregunta = `Pregunta ${index + 1}`;
             if (!respuestaCorrecta) respuestaCorrecta = "REVISAR_RESPUESTA_VACIA";

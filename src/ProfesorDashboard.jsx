@@ -21,6 +21,7 @@ import PikatronRun from './PikatronRun';
 import { MousePointer2, Rocket } from 'lucide-react';
 import EditorProBurbujasPikatron from './components/EditorProBurbujasPikatron';
 import EditorQuestionSender from './components/EditorQuestionSender';
+import MathWordleGame from './MathWordleGame';
 // ==============================================================================
 //  ZONA DE CLAVES (SEGURA)
 // ==============================================================================
@@ -68,6 +69,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
     const [mostrandoEditorPro, setMostrandoEditorPro] = useState(false);
     const [mostrandoEditorMathLive, setMostrandoEditorMathLive] = useState(false);
     const [mostrandoEditorBurbujasPikatron, setMostrandoEditorBurbujasPikatron] = useState(false);
+    const [mostrandoMathWordle, setMostrandoMathWordle] = useState(false);
 
     const [recursoResultados, setRecursoResultados] = useState(null);
     const [recursoProbando, setRecursoProbando] = useState(null);
@@ -531,6 +533,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
 
     // --- LÓGICA DE RENDERIZADO DE JUEGOS ---
     if (recursoProbando) {
+
         // CASO 1: PIKATRON
         if (recursoProbando.tipoJuego === 'PIKATRON') {
             return (
@@ -569,6 +572,19 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
         );
     }
     if (modoVista === 'ALUMNO') return (<div style={{ position: 'relative' }}><div style={{ position: 'fixed', top: 20, right: 20, zIndex: 9999 }}><button onClick={() => setModoVista('PROFESOR')} style={{ background: '#e74c3c', color: 'white', padding: '10px 20px', borderRadius: '30px', border: 'none', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}><LogOut size={20} /> SALIR MODO ALUMNO</button></div><StudentDashboard usuario={usuario} /></div>);
+
+    if (mostrandoMathWordle) {
+        return (
+            <MathWordleGame
+                usuario={perfilProfesor || usuario}
+                onExit={() => setMostrandoMathWordle(false)}
+            />
+        );
+    }
+
+
+
+
 
     // ==============================================================================
     //  RENDERIZADO PRINCIPAL
@@ -711,6 +727,32 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                                     >
                                         <Calculator size={16} /> <span className="btn-text">MathLive</span>
                                     </button>
+
+                                    {/* --- AÑADE ESTO: NUEVO BOTÓN MATH WORDLE --- */}
+                                    <button
+                                        onClick={() => setMostrandoMathWordle(true)}
+                                        className="header-btn"
+                                        style={{
+                                            padding: '8px 20px', borderRadius: '20px',
+                                            background: '#607D8B', // Un color gris/azulado diferente
+                                            color: 'white',
+                                            marginLeft: '10px'
+                                        }}
+                                    >
+                                        <div style={{ display: 'flex', gap: '2px', fontWeight: 'bold' }}>
+                                            <span style={{ color: '#81C784' }}>1</span>
+                                            <span style={{ color: '#FFF176' }}>+</span>
+                                            <span style={{ color: '#E57373' }}>2</span>
+                                        </div>
+                                        <span className="btn-text" style={{ marginLeft: '5px' }}>Wordle</span>
+                                    </button>
+                                    {/* ------------------------------------------- */}
+
+
+
+
+
+
                                 </>
                             )}
                         </div>

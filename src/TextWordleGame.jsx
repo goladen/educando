@@ -1,10 +1,11 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
 import { db } from './firebase';
+// Importamos lo necesario para buscar recursos por código
 import { collection, addDoc, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
-import { X, Delete, Globe, Settings, Trophy } from 'lucide-react';
+import { X, Settings, Trophy, Search, BookOpen, Globe } from 'lucide-react';
 import Confetti from 'react-confetti';
 
-// CONFIGURACIÓN DE IDIOMAS Y RECURSOS
+// CONFIGURACIÓN DE IDIOMAS Y RECURSOS (Listas de Frecuencia)
 const LANGUAGES = {
     ES: {
         label: 'Español',
@@ -31,19 +32,24 @@ const LANGUAGES = {
             ['A', 'Z', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
             ['Q', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'M'],
             ['W', 'X', 'C', 'V', 'B', 'N']
-        ] // Layout AZERTY simplificado
+        ]
     }
 };
 
 export default function TextWordleGame({ usuario, onExit }) {
-    // --- ESTADOS DE CONFIGURACIÓN ---
+    // --- ESTADOS DE PANTALLA ---
     const [screen, setScreen] = useState('CONFIG'); // CONFIG, LOADING, GAME, VICTORY, RANKING_VIEW
+
+    // Configuración actual (Idioma y Longitud)
     const [config, setConfig] = useState({ lang: 'ES', length: 5 });
+
+    // Estado para "Jugar Nivel de Profe"
+    const [customCode, setCustomCode] = useState('');
+    const [isCustomGame, setIsCustomGame] = useState(false); // Para saber si guardamos ranking como 'Custom'
 
     // --- DATOS DEL JUEGO ---
     const [solution, setSolution] = useState("");
-    const [validWords, setValidWords] = useState(new Set()); // Diccionario para validar
-    const [commonWords, setCommonWords] = useState([]); // Lista para elegir solución (más restrictiva)
+    const [validWords, setValidWords] = useState(new Set()); // Diccionario grande para validar intentos
 
     // --- ESTADOS DE PARTIDA ---
     const [guesses, setGuesses] = useState([]);
@@ -62,63 +68,163 @@ export default function TextWordleGame({ usuario, onExit }) {
     const [playerName, setPlayerName] = useState(usuario?.displayName || '');
 
     // =========================================================
-    // 1. CARGA INTELIGENTE DE DICCIONARIO
+    // 1. GESTIÓN DE DICCIONARIOS Y MODOS DE JUEGO
     // =========================================================
-    const cargarDiccionario = async () => {
+
+    // Normaliza palabras: quita acentos y pone mayúsculas
+    const normalizeWord = (word) => {
+        return word.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+    };
+
+    // Función principal para iniciar cualquier modo
+    const cargarDiccionarioYJugar = async (palabraForzada = null, idiomaForzado = null) => {
         setScreen('LOADING');
+        const idioma = idiomaForzado || config.lang; // Si viene forzado (custom), lo usamos
+
         try {
-            const langData = LANGUAGES[config.lang];
+            // 1. Descargamos el diccionario de frecuencia del idioma correspondiente
+            // Esto es necesario SIEMPRE para validar que lo que escribe el alumno existe
+            const langData = LANGUAGES[idioma] || LANGUAGES['ES'];
             const response = await fetch(langData.url);
-            if (!response.ok) throw new Error("Error de conexión");
+
+            if (!response.ok) throw new Error("Error de conexión al diccionario");
 
             const text = await response.text();
 
-            // PROCESAMIENTO DE LISTA DE FRECUENCIA
-            // El formato es: "palabra frecuencia" (ej: "casa 12312")
-            const allWords = text.split('\n')
-                .map(line => {
-                    const [word] = line.split(' '); // Cogemos solo la palabra
-                    return word ? normalizeWord(word) : '';
-                })
-                .filter(w => w.length === config.length && /^[A-ZÑ]+$/.test(w));
+            // 2. Procesamos todas las palabras del idioma
+            const allWords = text.split('\n').map(line => {
+                const [word] = line.split(' ');
+                return word ? normalizeWord(word) : '';
+            });
 
-            // ESTRATEGIA DE FILTRADO:
-            // 1. Common Words: Las top 1000 palabras más frecuentes (para SOLUCIONES)
-            // 2. Valid Words: Las top 15000 palabras (para permitir intentos válidos aunque raros)
-            const topCommon = allWords.slice(0, 1000);
-            const topValid = allWords.slice(0, 15000);
+            // 3. Configurar la partida según el modo
+            let targetLen = config.length;
+            let solucionFinal = "";
 
-            if (topCommon.length < 50) throw new Error("Pocas palabras encontradas");
+            // MODO A: NIVEL DE PROFE (Palabra Forzada)
+            if (palabraForzada) {
+                targetLen = palabraForzada.length;
+                solucionFinal = palabraForzada;
 
-            setCommonWords(topCommon);
-            setValidWords(new Set(topValid));
+                // Actualizamos la config visual para que coincida con la palabra del profe
+                setConfig({ lang: idioma, length: targetLen });
+                setIsCustomGame(true);
+            }
+            // MODO B: ALEATORIO (Normal)
+            else {
+                // Filtramos las 1000 más comunes de la longitud elegida
+                const topCommon = allWords.filter(w => w.length === config.length && /^[A-ZÑ]+$/.test(w)).slice(0, 1000);
 
-            iniciarPartida(topCommon);
+                if (topCommon.length === 0) throw new Error("No hay palabras comunes de esa longitud");
+
+                solucionFinal = topCommon[Math.floor(Math.random() * topCommon.length)];
+                setIsCustomGame(false);
+            }
+
+            // 4. Crear el Set de Validación (Permitimos las 20.000 más comunes para validar)
+            // Filtramos por la longitud que vamos a jugar
+            const validSet = new Set(
+                allWords
+                    .filter(w => w.length === targetLen && /^[A-ZÑ]+$/.test(w))
+                    .slice(0, 20000)
+            );
+
+            // Aseguramos que la solución sea válida (por si es una palabra rara del profe)
+            validSet.add(solucionFinal);
+
+            // 5. Guardamos estados e iniciamos
+            setValidWords(validSet);
+            setSolution(solucionFinal);
+            iniciarJuegoLogica();
 
         } catch (e) {
             console.error(e);
-            setMessage("Error cargando diccionario. Revisa tu conexión.");
+            setMessage("Error cargando. Revisa tu conexión.");
             setScreen('CONFIG');
         }
     };
 
-    // Función para quitar acentos y poner mayúsculas
-    const normalizeWord = (word) => {
-        return word.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+    // Lógica para buscar el recurso en Firebase
+    // Lógica para buscar el recurso en Firebase
+    const cargarNivelPersonalizado = async () => {
+        if (!customCode.trim()) return showMessage("Escribe un código");
+
+        setScreen('LOADING');
+        try {
+            // Buscamos por accessCode (código global)
+            let q = query(collection(db, "resources"), where("accessCode", "==", customCode.toUpperCase().trim()));
+            let snap = await getDocs(q);
+
+            // Si no encuentra, buscamos por código de hoja
+            if (snap.empty) {
+                q = query(collection(db, "resources"), where("hojasCodes", "array-contains", customCode.toUpperCase().trim()));
+                snap = await getDocs(q);
+            }
+
+            if (snap.empty) throw new Error("Código no encontrado");
+
+            const data = snap.docs[0].data();
+
+            // --- FILTRO DE SEGURIDAD (NUEVO) ---
+            if (data.tipoJuego !== 'WORDLE') {
+                setMessage("Código no válido para esta aplicación"); // Mensaje de error
+                setScreen('CONFIG');
+                return; // Detenemos la ejecución aquí
+            }
+            // -----------------------------------
+
+            procesarRecurso(data);
+
+        } catch (e) {
+            console.error(e);
+            setMessage(e.message === "Código no encontrado" ? "Código no encontrado" : "Error de conexión");
+            setScreen('CONFIG');
+        }
     };
 
-    const iniciarPartida = (listaPalabras = commonWords) => {
-        if (listaPalabras.length === 0) return;
+    const procesarRecurso = (data) => {
+        let palabrasCandidatas = [];
 
-        const randomWord = listaPalabras[Math.floor(Math.random() * listaPalabras.length)];
-        setSolution(randomWord);
-        // console.log("Solución:", randomWord); // Descomenta para pruebas
+        // Como ya hemos validado que es WORDLE, buscamos directamente 'palabras'
+        if (data.hojas) {
+            data.hojas.forEach(h => {
+                if (h.palabras && Array.isArray(h.palabras)) {
+                    h.palabras.forEach(palabra => {
+                        const limpia = normalizeWord(palabra);
+                        // Filtro de seguridad (4 a 9 letras)
+                        if (limpia && /^[A-ZÑ]+$/.test(limpia) && limpia.length >= 4 && limpia.length <= 9) {
+                            palabrasCandidatas.push(limpia);
+                        }
+                    });
+                }
+            });
+        }
 
+        if (palabrasCandidatas.length === 0) {
+            throw new Error("El recurso no tiene palabras válidas.");
+        }
+
+        // Elegir una al azar
+        const elegida = palabrasCandidatas[Math.floor(Math.random() * palabrasCandidatas.length)];
+
+        // Detectar idioma (o usar ES por defecto)
+        const idiomaRecurso = data.config?.idioma || 'ES';
+
+        console.log(`Recurso cargado. Palabra: ${elegida} (${idiomaRecurso})`);
+
+        // Iniciar Juego con esa palabra
+        cargarDiccionarioYJugar(elegida, idiomaRecurso);
+    };
+
+    // =========================================================
+    // 2. MOTOR DE JUEGO (LÓGICA INTERNA)
+    // =========================================================
+    const iniciarJuegoLogica = () => {
         setGuesses([]);
         setCurrentGuess("");
         setScreen('GAME');
 
-        // Timer
+        // Timer Reset
         const now = Date.now();
         setStartTime(now);
         setElapsedTime(0);
@@ -128,9 +234,7 @@ export default function TextWordleGame({ usuario, onExit }) {
         }, 1000);
     };
 
-    // =========================================================
-    // 2. LÓGICA DE JUEGO
-    // =========================================================
+    // Manejo de Teclado
     useEffect(() => {
         const handleKeyDown = (e) => {
             if (screen !== 'GAME') return;
@@ -138,15 +242,18 @@ export default function TextWordleGame({ usuario, onExit }) {
 
             if (key === 'ENTER') handleKey('ENTER');
             else if (key === 'BACKSPACE') handleKey('DEL');
-            else if (/^[A-ZÑ]$/.test(key)) handleKey(key); // Acepta letras y Ñ
+            else if (/^[A-ZÑ]$/.test(key)) handleKey(key);
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [screen, currentGuess]);
 
     const handleKey = (key) => {
+        // Usamos solution.length porque en modo custom la config.length puede no haberse actualizado visualmente aún
+        const targetLen = solution.length;
+
         if (key === 'ENTER') {
-            if (currentGuess.length !== config.length) {
+            if (currentGuess.length !== targetLen) {
                 showMessage("Faltan letras");
                 triggerShake();
                 return;
@@ -162,7 +269,7 @@ export default function TextWordleGame({ usuario, onExit }) {
             setCurrentGuess(prev => prev.slice(0, -1));
         }
         else {
-            if (currentGuess.length < config.length) {
+            if (currentGuess.length < targetLen) {
                 setCurrentGuess(prev => prev + key);
             }
         }
@@ -181,17 +288,18 @@ export default function TextWordleGame({ usuario, onExit }) {
         else if (newGuesses.length >= 6) {
             clearInterval(timerRef.current);
             alert(`La palabra era: ${solution}`);
-            setScreen('CONFIG');
+            setScreen('CONFIG'); // Volvemos a config al perder
         }
     };
 
     // =========================================================
-    // 3. RANKING
+    // 3. RANKING & UTILS
     // =========================================================
     const cargarRanking = async () => {
         setLoadingRanking(true);
         try {
-            const modoStr = `${config.lang}-${config.length}`; // Ej: ES-5
+            // Si es custom, mostramos un ranking genérico de 'CUSTOM' o podríamos filtrar por código si quisiéramos
+            const modoStr = isCustomGame ? 'CUSTOM' : `${config.lang}-${config.length}`;
             const q = query(
                 collection(db, "ranking_wordle"),
                 where("modo", "==", modoStr),
@@ -211,7 +319,7 @@ export default function TextWordleGame({ usuario, onExit }) {
                 fecha: new Date(),
                 nombre: playerName.trim(),
                 tiempo: Number(elapsedTime),
-                modo: `${config.lang}-${config.length}`, // Guardamos modo
+                modo: isCustomGame ? 'CUSTOM' : `${config.lang}-${config.length}`,
                 lang: config.lang
             });
             showMessage("¡Guardado!");
@@ -220,9 +328,6 @@ export default function TextWordleGame({ usuario, onExit }) {
         } catch (e) { showMessage("Error al guardar"); }
     };
 
-    // =========================================================
-    // 4. UTILS & COLORES
-    // =========================================================
     const showMessage = (msg) => {
         setMessage(msg);
         setTimeout(() => setMessage(null), 2000);
@@ -233,13 +338,16 @@ export default function TextWordleGame({ usuario, onExit }) {
         setTimeout(() => setShakeRow(false), 500);
     };
 
+    // COLORES (Lógica Wordle Estricta - Dos Pasadas)
     const getCellColor = (char, index, guessStr) => {
         if (!guessStr) return styles.absent;
         const solArr = solution.split('');
         const guessArr = guessStr.split('');
+
+        // Frecuencias
         const solFreq = {};
         solArr.forEach(c => solFreq[c] = (solFreq[c] || 0) + 1);
-        const statusArr = new Array(config.length).fill('absent');
+        const statusArr = new Array(solution.length).fill('absent');
 
         // Verdes
         guessArr.forEach((c, i) => {
@@ -263,41 +371,32 @@ export default function TextWordleGame({ usuario, onExit }) {
         return styles.absent;
     };
 
-    const formatTime = (seconds) => {
-        const m = Math.floor(seconds / 60).toString().padStart(2, '0');
-        const s = (seconds % 60).toString().padStart(2, '0');
-        return `${m}:${s}`;
-    };
+    const formatTime = (s) => `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
 
     // =========================================================
-    // 5. RENDERIZADO
+    // 4. RENDERIZADO
     // =========================================================
 
-    // --- PANTALLA DE CARGA ---
     if (screen === 'LOADING') return (
         <div style={styles.screen}>
             <div className="spin" style={{ border: '4px solid #333', borderTop: '4px solid #fff', borderRadius: '50%', width: '40px', height: '40px' }}></div>
-            <p style={{ marginTop: '20px', color: 'white' }}>Cargando Palabras...</p>
+            <p style={{ marginTop: '20px', color: 'white' }}>Cargando...</p>
             <style>{`.spin { animation: spin 1s linear infinite; } @keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
         </div>
     );
 
-    // --- PANTALLA DE CONFIGURACIÓN (MAIN) ---
     if (screen === 'CONFIG') return (
         <div style={styles.screen}>
-            <h1 style={styles.h1}>WORDLE MULTI</h1>
-            <p style={{ color: '#aaa', marginBottom: '30px' }}>Configura tu partida</p>
+            <h1 style={styles.h1}>WORDLE</h1>
+            <p style={{ color: '#aaa', marginBottom: '20px' }}>Configura tu partida</p>
 
+            {/* --- ZONA 1: JUEGO ALEATORIO --- */}
             <div style={styles.card}>
                 <div style={{ marginBottom: '20px' }}>
-                    <label style={styles.label}>Idioma</label>
-                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                    <label style={styles.label}><Globe size={16} style={{ verticalAlign: 'middle' }} /> Idioma</label>
+                    <div style={{ display: 'flex', gap: '5px', justifyContent: 'center' }}>
                         {Object.keys(LANGUAGES).map(k => (
-                            <button
-                                key={k}
-                                onClick={() => setConfig({ ...config, lang: k })}
-                                style={{ ...styles.optionBtn, background: config.lang === k ? '#3F51B5' : '#eee', color: config.lang === k ? 'white' : '#333' }}
-                            >
+                            <button key={k} onClick={() => setConfig({ ...config, lang: k })} style={{ ...styles.optionBtn, background: config.lang === k ? '#3F51B5' : '#eee', color: config.lang === k ? 'white' : '#333' }}>
                                 {LANGUAGES[k].label}
                             </button>
                         ))}
@@ -306,38 +405,45 @@ export default function TextWordleGame({ usuario, onExit }) {
 
                 <div style={{ marginBottom: '20px' }}>
                     <label style={styles.label}>Longitud: {config.length} Letras</label>
-                    <input
-                        type="range" min="4" max="8" step="1"
-                        value={config.length}
-                        onChange={(e) => setConfig({ ...config, length: parseInt(e.target.value) })}
-                        style={{ width: '100%', cursor: 'pointer' }}
-                    />
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#666' }}>
-                        <span>4</span><span>5</span><span>6</span><span>7</span><span>8</span>
-                    </div>
+                    <input type="range" min="4" max="8" step="1" value={config.length} onChange={(e) => setConfig({ ...config, length: parseInt(e.target.value) })} style={{ width: '100%', cursor: 'pointer' }} />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#666' }}><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span></div>
                 </div>
 
-                <button style={{ ...styles.btn, ...styles.btnPrimary }} onClick={cargarDiccionario}>COMENZAR</button>
+                <button style={{ ...styles.btn, ...styles.btnPrimary }} onClick={() => cargarDiccionarioYJugar(null, null)}>JUGAR ALEATORIO</button>
+            </div>
+
+            {/* --- ZONA 2: CÓDIGO DE PROFE --- */}
+            <div style={{ ...styles.card, marginTop: '15px', background: '#e3f2fd', border: '1px solid #90caf9' }}>
+                <label style={{ ...styles.label, color: '#1565c0' }}><BookOpen size={16} style={{ verticalAlign: 'middle' }} /> Jugar Nivel de Profe</label>
+                <div style={{ display: 'flex', gap: '5px' }}>
+                    <input
+                        value={customCode}
+                        onChange={e => setCustomCode(e.target.value.toUpperCase())}
+                        placeholder="CÓDIGO..."
+                        style={styles.inputCode}
+                        maxLength={6}
+                    />
+                    <button onClick={cargarNivelPersonalizado} style={styles.btnSearch}><Search size={20} /></button>
+                </div>
             </div>
 
             <button style={{ ...styles.btnOutline, marginTop: '20px' }} onClick={onExit}>SALIR</button>
         </div>
     );
 
-    // --- PANTALLA DE JUEGO ---
     if (screen === 'GAME') return (
         <div style={{ ...styles.screen, justifyContent: 'flex-start' }}>
-            {/* Header */}
             <div style={styles.header}>
                 <div style={styles.timer}>{formatTime(elapsedTime)}</div>
                 <div style={{ textAlign: 'center' }}>
                     <h2 style={{ margin: 0, fontSize: '1.2rem', letterSpacing: '1px' }}>WORDLE</h2>
-                    <span style={{ fontSize: '0.7rem', color: '#888' }}>{LANGUAGES[config.lang].label} ({config.length})</span>
+                    <span style={{ fontSize: '0.7rem', color: '#888' }}>
+                        {isCustomGame ? 'NIVEL PROFESOR' : `${LANGUAGES[config.lang].label} (${config.length})`}
+                    </span>
                 </div>
                 <div style={{ width: '40px', textAlign: 'right', cursor: 'pointer' }} onClick={() => setScreen('CONFIG')}><Settings color="white" /></div>
             </div>
 
-            {/* Grid */}
             <div style={styles.gridScroll}>
                 <div style={styles.gridContainer}>
                     {guesses.map((g, i) => (
@@ -349,7 +455,7 @@ export default function TextWordleGame({ usuario, onExit }) {
                     ))}
                     {/* Fila Actual */}
                     <div style={{ ...styles.row, animation: shakeRow ? 'shake 0.4s' : 'none' }}>
-                        {Array.from({ length: config.length }).map((_, j) => (
+                        {Array.from({ length: solution.length }).map((_, j) => (
                             <div key={j} style={{ ...styles.cell, borderColor: currentGuess[j] ? '#888' : '#333' }}>
                                 {currentGuess[j] || ''}
                             </div>
@@ -358,7 +464,7 @@ export default function TextWordleGame({ usuario, onExit }) {
                     {/* Filas Restantes */}
                     {Array.from({ length: Math.max(0, 5 - guesses.length) }).map((_, i) => (
                         <div key={`empty-${i}`} style={styles.row}>
-                            {Array.from({ length: config.length }).map((_, j) => <div key={j} style={styles.cell}></div>)}
+                            {Array.from({ length: solution.length }).map((_, j) => <div key={j} style={styles.cell}></div>)}
                         </div>
                     ))}
                 </div>
@@ -366,18 +472,12 @@ export default function TextWordleGame({ usuario, onExit }) {
 
             <div style={{ ...styles.toast, opacity: message ? 1 : 0 }}>{message}</div>
 
-            {/* Teclado Dinámico según Idioma */}
             <div style={styles.keyboard}>
-                {LANGUAGES[config.lang].keyboard.map((row, i) => (
+                {(LANGUAGES[config.lang] || LANGUAGES['ES']).keyboard.map((row, i) => (
                     <div key={i} style={{ display: 'flex', gap: '4px', width: '100%', justifyContent: 'center' }}>
-                        {row.map(char => {
-                            // Colores de teclado simplificados
-                            let keyColor = '#818384';
-                            // ...lógica visual opcional aquí...
-                            return (
-                                <button key={char} onClick={() => handleKey(char)} style={{ ...styles.key, backgroundColor: keyColor }}>{char}</button>
-                            );
-                        })}
+                        {row.map(char => (
+                            <button key={char} onClick={() => handleKey(char)} style={{ ...styles.key, backgroundColor: '#818384' }}>{char}</button>
+                        ))}
                     </div>
                 ))}
                 <div style={{ display: 'flex', gap: '5px', width: '100%', justifyContent: 'center', marginTop: '5px' }}>
@@ -389,11 +489,12 @@ export default function TextWordleGame({ usuario, onExit }) {
         </div>
     );
 
-    // --- PANTALLA RANKING ---
     if (screen === 'RANKING_VIEW') return (
         <div style={styles.screen}>
             <h2 style={{ color: '#b59f3b' }}><Trophy /> Top 10</h2>
-            <p style={{ color: '#aaa', marginBottom: '20px' }}>Modo: {LANGUAGES[config.lang].label} - {config.length} Letras</p>
+            <p style={{ color: '#aaa', marginBottom: '20px' }}>
+                {isCustomGame ? 'Nivel Personalizado' : `${LANGUAGES[config.lang].label} - ${config.length}`}
+            </p>
             <div style={styles.rankingContainer}>
                 {loadingRanking ? <p style={{ color: '#888', textAlign: 'center' }}>Cargando...</p> : (
                     <table style={styles.table}>
@@ -414,7 +515,6 @@ export default function TextWordleGame({ usuario, onExit }) {
         </div>
     );
 
-    // --- PANTALLA VICTORIA ---
     if (screen === 'VICTORY') return (
         <div style={styles.screen}>
             <Confetti recycle={false} />
@@ -436,7 +536,7 @@ export default function TextWordleGame({ usuario, onExit }) {
 
 const styles = {
     screen: { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: '#121213', zIndex: 5000, color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: "'Roboto', sans-serif" },
-    card: { background: 'white', padding: '30px', borderRadius: '15px', width: '90%', maxWidth: '350px', textAlign: 'center', color: '#333' },
+    card: { background: 'white', padding: '25px', borderRadius: '15px', width: '90%', maxWidth: '350px', textAlign: 'center', color: '#333', boxShadow: '0 4px 15px rgba(0,0,0,0.3)' },
     h1: { fontSize: '1.8rem', textTransform: 'uppercase', letterSpacing: '2px', margin: '10px 0' },
     label: { display: 'block', fontWeight: 'bold', marginBottom: '10px', color: '#555', fontSize: '0.9rem' },
     optionBtn: { padding: '8px 12px', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' },
@@ -444,6 +544,9 @@ const styles = {
     btnPrimary: { backgroundColor: '#538d4e', color: 'white' },
     btnSecondary: { backgroundColor: '#818384', color: 'white' },
     btnOutline: { background: 'transparent', border: '2px solid #3a3a3c', color: '#fff', padding: '10px 20px', borderRadius: '5px', cursor: 'pointer' },
+
+    inputCode: { flex: 1, padding: '12px', fontSize: '1.2rem', textAlign: 'center', letterSpacing: '2px', textTransform: 'uppercase', borderRadius: '5px', border: '1px solid #90caf9', outline: 'none' },
+    btnSearch: { background: '#1565c0', color: 'white', border: 'none', borderRadius: '5px', padding: '0 15px', cursor: 'pointer' },
 
     header: { padding: '15px', width: '100%', borderBottom: '1px solid #3a3a3c', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxSizing: 'border-box' },
     timer: { fontFamily: "'Roboto Mono', monospace", background: '#3a3a3c', padding: '5px 10px', borderRadius: '4px' },

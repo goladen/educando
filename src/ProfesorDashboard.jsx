@@ -22,6 +22,7 @@ import { MousePointer2, Rocket } from 'lucide-react';
 import EditorProBurbujasPikatron from './components/EditorProBurbujasPikatron';
 import EditorQuestionSender from './components/EditorQuestionSender';
 import MathWordleGame from './MathWordleGame';
+import EditorWordle from './components/EditorWordle';
 // ==============================================================================
 //  ZONA DE CLAVES (SEGURA)
 // ==============================================================================
@@ -36,6 +37,11 @@ const TIPOS_JUEGOS = {
     // --- AÑADE ESTA LÍNEA ---
     MATHLIVE: { id: 'MATHLIVE', label: 'MathLive', color: '#009688', camposConfig: [] },
     // --
+
+    // --- AÑADIR WORDLE AQUÍ (Color Verde) ---
+    WORDLE: { id: 'WORDLE', label: 'Wordle Pro', color: '#2E7D32', camposConfig: [] },
+    // ---
+
     APAREJADOS: { id: 'APAREJADOS', label: 'AparejaDOS', color: '#FF9800', camposConfig: [{ key: 'tiempoTotal', label: 'Tiempo Total (seg)', type: 'number', default: 60 }, { key: 'numParejas', label: 'Nº Parejas', type: 'number', default: 8 }, { key: 'puntosPareja', label: 'Pts Pareja', type: 'number', default: 10 }] },
     THINKHOOT: { id: 'THINKHOOT', label: 'Pi-Live', color: '#9C27B0', camposConfig: [{ key: 'tiempoPregunta', label: 'Tiempo/preg (seg)', type: 'number', default: 30 }, { key: 'numPreguntas', label: 'Nº Preguntas', type: 'number', default: 10 }, { key: 'puntosMax', label: 'Puntos Max', type: 'number', default: 120 }, { key: 'puntosMin', label: 'Puntos Min', type: 'number', default: 30 }] },
     RULETA: { id: 'RULETA', label: 'La Ruleta', color: '#f1c40f', camposConfig: [{ key: 'tiempoTurno', label: 'Tiempo Turno (s)', type: 'number', default: 20 }] },
@@ -70,6 +76,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
     const [mostrandoEditorMathLive, setMostrandoEditorMathLive] = useState(false);
     const [mostrandoEditorBurbujasPikatron, setMostrandoEditorBurbujasPikatron] = useState(false);
     const [mostrandoMathWordle, setMostrandoMathWordle] = useState(false);
+    const [mostrandoEditorWordle, setMostrandoEditorWordle] = useState(false);
 
     const [recursoResultados, setRecursoResultados] = useState(null);
     const [recursoProbando, setRecursoProbando] = useState(null);
@@ -173,6 +180,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             if (juegoSeleccionado === 'CAZABURBUJAS') return iniciarCreacionBurbujasPikatron();
             if (juegoSeleccionado === 'THINKHOOT') return iniciarCreacionPiLive();
             if (juegoSeleccionado === 'MATHLIVE') return iniciarCreacionMathLive();
+            if (juegoSeleccionado === 'WORDLE') return iniciarCreacionWordle(); // <--- AÑADIR ESTO
         
 
         }
@@ -192,7 +200,18 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
     };
 
     // --- NUEVAS FUNCIONES PARA LOS BOTONES PRO ---
-
+    const iniciarCreacionWordle = () => {
+        const nuevoRecurso = {
+            id: null, titulo: '', temas: '', profesorNombre: usuario.displayName,
+            tipo: 'PRO',
+            tipoJuego: 'WORDLE', // Importante
+            config: { tiempoTotal: 300, numPalabras: 5, aleatorio: true },
+            hojas: [{ nombreHoja: 'Nivel 1', palabras: [] }],
+            isPrivate: false
+        };
+        setDatosEditor(nuevoRecurso);
+        setMostrandoEditorWordle(true);
+    };
     // 1. CREAR PILIVE (THINKHOOT PRO)
     const iniciarCreacionPiLive = () => {
         const nuevoRecurso = {
@@ -262,12 +281,18 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                 setMostrandoEditorBurbujasPikatron(true);
             }
             else if (dataFresca.tipo === 'PRO') {
+                // PRIMERO comprobamos el subtipo
                 if (dataFresca.config?.isMathLive) {
                     setMostrandoEditorMathLive(true);
-                } else {
+                }
+                else if (dataFresca.tipoJuego === 'WORDLE') { // <--- AHORA SÍ ENTRA AQUÍ
+                    setMostrandoEditorWordle(true);
+                }
+                else {
                     setMostrandoEditorPro(true);
                 }
-            } else {
+            }
+            else {
                 setMostrandoEditorManual(true); // Clásico
             }
 
@@ -293,44 +318,77 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
     const guardarRecursoFinal = async () => {
         if (!datosEditor.titulo) return alert("Falta Título");
         if (datosEditor.hojas.length === 0) return alert("Falta Hoja");
-        // --- MODIFICACIÓN AQUÍ: VALIDACIÓN RELAJADA PARA PRO-BURBUJAS ---
-        const totalPreguntasManuales = datosEditor.hojas.reduce((a, h) => a + h.preguntas.length, 0);
-        const esProBurbujas = datosEditor.tipo === 'PRO-BURBUJAS';
-        const tieneGeneradorMath = datosEditor.config?.mathCount > 0;
 
+        // --- VALIDACIÓN DIFERENCIADA POR TIPO DE JUEGO ---
 
-        if (juegoSeleccionado !== 'QUESTION_SENDER') {
+        // CASO 1: WORDLE (Validamos 'palabras')
+        if (datosEditor.tipoJuego === 'WORDLE') {
+            // Usamos ?. para seguridad, por si alguna hoja no tuviera el array
+            const totalPalabras = datosEditor.hojas.reduce((a, h) => a + (h.palabras?.length || 0), 0);
+            if (totalPalabras === 0) return alert("Añade al menos una palabra a la lista.");
+        }
+
+        // CASO 2: QUESTION SENDER (No requiere preguntas iniciales)
+        else if (juegoSeleccionado === 'QUESTION_SENDER') {
+            // Pasa sin validar contenido, ya que se llena después
+        }
+
+        // CASO 3: RESTO DE JUEGOS (Validamos 'preguntas' o generador)
+        else {
+            // IMPORTANTE: Usamos (h.preguntas?.length || 0) para evitar el error "undefined reading length"
+            const totalPreguntasManuales = datosEditor.hojas.reduce((a, h) => a + (h.preguntas?.length || 0), 0);
+
+            const esProBurbujas = datosEditor.tipo === 'PRO-BURBUJAS';
+            const tieneGeneradorMath = datosEditor.config?.mathCount > 0;
+
             if (esProBurbujas && tieneGeneradorMath) {
-                // Es válido aunque tenga 0 manuales, porque tiene generador matemático
+                // Válido: Tiene generador matemático activado
             } else if (totalPreguntasManuales === 0) {
                 return alert("Añade preguntas manuales o configura el generador.");
             }
         }
+
+        // --- GUARDADO EN FIREBASE ---
         try {
-            const dataToSave = { ...datosEditor, profesorUid: usuario.uid, tipoJuego: juegoSeleccionado, fechaCreacion: new Date() };
+            const dataToSave = {
+                ...datosEditor,
+                profesorUid: usuario.uid,
+                tipoJuego: juegoSeleccionado, // Aseguramos el tipo seleccionado
+                fechaCreacion: new Date()
+            };
+
             delete dataToSave.id;
+
+            // Ajustes específicos al guardar
             if (juegoSeleccionado === 'QUESTION_SENDER') {
                 dataToSave.hojasCodes = datosEditor.hojas.map(h => h.accessCode).filter(c => c);
                 dataToSave.targetGame = datosEditor.targetGame || 'PASAPALABRA';
             }
+
             if (datosEditor.id) {
                 await updateDoc(doc(db, "resources", datosEditor.id), dataToSave);
-                alert("Actualizado");
+                alert("Actualizado correctamente");
             } else {
                 dataToSave.accessCode = generarCodigoAcceso();
                 dataToSave.playCount = 0;
                 dataToSave.origen = 'manual';
                 await addDoc(collection(db, "resources"), dataToSave);
-                alert("Creado");
+                alert("Recurso creado correctamente");
             }
+
+            // Cerrar todos los editores
             setMostrandoEditorManual(false);
             setMostrandoEditorPro(false);
             setMostrandoEditorMathLive(false);
             setMostrandoEditorBurbujasPikatron(false);
-            cargarRecursosPropios();
-        } catch (e) { alert(e.message); }
-    };
+            setMostrandoEditorWordle(false); // <--- Cerramos el de Wordle
 
+            cargarRecursosPropios();
+        } catch (e) {
+            console.error(e);
+            alert("Error al guardar: " + e.message);
+        }
+    };
     const handleFileUpload = async (e) => { const f = e.target.files[0]; if (f) { try { const h = await procesarArchivoExcel(f, juegoSeleccionado); setDatosEditor(p => ({ ...p, hojas: h, titulo: f.name.split('.')[0] })); setMostrandoCrear(false); setMostrandoEditorManual(true); } catch (err) { alert(err.message); } } };
     const procesarCreacionIA = async () => { const t = prompt("Tema:"); if (t) { try { alert("Generando..."); const h = await generarPreguntasGemini(GEMINI_API_KEY, t, juegoSeleccionado); setDatosEditor(p => ({ ...p, hojas: h, titulo: t })); setMostrandoCrear(false); setMostrandoEditorManual(true); } catch (e) { alert(e.message); } } };
     const handleOpenPicker = () => { openPicker({ clientId: GOOGLE_CLIENT_ID, developerKey: GOOGLE_DEVELOPER_KEY, viewId: "DOCS", token: googleToken, showUploadView: true, showUploadFolders: true, supportDrives: true, multiselect: false, mimetypes: ["application/vnd.google-apps.spreadsheet"], callbackFunction: async (data) => { if (data.action === 'picked') { try { const blob = await (await fetch(`https://www.googleapis.com/drive/v3/files/${data.docs[0].id}/export?mimeType=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`, { headers: { Authorization: `Bearer ${googleToken}` } })).blob(); const h = await procesarArchivoExcel(blob, juegoSeleccionado); setDatosEditor(p => ({ ...p, hojas: h, titulo: data.docs[0].name })); setMostrandoCrear(false); setMostrandoEditorManual(true); } catch (e) { alert(e.message); } } } }); };
@@ -646,7 +704,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                 <>{modoDashboard === 'CLASICO' && (
                     <div className="game-type-scroll" style={{ marginBottom: '20px' }}>
                         {Object.values(TIPOS_JUEGOS)
-                            .filter(j => j.id !== 'MATHLIVE') // <--- FILTRO AÑADIDO
+                            .filter(j => j.id !== 'MATHLIVE' && j.id !== 'WORDLE') // <--- FILTRO AÑADIDO
                             .map(j => (
                                 <button key={j.id} onClick={() => setJuegoSeleccionado(j.id)} style={{ padding: '8px 16px', borderRadius: '20px', border: 'none', background: juegoSeleccionado === j.id ? j.color : 'white', color: juegoSeleccionado === j.id ? 'white' : '#555', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
                                     {j.label}
@@ -730,21 +788,16 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
 
                                     {/* --- AÑADE ESTO: NUEVO BOTÓN MATH WORDLE --- */}
                                     <button
-                                        onClick={() => setMostrandoMathWordle(true)}
+                                        onClick={() => setJuegoSeleccionado('WORDLE')}
                                         className="header-btn"
                                         style={{
                                             padding: '8px 20px', borderRadius: '20px',
-                                            background: '#607D8B', // Un color gris/azulado diferente
-                                            color: 'white',
-                                            marginLeft: '10px'
+                                            // Si está seleccionado, fondo verde, si no blanco
+                                            background: juegoSeleccionado === 'WORDLE' ? '#2E7D32' : 'white',
+                                            color: juegoSeleccionado === 'WORDLE' ? 'white' : '#555'
                                         }}
                                     >
-                                        <div style={{ display: 'flex', gap: '2px', fontWeight: 'bold' }}>
-                                            <span style={{ color: '#81C784' }}>1</span>
-                                            <span style={{ color: '#FFF176' }}>+</span>
-                                            <span style={{ color: '#E57373' }}>2</span>
-                                        </div>
-                                        <span className="btn-text" style={{ marginLeft: '5px' }}>Wordle</span>
+                                        <FileText size={16} /> <span className="btn-text">Wordle</span>
                                     </button>
                                     {/* ------------------------------------------- */}
 
@@ -876,6 +929,18 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                     usuario={perfilProfesor || usuario}
                 />
             )}
+
+            {mostrandoEditorWordle && (
+                <EditorWordle
+                    datos={datosEditor}
+                    setDatos={setDatosEditor}
+                    onClose={() => setMostrandoEditorWordle(false)}
+                    onSave={guardarRecursoFinal}
+                    usuario={perfilProfesor || usuario}
+                />
+            )}
+
+
 
                         {/* MODAL AYUDA GLOBAL DASHBOARD */}
             {mostrandoAyudaDashboard && (

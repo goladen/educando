@@ -73,16 +73,15 @@ export default function Login({ setGoogleToken }) {
     // VISTA JUEGO MATHLE
     if (vistaActual === 'MATHLE') {
         return <MathWordleGame usuario={null} onExit={() => {
-            window.history.pushState({}, '', '/');
-            setVistaActual('LOGIN');
+            window.history.pushState({}, '', '/Desafios'); // <--- VUELVE A DESAFIOS
+            setVistaActual('GAMES_HUB');
         }} />;
     }
 
-    // VISTA JUEGO WORDLE
     if (vistaActual === 'WORDLE') {
         return <TextWordleGame usuario={null} onExit={() => {
-            window.history.pushState({}, '', '/');
-            setVistaActual('LOGIN');
+            window.history.pushState({}, '', '/Desafios'); // <--- VUELVE A DESAFIOS
+            setVistaActual('GAMES_HUB');
         }} />;
     }
 
@@ -97,7 +96,12 @@ export default function Login({ setGoogleToken }) {
 
                     <div style={styles.hubGrid}>
                         {/* TARJETA MATHLE */}
-                        <div style={styles.gameOptionCard} onClick={() => setVistaActual('MATHLE')}>
+                        <div style={styles.gameOptionCard} onClick={() => {
+                            window.history.pushState({}, '', '/Mathle'); // <--- CAMBIA LA URL
+                            setVistaActual('MATHLE');
+                        }}>
+
+
                             <div style={{ ...styles.iconCircle, background: '#e3f2fd', color: '#1565C0' }}>
                                 <Calculator size={32} />
                             </div>
@@ -106,7 +110,12 @@ export default function Login({ setGoogleToken }) {
                         </div>
 
                         {/* TARJETA WORDLE */}
-                        <div style={styles.gameOptionCard} onClick={() => setVistaActual('WORDLE')}>
+                        <div style={styles.gameOptionCard} onClick={() => {
+                            window.history.pushState({}, '', '/Wordle'); // <--- CAMBIA LA URL
+                            setVistaActual('WORDLE');
+                        }}>
+
+
                             <div style={{ ...styles.iconCircle, background: '#e8f5e9', color: '#2e7d32' }}>
                                 <Type size={32} />
                             </div>

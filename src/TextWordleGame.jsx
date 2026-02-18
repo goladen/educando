@@ -66,7 +66,57 @@ export default function TextWordleGame({ usuario, onExit }) {
     const [ranking, setRanking] = useState([]);
     const [loadingRanking, setLoadingRanking] = useState(false);
     const [playerName, setPlayerName] = useState(usuario?.displayName || '');
+    // --- ESTADOS PARA EL BUSCADOR ---
+    // --- ESTADOS PARA EL BUSCADOR (NUEVO) ---
+    const [bibliotecaWordle, setBibliotecaWordle] = useState([]);
+    const [buscando, setBuscando] = useState(false);
+    const [mostrarMasFiltros, setMostrarMasFiltros] = useState(false);
+    const [filtros, setFiltros] = useState({
+        tema: '', ciclo: 'Secundaria',
+        pais: '', region: '', poblacion: '', autor: ''
+    });
 
+    // Función de búsqueda con filtros avanzados
+    const buscarRecursosPublicos = async () => {
+        setBuscando(true);
+        try {
+            // Consulta base a Firebase
+            const q = query(
+                collection(db, "resources"),
+                where("tipoJuego", "==", "WORDLE"),
+                where("isPrivate", "==", false),
+                // where("isFinished", "==", true), // Descomenta esta línea si ya tienes este campo en la BD
+                limit(50)
+            );
+            const snap = await getDocs(q);
+            const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+            // Filtrado "Amplio" en el cliente (insensible a mayúsculas/acentos)
+            const filtrados = docs.filter(r => {
+                const clean = (t) => t ? t.toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
+                const fTema = clean(filtros.tema);
+                const fPais = clean(filtros.pais);
+                const fReg = clean(filtros.region);
+                const fPob = clean(filtros.poblacion);
+                const fAut = clean(filtros.autor);
+
+                // Comprobamos si cumple TODOS los filtros activos
+                const cumpleTema = !filtros.tema || clean(r.titulo).includes(fTema) || clean(r.temas).includes(fTema);
+                const cumpleCiclo = !filtros.ciclo || r.ciclo === filtros.ciclo;
+                const cumplePais = !filtros.pais || clean(r.pais).includes(fPais);
+                const cumpleRegion = !filtros.region || clean(r.region).includes(fReg);
+                const cumplePob = !filtros.poblacion || clean(r.poblacion).includes(fPob);
+                const cumpleAutor = !filtros.autor || clean(r.profesorNombre).includes(fAut);
+
+                return cumpleTema && cumpleCiclo && cumplePais && cumpleRegion && cumplePob && cumpleAutor;
+            });
+
+            setBibliotecaWordle(filtrados);
+        } catch (e) {
+            console.error("Error buscando:", e);
+        }
+        setBuscando(false);
+    };
     // =========================================================
     // 1. GESTIÓN DE DICCIONARIOS Y MODOS DE JUEGO
     // =========================================================
@@ -409,12 +459,12 @@ export default function TextWordleGame({ usuario, onExit }) {
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#666' }}><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span></div>
                 </div>
 
-                <button style={{ ...styles.btn, ...styles.btnPrimary }} onClick={() => cargarDiccionarioYJugar(null, null)}>JUGAR ALEATORIO</button>
+                <button style={{ ...styles.btn, ...styles.btnPrimary }} onClick={() => cargarDiccionarioYJugar(null, null)}>JUGAR</button>
             </div>
 
             {/* --- ZONA 2: CÓDIGO DE PROFE --- */}
             <div style={{ ...styles.card, marginTop: '15px', background: '#e3f2fd', border: '1px solid #90caf9' }}>
-                <label style={{ ...styles.label, color: '#1565c0' }}><BookOpen size={16} style={{ verticalAlign: 'middle' }} /> Jugar Nivel de Profe</label>
+                <label style={{ ...styles.label, color: '#1565c0' }}><BookOpen size={16} style={{ verticalAlign: 'middle' }} /> Jugar Desafio</label>
                 <div style={{ display: 'flex', gap: '5px' }}>
                     <input
                         value={customCode}
@@ -426,10 +476,152 @@ export default function TextWordleGame({ usuario, onExit }) {
                     <button onClick={cargarNivelPersonalizado} style={styles.btnSearch}><Search size={20} /></button>
                 </div>
             </div>
+            {/* --- BUSCADOR DE BIBLIOTECA (NUEVO) --- */}
+         
+                <div style={{ ...styles.card, marginTop: '15px', background: '#e3f2fd', border: '1px solid #90caf9' }}>
 
-            <button style={{ ...styles.btnOutline, marginTop: '20px' }} onClick={onExit}>SALIR</button>
+                <h3 style={{ color: '#2e7d32', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <Search size={20} /> Buscar sobre un tema
+                        </h3>
+              
+                {/* Filtros Básicos */}
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                    <input
+                        placeholder="Tema o Título..."
+                        value={filtros.tema}
+                        onChange={e => setFiltros({ ...filtros, tema: e.target.value })}
+                        style={styles.miniInputFilter}
+                    />
+                    <select
+                        value={filtros.ciclo}
+                        onChange={e => setFiltros({ ...filtros, ciclo: e.target.value })}
+                        style={styles.miniInputFilter}
+                    >
+                        <option value="Infantil">Infantil</option>
+                        <option value="Primaria">Primaria</option>
+                        <option value="Secundaria">Secundaria</option>
+                        <option value="Bachillerato">Bachillerato</option>
+                        <option value="FP">FP</option>
+                        <option value="Universidad">Universidad</option>
+                    </select>
+                </div>
+
+                {/* Botón Más Filtros */}
+                <div style={{ textAlign: 'right', marginBottom: '10px' }}>
+                    <button
+                        onClick={() => setMostrarMasFiltros(!mostrarMasFiltros)}
+                        style={{ background: '#3F51B5', border: 'line', color: 'white', fontSize: '12px', cursor: 'pointer', textDecoration: 'underline' }}
+                >
+                        {mostrarMasFiltros ? "- Menos filtros" : "+ Más filtros (País, Región...)"}
+                    </button>
+                </div>
+
+                {/* Filtros Avanzados (Ocultos) */}
+                {mostrarMasFiltros && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '15px', background: '#f9f9f9', padding: '10px', borderRadius: '8px' }}>
+                        <input placeholder="País" value={filtros.pais} onChange={e => setFiltros({ ...filtros, pais: e.target.value })} style={styles.miniInputFilter} />
+                        <input placeholder="Región/CCAA" value={filtros.region} onChange={e => setFiltros({ ...filtros, region: e.target.value })} style={styles.miniInputFilter} />
+                        <input placeholder="Localidad" value={filtros.poblacion} onChange={e => setFiltros({ ...filtros, poblacion: e.target.value })} style={styles.miniInputFilter} />
+                        <input placeholder="Nombre Profesor" value={filtros.autor} onChange={e => setFiltros({ ...filtros, autor: e.target.value })} style={styles.miniInputFilter} />
+                    </div>
+                )}
+
+                <button onClick={buscarRecursosPublicos} style={{ ...styles.button, borderRadius: '10px', width: '80%', background: '#2e7d32' }}>
+                    {buscando ? 'Buscando...' : '🔍 Buscar Desafíos'}
+                </button>
+
+                {/* Resultados */}
+                {/* RESULTADOS CON SCROLL LATERAL */}
+                {/* RESULTADOS CON SCROLL LATERAL ROBUSTO */}
+                <div style={{
+                    marginTop: '20px',
+                    width: '100%',               // Ocupa todo el ancho disponible
+                    boxSizing: 'border-box',     // El padding no afecta al ancho total
+                    display: 'flex',             // Disposición horizontal
+                    flexWrap: 'nowrap',          // PROHIBIDO saltar de línea
+                    overflowX: 'auto',        // 'auto' en vez de 'scroll' (solo sale si es necesario)
+                    scrollbarWidth: 'none',   // Oculta la barra en Firefox
+                    msOverflowStyle: 'none',         // Forzar scroll horizontal
+                    gap: '15px',                 // Espacio entre tarjetas
+                    padding: '10px 5px',         // Un poco de aire para las sombras
+                    scrollBehavior: 'smooth',    // Desplazamiento suave
+                    WebkitOverflowScrolling: 'touch' // Mejora para móviles (iPhone/iPad)
+                }}>
+                    {bibliotecaWordle.map(r => (
+                        <div key={r.id} onClick={() => procesarRecurso(r)} style={{
+                            minWidth: '240px',       // Ancho FIJO (importante)
+                            width: '240px',          // Aseguramos que no se estire ni encoja
+                            flexShrink: 0,           // PROHIBIDO encogerse (clave del fix)
+
+                            background: 'white',
+                            padding: '15px',
+                            borderRadius: '12px',
+                            border: '1px solid #e0e0e0',
+                            boxShadow: '0 4px 6px rgba(0,0,0,0.05)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            position: 'relative'     // Para posicionar elementos dentro si hace falta
+                        }}>
+                            <div style={{ marginBottom: '10px' }}>
+                                <h4 style={{
+                                    margin: '0 0 5px 0',
+                                    color: '#2e7d32',
+                                    fontSize: '15px',
+                                    whiteSpace: 'nowrap',      // Texto en una línea
+                                    overflow: 'hidden',        // Cortar si es muy largo
+                                    textOverflow: 'ellipsis'   // Poner "..."
+                                }}>
+                                    {r.titulo}
+                                </h4>
+                                <div style={{ fontSize: '12px', color: '#555' }}>
+                                    🏫 {r.ciclo}
+                                </div>
+                                <div style={{ fontSize: '11px', color: '#777', marginTop: '2px' }}>
+                                    👤 {r.profesorNombre || 'Anónimo'}
+                                </div>
+                                <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>
+                                    📍 {r.poblacion || 'Global'}
+                                </div>
+                            </div>
+
+                            <button style={{
+                                background: '#2e7d32',
+                                color: 'white',
+                                border: '1px',
+                                padding: '8px',
+                                borderRadius: '8px',
+                                fontWeight: 'bold',
+                                cursor: 'pointer',
+                                width: '100%',
+                                fontSize: '12px',
+                                marginTop: 'auto' // Empuja el botón al fondo de la tarjeta
+                            }}>
+                                JUGAR
+            </button>
+                        </div>
+                    ))}
+
+                   
+                    {/* Mensaje si no hay resultados */}
+                    {bibliotecaWordle.length === 0 && !buscando && (
+                        <div style={{ width: '100%', textAlign: 'center', color: '#999', padding: '20px' }}>
+                            <p style={{ margin: 0, fontSize: '14px' }}>No se encontraron juegos con esos filtros.</p>
+                        </div>
+                    )}
+                </div>
+
+
+
+
+
+
+
+            </div>
         </div>
-    );
+            );
+
 
     if (screen === 'GAME') return (
         <div style={{ ...styles.screen, justifyContent: 'flex-start' }}>
@@ -535,12 +727,41 @@ export default function TextWordleGame({ usuario, onExit }) {
 }
 
 const styles = {
-    screen: { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: '#121213', zIndex: 5000, color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: "'Roboto', sans-serif" },
-    card: { background: 'white', padding: '25px', borderRadius: '15px', width: '90%', maxWidth: '350px', textAlign: 'center', color: '#333', boxShadow: '0 4px 15px rgba(0,0,0,0.3)' },
+    screen: {
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '90%',
+        backgroundColor: '#7e7b52',//'#121213',
+        zIndex: 5000,
+        color: 'black',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'flex-start', // CAMBIO 1: Empieza arriba en vez de centrar (para que no se corte lo de arriba)
+        fontFamily: "'Roboto', sans-serif",
+        overflowY: 'auto',            // CAMBIO 2: Activa el scroll vertical
+        padding: '40px 0',            // CAMBIO 3: Deja un poco de aire arriba y abajo
+        WebkitOverflowScrolling: 'touch' // Mejora para móviles
+    },
+   // card: { background: 'white', padding: '25px', borderRadius: '15px', width: '90%', maxWidth: '350px', textAlign: 'center', color: '#333', boxShadow: '0 4px 15px rgba(0,0,0,0.3)' },
+    card: {
+        background: '#fffacb',
+        padding: '2rem',
+        borderRadius: '20px',
+        boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+        maxWidth: '500px',
+        width: '100%',
+        textAlign: 'center',
+        marginBottom: '40px' // Un poco de margen abajo por si acaso
+    
+    },
+
     h1: { fontSize: '1.8rem', textTransform: 'uppercase', letterSpacing: '2px', margin: '10px 0' },
     label: { display: 'block', fontWeight: 'bold', marginBottom: '10px', color: '#555', fontSize: '0.9rem' },
     optionBtn: { padding: '8px 12px', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' },
-    btn: { padding: '15px', fontSize: '1.1rem', borderRadius: '5px', margin: '8px 0', border: 'none', cursor: 'pointer', fontWeight: 'bold', width: '100%' },
+    btn: { padding: '15px', fontSize: '1.1rem', borderRadius: '5px', margin: '8px 0', border: 'none', cursor: 'pointer', fontWeight: 'bold', width: '70%' },
     btnPrimary: { backgroundColor: '#538d4e', color: 'white' },
     btnSecondary: { backgroundColor: '#818384', color: 'white' },
     btnOutline: { background: 'transparent', border: '2px solid #3a3a3c', color: '#fff', padding: '10px 20px', borderRadius: '5px', cursor: 'pointer' },
@@ -567,5 +788,19 @@ const styles = {
     rankingContainer: { width: '90%', maxWidth: '350px', maxHeight: '300px', overflowY: 'auto', margin: '15px 0', border: '1px solid #3a3a3c', borderRadius: '5px', background: '#121213' },
     table: { width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' },
     td: { padding: '10px', textAlign: 'left', borderBottom: '1px solid #3a3a3c', color: '#ddd' },
-    inputName: { padding: '10px', width: '200px', textAlign: 'center', borderRadius: '5px', border: 'none', marginBottom: '10px', fontSize: '1rem' }
+    inputName: { padding: '10px', width: '200px', textAlign: 'center', borderRadius: '5px', border: 'none', marginBottom: '10px', fontSize: '1rem' },
+    miniInputFilter: {
+
+        background: '#fffacb',
+        padding: '8px',
+        borderRadius: '6px',
+        border: '1px solid #ccc',
+        fontSize: '13px',
+        width: '100%',
+        boxSizing: 'border-box'
+    },
+
+
+
+
 };

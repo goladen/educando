@@ -17,12 +17,19 @@ export default function Login({ setGoogleToken }) {
     const [vistaActual, setVistaActual] = useState('LOGIN');
 
     // --- DETECTAR URL PARA ABRIR JUEGOS DIRECTAMENTE ---
+    // --- DETECTAR URL PARA ABRIR JUEGOS DIRECTAMENTE ---
     useEffect(() => {
-        const path = window.location.pathname.toLowerCase(); // Convertimos a minúsculas para evitar errores
+        const path = window.location.pathname.toLowerCase(); 
 
-        if (path.includes('/mathle')) {
+        // --- AÑADE ESTE BLOQUE AL PRINCIPIO ---
+        if (path.includes('/desafios')) {
+            setVistaActual('GAMES_HUB'); // Abre la pantalla de selección
+        } 
+        // --------------------------------------
+        else if (path.includes('/mathle')) {
             setVistaActual('MATHLE');
-        } else if (path.includes('/wordle')) {
+        } 
+        else if (path.includes('/wordle')) {
             setVistaActual('WORDLE');
         }
     }, []);

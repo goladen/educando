@@ -2,9 +2,8 @@
 import { db } from './firebase';
 // Importamos lo necesario para buscar recursos por código
 import { collection, addDoc, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
-import { X, Settings, Trophy, Search, BookOpen, Globe } from 'lucide-react';
+import { X, Settings, Trophy, Search, BookOpen, Globe,ArrowLeft } from 'lucide-react';
 import Confetti from 'react-confetti';
-
 // CONFIGURACIÓN DE IDIOMAS Y RECURSOS (Listas de Frecuencia)
 const LANGUAGES = {
     ES: {
@@ -436,7 +435,33 @@ export default function TextWordleGame({ usuario, onExit }) {
     );
 
     if (screen === 'CONFIG') return (
+
+
         <div style={styles.screen}>
+            <button
+                onClick={onExit}
+                style={{
+                    position: 'absolute',
+                    top: '20px',
+                    left: '20px',
+                    background: 'white',
+                    border: '1px solid #ddd',
+                    borderRadius: '30px',
+                    padding: '8px 15px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    color: '#333',
+                    fontWeight: 'bold',
+                    zIndex: 1000,
+                    boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
+                }}
+            >
+                <ArrowLeft size={20} /> Volver
+                </button>
+
+
             <h1 style={styles.h1}>WORDLE</h1>
             <p style={{ color: '#aaa', marginBottom: '20px' }}>Configura tu partida</p>
 

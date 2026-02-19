@@ -23,6 +23,7 @@ import EditorProBurbujasPikatron from './components/EditorProBurbujasPikatron';
 import EditorQuestionSender from './components/EditorQuestionSender';
 import MathWordleGame from './MathWordleGame';
 import EditorWordle from './components/EditorWordle';
+import * as XLSX from 'xlsx'; // <--- IMPORTANTE
 // ==============================================================================
 //  ZONA DE CLAVES (SEGURA)
 // ==============================================================================
@@ -391,8 +392,174 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
     };
     const handleFileUpload = async (e) => { const f = e.target.files[0]; if (f) { try { const h = await procesarArchivoExcel(f, juegoSeleccionado); setDatosEditor(p => ({ ...p, hojas: h, titulo: f.name.split('.')[0] })); setMostrandoCrear(false); setMostrandoEditorManual(true); } catch (err) { alert(err.message); } } };
     const procesarCreacionIA = async () => { const t = prompt("Tema:"); if (t) { try { alert("Generando..."); const h = await generarPreguntasGemini(GEMINI_API_KEY, t, juegoSeleccionado); setDatosEditor(p => ({ ...p, hojas: h, titulo: t })); setMostrandoCrear(false); setMostrandoEditorManual(true); } catch (e) { alert(e.message); } } };
-    const handleOpenPicker = () => { openPicker({ clientId: GOOGLE_CLIENT_ID, developerKey: GOOGLE_DEVELOPER_KEY, viewId: "DOCS", token: googleToken, showUploadView: true, showUploadFolders: true, supportDrives: true, multiselect: false, mimetypes: ["application/vnd.google-apps.spreadsheet"], callbackFunction: async (data) => { if (data.action === 'picked') { try { const blob = await (await fetch(`https://www.googleapis.com/drive/v3/files/${data.docs[0].id}/export?mimeType=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`, { headers: { Authorization: `Bearer ${googleToken}` } })).blob(); const h = await procesarArchivoExcel(blob, juegoSeleccionado); setDatosEditor(p => ({ ...p, hojas: h, titulo: data.docs[0].name })); setMostrandoCrear(false); setMostrandoEditorManual(true); } catch (e) { alert(e.message); } } } }); };
 
+
+    // --- NUEVA FUNCIÓN PARA LEER EL ARCHIVO DE DRIVE ---
+    // --- FUNCIÓN DE IMPORTACIÓN ROBUSTA (GOOGLE SHEETS Y EXCEL) ---
+    const procesarArchivoDrive = async (fileId, oauthToken, mimeType) => {
+        console.log("Iniciando importación...", { fileId, mimeType, tieneToken: !!oauthToken });
+
+        // 1. CHEQUEO DE SEGURIDAD
+        if (!oauthToken) {
+            alert("⚠️ ERROR DE SESIÓN: No se detecta el token de Google Drive.\n\nPor favor, cierra sesión (botón Salir) y vuelve a entrar con Google para renovar los permisos.");
+            return;
+        }
+
+        try {
+            setCargando(true);
+
+            // 2. CONSTRUIR URL DE DESCARGA
+            let url;
+            // Si es nativo de Google (Sheet), hay que EXPORTARLO
+            if (mimeType === 'application/vnd.google-apps.spreadsheet') {
+                url = `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`;
+            }
+            // Si es un Excel subido (.xlsx), se descarga directo
+            else {
+                url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
+            }
+
+            // 3. PETICIÓN A GOOGLE
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${oauthToken}`
+                }
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text(); // Leemos el detalle del error de Google
+                console.error("Error respuesta Google:", response.status, errorText);
+
+                if (response.status === 401) throw new Error("Token caducado. Cierra sesión y vuelve a entrar.");
+                if (response.status === 403) throw new Error("Permiso denegado. Asegúrate de que el archivo es tuyo.");
+                throw new Error(`Error ${response.status} al descargar.`);
+            }
+
+            // 4. PROCESAMIENTO DEL ARCHIVO (Igual que antes)
+            const blob = await response.blob();
+            const arrayBuffer = await blob.arrayBuffer();
+            const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+
+            let nuevasHojas = [];
+
+            workbook.SheetNames.forEach((nombreHoja, index) => {
+                const worksheet = workbook.Sheets[nombreHoja];
+                const datos = XLSX.utils.sheet_to_json(worksheet, { header: 1 }); // Matriz pura
+
+                if (datos && datos.length > 0) {
+                    let preguntasDeEstaHoja = [];
+
+                    datos.forEach(fila => {
+                        if (!fila || fila.length === 0) return;
+
+                        // Convertir a String seguro para evitar errores
+                        const A = fila[0] ? String(fila[0]).trim() : "";
+                        const B = fila[1] ? String(fila[1]).trim() : "";
+
+                        // LÓGICA PASAPALABRA (A: Letra, B: Pregunta, C: Respuesta)
+                        if (juegoSeleccionado === 'PASAPALABRA' && A && B) {
+                            const C = fila[2] ? String(fila[2]).trim() : "";
+                            preguntasDeEstaHoja.push({
+                                id: Date.now() + Math.random(),
+                                letra: A.toUpperCase(),
+                                estado: 'pendiente',
+                                pregunta: B,
+                                respuesta: C,
+                                tipo: 'texto'
+                            });
+                        }
+                        // LÓGICA CAZABURBUJAS (A: Pregunta, B: Correcta, C...: Incorrectas)
+                        else if (juegoSeleccionado === 'CAZABURBUJAS' && A && B) {
+                            const incorrectas = fila.slice(2).map(x => x ? String(x).trim() : "").filter(x => x !== "");
+                            preguntasDeEstaHoja.push({
+                                id: Date.now() + Math.random(),
+                                pregunta: A,
+                                correcta: B,
+                                respuesta: B, // Compatibilidad
+                                incorrectas: incorrectas.length > 0 ? incorrectas : ["Respuesta Incorrecta 1"],
+                                tiempo: 20
+                            });
+                        }
+                        // LÓGICA APAREJADOS (A: Concepto 1, B: Concepto 2)
+                        else if (juegoSeleccionado === 'APAREJADOS' && A && B) {
+                            preguntasDeEstaHoja.push({
+                                id: Date.now() + Math.random(),
+                                tipo: 'pareja',
+                               terminoA: A,
+                                terminoB: B
+                            });
+                        }
+                        // LÓGICA WORDLE (A: Palabra)
+                        else if (juegoSeleccionado === 'WORDLE' && A) {
+                            if (A.length >= 4 && A.length <= 9) preguntasDeEstaHoja.push(A.toUpperCase());
+                        }
+                    });
+
+                    if (preguntasDeEstaHoja.length > 0) {
+                        if (juegoSeleccionado === 'WORDLE') {
+                            nuevasHojas.push({ nombreHoja, palabras: preguntasDeEstaHoja });
+                        } else {
+                            nuevasHojas.push({ nombreHoja, preguntas: preguntasDeEstaHoja });
+                        }
+                    }
+                }
+            });
+
+            if (nuevasHojas.length === 0) {
+                alert("⚠️ Archivo leído pero sin datos válidos.\nRevisa que las columnas A y B tengan contenido.");
+            } else {
+                setDatosEditor(prev => ({
+                    ...prev,
+                    hojas: nuevasHojas,
+                    titulo: prev.titulo || "Importado de Drive"
+                }));
+                setMostrandoCrear(false);
+
+                // Abrir el editor correcto
+                if (juegoSeleccionado === 'WORDLE') setMostrandoEditorWordle(true);
+                else if (juegoSeleccionado === 'CAZABURBUJAS') setMostrandoEditorBurbujasPikatron(true);
+                else if (juegoSeleccionado === 'THINKHOOT') setMostrandoEditorPro(true);
+                else setMostrandoEditorManual(true);
+
+                alert(`✅ ¡Importado! Se han creado ${nuevasHojas.length} niveles.`);
+            }
+
+        } catch (error) {
+            console.error("ERROR CRÍTICO DRIVE:", error);
+            alert(`❌ Error al importar: ${error.message}`);
+        } finally {
+            setCargando(false);
+        }
+    };
+
+
+
+    const handleOpenPicker = () => {
+        openPicker({
+            clientId: GOOGLE_CLIENT_ID,
+            developerKey: GOOGLE_DEVELOPER_KEY,
+            viewId: "DOCS",
+            token: googleToken,
+            showUploadView: true,
+            showUploadFolders: true,
+            supportDrives: true,
+            multiselect: false,
+            // Aceptamos tanto Hojas de Google como Excel
+            mimetypes: ["application/vnd.google-apps.spreadsheet", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"],
+            callbackFunction: (data) => {
+                if (data.action === 'picked') {
+                    // --- AQUÍ ESTABA EL ERROR ---
+                    const doc = data.docs[0];
+
+                    // Antes tenías: procesarArchivoDrive(fileId, googleToken);
+                    // FALTABA EL TERCER PARÁMETRO (doc.mimeType)
+
+                    procesarArchivoDrive(doc.id, googleToken, doc.mimeType);
+                }
+            }
+        });
+    };
     const confirmarCopiaAplicacion = async () => {
         if (!modalCopiarApp) return;
 

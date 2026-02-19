@@ -73,8 +73,16 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
             const hObj = recurso.hojas?.find(h => h.nombreHoja === hoja);
             if (hObj) hObj.preguntas.forEach((p, i) => pool.push({ ...p, idOriginal: i }));
         }
+        if (recurso.config?.aleatorio !== false) {
+            // ALGORITMO FISHER-YATES (Barajado perfecto)
+            // Recorremos el array hacia atrás e intercambiamos cada elemento con uno aleatorio anterior
+            for (let i = pool.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [pool[i], pool[j]] = [pool[j], pool[i]];
+            }
+        }
 
-        pool.sort(() => Math.random() - 0.5);
+        
         const limitConfig = parseInt(recurso.config?.numParejas) || 8;
         const limitReal = Math.min(pool.length, limitConfig);
         const seleccion = pool.slice(0, limitReal);
@@ -242,7 +250,12 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
         } catch (e) { console.error(e); alert("Error guardando"); }
         setGuardando(false);
     };
-
+    // --- DETECTAR SI ES IMAGEN ---
+    const esImagen = (texto) => {
+        if (typeof texto !== 'string') return false;
+        // Detecta extensiones comunes de imagen o si viene de flagcdn
+        return /\.(jpeg|jpg|gif|png|svg|webp)$/i.test(texto) || texto.includes('flagcdn.com');
+    };
     // --- CÁLCULO DE COLUMNAS Y FILAS PARA CSS GRID ---
     const calcularGrid = () => {
         const total = cartas.length;
@@ -337,7 +350,20 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
                                     style={{ visibility: isMatched ? 'hidden' : 'visible', opacity: isMatched ? 0 : 1 }}
                                 >
                                     <div className="face front">
-                                        <span>{carta.content}</span>
+                                        {esImagen(carta.content) ? (
+                                            <img
+                                                src={carta.content}
+                                                alt="contenido"
+                                                style={{
+                                                    maxWidth: '90%',
+                                                    maxHeight: '90%',
+                                                    objectFit: 'contain',
+                                                    pointerEvents: 'none' // Para evitar arrastrar la imagen
+                                                }}
+                                            />
+                                        ) : (
+                                                <span>{carta.content}</span>
+                                            )}
                                     </div>
                                     <div className="face back">?</div>
                                 </div>

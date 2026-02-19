@@ -38,8 +38,11 @@ export default function Login({ setGoogleToken }) {
         setLoading(true);
         setError(null);
         const provider = new GoogleAuthProvider();
+
+        provider.addScope('https://www.googleapis.com/auth/drive.readonly');
         provider.addScope('https://www.googleapis.com/auth/drive.file');
         provider.addScope('https://www.googleapis.com/auth/forms.body');
+       
         try {
             const result = await signInWithPopup(auth, provider);
             const credential = GoogleAuthProvider.credentialFromResult(result);

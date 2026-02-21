@@ -35,7 +35,7 @@ const LANGUAGES = {
     }
 };
 
-export default function TextWordleGame({ usuario, onExit }) {
+export default function TextWordleGame({ usuario, onExit, recursoInicial }) {
     // --- ESTADOS DE PANTALLA ---
     const [screen, setScreen] = useState('CONFIG'); // CONFIG, LOADING, GAME, VICTORY, RANKING_VIEW
 
@@ -74,7 +74,11 @@ export default function TextWordleGame({ usuario, onExit }) {
         tema: '', ciclo: 'Secundaria',
         pais: '', region: '', poblacion: '', autor: ''
     });
-
+    useEffect(() => {
+        if (recursoInicial) {
+            procesarRecurso(recursoInicial);
+        }
+    }, [recursoInicial]);
     // Función de búsqueda con filtros avanzados
     const buscarRecursosPublicos = async () => {
         setBuscando(true);

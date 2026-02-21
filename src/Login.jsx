@@ -1,238 +1,185 @@
-﻿import React, { useState, useEffect } from 'react';
-import { auth } from './firebase';
-import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-import { Menu, X, ArrowLeft, Calculator, Type } from 'lucide-react'; // Iconos nuevos
-import logoPikt from './assets/icono2.png';
-import QuestionSenderClient from './QuestionSenderClient';
-import LandingGames from './components/LandingGames2';
+﻿//import LandingGames from './components/LandingGames3';
 import MathWordleGame from './MathWordleGame';
 import TextWordleGame from './TextWordleGame'; // <--- IMPORTA TU NUEVO COMPONENTE
+import React, { useState, useEffect } from 'react';
+import { auth } from './firebase';
+import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { Menu, X } from 'lucide-react';
+import logoPikt from './assets/icono2.png';
+import LandingGames, { APPS, SpecificGamePage, ResourceCard } from './components/LandingGames3';
+import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
+import { db } from './firebase';
 
 export default function Login({ setGoogleToken }) {
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
 
-    // VISTAS: 'LOGIN', 'QUESTION_SENDER', 'MATHLE', 'WORDLE', 'GAMES_HUB'
-    const [vistaActual, setVistaActual] = useState('LOGIN');
+    // VISTAS: 'MAIN', 'POPULARES', o el ID del juego (ej: 'PASAPALABRA', 'WORDLE', etc.)
+    const [vistaActual, setVistaActual] = useState('MAIN');
+    const [topGames, setTopGames] = useState([]);
 
-    // --- DETECTAR URL PARA ABRIR JUEGOS DIRECTAMENTE ---
-    // --- DETECTAR URL PARA ABRIR JUEGOS DIRECTAMENTE ---
+    // --- DETECTOR DE RUTAS (ESTO HACE QUE SE ABRA LA PANTALLA COMPLETA) ---
     useEffect(() => {
-        const path = window.location.pathname.toLowerCase(); 
+        const handleRoute = () => {
+            const path = window.location.pathname.toLowerCase().replace('/', '');
 
-        // --- AÑADE ESTE BLOQUE AL PRINCIPIO ---
-        if (path.includes('/desafios')) {
-            setVistaActual('GAMES_HUB'); // Abre la pantalla de selección
-        } 
-        // --------------------------------------
-        else if (path.includes('/mathle')) {
-            setVistaActual('MATHLE');
-        } 
-        else if (path.includes('/wordle')) {
-            setVistaActual('WORDLE');
-        }
+            if (!path || path === 'inicio') {
+                setVistaActual('MAIN');
+            } else if (path === 'populares') {
+                setVistaActual('POPULARES');
+                cargarPopulares();
+            } else {
+                // Buscamos si la ruta coincide con algún juego
+                const app = APPS.find(a => a.name.toLowerCase() === path || a.id.toLowerCase() === path);
+                if (app) setVistaActual(app.id);
+                else setVistaActual('MAIN');
+            }
+        };
+
+        handleRoute();
+        window.addEventListener('popstate', handleRoute);
+        return () => window.removeEventListener('popstate', handleRoute);
     }, []);
 
-    const handleLogin = async () => {
-        setLoading(true);
-        setError(null);
-        const provider = new GoogleAuthProvider();
+    const cargarPopulares = async () => {
+        try {
+            const q = query(collection(db, 'resources'), orderBy('playCount', 'desc'), limit(15));
+            const snap = await getDocs(q);
+            setTopGames(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        } catch (e) { console.error(e); }
+    };
 
+    const handleLogin = async () => {
+        setLoading(true); setError(null);
+        const provider = new GoogleAuthProvider();
         provider.addScope('https://www.googleapis.com/auth/drive.readonly');
         provider.addScope('https://www.googleapis.com/auth/drive.file');
         provider.addScope('https://www.googleapis.com/auth/forms.body');
-       
+
         try {
             const result = await signInWithPopup(auth, provider);
             const credential = GoogleAuthProvider.credentialFromResult(result);
             if (setGoogleToken) setGoogleToken(credential.accessToken);
         } catch (error) {
-            console.error("Error al entrar:", error);
-            setError("Hubo un problema al conectar con Google.");
+            setError("Error conectando con Google.");
             setLoading(false);
         }
     };
 
-    const toggleMenu = () => setMenuOpen(!menuOpen);
-
     const handleMenuClick = (opcion) => {
         setMenuOpen(false);
-        if (opcion === 'unete') document.getElementById('login-card')?.scrollIntoView({ behavior: 'smooth' });
-        else if (opcion === 'buscador' || opcion === 'populares') window.scrollTo({ top: window.innerHeight, behavior: 'smooth' });
+        if (opcion === 'inicio') {
+            window.history.pushState({}, '', '/');
+            window.dispatchEvent(new Event('popstate'));
+        }
+        else if (opcion === 'populares') {
+            window.history.pushState({}, '', '/populares');
+            window.dispatchEvent(new Event('popstate'));
+        }
         else if (opcion === 'que-hacer') window.open('https://goladen.wixsite.com/matematicas/copia-de-pikt', '_blank');
         else if (opcion === 'privacidad') window.open('https://www.pikt.es/politica.html', '_blank');
-
-        // --- CAMBIO: AHORA ABRE EL HUB DE SELECCIÓN ---
-        else if (opcion === 'games_hub') setVistaActual('GAMES_HUB');
     };
 
-    // --- RENDERIZADO DE VISTAS ESPECIALES ---
+    // --- RENDERIZADO CONDICIONAL DE VISTAS ---
 
-    if (vistaActual === 'QUESTION_SENDER') {
-        return <QuestionSenderClient usuario={null} onBack={() => setVistaActual('LOGIN')} />;
-    }
-
-    // VISTA JUEGO MATHLE
-    if (vistaActual === 'MATHLE') {
-        return <MathWordleGame usuario={null} onExit={() => {
-            window.history.pushState({}, '', '/Desafios'); // <--- VUELVE A DESAFIOS
-            setVistaActual('GAMES_HUB');
-        }} />;
-    }
-
-    if (vistaActual === 'WORDLE') {
-        return <TextWordleGame usuario={null} onExit={() => {
-            window.history.pushState({}, '', '/Desafios'); // <--- VUELVE A DESAFIOS
-            setVistaActual('GAMES_HUB');
-        }} />;
-    }
-
-    // --- NUEVA VISTA: HUB DE SELECCIÓN (PANTALLA INTERMEDIA) ---
-    if (vistaActual === 'GAMES_HUB') {
+    // 1. VISTA DE LOS MÁS POPULARES
+    if (vistaActual === 'POPULARES') {
         return (
-            <div style={styles.hubContainer}>
-                <button onClick={() => setVistaActual('LOGIN')} style={styles.backBtnAbsolute}><ArrowLeft size={20} /> Volver</button>
-                <div style={styles.hubCard}>
-                    <h1 style={{ color: '#2c3e50', marginBottom: '10px' }}>🎮 Zona de Juegos</h1>
-                    <p style={{ color: '#666', marginBottom: '30px' }}>Elige tu desafío diario:</p>
-
-                    <div style={styles.hubGrid}>
-                        {/* TARJETA MATHLE */}
-                        <div style={styles.gameOptionCard} onClick={() => {
-                            window.history.pushState({}, '', '/Mathle'); // <--- CAMBIA LA URL
-                            setVistaActual('MATHLE');
-                        }}>
-
-
-                            <div style={{ ...styles.iconCircle, background: '#e3f2fd', color: '#1565C0' }}>
-                                <Calculator size={32} />
-                            </div>
-                            <h3>MathLe</h3>
-                            <p>Adivina la operación oculta</p>
-                        </div>
-
-                        {/* TARJETA WORDLE */}
-                        <div style={styles.gameOptionCard} onClick={() => {
-                            window.history.pushState({}, '', '/Wordle'); // <--- CAMBIA LA URL
-                            setVistaActual('WORDLE');
-                        }}>
-
-
-                            <div style={{ ...styles.iconCircle, background: '#e8f5e9', color: '#2e7d32' }}>
-                                <Type size={32} />
-                            </div>
-                            <h3>WordLe</h3>
-                            <p>Adivina la palabra de 5 letras</p>
-                        </div>
+            <div style={styles.container}>
+                <button onClick={() => handleMenuClick('inicio')} style={styles.homeBtnAbsolute}>Volver al Inicio</button>
+                <div style={{ background: 'rgba(255,255,255,0.95)', padding: '30px', borderRadius: '20px', width: '90%', maxWidth: '1000px', margin: '60px auto' }}>
+                    <h2 style={{ textAlign: 'center', color: '#2c3e50', marginBottom: '30px' }}>🔥 Los Juegos Más Populares</h2>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
+                        {topGames.map(r => <ResourceCard key={r.id} r={r} onClick={() => console.log("Abriendo desde populares")} />)}
                     </div>
                 </div>
             </div>
         );
     }
 
-    // --- VISTA NORMAL (LOGIN) ---
+    // 2. VISTA ESPECÍFICA DE UN JUEGO (A pantalla completa)
+    // 2. JUEGOS DIRECTOS (WordLe y MathLe abren su propia interfaz original)
+    if (vistaActual === 'WORDLE') {
+        return <TextWordleGame usuario={null} onExit={() => handleMenuClick('inicio')} />;
+    }
+    if (vistaActual === 'MATHLE') {
+        return <MathWordleGame usuario={null} onExit={() => handleMenuClick('inicio')} />;
+    }
+
+
+    const appData = APPS.find(a => a.id === vistaActual);
+    if (appData) {
+        return <SpecificGamePage appData={appData} onHome={() => handleMenuClick('inicio')} />;
+    }
+
+    // 3. VISTA PRINCIPAL (Landing normal + Login Arriba a la derecha)
     return (
         <div style={styles.container}>
-            <button onClick={toggleMenu} style={styles.menuButton}>
-                <Menu size={32} color="white" />
-            </button>
+            {/* CABECERA */}
+            <header style={styles.header}>
+                <button onClick={() => setMenuOpen(true)} style={styles.menuButton}><Menu size={28} color="white" /></button>
 
+                {/* LOGIN PEQUEÑO SUPERIOR DERECHO */}
+                <div style={styles.smallLoginBox}>
+                    <img src={logoPikt} alt="Logo" style={{ width: '30px', height: '30px', borderRadius: '50%' }} />
+                    <button onClick={handleLogin} disabled={loading} style={styles.smallLoginBtn}>
+                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="G" style={{ width: '16px' }} />
+                        {loading ? '...' : 'Entrar'}
+                    </button>
+                    {error && <span style={{ color: 'red', fontSize: '10px' }}>{error}</span>}
+                </div>
+            </header>
+
+            {/* MENÚ LATERAL */}
             {menuOpen && (
-                <div style={styles.menuOverlay} onClick={toggleMenu}>
+                <div style={styles.menuOverlay} onClick={() => setMenuOpen(false)}>
                     <div style={styles.menuPanel} onClick={(e) => e.stopPropagation()}>
                         <div style={styles.menuHeader}>
-                            <h2 style={styles.menuTitle}>Menú</h2>
-                            <button onClick={toggleMenu} style={styles.closeButton}><X size={28} color="#2c3e50" /></button>
+                            <h2 style={{ margin: 0 }}>Menú</h2>
+                            <button onClick={() => setMenuOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={28} /></button>
                         </div>
                         <ul style={styles.menuList}>
-                            <li style={styles.menuItem} onClick={() => handleMenuClick('unete')}>Únete a PiKT</li>
-                            <li style={styles.menuItem} onClick={() => handleMenuClick('buscador')}>Buscador de juegos</li>
-
-                            {/* --- ENLACE AL HUB DE JUEGOS --- */}
-                            <li style={{ ...styles.menuItem, background: '#f0f4c3', fontWeight: 'bold', color: '#827717' }} onClick={() => handleMenuClick('games_hub')}>
-                                🎮 Juegos Diarios (Math/Word)
-                            </li>
-
-                            <li style={styles.menuItem} onClick={() => handleMenuClick('populares')}>Los juegos más populares</li>
-                            <li style={styles.menuItem} onClick={() => handleMenuClick('que-hacer')}>¿Qué puedo hacer?</li>
-                            <li style={styles.menuItem} onClick={() => handleMenuClick('privacidad')}>Política de privacidad</li>
+                            <li style={styles.menuItem} onClick={() => handleMenuClick('inicio')}>🏠 Inicio</li>
+                            <li style={styles.menuItem} onClick={() => handleMenuClick('populares')}>🔥 Los juegos más populares</li>
+                            <li style={styles.menuItem} onClick={() => handleMenuClick('que-hacer')}>❓ ¿Qué puedo hacer?</li>
+                            <li style={styles.menuItem} onClick={() => handleMenuClick('privacidad')}>🔒 Política de privacidad</li>
                         </ul>
-                        <div style={styles.menuFooter}>PiKT © 2024</div>
                     </div>
                 </div>
             )}
 
-            <div style={styles.scrollWrapper}>
-                <div style={styles.card} id="login-card">
-                    <div style={styles.logoArea}>
-                        <div style={styles.logoImageContainer}>
-                            <img src={logoPikt} alt="PiKT Logo" style={styles.logoImage} />
-                        </div>
-                        <h1 style={styles.title}>PiKT</h1>
-                    </div>
-                    <p style={styles.slogan}>Juega, aprende y repite</p>
-                    <div style={styles.divider}></div>
-                    <p style={styles.welcomeText}>Bienvenido a tu plataforma de aprendizaje gamificado.</p>
-                    {error && <div style={styles.error}>{error}</div>}
-                    <button onClick={handleLogin} disabled={loading} style={loading ? styles.buttonDisabled : styles.button}>
-                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="G" style={styles.googleIcon} />
-                        {loading ? 'Conectando...' : 'Entrar con Google'}
-                    </button>
-                    <p style={styles.footer}>Gestión Docente & Gamificación</p>
-                    <div style={{ marginTop: '15px', fontSize: '11px' }}>
-                        <a href="https://www.pikt.es/politica.html" target="_blank" rel="noopener noreferrer" style={{ color: '#7f8c8d', textDecoration: 'underline' }}>Política de Privacidad</a>
-                    </div>
+            {/* CONTENIDO PRINCIPAL */}
+            <div style={{ width: '80%', maxWidth: '1000px', margin: '80px auto 0 auto', padding: '0 20px', zIndex: 10 }}>
+                <div style={{ textAlign: 'center', color: 'white', marginBottom: '20px', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
+                    <h1 style={{ fontSize: '3rem', margin: 0 }}>PiKT</h1>
+                    <p style={{ fontSize: '1.2rem', fontStyle: 'italic', opacity: 0.9 }}>Juega, aprende y repite</p>
                 </div>
 
-                <LandingGames onLoginRequest={handleLogin} onOpenQuestionSender={() => setVistaActual('QUESTION_SENDER')} />
+                {/* AQUÍ CARGA EL COMPONENTE QUE HAS ACTUALIZADO ARRIBA */}
+                <LandingGames />
             </div>
         </div>
     );
 }
 
-// ESTILOS ACTUALIZADOS
 const styles = {
-    container: { minHeight: '100vh', width: '100%', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', fontFamily: "'Segoe UI', Roboto, sans-serif", display: 'flex', justifyContent: 'center', padding: '40px 20px', boxSizing: 'border-box', overflowY: 'auto', position: 'relative' },
-    menuButton: { position: 'absolute', top: '20px', left: '20px', background: 'rgba(255, 255, 255, 0.2)', border: 'none', borderRadius: '8px', padding: '8px', cursor: 'pointer', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(5px)' },
-    menuOverlay: { position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.5)', zIndex: 100, display: 'flex', justifyContent: 'flex-start' },
-    menuPanel: { width: '80%', maxWidth: '300px', height: '100%', backgroundColor: 'white', boxShadow: '2px 0 10px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', animation: 'slideIn 0.3s ease-out' },
-    menuHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px', borderBottom: '1px solid #eee' },
-    menuTitle: { margin: 0, color: '#2c3e50', fontSize: '1.5rem', fontWeight: 'bold' },
-    closeButton: { background: 'transparent', border: 'none', cursor: 'pointer', padding: '5px' },
-    menuList: { listStyle: 'none', padding: '0', margin: '0', flex: 1, overflowY: 'auto' },
-    menuItem: { padding: '20px', borderBottom: '1px solid #f0f0f0', color: '#34495e', fontSize: '1.1rem', fontWeight: '500', cursor: 'pointer', transition: 'background 0.2s' },
-    menuFooter: { padding: '20px', textAlign: 'center', color: '#bdc3c7', fontSize: '0.8rem', borderTop: '1px solid #eee' },
+    container: { minHeight: '100vh', width: '100%', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', fontFamily: "'Segoe UI', Roboto, sans-serif", overflowY: 'auto', position: 'relative' },
 
-    // --- ESTILOS DEL LOGIN ---
-    scrollWrapper: { width: '100%', maxWidth: '600px', display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 10, marginTop: '20px' },
-    card: { background: 'rgba(255, 255, 255, 0.95)', padding: '40px', borderRadius: '24px', boxShadow: '0 20px 50px rgba(0,0,0,0.2)', width: '100%', textAlign: 'center', backdropFilter: 'blur(10px)', marginBottom: '20px', boxSizing: 'border-box' },
-    logoArea: { display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '10px' },
-    logoImageContainer: { marginBottom: '15px', filter: 'drop-shadow(0 10px 20px rgba(0,0,0,0.2))' },
-    logoImage: { width: '120px', height: '120px', borderRadius: '50%', objectFit: 'cover' },
-    title: { margin: 0, color: '#2c3e50', fontSize: '2.5rem', fontWeight: '800', letterSpacing: '-1px', background: '-webkit-linear-gradient(45deg, #2c3e50, #3498db)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' },
-    slogan: { margin: '5px 0 20px 0', color: '#7f8c8d', fontSize: '1.2rem', fontWeight: '500', fontStyle: 'italic', letterSpacing: '1px' },
-    divider: { height: 2, background: '#f0f0f0', margin: '20px auto', width: '50%' },
-    welcomeText: { color: '#555', marginBottom: '30px', fontSize: '0.95rem', lineHeight: '1.5' },
-    button: { width: '100%', padding: '12px', borderRadius: '50px', border: '2px solid #e0e0e0', background: 'white', color: '#333', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', transition: 'all 0.3s ease', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' },
-    buttonDisabled: { width: '100%', padding: '12px', borderRadius: '50px', border: '2px solid #f0f0f0', background: '#f9f9f9', color: '#999', cursor: 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' },
-    googleIcon: { width: '24px', height: '24px' },
-    error: { color: '#e74c3c', fontSize: '0.9rem', marginBottom: '15px', background: '#fadbd8', padding: '10px', borderRadius: '8px' },
-    footer: { marginTop: '30px', fontSize: '0.8rem', color: '#bdc3c7' },
+    // Header y Menu
+    header: { position: 'fixed', top: 0, left: 0, width: '100%', padding: '15px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 50, boxSizing: 'border-box' },
+    menuButton: { background: 'rgba(255, 255, 255, 0.2)', border: 'none', borderRadius: '8px', padding: '8px', cursor: 'pointer', backdropFilter: 'blur(5px)' },
 
-    // --- ESTILOS DEL GAME HUB (SELECCIÓN) ---
-    hubContainer: { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: '#f0f2f5', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 5000 },
-    hubCard: { background: 'white', padding: '40px', borderRadius: '20px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)', textAlign: 'center', maxWidth: '500px', width: '90%' },
-    hubGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' },
-    gameOptionCard: { background: 'white', border: '1px solid #eee', borderRadius: '15px', padding: '20px', cursor: 'pointer', transition: 'transform 0.2s, boxShadow 0.2s', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' },
-    iconCircle: { width: '60px', height: '60px', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center' },
-    backBtnAbsolute: { position: 'absolute', top: '20px', left: '20px', background: 'transparent', border: 'none', color: '#555', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 'bold' }
+    // Login Mini Top Right
+    smallLoginBox: { background: 'rgba(255, 255, 255, 0.9)', padding: '5px 15px', borderRadius: '30px', display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 4px 10px rgba(0,0,0,0.2)' },
+    smallLoginBtn: { background: 'white', border: '1px solid #ccc', borderRadius: '20px', padding: '6px 12px', fontSize: '0.9rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' },
+
+    // Panel Menú Lateral
+    menuOverlay: { position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.5)', zIndex: 100 },
+    menuPanel: { width: '80%', maxWidth: '300px', height: '100%', backgroundColor: 'white', display: 'flex', flexDirection: 'column' },
+    menuHeader: { display: 'flex', justifyContent: 'space-between', padding: '20px', borderBottom: '1px solid #eee' },
+    menuList: { listStyle: 'none', padding: 0, margin: 0 },
+    menuItem: { padding: '20px', borderBottom: '1px solid #eee', cursor: 'pointer', fontSize: '1.1rem', color: '#333' },
+
+    homeBtnAbsolute: { position: 'absolute', top: '20px', left: '20px', background: 'rgba(255,255,255,0.9)', border: 'none', padding: '10px 15px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }
 };
-
-// Animación Menú
-const styleSheet = document.createElement("style");
-styleSheet.innerText = `
-@keyframes slideIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }
-.gameOptionCard:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); border-color: #2196F3; }
-`;
-document.head.appendChild(styleSheet);

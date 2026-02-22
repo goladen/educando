@@ -52,6 +52,11 @@ const esJuegoEnVivo = (r) => {
 
 const getAppInfo = (tipoJuego) => {
     if (!tipoJuego) return { name: 'Recurso', color: '#999' };
+
+    if (tipoJuego === 'CAZABURBUJAS' || tipoJuego === 'PIKATRON') {
+        return { name: 'Burbujas/Pikatron', color: '#de896e' };
+    }
+
     const app = APPS.find(a => a.id === tipoJuego);
     if (app) return app;
     if (tipoJuego === 'PRO') return { name: 'PiLive', color: '#9C27B0' };
@@ -145,7 +150,13 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
                         if (filtros.tipoJuego === 'THINKHOOT') {
                             // Si busca PiLive, nos aseguramos que no se cuele Wordle
                             if (!esJuegoEnVivo(r) || r.tipoJuego === 'MATHLIVE') return false;
-                        } else {
+                        } else if (filtros.tipoJuego === 'CAZABURBUJAS') {
+                            if (r.tipoJuego !== 'CAZABURBUJAS' && r.tipoJuego !== 'PIKATRON') return false;
+                        }
+
+
+
+                        else {
                             if (r.tipoJuego !== filtros.tipoJuego) return false;
                         }
                     }
@@ -252,11 +263,14 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
     }
 
     // 3. Single Player
+    // 3. Single Player
     if (juegoActivo) {
         if (juegoActivo.modoEspecial === 'PIKATRON') return <PikatronRun recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'RULETA') return <RuletaGame recurso={juegoActivo} usuario={null} alTerminar={() => setJuegoActivo(null)} />;
-        if (appData.id === 'MATHLE' || juegoActivo.tipoJuego === 'MATHLE') return <MathWordleGame usuario={null} onExit={() => setJuegoActivo(null)} />;
-        if (appData.id === 'WORDLE' || juegoActivo.tipoJuego === 'WORDLE') return <TextWordleGame recursoInicial={juegoActivo} usuario={null} onExit={() => setJuegoActivo(null)} />;
+
+        // --- CORRECCIÓN: Quitamos appData porque aquí no existe ---
+        if (juegoActivo.tipoJuego === 'MATHLE') return <MathWordleGame usuario={null} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'WORDLE') return <TextWordleGame recursoInicial={juegoActivo} usuario={null} onExit={() => setJuegoActivo(null)} />;
 
         return <GamePlayer recurso={juegoActivo} usuario={null} alTerminar={() => setJuegoActivo(null)} />;
     }
@@ -427,7 +441,15 @@ export const SpecificGamePage = ({ appData, onHome }) => {
                 const snap = await getDocs(q);
                 if (!snap.empty) {
                     const data = snap.docs[0].data();
-                    const esEsteJuego = data.tipoJuego === appData.id;
+                    //const esEsteJuego = data.tipoJuego === appData.id;
+                    let esEsteJuego = data.tipoJuego === appData.id;
+                    if (appData.id === 'CAZABURBUJAS' || appData.id === 'PIKATRON') {
+                        esEsteJuego = (data.tipoJuego === 'CAZABURBUJAS' || data.tipoJuego === 'PIKATRON');
+                    }
+
+
+
+
                     const esPiLiveAntiguo = appData.id === 'THINKHOOT' && data.tipo === 'PRO' && data.tipoJuego !== 'WORDLE';
 
                     if (esEsteJuego || esPiLiveAntiguo) {
@@ -440,7 +462,15 @@ export const SpecificGamePage = ({ appData, onHome }) => {
                 const q = query(ref, limit(150));
                 const snap = await getDocs(q);
                 filtrados = snap.docs.map(d => ({ ...d.data(), id: d.id })).filter(r => {
-                    const esEsteJuego = r.tipoJuego === appData.id;
+                  //  const esEsteJuego = r.tipoJuego === appData.id;
+                    let esEsteJuego = r.tipoJuego === appData.id;
+                    if (appData.id === 'CAZABURBUJAS' || appData.id === 'PIKATRON') {
+                        esEsteJuego = (r.tipoJuego === 'CAZABURBUJAS' || r.tipoJuego === 'PIKATRON');
+                    }
+
+
+
+
                     const esPiLiveAntiguo = appData.id === 'THINKHOOT' && r.tipo === 'PRO' && r.tipoJuego !== 'WORDLE';
 
                     if (!esEsteJuego && !esPiLiveAntiguo) return false;
@@ -608,5 +638,5 @@ export const SpecificGamePage = ({ appData, onHome }) => {
 }
 
 const styles = {
-    input: { padding: '12px', borderRadius: '8px', border: '1px solid #ccc', outline: 'none', flex: 1, fontSize: '0.95rem' }
+    input: { padding: '12px',width:'100%', borderRadius: '8px', border: '1px solid #ccc', outline: 'none', flex: 1, fontSize: '0.95rem' }
 };

@@ -76,7 +76,13 @@ export default function TextWordleGame({ usuario, onExit, recursoInicial }) {
     });
     useEffect(() => {
         if (recursoInicial) {
-            procesarRecurso(recursoInicial);
+            try {
+                procesarRecurso(recursoInicial);
+            } catch (error) {
+                console.error("Error al iniciar Wordle:", error);
+                alert(error.message);
+                setScreen('CONFIG');
+            }
         }
     }, [recursoInicial]);
     // Función de búsqueda con filtros avanzados
@@ -467,7 +473,7 @@ export default function TextWordleGame({ usuario, onExit, recursoInicial }) {
 
 
             <h1 style={styles.h1}>WORDLE</h1>
-            <p style={{ color: '#aaa', marginBottom: '20px' }}>Configura tu partida</p>
+            <p style={{ color: 'white', marginBottom: '20px' }}>Configura tu partida</p>
 
             {/* --- ZONA 1: JUEGO ALEATORIO --- */}
             <div style={styles.card}>
@@ -539,7 +545,7 @@ export default function TextWordleGame({ usuario, onExit, recursoInicial }) {
                 <div style={{ textAlign: 'right', marginBottom: '10px' }}>
                     <button
                         onClick={() => setMostrarMasFiltros(!mostrarMasFiltros)}
-                        style={{ background: '#3F51B5', border: 'line', color: 'white', fontSize: '12px', cursor: 'pointer', textDecoration: 'underline' }}
+                        style={{ background: '#3F51B580', border: 'line', borderRadius:'4px', color: 'white', fontSize: '12px', cursor: 'pointer', textDecoration: 'underline' }}
                 >
                         {mostrarMasFiltros ? "- Menos filtros" : "+ Más filtros (País, Región...)"}
                     </button>
@@ -762,7 +768,7 @@ const styles = {
         left: 0,
         width: '100%',
         height: '90%',
-        backgroundColor: '#7e7b52',//'#121213',
+        backgroundColor: '#7e7b5280',//'#121213',
         zIndex: 5000,
         color: 'black',
         display: 'flex',
@@ -781,7 +787,7 @@ const styles = {
         borderRadius: '20px',
         boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
         maxWidth: '500px',
-        width: '100%',
+        width: '80%',
         textAlign: 'center',
         marginBottom: '40px' // Un poco de margen abajo por si acaso
     
@@ -799,7 +805,7 @@ const styles = {
     btnSearch: { background: '#1565c0', color: 'white', border: 'none', borderRadius: '5px', padding: '0 15px', cursor: 'pointer' },
 
     header: { padding: '15px', width: '100%', borderBottom: '1px solid #3a3a3c', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxSizing: 'border-box' },
-    timer: { fontFamily: "'Roboto Mono', monospace", background: '#3a3a3c', padding: '5px 10px', borderRadius: '4px' },
+    timer: { fontFamily: "'Roboto Mono', monospace", background: 'white', padding: '5px 10px', borderRadius: '4px' },
 
     gridScroll: { flexGrow: 1, overflowY: 'auto', width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', paddingTop: '20px' },
     gridContainer: { display: 'flex', flexDirection: 'column', gap: '5px' },
@@ -810,7 +816,7 @@ const styles = {
     present: { backgroundColor: '#b59f3b', borderColor: '#b59f3b' },
     absent: { backgroundColor: '#3a3a3c', borderColor: '#3a3a3c' },
 
-    keyboard: { display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', maxWidth: '500px', padding: '10px', paddingBottom: '30px' },
+    keyboard: { display: 'flex', flexDirection: 'column', gap: '6px', width: '85%', maxWidth: '500px', padding: '10px', paddingBottom: '30px' },
     key: { color: 'white', padding: '15px 0', border: 'none', borderRadius: '4px', fontSize: '1.1rem', fontWeight: 'bold', cursor: 'pointer', flex: 1, minWidth: '25px' },
 
     toast: { position: 'absolute', top: '12%', background: 'white', color: 'black', padding: '10px 20px', borderRadius: '20px', fontWeight: 'bold', transition: 'opacity 0.3s', pointerEvents: 'none', zIndex: 6000 },

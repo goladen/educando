@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect, useRef } from 'react';
 import { db } from './firebase';
-import { doc, updateDoc, addDoc, collection, query, where, getDocs, orderBy, limit, getCountFromServer } from 'firebase/firestore';
+import { doc, updateDoc, addDoc, collection, query, where, getDocs, orderBy, limit, getCountFromServer,increment } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
 
 // --- IMPORTACIÓN DE AUDIOS ---
@@ -262,6 +262,13 @@ export default function PasapalabraGame({ recurso, usuario, alTerminar }) {
         }
         setTurno(0);
         // CAMBIO: Ir a cuenta atrás antes de JUEGO
+
+        try {
+            const refR = doc(db, 'resources', recurso.id);
+           updateDoc(refR, { playCount: increment(1) });
+        } catch (e) { console.error("Error sumando partida:", e); }
+
+
         setFase('COUNTDOWN');
     };
 
@@ -594,8 +601,10 @@ const Tablero = ({ jugadores, setJugadores, turno, setTurno, modoDuelo, playSoun
 };
 
 // --- PANTALLA FIN ---
+// --- PANTALLA FIN ---
 const PantallaFin = ({ jugadores, recurso, hoja, usuario, modoDuelo, esInvitado, playSound, onExit }) => {
     const [guardando, setGuardando] = useState(false);
+    const [nombreInvitado, setNombreInvitado] = useState(''); // <--- NUEVO ESTADO PARA INVITADOS
 
     useEffect(() => {
         playSound('WIN');
@@ -618,7 +627,13 @@ const PantallaFin = ({ jugadores, recurso, hoja, usuario, modoDuelo, esInvitado,
     };
 
     const guardar = async () => {
-        if (modoDuelo || esInvitado) return; // Invitados no guardan aquí
+        if (modoDuelo) return; // En duelo no se guarda ranking
+
+        // --- VALIDACIÓN PARA INVITADOS ---
+        if (esInvitado && nombreInvitado.trim().length === 0) {
+            return alert("Escribe un nombre para guardar tu puntuación.");
+        }
+
         setGuardando(true);
         try {
             const score = jugadores[0].aciertos;
@@ -633,21 +648,34 @@ const PantallaFin = ({ jugadores, recurso, hoja, usuario, modoDuelo, esInvitado,
             if (rank === 2) medallaCalc = '🥈';
             if (rank === 3) medallaCalc = '🥉';
 
-            const q = query(rankingRef, where('recursoId', '==', recurso.id), where('categoria', '==', hoja), where('email', '==', usuario.email), where('tipoJuego', '==', 'PASAPALABRA'));
-            const snap = await getDocs(q);
+            const emailGuardar = esInvitado ? 'invitado' : usuario.email;
+            const nombreGuardar = esInvitado ? nombreInvitado : (usuario.displayName || "Anónimo");
 
-            if (!snap.empty) {
-                const docExistente = snap.docs[0];
-                if (score > docExistente.data().aciertos) {
-                    await updateDoc(doc(db, 'ranking', docExistente.id), { aciertos: score, fecha: new Date(), medalla: medallaCalc, recursoTitulo: recurso.titulo });
-                    alert(`¡Nuevo Récord Personal! Estás en la posición #${rank} 🏆`);
-                } else alert(`No has superado tu récord. Posición actual: #${rank}`);
-            } else {
+            if (esInvitado) {
+                // INVITADOS: Siempre crean un registro nuevo
                 await addDoc(rankingRef, {
                     recursoId: recurso.id, recursoTitulo: recurso.titulo, tipoJuego: 'PASAPALABRA', juego: 'Pasapalabra', categoria: hoja,
-                    email: usuario.email, jugador: usuario.displayName || "Anónimo", aciertos: score, fecha: new Date(), medalla: medallaCalc
+                    email: 'invitado', jugador: nombreGuardar, aciertos: score, fecha: new Date(), medalla: medallaCalc
                 });
-                alert(`Puntuación Guardada. Estás en la posición #${rank} 🚀`);
+                alert(`¡Puntuación Guardada como ${nombreGuardar}! Estás en la posición #${rank} 🚀`);
+            } else {
+                // REGISTRADOS: Buscan su registro anterior para actualizarlo
+                const q = query(rankingRef, where('recursoId', '==', recurso.id), where('categoria', '==', hoja), where('email', '==', usuario.email), where('tipoJuego', '==', 'PASAPALABRA'));
+                const snap = await getDocs(q);
+
+                if (!snap.empty) {
+                    const docExistente = snap.docs[0];
+                    if (score > docExistente.data().aciertos) {
+                        await updateDoc(doc(db, 'ranking', docExistente.id), { aciertos: score, fecha: new Date(), medalla: medallaCalc, recursoTitulo: recurso.titulo });
+                        alert(`¡Nuevo Récord Personal! Estás en la posición #${rank} 🏆`);
+                    } else alert(`No has superado tu récord. Posición actual: #${rank}`);
+                } else {
+                    await addDoc(rankingRef, {
+                        recursoId: recurso.id, recursoTitulo: recurso.titulo, tipoJuego: 'PASAPALABRA', juego: 'Pasapalabra', categoria: hoja,
+                        email: usuario.email, jugador: nombreGuardar, aciertos: score, fecha: new Date(), medalla: medallaCalc
+                    });
+                    alert(`Puntuación Guardada. Estás en la posición #${rank} 🚀`);
+                }
             }
             onExit();
         } catch (e) { console.error(e); alert("Error guardando."); setGuardando(false); }
@@ -683,22 +711,30 @@ const PantallaFin = ({ jugadores, recurso, hoja, usuario, modoDuelo, esInvitado,
                 ))}
             </div>
 
-            {/* SI ES INVITADO -> MENSAJE MARKETING */}
-            {esInvitado && (
-                <div style={{ margin: '20px 0', padding: '15px', background: 'rgba(255,255,255,0.1)', borderRadius: '15px' }}>
-                    <p style={{ color: '#eee', lineHeight: '1.5' }}>
-                        Regístrate para <b>guardar tus resultados</b> y descubrir muchos más juegos.
-                    </p>
-                    <p style={{ color: 'white', fontWeight: 'bold' }}>¡Únete a PiKT!</p>
-                    {/* El botón de login lo gestionará el componente padre si se quiere, o simplemente vuelve a Home */}
-                </div>
-            )}
-
-            {/* SI ES REGISTRADO Y NO DUELO -> BOTÓN GUARDAR */}
-            {!modoDuelo && !esInvitado && (
-                <button className="btn-primary" onClick={guardar} disabled={guardando}>
-                    {guardando ? 'Procesando...' : '💾 GUARDAR RESULTADO'}
-                </button>
+            {/* ZONA DE GUARDADO PARA UN JUGADOR (Registrado o Invitado) */}
+            {!modoDuelo && (
+                <>
+                    {esInvitado ? (
+                        <div style={{ margin: '20px 0', padding: '15px', background: 'rgba(255,255,255,0.1)', borderRadius: '15px' }}>
+                            <p style={{ color: '#eee', marginBottom: '10px' }}>Introduce tu nombre para el ranking:</p>
+                            <input
+                                type="text"
+                                placeholder="Tu Nombre"
+                                value={nombreInvitado}
+                                onChange={(e) => setNombreInvitado(e.target.value)}
+                                maxLength={15}
+                                style={{ padding: '10px', borderRadius: '5px', border: 'none', width: '80%', textAlign: 'center', fontWeight: 'bold', fontSize: '1.1rem', marginBottom: '15px' }}
+                            />
+                            <button className="btn-primary" onClick={guardar} disabled={guardando}>
+                                {guardando ? 'Guardando...' : '💾 GUARDAR EN RANKING'}
+                            </button>
+                        </div>
+                    ) : (
+                            <button className="btn-primary" onClick={guardar} disabled={guardando}>
+                                {guardando ? 'Procesando...' : '💾 GUARDAR RESULTADO'}
+                            </button>
+                        )}
+                </>
             )}
 
             <button className="btn-back" onClick={onExit}>

@@ -93,7 +93,18 @@ const generarOperacionesMathLive = (config) => {
                 if (!isDecimal) { const resTemp = isNegative ? (Math.random() > 0.5 ? -getRandomInt(min, max) : getRandomInt(min, max)) : getRandomInt(min, max); a = b * resTemp; }
             }
             if (op === 'SUMA') { operatorSymbol = '+'; res = a + b; }
-            else if (op === 'RESTA') { operatorSymbol = '-'; res = a - b; }
+            else if (op === 'RESTA') {
+                operatorSymbol = '-';
+
+                // --- SEGURO PARA RESTAS: Si solo queremos POSITIVOS, evitamos que dé negativo ---
+                if (!isNegative && b > a) {
+                    const temp = a;
+                    a = b;
+                    b = temp;
+                }
+
+                res = a - b;
+            }
             else if (op === 'MULT') { operatorSymbol = '·'; res = a * b; }
             else if (op === 'DIV') { operatorSymbol = ':'; res = a / b; }
 
@@ -186,7 +197,7 @@ function MathLiveHost({ codigoSala, onExit, usuario }) {
                             hayCambios = true;
                             let puntos = 0;
                             // Lógica de puntos (igual que ThinkHoot)
-                            if (resp.correct && data.preguntas[data.indicePregunta]?.tipo !== 'PRESENTATION') {
+                            if (resp.correct && data.preguntas[data.indicePregunta]?.tipo !== 'PRESENTATION' && data.preguntas[data.indicePregunta]?.tipo !== 'DIBUJO') {
                                 const p = data.preguntas[data.indicePregunta];
                                 const max = parseInt(p.puntosMax || 100);
                                 const min = parseInt(p.puntosMin || 50);
@@ -285,7 +296,13 @@ function MathLiveHost({ codigoSala, onExit, usuario }) {
         if (totalR > 0) { if (pct < 30) newMood = 'angry'; else if (pct >= 60) newMood = 'happy'; }
         setAvatarMood(newMood);
         await updateDoc(doc(db, "live_games", codigoSala), { fasePregunta: 'REVEAL' });
-        setTimeout(async () => await updateDoc(doc(db, "live_games", codigoSala), { fasePregunta: 'LEADERBOARD' }), 5000);
+
+
+
+        const esDibujo = dataActual.preguntas[dataActual.indicePregunta]?.tipo === 'DIBUJO';
+        if (!esDibujo) {
+            setTimeout(async () => await updateDoc(doc(db, "live_games", codigoSala), { fasePregunta: 'LEADERBOARD' }), 5000);
+        }
     };
 
     const siguientePregunta = async (e) => {
@@ -526,16 +543,33 @@ function MathLiveHost({ codigoSala, onExit, usuario }) {
 
                         {subFase === 'REVEAL' && (
                             <div className="host-question-view centered">
-                                <div className="correct-answer-reveal" style={{ marginTop: '150px' }}>
-                                    <div className="reveal-label">Solución:</div>
-                                    {currentP.tipo === 'ORDENAR' ? (
-                                        <div className="ordered-solution">
-                                            {currentP.bloques.map((b, i) => <span key={i} className="order-chip">{parseText(b)}</span>)}
+                                {currentP.tipo === 'DIBUJO' ? (
+                                    // --- CORRECCIÓN MANUAL DE DIBUJOS ---
+                                    <ManualGrader
+                                        respuestas={gameData.respuestasRonda || {}}
+                                        puntosMax={parseInt(currentP.puntosMax) || 1000}
+                                        jugadores={jugadores}
+                                        onTerminar={async (notas) => {
+                                            const updates = {};
+                                            Object.entries(notas).forEach(([uid, puntos]) => {
+                                                if (puntos > 0) updates[`jugadores.${uid}.puntos`] = increment(puntos);
+                                            });
+                                            updates['fasePregunta'] = 'LEADERBOARD';
+                                            await updateDoc(doc(db, "live_games", codigoSala), updates);
+                                        }}
+                                    />
+                                ) : (
+                                        <div className="correct-answer-reveal" style={{ marginTop: '150px' }}>
+                                            <div className="reveal-label">Solución:</div>
+                                            {currentP.tipo === 'ORDENAR' ? (
+                                                <div className="ordered-solution">
+                                                    {currentP.bloques.map((b, i) => <span key={i} className="order-chip">{parseText(b)}</span>)}
+                                                </div>
+                                            ) : (
+                                                    <div className="reveal-text">{parseText(correctStr)}</div>
+                                                )}
                                         </div>
-                                    ) : (
-                                            <div className="reveal-text">{parseText(correctStr)}</div>
-                                        )}
-                                </div>
+                                    )}
                             </div>
                         )}
 
@@ -642,7 +676,7 @@ function MathLiveClient({ codigoSala, usuario, onExit }) {
         return () => unsubscribe();
     }, [codigoSala]);
 
-    const notificarRespuesta = async (esCorrecta) => {
+    const notificarRespuesta = async (esCorrecta, dibujoBase64 = null) => {
         const respuestaData = {
             uid: myUid,
             correct: esCorrecta,
@@ -650,6 +684,8 @@ function MathLiveClient({ codigoSala, usuario, onExit }) {
             timestamp: Date.now(),
             processed: false
         };
+        // Si hay dibujo, lo adjuntamos
+        if (dibujoBase64) respuestaData.dibujo = dibujoBase64;
         await updateDoc(doc(db, "live_games", codigoSala), { [`respuestasRonda.${myUid}`]: respuestaData });
     };
 
@@ -772,10 +808,10 @@ function ClientQuestionEngine({ data, config, startTime, subFase, myResult, corr
         return () => clearInterval(interval);
     }, [startTime, subFase, answeredLocal, myResult, data]);
 
-    const handleAnswer = (isCorrect) => {
+    const handleAnswer = (isCorrect, extraData = null) => {
         if (answeredLocal) return;
         setAnsweredLocal(true);
-        onResponded(isCorrect);
+        onResponded(isCorrect, extraData);
     };
 
     if (data.tipo === 'PRESENTATION') {
@@ -873,14 +909,43 @@ const QuestionDisplay = memo(function QuestionDisplay({ data, onAnswer, disabled
         // RESETEO COMPLETO
         setValNum(''); setValDen(''); setFocusField('NUM'); setTexto('');
 
+        // 1. TIPO ORDENAR (Con barajado matemático robusto)
         if (data.tipo === 'ORDENAR' && data.bloques) {
-            setOrden(isHostView ? data.bloques : [...data.bloques].sort(() => Math.random() - 0.5));
-            if (!isHostView) setSlots(new Array(data.bloques.length).fill(null));
+            if (isHostView) {
+                setOrden(data.bloques);
+            } else {
+                let mezclado = [...data.bloques];
+
+                // Algoritmo Fisher-Yates para barajar de verdad
+                for (let i = mezclado.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [mezclado[i], mezclado[j]] = [mezclado[j], mezclado[i]];
+                }
+
+                // SEGURO ANTI-CASUALIDADES
+                if (mezclado.length > 1 && JSON.stringify(mezclado) === JSON.stringify(data.bloques)) {
+                    [mezclado[0], mezclado[1]] = [mezclado[1], mezclado[0]];
+                }
+
+                setOrden(mezclado);
+                setSlots(new Array(data.bloques.length).fill(null));
+            }
         }
 
+        // 2. SELECCIÓN MÚLTIPLE - Barajado inicial robusto
         const rawOptions = data.opcionesFijas || [data.respuesta || data.correcta, ...(data.incorrectas || [])];
         const validOptions = rawOptions.filter(opt => opt && String(opt).trim() !== "");
-        if (validOptions.length > 0) setOpcionesMezcladas([...validOptions].sort(() => Math.random() - 0.5));
+
+        if (validOptions.length > 0) {
+            let opcionesM = [...validOptions];
+            // Aplicamos también el barajado matemático a las respuestas tipo test
+            for (let i = opcionesM.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [opcionesM[i], opcionesM[j]] = [opcionesM[j], opcionesM[i]];
+            }
+            setOpcionesMezcladas(opcionesM);
+        }
+
     }, [data, isHostView]);
 
     // MANEJADORES
@@ -911,8 +976,8 @@ const QuestionDisplay = memo(function QuestionDisplay({ data, onAnswer, disabled
     const isRellenar = data.tipo === 'RELLENAR';
     // CORRECCIÓN: Solo es múltiple si hay MÁS DE 1 opción. Si solo hay 1, es respuesta corta.
     const isMultiple = (opcionesMezcladas.length > 1) && !isOrdenar && !isRellenar && !isMath;
-    const isShortAnswer = !isMultiple && !isOrdenar && !isRellenar && !isMath;
-
+    
+    const isShortAnswer = !isMultiple && !isOrdenar && !isRellenar && !isMath && data.tipo !== 'DIBUJO';
     return (
         <div className="question-card">
             <h2>{parseText(data.q || data.pregunta)}</h2>
@@ -985,6 +1050,15 @@ const QuestionDisplay = memo(function QuestionDisplay({ data, onAnswer, disabled
                 <div className="short-answer-ruleta">
                     <input placeholder="Escribe tu respuesta..." value={texto} onChange={e => setTexto(e.target.value)} disabled={disabled} onKeyDown={(e) => { if (e.key === 'Enter') onAnswer(clean(texto) === clean(data.a || data.respuesta)) }} />
                     <button onClick={() => onAnswer(clean(texto) === clean(data.a || data.respuesta))} disabled={disabled}>ENVIAR</button>
+                </div>
+            )}
+
+            {data.tipo === 'DIBUJO' && !isHostView && (
+                <DrawingPad onSend={(isCorrect, base64) => onAnswer(isCorrect, base64)} disabled={disabled} />
+            )}
+            {data.tipo === 'DIBUJO' && isHostView && (
+                <div style={{ color: '#bdc3c7', fontSize: '1.2rem', marginTop: '20px', textAlign: 'center' }}>
+                    🖌️ Los alumnos están dibujando...
                 </div>
             )}
 
@@ -1694,3 +1768,137 @@ const EstilosThinkHoot = () => (
 
     `}</style>
 );
+
+// ==========================================
+// COMPONENTES NUEVOS: DIBUJO Y CORRECCIÓN
+// ==========================================
+
+function DrawingPad({ onSend, disabled }) {
+    const canvasRef = useRef(null);
+    const [isDrawing, setIsDrawing] = useState(false);
+    const [color, setColor] = useState('#2c3e50');
+
+    // Prevenir scroll en móviles al dibujar
+    // Prevenir scroll en móviles al dibujar y dar fondo blanco real
+    useEffect(() => {
+        const preventScroll = (e) => e.preventDefault();
+        const canvas = canvasRef.current;
+        if (canvas) {
+            // --- NUEVO: PINTAR EL FONDO DE BLANCO REAL ---
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            // ---------------------------------------------
+
+            canvas.addEventListener('touchmove', preventScroll, { passive: false });
+            return () => canvas.removeEventListener('touchmove', preventScroll);
+        }
+    }, []);
+
+    const getPos = (e) => {
+        const canvas = canvasRef.current;
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return { x: clientX - rect.left, y: clientY - rect.top };
+    };
+
+    const startDraw = (e) => {
+        if (disabled) return;
+        setIsDrawing(true);
+        const pos = getPos(e);
+        const ctx = canvasRef.current.getContext('2d');
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y);
+    };
+
+    const draw = (e) => {
+        if (!isDrawing || disabled) return;
+        const pos = getPos(e);
+        const ctx = canvasRef.current.getContext('2d');
+        ctx.strokeStyle = color === 'ERASER' ? '#ffffff' : color;
+        ctx.lineWidth = color === 'ERASER' ? 20 : 4;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.lineTo(pos.x, pos.y);
+        ctx.stroke();
+    };
+
+    const stopDraw = () => setIsDrawing(false);
+
+    const handleSend = () => {
+        // Se envía en JPEG muy comprimido (0.4) para no saturar Firebase
+        const base64 = canvasRef.current.toDataURL('image/jpeg', 0.4);
+        onSend(true, base64);
+    };
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems: 'center', marginTop: '20px' }}>
+            <canvas
+                ref={canvasRef}
+                width={300}
+                height={250}
+                style={{ background: 'white', border: '3px solid #bdc3c7', borderRadius: '15px', touchAction: 'none' }}
+                onMouseDown={startDraw} onMouseMove={draw} onMouseUp={stopDraw} onMouseLeave={stopDraw}
+                onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={stopDraw}
+            />
+            {!disabled && (
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    {['#2c3e50', '#e74c3c', '#3498db', '#2ecc71', 'ERASER'].map(c => (
+                        <button key={c} onClick={() => setColor(c)} style={{ width: 45, height: 45, borderRadius: '50%', background: c === 'ERASER' ? '#ecf0f1' : c, border: color === c ? '4px solid #f1c40f' : '2px solid transparent', fontSize: '1.2rem', cursor: 'pointer' }}>
+                            {c === 'ERASER' ? '🧹' : ''}
+                        </button>
+                    ))}
+                </div>
+            )}
+            {!disabled && <button className="btn-confirmar-amarillo" onClick={handleSend} style={{ marginTop: '10px' }}>ENVIAR DIBUJO</button>}
+        </div>
+    );
+}
+
+function ManualGrader({ respuestas, puntosMax, jugadores, onTerminar }) {
+    const [index, setIndex] = useState(0);
+    const [notas, setNotas] = useState({});
+
+    // Filtramos solo los que han enviado dibujo
+    const arr = Object.entries(respuestas).filter(([uid, r]) => r.dibujo);
+
+    if (arr.length === 0) return <div style={{ color: 'white' }}>Nadie envió un dibujo. <button onClick={() => onTerminar({})}>Continuar</button></div>;
+
+    const currentUid = arr[index][0];
+    const currentData = arr[index][1];
+    const currentNota = notas[currentUid] || 0;
+
+    const handleNext = () => {
+        if (index < arr.length - 1) setIndex(index + 1);
+        else onTerminar(notas); // Enviar todas las notas a Firebase
+    };
+
+    return (
+        < div className = "question-card" style = {{ width: '90%', maxWidth: '500px', background: 'white', padding: '30px', borderRadius: '20px', color: '#2c3e50' }
+}>
+            <h2 style={{ color: '#3498db' }}>Corrigiendo a: {jugadores.find(j => j.uid === currentUid)?.nombre}</h2>
+
+            <img src={currentData.dibujo} style={{ width: '100%', maxWidth: '300px', border: '3px solid #bdc3c7', borderRadius: '10px', background: 'white', margin: '20px 0' }} alt="Dibujo alumno" />
+
+            <div style={{ marginBottom: '20px' }}>
+                <input
+                    type="range"
+                    min="0"
+                    max={puntosMax}
+                    value={currentNota}
+                    onChange={e => setNotas({ ...notas, [currentUid]: parseInt(e.target.value) })}
+                    style={{ width: '100%', cursor: 'pointer' }}
+                />
+                <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#f1c40f', marginTop: '10px' }}>
+                    {currentNota} / {puntosMax} pts
+                </div>
+            </div>
+
+            <button className="btn-confirmar-amarillo" onClick={handleNext}>
+                {index < arr.length - 1 ? 'Siguiente Dibujo ➡️' : 'Terminar Corrección ✅'}
+            </button>
+            <p style={{ marginTop: '15px', color: '#7f8c8d' }}>Dibujo {index + 1} de {arr.length}</p>
+        </div>
+    );
+}

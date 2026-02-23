@@ -122,6 +122,7 @@ export default function EditorPro({ datos, setDatos, onClose, onSave, usuario })
                         <option value="ORDENAR">Ordenar</option>
                         <option value="RELLENAR">Rellenar Hueco</option>
                         <option value="PRESENTATION">Presentación</option>
+                        <option value="DIBUJO">Dibujo en Pizarra</option>
                     </select>
 
                     {tipo !== 'PRESENTATION' && (
@@ -211,6 +212,25 @@ export default function EditorPro({ datos, setDatos, onClose, onSave, usuario })
                         <input placeholder="Enunciado Inferior" value={p.bloques?.[2] || ''} onChange={e => updatePreguntaArray(i, 'bloques', 2, e.target.value)} className="inp" />
                     </div>
                 )}
+
+                {/* --- NUEVO BLOQUE PARA DIBUJO --- */}
+                {tipo === 'DIBUJO' && (
+                    <div style={{ border: '2px dashed #e67e22', padding: '10px', borderRadius: '5px', background: '#fdf3e8', marginTop: '5px' }}>
+                        <div style={{ textAlign: 'center', color: '#d35400', fontSize: '12px', marginBottom: '5px', fontWeight: 'bold' }}>
+                            🖌️ Pizarra Digital (El profesor corrige manualmente)
+                        </div>
+                        <input
+                            placeholder="Enunciado (Ej: Dibuja una célula vegetal y sus partes)"
+                            value={p.pregunta}
+                            onChange={e => updatePregunta(i, 'pregunta', e.target.value)}
+                            className="inp"
+                            style={{ fontWeight: 'bold', borderColor: '#e67e22' }}
+                        />
+                    </div>
+                )}
+
+
+
             </div>
         );
     };

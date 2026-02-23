@@ -134,6 +134,8 @@ export default function EditorMathLive({ datos, setDatos, onClose, onSave, usuar
                         <option value="ORDENAR">Ordenar</option>
                         <option value="RELLENAR">Rellenar Hueco</option>
                         <option value="PRESENTATION">Presentación</option>
+                        <option value="DIBUJO">Dibujo en Pizarra</option>
+
                     </select>
                     {tipo !== 'PRESENTATION' && (
                         <>
@@ -149,6 +151,24 @@ export default function EditorMathLive({ datos, setDatos, onClose, onSave, usuar
                 {tipo === 'ORDENAR' && (<><input placeholder="Enunciado (Ej: Ordena la frase...)" value={p.pregunta} onChange={e => updatePregunta(i, 'pregunta', e.target.value)} className="inp" style={{ fontWeight: 'bold' }} /><div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '5px' }}><label style={{ fontSize: '12px', color: '#666' }}>Nº Bloques:</label><select value={p.numBloques || 4} onChange={e => { const num = parseInt(e.target.value); updatePregunta(i, 'numBloques', num); const currentBloques = p.bloques || []; const newBloques = Array(num).fill('').map((_, idx) => currentBloques[idx] || ''); updatePregunta(i, 'bloques', newBloques); }} style={miniSelect}>{[2, 3, 4, 5, 6, 7, 8].map(n => <option key={n} value={n}>{n}</option>)}</select></div><div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>{(p.bloques || Array(p.numBloques || 4).fill('')).map((b, k) => (<input key={k} placeholder={`Parte ${k + 1}`} value={b} onChange={e => updatePreguntaArray(i, 'bloques', k, e.target.value)} className="inp" style={{ flex: '1 1 45%', minWidth: '100px' }} />))}</div></>)}
                 {tipo === 'RELLENAR' && (<><input placeholder="Enunciado (Ej: Completa la frase...)" value={p.pregunta} onChange={e => updatePregunta(i, 'pregunta', e.target.value)} className="inp" style={{ fontWeight: 'bold' }} /><div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: '#f9f9f9', padding: '10px', borderRadius: '5px' }}><input placeholder="Primera parte..." value={p.bloques?.[0] || ''} onChange={e => updatePreguntaArray(i, 'bloques', 0, e.target.value)} className="inp" style={{ flex: 1 }} /><input placeholder="[ A RELLENAR ]" value={p.bloques?.[1] || ''} onChange={e => updatePreguntaArray(i, 'bloques', 1, e.target.value)} className="inp" style={{ flex: 0.5, borderColor: '#3498db', fontWeight: 'bold', textAlign: 'center' }} /><input placeholder="Segunda parte..." value={p.bloques?.[2] || ''} onChange={e => updatePreguntaArray(i, 'bloques', 2, e.target.value)} className="inp" style={{ flex: 1 }} /></div></>)}
                 {tipo === 'PRESENTATION' && (<div style={{ border: '2px dashed #95a5a6', padding: '10px', borderRadius: '5px' }}><div style={{ textAlign: 'center', color: '#95a5a6', fontSize: '12px', marginBottom: '5px' }}><ImageIcon size={16} style={{ verticalAlign: 'middle' }} /> Pantalla Informativa (Sin puntos)</div><input placeholder="Enunciado Superior" value={p.bloques?.[0] || ''} onChange={e => updatePreguntaArray(i, 'bloques', 0, e.target.value)} className="inp" style={{ marginBottom: '5px' }} /><input placeholder="URL de la Imagen (https://...)" value={p.bloques?.[1] || ''} onChange={e => updatePreguntaArray(i, 'bloques', 1, e.target.value)} className="inp" style={{ marginBottom: '5px' }} /><input placeholder="Enunciado Inferior" value={p.bloques?.[2] || ''} onChange={e => updatePreguntaArray(i, 'bloques', 2, e.target.value)} className="inp" /></div>)}
+                {/* --- NUEVO BLOQUE PARA DIBUJO --- */}
+                {tipo === 'DIBUJO' && (
+                    <div style={{ border: '2px dashed #e67e22', padding: '10px', borderRadius: '5px', background: '#fdf3e8', marginTop: '5px' }}>
+                        <div style={{ textAlign: 'center', color: '#d35400', fontSize: '12px', marginBottom: '5px', fontWeight: 'bold' }}>
+                            🖌️ Pizarra Digital (El profesor corrige manualmente)
+                        </div>
+                        <input
+                            placeholder="Enunciado (Ej: Dibuja una célula vegetal y sus partes)"
+                            value={p.pregunta}
+                            onChange={e => updatePregunta(i, 'pregunta', e.target.value)}
+                            className="inp"
+                            style={{ fontWeight: 'bold', borderColor: '#e67e22' }}
+                        />
+                    </div>
+                )}
+
+
+
             </div>
         );
     };
@@ -161,7 +181,7 @@ export default function EditorMathLive({ datos, setDatos, onClose, onSave, usuar
     const miniSelect = { padding: '2px', borderRadius: '3px', border: '1px solid #ccc' };
 
     // COMPONENTE: Bloque de Configuración MathLive
-    const MathLiveBlock = () => {
+    const renderMathLiveBlock = () => {
         const config = datos.config || {};
         return (
             <div style={styles.mathBlock}>
@@ -256,7 +276,7 @@ export default function EditorMathLive({ datos, setDatos, onClose, onSave, usuar
                 <div style={styles.body}>
 
                     {/* SIEMPRE EL BLOQUE MATHLIVE PRIMERO */}
-                    <MathLiveBlock />
+                    {renderMathLiveBlock()}
 
                     <div style={{ borderBottom: '2px dashed #ccc', margin: '20px 0', paddingBottom: '10px', color: '#7f8c8d', fontStyle: 'italic', textAlign: 'center' }}>
                         A continuación, añade preguntas estándar que se intercalarán:

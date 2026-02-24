@@ -9,6 +9,7 @@ import logoPikt from './assets/icono2.png';
 import LandingGames, { APPS, SpecificGamePage, ResourceCard } from './components/LandingGames3';
 import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from './firebase';
+import SopaDeLetrasGame from './SopaDeLetrasGame';
 
 export default function Login({ setGoogleToken }) {
     const [error, setError] = useState(null);
@@ -130,6 +131,11 @@ export default function Login({ setGoogleToken }) {
                     {error && <span style={{ color: 'red', fontSize: '10px' }}>{error}</span>}
                 </div>
             </header>
+
+
+           
+
+
 
             {/* MENÚ LATERAL */}
             {menuOpen && (

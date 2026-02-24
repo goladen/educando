@@ -237,9 +237,13 @@ function ThinkHootHost({ codigoSala, onExit, usuario }) {
 
         await updateDoc(doc(db, "live_games", codigoSala), { fasePregunta: 'REVEAL' });
 
+        // --- ESTA ES LA LÍNEA QUE FALTABA ---
+        const esDibujo = dataActual.preguntas[dataActual.indicePregunta]?.tipo === 'DIBUJO';
+
         if (!esDibujo) {
             setTimeout(async () => await updateDoc(doc(db, "live_games", codigoSala), { fasePregunta: 'LEADERBOARD' }), 5000);
         }
+    
     };
 
     const siguientePregunta = async (e) => { // <--- 1. Añadimos 'e' aquí

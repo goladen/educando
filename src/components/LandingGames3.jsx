@@ -9,6 +9,7 @@ import MathLive from '../MathLive';
 import PikatronRun from '../PikatronRun';
 import TextWordleGame from '../TextWordleGame';
 import MathWordleGame from '../MathWordleGame';
+import SopaDeLetrasGame from '../SopaDeLetrasGame';
 import imgPasapalabra from '../assets/icono_pasapal.png'; // Revisa si es .png o .jpg
 import imgBurbujas from '../assets/icono_burbujas.png';
 import imgPikatron from '../assets/icono_pikatron.png';
@@ -18,6 +19,7 @@ import imgWordle from '../assets/icono_wordle.png';
 import imgMathle from '../assets/icono_mathle.png';
 import imgPilive from '../assets/icono_pilive.png';
 import imgMathlive from '../assets/icono_mathlive.png';
+import imgSopa from '../assets/icono_sopa.png';
 // --- CONFIGURACIÓN DE APLICACIONES Y COLORES ---
 export const APPS = [
     { id: 'PASAPALABRA', name: 'Pasapalabra', desc: 'Adivina la palabra con cada letra del abecedario.', color: '#0A0E45', img: imgPasapalabra },
@@ -27,8 +29,10 @@ export const APPS = [
     { id: 'RULETA', name: 'Ruleta', desc: 'Resuelve el panel oculto.', color: '#f1c40f', img: imgRuleta },
     { id: 'WORDLE', name: 'WordLe', desc: 'Adivina la palabra en 6 intentos.', color: '#2e7d32', img: imgWordle },
     { id: 'MATHLE', name: 'MathLe', desc: 'Adivina la ecuación matemática oculta.', color: '#1565C0', img: imgMathle },
-    { id: 'THINKHOOT', name: 'PiLive', desc: 'Compite en vivo con tus compañeros.', color: '#9C27B0', img: imgPilive, isLive: true },
-    { id: 'MATHLIVE', name: 'MathLive', desc: 'Competición matemática en tiempo real.', color: '#009688', img: imgMathlive, isLive: true }
+    { id: 'THINKHOOT', name: 'PiLive', desc: 'Diviértete en vivo con tus compañeros.', color: '#9C27B0', img: imgPilive, isLive: true },
+    { id: 'MATHLIVE', name: 'MathLive', desc: 'Juega con las mates en tiempo real.', color: '#009688', img: imgMathlive, isLive: true },
+    { id: 'SOPA', name: 'Sopa_letras', desc: 'Encuentra las palabras ocultas.', color: '#e67e22', img: imgSopa }
+
 ];
 const FAKE_MATHLE = {
     id: 'fake-mathle',
@@ -315,6 +319,8 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
                                     <option value="CAZABURBUJAS">Burbujas/Pikatron</option>
                                     <option value="APAREJADOS">Aparejados</option>
                                     <option value="RULETA">La Ruleta</option>
+                                    <option value="SOPA">Sopa de Letras</option>
+
                                     <option value="WORDLE">WordLe</option>
                                     <option value="THINKHOOT">📡 Live (En Vivo)</option>
                                 </select>
@@ -365,18 +371,39 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
                 )}
             </div>
 
-            {/* CUADRÍCULA DE APLICACIONES */}
-            <h2 style={{ color: 'white', textShadow: '0 2px 4px rgba(0,0,0,0.5)', textAlign: 'center', marginBottom: '20px' }}>Nuestras Aplicaciones</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '15px' }}>
-                {APPS.map(app => (
+            {/* --- SECCIÓN 1: JUEGOS EN VIVO (TODA LA CLASE) --- */}
+            <h2 style={{ color: '#f1c40f', textShadow: '0 2px 4px rgba(0,0,0,0.8)', textAlign: 'center', marginBottom: '20px', marginTop: '30px' }}>
+                📡 Juegos para toda la clase (En Vivo)
+            </h2>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '40px', maxWidth: '700px', margin: '0 auto 40px auto' }}>
+                {APPS.filter(app => app.isLive).map(app => (
+                    <div key={app.id} onClick={() => abrirJuego(app.id)} style={{ background: '#fff', borderRadius: '20px', padding: '20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.3)', border: `4px solid ${app.color}`, transition: 'transform 0.2s', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <div style={{ width: '80px', height: '80px', marginBottom: '15px' }}>
+                            <img src={app.img} alt={app.name} style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '15px' }} onError={(e) => e.target.style.display = 'none'} />
+                        </div>
+                        <h3 style={{ margin: 0, color: app.color, fontSize: '1.4rem', fontWeight: 'bold' }}>{app.name}</h3>
+                        <p style={{ margin: '10px 0 0 0', fontSize: '0.9rem', color: '#555', lineHeight: '1.3' }}>{app.desc}</p>
+                    </div>
+                ))}
+            </div>
+
+            {/* --- SECCIÓN 2: JUEGOS INDIVIDUALES / PEQUEÑOS GRUPOS --- */}
+            <h2 style={{ color: 'white', textShadow: '0 2px 4px rgba(0,0,0,0.5)', textAlign: 'center', marginBottom: '20px', marginTop: '20px' }}>
+                🕹️ Juegos de uno a tres jugadores
+            </h2>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '15px', marginBottom: '40px' }}>
+                {APPS.filter(app => !app.isLive).map(app => (
                     <div key={app.id} onClick={() => abrirJuego(app.id)} style={{ background: '#ffffbf', borderRadius: '15px', padding: '15px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transition: 'transform 0.2s' }}>
                         <div style={{ width: '60px', height: '60px', margin: '0 auto 10px auto', background: 'transparent', borderRadius: '15px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'white' }}>
-                            <img src={app.img} alt={app.name} style={{ width: '60px', height: '60px', objectFit: 'contain', borderRadius: '15px'}} onError={(e) => e.target.style.display = 'none'} />
+                            <img src={app.img} alt={app.name} style={{ width: '60px', height: '60px', objectFit: 'contain', borderRadius: '15px' }} onError={(e) => e.target.style.display = 'none'} />
                         </div>
                         <h4 style={{ margin: 0, color: '#333', fontSize: '0.9rem' }}>{app.name}</h4>
                     </div>
                 ))}
             </div>
+       
         </div>
     );
 }
@@ -430,6 +457,13 @@ export const SpecificGamePage = ({ appData, onHome }) => {
     const [hostRoomCode, setHostRoomCode] = useState('');
     const [juegoActivo, setJuegoActivo] = useState(null);
     const [recursoParaElegir, setRecursoParaElegir] = useState(null);
+
+    // --- NUEVO: ATAJO PARA JUEGOS CON MENÚ PROPIO ---
+    if (appData.id === 'WORDLE') return <TextWordleGame usuario={null} onExit={onHome} />;
+    if (appData.id === 'MATHLE') return <MathWordleGame usuario={null} onExit={onHome} />;
+    if (appData.id === 'SOPA') return <SopaDeLetrasGame usuario={null} onExit={onHome} />;
+    // --------
+
 
     const buscarEspecífico = async () => {
         try {
@@ -547,7 +581,8 @@ export const SpecificGamePage = ({ appData, onHome }) => {
         if (appData.id === 'RULETA') return <RuletaGame recurso={juegoActivo} usuario={null} alTerminar={() => setJuegoActivo(null)} />;
         // --- AÑADIDO WORDLE AQUÍ ---
        if (appData.id === 'WORDLE' || juegoActivo.tipoJuego === 'WORDLE') return <TextWordleGame recursoInicial={juegoActivo} usuario={null} onExit={() => setJuegoActivo(null)} />;
-        
+        if (appData.id === 'SOPA' || juegoActivo.tipoJuego === 'SOPA') return <SopaDeLetrasGame recursoInicial={juegoActivo} usuario={null} onExit={() => setJuegoActivo(null)} />;
+
         return <GamePlayer recurso={juegoActivo} usuario={null} alTerminar={() => setJuegoActivo(null)} />;
     }
 

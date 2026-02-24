@@ -290,7 +290,7 @@ export default function SopaDeLetrasGame({ usuario, onExit, recursoInicial }) {
             </div>
 
             {/* BUSCADOR BIBLIOTECA (Simplificado para el ejemplo) */}
-            <div style={{ ...styles.card, marginTop: '15px', background: '#e8f5e9', border: '1px solid #81c784' }}>
+            <div style={{ ...styles.card, marginBottom: '50px', marginTop: '15px', background: '#e8f5e9', border: '1px solid #81c784' }}>
                 <h3 style={{ color: '#2e7d32', display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'center' }}><Search size={20} /> Explorar Sopas</h3>
                 <button onClick={buscarRecursosPublicos} style={{ ...styles.btn, background: '#2e7d32', color: 'white' }}>{buscando ? 'Buscando...' : 'Ver Sopas Públicas'}</button>
                 
@@ -400,7 +400,7 @@ export default function SopaDeLetrasGame({ usuario, onExit, recursoInicial }) {
 const styles = {
     screen: { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: '#2c3e50', zIndex: 5000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', fontFamily: "'Roboto', sans-serif", overflowY: 'auto', padding: '40px 0', WebkitOverflowScrolling: 'touch' },
     backBtn: { position: 'absolute', top: '20px', left: '20px', background: 'white', border: '1px solid #ddd', borderRadius: '30px', padding: '8px 15px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', color: '#333', fontWeight: 'bold', zIndex: 1000, boxShadow: '0 2px 5px rgba(0,0,0,0.1)' },
-    card: { background: '#fffacb', padding: '2rem', borderRadius: '20px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', maxWidth: '500px', width: '80%', textAlign: 'center' },
+    card: { background: '#fffacb', padding: '2rem', borderRadius: '20px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', maxWidth: '500px', width: '80%',textAlign: 'center' },
     h1: { fontSize: '2rem', textTransform: 'uppercase', letterSpacing: '2px', margin: '10px 0', color: '#f1c40f', textShadow: '0 2px 4px rgba(0,0,0,0.3)' },
     label: { display: 'block', fontWeight: 'bold', marginBottom: '10px', color: '#555', fontSize: '0.9rem' },
     optionBtn: { padding: '8px 12px', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' },

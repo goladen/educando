@@ -26,6 +26,10 @@ export default function SopaDeLetras({
     const [seleccion, setSeleccion] = useState([]); // Celdas siendo arrastradas actualmente
     const [isDragging, setIsDragging] = useState(false);
 
+
+    const [mostrarSolucion, setMostrarSolucion] = useState(false);
+    const [solucionesCeldas, setSolucionesCeldas] = useState([]);
+
     const startCell = useRef(null);
     const gridRef = useRef(null);
 
@@ -42,7 +46,7 @@ export default function SopaDeLetras({
 
         let tablero = Array(size).fill(null).map(() => Array(size).fill(''));
         let colocadasExitosamente = []; // <--- Lista de las que SÍ entran
-
+        let nuevasSoluciones = [];
         const intentarColocar = (item) => {
             let colocada = false;
             let intentos = 0;
@@ -63,11 +67,17 @@ export default function SopaDeLetras({
                 }
 
                 if (cabe) {
+                    let celdasDePalabra = []; // <--- NUEVO
                     for (let i = 0; i < item.limpia.length; i++) {
-                        tablero[filaInicio + (dir[0] * i)][colInicio + (dir[1] * i)] = item.limpia[i];
+                        const f = filaInicio + (dir[0] * i);
+                        const c = colInicio + (dir[1] * i);
+                        tablero[f][c] = item.limpia[i];
+                        celdasDePalabra.push({ f, c }); // <--- NUEVO: Guardamos cada letra
                     }
                     colocada = true;
-                    colocadasExitosamente.push(item.original); // <--- ¡Aprobada! La guardamos
+                    colocadasExitosamente.push(item.original);
+                    // <--- NUEVO: Guardamos la palabra y sus celdas
+                    nuevasSoluciones.push({ palabra: item.limpia, celdas: celdasDePalabra });
                 }
             }
             if (!colocada) console.warn("Se quedó fuera por falta de espacio: ", item.original);
@@ -85,6 +95,7 @@ export default function SopaDeLetras({
 
         setGrid(tablero);
         setPalabrasActivas(colocadasExitosamente); // <--- Guardamos la lista definitiva en el estado
+        setSolucionesCeldas(nuevasSoluciones);
     }, [palabras]);
 
     // --- NUEVO: Bloquear el scroll en móviles de forma segura ---
@@ -120,6 +131,7 @@ export default function SopaDeLetras({
     };
 
     const iniciarTrazo = (f, c) => {
+        if (mostrarSolucion) return;
         setIsDragging(true);
         startCell.current = { f, c };
         setSeleccion([{ f, c }]);
@@ -164,7 +176,7 @@ export default function SopaDeLetras({
 
     // --- 3. LÓGICA TÁCTIL (MÓVILES) ---
     const handleTouchMove = (e) => {
-        if (!isDragging) return;
+        if (!isDragging || mostrarSolucion) return;
         // Prevenir scroll
        
 
@@ -178,6 +190,25 @@ export default function SopaDeLetras({
     // --- RENDERIZADO ---
     const isCeldaSeleccionada = (f, c) => seleccion.some(s => s.f === f && s.c === c);
     const getTrazoEncontrado = (f, c) => trazosEncontrados.find(s => s.f === f && s.c === c);
+    // --- NUEVO: Función para dar un color distinto a cada palabra no encontrada ---
+    const getColorSolucion = (f, c) => {
+        if (!mostrarSolucion) return null;
+
+        // Buscamos a qué palabra pertenece esta celda
+        const solucion = solucionesCeldas.find(sol =>
+            !palabrasEncontradas.includes(sol.palabra) &&
+            sol.celdas.some(celda => celda.f === f && celda.c === c)
+        );
+
+        if (solucion) {
+            // Usamos la posición de la palabra para elegir uno de tus colores predefinidos
+            const index = solucionesCeldas.indexOf(solucion);
+            return COLORES[index % COLORES.length];
+        }
+        return null;
+    };
+
+
 
     if (grid.length === 0) return <div>Generando sopa de letras...</div>;
 
@@ -223,12 +254,13 @@ export default function SopaDeLetras({
                     fila.map((letra, c) => {
                         const seleccionada = isCeldaSeleccionada(f, c);
                         const encontrada = getTrazoEncontrado(f, c);
+                        const colorSolucion = getColorSolucion(f, c);
 
                         let bg = 'white';
                         let color = '#2c3e50';
                         if (seleccionada) { bg = '#3498db'; color = 'white'; }
                         else if (encontrada) { bg = encontrada.color; color = 'white'; }
-
+                        else if (colorSolucion) { bg = colorSolucion; color = 'white'; } // <--- ACTUALIZADO
                         return (
                             <div
                                 key={`${f}-${c}`}
@@ -249,13 +281,41 @@ export default function SopaDeLetras({
                     })
                 )}
             </div>
+
+            <button
+                onClick={() => setMostrarSolucion(true)}
+                disabled={mostrarSolucion}
+                style={{
+                    marginTop: '20px',
+                    padding: '12px 24px',
+                    background: mostrarSolucion ? '#7f8c8d' : '#e74c3c',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontWeight: 'bold',
+                    cursor: mostrarSolucion ? 'not-allowed' : 'pointer',
+                    fontSize: '1rem',
+                    boxShadow: mostrarSolucion ? 'none' : '0 4px 6px rgba(0,0,0,0.2)',
+                    transition: 'all 0.2s'
+                }}
+            >
+                {mostrarSolucion ? 'Juego Terminado' : '👀 Rendirse y Ver Solución'}
+            </button>
+
+
             <style>{` body { touch-action: none; /* Crucial para que el móvil no haga scroll al jugar */ } `}</style>
         </div>
     );
 }
 
 const styles = {
-    container: { display: 'flex', flexDirection: 'column', alignItems: 'center', background: '#2c3e50', padding: '20px', borderRadius: '20px', color: 'white', fontFamily: 'Roboto, sans-serif', maxWidth: '100%', overflow: 'hidden' },
+    container: {
+        display: 'flex', flexDirection: 'column', alignItems: 'center', background: '#2c3e50', padding: '20px',
+        paddingBottom: '40px',
+        marginBottom: '30px',
+
+        borderRadius: '20px', color: 'white', fontFamily: 'Roboto, sans-serif', maxWidth: '100%', overflow: 'hidden'
+    },
     title: { color: '#f1c40f', margin: '0 0 20px 0' },
     wordList: { display: 'flex', flexWrap: 'wrap', gap: '10px', justifyContent: 'center', marginBottom: '20px', width: '100%', maxWidth: '600px' },
     wordBadge: { padding: '8px 15px', borderRadius: '20px', fontWeight: 'bold', fontSize: '0.9rem', transition: 'all 0.3s' },

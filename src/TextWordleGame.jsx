@@ -15,6 +15,17 @@ const LANGUAGES = {
             ['Z', 'X', 'C', 'V', 'B', 'N', 'M']
         ]
     },
+
+    CA: {
+        label: 'Català',
+        url: 'https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/ca/ca_50k.txt',
+        keyboard: [
+            ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
+            ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
+            ['Z', 'X', 'C', 'V', 'B', 'N', 'M']
+        ]
+    },
+
     EN: {
         label: 'English',
         url: 'https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/en/en_50k.txt',

@@ -8,8 +8,10 @@ import SopaDeLetras from './SopaDeLetras'; // <--- Importamos el motor de la sop
 // --- DICCIONARIOS (Igual que Wordle) ---
 const LANGUAGES = {
     ES: { label: 'Español', url: 'https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/es/es_50k.txt' },
+    CA: { label: 'Català', url: 'https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/ca/ca_50k.txt' },
     EN: { label: 'English', url: 'https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/en/en_50k.txt' },
     FR: { label: 'Français', url: 'https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/fr/fr_50k.txt' }
+
 };
 
 export default function SopaDeLetrasGame({ usuario, onExit, recursoInicial }) {

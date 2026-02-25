@@ -60,6 +60,10 @@ const getAppInfo = (tipoJuego) => {
     if (tipoJuego === 'CAZABURBUJAS' || tipoJuego === 'PIKATRON') {
         return { name: 'Burbujas/Pikatron', color: '#de896e' };
     }
+    if (tipoJuego === 'WORDLE' || tipoJuego === 'SOPA') {
+        return { name: 'Wordle / Sopa', color: '#4CAF50' };
+    }
+
 
     const app = APPS.find(a => a.id === tipoJuego);
     if (app) return app;
@@ -156,8 +160,10 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
                             if (!esJuegoEnVivo(r) || r.tipoJuego === 'MATHLIVE') return false;
                         } else if (filtros.tipoJuego === 'CAZABURBUJAS') {
                             if (r.tipoJuego !== 'CAZABURBUJAS' && r.tipoJuego !== 'PIKATRON') return false;
+                        } else if (filtros.tipoJuego === 'SOPA' || filtros.tipoJuego === 'WORDLE') {
+                            // MAGIA: Sopa y Wordle comparten los mismos recursos
+                            if (r.tipoJuego !== 'SOPA' && r.tipoJuego !== 'WORDLE') return false;
                         }
-
 
 
                         else {
@@ -244,7 +250,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
     const procesarClickTarjeta = (r) => {
         if (esJuegoEnVivo(r)) {
             lanzarComoGestor(r);
-        } else if (r.tipoJuego === 'CAZABURBUJAS') {
+        } else if (r.tipoJuego === 'CAZABURBUJAS' || r.tipoJuego === 'WORDLE' || r.tipoJuego === 'SOPA') {
             setRecursoParaElegir(r);
         } else {
             setJuegoActivo(r);
@@ -274,8 +280,9 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
 
         // --- CORRECCIÓN: Quitamos appData porque aquí no existe ---
         if (juegoActivo.tipoJuego === 'MATHLE') return <MathWordleGame usuario={null} onExit={() => setJuegoActivo(null)} />;
-        if (juegoActivo.tipoJuego === 'WORDLE') return <TextWordleGame recursoInicial={juegoActivo} usuario={null} onExit={() => setJuegoActivo(null)} />;
-
+        // --- AÑADIDO: Distinguir Wordle y Sopa ---
+        if (juegoActivo.modoEspecial === 'WORDLE' || (juegoActivo.tipoJuego === 'WORDLE' && !juegoActivo.modoEspecial)) return <TextWordleGame recursoInicial={juegoActivo} usuario={null} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.modoEspecial === 'SOPA' || (juegoActivo.tipoJuego === 'SOPA' && !juegoActivo.modoEspecial)) return <SopaDeLetrasGame recursoInicial={juegoActivo} usuario={null} onExit={() => setJuegoActivo(null)} />;
         return <GamePlayer recurso={juegoActivo} usuario={null} alTerminar={() => setJuegoActivo(null)} />;
     }
 
@@ -288,8 +295,18 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
                     <div style={{ background: 'white', padding: '30px', borderRadius: '20px', textAlign: 'center', maxWidth: '400px', width: '90%' }}>
                         <h2 style={{ color: '#2c3e50', margin: '0 0 20px 0' }}>🚀 ¡Elige tu aventura!</h2>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            <button onClick={() => { setJuegoActivo(recursoParaElegir); setRecursoParaElegir(null); }} style={{ padding: '15px', background: '#E91E63', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>🔵 Cazaburbujas Clásico</button>
-                            <button onClick={() => { setJuegoActivo({ ...recursoParaElegir, modoEspecial: 'PIKATRON' }); setRecursoParaElegir(null); }} style={{ padding: '15px', background: '#2196F3', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>⚡ Pikatron Run (Runner)</button>
+                            {(recursoParaElegir.tipoJuego === 'CAZABURBUJAS' || recursoParaElegir.tipoJuego === 'PIKATRON') ? (
+                                <>
+                                    <button onClick={() => { setJuegoActivo({ ...recursoParaElegir, modoEspecial: 'CAZABURBUJAS' }); setRecursoParaElegir(null); }} style={{ padding: '15px', background: '#E91E63', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>🔵 Cazaburbujas Clásico</button>
+                                    <button onClick={() => { setJuegoActivo({ ...recursoParaElegir, modoEspecial: 'PIKATRON' }); setRecursoParaElegir(null); }} style={{ padding: '15px', background: '#2196F3', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>⚡ Pikatron Run (Runner)</button>
+                                </>
+                            ) : (
+                                    <>
+                                        {/* OPCIONES DE WORDLE Y SOPA */}
+                                        <button onClick={() => { setJuegoActivo({ ...recursoParaElegir, modoEspecial: 'WORDLE' }); setRecursoParaElegir(null); }} style={{ padding: '15px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>🟩 Wordle Clásico</button>
+                                        <button onClick={() => { setJuegoActivo({ ...recursoParaElegir, modoEspecial: 'SOPA' }); setRecursoParaElegir(null); }} style={{ padding: '15px', background: '#FF9800', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>🔍 Sopa de Letras</button>
+                                    </>
+                                )}
                             <button onClick={() => setRecursoParaElegir(null)} style={{ marginTop: '10px', background: 'transparent', border: 'none', color: '#999', cursor: 'pointer' }}>Cancelar</button>
                         </div>
                     </div>
@@ -440,7 +457,7 @@ export const ResourceCard = ({ r, onClick }) => {
 };
 
 // PÁGINA ESPECÍFICA DEL JUEGO
-export const SpecificGamePage = ({ appData, onHome }) => {
+export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
     const [tab, setTab] = useState(appData.isLive ? 'LIVE' : 'SEARCH');
     const [filtros, setFiltros] = useState({ tema: '', ciclo: '', pais: '', region: '', poblacion: '', autor: '' });
     const [mostrarMasFiltros, setMostrarMasFiltros] = useState(false);
@@ -480,7 +497,10 @@ export const SpecificGamePage = ({ appData, onHome }) => {
                     if (appData.id === 'CAZABURBUJAS' || appData.id === 'PIKATRON') {
                         esEsteJuego = (data.tipoJuego === 'CAZABURBUJAS' || data.tipoJuego === 'PIKATRON');
                     }
-
+                    else if (appData.id === 'SOPA' || appData.id === 'WORDLE') {
+                        // MAGIA: Sopa y Wordle comparten los mismos recursos
+                        esEsteJuego = (data.tipoJuego === 'SOPA' || data.tipoJuego === 'WORDLE');
+                    }
 
 
 
@@ -501,7 +521,10 @@ export const SpecificGamePage = ({ appData, onHome }) => {
                     if (appData.id === 'CAZABURBUJAS' || appData.id === 'PIKATRON') {
                         esEsteJuego = (r.tipoJuego === 'CAZABURBUJAS' || r.tipoJuego === 'PIKATRON');
                     }
-
+                    else if (appData.id === 'SOPA' || appData.id === 'WORDLE') {
+                        // MAGIA: Sopa y Wordle comparten los mismos recursos
+                        esEsteJuego = (data.tipoJuego === 'SOPA' || data.tipoJuego === 'WORDLE');
+                    }
 
 
 
@@ -560,7 +583,7 @@ export const SpecificGamePage = ({ appData, onHome }) => {
 
     const procesarClickTarjeta = (r) => {
         if (appData.isLive) lanzarComoGestor(r);
-        else if (r.tipoJuego === 'CAZABURBUJAS') setRecursoParaElegir(r);
+        else if (r.tipoJuego === 'CAZABURBUJAS' || r.tipoJuego === 'WORDLE' || r.tipoJuego === 'SOPA') setRecursoParaElegir(r);
         else setJuegoActivo(r);
     };
 
@@ -579,10 +602,9 @@ export const SpecificGamePage = ({ appData, onHome }) => {
     if (juegoActivo) {
         if (appData.id === 'PIKATRON' || juegoActivo.modoEspecial === 'PIKATRON') return <PikatronRun recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
         if (appData.id === 'RULETA') return <RuletaGame recurso={juegoActivo} usuario={null} alTerminar={() => setJuegoActivo(null)} />;
-        // --- AÑADIDO WORDLE AQUÍ ---
-       if (appData.id === 'WORDLE' || juegoActivo.tipoJuego === 'WORDLE') return <TextWordleGame recursoInicial={juegoActivo} usuario={null} onExit={() => setJuegoActivo(null)} />;
-        if (appData.id === 'SOPA' || juegoActivo.tipoJuego === 'SOPA') return <SopaDeLetrasGame recursoInicial={juegoActivo} usuario={null} onExit={() => setJuegoActivo(null)} />;
-
+        // --- AÑADIDO: Distinguir Wordle y Sopa ---
+        if (appData.id === 'WORDLE' || juegoActivo.modoEspecial === 'WORDLE' || (juegoActivo.tipoJuego === 'WORDLE' && !juegoActivo.modoEspecial)) return <TextWordleGame recursoInicial={juegoActivo} usuario={null} onExit={() => setJuegoActivo(null)} />;
+        if (appData.id === 'SOPA' || juegoActivo.modoEspecial === 'SOPA' || (juegoActivo.tipoJuego === 'SOPA' && !juegoActivo.modoEspecial)) return <SopaDeLetrasGame recursoInicial={juegoActivo} usuario={null} onExit={() => setJuegoActivo(null)} />;
         return <GamePlayer recurso={juegoActivo} usuario={null} alTerminar={() => setJuegoActivo(null)} />;
     }
 
@@ -595,8 +617,18 @@ export const SpecificGamePage = ({ appData, onHome }) => {
                     <div style={{ background: 'white', padding: '30px', borderRadius: '20px', textAlign: 'center', maxWidth: '400px', width: '90%' }}>
                         <h2 style={{ color: '#2c3e50', margin: '0 0 20px 0' }}>🚀 ¡Elige tu aventura!</h2>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            <button onClick={() => { setJuegoActivo(recursoParaElegir); setRecursoParaElegir(null); }} style={{ padding: '15px', background: '#E91E63', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>🔵 Cazaburbujas Clásico</button>
-                            <button onClick={() => { setJuegoActivo({ ...recursoParaElegir, modoEspecial: 'PIKATRON' }); setRecursoParaElegir(null); }} style={{ padding: '15px', background: '#2196F3', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>⚡ Pikatron Run (Runner)</button>
+                            {(recursoParaElegir.tipoJuego === 'CAZABURBUJAS' || recursoParaElegir.tipoJuego === 'PIKATRON') ? (
+                                <>
+                                    <button onClick={() => { setJuegoActivo({ ...recursoParaElegir, modoEspecial: 'CAZABURBUJAS' }); setRecursoParaElegir(null); }} style={{ padding: '15px', background: '#E91E63', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>🔵 Cazaburbujas Clásico</button>
+                                    <button onClick={() => { setJuegoActivo({ ...recursoParaElegir, modoEspecial: 'PIKATRON' }); setRecursoParaElegir(null); }} style={{ padding: '15px', background: '#2196F3', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>⚡ Pikatron Run (Runner)</button>
+                                </>
+                            ) : (
+                                    <>
+                                        {/* OPCIONES DE WORDLE Y SOPA */}
+                                        <button onClick={() => { setJuegoActivo({ ...recursoParaElegir, modoEspecial: 'WORDLE' }); setRecursoParaElegir(null); }} style={{ padding: '15px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>🟩 Wordle Clásico</button>
+                                        <button onClick={() => { setJuegoActivo({ ...recursoParaElegir, modoEspecial: 'SOPA' }); setRecursoParaElegir(null); }} style={{ padding: '15px', background: '#FF9800', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>🔍 Sopa de Letras</button>
+                                    </>
+                                )}
                             <button onClick={() => setRecursoParaElegir(null)} style={{ marginTop: '10px', background: 'transparent', border: 'none', color: '#999', cursor: 'pointer' }}>Cancelar</button>
                         </div>
                     </div>
@@ -614,6 +646,30 @@ export const SpecificGamePage = ({ appData, onHome }) => {
                     </div>
                     <h1 style={{ color: appData.color, margin: '15px 0 5px 0', fontSize: '2.5rem' }}>{appData.name}</h1>
                     <p style={{ color: appData.color, fontStyle: 'italic', fontSize: '1.1rem' }}>{appData.desc}</p>
+
+                    <button
+                        onClick={() => onLoginRequest && onLoginRequest()}
+                        style={{
+                            background: appData.color,
+                            color: 'white',
+                            padding: '12px 30px',
+                            border: `2px solid ${appData.color}`,
+                            borderRadius: '30px',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            fontSize: '1.1rem',
+                            boxShadow: '0 4px 10px rgba(0,0,0,0.2)',
+                            transition: 'all 0.2s',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '10px'
+                        }}
+                    >
+                        🚀 Únete para crear
+                    </button>
+
+
+
                 </div>
 
                 {appData.isLive && (

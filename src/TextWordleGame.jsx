@@ -250,6 +250,7 @@ export default function TextWordleGame({ usuario, onExit, recursoInicial }) {
                 if (h.palabras && Array.isArray(h.palabras)) {
                     h.palabras.forEach(palabra => {
                         const limpia = normalizeWord(palabra);
+
                         // Filtro de seguridad (4 a 9 letras)
                         if (limpia && /^[A-ZÑ]+$/.test(limpia) && limpia.length >= 4 && limpia.length <= 9) {
                             palabrasCandidatas.push(limpia);
@@ -260,7 +261,7 @@ export default function TextWordleGame({ usuario, onExit, recursoInicial }) {
         }
 
         if (palabrasCandidatas.length === 0) {
-            throw new Error("El recurso no tiene palabras válidas.");
+            throw new Error("El recurso no tiene palabras de longitud adecuada.");
         }
 
         // Elegir una al azar

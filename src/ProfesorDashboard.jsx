@@ -18,7 +18,9 @@ import EditorMathLive from './components/EditorMathLive';
 import MathLive from './MathLive';
 import CazaBurbujasGame from './CazaBurbujasGame';
 import PikatronRun from './PikatronRun';
-import { MousePointer2, Rocket } from 'lucide-react';
+import SopaDeLetrasGame from './SopaDeLetrasGame';
+import TextWordleGame from './TextWordleGame';
+import { MousePointer2, Rocket, Search as SearchIcon } from 'lucide-react';
 import EditorProBurbujasPikatron from './components/EditorProBurbujasPikatron';
 import EditorQuestionSender from './components/EditorQuestionSender';
 import MathWordleGame from './MathWordleGame';
@@ -40,9 +42,10 @@ const TIPOS_JUEGOS = {
     // --
 
     // --- AÑADIR WORDLE AQUÍ (Color Verde) ---
-    WORDLE: { id: 'WORDLE', label: 'Wordle Pro', color: '#2E7D32', camposConfig: [] },
+    WORDLE: { id: 'WORDLE', label: 'Wordle y sopa de letras', color: '#2E7D32', camposConfig: [] },
     // ---
-
+    // --- NUEVO: SOPA DE LETRAS ---
+    //SOPA: { id: 'SOPA', label: 'Sopa de Letras', color: '#e67e22', camposConfig: [] },
     APAREJADOS: { id: 'APAREJADOS', label: 'AparejaDOS', color: '#FF9800', camposConfig: [{ key: 'tiempoTotal', label: 'Tiempo Total (seg)', type: 'number', default: 60 }, { key: 'numParejas', label: 'Nº Parejas', type: 'number', default: 8 }, { key: 'puntosPareja', label: 'Pts Pareja', type: 'number', default: 10 }] },
     THINKHOOT: { id: 'THINKHOOT', label: 'Pi-Live', color: '#9C27B0', camposConfig: [{ key: 'tiempoPregunta', label: 'Tiempo/preg (seg)', type: 'number', default: 30 }, { key: 'numPreguntas', label: 'Nº Preguntas', type: 'number', default: 10 }, { key: 'puntosMax', label: 'Puntos Max', type: 'number', default: 120 }, { key: 'puntosMin', label: 'Puntos Min', type: 'number', default: 30 }] },
     RULETA: { id: 'RULETA', label: 'La Ruleta', color: '#f1c40f', camposConfig: [{ key: 'tiempoTurno', label: 'Tiempo Turno (s)', type: 'number', default: 20 }] },
@@ -781,6 +784,16 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             );
         }
 
+        // --- NUEVO CASO: WORDLE / SOPA ---
+        if (recursoProbando.tipoJuego === 'WORDLE') {
+            return <TextWordleGame recursoInicial={recursoProbando} usuario={perfilProfesor || usuario} onExit={() => setRecursoProbando(null)} />;
+        }
+        if (recursoProbando.tipoJuego === 'SOPA') {
+            return <SopaDeLetrasGame recursoInicial={recursoProbando} usuario={perfilProfesor || usuario} onExit={() => setRecursoProbando(null)} />;
+        }
+
+
+
         // CASO 3: RECURSOS CLÁSICOS (Usa el reproductor antiguo GamePlayer)
         return (
             <div style={{ background: '#2f3640', minHeight: '100vh' }}>
@@ -886,8 +899,11 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                     {/* BARRA DE TÍTULO Y BOTONES DE ACCIÓN */}
                     {/* BARRA DE TÍTULO Y BOTONES DE ACCIÓN RESPONSIVA */}
                     <div className="dashboard-header-row">
-                        <h2>{vista === 'MIS_RECURSOS' ? `Mis Recursos` : `Biblioteca`}</h2>
-
+                        <h2>
+                            {vista === 'MIS_RECURSOS'
+                                ? (modoDashboard === 'PRO' ? `Recursos: ${TIPOS_JUEGOS[juegoSeleccionado]?.label}` : `Mis Recursos`)
+                                : `Biblioteca`}
+                        </h2>
                         <div className="action-group">
                             {/* BOTÓN CREAR (OVALADO) */}
                             {vista === 'MIS_RECURSOS' && (
@@ -968,7 +984,9 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                                     </button>
                                     {/* ------------------------------------------- */}
 
+                                    
 
+                                  
 
 
 
@@ -994,7 +1012,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                                     <button
                                         onClick={() => {
                                             // AQUI ESTA LA CLAVE: Si es CAZABURBUJAS (da igual si es PRO o Manual), te deja elegir
-                                            if (r.tipoJuego === 'CAZABURBUJAS') {
+                                                if (r.tipoJuego === 'CAZABURBUJAS' || r.tipoJuego === 'WORDLE') {
                                                 setRecursoParaElegirModo(r);
                                             } else {
                                                 probarJuego(r);
@@ -1139,41 +1157,79 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                     </p>
 
                     <div style={{ display: 'grid', gap: '15px' }}>
-                        {/* OPCIÓN 1: CAZABURBUJAS */}
-                        <button
-                            onClick={() => {
-                                // Forzamos el tipo para que el renderizador sepa qué cargar
-                                probarJuego({ ...recursoParaElegirModo, tipoJuego: 'CAZABURBUJAS' });
-                                setRecursoParaElegirModo(null);
-                            }}
-                            style={{
-                                padding: '15px', borderRadius: '15px', border: 'none',
-                                background: 'linear-gradient(135deg, #FF4081 0%, #C2185B 100%)',
-                                color: 'white', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
-                                boxShadow: '0 4px 15px rgba(233, 30, 99, 0.3)'
-                            }}
-                        >
-                            <MousePointer2 size={24} /> CazaBurbujas
-                        </button>
+                        {recursoParaElegirModo.tipoJuego === 'CAZABURBUJAS' ? (
+                            <>
+                                {/* OPCIÓN 1: CAZABURBUJAS */}
+                                <button
+                                    onClick={() => {
+                                        probarJuego({ ...recursoParaElegirModo, tipoJuego: 'CAZABURBUJAS' });
+                                        setRecursoParaElegirModo(null);
+                                    }}
+                                    style={{
+                                        padding: '15px', borderRadius: '15px', border: 'none',
+                                        background: 'linear-gradient(135deg, #FF4081 0%, #C2185B 100%)',
+                                        color: 'white', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+                                        boxShadow: '0 4px 15px rgba(233, 30, 99, 0.3)'
+                                    }}
+                                >
+                                    <MousePointer2 size={24} /> CazaBurbujas
+                                </button>
 
-                        {/* OPCIÓN 2: PIKATRON */}
-                        <button
-                            onClick={() => {
-                                // Forzamos el tipo PIKATRON para que entre en el IF correcto
-                                probarJuego({ ...recursoParaElegirModo, tipoJuego: 'PIKATRON' });
-                                setRecursoParaElegirModo(null);
-                            }}
-                            style={{
-                                padding: '15px', borderRadius: '15px', border: 'none',
-                                background: 'linear-gradient(135deg, #2196F3 0%, #1976D2 100%)',
-                                color: 'white', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
-                                boxShadow: '0 4px 15px rgba(33, 150, 243, 0.3)'
-                            }}
-                        >
-                            <Rocket size={24} /> Pikatron Run
-                        </button>
+                                {/* OPCIÓN 2: PIKATRON */}
+                                <button
+                                    onClick={() => {
+                                        probarJuego({ ...recursoParaElegirModo, tipoJuego: 'PIKATRON' });
+                                        setRecursoParaElegirModo(null);
+                                    }}
+                                    style={{
+                                        padding: '15px', borderRadius: '15px', border: 'none',
+                                        background: 'linear-gradient(135deg, #2196F3 0%, #1976D2 100%)',
+                                        color: 'white', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+                                        boxShadow: '0 4px 15px rgba(33, 150, 243, 0.3)'
+                                    }}
+                                >
+                                    <Rocket size={24} /> Pikatron Run
+                                </button>
+                            </>
+                        ) : (
+                                <>
+                                    {/* OPCIÓN 1: WORDLE (Estilo Verde) */}
+                                    <button
+                                        onClick={() => {
+                                            probarJuego({ ...recursoParaElegirModo, tipoJuego: 'WORDLE' });
+                                            setRecursoParaElegirModo(null);
+                                        }}
+                                        style={{
+                                            padding: '15px', borderRadius: '15px', border: 'none',
+                                            background: 'linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)',
+                                            color: 'white', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+                                            boxShadow: '0 4px 15px rgba(76, 175, 80, 0.3)'
+                                        }}
+                                    >
+                                        <FileText size={24} /> Wordle
+                                </button>
+
+                                    {/* OPCIÓN 2: SOPA DE LETRAS (Estilo Naranja) */}
+                                    <button
+                                        onClick={() => {
+                                            probarJuego({ ...recursoParaElegirModo, tipoJuego: 'SOPA' });
+                                            setRecursoParaElegirModo(null);
+                                        }}
+                                        style={{
+                                            padding: '15px', borderRadius: '15px', border: 'none',
+                                            background: 'linear-gradient(135deg, #FF9800 0%, #E65100 100%)',
+                                            color: 'white', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+                                            boxShadow: '0 4px 15px rgba(255, 152, 0, 0.3)'
+                                        }}
+                                    >
+                                        <SearchIcon size={24} /> Sopa de Letras
+                                </button>
+                                </>
+                            )}
                     </div>
                 </ModalOverlay>
             )}

@@ -111,7 +111,7 @@ export default function Login({ setGoogleToken }) {
 
     const appData = APPS.find(a => a.id === vistaActual);
     if (appData) {
-        return <SpecificGamePage appData={appData} onHome={() => handleMenuClick('inicio')} />;
+        return <SpecificGamePage appData={appData} onHome={() => handleMenuClick('inicio')} onLoginRequest={handleLogin} />;
     }
 
     // 3. VISTA PRINCIPAL (Landing normal + Login Arriba a la derecha)

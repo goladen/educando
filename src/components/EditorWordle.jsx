@@ -71,12 +71,12 @@ export default function EditorWordle({ datos, setDatos, onClose, onSave, usuario
             .filter(p => {
                 // FILTRO: Letras válidas y longitud 4-8
                 const esLetras = /^[A-ZÑ]+$/.test(p);
-                const longitudValida = p.length >= 4 && p.length <= 8;
+                const longitudValida = p.length >= 4 && p.length <= 10;
                 return esLetras && longitudValida;
             });
 
         if (nuevasPalabras.length === 0) {
-            alert("Ninguna palabra válida. Deben tener entre 4 y 8 letras.");
+            alert("Ninguna palabra válida. Deben tener entre 4 y 10 letras.");
             return;
         }
 
@@ -160,7 +160,7 @@ export default function EditorWordle({ datos, setDatos, onClose, onSave, usuario
                     <div style={{ background: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
                         <h3 style={{ marginTop: 0, color: '#2e7d32' }}>Lista de Palabras ({datos.hojas?.[hojaActiva]?.palabras?.length || 0})</h3>
                         <p style={{ color: '#666', fontSize: '14px', marginBottom: '15px' }}>
-                            Escribe palabras de <b>4 a 8 letras</b> separadas por comas (Ej: CASA, PERRO, GATO).
+                            Escribe palabras de <b>4 a 10 letras</b> separadas por comas (Ej: CASA, PERRO, GATO).
                         </p>
 
                         <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>

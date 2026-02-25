@@ -1,9 +1,9 @@
 ﻿import React, { useState } from 'react';
-import { Wrench, Table, FileQuestion } from 'lucide-react';
+import { Wrench, Table, FileQuestion, RefreshCw } from 'lucide-react';
 
 import ToolExportarGoogleSheets from './ToolExportarGoogleSheets';
 import ToolGeneradorGoogleForms from './ToolGeneradorGoogleForms'; // <--- IMPORTAR
-
+import ToolConversorRecursos from './ToolConversorRecursos';
 export default function TeacherTools({ usuario, googleToken }) {
     const [herramientaActiva, setHerramientaActiva] = useState(null);
 
@@ -14,6 +14,10 @@ export default function TeacherTools({ usuario, googleToken }) {
 
     if (herramientaActiva === 'FORMS') { // <--- NUEVA CONDICIÓN
         return <ToolGeneradorGoogleForms usuario={usuario} googleToken={googleToken} onBack={() => setHerramientaActiva(null)} />;
+    }
+
+    if (herramientaActiva === 'CONVERSOR') {
+        return <ToolConversorRecursos usuario={usuario} onBack={() => setHerramientaActiva(null)} />;
     }
 
     // --- MENÚ PRINCIPAL DE HERRAMIENTAS ---
@@ -50,6 +54,19 @@ export default function TeacherTools({ usuario, googleToken }) {
                         Crea un Google Form (Cuestionario) automático a partir de tus juegos.
                     </p>
                 </div>
+
+
+                {/* TARJETA NUEVA: CONVERSOR MÁGICO */}
+                <div onClick={() => setHerramientaActiva('CONVERSOR')} style={cardStyle}>
+                    <div style={{ background: '#FFF3E0', padding: '15px', borderRadius: '50%', marginBottom: '15px' }}>
+                        <RefreshCw size={32} color="#E65100" />
+                    </div>
+                    <h3 style={{ margin: '0 0 10px 0', color: '#2c3e50' }}>Conversor Mágico</h3>
+                    <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>
+                        Transforma un recurso de un juego a otro (Ej: Pasa de Pasapalabra a Sopa de Letras o a Quiz).
+                    </p>
+                </div>
+
 
                 {/* TARJETA 3: PRÓXIMAMENTE */}
                 <div style={{ ...cardStyle, opacity: 0.6, cursor: 'default' }}>

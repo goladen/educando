@@ -34,7 +34,7 @@ export default function SopaDeLetrasGame({ usuario, onExit, recursoInicial }) {
     const [rankingData, setRankingData] = useState([]);
     const [cargandoRanking, setCargandoRanking] = useState(false);
     const [guardando, setGuardando] = useState(false);
-
+    const [recursoPendiente, setRecursoPendiente] = useState(null);
     // --- BUSCADOR (Igual que Wordle) ---
     const [biblioteca, setBiblioteca] = useState([]);
     const [buscando, setBuscando] = useState(false);
@@ -63,7 +63,7 @@ export default function SopaDeLetrasGame({ usuario, onExit, recursoInicial }) {
             if (palabrasForzadas && palabrasForzadas.length > 0) {
                 // MODO PROFESOR: Usamos las palabras del recurso
                 // Mezclamos y cogemos hasta un máximo de 10
-                palabrasFinales = palabrasForzadas.sort(() => Math.random() - 0.5).slice(0, 10);
+                palabrasFinales = palabrasForzadas;
                 setIsCustomGame(true);
             } else {
                 // MODO ALEATORIO: Descargamos diccionario
@@ -128,37 +128,80 @@ export default function SopaDeLetrasGame({ usuario, onExit, recursoInicial }) {
     const buscarRecursosPublicos = async () => {
         setBuscando(true);
         try {
-            const q = query(collection(db, "resources"), where("tipoJuego", "==", "SOPA"), where("isPrivate", "==", false), limit(50));
+            // Buscamos TODOS los recursos públicos. El filtrado fino lo haremos en JavaScript
+            // para poder aceptar tanto 'SOPA' como 'WORDLE'.
+            const q = query(collection(db, "resources"), where("isPrivate", "==", false), limit(150));
             const snap = await getDocs(q);
             const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
             const clean = (t) => t ? t.toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
+
             const filtrados = docs.filter(r => {
+                // 1. ACEPTAMOS SOPA Y WORDLE
+                if (r.tipoJuego !== 'SOPA' && r.tipoJuego !== 'WORDLE') return false;
+
+                // 2. FILTROS DE TEMA Y CICLO
                 const cumpleTema = !filtros.tema || clean(r.titulo).includes(clean(filtros.tema)) || clean(r.temas).includes(clean(filtros.tema));
                 const cumpleCiclo = !filtros.ciclo || r.ciclo === filtros.ciclo;
-                return cumpleTema && cumpleCiclo; // Versión simplificada para el ejemplo
+
+                return cumpleTema && cumpleCiclo;
             });
+
+            // Ordenamos por fecha de creación (los más nuevos primero)
+            filtrados.sort((a, b) => (b.fechaCreacion?.seconds || 0) - (a.fechaCreacion?.seconds || 0));
+
             setBiblioteca(filtrados);
-        } catch (e) { console.error("Error buscando:", e); }
+            if (filtrados.length === 0) alert("No se han encontrado sopas de letras públicas con esos filtros.");
+        } catch (e) {
+            console.error("Error buscando:", e);
+            alert("Error al buscar recursos.");
+        }
         setBuscando(false);
     };
 
     const procesarRecurso = (data) => {
-
         setRecursoActual(data);
+        // Si hay más de 1 hoja, mostramos el selector. Si no, jugamos directamente 'General'
+        if (data.hojas && data.hojas.length > 1) {
+            setRecursoPendiente(data);
+            setScreen('SELECT_HOJA');
+        } else {
+            iniciarJuegoConHoja(data, 'General');
+        }
+    };
+
+    const iniciarJuegoConHoja = (data, nombreHoja) => {
         let palabrasCandidatas = [];
+
         if (data.hojas) {
             data.hojas.forEach(h => {
-                if (h.preguntas) {
-                    h.preguntas.forEach(p => {
-                        const limpia = normalizeWord(p.pregunta || p.respuesta || p.a); // Dependerá de cómo lo guardemos en el editor
-                        if (limpia && /^[A-ZÑ]+$/.test(limpia)) palabrasCandidatas.push(limpia);
+                // Filtramos por la hoja seleccionada (o todas si es 'General')
+                if ((nombreHoja === 'General' || h.nombreHoja === nombreHoja) && h.palabras && Array.isArray(h.palabras)) {
+                    h.palabras.forEach(palabra => {
+                        const limpia = normalizeWord(palabra);
+                        if (limpia && /^[A-ZÑ]+$/.test(limpia)) {
+                            palabrasCandidatas.push(limpia);
+                        }
                     });
                 }
             });
         }
-        if (palabrasCandidatas.length === 0) return alert("El recurso no tiene palabras válidas.");
-        cargarDiccionarioYJugar(palabrasCandidatas, data.config?.idioma || 'ES');
+
+        if (palabrasCandidatas.length === 0) {
+            alert("No hay palabras válidas en esta selección.");
+            setScreen('CONFIG');
+            return;
+        }
+
+        // MAGIA: Leemos cuántas palabras configuró el profesor (o 8 por defecto)
+        const limitePalabras = data.config?.numPalabras || data.config?.numWords || 8;
+
+        // Mezclamos TODAS las palabras válidas y cogemos solo la cantidad del límite
+        const mezcladas = palabrasCandidatas.sort(() => Math.random() - 0.5);
+        const seleccionFinal = mezcladas.slice(0, limitePalabras);
+
+        // Arrancamos la sopa con esas palabras
+        cargarDiccionarioYJugar(seleccionFinal, data.config?.idioma || 'ES');
     };
 
     // =========================================================
@@ -251,6 +294,42 @@ export default function SopaDeLetrasGame({ usuario, onExit, recursoInicial }) {
             <style>{`.spin { animation: spin 1s linear infinite; } @keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
         </div>
     );
+
+    if (screen === 'SELECT_HOJA') return (
+        <div style={styles.screen}>
+            <button onClick={() => setScreen('CONFIG')} style={styles.backBtn}><ArrowLeft size={20} /> Volver</button>
+            <h1 style={{ ...styles.h1, color: '#f1c40f', marginTop: '40px' }}>Elige un Nivel</h1>
+
+            <div style={{ ...styles.card, marginTop: '20px' }}>
+                <h3 style={{ color: '#2c3e50', marginBottom: '20px' }}>{recursoPendiente?.titulo}</h3>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {/* Botón de Jugar General (Mezcla) */}
+                    <button
+                        onClick={() => iniciarJuegoConHoja(recursoPendiente, 'General')}
+                        style={{ ...styles.btn, ...styles.btnPrimary, width: '100%' }}
+                    >
+                        🌟 Jugar General (Mezcla)
+                    </button>
+
+                    <div style={{ width: '100%', height: '1px', background: '#ddd', margin: '10px 0' }}></div>
+                    <p style={{ margin: 0, color: '#666', fontSize: '0.9rem', fontWeight: 'bold' }}>O elige una hoja específica:</p>
+
+                    {/* Botones por cada hoja */}
+                    {recursoPendiente?.hojas.map((h, i) => (
+                        <button
+                            key={i}
+                            onClick={() => iniciarJuegoConHoja(recursoPendiente, h.nombreHoja)}
+                            style={{ ...styles.btn, background: '#eee', color: '#333', width: '100%', border: '2px solid #ccc' }}
+                        >
+                            📂 {h.nombreHoja} <span style={{ fontSize: '0.8rem', color: '#777' }}>({h.palabras?.length || 0} pal.)</span>
+                        </button>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+
 
     if (screen === 'CONFIG') return (
         <div style={styles.screen}>

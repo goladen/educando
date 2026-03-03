@@ -1,11 +1,13 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, setDoc } from 'firebase/firestore';
-import { Search, Key, Filter, Zap, Play, Home, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, Key, Filter, Zap, Play, Home, ChevronDown, ChevronUp, Mail } from 'lucide-react';
 import GamePlayer from '../GamePlayer';
 import ThinkHootGame from '../ThinkHootGame';
 import RuletaGame from '../RuletaGame';
 import MathLive from '../MathLive';
+import OlympicLive from '../OlympicLive';
+import QuestionSenderClient from '../QuestionSenderClient';
 import PikatronRun from '../PikatronRun';
 import TextWordleGame from '../TextWordleGame';
 import MathWordleGame from '../MathWordleGame';
@@ -20,6 +22,8 @@ import imgMathle from '../assets/icono_mathle.png';
 import imgPilive from '../assets/icono_pilive.png';
 import imgMathlive from '../assets/icono_mathlive.png';
 import imgSopa from '../assets/icono_sopa.png';
+import imgOlympic from '../assets/icono_olympic.png';
+
 // --- CONFIGURACIÓN DE APLICACIONES Y COLORES ---
 export const APPS = [
     { id: 'PASAPALABRA', name: 'Pasapalabra', desc: 'Adivina la palabra con cada letra del abecedario.', color: '#0A0E45', img: imgPasapalabra },
@@ -31,9 +35,63 @@ export const APPS = [
     { id: 'MATHLE', name: 'MathLe', desc: 'Adivina la ecuación matemática oculta.', color: '#1565C0', img: imgMathle },
     { id: 'THINKHOOT', name: 'PiLive', desc: 'Diviértete en vivo con tus compañeros.', color: '#9C27B0', img: imgPilive, isLive: true },
     { id: 'MATHLIVE', name: 'MathLive', desc: 'Juega con las mates en tiempo real.', color: '#009688', img: imgMathlive, isLive: true },
-    { id: 'SOPA', name: 'Sopa_letras', desc: 'Encuentra las palabras ocultas.', color: '#e67e22', img: imgSopa }
+    { id: 'OLYMPICLIVE', name: 'Olympic_Live', desc: 'Compite en minijuegos y cálculo.', color: '#D32F2F', img: imgOlympic, isLive: true },
+    { id: 'SOPA', name: 'Sopa_letras', desc: 'Encuentra las palabras ocultas.', color: '#e67e22', img: imgSopa },
+    {
+        id: 'QUESTION_SENDER',
+        name: 'Q-Sender',
+        desc: 'Envía tus preguntas al profesor para crear un juego.',
+        color: '#2c3e50',
+        img: null, // Usaremos el icono Mail si es null
+        emoji: '📮',
+        isSpecial: true
+    }
 
 ];
+
+// --- FUNCIONES DE AYUDA PARA BÚSQUEDA INTELIGENTE ---
+
+// Calcula la distancia de edición (cuántos cambios faltan para que sean iguales)
+const levenshteinDistance = (s, t) => {
+    if (!s.length) return t.length;
+    if (!t.length) return s.length;
+    const arr = [];
+    for (let i = 0; i <= t.length; i++) {
+        arr[i] = [i];
+        for (let j = 1; j <= s.length; j++) {
+            arr[i][j] =
+                i === 0
+                    ? j
+                    : Math.min(
+                        arr[i - 1][j] + 1,
+                        arr[i][j - 1] + 1,
+                        arr[i - 1][j - 1] + (s[j - 1] === t[i - 1] ? 0 : 1)
+                    );
+        }
+    }
+    return arr[t.length][s.length];
+};
+
+// Comprueba si hay coincidencia (Incluye: contiene, contenido en, o similitud > 80%)
+const checkFuzzyMatch = (text, search) => {
+    const t = cleanText(text);
+    const s = cleanText(search);
+
+    if (!t || !s) return false;
+
+    // 1. Coincidencia exacta o contención (rápida)
+    if (t.includes(s) || s.includes(t)) return true;
+
+    // 2. Coincidencia difusa (80% de similitud)
+    const distance = levenshteinDistance(t, s);
+    const maxLength = Math.max(t.length, s.length);
+    const similarity = 1 - distance / maxLength;
+
+    return similarity >= 0.8; // Umbral del 80%
+};
+
+
+
 const FAKE_MATHLE = {
     id: 'fake-mathle',
     titulo: 'Desafío MathLe',
@@ -48,7 +106,7 @@ const FAKE_MATHLE = {
 };
 // Función Helper para detectar juegos en vivo y separar PiLive de Wordle
 const esJuegoEnVivo = (r) => {
-    if (r.tipoJuego === 'MATHLIVE' || r.tipoJuego === 'THINKHOOT') return true;
+    if (r.tipoJuego === 'MATHLIVE' || r.tipoJuego === 'THINKHOOT' || r.tipoJuego === 'OLYMPICLIVE') return true;
     // Si es un PiLive antiguo (se guardaban como PRO pero NO son Wordle)
     if (r.tipo === 'PRO' && r.tipoJuego !== 'WORDLE' && r.tipoJuego !== 'MATHLIVE') return true;
     return false;
@@ -72,8 +130,15 @@ const getAppInfo = (tipoJuego) => {
     return { name: tipoJuego, color: '#999' };
 };
 
-const cleanText = (text) => text ? text.toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
-
+// Función para limpiar textos (quitar tildes, mayúsculas y espacios extra)
+const cleanText = (str) => {
+    if (!str) return "";
+    return String(str)
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") // Quitar tildes
+        .toLowerCase()
+        .trim();
+};
 export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
     const [modoBusqueda, setModoBusqueda] = useState('FILTROS');
     const [filtros, setFiltros] = useState({ tipoJuego: '', ciclo: '', tema: '', pais: '', region: '', poblacion: '', autor: '' });
@@ -90,7 +155,8 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
     const [joinLiveCode, setJoinLiveCode] = useState('');
     const [joinLiveName, setJoinLiveName] = useState('');
     const [isMathLiveAlumno, setIsMathLiveAlumno] = useState(false);
-
+    const [joinLiveTipoJuego, setJoinLiveTipoJuego] = useState('');
+    const [hostTipoJuego, setHostTipoJuego] = useState('');
     // Estados Live Host (Presentador)
     const [liveModeHost, setLiveModeHost] = useState(false);
     const [hostRoomCode, setHostRoomCode] = useState('');
@@ -103,10 +169,10 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
 
         try {
             if (modoBusqueda === 'CODIGO') {
+                // ... (ESTA PARTE DEL CÓDIGO SE QUEDA IGUAL) ...
                 const codigoLimpio = codigo.toUpperCase().trim();
                 if (!codigoLimpio) { alert("Introduce un código."); setBuscando(false); return; }
 
-                // Código 6 letras = Sesión en Vivo
                 if (codigoLimpio.length === 6) {
                     const salaRef = doc(db, "live_games", codigoLimpio);
                     const salaSnap = await getDoc(salaRef);
@@ -116,6 +182,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
                         if (nombre && nombre.trim() !== '') {
                             setJoinLiveCode(codigoLimpio);
                             setJoinLiveName(nombre.trim());
+                            setJoinLiveTipoJuego(data.tipoJuego || '');
                             setIsMathLiveAlumno(data.config?.isMathLive === true || data.tipoJuego === 'MATHLIVE');
                             setLiveModeAlumno(true);
                         }
@@ -124,7 +191,6 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
                     return;
                 }
 
-                // Código 4/5 letras = Recurso o Question Sender
                 let q = query(ref, where("accessCode", "==", codigoLimpio));
                 let snap = await getDocs(q);
 
@@ -134,16 +200,26 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
                 } else {
                     const qSender = query(ref, where("hojasCodes", "array-contains", codigoLimpio));
                     const snapSender = await getDocs(qSender);
-                    if (!snapSender.empty && onOpenQuestionSender) {
-                        onOpenQuestionSender();
+                    if (!snapSender.empty) {
+                        // ¡ENCONTRADO!
+                        // En lugar de llamar a una función externa, activamos el componente localmente
+                        // Pasamos un objeto especial como 'juegoActivo' para que el render sepa qué mostrar
+                        const recursoEncontrado = {
+                            ...snapSender.docs[0].data(),
+                            id: snapSender.docs[0].id,
+                            tipoJuego: 'QUESTION_SENDER',
+                            codigoInicial: codigoLimpio // ¡Pasamos el código que escribió el alumno!
+                        };
+
+                        setJuegoActivo(recursoEncontrado);
                         setBuscando(false);
-                        return;
+                        return; // Cortamos aquí para que abra directo
                     }
-                    alert("Código no encontrado.");
+                    else { alert("Código no encontrado."); }
                 }
 
             } else {
-                // BÚSQUEDA POR FILTROS
+                // --- BÚSQUEDA POR FILTROS MEJORADA ---
                 const q = query(ref, orderBy("fechaCreacion", "desc"), limit(150));
                 const snap = await getDocs(q);
                 const raw = snap.docs.map(d => ({ ...d.data(), id: d.id }));
@@ -154,26 +230,36 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
                     const isTerminado = r.isFinished === true || r.config?.isFinished === true;
                     if (!isTerminado) return false;
 
+                    // Filtro Tipo Juego
                     if (filtros.tipoJuego) {
                         if (filtros.tipoJuego === 'THINKHOOT') {
-                            // Si busca PiLive, nos aseguramos que no se cuele Wordle
                             if (!esJuegoEnVivo(r) || r.tipoJuego === 'MATHLIVE') return false;
                         } else if (filtros.tipoJuego === 'CAZABURBUJAS') {
                             if (r.tipoJuego !== 'CAZABURBUJAS' && r.tipoJuego !== 'PIKATRON') return false;
                         } else if (filtros.tipoJuego === 'SOPA' || filtros.tipoJuego === 'WORDLE') {
-                            // MAGIA: Sopa y Wordle comparten los mismos recursos
                             if (r.tipoJuego !== 'SOPA' && r.tipoJuego !== 'WORDLE') return false;
-                        }
-
-
-                        else {
+                        } else {
                             if (r.tipoJuego !== filtros.tipoJuego) return false;
                         }
                     }
 
-                    if (filtros.tema && !cleanText(r.titulo).includes(cleanText(filtros.tema)) && !cleanText(r.temas).includes(cleanText(filtros.tema))) return false;
-                    if (filtros.ciclo && cleanText(r.ciclo) !== cleanText(filtros.ciclo) && cleanText(r.config?.ciclo) !== cleanText(filtros.ciclo)) return false;
+                    // --- NUEVA LÓGICA DE BÚSQUEDA DE TEMA ---
+                    if (filtros.tema) {
+                        const search = filtros.tema;
 
+                        // 1. Buscar en Título
+                        const matchTitulo = checkFuzzyMatch(r.titulo, search);
+                        // 2. Buscar en Temas (campo texto)
+                        const matchTemas = checkFuzzyMatch(r.temas, search);
+                        // 3. Buscar en Nombres de Hojas (dentro del array)
+                        const matchHojas = r.hojas && r.hojas.some(h => checkFuzzyMatch(h.nombreHoja, search));
+
+                        // Si no coincide ninguno, descartamos
+                        if (!matchTitulo && !matchTemas && !matchHojas) return false;
+                    }
+                    // ----------------------------------------
+
+                    if (filtros.ciclo && cleanText(r.ciclo) !== cleanText(filtros.ciclo) && cleanText(r.config?.ciclo) !== cleanText(filtros.ciclo)) return false;
                     if (filtros.pais && !cleanText(r.pais).includes(cleanText(filtros.pais))) return false;
                     if (filtros.region && !cleanText(r.region).includes(cleanText(filtros.region))) return false;
                     if (filtros.poblacion && !cleanText(r.poblacion).includes(cleanText(filtros.poblacion))) return false;
@@ -181,12 +267,11 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
 
                     return true;
                 });
+
                 const temaMate = cleanText(filtros.tema);
-                // Si no hay tema escrito, o si escriben cosas de mates
                 const buscarMate = !temaMate || temaMate.includes('matematica') || temaMate.includes('mates') || temaMate.includes('calculo');
                 const buscarJuego = !filtros.tipoJuego || filtros.tipoJuego === 'MATHLE';
 
-                // Si encaja, la ponemos la primera de la lista (unshift)
                 if (buscarMate && buscarJuego) {
                     filtrados.unshift(FAKE_MATHLE);
                 }
@@ -196,7 +281,6 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
         } catch (e) { console.error(e); alert("Error en búsqueda."); }
         setBuscando(false);
     };
-
     const abrirJuego = (appId) => {
         const appInfo = APPS.find(a => a.id === appId);
         if (appInfo) {
@@ -218,7 +302,9 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
             if (!pool.length) return alert("El recurso no tiene preguntas válidas.");
 
             const pFin = pool.slice(0, limitePreguntas).map(p => {
-                if (r.tipo !== 'PRO') {
+                // Protegemos los juegos PRO y OLYMPIC para que no destruya el tipo de pregunta
+                // Añadimos también tipoJuego por si creaste el recurso antes de la actualización
+                if (r.tipo !== 'PRO' && r.tipo !== 'OLYMPIC' && r.tipoJuego !== 'OLYMPICLIVE') {
                     return { ...p, q: p.pregunta, a: p.correcta || p.respuesta, tipo: (p.incorrectas?.length > 0) ? 'MULTIPLE' : 'SIMPLE', opcionesFijas: (p.incorrectas?.length > 0) ? [p.correcta || p.respuesta, ...p.incorrectas].sort(() => Math.random() - 0.5) : [] };
                 }
                 return p;
@@ -235,11 +321,13 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
                 indicePregunta: 0,
                 jugadores: {},
                 respuestasRonda: {},
-                timestamp: new Date()
+                timestamp: new Date(),
+                tipoJuego: r.tipoJuego
             });
 
             setHostRoomCode(sala);
             setIsMathLiveHost(r.config?.isMathLive === true || r.tipoJuego === 'MATHLIVE');
+            setHostTipoJuego(r.tipoJuego);
             setLiveModeHost(true);
         } catch (error) {
             console.error("Error lanzando host:", error);
@@ -262,19 +350,38 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
     // 1. Host (Profesor/Gestor)
     if (liveModeHost && hostRoomCode) {
         const tempUser = { uid: "host_invitado_" + Date.now(), displayName: "Profe Invitado", email: null };
+        // --- CORRECCIÓN: USAMOS EL ESTADO ---
+        if (hostTipoJuego === 'OLYMPICLIVE') return <OlympicLive isHost={true} codigoSala={hostRoomCode} usuario={tempUser} onExit={() => setLiveModeHost(false)} />;
+        // ------------------------------------
+
         if (isMathLiveHost) return <MathLive isHost={true} codigoSala={hostRoomCode} usuario={tempUser} onExit={() => setLiveModeHost(false)} />;
         return <ThinkHootGame isHost={true} codigoSala={hostRoomCode} usuario={tempUser} onExit={() => setLiveModeHost(false)} />;
     }
-
-    // 2. Alumno (Unirse a Live)
     if (liveModeAlumno) {
-        if (isMathLiveAlumno) return <MathLive isHost={false} codigoSala={joinLiveCode} usuario={{ displayName: joinLiveName, email: null }} onExit={() => setLiveModeAlumno(false)} />;
-        return <ThinkHootGame isHost={false} codigoSala={joinLiveCode} usuario={{ displayName: joinLiveName, email: null }} onExit={() => setLiveModeAlumno(false)} />;
+        // Usamos la verdad absoluta de la base de datos, o el de la app si no está
+        const tipoFinal = (typeof joinLiveTipoJuego !== 'undefined' && joinLiveTipoJuego) ? joinLiveTipoJuego : (typeof appData !== 'undefined' ? appData.id : '');
+
+        if (tipoFinal === 'OLYMPICLIVE') return <OlympicLive isHost={false} codigoSala={typeof joinCode !== 'undefined' ? joinCode : joinLiveCode} usuario={{ displayName: typeof joinName !== 'undefined' ? joinName : joinLiveName, email: null }} onExit={() => setLiveModeAlumno(false)} />;
+        if (tipoFinal === 'MATHLIVE' || isMathLiveAlumno) return <MathLive isHost={false} codigoSala={typeof joinCode !== 'undefined' ? joinCode : joinLiveCode} usuario={{ displayName: typeof joinName !== 'undefined' ? joinName : joinLiveName, email: null }} onExit={() => setLiveModeAlumno(false)} />;
+
+        return <ThinkHootGame isHost={false} codigoSala={typeof joinCode !== 'undefined' ? joinCode : joinLiveCode} usuario={{ displayName: typeof joinName !== 'undefined' ? joinName : joinLiveName, email: null }} onExit={() => setLiveModeAlumno(false)} />;
     }
 
-    // 3. Single Player
+    
     // 3. Single Player
     if (juegoActivo) {
+        if (juegoActivo.tipoJuego === 'QUESTION_SENDER') {
+            return (
+                <QuestionSenderClient
+                    usuario={null} // O el usuario si lo tienes
+                    onBack={() => setJuegoActivo(null)}
+                    codigoInicial={juegoActivo.codigoInicial} // Pasamos el código para que no tenga que escribirlo de nuevo
+                />
+            );
+        }
+
+
+
         if (juegoActivo.modoEspecial === 'PIKATRON') return <PikatronRun recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'RULETA') return <RuletaGame recurso={juegoActivo} usuario={null} alTerminar={() => setJuegoActivo(null)} />;
 
@@ -325,7 +432,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
                 {modoBusqueda === 'CODIGO' ? (
                     <div style={{ textAlign: 'center' }}>
                         <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '15px' }}>Si tienes un código de 6 números es una sesión en vivo. Si tiene 4 o 5 letras, es un juego.</p>
-                        <input placeholder="Ej: A1B2C o 123456" value={codigo} onChange={e => setCodigo(e.target.value)} style={{ padding: '15px', fontSize: '1.5rem', textAlign: 'center', borderRadius: '10px', border: '2px solid #ddd', width: '250px', textTransform: 'uppercase', letterSpacing: '3px' }} maxLength={6} />
+                        <input placeholder="Ej: A1B2C o 123456" value={codigo} onChange={e => setCodigo(e.target.value)} style={{ padding: '15px', fontSize: '1.5rem', textAlign: 'center', borderRadius: '10px', border: '2px solid #ddd', width: '100%', maxwidth:'250px', textTransform: 'uppercase', letterSpacing: '3px' }} maxLength={6} />
                     </div>
                 ) : (
                         <div>
@@ -414,7 +521,12 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
                 {APPS.filter(app => !app.isLive).map(app => (
                     <div key={app.id} onClick={() => abrirJuego(app.id)} style={{ background: '#ffffbf', borderRadius: '15px', padding: '15px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transition: 'transform 0.2s' }}>
                         <div style={{ width: '60px', height: '60px', margin: '0 auto 10px auto', background: 'transparent', borderRadius: '15px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'white' }}>
+                            {app.img ? (
                             <img src={app.img} alt={app.name} style={{ width: '60px', height: '60px', objectFit: 'contain', borderRadius: '15px' }} onError={(e) => e.target.style.display = 'none'} />
+                            ) : (
+                                    <span style={{ fontSize: '45px', lineHeight: '1' }}>{app.emoji}</span>
+                                )}
+
                         </div>
                         <h4 style={{ margin: 0, color: '#333', fontSize: '0.9rem' }}>{app.name}</h4>
                     </div>
@@ -468,7 +580,7 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
     const [joinCode, setJoinCode] = useState('');
     const [joinName, setJoinName] = useState('');
     const [liveModeAlumno, setLiveModeAlumno] = useState(false);
-
+    const [joinLiveTipoJuego, setJoinLiveTipoJuego] = useState('');
     // Gestor/Single Player
     const [liveModeHost, setLiveModeHost] = useState(false);
     const [hostRoomCode, setHostRoomCode] = useState('');
@@ -480,7 +592,65 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
     if (appData.id === 'MATHLE') return <MathWordleGame usuario={null} onExit={onHome} />;
     if (appData.id === 'SOPA') return <SopaDeLetrasGame usuario={null} onExit={onHome} />;
     // --------
+    // --- CASO ESPECIAL: QUESTION SENDER ---
+    if (appData.id === 'QUESTION_SENDER') {
+        const [qsCode, setQsCode] = useState('');
 
+        // Función para abrir el cliente
+        const abrirCliente = async () => {
+            if (!qsCode || qsCode.trim().length < 4) return alert("Introduce un código válido.");
+
+            const qSender = query(collection(db, 'resources'), where("hojasCodes", "array-contains", qsCode.toUpperCase().trim()));
+            const snapSender = await getDocs(qSender);
+
+            if (!snapSender.empty) {
+                // Truco: Usamos setJuegoActivo para renderizar el cliente
+                setJuegoActivo({
+                    ...snapSender.docs[0].data(),
+                    id: snapSender.docs[0].id,
+                    tipoJuego: 'QUESTION_SENDER',
+                    codigoInicial: qsCode.toUpperCase().trim()
+                });
+            } else {
+                alert("Código de hoja no encontrado. Pídeselo a tu profesor.");
+            }
+        };
+
+        // Si ya hemos activado el juego (cliente), lo mostramos
+        if (juegoActivo) {
+            return <QuestionSenderClient usuario={null} onBack={() => setJuegoActivo(null)} codigoInicial={juegoActivo.codigoInicial} />;
+        }
+
+        // Si no, mostramos la pantalla de "Ingresar Código"
+        return (
+            <div style={{ width: '100%', minHeight: '100vh', background: '#2c3e50', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
+                <div style={{ background: 'white', padding: '40px', borderRadius: '20px', textAlign: 'center', maxWidth: '500px', width: '100%', boxShadow: '0 10px 30px rgba(0,0,0,0.3)' }}>
+                    {/* EMOJI GRANDE */}
+                    <div style={{ marginBottom: '20px', fontSize: '80px', lineHeight: '1' }}>
+                        📮
+                    </div>
+                    <h2 style={{ color: '#2c3e50', margin: '0 0 10px 0' }}>Buzón de Preguntas</h2>
+                    <p style={{ color: '#7f8c8d', marginBottom: '30px' }}>Introduce el código de tu grupo para enviar preguntas.</p>
+
+                    <input
+                        value={qsCode}
+                        onChange={e => setQsCode(e.target.value.toUpperCase())}
+                        placeholder="CÓDIGO (Ej: A1B2)"
+                        style={{ width: '100%', padding: '15px', fontSize: '1.5rem', textAlign: 'center', borderRadius: '10px', border: '2px solid #bdc3c7', marginBottom: '20px', letterSpacing: '3px', textTransform: 'uppercase', boxSizing: 'border-box' }}
+                        maxLength={5}
+                    />
+
+                    <button onClick={abrirCliente} style={{ width: '100%', padding: '15px', background: '#27ae60', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer', marginBottom: '15px' }}>
+                        ENTRAR
+                    </button>
+
+                    <button onClick={onHome} style={{ background: 'transparent', border: 'none', color: '#95a5a6', cursor: 'pointer', fontSize: '0.9rem', textDecoration: 'underline' }}>
+                        Volver al inicio
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     const buscarEspecífico = async () => {
         try {
@@ -558,7 +728,11 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
             if (r.config?.aleatorio !== false) pool.sort(() => Math.random() - 0.5);
 
             const pFin = pool.slice(0, limitePreguntas).map(p => {
-                if (r.tipo !== 'PRO') return { ...p, q: p.pregunta, a: p.correcta || p.respuesta, tipo: (p.incorrectas?.length > 0) ? 'MULTIPLE' : 'SIMPLE', opcionesFijas: (p.incorrectas?.length > 0) ? [p.correcta || p.respuesta, ...p.incorrectas].sort(() => Math.random() - 0.5) : [] };
+                // Protegemos los juegos PRO y OLYMPIC para que no destruya el tipo de pregunta
+                // Añadimos también tipoJuego por si creaste el recurso antes de la actualización
+                if (r.tipo !== 'PRO' && r.tipo !== 'OLYMPIC' && r.tipoJuego !== 'OLYMPICLIVE') {
+                    return { ...p, q: p.pregunta, a: p.correcta || p.respuesta, tipo: (p.incorrectas?.length > 0) ? 'MULTIPLE' : 'SIMPLE', opcionesFijas: (p.incorrectas?.length > 0) ? [p.correcta || p.respuesta, ...p.incorrectas].sort(() => Math.random() - 0.5) : [] };
+                }
                 return p;
             });
 
@@ -573,7 +747,8 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
                 indicePregunta: 0,
                 jugadores: {},
                 respuestasRonda: {},
-                timestamp: new Date()
+                timestamp: new Date(),
+                tipoJuego: r.tipoJuego
             });
 
             setHostRoomCode(sala);
@@ -595,8 +770,13 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
     }
 
     if (liveModeAlumno) {
-        if (appData.id === 'MATHLIVE') return <MathLive isHost={false} codigoSala={joinCode} usuario={{ displayName: joinName, email: null }} onExit={() => setLiveModeAlumno(false)} />;
-        return <ThinkHootGame isHost={false} codigoSala={joinCode} usuario={{ displayName: joinName, email: null }} onExit={() => setLiveModeAlumno(false)} />;
+        // Usamos la verdad absoluta de la base de datos, o el de la app si no está
+        const tipoFinal = (typeof joinLiveTipoJuego !== 'undefined' && joinLiveTipoJuego) ? joinLiveTipoJuego : (typeof appData !== 'undefined' ? appData.id : '');
+
+        if (tipoFinal === 'OLYMPICLIVE') return <OlympicLive isHost={false} codigoSala={typeof joinCode !== 'undefined' ? joinCode : joinLiveCode} usuario={{ displayName: typeof joinName !== 'undefined' ? joinName : joinLiveName, email: null }} onExit={() => setLiveModeAlumno(false)} />;
+        if (tipoFinal === 'MATHLIVE' || isMathLiveAlumno) return <MathLive isHost={false} codigoSala={typeof joinCode !== 'undefined' ? joinCode : joinLiveCode} usuario={{ displayName: typeof joinName !== 'undefined' ? joinName : joinLiveName, email: null }} onExit={() => setLiveModeAlumno(false)} />;
+
+        return <ThinkHootGame isHost={false} codigoSala={typeof joinCode !== 'undefined' ? joinCode : joinLiveCode} usuario={{ displayName: typeof joinName !== 'undefined' ? joinName : joinLiveName, email: null }} onExit={() => setLiveModeAlumno(false)} />;
     }
 
     if (juegoActivo) {
@@ -684,7 +864,16 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
                         <h3>Introduce el código de la sala</h3>
                         <input placeholder="Código de 6 números" value={joinCode} onChange={e => setJoinCode(e.target.value)} style={{ ...styles.input, width: '250px', display: 'block', margin: '15px auto', textAlign: 'center', fontSize: '1.5rem', letterSpacing: '2px' }} maxLength={6} />
                         <input placeholder="Tu Nombre" value={joinName} onChange={e => setJoinName(e.target.value)} style={{ ...styles.input, width: '250px', display: 'block', margin: '10px auto', textAlign: 'center', fontSize: '1.2rem' }} />
-                        <button onClick={() => { if (joinCode.length === 6 && joinName) setLiveModeAlumno(true); else alert("Introduce código y nombre."); }} style={{ background: appData.color, color: 'white', padding: '15px 50px', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', marginTop: '20px', fontSize: '1.2rem' }}>ENTRAR AL JUEGO</button>
+
+                        <button onClick={async () => {
+                            if (joinCode.length === 6 && joinName) {
+                                const salaSnap = await getDoc(doc(db, "live_games", joinCode.toUpperCase().trim()));
+                                if (salaSnap.exists()) {
+                                    setJoinLiveTipoJuego(salaSnap.data().tipoJuego || '');
+                                    setLiveModeAlumno(true);
+                                } else alert("Código incorrecto o sala no iniciada.");
+                            } else alert("Introduce código y nombre.");
+                        }} style={{ background: appData.color, color: 'white', padding: '15px 50px', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', marginTop: '20px', fontSize: '1.2rem' }}>ENTRAR AL JUEGO</button>
                     </div>
                 )}
 

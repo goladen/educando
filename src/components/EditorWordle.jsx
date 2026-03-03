@@ -233,6 +233,7 @@ export default function EditorWordle({ datos, setDatos, onClose, onSave, usuario
                                         style={{ ...styles.input, border: '1px solid #2e7d32', color: '#1b5e20', fontWeight: 'bold' }}
                                     >
                                         <option value="ES">🇪🇸 Español</option>
+                                        <option value="CA">🟥🟨 Català</option>
                                         <option value="EN">🇬🇧 English</option>
                                         <option value="FR">🇫🇷 Français</option>
                                     </select>

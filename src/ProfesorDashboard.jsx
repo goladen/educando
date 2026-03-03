@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect } from 'react';
 import { db } from './firebase';
 import { collection, query, where, getDocs, deleteDoc, doc, addDoc, updateDoc, getDoc, setDoc, orderBy } from 'firebase/firestore';
-import { Trash2, Plus, FileSpreadsheet, Bot, BarChart2, Save, X, Pencil, Key, Gamepad2, Edit3, Globe, Search, Copy, Eye, Users, RotateCcw, Send, Zap, UserCircle, LogOut, Menu, HelpCircle, Shield, Info, FileText, Calculator } from 'lucide-react';
+import { Trash2, Plus, FileSpreadsheet, Bot, BarChart2, Save, X, Pencil, Key, Gamepad2, Edit3, Globe, Search, Copy, Eye, Users, RotateCcw, Send, Zap, UserCircle, LogOut, Menu, HelpCircle, Shield, Info, FileText, Calculator, Medal } from 'lucide-react';
 import useDrivePicker from 'react-google-drive-picker';
 import { procesarArchivoExcel } from './ExcelParser';
 import { generarPreguntasGemini } from './GeminiGenerator';
@@ -16,6 +16,7 @@ import GlobalSearch from './components/GlobalSearch'; // <--- NUEVO
 import TeacherTools from './components/TeacherTools'; // <--- NUEVO
 import EditorMathLive from './components/EditorMathLive';
 import MathLive from './MathLive';
+import OlympicLive from './OlympicLive';
 import CazaBurbujasGame from './CazaBurbujasGame';
 import PikatronRun from './PikatronRun';
 import SopaDeLetrasGame from './SopaDeLetrasGame';
@@ -25,6 +26,7 @@ import EditorProBurbujasPikatron from './components/EditorProBurbujasPikatron';
 import EditorQuestionSender from './components/EditorQuestionSender';
 import MathWordleGame from './MathWordleGame';
 import EditorWordle from './components/EditorWordle';
+import EditorOlympic from './components/EditorOlympic';
 import * as XLSX from 'xlsx'; // <--- IMPORTANTE
 // ==============================================================================
 //  ZONA DE CLAVES (SEGURA)
@@ -40,7 +42,12 @@ const TIPOS_JUEGOS = {
     // --- AÑADE ESTA LÍNEA ---
     MATHLIVE: { id: 'MATHLIVE', label: 'MathLive', color: '#009688', camposConfig: [] },
     // --
+    // --- AÑADE ESTA LÍNEA PARA SOLUCIONAR EL ERROR ---
 
+
+    OLYMPICLIVE: { id: 'OLYMPICLIVE', label: 'Olympic Live', color: '#D32F2F', camposConfig: [] },
+
+    // ------
     // --- AÑADIR WORDLE AQUÍ (Color Verde) ---
     WORDLE: { id: 'WORDLE', label: 'Wordle y sopa de letras', color: '#2E7D32', camposConfig: [] },
     // ---
@@ -62,7 +69,12 @@ const INSTRUCCIONES_CREACION = {
     THINKHOOT: "Diseña un quiz competitivo tipo Kahoot. Preguntas rápidas y ranking en tiempo real.",
     RULETA: "Define una frase oculta y preguntas cuyas respuestas den pistas para resolverla.",
     APAREJADOS: "Crea parejas de conceptos (Ej: País - Capital). Los alumnos deberán unirlas.",
-    QUESTION_SENDER: "Crea un buzón para que tus alumnos te envíen preguntas desde sus dispositivos."
+    QUESTION_SENDER: "Crea un buzón para que tus alumnos te envíen preguntas desde sus dispositivos.",
+    OLYMPICLIVE: "Combina minijuegos y rondas de matemáticas en un evento en vivo espectacular." // <--- AÑADE ESTO
+
+
+
+
 };
 
 export default function ProfesorDashboard({ usuario, googleToken }) {
@@ -81,6 +93,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
     const [mostrandoEditorBurbujasPikatron, setMostrandoEditorBurbujasPikatron] = useState(false);
     const [mostrandoMathWordle, setMostrandoMathWordle] = useState(false);
     const [mostrandoEditorWordle, setMostrandoEditorWordle] = useState(false);
+    const [mostrandoEditorOlympic, setMostrandoEditorOlympic] = useState(false); // <--- AÑADE ESTA LÍNEA
 
     const [recursoResultados, setRecursoResultados] = useState(null);
     const [recursoProbando, setRecursoProbando] = useState(null);
@@ -120,10 +133,10 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             const docs = s.docs.map(d => ({ ...d.data(), id: d.id })).filter(r => {
                 if (modoDashboard === 'PRO') {
                     // CAMBIO AQUÍ: Aceptamos 'PRO' y 'PRO-BURBUJAS'
-                    return r.tipo === 'PRO' || r.tipo === 'PRO-BURBUJAS';
+                    return r.tipo === 'PRO' || r.tipo === 'PRO-BURBUJAS' || r.tipo === 'OLYMPIC';
                 }
                 // En clásico mostramos los que NO sean de ningún tipo PRO
-                return !r.tipo || (r.tipo !== 'PRO' && r.tipo !== 'PRO-BURBUJAS');
+                return !r.tipo || (r.tipo !== 'PRO' && r.tipo !== 'PRO-BURBUJAS' && r.tipo !== 'OLYMPIC');
             });
             setRecursos(docs);
         } catch (e) { console.error(e) }
@@ -138,9 +151,9 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             const docs = s.docs.map(d => ({ ...d.data(), id: d.id })).filter(d => d.profesorUid !== usuario.uid).filter(r => {
                 if (modoDashboard === 'PRO') {
                     // CAMBIO AQUÍ TAMBIÉN
-                    return r.tipo === 'PRO' || r.tipo === 'PRO-BURBUJAS';
+                    return r.tipo === 'PRO' || r.tipo === 'PRO-BURBUJAS' || r.tipo === 'OLYMPIC';
                 }
-                return !r.tipo || (r.tipo !== 'PRO' && r.tipo !== 'PRO-BURBUJAS');
+                return !r.tipo || (r.tipo !== 'PRO' && r.tipo !== 'PRO-BURBUJAS' && r.tipo !== 'OLYMPIC');
             });
             setBibliotecaRecursos(docs);
         } catch (e) { console.error(e); }
@@ -185,7 +198,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             if (juegoSeleccionado === 'THINKHOOT') return iniciarCreacionPiLive();
             if (juegoSeleccionado === 'MATHLIVE') return iniciarCreacionMathLive();
             if (juegoSeleccionado === 'WORDLE') return iniciarCreacionWordle(); // <--- AÑADIR ESTO
-        
+            if (juegoSeleccionado === 'OLYMPICLIVE') return iniciarCreacionOlympic();
 
         }
 
@@ -262,6 +275,26 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
         setMostrandoEditorMathLive(true);
     };
 
+
+    // 4. CREAR OLYMPIC LIVE
+    const iniciarCreacionOlympic = () => {
+        const conf = {
+            usarMates: true,
+            mathCount: 8, mathTime: 30, mathPuntosMax: 30, mathPuntosMin: 20,
+            mathTypes: ['POSITIVOS'], mathOps: ['SUMA'], mathMin: 1, mathMax: 10,
+            aleatorio: true, numPreguntas: 4
+        };
+        const nuevoRecurso = {
+            id: null, titulo: '', temas: '', profesorNombre: usuario.displayName,
+            tipo: 'OLYMPIC', // <-- Clave para diferenciarlo
+            tipoJuego: 'OLYMPICLIVE',
+            config: conf, hojas: [{ nombreHoja: 'Rondas', preguntas: [] }], isPrivate: false
+        };
+        setDatosEditor(nuevoRecurso);
+        setMostrandoEditorOlympic(true);
+    };
+
+
     const abrirEdicion = async (recursoLocal) => {
         try {
             const docRef = doc(db, "resources", recursoLocal.id);
@@ -284,6 +317,10 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             if (dataFresca.tipo === 'PRO-BURBUJAS') {
                 setMostrandoEditorBurbujasPikatron(true);
             }
+            else if (dataFresca.tipo === 'OLYMPIC') {
+                setMostrandoEditorOlympic(true);
+            }
+
             else if (dataFresca.tipo === 'PRO') {
                 // PRIMERO comprobamos el subtipo
                 if (dataFresca.config?.isMathLive) {
@@ -386,7 +423,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             setMostrandoEditorMathLive(false);
             setMostrandoEditorBurbujasPikatron(false);
             setMostrandoEditorWordle(false); // <--- Cerramos el de Wordle
-
+            setMostrandoEditorOlympic(false);
             cargarRecursosPropios();
         } catch (e) {
             console.error(e);
@@ -697,19 +734,10 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
 
         // 2. RECORTAR Y ADAPTAR FORMATO
         const pFin = pool.slice(0, limitePreguntas).map(p => {
-            // Si es recurso clásico, adaptamos estructura a algo estándar si hace falta
-            if (r.tipo !== 'PRO') {
-                return {
-                    ...p, // Mantener campos originales
-                    q: p.pregunta,
-                    a: p.correcta || p.respuesta,
-                    tipo: (p.incorrectas?.length > 0) ? 'MULTIPLE' : 'SIMPLE',
-                    // Para múltiple clásica, enviamos opciones ya barajadas al cliente si queremos que todos vean el mismo orden aleatorio
-                    // O lo dejamos al cliente. ThinkHootGame actual maneja 'opcionesFijas'
-                    opcionesFijas: (p.incorrectas?.length > 0) ? [p.correcta || p.respuesta, ...p.incorrectas].sort(() => Math.random() - 0.5) : []
-                };
+            // Protegemos los juegos PRO y OLYMPIC para que no destruya el tipo de pregunta
+            if (r.tipo !== 'PRO' && r.tipo !== 'OLYMPIC' && r.tipoJuego !== 'OLYMPICLIVE') {
+                return { ...p, q: p.pregunta, a: p.correcta || p.respuesta, tipo: (p.incorrectas?.length > 0) ? 'MULTIPLE' : 'SIMPLE', opcionesFijas: (p.incorrectas?.length > 0) ? [p.correcta || p.respuesta, ...p.incorrectas].sort(() => Math.random() - 0.5) : [] };
             }
-            // Si es PRO, ya tiene la estructura correcta (tipo, bloques, etc)
             return p;
         });
 
@@ -733,7 +761,8 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             indicePregunta: 0,
             jugadores: {},
             respuestasRonda: {},
-            timestamp: new Date()
+            timestamp: new Date(),
+            tipoJuego: r.tipoJuego
         });
         setHostGameData({ ...hostGameData, codigoSala: sala, fase: 'LIVE' });
     };
@@ -745,13 +774,17 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
     
     // --- LÓGICA DE SELECCIÓN DE JUEGO ---
     if (hostGameData?.fase === 'LIVE') {
-        // Si el recurso tiene la marca de MathLive, cargamos ese archivo
+        // 1. Si es de Olimpiadas, cargamos el motor Olímpico
+        if (hostGameData.recurso.tipoJuego === 'OLYMPICLIVE') {
+            return <OlympicLive isHost={true} codigoSala={hostGameData.codigoSala} usuario={usuario} onExit={() => setHostGameData(null)} />;
+        }
 
+        // 2. Si el recurso tiene la marca de MathLive, cargamos ese archivo
         if (hostGameData.recurso.config?.isMathLive) {
             return <MathLive isHost={true} codigoSala={hostGameData.codigoSala} usuario={usuario} onExit={() => setHostGameData(null)} />;
         }
-        // Si no, cargamos el ThinkHoot normal
 
+        // 3. Si no es ninguno de los anteriores, cargamos el ThinkHoot normal
         return <ThinkHootGame isHost={true} codigoSala={hostGameData.codigoSala} usuario={usuario} onExit={() => setHostGameData(null)} />;
     }
 
@@ -884,7 +917,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                 <>{modoDashboard === 'CLASICO' && (
                     <div className="game-type-scroll" style={{ marginBottom: '20px' }}>
                         {Object.values(TIPOS_JUEGOS)
-                            .filter(j => j.id !== 'MATHLIVE' && j.id !== 'WORDLE') // <--- FILTRO AÑADIDO
+                            .filter(j => j.id !== 'MATHLIVE' && j.id !== 'WORDLE' && j.id !== 'OLYMPICLIVE') // <--- FILTRO AÑADIDO
                             .map(j => (
                                 <button key={j.id} onClick={() => setJuegoSeleccionado(j.id)} style={{ padding: '8px 16px', borderRadius: '20px', border: 'none', background: juegoSeleccionado === j.id ? j.color : 'white', color: juegoSeleccionado === j.id ? 'white' : '#555', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
                                     {j.label}
@@ -980,12 +1013,27 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                                             color: juegoSeleccionado === 'WORDLE' ? 'white' : '#555'
                                         }}
                                     >
+
+                                        
+
+
+
                                         <FileText size={16} /> <span className="btn-text">Wordle</span>
                                     </button>
                                     {/* ------------------------------------------- */}
 
                                     
-
+                                    <button
+                                        onClick={() => setJuegoSeleccionado('OLYMPICLIVE')}
+                                        className="header-btn"
+                                        style={{
+                                            padding: '8px 20px', borderRadius: '20px',
+                                            background: juegoSeleccionado === 'OLYMPICLIVE' ? '#D32F2F' : 'white',
+                                            color: juegoSeleccionado === 'OLYMPICLIVE' ? 'white' : '#555'
+                                        }}
+                                    >
+                                        <Medal size={16} /> <span className="btn-text">Olympic</span>
+                                    </button>
                                   
 
 
@@ -1004,7 +1052,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                             display: 'flex',
                             flexDirection: 'column', borderLeft: `6px solid ${TIPOS_JUEGOS[juegoSeleccionado].color}` }}>{juegoSeleccionado !== 'QUESTION_SENDER' && <div style={{ position: 'absolute', top: '10px', right: '10px', background: '#f1c40f', padding: '2px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: 'bold' }}><Users size={12} /> {r.playCount || 0}</div>}<h3 style={{ margin: '0 0 5px 0' }}>{r.titulo}</h3><div style={{ display: 'flex', gap: '5px', marginTop: '10px' }}>{juegoSeleccionado === 'QUESTION_SENDER' ? (<><button onClick={() => abrirEdicion(r)} style={btnStyle('#E3F2FD', '#1565C0')}><Pencil size={18} /></button><button onClick={() => setModalCopiarApp(r)} style={btnStyle('#E8F5E9', '#2E7D32')}><Send size={18} /></button><button onClick={() => eliminarRecurso(r.id)} style={btnStyle('#FFEBEE', '#C62828')}><Trash2 size={18} /></button></>) : (vista === 'MIS_RECURSOS' ? (<>
                             
-                            {juegoSeleccionado === 'THINKHOOT' || juegoSeleccionado === 'MATHLIVE' ? (
+                                {juegoSeleccionado === 'THINKHOOT' || juegoSeleccionado === 'MATHLIVE' || juegoSeleccionado === 'OLYMPICLIVE' ? (
                                 <button title="Lanzar en Vivo" onClick={() => prepararJuegoEnVivo(r)} style={{ ...btnStyle('#9C27B0', 'white'), fontWeight: 'bold' }}>
                                     <Zap size={18} />
                                 </button>
@@ -1124,7 +1172,15 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                     usuario={perfilProfesor || usuario}
                 />
             )}
-
+            {mostrandoEditorOlympic && (
+                <EditorOlympic
+                    datos={datosEditor}
+                    setDatos={setDatosEditor}
+                    onClose={() => setMostrandoEditorOlympic(false)}
+                    onSave={guardarRecursoFinal}
+                    usuario={perfilProfesor || usuario}
+                />
+            )}
 
 
                         {/* MODAL AYUDA GLOBAL DASHBOARD */}

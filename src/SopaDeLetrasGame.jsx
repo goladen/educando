@@ -14,10 +14,12 @@ const LANGUAGES = {
 
 };
 
-export default function SopaDeLetrasGame({ usuario, onExit, recursoInicial }) {
-    // --- ESTADOS DE PANTALLA ---
+export default function SopaDeLetrasGame({ usuario, onExit, recurso, modoOlimpico = false, tiempoOlimpico = null, hojaOlimpica = 'General', onOlimpicoFinish = null }) { // --- ESTADOS DE PANTALLA ---
+
+
     const [screen, setScreen] = useState('CONFIG'); // CONFIG, LOADING, GAME, VICTORY, RANKING
-    
+
+
     // --- CONFIGURACIÓN ---
     const [config, setConfig] = useState({ lang: 'ES', numWords: 8 }); // Entre 6 y 10 palabras
     const [customCode, setCustomCode] = useState('');
@@ -25,7 +27,7 @@ export default function SopaDeLetrasGame({ usuario, onExit, recursoInicial }) {
 
     // --- DATOS DEL JUEGO ---
     const [palabrasJuego, setPalabrasJuego] = useState([]);
-    
+
     // --- TIMER ---
     const [startTime, setStartTime] = useState(0);
     const [elapsedTime, setElapsedTime] = useState(0);
@@ -42,13 +44,79 @@ export default function SopaDeLetrasGame({ usuario, onExit, recursoInicial }) {
     const [buscando, setBuscando] = useState(false);
     const [mostrarMasFiltros, setMostrarMasFiltros] = useState(false);
     const [filtros, setFiltros] = useState({ tema: '', ciclo: 'Secundaria', pais: '', region: '', poblacion: '', autor: '' });
-    
+
     const [playerName, setPlayerName] = useState(usuario?.displayName || '');
     const [ranking, setRanking] = useState([]);
 
+
+
+    // --- NUEVOS ESTADOS OLÍMPICOS Y SALVAVIDAS ---
+    const [tiempoRestante, setTiempoRestante] = useState(tiempoOlimpico || 60);
+    const [puntos, setPuntos] = useState(0);
+
+    // Referencias para el salvavidas (guardan el valor actual sin provocar renderizados)
+    const puntosRef = useRef(0);
+    const hasFinishedRef = useRef(false);
+
+
+
+
+
+    // 1. Mantener el espejo actualizado punto a punto
     useEffect(() => {
-        if (recursoInicial) procesarRecurso(recursoInicial);
-    }, [recursoInicial]);
+        puntosRef.current = puntos;
+    }, [puntos]);
+
+    // 2. Cronómetro Olímpico
+    useEffect(() => {
+        if (!modoOlimpico) return;
+        const t = setInterval(() => {
+            setTiempoRestante(prev => {
+                if (prev <= 1) {
+                    clearInterval(t);
+                    setScreen('TIMEOUT');
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        return () => clearInterval(t);
+    }, [modoOlimpico, tiempoOlimpico]);
+
+    // 3. Auto-Arranque Olímpico (MANDA SOBRE TODO LO DEMÁS)
+    useEffect(() => {
+        if (modoOlimpico && recurso && screen === 'CONFIG') {
+            iniciarJuegoConHoja(recurso, hojaOlimpica);
+        }
+    }, [modoOlimpico, recurso, screen, hojaOlimpica]);
+
+    // 4. Interceptor de Final Natural (Victoria o Tiempo)
+    useEffect(() => {
+        if ((screen === 'VICTORY' || screen === 'TIMEOUT') && modoOlimpico && !hasFinishedRef.current) {
+            hasFinishedRef.current = true;
+            // Si gana, aseguramos que envíe el total de palabras. Si es tiempo, lo que lleve.
+            const notaFinal = screen === 'VICTORY' ? palabrasJuego.length : puntos;
+            if (onOlimpicoFinish) onOlimpicoFinish(notaFinal);
+        }
+    }, [screen, modoOlimpico, puntos, onOlimpicoFinish, palabrasJuego]);
+
+    // 5. EL SALVAVIDAS: Interceptor de Corte Brusco (Si el profe pasa de diapo)
+    /*useEffect(() => {
+        return () => {
+            // Se ejecuta solo si el componente se destruye sin haber terminado "bien"
+            if (modoOlimpico && !hasFinishedRef.current) {
+                hasFinishedRef.current = true;
+                if (onOlimpicoFinish) onOlimpicoFinish(puntosRef.current);
+            }
+        };
+    }, [modoOlimpico]);*/
+    
+
+    useEffect(() => {
+        if (recurso && !modoOlimpico) {
+            procesarRecurso(recurso);
+        }
+    }, [recurso, modoOlimpico]);
 
     // =========================================================
     // 1. LÓGICA DE DICCIONARIOS Y PREPARACIÓN
@@ -389,56 +457,82 @@ export default function SopaDeLetrasGame({ usuario, onExit, recursoInicial }) {
     );
 
     if (screen === 'GAME') return (
-        <div style={{...styles.screen, backgroundColor: '#2c3e50'}}>
+        <div style={{ ...styles.screen, backgroundColor: '#2c3e50' }}>
             {/* Header del juego */}
             <div style={{ width: '100%', padding: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxSizing: 'border-box', background: 'rgba(0,0,0,0.2)', marginBottom: '10px' }}>
-                <div style={{ fontFamily: "'Roboto Mono', monospace", background: 'white', padding: '5px 10px', borderRadius: '4px', fontWeight: 'bold' }}>
-                    ⏱ {formatTime(elapsedTime)}
+                <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+                    <div style={{ fontFamily: "'Roboto Mono', monospace", background: modoOlimpico ? '#e74c3c' : 'white', color: modoOlimpico ? 'white' : 'black', padding: '5px 10px', borderRadius: '4px', fontWeight: 'bold' }}>
+                        ⏱ {modoOlimpico ? `${tiempoRestante}s` : formatTime(elapsedTime)}
+                    </div>
+                    {modoOlimpico && (
+                        <div style={{ background: '#f1c40f', color: '#2c3e50', padding: '5px 10px', borderRadius: '4px', fontWeight: 'bold' }}>
+                            ⭐ {puntos} pts
+                        </div>
+                    )}
                 </div>
-                <h2 style={{ color: 'white', margin: 0, fontSize: '1.2rem' }}>{isCustomGame ? 'Desafío PRO' : 'Modo Libre'}</h2>
-                <div style={{ cursor: 'pointer' }} onClick={() => setScreen('CONFIG')}><X color="white" /></div>
+
+                <h2 style={{ color: 'white', margin: 0, fontSize: '1.2rem' }}>{modoOlimpico ? 'Torneo Olímpico' : isCustomGame ? 'Desafío PRO' : 'Modo Libre'}</h2>
+
+                {!modoOlimpico && (
+                    <div style={{ cursor: 'pointer' }} onClick={() => setScreen('CONFIG')}><X color="white" /></div>
+                )}
             </div>
 
-            {/* AQUI INYECTAMOS EL MOTOR DE LA SOPA QUE YA CREASTE */}
+            {/* AQUI INYECTAMOS EL MOTOR DE LA SOPA */}
             <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', width: '100%' }}>
-                <SopaDeLetras 
-                    palabras={palabrasJuego} 
-                    mostrarLista={true} 
-                    onTerminar={handleVictoria} 
+                <SopaDeLetras
+                    palabras={palabrasJuego}
+                    mostrarLista={true}
+                    onTerminar={handleVictoria}
+                    onPalabraEncontrada={() => setPuntos(p => p + 1)} // <--- CLAVE PARA EL MODO OLÍMPICO
                 />
             </div>
         </div>
     );
 
-    if (screen === 'VICTORY') return (
-        <div style={{ ...styles.screen, backgroundColor: '#27ae60' }}>
-            <Confetti recycle={false} />
-            <h1 style={{ ...styles.h1, color: 'white' }}>¡SOPA COMPLETADA! 🥳</h1>
-            <p style={{ color: 'white', fontSize: '1.2rem' }}>¡Has encontrado las {palabrasJuego.length} palabras!</p>
-            <p style={{ color: '#d4edda' }}>Tiempo total: <span style={{ color: 'white', fontWeight: 'bold', fontSize: '2.5rem', display: 'block', margin: '10px 0' }}>{formatTime(elapsedTime)}</span></p>
+    if (screen === 'VICTORY' || screen === 'TIMEOUT') return (
+        <div style={{ ...styles.screen, backgroundColor: screen === 'TIMEOUT' ? '#e74c3c' : '#27ae60' }}>
+            {screen === 'VICTORY' && <Confetti recycle={false} />}
+            <h1 style={{ ...styles.h1, color: 'white' }}>
+                {screen === 'VICTORY' ? '¡SOPA COMPLETADA! 🥳' : '¡TIEMPO AGOTADO! ⏳'}
+            </h1>
+            <p style={{ color: 'white', fontSize: '1.2rem' }}>¡Has encontrado {screen === 'VICTORY' ? palabrasJuego.length : puntos} palabras!
+            </p>
 
-            {/* ZONA DE GUARDADO */}
-            <div style={{ background: 'rgba(255,255,255,0.1)', padding: '20px', borderRadius: '15px', marginTop: '20px', width: '90%', maxWidth: '350px', textAlign: 'center' }}>
-                <p style={{ color: 'white', marginBottom: '10px', fontWeight: 'bold' }}>{isCustomGame ? '🏆 Ranking del Recurso' : `🏆 Ranking ${LANGUAGES[config.lang].label} (${config.numWords} pal)`}</p>
+            {!modoOlimpico && (
+                <p style={{ color: '#d4edda' }}>Tiempo total: <span style={{ color: 'white', fontWeight: 'bold', fontSize: '2.5rem', display: 'block', margin: '10px 0' }}>{formatTime(elapsedTime)}</span></p>
+            )}
 
-                {(!usuario || !usuario.email) && (
-                    <input
-                        value={playerName}
-                        onChange={(e) => setPlayerName(e.target.value)}
-                        placeholder="Escribe tu nombre..."
-                        maxLength={15}
-                        style={{ padding: '12px', width: '100%', textAlign: 'center', borderRadius: '8px', border: 'none', marginBottom: '15px', fontSize: '1.1rem', boxSizing: 'border-box' }}
-                    />
+            {/* ZONA DE GUARDADO (Oculta en Olimpiadas) */}
+            {!modoOlimpico ? (
+                <>
+                    <div style={{ background: 'rgba(255,255,255,0.1)', padding: '20px', borderRadius: '15px', marginTop: '20px', width: '90%', maxWidth: '350px', textAlign: 'center' }}>
+                        <p style={{ color: 'white', marginBottom: '10px', fontWeight: 'bold' }}>{isCustomGame ? '🏆 Ranking del Recurso' : `🏆 Ranking ${LANGUAGES[config.lang].label} (${config.numWords} pal)`}</p>
+
+                        {(!usuario || !usuario.email) && (
+                            <input
+                                value={playerName}
+                                onChange={(e) => setPlayerName(e.target.value)}
+                                placeholder="Escribe tu nombre..."
+                                maxLength={15}
+                                style={{ padding: '12px', width: '100%', textAlign: 'center', borderRadius: '8px', border: 'none', marginBottom: '15px', fontSize: '1.1rem', boxSizing: 'border-box' }}
+                            />
+                        )}
+                        {usuario && usuario.email && <p style={{ color: '#f1c40f', marginBottom: '15px', fontSize: '1.2rem' }}><b>{usuario.displayName}</b></p>}
+
+                        <button style={{ ...styles.btn, width: '100%', background: '#f1c40f', color: '#2c3e50' }} onClick={guardarPuntuacion} disabled={guardando}>
+                            {guardando ? 'Guardando...' : '💾 Guardar mi Tiempo'}
+                        </button>
+                    </div>
+
+                    <button style={{ ...styles.btn, background: 'transparent', color: 'white', border: '2px solid white', marginTop: '15px' }} onClick={cargarRanking}>Ver Ranking</button>
+                    <button style={{ ...styles.btn, ...styles.btnPrimary, background: 'white', color: '#27ae60', marginTop: '15px' }} onClick={() => setScreen('CONFIG')}>Jugar otra vez</button>
+                </>
+            ) : (
+                    <div style={{ color: '#f1c40f', fontWeight: 'bold', marginTop: '30px', fontSize: '1.5rem', animation: 'pulse 1.5s infinite' }}>
+                        Enviando {puntos} puntos al profesor... 🚀
+                </div>
                 )}
-                {usuario && usuario.email && <p style={{ color: '#f1c40f', marginBottom: '15px', fontSize: '1.2rem' }}><b>{usuario.displayName}</b></p>}
-
-                <button style={{ ...styles.btn, width: '100%', background: '#f1c40f', color: '#2c3e50' }} onClick={guardarPuntuacion} disabled={guardando}>
-                    {guardando ? 'Guardando...' : '💾 Guardar mi Tiempo'}
-                </button>
-            </div>
-
-            <button style={{ ...styles.btn, background: 'transparent', color: 'white', border: '2px solid white', marginTop: '15px' }} onClick={cargarRanking}>Ver Ranking</button>
-            <button style={{ ...styles.btn, ...styles.btnPrimary, background: 'white', color: '#27ae60', marginTop: '15px' }} onClick={() => setScreen('CONFIG')}>Jugar otra vez</button>
         </div>
     );
 

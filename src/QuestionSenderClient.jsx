@@ -4,8 +4,8 @@ import { db } from './firebase';
 import { collection, query, where, getDocs, doc, updateDoc, getDoc, addDoc } from 'firebase/firestore';
 import { Send, CheckCircle, AlertCircle, ArrowLeft, User, Info } from 'lucide-react';
 import Confetti from 'react-confetti';
-export default function QuestionSenderClient({ usuario, onBack }) {
-    const [codigo, setCodigo] = useState('');
+export default function QuestionSenderClient({ usuario, onBack, codigoInicial}) {
+    const [codigo, setCodigo] = useState(codigoInicial || '');
     const [fase, setFase] = useState('CODIGO'); // CODIGO, FORMULARIO, EXITO, COMPLETADO
     const [datosHoja, setDatosHoja] = useState(null); // { recursoId, hojaIndex, nombreHoja, profesor, targetGame, config }
     const [respuestas, setRespuestas] = useState([]); // Array de objetos { pregunta, respuesta, letra... }

@@ -163,12 +163,48 @@ const generarPreguntasMatematicas = (config) => {
     return questions;
 };
 
-export default function PikatronRun({ recurso, onExit, usuario }) {
+export default function PikatronRun({ recurso, onExit, usuario, modoOlimpico = false, tiempoOlimpico = null, hojaOlimpica = 'General', onOlimpicoFinish = null }) {
     const canvasRef = useRef(null);
 
     // ESTADOS
     const [gameState, setGameState] = useState('SETUP');
     const [score, setScore] = useState(0);
+
+    // --- NUEVO: CRONÓMETRO Y LÓGICA OLÍMPICA ---
+    const [tiempoRestante, setTiempoRestante] = useState(tiempoOlimpico || 60);
+
+    // 1. Reloj Global
+    useEffect(() => {
+        if (!modoOlimpico) return;
+        const t = setInterval(() => {
+            setTiempoRestante(prev => {
+                if (prev <= 1) {
+                    clearInterval(t);
+                    setGameState('TIMEOUT'); // Detiene el juego por tiempo
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        return () => clearInterval(t);
+    }, [modoOlimpico, tiempoOlimpico]);
+
+    // 2. Auto-Start
+    useEffect(() => {
+        if (modoOlimpico && recurso && gameState === 'SETUP') {
+            iniciarPartida('SIMPLE', hojaOlimpica);
+        }
+    }, [modoOlimpico, recurso, gameState, hojaOlimpica]);
+
+    // 3. Interceptor (Cazador de Puntos)
+    const hasFinishedRef = useRef(false);
+    useEffect(() => {
+        if ((gameState === 'WIN' || gameState === 'GAMEOVER' || gameState === 'TIMEOUT') && modoOlimpico && !hasFinishedRef.current) {
+            hasFinishedRef.current = true;
+            if (onOlimpicoFinish) onOlimpicoFinish(score);
+        }
+    }, [gameState, modoOlimpico, score, onOlimpicoFinish]);
+    // ------------------------------------------
     const [lives, setLives] = useState(3);
     const [preguntaActual, setPreguntaActual] = useState(null);
     const [levelInfo, setLevelInfo] = useState({ current: 1, total: 1, name: '' });
@@ -836,6 +872,16 @@ export default function PikatronRun({ recurso, onExit, usuario }) {
                         }}>
                             ⭐ {score}
                         </div>
+                        {/* RELOJ OLÍMPICO */}
+                        {modoOlimpico && (
+                            <div style={{
+                                background: '#e74c3c', color: 'white', padding: '5px 15px',
+                                borderRadius: '20px', whiteSpace: 'nowrap', fontSize: '1.2rem',
+                                boxShadow: 'inset 0 2px 5px rgba(0,0,0,0.1)'
+                            }}>
+                                ⏱ {tiempoRestante}s
+                            </div>
+                        )}
 
                         {/* PREGUNTA TEXTO */}
                         {preguntaActual && (
@@ -850,13 +896,15 @@ export default function PikatronRun({ recurso, onExit, usuario }) {
                             </div>
                         )}
 
-                        {/* SALIR */}
-                        <button onClick={onExit} style={{
-                            background: '#ffebee', border: '1px solid #ffcdd2', borderRadius: '8px',
-                            cursor: 'pointer', display: 'flex', padding: '8px', color: '#c62828'
-                        }} title="Salir del Juego">
-                            <X size={24} />
-                        </button>
+                        {/* SALIR (Oculto en Olimpiadas) */}
+                        {!modoOlimpico && (
+                            <button onClick={onExit} style={{
+                                background: '#ffebee', border: '1px solid #ffcdd2', borderRadius: '8px',
+                                cursor: 'pointer', display: 'flex', padding: '8px', color: '#c62828'
+                            }} title="Salir del Juego">
+                                <X size={24} />
+                            </button>
+                        )}
                     </div>
                 </div>
             )}
@@ -886,46 +934,49 @@ export default function PikatronRun({ recurso, onExit, usuario }) {
                 </div>
             )}
 
-            {(gameState === 'GAMEOVER' || gameState === 'WIN') && (
+            {(gameState === 'GAMEOVER' || gameState === 'WIN' || gameState === 'TIMEOUT') && (
                 <div style={overlayStyle}>
                     {gameState === 'WIN' && <Trophy size={80} color="#f1c40f" style={{ marginBottom: 20 }} />}
                     {gameState === 'GAMEOVER' && <AlertTriangle size={80} color="#e74c3c" style={{ marginBottom: 20 }} />}
 
                     <h1 style={{ color: gameState === 'WIN' ? '#f1c40f' : '#e74c3c', fontSize: '3.5rem', fontFamily: 'monospace', textShadow: '3px 3px 0px #fff', margin: 0 }}>
-                        {gameState === 'WIN' ? '¡COMPLETADO!' : 'GAME OVER'}
+                        {gameState === 'WIN' ? '¡COMPLETADO!' : gameState === 'TIMEOUT' ? '¡TIEMPO AGOTADO!' : 'GAME OVER'}
                     </h1>
 
                     <div style={{ background: '#333', padding: '10px 30px', borderRadius: 10, margin: '20px 0', fontSize: '1.5rem', border: '2px solid #555' }}>
                         Puntuación: <span style={{ color: '#f1c40f', fontWeight: 'bold' }}>{score}</span>
                     </div>
 
-                    {/* --- ZONA DE GUARDADO --- */}
-                    {!yaGuardado ? (
-                        <div style={{ background: 'rgba(255,255,255,0.1)', padding: '20px', borderRadius: '15px', width: '90%', maxWidth: '350px', marginBottom: '20px' }}>
-                            {(!usuario || !usuario.email) ? (
-                                <>
-                                    <p style={{ margin: '0 0 10px 0', color: '#ccc', fontSize: '0.9rem' }}>Introduce tu nombre para el ranking:</p>
-                                    <input
-                                        value={nombreInvitado}
-                                        onChange={e => setNombreInvitado(e.target.value)}
-                                        placeholder="Tu Nombre"
-                                        maxLength={15}
-                                        style={{ padding: '10px', borderRadius: '5px', border: 'none', width: '100%', marginBottom: '10px', textAlign: 'center', fontWeight: 'bold', boxSizing: 'border-box' }}
-                                    />
-                                    <p style={{ fontSize: '0.8rem', color: '#f1c40f', margin: '5px 0 15px 0' }}>✨ Únete a PiKT y descubre más juegos ✨</p>
-                                </>
+                    {/* --- ZONA DE GUARDADO (SOLO MODO NORMAL) --- */}
+                    {!modoOlimpico ? (
+                        <>
+                            {!yaGuardado ? (
+                                <div style={{ background: 'rgba(255,255,255,0.1)', padding: '20px', borderRadius: '15px', width: '90%', maxWidth: '350px', marginBottom: '20px' }}>
+                                    {/* ... el código que ya tienes de tu input y guardado ... */}
+                                    {(!usuario || !usuario.email) ? (
+                                        <>
+                                            <p style={{ margin: '0 0 10px 0', color: '#ccc', fontSize: '0.9rem' }}>Introduce tu nombre para el ranking:</p>
+                                            <input value={nombreInvitado} onChange={e => setNombreInvitado(e.target.value)} placeholder="Tu Nombre" maxLength={15} style={{ padding: '10px', borderRadius: '5px', border: 'none', width: '100%', marginBottom: '10px', textAlign: 'center', fontWeight: 'bold', boxSizing: 'border-box' }} />
+                                        </>
+                                    ) : (
+                                            <p style={{ color: '#2ecc71', fontWeight: 'bold', marginBottom: '15px' }}>Usuario: {usuario.displayName}</p>
+                                        )}
+                                    <button onClick={guardarPuntuacion} style={{ ...btnStyle, marginTop: 0, background: '#3498db', fontSize: '1rem', padding: '10px' }} disabled={guardando}>
+                                        {guardando ? 'Guardando...' : <><Save size={18} /> Guardar Puntuación</>}
+                                    </button>
+                                </div>
                             ) : (
-                                    <p style={{ color: '#2ecc71', fontWeight: 'bold', marginBottom: '15px' }}>Usuario: {usuario.displayName}</p>
+                                    <div style={{ color: '#2ecc71', fontWeight: 'bold', marginBottom: '20px', fontSize: '1.2rem' }}>✅ ¡Puntuación Guardada!</div>
                                 )}
 
-                            <button onClick={guardarPuntuacion} style={{ ...btnStyle, marginTop: 0, background: '#3498db', fontSize: '1rem', padding: '10px' }} disabled={guardando}>
-                                {guardando ? 'Guardando...' : <><Save size={18} /> Guardar Puntuación</>}
-                            </button>
-                        </div>
+                            <button onClick={reiniciarJuegoCompleto} style={{ ...btnStyle, background: '#e74c3c' }}><RefreshCw size={24} /> REINICIAR</button>
+                            <button onClick={onExit} style={{ marginTop: 20, background: 'none', border: 'none', color: '#777', cursor: 'pointer' }}>Salir</button>
+                        </>
                     ) : (
-                            <div style={{ color: '#2ecc71', fontWeight: 'bold', marginBottom: '20px', fontSize: '1.2rem' }}>✅ ¡Puntuación Guardada!</div>
+                            <div style={{ color: '#2ecc71', fontWeight: 'bold', marginTop: '20px', fontSize: '1.5rem', animation: 'pulse 1.5s infinite' }}>
+                                Enviando puntos al profesor... 🚀
+                        </div>
                         )}
-                    {/* ------------------------- */}
 
                     <button onClick={reiniciarJuegoCompleto} style={{ ...btnStyle, background: '#e74c3c' }}><RefreshCw size={24} /> REINICIAR</button>
                     <button onClick={onExit} style={{ marginTop: 20, background: 'none', border: 'none', color: '#777', cursor: 'pointer' }}>Salir</button>

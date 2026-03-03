@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { Save, X, Trash2, Plus, Settings, RotateCcw, HelpCircle } from 'lucide-react'; // <--- AÑADIDO HelpCircle
+import { Save, X, Trash2, Plus, Settings, RotateCcw, HelpCircle, ArrowUp, ArrowDown } from 'lucide-react'; // <--- AÑADIDO HelpCircle
 import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore'; // Añade deleteDoc
 import { db } from '../firebase'; // Asegúrate de importar db
 const JUEGOS_DESTINO = [
@@ -112,6 +112,24 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
             setIndiceHojaActiva(nuevoIndice);
         }
     };
+
+    // --- NUEVO: REORDENAR PREGUNTAS ---
+    const moverPregunta = (idx, dir) => {
+        const nuevasHojas = [...datos.hojas];
+        const list = nuevasHojas[indiceHojaActiva].preguntas;
+
+        // Mover arriba (dir -1)
+        if (dir === -1 && idx > 0) {
+            [list[idx], list[idx - 1]] = [list[idx - 1], list[idx]];
+        }
+        // Mover abajo (dir 1)
+        if (dir === 1 && idx < list.length - 1) {
+            [list[idx], list[idx + 1]] = [list[idx + 1], list[idx]];
+        }
+
+        setDatos({ ...datos, hojas: nuevasHojas });
+    };
+
 
     const actualizarNombreHoja = (val) => {
         const nuevasHojas = [...datos.hojas];
@@ -338,35 +356,83 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
 
                     <div style={styles.questionsList}>
                         {hojaActual.preguntas.map((p, i) => (
-                            <div key={i} style={styles.questionCard}>
-                                <div style={styles.questionHeader}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        <span style={styles.qNumber}>#{i + 1}</span>
+                            <div key={i} style={{
+                                ...styles.questionCard,
+                                display: 'flex',       // <--- ACTIVAMOS FLEX
+                                alignItems: 'flex-start',
+                                gap: '15px',           // Espacio entre columna izq y derecha
+                                paddingLeft: '10px'    // Un poco menos de padding izq
+                            }}>
 
-                                        {/* VISUALIZADOR DE NOMBRE (Ahora sí se verá) */}
-                                        {p.studentName && (
-                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                                                <span style={{ fontSize: '11px', color: '#1565C0', background: '#E3F2FD', padding: '3px 8px', borderRadius: '12px', fontWeight: 'bold', border: '1px solid #BBDEFB' }}>
-                                                    👤 {p.studentName}
-                                                </span>
-                                                {p.fecha && (
-                                                    <span style={{ fontSize: '10px', color: '#999', marginTop: '2px', marginLeft: '5px' }}>
-                                                        {new Date(p.fecha).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                {/* --- COLUMNA IZQUIERDA: CONTROLES --- */}
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', paddingTop: '5px', minWidth: '30px' }}>
+
+                                    {/* Número */}
+                                    <span style={{ fontWeight: 'bold', color: '#bdc3c7', fontSize: '14px', marginBottom: '2px' }}>
+                                        #{i + 1}
+                                    </span>
+
+                                    {/* Flecha Arriba */}
+                                    <button
+                                        onClick={() => moverPregunta(i, -1)}
+                                        disabled={i === 0}
+                                        style={{ ...arrowBtn, opacity: i === 0 ? 0.3 : 1 }}
+                                        title="Subir"
+                                    >
+                                        <ArrowUp size={14} color="#555" />
+                                    </button>
+
+                                    {/* Flecha Abajo */}
+                                    <button
+                                        onClick={() => moverPregunta(i, 1)}
+                                        disabled={i === hojaActual.preguntas.length - 1}
+                                        style={{ ...arrowBtn, opacity: i === hojaActual.preguntas.length - 1 ? 0.3 : 1 }}
+                                        title="Bajar"
+                                    >
+                                        <ArrowDown size={14} color="#555" />
+                                    </button>
+
+                                    {/* Borrar (Ahora aquí a la izquierda, como en MathLive) */}
+                                    <button
+                                        onClick={() => borrarPregunta(i)}
+                                        style={{ ...arrowBtn, background: '#ffebee', marginTop: '8px' }}
+                                        title="Borrar"
+                                    >
+                                        <Trash2 size={14} color="#c62828" />
+                                    </button>
+                                </div>
+
+                                {/* --- COLUMNA DERECHA: CAMPOS --- */}
+                                <div style={{ flex: 1, width: '100%' }}>
+
+                                    {/* Cabecera interna (Solo si hay letra o nombre de alumno) */}
+                                    {(configJuego.id === 'PASAPALABRA' || p.studentName) && (
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+
+                                            {/* Nombre Alumno (Question Sender) */}
+                                            <div style={{ flex: 1 }}>
+                                                {p.studentName && (
+                                                    <span style={{ fontSize: '11px', color: '#1565C0', background: '#E3F2FD', padding: '3px 8px', borderRadius: '12px', fontWeight: 'bold', border: '1px solid #BBDEFB' }}>
+                                                        👤 {p.studentName}
                                                     </span>
                                                 )}
                                             </div>
-                                        )}
-                                    </div>
 
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                        {configJuego.id === 'PASAPALABRA' && (
-                                            <input value={p.letra} onChange={(e) => editarPregunta(i, 'letra', e.target.value.toUpperCase())} style={styles.letraInput} maxLength={1} />
-                                        )}
-                                        <button onClick={() => borrarPregunta(i)} style={styles.deleteBtn}><Trash2 size={16} /></button>
-                                    </div>
+                                            {/* Letra Pasapalabra (A la derecha) */}
+                                            {configJuego.id === 'PASAPALABRA' && (
+                                                <input
+                                                    value={p.letra}
+                                                    onChange={(e) => editarPregunta(i, 'letra', e.target.value.toUpperCase())}
+                                                    style={styles.letraInput}
+                                                    maxLength={1}
+                                                />
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Campos del formulario */}
+                                    {renderCamposPregunta(p, i)}
                                 </div>
-
-                                {renderCamposPregunta(p, i)}
                             </div>
                         ))}
 
@@ -518,4 +584,18 @@ const styles = {
     toggleRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', padding: '10px', background: '#f5f5f5', borderRadius: '8px' },
     toggleBtn: { width: '50px', height: '26px', borderRadius: '13px', border: 'none', padding: '2px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.3s' },
     toggleCircle: { width: '22px', height: '22px', background: 'white', borderRadius: '50%', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }
+};
+
+// Estilo para las flechas (puedes ponerlo justo antes de const styles = ...)
+const arrowBtn = {
+    background: '#eee',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: '10px',
+    padding: '4px',
+    borderRadius: '4px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: '5px'
 };

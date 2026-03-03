@@ -17,10 +17,6 @@ import bg4 from './assets/pantalla4.jpeg';
 
 const BACKGROUNDS = [bg1, bg2, bg3, bg4]; // Array para elegir al azar
 const TICK_SOUND_URL = 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_73686360b7.mp3?filename=clock-ticking-2-106637.mp3';
-
-// =================================================================================
-//  GENERADOR DE OPERACIONES (MOTOR MATEMÁTICO)
-// =================================================================================
 // =================================================================================
 //  GENERADOR DE OPERACIONES MEJORADO (LÓGICA EXACTA)
 // =================================================================================
@@ -163,7 +159,7 @@ const generarPreguntasMatematicas = (config) => {
 
 
 
-export default function CazaBurbujasGame({ recurso, usuario, alTerminar }) {
+export default function CazaBurbujasGame({ recurso, usuario, alTerminar, modoOlimpico = false, tiempoOlimpico = null, hojaOlimpica = 'General', onOlimpicoFinish = null }) {
     const [fase, setFase] = useState('SETUP');
     const [puntuacion, setPuntuacion] = useState(0);
     const [modo, setModo] = useState('Burbujas');
@@ -171,9 +167,44 @@ export default function CazaBurbujasGame({ recurso, usuario, alTerminar }) {
     const [verRanking, setVerRanking] = useState(false);
     const [guardando, setGuardando] = useState(false);
 
+    // --- AUTO-START MODO OLÍMPICO (CORREGIDO) ---
+    const [tiempoRestante, setTiempoRestante] = useState(tiempoOlimpico || 60);
+    useEffect(() => {
+        if (!modoOlimpico) return;
+        const t = setInterval(() => {
+            setTiempoRestante(prev => {
+                if (prev <= 1) {
+                    clearInterval(t);
+                    setFase('FIN'); // Termina el juego a la vez que el profe
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        return () => clearInterval(t);
+    }, [modoOlimpico, tiempoOlimpico]);
+
+
     // Detectar invitado
     const esInvitado = !usuario || !usuario.email;
 
+    // --- AUTO-START MODO OLÍMPICO ---
+    useEffect(() => {
+        if (modoOlimpico && recurso && fase === 'SETUP') {
+            iniciar('Burbujas', hojaOlimpica);
+        }
+    }, [modoOlimpico, recurso, fase, hojaOlimpica]);
+
+    // --- INTERCEPTOR FINAL MODO OLÍMPICO ---
+    const hasFinishedRef = useRef(false);
+    useEffect(() => {
+        if (fase === 'FIN' && modoOlimpico && !hasFinishedRef.current) {
+            hasFinishedRef.current = true;
+            if (onOlimpicoFinish) onOlimpicoFinish(puntuacion);
+        }
+    }, [fase, modoOlimpico, puntuacion, onOlimpicoFinish]);
+
+    
     // --- SONIDOS ---
     const playSound = (type) => {
         let file = null;
@@ -316,9 +347,15 @@ export default function CazaBurbujasGame({ recurso, usuario, alTerminar }) {
             modo={modo} 
             hoja={hojaSeleccionada} 
             setPuntuacionTotal={setPuntuacion} 
-            onFinish={() => setFase('FIN')} 
-            onExit={alTerminar} 
-            playSound={playSound} 
+            onFinish={() => {
+               
+                    setFase('FIN'); // Si es normal, va a tu PantallaFin
+                
+            }}
+            onExit={alTerminar}
+            playSound={playSound}
+            modoOlimpico={modoOlimpico} // Pasamos la variable al motor
+            tiempoOlimpico={tiempoRestante} // <--- PASAMOS EL TIEMPO
         />
     );
 }
@@ -485,10 +522,14 @@ function PantallaFin({ puntuacion, guardarRanking, guardando, esInvitado, alTerm
     );
 }
 
-function EngineBurbujas({ recurso, modo, hoja, setPuntuacionTotal, onFinish, onExit, playSound }) {
-    const [preguntaActualState, setPreguntaActualState] = useState(null); // Solo para renderizar texto
+function EngineBurbujas({ recurso, modo, hoja, setPuntuacionTotal, onFinish, onExit, playSound, modoOlimpico, tiempoOlimpico }) {
+    const [preguntaActualState, setPreguntaActualState] = useState(null);
     const [puntos, setPuntos] = useState(0);
     const [tiempoBarra, setTiempoBarra] = useState(100);
+
+    const puntosRef = useRef(0);
+    useEffect(() => { puntosRef.current = puntos; }, [puntos]);
+
     const [opcionesTest, setOpcionesTest] = useState([]);
     const [indiceFeedback, setIndiceFeedback] = useState(null);
     const [tipoFeedback, setTipoFeedback] = useState(null);
@@ -608,8 +649,7 @@ function EngineBurbujas({ recurso, modo, hoja, setPuntuacionTotal, onFinish, onE
         setTipoFeedback(null);
         bloqueoRef.current = false;
 
-        if (indiceActual.current >= preguntasJugables.current.length) { onFinish(); return; }
-
+        if (indiceActual.current >= preguntasJugables.current.length) { onFinish(puntosRef.current); return; }
         setProgreso({ actual: indiceActual.current + 1, total: preguntasJugables.current.length });
 
         const datos = preguntasJugables.current[indiceActual.current];
@@ -852,9 +892,22 @@ function EngineBurbujas({ recurso, modo, hoja, setPuntuacionTotal, onFinish, onE
             </div>
 
             <div id="top-bar" style={{ zIndex: 20 }}>
-                <button className="btn-back-game" onClick={onExit}>Salir</button>
+                {!modoOlimpico && (
+                    <button className="btn-back-game" onClick={onExit}>Salir</button>
+                )}
+
                 <div id="timer-container"><div id="timer-bar" style={{ width: `${tiempoBarra}%`, background: tiempoBarra < 30 ? '#ff4757' : '#2ecc71' }}></div></div>
-                <div id="score-display">{puntos} pts</div>
+
+                {/* --- CAJA CENTRAL (PUNTOS Y TIEMPO GLOBAL) --- */}
+                <div style={{ display: 'flex', gap: '20px', alignItems: 'center', marginTop: '5px' }}>
+                    <div id="score-display">{puntos} pts</div>
+                    {modoOlimpico && (
+                        <div style={{ color: '#f1c40f', fontSize: '1.5rem', fontWeight: 'bold', fontFamily: 'Fredoka One', textShadow: '2px 2px 0px #000' }}>
+                            ⏱ {tiempoOlimpico}s
+                        </div>
+                    )}
+                </div>
+
                 <div style={{ color: 'white', fontSize: '0.8rem' }}>Pregunta {progreso.actual} / {progreso.total}</div>
                 <div id="question-text">{preguntaActualState?.pregunta || '...'}</div>
             </div>

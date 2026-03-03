@@ -1,0 +1,1959 @@
+﻿import { useState, useEffect, useRef, useMemo, memo } from 'react';
+import { db } from './firebase';
+import { doc, updateDoc, onSnapshot, increment, deleteField, collection, writeBatch } from 'firebase/firestore';
+import confetti from 'canvas-confetti';
+import { MessageSquare, X, UserX, ThumbsUp, ThumbsDown, ArrowUp, Users, Play, Send, Loader, Trophy, CheckCircle, XCircle, Medal, Save, Monitor, Delete, ArrowLeftRight } from 'lucide-react';
+// --- AUDIOS ---
+import correctSoundFile from './assets/correct-choice-43861.mp3';
+import wrongSoundFile from './assets/negative_beeps-6008.mp3';
+import winSoundFile from './assets/applause-small-audience-97257.mp3';
+import startSoundFile from './assets/inicio juego.mp3';
+//---Motor para juegos
+
+import MotorMinijuego from './MotoMinijuego'
+// --- IMÁGENES DEL AVATAR ---
+import piHappy from './assets/Pi-contento.png';
+import piAngry from './assets/Pi-enfadado.png';
+import piNeutral from './assets/Pi-neutro.png';
+
+// --- AUDIOS (PRE-CARGADOS PARA EVITAR LAG) ---
+const audioCorrect = new Audio(correctSoundFile);
+const audioWrong = new Audio(wrongSoundFile);
+const audioWin = new Audio(winSoundFile);
+const audioStart = new Audio(startSoundFile);
+
+// Función auxiliar para reproducir sin solapamientos raros
+const safePlay = (audioObj) => {
+    audioObj.currentTime = 0;
+    audioObj.play().catch(e => console.log("Audio bloqueado por navegador", e));
+};
+
+
+
+
+
+
+export default function OlympicLive(props) {
+    if (props.isHost) return <OlympicLiveHost {...props} />;
+    if (props.codigoSala) return <OlympicLiveClient {...props} />;
+    return <OlympicLiveLocal {...props} />; // Placeholder para local si se usa
+}
+
+// --- UTILIDADES ---
+const clean = (s) => s ? String(s).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : "";
+
+const parseText = (text) => {
+    if (!text) return "";
+    let p = String(text).replace(/\((.*?)\)\^\((.*?)\)/g, '<span>$1<sup>$2</sup></span>');
+    p = p.replace(/\((.*?)\)\/\((.*?)\)/g, '<span class="fraction"><span class="numer">$1</span><span class="denom">$2</span></span>');
+    return <span dangerouslySetInnerHTML={{ __html: p }} />;
+};
+
+
+const generarOperacionesMathLive = (config) => {
+    const questions = [];
+    const count = parseInt(config.mathCount || 0);
+    if (count <= 0) return [];
+
+    const types = config.mathTypes || ['POSITIVOS'];
+    const ops = config.mathOps || ['SUMA'];
+    const min = parseInt(config.mathMin || 1);
+    const max = parseInt(config.mathMax || 10);
+
+    const getRandomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+    const getRandomFloat = (min, max) => (Math.random() * (max - min) + min).toFixed(1);
+    const gcd = (a, b) => b === 0 ? a : gcd(b, a % b);
+    const simplify = (n, d) => { const common = gcd(Math.abs(n), Math.abs(d)); return { n: n / common, d: d / common }; };
+
+    for (let i = 0; i < count; i++) {
+        const type = types[i % types.length];
+        const op = ops[i % ops.length];
+        let qObj = { tipo: 'MATH', tiempo: config.mathTime || 30, puntosMax: config.mathPuntosMax || 100, puntosMin: config.mathPuntosMin || 50, subtipo: 'STANDARD' };
+        let a, b, res, operatorSymbol;
+
+        if (type === 'FRACCIONES') {
+            qObj.subtipo = 'FRACTION';
+            const n1 = getRandomInt(min, max); const d1 = getRandomInt(min, max);
+            const n2 = getRandomInt(min, max); const d2 = getRandomInt(min, max);
+            qObj.f1 = { n: n1, d: d1 }; qObj.f2 = { n: n2, d: d2 };
+            let resN, resD;
+            if (op === 'SUMA') { operatorSymbol = '+'; resN = n1 * d2 + n2 * d1; resD = d1 * d2; }
+            else if (op === 'RESTA') { operatorSymbol = '-'; resN = n1 * d2 - n2 * d1; resD = d1 * d2; }
+            else if (op === 'MULT') { operatorSymbol = '·'; resN = n1 * n2; resD = d1 * d2; }
+            else if (op === 'DIV') { operatorSymbol = ':'; resN = n1 * d2; resD = d1 * n2; }
+            const simple = simplify(resN, resD);
+            if (simple.d < 0) { simple.n = -simple.n; simple.d = -simple.d; }
+            qObj.operator = operatorSymbol; qObj.respuesta = { n: simple.n, d: simple.d }; qObj.q = "Calcula";
+        } else {
+            qObj.subtipo = 'STANDARD';
+            const isDecimal = type === 'DECIMALES';
+            const isNegative = type === 'NEGATIVOS';
+            const getVal = () => { let v = isDecimal ? parseFloat(getRandomFloat(min, max)) : getRandomInt(min, max); if (isNegative && Math.random() > 0.5) v = -v; return v; };
+            a = getVal(); b = getVal();
+            if (op === 'DIV') {
+                if (b === 0) b = 1;
+                if (!isDecimal) { const resTemp = isNegative ? (Math.random() > 0.5 ? -getRandomInt(min, max) : getRandomInt(min, max)) : getRandomInt(min, max); a = b * resTemp; }
+            }
+            if (op === 'SUMA') { operatorSymbol = '+'; res = a + b; }
+            else if (op === 'RESTA') {
+                operatorSymbol = '-';
+
+                // --- SEGURO PARA RESTAS: Si solo queremos POSITIVOS, evitamos que dé negativo ---
+                if (!isNegative && b > a) {
+                    const temp = a;
+                    a = b;
+                    b = temp;
+                }
+
+                res = a - b;
+            }
+            else if (op === 'MULT') { operatorSymbol = '·'; res = a * b; }
+            else if (op === 'DIV') { operatorSymbol = ':'; res = a / b; }
+
+            if (isDecimal || !Number.isInteger(res)) {
+                res = parseFloat(res.toFixed(1));
+                qObj.respuesta = String(res).replace('.', ',');
+            } else {
+                qObj.respuesta = String(res);
+            }
+            qObj.displayA = String(a).replace('.', ','); qObj.displayB = String(b).replace('.', ',');
+            if (b < 0) qObj.displayB = `(${qObj.displayB})`; if (a < 0 && op !== '') qObj.displayA = `${qObj.displayA}`;
+            qObj.operator = operatorSymbol; qObj.q = "Calcula";
+        }
+        questions.push(qObj);
+    }
+    return questions;
+};
+
+
+
+// ============================================================================
+// 1. MODO HOST (PROFESOR)
+// ============================================================================
+function OlympicLiveHost({ codigoSala, onExit, usuario }) {
+    // 1. GENERAR ID SI ES INVITADO
+    const hostId = useMemo(() => {
+        return usuario?.uid || 'host_guest_' + Math.random().toString(36).substr(2, 9);
+    }, [usuario]);
+
+    const [gameData, setGameData] = useState(null);
+    const [jugadores, setJugadores] = useState([]);
+    const [mensajes, setMensajes] = useState([]);
+    const [mensajeActivo, setMensajeActivo] = useState(null);
+    const [mostrarPanelDudas, setMostrarPanelDudas] = useState(false);
+
+    const [faseHost, setFaseHost] = useState('LOBBY');
+    const [subFase, setSubFase] = useState('RESPONDING');
+    const [timerVisual, setTimerVisual] = useState(0);
+
+
+    const [cargandoSiguiente, setCargandoSiguiente] = useState(false);
+
+
+
+    const [guardandoGlobal, setGuardandoGlobal] = useState(false);
+
+    const [stats, setStats] = useState({ aciertos: 0, total: 0, pct: 0 });
+    const [avatarMood, setAvatarMood] = useState('neutral');
+
+    const timerRef = useRef(null);
+    const generationProcessed = useRef(false);
+    const gameDataRef = useRef(gameData);
+    useEffect(() => {
+        gameDataRef.current = gameData;
+    }, [gameData]);
+
+
+    // ESCUCHA DE SALA Y LÓGICA DE PUNTUACIÓN CENTRALIZADA
+
+    useEffect(() => {
+        const unsubscribe = onSnapshot(doc(db, "live_games", codigoSala), async (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+
+                // GENERACIÓN AUTOMÁTICA DE MATES (Mezclando con preguntas normales si las hay)
+                
+                if (data.config?.usarMates !== false && data.config?.isMathLive && !data.mathGenerated && !generationProcessed.current) {
+                    generationProcessed.current = true;
+                    const mathQuestions = generarOperacionesMathLive(data.config);
+                    // Si el profesor ya tenía preguntas normales (ej. orden, selección) las mezclamos
+                    const standardQuestions = data.preguntas || [];
+                    const combined = [...mathQuestions, ...standardQuestions].sort(() => Math.random() - 0.5); // Mezcla simple
+
+                    await updateDoc(doc(db, "live_games", codigoSala), { preguntas: combined, mathGenerated: true });
+                    return;
+                }
+
+                setGameData(data);
+                setFaseHost(data.estado || 'LOBBY');
+                setSubFase(data.fasePregunta || 'RESPONDING');
+                setJugadores(data.jugadores ? Object.values(data.jugadores) : []);
+                if (data.mensajes) setMensajes(Object.entries(data.mensajes).map(([k, v]) => ({ id: k, ...v })));
+
+                // PROCESAMIENTO DE RESPUESTAS (Protegido para 30+ alumnos)
+                if (data.estado === 'JUEGO' && data.fasePregunta === 'RESPONDING') {
+                    const respuestas = data.respuestasRonda || {};
+                    const updates = {};
+                    let hayCambios = false;
+                    Object.entries(respuestas).forEach(([uid, resp]) => {
+                        if (!resp.processed) {
+                            hayCambios = true;
+                            let puntos = 0;
+                            // Lógica de puntos (igual que ThinkHoot)
+                            if (resp.correct && data.preguntas[data.indicePregunta]?.tipo !== 'PRESENTATION' && data.preguntas[data.indicePregunta]?.tipo !== 'DIBUJO') {
+                                const p = data.preguntas[data.indicePregunta];
+                                const max = parseInt(p.puntosMax || 100);
+                                const min = parseInt(p.puntosMin || 50);
+                                const tiempoTotal = parseInt(p.tiempo || 30);
+                                const ahora = Date.now();
+                                const inicio = data.questionStartTime || ahora;
+                                const transcurrido = (ahora - inicio) / 1000;
+                                const factor = Math.max(0, Math.min(1, (tiempoTotal - transcurrido) / tiempoTotal));
+                                puntos = Math.round(min + (max - min) * factor);
+                            }
+                            updates[`respuestasRonda.${uid}.puntosGanados`] = puntos;
+                            updates[`respuestasRonda.${uid}.processed`] = true;
+
+                            // Protección: solo sumar si el jugador existe
+                            if (puntos > 0 && data.jugadores && data.jugadores[uid]) {
+                                updates[`jugadores.${uid}.puntos`] = increment(puntos);
+                            }
+                        }
+                    });
+                    if (hayCambios) await updateDoc(doc(db, "live_games", codigoSala), updates);
+
+                    const numRespuestas = Object.keys(respuestas).length;
+                    const numJugadores = Object.values(data.jugadores || {}).length;
+                    const isPres = data.preguntas?.[data.indicePregunta]?.tipo === 'PRESENTATION';
+                    if (!isPres && numJugadores > 0 && numRespuestas >= numJugadores) revelarRespuestas(data);
+                }
+            }
+        });
+        return () => unsubscribe();
+    }, [codigoSala]);
+
+    useEffect(() => { setCargandoSiguiente(false); }, [gameData?.indicePregunta, gameData?.fasePregunta, gameData?.estado]);
+
+    // Timer Blindado (Usa gameDataRef)
+    // Timer del Host
+    useEffect(() => {
+        if (faseHost === 'JUEGO' && subFase === 'RESPONDING' && gameData) {
+            const p = gameData.preguntas[gameData.indicePregunta];
+            if (p.tipo === 'PRESENTATION') {
+                setTimerVisual(0);
+                if (timerRef.current) clearInterval(timerRef.current);
+                return;
+            }
+
+            const tiempoTotal = parseInt(p.tiempo || gameData.config?.tiempoPregunta || 20);
+            const inicio = gameData.questionStartTime || Date.now();
+
+            if (timerRef.current) clearInterval(timerRef.current);
+
+            timerRef.current = setInterval(() => {
+                const transcurrido = (Date.now() - inicio) / 1000;
+                const restante = Math.max(0, Math.ceil(tiempoTotal - transcurrido));
+                setTimerVisual(restante);
+
+                if (restante <= 0) {
+                    clearInterval(timerRef.current);
+
+                    // --- SOLUCIÓN RACE CONDITION MINIJUEGOS ---
+                    // Damos 3 segundos invisibles extra al Profesor para que todos los alumnos 
+                    // tengan tiempo de terminar su cronómetro interno y enviar la puntuación
+                    const pActual = gameDataRef.current?.preguntas?.[gameDataRef.current?.indicePregunta];
+                    if (pActual?.tipo === 'MINIGAME') {
+                        setTimeout(() => {
+                            if (gameDataRef.current) revelarRespuestas(gameDataRef.current);
+                        }, 3000);
+                    } else {
+                        if (gameDataRef.current) revelarRespuestas(gameDataRef.current);
+                    }
+                }
+            }, 500);
+        } else {
+            clearInterval(timerRef.current);
+        }
+        return () => clearInterval(timerRef.current);
+    }, [faseHost, subFase, gameData?.indicePregunta, gameData?.questionStartTime]);
+
+    const playSound = (type) => {
+        if (type === 'START') safePlay(audioStart);
+        else if (type === 'WIN') safePlay(audioWin);
+        else if (type === 'CORRECT') safePlay(audioCorrect);
+        else if (type === 'WRONG') safePlay(audioWrong);
+    };
+
+    const empezarPartida = async () => {
+        await updateDoc(doc(db, "live_games", codigoSala), { estado: 'COUNTDOWN' });
+    };
+
+    const finCuentaAtras = async () => {
+        await updateDoc(doc(db, "live_games", codigoSala), {
+            estado: 'JUEGO',
+            indicePregunta: 0,
+            respuestasRonda: {},
+            fasePregunta: 'RESPONDING',
+            questionStartTime: Date.now()
+        });
+    };
+
+    const revelarRespuestas = async (dataActual) => {
+        if (dataActual.fasePregunta !== 'RESPONDING') return;
+        const respuestas = Object.values(dataActual.respuestasRonda || {});
+        const totalR = respuestas.length;
+        const aciertos = respuestas.filter(r => r.correct).length;
+        const pct = totalR > 0 ? Math.round((aciertos / totalR) * 100) : 0;
+        setStats({ aciertos, total: totalR, pct });
+        let newMood = 'neutral';
+        if (totalR > 0) { if (pct < 30) newMood = 'angry'; else if (pct >= 60) newMood = 'happy'; }
+        setAvatarMood(newMood);
+        await updateDoc(doc(db, "live_games", codigoSala), { fasePregunta: 'REVEAL' });
+
+
+
+        const esDibujo = dataActual.preguntas[dataActual.indicePregunta]?.tipo === 'DIBUJO';
+        if (!esDibujo) {
+            setTimeout(async () => await updateDoc(doc(db, "live_games", codigoSala), { fasePregunta: 'LEADERBOARD' }), 5000);
+        }
+    };
+
+    const siguientePregunta = async (e) => {
+        if (cargandoSiguiente) return;
+        if (e && e.target) e.target.blur(); // Fix foco botón
+        setCargandoSiguiente(true);
+        try {
+            const currentData = gameData || gameDataRef.current;
+            const nextIdx = (currentData.indicePregunta || 0) + 1;
+            if (currentData.estado === 'JUEGO' && currentData.fasePregunta === 'RESPONDING' && currentData.preguntas[currentData.indicePregunta].tipo !== 'PRESENTATION') {
+                await revelarRespuestas(currentData);
+            } else if (nextIdx < currentData.preguntas.length) {
+                await updateDoc(doc(db, "live_games", codigoSala), { indicePregunta: nextIdx, respuestasRonda: {}, fasePregunta: 'RESPONDING', questionStartTime: Date.now() });
+                setAvatarMood('neutral');
+            } else {
+                await updateDoc(doc(db, "live_games", codigoSala), { estado: 'FIN' });
+                playSound('WIN');
+            }
+        } catch (error) { console.error(error); setCargandoSiguiente(false); }
+    };
+
+    const guardarResultadosGlobales = async () => {
+        if (!usuario?.uid) return alert("Debes iniciar sesión para guardar resultados en tu cuenta."); // Bloqueamos guardado si es invitado
+        if (guardandoGlobal) return;
+        setGuardandoGlobal(true);
+        try {
+            const batch = writeBatch(db);
+            const rankingRef = collection(db, 'ranking');
+            jugadores.forEach(j => {
+                const newDocRef = doc(rankingRef);
+                batch.set(newDocRef, {
+                    recursoId: gameData.recursoId,
+                    recursoTitulo: gameData.titulo || "Juego en Vivo",
+                    tipoJuego: 'THINKHOOT',
+                    juego: 'ThinkHoot',
+                    categoria: 'General',
+                    email: 'alumno@clase.com',
+                    jugador: j.nombre,
+                    aciertos: j.puntos,
+                    fecha: new Date(),
+                    medalla: ''
+                });
+            });
+            await batch.commit();
+            alert(`✅ Resultados guardados.`);
+        } catch (error) { alert("Error al guardar resultados."); }
+        setGuardandoGlobal(false);
+    };
+
+    const resolverDuda = async (accion) => {
+        if (!mensajeActivo) return;
+        const refSala = doc(db, "live_games", codigoSala);
+        const keyJugador = Object.keys(gameData.jugadores).find(k => gameData.jugadores[k].uid === mensajeActivo.uid);
+
+        if (keyJugador) {
+            if (accion === 'PUNTOS_MAS') await updateDoc(refSala, { [`jugadores.${keyJugador}.puntos`]: increment(100) });
+            else if (accion === 'PUNTOS_MENOS') await updateDoc(refSala, { [`jugadores.${keyJugador}.puntos`]: increment(-50) });
+            else if (accion === 'KICK') await updateDoc(refSala, { [`jugadores.${keyJugador}`]: deleteField() });
+        }
+        const nuevosMensajes = { ...gameData.mensajes };
+        delete nuevosMensajes[mensajeActivo.id];
+        await updateDoc(refSala, { mensajes: nuevosMensajes });
+        setMensajeActivo(null);
+    };
+
+    if (!gameData) return <div style={{ color: 'white', padding: 20 }}>Cargando sala...</div>;
+
+    const currentQ = (gameData.indicePregunta || 0) + 1;
+    const totalQ = gameData.preguntas ? gameData.preguntas.length : 0;
+    const isLastQuestion = currentQ >= totalQ;
+
+    const currentP = gameData.preguntas?.[gameData.indicePregunta];
+    let correctStr = "";
+    if (currentP) {
+        if (currentP.tipo === 'MATH') {
+            correctStr = currentP.subtipo === 'FRACTION' ? `<span class="fraction"><span class="numer">${currentP.respuesta.n}</span><span class="denom">${currentP.respuesta.d}</span></span>` : currentP.respuesta;
+        } else if (currentP.tipo === 'RELLENAR' && currentP.bloques) {
+            correctStr = currentP.bloques[1];
+        } else {
+            correctStr = currentP.correcta || currentP.respuesta || currentP.a || "";
+        }
+    }
+
+    const isPresentation = currentP?.tipo === 'PRESENTATION';
+
+    const terminarTiempo = () => {
+        // 1. Paramos el contador visual
+        if (timerRef.current) clearInterval(timerRef.current);
+        setTimerVisual(0);
+
+        // 2. Forzamos pasar a "Revelar Respuestas" con margen si es minijuego
+        const dataActual = gameDataRef.current || gameData;
+        if (dataActual) {
+            const pActual = dataActual.preguntas?.[dataActual.indicePregunta];
+            if (pActual?.tipo === 'MINIGAME') {
+                setTimeout(() => revelarRespuestas(dataActual), 2000);
+            } else {
+                revelarRespuestas(dataActual);
+            }
+        }
+    };
+    return (
+        <div className="game-container host-mode">
+            <EstilosComunes />
+            <EstilosThinkHoot />
+
+            {/* HEADER PROFESOR */}
+            <div className="top-hud host-hud">
+                <button className="btn-exit" onClick={onExit}>X</button>
+                <div className="room-code">CÓDIGO: <span>{codigoSala}</span></div>
+                <div style={{ display: 'flex', gap: 15, alignItems: 'center' }}>
+                    {faseHost === 'JUEGO' && <div className="q-counter">P. {currentQ}/{totalQ}</div>}
+                    <button className={`btn-inbox ${mensajes.length > 0 ? 'has-messages' : ''}`} onClick={() => setMostrarPanelDudas(!mostrarPanelDudas)}>
+                        <MessageSquare size={24} />
+                        {mensajes.length > 0 && <span className="badge">{mensajes.length}</span>}
+                    </button>
+                    <div className="player-counter"><Users size={20} /> {jugadores.length}</div>
+                </div>
+            </div>
+
+            {/* AVATAR PI - HOST (FIJO IZQUIERDA) */}
+            {faseHost === 'JUEGO' && !isPresentation && (
+                <div className="pi-avatar-container-host">
+                    <img src={avatarMood === 'happy' ? piHappy : (avatarMood === 'angry' ? piAngry : piNeutral)} className={`pi-avatar-img ${avatarMood}`} />
+                    <div className="pi-stats-badge">{stats.pct}% Aciertos</div>
+                </div>
+            )}
+
+            {/* PANEL DUDAS */}
+            {mostrarPanelDudas && (
+                <div className="dudas-panel">
+                    <div className="dudas-header"><span>Dudas</span><button onClick={() => setMostrarPanelDudas(false)}><X size={16} /></button></div>
+                    <div className="dudas-list">
+                        {!mensajeActivo ? mensajes.map(m => (<div key={m.id} className="duda-item" onClick={() => setMensajeActivo(m)}><b>{m.alumno}</b>: {m.texto.substring(0, 20)}...</div>)) : (
+                            <div className="duda-detalle">
+                                <div className="duda-info"><p><b>{mensajeActivo.alumno}:</b> "{mensajeActivo.texto}"</p></div>
+                                <div className="duda-actions">
+                                    <button className="act-btn green" onClick={() => resolverDuda('PUNTOS_MAS')}><ThumbsUp size={16} /></button>
+                                    <button className="act-btn red" onClick={() => resolverDuda('PUNTOS_MENOS')}><ThumbsDown size={16} /></button>
+                                    <button className="act-btn dark" onClick={() => resolverDuda('KICK')}><UserX size={16} /></button>
+                                    <button className="act-btn gray" onClick={() => resolverDuda('CLOSE')}><X size={16} /></button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* ÁREA DE JUEGO (IZQUIERDA ALINEADA) */}
+            <div className="game-area-host">
+                {faseHost === 'LOBBY' && (
+                    <div className="lobby-screen">
+                        <h1>¡Únete a la partida!</h1>
+                        <div className="big-code">{codigoSala}</div>
+                        <p>Esperando jugadores...</p>
+                        <div className="players-grid">{jugadores.map((j, i) => (<div key={i} className="player-chip">{j.nombre}</div>))}</div>
+                        <button className="btn-start-big" onClick={empezarPartida} disabled={jugadores.length === 0} style={{ opacity: jugadores.length === 0 ? 0.5 : 1 }}>
+                            <Play size={32} fill="white" /> EMPEZAR
+                        </button>
+                    </div>
+                )}
+
+                {faseHost === 'COUNTDOWN' && <PantallaCuentaAtras playSound={playSound} onFinished={finCuentaAtras} />}
+
+                {faseHost === 'JUEGO' && (
+                    <>
+                        {subFase === 'RESPONDING' && (
+                            <div className="host-question-view centered">
+                                {currentP?.tipo === 'MINIGAME' ? (
+                                    <div className="question-card" style={{ textAlign: 'center' }}>
+                                        <h2 style={{ color: '#3498db', fontSize: '2.5rem', marginBottom: '15px' }}>🎮 Prueba Olímpica: {currentP.app}</h2>
+                                        <p style={{ fontSize: '1.2rem', color: '#7f8c8d', marginBottom: '20px' }}>Los atletas están jugando en sus pantallas...</p>
+                                    </div>
+                                ) : isPresentation ? (
+                                    <div className="question-card presentation-card">
+                                        <h2 className="p-top">{parseText(currentP.bloques?.[0])}</h2>
+                                        {currentP.bloques?.[1] && <img src={currentP.bloques[1]} className="presentation-img-large" />}
+                                        <div className="p-bottom">{parseText(currentP.bloques?.[2])}</div>
+
+                                        <div className="host-controls">
+
+
+
+
+                                            <button
+                                                className="btn-next-floating"
+                                                onClick={siguientePregunta}
+                                                disabled={cargandoSiguiente}
+                                                style={{
+                                                    opacity: cargandoSiguiente ? 0.7 : 1,
+                                                    cursor: cargandoSiguiente ? 'wait' : 'pointer',
+                                                    minWidth: '240px',        // <--- EVITA EL BAILE DE TAMAÑO
+                                                    justifyContent: 'center'  // <--- CENTRA EL CONTENIDO
+                                                }}
+                                            >
+                                                {cargandoSiguiente ? "Procesando..." : (isLastQuestion ? "🏆 Ranking Final" : "Siguiente")}
+                                                {!cargandoSiguiente && <ArrowUp className="rotate-90" />}
+                                            </button>
+
+
+
+                                        </div>
+                                    </div>
+                                ) : (
+                                        <div className="question-card">
+                                            <h2>{parseText(currentP.q)}</h2>
+                                            {currentP.imagenUrl && <img src={currentP.imagenUrl} className="question-img-small" />}
+                                            {/* VISUALIZADOR MATEMÁTICO HOST */}
+                                            {currentP.tipo === 'MATH' && (
+                                                <div className="math-operation-display">
+                                                    {currentP.subtipo === 'FRACTION' ? (
+                                                        <div className="fraction-layout">
+                                                            <div className="frac"><span>{currentP.f1.n}</span><span className="symbol">/</span><span>{currentP.f1.d}</span></div>
+                                                            <div className="op-symbol">{currentP.operator}</div>
+                                                            <div className="frac"><span>{currentP.f2.n}</span><span className="symbol">/</span><span>{currentP.f2.d}</span></div>
+                                                            <div className="op-symbol">=</div>
+                                                            <div className="frac-result">?</div>
+                                                        </div>
+                                                    ) : (
+                                                            <div className="standard-layout">
+                                                                <span>{currentP.displayA}</span>
+                                                                <span className="op-symbol">{currentP.operator}</span>
+                                                                <span>{currentP.displayB}</span>
+                                                                <span className="op-symbol">=</span>
+                                                                <span className="result-placeholder">?</span>
+                                                            </div>
+                                                        )}
+                                                </div>
+                                            )}
+
+
+
+                                            <div className="host-waiting">
+                                                <Loader className="spin-icon" size={64} />
+                                                <p>Esperando respuestas...</p>
+                                                <div className="timer-big">{timerVisual}s</div>
+
+                                                {/* NUEVO BOTÓN PARA FORZAR EL FIN DEL TIEMPO */}
+                                                <button className="btn-force-timeout" onClick={terminarTiempo}>
+                                                    ⏹ Forzar Final
+    </button>
+                                            </div>
+                                        </div>
+                                    )}
+                            </div>
+                        )}
+
+                        {subFase === 'REVEAL' && (
+                            <div className="host-question-view centered">
+                                {currentP.tipo === 'DIBUJO' ? (
+                                    // --- CORRECCIÓN MANUAL DE DIBUJOS ---
+                                    <ManualGrader
+                                        respuestas={gameData.respuestasRonda || {}}
+                                        puntosMax={parseInt(currentP.puntosMax) || 1000}
+                                        jugadores={jugadores}
+                                        onTerminar={async (notas) => {
+                                            const updates = {};
+                                            Object.entries(notas).forEach(([uid, puntos]) => {
+                                                if (puntos > 0) updates[`jugadores.${uid}.puntos`] = increment(puntos);
+                                            });
+                                            updates['fasePregunta'] = 'LEADERBOARD';
+                                            await updateDoc(doc(db, "live_games", codigoSala), updates);
+                                        }}
+                                    />
+                                ) : (
+                                        <div className="correct-answer-reveal" style={{ marginTop: '150px' }}>
+                                            {currentP.tipo === 'MINIGAME' ? (
+                                                <>
+                                                    <div className="reveal-label">Minijuego finalizado</div>
+                                                    <div className="reveal-text">¡Prueba Completada!</div>
+                                                </>
+                                            ) : (
+                                                    <>
+                                                        <div className="reveal-label">Solución:</div>
+                                                        {currentP.tipo === 'ORDENAR' ? (
+                                                            <div className="ordered-solution">
+                                                                {currentP.bloques.map((b, i) => <span key={i} className="order-chip">{parseText(b)}</span>)}
+                                                            </div>
+                                                        ) : (
+                                                                <div className="reveal-text">{parseText(correctStr)}</div>
+                                                            )}
+                                                    </>
+                                                )}
+                                        </div>
+                                    )}
+                            </div>
+                        )}
+
+                        {subFase === 'LEADERBOARD' && (
+                            <div className="podium-screen">
+                                <h2>🏆 Ranking de la Ronda</h2>
+                                <PodiumDisplay jugadores={jugadores} />
+
+                                <div className="host-controls">
+
+                                    <button
+                                        className="btn-next-floating"
+                                        onClick={siguientePregunta}
+                                        disabled={cargandoSiguiente}
+                                        style={{ opacity: cargandoSiguiente ? 0.7 : 1, cursor: cargandoSiguiente ? 'wait' : 'pointer' }}
+                                    >
+                                        {cargandoSiguiente ? "Procesando..." : (isLastQuestion ? "🏆 Ranking Final" : "Siguiente")}
+                                        {!cargandoSiguiente && <ArrowUp className="rotate-90" />}
+                                    </button>
+
+
+                                </div>
+                            </div>
+                        )}
+                    </>
+                )}
+
+                {faseHost === 'FIN' && (
+                    <div className="podium-screen">
+                        <h1>🏆 PODIO FINAL 🏆</h1>
+                        <PodiumDisplay jugadores={jugadores} final={true} playSound={playSound} />
+                        <div style={{ display: 'flex', gap: 15, marginTop: 30 }}>
+                            <button className="btn-save-global" onClick={guardarResultadosGlobales} disabled={guardandoGlobal}>
+                                <Save size={20} /> Guardar Resultados
+                            </button>
+                            <button className="btn-exit-big" onClick={onExit}>Cerrar Sala</button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+// ============================================================================
+// 2. MODO CLIENTE (ALUMNO)
+// ============================================================================
+function OlympicLiveClient({ codigoSala, usuario, onExit }) {
+    const [gameData, setGameData] = useState(null);
+    const [fase, setFase] = useState('LOBBY');
+    const [subFase, setSubFase] = useState('RESPONDING');
+    const [puntuacion, setPuntuacion] = useState(0);
+    const [myResult, setMyResult] = useState(null);
+    const [myRank, setMyRank] = useState(null);
+    const [textoDuda, setTextoDuda] = useState('');
+    const [showDudaModal, setShowDudaModal] = useState(false);
+    const joiningRef = useRef(false);
+
+    const guestId = useMemo(() => {
+        if (usuario?.uid) return usuario.uid;
+        const stored = localStorage.getItem('pikt_guest_id');
+        if (stored) return stored;
+        const newId = 'guest_' + Math.random().toString(36).substring(2, 9);
+        localStorage.setItem('pikt_guest_id', newId);
+        return newId;
+    }, [usuario]);
+    const myUid = usuario?.uid || guestId;
+    const myName = usuario?.displayName || "Invitado";
+
+    useEffect(() => {
+        const unsubscribe = onSnapshot(doc(db, "live_games", codigoSala), async (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                setGameData(data);
+                setFase(data.estado);
+                setSubFase(data.fasePregunta);
+
+                // Leemos los resultados (ya calculados por el HOST)
+                const misRespuestas = data.respuestasRonda ? data.respuestasRonda[myUid] : null;
+                setMyResult(misRespuestas);
+
+                const jugadoresMap = data.jugadores || {};
+                if (jugadoresMap[myUid]) {
+                    setPuntuacion(jugadoresMap[myUid].puntos || 0);
+                } else {
+                    // CORRECCIÓN: Permitimos unirse en LOBBY o en JUEGO (para los tardones)
+                    if ((data.estado === 'LOBBY' || data.estado === 'JUEGO') && !joiningRef.current) {
+                        joiningRef.current = true;
+                        await updateDoc(doc(db, "live_games", codigoSala), {
+                            [`jugadores.${myUid}`]: { uid: myUid, nombre: myName, puntos: 0, joinedAt: Date.now() }
+                        });
+                        joiningRef.current = false;
+                    }
+                }
+
+                if (data.estado === 'FIN') {
+                    const sorted = Object.values(jugadoresMap).sort((a, b) => b.puntos - a.puntos);
+                    const rank = sorted.findIndex(j => j.uid === myUid) + 1;
+                    setMyRank(rank);
+                    if (rank <= 3) confetti();
+                }
+            } else { alert("Sala cerrada."); onExit(); }
+        });
+        return () => unsubscribe();
+    }, [codigoSala]);
+
+    const notificarRespuesta = async (esCorrecta, dibujoBase64 = null) => {
+        const respuestaData = {
+            uid: myUid,
+            correct: esCorrecta,
+            puntosGanados: 0,
+            timestamp: Date.now(),
+            processed: false
+        };
+        // Si hay dibujo, lo adjuntamos
+        if (dibujoBase64) respuestaData.dibujo = dibujoBase64;
+        await updateDoc(doc(db, "live_games", codigoSala), { [`respuestasRonda.${myUid}`]: respuestaData });
+    };
+    // --- NUEVO: ENVIAR PUNTOS DE MINIJUEGO ---
+    const handleMinijuegoTerminado = async (puntosConseguidos) => {
+        const respuestaData = {
+            uid: myUid,
+            correct: true, // Se marca como correcto para dar feedback positivo en pantalla
+            puntosGanados: puntosConseguidos,
+            timestamp: Date.now(),
+            processed: true // ¡ESTO ES CLAVE! Evita que el profesor sobreescriba los puntos con su temporizador
+        };
+        await updateDoc(doc(db, "live_games", codigoSala), {
+            [`respuestasRonda.${myUid}`]: respuestaData,
+            [`jugadores.${myUid}.puntos`]: increment(puntosConseguidos)
+        });
+    };
+    const enviarDuda = async () => {
+        if (!textoDuda.trim()) return;
+        const dudaId = `msg_${Date.now()}`;
+        await updateDoc(doc(db, "live_games", codigoSala), { [`mensajes.${dudaId}`]: { uid: myUid, alumno: myName, texto: textoDuda, timestamp: Date.now() } });
+        setTextoDuda(''); setShowDudaModal(false); alert("Enviado");
+    };
+
+    if (!gameData) return <div style={{ color: 'white', padding: 20 }}>Conectando...</div>;
+
+    const preguntaActual = gameData.preguntas?.[gameData.indicePregunta];
+    let textoRespuestaCorrecta = "";
+    if (preguntaActual) {
+        if (preguntaActual.tipo === 'MATH') {
+            textoRespuestaCorrecta = preguntaActual.subtipo === 'FRACTION' ? `${preguntaActual.respuesta.n}/${preguntaActual.respuesta.d}` : preguntaActual.respuesta;
+        } else if (preguntaActual.tipo === 'RELLENAR' && preguntaActual.bloques) {
+            textoRespuestaCorrecta = preguntaActual.bloques[1];
+        } else {
+            textoRespuestaCorrecta = preguntaActual.correcta || preguntaActual.respuesta || preguntaActual.a || "";
+        }
+    }
+
+    const currentQ = (gameData.indicePregunta || 0) + 1;
+    const totalQ = gameData.preguntas ? gameData.preguntas.length : 0;
+
+    return (
+        <div className="game-container client-mode">
+            <EstilosComunes />
+            <EstilosThinkHoot />
+
+            <div className="client-header-container">
+                <button className="btn-exit" onClick={onExit} style={{ position: 'absolute', left: 10 }}>X</button>
+                <div className="client-score-wrapper">
+                    <div className="score-badge blue-pill">{puntuacion} pts</div>
+                    <button className="client-msg-btn" onClick={() => setShowDudaModal(true)}><Send size={20} color="white" /></button>
+                </div>
+            </div>
+
+            {showDudaModal && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <h3>Duda al Profe</h3>
+                        <textarea value={textoDuda} onChange={e => setTextoDuda(e.target.value)} rows={3} />
+                        <div className="modal-actions"><button className="btn-cancel" onClick={() => setShowDudaModal(false)}>Cancelar</button><button className="btn-confirm" onClick={enviarDuda}>Enviar</button></div>
+                    </div>
+                </div>
+            )}
+
+            {fase === 'LOBBY' && <div className="lobby-wait"><h2>¡Hola {myName}!</h2><p>Espera al profesor...</p><div className="avatar-wait">🦉</div></div>}
+            {fase === 'COUNTDOWN' && <div className="lobby-wait"><h1>¡ATENTOS!</h1></div>}
+
+            {fase === 'JUEGO' && (
+                <div className="client-question-area">
+                    {preguntaActual ? (
+                        // --- INTERCEPTOR DE MINIJUEGOS ---
+                        preguntaActual.tipo === 'MINIGAME' && subFase === 'RESPONDING' ? (
+                            <div style={{ width: '100vw', height: '100vh', position: 'fixed', top: 0, left: 0, zIndex: 9999, background: '#2c3e50' }}>
+                                <MotorMinijuego
+                                    pregunta={preguntaActual}
+                                    usuario={usuario}
+                                    onTerminar={handleMinijuegoTerminado}
+                                />
+                            </div>
+                        ) : (
+                                <ClientQuestionEngine
+                                    key={gameData.indicePregunta}
+                                    data={preguntaActual}
+                                    config={gameData.config}
+                                    startTime={gameData.questionStartTime}
+                                    subFase={subFase}
+                                    myResult={myResult}
+                                    correctAnswerText={textoRespuestaCorrecta}
+                                    currentTotalScore={puntuacion}
+                                    onResponded={notificarRespuesta}
+                                />
+                            )
+                    ) : <div>Cargando...</div>}
+                </div>
+            )}
+
+            {fase === 'FIN' && (
+                <div className="final-screen-client">
+                    <h1 className="final-title">¡FIN DE PARTIDA!</h1>
+                    <div className="final-card-client">
+                        <p className="final-text-intro">Enhorabuena <span className="highlight-name">{myName}</span></p>
+
+                        <p className="final-text-body">
+                            has quedado en<br />
+                            <span className="highlight-rank">{myRank}º posición</span>
+                        </p>
+
+                        <p className="final-text-body">
+                            con <span className="highlight-score">{puntuacion} puntos</span>
+                        </p>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// --- ENGINE DEL ALUMNO ---
+function ClientQuestionEngine({ data, config, startTime, subFase, myResult, correctAnswerText, currentTotalScore, onResponded }) {
+    const [answeredLocal, setAnsweredLocal] = useState(false);
+    const [timeLeft, setTimeLeft] = useState(100);
+    const [isLate, setIsLate] = useState(false);
+
+    useEffect(() => {
+        setAnsweredLocal(false);
+        setIsLate(false);
+        setTimeLeft(100);
+    }, []);
+
+    useEffect(() => {
+        if (subFase !== 'RESPONDING' || answeredLocal || data.tipo === 'PRESENTATION') return;
+        const tiempoTotal = parseInt(data.tiempo || config?.tiempoPregunta || 20);
+        const interval = setInterval(() => {
+            const transcurrido = (Date.now() - startTime) / 1000;
+            const pct = Math.max(0, 100 - (transcurrido / tiempoTotal * 100));
+            setTimeLeft(pct);
+            if (pct < 20) setIsLate(true);
+            if (pct <= 0) {
+                clearInterval(interval);
+                if (!answeredLocal && !myResult) {
+                    handleAnswer(false);
+                }
+            }
+        }, 100);
+        return () => clearInterval(interval);
+    }, [startTime, subFase, answeredLocal, myResult, data]);
+
+    const handleAnswer = (isCorrect, extraData = null) => {
+        if (answeredLocal) return;
+        setAnsweredLocal(true);
+        onResponded(isCorrect, extraData);
+    };
+
+    if (data.tipo === 'PRESENTATION') {
+        return <div className="waiting-others"><Monitor size={64} color="white" /><h2>¡Mira la pizarra!</h2></div>;
+    }
+
+    // --- MODO NEÓN RESTAURADO PARA EL FEEDBACK ---
+    if (subFase === 'REVEAL') {
+        const fueCorrecta = myResult?.correct;
+        const puntosGanados = myResult?.puntosGanados || 0;
+
+        if (fueCorrecta) {
+            return (
+                <div className="feedback-container">
+                    <div className="pi-feedback-wrapper">
+                        <img src={piHappy} className="pi-feedback happy" alt="Happy Pi" />
+                    </div>
+                    <div className="neon-card success">
+                        <CheckCircle size={50} color="#2ecc71" />
+                        <div className="neon-title">¡CORRECTO!</div>
+                        <div className="points-added">+{puntosGanados} pts</div>
+                    </div>
+                </div>
+            );
+        } else {
+            const mensajeError = (!myResult) ? "¡TIEMPO!" : "¡INCORRECTO!";
+            return (
+                <div className="feedback-container">
+                    <div className="pi-feedback-wrapper">
+                        <img src={piAngry} className="pi-feedback angry" alt="Angry Pi" />
+                    </div>
+                    <div className="neon-card error">
+                        <XCircle size={50} color="#ff003c" />
+                        <div className="neon-title">{mensajeError}</div>
+                        {correctAnswerText && (
+                            <>
+                                <div className="neon-label">La respuesta correcta era:</div>
+                                <div className="neon-answer">{parseText(correctAnswerText)}</div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+    }
+
+    if (subFase === 'LEADERBOARD') {
+        return (
+            <div className="feedback-container">
+                <div className="pi-feedback-wrapper">
+                    <img src={piNeutral} className="pi-feedback" alt="Neutral Pi" />
+                </div>
+                <div className="neon-card neutral">
+                    <div className="neon-title">Puntuación Total</div>
+                    <div className="points-added big">{currentTotalScore} pts</div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div style={{ width: '100%', maxWidth: '600px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div className={`timer-bar-container ${isLate ? 'blinking' : ''}`}>
+                <div className="timer-bar-fill" style={{ width: `${timeLeft}%`, backgroundColor: isLate ? '#e74c3c' : '#2ecc71' }}></div>
+            </div>
+
+            {answeredLocal || myResult ? (
+                <div className="waiting-others">
+                    <Loader className="spin-icon" size={48} />
+                    <p>Enviado. Espera...</p>
+                </div>
+            ) : (
+                    <QuestionDisplay data={data} onAnswer={handleAnswer} disabled={false} isHostView={false} />
+                )}
+        </div>
+    );
+}
+
+// --- VISUALIZADOR DE PREGUNTA ---
+// --- VISUALIZADOR DE PREGUNTA UNIVERSAL (SIN MEMO PARA EVITAR ERRORES) ---
+
+// --- VISUALIZADOR DE PREGUNTA (CORREGIDO: AHORA INCLUYE LA INTERFAZ MATEMÁTICA) ---
+// --- VISUALIZADOR DE PREGUNTA (OPTIMIZADO CON MEMO) ---
+const QuestionDisplay = memo(function QuestionDisplay({ data, onAnswer, disabled, feedback, isHostView, showAnswer }) {
+    // ESTADOS
+    const [valNum, setValNum] = useState('');
+    const [valDen, setValDen] = useState('');
+    const [focusField, setFocusField] = useState('NUM');
+    const [orden, setOrden] = useState([]);
+    const [texto, setTexto] = useState('');
+    const [slots, setSlots] = useState([]);
+    const [opcionesMezcladas, setOpcionesMezcladas] = useState([]);
+
+    useEffect(() => {
+        // RESETEO COMPLETO
+        setValNum(''); setValDen(''); setFocusField('NUM'); setTexto('');
+
+        // 1. TIPO ORDENAR (Con barajado matemático robusto)
+        if (data.tipo === 'ORDENAR' && data.bloques) {
+            if (isHostView) {
+                setOrden(data.bloques);
+            } else {
+                let mezclado = [...data.bloques];
+
+                // Algoritmo Fisher-Yates para barajar de verdad
+                for (let i = mezclado.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [mezclado[i], mezclado[j]] = [mezclado[j], mezclado[i]];
+                }
+
+                // SEGURO ANTI-CASUALIDADES
+                if (mezclado.length > 1 && JSON.stringify(mezclado) === JSON.stringify(data.bloques)) {
+                    [mezclado[0], mezclado[1]] = [mezclado[1], mezclado[0]];
+                }
+
+                setOrden(mezclado);
+                setSlots(new Array(data.bloques.length).fill(null));
+            }
+        }
+
+        // 2. SELECCIÓN MÚLTIPLE - Barajado inicial robusto
+        const rawOptions = data.opcionesFijas || [data.respuesta || data.correcta, ...(data.incorrectas || [])];
+        const validOptions = rawOptions.filter(opt => opt && String(opt).trim() !== "");
+
+        if (validOptions.length > 0) {
+            let opcionesM = [...validOptions];
+            // Aplicamos también el barajado matemático a las respuestas tipo test
+            for (let i = opcionesM.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [opcionesM[i], opcionesM[j]] = [opcionesM[j], opcionesM[i]];
+            }
+            setOpcionesMezcladas(opcionesM);
+        }
+
+    }, [data, isHostView]);
+
+    // MANEJADORES
+    const handleKeypad = (char) => {
+        if (char === 'DEL') {
+            if (focusField === 'NUM') setValNum(v => v.slice(0, -1)); else setValDen(v => v.slice(0, -1));
+        } else if (char === 'SWITCH') {
+            setFocusField(prev => prev === 'NUM' ? 'DEN' : 'NUM');
+        } else {
+            if (focusField === 'NUM') setValNum(v => v + char); else setValDen(v => v + char);
+        }
+    };
+    const enviarMath = () => {
+        if (data.subtipo === 'FRACTION') onAnswer(parseInt(valNum) === parseInt(data.respuesta.n) && parseInt(valDen) === parseInt(data.respuesta.d));
+        else onAnswer(clean(valNum) === clean(data.respuesta));
+    };
+
+    // FUNCIONES STANDARD
+    const addToSlot = (block, i) => { if (isHostView || disabled) return; const firstEmpty = slots.findIndex(s => s === null); if (firstEmpty !== -1) { const n = [...slots]; n[firstEmpty] = block; setSlots(n); } };
+    const removeFromSlot = (i) => { if (isHostView || disabled) return; const n = [...slots]; n[i] = null; setSlots(n); };
+    const confirmarOrden = () => { if (slots.some(s => s === null)) return; onAnswer(JSON.stringify(slots) === JSON.stringify(data.bloques)); };
+    const responderCompletar = () => { if (!isHostView) onAnswer(clean(texto) === clean(data.bloques?.[1])); };
+    const responderSimple = (op) => { if (!isHostView) { const correctStr = data.correcta || data.respuesta || data.a; onAnswer(clean(op) === clean(correctStr)); } };
+
+    // LÓGICA DE RENDERIZADO
+    const isMath = data.tipo === 'MATH' || (data.subtipo === 'STANDARD' || data.subtipo === 'FRACTION');
+    const isOrdenar = data.tipo === 'ORDENAR';
+    const isRellenar = data.tipo === 'RELLENAR';
+    // CORRECCIÓN: Solo es múltiple si hay MÁS DE 1 opción. Si solo hay 1, es respuesta corta.
+    const isMultiple = (opcionesMezcladas.length > 1) && !isOrdenar && !isRellenar && !isMath;
+
+    const isShortAnswer = !isMultiple && !isOrdenar && !isRellenar && !isMath && data.tipo !== 'DIBUJO';
+    return (
+        <div className="question-card">
+            <h2>{parseText(data.q || data.pregunta)}</h2>
+            {data.imagenUrl && !isMath && <img src={data.imagenUrl} className="question-img-small" alt="" />}
+
+            {/* INTERFAZ MATEMÁTICA */}
+            {isMath && (
+                <>
+                    <div className="math-operation-display large">
+                        {data.subtipo === 'FRACTION' ? (
+                            <div className="fraction-layout">
+                                <div className="frac"><span>{data.f1.n}</span><span className="symbol">/</span><span>{data.f1.d}</span></div>
+                                <div className="op-symbol">{data.operator}</div>
+                                <div className="frac"><span>{data.f2.n}</span><span className="symbol">/</span><span>{data.f2.d}</span></div>
+                                <div className="op-symbol">=</div>
+                            </div>
+                        ) : (
+                                <div className="standard-layout"><span>{data.displayA}</span><span className="op-symbol">{data.operator}</span><span>{data.displayB}</span><span className="op-symbol">=</span></div>
+                            )}
+                    </div>
+                    {!isHostView && (
+                        <>
+                            <div className="math-inputs-area">
+                                {data.subtipo === 'FRACTION' ? (
+                                    <div className="fraction-input-group">
+                                        <div className={`input-box ${focusField === 'NUM' ? 'focused' : ''}`} onClick={() => setFocusField('NUM')}>{valNum || '?'}</div>
+                                        <div className="fraction-bar"></div>
+                                        <div className={`input-box ${focusField === 'DEN' ? 'focused' : ''}`} onClick={() => setFocusField('DEN')}>{valDen || '?'}</div>
+                                    </div>
+                                ) : (
+                                        <div className={`input-box single ${focusField === 'NUM' ? 'focused' : ''}`} onClick={() => setFocusField('NUM')}>{valNum || '?'}</div>
+                                    )}
+                                <button className="btn-send-math" onClick={enviarMath} disabled={disabled}>ENVIAR</button>
+                            </div>
+                            <div className="virtual-keypad">
+                                {[7, 8, 9, 4, 5, 6, 1, 2, 3].map(n => <button key={n} className="btn-key" onClick={() => handleKeypad(String(n))}>{n}</button>)}
+                                <button className="btn-key" onClick={() => handleKeypad('-')}>-</button>
+                                <button className="btn-key" onClick={() => handleKeypad('0')}>0</button>
+                                <button className="btn-key" onClick={() => handleKeypad(',')}>,</button>
+                                <button className="btn-key danger" onClick={() => handleKeypad('DEL')}><Delete size={24} /></button>
+                                {data.subtipo === 'FRACTION' ? <button className="btn-key special" onClick={() => handleKeypad('SWITCH')}><ArrowLeftRight size={24} /></button> : <div className="btn-key empty"></div>}
+                            </div>
+                        </>
+                    )}
+                </>
+            )}
+
+            {/* RESTO DE MODOS */}
+            {isOrdenar && !isHostView && (
+                <div className="sort-wrapper">
+                    <div className="target-slots">{slots.map((s, i) => (<div key={i} className="slot-box" onClick={() => removeFromSlot(i)}>{s ? <span className="slot-content">{parseText(s)}</span> : <span className="slot-num">{i + 1}</span>}</div>))}</div>
+                    <div className="source-blocks">{orden.map((bloque, i) => (<button key={i} className="block-chip" onClick={() => addToSlot(bloque, i)} disabled={slots.includes(bloque) || disabled} style={{ opacity: slots.includes(bloque) ? 0 : 1, pointerEvents: slots.includes(bloque) ? 'none' : 'auto' }}>{parseText(bloque)}</button>))}</div>
+                    <button className="btn-confirmar-amarillo" onClick={confirmarOrden} disabled={disabled || slots.includes(null)}>ENVIAR</button>
+                </div>
+            )}
+            {isOrdenar && isHostView && <div className="ordered-solution">{data.bloques.map((b, i) => <span key={i} className="order-chip">{parseText(b)}</span>)}</div>}
+
+            {isRellenar && (
+                <div className="completar-wrapper">
+                    <div className="completar-box">
+                        <div className="bloque-azul">{parseText(data.bloques?.[0])}</div>
+                        {isHostView ? <span className="respuesta-host">[{parseText(data.bloques?.[1])}]</span> : <input value={texto} onChange={e => setTexto(e.target.value)} className="input-hueco-amarillo" disabled={disabled} />}
+                        <div className="bloque-azul">{parseText(data.bloques?.[2])}</div>
+                    </div>
+                    {!isHostView && <button className="btn-confirmar-amarillo" onClick={responderCompletar} disabled={disabled}>ENVIAR</button>}
+                </div>
+            )}
+
+            {isShortAnswer && !isHostView && (
+                <div className="short-answer-ruleta">
+                    <input placeholder="Escribe tu respuesta..." value={texto} onChange={e => setTexto(e.target.value)} disabled={disabled} onKeyDown={(e) => { if (e.key === 'Enter') onAnswer(clean(texto) === clean(data.a || data.respuesta)) }} />
+                    <button onClick={() => onAnswer(clean(texto) === clean(data.a || data.respuesta))} disabled={disabled}>ENVIAR</button>
+                </div>
+            )}
+
+            {data.tipo === 'DIBUJO' && !isHostView && (
+                <DrawingPad onSend={(isCorrect, base64) => onAnswer(isCorrect, base64)} disabled={disabled} />
+            )}
+            {data.tipo === 'DIBUJO' && isHostView && (
+                <div style={{ color: '#bdc3c7', fontSize: '1.2rem', marginTop: '20px', textAlign: 'center' }}>
+                    🖌️ Los alumnos están dibujando...
+                </div>
+            )}
+
+            {isMultiple && (
+                <div className="options-grid">
+                    {opcionesMezcladas.map((op, k) => (
+                        <button key={k} className={`btn-option ${feedback === 'correct' && clean(op) === clean(data.respuesta || data.correcta || data.a) ? 'correct' : ''} ${feedback === 'incorrect' ? 'dimmed' : ''} ${showAnswer && clean(op) === clean(data.respuesta || data.correcta || data.a) ? 'host-correct' : ''}`} onClick={() => responderSimple(op)} disabled={disabled || isHostView}>{parseText(op)}</button>
+                    ))}
+                </div>
+            )}
+
+            {feedback && <div className={`feedback-overlay ${feedback}`}>{feedback === 'correct' ? '¡BIEN!' : '¡MAL!'}</div>}
+        </div>
+    );
+}, (prev, next) => {
+    // FUNCIÓN DE COMPARACIÓN INTELIGENTE PARA MATHLIVE
+    // 1. Si el título cambia, renderiza.
+    if (prev.data.q !== next.data.q) return false;
+
+    // 2. IMPORTANTE: Si la RESPUESTA o los NÚMEROS (displayA) cambian, renderiza.
+    // Esto es lo que fallaba antes. Ahora detectará que "Calcula" 6*8 es distinto de "Calcula" 5+5.
+    const respuestaIgual = JSON.stringify(prev.data.respuesta) === JSON.stringify(next.data.respuesta);
+    const displayIgual = prev.data.displayA === next.data.displayA;
+    if (!respuestaIgual || !displayIgual) return false;
+
+    // 3. Chequeos estándar de estado
+    if (prev.disabled !== next.disabled) return false;
+    if (prev.feedback !== next.feedback) return false;
+    if (prev.showAnswer !== next.showAnswer) return false;
+
+    // Si todo es igual, NO renderices (ahorra memoria)
+    return true;
+});
+
+
+
+// 3. MODO LOCAL (Solo)
+function ThinkHootLocal({ recurso, usuario, alTerminar }) {
+    if (!recurso) return <div style={{ color: 'white', padding: 20 }}>Cargando...</div>;
+    const [fase, setFase] = useState('SETUP');
+    const [puntuacion, setPuntuacion] = useState(0);
+    const [nombreInvitado, setNombreInvitado] = useState('');
+    const [guardando, setGuardando] = useState(false);
+    const esInvitado = !usuario || !usuario.email;
+    const esPro = recurso?.tipo === 'PRO';
+
+    const playSound = (type) => {
+        if (type === 'START') safePlay(audioStart);
+        else if (type === 'WIN') safePlay(audioWin);
+        else if (type === 'CORRECT') safePlay(audioCorrect);
+        else if (type === 'WRONG') safePlay(audioWrong);
+    };
+
+    const incrementarPlayCount = async () => { if (recurso.id) try { await updateDoc(doc(db, 'resources', recurso.id), { playCount: increment(1) }); } catch (e) { } };
+
+    const guardarRanking = async () => {
+        if (guardando) return; setGuardando(true);
+        try {
+            const nombre = esInvitado ? (nombreInvitado || "Invitado") : usuario.displayName;
+            const email = esInvitado ? 'invitado' : usuario.email;
+            await updateDoc(collection(db, 'ranking'), { recursoId: recurso.id, recursoTitulo: recurso.titulo, tipoJuego: 'THINKHOOT', email, jugador: nombre, aciertos: puntuacion, fecha: new Date() });
+            alTerminar();
+        } catch (e) { alert("Error guardando"); }
+        setGuardando(false);
+    };
+
+    if (fase === 'SETUP') return <PantallaSetup recurso={recurso} esPro={esPro} esInvitado={esInvitado} nombreInvitado={nombreInvitado} setNombreInvitado={setNombreInvitado} onStart={() => { setFase('COUNTDOWN') }} onExit={alTerminar} />;
+    if (fase === 'COUNTDOWN') return <PantallaCuentaAtras playSound={playSound} onFinished={() => { incrementarPlayCount(); setFase('JUEGO') }} />;
+    if (fase === 'FIN') return <PantallaFin puntuacion={puntuacion} guardarRanking={guardarRanking} guardando={guardando} esInvitado={esInvitado} alTerminar={alTerminar} playSound={playSound} />;
+
+    return <EngineLocal recurso={recurso} esPro={esPro} setPuntuacionTotal={setPuntuacion} puntuacionActual={puntuacion} onFinish={() => setFase('FIN')} onExit={alTerminar} playSound={playSound} />;
+}
+
+// --- ENGINE LOCAL ---
+function EngineLocal({ recurso, esPro, setPuntuacionTotal, puntuacionActual, onFinish, onExit, playSound }) {
+    const [indice, setIndice] = useState(0); const [preguntas, setPreguntas] = useState([]); const [tiempoRestante, setTiempoRestante] = useState(0); const [pausa, setPausa] = useState(false); const [feedback, setFeedback] = useState(null); const timerRef = useRef(null);
+    useEffect(() => {
+        let pool = recurso.preguntas ? [...recurso.preguntas] : [];
+        if (pool.length === 0 && recurso.hojas) recurso.hojas.forEach(h => { if (h.preguntas) pool.push(...h.preguntas); });
+        setPreguntas(pool); if (pool.length > 0) cargarPregunta(0, pool); else onFinish();
+        return () => clearInterval(timerRef.current);
+    }, []);
+    const cargarPregunta = (idx, list) => {
+        const p = list[idx]; if (!p) { onFinish(); return; }
+        setIndice(idx); setFeedback(null); setPausa(false);
+        const tGlobal = parseInt(recurso.config?.tiempoPregunta) || 20; const t = esPro ? (parseInt(p.tiempo) || tGlobal) : tGlobal;
+        setTiempoRestante(t); if (timerRef.current) clearInterval(timerRef.current);
+        timerRef.current = setInterval(() => { setTiempoRestante(prev => { if (prev <= 1) { clearInterval(timerRef.current); gestionarRespuesta(false); return 0; } return prev - 1; }); }, 1000);
+    };
+    const gestionarRespuesta = (ok) => {
+        if (pausa) return; setPausa(true); clearInterval(timerRef.current);
+        const p = preguntas[indice]; const ptsWin = esPro ? (parseInt(p.puntosMax) || 100) : (parseInt(recurso.config?.puntosAcierto) || 10); const ptsLose = esPro ? (parseInt(p.puntosMin) || 0) : (parseInt(recurso.config?.puntosFallo) || 2);
+        if (ok) { playSound('CORRECT'); setFeedback('correct'); setPuntuacionTotal(v => v + ptsWin); }
+        else { if (p.tipo !== 'PRESENTATION') { playSound('WRONG'); setFeedback('incorrect'); setPuntuacionTotal(v => Math.max(0, v - ptsLose)); } }
+        setTimeout(() => { if (indice + 1 < preguntas.length) cargarPregunta(indice + 1, preguntas); else onFinish(); }, 2000);
+    };
+    const p = preguntas[indice]; if (!p) return <div>Cargando...</div>;
+    return <div className="game-container"><EstilosComunes /><EstilosThinkHoot /><div className="game-area"><div className="top-hud"><button className="btn-exit" onClick={onExit}>Salir</button><div className="timer-badge">{tiempoRestante}s</div><div className="score-badge">{puntuacionActual} pts</div></div><QuestionDisplay data={p} onAnswer={gestionarRespuesta} disabled={pausa} feedback={feedback} /></div></div>;
+}
+
+// --- PANTALLAS EXTRA ---
+
+function OlympicLiveLocal(props) { return <div>Modo Local no implementado en esta versión.</div> }
+
+function PantallaSetup({ recurso, esPro, esInvitado, nombreInvitado, setNombreInvitado, onStart, onExit }) {
+    return <div className="card-menu"><h1>ThinkHoot</h1><h2>{recurso.titulo}</h2><p style={{ color: '#ccc' }}>Modo: {esPro ? '🔥 PRO' : 'Estándar'}</p>{esInvitado && <div style={{ marginBottom: 20 }}><input value={nombreInvitado} onChange={e => setNombreInvitado(e.target.value)} placeholder="Tu nombre..." style={{ padding: 10, width: '80%', borderRadius: 5, textAlign: 'center' }} /></div>}<button className="btn-success" onClick={() => { if (esInvitado && !nombreInvitado) return alert("Nombre requerido"); onStart() }}>JUGAR</button><button className="btn-back" onClick={onExit}>Volver</button><EstilosComunes /></div>;
+}
+function PantallaCuentaAtras({ playSound, onFinished }) {
+    const [paso, setPaso] = useState(0); const [txt, setTxt] = useState('π');
+    useEffect(() => { if (playSound) playSound('START'); const seq = async () => { setTxt("π"); setPaso(0); await new Promise(r => setTimeout(r, 1000)); setTxt("K"); setPaso(1); await new Promise(r => setTimeout(r, 1000)); setTxt("T"); setPaso(2); await new Promise(r => setTimeout(r, 1000)); setTxt("¡YA!"); setPaso(3); await new Promise(r => setTimeout(r, 1000)); onFinished(); }; seq(); }, []);
+    return <div className="fullscreen-overlay"><div className={`countdown-text step-${paso}`}>{txt}</div><style>{`.fullscreen-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:radial-gradient(circle,#2c3e50,#000);display:flex;justify-content:center;align-items:center;z-index:9999}.countdown-text{font-size:10rem;font-weight:bold;color:white;animation:zoomIn 0.5s}.step-0{color:#3498db}.step-1{color:#e74c3c}.step-2{color:#f1c40f}.step-3{color:#2ecc71;transform:scale(1.2)}@keyframes zoomIn{from{transform:scale(0.5);opacity:0}to{transform:scale(1);opacity:1}}`}</style></div>;
+}
+function PantallaFin({ puntuacion, guardarRanking, guardando, esInvitado, alTerminar, playSound }) {
+    useEffect(() => { if (playSound) playSound('WIN'); confetti(); }, []);
+    return <div className="card-menu"><h1>¡Juego Terminado!</h1><h2 style={{ color: '#f1c40f', fontSize: '4rem' }}>{puntuacion} pts</h2>{esInvitado ? <div style={{ background: 'rgba(255,255,255,0.1)', padding: 15, borderRadius: 10, margin: '20px 0' }}><p style={{ color: 'white' }}>¡Regístrate para guardar récords!</p><button className="btn-back" onClick={alTerminar}>Salir</button></div> : <button className="btn-success" onClick={guardarRanking} disabled={guardando}>{guardando ? 'Guardando...' : '💾 Guardar'}</button>}{!esInvitado && <button className="btn-back" onClick={alTerminar}>Salir</button>}<EstilosComunes /></div>;
+}
+
+// --- PODIUM (HOST) ---
+function PodiumDisplay({ jugadores, final, playSound }) {
+    const sorted = [...jugadores].sort((a, b) => b.puntos - a.puntos);
+    const top3 = [sorted[1], sorted[0], sorted[2]].filter(Boolean);
+    const runnerUps = sorted.slice(3, 5);
+    const rest = sorted.slice(5);
+
+    useEffect(() => { if (final) { confetti(); if (playSound) playSound('WIN'); } }, [final]);
+
+    return (
+        <div className="podium-container">
+            <div className="podium-stage">
+                {top3.map((j, idx) => {
+                    const realRank = sorted.indexOf(j) + 1;
+                    let height = '100px'; if (realRank === 1) height = '160px'; if (realRank === 2) height = '120px';
+                    return (
+                        <div key={j.uid} className={`podium-pedestal rank-${realRank}`}>
+                            <div className="podium-avatar">{realRank === 1 && <Trophy size={40} color="#f1c40f" />}{realRank === 2 && <Medal size={30} color="#bdc3c7" />}{realRank === 3 && <Medal size={30} color="#d35400" />}</div>
+                            <div className="pedestal-bar" style={{ height }}><div className="p-rank">{realRank}º</div></div>
+                            <div className="p-name">{j.nombre}</div>
+                            <div className="p-score">{j.puntos}</div>
+                        </div>
+                    );
+                })}
+            </div>
+            <div className="runners-up-grid">
+                {runnerUps.map((j, i) => (
+                    <div key={j.uid} className="runner-up-card"><span className="r-rank">{i + 4}º</span><span className="r-name">{j.nombre}</span><span className="r-score">{j.puntos}</span></div>
+                ))}
+            </div>
+            {rest.length > 0 && (
+                <div className="rest-list">{rest.map((j, i) => (<div key={j.uid} className="rest-row"><span>{i + 6}º {j.nombre}</span><span>{j.puntos}</span></div>))}</div>
+            )}
+        </div>
+    );
+}
+
+const EstilosComunes = () => (<style>{` @import url('https://fonts.googleapis.com/css2?family=Righteous&family=Roboto:wght@400;700&display=swap'); .card-menu { background: rgba(0,0,0,0.85); padding: 40px; border-radius: 20px; width: 90%; max-width: 450px; text-align: center; color: white; font-family: 'Roboto', sans-serif; box-shadow: 0 20px 50px rgba(0,0,0,0.5); margin: 50px auto; } .btn-success { width: 100%; padding: 15px; border: none; border-radius: 30px; font-weight: bold; cursor: pointer; color: #fff; background: #2ecc71; margin-bottom: 10px; font-size: 1.2rem; } .btn-back { background: transparent; border: 1px solid #777; color: #ccc; width: 100%; padding: 10px; border-radius: 20px; cursor: pointer; } `}</style>);
+
+const EstilosThinkHoot = () => (
+    <style>{`
+        .game-container { width: 100vw; height: 100vh; background: #2c3e50; display: flex; flex-direction: column; justify-content: center; align-items: center; overflow: hidden; position: relative; font-family: 'Roboto', sans-serif; }
+        
+        /* AVATAR PI - HOST (Top Left) */
+        .pi-avatar-container-host { position: absolute; top: 80px; left: 20px; z-index: 50; display: flex; flex-direction: column; align-items: center; transition: all 0.3s; }
+        .pi-avatar-img { width: 120px; height: 120px; object-fit: contain; animation: popIn 0.5s; filter: drop-shadow(0 5px 10px rgba(0,0,0,0.3)); }
+        .pi-stats-badge { background: #f1c40f; color: #2c3e50; padding: 5px 10px; border-radius: 10px; font-weight: bold; font-family: 'Righteous'; margin-top: -10px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .pi-avatar-img.angry { animation: shake 0.5s; }
+        .pi-avatar-img.happy { animation: bounce 1s infinite; }
+/* MATH STYLES */
+   
+.fraction-layout { display: flex; align-items: center; gap: 10px; }
+    .frac { display: flex; flex-direction: column; align-items: center; }
+   
+.op-symbol { color: #f1c40f; margin: 0 10px; }
+    
+    .math-inputs-area { display: flex; flex-direction: column; align-items: center; gap: 15px; width: 100%; margin-bottom: 20px; }
+    .fraction-input-group { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+   
+
+/* --- CAMBIOS AQUI: NUMEROS AZULES --- */
+    .math-operation-display { 
+        font-family: 'Righteous'; 
+        color: #3498db; /* <--- AZUL (Antes era oscuro) */
+        font-size: 3.5rem; 
+        margin: 30px 0; 
+        display: flex; 
+        justify-content: center; 
+        align-items: center; 
+        width: 100%; 
+    }
+    
+    .standard-layout { display: flex; align-items: center; gap: 15px; }
+    .fraction-layout { display: flex; align-items: center; gap: 15px; }
+    
+    .frac { display: flex; flex-direction: column; align-items: center; }
+    .frac .symbol { 
+        border-top: 4px solid #3498db; /* <--- AZUL (Barra de fracción) */
+        width: 100%; 
+        display: block; 
+        margin: 5px 0; 
+    }
+    .op-symbol { color: #f1c40f; margin: 0 15px; font-weight: bold; } /* Amarillo se mantiene */
+    
+    .math-inputs-area { display: flex; flex-direction: column; align-items: center; gap: 15px; width: 100%; margin-bottom: 20px; }
+    .fraction-input-group { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    
+    .fraction-bar { 
+        width: 120px; 
+        height: 4px; 
+        background: #3498db; /* <--- AZUL (Barra del input) */
+        border-radius: 2px; 
+    }
+    
+    /* Input Boxes y Botones */
+    .input-box { width: 100px; height: 60px; background: #f8f9fa; color: #2c3e50; font-size: 2rem; font-weight: bold; display: flex; align-items: center; justify-content: center; border-radius: 12px; border: 3px solid #bdc3c7; cursor: pointer; transition: all 0.2s; }
+    .input-box.focused { border-color: #3498db; background: white; box-shadow: 0 0 15px rgba(52, 152, 219, 0.3); transform: scale(1.05); }
+    .input-box.single { width: 220px; height: 80px; font-size: 2.5rem; }
+    
+    .btn-send-math { background: #2ecc71; color: white; border: none; padding: 15px 50px; font-size: 1.5rem; border-radius: 50px; font-weight: bold; cursor: pointer; box-shadow: 0 6px 0 #27ae60; transition: transform 0.1s; margin-top: 10px; }
+    .btn-send-math:active { transform: translateY(6px); box-shadow: none; }
+
+   /* TECLADO VIRTUAL - VERSIÓN COMPACTA Y ESTÉTICA */
+    .virtual-keypad { 
+        display: grid; 
+        grid-template-columns: repeat(3, 1fr); 
+        gap: 8px; /* Menos espacio entre teclas (antes 12px) */
+        background: #34495e; 
+        padding: 12px; /* Menos relleno (antes 20px) */
+        border-radius: 16px; 
+        box-shadow: 0 8px 20px rgba(0,0,0,0.4); 
+        margin-top: 10px;
+        width: fit-content; /* Se ajusta al tamaño de las teclas, no estira */
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .btn-key { 
+        background: #ecf0f1; 
+        color: #2c3e50; 
+        border: none; 
+        height: 50px; /* Más pequeño (antes 65px) */
+        width: 55px;  /* Más estrecho (antes 75px) */
+        border-radius: 10px; 
+        font-size: 1.4rem; /* Fuente más pequeña (antes 1.8rem) */
+        font-weight: bold; 
+        cursor: pointer; 
+        box-shadow: 0 3px 0 #bdc3c7; /* Sombra más sutil (antes 5px) */
+        transition: transform 0.1s; 
+        font-family: 'Righteous'; 
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .btn-key:active { 
+        transform: translateY(3px); /* Ajustado a la nueva sombra */
+        box-shadow: none; 
+    }
+
+    .btn-key.danger { 
+        background: #e74c3c; 
+        color: white; 
+        box-shadow: 0 3px 0 #c0392b; 
+    }
+
+    .btn-key.special { 
+        background: #3498db; 
+        color: white; 
+        box-shadow: 0 3px 0 #2980b9; 
+    }
+
+    .btn-key.empty { 
+        background: transparent; 
+        box-shadow: none; 
+        cursor: default; 
+        pointer-events: none;
+    }
+
+/* FEEDBACK SCREEN CENTRADA (CLIENT - NEON) */
+        .feedback-container { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 20px; width: 100%; position: fixed; top: 0; left: 0; z-index: 2000; background: rgba(44, 62, 80, 0.95); }
+        .pi-feedback-wrapper { display: flex; justify-content: center; width: 100%; margin-bottom: 10px; }
+        .pi-feedback { width: 150px; height: 150px; object-fit: contain; animation: popIn 0.5s; filter: drop-shadow(0 5px 15px rgba(0,0,0,0.5)); }
+        .pi-feedback.happy { animation: bounce 2s infinite; }
+        .pi-feedback.angry { animation: shake 0.5s; }
+
+        .neon-card { background: #1a1a1a; padding: 25px; border-radius: 15px; text-align: center; color: white; width: 90%; max-width: 400px; animation: popIn 0.3s; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+        .neon-card.error { border: 3px solid #ff003c; box-shadow: 0 0 20px #ff003c, inset 0 0 10px #ff003c; }
+        .neon-card.success { border: 3px solid #2ecc71; box-shadow: 0 0 20px #2ecc71, inset 0 0 10px #2ecc71; }
+        .neon-card.neutral { border: 3px solid #f1c40f; box-shadow: 0 0 20px #f1c40f, inset 0 0 10px #f1c40f; }
+        .neon-title { font-size: 1.8rem; font-weight: bold; margin-bottom: 10px; }
+        .neon-card.error .neon-title { color: #ff003c; text-shadow: 0 0 10px #ff003c; }
+        .neon-card.success .neon-title { color: #2ecc71; text-shadow: 0 0 10px #2ecc71; }
+        .neon-card.neutral .neon-title { color: #f1c40f; text-shadow: 0 0 10px #f1c40f; }
+        .neon-label { color: #ccc; margin-bottom: 10px; }
+        .neon-answer { font-size: 1.5rem; font-weight: bold; background: rgba(255,0,60,0.1); padding: 10px; border-radius: 8px; border: 1px solid #ff003c; width: 100%; }
+        .points-added { font-size: 2rem; font-weight: bold; color: #f1c40f; animation: bounce 1s infinite; }
+        .points-added.big { font-size: 3rem; }
+
+        /* HEADER ALUMNO CENTRADO */
+        .client-header-container { position: absolute; top: 0; left: 0; width: 100%; padding: 15px; display: flex; justify-content: center; align-items: center; z-index: 3000; }
+        .client-score-wrapper { display: flex; align-items: center; gap: 0; }
+        .score-badge.blue-pill { background: #3498db; color: white; padding: 10px 20px; border-radius: 30px 0 0 30px; font-weight: bold; font-size: 1.2rem; min-width: 80px; text-align: center; }
+        .client-msg-btn { background: #2ecc71; padding: 10px 15px; border-radius: 0 30px 30px 0; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; height: 100%; }
+
+
+         /* ESTILOS PANTALLA FIN ALUMNO */
+        .final-screen-client { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; width: 100%; animation: popIn 0.5s; z-index: 10; position: relative; }
+        .final-title { font-family: 'Righteous'; font-size: 3rem; color: #f1c40f; text-shadow: 0 5px 10px rgba(0,0,0,0.5); margin-bottom: 20px; letter-spacing: 2px; }
+        
+        .final-card-client { background: rgba(0,0,0,0.6); padding: 40px 20px; border-radius: 20px; width: 90%; max-width: 400px; border: 2px solid rgba(255,255,255,0.1); backdrop-filter: blur(10px); box-shadow: 0 20px 50px rgba(0,0,0,0.5); text-align: center; }
+        
+        .final-text-intro { font-size: 1.5rem; color: white; margin-bottom: 20px; }
+        .final-text-body { font-size: 1.2rem; color: #ccc; margin: 15px 0; line-height: 1.5; }
+        
+        .highlight-name { color: #2ecc71; font-family: 'Righteous'; font-size: 2rem; display: block; margin-top: 5px; text-shadow: 0 0 10px rgba(46, 204, 113, 0.5); }
+        .highlight-rank { color: #f1c40f; font-family: 'Righteous'; font-size: 3.5rem; display: block; margin-top: 5px; text-shadow: 0 0 20px rgba(241, 196, 15, 0.6); animation: pulse 2s infinite; }
+        .highlight-score { color: #3498db; font-family: 'Righteous'; font-size: 2rem; display: block; margin-top: 5px; }
+
+
+        /* HOST LAYOUT CORREGIDO */
+        .host-hud { background: #34495e; height: 60px; padding: 0 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); width: 100%; box-sizing: border-box; display: flex; justify-content: space-between; align-items: center; }
+        .game-area-host { 
+            flex: 1; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            width: 100%; 
+            position: relative; 
+            padding-top: 60px; /* Espacio para el header fijo */
+        }
+        .host-mode .top-hud { position: absolute; top: 0; left: 0; right: 0; z-index:100 }
+        
+        .room-code { color: white; font-size: 1.5rem; font-weight: bold; }
+        .room-code span { color: #f1c40f; }
+        .player-counter { color: white; display: flex; align-items: center; gap: 10px; font-size: 1.2rem; }
+        .q-counter { color: white; font-weight: bold; font-family: 'Righteous'; background: rgba(0,0,0,0.2); padding: 5px 10px; border-radius: 5px; }
+        
+        /* CORRECT ANSWER REVEAL (HOST) */
+        .host-question-view { 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            width: 100%; 
+            height: 100%; 
+            flex-direction: column; 
+        }
+        .correct-answer-reveal { background: #2ecc71; padding: 40px; border-radius: 20px; text-align: center; color: white; width: 90%; max-width: 600px; animation: popIn 0.5s; box-shadow: 0 10px 30px rgba(0,0,0,0.4); border: 5px solid #27ae60; margin-top: 50px; }
+        .reveal-label { font-size: 1.5rem; margin-bottom: 20px; opacity: 0.8; }
+        .reveal-text { font-size: 3rem; font-weight: bold; font-family: 'Righteous'; line-height: 1.2; }
+
+        /* HOST CONTROLS (BOTÓN SIGUIENTE AZUL) */
+        .host-controls { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 100; }
+        .btn-next-floating { background: linear-gradient(135deg, #3498db, #2980b9); color: white; border: none; padding: 15px 40px; font-size: 1.5rem; border-radius: 50px; cursor: pointer; display: flex; align-items: center; gap: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); transition: transform 0.1s; font-family: 'Righteous'; border: 2px solid white; }
+        .btn-next-floating:active { transform: translateX(-50%) scale(0.95); }
+
+
+
+/* ESTILO BOTÓN CHAT/DUDAS */
+.btn-inbox { 
+    background: white; 
+    border: none; 
+    width: 40px; 
+    height: 40px; 
+    border-radius: 50%; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    cursor: pointer; 
+    position: relative; 
+    color: #34495e; 
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2); 
+    transition: transform 0.1s; 
+}
+.btn-inbox:active { transform: scale(0.95); }
+.btn-inbox.has-messages { background: #f1c40f; color: #2c3e50; animation: bounce 1s infinite; }
+
+.badge { 
+    position: absolute; 
+    top: -5px; 
+    right: -5px; 
+    background: #e74c3c; 
+    color: white; 
+    width: 18px; 
+    height: 18px; 
+    border-radius: 50%; 
+    font-size: 0.7rem; 
+    font-weight: bold; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    border: 2px solid white; 
+}
+
+
+/* BOTÓN DE EMERGENCIA PARA ACABAR TIEMPO */
+    .btn-force-timeout {
+        background: rgba(231, 76, 60, 0.2); /* Rojo suave transparente */
+        color: #e74c3c;
+        border: 1px solid #e74c3c;
+        padding: 5px 15px;
+        border-radius: 20px;
+        cursor: pointer;
+        margin-top: 15px;
+        font-size: 0.9rem;
+        font-weight: bold;
+        transition: all 0.2s;
+    }
+    .btn-force-timeout:hover {
+        background: #e74c3c;
+        color: white;
+    }
+
+
+        /* ORDENAR STYLES */
+        .sort-wrapper { display: flex; flex-direction: column; gap: 20px; width: 100%; align-items: center; }
+        .source-blocks { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+        .block-chip { padding: 12px 18px; background: #3498db; color: white; border-radius: 8px; border: 2px solid #2980b9; font-weight: bold; box-shadow: 0 3px 0 #2980b9; transition: all 0.2s; font-size: 1rem; cursor: pointer; }
+        .block-chip:active { transform: translateY(2px); box-shadow: none; }
+        .target-slots { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin: 20px 0; }
+        .slot-box { width: 100px; height: 60px; border: 2px dashed #ccc; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.1); color: white; font-weight: bold; cursor: pointer; font-size: 1.1rem; }
+        .slot-content { background: #27ae60; width: 100%; height: 100%; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .slot-num { color: #555; font-size: 1.5rem; opacity: 0.5; }
+        .ordered-solution { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+        .order-chip { background: #27ae60; color: white; padding: 10px; border-radius: 5px; font-weight: bold; font-size: 1.2rem; }
+
+        .completar-wrapper { display: flex; flex-direction: column; align-items: center; gap: 20px; width: 100%; }
+        .completar-box { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; font-size: 1.5rem; color: white; }
+        .bloque-azul { background: #3498db; padding: 10px 20px; border-radius: 10px; font-weight: bold; }
+        .input-hueco-amarillo { background: #f1c40f; color: #2c3e50; border: none; padding: 10px; border-radius: 10px; font-weight: bold; font-size: 1.5rem; width: 150px; text-align: center; }
+        
+        .presentation-card { background: #2c3e50; border: 4px solid #3498db; padding: 20px; border-radius: 20px; text-align: center; margin: auto; }
+        .p-top { font-family: 'Righteous'; color: #f1c40f; font-size: 2.5rem; margin-bottom: 20px; }
+        .p-bottom { font-family: 'Roboto'; color: white; font-size: 1.5rem; margin-top: 20px; font-weight: bold; }
+        .presentation-img-large { border: 5px solid white; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); max-height: 50vh; }
+
+        /* SHORT ANSWER STYLE - RULETA LIKE */
+        .short-answer-ruleta { display: flex; justify-content: center; gap: 10px; width: 100%; margin-top: 20px; }
+        .short-answer-ruleta input { padding: 15px; font-size: 1.5rem; border: 3px solid #f1c40f; border-radius: 10px; width: 60%; text-align: center; font-weight: bold; background: white; color: #2c3e50; }
+        .short-answer-ruleta button { padding: 15px 30px; font-size: 1.2rem; background: #2ecc71; color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 0 #27ae60; transition: transform 0.1s; }
+        .short-answer-ruleta button:active { transform: translateY(4px); box-shadow: none; }
+
+        /* MULTIPLE CHOICE COLORS RESTORED */
+        .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; width: 100%; margin-top: 20px; }
+        .btn-option { padding: 20px; border: none; border-radius: 15px; font-size: 1.5rem; cursor: pointer; color: white; font-weight: bold; transition: transform 0.1s; box-shadow: 0 5px 0 rgba(0,0,0,0.2); text-transform: uppercase; }
+        .btn-option:nth-child(1) { background: #e74c3c; } /* Rojo */
+        .btn-option:nth-child(2) { background: #3498db; } /* Azul */
+        .btn-option:nth-child(3) { background: #f1c40f; } /* Amarillo */
+        .btn-option:nth-child(4) { background: #2ecc71; } /* Verde */
+        .btn-option:active { transform: translateY(4px); box-shadow: none; }
+        .btn-option.dimmed { opacity: 0.2; transform: scale(0.95); }
+        .host-correct { border: 5px solid white; transform: scale(1.05); box-shadow: 0 0 20px white; }
+
+        /* CLIENT QUESTION AREA CENTRADA */
+        .client-question-area { flex-grow: 1; display: flex; align-items: center; justify-content: center; width: 100%; padding: 20px; box-sizing: border-box; min-height: 50vh; }
+
+        /* PODIUM STYLES */
+        .podium-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; width: 100%; color: white; overflow-y: auto; padding-top: 60px; padding-bottom: 100px; }
+        .podium-container { display: flex; flex-direction: column; align-items: center; gap: 20px; width: 100%; max-width: 800px; }
+        .podium-stage { display: flex; align-items: flex-end; justify-content: center; gap: 10px; margin-bottom: 30px; }
+        .podium-pedestal { display: flex; flex-direction: column; align-items: center; animation: bounceIn 1s; }
+        .pedestal-bar { width: 80px; background: linear-gradient(to bottom, #f39c12, #d35400); border-radius: 10px 10px 0 0; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .rank-2 .pedestal-bar { background: linear-gradient(to bottom, #bdc3c7, #7f8c8d); }
+        .rank-3 .pedestal-bar { background: linear-gradient(to bottom, #e67e22, #a0500d); }
+        .p-rank { font-size: 2rem; font-weight: bold; color: rgba(0,0,0,0.3); }
+        .p-name { margin-top: 10px; font-weight: bold; font-size: 1.1rem; }
+        .p-score { background: rgba(0,0,0,0.3); padding: 2px 8px; border-radius: 10px; margin-top: 5px; font-size: 0.9rem; }
+        
+        .runners-up-grid { display: flex; gap: 10px; width: 100%; justify-content: center; animation: slideInDown 0.5s; flex-wrap: wrap; }
+        .runner-up-card { background: rgba(255,255,255,0.1); padding: 10px 20px; border-radius: 10px; display: flex; gap: 10px; align-items: center; font-weight: bold; }
+        .r-rank { color: #f1c40f; }
+        
+        .rest-list { width: 80%; background: rgba(0,0,0,0.2); border-radius: 10px; max-height: 150px; overflow-y: auto; padding: 10px; margin-top: 20px; }
+        .rest-row { display: flex; justify-content: space-between; padding: 5px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+
+        .btn-save-global { background: #3498db; color: white; border: none; padding: 10px 20px; border-radius: 20px; cursor: pointer; display: flex; align-items: center; gap: 10px; font-size: 1rem; }
+        .btn-exit-big { background: transparent; border: 2px solid #ccc; color: #ccc; padding: 10px 30px; border-radius: 20px; cursor: pointer; font-size: 1rem; }
+
+        .btn-confirmar-amarillo { background: #f1c40f; color: #2c3e50; padding: 15px 40px; border-radius: 30px; border: none; font-size: 1.2rem; cursor: pointer; font-weight: bold; margin-top: 20px; box-shadow: 0 5px 0 #d4ac0d; transition: transform 0.1s; }
+        .btn-confirmar-amarillo:active { transform: translateY(4px); box-shadow: none; }
+
+        /* TIMER BAR */
+        .timer-bar-container { width: 100%; height: 10px; background: #444; border-radius: 5px; margin-bottom: 20px; overflow: hidden; }
+        .timer-bar-fill { height: 100%; transition: width 0.1s linear; }
+        .blinking { animation: flashRed 0.5s infinite; }
+        .waiting-others { text-align: center; color: #ccc; margin-top: 50px; display: flex; flex-direction: column; align-items: center; gap: 15px; }
+        .spin-icon { animation: spin 2s linear infinite; }
+        .host-waiting { display: flex; flex-direction: column; align-items: center; gap: 20px; color: #bdc3c7; font-size: 1.2rem; margin-top: 30px; }
+        .timer-big { font-size: 4rem; font-weight: bold; color: #f1c40f; font-family: 'Righteous'; animation: pulse 1s infinite; }
+        
+        /* CÓDIGO GRANDE */
+        .big-code { font-size: 6rem; font-family: 'Righteous'; color: #f1c40f; letter-spacing: 5px; margin: 20px 0; text-shadow: 0 0 30px rgba(241, 196, 15, 0.5); }
+        .players-grid { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; max-width: 800px; margin: 30px 0; }
+        .player-chip { background: #3498db; color: white; padding: 10px 20px; border-radius: 20px; font-weight: bold; animation: popIn 0.3s; }
+        .btn-start-big { background: #2ecc71; color: white; border: none; padding: 20px 50px; font-size: 2rem; border-radius: 50px; cursor: pointer; font-family: 'Righteous'; display: flex; align-items: center; gap: 15px; box-shadow: 0 10px 0 #27ae60; transition: transform 0.1s; }
+        .btn-start-big:active { transform: translateY(10px); box-shadow: none; }
+
+        @keyframes popIn { from { transform: scale(0); } to { transform: scale(1); } }
+        @keyframes bounceIn { 0% { transform: scale(0.3); opacity: 0; } 50% { transform: scale(1.05); } 70% { transform: scale(0.9); } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes slideInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        @keyframes flashRed { 0%, 100% { box-shadow: 0 0 0 transparent; } 50% { box-shadow: 0 0 20px red; } }
+        @keyframes floatUp { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-30px); } }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .rotate-90 { transform: rotate(90deg); }
+
+        /* RESPONSIVE */
+        @media (max-width: 600px) {
+            .pi-avatar-container-host { top: unset; bottom: 20px; left: 10px; transform: scale(0.6); transform-origin: bottom left; }
+            .top-hud { padding: 0 10px; height: 50px; font-size: 0.8rem; }
+            .room-code { font-size: 1rem; }
+            .question-card { margin-top: 20px; padding: 15px; width: 95%; }
+            .question-card h2 { font-size: 1.2rem; }
+            .options-grid { grid-template-columns: 1fr; }
+            .btn-option { padding: 15px; font-size: 1rem; }
+            .timer-big { font-size: 2.5rem; }
+            .podium-row { padding: 10px 15px; font-size: 1rem; }
+}
+/* --- ESTILOS DEL PANEL DE CHAT (DUDAS) --- */
+    .dudas-panel {
+        position: absolute;
+        top: 70px;
+        right: 20px;
+        width: 300px;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 5px 25px rgba(0,0,0,0.3);
+        z-index: 2000; /* MUY IMPORTANTE: Para que salga encima de todo */
+        overflow: hidden;
+        animation: slideInDown 0.3s;
+        display: flex;
+        flex-direction: column;
+        border: 2px solid #34495e;
+    }
+
+    .dudas-header {
+        background: #34495e;
+        color: white;
+        padding: 10px 15px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-weight: bold;
+        border-bottom: 1px solid #2c3e50;
+    }
+
+    .dudas-header button {
+        background: transparent;
+        border: none;
+        color: white;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+    }
+
+    .dudas-list {
+        max-height: 400px;
+        overflow-y: auto;
+        background: #f8f9fa;
+    }
+
+    .duda-item {
+        padding: 12px 15px;
+        border-bottom: 1px solid #eee;
+        cursor: pointer;
+        color: #333;
+        font-size: 0.9rem;
+        transition: background 0.2s;
+    }
+
+    .duda-item:hover {
+        background: #e3f2fd;
+    }
+
+    .duda-item b {
+        color: #2980b9;
+    }
+
+    .duda-detalle {
+        padding: 15px;
+        background: #fdfefe;
+    }
+
+    .duda-info {
+        margin-bottom: 15px;
+        color: #333;
+        font-size: 1rem;
+        line-height: 1.4;
+    }
+
+    .duda-actions {
+        display: flex;
+        justify-content: space-between;
+        gap: 5px;
+    }
+
+    .act-btn {
+        flex: 1;
+        padding: 8px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        color: white;
+        transition: transform 0.1s;
+    }
+    
+    .act-btn:active { transform: scale(0.95); }
+    .act-btn.green { background: #2ecc71; }
+    .act-btn.red { background: #e74c3c; }
+    .act-btn.dark { background: #34495e; }
+    .act-btn.gray { background: #95a5a6; }
+
+/* --- VENTANA MODAL ALUMNO (CHAT/DUDAS) --- */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7); /* Fondo oscuro */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 4000; /* <--- MUY IMPORTANTE: Encima de todo */
+        backdrop-filter: blur(5px); /* Efecto borroso elegante */
+        animation: fadeIn 0.3s;
+    }
+
+    .modal-content {
+        background: white;
+        padding: 25px;
+        border-radius: 20px;
+        width: 85%;
+        max-width: 400px;
+        text-align: center;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        animation: popIn 0.3s;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .modal-content h3 {
+        margin: 0;
+        color: #2c3e50;
+        font-family: 'Righteous', sans-serif;
+        font-size: 1.5rem;
+    }
+
+    .modal-content textarea {
+        width: 100%;
+        padding: 15px;
+        border: 2px solid #bdc3c7;
+        border-radius: 15px;
+        font-family: 'Roboto', sans-serif;
+        font-size: 1rem;
+        resize: none;
+        box-sizing: border-box;
+        background: #f8f9fa;
+    }
+
+    .modal-content textarea:focus {
+        border-color: #3498db;
+        outline: none;
+    }
+
+    .modal-actions {
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+        margin-top: 10px;
+    }
+
+    .btn-cancel {
+        background: #95a5a6;
+        color: white;
+        border: none;
+        padding: 12px 25px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-weight: bold;
+        transition: transform 0.1s;
+    }
+
+    .btn-confirm {
+        background: #2ecc71;
+        color: white;
+        border: none;
+        padding: 12px 25px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-weight: bold;
+        box-shadow: 0 4px 0 #27ae60;
+        transition: transform 0.1s;
+    }
+
+    .btn-cancel:active, .btn-confirm:active {
+        transform: scale(0.95);
+        box-shadow: none;
+    }
+
+
+
+
+    `}</style>
+);
+
+// ==========================================
+// COMPONENTES NUEVOS: DIBUJO Y CORRECCIÓN
+// ==========================================
+
+function DrawingPad({ onSend, disabled }) {
+    const canvasRef = useRef(null);
+    const [isDrawing, setIsDrawing] = useState(false);
+    const [color, setColor] = useState('#2c3e50');
+
+    // Prevenir scroll en móviles al dibujar
+    // Prevenir scroll en móviles al dibujar y dar fondo blanco real
+    useEffect(() => {
+        const preventScroll = (e) => e.preventDefault();
+        const canvas = canvasRef.current;
+        if (canvas) {
+            // --- NUEVO: PINTAR EL FONDO DE BLANCO REAL ---
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            // ---------------------------------------------
+
+            canvas.addEventListener('touchmove', preventScroll, { passive: false });
+            return () => canvas.removeEventListener('touchmove', preventScroll);
+        }
+    }, []);
+
+    const getPos = (e) => {
+        const canvas = canvasRef.current;
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return { x: clientX - rect.left, y: clientY - rect.top };
+    };
+
+    const startDraw = (e) => {
+        if (disabled) return;
+        setIsDrawing(true);
+        const pos = getPos(e);
+        const ctx = canvasRef.current.getContext('2d');
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y);
+    };
+
+    const draw = (e) => {
+        if (!isDrawing || disabled) return;
+        const pos = getPos(e);
+        const ctx = canvasRef.current.getContext('2d');
+        ctx.strokeStyle = color === 'ERASER' ? '#ffffff' : color;
+        ctx.lineWidth = color === 'ERASER' ? 20 : 4;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.lineTo(pos.x, pos.y);
+        ctx.stroke();
+    };
+
+    const stopDraw = () => setIsDrawing(false);
+
+    const handleSend = () => {
+        // Se envía en JPEG muy comprimido (0.4) para no saturar Firebase
+        const base64 = canvasRef.current.toDataURL('image/jpeg', 0.4);
+        onSend(true, base64);
+    };
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems: 'center', marginTop: '20px' }}>
+            <canvas
+                ref={canvasRef}
+                width={300}
+                height={250}
+                style={{ background: 'white', border: '3px solid #bdc3c7', borderRadius: '15px', touchAction: 'none' }}
+                onMouseDown={startDraw} onMouseMove={draw} onMouseUp={stopDraw} onMouseLeave={stopDraw}
+                onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={stopDraw}
+            />
+            {!disabled && (
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    {['#2c3e50', '#e74c3c', '#3498db', '#2ecc71', 'ERASER'].map(c => (
+                        <button key={c} onClick={() => setColor(c)} style={{ width: 45, height: 45, borderRadius: '50%', background: c === 'ERASER' ? '#ecf0f1' : c, border: color === c ? '4px solid #f1c40f' : '2px solid transparent', fontSize: '1.2rem', cursor: 'pointer' }}>
+                            {c === 'ERASER' ? '🧹' : ''}
+                        </button>
+                    ))}
+                </div>
+            )}
+            {!disabled && <button className="btn-confirmar-amarillo" onClick={handleSend} style={{ marginTop: '10px' }}>ENVIAR DIBUJO</button>}
+        </div>
+    );
+}
+
+function ManualGrader({ respuestas, puntosMax, jugadores, onTerminar }) {
+    const [index, setIndex] = useState(0);
+    const [notas, setNotas] = useState({});
+
+    // Filtramos solo los que han enviado dibujo
+    const arr = Object.entries(respuestas).filter(([uid, r]) => r.dibujo);
+
+    if (arr.length === 0) return <div style={{ color: 'white' }}>Nadie envió un dibujo. <button onClick={() => onTerminar({})}>Continuar</button></div>;
+
+    const currentUid = arr[index][0];
+    const currentData = arr[index][1];
+    const currentNota = notas[currentUid] || 0;
+
+    const handleNext = () => {
+        if (index < arr.length - 1) setIndex(index + 1);
+        else onTerminar(notas); // Enviar todas las notas a Firebase
+    };
+
+    return (
+        < div className="question-card" style={{ width: '90%', maxWidth: '500px', background: 'white', padding: '30px', borderRadius: '20px', color: '#2c3e50' }
+        }>
+            <h2 style={{ color: '#3498db' }}>Corrigiendo a: {jugadores.find(j => j.uid === currentUid)?.nombre}</h2>
+
+            <img src={currentData.dibujo} style={{ width: '100%', maxWidth: '300px', border: '3px solid #bdc3c7', borderRadius: '10px', background: 'white', margin: '20px 0' }} alt="Dibujo alumno" />
+
+            <div style={{ marginBottom: '20px' }}>
+                <input
+                    type="range"
+                    min="0"
+                    max={puntosMax}
+                    value={currentNota}
+                    onChange={e => setNotas({ ...notas, [currentUid]: parseInt(e.target.value) })}
+                    style={{ width: '100%', cursor: 'pointer' }}
+                />
+                <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#f1c40f', marginTop: '10px' }}>
+                    {currentNota} / {puntosMax} pts
+                </div>
+            </div>
+
+            <button className="btn-confirmar-amarillo" onClick={handleNext}>
+                {index < arr.length - 1 ? 'Siguiente Dibujo ➡️' : 'Terminar Corrección ✅'}
+            </button>
+            <p style={{ marginTop: '15px', color: '#7f8c8d' }}>Dibujo {index + 1} de {arr.length}</p>
+        </div>
+    );
+}

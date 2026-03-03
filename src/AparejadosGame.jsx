@@ -9,7 +9,7 @@ import startSoundFile from './assets/inicio juego.mp3';
 import correctSoundFile from './assets/correct-choice-43861.mp3';
 import winSoundFile from './assets/applause-small-audience-97257.mp3';
 
-export default function AparejadosGame({ recurso, usuario, alTerminar }) {
+export default function AparejadosGame({ recurso, usuario, alTerminar, modoOlimpico = false, tiempoOlimpico = null, onOlimpicoFinish = null}) {
     const [fase, setFase] = useState('SETUP');
     const [hojaSeleccionada, setHojaSeleccionada] = useState('General');
     const [modoDuelo, setModoDuelo] = useState(false);
@@ -18,6 +18,7 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
     const [cartas, setCartas] = useState([]);
     const [flipped, setFlipped] = useState([]);
     const [matched, setMatched] = useState([]);
+   
 
     // Puntuación
     const [puntos, setPuntos] = useState(0);
@@ -27,6 +28,21 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
     const [tiempo, setTiempo] = useState(60);
     const [verRanking, setVerRanking] = useState(false);
     const [guardando, setGuardando] = useState(false);
+
+    // --- AUTO-START MODO OLÍMPICO ---
+    useEffect(() => {
+        if (modoOlimpico && recurso && fase === 'SETUP') {
+            iniciar(false, 'General'); // Inicia 1 Jugador automáticamente
+        }
+    }, [modoOlimpico, recurso, fase]);
+
+    // --- INTERCEPTOR FINAL MODO OLÍMPICO ---
+    useEffect(() => {
+        if (fase === 'FIN' && modoOlimpico) {
+            if (onOlimpicoFinish) onOlimpicoFinish(puntos);
+        }
+    }, [fase, modoOlimpico, puntos]); // Pasará la variable 'puntos' actual
+
 
     // Detectar si es invitado (sin usuario logueado)
     const esInvitado = !usuario || !usuario.email;
@@ -101,8 +117,7 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
         setPuntos(0);
         setPuntosDuelo([0, 0]);
         setTurno(0);
-        setTiempo(parseInt(recurso.config?.tiempoTotal) || 60);
-
+        setTiempo(modoOlimpico && tiempoOlimpico ? tiempoOlimpico : (parseInt(recurso.config?.tiempoTotal) || 60));
         // IR A CUENTA ATRÁS PRIMERO
         setFase('COUNTDOWN');
     };
@@ -313,8 +328,10 @@ export default function AparejadosGame({ recurso, usuario, alTerminar }) {
         <div id="game-ui">
             {/* HEADER */}
             <header>
-                <button className="btn-back-small" onClick={alTerminar}>SALIR</button>
-
+                {/* OCULTAMOS EL BOTÓN SALIR SI ESTAMOS EN OLIMPIADAS */}
+                {!modoOlimpico && (
+                    <button className="btn-back-small" onClick={alTerminar}>SALIR</button>
+                )}
                 {modoDuelo ? (
                     <div className="duelo-header">
                         <div className={`marcador ${turno === 0 ? 'activo azul' : ''}`}>AZUL: {puntosDuelo[0]}</div>

@@ -157,13 +157,14 @@ const STYLES = `
   @media (max-width: 700px) { #game-container { transform: scale(0.6); } }
 `;
 
-export default function PasapalabraGame({ recurso, usuario, alTerminar }) {
+export default function PasapalabraGame({ recurso, usuario, alTerminar, modoOlimpico = false, tiempoOlimpico = null, onOlimpicoFinish = null}) {
     const [fase, setFase] = useState('SETUP');
     const [modoDuelo, setModoDuelo] = useState(false);
     const [hojaSeleccionada, setHojaSeleccionada] = useState('General');
     const [jugadores, setJugadores] = useState([]);
     const [turno, setTurno] = useState(0);
     const [verRanking, setVerRanking] = useState(false);
+   
 
     // Detectar si es invitado
     const esInvitado = !usuario || !usuario.email;
@@ -190,7 +191,25 @@ export default function PasapalabraGame({ recurso, usuario, alTerminar }) {
             }
         }
     };
+    
+    // --- 1. AUTO-START MODO OLÍMPICO ---
+    useEffect(() => {
+        // En tu juego, la fase inicial es SETUP, y para arrancar hay que llamar a iniciar()
+        // para que cree el rosco y los jugadores correctamente.
+        if (modoOlimpico && recurso && fase === 'SETUP') {
+            iniciar(false, 'General');
+        }
+    }, [modoOlimpico, recurso, fase]);
 
+    // --- 2. INTERCEPTOR FINAL MODO OLÍMPICO ---
+    useEffect(() => {
+        // En tu juego, la fase final se llama 'FIN'
+        if (fase === 'FIN' && modoOlimpico) {
+            // Extraemos los puntos del objeto jugador
+            const puntosConseguidos = jugadores[0]?.aciertos || 0;
+            if (onOlimpicoFinish) onOlimpicoFinish(puntosConseguidos);
+        }
+    }, [fase, modoOlimpico, jugadores]);
     // --- GENERADOR DE ROSCOS ---
     const generarRoscos = (duelo, hoja) => {
         const abecedario = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -245,7 +264,7 @@ export default function PasapalabraGame({ recurso, usuario, alTerminar }) {
         setHojaSeleccionada(hoja);
 
         const { rosco1, rosco2 } = generarRoscos(duelo, hoja);
-        const tiempo = parseInt(recurso.config?.tiempoTotal) || 150;
+        const tiempo = (modoOlimpico && tiempoOlimpico) ? tiempoOlimpico : (parseInt(recurso.config?.tiempoTotal) || 150);
 
         // Nombre del jugador 1 (Usuario o Invitado)
         const nombreP1 = esInvitado ? "Invitado" : (usuario.displayName || "Jugador 1");

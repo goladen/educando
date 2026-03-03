@@ -87,11 +87,23 @@ export default function EditorQuestionSender({ datos, setDatos, onClose, onSave 
         }
         setCargandoMensajes(false);
     };
+    const actualizarHojasYCodigos = (nuevasHojas) => {
+        // Extraemos todos los códigos que no estén vacíos
+        const listaCodigos = nuevasHojas
+            .map(h => h.accessCode)
+            .filter(c => c && c.trim() !== '');
 
+        // Guardamos las hojas Y la lista de códigos para el buscador
+        setDatos({
+            ...datos,
+            hojas: nuevasHojas,
+            hojasCodes: listaCodigos // <--- ESTO ES LO QUE FALTABA
+        });
+    };
     // --- GESTIÓN DE HOJAS ---
     const agregarHoja = () => {
         const nuevasHojas = [...datos.hojas, { nombreHoja: `Grupo ${datos.hojas.length + 1}`, preguntas: [], accessCode: '' }];
-        setDatos({ ...datos, hojas: nuevasHojas });
+        actualizarHojasYCodigos(nuevasHojas);
         setIndiceHojaActiva(nuevasHojas.length - 1);
     };
 
@@ -100,7 +112,7 @@ export default function EditorQuestionSender({ datos, setDatos, onClose, onSave 
         if (confirm("¿Borrar esta hoja y sus preguntas?")) {
             const nuevas = [...datos.hojas];
             nuevas.splice(indiceHojaActiva, 1);
-            setDatos({ ...datos, hojas: nuevas });
+            actualizarHojasYCodigos(nuevas);
             setIndiceHojaActiva(0);
         }
     };
@@ -109,7 +121,7 @@ export default function EditorQuestionSender({ datos, setDatos, onClose, onSave 
         const codigo = Math.random().toString(36).substring(2, 7).toUpperCase();
         const nuevas = [...datos.hojas];
         nuevas[indiceHojaActiva].accessCode = codigo;
-        setDatos({ ...datos, hojas: nuevas });
+        actualizarHojasYCodigos(nuevas);
     };
 
     // --- GESTIÓN DE PREGUNTAS ---

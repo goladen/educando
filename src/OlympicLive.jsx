@@ -10,7 +10,7 @@ import winSoundFile from './assets/applause-small-audience-97257.mp3';
 import startSoundFile from './assets/inicio juego.mp3';
 //---Motor para juegos
 
-import MotorMinijuego from './MotoMinijuego'
+import MotorMinijuego from './MotoMiniJuego'
 // --- IMÁGENES DEL AVATAR ---
 import piHappy from './assets/Pi-contento.png';
 import piAngry from './assets/Pi-enfadado.png';

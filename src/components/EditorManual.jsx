@@ -24,7 +24,7 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
     const [indiceHojaActiva, setIndiceHojaActiva] = useState(0);
     const [mostrandoConfig, setMostrandoConfig] = useState(false);
     const [mostrandoAyuda, setMostrandoAyuda] = useState(false); // <--- ESTADO NUEVO
-
+    const [mostrandoAvisoCierre, setMostrandoAvisoCierre] = useState(false);
     useEffect(() => {
         // Inicializar hojas si no existen
         if (!datos.hojas || datos.hojas.length === 0) {
@@ -274,7 +274,9 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
 
                         <button onClick={() => setMostrandoConfig(true)} style={styles.iconBtn} title="Configuración"><Settings size={24} /></button>
                         <button onClick={onSave} style={styles.saveBtn}><Save size={20} /> <span className="hide-mobile">Guardar</span></button>
-                        <button onClick={onClose} style={styles.iconBtn}><X size={24} /></button>
+                        {/* Al hacer clic, activamos el aviso en vez de cerrar directo */}
+                        <button onClick={() => setMostrandoAvisoCierre(true)} style={styles.iconBtn}><X size={24} /></button>
+
                     </div>
                 </div>
 
@@ -446,6 +448,51 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
                     </div>
 
                 </div>
+
+                {/* --- MODAL DE AVISO AL CERRAR --- */}
+                {mostrandoAvisoCierre && (
+                    <div style={styles.configOverlay}> {/* Reutilizamos el estilo de overlay existente */}
+                        <div style={{ ...styles.configModal, width: '350px', textAlign: 'center', height: 'auto', maxHeight: 'none' }}>
+                            <div style={{ padding: '25px' }}>
+                                <h3 style={{ color: '#e74c3c', marginTop: '0' }}>⚠️ Vas a cerrar el recurso</h3>
+                                <p style={{ color: '#666', fontSize: '14px', marginBottom: '25px' }}>
+                                    ¿Quieres guardar los cambios antes de salir?
+                                </p>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                    {/* Opción 1: Guardar y Salir */}
+                                    <button
+                                        onClick={async () => {
+                                            await onSave();
+                                            onClose();
+                                        }}
+                                        style={{ width: '100%', padding: '12px', background: '#27ae60', color: 'white', border: 'none', borderRadius: '5px', fontSize: '1.1rem', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }}
+                                    >
+                                        <Save size={18} /> Guardar y Salir
+                                    </button>
+
+                                    {/* Opción 2: Salir sin guardar */}
+                                    <button
+                                        onClick={onClose}
+                                        style={{ width: '100%', padding: '12px', background: '#e74c3c', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
+                                    >
+                                        Salir sin guardar
+                                    </button>
+
+                                    {/* Opción 3: Cancelar */}
+                                    <button
+                                        onClick={() => setMostrandoAvisoCierre(false)}
+                                        style={{ background: 'none', border: 'none', color: '#999', cursor: 'pointer', marginTop: '10px', textDecoration: 'underline' }}
+                                    >
+                                        Cancelar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+
 
                 {/* MODAL CONFIGURACIÓN */}
                 {mostrandoConfig && (

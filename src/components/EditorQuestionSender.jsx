@@ -17,7 +17,7 @@ export default function EditorQuestionSender({ datos, setDatos, onClose, onSave 
     const [indiceHojaActiva, setIndiceHojaActiva] = useState(0);
     const [mostrandoConfig, setMostrandoConfig] = useState(false);
     const [cargandoMensajes, setCargandoMensajes] = useState(false);
-
+    const [mostrandoAvisoCierre, setMostrandoAvisoCierre] = useState(false);
     // 1. INICIALIZACIÓN
     useEffect(() => {
         if (!datos.hojas || datos.hojas.length === 0) {
@@ -275,7 +275,10 @@ export default function EditorQuestionSender({ datos, setDatos, onClose, onSave 
                         </button>
                         <button onClick={() => setMostrandoConfig(true)} style={styles.iconBtn}><Settings /></button>
                         <button onClick={onSave} style={styles.saveBtn}><Save size={18} /> Guardar</button>
-                        <button onClick={onClose} style={styles.iconBtn}><X /></button>
+
+
+                        {/* Al hacer clic, abrimos el aviso en lugar de cerrar directo */}
+                        <button onClick={() => setMostrandoAvisoCierre(true)} style={styles.iconBtn}><X /></button>
                     </div>
                 </div>
 
@@ -373,7 +376,46 @@ export default function EditorQuestionSender({ datos, setDatos, onClose, onSave 
                     </div>
 
                 </div>
+                {/* --- MODAL DE AVISO AL CERRAR --- */}
+                {mostrandoAvisoCierre && (
+                    <div style={styles.modalOverlay}>
+                        <div style={{ ...styles.modal, width: '350px', textAlign: 'center' }}>
+                            <h3 style={{ color: '#e74c3c', marginTop: '0' }}>⚠️ Vas a cerrar el recurso</h3>
+                            <p style={{ color: '#666', fontSize: '14px', marginBottom: '25px' }}>
+                                ¿Quieres guardar los cambios antes de salir?
+                            </p>
 
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                {/* Opción 1: Guardar y Salir */}
+                                <button
+                                    onClick={async () => {
+                                        await onSave(); // Guardamos
+                                        onClose();      // Y cerramos
+                                    }}
+                                    style={{ ...styles.saveBtnFull, background: '#27ae60', marginTop: 0, fontSize: '1.1rem' }}
+                                >
+                                    <Save size={18} style={{ marginRight: '8px' }} /> Guardar
+                                </button>
+
+                                {/* Opción 2: Salir sin guardar */}
+                                <button
+                                    onClick={onClose}
+                                    style={{ ...styles.saveBtnFull, background: '#e74c3c', marginTop: 0 }}
+                                >
+                                    Salir sin guardar
+                                </button>
+
+                                {/* Opción 3: Cancelar (quedarse) */}
+                                <button
+                                    onClick={() => setMostrandoAvisoCierre(false)}
+                                    style={{ background: 'none', border: 'none', color: '#999', cursor: 'pointer', marginTop: '10px', textDecoration: 'underline' }}
+                                >
+                                    Cancelar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
                 {/* MODAL CONFIGURACIÓN (Solo para elegir destino) */}
                 {mostrandoConfig && (
                     <div style={styles.modalOverlay}>

@@ -112,7 +112,7 @@ function App() {
 
                     <p style={{ fontWeight: 'bold' }}>¿Cómo vas a usar la app?</p>
                     <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-                        <button onClick={() => completarRegistro('Profesor')} style={{ padding: '12px 24px', background: '#2196F3', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}>👨‍🏫 Soy Profesor</button>
+                        <button onClick={() => completarRegistro('profesor')} style={{ padding: '12px 24px', background: '#2196F3', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}>👨‍🏫 Soy Profesor</button>
                         <button onClick={() => completarRegistro('Alumno')} style={{ padding: '12px 24px', background: '#FF9800', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}>🎓 Soy Alumno</button>
                     </div>
                     <button onClick={handleLogout} style={{ marginTop: '20px', background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer' }}>Cancelar</button>
@@ -122,7 +122,7 @@ function App() {
             {/* Si ya tiene rol, mostramos el Dashboard correspondiente */}
             {rol && (
                 <div>
-                    {rol === 'profesor' ? (
+                    {rol === 'profesor' || rol === 'Profesor' ? (
                         <div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 20px', background: '#fff', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', alignItems: 'center' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>

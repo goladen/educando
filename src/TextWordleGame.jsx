@@ -1,4 +1,5 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+﻿
+import React, { useState, useEffect, useRef } from 'react';
 import { db } from './firebase';
 import { collection, addDoc, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { X, Settings, Trophy, Search, BookOpen, Globe, ArrowLeft, Zap, Clock } from 'lucide-react';
@@ -137,11 +138,15 @@ export default function TextWordleGame({ usuario, onExit, recurso, modoOlimpico 
         };
     }, [modoOlimpico]);*/
 
-    // Carga inicial recurso normal (No olímpico)
     useEffect(() => {
         if (recurso && !modoOlimpico) {
-            try { procesarRecurso(recurso, false); }
-            catch (e) { console.error(e); }
+            try {
+                procesarRecurso(recurso, false);
+            } catch (e) {
+                console.error(e);
+                setMessage("Error cargando el recurso.");
+                setScreen('CONFIG'); // ← esto es lo que faltaba
+            }
         }
     }, [recurso, modoOlimpico]);
 
@@ -290,7 +295,7 @@ export default function TextWordleGame({ usuario, onExit, recurso, modoOlimpico 
     };
 
     // --- HELPERS ---
-    const procesarRecurso = (data, forceStart = false) => {
+    const procesarRecurso = (data, forceStart = false, intento = 0) => {
         let palabrasCandidatas = [];
         if (data.hojas) {
             data.hojas.forEach(h => {
@@ -304,7 +309,20 @@ export default function TextWordleGame({ usuario, onExit, recurso, modoOlimpico 
                 }
             });
         }
-        if (palabrasCandidatas.length === 0) throw new Error("Sin palabras válidas.");
+
+        if (palabrasCandidatas.length === 0) {
+            if (intento < 2) {
+                // Reintenta en 2s, pero solo si el componente sigue montado
+                setTimeout(() => {
+                    // hasFinishedRef es false = componente activo
+                    // En modo olímpico esto evita actuar sobre componente desmontado
+                    if (modoOlimpico && hasFinishedRef.current) return;
+                    procesarRecurso(data, forceStart, intento + 1);
+                }, 2000);
+                return;
+            }
+            throw new Error("Sin palabras válidas.");
+        }
         palabrasCandidatas.sort(() => Math.random() - 0.5);
 
         // Configurar tiempo si el recurso lo trae
@@ -439,7 +457,7 @@ export default function TextWordleGame({ usuario, onExit, recurso, modoOlimpico 
 
     // --- PANTALLA DE JUEGO (Adaptada) ---
     if (screen === 'GAME') return (
-        <div style={{ ...styles.screen, justifyContent: 'flex-start', background: (modoOlimpico || gameMode === 'TIME_ATTACK') ? '#2c3e50' : '#7e7b5280' }}>
+        <div style={{ ...styles.screen, justifyContent: 'flex-start', background: (modoOlimpico || gameMode === 'TIME_ATTACK') ? '#7e7b5280' : '#7e7b5280' }}>
             <div style={styles.header}>
                 <div style={{ ...styles.timer, background: (modoOlimpico || gameMode === 'TIME_ATTACK') ? '#e74c3c' : 'white', color: (modoOlimpico || gameMode === 'TIME_ATTACK') ? 'white' : 'black' }}>
                     {/* Reloj dinámico */}
@@ -534,7 +552,7 @@ export default function TextWordleGame({ usuario, onExit, recurso, modoOlimpico 
     );
 
     // --- PANTALLA INICIAL (CONFIG) ---
-    return (
+    return (<div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: '#2c3e50', zIndex: 5000 }}>
         <div style={styles.screen}>
             <button onClick={onExit} style={styles.backBtn}><ArrowLeft size={20} /> Volver</button>
             <h1 style={styles.h1}>WORDLE</h1>
@@ -585,6 +603,7 @@ export default function TextWordleGame({ usuario, onExit, recurso, modoOlimpico 
                 )}
             </div>
         </div>
+    </div>
     );
 }
 
@@ -619,4 +638,6 @@ const styles = {
 
     inputName: { padding: '10px', width: '200px', textAlign: 'center', borderRadius: '5px', border: 'none', marginBottom: '10px', fontSize: '1rem' },
     miniInputFilter: { background: '#fffacb', padding: '8px', borderRadius: '6px', border: '1px solid #ccc', fontSize: '13px', width: '100%', boxSizing: 'border-box' },
+
+
 };

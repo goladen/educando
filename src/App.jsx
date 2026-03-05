@@ -3,7 +3,7 @@ import { auth, db } from './firebase';
 import { signOut, onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import ProfesorDashboard from './ProfesorDashboard';
-import StudentDashboard from './StudentDashboard';
+import StudentDashboard2 from './StudentDashboard2';
 import Login from './Login'; // <--- IMPORTAMOS EL NUEVO DISEÑO
 
 function App() {
@@ -135,14 +135,16 @@ function App() {
                         </div>
                     ) : (
                             <div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 20px', background: '#fff', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', alignItems: 'center' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 20px', background: '#2c3e5050', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', alignItems: 'center' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        <img src={usuario.photoURL} alt="User" style={{ width: '30px', borderRadius: '50%' }} />
+
+                                        
+
                                         <span>Alumno: <b>{usuario.displayName}</b></span>
                                     </div>
                                     <button onClick={handleLogout} style={{ border: 'none', background: 'none', color: '#666', cursor: 'pointer' }}>Salir</button>
                                 </div>
-                                <StudentDashboard usuario={usuario} />
+                                <StudentDashboard2 usuario={usuario} />
                             </div>
                         )}
                 </div>

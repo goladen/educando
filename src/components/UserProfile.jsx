@@ -5,8 +5,8 @@ import { deleteUser } from 'firebase/auth';
 import { User, MapPin, Heart, LifeBuoy, Shield, Trash2, X, Save, CheckCircle, Copy, AlertTriangle } from 'lucide-react';
 
 // --- ENLACES EXTERNOS ---
-const LINK_PRIVACIDAD = "https://tu-web-de-privacidad.com";
-const LINK_BAJA_FEEDBACK = "https://tu-formulario-google-o-tally.com";
+const LINK_PRIVACIDAD = "https://pikt.es/politica.html";
+const LINK_BAJA_FEEDBACK = "https://docs.google.com/forms/d/e/1FAIpQLSdfWMkZmyfbNa1nD2142zIV67_ErKqt-gYNMo6fEuYVhebqmw/viewform?usp=sharing&ouid=105455740891314946675";
 
 // AÑADIMOS showSupport COMO PROP (Por defecto true)
 export default function UserProfile({ usuario, perfil, onClose, onUpdate, showSupport = true }) {

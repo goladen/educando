@@ -12,7 +12,7 @@ import PikatronRun from '../PikatronRun';
 import TextWordleGame from '../TextWordleGame';
 import MathWordleGame from '../MathWordleGame';
 import SopaDeLetrasGame from '../SopaDeLetrasGame';
-import imgPasapalabra from '../assets/icono_pasapal.png'; // Revisa si es .png o .jpg
+import imgPasapalabra from '../assets/icono_pasapal.png'; 
 import imgBurbujas from '../assets/icono_burbujas.png';
 import imgPikatron from '../assets/icono_pikatron.png';
 import imgAparejados from '../assets/icono_aparejados.png';
@@ -24,7 +24,7 @@ import imgMathlive from '../assets/icono_mathlive.png';
 import imgSopa from '../assets/icono_sopa.png';
 import imgOlympic from '../assets/icono_olympic.png';
 
-// --- CONFIGURACIÓN DE APLICACIONES Y COLORES ---
+// --- CONFIGURACIÓN DE APLICACIONES ---
 export const APPS = [
     { id: 'PASAPALABRA', name: 'Pasapalabra', desc: 'Adivina la palabra con cada letra del abecedario.', color: '#0A0E45', img: imgPasapalabra },
     { id: 'CAZABURBUJAS', name: 'Burbujas', desc: 'Explota la burbuja con la respuesta correcta.', color: '#de896e', img: imgBurbujas },
@@ -37,21 +37,9 @@ export const APPS = [
     { id: 'MATHLIVE', name: 'MathLive', desc: 'Juega con las mates en tiempo real.', color: '#009688', img: imgMathlive, isLive: true },
     { id: 'OLYMPICLIVE', name: 'Olympic_Live', desc: 'Compite en minijuegos y cálculo.', color: '#D32F2F', img: imgOlympic, isLive: true },
     { id: 'SOPA', name: 'Sopa_letras', desc: 'Encuentra las palabras ocultas.', color: '#e67e22', img: imgSopa },
-    {
-        id: 'QUESTION_SENDER',
-        name: 'Q-Sender',
-        desc: 'Envía tus preguntas al profesor para crear un juego.',
-        color: '#2c3e50',
-        img: null, // Usaremos el icono Mail si es null
-        emoji: '📮',
-        isSpecial: true
-    }
-
+    { id: 'QUESTION_SENDER', name: 'Q-Sender', desc: 'Envía tus preguntas al profesor para crear un juego.', color: '#2c3e50', img: null, emoji: '📮', isSpecial: true }
 ];
 
-// --- FUNCIONES DE AYUDA PARA BÚSQUEDA INTELIGENTE ---
-
-// Calcula la distancia de edición (cuántos cambios faltan para que sean iguales)
 const levenshteinDistance = (s, t) => {
     if (!s.length) return t.length;
     if (!t.length) return s.length;
@@ -59,70 +47,34 @@ const levenshteinDistance = (s, t) => {
     for (let i = 0; i <= t.length; i++) {
         arr[i] = [i];
         for (let j = 1; j <= s.length; j++) {
-            arr[i][j] =
-                i === 0
-                    ? j
-                    : Math.min(
-                        arr[i - 1][j] + 1,
-                        arr[i][j - 1] + 1,
-                        arr[i - 1][j - 1] + (s[j - 1] === t[i - 1] ? 0 : 1)
-                    );
+            arr[i][j] = i === 0 ? j : Math.min(arr[i - 1][j] + 1, arr[i][j - 1] + 1, arr[i - 1][j - 1] + (s[j - 1] === t[i - 1] ? 0 : 1));
         }
     }
     return arr[t.length][s.length];
 };
 
-// Comprueba si hay coincidencia (Incluye: contiene, contenido en, o similitud > 80%)
 const checkFuzzyMatch = (text, search) => {
     const t = cleanText(text);
     const s = cleanText(search);
-
     if (!t || !s) return false;
-
-    // 1. Coincidencia exacta o contención (rápida)
     if (t.includes(s) || s.includes(t)) return true;
-
-    // 2. Coincidencia difusa (80% de similitud)
     const distance = levenshteinDistance(t, s);
     const maxLength = Math.max(t.length, s.length);
-    const similarity = 1 - distance / maxLength;
-
-    return similarity >= 0.8; // Umbral del 80%
+    return (1 - distance / maxLength) >= 0.8;
 };
 
+const FAKE_MATHLE = { id: 'fake-mathle', titulo: 'Desafío MathLe', tipoJuego: 'MATHLE', temas: 'Matemáticas', ciclo: 'Primaria, Secundaria, Bachillerato, Otros', profesorNombre: 'PiKT', poblacion: 'Global', pais: 'Global', accessCode: 'MATH', playCount: '+1000' };
 
-
-const FAKE_MATHLE = {
-    id: 'fake-mathle',
-    titulo: 'Desafío MathLe',
-    tipoJuego: 'MATHLE',
-    temas: 'Matemáticas',
-    ciclo: 'Primaria, Secundaria, Bachillerato, Otros',
-    profesorNombre: 'PiKT',
-    poblacion: 'Global',
-    pais: 'Global',
-    accessCode: 'MATH',
-    playCount: '+1000'
-};
-// Función Helper para detectar juegos en vivo y separar PiLive de Wordle
 const esJuegoEnVivo = (r) => {
     if (r.tipoJuego === 'MATHLIVE' || r.tipoJuego === 'THINKHOOT' || r.tipoJuego === 'OLYMPICLIVE') return true;
-    // Si es un PiLive antiguo (se guardaban como PRO pero NO son Wordle)
     if (r.tipo === 'PRO' && r.tipoJuego !== 'WORDLE' && r.tipoJuego !== 'MATHLIVE') return true;
     return false;
 };
 
 const getAppInfo = (tipoJuego) => {
     if (!tipoJuego) return { name: 'Recurso', color: '#999' };
-
-    if (tipoJuego === 'CAZABURBUJAS' || tipoJuego === 'PIKATRON') {
-        return { name: 'Burbujas/Pikatron', color: '#de896e' };
-    }
-    if (tipoJuego === 'WORDLE' || tipoJuego === 'SOPA') {
-        return { name: 'Wordle / Sopa', color: '#4CAF50' };
-    }
-
-
+    if (tipoJuego === 'CAZABURBUJAS' || tipoJuego === 'PIKATRON') return { name: 'Burbujas/Pikatron', color: '#de896e' };
+    if (tipoJuego === 'WORDLE' || tipoJuego === 'SOPA') return { name: 'Wordle / Sopa', color: '#4CAF50' };
     const app = APPS.find(a => a.id === tipoJuego);
     if (app) return app;
     if (tipoJuego === 'PRO') return { name: 'PiLive', color: '#9C27B0' };
@@ -130,16 +82,13 @@ const getAppInfo = (tipoJuego) => {
     return { name: tipoJuego, color: '#999' };
 };
 
-// Función para limpiar textos (quitar tildes, mayúsculas y espacios extra)
 const cleanText = (str) => {
     if (!str) return "";
-    return String(str)
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "") // Quitar tildes
-        .toLowerCase()
-        .trim();
+    return String(str).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 };
-export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
+
+// --- COMPONENTE PRINCIPAL (AHORA RECIBE USUARIO) ---
+export default function LandingGames4({ onLoginRequest, onOpenQuestionSender, usuario }) {
     const [modoBusqueda, setModoBusqueda] = useState('FILTROS');
     const [filtros, setFiltros] = useState({ tipoJuego: '', ciclo: '', tema: '', pais: '', region: '', poblacion: '', autor: '' });
     const [mostrarMasFiltros, setMostrarMasFiltros] = useState(false);
@@ -150,14 +99,13 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
     const [juegoActivo, setJuegoActivo] = useState(null);
     const [recursoParaElegir, setRecursoParaElegir] = useState(null);
 
-    // Estados Live Alumno
     const [liveModeAlumno, setLiveModeAlumno] = useState(false);
     const [joinLiveCode, setJoinLiveCode] = useState('');
     const [joinLiveName, setJoinLiveName] = useState('');
     const [isMathLiveAlumno, setIsMathLiveAlumno] = useState(false);
     const [joinLiveTipoJuego, setJoinLiveTipoJuego] = useState('');
     const [hostTipoJuego, setHostTipoJuego] = useState('');
-    // Estados Live Host (Presentador)
+    
     const [liveModeHost, setLiveModeHost] = useState(false);
     const [hostRoomCode, setHostRoomCode] = useState('');
     const [isMathLiveHost, setIsMathLiveHost] = useState(false);
@@ -169,7 +117,6 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
 
         try {
             if (modoBusqueda === 'CODIGO') {
-                // ... (ESTA PARTE DEL CÓDIGO SE QUEDA IGUAL) ...
                 const codigoLimpio = codigo.toUpperCase().trim();
                 if (!codigoLimpio) { alert("Introduce un código."); setBuscando(false); return; }
 
@@ -178,7 +125,15 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
                     const salaSnap = await getDoc(salaRef);
                     if (salaSnap.exists()) {
                         const data = salaSnap.data();
-                        const nombre = prompt("¡Sesión en vivo encontrada! Introduce tu nombre para entrar:");
+                        
+                        // --- DETECCIÓN DE USUARIO ALUMNO ---
+                        let nombre = '';
+                        if (usuario) {
+                            nombre = usuario.displayName || usuario.email.split('@')[0];
+                        } else {
+                            nombre = prompt("¡Sesión en vivo encontrada! Introduce tu nombre para entrar:");
+                        }
+
                         if (nombre && nombre.trim() !== '') {
                             setJoinLiveCode(codigoLimpio);
                             setJoinLiveName(nombre.trim());
@@ -201,36 +156,29 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
                     const qSender = query(ref, where("hojasCodes", "array-contains", codigoLimpio));
                     const snapSender = await getDocs(qSender);
                     if (!snapSender.empty) {
-                        // ¡ENCONTRADO!
-                        // En lugar de llamar a una función externa, activamos el componente localmente
-                        // Pasamos un objeto especial como 'juegoActivo' para que el render sepa qué mostrar
                         const recursoEncontrado = {
                             ...snapSender.docs[0].data(),
                             id: snapSender.docs[0].id,
                             tipoJuego: 'QUESTION_SENDER',
-                            codigoInicial: codigoLimpio // ¡Pasamos el código que escribió el alumno!
+                            codigoInicial: codigoLimpio 
                         };
-
                         setJuegoActivo(recursoEncontrado);
                         setBuscando(false);
-                        return; // Cortamos aquí para que abra directo
+                        return; 
                     }
                     else { alert("Código no encontrado."); }
                 }
 
             } else {
-                // --- BÚSQUEDA POR FILTROS MEJORADA ---
                 const q = query(ref, orderBy("fechaCreacion", "desc"), limit(150));
                 const snap = await getDocs(q);
                 const raw = snap.docs.map(d => ({ ...d.data(), id: d.id }));
 
                 const filtrados = raw.filter(r => {
                     if (r.tipoJuego === 'QUESTION_SENDER') return false;
-
                     const isTerminado = r.isFinished === true || r.config?.isFinished === true;
                     if (!isTerminado) return false;
 
-                    // Filtro Tipo Juego
                     if (filtros.tipoJuego) {
                         if (filtros.tipoJuego === 'THINKHOOT') {
                             if (!esJuegoEnVivo(r) || r.tipoJuego === 'MATHLIVE') return false;
@@ -243,21 +191,13 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
                         }
                     }
 
-                    // --- NUEVA LÓGICA DE BÚSQUEDA DE TEMA ---
                     if (filtros.tema) {
                         const search = filtros.tema;
-
-                        // 1. Buscar en Título
                         const matchTitulo = checkFuzzyMatch(r.titulo, search);
-                        // 2. Buscar en Temas (campo texto)
                         const matchTemas = checkFuzzyMatch(r.temas, search);
-                        // 3. Buscar en Nombres de Hojas (dentro del array)
                         const matchHojas = r.hojas && r.hojas.some(h => checkFuzzyMatch(h.nombreHoja, search));
-
-                        // Si no coincide ninguno, descartamos
                         if (!matchTitulo && !matchTemas && !matchHojas) return false;
                     }
-                    // ----------------------------------------
 
                     if (filtros.ciclo && cleanText(r.ciclo) !== cleanText(filtros.ciclo) && cleanText(r.config?.ciclo) !== cleanText(filtros.ciclo)) return false;
                     if (filtros.pais && !cleanText(r.pais).includes(cleanText(filtros.pais))) return false;
@@ -281,6 +221,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
         } catch (e) { console.error(e); alert("Error en búsqueda."); }
         setBuscando(false);
     };
+
     const abrirJuego = (appId) => {
         const appInfo = APPS.find(a => a.id === appId);
         if (appInfo) {
@@ -296,14 +237,10 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
             const limitePreguntas = parseInt(r.config?.numPreguntas) || 10;
             let pool = [];
             if (r.hojas) r.hojas.forEach(h => pool.push(...h.preguntas));
-
             if (r.config?.aleatorio !== false) pool.sort(() => Math.random() - 0.5);
-
             if (!pool.length) return alert("El recurso no tiene preguntas válidas.");
 
             const pFin = pool.slice(0, limitePreguntas).map(p => {
-                // Protegemos los juegos PRO y OLYMPIC para que no destruya el tipo de pregunta
-                // Añadimos también tipoJuego por si creaste el recurso antes de la actualización
                 if (r.tipo !== 'PRO' && r.tipo !== 'OLYMPIC' && r.tipoJuego !== 'OLYMPICLIVE') {
                     return { ...p, q: p.pregunta, a: p.correcta || p.respuesta, tipo: (p.incorrectas?.length > 0) ? 'MULTIPLE' : 'SIMPLE', opcionesFijas: (p.incorrectas?.length > 0) ? [p.correcta || p.respuesta, ...p.incorrectas].sort(() => Math.random() - 0.5) : [] };
                 }
@@ -329,74 +266,46 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
             setIsMathLiveHost(r.config?.isMathLive === true || r.tipoJuego === 'MATHLIVE');
             setHostTipoJuego(r.tipoJuego);
             setLiveModeHost(true);
-        } catch (error) {
-            console.error("Error lanzando host:", error);
-            alert("Hubo un error al crear la sala.");
-        }
+        } catch (error) { console.error(error); alert("Hubo un error al crear la sala."); }
     };
 
     const procesarClickTarjeta = (r) => {
-        if (esJuegoEnVivo(r)) {
-            lanzarComoGestor(r);
-        } else if (r.tipoJuego === 'CAZABURBUJAS' || r.tipoJuego === 'WORDLE' || r.tipoJuego === 'SOPA') {
-            setRecursoParaElegir(r);
-        } else {
-            setJuegoActivo(r);
-        }
+        if (esJuegoEnVivo(r)) lanzarComoGestor(r);
+        else if (r.tipoJuego === 'CAZABURBUJAS' || r.tipoJuego === 'WORDLE' || r.tipoJuego === 'SOPA') setRecursoParaElegir(r);
+        else setJuegoActivo(r);
     };
 
-    // --- RENDERIZADO DE JUEGOS A PANTALLA COMPLETA ---
-
-    // 1. Host (Profesor/Gestor)
     if (liveModeHost && hostRoomCode) {
         const tempUser = { uid: "host_invitado_" + Date.now(), displayName: "Profe Invitado", email: null };
-        // --- CORRECCIÓN: USAMOS EL ESTADO ---
         if (hostTipoJuego === 'OLYMPICLIVE') return <OlympicLive isHost={true} codigoSala={hostRoomCode} usuario={tempUser} onExit={() => setLiveModeHost(false)} />;
-        // ------------------------------------
-
         if (isMathLiveHost) return <MathLive isHost={true} codigoSala={hostRoomCode} usuario={tempUser} onExit={() => setLiveModeHost(false)} />;
         return <ThinkHootGame isHost={true} codigoSala={hostRoomCode} usuario={tempUser} onExit={() => setLiveModeHost(false)} />;
     }
+
     if (liveModeAlumno) {
-        // Usamos la verdad absoluta de la base de datos, o el de la app si no está
-        const tipoFinal = (typeof joinLiveTipoJuego !== 'undefined' && joinLiveTipoJuego) ? joinLiveTipoJuego : (typeof appData !== 'undefined' ? appData.id : '');
+        const tipoFinal = (typeof joinLiveTipoJuego !== 'undefined' && joinLiveTipoJuego) ? joinLiveTipoJuego : '';
+        const codigoFinal = typeof joinCode !== 'undefined' ? joinCode : joinLiveCode;
+        // --- USA USUARIO LOGUEADO O EL TEMPORAL ---
+        const usuarioFinal = usuario || { displayName: typeof joinName !== 'undefined' ? joinName : joinLiveName, email: null };
 
-        if (tipoFinal === 'OLYMPICLIVE') return <OlympicLive isHost={false} codigoSala={typeof joinCode !== 'undefined' ? joinCode : joinLiveCode} usuario={{ displayName: typeof joinName !== 'undefined' ? joinName : joinLiveName, email: null }} onExit={() => setLiveModeAlumno(false)} />;
-        if (tipoFinal === 'MATHLIVE' || isMathLiveAlumno) return <MathLive isHost={false} codigoSala={typeof joinCode !== 'undefined' ? joinCode : joinLiveCode} usuario={{ displayName: typeof joinName !== 'undefined' ? joinName : joinLiveName, email: null }} onExit={() => setLiveModeAlumno(false)} />;
-
-        return <ThinkHootGame isHost={false} codigoSala={typeof joinCode !== 'undefined' ? joinCode : joinLiveCode} usuario={{ displayName: typeof joinName !== 'undefined' ? joinName : joinLiveName, email: null }} onExit={() => setLiveModeAlumno(false)} />;
+        if (tipoFinal === 'OLYMPICLIVE') return <OlympicLive isHost={false} codigoSala={codigoFinal} usuario={usuarioFinal} onExit={() => setLiveModeAlumno(false)} />;
+        if (tipoFinal === 'MATHLIVE' || isMathLiveAlumno) return <MathLive isHost={false} codigoSala={codigoFinal} usuario={usuarioFinal} onExit={() => setLiveModeAlumno(false)} />;
+        return <ThinkHootGame isHost={false} codigoSala={codigoFinal} usuario={usuarioFinal} onExit={() => setLiveModeAlumno(false)} />;
     }
 
-    
-    // 3. Single Player
     if (juegoActivo) {
-        if (juegoActivo.tipoJuego === 'QUESTION_SENDER') {
-            return (
-                <QuestionSenderClient
-                    usuario={null} // O el usuario si lo tienes
-                    onBack={() => setJuegoActivo(null)}
-                    codigoInicial={juegoActivo.codigoInicial} // Pasamos el código para que no tenga que escribirlo de nuevo
-                />
-            );
-        }
-
-
-
-        if (juegoActivo.modoEspecial === 'PIKATRON') return <PikatronRun recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
-        if (juegoActivo.tipoJuego === 'RULETA') return <RuletaGame recurso={juegoActivo} usuario={null} alTerminar={() => setJuegoActivo(null)} />;
-
-        // --- CORRECCIÓN: Quitamos appData porque aquí no existe ---
-        if (juegoActivo.tipoJuego === 'MATHLE') return <MathWordleGame usuario={null} onExit={() => setJuegoActivo(null)} />;
-        // --- AÑADIDO: Distinguir Wordle y Sopa ---
-        if (juegoActivo.modoEspecial === 'WORDLE' || (juegoActivo.tipoJuego === 'WORDLE' && !juegoActivo.modoEspecial)) return <TextWordleGame recursoInicial={juegoActivo} usuario={null} onExit={() => setJuegoActivo(null)} />;
-        if (juegoActivo.modoEspecial === 'SOPA' || (juegoActivo.tipoJuego === 'SOPA' && !juegoActivo.modoEspecial)) return <SopaDeLetrasGame recursoInicial={juegoActivo} usuario={null} onExit={() => setJuegoActivo(null)} />;
-        return <GamePlayer recurso={juegoActivo} usuario={null} alTerminar={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'QUESTION_SENDER') return <QuestionSenderClient usuario={usuario} onBack={() => setJuegoActivo(null)} codigoInicial={juegoActivo.codigoInicial} />;
+        if (juegoActivo.modoEspecial === 'PIKATRON') return <PikatronRun recurso={juegoActivo} onExit={() => setJuegoActivo(null)} usuario={usuario} />;
+        if (juegoActivo.tipoJuego === 'RULETA') return <RuletaGame recurso={juegoActivo} usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'MATHLE') return <MathWordleGame usuario={usuario} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.modoEspecial === 'WORDLE' || (juegoActivo.tipoJuego === 'WORDLE' && !juegoActivo.modoEspecial)) return <TextWordleGame recursoInicial={juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.modoEspecial === 'SOPA' || (juegoActivo.tipoJuego === 'SOPA' && !juegoActivo.modoEspecial)) return <SopaDeLetrasGame recursoInicial={juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} />;
+        
+        return <GamePlayer recurso={juegoActivo} usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
     }
 
     return (
         <div style={{ width: '100%', marginTop: '20px' }}>
-
-            {/* MODAL ELEGIR MODO BURBUJAS/PIKATRON */}
             {recursoParaElegir && (
                 <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.8)', zIndex: 5000, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                     <div style={{ background: 'white', padding: '30px', borderRadius: '20px', textAlign: 'center', maxWidth: '400px', width: '90%' }}>
@@ -408,19 +317,17 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
                                     <button onClick={() => { setJuegoActivo({ ...recursoParaElegir, modoEspecial: 'PIKATRON' }); setRecursoParaElegir(null); }} style={{ padding: '15px', background: '#2196F3', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>⚡ Pikatron Run (Runner)</button>
                                 </>
                             ) : (
-                                    <>
-                                        {/* OPCIONES DE WORDLE Y SOPA */}
-                                        <button onClick={() => { setJuegoActivo({ ...recursoParaElegir, modoEspecial: 'WORDLE' }); setRecursoParaElegir(null); }} style={{ padding: '15px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>🟩 Wordle Clásico</button>
-                                        <button onClick={() => { setJuegoActivo({ ...recursoParaElegir, modoEspecial: 'SOPA' }); setRecursoParaElegir(null); }} style={{ padding: '15px', background: '#FF9800', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>🔍 Sopa de Letras</button>
-                                    </>
-                                )}
+                                <>
+                                    <button onClick={() => { setJuegoActivo({ ...recursoParaElegir, modoEspecial: 'WORDLE' }); setRecursoParaElegir(null); }} style={{ padding: '15px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>🟩 Wordle Clásico</button>
+                                    <button onClick={() => { setJuegoActivo({ ...recursoParaElegir, modoEspecial: 'SOPA' }); setRecursoParaElegir(null); }} style={{ padding: '15px', background: '#FF9800', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>🔍 Sopa de Letras</button>
+                                </>
+                            )}
                             <button onClick={() => setRecursoParaElegir(null)} style={{ marginTop: '10px', background: 'transparent', border: 'none', color: '#999', cursor: 'pointer' }}>Cancelar</button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* BUSCADOR PRINCIPAL (MÁS ANCHO) */}
             <div style={{ background: 'rgba(255,255,255,0.95)', padding: '30px', borderRadius: '20px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', marginBottom: '30px', maxWidth: '900px', margin: '0 auto 30px auto' }}>
                 <h3 style={{ margin: '0 0 20px 0', color: '#333', textAlign: 'center' }}><Search size={20} style={{ verticalAlign: 'middle' }} /> Encuentra un Recurso</h3>
 
@@ -432,76 +339,65 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
                 {modoBusqueda === 'CODIGO' ? (
                     <div style={{ textAlign: 'center' }}>
                         <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '15px' }}>Si tienes un código de 6 números es una sesión en vivo. Si tiene 4 o 5 letras, es un juego.</p>
-                        <input placeholder="Ej: A1B2C o 123456" value={codigo} onChange={e => setCodigo(e.target.value)} style={{ padding: '15px', fontSize: '1.5rem', textAlign: 'center', borderRadius: '10px', border: '2px solid #ddd', width: '100%', maxwidth:'250px', textTransform: 'uppercase', letterSpacing: '3px' }} maxLength={6} />
+                        <input placeholder="Ej: A1B2C o 123456" value={codigo} onChange={e => setCodigo(e.target.value)} style={{ padding: '15px', fontSize: '1.5rem', textAlign: 'center', borderRadius: '10px', border: '2px solid #ddd', width: '100%', maxWidth:'250px', textTransform: 'uppercase', letterSpacing: '3px' }} maxLength={6} />
                     </div>
                 ) : (
-                        <div>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px' }}>
-                                <select style={styles.input} value={filtros.tipoJuego} onChange={e => setFiltros({ ...filtros, tipoJuego: e.target.value })}>
-                                    <option value="">📂 Todos los Juegos</option>
-                                    <option value="PASAPALABRA">Pasapalabra</option>
-                                    <option value="CAZABURBUJAS">Burbujas/Pikatron</option>
-                                    <option value="APAREJADOS">Aparejados</option>
-                                    <option value="RULETA">La Ruleta</option>
-                                    <option value="SOPA">Sopa de Letras</option>
-
-                                    <option value="WORDLE">WordLe</option>
-                                    <option value="THINKHOOT">📡 Live (En Vivo)</option>
-                                </select>
-                                <select style={styles.input} value={filtros.ciclo} onChange={e => setFiltros({ ...filtros, ciclo: e.target.value })}>
-                                    <option value="">🎓 Cualquier Ciclo</option>
-                                    <option value="Infantil">Infantil</option>
-                                    <option value="Primaria">Primaria</option>
-                                    <option value="Secundaria">Secundaria</option>
+                    <div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px' }}>
+                            <select style={styles.input} value={filtros.tipoJuego} onChange={e => setFiltros({ ...filtros, tipoJuego: e.target.value })}>
+                                <option value="">📂 Todos los Juegos</option>
+                                <option value="PASAPALABRA">Pasapalabra</option>
+                                <option value="CAZABURBUJAS">Burbujas/Pikatron</option>
+                                <option value="APAREJADOS">Aparejados</option>
+                                <option value="RULETA">La Ruleta</option>
+                                <option value="SOPA">Sopa de Letras</option>
+                                <option value="WORDLE">WordLe</option>
+                                <option value="THINKHOOT">📡 Live (En Vivo)</option>
+                            </select>
+                            <select style={styles.input} value={filtros.ciclo} onChange={e => setFiltros({ ...filtros, ciclo: e.target.value })}>
+                                <option value="">🎓 Cualquier Ciclo</option>
+                                <option value="Infantil">Infantil</option>
+                                <option value="Primaria">Primaria</option>
+                                <option value="Secundaria">Secundaria</option>
                                     <option value="Bachillerato">Bachillerato</option>
                                     <option value="FP">FP</option>
                                     <option value="Otros">Otros</option>
-                                </select>
-                                <input style={styles.input} placeholder="Tema (Ej: Mates...)" value={filtros.tema} onChange={e => setFiltros({ ...filtros, tema: e.target.value })} />
-                            </div>
-
-                            {/* BOTÓN MÁS FILTROS */}
-                            <div style={{ textAlign: 'right', marginTop: '10px' }}>
-                                <button onClick={() => setMostrarMasFiltros(!mostrarMasFiltros)} style={{ background: 'none', border: 'none', color: '#2196F3', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '5px', width: '100%' }}>
-                                    {mostrarMasFiltros ? <ChevronUp size={16} /> : <ChevronDown size={16} />} {mostrarMasFiltros ? 'Menos filtros' : 'Más filtros (País, Autor...)'}
-                                </button>
-                            </div>
-
-                            {mostrarMasFiltros && (
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px', marginTop: '10px', padding: '15px', background: '#f5f5f5', borderRadius: '10px' }}>
-                                    <input style={styles.input} placeholder="País" value={filtros.pais} onChange={e => setFiltros({ ...filtros, pais: e.target.value })} />
-                                    <input style={styles.input} placeholder="Región/Provincia" value={filtros.region} onChange={e => setFiltros({ ...filtros, region: e.target.value })} />
-                                    <input style={styles.input} placeholder="Localidad" value={filtros.poblacion} onChange={e => setFiltros({ ...filtros, poblacion: e.target.value })} />
-                                    <input style={styles.input} placeholder="Nombre del Profesor" value={filtros.autor} onChange={e => setFiltros({ ...filtros, autor: e.target.value })} />
-                                </div>
-                            )}
+                            </select>
+                            <input style={styles.input} placeholder="Tema (Ej: Mates...)" value={filtros.tema} onChange={e => setFiltros({ ...filtros, tema: e.target.value })} />
                         </div>
-                    )}
-
+                        <div style={{ textAlign: 'right', marginTop: '10px' }}>
+                            <button onClick={() => setMostrarMasFiltros(!mostrarMasFiltros)} style={{ background: 'none', border: 'none', color: '#2196F3', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '5px', width: '100%' }}>
+                                {mostrarMasFiltros ? <ChevronUp size={16} /> : <ChevronDown size={16} />} {mostrarMasFiltros ? 'Menos filtros' : 'Más filtros (País, Autor...)'}
+                            </button>
+                        </div>
+                        {mostrarMasFiltros && (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px', marginTop: '10px', padding: '15px', background: '#f5f5f5', borderRadius: '10px' }}>
+                                <input style={styles.input} placeholder="País" value={filtros.pais} onChange={e => setFiltros({ ...filtros, pais: e.target.value })} />
+                                <input style={styles.input} placeholder="Región/Provincia" value={filtros.region} onChange={e => setFiltros({ ...filtros, region: e.target.value })} />
+                                <input style={styles.input} placeholder="Localidad" value={filtros.poblacion} onChange={e => setFiltros({ ...filtros, poblacion: e.target.value })} />
+                                <input style={styles.input} placeholder="Nombre del Profesor" value={filtros.autor} onChange={e => setFiltros({ ...filtros, autor: e.target.value })} />
+                            </div>
+                        )}
+                    </div>
+                )}
                 <button onClick={buscar} disabled={buscando} style={{ background: '#2196F3', color: 'white', padding: '12px', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', width: '100%', marginTop: '15px', fontSize: '1.1rem' }}>
                     {buscando ? 'Buscando...' : 'Buscar'}
                 </button>
-
-                {/* RESULTADOS (2 COLUMNAS, SCROLL VERTICAL) */}
                 {resultados.length > 0 && (
                     <div style={{ marginTop: '25px', borderTop: '2px dashed #eee', paddingTop: '20px' }}>
                         <h4 style={{ color: '#666', marginBottom: '15px' }}>Resultados ({resultados.length}):</h4>
                         <div style={{ maxHeight: '400px', overflowY: 'auto', paddingRight: '10px' }}>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '15px' }}>
-                                {resultados.map(r => (
-                                    <ResourceCard key={r.id} r={r} onClick={() => procesarClickTarjeta(r)} />
-                                ))}
+                                {resultados.map(r => <ResourceCard key={r.id} r={r} onClick={() => procesarClickTarjeta(r)} />)}
                             </div>
                         </div>
                     </div>
                 )}
             </div>
 
-            {/* --- SECCIÓN 1: JUEGOS EN VIVO (TODA LA CLASE) --- */}
             <h2 style={{ color: '#f1c40f', textShadow: '0 2px 4px rgba(0,0,0,0.8)', textAlign: 'center', marginBottom: '20px', marginTop: '30px' }}>
                 📡 Juegos para toda la clase (En Vivo)
             </h2>
-
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '40px', maxWidth: '700px', margin: '0 auto 40px auto' }}>
                 {APPS.filter(app => app.isLive).map(app => (
                     <div key={app.id} onClick={() => abrirJuego(app.id)} style={{ background: '#fff', borderRadius: '20px', padding: '20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.3)', border: `4px solid ${app.color}`, transition: 'transform 0.2s', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -514,36 +410,32 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
                 ))}
             </div>
 
-            {/* --- SECCIÓN 2: JUEGOS INDIVIDUALES / PEQUEÑOS GRUPOS --- */}
             <h2 style={{ color: 'white', textShadow: '0 2px 4px rgba(0,0,0,0.5)', textAlign: 'center', marginBottom: '20px', marginTop: '20px' }}>
                 🕹️ Juegos de uno a tres jugadores
             </h2>
-
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '15px', marginBottom: '40px' }}>
                 {APPS.filter(app => !app.isLive).map(app => (
                     <div key={app.id} onClick={() => abrirJuego(app.id)} style={{ background: '#ffffbf', borderRadius: '15px', padding: '15px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transition: 'transform 0.2s' }}>
                         <div style={{ width: '60px', height: '60px', margin: '0 auto 10px auto', background: 'transparent', borderRadius: '15px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'white' }}>
                             {app.img ? (
-                            <img src={app.img} alt={app.name} style={{ width: '60px', height: '60px', objectFit: 'contain', borderRadius: '15px' }} onError={(e) => e.target.style.display = 'none'} />
+                                <img src={app.img} alt={app.name} style={{ width: '60px', height: '60px', objectFit: 'contain', borderRadius: '15px' }} onError={(e) => e.target.style.display = 'none'} />
                             ) : (
-                                    <span style={{ fontSize: '45px', lineHeight: '1' }}>{app.emoji}</span>
-                                )}
-
+                                <span style={{ fontSize: '45px', lineHeight: '1' }}>{app.emoji}</span>
+                            )}
                         </div>
                         <h4 style={{ margin: 0, color: '#333', fontSize: '0.9rem' }}>{app.name}</h4>
                     </div>
                 ))}
             </div>
-       
         </div>
     );
 }
 
-// TARJETA DE RECURSO IDENTIFICADA POR COLOR Y SIN DATOS DE PROFESOR
+// --- RESOURCE CARD Y SPECIFIC GAME PAGE (ACTUALIZADAS PARA RECIBIR USUARIO) ---
+
 export const ResourceCard = ({ r, onClick }) => {
     const appInfo = getAppInfo(r.tipoJuego);
     const isLive = esJuegoEnVivo(r);
-
     return (
         <div onClick={onClick} style={{ background: '#e3f2fd', padding: '15px', borderRadius: '12px', borderLeft: `6px solid ${appInfo.color}`, cursor: 'pointer', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', height: '80%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: '1px solid #eee' }}>
             <div>
@@ -551,13 +443,10 @@ export const ResourceCard = ({ r, onClick }) => {
                     <h4 style={{ margin: 0, color: '#333', fontSize: '1.05rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '75%' }} title={r.titulo}>{r.titulo}</h4>
                     <span style={{ background: appInfo.color, color: 'white', padding: '3px 8px', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 'bold' }}>{appInfo.name}</span>
                 </div>
-
                 <div style={{ fontSize: '0.85rem', color: '#555', background: '#f9f9f9', padding: '8px', borderRadius: '8px' }}>
                     <div style={{ marginBottom: '4px' }}><b>📚 Tema:</b> {r.temas || 'General'}</div>
                     <div style={{ marginBottom: '4px' }}><b>🎓 Ciclo:</b> {r.ciclo || r.config?.ciclo || 'Todos'}</div>
-                    <div style={{ color: '#888', fontSize: '0.75rem', marginTop: '6px' }}>
-                        <b>Niveles/Hojas:</b> {r.hojas?.map(h => h.nombreHoja).join(', ') || 'Nivel 1'}
-                    </div>
+                    <div style={{ color: '#888', fontSize: '0.75rem', marginTop: '6px' }}><b>Niveles/Hojas:</b> {r.hojas?.map(h => h.nombreHoja).join(', ') || 'Nivel 1'}</div>
                 </div>
             </div>
             <div style={{ marginTop: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -570,85 +459,48 @@ export const ResourceCard = ({ r, onClick }) => {
     );
 };
 
-// PÁGINA ESPECÍFICA DEL JUEGO
-export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
+export const SpecificGamePage = ({ appData, onHome, onLoginRequest, usuario }) => {
     const [tab, setTab] = useState(appData.isLive ? 'LIVE' : 'SEARCH');
     const [filtros, setFiltros] = useState({ tema: '', ciclo: '', pais: '', region: '', poblacion: '', autor: '' });
     const [mostrarMasFiltros, setMostrarMasFiltros] = useState(false);
     const [codigo, setCodigo] = useState('');
     const [resultados, setResultados] = useState([]);
-
-    // Live Alumno
+    
     const [joinCode, setJoinCode] = useState('');
-    const [joinName, setJoinName] = useState('');
+    // Alumno auto-fill
+    const [joinName, setJoinName] = useState(usuario ? (usuario.displayName || usuario.email.split('@')[0]) : '');
     const [liveModeAlumno, setLiveModeAlumno] = useState(false);
     const [joinLiveTipoJuego, setJoinLiveTipoJuego] = useState('');
-    // Gestor/Single Player
+    
     const [liveModeHost, setLiveModeHost] = useState(false);
     const [hostRoomCode, setHostRoomCode] = useState('');
     const [juegoActivo, setJuegoActivo] = useState(null);
     const [recursoParaElegir, setRecursoParaElegir] = useState(null);
 
-    // --- NUEVO: ATAJO PARA JUEGOS CON MENÚ PROPIO ---
-    if (appData.id === 'WORDLE') return <TextWordleGame usuario={null} onExit={onHome} />;
-    if (appData.id === 'MATHLE') return <MathWordleGame usuario={null} onExit={onHome} />;
-    if (appData.id === 'SOPA') return <SopaDeLetrasGame usuario={null} onExit={onHome} />;
-    // --------
-    // --- CASO ESPECIAL: QUESTION SENDER ---
+    if (appData.id === 'WORDLE') return <TextWordleGame usuario={usuario} onExit={onHome} />;
+    if (appData.id === 'MATHLE') return <MathWordleGame usuario={usuario} onExit={onHome} />;
+    if (appData.id === 'SOPA') return <SopaDeLetrasGame usuario={usuario} onExit={onHome} />;
+
     if (appData.id === 'QUESTION_SENDER') {
         const [qsCode, setQsCode] = useState('');
-
-        // Función para abrir el cliente
         const abrirCliente = async () => {
             if (!qsCode || qsCode.trim().length < 4) return alert("Introduce un código válido.");
-
             const qSender = query(collection(db, 'resources'), where("hojasCodes", "array-contains", qsCode.toUpperCase().trim()));
             const snapSender = await getDocs(qSender);
-
             if (!snapSender.empty) {
-                // Truco: Usamos setJuegoActivo para renderizar el cliente
-                setJuegoActivo({
-                    ...snapSender.docs[0].data(),
-                    id: snapSender.docs[0].id,
-                    tipoJuego: 'QUESTION_SENDER',
-                    codigoInicial: qsCode.toUpperCase().trim()
-                });
-            } else {
-                alert("Código de hoja no encontrado. Pídeselo a tu profesor.");
-            }
+                setJuegoActivo({ ...snapSender.docs[0].data(), id: snapSender.docs[0].id, tipoJuego: 'QUESTION_SENDER', codigoInicial: qsCode.toUpperCase().trim() });
+            } else alert("Código de hoja no encontrado. Pídeselo a tu profesor.");
         };
-
-        // Si ya hemos activado el juego (cliente), lo mostramos
-        if (juegoActivo) {
-            return <QuestionSenderClient usuario={null} onBack={() => setJuegoActivo(null)} codigoInicial={juegoActivo.codigoInicial} />;
-        }
-
-        // Si no, mostramos la pantalla de "Ingresar Código"
+        if (juegoActivo) return <QuestionSenderClient usuario={usuario} onBack={() => setJuegoActivo(null)} codigoInicial={juegoActivo.codigoInicial} />;
         return (
             <div style={{ width: '100%', minHeight: '100vh', background: '#2c3e50', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
                 <div style={{ background: 'white', padding: '40px', borderRadius: '20px', textAlign: 'center', maxWidth: '500px', width: '100%', boxShadow: '0 10px 30px rgba(0,0,0,0.3)' }}>
-                    {/* EMOJI GRANDE */}
-                    <div style={{ marginBottom: '20px', fontSize: '80px', lineHeight: '1' }}>
-                        📮
-                    </div>
+                    <div style={{ marginBottom: '20px', fontSize: '80px', lineHeight: '1' }}>📮</div>
                     <h2 style={{ color: '#2c3e50', margin: '0 0 10px 0' }}>Buzón de Preguntas</h2>
                     <p style={{ color: '#7f8c8d', marginBottom: '30px' }}>Introduce el código de tu grupo para enviar preguntas.</p>
-
-                    <input
-                        value={qsCode}
-                        onChange={e => setQsCode(e.target.value.toUpperCase())}
-                        placeholder="CÓDIGO (Ej: A1B2)"
-                        style={{ width: '100%', padding: '15px', fontSize: '1.5rem', textAlign: 'center', borderRadius: '10px', border: '2px solid #bdc3c7', marginBottom: '20px', letterSpacing: '3px', textTransform: 'uppercase', boxSizing: 'border-box' }}
-                        maxLength={5}
-                    />
-
-                    <button onClick={abrirCliente} style={{ width: '100%', padding: '15px', background: '#27ae60', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer', marginBottom: '15px' }}>
-                        ENTRAR
-                    </button>
-
-                    <button onClick={onHome} style={{ background: 'transparent', border: 'none', color: '#95a5a6', cursor: 'pointer', fontSize: '0.9rem', textDecoration: 'underline' }}>
-                        Volver al inicio
-                    </button>
+                    <input value={qsCode} onChange={e => setQsCode(e.target.value.toUpperCase())} placeholder="CÓDIGO (Ej: A1B2)" style={{ width: '100%', padding: '15px', fontSize: '1.5rem', textAlign: 'center', borderRadius: '10px', border: '2px solid #bdc3c7', marginBottom: '20px', letterSpacing: '3px', textTransform: 'uppercase', boxSizing: 'border-box' }} maxLength={5} />
+                    <button onClick={abrirCliente} style={{ width: '100%', padding: '15px', background: '#27ae60', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer', marginBottom: '15px' }}>ENTRAR</button>
+                    <button onClick={onHome} style={{ background: 'transparent', border: 'none', color: '#95a5a6', cursor: 'pointer', fontSize: '0.9rem', textDecoration: 'underline' }}>Volver al inicio</button>
                 </div>
             </div>
         );
@@ -658,56 +510,34 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
         try {
             const ref = collection(db, 'resources');
             let filtrados = [];
-
             if (codigo) {
                 const q = query(ref, where("accessCode", "==", codigo.toUpperCase().trim()));
                 const snap = await getDocs(q);
                 if (!snap.empty) {
                     const data = snap.docs[0].data();
-                    //const esEsteJuego = data.tipoJuego === appData.id;
                     let esEsteJuego = data.tipoJuego === appData.id;
-                    if (appData.id === 'CAZABURBUJAS' || appData.id === 'PIKATRON') {
-                        esEsteJuego = (data.tipoJuego === 'CAZABURBUJAS' || data.tipoJuego === 'PIKATRON');
-                    }
-                    else if (appData.id === 'SOPA' || appData.id === 'WORDLE') {
-                        // MAGIA: Sopa y Wordle comparten los mismos recursos
-                        esEsteJuego = (data.tipoJuego === 'SOPA' || data.tipoJuego === 'WORDLE');
-                    }
-
-
-
+                    if (appData.id === 'CAZABURBUJAS' || appData.id === 'PIKATRON') esEsteJuego = (data.tipoJuego === 'CAZABURBUJAS' || data.tipoJuego === 'PIKATRON');
+                    else if (appData.id === 'SOPA' || appData.id === 'WORDLE') esEsteJuego = (data.tipoJuego === 'SOPA' || data.tipoJuego === 'WORDLE');
+                    
                     const esPiLiveAntiguo = appData.id === 'THINKHOOT' && data.tipo === 'PRO' && data.tipoJuego !== 'WORDLE';
 
-                    if (esEsteJuego || esPiLiveAntiguo) {
-                        filtrados = [{ ...data, id: snap.docs[0].id }];
-                    } else {
-                        alert("Código no encontrado para este juego.");
-                    }
+                    if (esEsteJuego || esPiLiveAntiguo) filtrados = [{ ...data, id: snap.docs[0].id }];
+                    else alert("Código no encontrado para este juego.");
                 } else alert("Código no encontrado.");
             } else {
                 const q = query(ref, limit(150));
                 const snap = await getDocs(q);
                 filtrados = snap.docs.map(d => ({ ...d.data(), id: d.id })).filter(r => {
-                  //  const esEsteJuego = r.tipoJuego === appData.id;
                     let esEsteJuego = r.tipoJuego === appData.id;
-                    if (appData.id === 'CAZABURBUJAS' || appData.id === 'PIKATRON') {
-                        esEsteJuego = (r.tipoJuego === 'CAZABURBUJAS' || r.tipoJuego === 'PIKATRON');
-                    }
-                    else if (appData.id === 'SOPA' || appData.id === 'WORDLE') {
-                        // MAGIA: Sopa y Wordle comparten los mismos recursos
-                        esEsteJuego = (data.tipoJuego === 'SOPA' || data.tipoJuego === 'WORDLE');
-                    }
-
-
+                    if (appData.id === 'CAZABURBUJAS' || appData.id === 'PIKATRON') esEsteJuego = (r.tipoJuego === 'CAZABURBUJAS' || r.tipoJuego === 'PIKATRON');
+                    else if (appData.id === 'SOPA' || appData.id === 'WORDLE') esEsteJuego = (r.tipoJuego === 'SOPA' || r.tipoJuego === 'WORDLE');
 
                     const esPiLiveAntiguo = appData.id === 'THINKHOOT' && r.tipo === 'PRO' && r.tipoJuego !== 'WORDLE';
 
                     if (!esEsteJuego && !esPiLiveAntiguo) return false;
                     if (r.isFinished !== true && r.config?.isFinished !== true) return false;
-
                     if (filtros.tema && !cleanText(r.temas).includes(cleanText(filtros.tema)) && !cleanText(r.titulo).includes(cleanText(filtros.tema))) return false;
                     if (filtros.ciclo && cleanText(r.ciclo) !== cleanText(filtros.ciclo)) return false;
-
                     if (filtros.pais && !cleanText(r.pais).includes(cleanText(filtros.pais))) return false;
                     if (filtros.region && !cleanText(r.region).includes(cleanText(filtros.region))) return false;
                     if (filtros.poblacion && !cleanText(r.poblacion).includes(cleanText(filtros.poblacion))) return false;
@@ -728,31 +558,14 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
             let pool = [];
             if (r.hojas) r.hojas.forEach(h => pool.push(...h.preguntas));
             if (r.config?.aleatorio !== false) pool.sort(() => Math.random() - 0.5);
-
             const pFin = pool.slice(0, limitePreguntas).map(p => {
-                // Protegemos los juegos PRO y OLYMPIC para que no destruya el tipo de pregunta
-                // Añadimos también tipoJuego por si creaste el recurso antes de la actualización
                 if (r.tipo !== 'PRO' && r.tipo !== 'OLYMPIC' && r.tipoJuego !== 'OLYMPICLIVE') {
                     return { ...p, q: p.pregunta, a: p.correcta || p.respuesta, tipo: (p.incorrectas?.length > 0) ? 'MULTIPLE' : 'SIMPLE', opcionesFijas: (p.incorrectas?.length > 0) ? [p.correcta || p.respuesta, ...p.incorrectas].sort(() => Math.random() - 0.5) : [] };
                 }
                 return p;
             });
 
-            await setDoc(doc(db, "live_games", sala), {
-                hostId: "host_invitado_" + Date.now(),
-                recursoId: r.id || 'temp_id',
-                recursoTitulo: r.titulo,
-                profesorNombre: "Profe Invitado",
-                config: r.config || {},
-                preguntas: pFin,
-                estado: 'LOBBY',
-                indicePregunta: 0,
-                jugadores: {},
-                respuestasRonda: {},
-                timestamp: new Date(),
-                tipoJuego: r.tipoJuego
-            });
-
+            await setDoc(doc(db, "live_games", sala), { hostId: "host_invitado_" + Date.now(), recursoId: r.id || 'temp_id', recursoTitulo: r.titulo, profesorNombre: "Profe Invitado", config: r.config || {}, preguntas: pFin, estado: 'LOBBY', indicePregunta: 0, jugadores: {}, respuestasRonda: {}, timestamp: new Date(), tipoJuego: r.tipoJuego });
             setHostRoomCode(sala);
             setLiveModeHost(true);
         } catch (error) { console.error(error); alert("Error al crear la sala."); }
@@ -764,36 +577,31 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
         else setJuegoActivo(r);
     };
 
-    // --- RENDERIZADO PANTALLA COMPLETA ---
-    // En móviles al usar position:fixed u ocupar 100vh se verá a pantalla completa
     if (liveModeHost && hostRoomCode) {
         if (appData.id === 'MATHLIVE') return <MathLive isHost={true} codigoSala={hostRoomCode} usuario={{ uid: "host", displayName: "Profe" }} onExit={() => setLiveModeHost(false)} />;
         return <ThinkHootGame isHost={true} codigoSala={hostRoomCode} usuario={{ uid: "host", displayName: "Profe" }} onExit={() => setLiveModeHost(false)} />;
     }
 
     if (liveModeAlumno) {
-        // Usamos la verdad absoluta de la base de datos, o el de la app si no está
-        const tipoFinal = (typeof joinLiveTipoJuego !== 'undefined' && joinLiveTipoJuego) ? joinLiveTipoJuego : (typeof appData !== 'undefined' ? appData.id : '');
+        const tipoFinal = (typeof joinLiveTipoJuego !== 'undefined' && joinLiveTipoJuego) ? joinLiveTipoJuego : appData.id;
+        const usuarioFinal = usuario || { displayName: joinName, email: null };
 
-        if (tipoFinal === 'OLYMPICLIVE') return <OlympicLive isHost={false} codigoSala={typeof joinCode !== 'undefined' ? joinCode : joinLiveCode} usuario={{ displayName: typeof joinName !== 'undefined' ? joinName : joinLiveName, email: null }} onExit={() => setLiveModeAlumno(false)} />;
-        if (tipoFinal === 'MATHLIVE' || isMathLiveAlumno) return <MathLive isHost={false} codigoSala={typeof joinCode !== 'undefined' ? joinCode : joinLiveCode} usuario={{ displayName: typeof joinName !== 'undefined' ? joinName : joinLiveName, email: null }} onExit={() => setLiveModeAlumno(false)} />;
-
-        return <ThinkHootGame isHost={false} codigoSala={typeof joinCode !== 'undefined' ? joinCode : joinLiveCode} usuario={{ displayName: typeof joinName !== 'undefined' ? joinName : joinLiveName, email: null }} onExit={() => setLiveModeAlumno(false)} />;
+        if (tipoFinal === 'OLYMPICLIVE') return <OlympicLive isHost={false} codigoSala={joinCode} usuario={usuarioFinal} onExit={() => setLiveModeAlumno(false)} />;
+        if (tipoFinal === 'MATHLIVE') return <MathLive isHost={false} codigoSala={joinCode} usuario={usuarioFinal} onExit={() => setLiveModeAlumno(false)} />;
+        return <ThinkHootGame isHost={false} codigoSala={joinCode} usuario={usuarioFinal} onExit={() => setLiveModeAlumno(false)} />;
     }
 
     if (juegoActivo) {
-        if (appData.id === 'PIKATRON' || juegoActivo.modoEspecial === 'PIKATRON') return <PikatronRun recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
-        if (appData.id === 'RULETA') return <RuletaGame recurso={juegoActivo} usuario={null} alTerminar={() => setJuegoActivo(null)} />;
-        // --- AÑADIDO: Distinguir Wordle y Sopa ---
-        if (appData.id === 'WORDLE' || juegoActivo.modoEspecial === 'WORDLE' || (juegoActivo.tipoJuego === 'WORDLE' && !juegoActivo.modoEspecial)) return <TextWordleGame recursoInicial={juegoActivo} usuario={null} onExit={() => setJuegoActivo(null)} />;
-        if (appData.id === 'SOPA' || juegoActivo.modoEspecial === 'SOPA' || (juegoActivo.tipoJuego === 'SOPA' && !juegoActivo.modoEspecial)) return <SopaDeLetrasGame recursoInicial={juegoActivo} usuario={null} onExit={() => setJuegoActivo(null)} />;
-        return <GamePlayer recurso={juegoActivo} usuario={null} alTerminar={() => setJuegoActivo(null)} />;
+        if (appData.id === 'PIKATRON' || juegoActivo.modoEspecial === 'PIKATRON') return <PikatronRun recurso={juegoActivo} onExit={() => setJuegoActivo(null)} usuario={usuario} />;
+        if (appData.id === 'RULETA') return <RuletaGame recurso={juegoActivo} usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
+        if (appData.id === 'WORDLE' || juegoActivo.modoEspecial === 'WORDLE' || (juegoActivo.tipoJuego === 'WORDLE' && !juegoActivo.modoEspecial)) return <TextWordleGame recursoInicial={juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} />;
+        if (appData.id === 'SOPA' || juegoActivo.modoEspecial === 'SOPA' || (juegoActivo.tipoJuego === 'SOPA' && !juegoActivo.modoEspecial)) return <SopaDeLetrasGame recursoInicial={juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} />;
+        return <GamePlayer recurso={juegoActivo} usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
     }
 
     return (
         <div style={{ width: '100%', minHeight: '100vh', background: '#f0f2f5', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
-
-            {/* MODAL ELEGIR MODO BURBUJAS/PIKATRON */}
+            {/* Modal Elegir */}
             {recursoParaElegir && (
                 <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.8)', zIndex: 5000, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                     <div style={{ background: 'white', padding: '30px', borderRadius: '20px', textAlign: 'center', maxWidth: '400px', width: '90%' }}>
@@ -805,18 +613,16 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
                                     <button onClick={() => { setJuegoActivo({ ...recursoParaElegir, modoEspecial: 'PIKATRON' }); setRecursoParaElegir(null); }} style={{ padding: '15px', background: '#2196F3', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>⚡ Pikatron Run (Runner)</button>
                                 </>
                             ) : (
-                                    <>
-                                        {/* OPCIONES DE WORDLE Y SOPA */}
-                                        <button onClick={() => { setJuegoActivo({ ...recursoParaElegir, modoEspecial: 'WORDLE' }); setRecursoParaElegir(null); }} style={{ padding: '15px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>🟩 Wordle Clásico</button>
-                                        <button onClick={() => { setJuegoActivo({ ...recursoParaElegir, modoEspecial: 'SOPA' }); setRecursoParaElegir(null); }} style={{ padding: '15px', background: '#FF9800', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>🔍 Sopa de Letras</button>
-                                    </>
-                                )}
+                                <>
+                                    <button onClick={() => { setJuegoActivo({ ...recursoParaElegir, modoEspecial: 'WORDLE' }); setRecursoParaElegir(null); }} style={{ padding: '15px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>🟩 Wordle Clásico</button>
+                                    <button onClick={() => { setJuegoActivo({ ...recursoParaElegir, modoEspecial: 'SOPA' }); setRecursoParaElegir(null); }} style={{ padding: '15px', background: '#FF9800', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>🔍 Sopa de Letras</button>
+                                </>
+                            )}
                             <button onClick={() => setRecursoParaElegir(null)} style={{ marginTop: '10px', background: 'transparent', border: 'none', color: '#999', cursor: 'pointer' }}>Cancelar</button>
                         </div>
                     </div>
                 </div>
             )}
-
             <div style={{ width: '100%', maxWidth: '900px', background: `color-mix(in srgb, ${appData.color}, white 60%)`, minHeight: '100vh', padding: '20px', boxShadow: '0 0 20px rgba(0,0,0,0.1)' }}>
                 <button onClick={onHome} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'black', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '20px', fontWeight: 'bold' }}>
                     <Home size={20} /> Volver al Inicio
@@ -824,34 +630,20 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
 
                 <div style={{ textAlign: 'center', marginBottom: '30px' }}>
                     <div style={{ width: '80px', height: '80px', margin: '0 auto', background: 'transparent', borderRadius: '20px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'white', boxShadow: '0 4px 10px rgba(0,0,0,0.2)' }}>
-                        <img src={appData.img} alt={appData.name} style={{ width: '100px', borderRadius:'15px' }} onError={(e) => e.target.style.display = 'none'} />
+                        {appData.img ? (
+                            <img src={appData.img} alt={appData.name} style={{ width: '100px', borderRadius:'15px' }} onError={(e) => e.target.style.display = 'none'} />
+                        ) : (
+                            <span style={{ fontSize: '60px', lineHeight: '1' }}>{appData.emoji}</span>
+                        )}
                     </div>
                     <h1 style={{ color: appData.color, margin: '15px 0 5px 0', fontSize: '2.5rem' }}>{appData.name}</h1>
                     <p style={{ color: appData.color, fontStyle: 'italic', fontSize: '1.1rem' }}>{appData.desc}</p>
-
-                    <button
-                        onClick={() => onLoginRequest && onLoginRequest()}
-                        style={{
-                            background: appData.color,
-                            color: 'white',
-                            padding: '12px 30px',
-                            border: `2px solid ${appData.color}`,
-                            borderRadius: '30px',
-                            fontWeight: 'bold',
-                            cursor: 'pointer',
-                            fontSize: '1.1rem',
-                            boxShadow: '0 4px 10px rgba(0,0,0,0.2)',
-                            transition: 'all 0.2s',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '10px'
-                        }}
-                    >
-                        🚀 Únete para crear
-                    </button>
-
-
-
+                    
+                    {!usuario && (
+                        <button onClick={() => onLoginRequest && onLoginRequest()} style={{ background: appData.color, color: 'white', padding: '12px 30px', border: `2px solid ${appData.color}`, borderRadius: '30px', fontWeight: 'bold', cursor: 'pointer', fontSize: '1.1rem', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transition: 'all 0.2s', display: 'inline-flex', alignItems: 'center', gap: '10px' }}>
+                            🚀 Únete para crear
+                        </button>
+                    )}
                 </div>
 
                 {appData.isLive && (
@@ -885,7 +677,6 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
                             <input placeholder="Tema o Título..." value={filtros.tema} onChange={e => setFiltros({ ...filtros, tema: e.target.value })} style={styles.input} />
                             <select value={filtros.ciclo} onChange={e => setFiltros({ ...filtros, ciclo: e.target.value })} style={styles.input}>
                                 <option value="">Cualquier Ciclo</option>
-                                <option value="Infantil">Primaria</option>
                                 <option value="Primaria">Primaria</option>
                                 <option value="Secundaria">Secundaria</option>
                                 <option value="Bachillerato">Bachillerato</option>
@@ -893,13 +684,11 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
                                 <option value="Otros">Otros</option>
                             </select>
                         </div>
-
                         <div style={{ textAlign: 'right', marginTop: '10px' }}>
                             <button onClick={() => setMostrarMasFiltros(!mostrarMasFiltros)} style={{ background: 'none', border: 'none', color: appData.color, fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '5px', width: '100%', fontSize: '0.9rem' }}>
                                 {mostrarMasFiltros ? <ChevronUp size={16} /> : <ChevronDown size={16} />} {mostrarMasFiltros ? 'Menos filtros' : 'Búsqueda avanzada y Código'}
                             </button>
                         </div>
-
                         {mostrarMasFiltros && (
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px', marginTop: '15px', padding: '15px', background: '#ebebeb', borderRadius: '10px' }}>
                                 <input style={styles.input} placeholder="CÓDIGO (4 o 5 letras)" value={codigo} onChange={e => setCodigo(e.target.value)} />
@@ -908,9 +697,7 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
                                 <input style={styles.input} placeholder="Autor" value={filtros.autor} onChange={e => setFiltros({ ...filtros, autor: e.target.value })} />
                             </div>
                         )}
-
                         <button onClick={buscarEspecífico} style={{ background: appData.color, color: 'white', padding: '15px', width: '100%', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', fontSize: '1.1rem', marginTop: '20px' }}>Buscar en {appData.name}</button>
-
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '15px', marginTop: '25px' }}>
                             {resultados.map(r => <ResourceCard key={r.id} r={r} onClick={() => procesarClickTarjeta(r)} />)}
                         </div>
@@ -922,5 +709,5 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
 }
 
 const styles = {
-    input: { padding: '12px',width:'100%', borderRadius: '8px', border: '1px solid #ccc', outline: 'none', flex: 1, fontSize: '0.95rem' }
+    input: { padding: '12px', width:'100%', borderRadius: '8px', border: '1px solid #ccc', outline: 'none', flex: 1, fontSize: '0.95rem' }
 };

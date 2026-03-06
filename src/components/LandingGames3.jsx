@@ -12,6 +12,8 @@ import PikatronRun from '../PikatronRun';
 import TextWordleGame from '../TextWordleGame';
 import MathWordleGame from '../MathWordleGame';
 import SopaDeLetrasGame from '../SopaDeLetrasGame';
+import SintaxisGame from '../SintaxisGamen';
+
 import imgPasapalabra from '../assets/icono_pasapal.png'; // Revisa si es .png o .jpg
 import imgBurbujas from '../assets/icono_burbujas.png';
 import imgPikatron from '../assets/icono_pikatron.png';
@@ -23,6 +25,7 @@ import imgPilive from '../assets/icono_pilive.png';
 import imgMathlive from '../assets/icono_mathlive.png';
 import imgSopa from '../assets/icono_sopa.png';
 import imgOlympic from '../assets/icono_olympic.png';
+
 
 // --- CONFIGURACIÓN DE APLICACIONES Y COLORES ---
 export const APPS = [
@@ -45,6 +48,14 @@ export const APPS = [
         img: null, // Usaremos el icono Mail si es null
         emoji: '📮',
         isSpecial: true
+    },
+    {
+        id: 'SINTAXIS',
+        name: 'Sintaxis',
+        desc: 'Analiza frases generadas por IA uniendo palabras y colores.',
+        color: '#3498db',
+        emoji: '🖍️',
+        isSpecial: false
     }
 
 ];
@@ -379,7 +390,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
                 />
             );
         }
-
+        if (juegoActivo.tipoJuego === 'SINTAXIS') return <SintaxisGame usuario={usuario} onExit={() => setJuegoActivo(null)} />;
 
 
         if (juegoActivo.modoEspecial === 'PIKATRON') return <PikatronRun recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
@@ -594,6 +605,10 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
     if (appData.id === 'MATHLE') return <MathWordleGame usuario={null} onExit={onHome} />;
     if (appData.id === 'SOPA') return <SopaDeLetrasGame usuario={null} onExit={onHome} />;
     // --------
+    
+    if (appData.id === 'SINTAXIS' || juegoActivo.tipoJuego === 'SINTAXIS') return <SintaxisGame usuario={null} onExit={() => setJuegoActivo(null)} recurso={juegoActivo} />;
+       
+
     // --- CASO ESPECIAL: QUESTION SENDER ---
     if (appData.id === 'QUESTION_SENDER') {
         const [qsCode, setQsCode] = useState('');
@@ -827,28 +842,56 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
                         <img src={appData.img} alt={appData.name} style={{ width: '100px', borderRadius:'15px' }} onError={(e) => e.target.style.display = 'none'} />
                     </div>
                     <h1 style={{ color: appData.color, margin: '15px 0 5px 0', fontSize: '2.5rem' }}>{appData.name}</h1>
-                    <p style={{ color: appData.color, fontStyle: 'italic', fontSize: '1.1rem' }}>{appData.desc}</p>
+                    <p style={{ color: appData.color, fontStyle: 'italic', fontSize: '1.1rem', marginBottom: '20px' }}>{appData.desc}</p>
 
-                    <button
-                        onClick={() => onLoginRequest && onLoginRequest()}
-                        style={{
-                            background: appData.color,
-                            color: 'white',
-                            padding: '12px 30px',
-                            border: `2px solid ${appData.color}`,
-                            borderRadius: '30px',
-                            fontWeight: 'bold',
-                            cursor: 'pointer',
-                            fontSize: '1.1rem',
-                            boxShadow: '0 4px 10px rgba(0,0,0,0.2)',
-                            transition: 'all 0.2s',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '10px'
-                        }}
-                    >
-                        🚀 Únete para crear
-                    </button>
+                    {/* CONTENEDOR DE BOTONES */}
+                    <div style={{ display: 'flex', gap: '15px', justifyContent: 'center', flexWrap: 'wrap' }}>
+
+                        {/* BOTÓN EXCLUSIVO PARA JUGAR DIRECTO CON IA */}
+                        {appData.id === 'SINTAXIS' && (
+                            <button
+                                onClick={() => setJuegoActivo({ tipoJuego: 'SINTAXIS', isIA: true })}
+                                style={{
+                                    background: 'white',
+                                    color: appData.color,
+                                    padding: '12px 30px',
+                                    border: `2px solid white`,
+                                    borderRadius: '30px',
+                                    fontWeight: 'bold',
+                                    cursor: 'pointer',
+                                    fontSize: '1.1rem',
+                                    boxShadow: '0 4px 10px rgba(0,0,0,0.2)',
+                                    transition: 'all 0.2s',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '10px'
+                                }}
+                            >
+                                🤖 Jugar Directamente (IA)
+                            </button>
+                        )}
+
+                        <button
+                            onClick={() => onLoginRequest && onLoginRequest()}
+                            style={{
+                                background: appData.color,
+                                color: 'white',
+                                padding: '12px 30px',
+                                border: `2px solid ${appData.color}`,
+                                borderRadius: '30px',
+                                fontWeight: 'bold',
+                                cursor: 'pointer',
+                                fontSize: '1.1rem',
+                                boxShadow: '0 4px 10px rgba(0,0,0,0.2)',
+                                transition: 'all 0.2s',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '10px'
+                            }}
+                        >
+                            🚀 Únete para crear
+                        </button>
+                    </div>
 
 
 

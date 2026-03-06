@@ -40,7 +40,7 @@ export default function UserProfile({ usuario, perfil, onClose, onUpdate, showSu
 
     // --- SOPORTE ---
     const copiarSoporte = () => {
-        navigator.clipboard.writeText("goladen@gmail.com");
+        navigator.clipboard.writeText("pikt314@gmail.com");
         setMensajeCopia("Has copiado el e-mail para soporte. Ve a tu correo y notifica lo que necesites.");
         setTimeout(() => setMensajeCopia(''), 5000);
     };

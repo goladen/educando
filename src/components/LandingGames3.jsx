@@ -14,6 +14,8 @@ import MathWordleGame from '../MathWordleGame';
 import SopaDeLetrasGame from '../SopaDeLetrasGame';
 import SintaxisGame from '../SintaxisGamen';
 import Geometrix from '../Geometrix';
+import CalculoMental from '../CalculoMental'; // AÑADE ESTO
+import Ecuaciones from '../Ecuaciones';
 
 import imgPasapalabra from '../assets/icono_pasapal.png'; // Revisa si es .png o .jpg
 import imgBurbujas from '../assets/icono_burbujas.png';
@@ -68,8 +70,22 @@ export const APPS = [
     },
     // --- JUEGOS DE MATEMÁTICAS (Saldrán en la segunda pantalla) ---
     { id: 'GEOMETRIX', name: 'Geometrix', desc: 'Áreas, volúmenes y regla virtual.', color: '#009688', emoji: '📐', isMath: true },
-    { id: 'CALCULO', name: 'Cálculo Base', desc: 'Agilidad y operaciones mentales.', color: '#E91E63', emoji: '🧠', isMath: true, comingSoon: true },
-    { id: 'ECUACIONES', name: 'Ecuaciones', desc: 'Despeja la X paso a paso.', color: '#3F51B5', emoji: '⚖️', isMath: true, comingSoon: true },
+    {
+        id: 'CALCULO',
+        name: 'Calculo',
+        desc: 'Agilidad mental y operaciones con tiempo.',
+        color: '#E91E63',
+        emoji: '🧠',
+        isMath: true
+    },
+    {
+        id: 'ECUACIONES',
+        name: 'Ecuaciones',
+        desc: 'Despeja la X paso a paso.',
+        color: '#3F51B5',
+        emoji: '⚖️',
+        isMath: true
+    },
     { id: 'FUNCIONES', name: 'Funciones', desc: 'Análisis de gráficas.', color: '#4CAF50', emoji: '📈', isMath: true, comingSoon: true },
     { id: 'POLINOMIOS', name: 'Álgebra', desc: 'Operaciones con polinomios.', color: '#FF9800', emoji: '✖️', isMath: true, comingSoon: true }
 
@@ -416,6 +432,9 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
         }
         if (juegoActivo.tipoJuego === 'SINTAXIS') return <SintaxisGame usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if ( juegoActivo.tipoJuego === 'GEOMETRIX') return <Geometrix usuario={usuario} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'CALCULO') return <CalculoMental usuario={null} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'ECUACIONES') return <Ecuaciones usuario={null} onExit={() => setJuegoActivo(null)} />;
+     // ------------------------
 
         if (juegoActivo.modoEspecial === 'PIKATRON') return <PikatronRun recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'RULETA') return <RuletaGame recurso={juegoActivo} usuario={null} alTerminar={() => setJuegoActivo(null)} />;
@@ -680,7 +699,9 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
     if (appData.id === 'SINTAXIS' ) return <SintaxisGame usuario={null} onExit={() => setJuegoActivo(null)} recurso={juegoActivo} />;
   
     if (appData.id === 'GEOMETRIX' ) return <Geometrix usuario={null} onExit={() => setJuegoActivo(null)} />;
-
+    if (appData.id === 'CALCULO' ) return <CalculoMental usuario={null} onExit={() => setJuegoActivo(null)} />;
+    if (appData.id === 'ECUACIONES') return <Ecuaciones usuario={null} onExit={() => setJuegoActivo(null)} />;
+     // ------------------------
     // --- CASO ESPECIAL: QUESTION SENDER ---
     if (appData.id === 'QUESTION_SENDER') {
         const [qsCode, setQsCode] = useState('');

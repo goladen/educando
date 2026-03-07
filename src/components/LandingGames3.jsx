@@ -13,6 +13,7 @@ import TextWordleGame from '../TextWordleGame';
 import MathWordleGame from '../MathWordleGame';
 import SopaDeLetrasGame from '../SopaDeLetrasGame';
 import SintaxisGame from '../SintaxisGamen';
+import Geometrix from '../Geometrix';
 
 import imgPasapalabra from '../assets/icono_pasapal.png'; // Revisa si es .png o .jpg
 import imgBurbujas from '../assets/icono_burbujas.png';
@@ -56,7 +57,21 @@ export const APPS = [
         color: '#3498db',
         emoji: '🖍️',
         isSpecial: false
-    }
+    },
+    {
+        id: 'MATH_WORLD_PORTAL',
+        name: 'Math World',
+        desc: 'Entra a la zona exclusiva de aplicaciones matemáticas.',
+        color: '#009688',
+        emoji: '🌍',
+        isPortal: true
+    },
+    // --- JUEGOS DE MATEMÁTICAS (Saldrán en la segunda pantalla) ---
+    { id: 'GEOMETRIX', name: 'Geometrix', desc: 'Áreas, volúmenes y regla virtual.', color: '#009688', emoji: '📐', isMath: true },
+    { id: 'CALCULO', name: 'Cálculo Base', desc: 'Agilidad y operaciones mentales.', color: '#E91E63', emoji: '🧠', isMath: true, comingSoon: true },
+    { id: 'ECUACIONES', name: 'Ecuaciones', desc: 'Despeja la X paso a paso.', color: '#3F51B5', emoji: '⚖️', isMath: true, comingSoon: true },
+    { id: 'FUNCIONES', name: 'Funciones', desc: 'Análisis de gráficas.', color: '#4CAF50', emoji: '📈', isMath: true, comingSoon: true },
+    { id: 'POLINOMIOS', name: 'Álgebra', desc: 'Operaciones con polinomios.', color: '#FF9800', emoji: '✖️', isMath: true, comingSoon: true }
 
 ];
 
@@ -151,6 +166,8 @@ const cleanText = (str) => {
         .trim();
 };
 export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
+    // --- AÑADE ESTA LÍNEA AQUÍ ---
+    const [zonaActiva, setZonaActiva] = useState('MAIN');
     const [modoBusqueda, setModoBusqueda] = useState('FILTROS');
     const [filtros, setFiltros] = useState({ tipoJuego: '', ciclo: '', tema: '', pais: '', region: '', poblacion: '', autor: '' });
     const [mostrarMasFiltros, setMostrarMasFiltros] = useState(false);
@@ -293,6 +310,13 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
         setBuscando(false);
     };
     const abrirJuego = (appId) => {
+
+        // Si pinchan en el portal, cambiamos de pantalla sin recargar la web
+        if (appId === 'MATH_WORLD_PORTAL') {
+            setZonaActiva('MATH');
+            return;
+        }
+
         const appInfo = APPS.find(a => a.id === appId);
         if (appInfo) {
             window.history.pushState({}, '', `/${appInfo.name.toLowerCase()}`);
@@ -391,7 +415,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
             );
         }
         if (juegoActivo.tipoJuego === 'SINTAXIS') return <SintaxisGame usuario={usuario} onExit={() => setJuegoActivo(null)} />;
-
+        if ( juegoActivo.tipoJuego === 'GEOMETRIX') return <Geometrix usuario={usuario} onExit={() => setJuegoActivo(null)} />;
 
         if (juegoActivo.modoEspecial === 'PIKATRON') return <PikatronRun recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'RULETA') return <RuletaGame recurso={juegoActivo} usuario={null} alTerminar={() => setJuegoActivo(null)} />;
@@ -403,6 +427,48 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
         if (juegoActivo.modoEspecial === 'SOPA' || (juegoActivo.tipoJuego === 'SOPA' && !juegoActivo.modoEspecial)) return <SopaDeLetrasGame recursoInicial={juegoActivo} usuario={null} onExit={() => setJuegoActivo(null)} />;
         return <GamePlayer recurso={juegoActivo} usuario={null} alTerminar={() => setJuegoActivo(null)} />;
     }
+
+    // --- PANTALLA EXCLUSIVA MATH WORLD ---
+    if (zonaActiva === 'MATH') {
+        return (
+            <div style={{ width: '100%', marginTop: '20px' }}>
+                <button onClick={() => setZonaActiva('MAIN')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#333', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '20px', fontWeight: 'bold' }}>
+                    <Home size={20} /> Volver al Menú Principal
+                </button>
+
+                <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+                    <div style={{ fontSize: '70px', marginBottom: '10px' }}>🌍</div>
+                    <h1 style={{ color: '#009688', fontSize: '3rem', margin: 0, textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>Math World</h1>
+                    <p style={{ color: '#666', fontSize: '1.2rem', marginTop: '10px' }}>Tu ecosistema de herramientas matemáticas</p>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '25px', maxWidth: '900px', margin: '0 auto', paddingBottom: '40px' }}>
+                    {APPS.filter(app => app.isMath).map(app => (
+                        <div
+                            key={app.id}
+                            onClick={() => {
+                                if (app.comingSoon) alert(`¡${app.name} está en desarrollo y llegará muy pronto! 🚀`);
+                                else abrirJuego(app.id);
+                            }}
+                            style={{
+                                background: app.comingSoon ? '#f8f9fa' : '#E0F2F1',
+                                borderRadius: '20px', padding: '30px 20px', textAlign: 'center',
+                                cursor: app.comingSoon ? 'not-allowed' : 'pointer',
+                                boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s',
+                                opacity: app.comingSoon ? 0.7 : 1, border: `3px solid ${app.comingSoon ? '#ddd' : app.color}`
+                            }}
+                        >
+                            <div style={{ fontSize: '50px', marginBottom: '15px', filter: app.comingSoon ? 'grayscale(100%)' : 'none' }}>{app.emoji}</div>
+                            <h3 style={{ margin: '0 0 10px 0', color: app.comingSoon ? '#7f8c8d' : app.color, fontSize: '1.4rem' }}>{app.name}</h3>
+                            <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>{app.desc}</p>
+                            {app.comingSoon && <span style={{ display: 'inline-block', marginTop: '15px', background: '#e0e0e0', color: '#555', padding: '5px 12px', borderRadius: '15px', fontSize: '0.8rem', fontWeight: 'bold' }}>Próximamente</span>}
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    }
+
 
     return (
         <div style={{ width: '100%', marginTop: '20px' }}>
@@ -530,8 +596,12 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
                 🕹️ Juegos de uno a tres jugadores
             </h2>
 
+
+
+
+
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '15px', marginBottom: '40px' }}>
-                {APPS.filter(app => !app.isLive).map(app => (
+                {APPS.filter(app => !app.isLive && !app.isMath).map(app => (
                     <div key={app.id} onClick={() => abrirJuego(app.id)} style={{ background: '#ffffbf', borderRadius: '15px', padding: '15px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transition: 'transform 0.2s' }}>
                         <div style={{ width: '60px', height: '60px', margin: '0 auto 10px auto', background: 'transparent', borderRadius: '15px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'white' }}>
                             {app.img ? (
@@ -605,9 +675,11 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
     if (appData.id === 'MATHLE') return <MathWordleGame usuario={null} onExit={onHome} />;
     if (appData.id === 'SOPA') return <SopaDeLetrasGame usuario={null} onExit={onHome} />;
     // --------
-    
-    if (appData.id === 'SINTAXIS' || juegoActivo.tipoJuego === 'SINTAXIS') return <SintaxisGame usuario={null} onExit={() => setJuegoActivo(null)} recurso={juegoActivo} />;
-       
+
+
+    if (appData.id === 'SINTAXIS' ) return <SintaxisGame usuario={null} onExit={() => setJuegoActivo(null)} recurso={juegoActivo} />;
+  
+    if (appData.id === 'GEOMETRIX' ) return <Geometrix usuario={null} onExit={() => setJuegoActivo(null)} />;
 
     // --- CASO ESPECIAL: QUESTION SENDER ---
     if (appData.id === 'QUESTION_SENDER') {
@@ -848,9 +920,9 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
                     <div style={{ display: 'flex', gap: '15px', justifyContent: 'center', flexWrap: 'wrap' }}>
 
                         {/* BOTÓN EXCLUSIVO PARA JUGAR DIRECTO CON IA */}
-                        {appData.id === 'SINTAXIS' && (
+                        {(appData.id === 'SINTAXIS' || appData.id === 'GEOMETRIX') && (
                             <button
-                                onClick={() => setJuegoActivo({ tipoJuego: 'SINTAXIS', isIA: true })}
+                                onClick={() => setJuegoActivo({ tipoJuego: appData.id, isIA: true })}
                                 style={{
                                     background: 'white',
                                     color: appData.color,
@@ -867,7 +939,7 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
                                     gap: '10px'
                                 }}
                             >
-                                🤖 Jugar Directamente (IA)
+                                {appData.id === 'SINTAXIS' ? '🤖 Jugar Directamente (IA)' : '📐 Jugar Modo Aleatorio'}
                             </button>
                         )}
 

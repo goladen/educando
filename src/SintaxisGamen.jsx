@@ -154,7 +154,7 @@ export default function SintaxisGame({ onExit, usuario }) {
             <div style={styles.header}>
                 <button onClick={() => window.location.href = 'https://www.pikt.es'} style={styles.btnVolver}>
                     <RotateCcw size={16} /> Salir
-                 </button>
+                </button>
                 <div style={styles.titulo}>Análisis Sintáctico</div>
                 <div style={styles.scoreBoard}>
                     <Trophy size={18} color="#f1c40f" />

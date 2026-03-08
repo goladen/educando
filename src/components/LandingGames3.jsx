@@ -13,7 +13,7 @@ import TextWordleGame from '../TextWordleGame';
 import MathWordleGame from '../MathWordleGame';
 import SopaDeLetrasGame from '../SopaDeLetrasGame';
 import SintaxisGame from '../SintaxisGamen';
-import Geometrix from '../Geometrix';
+import Geometrix from '../Geometrix3';
 import CalculoMental from '../CalculoMental2'; // AÑADE ESTO
 import Ecuaciones from '../Ecuaciones2';
 
@@ -634,7 +634,26 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
                     </div>
                 ))}
             </div>
+            {/* ========================================= */}
+            {/* FOOTER DE LICENCIA (PANTALLA PRINCIPAL) */}
+            {/* ========================================= */}
+            <div style={{ textAlign: 'center', padding: '20px', marginTop: '40px', fontSize: '0.85rem', color: '#fff', borderTop: '1px solid rgba(255,255,255,0.2)' }}>
+                <a href="https://github.com/goladen/educando" target="_blank" rel="noopener noreferrer" style={{ color: '#f1c40f', fontWeight: 'bold', textDecoration: 'none' }}>Pikt.es</a>
+                {' '}© 2025 by{' '}
+                <a href="https://pikt.es" target="_blank" rel="noopener noreferrer" style={{ color: '#fff', textDecoration: 'none' }}>Gonzalo Larrocha</a>
+                {' '}is licensed under{' '}
+                <a href="https://creativecommons.org/licenses/by-nc-nd/4.0/" target="_blank" rel="noopener noreferrer" style={{ color: '#fff', textDecoration: 'underline' }}>Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International</a>
+
+                <span style={{ display: 'inline-flex', alignItems: 'center', marginLeft: '8px', gap: '3px', verticalAlign: 'middle', filter: 'invert(1)' /* Pone los iconos blancos */ }}>
+                    <img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" alt="CC" style={{ width: '1.2em', height: '1.2em' }} />
+                    <img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" alt="BY" style={{ width: '1.2em', height: '1.2em' }} />
+                    <img src="https://mirrors.creativecommons.org/presskit/icons/nc.svg" alt="NC" style={{ width: '1.2em', height: '1.2em' }} />
+                    <img src="https://mirrors.creativecommons.org/presskit/icons/nd.svg" alt="ND" style={{ width: '1.2em', height: '1.2em' }} />
+                </span>
+            </div>
+
        
+    
         </div>
     );
 }
@@ -1052,9 +1071,35 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
                         </div>
                     </div>
                 )}
+
+                {/* ========================================= */}
+                {/* FOOTER DE LICENCIA (PANTALLA PRINCIPAL) */}
+                {/* ========================================= */}
+                <div style={{ textAlign: 'center', padding: '20px', marginTop: '40px', fontSize: '0.85rem', color: '#666', borderTop: '1px solid rgba(0,0,0,0.1)' }}>
+                    <a href="https://github.com/goladen/educando" target="_blank" rel="noopener noreferrer" style={{ color: '#2c3e50', fontWeight: 'bold', textDecoration: 'none' }}>Pikt.es</a>
+                    {' '}© 2025 by{' '}
+                    <a href="https://pikt.es" target="_blank" rel="noopener noreferrer" style={{ color: '#2c3e50', textDecoration: 'none' }}>Gonzalo Larrocha</a>
+                    {' '}is licensed under{' '}
+                    <a href="https://creativecommons.org/licenses/by-nc-nd/4.0/" target="_blank" rel="noopener noreferrer" style={{ color: '#2c3e50', textDecoration: 'underline' }}>Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International</a>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', marginLeft: '8px', gap: '3px', verticalAlign: 'middle', filter: 'invert(1)' /* Pone los iconos blancos */ }}>
+                        <img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" alt="CC" style={{ width: '1.2em', height: '1.2em' }} />
+                        <img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" alt="BY" style={{ width: '1.2em', height: '1.2em' }} />
+                        <img src="https://mirrors.creativecommons.org/presskit/icons/nc.svg" alt="NC" style={{ width: '1.2em', height: '1.2em' }} />
+                        <img src="https://mirrors.creativecommons.org/presskit/icons/nd.svg" alt="ND" style={{ width: '1.2em', height: '1.2em' }} />
+                    </span>
+                </div>
+
             </div>
-        </div>
+    
+        
+            </div>
+        
+
+
     );
+
+
+
 }
 
 const styles = {

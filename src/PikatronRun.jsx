@@ -213,6 +213,7 @@ export default function PikatronRun({ recurso, onExit, usuario, modoOlimpico = f
     const [nombreInvitado, setNombreInvitado] = useState('');
     const [guardando, setGuardando] = useState(false);
     const [yaGuardado, setYaGuardado] = useState(false);
+    const lastModeRef = useRef({ modo: 'SIMPLE', hoja: null }); // Recuerda el último modo jugado
 
 
 
@@ -240,6 +241,7 @@ export default function PikatronRun({ recurso, onExit, usuario, modoOlimpico = f
 
     // --- LÓGICA DE INICIO ---
     const iniciarPartida = (modo, nombreHoja = null) => {
+        lastModeRef.current = { modo, hoja: nombreHoja }; // Guardar para reiniciar
         const config = recurso.config || {};
 
         // 1. CONFIGURAR VELOCIDAD Y PUNTOS
@@ -686,21 +688,29 @@ export default function PikatronRun({ recurso, onExit, usuario, modoOlimpico = f
                 gameRef.current.pikatron.jumping = true;
             }
         };
-        window.addEventListener('keydown', (e) => {
+        // Usamos una referencia nombrada para poder eliminar el listener correctamente
+        const handleKeyDown = (e) => {
             if (e.code === 'Space' || e.code === 'ArrowUp') {
-                e.preventDefault(); // <--- ESTO EVITA QUE EL BOTÓN SE VUELVA A PULSAR O LA PANTALLA SE MUEVA
+                e.preventDefault();
                 handleInput();
             }
-        });
-
+        };
+        window.addEventListener('keydown', handleKeyDown);
         window.addEventListener('touchstart', handleInput);
         return () => {
-            window.removeEventListener('keydown', handleInput);
+            window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('touchstart', handleInput);
         };
     }, [gameState]);
 
-    const reiniciarJuegoCompleto = () => { setLives(3); setScore(0); iniciarPartida('RETO'); };
+    const reiniciarJuegoCompleto = () => {
+        setLives(3);
+        setScore(0);
+        setYaGuardado(false);      // Permite volver a guardar en la siguiente partida
+        setNombreInvitado('');     // Limpia el nombre del formulario
+        const { modo, hoja } = lastModeRef.current;
+        iniciarPartida(modo, hoja); // Repite el mismo modo y hoja que se estaba jugando
+    };
     // SI ESTAMOS EN SETUP, MOSTRAMOS EL MENÚ Y EL RANKING SI TOCA
     if (gameState === 'SETUP') return (
         <>
@@ -978,12 +988,8 @@ export default function PikatronRun({ recurso, onExit, usuario, modoOlimpico = f
                         </div>
                         )}
 
-                    <button onClick={reiniciarJuegoCompleto} style={{ ...btnStyle, background: '#e74c3c' }}><RefreshCw size={24} /> REINICIAR</button>
-                    <button onClick={onExit} style={{ marginTop: 20, background: 'none', border: 'none', color: '#777', cursor: 'pointer' }}>Salir</button>
                 </div>
             )}
-
-            {/* ... (Los bloques GAMEOVER y WIN se quedan igual que antes, usan overlayStyle así que taparán todo correctamente) ... */}
            
 
             {gameState === 'PLAYING' && <div style={{ color: '#777', marginTop: 10, fontFamily: 'monospace', fontSize: '12px' }}>[ ESPACIO ] o [ CLICK ] para saltar</div>}

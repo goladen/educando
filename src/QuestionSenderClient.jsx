@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { db } from './firebase';
 // Añade 'addDoc' a los imports
 import { collection, query, where, getDocs, doc, updateDoc, getDoc, addDoc } from 'firebase/firestore';
@@ -14,6 +14,14 @@ export default function QuestionSenderClient({ usuario, onBack, codigoInicial}) 
     // --- AÑADE ESTO ---
     const [nombreGuest, setNombreGuest] = useState('');
     const [letrasOcupadas, setLetrasOcupadas] = useState([]);
+
+    useEffect(() => {
+        if (codigoInicial && fase === 'CODIGO') {
+            entrar();
+        }
+    }, [codigoInicial]);
+
+
     // --- 1. ENTRAR EN LA HOJA ---
     const entrar = async () => {
         if (!codigo.trim()) return setError("Escribe el código.");

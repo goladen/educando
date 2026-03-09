@@ -24,6 +24,7 @@ import TextWordleGame from './TextWordleGame';
 import { MousePointer2, Rocket, Search as SearchIcon } from 'lucide-react';
 import EditorProBurbujasPikatron from './components/EditorProBurbujasPikatron';
 import EditorQuestionSender from './components/EditorQuestionSender';
+import ModalMigrarQsender from './components/ModalMigrarQsender';
 import MathWordleGame from './MathWordleGame';
 import EditorWordle from './components/EditorWordle';
 import EditorOlympic from './components/EditorOlympic';
@@ -94,6 +95,8 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
     const [mostrandoMathWordle, setMostrandoMathWordle] = useState(false);
     const [mostrandoEditorWordle, setMostrandoEditorWordle] = useState(false);
     const [mostrandoEditorOlympic, setMostrandoEditorOlympic] = useState(false); // <--- AÑADE ESTA LÍNEA
+    // Añade este estado junto a los demás en ProfesorDashboard
+    const [qSenderAMigrar, setQsenderAMigrar] = useState(null);
 
     const [recursoResultados, setRecursoResultados] = useState(null);
     const [recursoProbando, setRecursoProbando] = useState(null);
@@ -1050,10 +1053,13 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                         {(vista === 'MIS_RECURSOS' ? recursos : getRecursosFiltrados()).map((r, i) => (<div key={r.id || i} style={{
                             background: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', position: 'relative',
                             display: 'flex',
-                            flexDirection: 'column', borderLeft: `6px solid ${TIPOS_JUEGOS[juegoSeleccionado].color}` }}>{juegoSeleccionado !== 'QUESTION_SENDER' && <div style={{ position: 'absolute', top: '10px', right: '10px', background: '#f1c40f', padding: '2px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: 'bold' }}><Users size={12} /> {r.playCount || 0}</div>}<h3 style={{ margin: '0 0 5px 0' }}>{r.titulo}</h3><div style={{ display: 'flex', gap: '5px', marginTop: '10px' }}>{juegoSeleccionado === 'QUESTION_SENDER' ? (<><button onClick={() => abrirEdicion(r)} style={btnStyle('#E3F2FD', '#1565C0')}><Pencil size={18} /></button><button onClick={() => setModalCopiarApp(r)} style={btnStyle('#E8F5E9', '#2E7D32')}><Send size={18} /></button><button onClick={() => eliminarRecurso(r.id)} style={btnStyle('#FFEBEE', '#C62828')}><Trash2 size={18} /></button></>) : (vista === 'MIS_RECURSOS' ? (<>
-                            
+                            flexDirection: 'column', borderLeft: `6px solid ${TIPOS_JUEGOS[juegoSeleccionado].color}`
+                        }}>{juegoSeleccionado !== 'QUESTION_SENDER' && <div style={{ position: 'absolute', top: '10px', right: '10px', background: '#f1c40f', padding: '2px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: 'bold' }}><Users size={12} /> {r.playCount || 0}</div>}<h3 style={{ margin: '0 0 5px 0' }}>{r.titulo}</h3>
+
+                            <div style={{ display: 'flex', gap: '5px', marginTop: '10px' }}>{juegoSeleccionado === 'QUESTION_SENDER' ? (<><button onClick={() => setQsenderAMigrar(r)} style={btnStyle('#E8F5E9', '#2E7D32')} title="Migrar a Juego"><Send size={18} /></button><button onClick={() => abrirEdicion(r)} style={btnStyle('#E3F2FD', '#1565C0')}><Pencil size={18} /></button><button onClick={() => eliminarRecurso(r.id)} style={btnStyle('#FFEBEE', '#C62828')}><Trash2 size={18} /></button></>) : (vista === 'MIS_RECURSOS' ? (<>
                                 {juegoSeleccionado === 'THINKHOOT' || juegoSeleccionado === 'MATHLIVE' || juegoSeleccionado === 'OLYMPICLIVE' ? (
-                                <button title="Lanzar en Vivo" onClick={() => prepararJuegoEnVivo(r)} style={{ ...btnStyle('#9C27B0', 'white'), fontWeight: 'bold' }}>
+
+                                    <button title="Lanzar en Vivo" onClick={() => prepararJuegoEnVivo(r)} style={{ ...btnStyle('#9C27B0', 'white'), fontWeight: 'bold' }}>
                                     <Zap size={18} />
                                 </button>
                             ) : (
@@ -1200,7 +1206,21 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
 
             {/* OTROS MODALES */}
             {recursoResultados && <ModalOverlay onClose={() => setRecursoResultados(null)}><h2>Resultados</h2><button onClick={descargarCSV} style={{ background: '#4CAF50', color: 'white', padding: '10px', border: 'none', marginBottom: '10px' }}>Descargar CSV</button><div style={{ maxHeight: '300px', overflowY: 'auto' }}><table style={{ width: '100%' }}><thead><tr><th>Alumno</th><th>Nota</th></tr></thead><tbody>{listaResultados.map((r, i) => <tr key={i}><td>{r.jugador}</td><td>{r.aciertos || r.puntuacion}</td></tr>)}</tbody></table></div></ModalOverlay>}
-            {modalCopiarApp && <ModalOverlay onClose={() => setModalCopiarApp(null)}><h2>Mandar a App</h2><p>Crear recurso en <b>{TIPOS_JUEGOS[modalCopiarApp.targetGame]?.label}</b></p><button onClick={confirmarCopiaAplicacion} style={actionBtnStyle('#27ae60')}>Confirmar</button></ModalOverlay>}
+
+            {/* --- MODAL MIGRACIÓN INTELIGENTE QUESTION SENDER --- */}
+            {qSenderAMigrar && (
+                <ModalMigrarQsender
+                    qsRecurso={qSenderAMigrar}
+                    usuario={usuario}
+                    onClose={() => setQsenderAMigrar(null)}
+                    onMigrateSuccess={(mensaje) => {
+                        alert(mensaje);
+                        setQsenderAMigrar(null);
+                        cargarRecursosPropios();
+                    }}
+                />
+            )}
+
             {hostGameData?.fase === 'CONFIG_HOST' && (<ModalOverlay onClose={() => setHostGameData(null)}><h2>📡 Lanzar en Vivo</h2><select value={hostGameData.hojaElegida} onChange={e => setHostGameData({ ...hostGameData, hojaElegida: e.target.value })} style={{ width: '100%', padding: '10px', marginBottom: '20px' }}>{hostGameData.hojasDisponibles.map(h => <option key={h} value={h}>{h}</option>)}</select><button onClick={confirmarLanzamientoHost} style={{ width: '100%', padding: '15px', background: '#9C27B0', color: 'white', border: 'none', borderRadius: '5px' }}>🚀 GENERAR CÓDIGO</button></ModalOverlay>)}
             {recursoInspeccionando && <ModalOverlay onClose={() => setRecursoInspeccionando(null)}><h2>{recursoInspeccionando.titulo}</h2><div style={{ maxHeight: '400px', overflowY: 'auto' }}>{recursoInspeccionando.hojas.map((h, i) => <div key={i}><h4>{h.nombreHoja}</h4><ul>{h.preguntas.map((p, j) => <li key={j}><b>{p.letra ? `Letra ${p.letra}: ` : ''}{p.pregunta}</b> &rarr; {p.respuesta || p.correcta}</li>)}</ul></div>)}</div><button onClick={() => { copiarRecurso(recursoInspeccionando); setRecursoInspeccionando(null) }} style={actionBtnStyle('#27ae60')}>Copiar</button></ModalOverlay>}
             {mostrandoPerfil && (<UserProfile usuario={usuario} perfil={perfilProfesor} onClose={() => setMostrandoPerfil(false)} onUpdate={() => cargarPerfilProfesor()} />)}

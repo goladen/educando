@@ -689,6 +689,69 @@ export const ResourceCard = ({ r, onClick }) => {
     );
 };
 
+// --- NUEVO COMPONENTE ENVOLTORIO PARA ENLACES DIRECTOS A Q-SENDER ---
+const QuestionSenderWrapper = ({ onHome, initialJuegoActivo }) => {
+    const [qsCode, setQsCode] = useState('');
+    const [juegoActivo, setJuegoActivo] = useState(initialJuegoActivo);
+    const [loadingMsg, setLoadingMsg] = useState('');
+
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const codeFromUrl = params.get('c'); // Detecta si la url es ?c=A1B2C
+        if (codeFromUrl && !juegoActivo) {
+            setQsCode(codeFromUrl.toUpperCase());
+            abrirCliente(codeFromUrl.toUpperCase());
+        }
+    }, []);
+
+    const abrirCliente = async (codeToUse) => {
+        const targetCode = codeToUse || qsCode;
+        if (!targetCode || targetCode.trim().length < 4) return alert("Introduce un código válido.");
+        setLoadingMsg('Conectando...');
+
+        const qSender = query(collection(db, 'resources'), where("hojasCodes", "array-contains", targetCode.toUpperCase().trim()));
+        const snapSender = await getDocs(qSender);
+
+        if (!snapSender.empty) {
+            setJuegoActivo({
+                ...snapSender.docs[0].data(),
+                id: snapSender.docs[0].id,
+                tipoJuego: 'QUESTION_SENDER',
+                codigoInicial: targetCode.toUpperCase().trim()
+            });
+        } else {
+            alert("Código de hoja no encontrado. Pídeselo a tu profesor.");
+            if (window.location.search.includes('c=')) window.history.replaceState({}, '', '/q-sender');
+        }
+        setLoadingMsg('');
+    };
+
+    if (juegoActivo) {
+        return <QuestionSenderClient usuario={null} onBack={() => { setJuegoActivo(null); window.history.replaceState({}, '', '/q-sender'); }} codigoInicial={juegoActivo.codigoInicial} />;
+    }
+
+    return (
+        <div style={{ width: '100%', minHeight: '100vh', background: '#2c3e50', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
+            <div style={{ background: 'white', padding: '40px', borderRadius: '20px', textAlign: 'center', maxWidth: '500px', width: '100%', boxShadow: '0 10px 30px rgba(0,0,0,0.3)' }}>
+                <div style={{ marginBottom: '20px', fontSize: '80px', lineHeight: '1' }}>📮</div>
+                <h2 style={{ color: '#2c3e50', margin: '0 0 10px 0' }}>Buzón de Preguntas</h2>
+                <p style={{ color: '#7f8c8d', marginBottom: '30px' }}>Introduce el código de tu grupo para enviar preguntas.</p>
+
+                <input value={qsCode} onChange={e => setQsCode(e.target.value.toUpperCase())} placeholder="CÓDIGO (Ej: A1B2)" style={{ width: '100%', padding: '15px', fontSize: '1.5rem', textAlign: 'center', borderRadius: '10px', border: '2px solid #bdc3c7', marginBottom: '20px', letterSpacing: '3px', textTransform: 'uppercase', boxSizing: 'border-box' }} maxLength={5} />
+
+                <button onClick={() => abrirCliente()} disabled={!!loadingMsg} style={{ width: '100%', padding: '15px', background: '#27ae60', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer', marginBottom: '15px' }}>
+                    {loadingMsg || 'ENTRAR'}
+                </button>
+
+                <button onClick={onHome} style={{ background: 'transparent', border: 'none', color: '#95a5a6', cursor: 'pointer', fontSize: '0.9rem', textDecoration: 'underline' }}>Volver al inicio</button>
+            </div>
+        </div>
+    );
+};
+
+
+
+
 // PÁGINA ESPECÍFICA DEL JUEGO
 export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
     const [tab, setTab] = useState(appData.isLive ? 'LIVE' : 'SEARCH');
@@ -722,63 +785,9 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
     if (appData.id === 'ECUACIONES') return <Ecuaciones usuario={null} onExit={() => setJuegoActivo(null)} />;
      // ------------------------
     // --- CASO ESPECIAL: QUESTION SENDER ---
+    // --- CASO ESPECIAL: QUESTION SENDER ---
     if (appData.id === 'QUESTION_SENDER') {
-        const [qsCode, setQsCode] = useState('');
-
-        // Función para abrir el cliente
-        const abrirCliente = async () => {
-            if (!qsCode || qsCode.trim().length < 4) return alert("Introduce un código válido.");
-
-            const qSender = query(collection(db, 'resources'), where("hojasCodes", "array-contains", qsCode.toUpperCase().trim()));
-            const snapSender = await getDocs(qSender);
-
-            if (!snapSender.empty) {
-                // Truco: Usamos setJuegoActivo para renderizar el cliente
-                setJuegoActivo({
-                    ...snapSender.docs[0].data(),
-                    id: snapSender.docs[0].id,
-                    tipoJuego: 'QUESTION_SENDER',
-                    codigoInicial: qsCode.toUpperCase().trim()
-                });
-            } else {
-                alert("Código de hoja no encontrado. Pídeselo a tu profesor.");
-            }
-        };
-
-        // Si ya hemos activado el juego (cliente), lo mostramos
-        if (juegoActivo) {
-            return <QuestionSenderClient usuario={null} onBack={() => setJuegoActivo(null)} codigoInicial={juegoActivo.codigoInicial} />;
-        }
-
-        // Si no, mostramos la pantalla de "Ingresar Código"
-        return (
-            <div style={{ width: '100%', minHeight: '100vh', background: '#2c3e50', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}>
-                <div style={{ background: 'white', padding: '40px', borderRadius: '20px', textAlign: 'center', maxWidth: '500px', width: '100%', boxShadow: '0 10px 30px rgba(0,0,0,0.3)' }}>
-                    {/* EMOJI GRANDE */}
-                    <div style={{ marginBottom: '20px', fontSize: '80px', lineHeight: '1' }}>
-                        📮
-                    </div>
-                    <h2 style={{ color: '#2c3e50', margin: '0 0 10px 0' }}>Buzón de Preguntas</h2>
-                    <p style={{ color: '#7f8c8d', marginBottom: '30px' }}>Introduce el código de tu grupo para enviar preguntas.</p>
-
-                    <input
-                        value={qsCode}
-                        onChange={e => setQsCode(e.target.value.toUpperCase())}
-                        placeholder="CÓDIGO (Ej: A1B2)"
-                        style={{ width: '100%', padding: '15px', fontSize: '1.5rem', textAlign: 'center', borderRadius: '10px', border: '2px solid #bdc3c7', marginBottom: '20px', letterSpacing: '3px', textTransform: 'uppercase', boxSizing: 'border-box' }}
-                        maxLength={5}
-                    />
-
-                    <button onClick={abrirCliente} style={{ width: '100%', padding: '15px', background: '#27ae60', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer', marginBottom: '15px' }}>
-                        ENTRAR
-                    </button>
-
-                    <button onClick={onHome} style={{ background: 'transparent', border: 'none', color: '#95a5a6', cursor: 'pointer', fontSize: '0.9rem', textDecoration: 'underline' }}>
-                        Volver al inicio
-                    </button>
-                </div>
-            </div>
-        );
+        return <QuestionSenderWrapper onHome={onHome} initialJuegoActivo={juegoActivo} />;
     }
 
     const buscarEspecífico = async () => {

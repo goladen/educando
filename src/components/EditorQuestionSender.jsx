@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { Save, X, Trash2, Plus, Settings, RotateCcw, RefreshCw, Mail } from 'lucide-react';
+import { Save, X, Trash2, Plus, Settings, RotateCcw, RefreshCw, Mail, Link } from 'lucide-react';
 import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -115,6 +115,15 @@ export default function EditorQuestionSender({ datos, setDatos, onClose, onSave 
             actualizarHojasYCodigos(nuevas);
             setIndiceHojaActiva(0);
         }
+    };
+    const copiarEnlaceCompartir = (codigo) => {
+        // Genera el enlace directo a tu web
+        const url = `${window.location.origin}/q-sender?c=${codigo}`;
+        navigator.clipboard.writeText(url).then(() => {
+            alert('¡Enlace copiado! Envíalo a tus alumnos para que entren directamente al formulario.');
+        }).catch(() => {
+            alert('Error al copiar. El enlace es: ' + url);
+        });
     };
 
     const generarCodigoHoja = () => {
@@ -341,6 +350,15 @@ export default function EditorQuestionSender({ datos, setDatos, onClose, onSave 
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <span style={styles.bigCode}>{hojaActual.accessCode || '---'}</span>
                                 <button onClick={generarCodigoHoja} style={styles.btnSmall}><RotateCcw size={14} /> Generar</button>
+                                {/* NUEVO BOTÓN AÑADIDO AQUÍ 👇 */}
+                                {hojaActual.accessCode && (
+                                    <button onClick={() => copiarEnlaceCompartir(hojaActual.accessCode)} style={{ ...styles.btnSmall, background: '#3498db', color: 'white' }}>
+                                        <Link size={14} /> Compartir Enlace
+                                    </button>
+                                )}
+
+
+
                             </div>
                         </div>
                     </div>

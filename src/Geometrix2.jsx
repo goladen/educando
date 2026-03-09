@@ -25,8 +25,18 @@ const safePlay = (audioObj) => {
 
 // --- CONSTANTES GEOMETRIX ---
 const UNIDADES = ['mm', 'cm', 'dm', 'm', 'dam', 'hm', 'km'];
-const FIGURAS_TODAS = ['CUADRADO', 'RECTANGULO', 'TRIANGULO', 'CIRCULO', 'ROMBO', 'TRAPECIO', 'CUBO', 'PRISMA', 'CILINDRO', 'CONO'];
+const FIGURAS_2D = ['CUADRADO', 'RECTANGULO', 'TRIANGULO', 'CIRCULO', 'ROMBO', 'TRAPECIO'];
+const FIGURAS_3D = ['CILINDRO', 'CONO', 'ESFERA', 'PRISMA_RECT'];
+const FIGURAS_TODAS = [...FIGURAS_2D, ...FIGURAS_3D];
 const SCALE = 37.8;
+
+// Config por defecto para ejercicios
+const DEFAULT_GAME_CONFIG = {
+    tipos: { area: true, perimetro: true, volumen: true },
+    figuras: { planas2D: true, cuerpos3D: true },
+    numEjercicios: 10,
+    modoRegla: false,
+};
 
 const generarFormula = (shape, type, params, unit) => {
     const u = unit, u2 = `${unit}²`, u3 = `${unit}³`;
@@ -37,34 +47,150 @@ const generarFormula = (shape, type, params, unit) => {
         case 'CIRCULO': return type === 'ÁREA' ? `A = π × r² = 3.14 × ${params.r}² = ${parseFloat((Math.PI * params.r ** 2).toFixed(2))} ${u2}` : `P = 2 × π × r = 2 × 3.14 × ${params.r} = ${parseFloat((2 * Math.PI * params.r).toFixed(2))} ${u}`;
         case 'ROMBO': return type === 'ÁREA' ? `A = (D × d) / 2 = (${params.D} × ${params.d}) / 2 = ${(params.D * params.d) / 2} ${u2}` : `P = 4 × l = 4 × ${params.l} = ${4 * params.l} ${u}`;
         case 'TRAPECIO': return type === 'ÁREA' ? `A = ((B+b) / 2) × h = ((${params.B}+${params.b}) / 2) × ${params.h} = ${parseFloat((((params.B + params.b) / 2) * params.h).toFixed(2))} ${u2}` : `P = B+b+2×l = ${params.B}+${params.b}+2×${params.l_obl} = ${params.B + params.b + 2 * params.l_obl} ${u}`;
-        case 'CUBO': return `V = a³ = ${params.a} × ${params.a} × ${params.a} = ${params.a ** 3} ${u3}`;
-        case 'PRISMA': return `V = lb² × h = ${params.lb}² × ${params.h} = ${params.lb ** 2 * params.h} ${u3}`;
-        case 'CILINDRO': return `V = π × r² × h = 3.14 × ${params.r}² × ${params.h} = ${parseFloat((Math.PI * params.r ** 2 * params.h).toFixed(2))} ${u3}`;
-        case 'CONO': return `V = (π × r² × h) / 3 = (3.14 × ${params.r}² × ${params.h}) / 3 = ${parseFloat(((Math.PI * params.r ** 2 * params.h) / 3).toFixed(2))} ${u3}`;
+        // 3D
+        case 'CILINDRO': {
+            if (type === 'ÁREA') {
+                const at = parseFloat((2 * Math.PI * params.r * (params.r + params.h)).toFixed(2));
+                return `AT = 2×π×r×(r+h) = 2×3.14×${params.r}×(${params.r}+${params.h}) = ${at} ${u2}`;
+            }
+            return `V = π × r² × h = 3.14 × ${params.r}² × ${params.h} = ${parseFloat((Math.PI * params.r ** 2 * params.h).toFixed(2))} ${u3}`;
+        }
+        case 'CONO': {
+            const g = parseFloat(Math.sqrt(params.r ** 2 + params.h ** 2).toFixed(2));
+            if (type === 'ÁREA') {
+                const at = parseFloat((Math.PI * params.r * (params.r + g)).toFixed(2));
+                return `AT = π×r×(r+g) | g=√(r²+h²)=${g} → 3.14×${params.r}×(${params.r}+${g}) = ${at} ${u2}`;
+            }
+            return `V = (π × r² × h) / 3 = (3.14 × ${params.r}² × ${params.h}) / 3 = ${parseFloat(((Math.PI * params.r ** 2 * params.h) / 3).toFixed(2))} ${u3}`;
+        }
+        case 'ESFERA': {
+            if (type === 'ÁREA') return `AT = 4 × π × r² = 4 × 3.14 × ${params.r}² = ${parseFloat((4 * Math.PI * params.r ** 2).toFixed(2))} ${u2}`;
+            return `V = (4/3) × π × r³ = (4/3) × 3.14 × ${params.r}³ = ${parseFloat(((4 / 3) * Math.PI * params.r ** 3).toFixed(2))} ${u3}`;
+        }
+        case 'PRISMA_RECT': {
+            if (type === 'ÁREA') {
+                const at = 2 * (params.l * params.w + params.l * params.h + params.w * params.h);
+                return `AT = 2×(l×a + l×h + a×h) = 2×(${params.l}×${params.w}+${params.l}×${params.h}+${params.w}×${params.h}) = ${at} ${u2}`;
+            }
+            return `V = l × a × h = ${params.l} × ${params.w} × ${params.h} = ${params.l * params.w * params.h} ${u3}`;
+        }
         default: return '';
     }
 };
 
-const generarProblemaData = (modoRegla = false, bag = null) => {
-    const shape = bag && bag.length > 0 ? bag.pop() : FIGURAS_TODAS[Math.floor(Math.random() * FIGURAS_TODAS.length)];
+const generarProblemaData = (modoRegla = false, bag = null, cfg = DEFAULT_GAME_CONFIG) => {
+    // Construir pool de figuras según config
+    let pool = [];
+    if (cfg.figuras.planas2D) pool = [...pool, ...FIGURAS_2D];
+    if (cfg.figuras.cuerpos3D) pool = [...pool, ...FIGURAS_3D];
+    if (pool.length === 0) pool = [...FIGURAS_TODAS]; // fallback de seguridad
+
+    // Sacar figura de la bolsa (filtrando solo las del pool)
+    let shape;
+    if (bag && bag.length > 0) {
+        const idx = bag.findIndex(s => pool.includes(s));
+        if (idx !== -1) shape = bag.splice(idx, 1)[0];
+        else shape = pool[Math.floor(Math.random() * pool.length)];
+    } else {
+        shape = pool[Math.floor(Math.random() * pool.length)];
+    }
+
+    const is3D = FIGURAS_3D.includes(shape);
     const unit = modoRegla ? 'cm' : UNIDADES[Math.floor(Math.random() * UNIDADES.length)];
     const rI = (a, b) => Math.floor(Math.random() * (Math.max(a, b) - a + 1)) + a;
-    let text = '', correctAnswer = 0, type = '', correctExp = '', params = {};
-
-    // LIMITES MÁS PEQUEÑOS EN VIVO PARA ASEGURAR QUE CABE EN MÓVILES
     const maxS = modoRegla ? 5 : 12;
 
+    // Tipos válidos para esta figura según config
+    let validTypes = [];
+    if (!is3D) {
+        if (cfg.tipos.area) validTypes.push('ÁREA');
+        if (cfg.tipos.perimetro) validTypes.push('PERÍMETRO');
+    } else {
+        if (cfg.tipos.area) validTypes.push('ÁREA');      // área total de la superficie
+        if (cfg.tipos.volumen) validTypes.push('VOLUMEN');
+    }
+    if (validTypes.length === 0) validTypes = is3D ? ['VOLUMEN'] : ['ÁREA']; // fallback
+
+    const type = validTypes[Math.floor(Math.random() * validTypes.length)];
+
+    let text = '', correctAnswer = 0, correctExp = '', params = {};
+
     switch (shape) {
-        case 'CUADRADO': params.l = rI(3, maxS); type = Math.random() > 0.5 ? 'ÁREA' : 'PERÍMETRO'; correctAnswer = type === 'ÁREA' ? params.l ** 2 : 4 * params.l; correctExp = type === 'ÁREA' ? '2' : ''; text = `Calcula el ${type} de este cuadrado.`; break;
-        case 'RECTANGULO': params.b = rI(5, maxS); params.h = rI(3, Math.max(3, params.b - 1)); type = Math.random() > 0.5 ? 'ÁREA' : 'PERÍMETRO'; correctAnswer = type === 'ÁREA' ? params.b * params.h : 2 * params.b + 2 * params.h; correctExp = type === 'ÁREA' ? '2' : ''; text = `Calcula el ${type} de este rectángulo.`; break;
-        case 'TRIANGULO': params.b = rI(4, maxS); params.h = rI(4, maxS); type = 'ÁREA'; correctAnswer = (params.b * params.h) / 2; correctExp = '2'; text = 'Calcula el ÁREA de este triángulo.'; break;
-        case 'CIRCULO': params.r = rI(3, Math.floor(maxS / 2)); type = Math.random() > 0.5 ? 'ÁREA' : 'PERÍMETRO'; correctAnswer = type === 'ÁREA' ? Math.PI * params.r ** 2 : 2 * Math.PI * params.r; correctExp = type === 'ÁREA' ? '2' : ''; text = `Calcula el ${type} de este círculo (π≈3.14).`; break;
-        case 'ROMBO': type = Math.random() > 0.5 ? 'ÁREA' : 'PERÍMETRO'; if (type === 'ÁREA') { params.D = rI(6, maxS); params.d = rI(4, Math.max(4, params.D - 2)); correctAnswer = (params.D * params.d) / 2; correctExp = '2'; } else { params.l = rI(4, maxS); correctAnswer = 4 * params.l; correctExp = ''; } text = `Calcula el ${type} de este rombo.`; break;
-        case 'TRAPECIO': type = Math.random() > 0.5 ? 'ÁREA' : 'PERÍMETRO'; params.B = rI(8, maxS); params.b = rI(4, Math.max(4, params.B - 2)); if (type === 'ÁREA') { params.h = rI(4, maxS); correctAnswer = ((params.B + params.b) / 2) * params.h; correctExp = '2'; } else { params.l_obl = rI(4, maxS); correctAnswer = params.B + params.b + 2 * params.l_obl; correctExp = ''; } text = `Calcula el ${type} de este trapecio isósceles.`; break;
-        case 'CUBO': params.a = rI(3, Math.floor(maxS * 0.7)); type = 'VOLUMEN'; correctAnswer = params.a ** 3; correctExp = '3'; text = modoRegla ? 'Mide la cara frontal y calcula su VOLUMEN.' : 'Calcula el VOLUMEN de este cubo.'; break;
-        case 'PRISMA': params.lb = rI(3, Math.floor(maxS * 0.6)); params.h = rI(5, maxS); type = 'VOLUMEN'; correctAnswer = params.lb ** 2 * params.h; correctExp = '3'; text = modoRegla ? 'Mide ancho y alto frontal y calcula el VOLUMEN.' : 'Calcula el VOLUMEN del prisma.'; break;
-        case 'CILINDRO': params.r = rI(3, Math.floor(maxS * 0.5)); params.h = rI(5, maxS); type = 'VOLUMEN'; correctAnswer = Math.PI * params.r ** 2 * params.h; correctExp = '3'; text = modoRegla ? 'Mide radio y altura y calcula VOLUMEN (π≈3.14).' : 'Calcula el VOLUMEN del cilindro (π≈3.14).'; break;
-        case 'CONO': params.r = rI(3, Math.floor(maxS * 0.5)); params.h = rI(5, maxS); type = 'VOLUMEN'; correctAnswer = (Math.PI * params.r ** 2 * params.h) / 3; correctExp = '3'; text = modoRegla ? 'Mide base y altura y calcula VOLUMEN (π≈3.14).' : 'Calcula el VOLUMEN del cono (π≈3.14).'; break;
+        case 'CUADRADO':
+            params.l = rI(3, maxS);
+            correctAnswer = type === 'ÁREA' ? params.l ** 2 : 4 * params.l;
+            correctExp = type === 'ÁREA' ? '2' : '';
+            text = `Calcula el ${type} de este cuadrado.`; break;
+        case 'RECTANGULO':
+            params.b = rI(5, maxS); params.h = rI(3, Math.max(3, params.b - 1));
+            correctAnswer = type === 'ÁREA' ? params.b * params.h : 2 * params.b + 2 * params.h;
+            correctExp = type === 'ÁREA' ? '2' : '';
+            text = `Calcula el ${type} de este rectángulo.`; break;
+        case 'TRIANGULO':
+            params.b = rI(4, maxS); params.h = rI(4, maxS);
+            correctAnswer = (params.b * params.h) / 2; correctExp = '2';
+            text = 'Calcula el ÁREA de este triángulo.'; break;
+        case 'CIRCULO':
+            params.r = rI(3, Math.floor(maxS / 2));
+            correctAnswer = type === 'ÁREA' ? Math.PI * params.r ** 2 : 2 * Math.PI * params.r;
+            correctExp = type === 'ÁREA' ? '2' : '';
+            text = `Calcula el ${type} de este círculo (π≈3.14).`; break;
+        case 'ROMBO':
+            if (type === 'ÁREA') {
+                params.D = rI(6, maxS); params.d = rI(4, Math.max(4, params.D - 2));
+                correctAnswer = (params.D * params.d) / 2; correctExp = '2';
+            } else {
+                params.l = rI(4, maxS); correctAnswer = 4 * params.l; correctExp = '';
+            }
+            text = `Calcula el ${type} de este rombo.`; break;
+        case 'TRAPECIO':
+            params.B = rI(8, maxS); params.b = rI(4, Math.max(4, params.B - 2));
+            if (type === 'ÁREA') {
+                params.h = rI(4, maxS); correctAnswer = ((params.B + params.b) / 2) * params.h; correctExp = '2';
+            } else {
+                params.l_obl = rI(4, maxS); correctAnswer = params.B + params.b + 2 * params.l_obl; correctExp = '';
+            }
+            text = `Calcula el ${type} de este trapecio isósceles.`; break;
+        case 'CILINDRO':
+            params.r = rI(3, Math.floor(maxS * 0.5)); params.h = rI(5, maxS);
+            if (type === 'ÁREA') {
+                correctAnswer = 2 * Math.PI * params.r * (params.r + params.h); correctExp = '2';
+                text = 'Calcula el ÁREA TOTAL de este cilindro (π≈3.14).';
+            } else {
+                correctAnswer = Math.PI * params.r ** 2 * params.h; correctExp = '3';
+                text = modoRegla ? 'Mide radio y altura y calcula VOLUMEN (π≈3.14).' : 'Calcula el VOLUMEN del cilindro (π≈3.14).';
+            } break;
+        case 'CONO':
+            params.r = rI(3, Math.floor(maxS * 0.5)); params.h = rI(5, maxS);
+            if (type === 'ÁREA') {
+                const g = Math.sqrt(params.r ** 2 + params.h ** 2);
+                correctAnswer = Math.PI * params.r * (params.r + g); correctExp = '2';
+                text = 'Calcula el ÁREA TOTAL de este cono (π≈3.14).';
+            } else {
+                correctAnswer = (Math.PI * params.r ** 2 * params.h) / 3; correctExp = '3';
+                text = modoRegla ? 'Mide base y altura y calcula VOLUMEN (π≈3.14).' : 'Calcula el VOLUMEN del cono (π≈3.14).';
+            } break;
+        case 'ESFERA':
+            params.r = rI(3, Math.floor(maxS * 0.5));
+            if (type === 'ÁREA') {
+                correctAnswer = 4 * Math.PI * params.r ** 2; correctExp = '2';
+                text = modoRegla ? 'Mide el radio y calcula el ÁREA TOTAL (π≈3.14).' : 'Calcula el ÁREA TOTAL de esta esfera (π≈3.14).';
+            } else {
+                correctAnswer = (4 / 3) * Math.PI * params.r ** 3; correctExp = '3';
+                text = modoRegla ? 'Mide el radio y calcula el VOLUMEN (π≈3.14).' : 'Calcula el VOLUMEN de esta esfera (π≈3.14).';
+            } break;
+        case 'PRISMA_RECT':
+            params.l = rI(4, maxS);
+            // En modo regla: base cuadrada — solo hay que medir lado y altura
+            params.w = modoRegla ? params.l : rI(3, Math.max(3, params.l - 1));
+            params.h = rI(3, maxS);
+            if (type === 'ÁREA') {
+                correctAnswer = 2 * (params.l * params.w + params.l * params.h + params.w * params.h); correctExp = '2';
+                text = modoRegla ? 'Mide el lado de la base y la altura y calcula el ÁREA TOTAL.' : 'Calcula el ÁREA TOTAL de este prisma rectangular.';
+            } else {
+                correctAnswer = params.l * params.w * params.h; correctExp = '3';
+                text = modoRegla ? 'Mide el lado de la base y la altura y calcula el VOLUMEN.' : 'Calcula el VOLUMEN de este prisma rectangular.';
+            } break;
         default: break;
     }
     const formula = generarFormula(shape, type, params, unit);
@@ -72,6 +198,28 @@ const generarProblemaData = (modoRegla = false, bag = null) => {
 };
 
 const generarCodigo = () => Array.from({ length: 6 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
+
+// Genera un problema garantizando que no se repite la misma figura con las mismas medidas en la sesión
+const generarUnico = (modoRegla, bag, cfg, usedSet, maxIntentos = 20) => {
+    for (let i = 0; i < maxIntentos; i++) {
+        // Clonar la bolsa temporalmente para no consumirla si hay colisión
+        const bagSnapshot = [...bag];
+        const p = generarProblemaData(modoRegla, bagSnapshot, cfg);
+        const firma = `${p.shape}-${p.type}-${p.correctAnswer}`;
+        if (!usedSet.has(firma)) {
+            // Aceptado: aplicar los cambios a la bolsa real
+            bag.length = 0;
+            bagSnapshot.forEach(s => bag.push(s));
+            usedSet.add(firma);
+            return p;
+        }
+        // Si colisión, intentar de nuevo (la bolsa no se modificó)
+    }
+    // Tras maxIntentos, aceptar igualmente para no bloquear
+    const p = generarProblemaData(modoRegla, bag, cfg);
+    usedSet.add(`${p.shape}-${p.type}-${p.correctAnswer}`);
+    return p;
+};
 
 // ─── ROUTER PRINCIPAL INTELIGENTE ─────────────────────────────────────────────
 export default function GeometriaGame({ usuario, onExit, isHost, codigoSala }) {
@@ -98,7 +246,6 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
     const [modoRegla, setModoRegla] = useState(false);
     const [score, setScore] = useState(0);
     const [questionNum, setQuestionNum] = useState(1);
-    const [maxQuestions] = useState(10);
     const [currentProblem, setCurrentProblem] = useState(null);
     const [userAnswer, setUserAnswer] = useState('');
     const [userUnit, setUserUnit] = useState('');
@@ -106,14 +253,26 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
     const [feedback, setFeedback] = useState(null);
     const [canvasDim, setCanvasDim] = useState({ w: 600, h: 350 });
     const [isMobile, setIsMobile] = useState(false);
+    const [drawMode, setDrawMode] = useState(false);
+    const [showCalc, setShowCalc] = useState(false);
 
-    // Live config
+    // Modo 3 config
+    const [showGameConfig, setShowGameConfig] = useState(false);
+    const [gameConfig, setGameConfig] = useState({ ...DEFAULT_GAME_CONFIG });
+
+    // Live config (modo 4)
     const [joinCode, setJoinCode] = useState('');
     const [showLiveConfig, setShowLiveConfig] = useState(false);
-    const [liveConfig, setLiveConfig] = useState({ tiempoPregunta: 45, numPreguntas: 10, puntosMax: 100, puntosMin: 50, modoRegla: false });
+    const [liveConfig, setLiveConfig] = useState({
+        tiempoPregunta: 45, numPreguntas: 10, puntosMax: 100, puntosMin: 50,
+        modoRegla: false,
+        tipos: { area: true, perimetro: true, volumen: true },
+        figuras: { planas2D: true, cuerpos3D: true },
+    });
     const [creandoSala, setCreandoSala] = useState(false);
 
     const bagRef = useRef([]);
+    const usedRef = useRef(new Set());
     const canvasRef = useRef(null);
     const cardRef = useRef(null);
 
@@ -131,9 +290,31 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
         return () => window.removeEventListener('resize', update);
     }, [gameState]);
 
-    const startGame = (rm) => {
-        setModoRegla(rm); setScore(0); setQuestionNum(1); bagRef.current = [];
-        const p = generarProblemaData(rm, bagRef.current);
+    const abrirConfigModo3 = () => setShowGameConfig(true);
+
+    // Modo 1: rápido — todas las figuras, todos los tipos, 10 preguntas, fórmulas
+    const startModo1 = () => {
+        const cfg = { tipos: { area: true, perimetro: true, volumen: true }, figuras: { planas2D: true, cuerpos3D: true }, numEjercicios: 10, modoRegla: false };
+        setGameConfig(cfg);
+        startGame(false, cfg);
+    };
+
+    // Modo 2: regla — 2D y 3D medibles con regla, 10 preguntas
+    const startModo2 = () => {
+        const cfg = { tipos: { area: true, perimetro: true, volumen: true }, figuras: { planas2D: true, cuerpos3D: true }, numEjercicios: 10, modoRegla: true };
+        setGameConfig(cfg);
+        startGame(true, cfg);
+    };
+
+    const startGame = (rm, cfg) => {
+        setModoRegla(rm); setScore(0); setQuestionNum(1);
+        setDrawMode(false); setShowCalc(false);
+        const pool2D = cfg.figuras.planas2D ? [...FIGURAS_2D] : [];
+        const pool3D = cfg.figuras.cuerpos3D ? [...FIGURAS_3D] : [];
+        const bag = [...pool2D, ...pool2D, ...pool3D, ...pool3D].sort(() => Math.random() - 0.5);
+        bagRef.current = bag;
+        usedRef.current = new Set();
+        const p = generarUnico(rm, bagRef.current, cfg, usedRef.current);
         setCurrentProblem(p);
         setUserAnswer(''); setUserUnit(rm ? 'cm' : ''); setUserExp(''); setFeedback(null);
         setGameState('PLAYING');
@@ -157,10 +338,11 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
     };
 
     const nextQuestion = () => {
-        if (questionNum >= maxQuestions) { setGameState('END'); }
+        if (questionNum >= gameConfig.numEjercicios) { setGameState('END'); }
         else {
             setQuestionNum(q => q + 1);
-            const p = generarProblemaData(modoRegla, bagRef.current);
+            setDrawMode(false);
+            const p = generarUnico(modoRegla, bagRef.current, gameConfig, usedRef.current);
             setCurrentProblem(p);
             setUserAnswer(''); setUserUnit(modoRegla ? 'cm' : ''); setUserExp(''); setFeedback(null);
             setGameState('PLAYING');
@@ -173,11 +355,16 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
         setCreandoSala(true);
         try {
             const codigo = generarCodigo();
-            const bag1 = [...FIGURAS_TODAS].sort(() => Math.random() - 0.5);
-            const bag2 = [...FIGURAS_TODAS].sort(() => Math.random() - 0.5);
-            const bag = [...bag1, ...bag2];
+            const liveCfg = {
+                tipos: liveConfig.tipos,
+                figuras: liveConfig.figuras,
+                numEjercicios: liveConfig.numPreguntas,
+            };
+            const pool2D = liveConfig.figuras.planas2D ? [...FIGURAS_2D] : [];
+            const pool3D = liveConfig.figuras.cuerpos3D ? [...FIGURAS_3D] : [];
+            const bag = [...pool2D, ...pool2D, ...pool3D, ...pool3D].sort(() => Math.random() - 0.5);
             const preguntas = Array.from({ length: liveConfig.numPreguntas }, () => ({
-                ...generarProblemaData(liveConfig.modoRegla, bag),
+                ...generarProblemaData(liveConfig.modoRegla, bag, liveCfg),
                 tiempo: liveConfig.tiempoPregunta,
                 puntosMax: liveConfig.puntosMax,
                 puntosMin: liveConfig.puntosMin,
@@ -188,7 +375,7 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
                 questionStartTime: null, config: liveConfig, creadoEn: Date.now(),
             });
             setShowLiveConfig(false);
-            onHostStart(codigo); // ¡Activa el Host internamente!
+            onHostStart(codigo);
         } catch (e) { console.error(e); alert('Error al crear la sala. Comprueba la conexión.'); }
         setCreandoSala(false);
     };
@@ -198,48 +385,126 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
         onClientJoin(joinCode.toUpperCase());
     };
 
+    // ── Helpers de UI (definidos fuera del render para evitar re-renders) ──
+    const SeccionConfig = ({ label, children }) => (
+        <div style={sLive.section}><div style={sLive.label}>{label}</div>{children}</div>
+    );
+
+    // ChipToggle: no usa callback-pattern — recibe valor directo
+    const ChipToggle = ({ active, onClick, children, color = '#e74c3c', disabled }) => (
+        <button onClick={disabled ? undefined : onClick} style={{
+            ...sLive.chip,
+            background: active ? color : '#eee',
+            color: active ? 'white' : (disabled ? '#bbb' : '#555'),
+            opacity: disabled ? 0.5 : 1,
+            cursor: disabled ? 'not-allowed' : 'pointer',
+            border: disabled ? '1px dashed #ccc' : 'none',
+        }}>{children}</button>
+    );
+
+    // TiposFigurasConfig: usa cfg prop directamente, NO callback-pattern
+    const renderConfigFiguras = (cfg, onChangeCfg) => {
+        const toggle = (key, subKey) => {
+            const newVal = !cfg[key][subKey];
+            const updated = { ...cfg, [key]: { ...cfg[key], [subKey]: newVal } };
+            // Garantizar al menos 1 figura y 1 tipo válido
+            const anyFig = Object.values(updated.figuras).some(Boolean);
+            const anyTipo = Object.values(updated.tipos).some(Boolean);
+            if (!anyFig || !anyTipo) return;
+            onChangeCfg(updated);
+        };
+        const toggleModoRegla = (val) => {
+            onChangeCfg({ ...cfg, modoRegla: val });
+        };
+        const solo3D = cfg.figuras.cuerpos3D && !cfg.figuras.planas2D;
+        const solo2D = cfg.figuras.planas2D && !cfg.figuras.cuerpos3D;
+        return (<>
+            <SeccionConfig label="📐 Modo de juego">
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+                    <ChipToggle active={!cfg.modoRegla} onClick={() => toggleModoRegla(false)} color="#3498db">🔢 Fórmulas</ChipToggle>
+                    <ChipToggle active={cfg.modoRegla} onClick={() => toggleModoRegla(true)} color="#f39c12">📏 Regla</ChipToggle>
+                </div>
+                {cfg.modoRegla && <p style={{ color: '#e67e22', fontSize: '0.8rem', textAlign: 'center', margin: '6px 0 0' }}>📏 Modo regla: el prisma siempre tendrá base cuadrada (un solo lado a medir)</p>}
+            </SeccionConfig>
+            <SeccionConfig label="🔵 Tipo de figuras">
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+                    <ChipToggle active={cfg.figuras.planas2D} onClick={() => toggle('figuras', 'planas2D')} color="#2ecc71">⬡ 2D Planas</ChipToggle>
+                    <ChipToggle active={cfg.figuras.cuerpos3D} onClick={() => toggle('figuras', 'cuerpos3D')} color="#9b59b6">🧊 3D Cuerpos</ChipToggle>
+                </div>
+                <p style={{ fontSize: '0.76rem', color: '#888', textAlign: 'center', margin: '5px 0 0' }}>
+                    2D: cuadrado, rectángulo, triángulo, círculo, rombo, trapecio<br/>
+                    3D: cilindro, cono, esfera, prisma rectangular
+                </p>
+            </SeccionConfig>
+            <SeccionConfig label="📊 Tipos de ejercicios">
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+                    <ChipToggle active={cfg.tipos.area} onClick={() => toggle('tipos', 'area')} color="#e74c3c">📐 Área</ChipToggle>
+                    <ChipToggle active={cfg.tipos.perimetro} onClick={() => toggle('tipos', 'perimetro')} color="#3498db" disabled={solo3D}>📏 Perímetro</ChipToggle>
+                    <ChipToggle active={cfg.tipos.volumen} onClick={() => toggle('tipos', 'volumen')} color="#8e44ad" disabled={solo2D}>🧊 Volumen</ChipToggle>
+                </div>
+                {solo3D && <p style={{ color: '#e74c3c', fontSize: '0.76rem', textAlign: 'center', margin: '4px 0 0' }}>Perímetro no disponible para 3D</p>}
+                {solo2D && <p style={{ color: '#e74c3c', fontSize: '0.76rem', textAlign: 'center', margin: '4px 0 0' }}>Volumen no disponible para 2D</p>}
+            </SeccionConfig>
+        </>);
+    };
+
     return (
         <div style={sLocal.container}>
-            {/* Modal de Configuración Live */}
+
+            {/* ── MODAL CONFIG MODO 3 ── */}
+            {showGameConfig && (
+                <div style={sLive.overlay}>
+                    <div style={sLive.modal}>
+                        <h2 style={{ margin: '0 0 16px', color: '#2c3e50', fontSize: '1.25rem', textAlign: 'center' }}>⚙️ Modo Configurado</h2>
+                        {renderConfigFiguras(gameConfig, setGameConfig)}
+                        <SeccionConfig label="🔢 Número de ejercicios">
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+                                {[5, 8, 10, 15, 20].map(n => (
+                                    <ChipToggle key={n} active={gameConfig.numEjercicios === n} onClick={() => setGameConfig(c => ({ ...c, numEjercicios: n }))} color="#009688">{n}</ChipToggle>
+                                ))}
+                            </div>
+                        </SeccionConfig>
+                        <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 18 }}>
+                            <button onClick={() => setShowGameConfig(false)} style={sLive.btnSec}>Cancelar</button>
+                            <button onClick={() => { setShowGameConfig(false); startGame(gameConfig.modoRegla, gameConfig); }} style={sLive.btnPri}>▶ Comenzar</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── MODAL CONFIG EN VIVO ── */}
             {showLiveConfig && (
                 <div style={sLive.overlay}>
                     <div style={sLive.modal}>
-                        <h2 style={{ margin: '0 0 20px', color: '#2c3e50', fontSize: '1.35rem', textAlign: 'center' }}>🔴 Juego en Vivo — Configuración</h2>
-
-                        <div style={sLive.section}>
-                            <div style={sLive.label}>⏱ Tiempo por pregunta</div>
+                        <h2 style={{ margin: '0 0 16px', color: '#2c3e50', fontSize: '1.25rem', textAlign: 'center' }}>🔴 Juego en Vivo — Configuración</h2>
+                        {renderConfigFiguras(liveConfig, setLiveConfig)}
+                        <SeccionConfig label="⏱ Tiempo por pregunta">
                             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
                                 {[20, 30, 45, 60, 90].map(t => (
-                                    <button key={t} onClick={() => setLiveConfig(c => ({ ...c, tiempoPregunta: t }))}
-                                        style={{ ...sLive.chip, background: liveConfig.tiempoPregunta === t ? '#e74c3c' : '#eee', color: liveConfig.tiempoPregunta === t ? 'white' : '#555' }}>
-                                        {t}s
-                                    </button>
+                                    <ChipToggle key={t} active={liveConfig.tiempoPregunta === t} onClick={() => setLiveConfig(c => ({ ...c, tiempoPregunta: t }))}>{t}s</ChipToggle>
                                 ))}
                             </div>
-                        </div>
-
-                        <div style={sLive.section}>
-                            <div style={sLive.label}>🔢 Número de preguntas</div>
+                        </SeccionConfig>
+                        <SeccionConfig label="🔢 Número de preguntas">
                             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
                                 {[5, 8, 10, 15, 20].map(n => (
-                                    <button key={n} onClick={() => setLiveConfig(c => ({ ...c, numPreguntas: n }))}
-                                        style={{ ...sLive.chip, background: liveConfig.numPreguntas === n ? '#e74c3c' : '#eee', color: liveConfig.numPreguntas === n ? 'white' : '#555' }}>
-                                        {n}
-                                    </button>
+                                    <ChipToggle key={n} active={liveConfig.numPreguntas === n} onClick={() => setLiveConfig(c => ({ ...c, numPreguntas: n }))}>{n}</ChipToggle>
                                 ))}
                             </div>
-                        </div>
-
-                        <div style={sLive.section}>
-                            <div style={sLive.label}>📐 Modo de juego</div>
-                            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-                                <button onClick={() => setLiveConfig(c => ({ ...c, modoRegla: false }))} style={{ ...sLive.chip, padding: '10px 22px', background: !liveConfig.modoRegla ? '#3498db' : '#eee', color: !liveConfig.modoRegla ? 'white' : '#555' }}>🔢 Fórmulas</button>
-                                <button onClick={() => setLiveConfig(c => ({ ...c, modoRegla: true }))} style={{ ...sLive.chip, padding: '10px 22px', background: liveConfig.modoRegla ? '#f39c12' : '#eee', color: liveConfig.modoRegla ? 'white' : '#555' }}>📏 Regla</button>
+                        </SeccionConfig>
+                        <SeccionConfig label="🏆 Puntuación">
+                            <div style={{ display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+                                <label style={{ fontSize: '0.85rem', color: '#555' }}>Máx:
+                                    <input type="number" value={liveConfig.puntosMax} onChange={e => setLiveConfig(c => ({ ...c, puntosMax: parseInt(e.target.value) || 100 }))}
+                                        style={{ width: 60, marginLeft: 6, padding: '4px 8px', borderRadius: 6, border: '1px solid #ccc' }} />
+                                </label>
+                                <label style={{ fontSize: '0.85rem', color: '#555' }}>Mín:
+                                    <input type="number" value={liveConfig.puntosMin} onChange={e => setLiveConfig(c => ({ ...c, puntosMin: parseInt(e.target.value) || 50 }))}
+                                        style={{ width: 60, marginLeft: 6, padding: '4px 8px', borderRadius: 6, border: '1px solid #ccc' }} />
+                                </label>
                             </div>
-                            {liveConfig.modoRegla && <p style={{ color: '#e67e22', fontSize: '0.82rem', margin: '8px 0 0', textAlign: 'center' }}>⚠️ En vivo las figuras se adaptan a la pantalla del alumno.</p>}
-                        </div>
-
-                        <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 20 }}>
+                        </SeccionConfig>
+                        <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 18 }}>
                             <button onClick={() => setShowLiveConfig(false)} style={sLive.btnSec}>Cancelar</button>
                             <button onClick={crearSalaEnVivo} disabled={creandoSala} style={sLive.btnPri}>{creandoSala ? '⏳ Creando...' : '🚀 Lanzar Juego'}</button>
                         </div>
@@ -251,7 +516,7 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
                 <button onClick={handleExit} style={sLocal.btnVolver}><RotateCcw size={16} /> Salir</button>
                 {gameState !== 'START' && (
                     <div style={sLocal.scoreBoard}>
-                        <span>{questionNum}/{maxQuestions}</span>
+                        <span>{questionNum}/{gameConfig.numEjercicios}</span>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#f1c40f' }}><Trophy size={16} /> {score} pts</div>
                     </div>
                 )}
@@ -261,22 +526,31 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
                 <div ref={cardRef} style={sLocal.centerCard}>
                     <Calculator size={55} color="#009688" style={{ marginBottom: 8 }} />
                     <h1 style={{ color: '#2c3e50', fontSize: isMobile ? '1.8rem' : '2.4rem', margin: '8px 0' }}>Geometrix</h1>
+                    <p style={{ color: '#888', fontSize: '0.9rem', margin: '0 0 24px' }}>Áreas, perímetros y volúmenes</p>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, alignItems: 'center', marginTop: 30 }}>
-                        <button onClick={() => startGame(false)} style={{ ...sLocal.btnPrimary, background: '#3498db' }}><Calculator size={20} /> Modo Numérico (Solo)</button>
-                        <button onClick={() => startGame(true)} style={{ ...sLocal.btnPrimary, background: '#f39c12' }}><Ruler size={20} /> Modo Regla (Solo)</button>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
+                        {/* Modo 1 */}
+                        <button onClick={startModo1} style={{ ...sLocal.btnPrimary, background: '#3498db' }}>
+                            <Calculator size={20} /> 🎯 Modo Rápido <span style={{ fontSize: '0.8rem', opacity: 0.85 }}>(todas las figuras)</span>
+                        </button>
+                        {/* Modo 2 */}
+                        <button onClick={startModo2} style={{ ...sLocal.btnPrimary, background: '#f39c12' }}>
+                            <Ruler size={20} /> 📏 Modo Regla <span style={{ fontSize: '0.8rem', opacity: 0.85 }}>(medir en pantalla)</span>
+                        </button>
+                        {/* Modo 3 */}
+                        <button onClick={abrirConfigModo3} style={{ ...sLocal.btnPrimary, background: '#009688' }}>
+                            ⚙️ Modo Configurado <span style={{ fontSize: '0.8rem', opacity: 0.85 }}>(elige tipos y figuras)</span>
+                        </button>
 
-                        <div style={{ width: '100%', maxWidth: 320, height: 2, background: '#eee', margin: '15px 0' }} />
+                        <div style={{ width: '100%', maxWidth: 320, height: 2, background: '#eee', margin: '6px 0' }} />
 
-                        <button onClick={() => setShowLiveConfig(true)} style={{ ...sLocal.btnPrimary, background: '#9C27B0' }}><Monitor size={20} /> Crear Partida en Vivo</button>
-
-                        <div style={{ display: 'flex', gap: 10, width: '100%', maxWidth: 320, marginTop: 5 }}>
-                            <input
-                                type="text" placeholder="Código de 6 letras"
-                                value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())}
-                                style={{ flex: 1, padding: '12px', borderRadius: 30, border: '2px solid #ccc', textAlign: 'center', fontSize: '1.1rem', outline: 'none', textTransform: 'uppercase' }}
-                                maxLength={6}
-                            />
+                        {/* Modo 4 */}
+                        <button onClick={() => setShowLiveConfig(true)} style={{ ...sLocal.btnPrimary, background: '#9C27B0' }}>
+                            <Monitor size={20} /> 🔴 Crear Partida en Vivo
+                        </button>
+                        <div style={{ display: 'flex', gap: 10, width: '100%', maxWidth: 320 }}>
+                            <input type="text" placeholder="Código de 6 letras" value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())}
+                                style={{ flex: 1, padding: '12px', borderRadius: 30, border: '2px solid #ccc', textAlign: 'center', fontSize: '1.1rem', outline: 'none', textTransform: 'uppercase' }} maxLength={6} />
                             <button onClick={unirseASala} style={{ ...sLocal.btnPrimary, background: '#2ecc71', width: 'auto', padding: '12px 25px' }}>Unirse</button>
                         </div>
                     </div>
@@ -286,19 +560,32 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
             {gameState === 'PLAYING' && currentProblem && (
                 <div ref={cardRef} style={sLocal.centerCard}>
                     {modoRegla ? (
-                        <div style={{ width: '100%', overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', borderRadius: 14, border: '1px solid #ddd', background: '#f8f9fa', marginBottom: 18 }}>
+                        <div style={{ width: '100%', overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', borderRadius: 14, border: '1px solid #ddd', background: '#f8f9fa', marginBottom: 14, position: 'relative' }}>
                             <div ref={canvasRef} style={{ position: 'relative', width: `${canvasDim.w}px`, height: `${canvasDim.h}px`, flexShrink: 0 }}>
                                 <ShapeRenderer shape={currentProblem.shape} params={currentProblem.params} unit={currentProblem.unit} hideText={true} canvasDim={canvasDim} rulerMode={true} />
+                                <DrawingCanvas width={canvasDim.w} height={canvasDim.h} active={drawMode} key={`draw-${questionNum}`} />
                                 <VirtualRuler canvasRef={canvasRef} canvasDim={canvasDim} />
                             </div>
                         </div>
                     ) : (
-                            <div ref={canvasRef} style={{ position: 'relative', width: '100%', height: `${canvasDim.h}px`, margin: '0 auto 18px auto', background: '#f8f9fa', borderRadius: 14, border: '1px solid #ddd', overflow: 'hidden' }}>
-                                <ShapeRenderer shape={currentProblem.shape} params={currentProblem.params} unit={currentProblem.unit} hideText={false} canvasDim={canvasDim} rulerMode={false} />
-                            </div>
-                        )}
-                    <p style={{ fontSize: isMobile ? '1rem' : '1.15rem', color: '#333', fontWeight: 'bold', margin: '0 auto 18px', lineHeight: 1.5 }}>{currentProblem.text}</p>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 10, background: '#f8f9fa', padding: 14, borderRadius: 14 }}>
+                        <div ref={canvasRef} style={{ position: 'relative', width: '100%', height: `${canvasDim.h}px`, margin: '0 auto 14px auto', background: '#f8f9fa', borderRadius: 14, border: '1px solid #ddd', overflow: 'hidden' }}>
+                            <ShapeRenderer shape={currentProblem.shape} params={currentProblem.params} unit={currentProblem.unit} hideText={false} canvasDim={canvasDim} rulerMode={false} />
+                            <DrawingCanvas width={canvasDim.w} height={canvasDim.h} active={drawMode} key={`draw-${questionNum}`} />
+                        </div>
+                    )}
+
+                    {/* Enunciado + botones ✏️ y 🖩 */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                        <p style={{ flex: 1, fontSize: isMobile ? '1rem' : '1.1rem', color: '#333', fontWeight: 'bold', margin: 0, lineHeight: 1.4 }}>{currentProblem.text}</p>
+                        <button onClick={() => setDrawMode(d => !d)} title={drawMode ? 'Desactivar lápiz' : 'Activar lápiz'}
+                            style={{ flexShrink: 0, background: drawMode ? '#3498db' : '#f0f0f0', color: drawMode ? 'white' : '#555', border: 'none', borderRadius: 8, padding: '7px 10px', fontSize: '1.1rem', cursor: 'pointer' }}>✏️</button>
+                        <button onClick={() => setShowCalc(s => !s)} title="Mini calculadora"
+                            style={{ flexShrink: 0, background: showCalc ? '#f39c12' : '#f0f0f0', color: showCalc ? 'white' : '#555', border: 'none', borderRadius: 8, padding: '7px 10px', fontSize: '1.1rem', cursor: 'pointer' }}>🖩</button>
+                    </div>
+
+                    {showCalc && <MiniCalculadora onClose={() => setShowCalc(false)} />}
+
+                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 10, background: '#f8f9fa', padding: 12, borderRadius: 14 }}>
                         <input type="number" step="0.01" value={userAnswer} onChange={e => setUserAnswer(e.target.value)} onKeyDown={e => e.key === 'Enter' && checkAnswer()} placeholder="Número..." style={{ ...sLocal.inputNum, width: isMobile ? 95 : 115 }} autoFocus={!isMobile} />
                         <select value={userUnit} onChange={e => setUserUnit(e.target.value)} style={sLocal.inputSelect} disabled={modoRegla}>
                             <option value="">Unidad...</option>
@@ -319,17 +606,17 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
                     {feedback.isCorrect ? <CheckCircle size={55} color="#2ecc71" /> : <XCircle size={55} color="#e74c3c" />}
                     <h2 style={{ color: feedback.isCorrect ? '#27ae60' : '#c0392b', fontSize: isMobile ? '1rem' : '1.2rem', margin: '12px 0' }}>{feedback.message}</h2>
                     <div style={sLocal.formulaBox}><div style={sLocal.formulaLabel}>📐 Operación a realizar:</div><div style={sLocal.formulaText}>{feedback.formula}</div></div>
-                    <button onClick={nextQuestion} style={{ ...sLocal.btnPrimary, background: modoRegla ? '#f39c12' : '#3498db', marginTop: 20 }}>{questionNum >= maxQuestions ? 'Ver Resultados' : 'Siguiente'} <ArrowRight size={18} /></button>
+                    <button onClick={nextQuestion} style={{ ...sLocal.btnPrimary, background: modoRegla ? '#f39c12' : '#3498db', marginTop: 20 }}>{questionNum >= gameConfig.numEjercicios ? 'Ver Resultados' : 'Siguiente'} <ArrowRight size={18} /></button>
                 </div>
             )}
 
             {gameState === 'END' && (
                 <div style={sLocal.centerCard}>
-                    {score >= 50 && <Confetti recycle={false} />}
+                    {score >= gameConfig.numEjercicios * 5 && <Confetti recycle={false} />}
                     <Trophy size={75} color="#f1c40f" style={{ marginBottom: 16 }} />
                     <h1 style={{ color: '#2c3e50' }}>¡Desafío Completado!</h1>
                     <div style={{ fontSize: '4rem', fontWeight: 'bold', color: '#f1c40f' }}>{score}</div>
-                    <p style={{ color: '#999', marginBottom: 28 }}>Puntos sobre 100</p>
+                    <p style={{ color: '#999', marginBottom: 28 }}>Puntos sobre {gameConfig.numEjercicios * 10}</p>
                     <button onClick={handleExit} style={{ ...sLocal.btnPrimary, background: '#009688' }}>Salir al Menú</button>
                 </div>
             )}
@@ -646,6 +933,8 @@ function ClientPreguntaGeo({ pregunta, startTime, subFase, myResult, puntuacion,
     const [enviado, setEnviado] = useState(false);
     const [timeLeft, setTimeLeft] = useState(100);
     const [isLate, setIsLate] = useState(false);
+    const [drawMode, setDrawMode] = useState(false);
+    const [showCalc, setShowCalc] = useState(false);
     const tRef = useRef(null);
     const canvasRef = useRef(null);
 
@@ -714,20 +1003,32 @@ function ClientPreguntaGeo({ pregunta, startTime, subFase, myResult, puntuacion,
                 <div className="waiting-others"><Loader className="spin-icon" size={48} /><p>Respuesta enviada. Espera...</p></div>
             ) : (
                     <div className="question-card" style={{ width: '100%', maxWidth: 500, padding: 15 }}>
-                        <p style={{ color: '#2c3e50', fontWeight: 'bold', fontSize: '1.1rem', margin: '0 0 15px' }}>{pregunta.text}</p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                            <p style={{ flex: 1, color: '#2c3e50', fontWeight: 'bold', fontSize: '1.05rem', margin: 0 }}>{pregunta.text}</p>
+                            <button onClick={() => setDrawMode(d => !d)} title={drawMode ? 'Desactivar' : 'Anotar'}
+                                style={{ flexShrink: 0, background: drawMode ? '#3498db' : '#f0f0f0', color: drawMode ? 'white' : '#555', border: 'none', borderRadius: 8, padding: '6px 10px', fontSize: '1.1rem', cursor: 'pointer' }}>
+                                ✏️
+                            </button>
+                            <button onClick={() => setShowCalc(s => !s)} title="Mini calculadora"
+                                style={{ flexShrink: 0, background: showCalc ? '#f39c12' : '#f0f0f0', color: showCalc ? 'white' : '#555', border: 'none', borderRadius: 8, padding: '6px 10px', fontSize: '1.1rem', cursor: 'pointer' }}>🖩</button>
+                        </div>
 
-                        {modoRegla ? (
+                        {showCalc && <MiniCalculadora onClose={() => setShowCalc(false)} />}
+
+                        {esModoRegla ? (
                             <div style={{ width: '100%', overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', borderRadius: 14, border: '1px solid #ddd', background: '#f8f9fa', marginBottom: 15 }}>
                                 <div ref={canvasRef} style={{ position: 'relative', width: `${canvasDim.w}px`, height: `${canvasDim.h}px`, flexShrink: 0 }}>
                                     <ShapeRenderer shape={pregunta.shape} params={pregunta.params} unit={pregunta.unit} hideText={true} canvasDim={canvasDim} rulerMode={true} />
+                                    <DrawingCanvas width={canvasDim.w} height={canvasDim.h} active={drawMode} key="client-draw" />
                                     <VirtualRuler canvasRef={canvasRef} canvasDim={canvasDim} />
                                 </div>
                             </div>
                         ) : (
-                                <div style={{ position: 'relative', width: '100%', height: canvasDim.h, background: '#f8f9fa', borderRadius: 14, overflow: 'hidden', marginBottom: 15, border: '1px solid #ddd' }}>
-                                    <ShapeRenderer shape={pregunta.shape} params={pregunta.params} unit={pregunta.unit} hideText={false} canvasDim={canvasDim} rulerMode={false} />
-                                </div>
-                            )}
+                            <div style={{ position: 'relative', width: '100%', height: canvasDim.h, background: '#f8f9fa', borderRadius: 14, overflow: 'hidden', marginBottom: 15, border: '1px solid #ddd' }}>
+                                <ShapeRenderer shape={pregunta.shape} params={pregunta.params} unit={pregunta.unit} hideText={false} canvasDim={canvasDim} rulerMode={false} />
+                                <DrawingCanvas width={canvasDim.w} height={canvasDim.h} active={drawMode} key="client-draw" />
+                            </div>
+                        )}
 
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
                             <input type="number" step="0.01" value={userAnswer} onChange={e => setUserAnswer(e.target.value)} placeholder="Núm" style={{ padding: 10, fontSize: '1.1rem', borderRadius: 8, border: '2px solid #bdc3c7', textAlign: 'center', outline: 'none', width: 80 }} />
@@ -742,6 +1043,164 @@ function ClientPreguntaGeo({ pregunta, startTime, subFase, myResult, puntuacion,
                     </div>
                 )}
         </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MINI CALCULADORA
+// ─────────────────────────────────────────────────────────────────────────────
+function MiniCalculadora({ onClose }) {
+    const [display, setDisplay] = useState('0');
+    const [prev, setPrev] = useState(null);
+    const [op, setOp] = useState(null);
+    const [waitNext, setWaitNext] = useState(false);
+
+    const pressNum = (n) => {
+        if (waitNext) { setDisplay(String(n)); setWaitNext(false); }
+        else setDisplay(d => d === '0' ? String(n) : d + n);
+    };
+    const pressDecimal = () => {
+        if (waitNext) { setDisplay('0.'); setWaitNext(false); return; }
+        if (!display.includes('.')) setDisplay(d => d + '.');
+    };
+    const pressOp = (o) => {
+        const cur = parseFloat(display);
+        if (prev !== null && !waitNext) {
+            const res = calc(prev, cur, op);
+            setDisplay(String(parseFloat(res.toFixed(8))));
+            setPrev(parseFloat(res.toFixed(8)));
+        } else { setPrev(cur); }
+        setOp(o); setWaitNext(true);
+    };
+    const calc = (a, b, o) => { if (o === '+') return a + b; if (o === '-') return a - b; if (o === '×') return a * b; if (o === '÷') return b !== 0 ? a / b : 0; return b; };
+    const pressEqual = () => {
+        if (op === null || prev === null) return;
+        const res = calc(prev, parseFloat(display), op);
+        setDisplay(String(parseFloat(res.toFixed(8))));
+        setPrev(null); setOp(null); setWaitNext(true);
+    };
+    const pressClear = () => { setDisplay('0'); setPrev(null); setOp(null); setWaitNext(false); };
+    const pressPi = () => { setDisplay(String(parseFloat(Math.PI.toFixed(8)))); setWaitNext(false); };
+    const pressSqrt = () => { setDisplay(d => String(parseFloat(Math.sqrt(parseFloat(d)).toFixed(8)))); setWaitNext(true); };
+    const pressSq = () => { const v = parseFloat(display); setDisplay(String(parseFloat((v * v).toFixed(8)))); setWaitNext(true); };
+
+    const btn = (label, onClick, bg = '#f0f0f0', col = '#333') => (
+        <button key={label} onClick={onClick} style={{ padding: '10px 0', background: bg, color: col, border: '1px solid #ddd', borderRadius: 8, fontWeight: 'bold', fontSize: '0.95rem', cursor: 'pointer', touchAction: 'manipulation' }}>
+            {label}
+        </button>
+    );
+
+    return (
+        <div style={{ background: '#1a1a2e', borderRadius: 16, padding: 14, marginBottom: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)', position: 'relative' }}>
+            <button onClick={onClose} style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', borderRadius: 6, padding: '2px 8px', cursor: 'pointer', fontSize: '0.85rem' }}>✕</button>
+            <div style={{ background: '#0d0d1f', color: '#f1c40f', fontFamily: 'monospace', fontSize: '1.5rem', fontWeight: 'bold', textAlign: 'right', padding: '10px 12px', borderRadius: 10, marginBottom: 10, minHeight: 48, wordBreak: 'break-all' }}>
+                {op && <span style={{ fontSize: '0.75rem', color: '#888', marginRight: 8 }}>{prev} {op}</span>}
+                {display}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+                {btn('C', pressClear, '#e74c3c', 'white')}
+                {btn('√', pressSqrt, '#3498db', 'white')}
+                {btn('x²', pressSq, '#3498db', 'white')}
+                {btn('÷', () => pressOp('÷'), '#f39c12', 'white')}
+                {btn('7', () => pressNum('7'))}{btn('8', () => pressNum('8'))}{btn('9', () => pressNum('9'))}
+                {btn('×', () => pressOp('×'), '#f39c12', 'white')}
+                {btn('4', () => pressNum('4'))}{btn('5', () => pressNum('5'))}{btn('6', () => pressNum('6'))}
+                {btn('-', () => pressOp('-'), '#f39c12', 'white')}
+                {btn('1', () => pressNum('1'))}{btn('2', () => pressNum('2'))}{btn('3', () => pressNum('3'))}
+                {btn('+', () => pressOp('+'), '#f39c12', 'white')}
+                {btn('π', pressPi, '#9b59b6', 'white')}{btn('0', () => pressNum('0'))}{btn('.', pressDecimal)}
+                {btn('=', pressEqual, '#2ecc71', 'white')}
+            </div>
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CANVAS DE ANOTACIONES TÁCTIL/RATÓN
+// ─────────────────────────────────────────────────────────────────────────────
+function DrawingCanvas({ width, height, active }) {
+    const cvRef = useRef(null);
+    const drawing = useRef(false);
+    const lastPos = useRef(null);
+    const [color, setColor] = useState('#e74c3c');
+    const [isEraser, setIsEraser] = useState(false);
+
+    const getPos = (e) => {
+        const rect = cvRef.current.getBoundingClientRect();
+        const src = e.touches ? e.touches[0] : e;
+        return { x: src.clientX - rect.left, y: src.clientY - rect.top };
+    };
+
+    const startDraw = (e) => {
+        if (!active) return;
+        e.preventDefault();
+        drawing.current = true;
+        lastPos.current = getPos(e);
+    };
+
+    const doDraw = (e) => {
+        if (!drawing.current || !active) return;
+        e.preventDefault();
+        const pos = getPos(e);
+        const ctx = cvRef.current.getContext('2d');
+        ctx.beginPath();
+        ctx.moveTo(lastPos.current.x, lastPos.current.y);
+        ctx.lineTo(pos.x, pos.y);
+        ctx.globalCompositeOperation = isEraser ? 'destination-out' : 'source-over';
+        ctx.strokeStyle = isEraser ? 'rgba(0,0,0,1)' : color;
+        ctx.lineWidth = isEraser ? 22 : 3;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+        lastPos.current = pos;
+    };
+
+    const stopDraw = () => { drawing.current = false; };
+
+    const clearCanvas = () => {
+        const ctx = cvRef.current.getContext('2d');
+        ctx.clearRect(0, 0, width, height);
+    };
+
+    const COLORS = ['#e74c3c', '#2c3e50', '#3498db', '#2ecc71', '#f39c12', '#9b59b6'];
+
+    return (
+        <>
+            <canvas
+                ref={cvRef}
+                width={width}
+                height={height}
+                style={{
+                    position: 'absolute', top: 0, left: 0, zIndex: 6,
+                    pointerEvents: active ? 'auto' : 'none',
+                    cursor: active ? (isEraser ? 'cell' : 'crosshair') : 'default',
+                    touchAction: 'none',
+                }}
+                onMouseDown={startDraw} onMouseMove={doDraw} onMouseUp={stopDraw} onMouseLeave={stopDraw}
+                onTouchStart={startDraw} onTouchMove={doDraw} onTouchEnd={stopDraw}
+            />
+            {active && (
+                <div style={{
+                    position: 'absolute', top: 6, right: 6, zIndex: 10,
+                    display: 'flex', gap: 4, alignItems: 'center',
+                    background: 'rgba(255,255,255,0.93)', borderRadius: 10,
+                    padding: '4px 6px', boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                }}>
+                    {COLORS.map(c => (
+                        <button key={c} onClick={() => { setIsEraser(false); setColor(c); }}
+                            style={{ width: 20, height: 20, borderRadius: '50%', background: c, border: (!isEraser && color === c) ? '3px solid white' : '1px solid rgba(0,0,0,0.15)', cursor: 'pointer', boxShadow: (!isEraser && color === c) ? `0 0 0 2px ${c}` : 'none', padding: 0 }} />
+                    ))}
+                    <button onClick={() => setIsEraser(e => !e)}
+                        style={{ background: isEraser ? '#e0e0e0' : 'transparent', border: '1px solid #ccc', borderRadius: 6, padding: '2px 5px', cursor: 'pointer', fontSize: '0.85rem' }} title="Borrador">
+                        ⬜
+                    </button>
+                    <button onClick={clearCanvas}
+                        style={{ background: 'transparent', border: '1px solid #ccc', borderRadius: 6, padding: '2px 5px', cursor: 'pointer', fontSize: '0.85rem' }} title="Borrar todo">
+                        🗑️
+                    </button>
+                </div>
+            )}
+        </>
     );
 }
 
@@ -849,10 +1308,10 @@ const ShapeRenderer = ({ shape, params, unit, hideText, canvasDim, rulerMode }) 
             case 'CIRCULO': shapeW = params.r * 2; shapeH = params.r * 2; break;
             case 'ROMBO': shapeW = params.D || params.l * 2; shapeH = params.d || params.l * 2; break;
             case 'TRAPECIO': shapeW = params.B; shapeH = params.h || params.l_obl * 0.8; break;
-            case 'CUBO': shapeW = params.a * 1.5; shapeH = params.a * 1.5; break;
-            case 'PRISMA': shapeW = params.lb * 1.5; shapeH = params.h * 1.2; break;
             case 'CILINDRO': shapeW = params.r * 2; shapeH = params.h * 1.2; break;
             case 'CONO': shapeW = params.r * 2; shapeH = params.h * 1.1; break;
+            case 'ESFERA': shapeW = params.r * 2; shapeH = params.r * 2; break;
+            case 'PRISMA_RECT': shapeW = Math.max(params.l, params.w) * 1.5; shapeH = params.h * 1.2; break;
             default: shapeW = shapeH = 10;
         }
         activeScale = Math.min(maxW / shapeW, maxH / shapeH, 120);
@@ -875,10 +1334,10 @@ const ShapeRenderer = ({ shape, params, unit, hideText, canvasDim, rulerMode }) 
             else { const L = params.l * activeScale; const pts = `${cx},${cy - L} ${cx + L},${cy} ${cx},${cy + L} ${cx - L},${cy}`; return <svg {...svgProps}><polygon points={pts} {...s2D} fill="#fce4ec" />{T({ x: cx + L / 2 + 15, y: cy - L / 2 - 15 }, params.l)}</svg>; }
         }
         case 'TRAPECIO': { const B = params.B * activeScale, b = params.b * activeScale; const h = params.h ? params.h * activeScale : (Math.sqrt(Math.pow(params.l_obl, 2) - Math.pow((params.B - params.b) / 2, 2)) || 5) * activeScale; const pts = `${cx - b / 2},${cy - h / 2} ${cx + b / 2},${cy - h / 2} ${cx + B / 2},${cy + h / 2} ${cx - B / 2},${cy + h / 2}`; return <svg {...svgProps}><polygon points={pts} {...s2D} fill="#e0f2f1" />{T({ x: cx, y: cy - h / 2 - 10 }, params.b)}{T({ x: cx, y: cy + h / 2 + 20 }, params.B)}{params.h ? <><line x1={cx - b / 2} y1={cy - h / 2} x2={cx - b / 2} y2={cy + h / 2} stroke="#00cec9" strokeDasharray="6,6" strokeWidth="2" />{T({ x: cx - b / 2 + 20, y: cy }, params.h)}</> : T({ x: cx - B / 2 + 15, y: cy, rot: -60 }, params.l_obl)}</svg>; }
-        case 'CUBO': { const a = params.a * activeScale, off = a * 0.4; return <svg {...svgProps}><rect x={cx - a / 2 + off} y={cy - a / 2 - off} width={a} height={a} fill="none" stroke="#9b59b6" strokeWidth="3" /><line x1={cx - a / 2} y1={cy - a / 2} x2={cx - a / 2 + off} y2={cy - a / 2 - off} stroke="#9b59b6" strokeWidth="3" /><line x1={cx + a / 2} y1={cy - a / 2} x2={cx + a / 2 + off} y2={cy - a / 2 - off} stroke="#9b59b6" strokeWidth="3" /><line x1={cx - a / 2} y1={cy + a / 2} x2={cx - a / 2 + off} y2={cy + a / 2 - off} stroke="#9b59b6" strokeWidth="3" /><line x1={cx + a / 2} y1={cy + a / 2} x2={cx + a / 2 + off} y2={cy + a / 2 - off} stroke="#9b59b6" strokeWidth="3" /><rect x={cx - a / 2} y={cy - a / 2} width={a} height={a} {...s3D} />{T({ x: cx, y: cy + a / 2 + 20 }, params.a)}</svg>; }
-        case 'PRISMA': { const w = params.lb * activeScale, h = params.h * activeScale, off = w * 0.4; return <svg {...svgProps}><rect x={cx - w / 2 + off} y={cy - h / 2 - off} width={w} height={h} fill="none" stroke="#6c5ce7" strokeWidth="3" /><line x1={cx - w / 2} y1={cy - h / 2} x2={cx - w / 2 + off} y2={cy - h / 2 - off} stroke="#6c5ce7" strokeWidth="3" /><line x1={cx + w / 2} y1={cy - h / 2} x2={cx + w / 2 + off} y2={cy - h / 2 - off} stroke="#6c5ce7" strokeWidth="3" /><line x1={cx - w / 2} y1={cy + h / 2} x2={cx - w / 2 + off} y2={cy + h / 2 - off} stroke="#6c5ce7" strokeWidth="3" /><line x1={cx + w / 2} y1={cy + h / 2} x2={cx + w / 2 + off} y2={cy + h / 2 - off} stroke="#6c5ce7" strokeWidth="3" /><rect x={cx - w / 2} y={cy - h / 2} width={w} height={h} fill="rgba(108,92,231,0.2)" stroke="#6c5ce7" strokeWidth="3" />{T({ x: cx, y: cy + h / 2 + 20 }, params.lb)}{T({ x: cx - w / 2 - 15, y: cy, rot: -90 }, params.h)}</svg>; }
         case 'CILINDRO': { const r = params.r * activeScale, h = params.h * activeScale, ry = r * 0.3; return <svg {...svgProps}><ellipse cx={cx} cy={cy - h / 2} rx={r} ry={ry} fill="#fbeee6" stroke="#e67e22" strokeWidth="3" /><line x1={cx - r} y1={cy - h / 2} x2={cx - r} y2={cy + h / 2} stroke="#e67e22" strokeWidth="3" /><line x1={cx + r} y1={cy - h / 2} x2={cx + r} y2={cy + h / 2} stroke="#e67e22" strokeWidth="3" /><path d={`M ${cx - r} ${cy + h / 2} A ${r} ${ry} 0 0 0 ${cx + r} ${cy + h / 2}`} fill="none" stroke="#e67e22" strokeWidth="3" /><path d={`M ${cx - r} ${cy + h / 2} A ${r} ${ry} 0 0 1 ${cx + r} ${cy + h / 2}`} fill="none" stroke="#e67e22" strokeWidth="3" strokeDasharray="6,6" /><line x1={cx - r} y1={cy - h / 2} x2={cx + r} y2={cy - h / 2} stroke="#e67e22" strokeDasharray="6,6" strokeWidth="2" />{T({ x: cx + 15, y: cy - h / 2 - ry - 5 }, params.r)}{T({ x: cx - r - 20, y: cy, rot: -90 }, params.h)}</svg>; }
         case 'CONO': { const r = params.r * activeScale, h = params.h * activeScale, ry = r * 0.3; return <svg {...svgProps}><line x1={cx - r} y1={cy + h / 2} x2={cx} y2={cy - h / 2} stroke="#d63031" strokeWidth="3" /><line x1={cx + r} y1={cy + h / 2} x2={cx} y2={cy - h / 2} stroke="#d63031" strokeWidth="3" /><path d={`M ${cx - r} ${cy + h / 2} A ${r} ${ry} 0 0 0 ${cx + r} ${cy + h / 2}`} fill="none" stroke="#d63031" strokeWidth="3" /><path d={`M ${cx - r} ${cy + h / 2} A ${r} ${ry} 0 0 1 ${cx + r} ${cy + h / 2}`} fill="none" stroke="#d63031" strokeWidth="3" strokeDasharray="6,6" /><line x1={cx - r} y1={cy + h / 2} x2={cx + r} y2={cy + h / 2} stroke="#d63031" strokeDasharray="6,6" strokeWidth="2" /><line x1={cx} y1={cy - h / 2} x2={cx} y2={cy + h / 2} stroke="#d63031" strokeDasharray="6,6" strokeWidth="2" />{T({ x: cx + r / 2, y: cy + h / 2 + 20 }, params.r)}{T({ x: cx + 15, y: cy }, params.h)}</svg>; }
+        case 'ESFERA': { const r = params.r * activeScale; return <svg {...svgProps}><circle cx={cx} cy={cy} r={r} fill="rgba(52,152,219,0.15)" stroke="#2980b9" strokeWidth="3" /><ellipse cx={cx} cy={cy} rx={r} ry={r * 0.3} fill="none" stroke="#2980b9" strokeWidth="2" strokeDasharray="6,4" /><line x1={cx} y1={cy} x2={cx + r} y2={cy} stroke="#2980b9" strokeDasharray="5,4" strokeWidth="2" />{T({ x: cx + r / 2, y: cy - 10 }, params.r)}</svg>; }
+        case 'PRISMA_RECT': { const w = params.l * activeScale, h = params.h * activeScale, d = params.w * activeScale * 0.5, off = d * 0.7; return <svg {...svgProps}><rect x={cx - w / 2 + off} y={cy - h / 2 - off} width={w} height={h} fill="none" stroke="#6c5ce7" strokeWidth="3" /><line x1={cx - w / 2} y1={cy - h / 2} x2={cx - w / 2 + off} y2={cy - h / 2 - off} stroke="#6c5ce7" strokeWidth="3" /><line x1={cx + w / 2} y1={cy - h / 2} x2={cx + w / 2 + off} y2={cy - h / 2 - off} stroke="#6c5ce7" strokeWidth="3" /><line x1={cx - w / 2} y1={cy + h / 2} x2={cx - w / 2 + off} y2={cy + h / 2 - off} stroke="#6c5ce7" strokeWidth="3" /><line x1={cx + w / 2} y1={cy + h / 2} x2={cx + w / 2 + off} y2={cy + h / 2 - off} stroke="#6c5ce7" strokeWidth="3" /><rect x={cx - w / 2} y={cy - h / 2} width={w} height={h} fill="rgba(108,92,231,0.2)" stroke="#6c5ce7" strokeWidth="3" />{T({ x: cx, y: cy + h / 2 + 20 }, params.l)}{T({ x: cx - w / 2 - 18, y: cy, rot: -90 }, params.h)}{T({ x: cx + w / 2 + off / 2 + 12, y: cy - h / 2 - off / 2 - 5 }, params.w)}</svg>; }
         default: return null;
     }
 };

@@ -199,6 +199,28 @@ const generarProblemaData = (modoRegla = false, bag = null, cfg = DEFAULT_GAME_C
 
 const generarCodigo = () => Array.from({ length: 6 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
 
+// Genera un problema garantizando que no se repite la misma figura con las mismas medidas en la sesión
+const generarUnico = (modoRegla, bag, cfg, usedSet, maxIntentos = 20) => {
+    for (let i = 0; i < maxIntentos; i++) {
+        // Clonar la bolsa temporalmente para no consumirla si hay colisión
+        const bagSnapshot = [...bag];
+        const p = generarProblemaData(modoRegla, bagSnapshot, cfg);
+        const firma = `${p.shape}-${p.type}-${p.correctAnswer}`;
+        if (!usedSet.has(firma)) {
+            // Aceptado: aplicar los cambios a la bolsa real
+            bag.length = 0;
+            bagSnapshot.forEach(s => bag.push(s));
+            usedSet.add(firma);
+            return p;
+        }
+        // Si colisión, intentar de nuevo (la bolsa no se modificó)
+    }
+    // Tras maxIntentos, aceptar igualmente para no bloquear
+    const p = generarProblemaData(modoRegla, bag, cfg);
+    usedSet.add(`${p.shape}-${p.type}-${p.correctAnswer}`);
+    return p;
+};
+
 // ─── ROUTER PRINCIPAL INTELIGENTE ─────────────────────────────────────────────
 export default function GeometriaGame({ usuario, onExit, isHost, codigoSala }) {
     // Estados internos para gestionar las salas sin depender del Landing
@@ -250,6 +272,7 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
     const [creandoSala, setCreandoSala] = useState(false);
 
     const bagRef = useRef([]);
+    const usedRef = useRef(new Set());
     const canvasRef = useRef(null);
     const cardRef = useRef(null);
 
@@ -290,7 +313,8 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
         const pool3D = cfg.figuras.cuerpos3D ? [...FIGURAS_3D] : [];
         const bag = [...pool2D, ...pool2D, ...pool3D, ...pool3D].sort(() => Math.random() - 0.5);
         bagRef.current = bag;
-        const p = generarProblemaData(rm, bagRef.current, cfg);
+        usedRef.current = new Set();
+        const p = generarUnico(rm, bagRef.current, cfg, usedRef.current);
         setCurrentProblem(p);
         setUserAnswer(''); setUserUnit(rm ? 'cm' : ''); setUserExp(''); setFeedback(null);
         setGameState('PLAYING');
@@ -318,7 +342,7 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
         else {
             setQuestionNum(q => q + 1);
             setDrawMode(false);
-            const p = generarProblemaData(modoRegla, bagRef.current, gameConfig);
+            const p = generarUnico(modoRegla, bagRef.current, gameConfig, usedRef.current);
             setCurrentProblem(p);
             setUserAnswer(''); setUserUnit(modoRegla ? 'cm' : ''); setUserExp(''); setFeedback(null);
             setGameState('PLAYING');
@@ -434,10 +458,14 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
                         <h2 style={{ margin: '0 0 16px', color: '#2c3e50', fontSize: '1.25rem', textAlign: 'center' }}>⚙️ Modo Configurado</h2>
                         {renderConfigFiguras(gameConfig, setGameConfig)}
                         <SeccionConfig label="🔢 Número de ejercicios">
-                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-                                {[5, 8, 10, 15, 20].map(n => (
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
+                                {[5, 8, 10, 15].map(n => (
                                     <ChipToggle key={n} active={gameConfig.numEjercicios === n} onClick={() => setGameConfig(c => ({ ...c, numEjercicios: n }))} color="#009688">{n}</ChipToggle>
                                 ))}
+                                <input type="number" min="1" max="50" placeholder="···"
+                                    value={![5,8,10,15].includes(gameConfig.numEjercicios) ? gameConfig.numEjercicios : ''}
+                                    onChange={e => { const v = parseInt(e.target.value); if (v > 0) setGameConfig(c => ({ ...c, numEjercicios: v })); }}
+                                    style={{ width: 52, padding: '6px 8px', borderRadius: 20, border: `2px solid ${![5,8,10,15].includes(gameConfig.numEjercicios) ? '#009688' : '#ccc'}`, textAlign: 'center', fontSize: '0.9rem', outline: 'none', fontWeight: 'bold', color: '#333' }} />
                             </div>
                         </SeccionConfig>
                         <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 18 }}>
@@ -455,17 +483,25 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
                         <h2 style={{ margin: '0 0 16px', color: '#2c3e50', fontSize: '1.25rem', textAlign: 'center' }}>🔴 Juego en Vivo — Configuración</h2>
                         {renderConfigFiguras(liveConfig, setLiveConfig)}
                         <SeccionConfig label="⏱ Tiempo por pregunta">
-                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-                                {[20, 30, 45, 60, 90].map(t => (
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
+                                {[20, 30, 45, 60].map(t => (
                                     <ChipToggle key={t} active={liveConfig.tiempoPregunta === t} onClick={() => setLiveConfig(c => ({ ...c, tiempoPregunta: t }))}>{t}s</ChipToggle>
                                 ))}
+                                <input type="number" min="5" max="300" placeholder="···"
+                                    value={![20,30,45,60].includes(liveConfig.tiempoPregunta) ? liveConfig.tiempoPregunta : ''}
+                                    onChange={e => { const v = parseInt(e.target.value); if (v > 0) setLiveConfig(c => ({ ...c, tiempoPregunta: v })); }}
+                                    style={{ width: 52, padding: '6px 8px', borderRadius: 20, border: `2px solid ${![20,30,45,60].includes(liveConfig.tiempoPregunta) ? '#e74c3c' : '#ccc'}`, textAlign: 'center', fontSize: '0.9rem', outline: 'none', fontWeight: 'bold', color: '#333' }} />
                             </div>
                         </SeccionConfig>
                         <SeccionConfig label="🔢 Número de preguntas">
-                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-                                {[5, 8, 10, 15, 20].map(n => (
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
+                                {[5, 8, 10, 15].map(n => (
                                     <ChipToggle key={n} active={liveConfig.numPreguntas === n} onClick={() => setLiveConfig(c => ({ ...c, numPreguntas: n }))}>{n}</ChipToggle>
                                 ))}
+                                <input type="number" min="1" max="50" placeholder="···"
+                                    value={![5,8,10,15].includes(liveConfig.numPreguntas) ? liveConfig.numPreguntas : ''}
+                                    onChange={e => { const v = parseInt(e.target.value); if (v > 0) setLiveConfig(c => ({ ...c, numPreguntas: v })); }}
+                                    style={{ width: 52, padding: '6px 8px', borderRadius: 20, border: `2px solid ${![5,8,10,15].includes(liveConfig.numPreguntas) ? '#009688' : '#ccc'}`, textAlign: 'center', fontSize: '0.9rem', outline: 'none', fontWeight: 'bold', color: '#333' }} />
                             </div>
                         </SeccionConfig>
                         <SeccionConfig label="🏆 Puntuación">
@@ -556,7 +592,7 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
                         <button onClick={() => setDrawMode(d => !d)} title={drawMode ? 'Desactivar lápiz' : 'Activar lápiz'}
                             style={{ flexShrink: 0, background: drawMode ? '#3498db' : '#f0f0f0', color: drawMode ? 'white' : '#555', border: 'none', borderRadius: 8, padding: '7px 10px', fontSize: '1.1rem', cursor: 'pointer' }}>✏️</button>
                         <button onClick={() => setShowCalc(s => !s)} title="Mini calculadora"
-                            style={{ flexShrink: 0, background: showCalc ? '#f39c12' : '#f0f0f0', color: showCalc ? 'white' : '#555', border: 'none', borderRadius: 8, padding: '7px 10px', fontSize: '1.1rem', cursor: 'pointer' }}>🖩</button>
+                            style={{ flexShrink: 0, background: showCalc ? '#f39c12' : '#f0f0f0', color: showCalc ? 'white' : '#555', border: 'none', borderRadius: 8, padding: '7px 10px', fontSize: '1.1rem', cursor: 'pointer' }}>🧮</button>
                     </div>
 
                     {showCalc && <MiniCalculadora onClose={() => setShowCalc(false)} />}
@@ -986,7 +1022,7 @@ function ClientPreguntaGeo({ pregunta, startTime, subFase, myResult, puntuacion,
                                 ✏️
                             </button>
                             <button onClick={() => setShowCalc(s => !s)} title="Mini calculadora"
-                                style={{ flexShrink: 0, background: showCalc ? '#f39c12' : '#f0f0f0', color: showCalc ? 'white' : '#555', border: 'none', borderRadius: 8, padding: '6px 10px', fontSize: '1.1rem', cursor: 'pointer' }}>🖩</button>
+                                style={{ flexShrink: 0, background: showCalc ? '#f39c12' : '#f0f0f0', color: showCalc ? 'white' : '#555', border: 'none', borderRadius: 8, padding: '6px 10px', fontSize: '1.1rem', cursor: 'pointer' }}>🧮</button>
                         </div>
 
                         {showCalc && <MiniCalculadora onClose={() => setShowCalc(false)} />}

@@ -349,8 +349,14 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
         }
     };
 
-    const handleExit = () => { if (gameState !== 'START') { setGameState('START'); } else { if (onExit) onExit(); else window.location.href = '/'; } };
-
+    const handleExit = () => {
+        if (onExit) {
+            onExit();
+        } else {
+            window.history.pushState({}, '', '/math_world');
+            window.dispatchEvent(new Event('popstate'));
+        }
+    };
     const crearSalaEnVivo = async () => {
         setCreandoSala(true);
         try {

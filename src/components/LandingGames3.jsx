@@ -15,7 +15,7 @@ import SopaDeLetrasGame from '../SopaDeLetrasGame';
 import SintaxisGame from '../SintaxisGamen';
 import Geometrix from '../Geometrix';
 import CalculoMental from '../CalculoMental2'; // AÑADE ESTO
-import Ecuaciones from '../Ecuaciones2';
+import Ecuaciones from '../Ecuaciones';
 
 import imgPasapalabra from '../assets/icono_pasapal.png'; // Revisa si es .png o .jpg
 import imgBurbujas from '../assets/icono_burbujas.png';
@@ -184,6 +184,24 @@ const cleanText = (str) => {
 export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
     // --- AÑADE ESTA LÍNEA AQUÍ ---
     const [zonaActiva, setZonaActiva] = useState('MAIN');
+
+    // --- AÑADE ESTE BLOQUE PARA ESCUCHAR LA URL ---
+    useEffect(() => {
+        const checkURL = () => {
+            const path = window.location.pathname.toLowerCase().replace('/', '');
+            if (path === 'math_world') {
+                setZonaActiva('MATH');
+            } else if (path === '' || path === 'inicio') {
+                setZonaActiva('MAIN');
+            }
+        };
+        checkURL();
+        window.addEventListener('popstate', checkURL);
+        return () => window.removeEventListener('popstate', checkURL);
+    }, []);
+
+
+
     const [modoBusqueda, setModoBusqueda] = useState('FILTROS');
     const [filtros, setFiltros] = useState({ tipoJuego: '', ciclo: '', tema: '', pais: '', region: '', poblacion: '', autor: '' });
     const [mostrarMasFiltros, setMostrarMasFiltros] = useState(false);
@@ -327,9 +345,11 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
     };
     const abrirJuego = (appId) => {
 
-        // Si pinchan en el portal, cambiamos de pantalla sin recargar la web
+        
+            // Si pinchan en el portal, cambiamos de pantalla y CREAMOS LA URL
         if (appId === 'MATH_WORLD_PORTAL') {
             setZonaActiva('MATH');
+            window.history.pushState({}, '', '/math_world');
             return;
         }
 
@@ -451,7 +471,12 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
     if (zonaActiva === 'MATH') {
         return (
             <div style={{ width: '100%', marginTop: '20px' }}>
-                <button onClick={() => setZonaActiva('MAIN')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#333', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '20px', fontWeight: 'bold' }}>
+                {/* Botón Volver Modificado */}
+                <button onClick={() => {
+                    setZonaActiva('MAIN');
+                    window.history.pushState({}, '', '/');
+                    window.dispatchEvent(new Event('popstate'));
+                }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#333', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '20px', fontWeight: 'bold' }}>
                     <Home size={20} /> Volver al Menú Principal
                 </button>
 
@@ -770,7 +795,31 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
     const [hostRoomCode, setHostRoomCode] = useState('');
     const [juegoActivo, setJuegoActivo] = useState(null);
     const [recursoParaElegir, setRecursoParaElegir] = useState(null);
+    // --- NUEVAS FUNCIONES DE SALIDA DIRECTA ---
+    const handleExitGame = () => {
+        if (appData.isMath) {
+            window.history.pushState({}, '', '/math_world');
+            window.dispatchEvent(new Event('popstate'));
+        } else {
+            setJuegoActivo(null);
+        }
+    };
 
+    const handleVolverMenu = () => {
+        if (appData.isMath) {
+            window.history.pushState({}, '', '/math_world');
+            window.dispatchEvent(new Event('popstate'));
+        } else {
+            onHome();
+        }
+    };
+
+    if (juegoActivo) {
+        // Usa handleExitGame en lugar de setJuegoActivo(null)
+        if (appData.id === 'GEOMETRIX' || juegoActivo.tipoJuego === 'GEOMETRIX') return <Geometrix usuario={null} onExit={handleExitGame} />;
+        if (appData.id === 'CALCULO' || juegoActivo.tipoJuego === 'CALCULO') return <CalculoMental usuario={null} onExit={handleExitGame} />;
+        if (appData.id === 'ECUACIONES' || juegoActivo.tipoJuego === 'ECUACIONES') return <Ecuaciones onExit={handleExitGame} />;
+    }
     // --- NUEVO: ATAJO PARA JUEGOS CON MENÚ PROPIO ---
     if (appData.id === 'WORDLE') return <TextWordleGame usuario={null} onExit={onHome} />;
     if (appData.id === 'MATHLE') return <MathWordleGame usuario={null} onExit={onHome} />;
@@ -780,10 +829,11 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
 
     if (appData.id === 'SINTAXIS' ) return <SintaxisGame usuario={null} onExit={() => setJuegoActivo(null)} recurso={juegoActivo} />;
   
-    if (appData.id === 'GEOMETRIX' ) return <Geometrix usuario={null} onExit={() => setJuegoActivo(null)} />;
-    if (appData.id === 'CALCULO' ) return <CalculoMental usuario={null} onExit={() => setJuegoActivo(null)} />;
-    if (appData.id === 'ECUACIONES') return <Ecuaciones usuario={null} onExit={() => setJuegoActivo(null)} />;
-     // ------------------------
+    // --- NUEVO: USA handleExitGame PARA LOS DE MATES ---
+    if (appData.id === 'GEOMETRIX') return <Geometrix usuario={null} onExit={handleExitGame} />;
+    if (appData.id === 'CALCULO') return <CalculoMental usuario={null} onExit={handleExitGame} />;
+    if (appData.id === 'ECUACIONES') return <Ecuaciones usuario={null} onExit={handleExitGame} />;
+    // ------------------------// ------------------------
     // --- CASO ESPECIAL: QUESTION SENDER ---
     // --- CASO ESPECIAL: QUESTION SENDER ---
     if (appData.id === 'QUESTION_SENDER') {

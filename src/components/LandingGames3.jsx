@@ -14,8 +14,8 @@ import MathWordleGame from '../MathWordleGame';
 import SopaDeLetrasGame from '../SopaDeLetrasGame';
 import SintaxisGame from '../SintaxisGamen';
 import Geometrix from '../Geometrix';
-import CalculoMental from '../CalculoMental2'; // AÑADE ESTO
-import Ecuaciones from '../Ecuaciones';
+import CalculoMental from '../CalculoMental2'; 
+import Ecuaciones from '../Ecuaciones2';
 
 import imgPasapalabra from '../assets/icono_pasapal.png'; // Revisa si es .png o .jpg
 import imgBurbujas from '../assets/icono_burbujas.png';

@@ -220,10 +220,19 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
 
         else if (tipo === 'APAREJADOS') {
             return (
-                <div style={{ display: 'flex', gap: '10px' }}>
-                    <input style={{ flex: 1 }} placeholder="Término A" value={p.terminoA} onChange={e => updatePregunta(i, 'terminoA', e.target.value)} className="inp" />
-                    <span style={{ paddingTop: '5px' }}>↔️</span>
-                    <input style={{ flex: 1 }} placeholder="Término B" value={p.terminoB} onChange={e => updatePregunta(i, 'terminoB', e.target.value)} className="inp" />
+                <div style={styles.grid2}>
+                    <input
+                        placeholder="Término A (Ej: País)"
+                        value={p.terminoA || ''}
+                        onChange={(e) => editarPregunta(i, 'terminoA', e.target.value)}
+                        style={styles.input}
+                    />
+                    <input
+                        placeholder="Término B (Ej: Capital)"
+                        value={p.terminoB || ''}
+                        onChange={(e) => editarPregunta(i, 'terminoB', e.target.value)}
+                        style={styles.input}
+                    />
                 </div>
             );
         }

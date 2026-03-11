@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { Save, X, Trash2, Plus, Settings, RotateCcw, HelpCircle, ArrowUp, ArrowDown } from 'lucide-react'; // <--- AÑADIDO HelpCircle
-import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore'; // Añade deleteDoc
+import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore'; 
 import { db } from '../firebase'; // Asegúrate de importar db
 const JUEGOS_DESTINO = [
     { id: 'PASAPALABRA', label: 'Pasapalabra' },

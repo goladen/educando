@@ -79,19 +79,19 @@ const fmtTime = (s) => `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}
 // ─────────────────────────────────────────────────────────────────────
 // MAIN EXPORT — ROUTER
 // ─────────────────────────────────────────────────────────────────────
-export default function SintaxisGame({ onExit, isHost, codigoSala, usuario }) {
-    if (isHost)     return <SintaxisLiveHost   codigoSala={codigoSala} usuario={usuario} onExit={onExit} />;
+export default function SintaxisGame({ onExit, isHost, codigoSala, usuario, recurso }) {
+    if (isHost) return <SintaxisLiveHost codigoSala={codigoSala} usuario={usuario} onExit={onExit} />;
     if (codigoSala) return <SintaxisLiveClient codigoSala={codigoSala} usuario={usuario} onExit={onExit} />;
-    return <SintaxisApp onExit={onExit} />;
+    return <SintaxisApp onExit={onExit} recursoInicial={recurso} />;
 }
 
 // ─────────────────────────────────────────────────────────────────────
 // APP CONTAINER (gestiona pantallas locales + entrada al modo online)
 // ─────────────────────────────────────────────────────────────────────
-function SintaxisApp({ onExit }) {
-    const [screen, setScreen]           = useState('NIVEL');   // NIVEL | MODOS | LOCAL | CONTRARRELOJ | DUAL
-    const [nivelSel, setNivelSel]       = useState(null);
-    const [recurso, setRecurso]         = useState(null);
+function SintaxisApp({ onExit, recursoInicial}) {
+    const [screen, setScreen] = useState(recursoInicial ? 'MODOS' : 'NIVEL');
+    const [nivelSel, setNivelSel] = useState(null);
+    const [recurso, setRecurso] = useState(recursoInicial || null);
     const [internalHost, setInternalHost] = useState(null);
     const [internalClient, setInternalClient] = useState(null);
     const [joinCode, setJoinCode]       = useState('');
@@ -278,15 +278,15 @@ function BuscadorRecursos({ onSelect }) {
         setResultados([]);
         setErrorPermisos(false);
         try {
-            const ref = collection(db, 'sintaxis_recursos');
+            const ref = collection(db, 'resources');
             if (modoBusq === 'CODIGO' && codigo.trim()) {
-                const q = query(ref, where('accessCode', '==', codigo.trim().toUpperCase()));
-                const snap = await getDocs(q);
+                const q = query(ref, where('accessCode', '==', codigo.trim().toUpperCase()), where('tipoJuego', '==', 'SINTAXIS'));
+                const snap = await getDocs(query(ref, where('tipoJuego', '==', 'SINTAXIS')));
                 if (snap.empty) { alert('No se encontró ningún recurso con ese código.'); setBuscando(false); return; }
                 const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 setResultados(docs);
             } else {
-                const snap = await getDocs(ref);
+                const snap = await getDocs(query(ref, where('tipoJuego', '==', 'SINTAXIS')));
                 let todos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 todos = todos.filter(r => {
                     if (filtros.ciclo && !checkFuzzy(r.ciclo, filtros.ciclo)) return false;

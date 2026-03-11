@@ -21,6 +21,8 @@ import CazaBurbujasGame from './CazaBurbujasGame';
 import PikatronRun from './PikatronRun';
 import SopaDeLetrasGame from './SopaDeLetrasGame';
 import TextWordleGame from './TextWordleGame';
+import SintaxisGame from './SintaxisGamen2';
+
 import { MousePointer2, Rocket, Search as SearchIcon } from 'lucide-react';
 import EditorProBurbujasPikatron from './components/EditorProBurbujasPikatron';
 import EditorQuestionSender from './components/EditorQuestionSender';
@@ -398,6 +400,9 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
         else if (juegoSeleccionado === 'QUESTION_SENDER') {
             // Pasa sin validar contenido, ya que se llena después
         }
+
+        
+
 
         // CASO 3: RESTO DE JUEGOS (Validamos 'preguntas' o generador)
         else {
@@ -853,7 +858,15 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             return <SopaDeLetrasGame recursoInicial={recursoProbando} usuario={perfilProfesor || usuario} onExit={() => setRecursoProbando(null)} />;
         }
 
-
+        // CASO SINTAXIS
+        if (recursoProbando.tipoJuego === 'SINTAXIS') {
+            return (
+                <SintaxisGame
+                    recurso={recursoProbando}
+                    onExit={() => setRecursoProbando(null)}
+                />
+            );
+        }
 
         // CASO 3: RECURSOS CLÁSICOS (Usa el reproductor antiguo GamePlayer)
         return (

@@ -15,7 +15,7 @@ import SopaDeLetrasGame from '../SopaDeLetrasGame';
 import SintaxisGame from '../SintaxisGamen2';
 import Geometrix from '../Geometrix';
 import CalculoMental from '../CalculoMental2'; 
-import Ecuaciones from '../Ecuaciones2';
+import Ecuaciones from '../Ecuaciones';
 
 import imgPasapalabra from '../assets/icono_pasapal.png'; // Revisa si es .png o .jpg
 import imgBurbujas from '../assets/icono_burbujas.png';
@@ -827,8 +827,8 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
     // --------
 
 
-    if (appData.id === 'SINTAXIS' ) return <SintaxisGame usuario={null} onExit={() => setJuegoActivo(null)} recurso={juegoActivo} />;
-  
+    if (appData.id === 'SINTAXIS') return <SintaxisGame usuario={null} onExit={onHome} />;
+
     // --- NUEVO: USA handleExitGame PARA LOS DE MATES ---
     if (appData.id === 'GEOMETRIX') return <Geometrix usuario={null} onExit={handleExitGame} />;
     if (appData.id === 'CALCULO') return <CalculoMental usuario={null} onExit={handleExitGame} />;

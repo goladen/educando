@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { RotateCcw, CheckCircle, XCircle, Trophy, Clock, Calculator, Settings, SkipForward, Monitor, Loader } from 'lucide-react';
+import { RotateCcw, CheckCircle, XCircle, Trophy, Clock, Calculator, Settings, SkipForward, Monitor, Loader, Users } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { db } from './firebase';
 import { doc, setDoc, updateDoc, onSnapshot, increment } from 'firebase/firestore';
 import piHappy from './assets/Pi-contento.png';
 import piAngry from './assets/Pi-enfadado.png';
 import piNeutral from './assets/Pi-neutro.png';
+import correctSoundFile from './assets/correct-choice-43861.mp3';
+import wrongSoundFile from './assets/negative_beeps-6008.mp3';
+import winSoundFile from './assets/applause-small-audience-97257.mp3';
+import startSoundFile from './assets/inicio juego.mp3';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const rInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
@@ -84,6 +88,8 @@ const DEFAULT_CONFIG = {
     conDenominadores: false,
     conParentesis: false,
     conEnunciados: false,
+    numPantallas: 1,   // 1 | 2 | 3
+    numAlumnos: 1,     // 1 = sin etiquetas, >1 = cicla por alumnos
 };
 
 // Modos predefinidos (equivalentes a los originales) + Personalizado
@@ -126,7 +132,7 @@ const MODOS_PRESET = [
 ];
 
 // ─── Generador de ecuaciones ──────────────────────────────────────────────────
-const generarEcuacion = (cfg) => {
+const generarEcuacion = (cfg, enunciadosBag = null) => {
     const { minNum, maxNum, primerGrado, segundoGrado, conDenominadores, conParentesis, conEnunciados } = cfg;
     const lim = Math.max(2, Math.min(maxNum, 12));
     const X = rInt(-lim, lim);
@@ -153,7 +159,10 @@ const generarEcuacion = (cfg) => {
             if (!opciones.length) opciones.push('SIMPLE');
         }
     }
-    if (segundoGrado) opciones.push('CUADRATICA');
+    if (segundoGrado) {
+        // Tres subtipos de cuadrática con igual probabilidad
+        opciones.push('CUAD_COMPLETA', 'CUAD_SIN_B', 'CUAD_SIN_C');
+    }
     if (conEnunciados) opciones.push('ENUNCIADO');
 
     if (opciones.length === 0) {
@@ -164,21 +173,23 @@ const generarEcuacion = (cfg) => {
     tipo = opciones[Math.floor(Math.random() * opciones.length)];
 
     if (tipo === 'BASICA') {
+        // Nivel básico: la solución siempre es positiva
+        const Xpos = rInt(1, lim);
         const type = rInt(1, 4);
         const a = rInt(Math.max(1, minNum), lim);
         if (type === 1) {
-            ast.push({ t: 'text', v: `x + ${a} = ${X + a}` });
+            ast.push({ t: 'text', v: `x + ${a} = ${Xpos + a}` });
         } else if (type === 2) {
-            ast.push({ t: 'text', v: `x - ${a} = ${X - a}` });
+            ast.push({ t: 'text', v: `x - ${a} = ${Xpos - a}` });
         } else if (type === 3) {
-            ast.push({ t: 'text', v: `${a}x = ${a * X}` });
+            ast.push({ t: 'text', v: `${a}x = ${a * Xpos}` });
         } else {
-            const realX = a * rInt(-Math.floor(lim / a), Math.floor(lim / a));
+            const realX = a * rInt(1, Math.floor(lim / a));
             ast = [{ t: 'frac', n: 'x', d: a }, { t: 'text', v: ` = ${realX / a}` }];
             correctAnswers = [realX];
-            return { ast, correctAnswers, multipleChoice };
+            return { ast, correctAnswers, multipleChoice, tipo };
         }
-        correctAnswers = [X];
+        correctAnswers = [Xpos];
 
     } else if (tipo === 'SIMPLE') {
         const a = rNonZero(-lim, lim);
@@ -222,9 +233,13 @@ const generarEcuacion = (cfg) => {
         ast.push({ t: 'text', v: ` ${fmt2(d, 'x')} = ${e}` });
         correctAnswers = [X];
 
-    } else if (tipo === 'CUADRATICA') {
-        const X1 = rInt(-Math.min(7, lim), Math.min(7, lim));
-        const X2 = rInt(-Math.min(7, lim), Math.min(7, lim));
+    } else if (tipo === 'CUAD_COMPLETA') {
+        // Completa: x² + bx + c = 0, ambos b≠0 y c≠0
+        let X1, X2;
+        do {
+            X1 = rInt(-Math.min(7, lim), Math.min(7, lim));
+            X2 = rInt(-Math.min(7, lim), Math.min(7, lim));
+        } while (X1 === 0 || X2 === 0 || X1 === X2);
         const b = -(X1 + X2);
         const c = X1 * X2;
         let v = `x²`;
@@ -233,9 +248,40 @@ const generarEcuacion = (cfg) => {
         v += " = 0";
         ast.push({ t: 'text', v });
         correctAnswers = [X1, X2];
+        tipo = 'CUADRATICA';
+
+    } else if (tipo === 'CUAD_SIN_B') {
+        // Incompleta sin término en x: x² + c = 0  →  x = ±√(-c), necesitamos c<0
+        const r = rInt(1, Math.min(7, lim));  // raíz real positiva
+        const c = -(r * r);                    // c = -r²  →  x² = r²
+        let v = `x² ${fmt2(c, '')} = 0`;
+        ast.push({ t: 'text', v });
+        correctAnswers = [r, -r];
+        tipo = 'CUADRATICA';
+
+    } else if (tipo === 'CUAD_SIN_C') {
+        // Incompleta sin término independiente: x² + bx = 0  →  x(x+b)=0  →  x=0 ó x=-b
+        let b;
+        do { b = rInt(-Math.min(7, lim), Math.min(7, lim)); } while (b === 0);
+        let v = `x² ${fmt2(b, 'x')} = 0`;
+        ast.push({ t: 'text', v });
+        correctAnswers = [0, -b];
+        tipo = 'CUADRATICA';
 
     } else if (tipo === 'ENUNCIADO') {
-        const sel = ENUNCIADOS[Math.floor(Math.random() * ENUNCIADOS.length)];
+        // Usar bolsa para no repetir hasta que se agoten todos
+        let idx;
+        if (enunciadosBag && enunciadosBag.disponibles.length > 0) {
+            const pos = Math.floor(Math.random() * enunciadosBag.disponibles.length);
+            idx = enunciadosBag.disponibles.splice(pos, 1)[0];
+            if (enunciadosBag.disponibles.length === 0) {
+                // Recargar bolsa con todos excepto el último usado
+                enunciadosBag.disponibles = ENUNCIADOS.map((_, i) => i).filter(i => i !== idx);
+            }
+        } else {
+            idx = Math.floor(Math.random() * ENUNCIADOS.length);
+        }
+        const sel = ENUNCIADOS[idx];
         ast.push({ t: 'enunciado', v: sel.t });
         multipleChoice = [sel.eq, ...sel.w].sort(() => Math.random() - 0.5);
         correctAnswers = [sel.eq];
@@ -343,6 +389,51 @@ const ConfigModal = ({ config, onStart, onClose }) => {
                     </div>
                 </div>
 
+                {/* Pantallas / Jugadores */}
+                <div style={mSt.section}>
+                    <div style={mSt.sTitle}>Número de pantallas</div>
+                    <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+                        {[
+                            { n: 1, label: '1 pantalla', icon: '🖥️' },
+                            { n: 2, label: '2 pantallas', icon: '👥' },
+                            { n: 3, label: '3 pantallas', icon: '👨‍👩‍👦' },
+                        ].map(({ n, label, icon }) => (
+                            <button key={n} onClick={() => set('numPantallas', n)}
+                                style={{ ...mSt.chip, background: local.numPantallas === n ? '#27ae60' : '#f0f0f0', color: local.numPantallas === n ? 'white' : '#555', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '10px 14px' }}>
+                                <span style={{ fontSize: '1.3rem' }}>{icon}</span>
+                                <span style={{ fontSize: '0.78rem' }}>{label}</span>
+                            </button>
+                        ))}
+                    </div>
+                    {local.numPantallas > 1 && (
+                        <p style={{ fontSize: '0.75rem', color: '#888', textAlign: 'center', margin: '6px 0 0' }}>
+                            Modo pantalla grande — cada columna es un jugador independiente
+                        </p>
+                    )}
+                </div>
+
+                {/* Número de alumnos (cicla etiquetas) */}
+                <div style={mSt.section}>
+                    <div style={mSt.sTitle}>Número de alumnos <span style={{ color:'#aaa', fontWeight:'normal', textTransform:'none' }}>(asigna cada turno a un alumno)</span></div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
+                        {[1, 2, 3, 4, 5, 6].map(n => (
+                            <button key={n} onClick={() => set('numAlumnos', n)}
+                                style={{ ...mSt.chip, background: local.numAlumnos === n ? '#9b59b6' : '#f0f0f0', color: local.numAlumnos === n ? 'white' : '#555', minWidth: 38 }}>
+                                {n === 1 ? 'Libre' : n}
+                            </button>
+                        ))}
+                        <input type="number" min="2" max="99" placeholder="…"
+                            value={![1,2,3,4,5,6].includes(local.numAlumnos) ? local.numAlumnos : ''}
+                            onChange={e => { const v = parseInt(e.target.value); if (v > 1) set('numAlumnos', v); }}
+                            style={{ width: 52, padding: '6px 8px', borderRadius: 20, border: `2px solid ${![1,2,3,4,5,6].includes(local.numAlumnos) ? '#9b59b6' : '#ccc'}`, textAlign: 'center', fontSize: '0.9rem', outline: 'none' }} />
+                    </div>
+                    {local.numAlumnos > 1 && (
+                        <p style={{ fontSize: '0.75rem', color: '#888', textAlign: 'center', margin: '6px 0 0' }}>
+                            El encabezado mostrará «Alumno 1», «Alumno 2»… rotando con cada pregunta
+                        </p>
+                    )}
+                </div>
+
                 <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 24 }}>
                     <button onClick={onClose} style={mSt.btnSec}>Cancelar</button>
                     <button onClick={() => onStart(local)} style={mSt.btnPri}>▶ Empezar</button>
@@ -367,6 +458,9 @@ function EcuacionesGameLocal({ onExit }) {
     const [ans2, setAns2] = useState('');
     const [feedback, setFeedback] = useState(null);
     const [showSolution, setShowSolution] = useState(false);
+    const [alumnoActual, setAlumnoActual] = useState(1);
+    const ordenAlumnosRef = useRef([]); // lista barajada una sola vez al iniciar
+    const punteroAlumnoRef = useRef(0); // avanza secuencialmente
 
     // Live config
     const [showLiveConfig, setShowLiveConfig] = useState(false);
@@ -382,7 +476,35 @@ function EcuacionesGameLocal({ onExit }) {
     const [internalClientRoom, setInternalClientRoom] = useState(null);
 
     const timerRef = useRef(null);
+    const enunciadosBagRef = useRef({ disponibles: ENUNCIADOS.map((_, i) => i) });
     const isMobile = typeof window !== 'undefined' && window.innerWidth <= 600;
+
+    // ── Sonidos (igual que CazaBurbujas) ─────────────────────────────
+    const playSound = (type) => {
+        let file = null;
+        if (type === 'CORRECT') file = correctSoundFile;
+        else if (type === 'WRONG') file = wrongSoundFile;
+        else if (type === 'WIN') file = winSoundFile;
+        else if (type === 'START') file = startSoundFile;
+        if (file) {
+            const audio = new Audio(file);
+            audio.volume = 0.6;
+            audio.play().catch(() => {});
+            if (type === 'CORRECT') setTimeout(() => { audio.pause(); audio.currentTime = 0; }, 1500);
+        }
+    };
+
+    // ── Feedback visual grande ────────────────────────────────────────
+    const [flashIcon, setFlashIcon] = useState(null); // 'CORRECT' | 'INCORRECT' | 'SKIP'
+    const triggerFlash = (type) => {
+        setFlashIcon(type);
+        setTimeout(() => setFlashIcon(null), 700);
+    };
+
+    // Herramientas: lienzo y calculadora — siempre visible
+    const [showCalc, setShowCalc] = useState(false);
+    const [drawMode, setDrawMode] = useState(false);
+    const [questionKey, setQuestionKey] = useState(0); // para reset del canvas por pregunta
 
     useEffect(() => {
         if (gameState === 'PLAYING' && timeLeft > 0) {
@@ -400,23 +522,60 @@ function EcuacionesGameLocal({ onExit }) {
         setAciertos(0);
         setSkips(0);
         setTimeLeft(cfg.tiempo);
-        setCurrentEq(generarEcuacion(cfg));
+        enunciadosBagRef.current = { disponibles: ENUNCIADOS.map((_, i) => i) };
+        setCurrentEq(generarEcuacion(cfg, enunciadosBagRef.current));
         setAns1(''); setAns2('');
         setShowSolution(false);
         setFeedback(null);
         setShowConfig(false);
-        setGameState('PLAYING');
+        setShowCalc(false);
+        setDrawMode(false);
+        setQuestionKey(0);
+        // Generar lista barajada de alumnos una sola vez
+        if (cfg.numAlumnos > 1) {
+            const lista = Array.from({ length: cfg.numAlumnos }, (_, i) => i + 1)
+                .sort(() => Math.random() - 0.5);
+            ordenAlumnosRef.current = lista;
+            punteroAlumnoRef.current = 0;
+            setAlumnoActual(lista[0]);
+        } else {
+            ordenAlumnosRef.current = [];
+            punteroAlumnoRef.current = 0;
+            setAlumnoActual(1);
+        }
+        if (cfg.numPantallas > 1) {
+            setGameState('DUAL');
+        } else {
+            setGameState('PLAYING');
+        }
     };
 
     const siguienteEcuacion = () => {
-        setCurrentEq(generarEcuacion(config));
+        setCurrentEq(generarEcuacion(config, enunciadosBagRef.current));
         setAns1(''); setAns2('');
         setShowSolution(false);
         setFeedback(null);
+        setDrawMode(false);
+        setQuestionKey(k => k + 1);
+        if (config.numAlumnos > 1) {
+            const lista = ordenAlumnosRef.current;
+            const nuevoPtr = punteroAlumnoRef.current + 1;
+            // Al agotar la lista, rebarajar y empezar de nuevo
+            if (nuevoPtr >= lista.length) {
+                const nuevaLista = [...lista].sort(() => Math.random() - 0.5);
+                ordenAlumnosRef.current = nuevaLista;
+                punteroAlumnoRef.current = 0;
+                setAlumnoActual(nuevaLista[0]);
+            } else {
+                punteroAlumnoRef.current = nuevoPtr;
+                setAlumnoActual(lista[nuevoPtr]);
+            }
+        }
     };
 
     const esMultipleChoice = currentEq?.multipleChoice !== null && currentEq?.multipleChoice !== undefined;
     const esCuadratica = currentEq?.tipo === 'CUADRATICA';
+    // Lienzo siempre disponible en todos los modos
 
     const comprobarSolucion = (respTexto = null) => {
         if (!currentEq || showSolution) return;
@@ -436,10 +595,14 @@ function EcuacionesGameLocal({ onExit }) {
             setScore(s => s + 20);
             setAciertos(a => a + 1);
             setFeedback('CORRECT');
+            playSound('CORRECT');
+            triggerFlash('CORRECT');
             setTimeout(() => { setFeedback(null); siguienteEcuacion(); }, 600);
         } else {
             setScore(s => Math.max(0, s - 5));
             setFeedback('INCORRECT');
+            playSound('WRONG');
+            triggerFlash('INCORRECT');
             setTimeout(() => setFeedback(null), 600);
         }
     };
@@ -450,6 +613,7 @@ function EcuacionesGameLocal({ onExit }) {
         setScore(s => Math.max(0, s - 5));
         setShowSolution(true);
         setFeedback('SKIP');
+        triggerFlash('SKIP');
     };
 
     const handleNextAfterSkip = () => siguienteEcuacion();
@@ -491,6 +655,11 @@ function EcuacionesGameLocal({ onExit }) {
             window.dispatchEvent(new Event('popstate'));
         }
     };
+
+    // Win sound when game ends
+    useEffect(() => {
+        if (gameState === 'END') playSound('WIN');
+    }, [gameState]);
 
     const borderColor = feedback === 'CORRECT' ? '#2ecc71'
         : feedback === 'INCORRECT' ? '#e74c3c'
@@ -536,6 +705,17 @@ function EcuacionesGameLocal({ onExit }) {
             {internalHostRoom && <EcuacionesLiveHost codigoSala={internalHostRoom} onExit={() => setInternalHostRoom(null)} />}
             {internalClientRoom && <EcuacionesLiveClient codigoSala={internalClientRoom} onExit={() => setInternalClientRoom(null)} />}
             {(internalHostRoom || internalClientRoom) ? null : (<>
+
+            {/* MODO DUAL / TRIPLE */}
+            {gameState === 'DUAL' && (
+                <ModoDualEcuaciones
+                    config={config}
+                    numPantallas={config.numPantallas || 2}
+                    numAlumnos={config.numAlumnos || 1}
+                    onBack={() => setGameState('START')}
+                    playSound={playSound}
+                />
+            )}
 
             {showConfig && (
                 <ConfigModal config={config} onStart={startGame} onClose={() => setShowConfig(false)} />
@@ -692,7 +872,51 @@ function EcuacionesGameLocal({ onExit }) {
 
             {/* JUEGO */}
             {gameState === 'PLAYING' && currentEq && (
-                <div style={{ ...st.centerCard, border: `4px solid ${borderColor}`, transition: 'border-color 0.2s, transform 0.2s', transform: feedback === 'CORRECT' ? 'scale(1.03)' : 'none' }}>
+                <div style={{ ...st.centerCard, border: `4px solid ${borderColor}`, transition: 'border-color 0.2s, transform 0.2s', transform: feedback === 'CORRECT' ? 'scale(1.03)' : 'none', position: 'relative', overflow: 'hidden' }}>
+
+                    {/* Flash de acierto/fallo (estilo CazaBurbujas) */}
+                    {flashIcon && (
+                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 20, pointerEvents: 'none', background: flashIcon === 'CORRECT' ? 'rgba(46,204,113,0.18)' : flashIcon === 'INCORRECT' ? 'rgba(231,76,60,0.18)' : 'rgba(243,156,18,0.15)' }}>
+                            <div style={{ fontSize: '6rem', animation: 'ecuFlash 0.7s ease-out forwards' }}>
+                                {flashIcon === 'CORRECT' ? '✅' : flashIcon === 'INCORRECT' ? '❌' : '⏭️'}
+                            </div>
+                        </div>
+                    )}
+                    <style>{`@keyframes ecuFlash { 0%{transform:scale(0.4);opacity:0} 40%{transform:scale(1.2);opacity:1} 100%{transform:scale(1);opacity:0} }`}</style>
+
+                    {/* Etiqueta alumno */}
+                    {config.numAlumnos > 1 && (
+                        <div style={{ background: '#9b59b6', color: 'white', borderRadius: 20, padding: '4px 16px', fontSize: '0.85rem', fontWeight: 'bold', marginBottom: 10, display: 'inline-block' }}>
+                            👤 Alumno {alumnoActual}
+                        </div>
+                    )}
+
+                    {/* Lienzo siempre disponible */}
+                    {currentEq && (
+                        <div style={{ marginBottom: 12 }}>
+                            {showCalc && <MiniCalculadora onClose={() => setShowCalc(false)} />}
+                            <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+                                <button onClick={() => setShowCalc(c => !c)}
+                                    style={{ padding: '7px 14px', background: showCalc ? '#1a1a2e' : '#f0f0f0', color: showCalc ? '#f1c40f' : '#555', border: 'none', borderRadius: 20, cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem' }}>
+                                    🧮 Calculadora
+                                </button>
+                                <button onClick={() => setDrawMode(d => !d)}
+                                    style={{ padding: '7px 14px', background: drawMode ? '#e74c3c' : '#f0f0f0', color: drawMode ? 'white' : '#555', border: 'none', borderRadius: 20, cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem' }}>
+                                    ✏️ {drawMode ? 'Cerrar lienzo' : 'Lienzo'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Lienzo de anotaciones */}
+                    {drawMode && (
+                        <div style={{ position: 'relative', width: '100%', height: 180, background: '#fafafa', border: '2px dashed #bdc3c7', borderRadius: 12, marginBottom: 16, overflow: 'hidden' }}>
+                            <DrawingCanvas width={600} height={180} active={drawMode} key={`draw-${questionKey}`} />
+                            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', color: '#ddd', fontSize: '0.85rem', pointerEvents: 'none', userSelect: 'none' }}>
+                                Dibuja aquí tu resolución
+                            </div>
+                        </div>
+                    )}
 
                     {/* Ecuación */}
                     <div style={{ fontSize: isMobile ? '1.6rem' : '2rem', fontWeight: 'bold', color: '#2c3e50', marginBottom: 24, minHeight: 70, display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -1295,6 +1519,367 @@ function ClientPreguntaEcuacion({ pregunta, startTime, subFase, myResult, puntua
                     </button>
                 </div>
             )}
+        </div>
+    );
+}
+
+// ─── MiniCalculadora ──────────────────────────────────────────────────────────
+function MiniCalculadora({ onClose }) {
+    const [display, setDisplay] = useState('0');
+    const [prev, setPrev] = useState(null);
+    const [op, setOp] = useState(null);
+    const [waitNext, setWaitNext] = useState(false);
+
+    const pressNum = (n) => {
+        if (waitNext) { setDisplay(String(n)); setWaitNext(false); }
+        else setDisplay(d => d === '0' ? String(n) : d + n);
+    };
+    const pressDecimal = () => {
+        if (waitNext) { setDisplay('0.'); setWaitNext(false); return; }
+        if (!display.includes('.')) setDisplay(d => d + '.');
+    };
+    const calc = (a, b, o) => { if (o === '+') return a + b; if (o === '-') return a - b; if (o === '×') return a * b; if (o === '÷') return b !== 0 ? a / b : 0; return b; };
+    const pressOp = (o) => {
+        const cur = parseFloat(display);
+        if (prev !== null && !waitNext) {
+            const res = calc(prev, cur, op);
+            setDisplay(String(parseFloat(res.toFixed(8)))); setPrev(parseFloat(res.toFixed(8)));
+        } else { setPrev(cur); }
+        setOp(o); setWaitNext(true);
+    };
+    const pressEqual = () => {
+        if (op === null || prev === null) return;
+        const res = calc(prev, parseFloat(display), op);
+        setDisplay(String(parseFloat(res.toFixed(8)))); setPrev(null); setOp(null); setWaitNext(true);
+    };
+    const pressClear = () => { setDisplay('0'); setPrev(null); setOp(null); setWaitNext(false); };
+    const pressSqrt = () => { setDisplay(d => String(parseFloat(Math.sqrt(parseFloat(d)).toFixed(8)))); setWaitNext(true); };
+    const pressSq = () => { const v = parseFloat(display); setDisplay(String(parseFloat((v * v).toFixed(8)))); setWaitNext(true); };
+
+    const btn = (label, onClick, bg = '#f0f0f0', col = '#333') => (
+        <button key={label} onClick={onClick} style={{ padding: '10px 0', background: bg, color: col, border: '1px solid #ddd', borderRadius: 8, fontWeight: 'bold', fontSize: '0.95rem', cursor: 'pointer', touchAction: 'manipulation' }}>{label}</button>
+    );
+
+    return (
+        <div style={{ background: '#1a1a2e', borderRadius: 16, padding: 14, marginBottom: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)', position: 'relative' }}>
+            <button onClick={onClose} style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', borderRadius: 6, padding: '2px 8px', cursor: 'pointer', fontSize: '0.85rem' }}>✕</button>
+            <div style={{ background: '#0d0d1f', color: '#f1c40f', fontFamily: 'monospace', fontSize: '1.5rem', fontWeight: 'bold', textAlign: 'right', padding: '10px 12px', borderRadius: 10, marginBottom: 10, minHeight: 48, wordBreak: 'break-all' }}>
+                {op && <span style={{ fontSize: '0.75rem', color: '#888', marginRight: 8 }}>{prev} {op}</span>}
+                {display}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+                {btn('C', pressClear, '#e74c3c', 'white')}
+                {btn('√', pressSqrt, '#3498db', 'white')}
+                {btn('x²', pressSq, '#3498db', 'white')}
+                {btn('÷', () => pressOp('÷'), '#f39c12', 'white')}
+                {btn('7', () => pressNum('7'))}{btn('8', () => pressNum('8'))}{btn('9', () => pressNum('9'))}
+                {btn('×', () => pressOp('×'), '#f39c12', 'white')}
+                {btn('4', () => pressNum('4'))}{btn('5', () => pressNum('5'))}{btn('6', () => pressNum('6'))}
+                {btn('-', () => pressOp('-'), '#f39c12', 'white')}
+                {btn('1', () => pressNum('1'))}{btn('2', () => pressNum('2'))}{btn('3', () => pressNum('3'))}
+                {btn('+', () => pressOp('+'), '#f39c12', 'white')}
+                {btn('0', () => pressNum('0'))}{btn('.', pressDecimal)}{btn('±', () => setDisplay(d => String(-parseFloat(d))))}
+                {btn('=', pressEqual, '#2ecc71', 'white')}
+            </div>
+        </div>
+    );
+}
+
+// ─── DrawingCanvas ─────────────────────────────────────────────────────────────
+function DrawingCanvas({ width, height, active }) {
+    const cvRef = useRef(null);
+    const drawing = useRef(false);
+    const lastPos = useRef(null);
+    const [color, setColor] = useState('#e74c3c');
+    const [isEraser, setIsEraser] = useState(false);
+
+    const getPos = (e) => {
+        const rect = cvRef.current.getBoundingClientRect();
+        const src = e.touches ? e.touches[0] : e;
+        return { x: src.clientX - rect.left, y: src.clientY - rect.top };
+    };
+    const startDraw = (e) => { if (!active) return; e.preventDefault(); drawing.current = true; lastPos.current = getPos(e); };
+    const doDraw = (e) => {
+        if (!drawing.current || !active) return;
+        e.preventDefault();
+        const pos = getPos(e);
+        const ctx = cvRef.current.getContext('2d');
+        ctx.beginPath(); ctx.moveTo(lastPos.current.x, lastPos.current.y); ctx.lineTo(pos.x, pos.y);
+        ctx.globalCompositeOperation = isEraser ? 'destination-out' : 'source-over';
+        ctx.strokeStyle = isEraser ? 'rgba(0,0,0,1)' : color;
+        ctx.lineWidth = isEraser ? 22 : 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke();
+        lastPos.current = pos;
+    };
+    const stopDraw = () => { drawing.current = false; };
+    const clearCanvas = () => { const ctx = cvRef.current.getContext('2d'); ctx.clearRect(0, 0, width, height); };
+    const COLORS = ['#e74c3c', '#2c3e50', '#3498db', '#2ecc71', '#f39c12', '#9b59b6'];
+
+    return (
+        <>
+            <canvas ref={cvRef} width={width} height={height}
+                style={{ position: 'absolute', top: 0, left: 0, zIndex: 6, pointerEvents: active ? 'auto' : 'none', cursor: active ? (isEraser ? 'cell' : 'crosshair') : 'default', touchAction: 'none' }}
+                onMouseDown={startDraw} onMouseMove={doDraw} onMouseUp={stopDraw} onMouseLeave={stopDraw}
+                onTouchStart={startDraw} onTouchMove={doDraw} onTouchEnd={stopDraw} />
+            {active && (
+                <div style={{ position: 'absolute', top: 6, right: 6, zIndex: 10, display: 'flex', gap: 4, alignItems: 'center', background: 'rgba(255,255,255,0.93)', borderRadius: 10, padding: '4px 6px', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
+                    {COLORS.map(c => (
+                        <button key={c} onClick={() => { setIsEraser(false); setColor(c); }}
+                            style={{ width: 20, height: 20, borderRadius: '50%', background: c, border: (!isEraser && color === c) ? '3px solid white' : '1px solid rgba(0,0,0,0.15)', cursor: 'pointer', boxShadow: (!isEraser && color === c) ? `0 0 0 2px ${c}` : 'none', padding: 0 }} />
+                    ))}
+                    <button onClick={() => setIsEraser(e => !e)}
+                        style={{ background: isEraser ? '#e0e0e0' : 'transparent', border: '1px solid #ccc', borderRadius: 6, padding: '2px 5px', cursor: 'pointer', fontSize: '0.85rem' }} title="Borrador">⬜</button>
+                    <button onClick={clearCanvas}
+                        style={{ background: 'transparent', border: '1px solid #ccc', borderRadius: 6, padding: '2px 5px', cursor: 'pointer', fontSize: '0.85rem' }} title="Borrar todo">🗑️</button>
+                </div>
+            )}
+        </>
+    );
+}
+
+// ─── MODO DUAL / TRIPLE — PANTALLAS MÚLTIPLES ────────────────────────────────
+function ModoDualEcuaciones({ config, numPantallas = 2, numAlumnos = 1, onBack, playSound }) {
+    const makeState = () => {
+        const eq = generarEcuacion(config);
+        return { eq, ans1: '', ans2: '', feedback: null, showSol: false, score: 0, total: 0 };
+    };
+
+    const [panels, setPanels] = useState(() => Array.from({ length: numPantallas }, makeState));
+    const [dismissed, setDismissed] = useState(false);
+    const [flashes, setFlashes] = useState(() => Array(numPantallas).fill(null));
+    const [drawModes, setDrawModes] = useState(() => Array(numPantallas).fill(false));
+    const [drawKeys,  setDrawKeys]  = useState(() => Array(numPantallas).fill(0));
+
+    // ── Lista aleatoria compartida + puntero independiente por panel ──
+    // Una sola lista barajada al inicio, compartida por todos los paneles.
+    // Cada panel tiene su propio puntero que avanza de forma independiente.
+    const shuffleArr = (arr) => [...arr].sort(() => Math.random() - 0.5);
+    const listaRef    = useRef(
+        numAlumnos > 1
+            ? shuffleArr(Array.from({ length: numAlumnos }, (_, i) => i + 1))
+            : []
+    );
+    // punterosRef[i] = índice actual del panel i dentro de listaRef
+    // Los paneles arrancan en posiciones 0, 1, 2 de la lista
+    const punterosRef = useRef(
+        Array.from({ length: numPantallas }, (_, i) =>
+            numAlumnos > 1 ? Math.min(i, numAlumnos - 1) : 0
+        )
+    );
+
+    const [alumnos, setAlumnos] = useState(() =>
+        numAlumnos > 1
+            ? Array.from({ length: numPantallas }, (_, i) =>
+                listaRef.current[Math.min(i, numAlumnos - 1)]
+              )
+            : Array(numPantallas).fill(null)
+    );
+
+    const avanzarAlumnoPanel = (panelIdx) => {
+        if (numAlumnos <= 1) return;
+        const nuevoPtr = punterosRef.current[panelIdx] + 1;
+        if (nuevoPtr >= listaRef.current.length) {
+            // Rebarajar y empezar desde 0 para este panel
+            listaRef.current = shuffleArr(Array.from({ length: numAlumnos }, (_, i) => i + 1));
+            punterosRef.current[panelIdx] = 0;
+        } else {
+            punterosRef.current[panelIdx] = nuevoPtr;
+        }
+        const siguiente = listaRef.current[punterosRef.current[panelIdx]];
+        setAlumnos(prev => prev.map((a, i) => i === panelIdx ? siguiente : a));
+    };
+
+    const COLORS = ['#3498db', '#e74c3c', '#f39c12'];
+    const LABELS = ['🔵', '🔴', '🟡'];
+
+    const triggerFlash = (idx, type) => {
+        setFlashes(f => { const n = [...f]; n[idx] = type; return n; });
+        setTimeout(() => setFlashes(f => { const n = [...f]; n[idx] = null; return n; }), 700);
+    };
+
+    const comprobarPanel = (idx) => {
+        const side = panels[idx];
+        if (!side.eq || side.showSol) return;
+        const esCuad = side.eq.tipo === 'CUADRATICA';
+        const esMC = side.eq.multipleChoice != null;
+        let ok = false;
+        if (esMC)        ok = side.ans1 === side.eq.correctAnswers[0];
+        else if (esCuad) { const v1=parseFloat(side.ans1),v2=parseFloat(side.ans2); const [r1,r2]=side.eq.correctAnswers; ok=(v1===r1&&v2===r2)||(v1===r2&&v2===r1)||(r1===r2&&(v1===r1||v2===r1)); }
+        else             ok = parseFloat(side.ans1) === side.eq.correctAnswers[0];
+
+        if (ok) { playSound('CORRECT'); triggerFlash(idx, 'CORRECT'); }
+        else    { playSound('WRONG');   triggerFlash(idx, 'INCORRECT'); }
+
+        setPanels(prev => prev.map((p, i) => i !== idx ? p : {
+            ...p,
+            feedback: ok ? 'CORRECT' : 'INCORRECT',
+            score: ok ? p.score + 20 : Math.max(0, p.score - 5),
+            total: p.total + 1,
+        }));
+        if (ok) setTimeout(() => siguientePanel(idx), 700);
+        else    setTimeout(() => setPanels(prev => prev.map((p,i) => i!==idx ? p : {...p, feedback:null})), 700);
+    };
+
+    const skipPanel = (idx) => {
+        triggerFlash(idx, 'SKIP');
+        setPanels(prev => prev.map((p, i) => i !== idx ? p : { ...p, showSol: true, feedback: 'SKIP' }));
+    };
+
+    const siguientePanel = (idx) => {
+        const eq = generarEcuacion(config);
+        setPanels(prev => prev.map((p, i) => i !== idx ? p : { ...p, eq, ans1:'', ans2:'', feedback:null, showSol:false }));
+        setDrawKeys(prev  => prev.map((k, i) => i !== idx ? k : k + 1));
+        setDrawModes(prev => prev.map((d, i) => i !== idx ? d : false));
+        if (numAlumnos > 1) avanzarAlumnoPanel(idx);
+    };
+
+    const setAns = (idx, field, val) => {
+        setPanels(prev => prev.map((p, i) => i !== idx ? p : { ...p, [field]: val }));
+    };
+
+    const Fraction = ({ num, den }) => (
+        <span style={{ display:'inline-flex', flexDirection:'column', alignItems:'center', verticalAlign:'middle', margin:'0 4px', fontSize:'1.1rem', color:'#2c3e50', fontWeight:'bold' }}>
+            <span style={{ borderBottom:'2px solid #2c3e50', padding:'0 3px' }}>{num}</span>
+            <span style={{ padding:'0 3px' }}>{den}</span>
+        </span>
+    );
+
+    const renderEq = (eq) => eq?.ast?.map((el, i) => {
+        if (el.t === 'text') return <span key={i} style={{ whiteSpace:'pre-wrap' }}>{el.v}</span>;
+        if (el.t === 'frac') return <Fraction key={i} num={el.n} den={el.d} />;
+        if (el.t === 'enunciado') return <div key={i} style={{ fontSize:'0.85rem', lineHeight:1.4, padding:'10px 12px', background:'#f8f9fa', borderRadius:10, borderLeft:'4px solid #34495e', textAlign:'left', width:'100%' }}>{el.v}</div>;
+        return null;
+    });
+
+    const Panel = ({ idx }) => {
+        const side = panels[idx];
+        const flashVal = flashes[idx];
+        const color = COLORS[idx] || '#3498db';
+        const esCuad = side.eq?.tipo === 'CUADRATICA';
+        const esMC   = side.eq?.multipleChoice != null;
+        const borderC = side.feedback === 'CORRECT' ? '#2ecc71' : side.feedback === 'INCORRECT' ? '#e74c3c' : side.feedback === 'SKIP' ? '#f39c12' : '#e0e0e0';
+        const aLabel = numAlumnos > 1 ? `Alumno ${alumnos[idx]}` : null;
+        return (
+            <div style={{ flex:1, minWidth:0, background:'white', borderRadius:16, padding:'12px 10px', boxShadow:'0 4px 15px rgba(0,0,0,0.07)', border:`3px solid ${borderC}`, transition:'border-color 0.2s', position:'relative', overflow:'hidden', display:'flex', flexDirection:'column', gap:8 }}>
+                {flashVal && (
+                    <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', zIndex:20, pointerEvents:'none', background: flashVal==='CORRECT'?'rgba(46,204,113,0.2)':flashVal==='INCORRECT'?'rgba(231,76,60,0.2)':'rgba(243,156,18,0.15)' }}>
+                        <div style={{ fontSize:'4rem', animation:'ecuFlash 0.7s ease-out forwards' }}>{flashVal==='CORRECT'?'✅':flashVal==='INCORRECT'?'❌':'⏭️'}</div>
+                    </div>
+                )}
+                {/* Header */}
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:4 }}>
+                    <div style={{ display:'flex', flexDirection:'column', gap:1 }}>
+                        {aLabel
+                            ? <span style={{ fontWeight:900, color, fontSize:'1.05rem' }}>{LABELS[idx]} {aLabel}</span>
+                            : <span style={{ fontWeight:900, color, fontSize:'1.05rem' }}>{LABELS[idx]} Jugador {idx+1}</span>
+                        }
+                        {aLabel && (
+                            <span style={{ color:'#aaa', fontSize:'0.72rem', marginLeft:2 }}>Jugador {idx+1}</span>
+                        )}
+                    </div>
+                    <div style={{ background:color, color:'white', padding:'3px 10px', borderRadius:20, fontWeight:'bold', fontSize:'0.8rem' }}>
+                        <Trophy size={12} style={{verticalAlign:'middle'}}/> {side.score}
+                    </div>
+                </div>
+                {/* Ecuación */}
+                <div style={{ fontSize: numPantallas > 2 ? '1.1rem' : '1.3rem', fontWeight:'bold', color:'#2c3e50', minHeight:44, display:'flex', alignItems:'center', justifyContent:'center', flexWrap:'wrap', background:'#f8f9fa', borderRadius:10, padding:'10px 8px' }}>
+                    {renderEq(side.eq)}
+                </div>
+
+                {/* Lienzo por panel */}
+                <div>
+                    <button
+                        onClick={() => setDrawModes(prev => prev.map((d, i) => i !== idx ? d : !d))}
+                        style={{ padding:'5px 12px', background: drawModes[idx] ? '#e74c3c' : '#f0f0f0', color: drawModes[idx] ? 'white' : '#555', border:'none', borderRadius:20, cursor:'pointer', fontWeight:'bold', fontSize:'0.78rem' }}>
+                        ✏️ {drawModes[idx] ? 'Cerrar' : 'Lienzo'}
+                    </button>
+                    {drawModes[idx] && (
+                        <div style={{ position:'relative', width:'100%', height:120, background:'#fafafa', border:'2px dashed #bdc3c7', borderRadius:10, marginTop:6, overflow:'hidden' }}>
+                            <DrawingCanvas width={600} height={120} active={true} key={`draw-${idx}-${drawKeys[idx]}`} />
+                            <div style={{ position:'absolute', top:'50%', left:'50%', transform:'translate(-50%,-50%)', color:'#ddd', fontSize:'0.75rem', pointerEvents:'none', userSelect:'none' }}>
+                                Escribe aquí
+                            </div>
+                        </div>
+                    )}
+                </div>
+                {side.showSol && (
+                    <div style={{ background:'#e8f8f0', border:'2px solid #27ae60', borderRadius:10, padding:'7px 12px', fontSize:'0.95rem', textAlign:'center' }}>
+                        {esMC ? `✅ ${side.eq.correctAnswers[0]}` : esCuad ? `✅ X₁=${side.eq.correctAnswers[0]} X₂=${side.eq.correctAnswers[1]}` : `✅ X = ${side.eq.correctAnswers[0]}`}
+                    </div>
+                )}
+                {!side.showSol && (
+                    esMC ? (
+                        <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+                            {side.eq.multipleChoice.map((opt, i) => (
+                                <button key={i} onClick={() => { setAns(idx,'ans1',opt); setTimeout(()=>comprobarPanel(idx),50); }}
+                                    style={{ padding:'8px 10px', fontSize:'0.85rem', fontWeight:'bold', background:'#f8f9fa', color:'#34495e', border:'2px solid #bdc3c7', borderRadius:8, cursor:'pointer', textAlign:'left' }}>
+                                    {opt}
+                                </button>
+                            ))}
+                        </div>
+                    ) : (
+                        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:7 }}>
+                            <div style={{ display:'flex', gap:8, flexWrap:'wrap', justifyContent:'center' }}>
+                                <div style={{ display:'flex', alignItems:'center', gap:5 }}>
+                                    <span style={{ fontSize:'1rem', fontWeight:'bold', color }}>{esCuad?'X₁=':'X='}</span>
+                                    <input type="number" value={side.ans1}
+                                        onChange={e => setAns(idx,'ans1',e.target.value)}
+                                        onKeyDown={e => e.key==='Enter' && comprobarPanel(idx)}
+                                        style={{ width:52, height:40, fontSize:'1.3rem', textAlign:'center', borderRadius:8, border:`2px solid ${color}`, outline:'none', background:'#f8f9fa', fontWeight:'bold' }} />
+                                </div>
+                                {esCuad && (
+                                    <div style={{ display:'flex', alignItems:'center', gap:5 }}>
+                                        <span style={{ fontSize:'1rem', fontWeight:'bold', color:'#9b59b6' }}>X₂=</span>
+                                        <input type="number" value={side.ans2}
+                                            onChange={e => setAns(idx,'ans2',e.target.value)}
+                                            onKeyDown={e => e.key==='Enter' && comprobarPanel(idx)}
+                                            style={{ width:52, height:40, fontSize:'1.3rem', textAlign:'center', borderRadius:8, border:'2px solid #9b59b6', outline:'none', background:'#f8f9fa', fontWeight:'bold' }} />
+                                    </div>
+                                )}
+                            </div>
+                            <div style={{ display:'flex', gap:6, width:'100%' }}>
+                                <button onClick={() => skipPanel(idx)} style={{ flex:1, padding:'8px', background:'#f39c12', color:'white', border:'none', borderRadius:8, fontWeight:'bold', cursor:'pointer', fontSize:'0.8rem' }}>⏭ Pasar</button>
+                                <button onClick={() => comprobarPanel(idx)} style={{ flex:2, padding:'8px', background:'#27ae60', color:'white', border:'none', borderRadius:8, fontWeight:'bold', cursor:'pointer', fontSize:'0.85rem' }}>✓ Comprobar</button>
+                            </div>
+                        </div>
+                    )
+                )}
+                {side.showSol && (
+                    <button onClick={() => siguientePanel(idx)}
+                        style={{ padding:'8px', background:color, color:'white', border:'none', borderRadius:8, fontWeight:'bold', cursor:'pointer', fontSize:'0.88rem' }}>
+                        Siguiente →
+                    </button>
+                )}
+            </div>
+        );
+    };
+
+    const modeLabel = numPantallas === 3 ? '👨‍👩‍👦 Modo Triple' : '👥 Modo Dual';
+
+    return (
+        <div style={st.container}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+                <button onClick={onBack} style={st.btnVolver}><RotateCcw size={16}/> Salir</button>
+                <span style={{ fontWeight:'bold', color:'#27ae60', fontSize:'1.05rem' }}>{modeLabel}</span>
+                <div style={{ width:60 }}/>
+            </div>
+            {!dismissed && (
+                <div style={{ background:'#fff9e6', border:'2px solid #f39c12', borderRadius:12, padding:'10px 14px', marginBottom:12, display:'flex', alignItems:'center', gap:10 }}>
+                    <span style={{ fontSize:'0.82rem', color:'#7d6608', flex:1 }}>
+                        <strong>Modo pantalla grande:</strong> Diseñado para un monitor o tablet en horizontal.
+                        {numAlumnos > 1 && ` · ${numAlumnos} alumnos rotan en el encabezado.`}
+                    </span>
+                    <button onClick={() => setDismissed(true)} style={{ background:'#f39c12', color:'white', border:'none', borderRadius:20, padding:'4px 12px', cursor:'pointer', fontWeight:'bold', fontSize:'0.75rem' }}>OK</button>
+                </div>
+            )}
+            <div style={{ display:'flex', gap:10, alignItems:'flex-start' }}>
+                {Array.from({ length: numPantallas }, (_, i) => (
+                    <React.Fragment key={i}>
+                        <Panel idx={i} />
+                        {i < numPantallas - 1 && <div style={{ width:3, background:'#eee', alignSelf:'stretch', borderRadius:4, flexShrink:0 }}/>}
+                    </React.Fragment>
+                ))}
+            </div>
+            <style>{`@keyframes ecuFlash { 0%{transform:scale(0.4);opacity:0} 40%{transform:scale(1.2);opacity:1} 100%{transform:scale(1);opacity:0} }`}</style>
         </div>
     );
 }

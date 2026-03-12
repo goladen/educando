@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { RotateCcw, CheckCircle, XCircle, Trophy, Clock, Calculator, Settings, SkipForward, Monitor, Loader } from 'lucide-react';
+import { RotateCcw, CheckCircle, XCircle, Trophy, Clock, Calculator, Settings, SkipForward, Monitor, Loader, Users } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { db } from './firebase';
 import { doc, setDoc, updateDoc, onSnapshot, increment } from 'firebase/firestore';
 import piHappy from './assets/Pi-contento.png';
 import piAngry from './assets/Pi-enfadado.png';
 import piNeutral from './assets/Pi-neutro.png';
+import correctSoundFile from './assets/correct-choice-43861.mp3';
+import wrongSoundFile from './assets/negative_beeps-6008.mp3';
+import winSoundFile from './assets/applause-small-audience-97257.mp3';
+import startSoundFile from './assets/inicio juego.mp3';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const rInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
@@ -84,6 +88,8 @@ const DEFAULT_CONFIG = {
     conDenominadores: false,
     conParentesis: false,
     conEnunciados: false,
+    numPantallas: 1,   // 1 | 2 | 3
+    numAlumnos: 1,     // 1 = sin etiquetas, >1 = cicla por alumnos
 };
 
 // Modos predefinidos (equivalentes a los originales) + Personalizado
@@ -383,6 +389,51 @@ const ConfigModal = ({ config, onStart, onClose }) => {
                     </div>
                 </div>
 
+                {/* Pantallas / Jugadores */}
+                <div style={mSt.section}>
+                    <div style={mSt.sTitle}>Número de pantallas</div>
+                    <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+                        {[
+                            { n: 1, label: '1 pantalla', icon: '🖥️' },
+                            { n: 2, label: '2 pantallas', icon: '👥' },
+                            { n: 3, label: '3 pantallas', icon: '👨‍👩‍👦' },
+                        ].map(({ n, label, icon }) => (
+                            <button key={n} onClick={() => set('numPantallas', n)}
+                                style={{ ...mSt.chip, background: local.numPantallas === n ? '#27ae60' : '#f0f0f0', color: local.numPantallas === n ? 'white' : '#555', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '10px 14px' }}>
+                                <span style={{ fontSize: '1.3rem' }}>{icon}</span>
+                                <span style={{ fontSize: '0.78rem' }}>{label}</span>
+                            </button>
+                        ))}
+                    </div>
+                    {local.numPantallas > 1 && (
+                        <p style={{ fontSize: '0.75rem', color: '#888', textAlign: 'center', margin: '6px 0 0' }}>
+                            Modo pantalla grande — cada columna es un jugador independiente
+                        </p>
+                    )}
+                </div>
+
+                {/* Número de alumnos (cicla etiquetas) */}
+                <div style={mSt.section}>
+                    <div style={mSt.sTitle}>Número de alumnos <span style={{ color:'#aaa', fontWeight:'normal', textTransform:'none' }}>(asigna cada turno a un alumno)</span></div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
+                        {[1, 2, 3, 4, 5, 6].map(n => (
+                            <button key={n} onClick={() => set('numAlumnos', n)}
+                                style={{ ...mSt.chip, background: local.numAlumnos === n ? '#9b59b6' : '#f0f0f0', color: local.numAlumnos === n ? 'white' : '#555', minWidth: 38 }}>
+                                {n === 1 ? 'Libre' : n}
+                            </button>
+                        ))}
+                        <input type="number" min="2" max="99" placeholder="…"
+                            value={![1,2,3,4,5,6].includes(local.numAlumnos) ? local.numAlumnos : ''}
+                            onChange={e => { const v = parseInt(e.target.value); if (v > 1) set('numAlumnos', v); }}
+                            style={{ width: 52, padding: '6px 8px', borderRadius: 20, border: `2px solid ${![1,2,3,4,5,6].includes(local.numAlumnos) ? '#9b59b6' : '#ccc'}`, textAlign: 'center', fontSize: '0.9rem', outline: 'none' }} />
+                    </div>
+                    {local.numAlumnos > 1 && (
+                        <p style={{ fontSize: '0.75rem', color: '#888', textAlign: 'center', margin: '6px 0 0' }}>
+                            El encabezado mostrará «Alumno 1», «Alumno 2»… rotando con cada pregunta
+                        </p>
+                    )}
+                </div>
+
                 <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 24 }}>
                     <button onClick={onClose} style={mSt.btnSec}>Cancelar</button>
                     <button onClick={() => onStart(local)} style={mSt.btnPri}>▶ Empezar</button>
@@ -407,6 +458,9 @@ function EcuacionesGameLocal({ onExit }) {
     const [ans2, setAns2] = useState('');
     const [feedback, setFeedback] = useState(null);
     const [showSolution, setShowSolution] = useState(false);
+    const [alumnoActual, setAlumnoActual] = useState(1);
+    const ordenAlumnosRef = useRef([]); // lista barajada una sola vez al iniciar
+    const punteroAlumnoRef = useRef(0); // avanza secuencialmente
 
     // Live config
     const [showLiveConfig, setShowLiveConfig] = useState(false);
@@ -425,7 +479,29 @@ function EcuacionesGameLocal({ onExit }) {
     const enunciadosBagRef = useRef({ disponibles: ENUNCIADOS.map((_, i) => i) });
     const isMobile = typeof window !== 'undefined' && window.innerWidth <= 600;
 
-    // Herramientas: lienzo y calculadora (solo para tipos complejos)
+    // ── Sonidos (igual que CazaBurbujas) ─────────────────────────────
+    const playSound = (type) => {
+        let file = null;
+        if (type === 'CORRECT') file = correctSoundFile;
+        else if (type === 'WRONG') file = wrongSoundFile;
+        else if (type === 'WIN') file = winSoundFile;
+        else if (type === 'START') file = startSoundFile;
+        if (file) {
+            const audio = new Audio(file);
+            audio.volume = 0.6;
+            audio.play().catch(() => {});
+            if (type === 'CORRECT') setTimeout(() => { audio.pause(); audio.currentTime = 0; }, 1500);
+        }
+    };
+
+    // ── Feedback visual grande ────────────────────────────────────────
+    const [flashIcon, setFlashIcon] = useState(null); // 'CORRECT' | 'INCORRECT' | 'SKIP'
+    const triggerFlash = (type) => {
+        setFlashIcon(type);
+        setTimeout(() => setFlashIcon(null), 700);
+    };
+
+    // Herramientas: lienzo y calculadora — siempre visible
     const [showCalc, setShowCalc] = useState(false);
     const [drawMode, setDrawMode] = useState(false);
     const [questionKey, setQuestionKey] = useState(0); // para reset del canvas por pregunta
@@ -455,7 +531,23 @@ function EcuacionesGameLocal({ onExit }) {
         setShowCalc(false);
         setDrawMode(false);
         setQuestionKey(0);
-        setGameState('PLAYING');
+        // Generar lista barajada de alumnos una sola vez
+        if (cfg.numAlumnos > 1) {
+            const lista = Array.from({ length: cfg.numAlumnos }, (_, i) => i + 1)
+                .sort(() => Math.random() - 0.5);
+            ordenAlumnosRef.current = lista;
+            punteroAlumnoRef.current = 0;
+            setAlumnoActual(lista[0]);
+        } else {
+            ordenAlumnosRef.current = [];
+            punteroAlumnoRef.current = 0;
+            setAlumnoActual(1);
+        }
+        if (cfg.numPantallas > 1) {
+            setGameState('DUAL');
+        } else {
+            setGameState('PLAYING');
+        }
     };
 
     const siguienteEcuacion = () => {
@@ -465,17 +557,25 @@ function EcuacionesGameLocal({ onExit }) {
         setFeedback(null);
         setDrawMode(false);
         setQuestionKey(k => k + 1);
+        if (config.numAlumnos > 1) {
+            const lista = ordenAlumnosRef.current;
+            const nuevoPtr = punteroAlumnoRef.current + 1;
+            // Al agotar la lista, rebarajar y empezar de nuevo
+            if (nuevoPtr >= lista.length) {
+                const nuevaLista = [...lista].sort(() => Math.random() - 0.5);
+                ordenAlumnosRef.current = nuevaLista;
+                punteroAlumnoRef.current = 0;
+                setAlumnoActual(nuevaLista[0]);
+            } else {
+                punteroAlumnoRef.current = nuevoPtr;
+                setAlumnoActual(lista[nuevoPtr]);
+            }
+        }
     };
 
     const esMultipleChoice = currentEq?.multipleChoice !== null && currentEq?.multipleChoice !== undefined;
     const esCuadratica = currentEq?.tipo === 'CUADRATICA';
-    // Mostrar lienzo y calculadora solo en tipos que lo necesitan
-    const mostrarHerramientas = currentEq && (
-        currentEq.tipo === 'CUADRATICA' ||
-        currentEq.tipo === 'PARENTESIS' ||
-        currentEq.tipo === 'DENOMINADOR' ||
-        currentEq.tipo === 'EXPERTO'
-    );
+    // Lienzo siempre disponible en todos los modos
 
     const comprobarSolucion = (respTexto = null) => {
         if (!currentEq || showSolution) return;
@@ -495,10 +595,14 @@ function EcuacionesGameLocal({ onExit }) {
             setScore(s => s + 20);
             setAciertos(a => a + 1);
             setFeedback('CORRECT');
+            playSound('CORRECT');
+            triggerFlash('CORRECT');
             setTimeout(() => { setFeedback(null); siguienteEcuacion(); }, 600);
         } else {
             setScore(s => Math.max(0, s - 5));
             setFeedback('INCORRECT');
+            playSound('WRONG');
+            triggerFlash('INCORRECT');
             setTimeout(() => setFeedback(null), 600);
         }
     };
@@ -509,6 +613,7 @@ function EcuacionesGameLocal({ onExit }) {
         setScore(s => Math.max(0, s - 5));
         setShowSolution(true);
         setFeedback('SKIP');
+        triggerFlash('SKIP');
     };
 
     const handleNextAfterSkip = () => siguienteEcuacion();
@@ -550,6 +655,11 @@ function EcuacionesGameLocal({ onExit }) {
             window.dispatchEvent(new Event('popstate'));
         }
     };
+
+    // Win sound when game ends
+    useEffect(() => {
+        if (gameState === 'END') playSound('WIN');
+    }, [gameState]);
 
     const borderColor = feedback === 'CORRECT' ? '#2ecc71'
         : feedback === 'INCORRECT' ? '#e74c3c'
@@ -595,6 +705,17 @@ function EcuacionesGameLocal({ onExit }) {
             {internalHostRoom && <EcuacionesLiveHost codigoSala={internalHostRoom} onExit={() => setInternalHostRoom(null)} />}
             {internalClientRoom && <EcuacionesLiveClient codigoSala={internalClientRoom} onExit={() => setInternalClientRoom(null)} />}
             {(internalHostRoom || internalClientRoom) ? null : (<>
+
+            {/* MODO DUAL / TRIPLE */}
+            {gameState === 'DUAL' && (
+                <ModoDualEcuaciones
+                    config={config}
+                    numPantallas={config.numPantallas || 2}
+                    numAlumnos={config.numAlumnos || 1}
+                    onBack={() => setGameState('START')}
+                    playSound={playSound}
+                />
+            )}
 
             {showConfig && (
                 <ConfigModal config={config} onStart={startGame} onClose={() => setShowConfig(false)} />
@@ -751,10 +872,27 @@ function EcuacionesGameLocal({ onExit }) {
 
             {/* JUEGO */}
             {gameState === 'PLAYING' && currentEq && (
-                <div style={{ ...st.centerCard, border: `4px solid ${borderColor}`, transition: 'border-color 0.2s, transform 0.2s', transform: feedback === 'CORRECT' ? 'scale(1.03)' : 'none' }}>
+                <div style={{ ...st.centerCard, border: `4px solid ${borderColor}`, transition: 'border-color 0.2s, transform 0.2s', transform: feedback === 'CORRECT' ? 'scale(1.03)' : 'none', position: 'relative', overflow: 'hidden' }}>
 
-                    {/* Calculadora y botón de lienzo (solo tipos complejos) */}
-                    {mostrarHerramientas && (
+                    {/* Flash de acierto/fallo (estilo CazaBurbujas) */}
+                    {flashIcon && (
+                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 20, pointerEvents: 'none', background: flashIcon === 'CORRECT' ? 'rgba(46,204,113,0.18)' : flashIcon === 'INCORRECT' ? 'rgba(231,76,60,0.18)' : 'rgba(243,156,18,0.15)' }}>
+                            <div style={{ fontSize: '6rem', animation: 'ecuFlash 0.7s ease-out forwards' }}>
+                                {flashIcon === 'CORRECT' ? '✅' : flashIcon === 'INCORRECT' ? '❌' : '⏭️'}
+                            </div>
+                        </div>
+                    )}
+                    <style>{`@keyframes ecuFlash { 0%{transform:scale(0.4);opacity:0} 40%{transform:scale(1.2);opacity:1} 100%{transform:scale(1);opacity:0} }`}</style>
+
+                    {/* Etiqueta alumno */}
+                    {config.numAlumnos > 1 && (
+                        <div style={{ background: '#9b59b6', color: 'white', borderRadius: 20, padding: '4px 16px', fontSize: '0.85rem', fontWeight: 'bold', marginBottom: 10, display: 'inline-block' }}>
+                            👤 Alumno {alumnoActual}
+                        </div>
+                    )}
+
+                    {/* Lienzo siempre disponible */}
+                    {currentEq && (
                         <div style={{ marginBottom: 12 }}>
                             {showCalc && <MiniCalculadora onClose={() => setShowCalc(false)} />}
                             <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
@@ -771,7 +909,7 @@ function EcuacionesGameLocal({ onExit }) {
                     )}
 
                     {/* Lienzo de anotaciones */}
-                    {mostrarHerramientas && drawMode && (
+                    {drawMode && (
                         <div style={{ position: 'relative', width: '100%', height: 180, background: '#fafafa', border: '2px dashed #bdc3c7', borderRadius: 12, marginBottom: 16, overflow: 'hidden' }}>
                             <DrawingCanvas width={600} height={180} active={drawMode} key={`draw-${questionKey}`} />
                             <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', color: '#ddd', fontSize: '0.85rem', pointerEvents: 'none', userSelect: 'none' }}>
@@ -1495,6 +1633,320 @@ function DrawingCanvas({ width, height, active }) {
                 </div>
             )}
         </>
+    );
+}
+
+// ─── MODO DUAL / TRIPLE — PANTALLAS MÚLTIPLES ────────────────────────────────
+
+// ── Teclado virtual por panel (modo dual/triple) ──────────────────────────────
+function VirtualKeypad({ value, onChange, onConfirm, color = '#27ae60', label = 'X=' }) {
+    const press = (key) => {
+        if (key === '⌫') { onChange(value.slice(0, -1)); return; }
+        if (key === '+/-') { onChange(value.startsWith('-') ? value.slice(1) : value ? '-' + value : ''); return; }
+        if (key === 'C')  { onChange(''); return; }
+        // Evitar doble punto
+        if (key === '.' && value.includes('.')) return;
+        // Evitar doble '-'
+        if (key === '-' && value.includes('-')) return;
+        onChange(value + key);
+    };
+
+    const rows = [
+        ['7','8','9'],
+        ['4','5','6'],
+        ['1','2','3'],
+        ['+/-','0','.'],
+    ];
+
+    return (
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:6, width:'100%' }}>
+            {/* Display */}
+            <div style={{ display:'flex', alignItems:'center', gap:6, width:'100%', justifyContent:'center' }}>
+                <span style={{ fontSize:'1rem', fontWeight:'bold', color }}>{label}</span>
+                <div style={{
+                    minWidth: 80, padding:'6px 12px',
+                    background:'#f8f9fa', border:`2px solid ${color}`,
+                    borderRadius:10, fontSize:'1.5rem', fontWeight:'bold',
+                    color:'#2c3e50', textAlign:'right', minHeight:44,
+                    display:'flex', alignItems:'center', justifyContent:'flex-end',
+                }}>
+                    {value || <span style={{ color:'#ccc', fontSize:'1rem' }}>···</span>}
+                </div>
+                <button onClick={() => press('⌫')}
+                    style={{ padding:'6px 10px', background:'#e74c3c', color:'white', border:'none', borderRadius:8, cursor:'pointer', fontSize:'1rem', fontWeight:'bold' }}>
+                    ⌫
+                </button>
+            </div>
+            {/* Teclado */}
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:5, width:'100%' }}>
+                {rows.flat().map(k => (
+                    <button key={k} onClick={() => press(k)}
+                        style={{
+                            padding:'10px 0', fontSize: '1.05rem',
+                            fontWeight:'bold', borderRadius:8, border:'none', cursor:'pointer',
+                            background: k === '+/-' ? '#8e44ad' : k === '.' ? '#7f8c8d' : '#ecf0f1',
+                            color: k === '+/-' ? 'white' : k === '.' ? 'white' : '#2c3e50',
+                            boxShadow:'0 2px 0 rgba(0,0,0,0.1)',
+                            transition:'transform 0.08s',
+                        }}
+                        onPointerDown={e => e.currentTarget.style.transform='scale(0.93)'}
+                        onPointerUp={e => e.currentTarget.style.transform='scale(1)'}
+                    >
+                        {k}
+                    </button>
+                ))}
+            </div>
+            {/* Botón confirmar integrado */}
+            <button onClick={onConfirm}
+                style={{ width:'100%', padding:'10px', background:color, color:'white', border:'none', borderRadius:10, fontWeight:'bold', cursor:'pointer', fontSize:'0.95rem', marginTop:2 }}>
+                ✓ Comprobar
+            </button>
+        </div>
+    );
+}
+
+function ModoDualEcuaciones({ config, numPantallas = 2, numAlumnos = 1, onBack, playSound }) {
+    const makeState = () => {
+        const eq = generarEcuacion(config);
+        return { eq, ans1: '', ans2: '', feedback: null, showSol: false, score: 0, total: 0 };
+    };
+
+    const [panels, setPanels] = useState(() => Array.from({ length: numPantallas }, makeState));
+    const [dismissed, setDismissed] = useState(false);
+    const [flashes, setFlashes] = useState(() => Array(numPantallas).fill(null));
+    const [drawModes, setDrawModes] = useState(() => Array(numPantallas).fill(false));
+    const [drawKeys,  setDrawKeys]  = useState(() => Array(numPantallas).fill(0));
+
+    // ── Lista aleatoria compartida + puntero independiente por panel ──
+    // Una sola lista barajada al inicio, compartida por todos los paneles.
+    // Cada panel tiene su propio puntero que avanza de forma independiente.
+    const shuffleArr = (arr) => [...arr].sort(() => Math.random() - 0.5);
+    const listaRef    = useRef(
+        numAlumnos > 1
+            ? shuffleArr(Array.from({ length: numAlumnos }, (_, i) => i + 1))
+            : []
+    );
+    // punterosRef[i] = índice actual del panel i dentro de listaRef
+    // Los paneles arrancan en posiciones 0, 1, 2 de la lista
+    const punterosRef = useRef(
+        Array.from({ length: numPantallas }, (_, i) =>
+            numAlumnos > 1 ? Math.min(i, numAlumnos - 1) : 0
+        )
+    );
+
+    const [alumnos, setAlumnos] = useState(() =>
+        numAlumnos > 1
+            ? Array.from({ length: numPantallas }, (_, i) =>
+                listaRef.current[Math.min(i, numAlumnos - 1)]
+              )
+            : Array(numPantallas).fill(null)
+    );
+
+    const avanzarAlumnoPanel = (panelIdx) => {
+        if (numAlumnos <= 1) return;
+        const nuevoPtr = punterosRef.current[panelIdx] + 1;
+        if (nuevoPtr >= listaRef.current.length) {
+            // Rebarajar y empezar desde 0 para este panel
+            listaRef.current = shuffleArr(Array.from({ length: numAlumnos }, (_, i) => i + 1));
+            punterosRef.current[panelIdx] = 0;
+        } else {
+            punterosRef.current[panelIdx] = nuevoPtr;
+        }
+        const siguiente = listaRef.current[punterosRef.current[panelIdx]];
+        setAlumnos(prev => prev.map((a, i) => i === panelIdx ? siguiente : a));
+    };
+
+    const COLORS = ['#3498db', '#e74c3c', '#f39c12'];
+    const LABELS = ['🔵', '🔴', '🟡'];
+
+    const triggerFlash = (idx, type) => {
+        setFlashes(f => { const n = [...f]; n[idx] = type; return n; });
+        setTimeout(() => setFlashes(f => { const n = [...f]; n[idx] = null; return n; }), 700);
+    };
+
+    const comprobarPanel = (idx) => {
+        const side = panels[idx];
+        if (!side.eq || side.showSol) return;
+        const esCuad = side.eq.tipo === 'CUADRATICA';
+        const esMC = side.eq.multipleChoice != null;
+        let ok = false;
+        if (esMC)        ok = side.ans1 === side.eq.correctAnswers[0];
+        else if (esCuad) { const v1=parseFloat(side.ans1),v2=parseFloat(side.ans2); const [r1,r2]=side.eq.correctAnswers; ok=(v1===r1&&v2===r2)||(v1===r2&&v2===r1)||(r1===r2&&(v1===r1||v2===r1)); }
+        else             ok = parseFloat(side.ans1) === side.eq.correctAnswers[0];
+
+        if (ok) { playSound('CORRECT'); triggerFlash(idx, 'CORRECT'); }
+        else    { playSound('WRONG');   triggerFlash(idx, 'INCORRECT'); }
+
+        setPanels(prev => prev.map((p, i) => i !== idx ? p : {
+            ...p,
+            feedback: ok ? 'CORRECT' : 'INCORRECT',
+            score: ok ? p.score + 20 : Math.max(0, p.score - 5),
+            total: p.total + 1,
+        }));
+        if (ok) setTimeout(() => siguientePanel(idx), 700);
+        else    setTimeout(() => setPanels(prev => prev.map((p,i) => i!==idx ? p : {...p, feedback:null})), 700);
+    };
+
+    const skipPanel = (idx) => {
+        triggerFlash(idx, 'SKIP');
+        setPanels(prev => prev.map((p, i) => i !== idx ? p : { ...p, showSol: true, feedback: 'SKIP' }));
+    };
+
+    const siguientePanel = (idx) => {
+        const eq = generarEcuacion(config);
+        setPanels(prev => prev.map((p, i) => i !== idx ? p : { ...p, eq, ans1:'', ans2:'', feedback:null, showSol:false }));
+        setDrawKeys(prev  => prev.map((k, i) => i !== idx ? k : k + 1));
+        setDrawModes(prev => prev.map((d, i) => i !== idx ? d : false));
+        if (numAlumnos > 1) avanzarAlumnoPanel(idx);
+    };
+
+    const setAns = (idx, field, val) => {
+        setPanels(prev => prev.map((p, i) => i !== idx ? p : { ...p, [field]: val }));
+    };
+
+    const Fraction = ({ num, den }) => (
+        <span style={{ display:'inline-flex', flexDirection:'column', alignItems:'center', verticalAlign:'middle', margin:'0 4px', fontSize:'1.1rem', color:'#2c3e50', fontWeight:'bold' }}>
+            <span style={{ borderBottom:'2px solid #2c3e50', padding:'0 3px' }}>{num}</span>
+            <span style={{ padding:'0 3px' }}>{den}</span>
+        </span>
+    );
+
+    const renderEq = (eq) => eq?.ast?.map((el, i) => {
+        if (el.t === 'text') return <span key={i} style={{ whiteSpace:'pre-wrap' }}>{el.v}</span>;
+        if (el.t === 'frac') return <Fraction key={i} num={el.n} den={el.d} />;
+        if (el.t === 'enunciado') return <div key={i} style={{ fontSize:'0.85rem', lineHeight:1.4, padding:'10px 12px', background:'#f8f9fa', borderRadius:10, borderLeft:'4px solid #34495e', textAlign:'left', width:'100%' }}>{el.v}</div>;
+        return null;
+    });
+
+    const Panel = ({ idx }) => {
+        const side = panels[idx];
+        const flashVal = flashes[idx];
+        const color = COLORS[idx] || '#3498db';
+        const esCuad = side.eq?.tipo === 'CUADRATICA';
+        const esMC   = side.eq?.multipleChoice != null;
+        const borderC = side.feedback === 'CORRECT' ? '#2ecc71' : side.feedback === 'INCORRECT' ? '#e74c3c' : side.feedback === 'SKIP' ? '#f39c12' : '#e0e0e0';
+        const aLabel = numAlumnos > 1 ? `Alumno ${alumnos[idx]}` : null;
+        return (
+            <div style={{ flex:1, minWidth:0, background:'white', borderRadius:16, padding:'12px 10px', boxShadow:'0 4px 15px rgba(0,0,0,0.07)', border:`3px solid ${borderC}`, transition:'border-color 0.2s', position:'relative', overflow:'hidden', display:'flex', flexDirection:'column', gap:8 }}>
+                {flashVal && (
+                    <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', zIndex:20, pointerEvents:'none', background: flashVal==='CORRECT'?'rgba(46,204,113,0.2)':flashVal==='INCORRECT'?'rgba(231,76,60,0.2)':'rgba(243,156,18,0.15)' }}>
+                        <div style={{ fontSize:'4rem', animation:'ecuFlash 0.7s ease-out forwards' }}>{flashVal==='CORRECT'?'✅':flashVal==='INCORRECT'?'❌':'⏭️'}</div>
+                    </div>
+                )}
+                {/* Header */}
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:4 }}>
+                    <div style={{ display:'flex', flexDirection:'column', gap:1 }}>
+                        {aLabel
+                            ? <span style={{ fontWeight:900, color, fontSize:'1.05rem' }}>{LABELS[idx]} {aLabel}</span>
+                            : <span style={{ fontWeight:900, color, fontSize:'1.05rem' }}>{LABELS[idx]} Jugador {idx+1}</span>
+                        }
+                        {aLabel && (
+                            <span style={{ color:'#aaa', fontSize:'0.72rem', marginLeft:2 }}>Jugador {idx+1}</span>
+                        )}
+                    </div>
+                    <div style={{ background:color, color:'white', padding:'3px 10px', borderRadius:20, fontWeight:'bold', fontSize:'0.8rem' }}>
+                        <Trophy size={12} style={{verticalAlign:'middle'}}/> {side.score}
+                    </div>
+                </div>
+                {/* Ecuación */}
+                <div style={{ fontSize: numPantallas > 2 ? '1.1rem' : '1.3rem', fontWeight:'bold', color:'#2c3e50', minHeight:44, display:'flex', alignItems:'center', justifyContent:'center', flexWrap:'wrap', background:'#f8f9fa', borderRadius:10, padding:'10px 8px' }}>
+                    {renderEq(side.eq)}
+                </div>
+
+                {/* Lienzo por panel */}
+                <div>
+                    <button
+                        onClick={() => setDrawModes(prev => prev.map((d, i) => i !== idx ? d : !d))}
+                        style={{ padding:'5px 12px', background: drawModes[idx] ? '#e74c3c' : '#f0f0f0', color: drawModes[idx] ? 'white' : '#555', border:'none', borderRadius:20, cursor:'pointer', fontWeight:'bold', fontSize:'0.78rem' }}>
+                        ✏️ {drawModes[idx] ? 'Cerrar' : 'Lienzo'}
+                    </button>
+                    {drawModes[idx] && (
+                        <div style={{ position:'relative', width:'100%', height:120, background:'#fafafa', border:'2px dashed #bdc3c7', borderRadius:10, marginTop:6, overflow:'hidden' }}>
+                            <DrawingCanvas width={600} height={120} active={true} key={`draw-${idx}-${drawKeys[idx]}`} />
+                            <div style={{ position:'absolute', top:'50%', left:'50%', transform:'translate(-50%,-50%)', color:'#ddd', fontSize:'0.75rem', pointerEvents:'none', userSelect:'none' }}>
+                                Escribe aquí
+                            </div>
+                        </div>
+                    )}
+                </div>
+                {side.showSol && (
+                    <div style={{ background:'#e8f8f0', border:'2px solid #27ae60', borderRadius:10, padding:'7px 12px', fontSize:'0.95rem', textAlign:'center' }}>
+                        {esMC ? `✅ ${side.eq.correctAnswers[0]}` : esCuad ? `✅ X₁=${side.eq.correctAnswers[0]} X₂=${side.eq.correctAnswers[1]}` : `✅ X = ${side.eq.correctAnswers[0]}`}
+                    </div>
+                )}
+                {!side.showSol && (
+                    esMC ? (
+                        <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+                            {side.eq.multipleChoice.map((opt, i) => (
+                                <button key={i} onClick={() => { setAns(idx,'ans1',opt); setTimeout(()=>comprobarPanel(idx),50); }}
+                                    style={{ padding:'8px 10px', fontSize:'0.85rem', fontWeight:'bold', background:'#f8f9fa', color:'#34495e', border:'2px solid #bdc3c7', borderRadius:8, cursor:'pointer', textAlign:'left' }}>
+                                    {opt}
+                                </button>
+                            ))}
+                        </div>
+                    ) : (
+                        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:6, width:'100%' }}>
+                            <VirtualKeypad
+                                value={side.ans1}
+                                onChange={v => setAns(idx, 'ans1', v)}
+                                onConfirm={() => comprobarPanel(idx)}
+                                color={color}
+                                label={esCuad ? 'X₁=' : 'X='}
+                            />
+                            {esCuad && (
+                                <VirtualKeypad
+                                    value={side.ans2}
+                                    onChange={v => setAns(idx, 'ans2', v)}
+                                    onConfirm={() => comprobarPanel(idx)}
+                                    color="#9b59b6"
+                                    label="X₂="
+                                />
+                            )}
+                            <button onClick={() => skipPanel(idx)}
+                                style={{ width:'100%', padding:'7px', background:'#f39c12', color:'white', border:'none', borderRadius:8, fontWeight:'bold', cursor:'pointer', fontSize:'0.8rem' }}>
+                                ⏭ Pasar
+                            </button>
+                        </div>
+                    )
+                )}
+                {side.showSol && (
+                    <button onClick={() => siguientePanel(idx)}
+                        style={{ padding:'8px', background:color, color:'white', border:'none', borderRadius:8, fontWeight:'bold', cursor:'pointer', fontSize:'0.88rem' }}>
+                        Siguiente →
+                    </button>
+                )}
+            </div>
+        );
+    };
+
+    const modeLabel = numPantallas === 3 ? '👨‍👩‍👦 Modo Triple' : '👥 Modo Dual';
+
+    return (
+        <div style={st.container}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+                <button onClick={onBack} style={st.btnVolver}><RotateCcw size={16}/> Salir</button>
+                <span style={{ fontWeight:'bold', color:'#27ae60', fontSize:'1.05rem' }}>{modeLabel}</span>
+                <div style={{ width:60 }}/>
+            </div>
+            {!dismissed && (
+                <div style={{ background:'#fff9e6', border:'2px solid #f39c12', borderRadius:12, padding:'10px 14px', marginBottom:12, display:'flex', alignItems:'center', gap:10 }}>
+                    <span style={{ fontSize:'0.82rem', color:'#7d6608', flex:1 }}>
+                        <strong>Modo pantalla grande:</strong> Diseñado para un monitor o tablet en horizontal.
+                        {numAlumnos > 1 && ` · ${numAlumnos} alumnos rotan en el encabezado.`}
+                    </span>
+                    <button onClick={() => setDismissed(true)} style={{ background:'#f39c12', color:'white', border:'none', borderRadius:20, padding:'4px 12px', cursor:'pointer', fontWeight:'bold', fontSize:'0.75rem' }}>OK</button>
+                </div>
+            )}
+            <div style={{ display:'flex', gap:10, alignItems:'flex-start' }}>
+                {Array.from({ length: numPantallas }, (_, i) => (
+                    <React.Fragment key={i}>
+                        <Panel idx={i} />
+                        {i < numPantallas - 1 && <div style={{ width:3, background:'#eee', alignSelf:'stretch', borderRadius:4, flexShrink:0 }}/>}
+                    </React.Fragment>
+                ))}
+            </div>
+            <style>{`@keyframes ecuFlash { 0%{transform:scale(0.4);opacity:0} 40%{transform:scale(1.2);opacity:1} 100%{transform:scale(1);opacity:0} }`}</style>
+        </div>
     );
 }
 

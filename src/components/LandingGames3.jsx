@@ -15,8 +15,8 @@ import SopaDeLetrasGame from '../SopaDeLetrasGame';
 import SintaxisGame from '../SintaxisGamen2';
 import Geometrix from '../Geometrix';
 import CalculoMental from '../CalculoMental2'; 
-import Ecuaciones from '../Ecuaciones';
-
+import Ecuaciones from '../Ecuaciones2';
+import EtiquetaMe from '../EtiquetaMe2';
 import imgPasapalabra from '../assets/icono_pasapal.png'; // Revisa si es .png o .jpg
 import imgBurbujas from '../assets/icono_burbujas.png';
 import imgPikatron from '../assets/icono_pikatron.png';
@@ -78,6 +78,16 @@ export const APPS = [
         emoji: '🧠',
         isMath: true
     },
+    {
+        id: 'ETIQUETAS',
+        name: 'Etiquetas',
+        desc: 'Identifica las partes de un diagrama poniendo las etiquetas correctas.',
+        color: '#e74c3c',
+        emoji: '🏷️',
+        isSpecial: false
+    },
+
+
     {
         id: 'ECUACIONES',
         name: 'Ecuaciones',
@@ -407,13 +417,10 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
     };
 
     const procesarClickTarjeta = (r) => {
-        if (esJuegoEnVivo(r)) {
-            lanzarComoGestor(r);
-        } else if (r.tipoJuego === 'CAZABURBUJAS' || r.tipoJuego === 'WORDLE' || r.tipoJuego === 'SOPA') {
-            setRecursoParaElegir(r);
-        } else {
-            setJuegoActivo(r);
-        }
+        if (appData.isLive) lanzarComoGestor(r);
+        else if (r.tipoJuego === 'CAZABURBUJAS' || r.tipoJuego === 'WORDLE' || r.tipoJuego === 'SOPA') setRecursoParaElegir(r);
+        else if (r.tipoJuego === 'ETIQUETAS') setJuegoActivo(r);   // ← ya lo tienes, comprueba que esté
+        else setJuegoActivo(r);
     };
 
     // --- RENDERIZADO DE JUEGOS A PANTALLA COMPLETA ---
@@ -450,8 +457,11 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
                 />
             );
         }
-        if (juegoActivo.tipoJuego === 'SINTAXIS') return <SintaxisGame usuario={usuario} onExit={() => setJuegoActivo(null)} />;
-        if ( juegoActivo.tipoJuego === 'GEOMETRIX') return <Geometrix usuario={usuario} onExit={() => setJuegoActivo(null)} />;
+       
+       
+        if (juegoActivo.tipoJuego === 'ETIQUETAS') return <EtiquetaMe recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
+
+        if (juegoActivo.tipoJuego === 'GEOMETRIX') return <Geometrix usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'CALCULO') return <CalculoMental usuario={null} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'ECUACIONES') return <Ecuaciones usuario={null} onExit={() => setJuegoActivo(null)} />;
      // ------------------------
@@ -828,7 +838,7 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
 
 
     if (appData.id === 'SINTAXIS') return <SintaxisGame usuario={null} onExit={onHome} />;
-
+    
     // --- NUEVO: USA handleExitGame PARA LOS DE MATES ---
     if (appData.id === 'GEOMETRIX') return <Geometrix usuario={null} onExit={handleExitGame} />;
     if (appData.id === 'CALCULO') return <CalculoMental usuario={null} onExit={handleExitGame} />;
@@ -947,6 +957,7 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
     const procesarClickTarjeta = (r) => {
         if (appData.isLive) lanzarComoGestor(r);
         else if (r.tipoJuego === 'CAZABURBUJAS' || r.tipoJuego === 'WORDLE' || r.tipoJuego === 'SOPA') setRecursoParaElegir(r);
+        else if (r.tipoJuego === 'ETIQUETAS') setJuegoActivo(r);
         else setJuegoActivo(r);
     };
 
@@ -973,6 +984,7 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
         // --- AÑADIDO: Distinguir Wordle y Sopa ---
         if (appData.id === 'WORDLE' || juegoActivo.modoEspecial === 'WORDLE' || (juegoActivo.tipoJuego === 'WORDLE' && !juegoActivo.modoEspecial)) return <TextWordleGame recursoInicial={juegoActivo} usuario={null} onExit={() => setJuegoActivo(null)} />;
         if (appData.id === 'SOPA' || juegoActivo.modoEspecial === 'SOPA' || (juegoActivo.tipoJuego === 'SOPA' && !juegoActivo.modoEspecial)) return <SopaDeLetrasGame recursoInicial={juegoActivo} usuario={null} onExit={() => setJuegoActivo(null)} />;
+        if (appData.id === 'ETIQUETAS' || juegoActivo.tipoJuego === 'ETIQUETAS')     return <EtiquetaMe recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
         return <GamePlayer recurso={juegoActivo} usuario={null} alTerminar={() => setJuegoActivo(null)} />;
     }
 

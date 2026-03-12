@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect } from 'react';
 import { db } from './firebase';
 import { collection, query, where, getDocs, deleteDoc, doc, addDoc, updateDoc, getDoc, setDoc, orderBy } from 'firebase/firestore';
-import { Trash2, Plus, FileSpreadsheet, Bot, BarChart2, Save, X, Pencil, Key, Gamepad2, Edit3, Globe, Search, Copy, Eye, Users, RotateCcw, Send, Zap, UserCircle, LogOut, Menu, HelpCircle, Shield, Info, FileText, Calculator, Medal } from 'lucide-react';
+import { Trash2, Plus, FileSpreadsheet, Bot, BarChart2, Save, X, Pencil, Key, Gamepad2, Edit3, Globe, Search, Copy, Eye, Users, RotateCcw, Send, Zap, UserCircle, LogOut, Menu, HelpCircle, Shield, Info, FileText, Calculator, Medal, Crosshair } from 'lucide-react';
 import useDrivePicker from 'react-google-drive-picker';
 import { procesarArchivoExcel } from './ExcelParser';
 import { generarPreguntasGemini } from './GeminiGenerator';
@@ -31,6 +31,7 @@ import MathWordleGame from './MathWordleGame';
 import EditorWordle from './components/EditorWordle';
 import EditorOlympic from './components/EditorOlympic';
 import EditorSintaxis from './components/EditorSintaxis';
+import EditorEtiquetas from './components/EditorEtiquetas';
 import * as XLSX from 'xlsx'; // <--- IMPORTANTE
 // ==============================================================================
 //  ZONA DE CLAVES (SEGURA)
@@ -62,6 +63,7 @@ const TIPOS_JUEGOS = {
     RULETA: { id: 'RULETA', label: 'La Ruleta', color: '#f1c40f', camposConfig: [{ key: 'tiempoTurno', label: 'Tiempo Turno (s)', type: 'number', default: 20 }] },
     QUESTION_SENDER: { id: 'QUESTION_SENDER', label: 'Question Sender', color: '#2c3e50', camposConfig: [{ key: 'numPreguntas', label: 'Preguntas a pedir', type: 'number', default: 3 }] },
     // Añade dentro del objeto TIPOS_JUEGOS:
+    ETIQUETAS: { id: 'ETIQUETAS', label: 'Etiquetas', color: '#e74c3c', camposConfig: [] },
 SINTAXIS: { id: 'SINTAXIS', label: 'Sintaxis', color: '#3498db', camposConfig: [] }
 
 
@@ -101,7 +103,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
     const [mostrandoEditorOlympic, setMostrandoEditorOlympic] = useState(false); // <--- AÑADE ESTA LÍNEA
     // Añade junto a los otros useState de editores:
     const [mostrandoEditorSintaxis, setMostrandoEditorSintaxis] = useState(false);
-
+    const [mostrandoEditorEtiquetas, setMostrandoEditorEtiquetas] = useState(false);
     // Añade este estado junto a los demás en ProfesorDashboard
     const [qSenderAMigrar, setQsenderAMigrar] = useState(null);
 
@@ -143,7 +145,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             const docs = s.docs.map(d => ({ ...d.data(), id: d.id })).filter(r => {
                 if (modoDashboard === 'PRO') {
                     // CAMBIO AQUÍ: Aceptamos 'PRO' y 'PRO-BURBUJAS'
-                    return r.tipo === 'PRO' || r.tipo === 'PRO-BURBUJAS' || r.tipo === 'OLYMPIC' || r.tipo === 'SINTAXIS'; ;
+                    return r.tipo === 'PRO' || r.tipo === 'PRO-BURBUJAS' || r.tipo === 'OLYMPIC' || r.tipo === 'SINTAXIS'||r.tipo === 'ETIQUETAS';
                 }
                 // En clásico mostramos los que NO sean de ningún tipo PRO
                 return !r.tipo || (r.tipo !== 'PRO' && r.tipo !== 'PRO-BURBUJAS' && r.tipo !== 'OLYMPIC');
@@ -161,7 +163,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             const docs = s.docs.map(d => ({ ...d.data(), id: d.id })).filter(d => d.profesorUid !== usuario.uid).filter(r => {
                 if (modoDashboard === 'PRO') {
                     // CAMBIO AQUÍ TAMBIÉN
-                    return r.tipo === 'PRO' || r.tipo === 'PRO-BURBUJAS' || r.tipo === 'OLYMPIC' || r.tipo === 'SINTAXIS';;
+                    return r.tipo === 'PRO' || r.tipo === 'PRO-BURBUJAS' || r.tipo === 'OLYMPIC' || r.tipo === 'SINTAXIS' || r.tipo === 'ETIQUETAS';
                 }
                 return !r.tipo || (r.tipo !== 'PRO' && r.tipo !== 'PRO-BURBUJAS' && r.tipo !== 'OLYMPIC');
             });
@@ -210,6 +212,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             if (juegoSeleccionado === 'WORDLE') return iniciarCreacionWordle(); // <--- AÑADIR ESTO
             if (juegoSeleccionado === 'OLYMPICLIVE') return iniciarCreacionOlympic();
             if (juegoSeleccionado === 'SINTAXIS') return iniciarCreacionSintaxis();
+            if (juegoSeleccionado === 'ETIQUETAS') return iniciarCreacionEtiquetas();
         }
 
 
@@ -251,6 +254,20 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
         };
         setDatosEditor(nuevoRecurso);
         setMostrandoEditorSintaxis(true);
+    };
+
+    const iniciarCreacionEtiquetas = () => {
+        const nuevoRecurso = {
+            id: null, titulo: '', temas: '',
+            profesorNombre: perfilProfesor?.nombre || usuario.displayName,
+            pais: perfilProfesor?.pais || '',
+            region: perfilProfesor?.region || '',
+            poblacion: perfilProfesor?.poblacion || '',
+            tipo: 'ETIQUETAS', tipoJuego: 'ETIQUETAS',
+            hojas: [], isPrivate: false,
+        };
+        setDatosEditor(nuevoRecurso);
+        setMostrandoEditorEtiquetas(true);
     };
 
     // 1. CREAR PILIVE (THINKHOOT PRO)
@@ -359,6 +376,9 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             }
             else if (dataFresca.tipoJuego === 'SINTAXIS') {
                 setMostrandoEditorSintaxis(true);
+            }
+            else if (dataFresca.tipoJuego === 'ETIQUETAS') {
+                setMostrandoEditorEtiquetas(true);
             }
             else {
                 setMostrandoEditorManual(true); // Clásico
@@ -958,7 +978,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                 <>{modoDashboard === 'CLASICO' && (
                     <div className="game-type-scroll" style={{ marginBottom: '20px' }}>
                         {Object.values(TIPOS_JUEGOS)
-                            .filter(j => j.id !== 'MATHLIVE' && j.id !== 'WORDLE' && j.id !== 'OLYMPICLIVE' && j.id !== 'SINTAXIS')
+                            .filter(j => j.id !== 'MATHLIVE' && j.id !== 'WORDLE' && j.id !== 'OLYMPICLIVE' && j.id !== 'SINTAXIS' && j.id !== 'ETIQUETAS')
                             .map(j => (
                                 <button key={j.id} onClick={() => setJuegoSeleccionado(j.id)} style={{ padding: '8px 16px', borderRadius: '20px', border: 'none', background: juegoSeleccionado === j.id ? j.color : 'white', color: juegoSeleccionado === j.id ? 'white' : '#555', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
                                     {j.label}
@@ -1089,7 +1109,14 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                             >
                                 <FileText size={16} /> <span className="btn-text">Sintaxis</span>
                             </button>
-
+                                    <button onClick={() => setJuegoSeleccionado('ETIQUETAS')} className="header-btn"
+                                        style={{
+                                            padding: '8px 20px', borderRadius: '20px',
+                                            background: juegoSeleccionado === 'ETIQUETAS' ? '#e74c3c' : 'white',
+                                            color: juegoSeleccionado === 'ETIQUETAS' ? 'white' : '#555'
+                                        }}>
+                                        <Crosshair size={16} /> <span className="btn-text">Etiquetas</span>
+                                    </button>
 
                                 </>
                             )}
@@ -1175,7 +1202,18 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                             <Edit3 /> {juegoSeleccionado === 'SINTAXIS' ? 'Abrir Editor' : 'Manual'}
                         </button>
 
-                        {juegoSeleccionado !== 'QUESTION_SENDER' && juegoSeleccionado !== 'SINTAXIS' && (
+                        <button onClick={() => {
+                            setMostrandoCrear(false);
+                            if (juegoSeleccionado === 'SINTAXIS') setMostrandoEditorSintaxis(true);
+                            else if (juegoSeleccionado === 'ETIQUETAS') setMostrandoEditorEtiquetas(true);
+                            else setMostrandoEditorManual(true);
+                        }}
+                            style={{ ...actionBtnStyle('#2196F3'), flex: 1 }}
+                        >
+                            <Edit3 /> {juegoSeleccionado === 'ETIQUETAS' ? 'Abrir Editor' : 'Manual'}
+                        </button>
+                        
+                        {juegoSeleccionado !== 'QUESTION_SENDER' && juegoSeleccionado !== 'SINTAXIS' && juegoSeleccionado !== 'ETIQUETAS' && (
                             <>
                                 <button onClick={procesarCreacionIA} style={{ ...actionBtnStyle('#673AB7'), flex: 1 }}>
                                     <Bot /> IA
@@ -1247,7 +1285,14 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                 />
             )}
 
-
+            {mostrandoEditorEtiquetas && (
+                <EditorEtiquetas
+                    datos={datosEditor}
+                    setDatos={setDatosEditor}
+                    onClose={() => setMostrandoEditorEtiquetas(false)}
+                    usuario={perfilProfesor || usuario}
+                />
+            )}
 
             {mostrandoEditorOlympic && (
                 <EditorOlympic

@@ -46,9 +46,17 @@ const checkFuzzyMatch = (text, search) => {
 // COMPONENTE PRINCIPAL
 // ─────────────────────────────────────────────
 export default function EtiquetaMe({ onExit, recurso: recursoInicial = null }) {
-    const [pantalla, setPantalla] = useState(recursoInicial ? 'ELECCION' : 'BUSQUEDA');
+    // Si llega recurso desde LandingGames, saltamos la busqueda
+    const [pantalla, setPantalla]           = useState(() => {
+        if (!recursoInicial) return 'BUSQUEDA';
+        return (recursoInicial.hojas?.length || 0) <= 1 ? 'JUGANDO' : 'ELECCION';
+    });
     const [recursoActivo, setRecursoActivo] = useState(recursoInicial);
-    const [hojaActiva, setHojaActiva]       = useState(null);
+    const [hojaActiva, setHojaActiva]       = useState(() => {
+        if (!recursoInicial) return null;
+        if ((recursoInicial.hojas?.length || 0) === 1) return recursoInicial.hojas[0];
+        return null;
+    });
 
     const volverBusqueda = () => { setPantalla('BUSQUEDA'); setRecursoActivo(null); setHojaActiva(null); };
     const volverEleccion = () => { setPantalla('ELECCION'); setHojaActiva(null); };
@@ -334,14 +342,13 @@ function PantallaEleccion({ recurso, onElegir, onVolver }) {
 const COLORES = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c'];
 
 // ─────────────────────────────────────────────
-// PANTALLA 3 — JUEGO + RESULTADO
-// ─────────────────────────────────────────────
-function PantallaJuego({ recurso, hoja, onJugarDeNuevo, onCambiarDiagrama, onSalir }) {
-    const markers      = hoja?.markers || [];
-    const imageUrl     = hoja?.imageUrl || '';
+// PANTALLA 3 - JUEGO + RESULTADO
+function PantallaJuego({ recurso, hoja, onJugarDeNuevo, onCambiarDiagrama }) {
+    const markers  = hoja?.markers || [];
+    const imageUrl = hoja?.imageUrl || '';
 
-    const [respuestas, setRespuestas]   = useState({});
-    const [evaluacion, setEvaluacion]   = useState(null); // null | { resultados, aciertos, total, nota }
+    const [respuestas, setRespuestas] = useState({});
+    const [evaluacion, setEvaluacion] = useState(null);
 
     const comprobar = () => {
         let aciertos = 0;
@@ -354,7 +361,7 @@ function PantallaJuego({ recurso, hoja, onJugarDeNuevo, onCambiarDiagrama, onSal
             resultados[m.id] = ok;
         });
         const nota = markers.length > 0
-            ? Math.round((aciertos / markers.length) * 10000) / 100  // 2 decimales
+            ? Math.round((aciertos / markers.length) * 10000) / 100
             : 0;
         setEvaluacion({ resultados, aciertos, total: markers.length, nota });
     };
@@ -381,7 +388,6 @@ function PantallaJuego({ recurso, hoja, onJugarDeNuevo, onCambiarDiagrama, onSal
         <div style={st.pagina}>
             {perfecto && <Confetti recycle={false} numberOfPieces={300} />}
 
-            {/* Header */}
             <div style={st.headerJuego}>
                 <button onClick={onCambiarDiagrama} style={st.btnVolver}>
                     <ArrowLeft size={15} /> Diagramas
@@ -391,141 +397,179 @@ function PantallaJuego({ recurso, hoja, onJugarDeNuevo, onCambiarDiagrama, onSal
                     <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.7)' }}>{hoja.nombreHoja}</div>
                 </div>
                 {evaluacion ? (
-                    <div style={st.notaHeader(evaluacion.nota)}>
-                        {evaluacion.nota.toFixed(2)}%
-                    </div>
+                    <div style={st.notaHeader(evaluacion.nota)}>{evaluacion.nota.toFixed(2)}%</div>
                 ) : (
                     <div style={{ width: 80 }} />
                 )}
             </div>
 
-            {/* Imagen + respuestas */}
-            <div style={st.juegoWrapper}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px' }}>
+                <div style={{ maxWidth: 1000, margin: '0 auto' }}>
 
-                {/* IMAGEN CON PINES */}
-                <div style={st.imageZona}>
-                    <div style={{ position: 'relative', display: 'inline-block', maxWidth: '100%' }}>
+                    {/* Wrapper con padding igual que el editor para que las etiquetas no se corten */}
+                    <div style={{
+                        position: 'relative', display: 'inline-block', width: '100%',
+                        background: 'white', borderRadius: 14,
+                        padding: 60, boxSizing: 'border-box',
+                        boxShadow: '0 8px 28px rgba(0,0,0,0.3)',
+                    }}>
                         <img
-                            src={imageUrl}
-                            alt="diagrama"
-                            style={st.imagenJuego}
+                            src={imageUrl} alt="diagrama"
+                            style={{ display: 'block', width: '100%', height: 'auto', borderRadius: 8, userSelect: 'none' }}
                             draggable="false"
                         />
-                        {markers.map((m, i) => {
+
+                        {/* Lienzo del profesor — base64 PNG superpuesto sobre la imagen */}
+                        {hoja.paintData && (
+                            <img
+                                src={hoja.paintData}
+                                alt=""
+                                style={{
+                                    position: 'absolute', top: 0, left: 0,
+                                    width: '100%', height: '100%',
+                                    zIndex: 1,
+                                    pointerEvents: 'none',
+                                    borderRadius: 14,
+                                }}
+                                draggable="false"
+                            />
+                        )}
+
+                        {/* Lineas SVG con overflow visible */}
+                        <svg style={{
+                            position: 'absolute', top: 0, left: 0,
+                            width: '100%', height: '100%',
+                            pointerEvents: 'none', zIndex: 2, overflow: 'visible',
+                        }}>
+                            <defs>
+                                <marker id="arrow-game" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                                    <polygon points="0 0, 8 3, 0 6" fill="#777" />
+                                </marker>
+                            </defs>
+                            {markers.map(m => {
+                                const estado = evaluacion ? evaluacion.resultados[m.id] : null;
+                                const color  = estado === true ? '#27ae60' : estado === false ? '#e74c3c' : '#777';
+                                return (
+                                    <line key={`line-${m.id}`}
+                                        x1={`${m.anchorX}%`} y1={`${m.anchorY}%`}
+                                        x2={`${m.labelX}%`}  y2={`${m.labelY}%`}
+                                        stroke={color} strokeWidth="2"
+                                        markerEnd="url(#arrow-game)"
+                                    />
+                                );
+                            })}
+                        </svg>
+
+                        {/* Puntos de anclaje */}
+                        {markers.map(m => {
                             const estado = evaluacion ? evaluacion.resultados[m.id] : null;
                             const color  = estado === true ? '#27ae60' : estado === false ? '#e74c3c' : '#e67e22';
                             return (
-                                <div key={m.id} style={{
-                                    position:    'absolute',
-                                    left:        `${m.anchorX}%`,
-                                    top:         `${m.anchorY}%`,
-                                    transform:   'translate(-50%, -50%)',
-                                    width:       28, height: 28,
-                                    borderRadius: '50%',
-                                    background:  color,
-                                    border:      '2.5px solid white',
-                                    boxShadow:   '0 2px 6px rgba(0,0,0,0.45)',
-                                    display:     'flex', justifyContent: 'center', alignItems: 'center',
-                                    fontWeight:  'bold', fontSize: 13, color: 'white',
-                                    zIndex:      10,
-                                    transition:  'background 0.3s',
-                                }}>
-                                    {i + 1}
-                                </div>
+                                <div key={`anchor-${m.id}`} style={{
+                                    position: 'absolute',
+                                    left: `${m.anchorX}%`, top: `${m.anchorY}%`,
+                                    transform: 'translate(-50%, -50%)',
+                                    width: 14, height: 14, borderRadius: '50%',
+                                    background: color, border: '2px solid white',
+                                    boxShadow: '0 2px 5px rgba(0,0,0,0.4)',
+                                    zIndex: 5, transition: 'background 0.3s',
+                                }} />
                             );
                         })}
-                    </div>
-                </div>
 
-                {/* FORMULARIO DE RESPUESTAS */}
-                <div style={st.respuestasZona}>
-                    <h3 style={{ margin: '0 0 14px', color: '#2c3e50', fontSize: '0.95rem' }}>
-                        ¿Qué indica cada número?
-                    </h3>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 18 }}>
+                        {/* Inputs en la posicion exacta labelX/labelY del profesor */}
                         {markers.map((m, i) => {
-                            const estado = evaluacion ? evaluacion.resultados[m.id] : null;
+                            const estado      = evaluacion ? evaluacion.resultados[m.id] : null;
+                            const borderColor = estado === true ? '#27ae60' : estado === false ? '#e74c3c' : '#aaa';
+                            const bgColor     = estado === true ? '#e8f8f0' : estado === false ? '#fef0ef' : 'white';
+                            const displayVal  = (evaluacion && estado === false) ? m.text : (respuestas[m.id] || '');
                             return (
-                                <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    {/* Número */}
+                                <div key={`label-${m.id}`} style={{
+                                    position: 'absolute',
+                                    left: `${m.labelX}%`, top: `${m.labelY}%`,
+                                    transform: 'translate(-50%, -50%)',
+                                    zIndex: 10,
+                                    display: 'flex', alignItems: 'center', gap: 4,
+                                    background: bgColor,
+                                    border: `2px solid ${borderColor}`,
+                                    borderRadius: 8,
+                                    boxShadow: '0 3px 10px rgba(0,0,0,0.2)',
+                                    padding: '3px 6px 3px 4px',
+                                    whiteSpace: 'nowrap',
+                                    transition: 'border-color 0.3s, background 0.3s',
+                                }}>
                                     <div style={{
-                                        width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-                                        background: estado === true ? '#27ae60' : estado === false ? '#e74c3c' : '#e67e22',
-                                        color: 'white', fontWeight: 'bold', fontSize: 13,
+                                        width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
+                                        background: borderColor, color: 'white',
+                                        fontWeight: 'bold', fontSize: 11,
                                         display: 'flex', justifyContent: 'center', alignItems: 'center',
                                     }}>
                                         {i + 1}
                                     </div>
-
-                                    {/* Input */}
-                                    <div style={{ flex: 1 }}>
+                                    {!evaluacion ? (
                                         <input
-                                            type="text"
-                                            placeholder="Escribe la respuesta..."
+                                            type="text" placeholder="..."
                                             value={respuestas[m.id] || ''}
                                             onChange={e => setRespuestas({ ...respuestas, [m.id]: e.target.value })}
-                                            onKeyDown={e => e.key === 'Enter' && !evaluacion && comprobar()}
-                                            disabled={!!evaluacion}
+                                            onKeyDown={e => e.key === 'Enter' && comprobar()}
                                             style={{
-                                                ...st.inputRespuesta,
-                                                borderColor: estado === true ? '#27ae60' : estado === false ? '#e74c3c' : '#ddd',
-                                                background:  estado === true ? '#f0faf5' : estado === false ? '#fef5f5' : 'white',
+                                                border: 'none', outline: 'none',
+                                                fontSize: 13, fontWeight: 'bold',
+                                                background: 'transparent', color: '#2c3e50',
+                                                width: `${Math.max(6, (respuestas[m.id]?.length || 0) + 3)}ch`,
+                                                minWidth: 55, maxWidth: 160,
                                             }}
                                         />
-                                        {/* Respuesta correcta si ha fallado */}
-                                        {estado === false && (
-                                            <div style={{ fontSize: '0.72rem', color: '#e74c3c', marginTop: 2, fontWeight: 'bold' }}>
-                                                ✓ {m.text}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Icono estado */}
-                                    {estado === true  && <CheckCircle size={20} color="#27ae60" style={{ flexShrink: 0 }} />}
-                                    {estado === false && <XCircle     size={20} color="#e74c3c" style={{ flexShrink: 0 }} />}
+                                    ) : (
+                                        <span style={{
+                                            fontSize: 13, fontWeight: 'bold',
+                                            color: estado === true ? '#1a7a4a' : '#c0392b',
+                                            padding: '1px 2px', minWidth: 40,
+                                        }}>
+                                            {displayVal}
+                                        </span>
+                                    )}
+                                    {estado === true  && <CheckCircle size={14} color="#27ae60" />}
+                                    {estado === false && <XCircle     size={14} color="#e74c3c" />}
                                 </div>
                             );
                         })}
                     </div>
 
-                    {/* ── BOTONES ── */}
-                    {!evaluacion ? (
-                        <button onClick={comprobar} style={st.btnComprobar}>
-                            <CheckCircle size={18} /> Comprobar
-                        </button>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                            {/* Resultado */}
-                            <div style={st.resultadoBox(evaluacion.nota)}>
-                                <div style={{ fontSize: '0.85rem', opacity: 0.85 }}>
-                                    {evaluacion.aciertos} / {evaluacion.total} correctas
+                    {/* Acciones debajo de la imagen */}
+                    <div style={{ marginTop: 18, maxWidth: 460, margin: '18px auto 0' }}>
+                        {!evaluacion ? (
+                            <button onClick={comprobar} style={st.btnComprobar}>
+                                <CheckCircle size={18} /> Comprobar
+                            </button>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                <div style={st.resultadoBox(evaluacion.nota)}>
+                                    <div style={{ fontSize: '0.85rem', opacity: 0.85 }}>
+                                        {evaluacion.aciertos} / {evaluacion.total} correctas
+                                    </div>
+                                    <div style={{ fontSize: '2rem', fontWeight: 900, lineHeight: 1.1 }}>
+                                        {evaluacion.nota.toFixed(2)}%
+                                    </div>
+                                    <div style={{ fontSize: '0.9rem' }}>
+                                        {perfecto ? '🎉 ¡Perfecto!' : evaluacion.nota >= 70 ? '👏 ¡Muy bien!' : evaluacion.nota >= 50 ? '💪 ¡Sigue practicando!' : '📚 ¡A estudiar más!'}
+                                    </div>
                                 </div>
-                                <div style={{ fontSize: '2rem', fontWeight: 900, lineHeight: 1.1 }}>
-                                    {evaluacion.nota.toFixed(2)}%
-                                </div>
-                                <div style={{ fontSize: '0.9rem' }}>
-                                    {perfecto ? '🎉 ¡Perfecto!' : evaluacion.nota >= 70 ? '👏 ¡Muy bien!' : evaluacion.nota >= 50 ? '💪 ¡Sigue practicando!' : '📚 ¡A estudiar más!'}
-                                </div>
+                                <button onClick={reiniciar} style={st.btnJugarDeNuevo}>
+                                    <RotateCcw size={16} /> Jugar de nuevo (misma imagen)
+                                </button>
+                                <button onClick={onCambiarDiagrama} style={st.btnCambiarDiagrama}>
+                                    <Shuffle size={16} /> Cambiar diagrama
+                                </button>
                             </div>
-
-                            <button onClick={reiniciar} style={st.btnJugarDeNuevo}>
-                                <RotateCcw size={16} /> Jugar de nuevo (misma imagen)
-                            </button>
-                            <button onClick={onCambiarDiagrama} style={st.btnCambiarDiagrama}>
-                                <Shuffle size={16} /> Cambiar diagrama
-                            </button>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
     );
 }
 
-// ─────────────────────────────────────────────
-// ESTILOS
-// ─────────────────────────────────────────────
 const st = {
     pagina: {
         minHeight:  '100vh',

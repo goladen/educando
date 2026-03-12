@@ -16,7 +16,7 @@ import SintaxisGame from '../SintaxisGamen2';
 import Geometrix from '../Geometrix';
 import CalculoMental from '../CalculoMental2'; 
 import Ecuaciones from '../Ecuaciones2';
-import EtiquetaMe from '../EtiquetaMe2';
+import EtiquetaMe from '../EtiquetaMe';
 import imgPasapalabra from '../assets/icono_pasapal.png'; // Revisa si es .png o .jpg
 import imgBurbujas from '../assets/icono_burbujas.png';
 import imgPikatron from '../assets/icono_pikatron.png';

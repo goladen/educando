@@ -16,6 +16,9 @@ import SintaxisGame from '../SintaxisGamen2';
 import Geometrix from '../Geometrix';
 import CalculoMental from '../CalculoMental2'; 
 import Ecuaciones from '../Ecuaciones2';
+import Funciones from '../Funciones2';
+import Plataformas from '../Plataformas';
+
 import EtiquetaMe from '../EtiquetaMe';
 import imgPasapalabra from '../assets/icono_pasapal.png'; // Revisa si es .png o .jpg
 import imgBurbujas from '../assets/icono_burbujas.png';
@@ -55,11 +58,22 @@ export const APPS = [
     {
         id: 'SINTAXIS',
         name: 'Sintaxis',
-        desc: 'Analiza frases generadas por IA uniendo palabras y colores.',
+        desc: 'Analiza frases de distintos niveles.',
         color: '#3498db',
         emoji: '🖍️',
         isSpecial: false
     },
+
+    {
+        id: 'PLATAFORMAS',
+        name: 'Plataformas',
+        desc: 'Salta y corre y acierta.',
+        color: '#3498db',
+        emoji: '🖍️',
+        isSpecial: false
+    },
+
+
     {
         id: 'MATH_WORLD_PORTAL',
         name: 'Math World',
@@ -96,7 +110,9 @@ export const APPS = [
         emoji: '⚖️',
         isMath: true
     },
-    { id: 'FUNCIONES', name: 'Funciones', desc: 'Análisis de gráficas.', color: '#4CAF50', emoji: '📈', isMath: true, comingSoon: true },
+    { id: 'FUNCIONES', name: 'Funciones', desc: 'Rectas, parábolas y análisis gráfico.', color: '#4CAF50', emoji: '📈', isMath: true },
+
+
     { id: 'POLINOMIOS', name: 'Álgebra', desc: 'Operaciones con polinomios.', color: '#FF9800', emoji: '✖️', isMath: true, comingSoon: true }
 
 ];
@@ -464,7 +480,8 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
         if (juegoActivo.tipoJuego === 'GEOMETRIX') return <Geometrix usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'CALCULO') return <CalculoMental usuario={null} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'ECUACIONES') return <Ecuaciones usuario={null} onExit={() => setJuegoActivo(null)} />;
-     // ------------------------
+        if (juegoActivo.tipoJuego === 'FUNCIONES') return <Funciones onExit={() => setJuegoActivo(null)} />;
+        // ------------------------
 
         if (juegoActivo.modoEspecial === 'PIKATRON') return <PikatronRun recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'RULETA') return <RuletaGame recurso={juegoActivo} usuario={null} alTerminar={() => setJuegoActivo(null)} />;
@@ -829,6 +846,8 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
         if (appData.id === 'GEOMETRIX' || juegoActivo.tipoJuego === 'GEOMETRIX') return <Geometrix usuario={null} onExit={handleExitGame} />;
         if (appData.id === 'CALCULO' || juegoActivo.tipoJuego === 'CALCULO') return <CalculoMental usuario={null} onExit={handleExitGame} />;
         if (appData.id === 'ECUACIONES' || juegoActivo.tipoJuego === 'ECUACIONES') return <Ecuaciones onExit={handleExitGame} />;
+        if (appData.id === 'FUNCIONES' || juegoActivo.tipoJuego === 'FUNCIONES') return <Funciones usuario={null} onExit={handleExitGame} />;
+
     }
     // --- NUEVO: ATAJO PARA JUEGOS CON MENÚ PROPIO ---
     if (appData.id === 'WORDLE') return <TextWordleGame usuario={null} onExit={onHome} />;
@@ -838,11 +857,13 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
 
 
     if (appData.id === 'SINTAXIS') return <SintaxisGame usuario={null} onExit={onHome} />;
-    
+    if (appData.id === 'PLATAFORMAS') return <Plataformas usuario={null} onExit={onHome} />;
     // --- NUEVO: USA handleExitGame PARA LOS DE MATES ---
     if (appData.id === 'GEOMETRIX') return <Geometrix usuario={null} onExit={handleExitGame} />;
     if (appData.id === 'CALCULO') return <CalculoMental usuario={null} onExit={handleExitGame} />;
     if (appData.id === 'ECUACIONES') return <Ecuaciones usuario={null} onExit={handleExitGame} />;
+    if (appData.id === 'FUNCIONES') return <Funciones usuario={null} onExit={handleExitGame} />;
+
     // ------------------------// ------------------------
     // --- CASO ESPECIAL: QUESTION SENDER ---
     // --- CASO ESPECIAL: QUESTION SENDER ---

@@ -1122,7 +1122,7 @@ export default function QuizPlataformas({ onExit }) {
         const bx=Math.max(2, Math.min(CW-bw-2, sx+en.w/2-bw/2));
         const by=sy-bh-5;
         if (by>-20) {
-          ctx.fillStyle='rgba(30,100,210,0.92)';
+          ctx.fillStyle=en.isTrue?'rgba(39,174,96,0.88)':'rgba(192,57,43,0.88)';
           rr(ctx,bx,by,bw,bh,4); ctx.fill();
           ctx.strokeStyle='rgba(255,255,255,0.4)'; ctx.lineWidth=1;
           rr(ctx,bx,by,bw,bh,4); ctx.stroke();

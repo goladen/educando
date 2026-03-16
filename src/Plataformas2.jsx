@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { db } from './firebase';
+import { collection, getDocs, query, where, limit } from 'firebase/firestore';
 
 import pikatronImgSrc  from './assets/pikatron-sprite.png';
 // ── Imagen del enemigo: cambia esta ruta por la de tu personaje enemigo ──
@@ -26,6 +28,69 @@ const COYOTE_F   = 8;
 const JBUF_F     = 8;
 
 // ══════════════════════════════════════════════════════════════════════════════
+//  MOTOR MATEMÁTICO (compatible con recursos PRO-BURBUJAS/Pikatron)
+// ══════════════════════════════════════════════════════════════════════════════
+const generarPreguntasMatematicas = (config) => {
+  const questions = [];
+  const count = parseInt(config.mathCount || 0);
+  if (count <= 0) return [];
+  const types = config.mathTypes || ['POSITIVOS'];
+  const ops   = config.mathOps   || ['SUMA'];
+  const min   = parseInt(config.mathMin || 1);
+  const max   = parseInt(config.mathMax || 10);
+  const ri    = (a,b) => Math.floor(Math.random()*(b-a+1))+a;
+  const rf    = (a,b) => (Math.random()*(b-a)+a).toFixed(1);
+  const gcd   = (a,b) => b===0?a:gcd(b,a%b);
+  const simp  = (n,d) => { const g=gcd(Math.abs(n),Math.abs(d)); return {n:n/g,d:d/g}; };
+  for (let i=0;i<count;i++) {
+    const type=types[i%types.length], op=ops[i%ops.length];
+    let pObj={pregunta:'',respuesta:'',incorrectas:[]};
+    const isFrac=type==='FRACCIONES', isDec=type==='DECIMALES', isNeg=type==='NEGATIVOS';
+    if (isFrac) {
+      const n1=ri(min,max),d1=ri(min,max),n2=ri(min,max),d2=ri(min,max);
+      let rN,rD,sym;
+      if(op==='SUMA'){sym='+';rN=n1*d2+n2*d1;rD=d1*d2;}
+      else if(op==='RESTA'){sym='-';rN=n1*d2-n2*d1;rD=d1*d2;}
+      else if(op==='MULT'){sym='·';rN=n1*n2;rD=d1*d2;}
+      else{sym=':';rN=n1*d2;rD=d1*n2;}
+      const s=simp(rN,rD); if(s.d<0){s.n=-s.n;s.d=-s.d;}
+      pObj.pregunta=`${n1}/${d1} ${sym} ${n2}/${d2}`;
+      pObj.respuesta=`${s.n}/${s.d}`;
+      pObj.incorrectas=[`${s.n+1}/${s.d}`,`${s.n}/${s.d+1}`,`${s.d}/${s.n}`].filter(x=>x!==pObj.respuesta);
+    } else {
+      const gv=()=>{let v=isDec?parseFloat(rf(min,max)):ri(min,max);if(isNeg&&Math.random()>.5)v=-v;return v;};
+      let a=gv(),b=gv(),res,la,lb,sym;
+      if(op==='DIV'){if(b===0)b=1;if(!isDec){const rt=isNeg?(Math.random()>.5?-ri(min,max):ri(min,max)):ri(min,max);a=b*rt;}}
+      if(op==='SUMA'){sym='+';res=a+b;}else if(op==='RESTA'){sym='-';res=a-b;}
+      else if(op==='MULT'){sym='·';res=a*b;}else{sym=':';res=a/b;}
+      if(isDec||!Number.isInteger(res)){res=parseFloat(res.toFixed(1));pObj.respuesta=String(res).replace('.',',');la=String(a).replace('.',',');lb=String(b).replace('.',',');}
+      else{pObj.respuesta=String(res);la=String(a);lb=String(b);}
+      if(b<0)lb=`(${lb})`;
+      pObj.pregunta=`${la} ${sym} ${lb}`;
+      pObj.incorrectas=[String(isDec?(res+1).toFixed(1).replace('.',','):res+1),String(isDec?(res-1).toFixed(1).replace('.',','):res-1),String(isDec?(res+10).toFixed(1).replace('.',','):res+10)];
+    }
+    questions.push(pObj);
+  }
+  return questions;
+};
+
+// Normaliza una pregunta de cualquier formato a {q, a, inc[]}
+const normQ = p => ({
+  q:   p.pregunta || p.q || '',
+  a:   p.respuesta || p.correcta || p.a || '',
+  inc: p.incorrectas || p.inc || [],
+});
+
+// Extrae hasta N preguntas de una hoja (aleatorio o en orden)
+const extraerPreguntas = (hoja, n=5, aleatorio=true) => {
+  const esProBurbujas = hoja.mathConfig && parseInt(hoja.mathConfig.mathCount||0)>0;
+  let pool = [...(hoja.preguntas||[])].map(normQ);
+  if (esProBurbujas) pool = [...pool, ...generarPreguntasMatematicas(hoja.mathConfig).map(normQ)];
+  if (aleatorio) pool.sort(()=>Math.random()-.5);
+  return pool.slice(0, n);
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
 //  NIVEL
 // ══════════════════════════════════════════════════════════════════════════════
 const PLAT_H   = 16;
@@ -38,13 +103,13 @@ const EDGE_MARGIN = 80;
 
 // Bloques de respuesta ocupan exactamente el 60% del ancho de su plataforma
 const ANS_GAP  = 14;
-const ANS_H    = 26;
-const ANS_ABOVE = 115;  // px sobre la plataforma (separación respecto al tope)
+const ANS_H    = 42;
+const ANS_ABOVE = 132;  // px sobre la plataforma (separación respecto al tope)
 // Para que no roce: el jugador (58px) sube 115-58=57px ENCIMA de la plataforma antes de rozar los bloques
 // La separación real entre el tope de la plataforma y los bloques es ANS_ABOVE - ANS_H = 89px → espacio de sobra
 
 function getAnsLayout(platW) {
-  const blockW = Math.max(32, Math.floor((platW * 0.60 - 3 * ANS_GAP) / 4));
+  const blockW = Math.max(36, Math.floor((platW * 0.69 - 3 * ANS_GAP) / 4));
   const totalW = 4 * blockW + 3 * ANS_GAP;
   return { blockW, totalW };
 }
@@ -492,12 +557,270 @@ function Scr({ children }) {
   return <div style={{ minHeight:'100vh', background:'#1a1a2e', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:20, fontFamily:'Arial,sans-serif' }}>{children}</div>;
 }
 
-function PantallaMenu({ onEligir, onExit }) {
+// Normaliza texto quitando tildes y pasando a minúsculas (igual que LandingGames)
+const cleanText = (str) => {
+  if (!str) return '';
+  return String(str).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  BUSCADOR DE RECURSOS — lógica idéntica a SpecificGamePage de LandingGames3
+//  Solo muestra recursos de CAZABURBUJAS / PIKATRON que estén terminados.
+//  Filtros: tema/título, ciclo, código de acceso, país, región, autor.
+// ══════════════════════════════════════════════════════════════════════════════
+function BuscadorRecursos({ onSelect }) {
+  const [filtros,     setFiltros]     = useState({ tema:'', ciclo:'' });
+  const [codigo,      setCodigo]      = useState('');
+  const [pais,        setPais]        = useState('');
+  const [region,      setRegion]      = useState('');
+  const [autor,       setAutor]       = useState('');
+  const [avanzado,    setAvanzado]    = useState(false);
+  const [resultados,  setResultados]  = useState([]);
+  const [cargando,    setCargando]    = useState(false);
+  const [error,       setError]       = useState('');
+  const [buscado,     setBuscado]     = useState(false);
+
+  const buscar = async () => {
+    setCargando(true); setError(''); setResultados([]); setBuscado(true);
+    try {
+      const ref = collection(db, 'resources');
+      let filtrados = [];
+
+      if (codigo.trim()) {
+        // Búsqueda por código de acceso exacto
+        const q = query(ref, where('accessCode', '==', codigo.toUpperCase().trim()));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          const data = snap.docs[0].data();
+          const esValido = data.tipoJuego === 'CAZABURBUJAS' || data.tipoJuego === 'PIKATRON';
+          if (esValido) filtrados = [{ ...data, id: snap.docs[0].id }];
+          else setError('Este código pertenece a otro tipo de juego.');
+        } else {
+          setError('Código no encontrado.');
+        }
+      } else {
+        // Búsqueda general: limit(150) sin índices compuestos, filtrado client-side
+        const snap = await getDocs(query(ref, limit(150)));
+        filtrados = snap.docs
+          .map(d => ({ ...d.data(), id: d.id }))
+          .filter(r => {
+            // Solo CAZABURBUJAS y PIKATRON
+            if (r.tipoJuego !== 'CAZABURBUJAS' && r.tipoJuego !== 'PIKATRON') return false;
+            // Solo recursos marcados como terminados
+            if (r.isFinished !== true && r.config?.isFinished !== true) return false;
+            // Filtro tema: busca en temas y en titulo
+            if (filtros.tema && !cleanText(r.temas).includes(cleanText(filtros.tema))
+                             && !cleanText(r.titulo).includes(cleanText(filtros.tema))) return false;
+            // Filtro ciclo: comparación exacta (igual que LandingGames)
+            if (filtros.ciclo && cleanText(r.ciclo) !== cleanText(filtros.ciclo)
+                              && cleanText(r.config?.ciclo) !== cleanText(filtros.ciclo)) return false;
+            // Filtros avanzados
+            if (pais   && !cleanText(r.pais).includes(cleanText(pais)))             return false;
+            if (region && !cleanText(r.region).includes(cleanText(region)))          return false;
+            if (autor  && !cleanText(r.profesorNombre).includes(cleanText(autor)))   return false;
+            return true;
+          });
+        if (filtrados.length === 0) setError('Sin resultados con esos filtros.');
+      }
+      setResultados(filtrados);
+    } catch(e) {
+      console.error('BuscadorRecursos:', e);
+      setError('Error al conectar. Comprueba la consola.');
+    }
+    setCargando(false);
+  };
+
+  const inp = { padding:'7px 9px', borderRadius:8, border:'1.5px solid rgba(255,255,255,0.18)',
+    background:'rgba(255,255,255,0.07)', color:'white', fontFamily:'inherit', fontSize:'0.82rem', width:'100%', boxSizing:'border-box' };
+  const sel = { ...inp, appearance:'none' };
+
+  return (
+    <div style={{ width:'100%', maxWidth:420, marginTop:10 }}>
+      <div style={{ background:'rgba(255,255,255,0.06)', borderRadius:12, padding:'12px 14px', border:'1px solid rgba(255,255,255,0.12)' }}>
+
+        <div style={{ fontSize:'0.78rem', color:'rgba(255,255,255,0.55)', marginBottom:10, fontWeight:'bold', letterSpacing:'.5px' }}>
+          🔍 USAR UN RECURSO PROPIO (Burbujas / Pikatron)
+        </div>
+
+        {/* Fila 1: Tema + Ciclo */}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:6 }}>
+          <input style={inp} placeholder="Tema o título…" value={filtros.tema}
+            onChange={e=>setFiltros({...filtros,tema:e.target.value})}
+            onKeyDown={e=>e.key==='Enter'&&buscar()} />
+          <select style={sel} value={filtros.ciclo} onChange={e=>setFiltros({...filtros,ciclo:e.target.value})}>
+            <option value="">Cualquier ciclo</option>
+            <option value="Infantil">Infantil</option>
+            <option value="Primaria">Primaria</option>
+            <option value="Secundaria">Secundaria</option>
+            <option value="Bachillerato">Bachillerato</option>
+            <option value="FP">FP</option>
+            <option value="Otros">Otros</option>
+          </select>
+        </div>
+
+        {/* Filtros avanzados toggle */}
+        <button onClick={()=>setAvanzado(!avanzado)}
+          style={{ background:'none', border:'none', color:'rgba(255,255,255,0.35)', cursor:'pointer', fontSize:'0.73rem', padding:'2px 0', marginBottom:avanzado?6:0, fontFamily:'inherit' }}>
+          {avanzado ? '▲ Menos filtros' : '▼ Búsqueda avanzada y código'}
+        </button>
+
+        {avanzado && (
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:8, background:'rgba(0,0,0,0.2)', borderRadius:8, padding:8 }}>
+            <input style={inp} placeholder="CÓDIGO (4-5 letras)" value={codigo}
+              onChange={e=>setCodigo(e.target.value.toUpperCase())} maxLength={6} />
+            <input style={inp} placeholder="País" value={pais} onChange={e=>setPais(e.target.value)} />
+            <input style={inp} placeholder="Región/Provincia" value={region} onChange={e=>setRegion(e.target.value)} />
+            <input style={inp} placeholder="Autor/Profesor" value={autor} onChange={e=>setAutor(e.target.value)} />
+          </div>
+        )}
+
+        {/* Botón buscar */}
+        <button onClick={buscar} disabled={cargando}
+          style={{ width:'100%', padding:'9px', borderRadius:8, border:'none', background:'#2980b9', color:'white',
+            fontWeight:'bold', cursor:'pointer', fontFamily:'inherit', fontSize:'0.88rem', marginTop:2,
+            opacity:cargando?0.6:1 }}>
+          {cargando ? 'Buscando…' : 'Buscar en Burbujas / Pikatron'}
+        </button>
+
+        {error && <div style={{ fontSize:'0.73rem', color:'#e74c3c', marginTop:6 }}>{error}</div>}
+        {!error && buscado && !cargando &&
+          <div style={{ fontSize:'0.7rem', color:'rgba(255,255,255,0.3)', marginTop:5 }}>
+            {resultados.length} recurso(s) encontrado(s)
+          </div>
+        }
+
+        {/* Tarjetas de resultados */}
+        {resultados.length > 0 && (
+          <div style={{ marginTop:10, display:'flex', flexDirection:'column', gap:6, maxHeight:230, overflowY:'auto' }}>
+            {resultados.map(r => (
+              <button key={r.id} onClick={()=>onSelect(r)}
+                style={{ padding:'9px 10px', borderRadius:8, border:'1px solid rgba(255,255,255,0.14)',
+                  background:'rgba(255,255,255,0.06)', color:'white', cursor:'pointer', textAlign:'left',
+                  fontFamily:'inherit', width:'100%' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:6 }}>
+                  <span style={{ fontWeight:'bold', fontSize:'0.85rem', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                    {r.titulo || '(Sin título)'}
+                  </span>
+                  <span style={{ fontSize:'0.65rem', background:'rgba(52,152,219,0.3)', padding:'2px 6px', borderRadius:6, whiteSpace:'nowrap', flexShrink:0 }}>
+                    {r.tipoJuego==='PIKATRON'?'⚡ Pikatron':'🔵 Burbujas'}
+                  </span>
+                </div>
+                <div style={{ fontSize:'0.72rem', color:'rgba(255,255,255,0.45)', marginTop:3, display:'flex', gap:10 }}>
+                  <span>📚 {r.temas||'General'}</span>
+                  <span>🎓 {r.ciclo||r.config?.ciclo||'Todos'}</span>
+                  {r.accessCode && <span style={{ color:'rgba(255,255,255,0.25)' }}>🔑 {r.accessCode}</span>}
+                </div>
+                {(r.hojas||[]).length>0 && (
+                  <div style={{ fontSize:'0.68rem', color:'rgba(255,255,255,0.3)', marginTop:2 }}>
+                    {r.hojas.map(h=>h.nombreHoja||'Hoja').join(' · ')}
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Selector de hoja / modo de juego para un recurso ──────────────────────────
+function PantallaSelectorHoja({ recurso, onJugar, onBack }) {
+  const hojas = recurso.hojas || [];
+  const numHojas = Math.min(hojas.length, 4);
+  const [modo, setModo] = useState(hojas.length>1?'PANTALLAS':'HOJA');
+  const [hojaIdx, setHojaIdx] = useState(0);
+
+  const canPantallas = hojas.length >= 2;
+
+  return (
+    <Scr>
+      <div style={{ fontSize:'2.6rem', marginBottom:4 }}>📦</div>
+      <h2 style={{ color:'#f1c40f', fontSize:'1.4rem', margin:'0 0 4px', textShadow:'2px 2px 0 #000', textAlign:'center', maxWidth:380 }}>
+        {recurso.titulo||'Recurso'}
+      </h2>
+      <p style={{ color:'rgba(255,255,255,0.4)', fontSize:'0.76rem', margin:'0 0 18px' }}>
+        {hojas.length} hoja(s) · {recurso.tipo||'Manual'}
+      </p>
+
+      {/* Selector de modo */}
+      <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+        {canPantallas && (
+          <button onClick={()=>setModo('PANTALLAS')}
+            style={{ padding:'8px 18px', borderRadius:20, border:`2px solid ${modo==='PANTALLAS'?'#f1c40f':'rgba(255,255,255,0.2)'}`,
+              background:modo==='PANTALLAS'?'rgba(241,196,15,0.15)':'transparent',
+              color:modo==='PANTALLAS'?'#f1c40f':'rgba(255,255,255,0.5)', cursor:'pointer', fontFamily:'inherit', fontSize:'0.85rem' }}>
+            🗺 {numHojas} Pantallas
+          </button>
+        )}
+        <button onClick={()=>setModo('HOJA')}
+          style={{ padding:'8px 18px', borderRadius:20, border:`2px solid ${modo==='HOJA'?'#3498db':'rgba(255,255,255,0.2)'}`,
+            background:modo==='HOJA'?'rgba(52,152,219,0.15)':'transparent',
+            color:modo==='HOJA'?'#7ec8f7':'rgba(255,255,255,0.5)', cursor:'pointer', fontFamily:'inherit', fontSize:'0.85rem' }}>
+          📄 Un nivel
+        </button>
+      </div>
+
+      {/* Selector de hoja (solo en modo HOJA) */}
+      {modo==='HOJA' && hojas.length>1 && (
+        <div style={{ marginBottom:16, width:'100%', maxWidth:320 }}>
+          <div style={{ fontSize:'0.75rem', color:'rgba(255,255,255,0.45)', marginBottom:6 }}>Elegir hoja:</div>
+          <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+            {hojas.map((h,i)=>(
+              <button key={i} onClick={()=>setHojaIdx(i)}
+                style={{ padding:'7px 14px', borderRadius:8, border:`2px solid ${hojaIdx===i?'#3498db':'rgba(255,255,255,0.12)'}`,
+                  background:hojaIdx===i?'rgba(52,152,219,0.18)':'rgba(255,255,255,0.04)',
+                  color:'white', cursor:'pointer', textAlign:'left', fontFamily:'inherit', fontSize:'0.84rem' }}>
+                {h.nombreHoja||`Hoja ${i+1}`}
+                <span style={{ marginLeft:8, fontSize:'0.7rem', color:'rgba(255,255,255,0.35)' }}>
+                  {(h.preguntas||[]).length} preguntas
+                  {h.preguntaEspecial?.activo?' · frases':''}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{ background:'rgba(255,255,255,0.06)', borderRadius:12, padding:'10px 16px', maxWidth:320, fontSize:'0.78rem', color:'rgba(255,255,255,0.5)', lineHeight:1.7, marginBottom:18, textAlign:'center' }}>
+        {modo==='PANTALLAS'
+          ? `Se jugarán ${numHojas} pantallas (1 por hoja), 5 preguntas c/u.${recurso.config?.aleatorio!==false?' Orden aleatorio.':' Primeras 5 de cada hoja.'}`
+          : `Se juega 1 nivel con la hoja seleccionada (5 preguntas).`}
+        {' '}Los enemigos{' '}
+        {(hojas[hojaIdx]?.preguntaEspecial?.activo || hojas.some(h=>h.preguntaEspecial?.activo))
+          ? 'usarán las frases del recurso.'
+          : 'no aparecen (sin frases especiales).'}
+      </div>
+
+      <div style={{ display:'flex', gap:10 }}>
+        <button onClick={onBack} style={{ padding:'8px 18px', borderRadius:20, border:'1.5px solid rgba(255,255,255,0.18)', background:'transparent', color:'rgba(255,255,255,0.45)', cursor:'pointer', fontFamily:'inherit' }}>← Atrás</button>
+        <button onClick={()=>onJugar({ recurso, modo, hojaIdx })}
+          style={{ padding:'11px 32px', borderRadius:28, border:'none', background:'#f1c40f', color:'#1a1a2e', fontWeight:'bold', fontSize:'1rem', cursor:'pointer', fontFamily:'inherit' }}>
+          ▶ ¡Jugar!
+        </button>
+      </div>
+    </Scr>
+  );
+}
+
+function PantallaMenu({ onEligir, onRecurso, onExit }) {
+  const [recursoSeleccionado, setRecursoSeleccionado] = useState(null);
+
+  if (recursoSeleccionado) {
+    return (
+      <PantallaSelectorHoja
+        recurso={recursoSeleccionado}
+        onJugar={onRecurso}
+        onBack={()=>setRecursoSeleccionado(null)}
+      />
+    );
+  }
+
   return (
     <Scr>
       <div style={{ fontSize:'2.6rem', marginBottom:4 }}>🎮</div>
       <h1 style={{ color:'#f1c40f', fontSize:'2rem', margin:'0 0 4px', textShadow:'2px 2px 0 #000' }}>Quiz Plataformas</h1>
-      <p style={{ color:'rgba(255,255,255,0.5)', margin:'4px 0 24px', fontSize:'0.8rem', textAlign:'center', lineHeight:1.6 }}>
+      <p style={{ color:'rgba(255,255,255,0.5)', margin:'4px 0 20px', fontSize:'0.8rem', textAlign:'center', lineHeight:1.6 }}>
         Sube plataformas · golpea desde abajo la respuesta correcta<br/>
         ✅ Acierto +1 · ❌ Error −1 · 🟡 Moneda +1 · ☠️ Enemigo ±1
       </p>
@@ -514,24 +837,34 @@ function PantallaMenu({ onEligir, onExit }) {
           </button>
         ))}
       </div>
-      {onExit && <button onClick={onExit} style={{ marginTop:20, padding:'7px 18px', borderRadius:20, border:'1.5px solid rgba(255,255,255,0.15)', background:'transparent', color:'rgba(255,255,255,0.38)', cursor:'pointer', fontFamily:'inherit', fontSize:'0.78rem' }}>← Salir</button>}
+
+      {/* ── Separador ── */}
+      <div style={{ width:'100%', maxWidth:420, display:'flex', alignItems:'center', gap:10, margin:'18px 0 0' }}>
+        <div style={{ flex:1, height:1, background:'rgba(255,255,255,0.1)' }}/>
+        <span style={{ fontSize:'0.72rem', color:'rgba(255,255,255,0.3)' }}>o usa tus propios recursos</span>
+        <div style={{ flex:1, height:1, background:'rgba(255,255,255,0.1)' }}/>
+      </div>
+
+      <BuscadorRecursos onSelect={setRecursoSeleccionado} />
+
+      {onExit && <button onClick={onExit} style={{ marginTop:18, padding:'7px 18px', borderRadius:20, border:'1.5px solid rgba(255,255,255,0.15)', background:'transparent', color:'rgba(255,255,255,0.38)', cursor:'pointer', fontFamily:'inherit', fontSize:'0.78rem' }}>← Salir</button>}
     </Scr>
   );
 }
 
-function PantallaIntro({ materia, nivel, total, onStart, onBack }) {
-  const m = MATERIAS[materia];
+function PantallaIntro({ materia, nivel, total, hasEnemigos, onStart, onBack }) {
+  const m = materia ? MATERIAS[materia] : null;
   return (
     <Scr>
-      <div style={{ fontSize:'3.5rem' }}>{m.emoji}</div>
-      <h2 style={{ color:'white', fontSize:'1.4rem', margin:'8px 0' }}>{m.label}</h2>
-      <div style={{ background:`${m.color}33`, border:`3px solid ${m.color}`, borderRadius:14, padding:'10px 30px', color:'white', fontSize:'1.15rem', fontWeight:'bold', marginBottom:16 }}>
+      <div style={{ fontSize:'3.5rem' }}>{m?m.emoji:'📦'}</div>
+      <h2 style={{ color:'white', fontSize:'1.4rem', margin:'8px 0' }}>{m?m.label:'Recurso propio'}</h2>
+      <div style={{ background:`${m?m.color:'#2980b9'}33`, border:`3px solid ${m?m.color:'#2980b9'}`, borderRadius:14, padding:'10px 30px', color:'white', fontSize:'1.15rem', fontWeight:'bold', marginBottom:16 }}>
         Nivel {nivel} de {total}
       </div>
       <div style={{ background:'rgba(255,255,255,0.06)', borderRadius:14, padding:'14px 20px', maxWidth:340, color:'rgba(255,255,255,0.78)', lineHeight:1.8, fontSize:'0.84rem', textAlign:'center', marginBottom:20 }}>
         🕹️ <strong>← →</strong> moverse · <strong>↑/Espacio</strong> saltar<br/>
         Golpea los bloques de colores <strong>desde abajo</strong><br/>
-        🟡 Recoge monedas · {nivel>1?'☠️ Evita (o toca) enemigos — ¡lee la frase!':'(sin enemigos en nivel 1)'}
+        🟡 Recoge monedas{hasEnemigos?' · ☠️ Lee la frase del enemigo antes de tocarlo':''}
       </div>
       <div style={{ display:'flex', gap:10 }}>
         <button onClick={onBack} style={{ padding:'8px 18px', borderRadius:20, border:'1.5px solid rgba(255,255,255,0.18)', background:'transparent', color:'rgba(255,255,255,0.45)', cursor:'pointer', fontFamily:'inherit' }}>← Atrás</button>
@@ -571,7 +904,7 @@ function PantallaFin({ materia, score, aciertos, total, onReintentar, onSiguient
 // ══════════════════════════════════════════════════════════════════════════════
 //  PANTALLA RESUMEN FINAL — confetti, corazones, personaje saltando
 // ══════════════════════════════════════════════════════════════════════════════
-function PantallaResumen({ materia, levelStats, onMenu }) {
+function PantallaResumen({ materia, recurso, levelStats, onMenu }) {
   const canvasRef = useRef(null);
   const rafRef    = useRef(null);
   const spriteRef = useRef(null);
@@ -584,7 +917,8 @@ function PantallaResumen({ materia, levelStats, onMenu }) {
   const totalQuest   = levelStats.reduce((s,l)=>s+(l?.total||0),0);
   const totalPoints  = levelStats.reduce((s,l)=>s+(l?.points||0),0);
   const totalPct     = totalQuest>0 ? Math.round(totalCorrect/totalQuest*100) : 0;
-  const mat = MATERIAS[materia];
+  const mat = materia ? MATERIAS[materia] : null;
+  const titulo = mat ? mat.label : (recurso?.titulo || 'Recurso propio');
 
   useEffect(()=>{
     const canvas=canvasRef.current; if(!canvas) return;
@@ -677,9 +1011,9 @@ function PantallaResumen({ materia, levelStats, onMenu }) {
         <canvas ref={canvasRef} style={{ display:'block', width:'100%', background:'#0a0a20' }}/>
       </div>
 
-      <div style={{ fontSize:'1.5rem', marginBottom:4 }}>{mat.emoji} {stars}</div>
+      <div style={{ fontSize:'1.5rem', marginBottom:4 }}>{mat ? mat.emoji : '🎮'} {stars}</div>
       <h1 style={{ color:'#f1c40f', fontSize:'1.8rem', margin:'0 0 4px', textShadow:'2px 2px 0 #000', textAlign:'center' }}>¡Juego completado!</h1>
-      <p style={{ color:'rgba(255,255,255,0.5)', fontSize:'0.82rem', margin:'0 0 20px', textAlign:'center' }}>{mat.label} · 4 niveles</p>
+      <p style={{ color:'rgba(255,255,255,0.5)', fontSize:'0.82rem', margin:'0 0 20px', textAlign:'center' }}>{titulo} · {levelStats.length} nivel(es)</p>
 
       {/* Tabla por niveles */}
       <div style={{ width:'100%', maxWidth:520, marginBottom:20 }}>
@@ -740,14 +1074,20 @@ function PantallaResumen({ materia, levelStats, onMenu }) {
 //  COMPONENTE PRINCIPAL
 // ══════════════════════════════════════════════════════════════════════════════
 export default function QuizPlataformas({ onExit }) {
-  const [fase,     setFase]       = useState('MENU');
-  const [materia,  setMateria]    = useState(null);
-  const [nivelIdx, setNivelIdx]   = useState(0);
-  const [score,    setScore]      = useState(0);      // puntos totales (preguntas+monedas+enemigos)
-  const [aciertos, setAciertos]   = useState(0);      // solo respuestas correctas a preguntas
-  const [feedUI,   setFeedUI]     = useState(null);
-  const [totalQ,   setTotalQ]     = useState(5);
-  const [levelStats, setLevelStats] = useState([]);   // [{correct, total, points, mat}]
+  const [fase,       setFase]       = useState('MENU');
+  const [materia,    setMateria]    = useState(null);
+  const [nivelIdx,   setNivelIdx]   = useState(0);
+  const [score,      setScore]      = useState(0);
+  const [aciertos,   setAciertos]   = useState(0);
+  const [feedUI,     setFeedUI]     = useState(null);
+  const [totalQ,     setTotalQ]     = useState(5);
+  const [levelStats, setLevelStats] = useState([]);
+  // Modo recurso propio
+  const [recursoActivo,  setRecursoActivo]  = useState(null);   // el recurso Firebase
+  const [recursoModo,    setRecursoModo]    = useState(null);   // 'PANTALLAS'|'HOJA'
+  const [recursoHojaIdx, setRecursoHojaIdx] = useState(0);
+  const [recursoTotalNiv,setRecursoTotalNiv]= useState(1);
+  const [hasEnemigos,    setHasEnemigos]    = useState(false);
 
   const canvasRef = useRef(null);
   const rafRef    = useRef(null);
@@ -775,8 +1115,17 @@ export default function QuizPlataformas({ onExit }) {
   });
 
   // ── Construir nivel ──
-  const buildLevel = useCallback((mat, niv, layoutIdx)=>{
-    const preguntas = [...MATERIAS[mat].niveles[niv]].sort(()=>Math.random()-.5);
+  // preguntasOverride: array de {q,a,inc[]} ya normalizadas (para modo recurso)
+  // frasesOverride:    array de {txt,ok}  (para enemigos del recurso)
+  // sinEnemigos:       true en nivel 1 o cuando no hay frases
+  const buildLevel = useCallback((mat, niv, layoutIdx, preguntasOverride=null, frasesOverride=null, sinEnemigos=false)=>{
+    // Preguntas: usa override si existe, si no usa las de MATERIAS
+    let preguntas;
+    if (preguntasOverride) {
+      preguntas = preguntasOverride;
+    } else {
+      preguntas = [...MATERIAS[mat].niveles[niv]].sort(()=>Math.random()-.5);
+    }
     const lay       = LAYOUTS[layoutIdx % LAYOUTS.length];
     const plats     = lay.plataformas.map(p=>({ x:p.x, y:p.y, w:p.w, h:PLAT_H }));
     const qPlatSet  = new Set(lay.preguntas.map(q=>q.pi));
@@ -821,11 +1170,15 @@ export default function QuizPlataformas({ onExit }) {
 
       // Texto de pregunta centrado sobre los bloques, clampeado
       const qCX = Math.max(120, Math.min(LEVEL_W-120, startX + totalW/2));
-      stations.push({ cx:qCX, qY:blockY-26, qText:pq.q, answered:false, idx:qi });
+      stations.push({ cx:qCX, qY:blockY-38, qText:pq.q, answered:false, idx:qi });
     });
 
     // ── Monedas y enemigos en plataformas sin pregunta ──
-    const frasesPool = [...(FRASES[mat]||[])].sort(()=>Math.random()-.5);
+    // Frases: usa override del recurso si existe, si no usa las de MATERIAS
+    const frasesPoolSource = frasesOverride && frasesOverride.length>0
+      ? frasesOverride
+      : (mat ? (FRASES[mat]||[]) : []);
+    const frasesPool = [...frasesPoolSource].sort(()=>Math.random()-.5);
     let frasesCursor = 0;
 
     plats.forEach((plat,pi)=>{
@@ -843,7 +1196,8 @@ export default function QuizPlataformas({ onExit }) {
         }
       };
 
-      if (niv===0 || Math.random()<0.55) {
+      const noEnemigos = sinEnemigos || frasesPool.length===0;
+      if (noEnemigos || Math.random()<0.55) {
         // Monedas
         addCoins();
       } else {
@@ -888,9 +1242,54 @@ export default function QuizPlataformas({ onExit }) {
   },[]);
 
   const iniciar = (mat,niv)=>{
-    buildLevel(mat, niv, (niv*2 + Object.keys(MATERIAS).indexOf(mat)) % LAYOUTS.length);
+    setMateria(mat);
+    setRecursoActivo(null);
+    setHasEnemigos(niv>0);
+    buildLevel(mat, niv, (niv*2 + Object.keys(MATERIAS).indexOf(mat)) % LAYOUTS.length,
+      null, null, niv===0);
     setFase('PLAYING');
   };
+
+  // Construir frases a partir de preguntaEspecial de una hoja
+  const frasesDeHoja = (hoja) => {
+    const esp = hoja?.preguntaEspecial;
+    if (!esp?.activo) return [];
+    const correctas   = (esp.correctas  ||[]).map(txt=>({ txt, ok:true  }));
+    const incorrectas = (esp.incorrectas||[]).map(txt=>({ txt, ok:false }));
+    return [...correctas,...incorrectas];
+  };
+
+  // Iniciar con un recurso propio
+  const iniciarRecurso = useCallback(({ recurso, modo, hojaIdx })=>{
+    const hojas = recurso.hojas || [];
+    const aleatorio = recurso.config?.aleatorio !== false;
+    setRecursoActivo(recurso);
+    setRecursoModo(modo);
+    setRecursoHojaIdx(hojaIdx);
+    setLevelStats([]);
+    setNivelIdx(0);
+
+    if (modo==='PANTALLAS') {
+      const numNiv = Math.min(hojas.length, 4);
+      setRecursoTotalNiv(numNiv);
+      // Construir nivel 0 con la primera hoja
+      const hoja0 = hojas[0];
+      const pregs0 = extraerPreguntas(hoja0, 5, aleatorio);
+      const frases0 = frasesDeHoja(hoja0);
+      const hayFrases = hojas.some(h=>h.preguntaEspecial?.activo);
+      setHasEnemigos(hayFrases);
+      buildLevel(null, 0, 0, pregs0, frases0, !hayFrases);
+    } else {
+      const hoja = hojas[hojaIdx] || hojas[0] || { preguntas:[] };
+      setRecursoTotalNiv(1);
+      const pregs = extraerPreguntas(hoja, 5, aleatorio);
+      const frases = frasesDeHoja(hoja);
+      setHasEnemigos(frases.length>0);
+      buildLevel(null, 0, hojaIdx % LAYOUTS.length, pregs, frases, frases.length===0);
+    }
+    setMateria(null);
+    setFase('INTRO_REC');
+  },[buildLevel]);
 
   // ── Game Loop ──
   useEffect(()=>{
@@ -976,14 +1375,14 @@ export default function QuizPlataformas({ onExit }) {
           if (feedTimer.current) clearTimeout(feedTimer.current);
           feedTimer.current=setTimeout(()=>setFeedUI(null),1700);
           if (ref.answered>=ref.total) {
-            // Guardar stats del nivel antes de pasar
             const snap = { correct: aciertosRef.current, total: ref.total, points: scoreRef.current };
-            setLevelStats(prev => {
-              const next = [...prev];
-              next[nivelIdx] = snap;
-              return next;
-            });
-            setTimeout(()=>setFase(nivelIdx>=3?'RESUMEN':'FIN'),1300);
+            setLevelStats(prev => { const next=[...prev]; next[nivelIdx]=snap; return next; });
+            // Determinar si hay más niveles según modo
+            const totalNiveles = recursoActivo && recursoModo==='PANTALLAS'
+              ? Math.min((recursoActivo.hojas||[]).length, 4)
+              : (recursoActivo ? 1 : 4);
+            const esUltimo = nivelIdx >= totalNiveles - 1;
+            setTimeout(()=>setFase(esUltimo?'RESUMEN':'FIN'), 1300);
           }
         }
       }
@@ -1122,7 +1521,7 @@ export default function QuizPlataformas({ onExit }) {
         const bx=Math.max(2, Math.min(CW-bw-2, sx+en.w/2-bw/2));
         const by=sy-bh-5;
         if (by>-20) {
-          ctx.fillStyle=en.isTrue?'rgba(39,174,96,0.88)':'rgba(192,57,43,0.88)';
+          ctx.fillStyle='rgba(30,100,210,0.92)';
           rr(ctx,bx,by,bw,bh,4); ctx.fill();
           ctx.strokeStyle='rgba(255,255,255,0.4)'; ctx.lineWidth=1;
           rr(ctx,bx,by,bw,bh,4); ctx.stroke();
@@ -1136,43 +1535,91 @@ export default function QuizPlataformas({ onExit }) {
       for (const st of ref.stations) {
         if (st.answered) continue;
         const rawSx = st.cx-cx;
-        // Clampear dentro del viewport para que siempre sea legible
-        const sx = Math.max(100, Math.min(CW-100, rawSx));
+        const sx = Math.max(120, Math.min(CW-120, rawSx));
         const sy = st.qY-cy;
-        if (sy<-50||sy>CH+30) continue;
+        if (sy<-80||sy>CH+30) continue;
 
         ctx.save();
         ctx.font='bold 11px Arial';
-        const tw=ctx.measureText(st.qText).width;
-        const bw=Math.min(tw+18,CW-20), bh=20;
-        ctx.fillStyle='rgba(0,0,0,0.85)';
-        rr(ctx,sx-bw/2,sy-bh/2,bw,bh,5); ctx.fill();
+
+        // ── Word-wrap hasta 3 líneas ───────────────────────────────────
+        const MAX_W = Math.min(300, CW - 40);
+        const LINE_H = 14;
+        const words = st.qText.split(' ');
+        const lines = [];
+        let cur = '';
+        for (const w of words) {
+          const test = cur ? cur+' '+w : w;
+          if (ctx.measureText(test).width > MAX_W && cur) {
+            lines.push(cur); cur = w;
+            if (lines.length === 2) { cur = cur+'…'; break; } // max 3 lines
+          } else { cur = test; }
+        }
+        if (lines.length < 3 && cur) lines.push(cur);
+
+        const bw = Math.min(Math.max(...lines.map(l=>ctx.measureText(l).width)) + 18, CW - 20);
+        const bh = lines.length * LINE_H + 10;
+        const by = sy - bh / 2;
+
+        ctx.fillStyle='rgba(0,0,0,0.88)';
+        rr(ctx, sx-bw/2, by, bw, bh, 6); ctx.fill();
         ctx.strokeStyle='#f1c40f'; ctx.lineWidth=1.5;
-        rr(ctx,sx-bw/2,sy-bh/2,bw,bh,5); ctx.stroke();
+        rr(ctx, sx-bw/2, by, bw, bh, 6); ctx.stroke();
+
         ctx.fillStyle='#f1c40f'; ctx.textAlign='center'; ctx.textBaseline='middle';
-        ctx.fillText(st.qText.length>36?st.qText.slice(0,35)+'…':st.qText, sx, sy);
+        lines.forEach((line, i) => {
+          ctx.fillText(line, sx, by + (i + 0.5) * LINE_H + 5);
+        });
         ctx.restore();
       }
 
       // ─ Bloques de respuesta ─
       for (const blk of ref.ansBlocks) {
         const rawSx = blk.x-cx;
-        // Clampear al viewport (siempre visibles aunque la plataforma esté en el borde)
         const sx = Math.max(4, Math.min(CW-blk.w-4, rawSx));
         const shake=blk.shakeT>0?Math.sin(blk.shakeT*2)*3:0;
         if (blk.shakeT>0) blk.shakeT--;
         const sy=blk.y-cy+shake;
-        if (sy>CH+20||sy<-30) continue;
+        if (sy>CH+20||sy<-50) continue;
 
-        ctx.globalAlpha=blk.hit?0.22:1;
-        ctx.fillStyle='rgba(0,0,0,0.25)'; ctx.fillRect(sx+3,sy+4,blk.w,blk.h);
-        ctx.fillStyle=blk.color; rr(ctx,sx,sy,blk.w,blk.h,5); ctx.fill();
-        ctx.fillStyle='rgba(255,255,255,0.25)'; ctx.fillRect(sx+2,sy+2,blk.w-4,4);
-        ctx.fillStyle='white';
-        ctx.font=`bold ${blk.text.length>8?8:10}px Arial`;
+        ctx.globalAlpha = blk.hit ? 0.22 : 1;
+        // Sombra
+        ctx.fillStyle='rgba(0,0,0,0.3)'; rr(ctx,sx+3,sy+4,blk.w,blk.h,6); ctx.fill();
+        // Fondo coloreado
+        ctx.fillStyle = blk.color; rr(ctx,sx,sy,blk.w,blk.h,6); ctx.fill();
+        // Brillo superior
+        ctx.fillStyle='rgba(255,255,255,0.28)'; rr(ctx,sx+2,sy+2,blk.w-4,blk.h*0.45,4); ctx.fill();
+        // Borde
+        ctx.strokeStyle='rgba(0,0,0,0.35)'; ctx.lineWidth=1.5;
+        rr(ctx,sx,sy,blk.w,blk.h,6); ctx.stroke();
+
+        // Word-wrap hasta 2 líneas, texto negro nítido
+        const FONT_SZ=12, LINE_H=16, PAD=5;
+        const maxTW = blk.w - PAD*2;
+        ctx.font=`bold ${FONT_SZ}px Arial`;
         ctx.textAlign='center'; ctx.textBaseline='middle';
-        let t=blk.text; if(t.length>10) t=t.slice(0,9)+'…';
-        ctx.fillText(t,sx+blk.w/2,sy+blk.h/2);
+        const words=blk.text.split(' ');
+        const lines=[]; let cur='';
+        for (const w of words) {
+          const test=cur?cur+' '+w:w;
+          if (ctx.measureText(test).width>maxTW && cur) { lines.push(cur); cur=w; }
+          else { cur=test; }
+          if (lines.length===2) { cur=''; break; }
+        }
+        if (lines.length<2 && cur) lines.push(cur);
+        // Truncar 2ª línea si sigue siendo larga
+        if (lines[1] && ctx.measureText(lines[1]).width>maxTW) {
+          let l=lines[1];
+          while (l.length>1 && ctx.measureText(l+'…').width>maxTW) l=l.slice(0,-1);
+          lines[1]=l+'…';
+        }
+        const totalH=lines.length*LINE_H;
+        const startY=sy+blk.h/2-totalH/2+LINE_H/2;
+        lines.forEach((line,i)=>{
+          const ty=startY+i*LINE_H;
+          ctx.fillStyle='rgba(255,255,255,0.55)'; ctx.fillText(line,sx+blk.w/2+0.5,ty+0.5);
+          ctx.fillStyle='#111'; ctx.fillText(line,sx+blk.w/2,ty);
+        });
         ctx.globalAlpha=1;
       }
 
@@ -1278,21 +1725,45 @@ export default function QuizPlataformas({ onExit }) {
     else p.jumpBuffer=JBUF_F;
   },[]);
 
-  if(fase==='MENU')    return <PantallaMenu onEligir={m=>{ setMateria(m); setNivelIdx(0); setLevelStats([]); setFase('INTRO'); }} onExit={onExit}/>;
-  if(fase==='INTRO')   return <PantallaIntro materia={materia} nivel={nivelIdx+1} total={4} onStart={()=>iniciar(materia,nivelIdx)} onBack={()=>setFase('MENU')}/>;
-  if(fase==='RESUMEN') return <PantallaResumen materia={materia} levelStats={levelStats} onMenu={()=>{ setLevelStats([]); setFase('MENU'); }}/>;
-  if(fase==='FIN')     return <PantallaFin materia={materia} score={score} aciertos={aciertos} total={totalQ} hayMas={nivelIdx+1<4}
-    onSiguiente={()=>{ setNivelIdx(nivelIdx+1); setFase('INTRO'); }}
-    onReintentar={()=>setFase('INTRO')}
-    onMenu={()=>setFase('MENU')}/>;
+  // ── Siguiente nivel en modo recurso ──
+  const siguienteNivelRecurso = useCallback(()=>{
+    if (!recursoActivo) return;
+    const hojas    = recursoActivo.hojas||[];
+    const aleatorio= recursoActivo.config?.aleatorio!==false;
+    const nv       = nivelIdx+1;
+    setNivelIdx(nv);
+    if (recursoModo==='PANTALLAS') {
+      const hoja  = hojas[nv]||hojas[0];
+      const pregs = extraerPreguntas(hoja, 5, aleatorio);
+      const frases= frasesDeHoja(hoja);
+      buildLevel(null, nv, nv%LAYOUTS.length, pregs, frases, frases.length===0);
+    }
+    setFase('INTRO_REC');
+  },[recursoActivo, recursoModo, nivelIdx, buildLevel]);
 
-  const mat=MATERIAS[materia];
+  const totalNivelesActuales = recursoActivo && recursoModo==='PANTALLAS'
+    ? Math.min((recursoActivo.hojas||[]).length, 4)
+    : (recursoActivo ? 1 : 4);
+
+  if(fase==='MENU')    return <PantallaMenu onEligir={m=>{ setMateria(m); setNivelIdx(0); setLevelStats([]); setFase('INTRO'); }} onRecurso={iniciarRecurso} onExit={onExit}/>;
+  if(fase==='INTRO')   return <PantallaIntro materia={materia} nivel={nivelIdx+1} total={4} hasEnemigos={nivelIdx>0} onStart={()=>iniciar(materia,nivelIdx)} onBack={()=>setFase('MENU')}/>;
+  if(fase==='INTRO_REC') return <PantallaIntro materia={null} nivel={nivelIdx+1} total={totalNivelesActuales} hasEnemigos={hasEnemigos} onStart={()=>setFase('PLAYING')} onBack={()=>setFase('MENU')}/>;
+  if(fase==='RESUMEN') return <PantallaResumen materia={materia} recurso={recursoActivo} levelStats={levelStats} onMenu={()=>{ setLevelStats([]); setRecursoActivo(null); setFase('MENU'); }}/>;
+  if(fase==='FIN')     return <PantallaFin materia={materia} score={score} aciertos={aciertos} total={totalQ}
+    hayMas={nivelIdx+1<totalNivelesActuales}
+    onSiguiente={recursoActivo ? siguienteNivelRecurso : ()=>{ setNivelIdx(nivelIdx+1); setFase('INTRO'); }}
+    onReintentar={()=>setFase(recursoActivo?'INTRO_REC':'INTRO')}
+    onMenu={()=>{ setRecursoActivo(null); setFase('MENU'); }}/>;
+
+  const mat = materia ? MATERIAS[materia] : null;
   return (
     <div style={{ width:'100%', minHeight:'100vh', background:'#0a0a0a', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', userSelect:'none', WebkitUserSelect:'none', touchAction:'none' }}>
 
       <div style={{ width:'100%', maxWidth:CW, display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 10px', boxSizing:'border-box' }}>
         <button onClick={()=>setFase('MENU')} style={{ padding:'3px 10px', borderRadius:18, border:'1.5px solid rgba(255,255,255,0.14)', background:'transparent', color:'rgba(255,255,255,0.38)', cursor:'pointer', fontSize:'0.74rem', fontFamily:'inherit' }}>← Menú</button>
-        <span style={{ color:'rgba(255,255,255,0.45)', fontSize:'0.76rem' }}>{mat.emoji} {mat.label} · Nivel {nivelIdx+1}</span>
+        <span style={{ color:'rgba(255,255,255,0.45)', fontSize:'0.76rem' }}>
+          {mat ? `${mat.emoji} ${mat.label}` : (recursoActivo?.titulo||'Recurso')} · Nivel {nivelIdx+1}
+        </span>
         <div style={{ display:'flex', gap:6, alignItems:'center' }}>
           {/* Contador de aciertos (solo preguntas) */}
           <span style={{ background:'#2980b9', color:'white', padding:'2px 9px', borderRadius:18, fontWeight:'bold', fontSize:'0.82rem' }}>

@@ -23,8 +23,6 @@ import EtiquetaMe from '../EtiquetaMe';
 import imgPasapalabra from '../assets/icono_pasapal.png'; // Revisa si es .png o .jpg
 import imgBurbujas from '../assets/icono_burbujas.png';
 import imgPikatron from '../assets/icono_pikatron.png';
-import imgPikatron2 from '../assets/iconoPikatron2.png';
-import imgEtiquetas from '../assets/icono_etiquetas.png';
 import imgAparejados from '../assets/icono_aparejados.png';
 import imgRuleta from '../assets/icono_ruleta.png';
 import imgWordle from '../assets/icono_wordle.png';
@@ -40,17 +38,7 @@ export const APPS = [
     { id: 'PASAPALABRA', name: 'Pasapalabra', desc: 'Adivina la palabra con cada letra del abecedario.', color: '#0A0E45', img: imgPasapalabra },
     { id: 'CAZABURBUJAS', name: 'Burbujas', desc: 'Explota la burbuja con la respuesta correcta.', color: '#de896e', img: imgBurbujas },
     { id: 'PIKATRON', name: 'Pikatron', desc: 'Juego tipo runner con preguntas.', color: '#2196F3', img: imgPikatron },
- {
-        id: 'PIKATRON_2',
-        name: 'Pikatron_2',
-        desc: 'Salta y corre, acierta. Por plataformas',
-        color: '#2196F3',
-        img: imgPikatron2,
-        isSpecial: false
-    },
-
-
-{ id: 'APAREJADOS', name: 'AparejaDOS', desc: 'Encuentra las parejas correctas.', color: '#FF9800', img: imgAparejados },
+    { id: 'APAREJADOS', name: 'AparejaDOS', desc: 'Encuentra las parejas correctas.', color: '#FF9800', img: imgAparejados },
     { id: 'RULETA', name: 'Ruleta', desc: 'Resuelve el panel oculto.', color: '#f1c40f', img: imgRuleta },
     { id: 'WORDLE', name: 'WordLe', desc: 'Adivina la palabra en 6 intentos.', color: '#2e7d32', img: imgWordle },
     { id: 'MATHLE', name: 'MathLe', desc: 'Adivina la ecuación matemática oculta.', color: '#1565C0', img: imgMathle },
@@ -76,7 +64,14 @@ export const APPS = [
         isSpecial: false
     },
 
-   
+    {
+        id: 'PLATAFORMAS',
+        name: 'Plataformas',
+        desc: 'Salta y corre y acierta.',
+        color: '#3498db',
+        emoji: '🖍️',
+        isSpecial: false
+    },
 
 
     {
@@ -99,10 +94,10 @@ export const APPS = [
     },
     {
         id: 'ETIQUETAS',
-        name: 'EtiquetaMe',
+        name: 'Etiquetas',
         desc: 'Identifica las partes de un diagrama poniendo las etiquetas correctas.',
         color: '#e74c3c',
-         img: imgEtiquetas,
+        emoji: '🏷️',
         isSpecial: false
     },
 
@@ -438,9 +433,9 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
     };
 
     const procesarClickTarjeta = (r) => {
-        if (esJuegoEnVivo(r)) lanzarComoGestor(r);
-        else if (r.tipoJuego === 'CAZABURBUJAS' || r.tipoJuego === 'PIKATRON' || r.tipoJuego === 'WORDLE' || r.tipoJuego === 'SOPA') setRecursoParaElegir(r);
-        else if (r.tipoJuego === 'ETIQUETAS') setJuegoActivo(r);
+        if (appData.isLive) lanzarComoGestor(r);
+        else if (r.tipoJuego === 'CAZABURBUJAS' || r.tipoJuego === 'WORDLE' || r.tipoJuego === 'SOPA') setRecursoParaElegir(r);
+        else if (r.tipoJuego === 'ETIQUETAS') setJuegoActivo(r);   // ← ya lo tienes, comprueba que esté
         else setJuegoActivo(r);
     };
 
@@ -862,7 +857,7 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
 
 
     if (appData.id === 'SINTAXIS') return <SintaxisGame usuario={null} onExit={onHome} />;
-    if (appData.id === 'PIKATRON_2') return <Plataformas usuario={null} onExit={onHome} />;
+    if (appData.id === 'PLATAFORMAS') return <Plataformas usuario={null} onExit={onHome} />;
     // --- NUEVO: USA handleExitGame PARA LOS DE MATES ---
     if (appData.id === 'GEOMETRIX') return <Geometrix usuario={null} onExit={handleExitGame} />;
     if (appData.id === 'CALCULO') return <CalculoMental usuario={null} onExit={handleExitGame} />;

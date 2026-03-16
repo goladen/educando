@@ -78,7 +78,11 @@ export default function Login({ setGoogleToken }) {
             window.history.pushState({}, '', '/populares');
             window.dispatchEvent(new Event('popstate'));
         }
-        else if (opcion === 'que-hacer') window.open('https://goladen.wixsite.com/matematicas/copia-de-copia-de-pikt-web', '_blank');
+        else if (opcion === 'que-hacer') {
+            window.open('/guia-pikt-es.html', '_blank');
+        }
+
+
         else if (opcion === 'privacidad') window.open('https://www.pikt.es/politica.html', '_blank');
     };
 

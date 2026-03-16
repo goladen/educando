@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guía completa de PiKT.es - Juegos y Herramientas Educativas</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f4ff; color: #333; }
+.hero { background: linear-gradient(135deg, #6c63ff 0%, #a855f7 100%); color: white; padding: 40px 20px; text-align: center; }
+.hero h1 { font-size: 2.5em; margin-bottom: 10px; }
+.hero p { font-size: 1.2em; opacity: 0.9; }
+.container { max-width: 900px; margin: 0 auto; padding: 30px 20px; }
+.section { background: white; border-radius: 16px; padding: 25px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
+.section h2 { color: #6c63ff; font-size: 1.5em; margin-bottom: 15px; display: flex; align-items: center; gap: 10px; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; }
+.section h3 { color: #444; font-size: 1.1em; margin: 15px 0 8px 0; }
+.app-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; margin-top: 15px; }
+.app-card { background: #fafafa; border: 2px solid #e8e8ff; border-radius: 12px; padding: 15px; transition: transform 0.2s, border-color 0.2s; }
+.app-card:hover { transform: translateY(-3px); border-color: #6c63ff; }
+.app-card .emoji { font-size: 2em; display: block; margin-bottom: 8px; }
+.app-card h4 { color: #6c63ff; font-size: 1em; margin-bottom: 6px; }
+.app-card p { font-size: 0.88em; color: #666; line-height: 1.5; }
+.tag { display: inline-block; background: #ede9fe; color: #7c3aed; border-radius: 20px; padding: 2px 10px; font-size: 0.78em; margin: 3px 2px 0 0; }
+.tag.green { background: #d1fae5; color: #059669; }
+.tag.orange { background: #fef3c7; color: #d97706; }
+.tag.pink { background: #fce7f3; color: #db2777; }
+.steps { counter-reset: step; padding-left: 0; list-style: none; }
+.steps li { counter-increment: step; display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; padding: 12px; background: #f8f7ff; border-radius: 10px; }
+.steps li::before { content: counter(step); background: #6c63ff; color: white; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85em; font-weight: bold; flex-shrink: 0; }
+.steps li .step-text { font-size: 0.92em; line-height: 1.5; }
+.method-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-top: 15px; }
+.method-card { border-radius: 10px; padding: 14px; text-align: center; }
+.method-card.blue { background: #eff6ff; border: 2px solid #3b82f6; }
+.method-card.purple { background: #faf5ff; border: 2px solid #a855f7; }
+.method-card.yellow { background: #fffbeb; border: 2px solid #f59e0b; }
+.method-card h4 { font-size: 0.95em; margin-bottom: 5px; }
+.method-card p { font-size: 0.82em; color: #666; }
+.method-card .icon { font-size: 1.8em; margin-bottom: 6px; }
+.btn-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.btn-item { display: flex; align-items: center; gap: 8px; background: #f9f9f9; border-radius: 8px; padding: 8px 12px; font-size: 0.88em; }
+.btn-dot { width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1em; flex-shrink: 0; }
+.alert { background: #fffbeb; border: 2px solid #fbbf24; border-radius: 12px; padding: 15px; margin-top: 15px; font-size: 0.9em; line-height: 1.6; }
+.link-btn { display: inline-block; background: #6c63ff; color: white; text-decoration: none; padding: 10px 20px; border-radius: 25px; font-weight: bold; margin-top: 10px; transition: opacity 0.2s; }
+.link-btn:hover { opacity: 0.85; }
+footer { text-align: center; padding: 20px; font-size: 0.85em; color: #999; }
+@media (max-width: 600px) { .hero h1 { font-size: 1.8em; } .app-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>🎮 Guía PiKT.es</h1>
+  <p>Todo lo que necesitas saber sobre las aplicaciones y cómo crear tus propios recursos</p>
+  <a href="https://www.pikt.es" target="_blank" class="link-btn" style="background:white;color:#6c63ff;margin-top:15px;">Ir a PiKT.es →</a>
+</div>
+
+<div class="container">
+
+  <!-- SECCIÓN 1: QUÉ ES PIKT -->
+  <div class="section">
+    <h2>🌟 ¿Qué es PiKT.es?</h2>
+    <p style="line-height:1.7;font-size:0.95em;">PiKT es un <strong>ecosistema educativo gratuito</strong> de juegos y herramientas para profesores y alumnos. Permite crear recursos personalizados, usarlos en clase en tiempo real y compartirlos con la comunidad docente. El lema de PiKT es: <em>"Juega, aprende y repite"</em>.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;">
+      <span class="tag">✅ Gratuito</span>
+      <span class="tag">🎓 Infantil a Bachillerato/FP</span>
+      <span class="tag green">👨‍🏫 Recursos para profesores</span>
+      <span class="tag orange">🕹️ Juegos para alumnos</span>
+      <span class="tag pink">🤖 Creación con IA</span>
+    </div>
+  </div>
+
+  <!-- SECCIÓN 2: JUEGOS EN VIVO -->
+  <div class="section">
+    <h2>📡 Juegos para toda la clase (En Vivo)</h2>
+    <p style="margin-bottom:15px;font-size:0.93em;">Estos juegos están diseñados para proyectarse en clase. El profesor comparte un <strong>código de sala</strong> y todos los alumnos se conectan desde sus dispositivos. Los resultados se ven en tiempo real.</p>
+    <div class="app-grid">
+      <div class="app-card">
+        <span class="emoji">📡</span>
+        <h4>PiLive</h4>
+        <p>Juego tipo quiz multijugador en tiempo real. El profesor presenta las preguntas en pantalla y los alumnos responden desde sus dispositivos. Incluye marcador en directo. Los alumnos entran con código de sala y su nombre.</p>
+        <span class="tag">Quiz en vivo</span><span class="tag orange">1 pantalla + N alumnos</span>
+      </div>
+      <div class="app-card">
+        <span class="emoji">🧮</span>
+        <h4>MathLive</h4>
+        <p>Versión matemática de los juegos en vivo. Los alumnos compiten resolviendo operaciones matemáticas en tiempo real con sus compañeros. Ideal para agilidad de cálculo.</p>
+        <span class="tag">Matemáticas</span><span class="tag green">Tiempo real</span>
+      </div>
+      <div class="app-card">
+        <span class="emoji">🏅</span>
+        <h4>Olympic_Live</h4>
+        <p>Compite con minijuegos y ejercicios de cálculo en formato olímpico. Los alumnos se enfrentan entre ellos en pruebas rápidas de habilidades matemáticas.</p>
+        <span class="tag">Minijuegos</span><span class="tag orange">Cálculo</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECCIÓN 3: JUEGOS INDIVIDUALES/GRUPOS PEQUEÑOS -->
+  <div class="section">
+    <h2>🕹️ Juegos de 1 a 3 jugadores</h2>
+    <p style="margin-bottom:15px;font-size:0.93em;">Juegos que el alumno puede usar de forma individual o en pequeños grupos desde su dispositivo. El profesor crea el recurso con su contenido y el alumno accede mediante <strong>código o buscando en la biblioteca</strong>.</p>
+    <div class="app-grid">
+      <div class="app-card">
+        <span class="emoji">🔤</span>
+        <h4>Pasapalabra</h4>
+        <p>El clásico rosco de Pasapalabra. El alumno debe adivinar la palabra que corresponde a cada letra del abecedario según la definición dada. Tiene tiempo configurable (por defecto 150 seg) y orden aleatorio.</p>
+        <span class="tag">Vocabulario</span><span class="tag green">Definiciones</span>
+      </div>
+      <div class="app-card">
+        <span class="emoji">🫧</span>
+        <h4>Burbujas</h4>
+        <p>Juego tipo "revienta burbujas". Aparecen burbujas flotando con respuestas y hay que explotar la correcta. Formato de pregunta con una respuesta correcta y hasta 3 incorrectas.</p>
+        <span class="tag">Test visual</span><span class="tag orange">Acción</span>
+      </div>
+      <div class="app-card">
+        <span class="emoji">🦸</span>
+        <h4>Pikatron</h4>
+        <p>Juego tipo "runner" con preguntas. El personaje corre y hay que responder correctamente para superar los obstáculos. Versión 1 original del personaje corredor de PiKT.</p>
+        <span class="tag">Runner</span><span class="tag green">Acción y repaso</span>
+      </div>
+      <div class="app-card">
+        <span class="emoji">🦸‍♂️</span>
+        <h4>Pikatron 2</h4>
+        <p>Segunda versión del juego runner Pikatron, con mejoras en gráficos y mecánica. Mismo concepto de responder preguntas mientras el personaje avanza corriendo.</p>
+        <span class="tag">Runner mejorado</span><span class="tag orange">Acción</span>
+      </div>
+      <div class="app-card">
+        <span class="emoji">🃏</span>
+        <h4>AparejaDOS</h4>
+        <p>Juego de emparejar términos relacionados. Se introducen pares (ej: País – Capital, Palabra – Definición, Problema – Resultado). El alumno debe conectar cada término A con su término B.</p>
+        <span class="tag">Pares</span><span class="tag green">Relacionar conceptos</span>
+      </div>
+      <div class="app-card">
+        <span class="emoji">🎡</span>
+        <h4>La Ruleta</h4>
+        <p>Basado en el programa "La Ruleta de la Suerte". El alumno debe resolver una frase oculta respondiendo preguntas de tipo test para ganar letras. Incluye frase obligatoria a resolver + preguntas.</p>
+        <span class="tag">Frase oculta</span><span class="tag pink">Letras + preguntas</span>
+      </div>
+      <div class="app-card">
+        <span class="emoji">📝</span>
+        <h4>WordLe</h4>
+        <p>Versión del famoso juego Wordle. El alumno intenta adivinar una palabra en varios intentos, recibiendo pistas sobre las letras correctas. Disponible en Español, Català, English y Français. Longitud de 4 a 8 letras.</p>
+        <span class="tag">Idiomas</span><span class="tag green">Vocabulario</span>
+      </div>
+      <div class="app-card">
+        <span class="emoji">➕</span>
+        <h4>MathLe</h4>
+        <p>Wordle matemático. El alumno debe adivinar una operación matemática correcta (suma, resta o multiplicación) usando pistas, similar al Wordle pero con números y operaciones.</p>
+        <span class="tag">Matemáticas</span><span class="tag orange">Cálculo</span>
+      </div>
+      <div class="app-card">
+        <span class="emoji">🔎</span>
+        <h4>Sopa de Letras</h4>
+        <p>Sopa de letras generada automáticamente o personalizada. Se puede configurar el idioma (ES, CA, EN, FR), número de palabras (de 6 a 10) y la longitud. También existe el "Desafío de Profe" donde el profesor lanza retos en clase.</p>
+        <span class="tag">Búsqueda de palabras</span><span class="tag green">Idiomas múltiples</span>
+      </div>
+      <div class="app-card">
+        <span class="emoji">🖊️</span>
+        <h4>Sintaxis</h4>
+        <p>Herramienta de análisis sintáctico. El alumno practica analizando frases. Tiene niveles: Primaria (75 frases), ESO (70 frases) y Bachillerato (80 frases). Total de 225 frases en la base de datos. También acepta recursos del profesor.</p>
+        <span class="tag">Lengua</span><span class="tag pink">Análisis sintáctico</span>
+      </div>
+      <div class="app-card">
+        <span class="emoji">🌍</span>
+        <h4>Math World</h4>
+        <p>Ecosistema de herramientas matemáticas con cuatro módulos: <strong>Geometrix</strong> (áreas, volúmenes y regla virtual), <strong>Cálculo</strong> (agilidad mental y operaciones con tiempo), <strong>Ecuaciones</strong> (despejar la X paso a paso), <strong>Funciones</strong> (rectas, parábolas y análisis gráfico). Álgebra próximamente.</p>
+        <span class="tag">Matemáticas</span><span class="tag orange">Geometría</span><span class="tag green">Álgebra</span>
+      </div>
+      <div class="app-card">
+        <span class="emoji">🏷️</span>
+        <h4>EtiquetaMe</h4>
+        <p>Juego de etiquetar diagramas. El alumno debe identificar y colocar las etiquetas correctas en las partes de un diagrama o imagen. Muy útil para biología, geografía, anatomía, etc.</p>
+        <span class="tag">Diagramas</span><span class="tag pink">Identificar partes</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECCIÓN 4: Q-SENDER -->
+  <div class="section">
+    <h2>📮 Q-Sender (Buzón de Preguntas)</h2>
+    <p style="font-size:0.93em;line-height:1.6;">Herramienta especial que permite a los alumnos <strong>enviar preguntas y respuestas al profesor</strong>. El alumno accede con un código de grupo y envía sus respuestas. El profesor puede ver en tiempo real qué respuestas ha recibido. Es una forma de evaluación informal y participativa. Se vincula a recursos de Pasapalabra existentes del profesor.</p>
+    <div class="btn-legend" style="margin-top:15px;">
+      <div class="btn-item"><div class="btn-dot" style="background:#d4edda;">📤</div><span>Los alumnos envían respuestas al buzón del grupo</span></div>
+      <div class="btn-item"><div class="btn-dot" style="background:#cce5ff;">👁️</div><span>El profesor ve las respuestas en tiempo real</span></div>
+      <div class="btn-item"><div class="btn-dot" style="background:#fff3cd;">🔑</div><span>Acceso mediante código de grupo generado por el profe</span></div>
+    </div>
+  </div>
+
+  <!-- SECCIÓN 5: CÓMO CREAR RECURSOS -->
+  <div class="section">
+    <h2>🚀 ¿Cómo crear nuevos recursos?</h2>
+    <p style="margin-bottom:15px;font-size:0.93em;">Para crear recursos necesitas <strong>iniciar sesión con Google</strong> pulsando "Entrar" en la esquina superior derecha. Una vez dentro, verás tu panel con "Mis Recursos" organizado por tipo de juego.</p>
+
+    <h3>Paso a paso para crear un recurso:</h3>
+    <ol class="steps">
+      <li><span class="step-text"><strong>Entra en pikt.es</strong> y pulsa el botón "Entrar" (Google Sign-In) en la esquina superior derecha.</span></li>
+      <li><span class="step-text"><strong>Selecciona el tipo de juego</strong> en las pestañas superiores de tu panel: Pasapalabra, Burbujas y Pikatron, AparejaDOS, Pi-Live, La Ruleta o Question Sender.</span></li>
+      <li><span class="step-text"><strong>Pulsa el botón verde "+" (Crear Nuevo)</strong>. Se abrirá un modal donde debes escribir el <em>Título</em> del recurso.</span></li>
+      <li><span class="step-text"><strong>Elige el método de creación</strong>: Manual, Importar desde archivo, IA o Google Drive.</span></li>
+      <li><span class="step-text"><strong>Añade tus preguntas</strong> usando el editor. Pulsa "+ Añadir Pregunta" para cada nueva pregunta y rellena los campos.</span></li>
+      <li><span class="step-text"><strong>Configura el recurso</strong> con el icono ⚙️ (ajustes de juego, visibilidad, ciclo educativo, temas, etc.).</span></li>
+      <li><span class="step-text"><strong>Guarda</strong> pulsando el botón verde "Guardar".</span></li>
+    </ol>
+
+    <h3 style="margin-top:20px;">Métodos de creación disponibles:</h3>
+    <div class="method-grid">
+      <div class="method-card blue">
+        <div class="icon">✏️</div>
+        <h4>Manual (Editor)</h4>
+        <p>Creas las preguntas una a una directamente en el editor de PiKT. El más completo y personalizable.</p>
+      </div>
+      <div class="method-card blue">
+        <div class="icon">📂</div>
+        <h4>Manual (Importar)</h4>
+        <p>Subes un archivo con tus preguntas ya preparadas. Útil si tienes listas de vocabulario o definiciones en un documento.</p>
+      </div>
+      <div class="method-card purple">
+        <div class="icon">🤖</div>
+        <h4>IA (Inteligencia Artificial)</h4>
+        <p>La IA genera las preguntas automáticamente a partir de un tema o texto que le indiques. Ahorra mucho tiempo.</p>
+      </div>
+      <div class="method-card yellow">
+        <div class="icon">📊</div>
+        <h4>Google Drive</h4>
+        <p>Importa el contenido directamente desde una hoja de cálculo de Google Sheets en tu Google Drive.</p>
+      </div>
+    </div>
+
+    <h3 style="margin-top:20px;">Tipo de contenido según el juego:</h3>
+    <ul style="list-style:none;padding:0;margin-top:10px;">
+      <li style="background:#f0f4ff;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:0.9em;"><strong>🔤 Pasapalabra / 🎡 La Ruleta:</strong> Pregunta/Definición → Respuesta correcta (1 sola palabra)</li>
+      <li style="background:#f0f4ff;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:0.9em;"><strong>🫧 Burbujas / 🦸 Pikatron / 📡 Pi-Live:</strong> Enunciado → Respuesta correcta + hasta 3 respuestas incorrectas (opcional)</li>
+      <li style="background:#f0f4ff;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:0.9em;"><strong>🃏 AparejaDOS:</strong> Término A (ej: País) → Término B (ej: Capital)</li>
+      <li style="background:#f0f4ff;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:0.9em;"><strong>🎡 La Ruleta extra:</strong> Además de las preguntas, necesita una <em>Frase a Resolver</em> obligatoria (ej: LA CAPITAL DE FRANCIA)</li>
+      <li style="background:#f0f4ff;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:0.9em;"><strong>📮 Q-Sender:</strong> Grupos con nombre + nº de preguntas + código generado para alumnos</li>
+    </ul>
+  </div>
+
+  <!-- SECCIÓN 6: GESTIÓN DE RECURSOS -->
+  <div class="section">
+    <h2>⚙️ Gestión de tus recursos</h2>
+    <p style="margin-bottom:15px;font-size:0.93em;">Cada recurso creado aparece en tu panel con 5 botones de acción:</p>
+    <div class="btn-legend">
+      <div class="btn-item"><div class="btn-dot" style="background:#e9d5ff;font-size:0.8em;">🎮</div><span><strong>Jugar / Probar:</strong> Lanza el juego para probarlo o usarlo con un código</span></div>
+      <div class="btn-item"><div class="btn-dot" style="background:#fef3c7;font-size:0.8em;">🔑</div><span><strong>Código:</strong> Obtén el código o enlace para compartir con alumnos</span></div>
+      <div class="btn-item"><div class="btn-dot" style="background:#dbeafe;font-size:0.8em;">✏️</div><span><strong>Editar:</strong> Modifica las preguntas y la configuración del recurso</span></div>
+      <div class="btn-item"><div class="btn-dot" style="background:#d1fae5;font-size:0.8em;">📊</div><span><strong>Estadísticas:</strong> Ver resultados y participación de los alumnos</span></div>
+      <div class="btn-item"><div class="btn-dot" style="background:#fee2e2;font-size:0.8em;">🗑️</div><span><strong>Eliminar:</strong> Borrar el recurso permanentemente</span></div>
+    </div>
+
+    <h3 style="margin-top:20px;">Configuración del recurso (⚙️):</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px;">
+      <div style="background:#f8f7ff;border-radius:8px;padding:12px;font-size:0.88em;">
+        <strong>📍 Datos de Búsqueda</strong><br>
+        País, Región, Localidad, Temas, Ciclo Educativo. Sirve para que otros profesores encuentren tu recurso si lo haces público.
+      </div>
+      <div style="background:#f8f7ff;border-radius:8px;padding:12px;font-size:0.88em;">
+        <strong>🎮 Ajustes de Juego</strong><br>
+        Tiempo del rosco (en segundos), Orden Aleatorio (mezclar preguntas).
+      </div>
+      <div style="background:#f8f7ff;border-radius:8px;padding:12px;font-size:0.88em;">
+        <strong>🔓 Permitir Copia</strong><br>
+        Activa esta opción para que otros profesores puedan copiar tu recurso desde la Biblioteca.
+      </div>
+      <div style="background:#f8f7ff;border-radius:8px;padding:12px;font-size:0.88em;">
+        <strong>✅ Terminado</strong><br>
+        Marca el recurso como "visible para alumnos" cuando esté listo para usarse.
+      </div>
+    </div>
+  </div>
+
+  <!-- SECCIÓN 7: BIBLIOTECA -->
+  <div class="section">
+    <h2>📚 La Biblioteca</h2>
+    <p style="font-size:0.93em;line-height:1.6;">La Biblioteca es un repositorio de recursos educativos creados por profesores de toda la comunidad. Puedes buscar recursos usando filtros por <strong>Tema, País, Región y Población</strong>. Cada recurso tiene tres opciones: <strong>Probar</strong> (jugarlo sin copiarlo), <strong>Ver</strong> (inspeccionar el contenido) y <strong>Copiar</strong> (añadirlo a tus propios recursos para editarlo o usarlo directamente).</p>
+    <div class="alert">
+      💡 <strong>Consejo:</strong> Si haces público tu recurso activando "Permitir Copia", otros profesores podrán encontrarlo en la Biblioteca y usarlo en sus clases.
+    </div>
+  </div>
+
+  <!-- SECCIÓN 8: HERRAMIENTAS DEL PROFESOR -->
+  <div class="section">
+    <h2>🛠️ Herramientas del Profesor</h2>
+    <p style="margin-bottom:15px;font-size:0.93em;">Utilidades adicionales para gestionar y exportar tus recursos educativos, accesibles desde el menú lateral:</p>
+    <div class="app-grid">
+      <div class="app-card">
+        <span class="emoji">📊</span>
+        <h4>Google Sheets</h4>
+        <p>Convierte y sube tus juegos directamente a tu Google Drive en formato hoja de cálculo. Ideal para tener una copia de seguridad o trabajar con los datos fuera de PiKT.</p>
+      </div>
+      <div class="app-card">
+        <span class="emoji">📋</span>
+        <h4>Generar Examen</h4>
+        <p>Crea un <strong>Google Form (Cuestionario)</strong> automático a partir de tus juegos. Con un clic conviertes tus preguntas de PiKT en un cuestionario de Google listo para enviar a tus alumnos.</p>
+      </div>
+      <div class="app-card">
+        <span class="emoji">🔄</span>
+        <h4>Conversor Mágico</h4>
+        <p>Transforma un recurso de un tipo de juego a otro. Por ejemplo, convierte un Pasapalabra en una Sopa de Letras o en un Quiz. Ahorra tiempo al reutilizar contenido ya creado.</p>
+      </div>
+      <div class="app-card" style="opacity:0.7;">
+        <span class="emoji">📈</span>
+        <h4>Informes y Gestión (Próximamente)</h4>
+        <p>Generador de informes de rendimiento y gestión de grupos de alumnos. En desarrollo.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECCIÓN 9: CÓMO USAR EN CLASE -->
+  <div class="section">
+    <h2>👩‍🏫 ¿Cómo usar PiKT en clase?</h2>
+    <h3>Para los profesores:</h3>
+    <ol class="steps">
+      <li><span class="step-text">Crea tu recurso (pasapalabra, quiz, etc.) en tu panel de profesor.</span></li>
+      <li><span class="step-text">Pulsa "Jugar / Probar" para obtener el <strong>código del juego</strong> (6 dígitos).</span></li>
+      <li><span class="step-text">Comparte el código con tus alumnos o proyecta la pantalla de lanzamiento.</span></li>
+      <li><span class="step-text">Para juegos <strong>En Vivo</strong> (PiLive, MathLive): inicia la sesión y los alumnos se unen con el código.</span></li>
+    </ol>
+    <h3 style="margin-top:15px;">Para los alumnos:</h3>
+    <ol class="steps">
+      <li><span class="step-text">Entra en <strong>pikt.es</strong> desde el navegador (no hace falta registrarse).</span></li>
+      <li><span class="step-text">Pulsa en "Código" en la página principal e introduce el <strong>código de 6 dígitos</strong> que te da el profesor.</span></li>
+      <li><span class="step-text">O busca directamente el juego en el buscador por tema o título.</span></li>
+      <li><span class="step-text">Para juegos En Vivo: escribe tu nombre y espera a que el profesor inicie la partida.</span></li>
+    </ol>
+    <div class="alert">
+      🌐 <strong>Importante:</strong> PiKT funciona en cualquier dispositivo con navegador (móvil, tablet, ordenador). No requiere instalación ni cuenta para los alumnos.
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <p>Guía elaborada para facilitar el uso de <a href="https://www.pikt.es" target="_blank">PiKT.es</a> · Creado por Gonzalo Larrocha · Licencia CC BY-NC-ND 4.0</p>
+</footer>
+
+</body>
+</html>

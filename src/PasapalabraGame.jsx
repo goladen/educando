@@ -197,19 +197,17 @@ export default function PasapalabraGame({ recurso, usuario, alTerminar, modoOlim
         // En tu juego, la fase inicial es SETUP, y para arrancar hay que llamar a iniciar()
         // para que cree el rosco y los jugadores correctamente.
         if (modoOlimpico && recurso && fase === 'SETUP') {
-            iniciar(false, 'General');
+            iniciar(false, hojaOlimpica || 'General');
         }
     }, [modoOlimpico, recurso, fase]);
 
     // --- 2. INTERCEPTOR FINAL MODO OLÍMPICO ---
-    useEffect(() => {
-        // En tu juego, la fase final se llama 'FIN'
-        if (fase === 'FIN' && modoOlimpico) {
-            // Extraemos los puntos del objeto jugador
-            const puntosConseguidos = jugadores[0]?.aciertos || 0;
-            if (onOlimpicoFinish) onOlimpicoFinish(puntosConseguidos);
-        }
-    }, [fase, modoOlimpico, jugadores]);
+   
+   useEffect(() => {
+    if (fase === 'FIN' && modoOlimpico && !modoDuelo) {
+        // Ya se llama desde gestionarCambioTurno, esto es solo seguridad
+    }
+}, [fase, modoOlimpico]);
     // --- GENERADOR DE ROSCOS ---
     const generarRoscos = (duelo, hoja) => {
         const abecedario = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -491,7 +489,12 @@ const Tablero = ({ jugadores, setJugadores, turno, setTurno, modoDuelo, playSoun
 
     const gestionarCambioTurno = (copyJugadores, forzarCambio = false) => {
         if (!modoDuelo) {
-            if (copyJugadores[0].terminado) onFinish();
+            if (copyJugadores[0].terminado) {
+                if (modoOlimpico && onOlimpicoFinish) {
+                    onOlimpicoFinish(copyJugadores[0].aciertos);  // ← aquí el valor es fresco
+                }
+                onFinish();
+            }
             return;
         }
         const otro = turno === 0 ? 1 : 0;

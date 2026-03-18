@@ -959,10 +959,16 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                     <li style={styles.menuItem} onClick={() => navegar('HERRAMIENTAS')}>Herramientas del Profesor</li>
 
                     {/* --- CAMBIA ESTAS DOS LÍNEAS PARA LOS ENLACES EXTERNOS --- */}
-                    <li style={styles.menuItem} onClick={() => { setMenuOpen(false); window.open('https://goladen.wixsite.com/matematicas/copia-de-copia-de-pikt-web', '_blank'); }}>
+                    <li style={styles.menuItem} onClick={() => {
+                        setMenuOpen(false);
+                        window.open('https://www.pikt.es/politica.html', '_blank');
+                    }}>
                         Privacidad y Datos
                     </li>
-                    <li style={styles.menuItem} onClick={() => { setMenuOpen(false); window.open('https://goladen.wixsite.com/matematicas/copia-de-pikt', '_blank'); }}>
+                    <li style={styles.menuItem} onClick={() => {
+                        setMenuOpen(false);
+                        window.open('/guia-pikt-es.html', '_blank');
+                    }}>
                         Más Información
                     </li>
                 </ul>
@@ -1026,7 +1032,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                     <div className="dashboard-header-row">
                         <h2>
                             {vista === 'MIS_RECURSOS'
-                                ? (modoDashboard === 'PRO' ? `Recursos: ${TIPOS_JUEGOS[juegoSeleccionado]?.label}` : `Mis Recursos`)
+                                ? (modoDashboard === 'PRO' || modoDashboard === 'LIVE' ? `Recursos: ${TIPOS_JUEGOS[juegoSeleccionado]?.label}` : `Mis Recursos`)
                                 : `Biblioteca`}
                         </h2>
                         <div className="action-group">

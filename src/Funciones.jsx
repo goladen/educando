@@ -1,6 +1,11 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { ArrowLeft, RefreshCw, CheckCircle, XCircle, TrendingUp, BarChart2 } from 'lucide-react';
+import { ArrowLeft, RefreshCw, CheckCircle, XCircle, TrendingUp, BarChart2, Monitor, Users, Play, Loader } from 'lucide-react';
 import Confetti from 'react-confetti';
+import { db } from './firebase';
+import { doc, setDoc, updateDoc, onSnapshot, increment } from 'firebase/firestore';
+import piHappy from './assets/Pi-contento.png';
+import piAngry from './assets/Pi-enfadado.png';
+import piNeutral from './assets/Pi-neutro.png';
 
 // ─── CONSTANTES DEL CANVAS ────────────────────────────────────────────────────
 const CS = 420;            // tamaño canvas px
@@ -91,6 +96,67 @@ const genGrafica = () => {
     const m = niceSlope();
     const n = rInt(-5, 5);
     return { tipo: 'GRAFICA', m, n };
+};
+
+const genVector = () => {
+    let ax, ay, bx, by;
+    do {
+        ax = rInt(-4, 3); ay = rInt(-4, 4);
+        bx = rInt(-4, 4); by = rInt(-4, 4);
+    } while (ax === bx && ay === by);
+    const vx = bx - ax, vy = by - ay;
+    const modulo = Math.sqrt(vx*vx + vy*vy);
+    const angulo = Math.round(Math.atan2(vy, vx) * 180 / Math.PI * 10) / 10;
+    return { tipo: 'VECTOR', ax, ay, bx, by, vx, vy, modulo, angulo };
+};
+
+// Convierte y=mx+n a forma general Ax+By+C=0 con enteros
+const toGeneralForm = (m, n) => {
+    const fracMap = { '-0.5':[-1,2], '0.5':[1,2], '-1.5':[-3,2], '1.5':[3,2], '-2.5':[-5,2], '2.5':[5,2] };
+    const entry = fracMap[String(m)];
+    if (entry) {
+        const [p, q] = entry;
+        return { A: p, B: -q, C: q * n };
+    }
+    return { A: m, B: -1, C: n };
+};
+
+const fmtGeneral = ({ A, B, C }) => {
+    const t = (coef, varr, first) => {
+        if (coef === 0) return '';
+        const abs = Math.abs(coef);
+        const sign = coef < 0 ? (first ? '-' : '- ') : (first ? '' : '+ ');
+        const term = abs === 1 ? varr : `${abs}${varr}`;
+        return `${sign}${term}`;
+    };
+    const parts = [t(A,'x',true), t(B,'y',false), C !== 0 ? (C < 0 ? `- ${Math.abs(C)}` : `+ ${Math.abs(C)}`) : ''].filter(Boolean);
+    return (parts.length ? parts.join(' ') : '0') + ' = 0';
+};
+
+const genGeneral = () => {
+    const subtipo = ['PARALELAS','PERPENDICULARES','INTERSECCION'][Math.floor(Math.random()*3)];
+    const m1 = niceSlope();
+    const n1 = rInt(-3, 3);
+    let m2, n2;
+    if (subtipo === 'PARALELAS') {
+        m2 = m1;
+        do { n2 = rInt(-3, 3); } while (n2 === n1);
+    } else if (subtipo === 'PERPENDICULARES') {
+        m2 = -1/m1;
+        n2 = rInt(-3, 3);
+    } else {
+        do { m2 = niceSlope(); } while (m2 === m1);
+        n2 = rInt(-3, 3);
+    }
+    let ix = null, iy = null;
+    if (subtipo === 'INTERSECCION') {
+        ix = Math.round((n2 - n1) / (m1 - m2) * 100) / 100;
+        iy = Math.round((m1 * ix + n1) * 100) / 100;
+    }
+    const g1 = toGeneralForm(m1, n1);
+    const g2 = toGeneralForm(m2, n2);
+    return { tipo: 'GENERAL', m1, n1, m2, n2, g1, g2, subtipo,
+        paralelas: subtipo==='PARALELAS', perpendiculares: subtipo==='PERPENDICULARES', ix, iy };
 };
 
 // ─── CANVAS DE COORDENADAS ────────────────────────────────────────────────────
@@ -284,7 +350,7 @@ function CoordCanvas({ eq, studentPoints, onPointClick, disabled, resultado, mos
                           : '3px solid #e0e4f0',
                 }}
             />
-            {!disabled && studentPoints.length < 2 && (
+            {!disabled && studentPoints.length < 2 && eq?.tipo !== 'GRAFICA' && (
                 <div style={{ position:'absolute', bottom:8, left:'50%', transform:'translateX(-50%)', background:'rgba(44,62,80,0.75)', color:'white', padding:'4px 12px', borderRadius:20, fontSize:'0.75rem', pointerEvents:'none', whiteSpace:'nowrap' }}>
                     {studentPoints.length === 0 ? 'Haz clic para marcar el 1.er punto' : 'Haz clic para marcar el 2.º punto'}
                 </div>
@@ -324,24 +390,25 @@ function Ejercicio({ eq, onNuevo, onVolver }) {
         const mOk = eq.tipo === 'GRAFICA' ? approxEq(parseAnswer(ansM), eq.m) : approxEq(parseAnswer(ansM), correctM);
         const nOk = eq.tipo === 'GRAFICA' ? approxEq(parseAnswer(ansN), eq.n) : approxEq(parseAnswer(ansN), correctN);
 
-        let lineaOk = false;
-        if (studentPts.length === 2) {
+        // Para GRAFICA, la recta ya está mostrada — no se exige dibujar
+        let lineaOk = eq.tipo === 'GRAFICA';
+        if (!lineaOk && studentPts.length === 2) {
             const [p1, p2] = studentPts;
             const dx = p2.mx - p1.mx;
             if (dx !== 0) {
                 const mS = (p2.my - p1.my) / dx;
                 const nS = p1.my - mS * p1.mx;
-                const refM = eq.tipo === 'GRAFICA' ? eq.m : correctM;
-                const refN = eq.tipo === 'GRAFICA' ? eq.n : correctN;
-                lineaOk = approxEq(mS, refM, 0.1) && approxEq(nS, refN, 0.3);
+                lineaOk = approxEq(mS, correctM, 0.1) && approxEq(nS, correctN, 0.3);
             }
         }
 
         const msgs = [];
         if (!mOk) msgs.push('La pendiente m no es correcta.');
         if (!nOk) msgs.push('La ordenada en el origen n no es correcta.');
-        if (studentPts.length < 2) msgs.push('Dibuja la recta en el canvas (2 puntos).');
-        else if (!lineaOk) msgs.push('El dibujo de la recta no coincide.');
+        if (eq.tipo !== 'GRAFICA') {
+            if (studentPts.length < 2) msgs.push('Dibuja la recta en el canvas (2 puntos).');
+            else if (!lineaOk) msgs.push('El dibujo de la recta no coincide.');
+        }
 
         if (mOk && nOk && lineaOk) {
             setResultado('TODO_OK');
@@ -488,12 +555,448 @@ function EnunciadoTexto({ eq }) {
     return null;
 }
 
+// ─── CANVAS VECTOR ───────────────────────────────────────────────────────────
+function VectorCanvas({ eq, arrowPts, onPointClick, disabled, resultado }) {
+    const canvasRef = useRef(null);
+    const draw = useCallback(() => {
+        const canvas = canvasRef.current; if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0,0,CS,CS);
+        ctx.fillStyle='#f8f9ff'; ctx.fillRect(0,0,CS,CS);
+        // cuadrícula
+        ctx.strokeStyle='#dde1f5'; ctx.lineWidth=0.8;
+        for (let i=-RANGE;i<=RANGE;i++) {
+            const {x}=toCanvas(i,0); const {y}=toCanvas(0,i);
+            ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,CS); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(CS,y); ctx.stroke();
+        }
+        // ejes
+        ctx.strokeStyle='#2c3e50'; ctx.lineWidth=2;
+        ctx.beginPath(); ctx.moveTo(0,OY); ctx.lineTo(CS,OY); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(OX,0); ctx.lineTo(OX,CS); ctx.stroke();
+        ctx.fillStyle='#2c3e50';
+        ctx.beginPath(); ctx.moveTo(CS,OY); ctx.lineTo(CS-8,OY-5); ctx.lineTo(CS-8,OY+5); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(OX,0); ctx.lineTo(OX-5,8); ctx.lineTo(OX+5,8); ctx.fill();
+        // etiquetas
+        ctx.fillStyle='#7f8c8d'; ctx.font='11px Georgia,serif'; ctx.textAlign='center';
+        for (let i=-RANGE+1;i<=RANGE-1;i++) { if(i===0)continue; const{x}=toCanvas(i,0); ctx.fillText(i,x,OY+15); }
+        ctx.textAlign='right';
+        for (let i=-RANGE+1;i<=RANGE-1;i++) { if(i===0)continue; const{y}=toCanvas(0,i); ctx.fillText(i,OX-5,y+4); }
+        ctx.textAlign='center'; ctx.fillText('x',CS-5,OY-10); ctx.fillText('y',OX+12,10); ctx.fillText('0',OX-10,OY+14);
+        // puntos del enunciado A y B
+        if (eq) {
+            [[eq.ax,eq.ay,'A'],[eq.bx,eq.by,'B']].forEach(([mx,my,lbl])=>{
+                const {x,y}=toCanvas(mx,my);
+                ctx.beginPath(); ctx.arc(x,y,6,0,Math.PI*2);
+                ctx.fillStyle='#2c3e50'; ctx.fill();
+                ctx.font='bold 13px Georgia,serif'; ctx.fillStyle='#2c3e50'; ctx.textAlign='left';
+                ctx.fillText(`${lbl}(${mx},${my})`,x+9,y-8);
+            });
+        }
+        // flecha del alumno
+        if (arrowPts && arrowPts.length===2) {
+            const p1=arrowPts[0], p2=arrowPts[1];
+            const {x:x1,y:y1}=toCanvas(p1.mx,p1.my);
+            const {x:x2,y:y2}=toCanvas(p2.mx,p2.my);
+            const ok = resultado==='OK', fail = resultado==='FAIL';
+            const col = ok ? '#27ae60' : fail ? '#e74c3c' : '#e67e22';
+            ctx.save();
+            ctx.strokeStyle=col; ctx.lineWidth=2.5;
+            ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+            // punta de flecha
+            const ang=Math.atan2(y2-y1,x2-x1);
+            const hs=10;
+            ctx.fillStyle=col;
+            ctx.beginPath();
+            ctx.moveTo(x2,y2);
+            ctx.lineTo(x2-hs*Math.cos(ang-0.4),y2-hs*Math.sin(ang-0.4));
+            ctx.lineTo(x2-hs*Math.cos(ang+0.4),y2-hs*Math.sin(ang+0.4));
+            ctx.closePath(); ctx.fill();
+            ctx.restore();
+        }
+        // puntos del alumno (marcados)
+        if (arrowPts) arrowPts.forEach((p,i)=>{
+            const {x,y}=toCanvas(p.mx,p.my);
+            ctx.beginPath(); ctx.arc(x,y,5,0,Math.PI*2);
+            ctx.fillStyle=i===0?'#3498db':'#e67e22'; ctx.fill();
+            ctx.strokeStyle='white'; ctx.lineWidth=2; ctx.stroke();
+        });
+    },[eq,arrowPts,resultado]);
+    useEffect(()=>{draw();},[draw]);
+    const handleClick = (e) => {
+        if (disabled) return;
+        const rect=canvasRef.current.getBoundingClientRect();
+        const cx=(e.clientX-rect.left)*(CS/rect.width);
+        const cy=(e.clientY-rect.top)*(CS/rect.height);
+        const {x:mx,y:my}=toMath(cx,cy);
+        const snX=Math.round(mx),snY=Math.round(my);
+        if (Math.abs(snX)<=RANGE&&Math.abs(snY)<=RANGE) onPointClick({mx:snX,my:snY});
+    };
+    return (
+        <div style={{position:'relative',display:'inline-block'}}>
+            <canvas ref={canvasRef} width={CS} height={CS} onClick={handleClick}
+                style={{width:CS,height:CS,cursor:disabled?'default':'crosshair',borderRadius:10,
+                    boxShadow:'0 4px 20px rgba(0,0,0,0.12)',display:'block',
+                    border:resultado==='OK'?'3px solid #27ae60':resultado==='FAIL'?'3px solid #e74c3c':'3px solid #e0e4f0'}}/>
+            {!disabled && arrowPts && arrowPts.length<2 && (
+                <div style={{position:'absolute',bottom:8,left:'50%',transform:'translateX(-50%)',
+                    background:'rgba(44,62,80,0.75)',color:'white',padding:'4px 12px',borderRadius:20,
+                    fontSize:'0.75rem',pointerEvents:'none',whiteSpace:'nowrap'}}>
+                    {arrowPts.length===0?'Haz clic en el punto de inicio del vector':'Haz clic en el punto final del vector'}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ─── EJERCICIO VECTOR ─────────────────────────────────────────────────────────
+function EjercicioVector({ eq, onNuevo, onVolver }) {
+    const [arrowPts, setArrowPts] = useState([]);
+    const [ansVx, setAnsVx] = useState('');
+    const [ansVy, setAnsVy] = useState('');
+    const [ansMod, setAnsMod] = useState('');
+    const [ansAng, setAnsAng] = useState('');
+    const [resultado, setResultado] = useState(null);
+    const [errores, setErrores] = useState([]);
+    const [mostrarSol, setMostrarSol] = useState(false);
+
+    const reset = () => { setArrowPts([]); setAnsVx(''); setAnsVy(''); setAnsMod(''); setAnsAng(''); setResultado(null); setErrores([]); setMostrarSol(false); };
+
+    const handlePoint = (pt) => {
+        if (resultado) return;
+        setArrowPts(prev => prev.length >= 2 ? [pt] : [...prev, pt]);
+    };
+
+    const comprobar = () => {
+        const tol = 0.2;
+        const errs = [];
+        // Comprobar flecha
+        if (arrowPts.length < 2) errs.push('Dibuja el vector haciendo clic en el punto inicial y final.');
+        else {
+            const drawn = { vx: arrowPts[1].mx - arrowPts[0].mx, vy: arrowPts[1].my - arrowPts[0].my };
+            if (Math.abs(drawn.vx - eq.vx) > 0.5 || Math.abs(drawn.vy - eq.vy) > 0.5)
+                errs.push('El vector dibujado no coincide con el vector AB. Haz clic primero en A, luego en B.');
+        }
+        if (Math.abs(parseAnswer(ansVx) - eq.vx) > tol) errs.push(`La componente x del vector no es correcta.`);
+        if (Math.abs(parseAnswer(ansVy) - eq.vy) > tol) errs.push(`La componente y del vector no es correcta.`);
+        if (Math.abs(parseAnswer(ansMod) - eq.modulo) > 0.15) errs.push(`El módulo del vector no es correcto (redondea a 2 decimales).`);
+        // ángulo: acepta el ángulo normalizado y también el equivalente positivo
+        const angEst = parseAnswer(ansAng);
+        const angOk = Math.abs(angEst - eq.angulo) <= 1 || Math.abs(angEst - eq.angulo - 360) <= 1 || Math.abs(angEst - eq.angulo + 360) <= 1;
+        if (!angOk) errs.push(`El ángulo respecto al eje X no es correcto (en grados, con signo).`);
+
+        if (errs.length === 0) setResultado('OK');
+        else { setResultado('FAIL'); setErrores(errs); }
+    };
+
+    return (
+        <div style={st.ejercicioWrap}>
+            {resultado === 'OK' && <Confetti recycle={false} numberOfPieces={200} />}
+            <div style={st.enunciado}>
+                Dados los puntos <strong>A({eq.ax}, {eq.ay})</strong> y <strong>B({eq.bx}, {eq.by})</strong>,
+                calcula el vector <strong>AB⃗</strong>, su módulo y el ángulo con el eje X.
+                <div style={{fontSize:'0.82rem',color:'#5a6a9a',marginTop:6}}>
+                    Haz clic primero en A y luego en B para dibujar el vector.
+                </div>
+            </div>
+            <div style={{display:'flex',gap:24,flexWrap:'wrap',justifyContent:'center'}}>
+                <div style={{display:'flex',flexDirection:'column',gap:10,alignItems:'center'}}>
+                    <VectorCanvas eq={eq} arrowPts={arrowPts} onPointClick={handlePoint} disabled={!!resultado} resultado={resultado}/>
+                    {arrowPts.length>0 && !resultado && (
+                        <button onClick={()=>setArrowPts([])} style={st.btnClear}>↺ Borrar vector</button>
+                    )}
+                </div>
+                <div style={st.panelRespuestas}>
+                    <div style={st.inputLabel}>Vector <strong>AB⃗</strong> = (x, y)</div>
+                    <div style={{display:'flex',gap:8,alignItems:'center',marginTop:6}}>
+                        <span style={{fontSize:'0.82rem',color:'#5a6a9a'}}>x =</span>
+                        <input style={{...st.mathInput,width:70}} value={ansVx} onChange={e=>setAnsVx(e.target.value)} disabled={!!resultado} placeholder="ej: 3"/>
+                        <span style={{fontSize:'0.82rem',color:'#5a6a9a'}}>y =</span>
+                        <input style={{...st.mathInput,width:70}} value={ansVy} onChange={e=>setAnsVy(e.target.value)} disabled={!!resultado} placeholder="ej: -2"/>
+                    </div>
+                    <div style={st.inputGroup}>
+                        <label style={st.inputLabel}>Módulo |AB⃗| =</label>
+                        <input style={st.mathInput} value={ansMod} onChange={e=>setAnsMod(e.target.value)} disabled={!!resultado} placeholder="ej: 3.61"/>
+                    </div>
+                    <div style={st.inputGroup}>
+                        <label style={st.inputLabel}>Ángulo con eje X (grados) =</label>
+                        <input style={st.mathInput} value={ansAng} onChange={e=>setAnsAng(e.target.value)} disabled={!!resultado} placeholder="ej: -33.69"/>
+                    </div>
+                    {!resultado ? (
+                        <button onClick={comprobar} style={st.btnComprobar}><CheckCircle size={17}/> Comprobar</button>
+                    ) : resultado==='OK' ? (
+                        <div style={st.feedbackOk}><CheckCircle size={22}/> ¡Correcto!</div>
+                    ) : (
+                        <div style={st.feedbackFail}><XCircle size={18} style={{flexShrink:0}}/><div>{errores.map((e,i)=><div key={i}>{e}</div>)}</div></div>
+                    )}
+                    {resultado==='FAIL' && (
+                        <button onClick={()=>setMostrarSol(b=>!b)} style={st.btnVerSol}>{mostrarSol?'Ocultar solución':'Ver solución'}</button>
+                    )}
+                    {mostrarSol && (
+                        <div style={st.solucionBox}>
+                            <strong>Solución:</strong><br/>
+                            AB⃗ = ({eq.vx}, {eq.vy})<br/>
+                            |AB⃗| = {Math.round(eq.modulo*100)/100}<br/>
+                            Ángulo = {eq.angulo}°
+                        </div>
+                    )}
+                    <div style={{display:'flex',gap:8,marginTop:'auto'}}>
+                        <button onClick={()=>{reset();onNuevo();}} style={st.btnNuevo}><RefreshCw size={15}/> Nuevo</button>
+                        <button onClick={onVolver} style={st.btnVolver}><ArrowLeft size={15}/> Volver</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─── CANVAS GENERAL (dos rectas) ──────────────────────────────────────────────
+function GeneralCanvas({ eq, linePts, onPointClick, disabled, resultado, mostrarSolucion }) {
+    const canvasRef = useRef(null);
+    const draw = useCallback(() => {
+        const canvas=canvasRef.current; if(!canvas)return;
+        const ctx=canvas.getContext('2d');
+        ctx.clearRect(0,0,CS,CS);
+        ctx.fillStyle='#f8f9ff'; ctx.fillRect(0,0,CS,CS);
+        ctx.strokeStyle='#dde1f5'; ctx.lineWidth=0.8;
+        for(let i=-RANGE;i<=RANGE;i++){
+            const{x}=toCanvas(i,0);const{y}=toCanvas(0,i);
+            ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,CS);ctx.stroke();
+            ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(CS,y);ctx.stroke();
+        }
+        ctx.strokeStyle='#2c3e50';ctx.lineWidth=2;
+        ctx.beginPath();ctx.moveTo(0,OY);ctx.lineTo(CS,OY);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(OX,0);ctx.lineTo(OX,CS);ctx.stroke();
+        ctx.fillStyle='#2c3e50';
+        ctx.beginPath();ctx.moveTo(CS,OY);ctx.lineTo(CS-8,OY-5);ctx.lineTo(CS-8,OY+5);ctx.fill();
+        ctx.beginPath();ctx.moveTo(OX,0);ctx.lineTo(OX-5,8);ctx.lineTo(OX+5,8);ctx.fill();
+        ctx.fillStyle='#7f8c8d';ctx.font='11px Georgia,serif';ctx.textAlign='center';
+        for(let i=-RANGE+1;i<=RANGE-1;i++){if(i===0)continue;const{x}=toCanvas(i,0);ctx.fillText(i,x,OY+15);}
+        ctx.textAlign='right';
+        for(let i=-RANGE+1;i<=RANGE-1;i++){if(i===0)continue;const{y}=toCanvas(0,i);ctx.fillText(i,OX-5,y+4);}
+        ctx.textAlign='center';ctx.fillText('x',CS-5,OY-10);ctx.fillText('y',OX+12,10);ctx.fillText('0',OX-10,OY+14);
+        // helper para dibujar una recta dados dos puntos del alumno
+        const drawStudentLine = (p1,p2,col,idx)=>{
+            const dx=p2.mx-p1.mx;
+            if(dx===0) return;
+            const mS=(p2.my-p1.my)/dx, nS=p1.my-mS*p1.mx;
+            const pts2=[];
+            let yv=mS*(-RANGE)+nS; if(yv>=-RANGE&&yv<=RANGE)pts2.push(toCanvas(-RANGE,yv));
+            yv=mS*RANGE+nS; if(yv>=-RANGE&&yv<=RANGE)pts2.push(toCanvas(RANGE,yv));
+            if(mS!==0){const xv=(-RANGE-nS)/mS;if(xv>=-RANGE&&xv<=RANGE)pts2.push(toCanvas(xv,-RANGE));const xv2=(RANGE-nS)/mS;if(xv2>=-RANGE&&xv2<=RANGE)pts2.push(toCanvas(xv2,RANGE));}
+            if(pts2.length<2)return;
+            ctx.save();ctx.strokeStyle=col;ctx.lineWidth=2.2;
+            ctx.beginPath();ctx.moveTo(pts2[0].x,pts2[0].y);ctx.lineTo(pts2[1].x,pts2[1].y);ctx.stroke();
+            ctx.font='bold 11px Georgia,serif';ctx.fillStyle=col;ctx.textAlign='center';
+            ctx.fillText(`r${idx+1}`,pts2[1].x-10,pts2[1].y-8);
+            ctx.restore();
+        };
+        // Dibujar rectas del alumno
+        if(linePts[0]&&linePts[1]) drawStudentLine(linePts[0],linePts[1],'#e67e22',0);
+        if(linePts[2]&&linePts[3]) drawStudentLine(linePts[2],linePts[3],'#9b59b6',1);
+        // Mostrar solución
+        if(mostrarSolucion&&eq){
+            const drawRef=(m,n,col)=>{
+                const pts2=[];
+                let yv=m*(-RANGE)+n;if(yv>=-RANGE&&yv<=RANGE)pts2.push(toCanvas(-RANGE,yv));
+                yv=m*RANGE+n;if(yv>=-RANGE&&yv<=RANGE)pts2.push(toCanvas(RANGE,yv));
+                if(m!==0){const xv=(-RANGE-n)/m;if(xv>=-RANGE&&xv<=RANGE)pts2.push(toCanvas(xv,-RANGE));const xv2=(RANGE-n)/m;if(xv2>=-RANGE&&xv2<=RANGE)pts2.push(toCanvas(xv2,RANGE));}
+                if(pts2.length<2)return;
+                ctx.save();ctx.strokeStyle=col;ctx.lineWidth=2.5;ctx.setLineDash([6,3]);
+                ctx.beginPath();ctx.moveTo(pts2[0].x,pts2[0].y);ctx.lineTo(pts2[1].x,pts2[1].y);ctx.stroke();
+                ctx.setLineDash([]);ctx.restore();
+            };
+            drawRef(eq.m1,eq.n1,'#27ae60');drawRef(eq.m2,eq.n2,'#27ae60');
+        }
+        // puntos del alumno
+        linePts.forEach((p,i)=>{
+            if(!p)return;
+            const{x,y}=toCanvas(p.mx,p.my);
+            ctx.beginPath();ctx.arc(x,y,5,0,Math.PI*2);
+            ctx.fillStyle=i<2?'#e67e22':'#9b59b6';ctx.fill();
+            ctx.strokeStyle='white';ctx.lineWidth=2;ctx.stroke();
+        });
+    },[eq,linePts,resultado,mostrarSolucion]);
+    useEffect(()=>{draw();},[draw]);
+    const handleClick=(e)=>{
+        if(disabled)return;
+        const rect=canvasRef.current.getBoundingClientRect();
+        const cx=(e.clientX-rect.left)*(CS/rect.width);
+        const cy=(e.clientY-rect.top)*(CS/rect.height);
+        const{x:mx,y:my}=toMath(cx,cy);
+        const snX=Math.round(mx),snY=Math.round(my);
+        if(Math.abs(snX)<=RANGE&&Math.abs(snY)<=RANGE) onPointClick({mx:snX,my:snY});
+    };
+    const n = linePts.filter(Boolean).length;
+    const hints = ['Marca 1.er punto de r₁','Marca 2.º punto de r₁','Marca 1.er punto de r₂','Marca 2.º punto de r₂'];
+    return (
+        <div style={{position:'relative',display:'inline-block'}}>
+            <canvas ref={canvasRef} width={CS} height={CS} onClick={handleClick}
+                style={{width:CS,height:CS,cursor:disabled?'default':'crosshair',borderRadius:10,
+                    boxShadow:'0 4px 20px rgba(0,0,0,0.12)',display:'block',
+                    border:resultado==='OK'?'3px solid #27ae60':resultado==='FAIL'?'3px solid #e74c3c':'3px solid #e0e4f0'}}/>
+            {!disabled && n<4 && (
+                <div style={{position:'absolute',bottom:8,left:'50%',transform:'translateX(-50%)',
+                    background:'rgba(44,62,80,0.75)',color:'white',padding:'4px 12px',borderRadius:20,
+                    fontSize:'0.75rem',pointerEvents:'none',whiteSpace:'nowrap'}}>{hints[n]}</div>
+            )}
+        </div>
+    );
+}
+
+// ─── EJERCICIO GENERAL ────────────────────────────────────────────────────────
+function EjercicioGeneral({ eq, onNuevo, onVolver }) {
+    const [linePts, setLinePts] = useState([null,null,null,null]);
+    const [ansPar, setAnsPar] = useState(null);   // true/false
+    const [ansPerp, setAnsPerp] = useState(null);
+    const [ansIx, setAnsIx] = useState('');
+    const [ansIy, setAnsIy] = useState('');
+    const [noInter, setNoInter] = useState(false);
+    const [resultado, setResultado] = useState(null);
+    const [errores, setErrores] = useState([]);
+    const [mostrarSol, setMostrarSol] = useState(false);
+
+    const reset = () => { setLinePts([null,null,null,null]); setAnsPar(null); setAnsPerp(null); setAnsIx(''); setAnsIy(''); setNoInter(false); setResultado(null); setErrores([]); setMostrarSol(false); };
+
+    const handlePoint = (pt) => {
+        if (resultado) return;
+        setLinePts(prev => {
+            const next = [...prev];
+            const idx = next.findIndex(p => p===null);
+            if (idx === -1) return next;
+            next[idx] = pt;
+            return next;
+        });
+    };
+
+    // Valida que una recta dibujada (p1,p2) coincide con y=mx+n (tolerancia)
+    const lineMatchesMN = (p1, p2, m, n, tol=0.25) => {
+        if (!p1||!p2) return false;
+        const dx=p2.mx-p1.mx; if(dx===0) return false;
+        const mS=(p2.my-p1.my)/dx, nS=p1.my-mS*p1.mx;
+        return Math.abs(mS-m)<=tol && Math.abs(nS-n)<=tol*2;
+    };
+
+    const comprobar = () => {
+        const tol=0.12;
+        const errs=[];
+        // Rectas dibujadas
+        const l1drawn = linePts[0]&&linePts[1];
+        const l2drawn = linePts[2]&&linePts[3];
+        if (!l1drawn||!l2drawn) { errs.push('Dibuja las dos rectas (2 puntos por recta).'); }
+        else {
+            // La recta 1 puede ser r1 o r2 (aceptar cualquier orden)
+            const m1r1 = lineMatchesMN(linePts[0],linePts[1],eq.m1,eq.n1);
+            const m1r2 = lineMatchesMN(linePts[0],linePts[1],eq.m2,eq.n2);
+            const m2r1 = lineMatchesMN(linePts[2],linePts[3],eq.m1,eq.n1);
+            const m2r2 = lineMatchesMN(linePts[2],linePts[3],eq.m2,eq.n2);
+            const linesOk = (m1r1&&m2r2)||(m1r2&&m2r1);
+            if (!linesOk) errs.push('Una o las dos rectas dibujadas no coinciden con las ecuaciones dadas.');
+        }
+        if (ansPar === null) errs.push('Indica si las rectas son paralelas.');
+        else if (ansPar !== eq.paralelas) errs.push(`Las rectas ${eq.paralelas?'sí son':'no son'} paralelas.`);
+        if (ansPerp === null) errs.push('Indica si las rectas son perpendiculares.');
+        else if (ansPerp !== eq.perpendiculares) errs.push(`Las rectas ${eq.perpendiculares?'sí son':'no son'} perpendiculares.`);
+        if (eq.paralelas) {
+            if (!noInter) errs.push('Las rectas paralelas no se cortan. Marca "No hay intersección".');
+        } else {
+            if (noInter) errs.push('Estas rectas sí tienen punto de intersección.');
+            else {
+                if (Math.abs(parseAnswer(ansIx)-eq.ix)>tol) errs.push('La coordenada x del punto de intersección no es correcta.');
+                if (Math.abs(parseAnswer(ansIy)-eq.iy)>tol) errs.push('La coordenada y del punto de intersección no es correcta.');
+            }
+        }
+        if (errs.length===0) setResultado('OK');
+        else { setResultado('FAIL'); setErrores(errs); }
+    };
+
+    const btnYN = (val, current, set, disabled) => (
+        <div style={{display:'flex',gap:8}}>
+            {[[true,'Sí'],[false,'No']].map(([v,lbl])=>(
+                <button key={String(v)} onClick={()=>!disabled&&set(v)}
+                    style={{flex:1,padding:'7px',borderRadius:8,border:`2px solid ${current===v?'#3498db':'#dde2f0'}`,
+                        background:current===v?'#ebf5fb':'white',cursor:'pointer',fontWeight:current===v?'bold':'normal',
+                        fontSize:'0.82rem',color:current===v?'#1a5276':'#555',fontFamily:'inherit'}}>{lbl}</button>
+            ))}
+        </div>
+    );
+
+    return (
+        <div style={st.ejercicioWrap}>
+            {resultado==='OK'&&<Confetti recycle={false} numberOfPieces={200}/>}
+            <div style={st.enunciado}>
+                Dadas las ecuaciones:<br/>
+                <strong style={{fontSize:'1.05em'}}>r₁: {fmtGeneral(eq.g1)}</strong> &nbsp;&nbsp;
+                <strong style={{fontSize:'1.05em'}}>r₂: {fmtGeneral(eq.g2)}</strong><br/>
+                <span style={{fontSize:'0.82rem',color:'#5a6a9a'}}>Dibuja las dos rectas y responde las preguntas.</span>
+            </div>
+            <div style={{display:'flex',gap:24,flexWrap:'wrap',justifyContent:'center'}}>
+                <div style={{display:'flex',flexDirection:'column',gap:10,alignItems:'center'}}>
+                    <GeneralCanvas eq={eq} linePts={linePts} onPointClick={handlePoint}
+                        disabled={!!resultado} resultado={resultado} mostrarSolucion={mostrarSol}/>
+                    {linePts.some(Boolean)&&!resultado&&(
+                        <button onClick={()=>setLinePts([null,null,null,null])} style={st.btnClear}>↺ Borrar dibujo</button>
+                    )}
+                </div>
+                <div style={st.panelRespuestas}>
+                    <div style={st.inputGroup}>
+                        <label style={st.inputLabel}>¿Son paralelas?</label>
+                        {btnYN(null,ansPar,setAnsPar,!!resultado)}
+                    </div>
+                    <div style={st.inputGroup}>
+                        <label style={st.inputLabel}>¿Son perpendiculares?</label>
+                        {btnYN(null,ansPerp,setAnsPerp,!!resultado)}
+                    </div>
+                    <div style={st.inputGroup}>
+                        <label style={st.inputLabel}>Punto de intersección</label>
+                        <label style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer',fontSize:'0.82rem',marginTop:4}}>
+                            <input type="checkbox" checked={noInter} onChange={e=>!resultado&&setNoInter(e.target.checked)} style={{width:14,height:14}}/>
+                            No hay intersección (paralelas)
+                        </label>
+                        {!noInter&&(
+                            <div style={{display:'flex',gap:8,alignItems:'center',marginTop:6}}>
+                                <span style={{fontSize:'0.82rem',color:'#5a6a9a'}}>x =</span>
+                                <input style={{...st.mathInput,width:70}} value={ansIx} onChange={e=>setAnsIx(e.target.value)} disabled={!!resultado} placeholder="ej: 2"/>
+                                <span style={{fontSize:'0.82rem',color:'#5a6a9a'}}>y =</span>
+                                <input style={{...st.mathInput,width:70}} value={ansIy} onChange={e=>setAnsIy(e.target.value)} disabled={!!resultado} placeholder="ej: 1"/>
+                            </div>
+                        )}
+                    </div>
+                    {!resultado?(
+                        <button onClick={comprobar} style={st.btnComprobar}><CheckCircle size={17}/> Comprobar</button>
+                    ):resultado==='OK'?(
+                        <div style={st.feedbackOk}><CheckCircle size={22}/> ¡Correcto!</div>
+                    ):(
+                        <div style={st.feedbackFail}><XCircle size={18} style={{flexShrink:0}}/><div>{errores.map((e,i)=><div key={i}>{e}</div>)}</div></div>
+                    )}
+                    {resultado==='FAIL'&&(
+                        <button onClick={()=>setMostrarSol(b=>!b)} style={st.btnVerSol}>{mostrarSol?'Ocultar solución':'Ver solución'}</button>
+                    )}
+                    {mostrarSol&&(
+                        <div style={st.solucionBox}>
+                            <strong>Solución:</strong><br/>
+                            {eq.paralelas?'Paralelas: no se cortan':`Intersección: (${eq.ix}, ${eq.iy})`}<br/>
+                            Paralelas: {eq.paralelas?'Sí':'No'} · Perpendiculares: {eq.perpendiculares?'Sí':'No'}
+                        </div>
+                    )}
+                    <div style={{display:'flex',gap:8,marginTop:'auto'}}>
+                        <button onClick={()=>{reset();onNuevo();}} style={st.btnNuevo}><RefreshCw size={15}/> Nuevo</button>
+                        <button onClick={onVolver} style={st.btnVolver}><ArrowLeft size={15}/> Volver</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // ─── PANTALLA RECTAS ─────────────────────────────────────────────────────────
 const TIPOS = [
     { id:'DOS_PUNTOS',    label:'Recta por dos puntos',       desc:'Dados A y B, encuentra y = mx + n', emoji:'📍', gen: genDosPuntos },
     { id:'PARALELA',      label:'Recta paralela a una dada',  desc:'Dada una recta y un punto P',        emoji:'⫸', gen: genParalela },
     { id:'PERPENDICULAR', label:'Recta perpendicular',        desc:'Encuentra la recta ⊥ por P',         emoji:'⊥', gen: genPerpendicular },
     { id:'GRAFICA',       label:'Recta por su gráfica',       desc:'Lee m y n de la representación',     emoji:'📈', gen: genGrafica },
+    { id:'VECTOR',        label:'Vector entre dos puntos',    desc:'Componentes, módulo y ángulo de AB⃗', emoji:'➡️', gen: genVector },
+    { id:'GENERAL',       label:'Forma general · relaciones', desc:'Paralelas, perpendiculares e intersección', emoji:'✕', gen: genGeneral },
 ];
 
 function PantallaRectas({ onVolver }) {
@@ -505,13 +1008,19 @@ function PantallaRectas({ onVolver }) {
         setEq(tipo.gen());
     };
 
-    if (tipoActivo && eq) return (
-        <Ejercicio
-            eq={eq}
-            onNuevo={() => setEq(tipoActivo.gen())}
-            onVolver={() => { setTipoActivo(null); setEq(null); }}
-        />
-    );
+    if (tipoActivo && eq) {
+        if (tipoActivo.id === 'VECTOR')
+            return <EjercicioVector eq={eq} onNuevo={() => setEq(tipoActivo.gen())} onVolver={() => { setTipoActivo(null); setEq(null); }} />;
+        if (tipoActivo.id === 'GENERAL')
+            return <EjercicioGeneral eq={eq} onNuevo={() => setEq(tipoActivo.gen())} onVolver={() => { setTipoActivo(null); setEq(null); }} />;
+        return (
+            <Ejercicio
+                eq={eq}
+                onNuevo={() => setEq(tipoActivo.gen())}
+                onVolver={() => { setTipoActivo(null); setEq(null); }}
+            />
+        );
+    }
 
     return (
         <div style={st.seccionWrap}>
@@ -645,7 +1154,7 @@ function MiniPaint() {
 }
 
 // ─── Canvas de parábola ───────────────────────────────────────────────────────
-function ParabolaCanvas({ a, b, c, studentPoints = [], resultado = null, mostrarSolucion = false }) {
+function ParabolaCanvas({ a, b, c, studentPoints = [], resultado = null, mostrarSolucion = false, onPointClick = null, clickable = false }) {
     const canvasRef = useRef(null);
     const RANGE_P = 7;
     const CSP = 360;
@@ -733,16 +1242,36 @@ function ParabolaCanvas({ a, b, c, studentPoints = [], resultado = null, mostrar
 
     }, [a, b, c, studentPoints, resultado, mostrarSolucion]);
 
+    const handleParClick = (e) => {
+        if (!clickable || !onPointClick) return;
+        const rect = canvasRef.current.getBoundingClientRect();
+        const cx = (e.clientX - rect.left) * (CSP / rect.width);
+        const cy = (e.clientY - rect.top)  * (CSP / rect.height);
+        const mx = Math.round((cx - OXP) / SCP);
+        const my = Math.round((OYP - cy) / SCP);
+        if (Math.abs(mx) <= RANGE_P && Math.abs(my) <= RANGE_P) onPointClick({ x: mx, y: my });
+    };
+
     return (
-        <canvas ref={canvasRef} width={CSP} height={CSP}
-            style={{
-                width: CSP, height: CSP, borderRadius: 10, display: 'block',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
-                border: resultado === 'OK' ? '3px solid #27ae60'
-                      : resultado === 'FAIL' ? '3px solid #e74c3c'
-                      : '3px solid #e0e4f0',
-            }}
-        />
+        <div style={{position:'relative',display:'inline-block'}}>
+            <canvas ref={canvasRef} width={CSP} height={CSP} onClick={handleParClick}
+                style={{
+                    width: CSP, height: CSP, borderRadius: 10, display: 'block',
+                    cursor: clickable ? 'crosshair' : 'default',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
+                    border: resultado === 'OK' ? '3px solid #27ae60'
+                          : resultado === 'FAIL' ? '3px solid #e74c3c'
+                          : '3px solid #e0e4f0',
+                }}
+            />
+            {clickable && studentPoints.length < 3 && (
+                <div style={{position:'absolute',bottom:8,left:'50%',transform:'translateX(-50%)',
+                    background:'rgba(44,62,80,0.75)',color:'white',padding:'3px 10px',borderRadius:20,
+                    fontSize:'0.72rem',pointerEvents:'none',whiteSpace:'nowrap'}}>
+                    {studentPoints.length} punto(s) marcado(s) · necesitas al menos 3
+                </div>
+            )}
+        </div>
     );
 }
 
@@ -809,7 +1338,7 @@ function EjercicioAnalisis({ eq, onNuevo, onVolver }) {
     const xv = -b / (2 * a);
     const yv = a * xv * xv + b * xv + c;
 
-    const [forma, setForma]     = useState('');           // 'U' | 'N'
+    const [forma, setForma]     = useState('');
     const [ansXv, setAnsXv]     = useState('');
     const [ansYv, setAnsYv]     = useState('');
     const [noCortes, setNoCortes] = useState(false);
@@ -819,8 +1348,9 @@ function EjercicioAnalisis({ eq, onNuevo, onVolver }) {
     const [resultado, setResultado] = useState(null);
     const [errores, setErrores]     = useState([]);
     const [mostrarSol, setMostrarSol] = useState(false);
+    const [studentParPts, setStudentParPts] = useState([]);  // puntos marcados por el alumno
 
-    const reset = () => { setForma(''); setAnsXv(''); setAnsYv(''); setNoCortes(false); setAnsX1(''); setAnsX2(''); setAnsYeje(''); setResultado(null); setErrores([]); setMostrarSol(false); };
+    const reset = () => { setForma(''); setAnsXv(''); setAnsYv(''); setNoCortes(false); setAnsX1(''); setAnsX2(''); setAnsYeje(''); setResultado(null); setErrores([]); setMostrarSol(false); setStudentParPts([]); };
 
     const tol = 0.11;
     const numStr2 = (v) => Number.isInteger(v) ? `${v}` : (Math.round(v*100)/100).toString();
@@ -863,6 +1393,12 @@ function EjercicioAnalisis({ eq, onNuevo, onVolver }) {
         const yejeOk = Math.abs(parseAnswer(ansYeje) - c) <= tol;
         if (!yejeOk) errs.push('El corte con el eje Y no es correcto (es el valor de c).');
 
+        // Validar puntos dibujados (mínimo 3 en la parábola)
+        const ptsTol = 0.4;
+        const ptsOk = studentParPts.filter(p => Math.abs(a*p.x*p.x + b*p.x + c - p.y) <= ptsTol);
+        if (studentParPts.length < 3) errs.push('Marca al menos 3 puntos por los que pasa la parábola.');
+        else if (ptsOk.length < 3) errs.push('Al menos 3 de tus puntos deben estar sobre la parábola.');
+
         if (errs.length === 0) setResultado('OK');
         else { setResultado('FAIL'); setErrores(errs); }
     };
@@ -881,8 +1417,17 @@ function EjercicioAnalisis({ eq, onNuevo, onVolver }) {
                 Analiza la parábola: <strong style={{ fontSize:'1.1em' }}>{fmtPar()}</strong>
             </div>
             <div style={{ display:'flex', gap:24, flexWrap:'wrap', justifyContent:'center' }}>
-                <div style={{ display:'flex', flexDirection:'column', alignItems:'center' }}>
-                    <ParabolaCanvas a={resultado ? a : null} b={resultado ? b : null} c={resultado ? c : null} resultado={resultado} mostrarSolucion={mostrarSol} />
+                <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:10 }}>
+                    <ParabolaCanvas a={resultado ? a : null} b={resultado ? b : null} c={resultado ? c : null}
+                        resultado={resultado} mostrarSolucion={mostrarSol}
+                        studentPoints={studentParPts}
+                        onPointClick={(pt) => { if (!resultado) setStudentParPts(prev => [...prev, pt]); }}
+                        clickable={!resultado}
+                    />
+                    {studentParPts.length>0 && !resultado && (
+                        <button onClick={()=>setStudentParPts([])} style={st.btnClear}>↺ Borrar puntos</button>
+                    )}
+                    {!resultado && <div style={{fontSize:'0.75rem',color:'#5a6a9a',textAlign:'center',maxWidth:180}}>Haz clic para marcar puntos de la parábola (mín. 3)</div>}
                     <MiniPaint />
                 </div>
                 <div style={{ ...st.panelRespuestas, width:300, minHeight:'auto' }}>
@@ -1119,25 +1664,822 @@ function PantallaParabolas({ onVolver }) {
     );
 }
 
+
+// ══════════════════════════════════════════════════════════════════════════════
+// JUEGO EN VIVO — FUNCIONES
+// ══════════════════════════════════════════════════════════════════════════════
+
+const GEN_CODE = () =>
+    Array.from({ length: 6 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
+
+// Tipos con su generador, label y sección
+const TIPOS_LIVE = [
+    { id: 'DOS_PUNTOS',    label: 'Recta por 2 puntos',    emoji: '📍', seccion: 'RECTAS',    gen: genDosPuntos    },
+    { id: 'PARALELA',      label: 'Recta paralela',         emoji: '⫸',  seccion: 'RECTAS',    gen: genParalela     },
+    { id: 'PERPENDICULAR', label: 'Recta perpendicular',    emoji: '⊥',  seccion: 'RECTAS',    gen: genPerpendicular },
+    { id: 'GRAFICA',       label: 'Recta por su gráfica',   emoji: '📈', seccion: 'RECTAS',    gen: genGrafica      },
+    { id: 'VECTOR',        label: 'Vector entre 2 puntos',  emoji: '➡️', seccion: 'RECTAS',    gen: genVector       },
+    { id: 'GENERAL',       label: 'Forma general',          emoji: '✕',  seccion: 'RECTAS',    gen: genGeneral      },
+    { id: 'ANALISIS',      label: 'Analizar parábola',      emoji: '🔍', seccion: 'PARABOLAS', gen: genAnalisis     },
+    { id: 'TRES_PUNTOS',   label: 'Parábola por 3 puntos',  emoji: '📍', seccion: 'PARABOLAS', gen: genTresPuntos   },
+];
+
+// ─── Modal de configuración ───────────────────────────────────────────────────
+function ModalLiveConfig({ onCrear, onCancelar }) {
+    const [cantidades, setCantidades] = useState(
+        Object.fromEntries(TIPOS_LIVE.map(t => [t.id, 0]))
+    );
+    const [tiempo, setTiempo]       = useState(45);
+    const [aleatorio, setAleatorio] = useState(false);
+    const [puntosMax, setPuntosMax] = useState(100);
+    const [puntosMin, setPuntosMin] = useState(50);
+    const [creando, setCreando]     = useState(false);
+
+    const total = Object.values(cantidades).reduce((s, v) => s + v, 0);
+
+    const set = (id, v) => {
+        const n = Math.max(0, Math.min(10, parseInt(v) || 0));
+        setCantidades(prev => ({ ...prev, [id]: n }));
+    };
+
+    const crear = async () => {
+        if (total === 0) return alert('Añade al menos 1 pregunta.');
+        setCreando(true);
+        // Generar todas las preguntas
+        let preguntas = [];
+        TIPOS_LIVE.forEach(t => {
+            for (let i = 0; i < cantidades[t.id]; i++) {
+                preguntas.push({ ...t.gen(), tipo: t.id, tiempo, puntosMax, puntosMin });
+            }
+        });
+        if (aleatorio) preguntas = preguntas.sort(() => Math.random() - 0.5);
+
+        const codigo = GEN_CODE();
+        await setDoc(doc(db, 'live_games', codigo), {
+            tipoJuego: 'FUNCIONES', estado: 'LOBBY',
+            fasePregunta: 'RESPONDING',
+            jugadores: {}, preguntas,
+            indicePregunta: 0, respuestasRonda: {},
+            questionStartTime: null, creadoEn: Date.now(),
+        });
+        setCreando(false);
+        onCrear(codigo);
+    };
+
+    const Chip = ({ active, onClick, children }) => (
+        <button onClick={onClick} style={{
+            padding: '5px 12px', borderRadius: 20, border: 'none', cursor: 'pointer',
+            fontWeight: 'bold', fontSize: '0.82rem', fontFamily: 'inherit',
+            background: active ? '#1a2d5a' : '#f0f3fb',
+            color: active ? 'white' : '#5a6a9a',
+        }}>{children}</button>
+    );
+
+    return (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:5000, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+            <div style={{ background:'white', borderRadius:20, width:'100%', maxWidth:560, maxHeight:'90vh', overflowY:'auto', boxShadow:'0 20px 60px rgba(0,0,0,0.3)', fontFamily:"'Georgia',serif" }}>
+                <div style={{ background:'linear-gradient(135deg,#0f1b35,#1a2d5a)', padding:'18px 22px', borderRadius:'20px 20px 0 0', color:'white' }}>
+                    <div style={{ fontSize:'1.15rem', fontWeight:'bold' }}>🔴 Crear Partida en Vivo</div>
+                    <div style={{ fontSize:'0.78rem', color:'rgba(255,255,255,0.6)', marginTop:3 }}>Funciones — Rectas y Parábolas</div>
+                </div>
+                <div style={{ padding:'20px 22px', display:'flex', flexDirection:'column', gap:18 }}>
+
+                    {/* Preguntas por tipo */}
+                    <div>
+                        <div style={{ fontWeight:'bold', color:'#1a2d5a', fontSize:'0.88rem', marginBottom:10, textTransform:'uppercase', letterSpacing:'0.5px' }}>
+                            📐 Rectas
+                        </div>
+                        {TIPOS_LIVE.filter(t => t.seccion === 'RECTAS').map(t => (
+                            <div key={t.id} style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
+                                <span style={{ flex:1, fontSize:'0.88rem', color:'#2c3e50' }}>{t.emoji} {t.label}</span>
+                                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                                    <button onClick={() => set(t.id, cantidades[t.id]-1)} style={btnQStyle}>−</button>
+                                    <span style={{ minWidth:24, textAlign:'center', fontWeight:'bold', color:'#1a2d5a' }}>{cantidades[t.id]}</span>
+                                    <button onClick={() => set(t.id, cantidades[t.id]+1)} style={btnQStyle}>+</button>
+                                </div>
+                            </div>
+                        ))}
+
+                        <div style={{ fontWeight:'bold', color:'#1a2d5a', fontSize:'0.88rem', margin:'14px 0 10px', textTransform:'uppercase', letterSpacing:'0.5px' }}>
+                            ⌒ Parábolas
+                        </div>
+                        {TIPOS_LIVE.filter(t => t.seccion === 'PARABOLAS').map(t => (
+                            <div key={t.id} style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
+                                <span style={{ flex:1, fontSize:'0.88rem', color:'#2c3e50' }}>{t.emoji} {t.label}</span>
+                                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                                    <button onClick={() => set(t.id, cantidades[t.id]-1)} style={btnQStyle}>−</button>
+                                    <span style={{ minWidth:24, textAlign:'center', fontWeight:'bold', color:'#1a2d5a' }}>{cantidades[t.id]}</span>
+                                    <button onClick={() => set(t.id, cantidades[t.id]+1)} style={btnQStyle}>+</button>
+                                </div>
+                            </div>
+                        ))}
+
+                        <div style={{ background:'#f0f3fb', borderRadius:8, padding:'6px 12px', fontSize:'0.82rem', color:'#5a6a9a', marginTop:4 }}>
+                            Total: <strong style={{ color:'#1a2d5a' }}>{total}</strong> pregunta{total !== 1 ? 's' : ''}
+                        </div>
+                    </div>
+
+                    {/* Tiempo */}
+                    <div>
+                        <div style={{ fontWeight:'bold', color:'#1a2d5a', fontSize:'0.88rem', marginBottom:8 }}>⏱ Tiempo por pregunta</div>
+                        <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
+                            {[30, 45, 60, 90].map(t => (
+                                <Chip key={t} active={tiempo === t} onClick={() => setTiempo(t)}>{t}s</Chip>
+                            ))}
+                            <input type="number" min="10" max="300" value={![30,45,60,90].includes(tiempo) ? tiempo : ''}
+                                placeholder="otro"
+                                onChange={e => { const v = parseInt(e.target.value); if (v > 0) setTiempo(v); }}
+                                style={{ width:60, padding:'5px 8px', borderRadius:20, border:'2px solid #c0c8e8', textAlign:'center', fontSize:'0.85rem', outline:'none' }}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Orden */}
+                    <div>
+                        <div style={{ fontWeight:'bold', color:'#1a2d5a', fontSize:'0.88rem', marginBottom:8 }}>🔀 Orden de preguntas</div>
+                        <div style={{ display:'flex', gap:8 }}>
+                            <Chip active={!aleatorio} onClick={() => setAleatorio(false)}>📋 En orden</Chip>
+                            <Chip active={aleatorio}  onClick={() => setAleatorio(true)}>🎲 Aleatorio</Chip>
+                        </div>
+                    </div>
+
+                    {/* Puntuación */}
+                    <div>
+                        <div style={{ fontWeight:'bold', color:'#1a2d5a', fontSize:'0.88rem', marginBottom:8 }}>🏆 Puntuación</div>
+                        <div style={{ display:'flex', gap:12, alignItems:'center', flexWrap:'wrap' }}>
+                            <label style={{ fontSize:'0.85rem', color:'#555' }}>Máx:
+                                <input type="number" value={puntosMax} onChange={e => setPuntosMax(+e.target.value || 100)}
+                                    style={{ width:60, marginLeft:6, padding:'4px 8px', borderRadius:6, border:'1px solid #ccc' }} />
+                            </label>
+                            <label style={{ fontSize:'0.85rem', color:'#555' }}>Mín:
+                                <input type="number" value={puntosMin} onChange={e => setPuntosMin(+e.target.value || 50)}
+                                    style={{ width:60, marginLeft:6, padding:'4px 8px', borderRadius:6, border:'1px solid #ccc' }} />
+                            </label>
+                        </div>
+                    </div>
+
+                    {/* Botones */}
+                    <div style={{ display:'flex', gap:10, justifyContent:'flex-end', paddingTop:8, borderTop:'1px solid #eee' }}>
+                        <button onClick={onCancelar} style={{ padding:'9px 18px', borderRadius:10, border:'1.5px solid #c0c8e8', background:'white', cursor:'pointer', fontSize:'0.9rem', fontFamily:'inherit', color:'#5a6a9a' }}>Cancelar</button>
+                        <button onClick={crear} disabled={creando || total === 0} style={{ padding:'9px 22px', borderRadius:10, border:'none', background: total === 0 ? '#ccc' : '#1a2d5a', color:'white', cursor: total === 0 ? 'not-allowed' : 'pointer', fontWeight:'bold', fontSize:'0.9rem', fontFamily:'inherit' }}>
+                            {creando ? '⏳ Creando...' : '🚀 Lanzar Partida'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+const btnQStyle = { width:28, height:28, borderRadius:'50%', border:'2px solid #c0c8e8', background:'white', cursor:'pointer', fontWeight:'bold', fontSize:'1rem', display:'flex', alignItems:'center', justifyContent:'center', color:'#1a2d5a' };
+
+// ─── HOST ─────────────────────────────────────────────────────────────────────
+function FuncionesLiveHost({ codigoSala, onExit }) {
+    const [gameData, setGameData]   = useState(null);
+    const [jugadores, setJugadores] = useState([]);
+    const [fase, setFase]           = useState('LOBBY');
+    const [subFase, setSubFase]     = useState('RESPONDING');
+    const [timer, setTimer]         = useState(0);
+    const [stats, setStats]         = useState({ aciertos:0, total:0, pct:0 });
+    const [cargando, setCargando]   = useState(false);
+    const timerRef = useRef(null);
+    const gdRef    = useRef(null);
+    useEffect(() => { gdRef.current = gameData; }, [gameData]);
+
+    useEffect(() => {
+        const unsub = onSnapshot(doc(db, 'live_games', codigoSala), async snap => {
+            if (!snap.exists()) return;
+            const data = snap.data();
+            setGameData(data);
+            setFase(data.estado || 'LOBBY');
+            setSubFase(data.fasePregunta || 'RESPONDING');
+            setJugadores(data.jugadores ? Object.values(data.jugadores) : []);
+
+            if (data.estado === 'JUEGO' && data.fasePregunta === 'RESPONDING') {
+                const resps = data.respuestasRonda || {};
+                const updates = {}; let hayCambios = false;
+                Object.entries(resps).forEach(([uid, resp]) => {
+                    if (!resp.processed) {
+                        hayCambios = true;
+                        let puntos = 0;
+                        if (resp.correct) {
+                            const p = data.preguntas[data.indicePregunta];
+                            const max = p.puntosMax || 100, min = p.puntosMin || 50, tt = p.tiempo || 45;
+                            const tr = (Date.now() - (data.questionStartTime || Date.now())) / 1000;
+                            puntos = Math.round(min + (max - min) * Math.max(0, Math.min(1, (tt - tr) / tt)));
+                        }
+                        updates[`respuestasRonda.${uid}.puntosGanados`] = puntos;
+                        updates[`respuestasRonda.${uid}.processed`]     = true;
+                        if (puntos > 0 && data.jugadores?.[uid])
+                            updates[`jugadores.${uid}.puntos`] = increment(puntos);
+                    }
+                });
+                if (hayCambios) await updateDoc(doc(db, 'live_games', codigoSala), updates);
+                const n = Object.keys(resps).length;
+                const tot = Object.values(data.jugadores || {}).length;
+                if (tot > 0 && n >= tot) revelar(data);
+            }
+        });
+        return () => unsub();
+    }, [codigoSala]);
+
+    useEffect(() => { setCargando(false); }, [gameData?.indicePregunta, gameData?.fasePregunta, gameData?.estado]);
+
+    useEffect(() => {
+        clearInterval(timerRef.current);
+        if (fase === 'JUEGO' && subFase === 'RESPONDING' && gameData) {
+            const p   = gameData.preguntas[gameData.indicePregunta];
+            const tt  = p.tiempo || 45;
+            const ini = gameData.questionStartTime || Date.now();
+            timerRef.current = setInterval(() => {
+                const r = Math.max(0, Math.ceil(tt - (Date.now() - ini) / 1000));
+                setTimer(r);
+                if (r <= 0) { clearInterval(timerRef.current); if (gdRef.current) revelar(gdRef.current); }
+            }, 500);
+        }
+        return () => clearInterval(timerRef.current);
+    }, [fase, subFase, gameData?.indicePregunta, gameData?.questionStartTime]);
+
+    const revelar = async (d) => {
+        if (d.fasePregunta !== 'RESPONDING') return;
+        const resps = Object.values(d.respuestasRonda || {});
+        const aciertos = resps.filter(r => r.correct).length;
+        const pct = resps.length > 0 ? Math.round((aciertos / resps.length) * 100) : 0;
+        setStats({ aciertos, total: resps.length, pct });
+        await updateDoc(doc(db, 'live_games', codigoSala), { fasePregunta: 'REVEAL' });
+        setTimeout(() => updateDoc(doc(db, 'live_games', codigoSala), { fasePregunta: 'LEADERBOARD' }), 5000);
+    };
+
+    const siguientePregunta = async () => {
+        if (cargando) return; setCargando(true);
+        const d = gdRef.current || gameData;
+        const next = (d.indicePregunta || 0) + 1;
+        if (next < d.preguntas.length) {
+            await updateDoc(doc(db, 'live_games', codigoSala), { indicePregunta: next, respuestasRonda: {}, fasePregunta: 'RESPONDING', questionStartTime: Date.now() });
+        } else {
+            await updateDoc(doc(db, 'live_games', codigoSala), { estado: 'FIN' });
+        }
+    };
+
+    const empezar = async () => {
+        await updateDoc(doc(db, 'live_games', codigoSala), { estado: 'COUNTDOWN' });
+        setTimeout(async () => {
+            await updateDoc(doc(db, 'live_games', codigoSala), { estado: 'JUEGO', indicePregunta: 0, respuestasRonda: {}, fasePregunta: 'RESPONDING', questionStartTime: Date.now() });
+        }, 3000);
+    };
+
+    if (!gameData) return <div style={sHost.wrap}><Loader size={40} color="white" /></div>;
+
+    const p      = gameData.preguntas?.[gameData.indicePregunta];
+    const isLast = (gameData.indicePregunta || 0) >= (gameData.preguntas?.length || 1) - 1;
+    const nResp  = Object.keys(gameData.respuestasRonda || {}).length;
+    const sorted = jugadores.slice().sort((a,b) => (b.puntos||0) - (a.puntos||0));
+
+    return (
+        <div style={sHost.wrap}>
+            {/* HUD */}
+            <div style={sHost.hud}>
+                <button onClick={onExit} style={sHost.btnExit}>✕ Salir</button>
+                <div style={sHost.code}>SALA: <strong>{codigoSala}</strong></div>
+                <div style={sHost.hudRight}>
+                    {fase === 'JUEGO' && <span style={sHost.qCounter}>P. {(gameData.indicePregunta||0)+1}/{gameData.preguntas?.length}</span>}
+                    <span style={sHost.players}><Users size={16} /> {jugadores.length}</span>
+                </div>
+            </div>
+
+            {/* Avatar */}
+            {fase === 'JUEGO' && (
+                <div style={sHost.avatarWrap}>
+                    <img src={stats.pct >= 60 ? piHappy : stats.pct < 30 && stats.total > 0 ? piAngry : piNeutral}
+                        style={sHost.avatar} alt="Pi" />
+                    {stats.total > 0 && <div style={sHost.statsBadge}>{stats.pct}% aciertos</div>}
+                </div>
+            )}
+
+            <div style={sHost.area}>
+                {/* LOBBY */}
+                {fase === 'LOBBY' && (
+                    <div style={sHost.lobby}>
+                        <div style={{ fontSize:'3rem' }}>∫</div>
+                        <h1 style={{ color:'white', margin:'8px 0' }}>Funciones en Vivo</h1>
+                        <div style={sHost.bigCode}>{codigoSala}</div>
+                        <p style={{ color:'rgba(255,255,255,0.7)', fontSize:'0.9rem' }}>
+                            {gameData.preguntas?.length} preguntas · {gameData.preguntas?.[0]?.tiempo}s c/u
+                        </p>
+                        <div style={sHost.playerGrid}>
+                            {jugadores.map((j,i) => <div key={i} style={sHost.playerChip}>{j.nombre}</div>)}
+                        </div>
+                        <button onClick={empezar} disabled={jugadores.length === 0}
+                            style={{ ...sHost.btnStart, opacity: jugadores.length === 0 ? 0.5 : 1 }}>
+                            <Play size={28} fill="white" /> EMPEZAR
+                        </button>
+                    </div>
+                )}
+
+                {/* COUNTDOWN */}
+                {fase === 'COUNTDOWN' && (
+                    <div style={sHost.lobby}>
+                        <div style={{ fontSize:'8rem', color:'#f1c40f', fontWeight:'bold', animation:'pulse 1s infinite' }}>¡YA!</div>
+                    </div>
+                )}
+
+                {/* JUEGO */}
+                {fase === 'JUEGO' && p && (
+                    <div style={sHost.questionArea}>
+                        {subFase === 'RESPONDING' && (
+                            <div style={sHost.questionCard}>
+                                <HostEnunciado p={p} />
+                                <div style={{ display:'flex', gap:16, alignItems:'center', justifyContent:'center', marginTop:16, flexWrap:'wrap' }}>
+                                    <div style={sHost.timerBig}>{timer}s</div>
+                                    <div style={{ color:'rgba(255,255,255,0.7)', fontSize:'0.9rem' }}>{nResp}/{jugadores.length} resp.</div>
+                                    <button onClick={() => revelar(gdRef.current || gameData)} style={sHost.btnForce}>⏹ Forzar fin</button>
+                                </div>
+                            </div>
+                        )}
+                        {subFase === 'REVEAL' && (
+                            <div style={sHost.revealCard}>
+                                <div style={{ color:'rgba(255,255,255,0.7)', fontSize:'1rem', marginBottom:8 }}>Solución correcta:</div>
+                                <HostSolucion p={p} />
+                                <div style={{ marginTop:12, fontSize:'1.1rem', color:'#f1c40f' }}>
+                                    {stats.aciertos}/{stats.total} correctas ({stats.pct}%)
+                                </div>
+                            </div>
+                        )}
+                        {subFase === 'LEADERBOARD' && (
+                            <div style={sHost.leaderboard}>
+                                <h2 style={{ color:'white', margin:'0 0 14px' }}>🏆 Clasificación</h2>
+                                {sorted.slice(0,10).map((j,i) => (
+                                    <div key={j.uid} style={{ ...sHost.rankRow, background: i===0?'rgba(241,196,15,0.25)':i===1?'rgba(189,195,199,0.2)':i===2?'rgba(205,127,50,0.2)':'rgba(255,255,255,0.07)' }}>
+                                        <span style={{ fontWeight:'bold', color:'#f1c40f', minWidth:24 }}>{i+1}.</span>
+                                        <span style={{ flex:1, color:'white' }}>{j.nombre}</span>
+                                        <span style={{ fontWeight:'bold', color:'#2ecc71' }}>{j.puntos||0} pts</span>
+                                    </div>
+                                ))}
+                                <button onClick={siguientePregunta} disabled={cargando} style={sHost.btnNext}>
+                                    {cargando ? '...' : isLast ? '🏆 Podio Final' : 'Siguiente →'}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* FIN */}
+                {fase === 'FIN' && (
+                    <div style={sHost.leaderboard}>
+                        <h1 style={{ color:'#f1c40f', margin:'0 0 20px' }}>🏆 PODIO FINAL 🏆</h1>
+                        {sorted.map((j,i) => (
+                            <div key={j.uid} style={{ ...sHost.rankRow, fontSize: i < 3 ? '1.1rem' : '0.95rem', background: i===0?'rgba(241,196,15,0.3)':i===1?'rgba(189,195,199,0.2)':i===2?'rgba(205,127,50,0.2)':'rgba(255,255,255,0.07)' }}>
+                                <span style={{ minWidth:32, color:'#f1c40f', fontWeight:'bold' }}>{['🥇','🥈','🥉'][i] || `${i+1}.`}</span>
+                                <span style={{ flex:1, color:'white' }}>{j.nombre}</span>
+                                <span style={{ color:'#2ecc71', fontWeight:'bold' }}>{j.puntos||0} pts</span>
+                            </div>
+                        ))}
+                        <button onClick={onExit} style={{ ...sHost.btnNext, background:'#e74c3c', marginTop:20 }}>Cerrar Sala</button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+// Enunciado visible en la pantalla del profesor
+function HostEnunciado({ p }) {
+    const s = { color:'white', fontSize:'1.1rem', lineHeight:1.7, textAlign:'center' };
+    if (p.tipo === 'DOS_PUNTOS') return <div style={s}>Ecuación de la recta que pasa por <strong>A({p.ax},{p.ay})</strong> y <strong>B({p.bx},{p.by})</strong></div>;
+    if (p.tipo === 'PARALELA')   return <div style={s}>Recta <strong>paralela</strong> a y={p.m}x{p.n>=0?'+':''}{p.n} por <strong>P({p.px},{p.py})</strong></div>;
+    if (p.tipo === 'PERPENDICULAR') return <div style={s}>Recta <strong>perpendicular</strong> a y={p.m}x{p.n>=0?'+':''}{p.n} por <strong>P({p.px},{p.py})</strong></div>;
+    if (p.tipo === 'GRAFICA')    return <div style={s}>Encuentra <em>m</em> y <em>n</em> de la recta representada en el gráfico</div>;
+    if (p.tipo === 'ANALISIS') {
+        const aStr = p.a===1?'':p.a===-1?'-':`${p.a}`;
+        const bStr = p.b===0?'':p.b>0?` + ${p.b}x`:` - ${Math.abs(p.b)}x`;
+        const cStr = p.c===0?'':p.c>0?` + ${p.c}`:` - ${Math.abs(p.c)}`;
+        return <div style={s}>Analiza: <strong>y = {aStr}x²{bStr}{cStr}</strong></div>;
+    }
+    if (p.tipo === 'TRES_PUNTOS') return <div style={s}>Parábola por <strong>{p.pts.map(([x,y])=>`(${x},${y})`).join(' · ')}</strong></div>;
+    return null;
+}
+
+// Solución visible en pantalla del profesor tras revelar
+function HostSolucion({ p }) {
+    const s = { color:'#f1c40f', fontSize:'1.3rem', fontWeight:'bold', textAlign:'center' };
+    if (['DOS_PUNTOS','PARALELA','PERPENDICULAR','GRAFICA'].includes(p.tipo)) {
+        const m = p.mp ?? p.m, n = p.np ?? p.n;
+        return <div style={s}>m = {numStr(m)} · n = {numStr(n)}<br /><span style={{fontSize:'1rem'}}>y = {numStr(m)}x {n>=0?`+ ${numStr(n)}`:`− ${numStr(Math.abs(n))}`}</span></div>;
+    }
+    if (p.tipo === 'ANALISIS') return (
+        <div style={s}>
+            {p.a>0?'∪ Cóncava':'∩ Convexa'} · V({numStr(-p.b/(2*p.a))}, {numStr(p.a*(-p.b/(2*p.a))**2+p.b*(-p.b/(2*p.a))+p.c)})<br />
+            <span style={{fontSize:'0.9rem'}}>Corte Y: (0,{p.c})</span>
+        </div>
+    );
+    if (p.tipo === 'TRES_PUNTOS') return <div style={s}>a={p.a} · b={p.b} · c={p.c}</div>;
+    return null;
+}
+
+// ─── CLIENTE ──────────────────────────────────────────────────────────────────
+function FuncionesLiveClient({ codigoSala, usuario, onExit }) {
+    const [gameData, setGameData] = useState(null);
+    const [fase, setFase]         = useState('LOBBY');
+    const [subFase, setSubFase]   = useState('RESPONDING');
+    const [puntos, setPuntos]     = useState(0);
+    const [myResult, setMyResult] = useState(null);
+    const [myRank, setMyRank]     = useState(null);
+    const joiningRef = useRef(false);
+    const myName = usuario?.displayName || 'Alumno';
+    const myUid  = useRef(usuario?.uid || 'guest_' + Math.random().toString(36).substr(2,8)).current;
+
+    useEffect(() => {
+        const unsub = onSnapshot(doc(db, 'live_games', codigoSala), async snap => {
+            if (!snap.exists()) { alert('La sala se ha cerrado.'); onExit(); return; }
+            const data = snap.data();
+            setGameData(data); setFase(data.estado||'LOBBY'); setSubFase(data.fasePregunta||'RESPONDING');
+            const jugs = data.jugadores||{};
+            if (jugs[myUid]) setPuntos(jugs[myUid].puntos||0);
+            else if (!joiningRef.current && (data.estado==='LOBBY'||data.estado==='JUEGO')) {
+                joiningRef.current = true;
+                await updateDoc(doc(db,'live_games',codigoSala),{[`jugadores.${myUid}`]:{uid:myUid,nombre:myName,puntos:0}});
+                joiningRef.current = false;
+            }
+            setMyResult(data.respuestasRonda?.[myUid]||null);
+            if (data.estado==='FIN') {
+                const sorted = Object.values(jugs).sort((a,b)=>(b.puntos||0)-(a.puntos||0));
+                setMyRank(sorted.findIndex(j=>j.uid===myUid)+1);
+            }
+        });
+        return () => unsub();
+    }, [codigoSala]);
+
+    if (!gameData) return <div style={sCli.wrap}><Loader size={40} color="white" /></div>;
+    const p = gameData.preguntas?.[gameData.indicePregunta];
+
+    return (
+        <div style={sCli.wrap}>
+            <div style={sCli.header}>
+                <button onClick={onExit} style={sCli.btnExit}>✕</button>
+                <div style={sCli.scoreBadge}>{puntos} pts</div>
+            </div>
+
+            {fase === 'LOBBY' && (
+                <div style={sCli.lobbyWait}>
+                    <div style={{ fontSize:'3rem' }}>∫</div>
+                    <h2 style={{ color:'white' }}>¡Hola {myName}!</h2>
+                    <p style={{ color:'rgba(255,255,255,0.7)' }}>Espera a que el profesor empiece...</p>
+                </div>
+            )}
+            {fase === 'COUNTDOWN' && (
+                <div style={sCli.lobbyWait}><div style={{ fontSize:'7rem', color:'#f1c40f', fontWeight:'bold' }}>¡YA!</div></div>
+            )}
+            {fase === 'JUEGO' && p && (
+                <ClientPreguntaFunciones
+                    key={gameData.indicePregunta}
+                    pregunta={p}
+                    startTime={gameData.questionStartTime}
+                    subFase={subFase}
+                    myResult={myResult}
+                    puntos={puntos}
+                    onResponder={async (esCorrecta) => {
+                        await updateDoc(doc(db,'live_games',codigoSala), {
+                            [`respuestasRonda.${myUid}`]:{uid:myUid,correct:esCorrecta,puntosGanados:0,processed:false}
+                        });
+                    }}
+                />
+            )}
+            {fase === 'FIN' && (
+                <div style={sCli.lobbyWait}>
+                    {myRank <= 3 && <Confetti recycle={false} numberOfPieces={200} />}
+                    <h1 style={{ color:'#f1c40f' }}>¡FIN!</h1>
+                    <p style={{ color:'white', fontSize:'1.2rem' }}>{myName}</p>
+                    <p style={{ color:'#f1c40f', fontSize:'2rem', fontWeight:'bold' }}>{myRank}ª posición</p>
+                    <p style={{ color:'#2ecc71', fontSize:'1.4rem' }}>{puntos} pts</p>
+                    <button onClick={onExit} style={sCli.btnSalir}>Salir al Menú</button>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// Pregunta para el cliente según tipo
+function ClientPreguntaFunciones({ pregunta, startTime, subFase, myResult, puntos, onResponder }) {
+    const [enviado, setEnviado] = useState(false);
+    const [timeLeft, setTimeLeft] = useState(100);
+    const [isLate, setIsLate]   = useState(false);
+    const tRef = useRef(null);
+
+    // Respuestas según tipo
+    const [ansM, setAnsM] = useState('');
+    const [ansN, setAnsN] = useState('');
+    const [forma, setForma] = useState('');
+    const [ansXv, setAnsXv] = useState('');
+    const [ansYv, setAnsYv] = useState('');
+    const [noCortes, setNoCortes] = useState(false);
+    const [ansX1, setAnsX1] = useState('');
+    const [ansX2, setAnsX2] = useState('');
+    const [ansYeje, setAnsYeje] = useState('');
+    const [ansA, setAnsA] = useState('');
+    const [ansB, setAnsB] = useState('');
+    const [ansC_, setAnsC_] = useState('');
+    // VECTOR
+    const [ansVx, setAnsVx] = useState('');
+    const [ansVy, setAnsVy] = useState('');
+    const [ansMod, setAnsMod] = useState('');
+    const [ansAngV, setAnsAngV] = useState('');
+    const [arrowPts, setArrowPts] = useState([]);
+    // GENERAL
+    const [linePts, setLinePts] = useState([null,null,null,null]);
+    const [ansPar, setAnsPar] = useState(null);
+    const [ansPerp, setAnsPerp] = useState(null);
+    const [ansIx, setAnsIx] = useState('');
+    const [ansIy, setAnsIy] = useState('');
+    const [noInter, setNoInter] = useState(false);
+
+    useEffect(() => {
+        if (subFase !== 'RESPONDING' || enviado) return;
+        const tt = pregunta.tiempo || 45;
+        tRef.current = setInterval(() => {
+            const tr = (Date.now() - startTime) / 1000;
+            const pct = Math.max(0, 100 - (tr / tt * 100));
+            setTimeLeft(pct);
+            if (pct < 20) setIsLate(true);
+            if (pct <= 0) { clearInterval(tRef.current); if (!enviado) enviar(true); }
+        }, 150);
+        return () => clearInterval(tRef.current);
+    }, [startTime, subFase, enviado]);
+
+    const enviar = (porTiempo = false) => {
+        if (enviado) return;
+        let ok = false;
+        if (!porTiempo) {
+            const tol = 0.11;
+            const p = pregunta;
+            if (['DOS_PUNTOS','PARALELA','PERPENDICULAR','GRAFICA'].includes(p.tipo)) {
+                const cm = p.mp ?? p.m, cn = p.np ?? p.n;
+                ok = approxEq(parseAnswer(ansM), cm) && approxEq(parseAnswer(ansN), cn);
+            } else if (p.tipo === 'ANALISIS') {
+                const xv = -p.b/(2*p.a), yv = p.a*xv*xv+p.b*xv+p.c;
+                const disc = p.b*p.b - 4*p.a*p.c;
+                const formaOk = (p.a>0&&forma==='U')||(p.a<0&&forma==='N');
+                const xvOk = Math.abs(parseAnswer(ansXv)-xv)<=tol;
+                const yvOk = Math.abs(parseAnswer(ansYv)-yv)<=tol;
+                let cortesOk = false;
+                if (disc<0) cortesOk = noCortes;
+                else if (disc===0) { const x1=(-p.b)/(2*p.a); cortesOk = !noCortes&&Math.abs(parseAnswer(ansX1)-x1)<=tol; }
+                else {
+                    const x1=(-p.b+Math.sqrt(disc))/(2*p.a), x2=(-p.b-Math.sqrt(disc))/(2*p.a);
+                    const vals=[parseAnswer(ansX1),parseAnswer(ansX2)].sort((a,b)=>a-b);
+                    const sols=[x1,x2].sort((a,b)=>a-b);
+                    cortesOk = !noCortes&&Math.abs(vals[0]-sols[0])<=tol&&Math.abs(vals[1]-sols[1])<=tol;
+                }
+                const yejeOk = Math.abs(parseAnswer(ansYeje)-p.c)<=tol;
+                ok = formaOk && xvOk && yvOk && cortesOk && yejeOk;
+            } else if (p.tipo === 'TRES_PUNTOS') {
+                ok = Math.abs(parseAnswer(ansA)-p.a)<=tol && Math.abs(parseAnswer(ansB)-p.b)<=tol && Math.abs(parseAnswer(ansC_)-p.c)<=tol;
+            } else if (p.tipo === 'VECTOR') {
+                const vxOk=Math.abs(parseAnswer(ansVx)-p.vx)<=tol;
+                const vyOk=Math.abs(parseAnswer(ansVy)-p.vy)<=tol;
+                const modOk=Math.abs(parseAnswer(ansMod)-p.modulo)<=0.15;
+                const angEst=parseAnswer(ansAngV);
+                const angOk=Math.abs(angEst-p.angulo)<=1||Math.abs(angEst-p.angulo-360)<=1||Math.abs(angEst-p.angulo+360)<=1;
+                const arrowOk=arrowPts.length===2&&Math.abs(arrowPts[1].mx-arrowPts[0].mx-p.vx)<=0.5&&Math.abs(arrowPts[1].my-arrowPts[0].my-p.vy)<=0.5;
+                ok=vxOk&&vyOk&&modOk&&angOk&&arrowOk;
+            } else if (p.tipo === 'GENERAL') {
+                const parOk=ansPar===p.paralelas, perpOk=ansPerp===p.perpendiculares;
+                const interOk=p.paralelas?noInter:(!noInter&&Math.abs(parseAnswer(ansIx)-p.ix)<=tol&&Math.abs(parseAnswer(ansIy)-p.iy)<=tol);
+                ok=parOk&&perpOk&&interOk;
+            }
+        }
+        clearInterval(tRef.current);
+        setEnviado(true);
+        onResponder(ok);
+    };
+
+    if (subFase === 'REVEAL') {
+        const ok = myResult?.correct; const pts = myResult?.puntosGanados || 0;
+        return (
+            <div style={sCli.feedback}>
+                <img src={ok ? piHappy : piAngry} style={{ width:80, height:80, objectFit:'contain' }} alt="Pi" />
+                <div style={{ ...sCli.neonCard, borderColor: ok ? '#2ecc71' : '#e74c3c' }}>
+                    {ok ? <CheckCircle size={44} color="#2ecc71" /> : <XCircle size={44} color="#e74c3c" />}
+                    <div style={{ fontSize:'1.4rem', fontWeight:'bold', color:'white', marginTop:8 }}>{ok?'¡CORRECTO!':!myResult?'¡TIEMPO!':'INCORRECTO'}</div>
+                    {ok && <div style={{ color:'#f1c40f', fontSize:'1.6rem', fontWeight:'bold' }}>+{pts} pts</div>}
+                </div>
+            </div>
+        );
+    }
+    if (subFase === 'LEADERBOARD') {
+        return (
+            <div style={sCli.feedback}>
+                <img src={piNeutral} style={{ width:80, height:80, objectFit:'contain' }} alt="Pi" />
+                <div style={{ ...sCli.neonCard, borderColor:'#7f8c8d' }}>
+                    <div style={{ color:'white', fontSize:'1rem' }}>Puntuación</div>
+                    <div style={{ color:'#2ecc71', fontSize:'2rem', fontWeight:'bold' }}>{puntos} pts</div>
+                </div>
+            </div>
+        );
+    }
+
+    const p = pregunta;
+    const isRecta = ['DOS_PUNTOS','PARALELA','PERPENDICULAR','GRAFICA'].includes(p.tipo);
+
+    return (
+        <div style={{...sCli.questionArea, maxWidth: (p.tipo==='VECTOR'||p.tipo==='GENERAL')?600:480}}>
+            {/* Barra de tiempo */}
+            <div style={{ width:'100%', height:8, background:'rgba(255,255,255,0.15)', borderRadius:4, overflow:'hidden', margin:'50px 0 12px' }}>
+                <div style={{ height:'100%', width:`${timeLeft}%`, background: isLate ? '#e74c3c' : '#2ecc71', transition:'width 0.15s linear', borderRadius:4 }} />
+            </div>
+
+            {(enviado || myResult) ? (
+                <div style={sCli.waiting}><Loader size={44} color="white" /><p style={{ color:'white' }}>Esperando...</p></div>
+            ) : (
+                <div style={sCli.card}>
+                    <HostEnunciado p={p} />
+
+                    {/* Formulario según tipo */}
+                    <div style={{ marginTop:14, display:'flex', flexDirection:'column', gap:10 }}>
+                        {isRecta && (
+                            <>
+                                <div style={sCli.row}>
+                                    <span style={sCli.lbl}>m =</span>
+                                    <input style={sCli.inp} value={ansM} onChange={e=>setAnsM(e.target.value)} placeholder="ej: 2 ó 1/2" />
+                                </div>
+                                <div style={sCli.row}>
+                                    <span style={sCli.lbl}>n =</span>
+                                    <input style={sCli.inp} value={ansN} onChange={e=>setAnsN(e.target.value)} placeholder="ej: -3" />
+                                </div>
+                            </>
+                        )}
+                        {p.tipo === 'ANALISIS' && (
+                            <>
+                                <div style={{ display:'flex', gap:8 }}>
+                                    {[['U','∪ Cóncava'],['N','∩ Convexa']].map(([v,lbl])=>(
+                                        <button key={v} onClick={()=>setForma(v)} style={{ flex:1, padding:'7px', borderRadius:8, border:`2px solid ${forma===v?'#f1c40f':'#444'}`, background:forma===v?'rgba(241,196,15,0.2)':'transparent', color:'white', cursor:'pointer', fontFamily:'inherit', fontSize:'0.82rem', fontWeight:forma===v?'bold':'normal' }}>{lbl}</button>
+                                    ))}
+                                </div>
+                                <div style={sCli.row}><span style={sCli.lbl}>xᵥ=</span><input style={sCli.inp} value={ansXv} onChange={e=>setAnsXv(e.target.value)} placeholder="xv" /></div>
+                                <div style={sCli.row}><span style={sCli.lbl}>yᵥ=</span><input style={sCli.inp} value={ansYv} onChange={e=>setAnsYv(e.target.value)} placeholder="yv" /></div>
+                                <label style={{ color:'white', fontSize:'0.85rem', display:'flex', gap:6, alignItems:'center' }}>
+                                    <input type="checkbox" checked={noCortes} onChange={e=>setNoCortes(e.target.checked)} />
+                                    Sin cortes con eje X
+                                </label>
+                                {!noCortes && (
+                                    <div style={{ display:'flex', gap:8 }}>
+                                        <div style={sCli.row}><span style={sCli.lbl}>x₁=</span><input style={{...sCli.inp,width:70}} value={ansX1} onChange={e=>setAnsX1(e.target.value)} /></div>
+                                        <div style={sCli.row}><span style={sCli.lbl}>x₂=</span><input style={{...sCli.inp,width:70}} value={ansX2} onChange={e=>setAnsX2(e.target.value)} /></div>
+                                    </div>
+                                )}
+                                <div style={sCli.row}><span style={sCli.lbl}>(0,</span><input style={sCli.inp} value={ansYeje} onChange={e=>setAnsYeje(e.target.value)} placeholder="c" /><span style={sCli.lbl}>)</span></div>
+                            </>
+                        )}
+                        {p.tipo === 'TRES_PUNTOS' && (
+                            <>
+                                <div style={sCli.row}><span style={sCli.lbl}>a=</span><input style={sCli.inp} value={ansA} onChange={e=>setAnsA(e.target.value)} /></div>
+                                <div style={sCli.row}><span style={sCli.lbl}>b=</span><input style={sCli.inp} value={ansB} onChange={e=>setAnsB(e.target.value)} /></div>
+                                <div style={sCli.row}><span style={sCli.lbl}>c=</span><input style={sCli.inp} value={ansC_} onChange={e=>setAnsC_(e.target.value)} /></div>
+                            </>
+                        )}
+                        {p.tipo === 'VECTOR' && (
+                            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                                <div style={{fontSize:'0.78rem',color:'rgba(255,255,255,0.5)'}}>Haz clic en A luego en B para dibujar el vector:</div>
+                                <VectorCanvas eq={p} arrowPts={arrowPts} onPointClick={pt=>setArrowPts(prev=>prev.length>=2?[pt]:[...prev,pt])} disabled={false} resultado={null}/>
+                                {arrowPts.length>0&&<button onClick={()=>setArrowPts([])} style={{...sCli.btnEnviar,background:'#7f8c8d',marginTop:0,padding:'6px'}}>↺ Borrar</button>}
+                                <div style={sCli.row}><span style={sCli.lbl}>x=</span><input style={sCli.inp} value={ansVx} onChange={e=>setAnsVx(e.target.value)} placeholder="comp x"/></div>
+                                <div style={sCli.row}><span style={sCli.lbl}>y=</span><input style={sCli.inp} value={ansVy} onChange={e=>setAnsVy(e.target.value)} placeholder="comp y"/></div>
+                                <div style={sCli.row}><span style={sCli.lbl}>|v|=</span><input style={sCli.inp} value={ansMod} onChange={e=>setAnsMod(e.target.value)} placeholder="módulo"/></div>
+                                <div style={sCli.row}><span style={sCli.lbl}>θ°=</span><input style={sCli.inp} value={ansAngV} onChange={e=>setAnsAngV(e.target.value)} placeholder="ángulo"/></div>
+                            </div>
+                        )}
+                        {p.tipo === 'GENERAL' && (
+                            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                                <div style={{fontSize:'0.78rem',color:'rgba(255,255,255,0.5)'}}>Dibuja r₁ (naranja) y r₂ (morado):</div>
+                                <GeneralCanvas eq={p} linePts={linePts} onPointClick={pt=>{setLinePts(prev=>{const n=[...prev];const i=n.findIndex(x=>x===null);if(i!==-1)n[i]=pt;return n;});}} disabled={false} resultado={null} mostrarSolucion={false}/>
+                                {linePts.some(Boolean)&&<button onClick={()=>setLinePts([null,null,null,null])} style={{...sCli.btnEnviar,background:'#7f8c8d',marginTop:0,padding:'6px'}}>↺ Borrar</button>}
+                                <div style={{display:'flex',gap:6}}>
+                                    {[[true,'Sí','par'],[false,'No','par']].map(([v,lbl])=>(
+                                        <button key={`par${v}`} onClick={()=>setAnsPar(v)} style={{flex:1,padding:'6px',borderRadius:8,border:`2px solid ${ansPar===v?'#f1c40f':'rgba(255,255,255,0.2)'}`,background:ansPar===v?'rgba(241,196,15,0.2)':'transparent',color:'white',cursor:'pointer',fontSize:'0.8rem',fontFamily:'inherit'}}>Paralelas: {lbl}</button>
+                                    ))}
+                                </div>
+                                <div style={{display:'flex',gap:6}}>
+                                    {[[true,'Sí'],[false,'No']].map(([v,lbl])=>(
+                                        <button key={`perp${v}`} onClick={()=>setAnsPerp(v)} style={{flex:1,padding:'6px',borderRadius:8,border:`2px solid ${ansPerp===v?'#f1c40f':'rgba(255,255,255,0.2)'}`,background:ansPerp===v?'rgba(241,196,15,0.2)':'transparent',color:'white',cursor:'pointer',fontSize:'0.8rem',fontFamily:'inherit'}}>Perpendiculares: {lbl}</button>
+                                    ))}
+                                </div>
+                                <label style={{color:'white',fontSize:'0.82rem',display:'flex',gap:6,alignItems:'center'}}>
+                                    <input type="checkbox" checked={noInter} onChange={e=>setNoInter(e.target.checked)}/>
+                                    Sin intersección
+                                </label>
+                                {!noInter&&<>
+                                    <div style={sCli.row}><span style={sCli.lbl}>x=</span><input style={sCli.inp} value={ansIx} onChange={e=>setAnsIx(e.target.value)} placeholder="x intersecc."/></div>
+                                    <div style={sCli.row}><span style={sCli.lbl}>y=</span><input style={sCli.inp} value={ansIy} onChange={e=>setAnsIy(e.target.value)} placeholder="y intersecc."/></div>
+                                </>}
+                            </div>
+                        )}
+                    </div>
+
+                    <button onClick={()=>enviar(false)} style={sCli.btnEnviar}>✓ Enviar</button>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ─── Estilos live ─────────────────────────────────────────────────────────────
+const sHost = {
+    wrap:       { minHeight:'100vh', background:'linear-gradient(135deg,#0f1b35,#1a2d5a)', display:'flex', flexDirection:'column', fontFamily:"'Georgia',serif" },
+    hud:        { display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 16px', background:'rgba(0,0,0,0.3)' },
+    btnExit:    { background:'rgba(231,76,60,0.3)', border:'1px solid #e74c3c', color:'white', padding:'6px 12px', borderRadius:8, cursor:'pointer', fontSize:'0.82rem', fontFamily:'inherit' },
+    code:       { color:'rgba(255,255,255,0.7)', fontSize:'0.9rem' },
+    hudRight:   { display:'flex', alignItems:'center', gap:12 },
+    qCounter:   { background:'rgba(255,255,255,0.15)', color:'white', padding:'4px 10px', borderRadius:20, fontSize:'0.85rem', fontWeight:'bold' },
+    players:    { display:'flex', alignItems:'center', gap:5, color:'rgba(255,255,255,0.7)', fontSize:'0.85rem' },
+    avatarWrap: { position:'absolute', top:60, right:16, display:'flex', flexDirection:'column', alignItems:'center', gap:4 },
+    avatar:     { width:60, height:60, objectFit:'contain' },
+    statsBadge: { background:'rgba(255,255,255,0.15)', color:'white', padding:'3px 8px', borderRadius:20, fontSize:'0.72rem' },
+    area:       { flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:20 },
+    lobby:      { display:'flex', flexDirection:'column', alignItems:'center', gap:12, textAlign:'center' },
+    bigCode:    { fontSize:'3.5rem', fontWeight:'bold', color:'#f1c40f', letterSpacing:8, background:'rgba(255,255,255,0.08)', padding:'10px 24px', borderRadius:14 },
+    playerGrid: { display:'flex', flexWrap:'wrap', gap:8, justifyContent:'center', maxWidth:500 },
+    playerChip: { background:'rgba(255,255,255,0.15)', color:'white', padding:'5px 12px', borderRadius:20, fontSize:'0.85rem' },
+    btnStart:   { display:'flex', alignItems:'center', gap:10, padding:'14px 32px', background:'#27ae60', color:'white', border:'none', borderRadius:14, fontSize:'1.3rem', fontWeight:'bold', cursor:'pointer', marginTop:10, fontFamily:'inherit' },
+    questionArea:{ width:'100%', maxWidth:700 },
+    questionCard:{ background:'rgba(255,255,255,0.08)', borderRadius:16, padding:'24px', textAlign:'center' },
+    timerBig:   { fontSize:'3.5rem', fontWeight:'bold', color:'#f1c40f' },
+    btnForce:   { padding:'6px 14px', background:'rgba(231,76,60,0.4)', border:'1px solid #e74c3c', color:'white', borderRadius:8, cursor:'pointer', fontSize:'0.8rem', fontFamily:'inherit' },
+    revealCard: { background:'rgba(255,255,255,0.08)', borderRadius:16, padding:'24px', textAlign:'center' },
+    leaderboard:{ width:'100%', maxWidth:480, display:'flex', flexDirection:'column', gap:8, alignItems:'stretch' },
+    rankRow:    { display:'flex', alignItems:'center', gap:10, padding:'9px 14px', borderRadius:10, fontFamily:"'Georgia',serif" },
+    btnNext:    { padding:'12px', background:'#3498db', color:'white', border:'none', borderRadius:10, fontSize:'1rem', fontWeight:'bold', cursor:'pointer', marginTop:10, fontFamily:'inherit' },
+};
+const sCli = {
+    wrap:        { minHeight:'100vh', background:'linear-gradient(135deg,#0f1b35,#1a2d5a)', display:'flex', flexDirection:'column', alignItems:'center', fontFamily:"'Georgia',serif" },
+    header:      { width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 16px', background:'rgba(0,0,0,0.3)' },
+    btnExit:     { background:'rgba(231,76,60,0.3)', border:'1px solid #e74c3c', color:'white', padding:'6px 10px', borderRadius:8, cursor:'pointer', fontFamily:'inherit' },
+    scoreBadge:  { background:'rgba(46,204,113,0.25)', color:'#2ecc71', padding:'5px 14px', borderRadius:20, fontWeight:'bold', fontSize:'0.95rem' },
+    lobbyWait:   { flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:12, textAlign:'center', padding:20 },
+    feedback:    { flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:16 },
+    neonCard:    { background:'rgba(255,255,255,0.08)', border:'3px solid', borderRadius:16, padding:'24px 32px', textAlign:'center', display:'flex', flexDirection:'column', alignItems:'center', gap:8, minWidth:220 },
+    waiting:     { flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:12 },
+    questionArea:{ flex:1, width:'100%', maxWidth:480, display:'flex', flexDirection:'column', alignItems:'center', padding:'0 16px 20px' },
+    card:        { background:'rgba(255,255,255,0.08)', borderRadius:16, padding:'18px', width:'100%', boxSizing:'border-box' },
+    row:         { display:'flex', alignItems:'center', gap:8 },
+    lbl:         { color:'rgba(255,255,255,0.7)', fontSize:'0.9rem', minWidth:28 },
+    inp:         { flex:1, padding:'8px 12px', borderRadius:8, border:'2px solid rgba(255,255,255,0.25)', background:'rgba(255,255,255,0.08)', color:'white', fontSize:'1rem', outline:'none', fontFamily:"'Georgia',serif", textAlign:'center' },
+    btnEnviar:   { width:'100%', marginTop:14, padding:'12px', background:'#27ae60', color:'white', border:'none', borderRadius:10, fontSize:'1rem', fontWeight:'bold', cursor:'pointer', fontFamily:'inherit' },
+    btnSalir:    { marginTop:16, padding:'10px 24px', background:'#3498db', color:'white', border:'none', borderRadius:10, fontSize:'1rem', cursor:'pointer', fontFamily:'inherit' },
+};
+
 // ─── PANTALLA PRINCIPAL ───────────────────────────────────────────────────────
-export default function Funciones() {
-    const [seccion, setSeccion] = useState(null);
+export default function Funciones({ isHost = false, codigoSala: codigoExterno = null, onHostStart = null, onClientJoin = null, usuario = null, onExit = null }) {
+    const [seccion, setSeccion]         = useState(null);
+    const [showLiveConfig, setShowLiveConfig] = useState(false);
+    const [joinCode, setJoinCode]       = useState('');
+    const [joinName, setJoinName]       = useState('');
+    const [internalHost, setInternalHost]   = useState(null);
+    const [internalClient, setInternalClient] = useState(null);
+    const [internalClientUser, setInternalClientUser] = useState(null);
+
+    // Props desde LandingGames (modo externo)
+    if (isHost && codigoExterno)   return <FuncionesLiveHost   codigoSala={codigoExterno} onExit={onExit || (() => {})} />;
+    if (!isHost && codigoExterno)  return <FuncionesLiveClient codigoSala={codigoExterno} usuario={usuario} onExit={onExit || (() => {})} />;
+
+    // Modo interno (desde la propia pantalla de Funciones)
+    if (internalHost)   return <FuncionesLiveHost   codigoSala={internalHost}   onExit={() => setInternalHost(null)} />;
+    if (internalClient) return <FuncionesLiveClient codigoSala={internalClient} usuario={internalClientUser||usuario} onExit={() => { setInternalClient(null); setInternalClientUser(null); }} />;
 
     if (seccion === 'RECTAS')    return <PantallaRectas    onVolver={() => setSeccion(null)} />;
     if (seccion === 'PARABOLAS') return <PantallaParabolas onVolver={() => setSeccion(null)} />;
 
+    const handleCrear = (codigo) => {
+        setShowLiveConfig(false);
+        if (onHostStart) onHostStart(codigo);
+        else setInternalHost(codigo);
+    };
+
+    const handleUnirse = () => {
+        const code = joinCode.trim().toUpperCase();
+        if (code.length !== 6) return alert('El código debe tener 6 caracteres.');
+        if (!joinName.trim()) return alert('Introduce tu nombre antes de unirte.');
+        const userObj = { displayName: joinName.trim(), uid: 'guest_' + Math.random().toString(36).substr(2,8) };
+        if (onClientJoin) onClientJoin(code);
+        else { setInternalClientUser(userObj); setInternalClient(code); }
+    };
+
     return (
         <div style={st.pagina}>
+            {showLiveConfig && (
+                <ModalLiveConfig
+                    onCrear={handleCrear}
+                    onCancelar={() => setShowLiveConfig(false)}
+                />
+            )}
+
             {/* Header */}
             <div style={st.header}>
                 <div style={st.headerIcon}>∫</div>
                 <div>
                     <div style={st.headerTitulo}>Funciones</div>
-                    <div style={st.headerSub}>Geometría Analítica · Ecuaciones de la recta</div>
+                    <div style={st.headerSub}>Geometría Analítica · Rectas y Parábolas</div>
                 </div>
             </div>
 
-            {/* Cards */}
+            {/* Cards práctica individual */}
             <div style={st.mainGrid}>
                 <button onClick={() => setSeccion('RECTAS')} style={{ ...st.mainCard, '--accent':'#3498db' }}>
                     <TrendingUp size={40} color="#3498db" />
@@ -1154,8 +2496,43 @@ export default function Funciones() {
                     <div style={st.mainCardDesc}>
                         Función cuadrática, vértice, eje de simetría y representación gráfica
                     </div>
-                    <div style={{ ...st.mainCardPill, background:'#9b59b622', color:'#9b59b6' }}>Próximamente</div>
+                    <div style={{ ...st.mainCardPill, background:'#9b59b622', color:'#9b59b6' }}>2 tipos de ejercicio</div>
                 </button>
+            </div>
+
+            {/* Separador */}
+            <div style={{ width:'100%', maxWidth:620, height:1, background:'rgba(255,255,255,0.12)', margin:'28px 0 20px' }} />
+
+            {/* Juego en vivo */}
+            <div style={{ width:'100%', maxWidth:620, display:'flex', flexDirection:'column', alignItems:'center', gap:12 }}>
+                <button onClick={() => setShowLiveConfig(true)} style={{ ...st.mainCard, '--accent':'#e74c3c', width:'100%', flexDirection:'row', gap:14, padding:'18px 24px', justifyContent:'center' }}>
+                    <Monitor size={28} color="#e74c3c" />
+                    <div style={{ textAlign:'left' }}>
+                        <div style={{ fontSize:'1.05rem', fontWeight:'bold' }}>🔴 Crear Partida en Vivo</div>
+                        <div style={{ fontSize:'0.78rem', color:'rgba(255,255,255,0.55)', marginTop:2 }}>Elige tipos, cantidad y tiempo · para toda la clase</div>
+                    </div>
+                </button>
+
+                <div style={{ display:'flex', flexDirection:'column', gap:8, width:'100%' }}>
+                    <input
+                        type="text" placeholder="Tu nombre"
+                        value={joinName} onChange={e => setJoinName(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && handleUnirse()}
+                        style={{ width:'100%', boxSizing:'border-box', padding:'11px 14px', borderRadius:10, border:'2px solid rgba(255,255,255,0.2)', background:'rgba(255,255,255,0.08)', color:'white', fontSize:'1rem', outline:'none', fontFamily:"'Georgia',serif" }}
+                    />
+                    <div style={{ display:'flex', gap:8 }}>
+                        <input
+                            type="text" placeholder="Código de 6 letras"
+                            value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())}
+                            onKeyDown={e => e.key === 'Enter' && handleUnirse()}
+                            maxLength={6}
+                            style={{ flex:1, padding:'11px 14px', borderRadius:10, border:'2px solid rgba(255,255,255,0.2)', background:'rgba(255,255,255,0.08)', color:'white', fontSize:'1rem', outline:'none', letterSpacing:3, textAlign:'center', fontFamily:"'Georgia',serif" }}
+                        />
+                        <button onClick={handleUnirse} style={{ padding:'11px 18px', borderRadius:10, background:'#27ae60', border:'none', color:'white', fontWeight:'bold', cursor:'pointer', fontSize:'0.9rem', fontFamily:"'Georgia',serif" }}>
+                            Unirse →
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     );

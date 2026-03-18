@@ -17,7 +17,8 @@ const COLORES = ['#e74c3c', '#3498db', '#f1c40f', '#2ecc71', '#9b59b6', '#e67e22
 export default function SopaDeLetras({
     palabras = PALABRAS_PRUEBA,
     mostrarLista = true,
-    onTerminar = () => alert('¡Sopa completada!')
+    onTerminar = () => alert('¡Sopa completada!'),
+    onPalabraEncontrada = null
 }) {
     const [grid, setGrid] = useState([]);
     const [palabrasActivas, setPalabrasActivas] = useState([]);
@@ -161,8 +162,10 @@ export default function SopaDeLetras({
                 const color = COLORES[palabrasEncontradas.length % COLORES.length];
                 setTrazosEncontrados([...trazosEncontrados, ...seleccion.map(s => ({ ...s, color }))]);
 
-                // Comprobar victoria
-                if (palabrasEncontradas.length + 1 === palabras.length) {
+                if (onPalabraEncontrada) onPalabraEncontrada();
+
+                // Comprobar victoria (contra palabrasActivas, no palabras, por si alguna no cupó)
+                if (palabrasEncontradas.length + 1 === palabrasActivas.length) {
                     setTimeout(onTerminar, 500);
                 }
             } else {

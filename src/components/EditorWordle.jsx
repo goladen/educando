@@ -133,7 +133,7 @@ export default function EditorWordle({ datos, setDatos, onClose, onSave, usuario
                             borderBottom: i === hojaActiva ? '3px solid #2e7d32' : 'none',
                             color: i === hojaActiva ? '#1b5e20' : '#7f8c8d'
                         }}>
-                            <input value={h.nombreHoja} onChange={(e) => renameHoja(i, e.target.value)} style={styles.tabInput} onClick={e => e.stopPropagation()} />
+                            <input value={h.nombreHoja ?? ''} onChange={(e) => renameHoja(i, e.target.value)} style={styles.tabInput} onClick={e => e.stopPropagation()} />
                             {datos.hojas.length > 1 && <Trash2 size={14} onClick={(e) => { e.stopPropagation(); deleteHoja(i) }} style={{ cursor: 'pointer', color: '#c62828' }} />}
                         </div>
                     ))}

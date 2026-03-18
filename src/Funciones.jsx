@@ -1324,11 +1324,11 @@ const genTresPuntos = () => {
         // Los otros dos puntos con x != 0, distintos entre sí
         const otrasX = [-3, -2, -1, 1, 2, 3].sort(() => Math.random() - 0.5).slice(0, 2);
         pts = [
-            [0, c],                                        // punto fijo (0, c)
-            [otrasX[0], a*otrasX[0]**2 + b*otrasX[0] + c],
-            [otrasX[1], a*otrasX[1]**2 + b*otrasX[1] + c],
+            { x: 0,        y: c },
+            { x: otrasX[0], y: a*otrasX[0]**2 + b*otrasX[0] + c },
+            { x: otrasX[1], y: a*otrasX[1]**2 + b*otrasX[1] + c },
         ];
-    } while (pts.some(([,y]) => Math.abs(y) > 9));
+    } while (pts.some(p => Math.abs(p.y) > 9));
     return { tipo: 'TRES_PUNTOS', a, b, c, pts };
 };
 
@@ -1552,7 +1552,7 @@ function EjercicioTresPuntos({ eq, onNuevo, onVolver }) {
         else { setResultado('FAIL'); setErrores(errs); }
     };
 
-    const studentPoints = pts.map(([x, y]) => ({ x, y }));
+    const studentPoints = pts.map(p => ({ x: p.x, y: p.y }));
 
     const fmtPar = (aa, bb, cc) => {
         const aStr = aa === 1 ? '' : aa === -1 ? '-' : `${aa}`;
@@ -1566,7 +1566,7 @@ function EjercicioTresPuntos({ eq, onNuevo, onVolver }) {
             {resultado === 'OK' && <Confetti recycle={false} numberOfPieces={200} />}
             <div style={st.enunciado}>
                 Encuentra la función <em>y = ax² + bx + c</em> cuya parábola pasa por los puntos:
-                {' '}{pts.map(([x,y], i) => <strong key={i}>{i > 0 ? ', ' : ''}({x}, {y})</strong>)}
+                {' '}{pts.map((p, i) => <strong key={i}>{i > 0 ? ', ' : ''}({p.x}, {p.y})</strong>)}
             </div>
             <div style={{ display:'flex', gap:24, flexWrap:'wrap', justifyContent:'center' }}>
                 <div style={{ display:'flex', flexDirection:'column', alignItems:'center' }}>
@@ -1861,11 +1861,14 @@ function FuncionesLiveHost({ codigoSala, onExit }) {
                     if (!resp.processed) {
                         hayCambios = true;
                         let puntos = 0;
-                        if (resp.correct) {
+                        const ratio = resp.ratio ?? (resp.correct ? 1 : 0); // compatibilidad con versiones antiguas
+                        if (ratio > 0) {
                             const p = data.preguntas[data.indicePregunta];
-                            const max = p.puntosMax || 100, min = p.puntosMin || 50, tt = p.tiempo || 45;
+                            const max = p.puntosMax || 100, min = p.puntosMin || 0, tt = p.tiempo || 45;
                             const tr = (Date.now() - (data.questionStartTime || Date.now())) / 1000;
-                            puntos = Math.round(min + (max - min) * Math.max(0, Math.min(1, (tt - tr) / tt)));
+                            // Puntos base según velocidad, escalados por fracción de aciertos
+                            const ptsVelocidad = Math.round(min + (max - min) * Math.max(0, Math.min(1, (tt - tr) / tt)));
+                            puntos = Math.round(ptsVelocidad * ratio);
                         }
                         updates[`respuestasRonda.${uid}.puntosGanados`] = puntos;
                         updates[`respuestasRonda.${uid}.processed`]     = true;
@@ -2054,7 +2057,7 @@ function HostEnunciado({ p }) {
         const cStr = p.c===0?'':p.c>0?` + ${p.c}`:` - ${Math.abs(p.c)}`;
         return <div style={s}>Analiza: <strong>y = {aStr}x²{bStr}{cStr}</strong></div>;
     }
-    if (p.tipo === 'TRES_PUNTOS') return <div style={s}>Parábola por <strong>{p.pts.map(([x,y])=>`(${x},${y})`).join(' · ')}</strong></div>;
+    if (p.tipo === 'TRES_PUNTOS') return <div style={s}>Parábola por <strong>{p.pts.map(pt=>`(${pt.x},${pt.y})`).join(' · ')}</strong></div>;
     return null;
 }
 
@@ -2136,9 +2139,9 @@ function FuncionesLiveClient({ codigoSala, usuario, onExit }) {
                     subFase={subFase}
                     myResult={myResult}
                     puntos={puntos}
-                    onResponder={async (esCorrecta) => {
+                    onResponder={async (esCorrecta, ratio=0) => {
                         await updateDoc(doc(db,'live_games',codigoSala), {
-                            [`respuestasRonda.${myUid}`]:{uid:myUid,correct:esCorrecta,puntosGanados:0,processed:false}
+                            [`respuestasRonda.${myUid}`]:{uid:myUid,correct:esCorrecta,ratio:ratio,puntosGanados:0,processed:false}
                         });
                     }}
                 />
@@ -2207,12 +2210,16 @@ function ClientPreguntaFunciones({ pregunta, startTime, subFase, myResult, punto
     const enviar = (porTiempo = false) => {
         if (enviado) return;
         let ok = false;
+        let ratio = 0; // fracción de elementos correctos (0–1)
         if (!porTiempo) {
             const tol = 0.11;
             const p = pregunta;
             if (['DOS_PUNTOS','PARALELA','PERPENDICULAR','GRAFICA'].includes(p.tipo)) {
                 const cm = p.mp ?? p.m, cn = p.np ?? p.n;
-                ok = approxEq(parseAnswer(ansM), cm) && approxEq(parseAnswer(ansN), cn);
+                const mOk = approxEq(parseAnswer(ansM), cm);
+                const nOk = approxEq(parseAnswer(ansN), cn);
+                ratio = (mOk ? 0.5 : 0) + (nOk ? 0.5 : 0);
+                ok = mOk && nOk;
             } else if (p.tipo === 'ANALISIS') {
                 const xv = -p.b/(2*p.a), yv = p.a*xv*xv+p.b*xv+p.c;
                 const disc = p.b*p.b - 4*p.a*p.c;
@@ -2229,9 +2236,16 @@ function ClientPreguntaFunciones({ pregunta, startTime, subFase, myResult, punto
                     cortesOk = !noCortes&&Math.abs(vals[0]-sols[0])<=tol&&Math.abs(vals[1]-sols[1])<=tol;
                 }
                 const yejeOk = Math.abs(parseAnswer(ansYeje)-p.c)<=tol;
-                ok = formaOk && xvOk && yvOk && cortesOk && yejeOk;
+                // 5 elementos: forma, xv, yv, cortes, corte eje Y
+                const items = [formaOk, xvOk, yvOk, cortesOk, yejeOk];
+                ratio = items.filter(Boolean).length / items.length;
+                ok = items.every(Boolean);
             } else if (p.tipo === 'TRES_PUNTOS') {
-                ok = Math.abs(parseAnswer(ansA)-p.a)<=tol && Math.abs(parseAnswer(ansB)-p.b)<=tol && Math.abs(parseAnswer(ansC_)-p.c)<=tol;
+                const aOk = Math.abs(parseAnswer(ansA)-p.a)<=tol;
+                const bOk = Math.abs(parseAnswer(ansB)-p.b)<=tol;
+                const cOk = Math.abs(parseAnswer(ansC_)-p.c)<=tol;
+                ratio = (aOk?1:0 + bOk?1:0 + cOk?1:0) / 3;
+                ok = aOk && bOk && cOk;
             } else if (p.tipo === 'VECTOR') {
                 const vxOk=Math.abs(parseAnswer(ansVx)-p.vx)<=tol;
                 const vyOk=Math.abs(parseAnswer(ansVy)-p.vy)<=tol;
@@ -2239,16 +2253,20 @@ function ClientPreguntaFunciones({ pregunta, startTime, subFase, myResult, punto
                 const angEst=parseAnswer(ansAngV);
                 const angOk=Math.abs(angEst-p.angulo)<=1||Math.abs(angEst-p.angulo-360)<=1||Math.abs(angEst-p.angulo+360)<=1;
                 const arrowOk=arrowPts.length===2&&Math.abs(arrowPts[1].mx-arrowPts[0].mx-p.vx)<=0.5&&Math.abs(arrowPts[1].my-arrowPts[0].my-p.vy)<=0.5;
-                ok=vxOk&&vyOk&&modOk&&angOk&&arrowOk;
+                const items=[arrowOk,vxOk,vyOk,modOk,angOk];
+                ratio=items.filter(Boolean).length/items.length;
+                ok=items.every(Boolean);
             } else if (p.tipo === 'GENERAL') {
                 const parOk=ansPar===p.paralelas, perpOk=ansPerp===p.perpendiculares;
                 const interOk=p.paralelas?noInter:(!noInter&&Math.abs(parseAnswer(ansIx)-p.ix)<=tol&&Math.abs(parseAnswer(ansIy)-p.iy)<=tol);
-                ok=parOk&&perpOk&&interOk;
+                const items=[parOk,perpOk,interOk];
+                ratio=items.filter(Boolean).length/items.length;
+                ok=items.every(Boolean);
             }
         }
         clearInterval(tRef.current);
         setEnviado(true);
-        onResponder(ok);
+        onResponder(ok, ratio);
     };
 
     if (subFase === 'REVEAL') {

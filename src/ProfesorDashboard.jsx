@@ -117,7 +117,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
     const [modoVista, setModoVista] = useState('PROFESOR');
     const [mostrandoPerfil, setMostrandoPerfil] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
-    const [modoDashboard, setModoDashboard] = useState('CLASICO'); // 'CLASICO', 'PRO', 'BUSCADOR_GLOBAL', 'HERRAMIENTAS', 'LEGAL', 'INFO'
+    const [modoDashboard, setModoDashboard] = useState('CLASICO'); // 'CLASICO', 'PRO','LIVE', 'BUSCADOR_GLOBAL', 'HERRAMIENTAS', 'LEGAL', 'INFO'
     const [mostrandoAyudaDashboard, setMostrandoAyudaDashboard] = useState(false); // <--- Ayuda Global
     const [recursoParaElegirModo, setRecursoParaElegirModo] = useState(null);
     const [openPicker] = useDrivePicker();
@@ -128,7 +128,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             setRecursos([]);
             setBibliotecaRecursos([]);
             // Solo cargamos recursos si estamos en modo Clásico o PRO
-            if (modoDashboard === 'CLASICO' || modoDashboard === 'PRO') {
+            if (modoDashboard === 'CLASICO' || modoDashboard === 'PRO' || modoDashboard === 'LIVE') {
                 if (vista === 'MIS_RECURSOS') cargarRecursosPropios();
                 else cargarBiblioteca();
             }
@@ -147,6 +147,13 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                     // CAMBIO AQUÍ: Aceptamos 'PRO' y 'PRO-BURBUJAS'
                     return r.tipo === 'PRO' || r.tipo === 'PRO-BURBUJAS' || r.tipo === 'OLYMPIC' || r.tipo === 'SINTAXIS'||r.tipo === 'ETIQUETAS';
                 }
+
+                if (modoDashboard === 'LIVE') {
+                    return (r.tipo === 'PRO' || r.tipo === 'OLYMPIC') &&
+                        (r.tipoJuego === 'THINKHOOT' || r.tipoJuego === 'MATHLIVE' || r.tipoJuego === 'OLYMPICLIVE');
+                }
+
+
                 // En clásico mostramos los que NO sean de ningún tipo PRO
                 return !r.tipo || (r.tipo !== 'PRO' && r.tipo !== 'PRO-BURBUJAS' && r.tipo !== 'OLYMPIC');
             });
@@ -165,6 +172,12 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                     // CAMBIO AQUÍ TAMBIÉN
                     return r.tipo === 'PRO' || r.tipo === 'PRO-BURBUJAS' || r.tipo === 'OLYMPIC' || r.tipo === 'SINTAXIS' || r.tipo === 'ETIQUETAS';
                 }
+
+                if (modoDashboard === 'LIVE') {
+                    return (r.tipo === 'PRO' || r.tipo === 'OLYMPIC') &&
+                        (r.tipoJuego === 'THINKHOOT' || r.tipoJuego === 'MATHLIVE' || r.tipoJuego === 'OLYMPICLIVE');
+                }
+
                 return !r.tipo || (r.tipo !== 'PRO' && r.tipo !== 'PRO-BURBUJAS' && r.tipo !== 'OLYMPIC');
             });
             setBibliotecaRecursos(docs);
@@ -190,8 +203,9 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
         setModoDashboard(destino);
         setMenuOpen(false);
         // Reset defaults si vuelve a juegos
-        if (destino === 'PRO') setJuegoSeleccionado('THINKHOOT');
+        if (destino === 'PRO') setJuegoSeleccionado('CAZABURBUJAS');
         if (destino === 'CLASICO') setJuegoSeleccionado('PASAPALABRA');
+        if (destino === 'LIVE') setJuegoSeleccionado('THINKHOOT');
     };
 
     const ejecutarBusqueda = () => setFiltrosActivos(filtrosInput);
@@ -205,7 +219,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
 
     // --- FUNCIÓN PARA EL EDITOR CLÁSICO (NO TOCAR) ---
     const iniciarCreacion = () => {
-        if (modoDashboard === 'PRO') {
+        if (modoDashboard === 'PRO' || modoDashboard === 'LIVE') {
             if (juegoSeleccionado === 'CAZABURBUJAS') return iniciarCreacionBurbujasPikatron();
             if (juegoSeleccionado === 'THINKHOOT') return iniciarCreacionPiLive();
             if (juegoSeleccionado === 'MATHLIVE') return iniciarCreacionMathLive();
@@ -611,8 +625,15 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
 
                 // Abrir el editor correcto
                 if (juegoSeleccionado === 'WORDLE') setMostrandoEditorWordle(true);
-                else if (juegoSeleccionado === 'CAZABURBUJAS') setMostrandoEditorBurbujasPikatron(true);
-                else if (juegoSeleccionado === 'THINKHOOT') setMostrandoEditorPro(true);
+                else if (juegoSeleccionado === 'CAZABURBUJAS') {
+                    if (modoDashboard === 'PRO') setMostrandoEditorBurbujasPikatron(true);
+                    else setMostrandoEditorManual(true);
+                }
+                else if (juegoSeleccionado === 'THINKHOOT') {
+                    if (modoDashboard === 'PRO' || modoDashboard === 'LIVE') setMostrandoEditorPro(true);
+                    else setMostrandoEditorManual(true);
+                }
+
                 else setMostrandoEditorManual(true);
 
                 alert(`✅ ¡Importado! Se han creado ${nuevasHojas.length} niveles.`);
@@ -933,6 +954,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                 <ul style={styles.menuList}>
                     <li style={styles.menuItem} onClick={() => navegar('CLASICO')}>Recursos Clásicos</li>
                     <li style={styles.menuItem} onClick={() => navegar('PRO')}>Recursos PRO</li>
+                    <li style={styles.menuItem} onClick={() => navegar('LIVE')}>Recursos Live</li>   {/* ← NUEVO */}
                     <li style={styles.menuItem} onClick={() => navegar('BUSCADOR_GLOBAL')}>Buscador de Recursos</li>
                     <li style={styles.menuItem} onClick={() => navegar('HERRAMIENTAS')}>Herramientas del Profesor</li>
 
@@ -974,7 +996,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             )}
 
             {/* 4. MODOS CLÁSICO Y PRO (RECURSOS) */}
-            {(modoDashboard === 'CLASICO' || modoDashboard === 'PRO') && (
+            {(modoDashboard === 'CLASICO' || modoDashboard === 'PRO' || modoDashboard === 'LIVE') && (
                 <>{modoDashboard === 'CLASICO' && (
                     <div className="game-type-scroll" style={{ marginBottom: '20px' }}>
                         {Object.values(TIPOS_JUEGOS)
@@ -989,7 +1011,16 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
 
 
                     {modoDashboard === 'PRO' && (<div style={{ marginBottom: '20px', textAlign: 'center' }}><h1 style={{ color: '#9C27B0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}><Zap size={32} /> RECURSOS PRO</h1></div>)}
-                    
+
+                    {modoDashboard === 'LIVE' && (
+                        <div style={{ marginBottom: '20px', textAlign: 'center' }}>
+                            <h1 style={{ color: '#D32F2F', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+                                <Zap size={32} /> RECURSOS LIVE
+        </h1>
+                        </div>
+                    )}
+
+
                     {/* BARRA DE TÍTULO Y BOTONES DE ACCIÓN */}
                     {/* BARRA DE TÍTULO Y BOTONES DE ACCIÓN RESPONSIVA */}
                     <div className="dashboard-header-row">
@@ -1027,17 +1058,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                             {/* BOTONES PRO (OVALADOS 20px) */}
                             {modoDashboard === 'PRO' && (
                                 <>
-                                    <button
-                                        onClick={() => setJuegoSeleccionado('THINKHOOT')}
-                                        className="header-btn"
-                                        style={{
-                                            padding: '8px 20px', borderRadius: '20px',
-                                            background: juegoSeleccionado === 'THINKHOOT' ? '#9C27B0' : 'white',
-                                            color: juegoSeleccionado === 'THINKHOOT' ? 'white' : '#555'
-                                        }}
-                                    >
-                                        <Zap size={16} /> <span className="btn-text">Pi-Live</span>
-                                    </button>
+                                  
 
                                     <button
                                         onClick={() => setJuegoSeleccionado('CAZABURBUJAS')}
@@ -1051,17 +1072,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                                         <Gamepad2 size={16} /> <span className="btn-text">Burbujas</span>
                                     </button>
 
-                                    <button
-                                        onClick={() => setJuegoSeleccionado('MATHLIVE')}
-                                        className="header-btn"
-                                        style={{
-                                            padding: '8px 20px', borderRadius: '20px',
-                                            background: juegoSeleccionado === 'MATHLIVE' ? '#009688' : 'white',
-                                            color: juegoSeleccionado === 'MATHLIVE' ? 'white' : '#555'
-                                        }}
-                                    >
-                                        <Calculator size={16} /> <span className="btn-text">MathLive</span>
-                                    </button>
+                                  
 
                                     {/* --- AÑADE ESTO: NUEVO BOTÓN MATH WORDLE --- */}
                                     <button
@@ -1084,17 +1095,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                                     {/* ------------------------------------------- */}
 
                                     
-                                    <button
-                                        onClick={() => setJuegoSeleccionado('OLYMPICLIVE')}
-                                        className="header-btn"
-                                        style={{
-                                            padding: '8px 20px', borderRadius: '20px',
-                                            background: juegoSeleccionado === 'OLYMPICLIVE' ? '#D32F2F' : 'white',
-                                            color: juegoSeleccionado === 'OLYMPICLIVE' ? 'white' : '#555'
-                                        }}
-                                    >
-                                        <Medal size={16} /> <span className="btn-text">Olympic</span>
-                                    </button>
+                                   
                                   
 
                             
@@ -1120,6 +1121,38 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
 
                                 </>
                             )}
+
+                            {modoDashboard === 'LIVE' && (
+                                <>
+                                    <button onClick={() => setJuegoSeleccionado('THINKHOOT')} className="header-btn"
+                                        style={{
+                                            padding: '8px 20px', borderRadius: '20px',
+                                            background: juegoSeleccionado === 'THINKHOOT' ? '#9C27B0' : 'white',
+                                            color: juegoSeleccionado === 'THINKHOOT' ? 'white' : '#555'
+                                        }}>
+                                        <Zap size={16} /> <span className="btn-text">Pi-Live</span>
+                                    </button>
+                                    <button onClick={() => setJuegoSeleccionado('MATHLIVE')} className="header-btn"
+                                        style={{
+                                            padding: '8px 20px', borderRadius: '20px',
+                                            background: juegoSeleccionado === 'MATHLIVE' ? '#009688' : 'white',
+                                            color: juegoSeleccionado === 'MATHLIVE' ? 'white' : '#555'
+                                        }}>
+                                        <Calculator size={16} /> <span className="btn-text">MathLive</span>
+                                    </button>
+                                    <button onClick={() => setJuegoSeleccionado('OLYMPICLIVE')} className="header-btn"
+                                        style={{
+                                            padding: '8px 20px', borderRadius: '20px',
+                                            background: juegoSeleccionado === 'OLYMPICLIVE' ? '#D32F2F' : 'white',
+                                            color: juegoSeleccionado === 'OLYMPICLIVE' ? 'white' : '#555'
+                                        }}>
+                                        <Medal size={16} /> <span className="btn-text">Olympic</span>
+                                    </button>
+                                </>
+                            )}
+
+
+
                         </div>
                     </div>
 
@@ -1188,19 +1221,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                     />
                     <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
 
-                        <button
-                            onClick={() => {
-                                setMostrandoCrear(false);
-                                if (juegoSeleccionado === 'SINTAXIS') {
-                                    setMostrandoEditorSintaxis(true);
-                                } else {
-                                    setMostrandoEditorManual(true);
-                                }
-                            }}
-                            style={{ ...actionBtnStyle('#2196F3'), flex: 1 }}
-                        >
-                            <Edit3 /> {juegoSeleccionado === 'SINTAXIS' ? 'Abrir Editor' : 'Manual'}
-                        </button>
+                       
 
                         <button onClick={() => {
                             setMostrandoCrear(false);
@@ -1210,7 +1231,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                         }}
                             style={{ ...actionBtnStyle('#2196F3'), flex: 1 }}
                         >
-                            <Edit3 /> {juegoSeleccionado === 'ETIQUETAS' ? 'Abrir Editor' : 'Manual'}
+                            <Edit3 /> {juegoSeleccionado === 'ETIQUETAS' || juegoSeleccionado === 'SINTAXIS' ? 'Abrir Editor' : 'Manual'}
                         </button>
                         
                         {juegoSeleccionado !== 'QUESTION_SENDER' && juegoSeleccionado !== 'SINTAXIS' && juegoSeleccionado !== 'ETIQUETAS' && (

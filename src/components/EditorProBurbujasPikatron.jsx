@@ -586,7 +586,7 @@ export default function EditorProBurbujasPikatron({ datos, setDatos, onClose, on
                                     <div style={{ marginBottom: '10px' }}>
                                         <input
                                             placeholder="Escribe la pregunta..."
-                                            value={p.pregunta}
+                                            value={p.pregunta ?? ''}
                                             onChange={e => updatePregunta(i, 'pregunta', e.target.value)}
                                             style={{ ...inputStyleSmall, fontWeight: 'bold', fontSize: '16px', border: '1px solid #bdc3c7' }}
                                         />
@@ -595,7 +595,7 @@ export default function EditorProBurbujasPikatron({ datos, setDatos, onClose, on
                                         <div style={{ position: 'relative' }}>
                                             <input
                                                 placeholder="Respuesta Correcta"
-                                                value={p.correcta}
+                                                value={p.correcta ?? ''}
                                                 onChange={e => updatePregunta(i, 'correcta', e.target.value)}
                                                 style={{ ...inputStyleSmall, borderColor: '#2ecc71', background: '#eafaf1', paddingLeft: '30px' }}
                                             />

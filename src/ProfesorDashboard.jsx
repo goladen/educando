@@ -23,7 +23,9 @@ import SopaDeLetrasGame from './SopaDeLetrasGame';
 import TextWordleGame from './TextWordleGame';
 import SintaxisGame from './SintaxisGamen2';
 
+
 import { MousePointer2, Rocket, Search as SearchIcon } from 'lucide-react';
+import InformesJuegos from './components/InformesJuegos';
 import EditorProBurbujasPikatron from './components/EditorProBurbujasPikatron';
 import EditorQuestionSender from './components/EditorQuestionSender';
 import ModalMigrarQsender from './components/ModalMigrarQsender';
@@ -206,6 +208,8 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
         if (destino === 'PRO') setJuegoSeleccionado('CAZABURBUJAS');
         if (destino === 'CLASICO') setJuegoSeleccionado('PASAPALABRA');
         if (destino === 'LIVE') setJuegoSeleccionado('THINKHOOT');
+        if (destino === 'INFORMES') setJuegoSeleccionado('PASAPALABRA'); // reset opcional
+
     };
 
     const ejecutarBusqueda = () => setFiltrosActivos(filtrosInput);
@@ -976,7 +980,12 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
 
             {/* BARRA SUPERIOR (PERFIL, AYUDA) */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '15px', marginBottom: '30px', paddingBottom: '15px', marginTop:'60px' }}>
-                <button onClick={() => setMostrandoAyudaDashboard(true)} style={styles.helpButtonTop} title="Ayuda"><HelpCircle size={24} color="#1565C0"/></button>
+                <button onClick={() => navegar('INFORMES')} style={{ ...styles.helpButtonTop, background: '#1565C0' }} title="Informes de Juegos">
+                    <BarChart2 size={20} color="white" />
+                </button>
+
+
+                <button onClick={() => setMostrandoAyudaDashboard(true)} style={styles.helpButtonTop} title="Ayuda"><HelpCircle size={24} color="#1565C0" /></button>
                 <button onClick={() => setModoVista('ALUMNO')} style={{ background: 'white', color: '#1565C0', border: 'none', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', boxShadow:'0 2px 5px rgba(0,0,0,0.1)' }}><Eye size={18} /> Vista Alumno</button>
                 <button onClick={() => setMostrandoPerfil(true)} style={{ background: 'white', color: '#8E24AA', border: 'none', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', boxShadow:'0 2px 5px rgba(0,0,0,0.1)' }}><UserCircle size={18} /> Mi Perfil</button>
             </div>
@@ -992,6 +1001,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             {modoDashboard === 'HERRAMIENTAS' && (
                 <TeacherTools usuario={usuario} googleToken={googleToken} />
             )}
+            {modoDashboard === 'INFORMES' && <InformesJuegos usuario={usuario} />}
 
             {/* 3. LEGAL / INFO */}
             {(modoDashboard === 'LEGAL' || modoDashboard === 'INFO') && (

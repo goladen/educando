@@ -360,7 +360,7 @@ function CoordCanvas({ eq, studentPoints, onPointClick, disabled, resultado, mos
 }
 
 // ─── EJERCICIO GENÉRICO ───────────────────────────────────────────────────────
-function Ejercicio({ eq, onNuevo, onVolver }) {
+function Ejercicio({ eq, onNuevo, onVolver, onLiveEnviar = null, liveMode = false }) {
     const [ansM, setAnsM] = useState('');
     const [ansN, setAnsN] = useState('');
     const [studentPts, setStudentPts] = useState([]);
@@ -410,6 +410,7 @@ function Ejercicio({ eq, onNuevo, onVolver }) {
             else if (!lineaOk) msgs.push('El dibujo de la recta no coincide.');
         }
 
+        const ratio = (mOk ? 0.5 : 0) + (nOk ? 0.5 : 0);
         if (mOk && nOk && lineaOk) {
             setResultado('TODO_OK');
             setFeedback(null);
@@ -417,6 +418,7 @@ function Ejercicio({ eq, onNuevo, onVolver }) {
             setResultado(lineaOk ? 'LINEA_OK' : 'LINEA_FAIL');
             setFeedback(msgs);
         }
+        if (onLiveEnviar) onLiveEnviar(ratio);
     };
 
     const correctM = eq.mp ?? eq.m;
@@ -507,14 +509,11 @@ function Ejercicio({ eq, onNuevo, onVolver }) {
                         </div>
                     )}
 
-                    <div style={{ display:'flex', gap:8, marginTop:'auto' }}>
-                        <button onClick={handleNuevo} style={st.btnNuevo}>
-                            <RefreshCw size={15} /> Nuevo
-                        </button>
-                        <button onClick={onVolver} style={st.btnVolver}>
-                            <ArrowLeft size={15} /> Volver
-                        </button>
-                    </div>
+                    {!liveMode && <div style={{ display:'flex', gap:8, marginTop:'auto' }}>
+                        <button onClick={handleNuevo} style={st.btnNuevo}><RefreshCw size={15} /> Nuevo</button>
+                        <button onClick={onVolver} style={st.btnVolver}><ArrowLeft size={15} /> Volver</button>
+                    </div>}
+                    {liveMode && resultado && <div style={{ color:'rgba(255,255,255,0.5)', fontSize:'0.82rem', textAlign:'center', marginTop:8 }}>Esperando al resto...</div>}
                 </div>
             </div>
         </div>
@@ -650,7 +649,7 @@ function VectorCanvas({ eq, arrowPts, onPointClick, disabled, resultado }) {
 }
 
 // ─── EJERCICIO VECTOR ─────────────────────────────────────────────────────────
-function EjercicioVector({ eq, onNuevo, onVolver }) {
+function EjercicioVector({ eq, onNuevo, onVolver, onLiveEnviar = null, liveMode = false }) {
     const [arrowPts, setArrowPts] = useState([]);
     const [ansVx, setAnsVx] = useState('');
     const [ansVy, setAnsVy] = useState('');
@@ -685,8 +684,16 @@ function EjercicioVector({ eq, onNuevo, onVolver }) {
         const angOk = Math.abs(angEst - eq.angulo) <= 1 || Math.abs(angEst - eq.angulo - 360) <= 1 || Math.abs(angEst - eq.angulo + 360) <= 1;
         if (!angOk) errs.push(`El ángulo respecto al eje X no es correcto (en grados, con signo).`);
 
+        const items2 = [
+            errs.filter(e=>e.includes('vector dibujado')).length===0 && arrowPts.length===2,
+            errs.filter(e=>e.includes('componente x')).length===0,
+            errs.filter(e=>e.includes('componente y')).length===0,
+            errs.filter(e=>e.includes('módulo')).length===0,
+            errs.filter(e=>e.includes('ángulo')).length===0,
+        ];
         if (errs.length === 0) setResultado('OK');
         else { setResultado('FAIL'); setErrores(errs); }
+        if (onLiveEnviar) onLiveEnviar(errs.length === 0 ? 1 : items2.filter(Boolean).length / items2.length);
     };
 
     return (
@@ -740,10 +747,11 @@ function EjercicioVector({ eq, onNuevo, onVolver }) {
                             Ángulo = {eq.angulo}°
                         </div>
                     )}
-                    <div style={{display:'flex',gap:8,marginTop:'auto'}}>
+                    {!liveMode && <div style={{display:'flex',gap:8,marginTop:'auto'}}>
                         <button onClick={()=>{reset();onNuevo();}} style={st.btnNuevo}><RefreshCw size={15}/> Nuevo</button>
                         <button onClick={onVolver} style={st.btnVolver}><ArrowLeft size={15}/> Volver</button>
-                    </div>
+                    </div>}
+                    {liveMode && resultado && <div style={{ color:'rgba(255,255,255,0.5)', fontSize:'0.82rem', textAlign:'center', marginTop:8 }}>Esperando al resto...</div>}
                 </div>
             </div>
         </div>
@@ -845,7 +853,7 @@ function GeneralCanvas({ eq, linePts, onPointClick, disabled, resultado, mostrar
 }
 
 // ─── EJERCICIO GENERAL ────────────────────────────────────────────────────────
-function EjercicioGeneral({ eq, onNuevo, onVolver }) {
+function EjercicioGeneral({ eq, onNuevo, onVolver, onLiveEnviar = null, liveMode = false }) {
     const [linePts, setLinePts] = useState([null,null,null,null]);
     const [ansPar, setAnsPar] = useState(null);   // true/false
     const [ansPerp, setAnsPerp] = useState(null);
@@ -906,8 +914,15 @@ function EjercicioGeneral({ eq, onNuevo, onVolver }) {
                 if (Math.abs(parseAnswer(ansIy)-eq.iy)>tol) errs.push('La coordenada y del punto de intersección no es correcta.');
             }
         }
+        const itemsG = [
+            !errs.some(e=>e.includes('dibujadas')),
+            !errs.some(e=>e.includes('paralelas')),
+            !errs.some(e=>e.includes('perpendiculares')),
+            !errs.some(e=>e.includes('intersección')||e.includes('No hay intersección')||e.includes('x del punto')||e.includes('y del punto')),
+        ];
         if (errs.length===0) setResultado('OK');
         else { setResultado('FAIL'); setErrores(errs); }
+        if (onLiveEnviar) onLiveEnviar(errs.length===0 ? 1 : itemsG.filter(Boolean).length / itemsG.length);
     };
 
     const btnYN = (val, current, set, disabled) => (
@@ -1333,7 +1348,7 @@ const genTresPuntos = () => {
 };
 
 // ─── Ejercicio ANÁLISIS ───────────────────────────────────────────────────────
-function EjercicioAnalisis({ eq, onNuevo, onVolver }) {
+function EjercicioAnalisis({ eq, onNuevo, onVolver, onLiveEnviar = null, liveMode = false }) {
     const { a, b, c, disc } = eq;
     const xv = -b / (2 * a);
     const yv = a * xv * xv + b * xv + c;
@@ -1399,8 +1414,10 @@ function EjercicioAnalisis({ eq, onNuevo, onVolver }) {
         if (studentParPts.length < 3) errs.push('Marca al menos 3 puntos por los que pasa la parábola.');
         else if (ptsOk.length < 3) errs.push('Al menos 3 de tus puntos deben estar sobre la parábola.');
 
+        const itemsA = [formaOk, xvOk, yvOk, cortesOk, yejeOk, ptsOk.length >= 3];
         if (errs.length === 0) setResultado('OK');
         else { setResultado('FAIL'); setErrores(errs); }
+        if (onLiveEnviar) onLiveEnviar(errs.length === 0 ? 1 : itemsA.filter(Boolean).length / itemsA.length);
     };
 
     const fmtPar = () => {
@@ -1515,10 +1532,11 @@ function EjercicioAnalisis({ eq, onNuevo, onVolver }) {
                             Corte eje Y: (0, {c})
                         </div>
                     )}
-                    <div style={{ display:'flex', gap:8 }}>
+                    {!liveMode && <div style={{ display:'flex', gap:8 }}>
                         <button onClick={() => { reset(); onNuevo(); }} style={st.btnNuevo}><RefreshCw size={14} /> Nuevo</button>
                         <button onClick={onVolver} style={st.btnVolver}><ArrowLeft size={14} /> Volver</button>
-                    </div>
+                    </div>}
+                    {liveMode && resultado && <div style={{ color:'rgba(255,255,255,0.5)', fontSize:'0.82rem', textAlign:'center', marginTop:8 }}>Esperando al resto...</div>}
                 </div>
             </div>
         </div>
@@ -1526,7 +1544,7 @@ function EjercicioAnalisis({ eq, onNuevo, onVolver }) {
 }
 
 // ─── Ejercicio TRES PUNTOS ────────────────────────────────────────────────────
-function EjercicioTresPuntos({ eq, onNuevo, onVolver }) {
+function EjercicioTresPuntos({ eq, onNuevo, onVolver, onLiveEnviar = null, liveMode = false }) {
     const { a, b, c, pts } = eq;
 
     const [ansA, setAnsA] = useState('');
@@ -2058,6 +2076,13 @@ function HostEnunciado({ p }) {
         return <div style={s}>Analiza: <strong>y = {aStr}x²{bStr}{cStr}</strong></div>;
     }
     if (p.tipo === 'TRES_PUNTOS') return <div style={s}>Parábola por <strong>{p.pts.map(pt=>`(${pt.x},${pt.y})`).join(' · ')}</strong></div>;
+    if (p.tipo === 'VECTOR') return <div style={s}>Calcula el vector <strong>AB⃗</strong>, módulo y ángulo · <strong>A({p.ax},{p.ay})</strong> y <strong>B({p.bx},{p.by})</strong></div>;
+    if (p.tipo === 'GENERAL') return (
+        <div style={s}>
+            Dadas las ecuaciones:<br/>
+            <strong>r₁: {fmtGeneral(p.g1)}</strong> &nbsp;&nbsp; <strong>r₂: {fmtGeneral(p.g2)}</strong>
+        </div>
+    );
     return null;
 }
 
@@ -2075,6 +2100,13 @@ function HostSolucion({ p }) {
         </div>
     );
     if (p.tipo === 'TRES_PUNTOS') return <div style={s}>a={p.a} · b={p.b} · c={p.c}</div>;
+    if (p.tipo === 'VECTOR') return <div style={s}>AB⃗=({p.vx},{p.vy}) · |AB⃗|={Math.round(p.modulo*100)/100} · θ={p.angulo}°</div>;
+    if (p.tipo === 'GENERAL') return (
+        <div style={s}>
+            {p.paralelas?'Paralelas':'Perpendiculares: '+p.perpendiculares}
+            {p.ix!==null?<><br/><span style={{fontSize:'0.9rem'}}>Intersección: ({p.ix},{p.iy})</span></>:''}
+        </div>
+    );
     return null;
 }
 
@@ -2132,19 +2164,21 @@ function FuncionesLiveClient({ codigoSala, usuario, onExit }) {
                 <div style={sCli.lobbyWait}><div style={{ fontSize:'7rem', color:'#f1c40f', fontWeight:'bold' }}>¡YA!</div></div>
             )}
             {fase === 'JUEGO' && p && (
-                <ClientPreguntaFunciones
-                    key={gameData.indicePregunta}
-                    pregunta={p}
-                    startTime={gameData.questionStartTime}
-                    subFase={subFase}
-                    myResult={myResult}
-                    puntos={puntos}
-                    onResponder={async (esCorrecta, ratio=0) => {
-                        await updateDoc(doc(db,'live_games',codigoSala), {
-                            [`respuestasRonda.${myUid}`]:{uid:myUid,correct:esCorrecta,ratio:ratio,puntosGanados:0,processed:false}
-                        });
-                    }}
-                />
+                <div style={sCli.questionArea}>
+                    <ClientPreguntaFunciones
+                        key={gameData.indicePregunta}
+                        pregunta={p}
+                        startTime={gameData.questionStartTime}
+                        subFase={subFase}
+                        myResult={myResult}
+                        puntos={puntos}
+                        onResponder={async (esCorrecta, ratio=0) => {
+                            await updateDoc(doc(db,'live_games',codigoSala), {
+                                [`respuestasRonda.${myUid}`]:{uid:myUid,correct:esCorrecta,ratio:ratio,puntosGanados:0,processed:false}
+                            });
+                        }}
+                    />
+                </div>
             )}
             {fase === 'FIN' && (
                 <div style={sCli.lobbyWait}>
@@ -2160,39 +2194,13 @@ function FuncionesLiveClient({ codigoSala, usuario, onExit }) {
     );
 }
 
-// Pregunta para el cliente según tipo
+// Pregunta para el cliente — usa los componentes de ejercicio reales
 function ClientPreguntaFunciones({ pregunta, startTime, subFase, myResult, puntos, onResponder }) {
     const [enviado, setEnviado] = useState(false);
     const [timeLeft, setTimeLeft] = useState(100);
     const [isLate, setIsLate]   = useState(false);
-    const tRef = useRef(null);
-
-    // Respuestas según tipo
-    const [ansM, setAnsM] = useState('');
-    const [ansN, setAnsN] = useState('');
-    const [forma, setForma] = useState('');
-    const [ansXv, setAnsXv] = useState('');
-    const [ansYv, setAnsYv] = useState('');
-    const [noCortes, setNoCortes] = useState(false);
-    const [ansX1, setAnsX1] = useState('');
-    const [ansX2, setAnsX2] = useState('');
-    const [ansYeje, setAnsYeje] = useState('');
-    const [ansA, setAnsA] = useState('');
-    const [ansB, setAnsB] = useState('');
-    const [ansC_, setAnsC_] = useState('');
-    // VECTOR
-    const [ansVx, setAnsVx] = useState('');
-    const [ansVy, setAnsVy] = useState('');
-    const [ansMod, setAnsMod] = useState('');
-    const [ansAngV, setAnsAngV] = useState('');
-    const [arrowPts, setArrowPts] = useState([]);
-    // GENERAL
-    const [linePts, setLinePts] = useState([null,null,null,null]);
-    const [ansPar, setAnsPar] = useState(null);
-    const [ansPerp, setAnsPerp] = useState(null);
-    const [ansIx, setAnsIx] = useState('');
-    const [ansIy, setAnsIy] = useState('');
-    const [noInter, setNoInter] = useState(false);
+    const tRef   = useRef(null);
+    const envRef = useRef(false); // evita doble envío
 
     useEffect(() => {
         if (subFase !== 'RESPONDING' || enviado) return;
@@ -2202,78 +2210,26 @@ function ClientPreguntaFunciones({ pregunta, startTime, subFase, myResult, punto
             const pct = Math.max(0, 100 - (tr / tt * 100));
             setTimeLeft(pct);
             if (pct < 20) setIsLate(true);
-            if (pct <= 0) { clearInterval(tRef.current); if (!enviado) enviar(true); }
+            if (pct <= 0) {
+                clearInterval(tRef.current);
+                if (!envRef.current) { envRef.current=true; setEnviado(true); onResponder(false, 0); }
+            }
         }, 150);
         return () => clearInterval(tRef.current);
     }, [startTime, subFase, enviado]);
 
-    const enviar = (porTiempo = false) => {
-        if (enviado) return;
-        let ok = false;
-        let ratio = 0; // fracción de elementos correctos (0–1)
-        if (!porTiempo) {
-            const tol = 0.11;
-            const p = pregunta;
-            if (['DOS_PUNTOS','PARALELA','PERPENDICULAR','GRAFICA'].includes(p.tipo)) {
-                const cm = p.mp ?? p.m, cn = p.np ?? p.n;
-                const mOk = approxEq(parseAnswer(ansM), cm);
-                const nOk = approxEq(parseAnswer(ansN), cn);
-                ratio = (mOk ? 0.5 : 0) + (nOk ? 0.5 : 0);
-                ok = mOk && nOk;
-            } else if (p.tipo === 'ANALISIS') {
-                const xv = -p.b/(2*p.a), yv = p.a*xv*xv+p.b*xv+p.c;
-                const disc = p.b*p.b - 4*p.a*p.c;
-                const formaOk = (p.a>0&&forma==='U')||(p.a<0&&forma==='N');
-                const xvOk = Math.abs(parseAnswer(ansXv)-xv)<=tol;
-                const yvOk = Math.abs(parseAnswer(ansYv)-yv)<=tol;
-                let cortesOk = false;
-                if (disc<0) cortesOk = noCortes;
-                else if (disc===0) { const x1=(-p.b)/(2*p.a); cortesOk = !noCortes&&Math.abs(parseAnswer(ansX1)-x1)<=tol; }
-                else {
-                    const x1=(-p.b+Math.sqrt(disc))/(2*p.a), x2=(-p.b-Math.sqrt(disc))/(2*p.a);
-                    const vals=[parseAnswer(ansX1),parseAnswer(ansX2)].sort((a,b)=>a-b);
-                    const sols=[x1,x2].sort((a,b)=>a-b);
-                    cortesOk = !noCortes&&Math.abs(vals[0]-sols[0])<=tol&&Math.abs(vals[1]-sols[1])<=tol;
-                }
-                const yejeOk = Math.abs(parseAnswer(ansYeje)-p.c)<=tol;
-                // 5 elementos: forma, xv, yv, cortes, corte eje Y
-                const items = [formaOk, xvOk, yvOk, cortesOk, yejeOk];
-                ratio = items.filter(Boolean).length / items.length;
-                ok = items.every(Boolean);
-            } else if (p.tipo === 'TRES_PUNTOS') {
-                const aOk = Math.abs(parseAnswer(ansA)-p.a)<=tol;
-                const bOk = Math.abs(parseAnswer(ansB)-p.b)<=tol;
-                const cOk = Math.abs(parseAnswer(ansC_)-p.c)<=tol;
-                ratio = (aOk?1:0 + bOk?1:0 + cOk?1:0) / 3;
-                ok = aOk && bOk && cOk;
-            } else if (p.tipo === 'VECTOR') {
-                const vxOk=Math.abs(parseAnswer(ansVx)-p.vx)<=tol;
-                const vyOk=Math.abs(parseAnswer(ansVy)-p.vy)<=tol;
-                const modOk=Math.abs(parseAnswer(ansMod)-p.modulo)<=0.15;
-                const angEst=parseAnswer(ansAngV);
-                const angOk=Math.abs(angEst-p.angulo)<=1||Math.abs(angEst-p.angulo-360)<=1||Math.abs(angEst-p.angulo+360)<=1;
-                const arrowOk=arrowPts.length===2&&Math.abs(arrowPts[1].mx-arrowPts[0].mx-p.vx)<=0.5&&Math.abs(arrowPts[1].my-arrowPts[0].my-p.vy)<=0.5;
-                const items=[arrowOk,vxOk,vyOk,modOk,angOk];
-                ratio=items.filter(Boolean).length/items.length;
-                ok=items.every(Boolean);
-            } else if (p.tipo === 'GENERAL') {
-                const parOk=ansPar===p.paralelas, perpOk=ansPerp===p.perpendiculares;
-                const interOk=p.paralelas?noInter:(!noInter&&Math.abs(parseAnswer(ansIx)-p.ix)<=tol&&Math.abs(parseAnswer(ansIy)-p.iy)<=tol);
-                const items=[parOk,perpOk,interOk];
-                ratio=items.filter(Boolean).length/items.length;
-                ok=items.every(Boolean);
-            }
-        }
+    const handleLiveEnviar = (ratio) => {
+        if (envRef.current) return;
+        envRef.current = true;
         clearInterval(tRef.current);
         setEnviado(true);
-        onResponder(ok, ratio);
+        onResponder(ratio > 0, ratio);
     };
 
     if (subFase === 'REVEAL') {
         const ok = myResult?.correct; const pts = myResult?.puntosGanados || 0;
         return (
             <div style={sCli.feedback}>
-                <img src={ok ? piHappy : piAngry} style={{ width:80, height:80, objectFit:'contain' }} alt="Pi" />
                 <div style={{ ...sCli.neonCard, borderColor: ok ? '#2ecc71' : '#e74c3c' }}>
                     {ok ? <CheckCircle size={44} color="#2ecc71" /> : <XCircle size={44} color="#e74c3c" />}
                     <div style={{ fontSize:'1.4rem', fontWeight:'bold', color:'white', marginTop:8 }}>{ok?'¡CORRECTO!':!myResult?'¡TIEMPO!':'INCORRECTO'}</div>
@@ -2285,7 +2241,6 @@ function ClientPreguntaFunciones({ pregunta, startTime, subFase, myResult, punto
     if (subFase === 'LEADERBOARD') {
         return (
             <div style={sCli.feedback}>
-                <img src={piNeutral} style={{ width:80, height:80, objectFit:'contain' }} alt="Pi" />
                 <div style={{ ...sCli.neonCard, borderColor:'#7f8c8d' }}>
                     <div style={{ color:'white', fontSize:'1rem' }}>Puntuación</div>
                     <div style={{ color:'#2ecc71', fontSize:'2rem', fontWeight:'bold' }}>{puntos} pts</div>
@@ -2295,104 +2250,43 @@ function ClientPreguntaFunciones({ pregunta, startTime, subFase, myResult, punto
     }
 
     const p = pregunta;
-    const isRecta = ['DOS_PUNTOS','PARALELA','PERPENDICULAR','GRAFICA'].includes(p.tipo);
+    const noop = () => {};
 
     return (
-        <div style={{...sCli.questionArea, maxWidth: (p.tipo==='VECTOR'||p.tipo==='GENERAL')?600:480}}>
+        <div style={{ width:'100%', overflowY:'auto', paddingBottom:20, boxSizing:'border-box' }}>
             {/* Barra de tiempo */}
-            <div style={{ width:'100%', height:8, background:'rgba(255,255,255,0.15)', borderRadius:4, overflow:'hidden', margin:'50px 0 12px' }}>
+            <div style={{ width:'100%', height:8, background:'rgba(255,255,255,0.15)', borderRadius:4, overflow:'hidden', marginBottom:4, flexShrink:0 }}>
                 <div style={{ height:'100%', width:`${timeLeft}%`, background: isLate ? '#e74c3c' : '#2ecc71', transition:'width 0.15s linear', borderRadius:4 }} />
             </div>
 
-            {(enviado || myResult) ? (
-                <div style={sCli.waiting}><Loader size={44} color="white" /><p style={{ color:'white' }}>Esperando...</p></div>
-            ) : (
-                <div style={sCli.card}>
-                    <HostEnunciado p={p} />
-
-                    {/* Formulario según tipo */}
-                    <div style={{ marginTop:14, display:'flex', flexDirection:'column', gap:10 }}>
-                        {isRecta && (
-                            <>
-                                <div style={sCli.row}>
-                                    <span style={sCli.lbl}>m =</span>
-                                    <input style={sCli.inp} value={ansM} onChange={e=>setAnsM(e.target.value)} placeholder="ej: 2 ó 1/2" />
-                                </div>
-                                <div style={sCli.row}>
-                                    <span style={sCli.lbl}>n =</span>
-                                    <input style={sCli.inp} value={ansN} onChange={e=>setAnsN(e.target.value)} placeholder="ej: -3" />
-                                </div>
-                            </>
-                        )}
-                        {p.tipo === 'ANALISIS' && (
-                            <>
-                                <div style={{ display:'flex', gap:8 }}>
-                                    {[['U','∪ Cóncava'],['N','∩ Convexa']].map(([v,lbl])=>(
-                                        <button key={v} onClick={()=>setForma(v)} style={{ flex:1, padding:'7px', borderRadius:8, border:`2px solid ${forma===v?'#f1c40f':'#444'}`, background:forma===v?'rgba(241,196,15,0.2)':'transparent', color:'white', cursor:'pointer', fontFamily:'inherit', fontSize:'0.82rem', fontWeight:forma===v?'bold':'normal' }}>{lbl}</button>
-                                    ))}
-                                </div>
-                                <div style={sCli.row}><span style={sCli.lbl}>xᵥ=</span><input style={sCli.inp} value={ansXv} onChange={e=>setAnsXv(e.target.value)} placeholder="xv" /></div>
-                                <div style={sCli.row}><span style={sCli.lbl}>yᵥ=</span><input style={sCli.inp} value={ansYv} onChange={e=>setAnsYv(e.target.value)} placeholder="yv" /></div>
-                                <label style={{ color:'white', fontSize:'0.85rem', display:'flex', gap:6, alignItems:'center' }}>
-                                    <input type="checkbox" checked={noCortes} onChange={e=>setNoCortes(e.target.checked)} />
-                                    Sin cortes con eje X
-                                </label>
-                                {!noCortes && (
-                                    <div style={{ display:'flex', gap:8 }}>
-                                        <div style={sCli.row}><span style={sCli.lbl}>x₁=</span><input style={{...sCli.inp,width:70}} value={ansX1} onChange={e=>setAnsX1(e.target.value)} /></div>
-                                        <div style={sCli.row}><span style={sCli.lbl}>x₂=</span><input style={{...sCli.inp,width:70}} value={ansX2} onChange={e=>setAnsX2(e.target.value)} /></div>
-                                    </div>
-                                )}
-                                <div style={sCli.row}><span style={sCli.lbl}>(0,</span><input style={sCli.inp} value={ansYeje} onChange={e=>setAnsYeje(e.target.value)} placeholder="c" /><span style={sCli.lbl}>)</span></div>
-                            </>
-                        )}
-                        {p.tipo === 'TRES_PUNTOS' && (
-                            <>
-                                <div style={sCli.row}><span style={sCli.lbl}>a=</span><input style={sCli.inp} value={ansA} onChange={e=>setAnsA(e.target.value)} /></div>
-                                <div style={sCli.row}><span style={sCli.lbl}>b=</span><input style={sCli.inp} value={ansB} onChange={e=>setAnsB(e.target.value)} /></div>
-                                <div style={sCli.row}><span style={sCli.lbl}>c=</span><input style={sCli.inp} value={ansC_} onChange={e=>setAnsC_(e.target.value)} /></div>
-                            </>
-                        )}
-                        {p.tipo === 'VECTOR' && (
-                            <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                                <div style={{fontSize:'0.78rem',color:'rgba(255,255,255,0.5)'}}>Haz clic en A luego en B para dibujar el vector:</div>
-                                <VectorCanvas eq={p} arrowPts={arrowPts} onPointClick={pt=>setArrowPts(prev=>prev.length>=2?[pt]:[...prev,pt])} disabled={false} resultado={null}/>
-                                {arrowPts.length>0&&<button onClick={()=>setArrowPts([])} style={{...sCli.btnEnviar,background:'#7f8c8d',marginTop:0,padding:'6px'}}>↺ Borrar</button>}
-                                <div style={sCli.row}><span style={sCli.lbl}>x=</span><input style={sCli.inp} value={ansVx} onChange={e=>setAnsVx(e.target.value)} placeholder="comp x"/></div>
-                                <div style={sCli.row}><span style={sCli.lbl}>y=</span><input style={sCli.inp} value={ansVy} onChange={e=>setAnsVy(e.target.value)} placeholder="comp y"/></div>
-                                <div style={sCli.row}><span style={sCli.lbl}>|v|=</span><input style={sCli.inp} value={ansMod} onChange={e=>setAnsMod(e.target.value)} placeholder="módulo"/></div>
-                                <div style={sCli.row}><span style={sCli.lbl}>θ°=</span><input style={sCli.inp} value={ansAngV} onChange={e=>setAnsAngV(e.target.value)} placeholder="ángulo"/></div>
-                            </div>
-                        )}
-                        {p.tipo === 'GENERAL' && (
-                            <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                                <div style={{fontSize:'0.78rem',color:'rgba(255,255,255,0.5)'}}>Dibuja r₁ (naranja) y r₂ (morado):</div>
-                                <GeneralCanvas eq={p} linePts={linePts} onPointClick={pt=>{setLinePts(prev=>{const n=[...prev];const i=n.findIndex(x=>x===null);if(i!==-1)n[i]=pt;return n;});}} disabled={false} resultado={null} mostrarSolucion={false}/>
-                                {linePts.some(Boolean)&&<button onClick={()=>setLinePts([null,null,null,null])} style={{...sCli.btnEnviar,background:'#7f8c8d',marginTop:0,padding:'6px'}}>↺ Borrar</button>}
-                                <div style={{display:'flex',gap:6}}>
-                                    {[[true,'Sí','par'],[false,'No','par']].map(([v,lbl])=>(
-                                        <button key={`par${v}`} onClick={()=>setAnsPar(v)} style={{flex:1,padding:'6px',borderRadius:8,border:`2px solid ${ansPar===v?'#f1c40f':'rgba(255,255,255,0.2)'}`,background:ansPar===v?'rgba(241,196,15,0.2)':'transparent',color:'white',cursor:'pointer',fontSize:'0.8rem',fontFamily:'inherit'}}>Paralelas: {lbl}</button>
-                                    ))}
-                                </div>
-                                <div style={{display:'flex',gap:6}}>
-                                    {[[true,'Sí'],[false,'No']].map(([v,lbl])=>(
-                                        <button key={`perp${v}`} onClick={()=>setAnsPerp(v)} style={{flex:1,padding:'6px',borderRadius:8,border:`2px solid ${ansPerp===v?'#f1c40f':'rgba(255,255,255,0.2)'}`,background:ansPerp===v?'rgba(241,196,15,0.2)':'transparent',color:'white',cursor:'pointer',fontSize:'0.8rem',fontFamily:'inherit'}}>Perpendiculares: {lbl}</button>
-                                    ))}
-                                </div>
-                                <label style={{color:'white',fontSize:'0.82rem',display:'flex',gap:6,alignItems:'center'}}>
-                                    <input type="checkbox" checked={noInter} onChange={e=>setNoInter(e.target.checked)}/>
-                                    Sin intersección
-                                </label>
-                                {!noInter&&<>
-                                    <div style={sCli.row}><span style={sCli.lbl}>x=</span><input style={sCli.inp} value={ansIx} onChange={e=>setAnsIx(e.target.value)} placeholder="x intersecc."/></div>
-                                    <div style={sCli.row}><span style={sCli.lbl}>y=</span><input style={sCli.inp} value={ansIy} onChange={e=>setAnsIy(e.target.value)} placeholder="y intersecc."/></div>
-                                </>}
-                            </div>
-                        )}
-                    </div>
-
-                    <button onClick={()=>enviar(false)} style={sCli.btnEnviar}>✓ Enviar</button>
+            {/* Banner de espera tras enviar */}
+            {enviado && (
+                <div style={{ textAlign:'center', padding:'12px', background:'rgba(255,255,255,0.08)', borderRadius:10, marginBottom:8, color:'rgba(255,255,255,0.7)', fontSize:'0.88rem' }}>
+                    <Loader size={18} style={{ verticalAlign:'middle', marginRight:6 }} />
+                    Respuesta enviada · esperando al resto...
                 </div>
+            )}
+
+            {/* Ejercicio completo reutilizado */}
+            {p.tipo === 'VECTOR' && (
+                <EjercicioVector eq={p} onNuevo={noop} onVolver={noop}
+                    onLiveEnviar={!enviado ? handleLiveEnviar : null} liveMode={true} />
+            )}
+            {p.tipo === 'GENERAL' && (
+                <EjercicioGeneral eq={p} onNuevo={noop} onVolver={noop}
+                    onLiveEnviar={!enviado ? handleLiveEnviar : null} liveMode={true} />
+            )}
+            {p.tipo === 'ANALISIS' && (
+                <EjercicioAnalisis eq={p} onNuevo={noop} onVolver={noop}
+                    onLiveEnviar={!enviado ? handleLiveEnviar : null} liveMode={true} />
+            )}
+            {p.tipo === 'TRES_PUNTOS' && (
+                <EjercicioTresPuntos eq={p} onNuevo={noop} onVolver={noop}
+                    onLiveEnviar={!enviado ? handleLiveEnviar : null} liveMode={true} />
+            )}
+            {['DOS_PUNTOS','PARALELA','PERPENDICULAR','GRAFICA'].includes(p.tipo) && (
+                <Ejercicio eq={p} onNuevo={noop} onVolver={noop}
+                    onLiveEnviar={!enviado ? handleLiveEnviar : null} liveMode={true} />
             )}
         </div>
     );
@@ -2434,7 +2328,7 @@ const sCli = {
     feedback:    { flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:16 },
     neonCard:    { background:'rgba(255,255,255,0.08)', border:'3px solid', borderRadius:16, padding:'24px 32px', textAlign:'center', display:'flex', flexDirection:'column', alignItems:'center', gap:8, minWidth:220 },
     waiting:     { flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:12 },
-    questionArea:{ flex:1, width:'100%', maxWidth:480, display:'flex', flexDirection:'column', alignItems:'center', padding:'0 16px 20px' },
+    questionArea:{ flex:1, width:'100%', maxWidth:900, display:'flex', flexDirection:'column', alignItems:'stretch', padding:'0 8px 20px', overflowY:'auto' },
     card:        { background:'rgba(255,255,255,0.08)', borderRadius:16, padding:'18px', width:'100%', boxSizing:'border-box' },
     row:         { display:'flex', alignItems:'center', gap:8 },
     lbl:         { color:'rgba(255,255,255,0.7)', fontSize:'0.9rem', minWidth:28 },

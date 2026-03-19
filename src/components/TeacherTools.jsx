@@ -1,6 +1,7 @@
 ﻿import React, { useState } from 'react';
-import { Wrench, Table, FileQuestion, RefreshCw } from 'lucide-react';
+import { Wrench, Table, FileQuestion, RefreshCw, BarChart2 } from 'lucide-react';
 
+import InformesJuegos from './InformesJuegos';
 import ToolExportarGoogleSheets from './ToolExportarGoogleSheets';
 import ToolGeneradorGoogleForms from './ToolGeneradorGoogleForms'; // <--- IMPORTAR
 import ToolConversorRecursos from './ToolConversorRecursos';
@@ -69,14 +70,14 @@ export default function TeacherTools({ usuario, googleToken }) {
 
 
                 {/* TARJETA 3: PRÓXIMAMENTE */}
-                <div style={{ ...cardStyle, opacity: 0.6, cursor: 'default' }}>
-                    <div style={{ background: '#f5f5f5', padding: '15px', borderRadius: '50%', marginBottom: '15px' }}>
-                        <Wrench size={32} color="#bdc3c7" />
+                <div onClick={() => setHerramientaActiva('INFORMES')} style={cardStyle}>
+                    <div style={{ background: '#e8f5e9', padding: '15px', borderRadius: '50%', marginBottom: '15px' }}>
+                        <BarChart2 size={32} color="#27ae60" />
                     </div>
-                    <h3 style={{ margin: '0 0 10px 0', color: '#7f8c8d' }}>Próximamente...</h3>
-                    <p style={{ margin: 0, color: '#999', fontSize: '0.9rem' }}>
-                        Generador de informes y gestión de alumnos.
-                    </p>
+                    <h3 style={{ margin: '0 0 10px 0', color: '#2c3e50' }}>Informes de Juegos</h3>
+                    <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>
+                        Consulta los resultados enviados por tus alumnos y el ranking de tus recursos.
+    </p>
                 </div>
 
             </div>

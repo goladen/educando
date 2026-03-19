@@ -14,7 +14,7 @@ import MathWordleGame from '../MathWordleGame';
 import SopaDeLetrasGame from '../SopaDeLetrasGame';
 import SintaxisGame from '../SintaxisGamen2';
 import Geometrix from '../Geometrix';
-import CalculoMental from '../CalculoMental2'; 
+import CalculoMental from '../CalculoMental'; 
 import Ecuaciones from '../Ecuaciones2';
 import Funciones from '../Funciones';
 import Plataformas from '../Plataformas2';

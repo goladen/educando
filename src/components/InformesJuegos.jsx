@@ -81,23 +81,30 @@ export default function InformesJuegos({ usuario }) {
 
     // ── Guardar código con comprobación de duplicados ─────────────────────────
     const guardarCodigo = async () => {
-        const nuevo = codigoEdit.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+        const nuevo = codigoEdit.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
         if (!nuevo || nuevo.length < 3) { setErrCodigo('El código debe tener al menos 3 caracteres.'); return; }
         setGuardandoCod(true); setErrCodigo(''); setCodOK(false);
         try {
-            // Comprobar si ya existe otro profesor con ese código
-            const q = query(collection(db, 'users'), where('codigoProfesor','==',nuevo));
-            const snap = await getDocs(q);
-            const existe = snap.docs.find(d => d.id !== usuario.uid);
-            if (existe) { setErrCodigo(`El código "${nuevo}" ya está en uso por otro profesor. Elige otro.`); setGuardandoCod(false); return; }
-            // Guardar
+            // Comprobar si el código ya existe (el ID del doc ES el código)
+            const codigoDoc = await getDoc(doc(db, 'codigos_profesor', nuevo));
+            if (codigoDoc.exists() && codigoDoc.data().uid !== usuario.uid) {
+                setErrCodigo(`El código "${nuevo}" ya está en uso. Elige otro.`);
+                setGuardandoCod(false); return;
+            }
+            // Liberar código anterior si tenía uno
+            if (codigoProf && codigoProf !== nuevo) {
+                await deleteDoc(doc(db, 'codigos_profesor', codigoProf));
+            }
+            // Reservar el nuevo código
+            await setDoc(doc(db, 'codigos_profesor', nuevo), { uid: usuario.uid });
+            // Guardar en el perfil del usuario
             await setDoc(doc(db, 'users', usuario.uid), { codigoProfesor: nuevo }, { merge: true });
             setCodigoProf(nuevo); setEditandoCod(false); setCodOK(true);
             setTimeout(() => setCodOK(false), 3000);
-            // Recargar informes con nuevo código
             cargar(nuevo);
-        } catch(e) {
-            setErrCodigo('Error al guardar. Comprueba tu conexión.');
+        } catch (e) {
+            console.error('Error:', e);
+            setErrCodigo(`Error: ${e.message}`);
         }
         setGuardandoCod(false);
     };

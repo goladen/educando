@@ -2,8 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Dices, Trophy, Clock, RotateCcw, Play, AlertCircle, Send, CheckCircle } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { db } from './firebase';
-import { collection, addDoc, query, where, getDocs, orderBy } from 'firebase/firestore';
-
+import { collection, addDoc, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 // ─── Constantes ───────────────────────────────────────────────────────────────
 const TOTAL    = 63;
 const OCAS     = new Set([5, 9, 14, 18, 23, 27, 32, 36, 41, 45, 50, 54, 59]);
@@ -312,27 +311,27 @@ function PantallaFin({ ord, modo, stats, jugadores, baseStr, onSetup, onRepetir 
         if (!code) { setErrorEnv('Escribe el código del profesor.'); return; }
         setEnviando(true); setErrorEnv('');
         try {
-            // Verificar que el código existe
-            const q = query(collection(db,'profesores'), where('codigoAcceso','==',code));
-            const snap = await getDocs(q);
-            if (snap.empty) { setErrorEnv('Código no encontrado.'); setEnviando(false); return; }
-            const profUid = snap.docs[0].data().uid || snap.docs[0].id;
+            // Buscar en codigos_profesor (el ID del doc ES el código)
+            const codigoDoc = await getDoc(doc(db, 'codigos_profesor', code));
+            if (!codigoDoc.exists()) {
+                setErrorEnv('Código no encontrado.');
+                setEnviando(false); return;
+            }
 
             // Guardar informe
-            await addDoc(collection(db,'informes_juegos'), {
-                tipo:       'OCA',
-                modalidad:  MODO_LABEL[modo] || modo,
-                fecha:      new Date(),
+            await addDoc(collection(db, 'informes_juegos'), {
+                tipo: 'OCA',
+                modalidad: MODO_LABEL[modo] || modo,
+                fecha: new Date(),
                 codigoProfesor: code,
-                profesorUid: profUid,
                 jugadores: jugadores.map(j => {
-                    const s = stats[j.id] || { intentos:0, aciertos:0 };
-                    const pct = s.intentos>0 ? Math.round(s.aciertos/s.intentos*100) : 0;
-                    return { nombre:j.nombre, aciertos:s.aciertos, intentos:s.intentos, porcentaje:pct };
+                    const s = stats[j.id] || { intentos: 0, aciertos: 0 };
+                    const pct = s.intentos > 0 ? Math.round(s.aciertos / s.intentos * 100) : 0;
+                    return { nombre: j.nombre, aciertos: s.aciertos, intentos: s.intentos, porcentaje: pct };
                 }),
             });
             setEnviado(true);
-        } catch(e) {
+        } catch (e) {
             console.error(e);
             setErrorEnv('Error al enviar. Comprueba tu conexión.');
         }

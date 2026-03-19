@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
-import { doc, updateDoc, deleteDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, updateDoc, deleteDoc, collection, query, where, getDocs, setDoc } from 'firebase/firestore';
 import { deleteUser } from 'firebase/auth';
 import { User, MapPin, Heart, LifeBuoy, Shield, Trash2, X, Save, CheckCircle, Copy, AlertTriangle } from 'lucide-react';
 
@@ -27,7 +27,7 @@ export default function UserProfile({ usuario, perfil, onClose, onUpdate, showSu
     const guardarCambios = async () => {
         setGuardando(true);
         try {
-            await updateDoc(doc(db, "users", usuario.uid), formData);
+            await setDoc(doc(db, "users", usuario.uid), formData, { merge: true });
             if (onUpdate) onUpdate();
             alert("¡Perfil actualizado!");
             onClose();

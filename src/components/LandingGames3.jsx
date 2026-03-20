@@ -16,7 +16,7 @@ import SintaxisGame from '../SintaxisGamen2';
 import Geometrix from '../Geometrix';
 import CalculoMental from '../CalculoMental'; 
 import Ecuaciones from '../Ecuaciones2';
-import Funciones from '../Funciones2';
+import Funciones from '../Funciones';
 import Plataformas from '../Plataformas2';
 
 import EtiquetaMe from '../EtiquetaMe';

@@ -466,7 +466,7 @@ function ModalEnviarProfe({ datos, onClose }) {
     );
 }
 
-function Ejercicio({ eq, onNuevo, onVolver, onLiveEnviar = null, liveMode = false }) {
+function Ejercicio({ eq, onNuevo, onVolver, onLiveEnviar = null, silentCheckTrigger = null, liveMode = false }) {
     const [ansM, setAnsM] = useState('');
     const [ansN, setAnsN] = useState('');
     const [studentPts, setStudentPts] = useState([]);
@@ -482,6 +482,17 @@ function Ejercicio({ eq, onNuevo, onVolver, onLiveEnviar = null, liveMode = fals
     };
 
     const handleNuevo = () => { resetEstado(); onNuevo(); };
+    // Cálculo silencioso cuando el host lo pide (1s antes del fin)
+    useEffect(() => {
+        if (!silentCheckTrigger || !onLiveEnviar || resultado) return;
+        const correctM = eq.mp ?? eq.m;
+        const correctN = eq.np ?? eq.n;
+        const mOk = eq.tipo === 'GRAFICA' ? approxEq(parseAnswer(ansM), eq.m) : approxEq(parseAnswer(ansM), correctM);
+        const nOk = eq.tipo === 'GRAFICA' ? approxEq(parseAnswer(ansN), eq.n) : approxEq(parseAnswer(ansN), correctN);
+        const ratio = (mOk ? 0.5 : 0) + (nOk ? 0.5 : 0);
+        onLiveEnviar(ratio, true); // silent=true
+    }, [silentCheckTrigger]);
+
 
     const handlePoint = (pt) => {
         if (resultado) return;
@@ -762,7 +773,7 @@ function VectorCanvas({ eq, arrowPts, onPointClick, disabled, resultado }) {
 }
 
 // ─── EJERCICIO VECTOR ─────────────────────────────────────────────────────────
-function EjercicioVector({ eq, onNuevo, onVolver, onLiveEnviar = null, liveMode = false }) {
+function EjercicioVector({ eq, onNuevo, onVolver, onLiveEnviar = null, silentCheckTrigger = null, liveMode = false }) {
     const [arrowPts, setArrowPts] = useState([]);
     const [ansVx, setAnsVx] = useState('');
     const [ansVy, setAnsVy] = useState('');
@@ -775,6 +786,18 @@ function EjercicioVector({ eq, onNuevo, onVolver, onLiveEnviar = null, liveMode 
     const [pctEnvio, setPctEnvio] = useState(0);
     const reset = () => { setArrowPts([]); setAnsVx(''); setAnsVy(''); setAnsMod(''); setAnsAng(''); setResultado(null); setErrores([]); setMostrarSol(false); setPctEnvio(0); };
     const [mostrarEnvio, setMostrarEnvio] = useState(false);
+    useEffect(() => {
+        if (!silentCheckTrigger || !onLiveEnviar || resultado) return;
+        const tol = 0.11;
+        const vxOk = Math.abs(parseAnswer(ansVx) - eq.vx) <= tol;
+        const vyOk = Math.abs(parseAnswer(ansVy) - eq.vy) <= tol;
+        const modOk = Math.abs(parseAnswer(ansMod) - eq.modulo) <= 0.15;
+        const angEst = parseAnswer(ansAng);
+        const angOk = Math.abs(angEst-eq.angulo)<=1||Math.abs(angEst-eq.angulo-360)<=1||Math.abs(angEst-eq.angulo+360)<=1;
+        const items = [arrowPts.length===2, vxOk, vyOk, modOk, angOk];
+        onLiveEnviar(items.filter(Boolean).length / items.length, true);
+    }, [silentCheckTrigger]);
+
 
     const handlePoint = (pt) => {
         if (resultado) return;
@@ -974,7 +997,7 @@ function GeneralCanvas({ eq, linePts, onPointClick, disabled, resultado, mostrar
 }
 
 // ─── EJERCICIO GENERAL ────────────────────────────────────────────────────────
-function EjercicioGeneral({ eq, onNuevo, onVolver, onLiveEnviar = null, liveMode = false }) {
+function EjercicioGeneral({ eq, onNuevo, onVolver, onLiveEnviar = null, silentCheckTrigger = null, liveMode = false }) {
     const [linePts, setLinePts] = useState([null,null,null,null]);
     const [ansPar, setAnsPar] = useState(null);   // true/false
     const [ansPerp, setAnsPerp] = useState(null);
@@ -988,6 +1011,17 @@ function EjercicioGeneral({ eq, onNuevo, onVolver, onLiveEnviar = null, liveMode
     const [pctEnvio, setPctEnvio] = useState(0);
     const reset = () => { setLinePts([null,null,null,null]); setAnsPar(null); setAnsPerp(null); setAnsIx(''); setAnsIy(''); setNoInter(false); setResultado(null); setErrores([]); setMostrarSol(false); setPctEnvio(0); };
     const [mostrarEnvio, setMostrarEnvio] = useState(false);
+    useEffect(() => {
+        if (!silentCheckTrigger || !onLiveEnviar || resultado) return;
+        const tol = 0.11;
+        const parOk  = ansPar === eq.paralelas;
+        const perpOk = ansPerp === eq.perpendiculares;
+        const ixOk   = eq.paralelas ? noInter : Math.abs(parseAnswer(ansIx) - eq.ix) <= tol;
+        const iyOk   = eq.paralelas ? noInter : Math.abs(parseAnswer(ansIy) - eq.iy) <= tol;
+        const items  = [parOk, perpOk, ixOk, iyOk];
+        onLiveEnviar(items.filter(Boolean).length / items.length, true);
+    }, [silentCheckTrigger]);
+
 
     const handlePoint = (pt) => {
         if (resultado) return;
@@ -1062,6 +1096,7 @@ function EjercicioGeneral({ eq, onNuevo, onVolver, onLiveEnviar = null, liveMode
     );
 
     return (
+        <>
         <div style={st.ejercicioWrap}>
             {resultado==='OK'&&<Confetti recycle={false} numberOfPieces={200}/>}
             <div style={st.enunciado}>
@@ -1119,13 +1154,17 @@ function EjercicioGeneral({ eq, onNuevo, onVolver, onLiveEnviar = null, liveMode
                             Paralelas: {eq.paralelas?'Sí':'No'} · Perpendiculares: {eq.perpendiculares?'Sí':'No'}
                         </div>
                     )}
-                    <div style={{display:'flex',gap:8,marginTop:'auto'}}>
+                    <div style={{display:'flex',gap:8,marginTop:'auto',flexWrap:'wrap'}}>
                         <button onClick={()=>{reset();onNuevo();}} style={st.btnNuevo}><RefreshCw size={15}/> Nuevo</button>
                         <button onClick={onVolver} style={st.btnVolver}><ArrowLeft size={15}/> Volver</button>
+                        {resultado && !liveMode && <button onClick={()=>setMostrarEnvio(true)} style={{...st.btnVolver,background:'#2980b9',color:'white',border:'none'}}>📤 Profe</button>}
                     </div>
+                    {liveMode && resultado && <div style={{color:'rgba(255,255,255,0.5)',fontSize:'0.82rem',textAlign:'center',marginTop:8}}>Esperando al resto...</div>}
                 </div>
             </div>
         </div>
+        {mostrarEnvio && <ModalEnviarProfe datos={{ porcentaje: pctEnvio, tipoEjercicio:'GENERAL' }} onClose={()=>setMostrarEnvio(false)}/>}
+        </>
     );
 }
 
@@ -1473,7 +1512,7 @@ const genTresPuntos = () => {
 };
 
 // ─── Ejercicio ANÁLISIS ───────────────────────────────────────────────────────
-function EjercicioAnalisis({ eq, onNuevo, onVolver, onLiveEnviar = null, liveMode = false }) {
+function EjercicioAnalisis({ eq, onNuevo, onVolver, onLiveEnviar = null, silentCheckTrigger = null, liveMode = false }) {
     const { a, b, c, disc } = eq;
     const xv = -b / (2 * a);
     const yv = a * xv * xv + b * xv + c;
@@ -1493,6 +1532,17 @@ function EjercicioAnalisis({ eq, onNuevo, onVolver, onLiveEnviar = null, liveMod
     const [pctEnvio, setPctEnvio] = useState(0);
     const reset = () => { setForma(''); setAnsXv(''); setAnsYv(''); setNoCortes(false); setAnsX1(''); setAnsX2(''); setAnsYeje(''); setResultado(null); setErrores([]); setMostrarSol(false); setStudentParPts([]); setPctEnvio(0); };
     const [mostrarEnvio, setMostrarEnvio] = useState(false);
+    useEffect(() => {
+        if (!silentCheckTrigger || !onLiveEnviar || resultado) return;
+        const tol = 0.11;
+        const formaOk = (a > 0 && forma === 'U') || (a < 0 && forma === 'N');
+        const xvOk = Math.abs(parseAnswer(ansXv) - xv) <= tol;
+        const yvOk = Math.abs(parseAnswer(ansYv) - yv) <= tol;
+        const yejeOk = Math.abs(parseAnswer(ansYeje) - c) <= tol;
+        const items = [formaOk, xvOk, yvOk, yejeOk];
+        onLiveEnviar(items.filter(Boolean).length / items.length, true);
+    }, [silentCheckTrigger]);
+
 
     const tol = 0.11;
     const numStr2 = (v) => Number.isInteger(v) ? `${v}` : (Math.round(v*100)/100).toString();
@@ -1677,7 +1727,7 @@ function EjercicioAnalisis({ eq, onNuevo, onVolver, onLiveEnviar = null, liveMod
 }
 
 // ─── Ejercicio TRES PUNTOS ────────────────────────────────────────────────────
-function EjercicioTresPuntos({ eq, onNuevo, onVolver, onLiveEnviar = null, liveMode = false }) {
+function EjercicioTresPuntos({ eq, onNuevo, onVolver, onLiveEnviar = null, silentCheckTrigger = null, liveMode = false }) {
     const { a, b, c, pts } = eq;
 
     const [ansA, setAnsA] = useState('');
@@ -1690,10 +1740,30 @@ function EjercicioTresPuntos({ eq, onNuevo, onVolver, onLiveEnviar = null, liveM
     const [parciales, setParciales] = useState({ aOk:false, bOk:false, cOk:false });
     const reset = () => { setAnsA(''); setAnsB(''); setAnsC(''); setResultado(null); setErrores([]); setMostrarSol(false); setParciales({aOk:false,bOk:false,cOk:false}); };
     const [mostrarEnvio, setMostrarEnvio] = useState(false);
+    useEffect(() => {
+        if (!silentCheckTrigger || !onLiveEnviar || resultado) return;
+        const tol2 = 0.11;
+        const aOk = ansA.trim()!=='' && Math.abs(parseAnswer(ansA)-a)<=tol2;
+        const bOk = ansB.trim()!=='' && Math.abs(parseAnswer(ansB)-b)<=tol2;
+        const cOk = ansC.trim()!=='' && Math.abs(parseAnswer(ansC)-c)<=tol2;
+        onLiveEnviar([aOk,bOk,cOk].filter(Boolean).length / 3, true);
+    }, [silentCheckTrigger]);
+
 
     const tol = 0.11;
 
     const comprobar = () => {
+        if (!liveMode && (ansA.trim()==='' || ansB.trim()==='' || ansC.trim()==='')) {
+            const aOkP = ansA.trim()!=='' && Math.abs(parseAnswer(ansA)-a)<=tol;
+            const bOkP = ansB.trim()!=='' && Math.abs(parseAnswer(ansB)-b)<=tol;
+            const cOkP = ansC.trim()!=='' && Math.abs(parseAnswer(ansC)-c)<=tol;
+            setParciales({aOk:aOkP,bOk:bOkP,cOk:cOkP});
+            const ac=[aOkP,bOkP,cOkP].filter(Boolean).length;
+            setPctEnvio(Math.round(ac/3*1000)/10);
+            setErrores(['⚠ Rellena todos los campos (a, b y c) antes de comprobar.']);
+            setResultado('FAIL');
+            return;
+        }
         const errs = [];
         const aOk = Math.abs(parseAnswer(ansA) - a) <= tol;
         const bOk = Math.abs(parseAnswer(ansB) - b) <= tol;
@@ -2055,9 +2125,15 @@ function FuncionesLiveHost({ codigoSala, onExit }) {
             const p   = gameData.preguntas[gameData.indicePregunta];
             const tt  = p.tiempo || 45;
             const ini = gameData.questionStartTime || Date.now();
+            const forceSentRef = { current: false };
             timerRef.current = setInterval(() => {
                 const r = Math.max(0, Math.ceil(tt - (Date.now() - ini) / 1000));
                 setTimer(r);
+                // Con 1 segundo de margen, forzar envío de todos los clientes
+                if (r <= 1 && !forceSentRef.current) {
+                    forceSentRef.current = true;
+                    updateDoc(doc(db, 'live_games', codigoSala), { forceCheck: Date.now() }).catch(()=>{});
+                }
                 if (r <= 0) { clearInterval(timerRef.current); if (gdRef.current) revelar(gdRef.current); }
             }, 500);
         }
@@ -2066,10 +2142,15 @@ function FuncionesLiveHost({ codigoSala, onExit }) {
 
     const revelar = async (d) => {
         if (d.fasePregunta !== 'RESPONDING') return;
-        const resps = Object.values(d.respuestasRonda || {});
-        const aciertos = resps.filter(r => r.correct).length;
-        const pct = resps.length > 0 ? Math.round((aciertos / resps.length) * 100) : 0;
-        setStats({ aciertos, total: resps.length, pct });
+        const jugsKeys = Object.keys(d.jugadores || {});
+        const resps = d.respuestasRonda || {};
+        // Calcular stats usando lo que hay + contar ausentes como 0 (solo para display)
+        const allResps = jugsKeys.map(uid => resps[uid] || { correct:false, ratio:0 });
+        const aciertos = allResps.filter(r => r.correct).length;
+        const pct = allResps.length > 0 ? Math.round(aciertos / allResps.length * 100) : 0;
+        setStats({ aciertos, total: allResps.length, pct });
+        // NO escribimos auto-submits a Firestore — los clientes envían su lastRatio
+        // en los próximos ~500ms cuando su propio timer llega a 0
         await updateDoc(doc(db, 'live_games', codigoSala), { fasePregunta: 'REVEAL' });
         setTimeout(() => updateDoc(doc(db, 'live_games', codigoSala), { fasePregunta: 'LEADERBOARD' }), 5000);
     };
@@ -2086,7 +2167,10 @@ function FuncionesLiveHost({ codigoSala, onExit }) {
     };
 
     const empezar = async () => {
-        await updateDoc(doc(db, 'live_games', codigoSala), { estado: 'COUNTDOWN' });
+        const d = gdRef.current || gameData;
+        const resetPts = {};
+        Object.keys(d?.jugadores || {}).forEach(uid => { resetPts[`jugadores.${uid}.puntos`] = 0; });
+        await updateDoc(doc(db, 'live_games', codigoSala), { estado: 'COUNTDOWN', ...resetPts });
         setTimeout(async () => {
             await updateDoc(doc(db, 'live_games', codigoSala), { estado: 'JUEGO', indicePregunta: 0, respuestasRonda: {}, fasePregunta: 'RESPONDING', questionStartTime: Date.now() });
         }, 3000);
@@ -2280,27 +2364,38 @@ function FuncionesLiveClient({ codigoSala, usuario, onExit }) {
     const [gameData, setGameData] = useState(null);
     const [fase, setFase]         = useState('LOBBY');
     const [subFase, setSubFase]   = useState('RESPONDING');
-    const [puntos, setPuntos]     = useState(0);
-    const [myResult, setMyResult] = useState(null);
-    const [myRank, setMyRank]     = useState(null);
+    const [puntos, setPuntos]         = useState(0);
+    const [myResult, setMyResult]     = useState(null);
+    const [myRank, setMyRank]         = useState(null);
+    const [forceCheck, setForceCheck] = useState(null); // timestamp del último forceCheck silencioso
     const joiningRef = useRef(false);
     const myName = usuario?.displayName || 'Alumno';
     const myUid  = useRef(usuario?.uid || 'guest_' + Math.random().toString(36).substr(2,8)).current;
 
+    const prevEstadoRef = useRef(null);
     useEffect(() => {
         const unsub = onSnapshot(doc(db, 'live_games', codigoSala), async snap => {
             if (!snap.exists()) { alert('La sala se ha cerrado.'); onExit(); return; }
             const data = snap.data();
-            setGameData(data); setFase(data.estado||'LOBBY'); setSubFase(data.fasePregunta||'RESPONDING');
-            const jugs = data.jugadores||{};
-            if (jugs[myUid]) setPuntos(jugs[myUid].puntos||0);
-            else if (!joiningRef.current && (data.estado==='LOBBY'||data.estado==='JUEGO')) {
+            setGameData(data);
+            const estado = data.estado || 'LOBBY';
+            setFase(estado); setSubFase(data.fasePregunta || 'RESPONDING');
+            const jugs = data.jugadores || {};
+            // Resetear puntos locales si volvemos a LOBBY (nueva partida)
+            if (prevEstadoRef.current === 'FIN' && estado === 'LOBBY') setPuntos(0);
+            prevEstadoRef.current = estado;
+            if (jugs[myUid]) {
+                setPuntos(jugs[myUid].puntos || 0);
+            } else if (!joiningRef.current && (estado === 'LOBBY' || estado === 'JUEGO')) {
                 joiningRef.current = true;
-                await updateDoc(doc(db,'live_games',codigoSala),{[`jugadores.${myUid}`]:{uid:myUid,nombre:myName,puntos:0}});
+                try {
+                    await updateDoc(doc(db,'live_games',codigoSala), {[`jugadores.${myUid}`]:{uid:myUid,nombre:myName,puntos:0}});
+                } catch(e) { console.warn('join error:', e); }
                 joiningRef.current = false;
             }
-            setMyResult(data.respuestasRonda?.[myUid]||null);
-            if (data.estado==='FIN') {
+            setMyResult(data.respuestasRonda?.[myUid] || null);
+            if (data.forceCheck) setForceCheck(data.forceCheck);
+            if (estado === 'FIN') {
                 const sorted = Object.values(jugs).sort((a,b)=>(b.puntos||0)-(a.puntos||0));
                 setMyRank(sorted.findIndex(j=>j.uid===myUid)+1);
             }
@@ -2335,6 +2430,7 @@ function FuncionesLiveClient({ codigoSala, usuario, onExit }) {
                         pregunta={p}
                         startTime={gameData.questionStartTime}
                         subFase={subFase}
+                        forceCheck={forceCheck}
                         myResult={myResult}
                         puntos={puntos}
                         onResponder={async (esCorrecta, ratio=0) => {
@@ -2380,13 +2476,23 @@ function FinLiveClientButtons({ myName, puntos, myRank, onExit, gameData }) {
 }
 
 // Pregunta para el cliente — usa los componentes de ejercicio reales
-function ClientPreguntaFunciones({ pregunta, startTime, subFase, myResult, puntos, onResponder }) {
+function ClientPreguntaFunciones({ pregunta, startTime, subFase, forceCheck, myResult, puntos, onResponder }) {
     const [enviado, setEnviado] = useState(false);
     const [timeLeft, setTimeLeft] = useState(100);
     const [isLate, setIsLate]   = useState(false);
-    const tRef   = useRef(null);
-    const envRef = useRef(false); // evita doble envío
+    const tRef        = useRef(null);
+    const envRef      = useRef(false);   // evita doble envío
+    const lastRatio   = useRef(0);       // último ratio parcial computado silenciosamente
 
+    // forceCheck: el host avisa 1s antes — dispara cálculo silencioso en el ejercicio hijo
+    const [silentCheckTrigger, setSilentCheckTrigger] = useState(null);
+    useEffect(() => {
+        if (!forceCheck || enviado) return;
+        setSilentCheckTrigger(forceCheck); // el hijo calcula y llama onLiveEnviar(ratio, true)
+    }, [forceCheck]);
+
+    // Timer del cliente — usa questionStartTime del servidor como referencia absoluta
+    // así el desfase de reloj entre host y cliente no afecta (ambos miden desde el mismo origen)
     useEffect(() => {
         if (subFase !== 'RESPONDING' || enviado) return;
         const tt = pregunta.tiempo || 45;
@@ -2397,13 +2503,20 @@ function ClientPreguntaFunciones({ pregunta, startTime, subFase, myResult, punto
             if (pct < 20) setIsLate(true);
             if (pct <= 0) {
                 clearInterval(tRef.current);
-                if (!envRef.current) { envRef.current=true; setEnviado(true); onResponder(false, 0); }
+                if (!envRef.current) {
+                    envRef.current = true;
+                    setEnviado(true);
+                    onResponder(lastRatio.current > 0, lastRatio.current);
+                }
             }
         }, 150);
         return () => clearInterval(tRef.current);
     }, [startTime, subFase, enviado]);
 
-    const handleLiveEnviar = (ratio) => {
+    // Llamado por el ejercicio hijo: silent=true → solo actualiza lastRatio sin enviar ni mostrar
+    const handleLiveEnviar = (ratio, silent = false) => {
+        lastRatio.current = ratio; // guardar siempre
+        if (silent) return;        // cálculo silencioso: no enviar, no marcar como enviado
         if (envRef.current) return;
         envRef.current = true;
         clearInterval(tRef.current);
@@ -2455,23 +2568,23 @@ function ClientPreguntaFunciones({ pregunta, startTime, subFase, myResult, punto
             {/* Ejercicio completo reutilizado */}
             {p.tipo === 'VECTOR' && (
                 <EjercicioVector eq={p} onNuevo={noop} onVolver={noop}
-                    onLiveEnviar={!enviado ? handleLiveEnviar : null} liveMode={true} />
+                    onLiveEnviar={handleLiveEnviar} silentCheckTrigger={silentCheckTrigger} liveMode={true} />
             )}
             {p.tipo === 'GENERAL' && (
                 <EjercicioGeneral eq={p} onNuevo={noop} onVolver={noop}
-                    onLiveEnviar={!enviado ? handleLiveEnviar : null} liveMode={true} />
+                    onLiveEnviar={handleLiveEnviar} silentCheckTrigger={silentCheckTrigger} liveMode={true} />
             )}
             {p.tipo === 'ANALISIS' && (
                 <EjercicioAnalisis eq={p} onNuevo={noop} onVolver={noop}
-                    onLiveEnviar={!enviado ? handleLiveEnviar : null} liveMode={true} />
+                    onLiveEnviar={handleLiveEnviar} silentCheckTrigger={silentCheckTrigger} liveMode={true} />
             )}
             {p.tipo === 'TRES_PUNTOS' && (
                 <EjercicioTresPuntos eq={p} onNuevo={noop} onVolver={noop}
-                    onLiveEnviar={!enviado ? handleLiveEnviar : null} liveMode={true} />
+                    onLiveEnviar={handleLiveEnviar} silentCheckTrigger={silentCheckTrigger} liveMode={true} />
             )}
             {['DOS_PUNTOS','PARALELA','PERPENDICULAR','GRAFICA'].includes(p.tipo) && (
                 <Ejercicio eq={p} onNuevo={noop} onVolver={noop}
-                    onLiveEnviar={!enviado ? handleLiveEnviar : null} liveMode={true} />
+                    onLiveEnviar={handleLiveEnviar} silentCheckTrigger={silentCheckTrigger} liveMode={true} />
             )}
         </div>
     );
@@ -2569,6 +2682,11 @@ export default function Funciones({ isHost = false, codigoSala: codigoExterno = 
 
             {/* Header */}
             <div style={st.header}>
+                {onExit && (
+                    <button onClick={onExit} style={{ background:'rgba(255,255,255,0.1)', border:'none', borderRadius:10, padding:'8px 14px', color:'white', cursor:'pointer', display:'flex', alignItems:'center', gap:6, fontSize:'0.9rem', marginBottom:8, alignSelf:'flex-start' }}>
+                        <ArrowLeft size={16}/> Volver
+                    </button>
+                )}
                 <div style={st.headerIcon}>∫</div>
                 <div>
                     <div style={st.headerTitulo}>Funciones</div>
@@ -2580,11 +2698,11 @@ export default function Funciones({ isHost = false, codigoSala: codigoExterno = 
             <div style={st.mainGrid}>
                 <button onClick={() => setSeccion('RECTAS')} style={{ ...st.mainCard, '--accent':'#3498db' }}>
                     <TrendingUp size={40} color="#3498db" />
-                    <div style={st.mainCardTitle}>Rectas</div>
+                    <div style={st.mainCardTitle}>Rectas en 2D</div>
                     <div style={st.mainCardDesc}>
-                        Ecuación explícita, rectas paralelas y perpendiculares, lectura de gráficas
+                        Ecuación explícita, rectas paralelas y perpendiculares, vector...
                     </div>
-                    <div style={st.mainCardPill}>4 tipos de ejercicio</div>
+                    <div style={st.mainCardPill}>6 tipos de ejercicio</div>
                 </button>
 
                 <button onClick={() => setSeccion('PARABOLAS')} style={{ ...st.mainCard, '--accent':'#9b59b6' }}>

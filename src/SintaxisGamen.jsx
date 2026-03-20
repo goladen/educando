@@ -3,7 +3,7 @@ import { db } from './firebase';
 import { collection, query, where, getDocs, doc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { CheckCircle, XCircle, RotateCcw, Play, Trophy, PaintBucket, ArrowRight,
          BookOpen, ChevronRight, Search, Key, ChevronDown, ChevronUp, Clock,
-         Users, AlertTriangle } from 'lucide-react';
+         Users, AlertTriangle, Volume2 } from 'lucide-react';
 import { CATEGORIAS, NIVELES, FRASES } from './BibliotecaFrases';
 import { CATEGORIAS_FR, NIVELES_FR, FRASES_FR } from './BibliotecaFrances';
 
@@ -76,6 +76,50 @@ const nivelLabel = (nivelId, recurso) => {
 
 // Tiempo formateado mm:ss
 const fmtTime = (s) => `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`;
+
+// ─────────────────────────────────────────────────────────────────────
+// HOOK: Texto a Voz (Web Speech API — sin API key, sin coste)
+// ─────────────────────────────────────────────────────────────────────
+const useTTS = () => {
+    const [speaking, setSpeaking] = React.useState(false);
+    const speak = (texto, lang = 'es-ES') => {
+        if (!window.speechSynthesis) return;
+        window.speechSynthesis.cancel();
+        const utt = new SpeechSynthesisUtterance(texto);
+        utt.lang  = lang;
+        utt.rate  = 0.85;
+        utt.pitch = 1;
+        utt.onstart = () => setSpeaking(true);
+        utt.onend   = () => setSpeaking(false);
+        utt.onerror = () => setSpeaking(false);
+        window.speechSynthesis.speak(utt);
+    };
+    const stop = () => { window.speechSynthesis?.cancel(); setSpeaking(false); };
+    return { speak, stop, speaking };
+};
+
+// Botón de lectura en voz alta
+function BtnLeer({ tokens, lang = 'es-ES' }) {
+    const { speak, stop, speaking } = useTTS();
+    const texto = tokens.map(t => t.text).join(' ');
+    return (
+        <button
+            onClick={() => speaking ? stop() : speak(texto, lang)}
+            title={speaking ? 'Parar' : 'Leer en voz alta'}
+            style={{
+                padding: '6px 12px', borderRadius: 20,
+                border: `2px solid ${speaking ? '#e74c3c' : '#3498db'}`,
+                background: speaking ? '#fdecea' : '#eaf4fe',
+                color: speaking ? '#e74c3c' : '#2980b9',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+                fontSize: '0.8rem', fontWeight: 'bold', transition: 'all 0.2s',
+            }}>
+            <Volume2 size={14} style={{ animation: speaking ? 'pulse 0.8s infinite' : 'none' }}/>
+            {speaking ? 'Parar' : '🔊 Leer'}
+        </button>
+    );
+}
+
 
 // ─────────────────────────────────────────────────────────────────────
 // MAIN EXPORT — ROUTER
@@ -274,7 +318,11 @@ const correctBgFR = (esp) => {
 
 function FraseTokensFR({ tokens, answers, onClickWord, readonly, results }) {
     return (
-        <div style={{display:'flex',flexWrap:'wrap',gap:8,justifyContent:'center',padding:'12px 0'}}>
+        <div>
+        <div style={{display:'flex',justifyContent:'center',marginBottom:6}}>
+            <BtnLeer tokens={tokens} lang="fr-FR"/>
+        </div>
+        <div style={{display:'flex',flexWrap:'wrap',gap:8,justifyContent:'center',padding:'4px 0'}}>
             {tokens.map((t, i) => {
                 const ans = answers?.[i] || [];
                 const r = results?.[i];
@@ -309,6 +357,7 @@ function FraseTokensFR({ tokens, answers, onClickWord, readonly, results }) {
                     </div>
                 );
             })}
+        </div>
         </div>
     );
 }
@@ -1043,9 +1092,13 @@ function Paleta({ catSel, setCatSel, nivel, tokens }) {
 // ─────────────────────────────────────────────────────────────────────
 // COMPONENTE COMPARTIDO — FRASE INTERACTIVA
 // ─────────────────────────────────────────────────────────────────────
-function FraseTokens({ tokens, answers, onClickWord, readonly, results }) {
+function FraseTokens({ tokens, answers, onClickWord, readonly, results, lang = 'es-ES' }) {
     return (
-        <div style={{display:'flex',flexWrap:'wrap',gap:8,justifyContent:'center',padding:'12px 0'}}>
+        <div>
+        <div style={{display:'flex',justifyContent:'center',marginBottom:6}}>
+            <BtnLeer tokens={tokens} lang={lang}/>
+        </div>
+        <div style={{display:'flex',flexWrap:'wrap',gap:8,justifyContent:'center',padding:'4px 0'}}>
             {tokens.map((t, i) => {
                 const ans = answers?.[i] || [];
                 const r = results?.[i];
@@ -1081,6 +1134,7 @@ function FraseTokens({ tokens, answers, onClickWord, readonly, results }) {
                     </div>
                 );
             })}
+        </div>
         </div>
     );
 }
@@ -1977,6 +2031,6 @@ const g = {
 if (typeof document !== 'undefined' && !document.getElementById('sintaxis-kf')) {
     const s = document.createElement('style');
     s.id = 'sintaxis-kf';
-    s.textContent = `@keyframes popUp{0%{opacity:0;transform:translateY(0) scale(.8)}50%{opacity:1;transform:translateY(-28px) scale(1.2)}100%{opacity:0;transform:translateY(-56px) scale(1)}}`;
+    s.textContent = `@keyframes popUp{0%{opacity:0;transform:translateY(0) scale(.8)}50%{opacity:1;transform:translateY(-28px) scale(1.2)}100%{opacity:0;transform:translateY(-56px) scale(1)}} @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(1.2)}}`;
     document.head.appendChild(s);
 }

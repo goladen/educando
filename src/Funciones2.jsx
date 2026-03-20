@@ -1212,6 +1212,10 @@ function PantallaRectas({ onVolver }) {
                     <div style={st.seccionSubtitulo}>Ecuación explícita · y = mx + n</div>
                 </div>
             </div>
+
+           
+
+
             <div style={st.tiposGrid}>
                 {TIPOS.map(t => (
                     <button key={t.id} onClick={() => iniciar(t)} style={st.tipoBtn}>
@@ -1221,6 +1225,22 @@ function PantallaRectas({ onVolver }) {
                     </button>
                 ))}
             </div>
+
+            {/* Vídeo explicativo */}
+            <div style={{ width: '100%', maxWidth: 560, aspectRatio: '16/9', borderRadius: 14, overflow: 'hidden', marginTop: 20, marginLeft: 40, boxShadow: '20px 4px 20px rgba(0,0,0,0.2)' }}>
+                <iframe
+                    width="100%" height="100%"
+                    src="https://www.youtube.com/embed/LBRPwvvobfA"
+                    title="Ecuación de la recta"
+                    frameBorder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                />
+            </div>
+
+
+
+
         </div>
     );
 }

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { RotateCcw, CheckCircle, XCircle, Trophy, Clock, Calculator, Settings, SkipForward, Monitor, Loader, Users } from 'lucide-react';
+import { RotateCcw, CheckCircle, XCircle, Trophy, Clock, Calculator, Settings, SkipForward, Monitor, Loader, Users, Send } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { db } from './firebase';
-import { doc, setDoc, updateDoc, onSnapshot, increment } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, onSnapshot, increment, collection, addDoc, getDoc } from 'firebase/firestore';
 import piHappy from './assets/Pi-contento.png';
 import piAngry from './assets/Pi-enfadado.png';
 import piNeutral from './assets/Pi-neutro.png';
@@ -1030,6 +1030,73 @@ export default function EcuacionesGame({ onExit, isHost, codigoSala, usuario }) 
 }
 
 // ─── HOST EN VIVO ─────────────────────────────────────────────────────────────
+// ─── Modal enviar al profesor ────────────────────────────────────────────────
+function ModalEnviarProfeEcu({ datos, onClose }) {
+    const [codigo,   setCodigo]   = useState('');
+    const [enviando, setEnviando] = useState(false);
+    const [enviado,  setEnviado]  = useState(false);
+    const [error,    setError]    = useState('');
+    const esLive = !!datos.jugadores;
+    const [nombre, setNombre] = useState('');
+    const [curso,  setCurso]  = useState('');
+
+    const enviar = async () => {
+        const code = codigo.trim().toUpperCase();
+        if (!esLive && !nombre.trim()) { setError('Escribe tu nombre.'); return; }
+        if (!code) { setError('Escribe el código del profesor.'); return; }
+        setEnviando(true); setError('');
+        try {
+            const codigoDoc = await getDoc(doc(db, 'codigos_profesor', code));
+            if (!codigoDoc.exists()) { setError('Código de profesor no encontrado.'); setEnviando(false); return; }
+            const jugadoresInforme = esLive ? datos.jugadores
+                : [{ nombre: nombre.trim(), curso: curso.trim(), puntos: datos.puntos||0, correcto: datos.correcto, porcentaje: datos.correcto?100:0 }];
+            await addDoc(collection(db, 'informes_juegos'), {
+                tipo: 'ECUACIONES', modalidad: esLive ? 'Online' : 'Individual',
+                fecha: new Date(), codigoProfesor: code, jugadores: jugadoresInforme,
+            });
+            setEnviado(true);
+        } catch(e) { console.error(e); setError('Error: ' + e.message); }
+        setEnviando(false);
+    };
+    const inp = { padding:'9px 12px', borderRadius:9, border:'1.5px solid #e0e4f0', fontSize:'0.9rem', outline:'none', width:'100%', boxSizing:'border-box', fontFamily:'inherit' };
+    return (
+        <div style={{ position:'fixed', inset:0, zIndex:3000, background:'rgba(8,12,24,0.88)', display:'flex', alignItems:'center', justifyContent:'center', padding:16, backdropFilter:'blur(4px)' }}>
+            <div style={{ background:'white', borderRadius:20, width:'100%', maxWidth:380, boxShadow:'0 30px 80px rgba(0,0,0,0.5)', padding:'26px 28px' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:18 }}>
+                    <h3 style={{ margin:0, color:'#2c3e50', fontSize:'1.05rem' }}>📤 Enviar resultados al profesor</h3>
+                    <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', color:'#95a5a6', fontSize:'1.2rem' }}>✕</button>
+                </div>
+                {enviado ? (
+                    <div style={{ textAlign:'center', padding:'20px 0' }}>
+                        <CheckCircle size={48} color="#27ae60" style={{ marginBottom:10 }}/>
+                        <div style={{ color:'#27ae60', fontWeight:700 }}>¡Informe enviado!</div>
+                        <button onClick={onClose} style={{ marginTop:14, padding:'9px 22px', borderRadius:10, border:'none', background:'#f0f0f0', cursor:'pointer' }}>Cerrar</button>
+                    </div>
+                ) : (
+                    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                        {!esLive && (<>
+                            <div><label style={{ fontSize:'0.78rem', color:'#7f8c8d', fontWeight:600, display:'block', marginBottom:4 }}>Nombre y apellido</label>
+                            <input value={nombre} onChange={e=>setNombre(e.target.value)} placeholder="Tu nombre completo" style={inp}/></div>
+                            <div><label style={{ fontSize:'0.78rem', color:'#7f8c8d', fontWeight:600, display:'block', marginBottom:4 }}>Curso</label>
+                            <input value={curso} onChange={e=>setCurso(e.target.value)} placeholder="Ej: 3º ESO A" style={inp}/></div>
+                        </>)}
+                        {esLive && <div style={{ background:'#f8f9fa', borderRadius:10, padding:'10px 12px', fontSize:'0.83rem', color:'#555' }}>Se enviarán los resultados de <strong>{datos.jugadores.length}</strong> jugadores.</div>}
+                        <div><label style={{ fontSize:'0.78rem', color:'#7f8c8d', fontWeight:600, display:'block', marginBottom:4 }}>Código del profesor</label>
+                        <input value={codigo} onChange={e=>setCodigo(e.target.value.toUpperCase())} placeholder="Ej: PROF01" maxLength={10} style={{...inp,letterSpacing:2,fontWeight:700}}/></div>
+                        {error && <div style={{ color:'#e74c3c', fontSize:'0.8rem' }}>⚠ {error}</div>}
+                        <div style={{ display:'flex', gap:9, marginTop:4 }}>
+                            <button onClick={onClose} style={{ flex:1, padding:'10px', borderRadius:10, border:'1px solid #ddd', background:'white', cursor:'pointer', fontFamily:'inherit' }}>Cancelar</button>
+                            <button onClick={enviar} disabled={enviando} style={{ flex:2, padding:'10px', borderRadius:10, border:'none', background:enviando?'#95a5a6':'linear-gradient(135deg,#3498db,#2980b9)', color:'white', fontWeight:700, cursor:enviando?'default':'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', gap:7, opacity:enviando?.7:1 }}>
+                                <Send size={15}/>{enviando?'Enviando…':'Enviar'}
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
 function EcuacionesLiveHost({ codigoSala, onExit, usuario }) {
     const [gameData, setGameData] = useState(null);
     const [jugadores, setJugadores] = useState([]);
@@ -1084,9 +1151,14 @@ function EcuacionesLiveHost({ codigoSala, onExit, usuario }) {
         if (faseHost === 'JUEGO' && subFase === 'RESPONDING' && gameData) {
             const p = gameData.preguntas[gameData.indicePregunta];
             const tt = parseInt(p.tiempo || 30), inicio = gameData.questionStartTime || Date.now();
+            const fcSent = { current: false };
             timerRef.current = setInterval(() => {
                 const r = Math.max(0, Math.ceil(tt - (Date.now() - inicio) / 1000));
                 setTimerVisual(r);
+                if (r <= 1 && !fcSent.current) {
+                    fcSent.current = true;
+                    updateDoc(doc(db, 'live_games', codigoSala), { forceCheck: Date.now() }).catch(()=>{});
+                }
                 if (r <= 0) { clearInterval(timerRef.current); if (gdRef.current) revelarRespuestas(gdRef.current); }
             }, 500);
         }
@@ -1095,17 +1167,22 @@ function EcuacionesLiveHost({ codigoSala, onExit, usuario }) {
 
     const revelarRespuestas = async (d) => {
         if (d.fasePregunta !== 'RESPONDING') return;
-        const resps = Object.values(d.respuestasRonda || {});
-        const aciertos = resps.filter(r => r.correct).length;
-        setStats({ aciertos, total: resps.length, pct: resps.length > 0 ? Math.round((aciertos / resps.length) * 100) : 0 });
+        const jugsKeys = Object.keys(d.jugadores || {});
+        const resps = d.respuestasRonda || {};
+        const allResps = jugsKeys.map(uid => resps[uid] || { correct:false });
+        const aciertos = allResps.filter(r => r.correct).length;
+        setStats({ aciertos, total: allResps.length, pct: allResps.length > 0 ? Math.round(aciertos/allResps.length*100) : 0 });
         await updateDoc(doc(db, 'live_games', codigoSala), { fasePregunta: 'REVEAL' });
         setTimeout(() => updateDoc(doc(db, 'live_games', codigoSala), { fasePregunta: 'LEADERBOARD' }), 4000);
     };
 
     const iniciarJuego = async () => {
+        const d = gdRef.current || gameData;
+        const resetPts = {};
+        Object.keys(d?.jugadores || {}).forEach(uid => { resetPts[`jugadores.${uid}.puntos`] = 0; });
         await updateDoc(doc(db, 'live_games', codigoSala), {
             estado: 'JUEGO', fasePregunta: 'RESPONDING', indicePregunta: 0,
-            respuestasRonda: {}, questionStartTime: Date.now(),
+            respuestasRonda: {}, questionStartTime: Date.now(), ...resetPts,
         });
     };
 
@@ -1248,24 +1325,39 @@ function EcuacionesLiveHost({ codigoSala, onExit, usuario }) {
             )}
 
             {faseHost === 'FIN' && (
-                <div style={{ ...sH.card, textAlign: 'center' }}>
-                    <Confetti recycle={false} numberOfPieces={250} />
-                    <Trophy size={70} color="#f1c40f" style={{ marginBottom: 16 }} />
-                    <h2 style={{ fontSize: '1.6rem', marginBottom: 20 }}>🏆 Resultados Finales</h2>
-                    {ranking.map((j, i) => (
-                        <div key={j.uid} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: i === 0 ? 'rgba(241,196,15,0.2)' : 'rgba(255,255,255,0.07)', borderRadius: 12, padding: '12px 18px', marginBottom: 6 }}>
-                            <span style={{ fontSize: '1.1rem' }}>{['🥇','🥈','🥉'][i] || `${i+1}.`} {j.nombre || 'Jugador'}</span>
-                            <span style={{ fontWeight: 'bold', color: '#f1c40f', fontSize: '1.2rem' }}>{j.puntos || 0} pts</span>
-                        </div>
-                    ))}
-                    <button onClick={onExit} style={{ ...sH.btn('#3498db'), marginTop: 20 }}>Volver al Menú</button>
-                </div>
+                <FinHostEcu ranking={ranking} onExit={onExit} />
             )}
         </div>
     );
 }
 
 // ─── CLIENTE EN VIVO ──────────────────────────────────────────────────────────
+function FinHostEcu({ ranking, onExit }) {
+    const [mostrarEnvio, setMostrarEnvio] = useState(false);
+    const maxPts = Math.max(...ranking.map(j=>j.puntos||0), 1);
+    const datos = { jugadores: ranking.map(j=>({ nombre:j.nombre||'Jugador', curso:'', puntos:j.puntos||0, porcentaje:Math.round((j.puntos||0)/maxPts*100), correcto:(j.puntos||0)>0 })) };
+    return (
+        <div style={{ textAlign:'center' }}>
+            <Confetti recycle={false} numberOfPieces={250}/>
+            <Trophy size={70} color="#f1c40f" style={{ marginBottom:16 }}/>
+            <h2 style={{ fontSize:'1.6rem', marginBottom:20 }}>🏆 Resultados Finales</h2>
+            {ranking.map((j,i) => (
+                <div key={j.uid} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', background: i===0?'rgba(241,196,15,0.2)':'rgba(255,255,255,0.07)', borderRadius:12, padding:'12px 18px', marginBottom:6 }}>
+                    <span style={{ fontSize:'1.1rem' }}>{['🥇','🥈','🥉'][i]||`${i+1}.`} {j.nombre||'Jugador'}</span>
+                    <span style={{ fontWeight:'bold', color:'#f1c40f', fontSize:'1.2rem' }}>{j.puntos||0} pts</span>
+                </div>
+            ))}
+            <div style={{ display:'flex', gap:10, marginTop:20 }}>
+                <button onClick={()=>setMostrarEnvio(true)} style={{ flex:1, padding:'12px', background:'linear-gradient(135deg,#3498db,#2980b9)', color:'white', border:'none', borderRadius:12, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:7 }}>
+                    <Send size={15}/> Enviar a profesor
+                </button>
+                <button onClick={onExit} style={{ flex:1, padding:'12px', background:'#e74c3c', color:'white', border:'none', borderRadius:12, fontWeight:700, cursor:'pointer' }}>Volver al Menú</button>
+            </div>
+            {mostrarEnvio && <ModalEnviarProfeEcu datos={datos} onClose={()=>setMostrarEnvio(false)}/>}
+        </div>
+    );
+}
+
 function EcuacionesLiveClient({ codigoSala, onExit, usuario }) {
     const [gameData, setGameData] = useState(null);
     const [fase, setFase] = useState('LOBBY');
@@ -1288,15 +1380,23 @@ function EcuacionesLiveClient({ codigoSala, onExit, usuario }) {
         localStorage.setItem('pikt_guest_id', id);
         return id;
     });
-    const joiningRef = useRef(false);
+    const joiningRef  = useRef(false);
+    const prevEstadoRef = useRef(null);
+    const [forceCheck, setForceCheck] = useState(null);
 
     useEffect(() => {
-        if (!joiningRef.current) {
+        // Unirse solo si no existe ya en la sala
+        const tryJoin = async () => {
+            if (joiningRef.current) return;
             joiningRef.current = true;
-            updateDoc(doc(db, 'live_games', codigoSala), {
-                [`jugadores.${myUid}`]: { uid: myUid, nombre: myName, puntos: 0 }
-            }).catch(console.error);
-        }
+            try {
+                await updateDoc(doc(db, 'live_games', codigoSala), {
+                    [`jugadores.${myUid}`]: { uid: myUid, nombre: myName, puntos: 0 }
+                });
+            } catch(e) { console.warn('join error:', e); }
+            joiningRef.current = false;
+        };
+        tryJoin();
     }, []);
 
     useEffect(() => {
@@ -1304,14 +1404,18 @@ function EcuacionesLiveClient({ codigoSala, onExit, usuario }) {
             if (!snap.exists()) return;
             const data = snap.data();
             setGameData(data);
-            setFase(data.estado || 'LOBBY');
-            setSubFase(data.fasePregunta || 'RESPONDING');
+            const estado = data.estado || 'LOBBY';
+            setFase(estado); setSubFase(data.fasePregunta || 'RESPONDING');
+            // Reset puntos locales si volvemos a JUEGO desde FIN (nueva partida)
+            if (prevEstadoRef.current === 'FIN' && estado === 'JUEGO') setPuntuacion(0);
+            prevEstadoRef.current = estado;
             const me = data.jugadores?.[myUid];
             if (me) setPuntuacion(me.puntos || 0);
             const resp = data.respuestasRonda?.[myUid];
             if (resp?.processed) setMyResult(resp);
-            if (data.estado === 'JUEGO' && data.fasePregunta === 'RESPONDING') setMyResult(null);
-            if (data.estado === 'FIN') {
+            if (estado === 'JUEGO' && data.fasePregunta === 'RESPONDING') setMyResult(null);
+            if (data.forceCheck) setForceCheck(data.forceCheck);
+            if (estado === 'FIN') {
                 const sorted = Object.values(data.jugadores || {}).sort((a, b) => (b.puntos || 0) - (a.puntos || 0));
                 setMyRank(sorted.findIndex(j => j.uid === myUid) + 1);
             }
@@ -1351,6 +1455,7 @@ function EcuacionesLiveClient({ codigoSala, onExit, usuario }) {
                     pregunta={pregunta}
                     startTime={gameData.questionStartTime}
                     subFase={subFase}
+                    forceCheck={forceCheck}
                     myResult={myResult}
                     puntuacion={puntuacion}
                     onResponder={async (esCorrecta) => {
@@ -1362,31 +1467,74 @@ function EcuacionesLiveClient({ codigoSala, onExit, usuario }) {
             )}
 
             {fase === 'FIN' && (
-                <div style={{ textAlign: 'center', marginTop: 40 }}>
-                    {myRank <= 3 && <Confetti recycle={false} numberOfPieces={200} />}
-                    <Trophy size={70} color="#f1c40f" />
-                    <h2 style={{ fontSize: '1.6rem', margin: '16px 0 8px' }}>¡Fin de partida!</h2>
-                    <p style={{ color: '#aaa', marginBottom: 6 }}>Enhorabuena, <b style={{ color: 'white' }}>{myName}</b></p>
-                    <div style={{ fontSize: '1.2rem', marginBottom: 4 }}>Posición: <b style={{ color: '#f1c40f' }}>{myRank}º</b></div>
-                    <div style={{ fontSize: '1.4rem', fontWeight: 'bold', color: '#f1c40f', marginBottom: 24 }}>{puntuacion} puntos</div>
-                    <button onClick={onExit} style={{ padding: '12px 28px', background: '#3498db', color: 'white', border: 'none', borderRadius: 30, fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer' }}>Volver al Menú</button>
-                </div>
+                <FinClientEcu myName={myName} myRank={myRank} puntuacion={puntuacion} gameData={gameData} myUid={myUid} onExit={onExit}/>
             )}
         </div>
     );
 }
 
+function FinClientEcu({ myName, myRank, puntuacion, gameData, myUid, onExit }) {
+    const [mostrarEnvio, setMostrarEnvio] = useState(false);
+    const jugs = gameData?.jugadores ? Object.values(gameData.jugadores).sort((a,b)=>(b.puntos||0)-(a.puntos||0)) : [];
+    const maxPts = Math.max(...jugs.map(j=>j.puntos||0), 1);
+    const datos = { jugadores: jugs.map(j=>({ nombre:j.nombre||'Jugador', curso:'', puntos:j.puntos||0, porcentaje:Math.round((j.puntos||0)/maxPts*100), correcto:(j.puntos||0)>0 })) };
+    return (
+        <div style={{ textAlign:'center', marginTop:40 }}>
+            {myRank <= 3 && <Confetti recycle={false} numberOfPieces={200}/>}
+            <Trophy size={70} color="#f1c40f"/>
+            <h2 style={{ fontSize:'1.6rem', margin:'16px 0 8px' }}>¡Fin de partida!</h2>
+            <p style={{ color:'#aaa', marginBottom:6 }}>Enhorabuena, <b style={{ color:'white' }}>{myName}</b></p>
+            <div style={{ fontSize:'1.2rem', marginBottom:4 }}>Posición: <b style={{ color:'#f1c40f' }}>{myRank}º</b></div>
+            <div style={{ fontSize:'1.4rem', fontWeight:'bold', color:'#f1c40f', marginBottom:20 }}>{puntuacion} puntos</div>
+            <div style={{ display:'flex', gap:10, justifyContent:'center', flexWrap:'wrap' }}>
+                <button onClick={()=>setMostrarEnvio(true)} style={{ padding:'12px 22px', background:'linear-gradient(135deg,#3498db,#2980b9)', color:'white', border:'none', borderRadius:12, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', gap:7 }}>
+                    <Send size={15}/> Enviar a profesor
+                </button>
+                <button onClick={onExit} style={{ padding:'12px 22px', background:'#e74c3c', color:'white', border:'none', borderRadius:12, fontWeight:700, cursor:'pointer' }}>Volver al Menú</button>
+            </div>
+            {mostrarEnvio && <ModalEnviarProfeEcu datos={datos} onClose={()=>setMostrarEnvio(false)}/>}
+        </div>
+    );
+}
+
 // ─── PREGUNTA CLIENTE ─────────────────────────────────────────────────────────
-function ClientPreguntaEcuacion({ pregunta, startTime, subFase, myResult, puntuacion, onResponder }) {
+function ClientPreguntaEcuacion({ pregunta, startTime, subFase, forceCheck, myResult, puntuacion, onResponder }) {
     const [ans1, setAns1] = useState('');
     const [ans2, setAns2] = useState('');
     const [enviado, setEnviado] = useState(false);
     const [timeLeft, setTimeLeft] = useState(100);
     const [isLate, setIsLate] = useState(false);
-    const tRef = useRef(null);
+    const tRef    = useRef(null);
+    const envRef  = useRef(false);  // evita doble envío — no sufre del stale closure bug
 
     const esCuadratica = pregunta.tipo === 'CUADRATICA';
     const esMultipleChoice = !!pregunta.multipleChoice;
+
+    // Calcular si la respuesta actual es correcta (sin setState)
+    const calcCorrect = (a1, a2) => {
+        if (esMultipleChoice) return a1 === pregunta.correctAnswers[0];
+        if (esCuadratica) {
+            const v1 = parseFloat(a1), v2 = parseFloat(a2);
+            const [r1, r2] = pregunta.correctAnswers;
+            return (v1===r1&&v2===r2)||(v1===r2&&v2===r1)||(r1===r2&&(v1===r1||v2===r1));
+        }
+        return parseFloat(a1) === pregunta.correctAnswers[0];
+    };
+
+    // forceCheck: el host avisa 1s antes — enviamos con lo que tenga el alumno
+    const ans1Ref = useRef(''); const ans2Ref = useRef('');
+    useEffect(() => { ans1Ref.current = ans1; }, [ans1]);
+    useEffect(() => { ans2Ref.current = ans2; }, [ans2]);
+
+    useEffect(() => {
+        if (!forceCheck || envRef.current) return;
+        // No enviamos aún — guardamos en lastCorrect para cuando el timer llegue a 0
+        // En realidad en Ecuaciones la respuesta es binaria, así que enviamos directamente
+        envRef.current = true;
+        clearInterval(tRef.current);
+        setEnviado(true);
+        onResponder(calcCorrect(ans1Ref.current, ans2Ref.current));
+    }, [forceCheck]);
 
     useEffect(() => {
         if (subFase !== 'RESPONDING' || enviado) return;
@@ -1396,28 +1544,24 @@ function ClientPreguntaEcuacion({ pregunta, startTime, subFase, myResult, puntua
             const pct = Math.max(0, 100 - (tr / tt * 100));
             setTimeLeft(pct);
             if (pct < 20) setIsLate(true);
-            if (pct <= 0) { clearInterval(tRef.current); if (!enviado) enviar(true); }
+            if (pct <= 0) {
+                clearInterval(tRef.current);
+                if (!envRef.current) {  // ← usa ref, no state (evita el stale closure bug)
+                    envRef.current = true;
+                    setEnviado(true);
+                    onResponder(false); // tiempo agotado = incorrecto
+                }
+            }
         }, 150);
         return () => clearInterval(tRef.current);
     }, [startTime, subFase, enviado]);
 
-    const enviar = (porTiempo = false) => {
-        if (enviado) return;
-        let esCorrecta = false;
-        if (!porTiempo) {
-            if (esMultipleChoice) {
-                esCorrecta = ans1 === pregunta.correctAnswers[0];
-            } else if (esCuadratica) {
-                const v1 = parseFloat(ans1), v2 = parseFloat(ans2);
-                const [r1, r2] = pregunta.correctAnswers;
-                esCorrecta = (v1 === r1 && v2 === r2) || (v1 === r2 && v2 === r1) || (r1 === r2 && (v1 === r1 || v2 === r1));
-            } else {
-                esCorrecta = parseFloat(ans1) === pregunta.correctAnswers[0];
-            }
-        }
+    const enviar = (a1 = ans1, a2 = ans2) => {
+        if (envRef.current) return;
+        envRef.current = true;
         clearInterval(tRef.current);
         setEnviado(true);
-        onResponder(esCorrecta);
+        onResponder(calcCorrect(a1, a2));
     };
 
     const Fraction = ({ num, den }) => (
@@ -1637,6 +1781,74 @@ function DrawingCanvas({ width, height, active }) {
 }
 
 // ─── MODO DUAL / TRIPLE — PANTALLAS MÚLTIPLES ────────────────────────────────
+
+// ── Teclado virtual por panel (modo dual/triple) ──────────────────────────────
+function VirtualKeypad({ value, onChange, onConfirm, color = '#27ae60', label = 'X=' }) {
+    const press = (key) => {
+        if (key === '⌫') { onChange(value.slice(0, -1)); return; }
+        if (key === '+/-') { onChange(value.startsWith('-') ? value.slice(1) : value ? '-' + value : ''); return; }
+        if (key === 'C')  { onChange(''); return; }
+        // Evitar doble punto
+        if (key === '.' && value.includes('.')) return;
+        // Evitar doble '-'
+        if (key === '-' && value.includes('-')) return;
+        onChange(value + key);
+    };
+
+    const rows = [
+        ['7','8','9'],
+        ['4','5','6'],
+        ['1','2','3'],
+        ['+/-','0','.'],
+    ];
+
+    return (
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:6, width:'100%' }}>
+            {/* Display */}
+            <div style={{ display:'flex', alignItems:'center', gap:6, width:'100%', justifyContent:'center' }}>
+                <span style={{ fontSize:'1rem', fontWeight:'bold', color }}>{label}</span>
+                <div style={{
+                    minWidth: 80, padding:'6px 12px',
+                    background:'#f8f9fa', border:`2px solid ${color}`,
+                    borderRadius:10, fontSize:'1.5rem', fontWeight:'bold',
+                    color:'#2c3e50', textAlign:'right', minHeight:44,
+                    display:'flex', alignItems:'center', justifyContent:'flex-end',
+                }}>
+                    {value || <span style={{ color:'#ccc', fontSize:'1rem' }}>···</span>}
+                </div>
+                <button onClick={() => press('⌫')}
+                    style={{ padding:'6px 10px', background:'#e74c3c', color:'white', border:'none', borderRadius:8, cursor:'pointer', fontSize:'1rem', fontWeight:'bold' }}>
+                    ⌫
+                </button>
+            </div>
+            {/* Teclado */}
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:5, width:'100%' }}>
+                {rows.flat().map(k => (
+                    <button key={k} onClick={() => press(k)}
+                        style={{
+                            padding:'10px 0', fontSize: '1.05rem',
+                            fontWeight:'bold', borderRadius:8, border:'none', cursor:'pointer',
+                            background: k === '+/-' ? '#8e44ad' : k === '.' ? '#7f8c8d' : '#ecf0f1',
+                            color: k === '+/-' ? 'white' : k === '.' ? 'white' : '#2c3e50',
+                            boxShadow:'0 2px 0 rgba(0,0,0,0.1)',
+                            transition:'transform 0.08s',
+                        }}
+                        onPointerDown={e => e.currentTarget.style.transform='scale(0.93)'}
+                        onPointerUp={e => e.currentTarget.style.transform='scale(1)'}
+                    >
+                        {k}
+                    </button>
+                ))}
+            </div>
+            {/* Botón confirmar integrado */}
+            <button onClick={onConfirm}
+                style={{ width:'100%', padding:'10px', background:color, color:'white', border:'none', borderRadius:10, fontWeight:'bold', cursor:'pointer', fontSize:'0.95rem', marginTop:2 }}>
+                ✓ Comprobar
+            </button>
+        </div>
+    );
+}
+
 function ModoDualEcuaciones({ config, numPantallas = 2, numAlumnos = 1, onBack, playSound }) {
     const makeState = () => {
         const eq = generarEcuacion(config);
@@ -1817,29 +2029,27 @@ function ModoDualEcuaciones({ config, numPantallas = 2, numAlumnos = 1, onBack, 
                             ))}
                         </div>
                     ) : (
-                        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:7 }}>
-                            <div style={{ display:'flex', gap:8, flexWrap:'wrap', justifyContent:'center' }}>
-                                <div style={{ display:'flex', alignItems:'center', gap:5 }}>
-                                    <span style={{ fontSize:'1rem', fontWeight:'bold', color }}>{esCuad?'X₁=':'X='}</span>
-                                    <input type="number" value={side.ans1}
-                                        onChange={e => setAns(idx,'ans1',e.target.value)}
-                                        onKeyDown={e => e.key==='Enter' && comprobarPanel(idx)}
-                                        style={{ width:52, height:40, fontSize:'1.3rem', textAlign:'center', borderRadius:8, border:`2px solid ${color}`, outline:'none', background:'#f8f9fa', fontWeight:'bold' }} />
-                                </div>
-                                {esCuad && (
-                                    <div style={{ display:'flex', alignItems:'center', gap:5 }}>
-                                        <span style={{ fontSize:'1rem', fontWeight:'bold', color:'#9b59b6' }}>X₂=</span>
-                                        <input type="number" value={side.ans2}
-                                            onChange={e => setAns(idx,'ans2',e.target.value)}
-                                            onKeyDown={e => e.key==='Enter' && comprobarPanel(idx)}
-                                            style={{ width:52, height:40, fontSize:'1.3rem', textAlign:'center', borderRadius:8, border:'2px solid #9b59b6', outline:'none', background:'#f8f9fa', fontWeight:'bold' }} />
-                                    </div>
-                                )}
-                            </div>
-                            <div style={{ display:'flex', gap:6, width:'100%' }}>
-                                <button onClick={() => skipPanel(idx)} style={{ flex:1, padding:'8px', background:'#f39c12', color:'white', border:'none', borderRadius:8, fontWeight:'bold', cursor:'pointer', fontSize:'0.8rem' }}>⏭ Pasar</button>
-                                <button onClick={() => comprobarPanel(idx)} style={{ flex:2, padding:'8px', background:'#27ae60', color:'white', border:'none', borderRadius:8, fontWeight:'bold', cursor:'pointer', fontSize:'0.85rem' }}>✓ Comprobar</button>
-                            </div>
+                        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:6, width:'100%' }}>
+                            <VirtualKeypad
+                                value={side.ans1}
+                                onChange={v => setAns(idx, 'ans1', v)}
+                                onConfirm={() => comprobarPanel(idx)}
+                                color={color}
+                                label={esCuad ? 'X₁=' : 'X='}
+                            />
+                            {esCuad && (
+                                <VirtualKeypad
+                                    value={side.ans2}
+                                    onChange={v => setAns(idx, 'ans2', v)}
+                                    onConfirm={() => comprobarPanel(idx)}
+                                    color="#9b59b6"
+                                    label="X₂="
+                                />
+                            )}
+                            <button onClick={() => skipPanel(idx)}
+                                style={{ width:'100%', padding:'7px', background:'#f39c12', color:'white', border:'none', borderRadius:8, fontWeight:'bold', cursor:'pointer', fontSize:'0.8rem' }}>
+                                ⏭ Pasar
+                            </button>
                         </div>
                     )
                 )}

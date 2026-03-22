@@ -12,7 +12,7 @@ import PikatronRun from '../PikatronRun';
 import TextWordleGame from '../TextWordleGame';
 import MathWordleGame from '../MathWordleGame';
 import SopaDeLetrasGame from '../SopaDeLetrasGame';
-import SintaxisGame from '../SintaxisGamen';
+import SintaxisGame from '../SintaxisGamen2';
 import Geometrix from '../Geometrix';
 import CalculoMental from '../CalculoMental'; 
 import Ecuaciones from '../Ecuaciones';

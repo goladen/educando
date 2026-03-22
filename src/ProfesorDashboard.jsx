@@ -25,7 +25,7 @@ import SintaxisGame from './SintaxisGamen2';
 
 
 import { MousePointer2, Rocket, Search as SearchIcon } from 'lucide-react';
-import InformesJuegos from './components/InformesJuegos';
+import InformesJuegos from './components/InformesJuegos2';
 import EditorProBurbujasPikatron from './components/EditorProBurbujasPikatron';
 import EditorQuestionSender from './components/EditorQuestionSender';
 import ModalMigrarQsender from './components/ModalMigrarQsender';

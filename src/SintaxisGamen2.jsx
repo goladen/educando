@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { db } from './firebase';
-import { collection, query, where, getDocs, doc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, setDoc, updateDoc, onSnapshot, addDoc, getDoc } from 'firebase/firestore';
 import { CheckCircle, XCircle, RotateCcw, Play, Trophy, PaintBucket, ArrowRight,
          BookOpen, ChevronRight, Search, Key, ChevronDown, ChevronUp, Clock,
-         Users, AlertTriangle } from 'lucide-react';
+         Users, AlertTriangle, Volume2, Send } from 'lucide-react';
 import { CATEGORIAS, NIVELES, FRASES } from './BibliotecaFrases';
+import { CATEGORIAS_FR, NIVELES_FR, FRASES_FR } from './BibliotecaFrances';
+import { CATEGORIAS_CA, NIVELLS_CA, FRASES_CA } from './BibliotecaCatalana';
 
 
 
@@ -77,12 +79,60 @@ const nivelLabel = (nivelId, recurso) => {
 const fmtTime = (s) => `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`;
 
 // ─────────────────────────────────────────────────────────────────────
+// HOOK: Texto a Voz (Web Speech API — sin API key, sin coste)
+// ─────────────────────────────────────────────────────────────────────
+const useTTS = () => {
+    const [speaking, setSpeaking] = React.useState(false);
+    const speak = (texto, lang = 'es-ES') => {
+        if (!window.speechSynthesis) return;
+        window.speechSynthesis.cancel();
+        const utt = new SpeechSynthesisUtterance(texto);
+        utt.lang  = lang;
+        utt.rate  = 0.85;
+        utt.pitch = 1;
+        utt.onstart = () => setSpeaking(true);
+        utt.onend   = () => setSpeaking(false);
+        utt.onerror = () => setSpeaking(false);
+        window.speechSynthesis.speak(utt);
+    };
+    const stop = () => { window.speechSynthesis?.cancel(); setSpeaking(false); };
+    return { speak, stop, speaking };
+};
+
+// Botón de lectura en voz alta
+function BtnLeer({ tokens, lang = 'es-ES' }) {
+    const { speak, stop, speaking } = useTTS();
+    const texto = tokens.map(t => t.text).join(' ');
+    return (
+        <button
+            onClick={() => speaking ? stop() : speak(texto, lang)}
+            title={speaking ? 'Parar' : 'Leer en voz alta'}
+            style={{
+                padding: '6px 12px', borderRadius: 20,
+                border: `2px solid ${speaking ? '#e74c3c' : '#3498db'}`,
+                background: speaking ? '#fdecea' : '#eaf4fe',
+                color: speaking ? '#e74c3c' : '#2980b9',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+                fontSize: '0.8rem', fontWeight: 'bold', transition: 'all 0.2s',
+            }}>
+            <Volume2 size={14} style={{ animation: speaking ? 'pulse 0.8s infinite' : 'none' }}/>
+            {speaking ? 'Parar' : '🔊 Leer'}
+        </button>
+    );
+}
+
+
+// ─────────────────────────────────────────────────────────────────────
 // MAIN EXPORT — ROUTER
 // ─────────────────────────────────────────────────────────────────────
 export default function SintaxisGame({ onExit, isHost, codigoSala, usuario, recurso }) {
+    const [idioma, setIdioma] = useState(null);
     if (isHost) return <SintaxisLiveHost codigoSala={codigoSala} usuario={usuario} onExit={onExit} />;
     if (codigoSala) return <SintaxisLiveClient codigoSala={codigoSala} usuario={usuario} onExit={onExit} />;
-    return <SintaxisApp onExit={onExit} recursoInicial={recurso} />;
+    if (!idioma) return <PantallaIdioma onEspanol={()=>setIdioma('ES')} onFrances={()=>setIdioma('FR')} onCatala={()=>setIdioma('CA')} onExit={onExit}/>;
+    if (idioma === 'FR') return <SintaxisAppFR onExit={()=>setIdioma(null)}/>;
+    if (idioma === 'CA') return <SintaxisAppCA onExit={()=>setIdioma(null)}/>;
+    return <SintaxisApp onExit={()=>setIdioma(null)} recursoInicial={recurso}/>;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -158,6 +208,884 @@ function SintaxisApp({ onExit, recursoInicial}) {
             onNext={() => setScreen('MODOS')}
             onExit={handleExit}
         />
+    );
+}
+
+
+// ─────────────────────────────────────────────────────────────────────
+// PANTALLA SELECCIÓN DE IDIOMA
+// ─────────────────────────────────────────────────────────────────────
+function PantallaIdioma({ onEspanol, onFrances, onCatala, onExit }) {
+    return (
+        <div style={g.container}>
+            <div style={g.header}>
+                {onExit && <button onClick={onExit} style={g.btnBack}><RotateCcw size={16}/> Salir</button>}
+                <span style={g.titulo}>🪄 Análisis Sintáctico</span>
+                <div style={{width:60}}/>
+            </div>
+            <div style={g.centerBox}>
+                <div style={{...g.card, maxWidth:480}}>
+                    <div style={{fontSize:'3rem',marginBottom:8}}>🌍</div>
+                    <h1 style={g.cardTitle}>Elige el idioma</h1>
+                    <p style={{color:'#666',fontSize:'0.88rem',marginBottom:28}}>
+                        Selecciona el idioma en el que quieres practicar el análisis sintáctico.
+                    </p>
+                    <div style={{display:'flex',flexDirection:'column',gap:14}}>
+                        <button onClick={onEspanol} style={{
+                            padding:'20px 24px',borderRadius:18,border:'2px solid #e74c3c',
+                            background:'#fdf2f2',cursor:'pointer',textAlign:'left',fontFamily:'inherit',transition:'all 0.18s',
+                        }}
+                            onMouseEnter={e=>{e.currentTarget.style.background='#e74c3c';e.currentTarget.style.color='white';}}
+                            onMouseLeave={e=>{e.currentTarget.style.background='#fdf2f2';e.currentTarget.style.color='inherit';}}>
+                            <div style={{display:'flex',alignItems:'center',gap:12}}>
+                                <span style={{fontSize:'2.2rem'}}>🇪🇸</span>
+                                <div>
+                                    <div style={{fontWeight:800,fontSize:'1.15rem',color:'#c0392b'}}>Español</div>
+                                    <div style={{fontSize:'0.8rem',color:'#888',marginTop:2}}>
+                                        Sujeto · Verbo · CD · CI · CC · Atributo · C. Predicativo
+                                    </div>
+                                </div>
+                            </div>
+                        </button>
+                        <button onClick={onFrances} style={{
+                            padding:'20px 24px',borderRadius:18,border:'2px solid #3498db',
+                            background:'#f0f7ff',cursor:'pointer',textAlign:'left',fontFamily:'inherit',transition:'all 0.18s',
+                        }}
+                            onMouseEnter={e=>{e.currentTarget.style.background='#3498db';e.currentTarget.style.color='white';}}
+                            onMouseLeave={e=>{e.currentTarget.style.background='#f0f7ff';e.currentTarget.style.color='inherit';}}>
+                            <div style={{display:'flex',alignItems:'center',gap:12}}>
+                                <span style={{fontSize:'2.2rem'}}>🇫🇷</span>
+                                <div>
+                                    <div style={{fontWeight:800,fontSize:'1.15rem',color:'#2980b9'}}>Français</div>
+                                    <div style={{fontSize:'0.8rem',color:'#888',marginTop:2}}>
+                                        Sujet · Verbe · COD · COI · CC · Attribut · Pronoms y/en
+                                    </div>
+                                    <div style={{fontSize:'0.75rem',color:'#aaa',marginTop:1}}>
+                                        Passé composé · Causales · Finalité · Conséquence
+                                    </div>
+                                </div>
+                            </div>
+                        </button>
+                        <button onClick={onCatala} style={{
+                            padding:'20px 24px',borderRadius:18,border:'2px solid #f39c12',
+                            background:'#fffbf0',cursor:'pointer',textAlign:'left',fontFamily:'inherit',transition:'all 0.18s',
+                        }}
+                            onMouseEnter={e=>{e.currentTarget.style.background='#f39c12';e.currentTarget.style.color='white';}}
+                            onMouseLeave={e=>{e.currentTarget.style.background='#fffbf0';e.currentTarget.style.color='inherit';}}>
+                            <div style={{display:'flex',alignItems:'center',gap:12}}>
+                                
+                                <img src="https://png.pngtree.com/png-clipart/20221224/original/pngtree-catalonia-flag-png-image_8802511.png" style={{ width: 56, height: 'auto', objectFit: 'contain' }} alt="Català" />
+                                <div>
+                                    <div style={{fontWeight:800,fontSize:'1.15rem',color:'#d68910'}}>Català</div>
+                                    <div style={{fontSize:'0.8rem',color:'#888',marginTop:2}}>
+                                        Subjecte · Verb · CD · CI · CC · Atribut · C. Predicatiu
+                                    </div>
+                                    <div style={{fontSize:'0.75rem',color:'#aaa',marginTop:1}}>
+                                        C. de Règim · C. Agent · Veu passiva
+                                    </div>
+                                </div>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─── Helpers multi-idioma ────────────────────────────────────────────
+const getCatsByIdioma = (id) => id==='FR'?CATEGORIAS_FR:id==='CA'?CATEGORIAS_CA:CATEGORIAS;
+const getNivByIdioma  = (id) => id==='FR'?NIVELES_FR:id==='CA'?NIVELLS_CA:NIVELES;
+const getPoolByIdioma = (id,niv,rec) => {
+    if (id==='FR') return FRASES_FR.filter(f=>!niv||f.nivel===niv);
+    if (id==='CA') return FRASES_CA.filter(f=>!niv||f.nivel===niv);
+    if (rec?.frases?.length) return rec.frases;
+    return FRASES.filter(f=>!niv||f.nivel===niv);
+};
+const idiomaLabel = (id) => id==='FR'?'Français':id==='CA'?'Català':'Español';
+
+// ─── Modal Enviar al Profesor ─────────────────────────────────────────
+function ModalEnviarProfe({ datos, onClose }) {
+    const [codigo,   setCodigo]   = useState('');
+    const [enviando, setEnviando] = useState(false);
+    const [enviado,  setEnviado]  = useState(false);
+    const [error,    setError]    = useState('');
+    const [nombre,   setNombre]   = useState('');
+    const [curso,    setCurso]    = useState('');
+    const esLive = !!datos.jugadores;
+
+    const enviar = async () => {
+        const code = codigo.trim().toUpperCase();
+        if (!esLive && !nombre.trim()) { setError('Escribe tu nombre.'); return; }
+        if (!code) { setError('Escribe el código del profesor.'); return; }
+        setEnviando(true); setError('');
+        try {
+            const codigoDoc = await getDoc(doc(db, 'codigos_profesor', code));
+            if (!codigoDoc.exists()) { setError('Código no encontrado.'); setEnviando(false); return; }
+            const jugadoresInforme = esLive ? datos.jugadores
+                : [{ nombre:nombre.trim(), curso:curso.trim(), puntos:datos.puntos||0,
+                     aciertos:datos.aciertos||0, total:datos.total||0,
+                     porcentaje:datos.porcentaje||0, nivel:datos.nivel||'', idioma:datos.idioma||'ES' }];
+            await addDoc(collection(db,'informes_juegos'), {
+                tipo:'SINTAXIS', modalidad:datos.modalidad||'Individual',
+                idioma:datos.idioma||'ES', fecha:new Date(),
+                codigoProfesor:code, jugadores:jugadoresInforme,
+            });
+            setEnviado(true);
+        } catch(e) { console.error(e); setError('Error: '+e.message); }
+        setEnviando(false);
+    };
+    const inp = {padding:'9px 12px',borderRadius:9,border:'1.5px solid #e0e4f0',fontSize:'0.9rem',outline:'none',width:'100%',boxSizing:'border-box',fontFamily:'inherit'};
+    return (
+        <div style={{position:'fixed',inset:0,zIndex:3000,background:'rgba(8,12,24,0.88)',display:'flex',alignItems:'center',justifyContent:'center',padding:16,backdropFilter:'blur(4px)'}}>
+            <div style={{background:'white',borderRadius:20,width:'100%',maxWidth:380,boxShadow:'0 30px 80px rgba(0,0,0,0.5)',padding:'26px 28px'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:18}}>
+                    <h3 style={{margin:0,color:'#2c3e50',fontSize:'1.05rem'}}>📤 Enviar al profesor</h3>
+                    <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',color:'#95a5a6',fontSize:'1.2rem'}}>✕</button>
+                </div>
+                {enviado ? (
+                    <div style={{textAlign:'center',padding:'20px 0'}}>
+                        <CheckCircle size={48} color="#27ae60" style={{marginBottom:10}}/>
+                        <div style={{color:'#27ae60',fontWeight:700}}>¡Informe enviado!</div>
+                        {!esLive && datos.porcentaje!==undefined && (
+                            <div style={{marginTop:8,fontSize:'1.4rem',fontWeight:900,color:datos.porcentaje>=80?'#27ae60':datos.porcentaje>=50?'#e67e22':'#e74c3c'}}>{datos.porcentaje}%</div>
+                        )}
+                        <button onClick={onClose} style={{marginTop:14,padding:'9px 22px',borderRadius:10,border:'none',background:'#f0f0f0',cursor:'pointer'}}>Cerrar</button>
+                    </div>
+                ) : (
+                    <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                        {!esLive && (<>
+                            <div><label style={{fontSize:'0.78rem',color:'#7f8c8d',fontWeight:600,display:'block',marginBottom:4}}>Nombre y apellido</label>
+                            <input value={nombre} onChange={e=>setNombre(e.target.value)} placeholder="Tu nombre completo" style={inp}/></div>
+                            <div><label style={{fontSize:'0.78rem',color:'#7f8c8d',fontWeight:600,display:'block',marginBottom:4}}>Curso</label>
+                            <input value={curso} onChange={e=>setCurso(e.target.value)} placeholder="Ej: 3º ESO A" style={inp}/></div>
+                        </>)}
+                        {esLive && <div style={{background:'#f8f9fa',borderRadius:10,padding:'10px 12px',fontSize:'0.83rem',color:'#555'}}>
+                            <strong>{datos.jugadores.length}</strong> jugadores · {idiomaLabel(datos.idioma||'ES')}
+                        </div>}
+                        <div><label style={{fontSize:'0.78rem',color:'#7f8c8d',fontWeight:600,display:'block',marginBottom:4}}>Código del profesor</label>
+                        <input value={codigo} onChange={e=>setCodigo(e.target.value.toUpperCase())} placeholder="Ej: PROF01" maxLength={10} style={{...inp,letterSpacing:2,fontWeight:700}}/></div>
+                        {error && <div style={{color:'#e74c3c',fontSize:'0.8rem'}}>⚠ {error}</div>}
+                        <div style={{display:'flex',gap:9,marginTop:4}}>
+                            <button onClick={onClose} style={{flex:1,padding:'10px',borderRadius:10,border:'1px solid #ddd',background:'white',cursor:'pointer',fontFamily:'inherit'}}>Cancelar</button>
+                            <button onClick={enviar} disabled={enviando} style={{flex:2,padding:'10px',borderRadius:10,border:'none',background:enviando?'#95a5a6':'linear-gradient(135deg,#3498db,#2980b9)',color:'white',fontWeight:700,cursor:enviando?'default':'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',gap:7,opacity:enviando?.7:1}}>
+                                <Send size={15}/>{enviando?'Enviando…':'Enviar'}
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// PALETA CA — botones de categorías catalanes
+// ─────────────────────────────────────────────────────────────────────
+function PaletaCA({ catSel, setCatSel }) {
+    return (
+        <div style={{background:'#f8f9fa',padding:'12px 16px',borderRadius:14,marginBottom:20}}>
+            <div style={{fontWeight:'bold',color:'#333',display:'flex',alignItems:'center',gap:6,marginBottom:9,fontSize:'0.88rem'}}>
+                <PaintBucket size={14}/> Tria la funció
+            </div>
+            <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                {Object.entries(CATEGORIAS_CA).map(([k,v]) => {
+                    const sel = catSel === k;
+                    return (
+                        <button key={k} onClick={() => setCatSel(sel ? null : k)}
+                            style={{padding:'6px 11px',borderRadius:20,fontWeight:'bold',cursor:'pointer',
+                                fontSize:'0.78rem',display:'flex',alignItems:'center',gap:3,transition:'all 0.15s',
+                                background:sel?v.color:'#f0f0f0',color:sel?'white':'#555',
+                                border:`2px solid ${v.color}`,transform:sel?'scale(1.05)':'scale(1)',
+                                boxShadow:sel?`0 3px 10px ${v.color}55`:'none'}}>
+                            {v.emoji} {v.label}
+                        </button>
+                    );
+                })}
+            </div>
+            <p style={{margin:'8px 0 0',color:'#999',fontSize:'0.72rem',fontStyle:'italic'}}>
+                💡 Fes clic en una paraula amb la funció seleccionada · Màx. 2 funcions per paraula
+            </p>
+        </div>
+    );
+}
+
+const tokenBgCA = (ans) => {
+    if (!ans?.length) return 'transparent';
+    if (ans.length===1) return CATEGORIAS_CA[ans[0]]?.color||'transparent';
+    return `linear-gradient(135deg,${CATEGORIAS_CA[ans[0]]?.color} 50%,${CATEGORIAS_CA[ans[1]]?.color} 50%)`;
+};
+const correctBgCA = (esp) => {
+    if (!esp?.length) return '#ccc';
+    if (esp.length===1) return CATEGORIAS_CA[esp[0]]?.color||'#ccc';
+    return `linear-gradient(135deg,${CATEGORIAS_CA[esp[0]]?.color} 50%,${CATEGORIAS_CA[esp[1]]?.color} 50%)`;
+};
+
+function FraseTokensCA({ tokens, answers, onClickWord, readonly, results }) {
+    return (
+        <div>
+        <div style={{display:'flex',justifyContent:'center',marginBottom:6}}>
+            <BtnLeer tokens={tokens} lang="ca-ES"/>
+        </div>
+        <div style={{display:'flex',flexWrap:'wrap',gap:8,justifyContent:'center',padding:'4px 0'}}>
+            {tokens.map((t,i) => {
+                const ans=answers?.[i]||[], r=results?.[i];
+                return (
+                    <div key={i} onClick={readonly?undefined:()=>onClickWord(i)}
+                        style={{padding:'10px 13px',borderRadius:10,display:'flex',flexDirection:'column',alignItems:'center',
+                            transition:'all 0.18s',minWidth:46,userSelect:'none',cursor:readonly?'default':'pointer',
+                            background:readonly&&r?correctBgCA(r.esp):tokenBgCA(ans),
+                            color:(readonly&&r)||ans.length?'white':'#333',
+                            border:readonly&&r?`3px solid ${r.ok?'#27ae60':'#c0392b'}`:(ans.length?'2px solid transparent':'2px dashed #ccc')}}>
+                        <span style={{fontSize:'1.1rem',fontWeight:'bold',textShadow:(ans.length||(readonly&&r))?'0 1px 3px rgba(0,0,0,0.3)':'none'}}>{t.text}</span>
+                        {ans.length>0&&!readonly&&<div style={{display:'flex',gap:2,marginTop:2}}>{ans.map(a=><span key={a} style={{fontSize:'0.72rem'}}>{CATEGORIAS_CA[a]?.emoji}</span>)}</div>}
+                        {readonly&&r&&<div style={{marginTop:2}}>{r.ok?<CheckCircle size={12} color="#27ae60" style={{background:'white',borderRadius:'50%'}}/>:<XCircle size={12} color="#c0392b" style={{background:'white',borderRadius:'50%'}}/>}</div>}
+                    </div>
+                );
+            })}
+        </div>
+        </div>
+    );
+}
+
+function ResultatCA({ tokens, results }) {
+    const allOk = Object.values(results).every(v=>v.ok);
+    return (
+        <div style={{background:allOk?'#e8f5e9':'#fdecea',borderRadius:14,padding:'14px 16px',border:`2px solid ${allOk?'#4caf50':'#e74c3c'}`,marginTop:12}}>
+            <div style={{fontWeight:'bold',color:allOk?'#2e7d32':'#c0392b',marginBottom:8}}>{allOk?'✅ Excel·lent!':'❌ Revisa la resposta'}</div>
+            {tokens.map((t,i)=>{const r=results[i];if(r?.ok||!r)return null;return(
+                <div key={i} style={{fontSize:'0.83rem',marginBottom:5,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                    <span style={{fontWeight:'bold'}}>{t.text}</span>
+                    <span style={{color:'#c0392b'}}>→ {(t.funcion||[]).map(f=>`${CATEGORIAS_CA[f]?.emoji||''} ${CATEGORIAS_CA[f]?.label||f}`).join(' + ')}</span>
+                </div>
+            );})}
+        </div>
+    );
+}
+
+// Generic mode factory for CA (same logic as FR)
+function ModoLocalCA({ nivel, onBack }) {
+    const pool=FRASES_CA.filter(f=>!nivel||f.nivel===nivel);
+    const bagRef=useRef(createBag(pool));
+    const [frase,setFrase]=useState(()=>pickFromBag(bagRef.current,pool));
+    const [answers,setAnswers]=useState({});
+    const [results,setResults]=useState(null);
+    const [catSel,setCatSel]=useState(null);
+    const [score,setScore]=useState(0);
+    const [mostrarEnvio,setMostrarEnvio]=useState(false);
+    const [aciertos,setAciertos]=useState(0);
+    const [total,setTotal]=useState(0);
+
+    const siguiente=()=>{setFrase(pickFromBag(bagRef.current,pool));setAnswers({});setResults(null);setCatSel(null);};
+    const comprobar=()=>{
+        let pts=0,ac=0,tot=0;const res={};
+        frase.tokens.forEach((t,i)=>{const esp=t.funcion||[],ans=answers[i]||[];tot++;
+            const ok=esp.length===ans.length&&esp.every(f=>ans.includes(f));
+            res[i]={ok,esp,dad:ans};if(ok){pts+=(esp[0]&&CATEGORIAS_CA[esp[0]]?.puntos)||10;ac++;}
+        });
+        setResults(res);setScore(s=>s+pts);setAciertos(a=>a+ac);setTotal(t=>t+tot);
+    };
+    const handleClickWord=(i)=>{if(results||!catSel)return;setAnswers(prev=>{const cur=prev[i]||[];if(cur.includes(catSel))return{...prev,[i]:cur.filter(c=>c!==catSel)};if(cur.length>=2)return prev;return{...prev,[i]:[...cur,catSel]};});};
+    const pct=total>0?Math.round(aciertos/total*100):0;
+    const nivLabel=NIVELLS_CA.find(n=>n.id===nivel)?.label||'Tots';
+    return(
+        <div style={g.container}>
+            <div style={g.header}><button onClick={onBack} style={g.btnBack}><RotateCcw size={16}/> Tornar</button><span style={g.titulo}>🏴 Mode Lliure · Català</span><div style={{...g.scoreboard}}>🏆 {score}</div></div>
+            <div style={{padding:'16px 12px',maxWidth:700,margin:'0 auto'}}>
+                <PaletaCA catSel={catSel} setCatSel={setCatSel}/>
+                <FraseTokensCA tokens={frase.tokens} answers={answers} onClickWord={handleClickWord} results={results}/>
+                {!results?(<button onClick={comprobar} style={{...g.btnPrimary,width:'100%',marginTop:16,justifyContent:'center'}}><CheckCircle size={18}/> Comprova</button>):(<>
+                    <ResultatCA tokens={frase.tokens} results={results}/>
+                    <div style={{display:'flex',gap:9,marginTop:12}}>
+                        <button onClick={siguiente} style={{...g.btnSuccess,flex:1,justifyContent:'center'}}><ArrowRight size={18}/> Frase següent</button>
+                        <button onClick={()=>setMostrarEnvio(true)} style={{...g.btnPrimary,padding:'10px 16px'}}><Send size={14}/> Profe</button>
+                    </div>
+                </>)}
+            </div>
+            {mostrarEnvio&&<ModalEnviarProfe datos={{puntos:score,aciertos,total,porcentaje:pct,nivel:nivLabel,idioma:'CA',modalidad:'Lliure'}} onClose={()=>setMostrarEnvio(false)}/>}
+        </div>
+    );
+}
+
+function ModoContrarrelojCA({ nivel, onBack }) {
+    const DURACION=180;const pool=FRASES_CA.filter(f=>!nivel||f.nivel===nivel);
+    const bagRef=useRef(createBag(pool));
+    const [fase,setFase]=useState('INTRO');const [frase,setFrase]=useState(null);
+    const [answers,setAnswers]=useState({});const [results,setResults]=useState(null);
+    const [catSel,setCatSel]=useState(null);const [score,setScore]=useState(0);
+    const [tiempo,setTiempo]=useState(DURACION);const [frasesDone,setFrasesDone]=useState(0);
+    const [aciertos,setAciertos]=useState(0);const [total,setTotal]=useState(0);
+    const [mostrarEnvio,setMostrarEnvio]=useState(false);
+    const timerRef=useRef(null);
+    useEffect(()=>{if(fase!=='JUGANDO')return;timerRef.current=setInterval(()=>{setTiempo(t=>{if(t<=1){clearInterval(timerRef.current);setFase('FIN');return 0;}return t-1;});},1000);return()=>clearInterval(timerRef.current);},[fase]);
+    const empezar=()=>{setFrase(pickFromBag(bagRef.current,pool));setFase('JUGANDO');};
+    const siguiente=()=>{setFrase(pickFromBag(bagRef.current,pool));setAnswers({});setResults(null);setCatSel(null);setFrasesDone(n=>n+1);};
+    const comprobar=()=>{let pts=0,ac=0,tot=0;const res={};frase.tokens.forEach((t,i)=>{const esp=t.funcion||[],ans=answers[i]||[];tot++;const ok=esp.length===ans.length&&esp.every(f=>ans.includes(f));res[i]={ok,esp,dad:ans};if(ok){pts+=(esp[0]&&CATEGORIAS_CA[esp[0]]?.puntos)||10;ac++;}});setResults(res);setScore(s=>s+pts);setAciertos(a=>a+ac);setTotal(t=>t+tot);};
+    const handleClickWord=(i)=>{if(results||!catSel)return;setAnswers(prev=>{const cur=prev[i]||[];if(cur.includes(catSel))return{...prev,[i]:cur.filter(c=>c!==catSel)};if(cur.length>=2)return prev;return{...prev,[i]:[...cur,catSel]};});};
+    const pct=total>0?Math.round(aciertos/total*100):0;
+    const nivLabel=NIVELLS_CA.find(n=>n.id===nivel)?.label||'Tots';
+    if(fase==='INTRO')return(<div style={g.container}><div style={g.header}><button onClick={onBack} style={g.btnBack}><RotateCcw size={16}/> Tornar</button><span style={g.titulo}>⏱️ Contrarellotge · CA</span><div style={{width:60}}/></div><div style={g.centerBox}><div style={{...g.card,maxWidth:420}}><div style={{fontSize:'3rem',marginBottom:8}}>⏱️</div><h2 style={g.cardTitle}>Contrarellotge</h2><p style={{color:'#555',marginBottom:20}}>Tens <strong>3 minuts</strong> per analitzar el màxim de frases.</p><button onClick={empezar} style={{...g.btnPrimary,width:'100%',justifyContent:'center'}}><Play size={18}/> Comença</button></div></div></div>);
+    if(fase==='FIN')return(<div style={g.container}><div style={g.header}><button onClick={onBack} style={g.btnBack}><RotateCcw size={16}/> Tornar</button><span style={g.titulo}>⏱️ Resultats</span><div style={{width:60}}/></div><div style={g.centerBox}><div style={{...g.card,maxWidth:420,textAlign:'center'}}><Trophy size={64} color="#f1c40f"/><h2 style={{...g.cardTitle,marginTop:12}}>Fet!</h2><div style={{fontSize:'2.5rem',fontWeight:900,color:'#e74c3c',margin:'8px 0'}}>{score}</div><p style={{color:'#666'}}>{frasesDone+(results?1:0)} frases analitzades</p><div style={{display:'flex',gap:9,marginTop:16,justifyContent:'center'}}><button onClick={()=>setMostrarEnvio(true)} style={{...g.btnPrimary,fontSize:'0.9rem'}}><Send size={14}/> Enviar al profe</button><button onClick={onBack} style={{...g.btnGray,fontSize:'0.9rem'}}><RotateCcw size={16}/> Tornar</button></div></div></div>{mostrarEnvio&&<ModalEnviarProfe datos={{puntos:score,aciertos,total,porcentaje:pct,nivel:nivLabel,idioma:'CA',modalidad:'Contrarellotge'}} onClose={()=>setMostrarEnvio(false)}/>}</div>);
+    return(<div style={g.container}><div style={g.header}><button onClick={onBack} style={g.btnBack}><RotateCcw size={16}/> Tornar</button><span style={g.titulo}>⏱️ Contrarellotge · CA</span><div style={{...g.scoreboard}}><Clock size={14}/> {fmtTime(tiempo)} · 🏆 {score}</div></div><div style={{padding:'16px 12px',maxWidth:700,margin:'0 auto'}}>{frase&&<><PaletaCA catSel={catSel} setCatSel={setCatSel}/><FraseTokensCA tokens={frase.tokens} answers={answers} onClickWord={handleClickWord} results={results}/>{!results?(<button onClick={comprobar} style={{...g.btnPrimary,width:'100%',marginTop:16,justifyContent:'center'}}><CheckCircle size={18}/> Comprova</button>):(<><ResultatCA tokens={frase.tokens} results={results}/><button onClick={siguiente} style={{...g.btnSuccess,width:'100%',marginTop:12,justifyContent:'center'}}><ArrowRight size={18}/> Frase següent</button></>)}</>}</div></div>);
+}
+
+function ModoDualCA({ nivel, onBack }) {
+    // Uses same dual logic but with CA categories
+    const pool=FRASES_CA.filter(f=>!nivel||f.nivel===nivel);
+    const bag=useRef(createBag(pool));
+    const init=()=>({frase:pickFromBag(bag.current,pool),answers:{},results:null,score:0,catSel:null});
+    const [sides,setSides]=useState([init(),init()]);
+    const update=(si,fn)=>setSides(prev=>{const n=[...prev];n[si]={...n[si],...fn(n[si])};return n;});
+    const clickWord=(si,i)=>{update(si,s=>{if(s.results||!s.catSel)return{};const a={...s.answers};const cur=a[i]||[];if(cur.includes(s.catSel))a[i]=cur.filter(c=>c!==s.catSel);else if(cur.length<2)a[i]=[...cur,s.catSel];return{answers:a};});};
+    const comprobar=(si)=>{const s=sides[si];let pts=0;const res={};s.frase.tokens.forEach((t,i)=>{const esp=t.funcion||[],ans=s.answers[i]||[];const ok=esp.length===ans.length&&esp.every(f=>ans.includes(f));res[i]={ok,esp,dad:ans};if(ok)pts+=(esp[0]&&CATEGORIAS_CA[esp[0]]?.puntos)||10;});update(si,()=>({results:res,score:s.score+pts}));};
+    const siguiente=(si)=>{update(si,()=>({...init()}));};
+    const cols=['#3498db','#e74c3c'];
+    return(
+        <div style={g.container}>
+            <div style={g.header}><button onClick={onBack} style={g.btnBack}><RotateCcw size={16}/> Tornar</button><span style={g.titulo}>⚔️ Dual · Català</span><div style={{display:'flex',gap:10}}>{sides.map((s,si)=><div key={si} style={{...g.scoreboard,background:cols[si]}}>J{si+1}: {s.score}</div>)}</div></div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,padding:'16px 12px',maxWidth:1100,margin:'0 auto'}}>
+                {sides.map((s,si)=>(
+                    <div key={si} style={{background:'white',borderRadius:16,padding:'14px',boxShadow:'0 4px 12px rgba(0,0,0,0.07)',borderTop:`4px solid ${cols[si]}`}}>
+                        <PaletaCA catSel={s.catSel} setCatSel={cat=>update(si,()=>({catSel:cat}))}/>
+                        <FraseTokensCA tokens={s.frase.tokens} answers={s.answers} onClickWord={(i)=>clickWord(si,i)} results={s.results}/>
+                        {!s.results?(<button onClick={()=>comprobar(si)} style={{...g.btnSuccess,width:'100%',marginTop:12,justifyContent:'center'}}><CheckCircle size={16}/> Comprova</button>):(<><ResultatCA tokens={s.frase.tokens} results={s.results}/><button onClick={()=>siguiente(si)} style={{...g.btnPrimary,width:'100%',marginTop:10,justifyContent:'center'}}><ArrowRight size={16}/> Frase següent</button></>)}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function SintaxisAppCA({ onExit }) {
+    const [screen,setScreen]=useState('NIVEL');
+    const [nivelSel,setNivelSel]=useState(null);
+    const [internalHost,setInternalHost]=useState(null);
+    const [internalClient,setInternalClient]=useState(null);
+    const [joinCode,setJoinCode]=useState('');
+    const [showLiveConfig,setShowLiveConfig]=useState(false);
+    const [liveConfig,setLiveConfig]=useState({tiempoPregunta:30,numPreguntas:8,puntosMax:100,puntosMin:50});
+    const [creandoSala,setCreandoSala]=useState(false);
+
+    const crearSala=async()=>{
+        setCreandoSala(true);
+        try{
+            const codigo=generarCodigo();
+            const pool=getPoolByIdioma('CA',nivelSel,null);
+            const bag=createBag(pool);
+            const preguntas=Array.from({length:liveConfig.numPreguntas},(_,i)=>{const f=pickFromBag(bag,pool);return{tokens:f.tokens,nivel:f.nivel||nivelSel||'eso',fid:f.id||i};});
+            await setDoc(doc(db,'live_games',codigo),{tipoJuego:'SINTAXIS',idioma:'CA',estado:'LOBBY',fasePregunta:'RESPONDING',jugadores:{},preguntas,indicePregunta:0,respuestasRonda:{},questionStartTime:null,config:liveConfig,catStats:{},creadoEn:Date.now()});
+            setShowLiveConfig(false);setInternalHost(codigo);
+        }catch(e){console.error(e);alert('Error al crear sala.');}
+        setCreandoSala(false);
+    };
+    const unirse=()=>{const c=joinCode.trim().toUpperCase();if(c.length!==6)return alert('El codi ha de tenir 6 caràcters.');setInternalClient(c);};
+
+    if(internalHost) return <SintaxisLiveHost codigoSala={internalHost} onExit={()=>setInternalHost(null)}/>;
+    if(internalClient) return <SintaxisLiveClient codigoSala={internalClient} onExit={()=>setInternalClient(null)}/>;
+    if(screen==='LOCAL') return <ModoLocalCA nivel={nivelSel} onBack={()=>setScreen('MODOS')}/>;
+    if(screen==='CONTRARRELOJ') return <ModoContrarrelojCA nivel={nivelSel} onBack={()=>setScreen('MODOS')}/>;
+    if(screen==='DUAL') return <ModoDualCA nivel={nivelSel} onBack={()=>setScreen('MODOS')}/>;
+
+    if(screen==='MODOS') return(
+        <div style={g.container}>
+            <div style={g.header}><button onClick={() => setScreen('NIVEL')} style={g.btnBack}><RotateCcw size={16} /> Tornar</button><span style={g.titulo}><img src="https://png.pngtree.com/png-clipart/20221224/original/pngtree-catalonia-flag-png-image_8802511.png" style={{ width: 20, height: 'auto', verticalAlign: 'middle', marginRight: 4 }} alt="" /> Sintaxi Catalana</span><div style={{width:60}}/></div>
+            <div style={g.centerBox}>
+                <div style={{...g.card,maxWidth:520}}>
+                    <img src="https://png.pngtree.com/png-clipart/20221224/original/pngtree-catalonia-flag-png-image_8802511.png" style={{ width: 60, height: 'auto', marginBottom: 6 }} alt="Català" />
+                    <h2 style={{...g.cardTitle,fontSize:'1.4rem'}}>{(NIVELLS_CA.find(n=>n.id===nivelSel)||{emoji:'📚',label:'Tots'}).emoji} {(NIVELLS_CA.find(n=>n.id===nivelSel)||{label:'Tots'}).label}</h2>
+                    <div style={{display:'flex',flexDirection:'column',gap:10,marginTop:16}}>
+                        {[{k:'LOCAL',e:'🎯',l:'Mode Lliure',d:"Practica al teu ritme.",c:'#3498db',f:()=>setScreen('LOCAL')},{k:'CONTRARRELOJ',e:'⏱️',l:'Contrarellotge',d:'3 minuts per analitzar el màxim.',c:'#e74c3c',f:()=>setScreen('CONTRARRELOJ')},{k:'DUAL',e:'⚔️',l:'Mode Dual',d:'Dos jugadors, dues frases a la vegada.',c:'#9b59b6',f:()=>setScreen('DUAL')},{k:'LIVE',e:'📡',l:'Sessió en Viu',d:'Juga en línia amb la classe.',c:'#27ae60',f:()=>setShowLiveConfig(true)}].map(m=>(
+                            <button key={m.k} onClick={m.f} style={{padding:'16px 20px',borderRadius:16,border:`2px solid ${m.c}`,background:'white',cursor:'pointer',textAlign:'left',display:'flex',alignItems:'center',gap:14,transition:'all 0.15s',fontFamily:'inherit'}}
+                                onMouseEnter={e=>e.currentTarget.style.background=`${m.c}15`} onMouseLeave={e=>e.currentTarget.style.background='white'}>
+                                <span style={{fontSize:'1.8rem'}}>{m.e}</span><div><div style={{fontWeight:'bold',color:m.c,fontSize:'0.95rem'}}>{m.l}</div><div style={{color:'#888',fontSize:'0.8rem'}}>{m.d}</div></div>
+                                <ChevronRight size={18} color={m.c} style={{marginLeft:'auto'}}/>
+                            </button>
+                        ))}
+                    </div>
+                    <div style={{borderTop:'2px dashed #eee',paddingTop:14,marginTop:14}}>
+                        <p style={{color:'#888',fontSize:'0.78rem',marginBottom:8,textAlign:'center'}}>Tens un codi de sessió en viu?</p>
+                        <div style={{display:'flex',gap:8}}>
+                            <input placeholder="CODI 6 LLETRES" value={joinCode} onChange={e=>setJoinCode(e.target.value.toUpperCase())} maxLength={6} style={{flex:1,padding:'10px 14px',borderRadius:30,border:'2px solid #ccc',textAlign:'center',fontSize:'1rem',letterSpacing:3,outline:'none',fontWeight:'bold'}}/>
+                            <button onClick={unirse} style={{...g.btnSuccess,padding:'10px 18px',margin:0}}>Unir-se</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {showLiveConfig&&(
+                <div style={{position:'fixed',inset:0,zIndex:2000,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+                    <div style={{...g.card,maxWidth:420,maxHeight:'90vh',overflowY:'auto'}}>
+                        <h3 style={{color:'#27ae60',marginTop:0}}>📡 Configurar Sessió en Viu</h3>
+                        <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:12}}>
+                            {[15,20,30,45].map(t=><button key={t} onClick={()=>setLiveConfig(c=>({...c,tiempoPregunta:t}))} style={{padding:'6px 14px',borderRadius:20,border:`2px solid ${liveConfig.tiempoPregunta===t?'#27ae60':'#ccc'}`,background:liveConfig.tiempoPregunta===t?'#27ae60':'white',color:liveConfig.tiempoPregunta===t?'white':'#555',cursor:'pointer',fontWeight:'bold'}}>{t}s</button>)}
+                        </div>
+                        <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:16}}>
+                            {[5,8,10,15].map(n=><button key={n} onClick={()=>setLiveConfig(c=>({...c,numPreguntas:n}))} style={{padding:'6px 14px',borderRadius:20,border:`2px solid ${liveConfig.numPreguntas===n?'#9b59b6':'#ccc'}`,background:liveConfig.numPreguntas===n?'#9b59b6':'white',color:liveConfig.numPreguntas===n?'white':'#555',cursor:'pointer',fontWeight:'bold'}}>{n} frases</button>)}
+                        </div>
+                        <div style={{display:'flex',gap:10}}>
+                            <button onClick={()=>setShowLiveConfig(false)} style={g.btnGray}>Cancel·lar</button>
+                            <button onClick={crearSala} disabled={creandoSala} style={{...g.btnSuccess,flex:1,justifyContent:'center'}}>{creandoSala?'Creant...':'Crear Sala'}</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+
+    return(
+        <div style={g.container}>
+            <div style={g.header}><button onClick={onExit} style={g.btnBack}><RotateCcw size={16} /> Sortir</button><span style={g.titulo}><img src="https://png.pngtree.com/png-clipart/20221224/original/pngtree-catalonia-flag-png-image_8802511.png" style={{ width: 20, height: 'auto', verticalAlign: 'middle', marginRight: 4 }} alt="" /> Sintaxi Catalana</span><div style={{width:60}}/></div>
+            <div style={g.centerBox}>
+                <div style={{...g.card,maxWidth:520}}>
+                    <img src="https://png.pngtree.com/png-clipart/20221224/original/pngtree-catalonia-flag-png-image_8802511.png" style={{ width: 60, height: 'auto', marginBottom: 6 }} alt="Català" />
+                    <h1 style={g.cardTitle}>Tria el nivell</h1>
+                    <p style={{color:'#666',fontSize:'0.88rem',marginBottom:20}}>Selecciona un nivell per començar a analitzar frases.</p>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:20}}>
+                        {NIVELLS_CA.map(n=>(
+                            <button key={String(n.id)} onClick={()=>setNivelSel(n.id)}
+                                style={{padding:'13px 8px',borderRadius:14,cursor:'pointer',fontWeight:'bold',fontSize:'0.9rem',transition:'all 0.15s',
+                                    background:nivelSel===n.id?n.color:'#f5f5f5',color:nivelSel===n.id?'white':'#444',border:`2px solid ${n.color}`}}>
+                                {n.emoji} {n.label}
+                                <div style={{fontSize:'0.68rem',opacity:.8,marginTop:2,fontWeight:'normal'}}>{FRASES_CA.filter(f=>!n.id||f.nivel===n.id).length} frases</div>
+                            </button>
+                        ))}
+                    </div>
+                    <button onClick={()=>setScreen('MODOS')} disabled={nivelSel===undefined}
+                        style={{...g.btnPrimary,width:'100%',justifyContent:'center',opacity:nivelSel!==undefined?1:0.4}}>
+                        <ChevronRight size={20}/> Continuar
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// PALETA FR — botones de categorías francesas
+// ─────────────────────────────────────────────────────────────────────
+function PaletaFR({ catSel, setCatSel }) {
+    return (
+        <div style={{background:'#f8f9fa',padding:'12px 16px',borderRadius:14,marginBottom:20}}>
+            <div style={{fontWeight:'bold',color:'#333',display:'flex',alignItems:'center',gap:6,marginBottom:9,fontSize:'0.88rem'}}>
+                <PaintBucket size={14}/> Choisir la fonction
+            </div>
+            <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                {Object.entries(CATEGORIAS_FR).map(([k,v]) => {
+                    const sel = catSel === k;
+                    return (
+                        <button key={k} onClick={() => setCatSel(sel ? null : k)}
+                            style={{padding:'6px 11px',borderRadius:20,fontWeight:'bold',cursor:'pointer',
+                                fontSize:'0.78rem',display:'flex',alignItems:'center',gap:3,transition:'all 0.15s',
+                                background:sel?v.color:'#f0f0f0',color:sel?'white':'#555',
+                                border:`2px solid ${v.color}`,transform:sel?'scale(1.05)':'scale(1)',
+                                boxShadow:sel?`0 3px 10px ${v.color}55`:'none'}}>
+                            {v.emoji} {v.label}
+                        </button>
+                    );
+                })}
+            </div>
+            <p style={{margin:'8px 0 0',color:'#999',fontSize:'0.72rem',fontStyle:'italic'}}>
+                💡 Clique sur un mot après avoir choisi sa fonction · Max. 2 fonctions par mot
+            </p>
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// FRASE TOKENS FR
+// ─────────────────────────────────────────────────────────────────────
+const tokenBgFR = (ans) => {
+    if (!ans?.length) return 'transparent';
+    if (ans.length === 1) return CATEGORIAS_FR[ans[0]]?.color || 'transparent';
+    return `linear-gradient(135deg, ${CATEGORIAS_FR[ans[0]]?.color} 50%, ${CATEGORIAS_FR[ans[1]]?.color} 50%)`;
+};
+const correctBgFR = (esp) => {
+    if (!esp?.length) return '#ccc';
+    if (esp.length === 1) return CATEGORIAS_FR[esp[0]]?.color || '#ccc';
+    return `linear-gradient(135deg, ${CATEGORIAS_FR[esp[0]]?.color} 50%, ${CATEGORIAS_FR[esp[1]]?.color} 50%)`;
+};
+
+function FraseTokensFR({ tokens, answers, onClickWord, readonly, results }) {
+    return (
+        <div>
+        <div style={{display:'flex',justifyContent:'center',marginBottom:6}}>
+            <BtnLeer tokens={tokens} lang="fr-FR"/>
+        </div>
+        <div style={{display:'flex',flexWrap:'wrap',gap:8,justifyContent:'center',padding:'4px 0'}}>
+            {tokens.map((t, i) => {
+                const ans = answers?.[i] || [];
+                const r = results?.[i];
+                return (
+                    <div key={i}
+                        onClick={readonly ? undefined : () => onClickWord(i)}
+                        style={{
+                            padding:'10px 13px',borderRadius:10,
+                            display:'flex',flexDirection:'column',alignItems:'center',
+                            transition:'all 0.18s',minWidth:46,userSelect:'none',
+                            cursor: readonly ? 'default' : 'pointer',
+                            background: readonly && r ? correctBgFR(r.esp) : tokenBgFR(ans),
+                            color: (readonly && r) || ans.length ? 'white' : '#333',
+                            border: readonly && r
+                                ? `3px solid ${r.ok?'#27ae60':'#c0392b'}`
+                                : (ans.length ? '2px solid transparent' : '2px dashed #ccc'),
+                        }}>
+                        <span style={{fontSize:'1.1rem',fontWeight:'bold',textShadow:(ans.length||(readonly&&r))?'0 1px 3px rgba(0,0,0,0.3)':'none'}}>
+                            {t.text}
+                        </span>
+                        {ans.length > 0 && !readonly && (
+                            <div style={{display:'flex',gap:2,marginTop:2}}>
+                                {ans.map(a => <span key={a} style={{fontSize:'0.72rem'}}>{CATEGORIAS_FR[a]?.emoji}</span>)}
+                            </div>
+                        )}
+                        {readonly && r && (
+                            <div style={{marginTop:2}}>
+                                {r.ok ? <CheckCircle size={12} color="#27ae60" style={{background:'white',borderRadius:'50%'}}/>
+                                       : <XCircle size={12} color="#c0392b" style={{background:'white',borderRadius:'50%'}}/>}
+                            </div>
+                        )}
+                    </div>
+                );
+            })}
+        </div>
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// RESULTADO FR
+// ─────────────────────────────────────────────────────────────────────
+function ResultadoFR({ tokens, results }) {
+    const allOk = Object.values(results).every(v => v.ok);
+    return (
+        <div style={{background:allOk?'#e8f5e9':'#fdecea',borderRadius:14,padding:'14px 16px',
+            border:`2px solid ${allOk?'#4caf50':'#e74c3c'}`,marginTop:12}}>
+            <div style={{fontWeight:'bold',color:allOk?'#2e7d32':'#c0392b',marginBottom:8}}>
+                {allOk ? '✅ Parfait !' : '❌ Revois ta réponse'}
+            </div>
+            {tokens.map((t,i) => {
+                const r = results[i];
+                if (r?.ok) return null;
+                if (!r) return null;
+                return (
+                    <div key={i} style={{fontSize:'0.83rem',marginBottom:5,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                        <span style={{fontWeight:'bold'}}>{t.text}</span>
+                        <span style={{color:'#c0392b'}}>
+                            → {(t.funcion||[]).map(f => `${CATEGORIAS_FR[f]?.emoji||''} ${CATEGORIAS_FR[f]?.label||f}`).join(' + ')}
+                        </span>
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// MODO LOCAL FR — práctica libre en francés
+// ─────────────────────────────────────────────────────────────────────
+function ModoLocalFR({ nivel, onBack }) {
+    const pool = FRASES_FR.filter(f => !nivel || f.nivel === nivel);
+    const bagRef = useRef(createBag(pool));
+    const [frase, setFrase]   = useState(() => pickFromBag(bagRef.current, pool));
+    const [answers, setAnswers] = useState({});
+    const [results, setResults] = useState(null);
+    const [catSel, setCatSel]   = useState(null);
+    const [score, setScore]     = useState(0);
+    const [streak, setStreak]   = useState(0);
+
+    const siguiente = () => {
+        setFrase(pickFromBag(bagRef.current, pool));
+        setAnswers({}); setResults(null); setCatSel(null);
+    };
+
+    const comprobar = () => {
+        let pts = 0;
+        const res = {};
+        frase.tokens.forEach((t,i) => {
+            const esp = t.funcion || [], ans = answers[i] || [];
+            const ok = esp.length === ans.length && esp.every(f => ans.includes(f));
+            res[i] = { ok, esp, dad: ans };
+            if (ok) pts += (esp[0] && CATEGORIAS_FR[esp[0]]?.puntos) || 10;
+        });
+        setResults(res);
+        const allOk = Object.values(res).every(v => v.ok);
+        if (allOk) setStreak(s=>s+1); else setStreak(0);
+        setScore(s => s + pts);
+    };
+
+    const handleClickWord = (i) => {
+        if (results || !catSel) return;
+        setAnswers(prev => {
+            const cur = prev[i] || [];
+            if (cur.includes(catSel)) return {...prev, [i]: cur.filter(c=>c!==catSel)};
+            if (cur.length >= 2) return prev;
+            return {...prev, [i]: [...cur, catSel]};
+        });
+    };
+
+    return (
+        <div style={g.container}>
+            <div style={g.header}>
+                <button onClick={onBack} style={g.btnBack}><RotateCcw size={16}/> Retour</button>
+                <span style={g.titulo}>🇫🇷 Mode Libre · Français</span>
+                <div style={{...g.scoreboard}}>🏆 {score} {streak>1&&`· 🔥${streak}`}</div>
+            </div>
+            <div style={{padding:'16px 12px',maxWidth:700,margin:'0 auto'}}>
+                <PaletaFR catSel={catSel} setCatSel={setCatSel}/>
+                <FraseTokensFR tokens={frase.tokens} answers={answers} onClickWord={handleClickWord} results={results}/>
+                {!results ? (
+                    <button onClick={comprobar} style={{...g.btnPrimary,width:'100%',marginTop:16,justifyContent:'center'}}>
+                        <CheckCircle size={18}/> Vérifier
+                    </button>
+                ) : (
+                    <>
+                        <ResultadoFR tokens={frase.tokens} results={results}/>
+                        <button onClick={siguiente} style={{...g.btnSuccess,width:'100%',marginTop:12,justifyContent:'center'}}>
+                            <ArrowRight size={18}/> Phrase suivante
+                        </button>
+                    </>
+                )}
+            </div>
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// MODO CONTRARRELOJ FR
+// ─────────────────────────────────────────────────────────────────────
+function ModoContrarrelojFR({ nivel, onBack }) {
+    const DURACION = 180;
+    const pool = FRASES_FR.filter(f => !nivel || f.nivel === nivel);
+    const bagRef = useRef(createBag(pool));
+    const [fase, setFase]       = useState('INTRO');
+    const [frase, setFrase]     = useState(null);
+    const [answers, setAnswers] = useState({});
+    const [results, setResults] = useState(null);
+    const [catSel, setCatSel]   = useState(null);
+    const [score, setScore]     = useState(0);
+    const [tiempo, setTiempo]   = useState(DURACION);
+    const [frasesDone, setFrasesDone] = useState(0);
+    const timerRef = useRef(null);
+
+    useEffect(() => {
+        if (fase !== 'JUGANDO') return;
+        timerRef.current = setInterval(() => {
+            setTiempo(t => {
+                if (t <= 1) { clearInterval(timerRef.current); setFase('FIN'); return 0; }
+                return t - 1;
+            });
+        }, 1000);
+        return () => clearInterval(timerRef.current);
+    }, [fase]);
+
+    const empezar = () => { setFrase(pickFromBag(bagRef.current, pool)); setFase('JUGANDO'); };
+    const siguiente = () => {
+        setFrase(pickFromBag(bagRef.current, pool));
+        setAnswers({}); setResults(null); setCatSel(null);
+        setFrasesDone(n => n + 1);
+    };
+
+    const comprobar = () => {
+        let pts = 0;
+        const res = {};
+        frase.tokens.forEach((t,i) => {
+            const esp = t.funcion||[], ans = answers[i]||[];
+            const ok = esp.length===ans.length && esp.every(f=>ans.includes(f));
+            res[i] = { ok, esp, dad:ans };
+            if (ok) pts += (esp[0] && CATEGORIAS_FR[esp[0]]?.puntos)||10;
+        });
+        setResults(res); setScore(s => s + pts);
+    };
+
+    const handleClickWord = (i) => {
+        if (results || !catSel) return;
+        setAnswers(prev => {
+            const cur = prev[i]||[];
+            if (cur.includes(catSel)) return {...prev,[i]:cur.filter(c=>c!==catSel)};
+            if (cur.length>=2) return prev;
+            return {...prev,[i]:[...cur,catSel]};
+        });
+    };
+
+    if (fase==='INTRO') return (
+        <div style={g.container}>
+            <div style={g.header}><button onClick={onBack} style={g.btnBack}><RotateCcw size={16}/> Retour</button><span style={g.titulo}>⏱️ Contre-la-montre · FR</span><div style={{width:60}}/></div>
+            <div style={g.centerBox}><div style={{...g.card,maxWidth:420}}>
+                <div style={{fontSize:'3rem',marginBottom:8}}>⏱️</div>
+                <h2 style={g.cardTitle}>Contre-la-montre</h2>
+                <p style={{color:'#555',marginBottom:20}}>Tu as <strong>3 minutes</strong> pour analyser le maximum de phrases.</p>
+                <button onClick={empezar} style={{...g.btnPrimary,width:'100%',justifyContent:'center'}}><Play size={18}/> Commencer</button>
+            </div></div>
+        </div>
+    );
+    if (fase==='FIN') return (
+        <div style={g.container}>
+            <div style={g.header}><button onClick={onBack} style={g.btnBack}><RotateCcw size={16}/> Retour</button><span style={g.titulo}>⏱️ Résultats</span><div style={{width:60}}/></div>
+            <div style={g.centerBox}><div style={{...g.card,maxWidth:420,textAlign:'center'}}>
+                <Trophy size={64} color="#f1c40f"/>
+                <h2 style={{...g.cardTitle,marginTop:12}}>Terminé !</h2>
+                <div style={{fontSize:'2.5rem',fontWeight:900,color:'#e74c3c',margin:'8px 0'}}>{score}</div>
+                <p style={{color:'#666'}}>Points totaux · {frasesDone+(results?1:0)} phrases analysées</p>
+                <button onClick={onBack} style={{...g.btnPrimary,width:'100%',justifyContent:'center',marginTop:16}}><RotateCcw size={16}/> Rejouer</button>
+            </div></div>
+        </div>
+    );
+    return (
+        <div style={g.container}>
+            <div style={g.header}>
+                <button onClick={onBack} style={g.btnBack}><RotateCcw size={16}/> Retour</button>
+                <span style={g.titulo}>⏱️ Contre-la-montre · FR</span>
+                <div style={{...g.scoreboard}}><Clock size={14}/> {fmtTime(tiempo)} · 🏆 {score}</div>
+            </div>
+            <div style={{padding:'16px 12px',maxWidth:700,margin:'0 auto'}}>
+                {frase && <>
+                    <PaletaFR catSel={catSel} setCatSel={setCatSel}/>
+                    <FraseTokensFR tokens={frase.tokens} answers={answers} onClickWord={handleClickWord} results={results}/>
+                    {!results ? (
+                        <button onClick={comprobar} style={{...g.btnPrimary,width:'100%',marginTop:16,justifyContent:'center'}}>
+                            <CheckCircle size={18}/> Vérifier
+                        </button>
+                    ) : (
+                        <>
+                            <ResultadoFR tokens={frase.tokens} results={results}/>
+                            <button onClick={siguiente} style={{...g.btnSuccess,width:'100%',marginTop:12,justifyContent:'center'}}>
+                                <ArrowRight size={18}/> Phrase suivante
+                            </button>
+                        </>
+                    )}
+                </>}
+            </div>
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// APP CONTAINER FRANÇAIS
+// ─────────────────────────────────────────────────────────────────────
+function ModoDualFR({ nivel, onBack }) {
+    const pool=FRASES_FR.filter(f=>!nivel||f.nivel===nivel);
+    const bag=useRef(createBag(pool));
+    const init=()=>({frase:pickFromBag(bag.current,pool),answers:{},results:null,score:0,catSel:null});
+    const [sides,setSides]=useState([init(),init()]);
+    const update=(si,fn)=>setSides(prev=>{const n=[...prev];n[si]={...n[si],...fn(n[si])};return n;});
+    const clickWord=(si,i)=>{update(si,s=>{if(s.results||!s.catSel)return{};const a={...s.answers};const cur=a[i]||[];if(cur.includes(s.catSel))a[i]=cur.filter(c=>c!==s.catSel);else if(cur.length<2)a[i]=[...cur,s.catSel];return{answers:a};});};
+    const comprobar=(si)=>{const s=sides[si];let pts=0;const res={};s.frase.tokens.forEach((t,i)=>{const esp=t.funcion||[],ans=s.answers[i]||[];const ok=esp.length===ans.length&&esp.every(f=>ans.includes(f));res[i]={ok,esp,dad:ans};if(ok)pts+=(esp[0]&&CATEGORIAS_FR[esp[0]]?.puntos)||10;});update(si,()=>({results:res,score:s.score+pts}));};
+    const siguiente=(si)=>{update(si,()=>({...init()}));};
+    const cols=['#3498db','#e74c3c'];
+    return(
+        <div style={g.container}>
+            <div style={g.header}><button onClick={onBack} style={g.btnBack}><RotateCcw size={16}/> Retour</button><span style={g.titulo}>⚔️ Duel · Français</span><div style={{display:'flex',gap:10}}>{sides.map((s,si)=><div key={si} style={{...g.scoreboard,background:cols[si]}}>J{si+1}: {s.score}</div>)}</div></div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,padding:'16px 12px',maxWidth:1100,margin:'0 auto'}}>
+                {sides.map((s,si)=>(
+                    <div key={si} style={{background:'white',borderRadius:16,padding:'14px',boxShadow:'0 4px 12px rgba(0,0,0,0.07)',borderTop:`4px solid ${cols[si]}`}}>
+                        <PaletaFR catSel={s.catSel} setCatSel={cat=>update(si,()=>({catSel:cat}))}/>
+                        <FraseTokensFR tokens={s.frase.tokens} answers={s.answers} onClickWord={(i)=>clickWord(si,i)} results={s.results}/>
+                        {!s.results?(<button onClick={()=>comprobar(si)} style={{...g.btnSuccess,width:'100%',marginTop:12,justifyContent:'center'}}><CheckCircle size={16}/> Vérifier</button>):(<><ResultadoFR tokens={s.frase.tokens} results={s.results}/><button onClick={()=>siguiente(si)} style={{...g.btnPrimary,width:'100%',marginTop:10,justifyContent:'center'}}><ArrowRight size={16}/> Phrase suivante</button></>)}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function SintaxisAppFR({ onExit }) {
+    const [screen,setScreen]=useState('NIVEL');
+    const [nivelSel,setNivelSel]=useState(null);
+    const [internalHost,setInternalHost]=useState(null);
+    const [internalClient,setInternalClient]=useState(null);
+    const [joinCode,setJoinCode]=useState('');
+    const [showLiveConfig,setShowLiveConfig]=useState(false);
+    const [liveConfig,setLiveConfig]=useState({tiempoPregunta:30,numPreguntas:8,puntosMax:100,puntosMin:50});
+    const [creandoSala,setCreandoSala]=useState(false);
+
+    const crearSala=async()=>{
+        setCreandoSala(true);
+        try{
+            const codigo=generarCodigo();
+            const pool=getPoolByIdioma('FR',nivelSel,null);
+            const bag=createBag(pool);
+            const preguntas=Array.from({length:liveConfig.numPreguntas},(_,i)=>{const f=pickFromBag(bag,pool);return{tokens:f.tokens,nivel:f.nivel||nivelSel||'debutant',fid:f.id||i};});
+            await setDoc(doc(db,'live_games',codigo),{tipoJuego:'SINTAXIS',idioma:'FR',estado:'LOBBY',fasePregunta:'RESPONDING',jugadores:{},preguntas,indicePregunta:0,respuestasRonda:{},questionStartTime:null,config:liveConfig,catStats:{},creadoEn:Date.now()});
+            setShowLiveConfig(false);setInternalHost(codigo);
+        }catch(e){console.error(e);alert('Erreur lors de la création de la salle.');}
+        setCreandoSala(false);
+    };
+    const unirse=()=>{const c=joinCode.trim().toUpperCase();if(c.length!==6)return alert('Le code doit avoir 6 caractères.');setInternalClient(c);};
+
+    if(internalHost) return <SintaxisLiveHost codigoSala={internalHost} onExit={()=>setInternalHost(null)}/>;
+    if(internalClient) return <SintaxisLiveClient codigoSala={internalClient} onExit={()=>setInternalClient(null)}/>;
+    if(screen==='LOCAL') return <ModoLocalFR nivel={nivelSel} onBack={()=>setScreen('MODOS')}/>;
+    if(screen==='CONTRARRELOJ') return <ModoContrarrelojFR nivel={nivelSel} onBack={()=>setScreen('MODOS')}/>;
+    if(screen==='DUAL') return <ModoDualFR nivel={nivelSel} onBack={()=>setScreen('MODOS')}/>;
+
+    if(screen==='MODOS') return(
+        <div style={g.container}>
+            <div style={g.header}><button onClick={()=>setScreen('NIVEL')} style={g.btnBack}><RotateCcw size={16}/> Retour</button><span style={g.titulo}>🇫🇷 Syntaxe Française</span><div style={{width:60}}/></div>
+            <div style={g.centerBox}>
+                <div style={{...g.card,maxWidth:520}}>
+                    <div style={{fontSize:'2.5rem',marginBottom:4}}>🇫🇷</div>
+                    <h2 style={{...g.cardTitle,fontSize:'1.4rem'}}>{(NIVELES_FR.find(n=>n.id===nivelSel)||{emoji:'📚',label:'Tous'}).emoji} {(NIVELES_FR.find(n=>n.id===nivelSel)||{label:'Tous'}).label}</h2>
+                    <div style={{display:'flex',flexDirection:'column',gap:10,marginTop:16}}>
+                        {[{k:'LOCAL',e:'🎯',l:'Mode Libre',d:"Entraîne-toi à ton rythme.",c:'#3498db',f:()=>setScreen('LOCAL')},{k:'CONTRARRELOJ',e:'⏱️',l:'Contre-la-montre',d:'3 minutes pour analyser le maximum.',c:'#e74c3c',f:()=>setScreen('CONTRARRELOJ')},{k:'DUAL',e:'⚔️',l:'Mode Duel',d:'Deux joueurs, deux phrases à la fois.',c:'#9b59b6',f:()=>setScreen('DUAL')},{k:'LIVE',e:'📡',l:'Session en Direct',d:'Joue en ligne avec la classe.',c:'#27ae60',f:()=>setShowLiveConfig(true)}].map(m=>(
+                            <button key={m.k} onClick={m.f} style={{padding:'16px 20px',borderRadius:16,border:`2px solid ${m.c}`,background:'white',cursor:'pointer',textAlign:'left',display:'flex',alignItems:'center',gap:14,transition:'all 0.15s',fontFamily:'inherit'}}
+                                onMouseEnter={e=>e.currentTarget.style.background=`${m.c}15`} onMouseLeave={e=>e.currentTarget.style.background='white'}>
+                                <span style={{fontSize:'1.8rem'}}>{m.e}</span><div><div style={{fontWeight:'bold',color:m.c,fontSize:'0.95rem'}}>{m.l}</div><div style={{color:'#888',fontSize:'0.8rem'}}>{m.d}</div></div>
+                                <ChevronRight size={18} color={m.c} style={{marginLeft:'auto'}}/>
+                            </button>
+                        ))}
+                    </div>
+                    <div style={{borderTop:'2px dashed #eee',paddingTop:14,marginTop:14}}>
+                        <p style={{color:'#888',fontSize:'0.78rem',marginBottom:8,textAlign:'center'}}>Tu as un code de session en direct ?</p>
+                        <div style={{display:'flex',gap:8}}>
+                            <input placeholder="CODE 6 LETTRES" value={joinCode} onChange={e=>setJoinCode(e.target.value.toUpperCase())} maxLength={6} style={{flex:1,padding:'10px 14px',borderRadius:30,border:'2px solid #ccc',textAlign:'center',fontSize:'1rem',letterSpacing:3,outline:'none',fontWeight:'bold'}}/>
+                            <button onClick={unirse} style={{...g.btnSuccess,padding:'10px 18px',margin:0}}>Rejoindre</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {showLiveConfig&&(
+                <div style={{position:'fixed',inset:0,zIndex:2000,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+                    <div style={{...g.card,maxWidth:420,maxHeight:'90vh',overflowY:'auto'}}>
+                        <h3 style={{color:'#27ae60',marginTop:0}}>📡 Configurer la Session</h3>
+                        <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:12}}>
+                            {[15,20,30,45].map(t=><button key={t} onClick={()=>setLiveConfig(c=>({...c,tiempoPregunta:t}))} style={{padding:'6px 14px',borderRadius:20,border:`2px solid ${liveConfig.tiempoPregunta===t?'#27ae60':'#ccc'}`,background:liveConfig.tiempoPregunta===t?'#27ae60':'white',color:liveConfig.tiempoPregunta===t?'white':'#555',cursor:'pointer',fontWeight:'bold'}}>{t}s</button>)}
+                        </div>
+                        <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:16}}>
+                            {[5,8,10,15].map(n=><button key={n} onClick={()=>setLiveConfig(c=>({...c,numPreguntas:n}))} style={{padding:'6px 14px',borderRadius:20,border:`2px solid ${liveConfig.numPreguntas===n?'#9b59b6':'#ccc'}`,background:liveConfig.numPreguntas===n?'#9b59b6':'white',color:liveConfig.numPreguntas===n?'white':'#555',cursor:'pointer',fontWeight:'bold'}}>{n} phrases</button>)}
+                        </div>
+                        <div style={{display:'flex',gap:10}}>
+                            <button onClick={()=>setShowLiveConfig(false)} style={g.btnGray}>Annuler</button>
+                            <button onClick={crearSala} disabled={creandoSala} style={{...g.btnSuccess,flex:1,justifyContent:'center'}}>{creandoSala?'Création...':'Créer la Salle'}</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+
+    return(
+        <div style={g.container}>
+            <div style={g.header}><button onClick={onExit} style={g.btnBack}><RotateCcw size={16}/> Retour</button><span style={g.titulo}>🇫🇷 Syntaxe Française</span><div style={{width:60}}/></div>
+            <div style={g.centerBox}>
+                <div style={{...g.card,maxWidth:520}}>
+                    <div style={{fontSize:'3rem',marginBottom:6}}>🇫🇷</div>
+                    <h1 style={g.cardTitle}>Choisir le niveau</h1>
+                    <p style={{color:'#666',fontSize:'0.88rem',marginBottom:20}}>Sélectionne un niveau pour commencer à analyser des phrases.</p>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:20}}>
+                        {NIVELES_FR.map(n=>(
+                            <button key={String(n.id)} onClick={()=>setNivelSel(n.id)}
+                                style={{padding:'13px 8px',borderRadius:14,cursor:'pointer',fontWeight:'bold',fontSize:'0.9rem',transition:'all 0.15s',
+                                    background:nivelSel===n.id?n.color:'#f5f5f5',color:nivelSel===n.id?'white':'#444',border:`2px solid ${n.color}`}}>
+                                {n.emoji} {n.label}
+                                <div style={{fontSize:'0.68rem',opacity:.8,marginTop:2,fontWeight:'normal'}}>{FRASES_FR.filter(f=>!n.id||f.nivel===n.id).length} phrases</div>
+                            </button>
+                        ))}
+                    </div>
+                    <button onClick={()=>setScreen('MODOS')} disabled={nivelSel===undefined}
+                        style={{...g.btnPrimary,width:'100%',justifyContent:'center',opacity:nivelSel!==undefined?1:0.4}}>
+                        <ChevronRight size={20}/> Continuer
+                    </button>
+                </div>
+            </div>
+        </div>
     );
 }
 
@@ -557,11 +1485,12 @@ const Chip = ({active,color,onClick,children}) => <button onClick={onClick} styl
 // ─────────────────────────────────────────────────────────────────────
 // COMPONENTE COMPARTIDO — PALETA DE FUNCIONES
 // ─────────────────────────────────────────────────────────────────────
-function Paleta({ catSel, setCatSel, nivel, tokens }) {
+function Paleta({ catSel, setCatSel, nivel, tokens, categorias: catOverride }) {
+    const cats = catOverride || CATEGORIAS;
     // En modo primaria, sólo las categorías presentes en la frase
-    const visibles = (nivel === 'primaria' && tokens)
-        ? Object.entries(CATEGORIAS).filter(([k]) => getCatsEnFrase(tokens).has(k))
-        : Object.entries(CATEGORIAS);
+    const visibles = (nivel === 'primaria' && tokens && !catOverride)
+        ? Object.entries(cats).filter(([k]) => getCatsEnFrase(tokens).has(k))
+        : Object.entries(cats);
 
     return (
         <div style={{background:'#f8f9fa',padding:'12px 16px',borderRadius:14,marginBottom:20}}>
@@ -593,9 +1522,13 @@ function Paleta({ catSel, setCatSel, nivel, tokens }) {
 // ─────────────────────────────────────────────────────────────────────
 // COMPONENTE COMPARTIDO — FRASE INTERACTIVA
 // ─────────────────────────────────────────────────────────────────────
-function FraseTokens({ tokens, answers, onClickWord, readonly, results }) {
+function FraseTokens({ tokens, answers, onClickWord, readonly, results, lang = 'es-ES' }) {
     return (
-        <div style={{display:'flex',flexWrap:'wrap',gap:8,justifyContent:'center',padding:'12px 0'}}>
+        <div>
+        <div style={{display:'flex',justifyContent:'center',marginBottom:6}}>
+            <BtnLeer tokens={tokens} lang={lang}/>
+        </div>
+        <div style={{display:'flex',flexWrap:'wrap',gap:8,justifyContent:'center',padding:'4px 0'}}>
             {tokens.map((t, i) => {
                 const ans = answers?.[i] || [];
                 const r = results?.[i];
@@ -631,6 +1564,7 @@ function FraseTokens({ tokens, answers, onClickWord, readonly, results }) {
                     </div>
                 );
             })}
+        </div>
         </div>
     );
 }
@@ -986,19 +1920,21 @@ function ModoDual({ nivel, recurso, onBack }) {
 // ─────────────────────────────────────────────────────────────────────
 function SintaxisLiveHost({ codigoSala, onExit }) {
     const [sala, setSala]       = useState(null);
+    const salaRef               = useRef(null);
     const [answers, setAnswers] = useState([]);
-    const [catSel, setCatSel]   = useState(Object.keys(CATEGORIAS)[0]);
+    const [catSel, setCatSel]   = useState(null);
     const [timerLocal, setTimerLocal] = useState(0);
     const timerRef = useRef(null);
     const [revealResults, setRevealResults] = useState(null);
     const [weakCats, setWeakCats] = useState([]);
     const [showWeakModal, setShowWeakModal] = useState(false);
+    const [mostrarEnvio, setMostrarEnvio] = useState(false);
 
     useEffect(() => {
         const unsub = onSnapshot(doc(db, 'live_games', codigoSala), snap => {
             if (!snap.exists()) return;
             const d = snap.data();
-            setSala(d);
+            setSala(d); salaRef.current = d;
             if (d.estado === 'PLAYING' && d.fasePregunta === 'RESPONDING') {
                 const elapsed = d.questionStartTime ? Math.floor((Date.now() - d.questionStartTime) / 1000) : 0;
                 const remaining = Math.max(0, d.config.tiempoPregunta - elapsed);
@@ -1012,8 +1948,13 @@ function SintaxisLiveHost({ codigoSala, onExit }) {
     useEffect(() => {
         clearInterval(timerRef.current);
         if (sala?.estado === 'PLAYING' && sala?.fasePregunta === 'RESPONDING') {
+            const fcSent = { current: false };
             timerRef.current = setInterval(() => {
                 setTimerLocal(t => {
+                    if (t <= 1 && !fcSent.current) {
+                        fcSent.current = true;
+                        updateDoc(doc(db,'live_games',codigoSala),{forceCheck:Date.now()}).catch(()=>{});
+                    }
                     if (t <= 1) { clearInterval(timerRef.current); hostReveal(); return 0; }
                     return t - 1;
                 });
@@ -1023,19 +1964,23 @@ function SintaxisLiveHost({ codigoSala, onExit }) {
     }, [sala?.indicePregunta, sala?.fasePregunta]);
 
     const iniciarJuego = async () => {
-        const preg0 = sala.preguntas[0];
+        const s = salaRef.current || sala;
+        const preg0 = s.preguntas[0];
+        const cats = getCatsByIdioma(s.idioma || 'ES');
         await updateDoc(doc(db, 'live_games', codigoSala), {
             estado: 'PLAYING', fasePregunta: 'RESPONDING',
             indicePregunta: 0, respuestasRonda: {},
             questionStartTime: Date.now(),
         });
         setAnswers(preg0.tokens.map(()=>[]));
-        setCatSel(Object.keys(CATEGORIAS)[0]);
+        setCatSel(Object.keys(cats)[0]);
     };
 
     const hostReveal = async () => {
         clearInterval(timerRef.current);
+        const sala = salaRef.current;
         if (!sala) return;
+        const CATS = getCatsByIdioma(sala.idioma || 'ES');
         const idx = sala.indicePregunta;
         const preg = sala.preguntas[idx];
         const jugadores = sala.jugadores || {};
@@ -1052,7 +1997,7 @@ function SintaxisLiveHost({ codigoSala, onExit }) {
                 const dad = resp[i] || [];
                 const ok = esp.length === dad.length && esp.every(f => dad.includes(f));
                 if (ok) {
-                    const puntosTok = esp.reduce((a,f) => a + (CATEGORIAS[f]?.puntos||10), 0);
+                    const puntosTok = esp.reduce((a,f) => a + (CATS[f]?.puntos||10), 0);
                     const tiempoBonus = j.tiempoRespuesta
                         ? Math.max(0, sala.config.tiempoPregunta - j.tiempoRespuesta) / sala.config.tiempoPregunta
                         : 0;
@@ -1100,7 +2045,9 @@ function SintaxisLiveHost({ codigoSala, onExit }) {
     };
 
     const hostNextOrEnd = async () => {
+        const sala = salaRef.current;
         if (!sala) return;
+        const cats = getCatsByIdioma(sala.idioma || 'ES');
         const next = sala.indicePregunta + 1;
         if (next >= sala.preguntas.length) {
             await updateDoc(doc(db, 'live_games', codigoSala), { estado: 'FIN' });
@@ -1108,7 +2055,7 @@ function SintaxisLiveHost({ codigoSala, onExit }) {
             setRevealResults(null);
             const preg = sala.preguntas[next];
             setAnswers(preg.tokens.map(()=>[]));
-            setCatSel(Object.keys(CATEGORIAS)[0]);
+            setCatSel(Object.keys(cats)[0]);
             await updateDoc(doc(db, 'live_games', codigoSala), {
                 estado: 'PLAYING', fasePregunta: 'RESPONDING',
                 indicePregunta: next, respuestasRonda: {},
@@ -1132,6 +2079,7 @@ function SintaxisLiveHost({ codigoSala, onExit }) {
     const numJugadores = Object.keys(jugadores).length;
     const preg = sala.preguntas?.[sala.indicePregunta];
     const urgente = timerLocal <= 10;
+    const CATS_HOST = getCatsByIdioma(sala.idioma || 'ES');
 
     // LEADERBOARD
     const Leaderboard = () => {
@@ -1256,47 +2204,86 @@ function SintaxisLiveHost({ codigoSala, onExit }) {
                         <div style={{fontSize:'2.5rem',marginBottom:8}}>🏆</div>
                         <h1 style={g.cardTitle}>¡Fin del Juego!</h1>
                         <Leaderboard/>
-                        {/* Resumen categorías débiles globales */}
                         {sala.catStats && Object.entries(sala.catStats).some(([,v])=>v.total>0&&v.correct/v.total<0.4) && (
                             <div style={{background:'#fef2f2',borderRadius:14,padding:'14px',marginTop:16}}>
-                                <div style={{fontWeight:'bold',color:'#e74c3c',marginBottom:8,fontSize:'0.9rem'}}>⚠️ Categorías con dificultad (menos del 40% de aciertos globales):</div>
+                                <div style={{fontWeight:'bold',color:'#e74c3c',marginBottom:8,fontSize:'0.9rem'}}>⚠️ Categorías con dificultad (menos del 40%):</div>
                                 <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
                                     {Object.entries(sala.catStats).filter(([,v])=>v.total>0&&v.correct/v.total<0.4).map(([cat,v])=>(
-                                        <span key={cat} style={{background:CATEGORIAS[cat]?.color||'#ccc',color:'white',padding:'5px 12px',borderRadius:20,fontSize:'0.82rem',fontWeight:'bold'}}>
-                                            {CATEGORIAS[cat]?.emoji} {CATEGORIAS[cat]?.label||cat} ({Math.round(v.correct/v.total*100)}%)
+                                        <span key={cat} style={{background:CATS_HOST[cat]?.color||'#ccc',color:'white',padding:'5px 12px',borderRadius:20,fontSize:'0.82rem',fontWeight:'bold'}}>
+                                            {CATS_HOST[cat]?.emoji} {CATS_HOST[cat]?.label||cat} ({Math.round(v.correct/v.total*100)}%)
                                         </span>
                                     ))}
                                 </div>
                             </div>
                         )}
-                        <button onClick={onExit} style={{...g.btnGray,marginTop:18,justifyContent:'center',width:'100%'}}>Salir</button>
+                        <div style={{display:'flex',gap:10,marginTop:18}}>
+                            <button onClick={()=>setMostrarEnvio(true)} style={{...g.btnPrimary,flex:1,justifyContent:'center',fontSize:'0.9rem'}}>
+                                <Send size={15}/> Enviar al profesor
+                            </button>
+                            <button onClick={onExit} style={{...g.btnGray,flex:1,justifyContent:'center'}}>Salir</button>
+                        </div>
                     </div>
                 </div>
             )}
+            {mostrarEnvio && (() => {
+                const sorted2=Object.entries(jugadores).sort(([,a],[,b])=>(b.puntos||0)-(a.puntos||0));
+                const maxPts2=Math.max(...sorted2.map(([,j])=>j.puntos||0),1);
+                const datosHost={modalidad:'Online',idioma:sala.idioma||'ES',jugadores:sorted2.map(([id,j])=>({nombre:j.nombre||id,curso:'',puntos:j.puntos||0,porcentaje:Math.round((j.puntos||0)/maxPts2*100),nivel:sala.config?.nivel||'',idioma:sala.idioma||'ES'}))};
+                return <ModalEnviarProfe datos={datosHost} onClose={()=>setMostrarEnvio(false)}/>;
+            })()}
         </div>
     );
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// LIVE CLIENT
+// FIN CLIENT component con envío al profesor
 // ─────────────────────────────────────────────────────────────────────
+function FinClientSintaxis({ sorted, myScore, myPos, nombre, uid, sala, onExit }) {
+    const [mostrarEnvio, setMostrarEnvio] = useState(false);
+    const idioma = sala?.idioma || 'ES';
+    const maxPts = Math.max(...sorted.map(([,j])=>j.puntos||0), 1);
+    const datos = {
+        modalidad: 'Online', idioma,
+        jugadores: sorted.map(([id,j])=>({
+            nombre:j.nombre||id, curso:'', puntos:j.puntos||0,
+            porcentaje:Math.round((j.puntos||0)/maxPts*100),
+            nivel:sala?.config?.nivel||'', idioma,
+        })),
+    };
+    return (
+        <>
+            <div style={{display:'flex',gap:10,marginTop:16,flexWrap:'wrap',justifyContent:'center'}}>
+                <button onClick={()=>setMostrarEnvio(true)} style={{...g.btnPrimary,fontSize:'0.9rem',padding:'10px 18px'}}>
+                    <Send size={15}/> Enviar al profesor
+                </button>
+                <button onClick={onExit} style={{...g.btnGray,fontSize:'0.9rem',padding:'10px 18px'}}>Salir</button>
+            </div>
+            {mostrarEnvio && <ModalEnviarProfe datos={datos} onClose={()=>setMostrarEnvio(false)}/>}
+        </>
+    );
+}
 function SintaxisLiveClient({ codigoSala, onExit }) {
     const [nombre, setNombre]   = useState(() => localStorage.getItem('pikt_guest_name') || '');
     const [uid]                 = useState(() => localStorage.getItem('pikt_guest_id') || ('guest_' + Math.random().toString(36).slice(2)));
     const [sala, setSala]       = useState(null);
     const [joined, setJoined]   = useState(false);
     const [answers, setAnswers] = useState([]);
-    const [catSel, setCatSel]   = useState(Object.keys(CATEGORIAS)[0]);
+    const [catSel, setCatSel]   = useState(null);
     const [submitted, setSubmitted] = useState(false);
     const [timerLocal, setTimerLocal] = useState(0);
-    const timerRef = useRef(null);
-    const prevIdx = useRef(-1);
+    const [forceCheck, setForceCheck] = useState(null);
+    const timerRef   = useRef(null);
+    const prevIdx    = useRef(-1);
+    const envRef     = useRef(false);
+    const answersRef = useRef([]);
 
     useEffect(() => {
         localStorage.setItem('pikt_guest_id', uid);
         const unsub = onSnapshot(doc(db, 'live_games', codigoSala), snap => {
             if (!snap.exists()) return;
-            setSala(snap.data());
+            const d = snap.data();
+            setSala(d);
+            if (d.forceCheck) setForceCheck(d.forceCheck);
         });
         return () => unsub();
     }, []);
@@ -1308,13 +2295,26 @@ function SintaxisLiveClient({ codigoSala, onExit }) {
             if (idx !== prevIdx.current) {
                 prevIdx.current = idx;
                 setSubmitted(false);
+                envRef.current = false;
                 const preg = sala.preguntas[idx];
-                setAnswers(preg.tokens.map(()=>[]));
-                setCatSel(Object.keys(CATEGORIAS)[0]);
+                const emptyAnswers = preg.tokens.map(()=>[]);
+                setAnswers(emptyAnswers);
+                answersRef.current = emptyAnswers;
+                const cats = getCatsByIdioma(sala.idioma || 'ES');
+                setCatSel(Object.keys(cats)[0]);
                 const elapsed = sala.questionStartTime ? Math.floor((Date.now() - sala.questionStartTime)/1000) : 0;
                 setTimerLocal(Math.max(0, sala.config.tiempoPregunta - elapsed));
                 clearInterval(timerRef.current);
-                timerRef.current = setInterval(() => setTimerLocal(t => Math.max(0,t-1)), 1000);
+                timerRef.current = setInterval(() => {
+                    setTimerLocal(t => {
+                        if (t <= 0) {
+                            clearInterval(timerRef.current);
+                            if (!envRef.current) enviarRespuesta(answersRef.current);
+                            return 0;
+                        }
+                        return t - 1;
+                    });
+                }, 1000);
             }
         } else {
             clearInterval(timerRef.current);
@@ -1322,6 +2322,12 @@ function SintaxisLiveClient({ codigoSala, onExit }) {
     }, [sala?.estado, sala?.fasePregunta, sala?.indicePregunta]);
 
     useEffect(() => () => clearInterval(timerRef.current), []);
+
+    // forceCheck: el host avisa 1s antes — enviar con lo que tengamos
+    useEffect(() => {
+        if (!forceCheck || envRef.current || !joined) return;
+        enviarRespuesta(answersRef.current);
+    }, [forceCheck]);
 
     const unirse = async () => {
         if (!nombre.trim()) return alert('Introduce tu nombre.');
@@ -1332,12 +2338,14 @@ function SintaxisLiveClient({ codigoSala, onExit }) {
         setJoined(true);
     };
 
-    const enviarRespuesta = async () => {
-        if (submitted) return;
+    const enviarRespuesta = async (ans = null) => {
+        if (envRef.current) return;
+        envRef.current = true;
         setSubmitted(true);
+        const respAnswers = ans || answersRef.current;
         const tiempoResp = sala.questionStartTime ? Math.floor((Date.now() - sala.questionStartTime)/1000) : sala.config.tiempoPregunta;
         const respObj = {};
-        answers.forEach((a, i) => { respObj[i] = a; });
+        respAnswers.forEach((a, i) => { respObj[i] = a; });
         await updateDoc(doc(db, 'live_games', codigoSala), {
             [`respuestasRonda.${uid}`]: respObj,
             [`jugadores.${uid}.tiempoRespuesta`]: tiempoResp,
@@ -1351,6 +2359,7 @@ function SintaxisLiveClient({ codigoSala, onExit }) {
         if (c.includes(catSel)) a[i] = c.filter(x=>x!==catSel);
         else if (c.length < 2) a[i] = [...c, catSel];
         setAnswers(a);
+        answersRef.current = a;
     };
 
     if (!sala) return <div style={g.centerBox}><div style={{color:'#555'}}>Conectando a la sala...</div></div>;
@@ -1359,6 +2368,7 @@ function SintaxisLiveClient({ codigoSala, onExit }) {
     const preg = sala.preguntas?.[sala.indicePregunta];
     const urgente = timerLocal <= 10 && timerLocal > 0;
     const myScore = jugadores[uid]?.puntos || 0;
+    const CATS_CLI = getCatsByIdioma(sala.idioma || 'ES');
 
     // Pantalla JOIN
     if (!joined) return (
@@ -1418,6 +2428,18 @@ function SintaxisLiveClient({ codigoSala, onExit }) {
                             <span style={{fontWeight:900,color:'#9b59b6'}}>{j.puntos||0} pts</span>
                         </div>
                     ))}
+                    {sala.fasePregunta === 'WEAKCAT' && sala.catStats && (
+                        <div style={{background:'#fef2f2',borderRadius:14,padding:'14px',marginTop:12}}>
+                            <div style={{fontWeight:'bold',color:'#e74c3c',fontSize:'0.9rem',marginBottom:8}}>⚠️ Punts febles de la classe</div>
+                            <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+                                {Object.entries(sala.catStats).filter(([,v])=>v.total>0&&v.correct/v.total<0.4).map(([cat,v])=>(
+                                    <span key={cat} style={{background:CATS_CLI[cat]?.color||'#ccc',color:'white',padding:'5px 12px',borderRadius:20,fontSize:'0.82rem',fontWeight:'bold'}}>
+                                        {CATS_CLI[cat]?.emoji} {CATS_CLI[cat]?.label||cat} ({Math.round(v.correct/v.total*100)}%)
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         );
@@ -1443,7 +2465,7 @@ function SintaxisLiveClient({ codigoSala, onExit }) {
                             <span style={{fontWeight:900,color:'#9b59b6'}}>{j.puntos||0} pts</span>
                         </div>
                     ))}
-                    <button onClick={onExit} style={{...g.btnGray,marginTop:16,justifyContent:'center',width:'100%'}}>Salir</button>
+                    <FinClientSintaxis sorted={sorted} myScore={myScore} myPos={myPos} nombre={nombre} uid={uid} sala={sala} onExit={onExit}/>
                 </div>
             </div>
         );
@@ -1483,10 +2505,10 @@ function SintaxisLiveClient({ codigoSala, onExit }) {
             )}
             {!submitted ? (
                 <>
-                    <Paleta catSel={catSel} setCatSel={setCatSel} nivel={preg.nivel} tokens={preg.tokens}/>
+                    <Paleta catSel={catSel} setCatSel={setCatSel} nivel={preg.nivel} tokens={preg.tokens} categorias={CATS_CLI}/>
                     <FraseTokens tokens={preg.tokens} answers={answers} onClickWord={clickWord}/>
                     <div style={{textAlign:'center',marginTop:18}}>
-                        <button onClick={enviarRespuesta} style={{...g.btnSuccess,justifyContent:'center'}}>
+                        <button onClick={()=>enviarRespuesta()} style={{...g.btnSuccess,justifyContent:'center'}}>
                             <CheckCircle size={17}/> Enviar Respuesta
                         </button>
                     </div>
@@ -1527,6 +2549,6 @@ const g = {
 if (typeof document !== 'undefined' && !document.getElementById('sintaxis-kf')) {
     const s = document.createElement('style');
     s.id = 'sintaxis-kf';
-    s.textContent = `@keyframes popUp{0%{opacity:0;transform:translateY(0) scale(.8)}50%{opacity:1;transform:translateY(-28px) scale(1.2)}100%{opacity:0;transform:translateY(-56px) scale(1)}}`;
+    s.textContent = `@keyframes popUp{0%{opacity:0;transform:translateY(0) scale(.8)}50%{opacity:1;transform:translateY(-28px) scale(1.2)}100%{opacity:0;transform:translateY(-56px) scale(1)}} @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(1.2)}}`;
     document.head.appendChild(s);
 }

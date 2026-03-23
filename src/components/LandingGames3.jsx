@@ -13,6 +13,7 @@ import TextWordleGame from '../TextWordleGame';
 import MathWordleGame from '../MathWordleGame';
 import SopaDeLetrasGame from '../SopaDeLetrasGame';
 import SintaxisGame from '../SintaxisGamen2';
+import Listening from '../Listeninggame'
 import Geometrix from '../Geometrix';
 import CalculoMental from '../CalculoMental'; 
 import Ecuaciones from '../Ecuaciones';
@@ -76,7 +77,14 @@ export const APPS = [
         isSpecial: false
     },
 
-   
+    {
+        id: 'LISTENING',
+        name: 'Listening',
+        desc: 'Escucha y completa.',
+        color: '#3498db',
+        emoji: '🖍️',
+        isSpecial: false
+    },
 
 
     {
@@ -862,7 +870,10 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
 
 
     if (appData.id === 'SINTAXIS') return <SintaxisGame usuario={null} onExit={onHome} />;
-    if (appData.id === 'PIKATRON_2') return <Plataformas usuario={null} onExit={onHome} />;
+if (appData.id === 'LISTENING') return <Listening usuario={null} onExit={onHome} />;
+
+
+if (appData.id === 'PIKATRON_2') return <Plataformas usuario={null} onExit={onHome} />;
     // --- NUEVO: USA handleExitGame PARA LOS DE MATES ---
     if (appData.id === 'GEOMETRIX') return <Geometrix usuario={null} onExit={handleExitGame} />;
     if (appData.id === 'CALCULO') return <CalculoMental usuario={null} onExit={handleExitGame} />;
@@ -1057,7 +1068,7 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
                     <div style={{ display: 'flex', gap: '15px', justifyContent: 'center', flexWrap: 'wrap' }}>
 
                         {/* BOTÓN EXCLUSIVO PARA JUGAR DIRECTO CON IA */}
-                        {(appData.id === 'SINTAXIS' || appData.id === 'GEOMETRIX') && (
+                        {(appData.id === 'SINTAXIS' || appData.id === 'GEOMETRIX'|| appData.id === 'LISTENING') && (
                             <button
                                 onClick={() => setJuegoActivo({ tipoJuego: appData.id, isIA: true })}
                                 style={{

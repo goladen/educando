@@ -495,7 +495,8 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
         if (juegoActivo.tipoJuego === 'ECUACIONES') return <Ecuaciones usuario={null} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'FUNCIONES') return <Funciones onExit={() => setJuegoActivo(null)} />;
         // ------------------------
-
+if (juegoActivo.tipoJuego === 'SINTAXIS')  return <SintaxisGame  usuario={usuario} onExit={() => setJuegoActivo(null)} />;
+if (juegoActivo.tipoJuego === 'LISTENING') return <Listening     usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.modoEspecial === 'PIKATRON') return <PikatronRun recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'RULETA') return <RuletaGame recurso={juegoActivo} usuario={null} alTerminar={() => setJuegoActivo(null)} />;
 
@@ -504,7 +505,8 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
         // --- AÑADIDO: Distinguir Wordle y Sopa ---
         if (juegoActivo.modoEspecial === 'WORDLE' || (juegoActivo.tipoJuego === 'WORDLE' && !juegoActivo.modoEspecial)) return <TextWordleGame recursoInicial={juegoActivo} usuario={null} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.modoEspecial === 'SOPA' || (juegoActivo.tipoJuego === 'SOPA' && !juegoActivo.modoEspecial)) return <SopaDeLetrasGame recursoInicial={juegoActivo} usuario={null} onExit={() => setJuegoActivo(null)} />;
-        return <GamePlayer recurso={juegoActivo} usuario={null} alTerminar={() => setJuegoActivo(null)} />;
+
+return <GamePlayer recurso={juegoActivo} usuario={null} alTerminar={() => setJuegoActivo(null)} />;
     }
 
     // --- PANTALLA EXCLUSIVA MATH WORLD ---

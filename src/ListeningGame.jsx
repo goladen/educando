@@ -933,7 +933,7 @@ export default function ListeningGame({ onExit, isHost, codigoSala: codigoExtern
 
     return (
         <PantallaSeleccion
-            onExit={onExit}
+            onBack={onExit}
             onSel={item => { setItemSel(item); setPantalla('MODO'); }}
             onLive={async () => {
                 const codigo = await crearSalaListening();

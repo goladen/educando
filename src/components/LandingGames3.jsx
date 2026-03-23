@@ -13,7 +13,7 @@ import TextWordleGame from '../TextWordleGame';
 import MathWordleGame from '../MathWordleGame';
 import SopaDeLetrasGame from '../SopaDeLetrasGame';
 import SintaxisGame from '../SintaxisGamen2';
-import Listening from '../Listeninggame'
+import Listening from '../ListeningGame'
 import Geometrix from '../Geometrix';
 import CalculoMental from '../CalculoMental'; 
 import Ecuaciones from '../Ecuaciones';

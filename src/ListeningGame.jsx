@@ -268,7 +268,7 @@ function Hueco({ gap, modo, respuesta, onRespuesta, revealed, comprobado, hostVi
 function TranscriptView({ segmentos, modo, respuestas, onRespuesta, frasesReveladas, comprobado, totalFrases, hostView=false }) {
     const frases = dividirEnFrases(segmentos);
     return (
-        <div style={{ lineHeight: 2.2, fontSize:'1.05rem', color:'#2c3e50' }}>
+        <div style={{ lineHeight: 2.2, fontSize:'1.05rem', color:'white' }}>
             {frases.map((frase, fi) => {
                 const visible = fi < frasesReveladas;
                 return (

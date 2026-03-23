@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { db } from '../firebase';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where, doc, updateDoc, arrayUnion } from 'firebase/firestore';
 
 // ─── Constantes ────────────────────────────────────────────────────────────────
 const JUEGOS = [
@@ -45,30 +45,65 @@ const JUEGOS = [
 
 const MODELOS_GEMINI = ['gemini-2.0-flash', 'gemini-2.5-flash'];
 
+// Instrucciones comunes a todos los prompts
+const INSTRUCCIONES_COMUNES = `
+REGLAS ESTRICTAS DE CALIDAD (aplícalas antes de incluir cualquier pregunta):
+1. IDIOMA: Detecta el idioma del documento y mantén ese mismo idioma en todas las preguntas y respuestas.
+2. AUTOSUFICIENCIA: Cada pregunta debe poder responderse SIN ver el documento. Si la pregunta dice "¿Cuál es el resultado del ejercicio anterior?" o "¿Qué hace el personaje en el párrafo 3?" o hace referencia a algo que no está en ella misma → DESCÁRTALA completamente.
+3. LONGITUD: La pregunta (enunciado) no debe superar 15 palabras. Si es más larga, reformúlala de forma concisa manteniendo el significado, o descártala si no es posible.
+4. NIVEL ESO: El lenguaje debe ser adecuado para alumnos de secundaria (12-16 años).
+5. REFORMULACIÓN: Si en el documento hay un ejercicio del tipo "Calcula 3x + 5 = 20" → transfórmalo en una pregunta directa: "¿Cuánto vale x si 3x + 5 = 20?". Si hay una definición, conviértela en "¿Qué es...?" o "¿Cómo se llama...?".
+6. COMPLETO: La respuesta correcta debe estar contenida o deducirse directamente del enunciado de la pregunta, nunca de contexto externo.
+`;
+
 const PROMPTS = {
-    PASAPALABRA: `Analiza esta imagen de un documento educativo. Extrae TODAS las preguntas/definiciones y respuestas que veas.
-Conviértelas al formato Pasapalabra: cada respuesta debe ser una palabra que empiece por una letra del abecedario.
-Devuelve ÚNICAMENTE un JSON array válido (sin markdown, sin explicaciones):
-[{"letra":"A","pregunta":"Definición o pregunta","respuesta":"Palabra que empieza por A"}, ...]
-Si no encuentras contenido educativo útil responde exactamente: {"error":"No se pudo extraer contenido"}`,
+    PASAPALABRA: `Eres un asistente que convierte documentos educativos en juegos de Pasapalabra para alumnos de ESO.
+${INSTRUCCIONES_COMUNES}
+TAREA:
+- Lee el documento imagen completo.
+- Muy importnte, para cada concepto, término o pregunta válida que encuentres, genera una DEFINICIÓN BREVE (máx 15 palabras) cuya respuesta sea UNA SOLA PALABRA que empiece por una letra del abecedario.
+- La definición debe poder responderse sin ver el documento original.
+- Varía las letras: intenta cubrir distintas letras del abecedario.
 
-    CAZABURBUJAS: `Analiza esta imagen de un documento educativo. Extrae TODAS las preguntas y respuestas que veas.
-Conviértelas a preguntas de opción múltiple. Inventa 3 respuestas incorrectas plausibles para cada pregunta correcta.
-Devuelve ÚNICAMENTE un JSON array válido (sin markdown, sin explicaciones):
-[{"pregunta":"¿Pregunta?","correcta":"Respuesta correcta","incorrectas":["Incorrecta1","Incorrecta2","Incorrecta3"]}, ...]
-Si no encuentras contenido educativo útil responde exactamente: {"error":"No se pudo extraer contenido"}`,
+Devuelve ÚNICAMENTE un JSON array válido (sin markdown, sin texto extra):
+[{"letra":"A","pregunta":"Definición breve y autosuficiente","respuesta":"PalabraQueEmpiezaPorA"}, ...]
+Si no hay contenido aprovechable responde exactamente: {"error":"No se pudo extraer contenido"}`,
 
-    APAREJADOS: `Analiza esta imagen de un documento educativo. Extrae TODOS los conceptos, términos, definiciones o parejas que veas.
-Conviértelos en parejas para unir (concepto-definición, pregunta-respuesta, término-significado, etc.).
-Devuelve ÚNICAMENTE un JSON array válido (sin markdown, sin explicaciones):
-[{"terminoA":"Concepto o término","terminoB":"Definición o respuesta"}, ...]
-Si no encuentras contenido educativo útil responde exactamente: {"error":"No se pudo extraer contenido"}`,
+    CAZABURBUJAS: `Eres un asistente que convierte documentos educativos en preguntas de opción múltiple para alumnos de ESO.
+${INSTRUCCIONES_COMUNES}
+TAREA:
+- Lee el documento imagen completo.
+- Muy importante, para cada pregunta del documento o concepto válido, que encuentres, formula una pregunta directa (máx 15 palabras) que se pueda responder sin ver el documento.
+- Inventa 3 respuestas incorrectas pero plausibles y del mismo tipo que la correcta (no absurdas).
+- Si el documento tiene ejercicios numéricos, incluye también opciones numéricas cercanas al valor correcto.
 
-    THINKHOOT: `Analiza esta imagen de un documento educativo. Extrae TODAS las preguntas y respuestas que veas.
-Conviértelas a preguntas de quiz rápido. Inventa 3 respuestas incorrectas plausibles para cada pregunta.
-Devuelve ÚNICAMENTE un JSON array válido (sin markdown, sin explicaciones):
-[{"pregunta":"¿Pregunta?","correcta":"Respuesta correcta","incorrectas":["Incorrecta1","Incorrecta2","Incorrecta3"]}, ...]
-Si no encuentras contenido educativo útil responde exactamente: {"error":"No se pudo extraer contenido"}`,
+Devuelve ÚNICAMENTE un JSON array válido (sin markdown, sin texto extra):
+[{"pregunta":"Pregunta autosuficiente (máx 15 palabras)","correcta":"Respuesta correcta","incorrectas":["Opción2","Opción3","Opción4"]}, ...]
+Si no hay contenido aprovechable responde exactamente: {"error":"No se pudo extraer contenido"}`,
+
+    APAREJADOS: `Eres un asistente que convierte documentos educativos en ejercicios de emparejar para alumnos de ESO.
+${INSTRUCCIONES_COMUNES}
+TAREA:
+- Lee el documento imagen completo.
+- Extrae pares de conceptos relacionados: término-definición, causa-consecuencia, pregunta-respuesta, fórmula-nombre, fecha-evento, palabra-traducción, etc.
+- El término A debe ser breve (1-5 palabras). El término B debe ser una respuesta concisa (máx 10 palabras).
+- Ambos términos deben ser comprensibles sin necesidad del documento original.
+
+Devuelve ÚNICAMENTE un JSON array válido (sin markdown, sin texto extra):
+[{"terminoA":"Concepto breve","terminoB":"Definición o respuesta concisa"}, ...]
+Si no hay contenido aprovechable responde exactamente: {"error":"No se pudo extraer contenido"}`,
+
+    THINKHOOT: `Eres un asistente que convierte documentos educativos en preguntas de quiz rápido para alumnos de ESO.
+${INSTRUCCIONES_COMUNES}
+TAREA:
+- Lee el documento imagen completo.
+- Muy importante, para cada pregunta o concepto válido que encuentres, formula una pregunta directa (máx 15 palabras) que se pueda responder sin ver el documento.
+- Inventa 3 respuestas incorrectas plausibles. En un quiz rápido las opciones deben ser cortas (1-4 palabras si es posible).
+- Prioriza preguntas con respuesta única y clara.
+
+Devuelve ÚNICAMENTE un JSON array válido (sin markdown, sin texto extra):
+[{"pregunta":"Pregunta autosuficiente (máx 15 palabras)","correcta":"Respuesta","incorrectas":["Opción2","Opción3","Opción4"]}, ...]
+Si no hay contenido aprovechable responde exactamente: {"error":"No se pudo extraer contenido"}`,
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -107,23 +142,37 @@ export default function FotoARecurso({ usuario, perfilProfesor }) {
     const [guardadoOk, setGuardadoOk] = useState(false);
     const [arrastrando, setArrastrando] = useState(false);
     const inputRef = useRef(null);
+    const [modalDestino, setModalDestino] = useState(false);
+    const [destino, setDestino]           = useState('NUEVO'); // 'NUEVO' | 'HOJA_NUEVA' | 'HOJA_EXIST'
+    const [recursosExist, setRecursosExist] = useState([]);
+    const [recursoDestId, setRecursoDestId] = useState('');
+    const [hojaDestIdx, setHojaDestIdx]   = useState(0);
+    const [nombreHojaNueva, setNombreHojaNueva] = useState('Desde foto');
 
     const juego = JUEGOS.find(j => j.id === juegoSel);
 
     // ── Subida de imagen ──────────────────────────────────────────────────────
     const procesarArchivo = (file) => {
-        if (!file || !file.type.startsWith('image/')) {
-            setError('Por favor sube una imagen (JPG, PNG, WEBP...)');
+        if (!file) return;
+        const esImagen = file.type.startsWith('image/');
+        const esPDF    = file.type === 'application/pdf';
+        if (!esImagen && !esPDF) {
+            setError('Por favor sube una imagen (JPG, PNG, WEBP...) o un PDF');
             return;
         }
-        if (file.size > 10 * 1024 * 1024) {
-            setError('La imagen es demasiado grande (máx 10MB)');
+        if (file.size > 20 * 1024 * 1024) {
+            setError('El archivo es demasiado grande (máx 20MB)');
             return;
         }
         setError('');
-        const reader = new FileReader();
-        reader.onload = (e) => setImagen({ file, dataUrl: e.target.result });
-        reader.readAsDataURL(file);
+        if (esImagen) {
+            const reader = new FileReader();
+            reader.onload = (e) => setImagen({ file, dataUrl: e.target.result, esPDF: false });
+            reader.readAsDataURL(file);
+        } else {
+            // PDF: mostrar icono en lugar de preview de imagen
+            setImagen({ file, dataUrl: null, esPDF: true });
+        }
     };
 
     const handleDrop = useCallback((e) => {
@@ -142,7 +191,7 @@ export default function FotoARecurso({ usuario, perfilProfesor }) {
         setPreguntas(null);
 
         const base64 = await fileToBase64(imagen.file);
-        const mimeType = imagen.file.type;
+        const mimeType = imagen.esPDF ? 'application/pdf' : imagen.file.type;
         let errorFinal = null;
 
         for (const modelo of MODELOS_GEMINI) {
@@ -195,36 +244,63 @@ export default function FotoARecurso({ usuario, perfilProfesor }) {
         setProcesando(false);
     };
 
-    // ── Guardar en Firebase ───────────────────────────────────────────────────
-    const guardar = async () => {
-        if (!tituloRecurso.trim()) { setError('Ponle un título al recurso'); return; }
-        setGuardando(true);
-        try {
-            const hojas = [{ nombreHoja: 'Desde foto', preguntas }];
-            // APAREJADOS usa "parejas" en lugar de "preguntas"
-            const hojasFinales = juegoSel === 'APAREJADOS'
-                ? [{ nombreHoja: 'Desde foto', parejas: preguntas }]
-                : hojas;
+    // ── Construir hoja a partir de las preguntas ─────────────────────────────
+    const construirHoja = (nombre) => juegoSel === 'APAREJADOS'
+        ? { nombreHoja: nombre, parejas: preguntas }
+        : { nombreHoja: nombre, preguntas };
 
-            await addDoc(collection(db, 'resources'), {
-                titulo: tituloRecurso.trim(),
-                temas: 'Generado desde foto',
-                tipoJuego: juegoSel,
-                profesorUid: usuario.uid,
-                profesorNombre: perfilProfesor?.nombre || usuario.displayName || '',
-                pais: perfilProfesor?.pais || '',
-                region: perfilProfesor?.region || '',
-                poblacion: perfilProfesor?.poblacion || '',
-                hojas: hojasFinales,
-                config: {},
-                isPrivate: true,
-                origen: 'foto-ia',
-                accessCode: generarCodigo(),
-                playCount: 0,
-                fechaCreacion: new Date(),
-            });
+    // ── Abrir modal de destino ────────────────────────────────────────────────
+    const abrirModalDestino = async () => {
+        if (!tituloRecurso.trim() && destino === 'NUEVO') {
+            setError('Ponle un título al recurso'); return;
+        }
+        setError('');
+        // Cargar recursos del profesor del mismo tipo para poder añadir a uno existente
+        try {
+            const q = query(collection(db,'resources'), where('profesorUid','==',usuario.uid), where('tipoJuego','==',juegoSel));
+            const snap = await getDocs(q);
+            setRecursosExist(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        } catch(e) { console.warn(e); }
+        setModalDestino(true);
+    };
+
+    // ── Guardar según destino elegido ─────────────────────────────────────────
+    const guardarConDestino = async () => {
+        setGuardando(true); setError('');
+        try {
+            if (destino === 'NUEVO') {
+                if (!tituloRecurso.trim()) { setError('Ponle un título al recurso'); setGuardando(false); return; }
+                await addDoc(collection(db,'resources'), {
+                    titulo: tituloRecurso.trim(), temas: 'Generado desde foto/PDF',
+                    tipoJuego: juegoSel, profesorUid: usuario.uid,
+                    profesorNombre: perfilProfesor?.nombre || usuario.displayName || '',
+                    pais: perfilProfesor?.pais || '', region: perfilProfesor?.region || '',
+                    poblacion: perfilProfesor?.poblacion || '',
+                    hojas: [construirHoja('Desde foto')], config: {},
+                    isPrivate: true, origen: 'foto-ia',
+                    accessCode: generarCodigo(), playCount: 0, fechaCreacion: new Date(),
+                });
+            } else if (destino === 'HOJA_NUEVA') {
+                if (!recursoDestId) { setError('Elige un recurso'); setGuardando(false); return; }
+                const nombre = nombreHojaNueva.trim() || 'Desde foto';
+                await updateDoc(doc(db,'resources',recursoDestId), {
+                    hojas: arrayUnion(construirHoja(nombre))
+                });
+            } else if (destino === 'HOJA_EXIST') {
+                if (!recursoDestId) { setError('Elige un recurso'); setGuardando(false); return; }
+                const recurso = recursosExist.find(r => r.id === recursoDestId);
+                const hoja = recurso?.hojas?.[hojaDestIdx];
+                if (!hoja) { setError('Hoja no encontrada'); setGuardando(false); return; }
+                const nuevasHojas = recurso.hojas.map((h, i) => {
+                    if (i !== hojaDestIdx) return h;
+                    if (juegoSel === 'APAREJADOS') return { ...h, parejas: [...(h.parejas||[]), ...preguntas] };
+                    return { ...h, preguntas: [...(h.preguntas||[]), ...preguntas] };
+                });
+                await updateDoc(doc(db,'resources',recursoDestId), { hojas: nuevasHojas });
+            }
+            setModalDestino(false);
             setGuardadoOk(true);
-        } catch (e) {
+        } catch(e) {
             setError('Error al guardar: ' + e.message);
         }
         setGuardando(false);
@@ -345,13 +421,17 @@ export default function FotoARecurso({ usuario, perfilProfesor }) {
                             position: 'relative', overflow: 'hidden',
                         }}
                     >
-                        <input ref={inputRef} type="file" accept="image/*" style={{ display: 'none' }}
+                        <input ref={inputRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }}
                             onChange={e => procesarArchivo(e.target.files[0])} />
 
                         {imagen ? (
                             <div>
-                                <img src={imagen.dataUrl} alt="preview"
-                                    style={{ maxWidth: '100%', maxHeight: 300, borderRadius: 10, objectFit: 'contain', display: 'block', margin: '0 auto' }} />
+                                {imagen.esPDF ? (
+                                    <div style={{ fontSize: '4rem', marginBottom: 8 }}>📄</div>
+                                ) : (
+                                    <img src={imagen.dataUrl} alt="preview"
+                                        style={{ maxWidth: '100%', maxHeight: 300, borderRadius: 10, objectFit: 'contain', display: 'block', margin: '0 auto' }} />
+                                )}
                                 <p style={{ margin: '10px 0 0', fontSize: '0.8rem', color: '#27ae60', fontWeight: 600 }}>
                                     ✅ {imagen.file.name} ({(imagen.file.size / 1024).toFixed(0)} KB) · Haz clic para cambiar
                                 </p>
@@ -362,7 +442,7 @@ export default function FotoARecurso({ usuario, perfilProfesor }) {
                                 <div style={{ fontWeight: 700, color: '#2c3e50', marginBottom: 4 }}>
                                     {arrastrando ? '¡Suelta la imagen!' : 'Arrastra tu foto aquí'}
                                 </div>
-                                <div style={{ color: '#aaa', fontSize: '0.82rem' }}>o haz clic para seleccionar · JPG, PNG, WEBP · Máx 10MB</div>
+                                <div style={{ color: '#aaa', fontSize: '0.82rem' }}>o haz clic para seleccionar · JPG, PNG, WEBP, PDF · Máx 20MB</div>
                             </>
                         )}
                     </div>
@@ -454,9 +534,9 @@ export default function FotoARecurso({ usuario, perfilProfesor }) {
                                 <button onClick={reiniciar} style={{ flex: 1, padding: '12px', borderRadius: 12, border: '1.5px solid #dde', background: 'white', color: '#7f8c8d', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
                                     Cancelar
                                 </button>
-                                <button onClick={guardar} disabled={guardando}
+                                <button onClick={abrirModalDestino} disabled={guardando}
                                     style={{ flex: 2, padding: '12px', borderRadius: 12, border: 'none', background: guardando ? '#aaa' : '#27ae60', color: 'white', fontWeight: 700, cursor: guardando ? 'default' : 'pointer', fontFamily: 'inherit', fontSize: '0.95rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
-                                    {guardando ? '⏳ Guardando...' : '💾 Guardar recurso privado'}
+                                    {guardando ? '⏳ Guardando...' : '💾 Guardar →'}
                                 </button>
                             </div>
                         </>
@@ -464,6 +544,91 @@ export default function FotoARecurso({ usuario, perfilProfesor }) {
                 </div>
             )}
 
+            {/* ── Modal selección de destino ── */}
+            {modalDestino && (
+                <div style={{ position:'fixed',inset:0,zIndex:3000,background:'rgba(8,12,24,0.85)',display:'flex',alignItems:'center',justifyContent:'center',padding:16,backdropFilter:'blur(4px)' }}>
+                    <div style={{ background:'white',borderRadius:20,width:'100%',maxWidth:440,boxShadow:'0 30px 80px rgba(0,0,0,0.4)',padding:'26px 28px' }}>
+                        <div style={{ display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20 }}>
+                            <h3 style={{ margin:0,fontSize:'1.05rem',color:'#2c3e50',fontWeight:800 }}>¿Dónde guardar las preguntas?</h3>
+                            <button onClick={()=>setModalDestino(false)} style={{ background:'none',border:'none',cursor:'pointer',color:'#aaa',fontSize:'1.3rem' }}>✕</button>
+                        </div>
+
+                        {/* Opciones */}
+                        {[
+                            { id:'NUEVO', emoji:'🆕', label:'Nuevo recurso', desc:'Crea un recurso nuevo independiente' },
+                            { id:'HOJA_NUEVA', emoji:'📋', label:'Hoja nueva en recurso existente', desc:'Añade una hoja extra a uno de tus recursos' },
+                            { id:'HOJA_EXIST', emoji:'➕', label:'Añadir a hoja existente', desc:'Agrega las preguntas al final de una hoja ya existente' },
+                        ].map(op => (
+                            <button key={op.id} onClick={()=>setDestino(op.id)}
+                                style={{ width:'100%',padding:'12px 14px',borderRadius:12,border:`2px solid ${destino===op.id?juego.color:'#ecf0f1'}`,background:destino===op.id?juego.colorLight:'white',cursor:'pointer',textAlign:'left',marginBottom:8,fontFamily:'inherit',transition:'all 0.15s' }}>
+                                <span style={{ fontWeight:700,color:destino===op.id?juego.color:'#2c3e50',fontSize:'0.9rem' }}>{op.emoji} {op.label}</span>
+                                <div style={{ fontSize:'0.75rem',color:'#7f8c8d',marginTop:2 }}>{op.desc}</div>
+                            </button>
+                        ))}
+
+                        {/* Sub-opciones según destino */}
+                        {destino === 'NUEVO' && (
+                            <div style={{ marginTop:12 }}>
+                                <label style={{ fontSize:'0.78rem',color:'#7f8c8d',fontWeight:600,display:'block',marginBottom:5 }}>Título del nuevo recurso</label>
+                                <input value={tituloRecurso} onChange={e=>setTituloRecurso(e.target.value)} placeholder="Ej: Examen Tema 3"
+                                    style={{ width:'100%',padding:'9px 12px',borderRadius:9,border:'1.5px solid #dde',fontSize:'0.9rem',outline:'none',boxSizing:'border-box',fontFamily:'inherit' }}/>
+                            </div>
+                        )}
+
+                        {(destino === 'HOJA_NUEVA' || destino === 'HOJA_EXIST') && (
+                            <div style={{ marginTop:12 }}>
+                                <label style={{ fontSize:'0.78rem',color:'#7f8c8d',fontWeight:600,display:'block',marginBottom:5 }}>Recurso de destino ({juego.emoji} {juego.label})</label>
+                                {recursosExist.length === 0 ? (
+                                    <div style={{ background:'#fef2f2',borderRadius:9,padding:'10px 12px',color:'#e74c3c',fontSize:'0.82rem' }}>
+                                        No tienes recursos de tipo {juego.label}. Elige "Nuevo recurso".
+                                    </div>
+                                ) : (
+                                    <select value={recursoDestId} onChange={e=>{ setRecursoDestId(e.target.value); setHojaDestIdx(0); }}
+                                        style={{ width:'100%',padding:'9px 12px',borderRadius:9,border:'1.5px solid #dde',fontSize:'0.88rem',outline:'none',fontFamily:'inherit',background:'white' }}>
+                                        <option value="">— Elige un recurso —</option>
+                                        {recursosExist.map(r => <option key={r.id} value={r.id}>{r.titulo}</option>)}
+                                    </select>
+                                )}
+                            </div>
+                        )}
+
+                        {destino === 'HOJA_NUEVA' && (
+                            <div style={{ marginTop:10 }}>
+                                <label style={{ fontSize:'0.78rem',color:'#7f8c8d',fontWeight:600,display:'block',marginBottom:5 }}>Nombre de la nueva hoja</label>
+                                <input value={nombreHojaNueva} onChange={e=>setNombreHojaNueva(e.target.value)} placeholder="Ej: Nivel 2"
+                                    style={{ width:'100%',padding:'9px 12px',borderRadius:9,border:'1.5px solid #dde',fontSize:'0.9rem',outline:'none',boxSizing:'border-box',fontFamily:'inherit' }}/>
+                            </div>
+                        )}
+
+                        {destino === 'HOJA_EXIST' && recursoDestId && (
+                            <div style={{ marginTop:10 }}>
+                                <label style={{ fontSize:'0.78rem',color:'#7f8c8d',fontWeight:600,display:'block',marginBottom:5 }}>Hoja de destino</label>
+                                {(() => {
+                                    const hojas = recursosExist.find(r=>r.id===recursoDestId)?.hojas || [];
+                                    return hojas.length === 0 ? (
+                                        <div style={{ fontSize:'0.8rem',color:'#e74c3c' }}>Este recurso no tiene hojas.</div>
+                                    ) : (
+                                        <select value={hojaDestIdx} onChange={e=>setHojaDestIdx(parseInt(e.target.value))}
+                                            style={{ width:'100%',padding:'9px 12px',borderRadius:9,border:'1.5px solid #dde',fontSize:'0.88rem',outline:'none',fontFamily:'inherit',background:'white' }}>
+                                            {hojas.map((h,i) => <option key={i} value={i}>{h.nombreHoja} ({(h.preguntas||h.parejas||[]).length} ítems)</option>)}
+                                        </select>
+                                    );
+                                })()}
+                            </div>
+                        )}
+
+                        {error && <p style={{ color:'#e74c3c',fontSize:'0.8rem',marginTop:10 }}>⚠ {error}</p>}
+
+                        <div style={{ display:'flex',gap:9,marginTop:18 }}>
+                            <button onClick={()=>setModalDestino(false)} style={{ flex:1,padding:'11px',borderRadius:10,border:'1px solid #dde',background:'white',cursor:'pointer',fontFamily:'inherit',color:'#7f8c8d',fontWeight:600 }}>Cancelar</button>
+                            <button onClick={guardarConDestino} disabled={guardando}
+                                style={{ flex:2,padding:'11px',borderRadius:10,border:'none',background:guardando?'#aaa':`linear-gradient(135deg,${juego.color},${juego.color}cc)`,color:'white',fontWeight:700,cursor:guardando?'default':'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',gap:7 }}>
+                                {guardando?'⏳ Guardando...':'💾 Confirmar'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
     );

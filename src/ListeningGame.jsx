@@ -211,10 +211,17 @@ function AudioPlayer({ url, onTimeUpdate, onEnded, controlRef, small = false }) 
 const fmtTime = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 // ─── Componente de hueco ──────────────────────────────────────────────────────
-function Hueco({ gap, modo, respuesta, onRespuesta, revealed, comprobado }) {
+function Hueco({ gap, modo, respuesta, onRespuesta, revealed, comprobado, hostView=false }) {
     const correcto = comprobado ? cleanText(respuesta) === cleanText(gap.answer) : null;
     const width = Math.max(80, gap.answer.length * 10 + 20);
 
+    if (hostView) {
+        return (
+            <span style={{ display:'inline-block', margin:'0 2px', padding:'2px 9px', borderRadius:6, background:'rgba(52,152,219,0.25)', border:'1px dashed #3498db', color:'#7fc3f0', fontWeight:700, fontSize:'0.88rem', verticalAlign:'middle' }}>
+                {gap.answer}
+            </span>
+        );
+    }
     if (!revealed) {
         return (
             <span style={{ display:'inline-block', width, height:22, background:'rgba(255,255,255,0.08)', borderRadius:4, verticalAlign:'middle', margin:'0 2px' }}/>
@@ -232,7 +239,7 @@ function Hueco({ gap, modo, respuesta, onRespuesta, revealed, comprobado }) {
         }
         return (
             <select value={respuesta || ''} onChange={e => onRespuesta(e.target.value)}
-                style={{ display:'inline-block', margin:'0 2px', padding:'2px 6px', borderRadius:6, border: respuesta ? '2px solid #3498db' : '2px dashed #aaa', background: respuesta ? '#eaf4fe' : 'white', cursor:'pointer', fontSize:'0.88rem', fontFamily:'inherit', verticalAlign:'middle', maxWidth:120 }}>
+                style={{ display:'inline-block', margin:'0 2px', padding:'3px 7px', borderRadius:6, border: respuesta ? '2px solid #2980b9' : '2px solid #bdc3c7', background: respuesta ? '#d6eaf8' : '#f8f9fa', cursor:'pointer', fontSize:'0.88rem', fontFamily:'inherit', verticalAlign:'middle', maxWidth:130, color:'#2c3e50', fontWeight: respuesta?700:400 }}>
                 <option value="">…</option>
                 {gap.opciones.map((o, i) => <option key={i} value={o}>{o}</option>)}
             </select>
@@ -252,13 +259,13 @@ function Hueco({ gap, modo, respuesta, onRespuesta, revealed, comprobado }) {
         <input value={respuesta || ''} onChange={e => onRespuesta(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') e.preventDefault(); }}
             placeholder="___"
-            style={{ display:'inline-block', width, margin:'0 2px', padding:'2px 6px', borderRadius:6, border: respuesta ? '2px solid #3498db' : '2px dashed #aaa', background: respuesta ? '#eaf4fe' : 'white', fontSize:'0.88rem', fontFamily:'inherit', verticalAlign:'middle', outline:'none', textAlign:'center' }}
+            style={{ display:'inline-block', width, margin:'0 2px', padding:'3px 7px', borderRadius:6, border: respuesta ? '2px solid #2980b9' : '2px solid #bdc3c7', background: respuesta ? '#d6eaf8' : '#f8f9fa', fontSize:'0.88rem', fontFamily:'inherit', verticalAlign:'middle', outline:'none', textAlign:'center', color:'#2c3e50', fontWeight: respuesta?700:400 }}
         />
     );
 }
 
 // ─── Vista del transcript con huecos ──────────────────────────────────────────
-function TranscriptView({ segmentos, modo, respuestas, onRespuesta, frasesReveladas, comprobado, totalFrases }) {
+function TranscriptView({ segmentos, modo, respuestas, onRespuesta, frasesReveladas, comprobado, totalFrases, hostView=false }) {
     const frases = dividirEnFrases(segmentos);
     return (
         <div style={{ lineHeight: 2.2, fontSize:'1.05rem', color:'#2c3e50' }}>
@@ -274,6 +281,7 @@ function TranscriptView({ segmentos, modo, respuestas, onRespuesta, frasesRevela
                                     onRespuesta={v => onRespuesta(seg.gapNum, v)}
                                     revealed={visible}
                                     comprobado={comprobado}
+                                    hostView={hostView}
                                 />
                             );
                         })}
@@ -285,7 +293,7 @@ function TranscriptView({ segmentos, modo, respuestas, onRespuesta, frasesRevela
 }
 
 // ─── Pantalla principal: selección de tema ────────────────────────────────────
-function PantallaSeleccion({ onSel, onLive, onUnirse }) {
+function PantallaSeleccion({ onSel, onLive, onUnirse, onBack }) {
     const [filtro, setFiltro] = useState(null);
     const [joinCode, setJoinCode] = useState('');
     const [busqueda, setBusqueda] = useState('');
@@ -301,6 +309,9 @@ function PantallaSeleccion({ onSel, onLive, onUnirse }) {
     return (
         <div style={{ minHeight:'100vh', background:'linear-gradient(135deg,#1a1a2e,#16213e)', fontFamily:"'Segoe UI',sans-serif", padding:'0 0 40px' }}>
             <div style={{ background:'rgba(255,255,255,0.05)', padding:'20px 24px', display:'flex', alignItems:'center', gap:12 }}>
+                {onBack && <button onClick={onBack} style={{ background:'rgba(255,255,255,0.1)', border:'none', borderRadius:10, padding:'8px 14px', color:'white', cursor:'pointer', display:'flex', alignItems:'center', gap:6, fontSize:'0.88rem', marginRight:4 }}>
+                    <ArrowLeft size={16}/> Volver
+                </button>}
                 <Headphones size={28} color="#3498db"/>
                 <div>
                     <div style={{ color:'white', fontWeight:800, fontSize:'1.2rem' }}>Listening Practice</div>
@@ -497,6 +508,44 @@ function JuegoIndividual({ item, modo, onBack }) {
     );
 }
 
+// ─── Transcript toggle para el host ──────────────────────────────────────────
+function TranscriptHostToggle({ transcript, gapped, gaps }) {
+    const [mostrar, setMostrar] = useState(false);
+    const [vista, setVista] = useState('full'); // 'full' | 'gapped'
+    return (
+        <div style={{ marginBottom:20 }}>
+            <div style={{ display:'flex', gap:10, alignItems:'center', marginBottom:10 }}>
+                <button onClick={() => setMostrar(m => !m)}
+                    style={{ padding:'7px 16px', borderRadius:10, border:'none', background: mostrar?'rgba(255,255,255,0.2)':'rgba(255,255,255,0.08)', color:'white', cursor:'pointer', fontFamily:'inherit', fontWeight:600, fontSize:'0.85rem', display:'flex', alignItems:'center', gap:6 }}>
+                    {mostrar ? '🙈 Ocultar transcript' : '👁 Mostrar transcript'}
+                </button>
+                {mostrar && (
+                    <div style={{ display:'flex', gap:6 }}>
+                        {[{id:'full',label:'Completo'},{id:'gapped',label:'Con huecos'}].map(v=>(
+                            <button key={v.id} onClick={()=>setVista(v.id)}
+                                style={{ padding:'5px 12px', borderRadius:8, border:`1.5px solid ${vista===v.id?'#3498db':'rgba(255,255,255,0.2)'}`, background:vista===v.id?'rgba(52,152,219,0.3)':'transparent', color:'white', cursor:'pointer', fontSize:'0.78rem', fontFamily:'inherit' }}>
+                                {v.label}
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </div>
+            {mostrar && (
+                <div style={{ background:'rgba(255,255,255,0.08)', borderRadius:14, padding:'18px 20px', lineHeight:1.9, fontSize:'0.92rem', color:'rgba(255,255,255,0.9)', maxHeight:320, overflowY:'auto' }}>
+                    {vista === 'full' ? transcript : (
+                        <span dangerouslySetInnerHTML={{ __html: gapped.replace(/\[___(\d+)___\]/g, (_, n) => {
+                            const g = gaps.find(g=>g.gap_number===parseInt(n));
+                            return `<span style="background:#3498db;color:white;padding:1px 8px;border-radius:6px;font-weight:700;margin:0 2px">${g?.answer||'???'}</span>`;
+                        })}}/>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+
+
 // ─── MODO ONLINE: HOST ────────────────────────────────────────────────────────
 function ListeningLiveHost({ codigoSala, onExit }) {
     const [sala, setSala] = useState(null);
@@ -551,15 +600,26 @@ function ListeningLiveHost({ codigoSala, onExit }) {
                 {sala.estado === 'LOBBY' && (
                     <div>
                         <h2 style={{ marginBottom:20 }}>Selecciona un listening para la clase</h2>
-                        {/* Config tiempo */}
-                        <div style={{ background:'rgba(255,255,255,0.06)', borderRadius:14, padding:'14px 18px', marginBottom:20, display:'flex', alignItems:'center', gap:16, flexWrap:'wrap' }}>
-                            <span style={{ color:'rgba(255,255,255,0.7)', fontSize:'0.88rem' }}>⏱ Tiempo por actividad:</span>
-                            {[60, 90, 120, 180].map(t => (
-                                <button key={t} onClick={() => updateDoc(doc(db,'live_games',codigoSala),{config:{...sala.config,tiempoLimite:t}})}
-                                    style={{ padding:'5px 14px', borderRadius:20, border:`2px solid ${sala.config?.tiempoLimite===t?'#3498db':'rgba(255,255,255,0.2)'}`, background:sala.config?.tiempoLimite===t?'rgba(52,152,219,0.3)':'transparent', color:'white', cursor:'pointer', fontSize:'0.82rem', fontFamily:'inherit' }}>
-                                    {t}s
-                                </button>
-                            ))}
+                        {/* Config modo + tiempo */}
+                        <div style={{ background:'rgba(255,255,255,0.06)', borderRadius:14, padding:'14px 18px', marginBottom:20, display:'flex', flexDirection:'column', gap:12 }}>
+                            <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+                                <span style={{ color:'rgba(255,255,255,0.7)', fontSize:'0.88rem', minWidth:120 }}>🎯 Modo alumno:</span>
+                                {[{id:'write',label:'✍️ Escribir',col:'#27ae60'},{id:'multiple',label:'🔘 Opciones',col:'#3498db'}].map(m => (
+                                    <button key={m.id} onClick={() => updateDoc(doc(db,'live_games',codigoSala),{config:{...sala.config,modoAlumno:m.id}})}
+                                        style={{ padding:'6px 16px', borderRadius:20, border:`2px solid ${(sala.config?.modoAlumno||'write')===m.id?m.col:'rgba(255,255,255,0.2)'}`, background:(sala.config?.modoAlumno||'write')===m.id?`${m.col}44`:'transparent', color:'white', cursor:'pointer', fontSize:'0.82rem', fontFamily:'inherit', fontWeight:(sala.config?.modoAlumno||'write')===m.id?700:400 }}>
+                                        {m.label}
+                                    </button>
+                                ))}
+                            </div>
+                            <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+                                <span style={{ color:'rgba(255,255,255,0.7)', fontSize:'0.88rem', minWidth:120 }}>⏱ Tiempo:</span>
+                                {[60, 90, 120, 180].map(t => (
+                                    <button key={t} onClick={() => updateDoc(doc(db,'live_games',codigoSala),{config:{...sala.config,tiempoLimite:t}})}
+                                        style={{ padding:'5px 14px', borderRadius:20, border:`2px solid ${sala.config?.tiempoLimite===t?'#3498db':'rgba(255,255,255,0.2)'}`, background:sala.config?.tiempoLimite===t?'rgba(52,152,219,0.3)':'transparent', color:'white', cursor:'pointer', fontSize:'0.82rem', fontFamily:'inherit' }}>
+                                        {t}s
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                         {/* Alumnos conectados */}
                         <div style={{ background:'rgba(255,255,255,0.05)', borderRadius:14, padding:'14px 18px', marginBottom:20 }}>
@@ -595,10 +655,8 @@ function ListeningLiveHost({ codigoSala, onExit }) {
                         <div style={{ marginBottom:20 }}>
                             <AudioPlayer url={itemActual.audioUrl}/>
                         </div>
-                        {/* Transcript completo del host */}
-                        <div style={{ background:'rgba(255,255,255,0.07)', borderRadius:16, padding:'20px', marginBottom:20, lineHeight:1.9, fontSize:'0.95rem', color:'rgba(255,255,255,0.85)' }}>
-                            {itemActual.fullTranscript}
-                        </div>
+                        {/* Transcript completo del host - oculto por defecto */}
+                        <TranscriptHostToggle transcript={itemActual.fullTranscript} gapped={itemActual.gappedTranscript} gaps={itemActual.gaps}/>
                         {/* Respuestas recibidas */}
                         <div style={{ background:'rgba(255,255,255,0.05)', borderRadius:14, padding:'14px 18px', marginBottom:16 }}>
                             <div style={{ fontSize:'0.82rem', color:'rgba(255,255,255,0.5)', marginBottom:8 }}>
@@ -736,12 +794,13 @@ function ListeningLiveClient({ codigoSala, onExit, usuario }) {
         </div>
     );
 
+    const isDark = sala.estado !== 'JUGANDO';
     return (
-        <div style={{ minHeight:'100vh', background:'linear-gradient(135deg,#1a1a2e,#16213e)', fontFamily:"'Segoe UI',sans-serif", color:'white' }}>
-            <div style={{ padding:'12px 16px', background:'rgba(0,0,0,0.2)', display:'flex', alignItems:'center', gap:10 }}>
-                <button onClick={onExit} style={{ background:'rgba(255,255,255,0.1)', border:'none', borderRadius:8, padding:'6px 10px', cursor:'pointer', color:'white', fontSize:'0.78rem' }}>✕</button>
-                <span style={{ flex:1, fontWeight:600 }}>{nombre}</span>
-                {yo && <span style={{ background:'rgba(241,196,15,0.2)', border:'1px solid rgba(241,196,15,0.4)', borderRadius:20, padding:'4px 12px', fontSize:'0.78rem', color:'#f1c40f' }}>
+        <div style={{ minHeight:'100vh', background: isDark ? 'linear-gradient(135deg,#1a1a2e,#16213e)' : '#f0f4f8', fontFamily:"'Segoe UI',sans-serif", transition:'background 0.4s' }}>
+            <div style={{ padding:'12px 16px', background: isDark ? 'rgba(0,0,0,0.3)' : '#2c3e50', display:'flex', alignItems:'center', gap:10 }}>
+                <button onClick={onExit} style={{ background:'rgba(255,255,255,0.15)', border:'none', borderRadius:8, padding:'6px 10px', cursor:'pointer', color:'white', fontSize:'0.78rem' }}>✕</button>
+                <span style={{ flex:1, fontWeight:700, color:'white' }}>{nombre}</span>
+                {yo && <span style={{ background:'rgba(241,196,15,0.3)', border:'1px solid #f1c40f', borderRadius:20, padding:'4px 12px', fontSize:'0.78rem', color:'#ffe066', fontWeight:700 }}>
                     {yo.aciertos||0}/7 · {pct}%
                 </span>}
             </div>
@@ -751,11 +810,11 @@ function ListeningLiveClient({ codigoSala, onExit, usuario }) {
                 {sala.estado === 'LOBBY' && (
                     <div style={{ textAlign:'center', marginTop:60 }}>
                         <div style={{ fontSize:'3rem', marginBottom:12 }}>⏳</div>
-                        <h2>¡Hola {nombre}!</h2>
-                        <p style={{ color:'rgba(255,255,255,0.5)' }}>Esperando que el profesor empiece...</p>
+                        <h2 style={{ color: isDark?'white':'#2c3e50' }}>¡Hola {nombre}!</h2>
+                        <p style={{ color: isDark?'rgba(255,255,255,0.5)':'#7f8c8d' }}>Esperando que el profesor empiece...</p>
                         <div style={{ display:'flex', flexWrap:'wrap', gap:8, justifyContent:'center', marginTop:20 }}>
                             {jugadores.map(j => (
-                                <span key={j.uid} style={{ background: j.uid===uid?'#3498db':'rgba(255,255,255,0.1)', borderRadius:20, padding:'5px 14px', fontSize:'0.82rem' }}>
+                                <span key={j.uid} style={{ background: j.uid===uid?'#3498db':(isDark?'rgba(255,255,255,0.1)':'#ecf0f1'), color: j.uid===uid?'white':'#2c3e50', borderRadius:20, padding:'5px 14px', fontSize:'0.82rem' }}>
                                     {j.nombre}
                                 </span>
                             ))}
@@ -766,13 +825,16 @@ function ListeningLiveClient({ codigoSala, onExit, usuario }) {
                 {/* JUGANDO */}
                 {sala.estado === 'JUGANDO' && item && (
                     <div>
-                        <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
-                            <h3 style={{ margin:0, flex:1 }}>{item.titulo}</h3>
-                            {enviado && <span style={{ background:'rgba(39,174,96,0.3)', borderRadius:20, padding:'4px 12px', fontSize:'0.78rem', color:'#2ecc71' }}>✓ Enviado</span>}
+                        <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14, flexWrap:'wrap' }}>
+                            <h3 style={{ margin:0, flex:1, color:'#2c3e50', fontSize:'1.1rem' }}>{item.titulo}</h3>
+                            <span style={{ background:'#eaf4fe', borderRadius:12, padding:'4px 12px', fontSize:'0.8rem', color:'#2980b9', fontWeight:600 }}>
+                                {sala.config?.modoAlumno==='multiple'?'🔘 Elige la opción':'✍️ Escribe la palabra'}
+                            </span>
+                            {enviado && <span style={{ background:'#e8f5e9', borderRadius:20, padding:'4px 12px', fontSize:'0.78rem', color:'#27ae60', fontWeight:700, border:'1px solid #27ae60' }}>✓ Enviado</span>}
                         </div>
-                        {/* Transcript CON TODOS LOS HUECOS VISIBLES desde el inicio */}
-                        <div style={{ background:'rgba(255,255,255,0.07)', borderRadius:16, padding:'20px', marginBottom:16, lineHeight:2.4, fontSize:'1rem' }}>
-                            <TranscriptView segmentos={segmentos} modo="write"
+                        {/* Transcript CON TODOS LOS HUECOS VISIBLES */}
+                        <div style={{ background:'white', borderRadius:16, padding:'22px 20px', marginBottom:16, lineHeight:2.8, fontSize:'1rem', color:'#2c3e50', boxShadow:'0 2px 12px rgba(0,0,0,0.08)' }}>
+                            <TranscriptView segmentos={segmentos} modo={sala.config?.modoAlumno||'write'}
                                 respuestas={respuestas}
                                 onRespuesta={(num, val) => !enviado && setRespuestas(prev => ({ ...prev, [num]: val }))}
                                 frasesReveladas={999} comprobado={false} totalFrases={999}/>
@@ -795,21 +857,21 @@ function ListeningLiveClient({ codigoSala, onExit, usuario }) {
                     <div>
                         <div style={{ textAlign:'center', marginBottom:24 }}>
                             <div style={{ fontSize:'3rem', marginBottom:8 }}>{pct>=80?'🎉':pct>=50?'👍':'💪'}</div>
-                            <div style={{ fontSize:'1.6rem', fontWeight:900, color:'#f1c40f' }}>{yo?.aciertos||0}/7</div>
-                            <div style={{ color:'rgba(255,255,255,0.6)', marginTop:4 }}>{pct}% · {nombre}</div>
+                            <div style={{ fontSize:'1.6rem', fontWeight:900, color:'#e67e22' }}>{yo?.aciertos||0}/7</div>
+                            <div style={{ color:'#7f8c8d', marginTop:4 }}>{pct}% · {nombre}</div>
                         </div>
                         {/* Ranking */}
-                        <div style={{ background:'rgba(255,255,255,0.07)', borderRadius:16, overflow:'hidden', marginBottom:20 }}>
+                        <div style={{ background:'white', borderRadius:16, overflow:'hidden', marginBottom:20, boxShadow:'0 2px 12px rgba(0,0,0,0.08)' }}>
                             {[...jugadores].sort((a,b)=>(b.aciertos||0)-(a.aciertos||0)).map((j, i) => (
-                                <div key={j.uid} style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 18px', borderBottom:'1px solid rgba(255,255,255,0.05)', background: j.uid===uid?'rgba(52,152,219,0.1)':'transparent' }}>
-                                    <span style={{ fontWeight:900, minWidth:26 }}>{['🥇','🥈','🥉'][i]||`${i+1}.`}</span>
-                                    <span style={{ flex:1 }}>{j.nombre}{j.uid===uid?' (tú)':''}</span>
-                                    <span style={{ color:'#f1c40f', fontWeight:700 }}>{j.aciertos||0}/7</span>
+                                <div key={j.uid} style={{ display:'flex', alignItems:'center', gap:10, padding:'13px 18px', borderBottom:'1px solid #f0f0f0', background: j.uid===uid?'#eaf4fe':(i===0?'#fffbf0':'white') }}>
+                                    <span style={{ fontWeight:900, minWidth:26, fontSize:'1.1rem' }}>{['🥇','🥈','🥉'][i]||`${i+1}.`}</span>
+                                    <span style={{ flex:1, fontWeight: j.uid===uid?700:400, color:'#2c3e50' }}>{j.nombre}{j.uid===uid?' (tú)':''}</span>
+                                    <span style={{ color:'#e67e22', fontWeight:700 }}>{j.aciertos||0}/7</span>
                                 </div>
                             ))}
                         </div>
                         <button onClick={() => setMostrarEnvio(true)}
-                            style={{ width:'100%', padding:'13px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#3498db,#2980b9)', color:'white', fontWeight:700, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+                            style={{ width:'100%', padding:'13px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#3498db,#2980b9)', color:'white', fontWeight:700, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', gap:8, boxShadow:'0 4px 12px rgba(52,152,219,0.35)' }}>
                             <Send size={16}/> Enviar al Profesor
                         </button>
                     </div>
@@ -871,6 +933,7 @@ export default function ListeningGame({ onExit, isHost, codigoSala: codigoExtern
 
     return (
         <PantallaSeleccion
+            onExit={onExit}
             onSel={item => { setItemSel(item); setPantalla('MODO'); }}
             onLive={async () => {
                 const codigo = await crearSalaListening();

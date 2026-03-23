@@ -82,7 +82,7 @@ export const APPS = [
         name: 'Listening',
         desc: 'Escucha y completa.',
         color: '#3498db',
-        emoji: '🖍️',
+        emoji: '🙉​',
         isSpecial: false
     },
 

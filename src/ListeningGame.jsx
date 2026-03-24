@@ -796,7 +796,7 @@ function ListeningLiveClient({ codigoSala, onExit, usuario }) {
 
     const isDark = sala.estado !== 'JUGANDO';
     return (
-        <div style={{ minHeight:'100vh', background: isDark ? 'linear-gradient(135deg,#1a1a2e,#16213e)' : '#f0f4f8', fontFamily:"'Segoe UI',sans-serif", transition:'background 0.4s' }}>
+        <div style={{ minHeight:'100vh', background: 'linear-gradient(135deg,#1a1a2e,#16213e)', fontFamily:"'Segoe UI',sans-serif", transition:'background 0.4s' }}>
             <div style={{ padding:'12px 16px', background: isDark ? 'rgba(0,0,0,0.3)' : '#2c3e50', display:'flex', alignItems:'center', gap:10 }}>
                 <button onClick={onExit} style={{ background:'rgba(255,255,255,0.15)', border:'none', borderRadius:8, padding:'6px 10px', cursor:'pointer', color:'white', fontSize:'0.78rem' }}>✕</button>
                 <span style={{ flex:1, fontWeight:700, color:'white' }}>{nombre}</span>

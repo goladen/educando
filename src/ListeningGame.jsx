@@ -826,14 +826,14 @@ function ListeningLiveClient({ codigoSala, onExit, usuario }) {
                 {sala.estado === 'JUGANDO' && item && (
                     <div>
                         <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14, flexWrap:'wrap' }}>
-                            <h3 style={{ margin:0, flex:1, color:'#2c3e50', fontSize:'1.1rem' }}>{item.titulo}</h3>
-                            <span style={{ background:'#eaf4fe', borderRadius:12, padding:'4px 12px', fontSize:'0.8rem', color:'#2980b9', fontWeight:600 }}>
+                                                   <h3 style={{ margin:0, flex:1, color:'white', fontSize:'1.1rem' }}>{item.titulo}</h3>
+                            <span style={{ background:'rgba(52,152,219,0.2)', borderRadius:12, padding:'4px 12px', fontSize:'0.8rem', color:'#7ec8f7', fontWeight:600 }}>
                                 {sala.config?.modoAlumno==='multiple'?'🔘 Elige la opción':'✍️ Escribe la palabra'}
                             </span>
-                            {enviado && <span style={{ background:'#e8f5e9', borderRadius:20, padding:'4px 12px', fontSize:'0.78rem', color:'#27ae60', fontWeight:700, border:'1px solid #27ae60' }}>✓ Enviado</span>}
+                            {enviado && <span style={{ background:'rgba(39,174,96,0.2)', borderRadius:20, padding:'4px 12px', fontSize:'0.78rem', color:'#2ecc71', fontWeight:700, border:'1px solid #27ae60' }}>✓ Enviado</span>}
                         </div>
                         {/* Transcript CON TODOS LOS HUECOS VISIBLES */}
-                        <div style={{ background:'white', borderRadius:16, padding:'22px 20px', marginBottom:16, lineHeight:2.8, fontSize:'1rem', color:'#2c3e50', boxShadow:'0 2px 12px rgba(0,0,0,0.08)' }}>
+                        <div style={{ background:'rgba(255,255,255,0.07)', borderRadius:16, padding:'22px 20px', marginBottom:16, lineHeight:2.8, fontSize:'1rem', border:'1px solid rgba(255,255,255,0.1)' }}>
                             <TranscriptView segmentos={segmentos} modo={sala.config?.modoAlumno||'write'}
                                 respuestas={respuestas}
                                 onRespuesta={(num, val) => !enviado && setRespuestas(prev => ({ ...prev, [num]: val }))}

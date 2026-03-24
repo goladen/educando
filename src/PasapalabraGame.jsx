@@ -157,7 +157,7 @@ const STYLES = `
   @media (max-width: 700px) { #game-container { transform: scale(0.6); } }
 `;
 
-export default function PasapalabraGame({ recurso, usuario, alTerminar, modoOlimpico = false, tiempoOlimpico = null, onOlimpicoFinish = null}) {
+export default function PasapalabraGame({ recurso, usuario, alTerminar, modoOlimpico = false, tiempoOlimpico = null, onOlimpicoFinish = null, hojaOlimpica = 'General'  }) {
     const [fase, setFase] = useState('SETUP');
     const [modoDuelo, setModoDuelo] = useState(false);
     const [hojaSeleccionada, setHojaSeleccionada] = useState('General');

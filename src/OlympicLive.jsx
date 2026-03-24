@@ -689,10 +689,13 @@ function OlympicLiveClient({ codigoSala, usuario, onExit }) {
                     // CORRECCIÓN: Permitimos unirse en LOBBY o en JUEGO (para los tardones)
                     if ((data.estado === 'LOBBY' || data.estado === 'JUEGO') && !joiningRef.current) {
                         joiningRef.current = true;
-                        await updateDoc(doc(db, "live_games", codigoSala), {
-                            [`jugadores.${myUid}`]: { uid: myUid, nombre: myName, puntos: 0, joinedAt: Date.now() }
-                        });
-                        joiningRef.current = false;
+                        try {
+                            await updateDoc(doc(db, "live_games", codigoSala), {
+                                [`jugadores.${myUid}`]: { uid: myUid, nombre: myName, puntos: 0, joinedAt: Date.now() }
+                            });
+                        } finally {
+                            joiningRef.current = false;
+                        }
                     }
                 }
 
@@ -740,8 +743,11 @@ function OlympicLiveClient({ codigoSala, usuario, onExit }) {
         setTextoDuda(''); setShowDudaModal(false); alert("Enviado");
     };
 
-    if (!gameData) return <div style={{ color: 'white', padding: 20 }}>Conectando...</div>;
-
+    if (!gameData) return (
+        <div style={{ minHeight: '100vh', background: '#2c3e50', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '1.2rem' }}>
+            Conectando...
+    </div>
+    );
     const preguntaActual = gameData.preguntas?.[gameData.indicePregunta];
     let textoRespuestaCorrecta = "";
     if (preguntaActual) {

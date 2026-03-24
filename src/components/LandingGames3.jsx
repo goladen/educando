@@ -826,7 +826,7 @@ export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
     const [mostrarMasFiltros, setMostrarMasFiltros] = useState(false);
     const [codigo, setCodigo] = useState('');
     const [resultados, setResultados] = useState([]);
-
+const [entrando, setEntrando] = useState(false);
     // Live Alumno
     const [joinCode, setJoinCode] = useState('');
     const [joinName, setJoinName] = useState('');
@@ -1132,15 +1132,23 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={null} onExit={onHo
                         <input placeholder="Código de 6 números" value={joinCode} onChange={e => setJoinCode(e.target.value)} style={{ ...styles.input, width: '250px', display: 'block', margin: '15px auto', textAlign: 'center', fontSize: '1.5rem', letterSpacing: '2px' }} maxLength={6} />
                         <input placeholder="Tu Nombre" value={joinName} onChange={e => setJoinName(e.target.value)} style={{ ...styles.input, width: '250px', display: 'block', margin: '10px auto', textAlign: 'center', fontSize: '1.2rem' }} />
 
-                        <button onClick={async () => {
-                            if (joinCode.length === 6 && joinName) {
-                                const salaSnap = await getDoc(doc(db, "live_games", joinCode.toUpperCase().trim()));
-                                if (salaSnap.exists()) {
-                                    setJoinLiveTipoJuego(salaSnap.data().tipoJuego || '');
-                                    setLiveModeAlumno(true);
-                                } else alert("Código incorrecto o sala no iniciada.");
-                            } else alert("Introduce código y nombre.");
-                        }} style={{ background: appData.color, color: 'white', padding: '15px 50px', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', marginTop: '20px', fontSize: '1.2rem' }}>ENTRAR AL JUEGO</button>
+                        <button  disabled={entrando}
+            onClick={async () => {
+        if (joinCode.length === 6 && joinName) {
+            setEntrando(true);
+            const salaSnap = await getDoc(doc(db, "live_games", joinCode.toUpperCase().trim()));
+            if (salaSnap.exists()) {
+                setJoinLiveTipoJuego(salaSnap.data().tipoJuego || '');
+                setLiveModeAlumno(true);
+            } else {
+                alert("Código incorrecto o sala no iniciada.");
+                setEntrando(false);
+            }
+        } else alert("Introduce código y nombre.");
+    }}
+>
+    {entrando ? 'Conectando...' : 'ENTRAR AL JUEGO'}
+</button>
                     </div>
                 )}
 

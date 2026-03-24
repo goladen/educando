@@ -861,7 +861,7 @@ function ListeningLiveClient({ codigoSala, onExit, usuario }) {
                             <div style={{ color:'#7f8c8d', marginTop:4 }}>{pct}% · {nombre}</div>
                         </div>
                         {/* Ranking */}
-                        <div style={{ background:'white', borderRadius:16, overflow:'hidden', marginBottom:20, boxShadow:'0 2px 12px rgba(0,0,0,0.08)' }}>
+                        <div style={{ background:'#2c3e50', borderRadius:16, overflow:'hidden', marginBottom:20, boxShadow:'0 2px 12px rgba(0,0,0,0.08)' }}>
                             {[...jugadores].sort((a,b)=>(b.aciertos||0)-(a.aciertos||0)).map((j, i) => (
                                 <div key={j.uid} style={{ display:'flex', alignItems:'center', gap:10, padding:'13px 18px', borderBottom:'1px solid #f0f0f0', background: j.uid===uid?'#eaf4fe':(i===0?'#fffbf0':'white') }}>
                                     <span style={{ fontWeight:900, minWidth:26, fontSize:'1.1rem' }}>{['🥇','🥈','🥉'][i]||`${i+1}.`}</span>

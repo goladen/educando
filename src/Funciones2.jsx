@@ -602,18 +602,23 @@ function Ejercicio({ eq, onNuevo, onVolver, onLiveEnviar = null, silentCheckTrig
                         <button onClick={comprobar} style={st.btnComprobar}>
                             <CheckCircle size={17} /> Comprobar
                         </button>
-                    ) : resultado === 'TODO_OK' ? (
-                        <div style={st.feedbackOk}>
-                            <CheckCircle size={22} /> ¡Correcto!
+                        ) : resultado === 'TODO_OK' ? (
+                            <div style={st.feedbackOk}>
+                                <CheckCircle size={22} /> ¡Correcto! — 100%
                         </div>
-                    ) : (
-                        <div style={st.feedbackFail}>
-                            <XCircle size={18} style={{ flexShrink:0 }} />
-                            <div>
-                                {feedback?.map((f, i) => <div key={i}>{f}</div>)}
-                            </div>
-                        </div>
-                    )}
+                        ) : (
+                                    <>
+                                        <div style={st.feedbackFail}>
+                                            <XCircle size={18} style={{ flexShrink: 0 }} />
+                                            <div>
+                                                {feedback?.map((f, i) => <div key={i}>{f}</div>)}
+                                            </div>
+                                        </div>
+                                        <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '1.1rem', color: '#e67e22', marginTop: 6 }}>Nota: {pctEnvio}%</div>
+                                    </>
+                                )}
+
+
 
                     {resultado && resultado !== 'TODO_OK' && (
                         <button onClick={() => setMostrarSol(b => !b)} style={st.btnVerSol}>
@@ -1724,14 +1729,14 @@ function EjercicioAnalisis({ eq, onNuevo, onVolver, onLiveEnviar = null, silentC
                     {/* Botones */}
                     {!resultado ? (
                         <button onClick={comprobar} style={st.btnComprobar}><CheckCircle size={16} /> Comprobar</button>
-                    ) : resultado === 'OK' ? (
-                        <div style={st.feedbackOk}><CheckCircle size={20} /> ¡Correcto!</div>
-                    ) : (
-                        <div style={st.feedbackFail}>
-                            <XCircle size={16} style={{ flexShrink:0 }} />
-                            <div>{errores.map((e,i) => <div key={i}>{e}</div>)}</div>
-                        </div>
-                    )}
+                        ) : resultado === 'OK' ? (
+                            <div style={st.feedbackOk}><CheckCircle size={22} /> ¡Correcto! — 100%</div>
+                        ) : (
+                                    <>
+                                        <div style={st.feedbackFail}><XCircle size={18} style={{ flexShrink: 0 }} /><div>{errores.map((e, i) => <div key={i}>{e}</div>)}</div></div>
+                                        <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '1.1rem', color: '#e67e22', marginTop: 6 }}>Nota: {pctEnvio}%</div>
+                                    </>
+                                )}
 
                     {resultado === 'FAIL' && (
                         <button onClick={() => setMostrarSol(b => !b)} style={st.btnVerSol}>
@@ -1853,14 +1858,14 @@ function EjercicioTresPuntos({ eq, onNuevo, onVolver, onLiveEnviar = null, silen
 
                     {!resultado ? (
                         <button onClick={comprobar} style={st.btnComprobar}><CheckCircle size={16} /> Comprobar</button>
-                    ) : resultado === 'OK' ? (
-                        <div style={st.feedbackOk}><CheckCircle size={20} /> ¡Correcto!</div>
-                    ) : (
-                        <div style={st.feedbackFail}>
-                            <XCircle size={16} style={{ flexShrink:0 }} />
-                            <div>{errores.map((e,i) => <div key={i}>{e}</div>)}</div>
-                        </div>
-                    )}
+                        ) : resultado === 'OK' ? (
+                            <div style={st.feedbackOk}><CheckCircle size={22} /> ¡Correcto! — 100%</div>
+                        ) : (
+                                    <>
+                                        <div style={st.feedbackFail}><XCircle size={18} style={{ flexShrink: 0 }} /><div>{errores.map((e, i) => <div key={i}>{e}</div>)}</div></div>
+                                        <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '1.1rem', color: '#e67e22', marginTop: 6 }}>Nota: {pctEnvio}%</div>
+                                    </>
+                                )}
 
                     {resultado === 'FAIL' && (
                         <button onClick={() => setMostrarSol(b => !b)} style={st.btnVerSol}>

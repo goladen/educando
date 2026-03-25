@@ -529,7 +529,9 @@ function Ejercicio({ eq, onNuevo, onVolver, onLiveEnviar = null, silentCheckTrig
             else if (!lineaOk) msgs.push('El dibujo de la recta no coincide.');
         }
 
-        const ratio = (mOk ? 0.5 : 0) + (nOk ? 0.5 : 0);
+        const ratio = eq.tipo === 'GRAFICA'
+            ? ((mOk ? 1 : 0) + (nOk ? 1 : 0)) / 2
+            : ((mOk ? 1 : 0) + (nOk ? 1 : 0) + (lineaOk ? 1 : 0)) / 3;
         setPctEnvio(Math.round(ratio * 100));
         if (mOk && nOk && lineaOk) {
             setResultado('TODO_OK');
@@ -1144,11 +1146,14 @@ function EjercicioGeneral({ eq, onNuevo, onVolver, onLiveEnviar = null, silentCh
                     </div>
                     {!resultado?(
                         <button onClick={comprobar} style={st.btnComprobar}><CheckCircle size={17}/> Comprobar</button>
-                    ):resultado==='OK'?(
-                        <div style={st.feedbackOk}><CheckCircle size={22}/> ¡Correcto!</div>
-                    ):(
-                        <div style={st.feedbackFail}><XCircle size={18} style={{flexShrink:0}}/><div>{errores.map((e,i)=><div key={i}>{e}</div>)}</div></div>
-                    )}
+                        ) : resultado === 'OK' ? (
+                            <div style={st.feedbackOk}><CheckCircle size={22} /> ¡Correcto! — 100%</div>
+                        ) : (
+                                    <>
+                                        <div style={st.feedbackFail}><XCircle size={18} style={{ flexShrink: 0 }} /><div>{errores.map((e, i) => <div key={i}>{e}</div>)}</div></div>
+                                        <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '1.1rem', color: '#e67e22', marginTop: 6 }}>Nota: {pctEnvio}%</div>
+                                    </>
+                                )}
                     {resultado==='FAIL'&&(
                         <button onClick={()=>setMostrarSol(b=>!b)} style={st.btnVerSol}>{mostrarSol?'Ocultar solución':'Ver solución'}</button>
                     )}

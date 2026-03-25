@@ -1567,6 +1567,15 @@ function EjercicioAnalisis({ eq, onNuevo, onVolver, onLiveEnviar = null, silentC
     const tol = 0.11;
     const numStr2 = (v) => Number.isInteger(v) ? `${v}` : (Math.round(v*100)/100).toString();
 
+
+    // Puntos enteros visibles en la zona gráfica (x e y dentro de [-7,7])
+    const ptsEnZona = Array.from({ length: 15 }, (_, i) => i - 7)
+        .filter(x => { const y = a * x * x + b * x + c; return Math.abs(y) <= 7; });
+    const minPuntos = Math.max(1, Math.min(3, ptsEnZona.length));
+
+
+
+
     // Raíces
     let x1sol = null, x2sol = null;
     if (disc > 0) {
@@ -1587,18 +1596,21 @@ function EjercicioAnalisis({ eq, onNuevo, onVolver, onLiveEnviar = null, silentC
         const yvOk = Math.abs(parseAnswer(ansYv) - yv) <= tol;
         if (!yvOk) errs.push('La coordenada y del vértice no es correcta.');
 
+        let cortesOk = false;
         if (disc < 0) {
+            cortesOk = noCortes;
             if (!noCortes) errs.push('Marca "No hay cortes con el eje X" (discriminante < 0).');
         } else if (disc === 0) {
-            const cortesOk = !noCortes && Math.abs(parseAnswer(ansX1) - x1sol) <= tol;
+            cortesOk = !noCortes && Math.abs(parseAnswer(ansX1) - x1sol) <= tol;
             if (!cortesOk) errs.push('El corte doble con el eje X no es correcto.');
         } else {
-            if (noCortes) errs.push('Sí hay cortes con el eje X (discriminante > 0).');
-            else {
-                const vals = [parseAnswer(ansX1), parseAnswer(ansX2)].sort((x,y)=>x-y);
-                const sols = [x1sol, x2sol].sort((x,y)=>x-y);
-                if (!(Math.abs(vals[0]-sols[0]) <= tol && Math.abs(vals[1]-sols[1]) <= tol))
-                    errs.push('Los cortes con el eje X no son correctos.');
+            if (noCortes) {
+                errs.push('Sí hay cortes con el eje X (discriminante > 0).');
+            } else {
+                const vals = [parseAnswer(ansX1), parseAnswer(ansX2)].sort((x, y) => x - y);
+                const sols = [x1sol, x2sol].sort((x, y) => x - y);
+                cortesOk = Math.abs(vals[0] - sols[0]) <= tol && Math.abs(vals[1] - sols[1]) <= tol;
+                if (!cortesOk) errs.push('Los cortes con el eje X no son correctos.');
             }
         }
 
@@ -1608,10 +1620,13 @@ function EjercicioAnalisis({ eq, onNuevo, onVolver, onLiveEnviar = null, silentC
         // Validar puntos dibujados (mínimo 3 en la parábola)
         const ptsTol = 0.4;
         const ptsOk = studentParPts.filter(p => Math.abs(a*p.x*p.x + b*p.x + c - p.y) <= ptsTol);
-        if (studentParPts.length < 3) errs.push('Marca al menos 3 puntos por los que pasa la parábola.');
-        else if (ptsOk.length < 3) errs.push('Al menos 3 de tus puntos deben estar sobre la parábola.');
 
-        const itemsA = [formaOk, xvOk, yvOk, cortesOk, yejeOk, ptsOk.length >= 3];
+
+        if (studentParPts.length < minPuntos) errs.push(`Marca al menos ${minPuntos} punto${minPuntos > 1 ? 's' : ''} por los que pasa la parábola.`);
+        else if (ptsOk.length < minPuntos) errs.push(`Al menos ${minPuntos} de tus puntos deben estar sobre la parábola.`);
+
+        const itemsA = [formaOk, xvOk, yvOk, cortesOk, yejeOk, ptsOk.length >= minPuntos];
+
         const ratioA = errs.length === 0 ? 1 : itemsA.filter(Boolean).length / itemsA.length;
         setPctEnvio(Math.round(ratioA * 100));
         if (errs.length === 0) setResultado('OK');
@@ -1644,7 +1659,7 @@ function EjercicioAnalisis({ eq, onNuevo, onVolver, onLiveEnviar = null, silentC
                     {studentParPts.length>0 && !resultado && (
                         <button onClick={()=>setStudentParPts([])} style={st.btnClear}>↺ Borrar puntos</button>
                     )}
-                    {!resultado && <div style={{fontSize:'0.75rem',color:'#5a6a9a',textAlign:'center',maxWidth:180}}>Haz clic para marcar puntos de la parábola (mín. 3)</div>}
+                        {!resultado && <div style={{ fontSize: '0.75rem', color: '#5a6a9a', textAlign: 'center', maxWidth: 180 }}>Haz clic para marcar puntos de la parábola (mín. {minPuntos})</div>}
                     <MiniPaint />
                 </div>
                 <div style={{ ...st.panelRespuestas, width:300, minHeight:'auto' }}>

@@ -334,7 +334,8 @@ function OlympicLiveHost({ codigoSala, onExit, usuario }) {
                 await updateDoc(doc(db, "live_games", codigoSala), { estado: 'FIN' });
                 playSound('WIN');
             }
-        } catch (error) { console.error(error); setCargandoSiguiente(false); }
+        } catch (error) { console.error(error); } finally { setCargandoSiguiente(false); }
+
     };
 
     const guardarResultadosGlobales = async () => {

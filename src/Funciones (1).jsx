@@ -29,15 +29,15 @@ function renderLatex(str) {
             if (str[i] === '{') {
                 let depth=1, j=i+1, exp='';
                 while (j<str.length&&depth>0){if(str[j]==='{')depth++;else if(str[j]==='}')depth--;if(depth>0)exp+=str[j];j++;}
-                i=j; nodes.push(<sup key={key++} style={{ fontSize:'0.6em', position:'relative', top:'-0.5em', lineHeight:0}}>{renderLatex(exp)}</sup>);
-            } else { nodes.push(<sup key={key++} style={{ fontSize:'0.6em', position:'relative', top:'-0.5em', lineHeight:0 }}>{str[i++]}</sup>); }
+                i=j; nodes.push(<sup key={key++}>{renderLatex(exp)}</sup>);
+            } else { nodes.push(<sup key={key++}>{str[i++]}</sup>); }
         } else if (str[i] === '_') {
             i++;
             if (str[i] === '{') {
                 let depth=1, j=i+1, sub='';
                 while (j<str.length&&depth>0){if(str[j]==='{')depth++;else if(str[j]==='}')depth--;if(depth>0)sub+=str[j];j++;}
-                i=j; nodes.push(<sup key={key++} style={{ fontSize:'0.6em', position:'relative', top:'-0.5em', lineHeight:0 }}>{renderLatex(exp)}</sup>);
-            } else { nodes.push(<sup key={key++} style={{ fontSize:'0.6em', position:'relative', top:'-0.5em', lineHeight:0 }}>{str[i++]}</sup>); }
+                i=j; nodes.push(<sub key={key++}>{renderLatex(sub)}</sub>);
+            } else { nodes.push(<sub key={key++}>{str[i++]}</sub>); }
         } else if (str[i] === '\\' && str.slice(i,i+5) === '\\sqrt') {
             i += 5;
             if (str[i]==='{') {

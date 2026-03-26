@@ -1052,39 +1052,50 @@ function EjercicioGeneral({ eq, onNuevo, onVolver, onLiveEnviar = null, silentCh
     const comprobar = () => {
         const tol=0.12;
         const errs=[];
-        // Rectas dibujadas
-        const l1drawn = linePts[0]&&linePts[1];
-        const l2drawn = linePts[2]&&linePts[3];
-        if (!l1drawn||!l2drawn) { errs.push('Dibuja las dos rectas (2 puntos por recta).'); }
+        // 1. Rectas dibujadas
+        const l1drawn = linePts[0] && linePts[1];
+        const l2drawn = linePts[2] && linePts[3];
+        let drawOk = false;
+        if (!l1drawn || !l2drawn) { errs.push('Dibuja las dos rectas (2 puntos por recta).'); }
         else {
-            // La recta 1 puede ser r1 o r2 (aceptar cualquier orden)
-            const m1r1 = lineMatchesMN(linePts[0],linePts[1],eq.m1,eq.n1);
-            const m1r2 = lineMatchesMN(linePts[0],linePts[1],eq.m2,eq.n2);
-            const m2r1 = lineMatchesMN(linePts[2],linePts[3],eq.m1,eq.n1);
-            const m2r2 = lineMatchesMN(linePts[2],linePts[3],eq.m2,eq.n2);
-            const linesOk = (m1r1&&m2r2)||(m1r2&&m2r1);
-            if (!linesOk) errs.push('Una o las dos rectas dibujadas no coinciden con las ecuaciones dadas.');
+            const m1r1 = lineMatchesMN(linePts[0], linePts[1], eq.m1, eq.n1);
+            const m1r2 = lineMatchesMN(linePts[0], linePts[1], eq.m2, eq.n2);
+            const m2r1 = lineMatchesMN(linePts[2], linePts[3], eq.m1, eq.n1);
+            const m2r2 = lineMatchesMN(linePts[2], linePts[3], eq.m2, eq.n2);
+            drawOk = (m1r1 && m2r2) || (m1r2 && m2r1);
+            if (!drawOk) errs.push('Una o las dos rectas dibujadas no coinciden con las ecuaciones dadas.');
         }
+        // 2. Paralelas
+        let parOk = false;
         if (ansPar === null) errs.push('Indica si las rectas son paralelas.');
-        else if (ansPar !== eq.paralelas) errs.push(`Las rectas ${eq.paralelas?'sí son':'no son'} paralelas.`);
+        else if (ansPar !== eq.paralelas) errs.push(`Las rectas ${eq.paralelas ? 'sí son' : 'no son'} paralelas.`);
+        else parOk = true;
+        // 3. Perpendiculares
+        let perpOk = false;
         if (ansPerp === null) errs.push('Indica si las rectas son perpendiculares.');
-        else if (ansPerp !== eq.perpendiculares) errs.push(`Las rectas ${eq.perpendiculares?'sí son':'no son'} perpendiculares.`);
+        else if (ansPerp !== eq.perpendiculares) errs.push(`Las rectas ${eq.perpendiculares ? 'sí son' : 'no son'} perpendiculares.`);
+        else perpOk = true;
+        // 4+. Intersección
+        let interItems;
         if (eq.paralelas) {
+            const noInterOk = noInter;
             if (!noInter) errs.push('Las rectas paralelas no se cortan. Marca "No hay intersección".');
+            interItems = [noInterOk];
         } else {
-            if (noInter) errs.push('Estas rectas sí tienen punto de intersección.');
-            else {
-                if (Math.abs(parseAnswer(ansIx)-eq.ix)>tol) errs.push('La coordenada x del punto de intersección no es correcta.');
-                if (Math.abs(parseAnswer(ansIy)-eq.iy)>tol) errs.push('La coordenada y del punto de intersección no es correcta.');
+            if (noInter) {
+                errs.push('Estas rectas sí tienen punto de intersección.');
+                interItems = [false, false];
+            } else {
+                const ixOk = Math.abs(parseAnswer(ansIx) - eq.ix) <= tol;
+                const iyOk = Math.abs(parseAnswer(ansIy) - eq.iy) <= tol;
+                if (!ixOk) errs.push('La coordenada x del punto de intersección no es correcta.');
+                if (!iyOk) errs.push('La coordenada y del punto de intersección no es correcta.');
+                interItems = [ixOk, iyOk];
             }
         }
-        const itemsG = [
-            !errs.some(e=>e.includes('dibujadas')),
-            !errs.some(e=>e.includes('paralelas')),
-            !errs.some(e=>e.includes('perpendiculares')),
-            !errs.some(e=>e.includes('intersección')||e.includes('No hay intersección')||e.includes('x del punto')||e.includes('y del punto')),
-        ];
-        const ratioG = errs.length===0 ? 1 : itemsG.filter(Boolean).length / itemsG.length;
+        const allItems = [drawOk, parOk, perpOk, ...interItems];
+        const ratioG = errs.length === 0 ? 1 : allItems.filter(Boolean).length / allItems.length;
+
         setPctEnvio(Math.round(ratioG * 100));
         if (errs.length===0) setResultado('OK');
         else { setResultado('FAIL'); setErrores(errs); }

@@ -17,7 +17,8 @@ import Listening from '../ListeningGame'
 import Geometrix from '../Geometrix';
 import CalculoMental from '../CalculoMental'; 
 import Ecuaciones from '../Ecuaciones';
-import Funciones from '../Funciones2';
+import Funciones from '../Funciones';
+import GeometriaAnalitica from '../Funciones2'
 import Plataformas from '../Plataformas2';
 
 import EtiquetaMe from '../EtiquetaMe';
@@ -123,7 +124,8 @@ export const APPS = [
         emoji: '⚖️',
         isMath: true
     },
-    { id: 'FUNCIONES', name: 'Funciones', desc: 'Rectas, parábolas y análisis gráfico.', color: '#4CAF50', emoji: '📈', isMath: true },
+    { id: 'FUNCIONES', name: 'Funciones', desc: 'Características de funciones, Representación', color: '#4CAF50', emoji: '📈', isMath: true },
+    { id: 'GEOMETRÍA_ANALÍTICA', name: 'Geometría_Analítica', desc: 'Rectas, parábolas y análisis gráfico.', color: '#4CAF50', emoji: '♐​', isMath: true },
 
 
     { id: 'POLINOMIOS', name: 'Álgebra', desc: 'Operaciones con polinomios.', color: '#FF9800', emoji: '✖️', isMath: true, comingSoon: true }
@@ -494,6 +496,9 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
         if (juegoActivo.tipoJuego === 'CALCULO') return <CalculoMental usuario={null} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'ECUACIONES') return <Ecuaciones usuario={null} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'FUNCIONES') return <Funciones onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'GEOMETRÍA_ANALÍTICA') return <GeometriaAnalitica onExit={() => setJuegoActivo(null)} />;
+        
+        
         // ------------------------
 if (juegoActivo.tipoJuego === 'SINTAXIS')  return <SintaxisGame  usuario={usuario} onExit={() => setJuegoActivo(null)} />;
 if (juegoActivo.tipoJuego === 'LISTENING') return <Listening     usuario={usuario} onExit={() => setJuegoActivo(null)} />;
@@ -862,6 +867,7 @@ const [entrando, setEntrando] = useState(false);
         if (appData.id === 'CALCULO' || juegoActivo.tipoJuego === 'CALCULO') return <CalculoMental usuario={null} onExit={handleExitGame} />;
         if (appData.id === 'ECUACIONES' || juegoActivo.tipoJuego === 'ECUACIONES') return <Ecuaciones onExit={handleExitGame} />;
         if (appData.id === 'FUNCIONES' || juegoActivo.tipoJuego === 'FUNCIONES') return <Funciones usuario={null} onExit={handleExitGame} />;
+        if (appData.id === 'GEOMETRÍA_ANALÍTICA' || juegoActivo.tipoJuego === 'GEOMETRÍA_ANALÍTICA') return <GeometriaAnalitica usuario={null} onExit={handleExitGame} />;
 
     }
     // --- NUEVO: ATAJO PARA JUEGOS CON MENÚ PROPIO ---
@@ -881,6 +887,7 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={null} onExit={onHo
     if (appData.id === 'CALCULO') return <CalculoMental usuario={null} onExit={handleExitGame} />;
     if (appData.id === 'ECUACIONES') return <Ecuaciones usuario={null} onExit={handleExitGame} />;
     if (appData.id === 'FUNCIONES') return <Funciones usuario={null} onExit={handleExitGame} />;
+    if (appData.id === 'GEOMETRÍA_ANALÍTICA') return <GeometriaAnalitica usuario={null} onExit={handleExitGame} />;
 
     // ------------------------// ------------------------
     // --- CASO ESPECIAL: QUESTION SENDER ---

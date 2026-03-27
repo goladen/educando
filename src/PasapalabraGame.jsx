@@ -314,14 +314,16 @@ export default function PasapalabraGame({ recurso, usuario, alTerminar, modoOlim
 
             {fase === 'JUEGO' && (
                 <Tablero
-                    jugadores={jugadores}
-                    setJugadores={setJugadores}
-                    turno={turno}
-                    setTurno={setTurno}
-                    modoDuelo={modoDuelo}
-                    playSound={playSound}
-                    onFinish={() => setFase('FIN')}
-                />
+                jugadores={jugadores}
+                setJugadores={setJugadores}
+                turno={turno}
+                setTurno={setTurno}
+                modoDuelo={modoDuelo}
+                playSound={playSound}
+                onFinish={() => setFase('FIN')}
+                modoOlimpico={modoOlimpico}
+                onOlimpicoFinish={onOlimpicoFinish}
+            />
             )}
 
             {fase === 'FIN' && (

@@ -380,14 +380,11 @@ function AnalisisFuncion({ modoEscritura, tipoSeleccionado, idInicial, onVolver 
         return norm(c);
     };
     const isAnswerCorrect = (k) => {
+        if (!modoEscritura) return norm(resp[k]||'') === norm(fnData.caracteristicas[k].correcta);
         const userAns = getUserAnswer(k);
         const realAns = getRealAnswer(k);
         if (userAns === realAns) return true;
-        // En modo escritura aplicar tolerancia ±0.3
-        if (modoEscritura) {
-            return compareConTolerance(getUserAnswer(k), getRealAnswer(k));
-        }
-        return false;
+        return compareConTolerance(userAns, realAns);
     };
 
     const comprobar = () => {
@@ -487,6 +484,10 @@ function AnalisisFuncion({ modoEscritura, tipoSeleccionado, idInicial, onVolver 
             </div>);
         }
         const opciones=[data.correcta,...data.incorrectas].sort((a,b)=>a.localeCompare(b));
+        const seleccionoAlgo = resp[k] !== undefined;
+        const acerto = evaluado && norm(resp[k]||'') === norm(data.correcta);
+
+        
         return (<div style={{display:'flex',flexDirection:'column',gap:6}}>
             {opciones.map((op,i)=>{
                 const sel=resp[k]===op, isC=evaluado&&op===data.correcta, isW=evaluado&&sel&&op!==data.correcta;
@@ -495,6 +496,8 @@ function AnalisisFuncion({ modoEscritura, tipoSeleccionado, idInicial, onVolver 
                 return (<button key={i} onClick={()=>!evaluado&&setRespRaw(p=>({...p,[k]:op}))} disabled={evaluado}
                     style={{padding:'7px 11px',borderRadius:8,border:`2px solid ${border}`,background:bg,color:col,cursor:evaluado?'default':'pointer',textAlign:'left',fontSize:'0.84rem',fontFamily:'monospace',transition:'all 0.15s'}}>{op}</button>);
             })}
+                        {evaluado && !acerto && <div style={{fontSize:'0.78rem',color:'#e74c3c',marginTop:2}}>✗ {seleccionoAlgo ? 'Incorrecto.' : 'Sin respuesta.'} Correcto: <strong>{data.correcta}</strong></div>}
+
         </div>);
     };
 
@@ -540,14 +543,19 @@ function AnalisisFuncion({ modoEscritura, tipoSeleccionado, idInicial, onVolver 
 
             {/* Columna preguntas */}
             <div style={{flex:1,minWidth:310,background:'white',padding:'18px 16px',borderRadius:14,boxShadow:'0 4px 15px rgba(0,0,0,0.06)',display:'flex',flexDirection:'column',gap:12}}>
-                {keys.map(k=>(
-                    <div key={k} style={{background:'#f8f9fa',padding:'11px 13px',borderRadius:10,border:'1px solid #eee'}}>
+            {keys.map(k=>{
+                    const fieldOk = evaluado && isAnswerCorrect(k);
+                    const fieldFail = evaluado && !isAnswerCorrect(k);
+                    return (
+                    <div key={k} style={{background: fieldFail?'#fff5f5': fieldOk?'#f0faf4':'#f8f9fa', padding:'11px 13px',borderRadius:10,border:`2px solid ${fieldFail?'#e74c3c':fieldOk?'#2ecc71':'#eee'}`}}>    
+                        
                         <div style={{fontWeight:700,color:'#34495e',marginBottom:8,fontSize:'0.88rem',display:'flex',alignItems:'center',gap:5}}>
                             <span>{keyIcon[k]||'•'}</span><span>{keyLabel[k]||k}</span>
                         </div>
                         {renderCampo(k)}
                     </div>
-                ))}
+                    );
+                    })}
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:6,paddingTop:12,borderTop:'2px dashed #eee'}}>
                     <button onClick={onVolver} style={{padding:'9px 18px',borderRadius:8,border:'none',background:'#95a5a6',color:'white',cursor:'pointer',fontWeight:'bold',fontFamily:'inherit',display:'flex',alignItems:'center',gap:5}}>
                         <ArrowLeft size={15}/> Cambiar

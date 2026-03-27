@@ -790,6 +790,9 @@ function ModoLocalFR({ nivel, onBack }) {
     const [catSel, setCatSel]   = useState(null);
     const [score, setScore]     = useState(0);
     const [streak, setStreak]   = useState(0);
+    const [mostrarEnvio, setMostrarEnvio] = useState(false);
+    const [aciertos, setAciertos] = useState(0);
+    const [total, setTotal]     = useState(0);
 
     const siguiente = () => {
         setFrase(pickFromBag(bagRef.current, pool));
@@ -797,18 +800,21 @@ function ModoLocalFR({ nivel, onBack }) {
     };
 
     const comprobar = () => {
-        let pts = 0;
+        let pts = 0, ac = 0, tot = 0;
         const res = {};
         frase.tokens.forEach((t,i) => {
             const esp = t.funcion || [], ans = answers[i] || [];
             const ok = esp.length === ans.length && esp.every(f => ans.includes(f));
             res[i] = { ok, esp, dad: ans };
-            if (ok) pts += (esp[0] && CATEGORIAS_FR[esp[0]]?.puntos) || 10;
+            tot++;
+            if (ok) { pts += (esp[0] && CATEGORIAS_FR[esp[0]]?.puntos) || 10; ac++; }
         });
         setResults(res);
         const allOk = Object.values(res).every(v => v.ok);
         if (allOk) setStreak(s=>s+1); else setStreak(0);
         setScore(s => s + pts);
+        setAciertos(a => a + ac);
+        setTotal(t => t + tot);
     };
 
     const handleClickWord = (i) => {
@@ -838,12 +844,14 @@ function ModoLocalFR({ nivel, onBack }) {
                 ) : (
                     <>
                         <ResultadoFR tokens={frase.tokens} results={results}/>
-                        <button onClick={siguiente} style={{...g.btnSuccess,width:'100%',marginTop:12,justifyContent:'center'}}>
-                            <ArrowRight size={18}/> Phrase suivante
-                        </button>
+                        <div style={{display:'flex',gap:9,marginTop:12}}>
+                            <button onClick={siguiente} style={{...g.btnSuccess,flex:1,justifyContent:'center'}}><ArrowRight size={18}/> Phrase suivante</button>
+                            <button onClick={()=>setMostrarEnvio(true)} style={{...g.btnPrimary,padding:'10px 16px'}}><Send size={14}/> Professeur</button>
+                        </div>
                     </>
                 )}
             </div>
+            {mostrarEnvio && <ModalEnviarProfe datos={{puntos:score,aciertos,total,porcentaje:total>0?Math.round(aciertos/total*100):0,nivel:NIVELES_FR.find(n=>n.id===nivel)?.label||'Tous',idioma:'FR',modalidad:'Libre'}} onClose={()=>setMostrarEnvio(false)}/>}
         </div>
     );
 }
@@ -863,6 +871,9 @@ function ModoContrarrelojFR({ nivel, onBack }) {
     const [score, setScore]     = useState(0);
     const [tiempo, setTiempo]   = useState(DURACION);
     const [frasesDone, setFrasesDone] = useState(0);
+    const [aciertos, setAciertos] = useState(0);
+    const [total, setTotal]     = useState(0);
+    const [mostrarEnvio, setMostrarEnvio] = useState(false);
     const timerRef = useRef(null);
 
     useEffect(() => {
@@ -884,15 +895,17 @@ function ModoContrarrelojFR({ nivel, onBack }) {
     };
 
     const comprobar = () => {
-        let pts = 0;
+        let pts = 0, ac = 0, tot = 0;
         const res = {};
         frase.tokens.forEach((t,i) => {
             const esp = t.funcion||[], ans = answers[i]||[];
             const ok = esp.length===ans.length && esp.every(f=>ans.includes(f));
             res[i] = { ok, esp, dad:ans };
-            if (ok) pts += (esp[0] && CATEGORIAS_FR[esp[0]]?.puntos)||10;
+            tot++;
+            if (ok) { pts += (esp[0] && CATEGORIAS_FR[esp[0]]?.puntos)||10; ac++; }
         });
         setResults(res); setScore(s => s + pts);
+        setAciertos(a => a + ac); setTotal(t => t + tot);
     };
 
     const handleClickWord = (i) => {
@@ -924,8 +937,12 @@ function ModoContrarrelojFR({ nivel, onBack }) {
                 <h2 style={{...g.cardTitle,marginTop:12}}>Terminé !</h2>
                 <div style={{fontSize:'2.5rem',fontWeight:900,color:'#e74c3c',margin:'8px 0'}}>{score}</div>
                 <p style={{color:'#666'}}>Points totaux · {frasesDone+(results?1:0)} phrases analysées</p>
-                <button onClick={onBack} style={{...g.btnPrimary,width:'100%',justifyContent:'center',marginTop:16}}><RotateCcw size={16}/> Rejouer</button>
+                <div style={{display:'flex',gap:9,marginTop:16,justifyContent:'center'}}>
+                    <button onClick={()=>setMostrarEnvio(true)} style={{...g.btnPrimary,fontSize:'0.9rem'}}><Send size={14}/> Envoyer au professeur</button>
+                    <button onClick={onBack} style={{...g.btnGray,fontSize:'0.9rem'}}><RotateCcw size={16}/> Rejouer</button>
+                </div>
             </div></div>
+            {mostrarEnvio && <ModalEnviarProfe datos={{puntos:score,aciertos,total,porcentaje:total>0?Math.round(aciertos/total*100):0,nivel:NIVELES_FR.find(n=>n.id===nivel)?.label||'Tous',idioma:'FR',modalidad:'Contre-la-montre'}} onClose={()=>setMostrarEnvio(false)}/>}
         </div>
     );
     return (
@@ -1632,6 +1649,9 @@ function ModoLocal({ nivel, recurso, onBack }) {
     const [results, setResults] = useState(null);
     const [score, setScore]     = useState(0);
     const [animScore, setAnimScore] = useState(null);
+    const [mostrarEnvio, setMostrarEnvio] = useState(false);
+    const [aciertos, setAciertos] = useState(0);
+    const [total, setTotal]     = useState(0);
 
     useEffect(() => { setAnswers(frase.tokens.map(()=>[])); setResults(null); }, [frase]);
 
@@ -1647,7 +1667,9 @@ function ModoLocal({ nivel, recurso, onBack }) {
     const comprobar = () => {
         const r = comprobarFrase(frase.tokens, answers);
         const pts = r.reduce((a,x)=>a+x.puntos,0);
+        const ac = r.filter(x=>x.ok).length;
         setResults(r); setScore(s=>s+pts); setAnimScore(pts);
+        setAciertos(a=>a+ac); setTotal(t=>t+r.length);
         setTimeout(() => setAnimScore(null), 2000);
     };
 
@@ -1677,11 +1699,13 @@ function ModoLocal({ nivel, recurso, onBack }) {
                         <Desglose tokens={frase.tokens} results={results}/>
                         <div style={{display:'flex',gap:10,justifyContent:'center',marginTop:16,flexWrap:'wrap'}}>
                             <button onClick={siguiente} style={g.btnPrimary}><ChevronRight size={17}/> Siguiente Frase</button>
+                            <button onClick={()=>setMostrarEnvio(true)} style={g.btnPrimary}><Send size={15}/> Enviar al profesor</button>
                             <button onClick={onBack} style={g.btnGray}><BookOpen size={15}/> Cambiar Nivel</button>
                         </div>
                       </>
                 }
             </div>
+            {mostrarEnvio && <ModalEnviarProfe datos={{puntos:score,aciertos,total,porcentaje:total>0?Math.round(aciertos/total*100):0,nivel:NIVELES.find(n=>n.id===nivel)?.label||'Todos',idioma:'ES',modalidad:'Individual'}} onClose={()=>setMostrarEnvio(false)}/>}
         </div>
     );
 }
@@ -1702,6 +1726,9 @@ function ModoContrarreloj({ nivel, recurso, onBack }) {
     const [score, setScore]     = useState(0);
     const [frasesDone, setFrasesDone] = useState(0);
     const [timeLeft, setTimeLeft] = useState(DURACION);
+    const [mostrarEnvio, setMostrarEnvio] = useState(false);
+    const [aciertos, setAciertos] = useState(0);
+    const [total, setTotal]     = useState(0);
     const timerRef = useRef(null);
 
     const start = () => {
@@ -1709,6 +1736,7 @@ function ModoContrarreloj({ nivel, recurso, onBack }) {
         setFrase(f); setAnswers(f.tokens.map(()=>[])); setResults(null);
         setCatSel(Object.keys(CATEGORIAS)[0]);
         setScore(0); setFrasesDone(0); setTimeLeft(DURACION);
+        setAciertos(0); setTotal(0);
         setPhase('PLAYING');
         timerRef.current = setInterval(() => {
             setTimeLeft(t => { if (t <= 1) { clearInterval(timerRef.current); setPhase('FINISHED'); return 0; } return t - 1; });
@@ -1729,7 +1757,9 @@ function ModoContrarreloj({ nivel, recurso, onBack }) {
     const comprobar = () => {
         const r = comprobarFrase(frase.tokens, answers);
         const pts = r.reduce((a,x)=>a+x.puntos,0);
+        const ac = r.filter(x=>x.ok).length;
         setResults(r); setScore(s=>s+pts);
+        setAciertos(a=>a+ac); setTotal(t=>t+r.length);
     };
 
     const siguiente = () => {
@@ -1805,12 +1835,14 @@ function ModoContrarreloj({ nivel, recurso, onBack }) {
                             </div>
                         </div>
                         <div style={{display:'flex',gap:10,justifyContent:'center',flexWrap:'wrap'}}>
+                            <button onClick={()=>setMostrarEnvio(true)} style={g.btnPrimary}><Send size={15}/> Enviar al profesor</button>
                             <button onClick={start} style={g.btnPrimary}><RotateCcw size={16}/> Repetir</button>
                             <button onClick={onBack} style={g.btnGray}><BookOpen size={15}/> Cambiar modo</button>
                         </div>
                     </div>
                 </div>
             )}
+            {mostrarEnvio && <ModalEnviarProfe datos={{puntos:score,aciertos,total,porcentaje:total>0?Math.round(aciertos/total*100):0,nivel:NIVELES.find(n=>n.id===nivel)?.label||'Todos',idioma:'ES',modalidad:'Contrarreloj'}} onClose={()=>setMostrarEnvio(false)}/>}
         </div>
     );
 }

@@ -159,7 +159,7 @@ const generarPreguntasMatematicas = (config) => {
 
 
 
-export default function CazaBurbujasGame({ recurso, usuario, alTerminar, modoOlimpico = false, tiempoOlimpico = null, hojaOlimpica = 'General', onOlimpicoFinish = null }) {
+export default function CazaBurbujasGame({ recurso, usuario, alTerminar, modoOlimpico = false, tiempoOlimpico = null, hojaOlimpica = 'General', onOlimpicoFinish = null, autoStart = false, hojaInicial = null, modoJuegoInicial = 'Burbujas' }) {
     const [fase, setFase] = useState('SETUP');
     const [puntuacion, setPuntuacion] = useState(0);
     const [modo, setModo] = useState('Burbujas');
@@ -194,6 +194,13 @@ export default function CazaBurbujasGame({ recurso, usuario, alTerminar, modoOli
             iniciar('Burbujas', hojaOlimpica);
         }
     }, [modoOlimpico, recurso, fase, hojaOlimpica]);
+
+    // --- AUTO-START DEEP LINK ---
+    useEffect(() => {
+        if (autoStart && !modoOlimpico && recurso && fase === 'SETUP') {
+            iniciar(modoJuegoInicial, hojaInicial || 'General');
+        }
+    }, [autoStart, recurso, fase]);
 
     // --- INTERCEPTOR FINAL MODO OLÍMPICO ---
     const hasFinishedRef = useRef(false);
@@ -330,13 +337,16 @@ export default function CazaBurbujasGame({ recurso, usuario, alTerminar, modoOli
 
     if (fase === 'FIN') {
         return (
-            <PantallaFin 
-                puntuacion={puntuacion} 
-                guardarRanking={guardarRanking} 
-                guardando={guardando} 
+            <PantallaFin
+                puntuacion={puntuacion}
+                guardarRanking={guardarRanking}
+                guardando={guardando}
                 esInvitado={esInvitado}
-                alTerminar={alTerminar} 
-                playSound={playSound} 
+                alTerminar={alTerminar}
+                playSound={playSound}
+                modoOlimpico={modoOlimpico}
+                recurso={recurso}
+                hoja={hojaSeleccionada}
             />
         );
     }
@@ -361,6 +371,73 @@ export default function CazaBurbujasGame({ recurso, usuario, alTerminar, modoOli
 }
 
 // --- PANTALLAS AUXILIARES ---
+
+function ModalEnviarProfe({ datos, onClose }) {
+    const [codigo, setCodigo]   = useState('');
+    const [nombre, setNombre]   = useState('');
+    const [curso,  setCurso]    = useState('');
+    const [enviando, setEnviando] = useState(false);
+    const [enviado,  setEnviado]  = useState(false);
+    const [error,    setError]    = useState('');
+
+    const enviar = async () => {
+        const code = codigo.trim().toUpperCase();
+        if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+        if (!code) { setError('Escribe el código del profesor.'); return; }
+        setEnviando(true); setError('');
+        try {
+            const codigoDoc = await getDoc(doc(db, 'codigos_profesor', code));
+            if (!codigoDoc.exists()) { setError('Código no encontrado.'); setEnviando(false); return; }
+            await addDoc(collection(db, 'informes_juegos'), {
+                tipo: 'CAZABURBUJAS', modalidad: 'Individual', fecha: new Date(),
+                recursoId: datos.recursoId, recursoTitulo: datos.recursoTitulo,
+                hoja: datos.hoja, codigoProfesor: code,
+                jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), aciertos: datos.aciertos, fallos: 0, hoja: datos.hoja }],
+            });
+            setEnviado(true);
+        } catch(e) { setError('Error: ' + e.message); }
+        setEnviando(false);
+    };
+
+    return (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.75)', zIndex: 10000, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <div style={{ background: '#1e272e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, width: '100%', maxWidth: 380, padding: '26px 28px', boxShadow: '0 30px 80px rgba(0,0,0,0.7)', color: 'white', fontFamily: "'Segoe UI', sans-serif" }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+                    <h3 style={{ margin: 0, fontSize: '1.05rem', color: '#f1c40f' }}>📤 Enviar al profesor</h3>
+                    <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#aaa', fontSize: '1.2rem' }}>✕</button>
+                </div>
+                {enviado ? (
+                    <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                        <div style={{ fontSize: '3rem', marginBottom: 10 }}>✅</div>
+                        <div style={{ color: '#2ecc71', fontWeight: 700, fontSize: '1.1rem' }}>¡Informe enviado!</div>
+                        <div style={{ marginTop: 8, color: '#aaa', fontSize: '0.9rem' }}>{datos.aciertos} aciertos</div>
+                        <button onClick={onClose} style={{ marginTop: 16, padding: '9px 22px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer', color: 'white', fontFamily: 'inherit' }}>Cerrar</button>
+                    </div>
+                ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {[['nombre', 'Nombre y apellido', nombre, setNombre, 'Tu nombre completo', false],
+                          ['curso',  'Curso',             curso,  setCurso,  'Ej: 3º ESO A',       false],
+                          ['codigo', 'Código del profesor', codigo, v => setCodigo(v.toUpperCase()), 'Ej: PROF01', true]
+                        ].map(([key, label, val, setter, ph, mono]) => (
+                            <div key={key}>
+                                <label style={{ fontSize: '0.78rem', color: '#aaa', fontWeight: 600, display: 'block', marginBottom: 4 }}>{label}</label>
+                                <input value={val} onChange={e => setter(e.target.value)} placeholder={ph} maxLength={key==='codigo'?10:undefined}
+                                    style={{ padding: '9px 12px', borderRadius: 9, border: '1.5px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: 'white', fontSize: '0.9rem', outline: 'none', width: '100%', boxSizing: 'border-box', fontFamily: 'inherit', letterSpacing: mono ? 2 : 0, fontWeight: mono ? 700 : 400 }}/>
+                            </div>
+                        ))}
+                        {error && <div style={{ color: '#e74c3c', fontSize: '0.8rem' }}>⚠ {error}</div>}
+                        <div style={{ display: 'flex', gap: 9, marginTop: 4 }}>
+                            <button onClick={onClose} style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', cursor: 'pointer', color: 'white', fontFamily: 'inherit' }}>Cancelar</button>
+                            <button onClick={enviar} disabled={enviando} style={{ flex: 2, padding: '10px', borderRadius: 10, border: 'none', background: enviando ? '#555' : 'linear-gradient(135deg,#3498db,#2980b9)', color: 'white', fontWeight: 700, cursor: enviando ? 'default' : 'pointer', fontFamily: 'inherit' }}>
+                                {enviando ? 'Enviando…' : '📤 Enviar'}
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
 
 function PantallaSetup({ recurso, onStart, onRanking, onExit }) {
     const [hoja, setHoja] = useState('General');
@@ -464,8 +541,9 @@ function PantallaCuentaAtras({ hoja, profesor, instrucciones, playSound, onFinis
     );
 }
 
-function PantallaFin({ puntuacion, guardarRanking, guardando, esInvitado, alTerminar, playSound }) {
+function PantallaFin({ puntuacion, guardarRanking, guardando, esInvitado, alTerminar, playSound, modoOlimpico, recurso, hoja }) {
     const [nombreInvitado, setNombreInvitado] = useState('');
+    const [mostrarEnvio, setMostrarEnvio] = useState(false);
 
     useEffect(() => {
         playSound('WIN');
@@ -516,8 +594,20 @@ function PantallaFin({ puntuacion, guardarRanking, guardando, esInvitado, alTerm
                     </button>
                 )}
 
+            {!modoOlimpico && (
+                <button className="btn-success" onClick={() => setMostrarEnvio(true)}
+                    style={{ background: 'linear-gradient(135deg,#27ae60,#2ecc71)', marginTop: 6 }}>
+                    📤 Enviar al profesor
+                </button>
+            )}
             <button className="btn-back" onClick={alTerminar}>Salir</button>
             <EstilosComunes />
+            {mostrarEnvio && (
+                <ModalEnviarProfe
+                    datos={{ recursoId: recurso.id, recursoTitulo: recurso.titulo, hoja, aciertos: puntuacion }}
+                    onClose={() => setMostrarEnvio(false)}
+                />
+            )}
         </div>
     );
 }

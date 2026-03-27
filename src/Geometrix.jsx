@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { RotateCcw, CheckCircle, XCircle, Trophy, ArrowRight, Calculator, Ruler, Play, Users, Loader, Monitor, Copy, Save, ArrowUp } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { db } from './firebase';
-import { doc, setDoc, updateDoc, onSnapshot, increment, collection, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, onSnapshot, increment, collection, writeBatch, addDoc, getDoc } from 'firebase/firestore';
+import { bibliotecaGeometria } from './BibliotecaGeometria';
 
 // --- AUDIOS Y AVATARES (Estética MathLive) ---
 import correctSoundFile from './assets/correct-choice-43861.mp3';
@@ -197,6 +200,309 @@ const generarProblemaData = (modoRegla = false, bag = null, cfg = DEFAULT_GAME_C
     return { shape, text, type, unit, params, correctAnswer: parseFloat(correctAnswer.toFixed(2)), correctExp, formula };
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// FIGURAS COMPUESTAS — 3D renderer (Three.js) + Modal
+// ─────────────────────────────────────────────────────────────────────────────
+function construirFigura3D(figura, group) {
+    const m = figura.medidas;
+    const key = figura.componentes.join(',');
+    const COLORS = [0x3498db, 0xe67e22, 0x9b59b6, 0x2ecc71];
+    const wireMat = new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.2 });
+    let ci = 0;
+    const nextMat = () => new THREE.MeshStandardMaterial({ color: COLORS[ci++ % COLORS.length], roughness: 0.5, metalness: 0.05 });
+
+    const add = (geo, mat, px = 0, py = 0, pz = 0, rx = 0, ry = 0, rz = 0) => {
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(px, py, pz);
+        mesh.rotation.set(rx, ry, rz);
+        mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo), wireMat));
+        group.add(mesh);
+        return mesh;
+    };
+
+    if (key === 'Cilindro,Cono') {
+        add(new THREE.CylinderGeometry(m.radio, m.radio, m.alturaCilindro, 32), nextMat(), 0, m.alturaCilindro / 2);
+        add(new THREE.ConeGeometry(m.radio, m.alturaCono, 32), nextMat(), 0, m.alturaCilindro + m.alturaCono / 2);
+
+    } else if (key === 'Prisma Cuadrangular,Pirámide') {
+        add(new THREE.BoxGeometry(m.lado, m.alturaPrisma, m.lado), nextMat(), 0, m.alturaPrisma / 2);
+        add(new THREE.ConeGeometry(m.lado / Math.sqrt(2), m.alturaPiramide, 4), nextMat(), 0, m.alturaPrisma + m.alturaPiramide / 2, 0, 0, Math.PI / 4);
+
+    } else if (key === 'Cilindro,Semiesfera') {
+        add(new THREE.CylinderGeometry(m.radio, m.radio, m.alturaCilindro, 32), nextMat(), 0, m.alturaCilindro / 2);
+        add(new THREE.SphereGeometry(m.radio, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), nextMat(), 0, m.alturaCilindro);
+
+    } else if (key === 'Prisma Rectangular,Cilindro') {
+        add(new THREE.BoxGeometry(m.largo, m.alturaPrisma, m.ancho), nextMat(), 0, m.alturaPrisma / 2);
+        add(new THREE.CylinderGeometry(m.radioCilindro, m.radioCilindro, m.alturaCilindro, 32), nextMat(), 0, m.alturaPrisma + m.alturaCilindro / 2);
+
+    } else if (key === 'Cono,Cono') {
+        add(new THREE.ConeGeometry(m.radio, m.alturaConos, 32), nextMat(), 0, m.alturaConos / 2);
+        add(new THREE.ConeGeometry(m.radio, m.alturaConos, 32), nextMat(), 0, -m.alturaConos / 2, 0, Math.PI);
+
+    } else if (key === 'Semiesfera,Cilindro,Cono') {
+        // Eraser (dome down), body, tip
+        add(new THREE.SphereGeometry(m.radio, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), nextMat(), 0, 0, 0, Math.PI);
+        add(new THREE.CylinderGeometry(m.radio, m.radio, m.alturaCilindro, 32), nextMat(), 0, m.alturaCilindro / 2);
+        add(new THREE.ConeGeometry(m.radio, m.alturaCono, 32), nextMat(), 0, m.alturaCilindro + m.alturaCono / 2);
+
+    } else if (key === 'Prisma Rectangular,Prisma Triangular') {
+        add(new THREE.BoxGeometry(m.largo, m.alturaPrisma, m.ancho), nextMat(), 0, m.alturaPrisma / 2);
+        const shape = new THREE.Shape();
+        shape.moveTo(-m.ancho / 2, 0); shape.lineTo(m.ancho / 2, 0); shape.lineTo(0, m.alturaTriangulo); shape.closePath();
+        const extGeo = new THREE.ExtrudeGeometry(shape, { depth: m.largo, bevelEnabled: false });
+        extGeo.translate(0, 0, -m.largo / 2);
+        add(extGeo, nextMat(), 0, m.alturaPrisma, 0, 0, Math.PI / 2);
+
+    } else if (key === 'Prisma Cuadrangular,Cilindro,Semiesfera') {
+        add(new THREE.BoxGeometry(m.ladoPrisma, m.alturaPrisma, m.ladoPrisma), nextMat(), 0, m.alturaPrisma / 2);
+        add(new THREE.CylinderGeometry(m.radio, m.radio, m.alturaCilindro, 32), nextMat(), 0, m.alturaPrisma + m.alturaCilindro / 2);
+        add(new THREE.SphereGeometry(m.radio, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), nextMat(), 0, m.alturaPrisma + m.alturaCilindro);
+
+    } else if (key === 'Cilindro,Cilindro') {
+        add(new THREE.CylinderGeometry(m.radioMayor, m.radioMayor, m.alturaMayor, 32), nextMat(), 0, m.alturaMayor / 2);
+        add(new THREE.CylinderGeometry(m.radioMenor, m.radioMenor, m.alturaMenor, 32), nextMat(), 0, m.alturaMayor + m.alturaMenor / 2);
+
+    } else {
+        // Pedestales: Prisma Rectangular + Prisma Rectangular
+        add(new THREE.BoxGeometry(m.l1, m.h1, m.w1), nextMat(), 0, m.h1 / 2);
+        add(new THREE.BoxGeometry(m.l2, m.h2, m.w2), nextMat(), 0, m.h1 + m.h2 / 2);
+    }
+}
+
+function Figura3D({ figura }) {
+    const containerRef = useRef(null);
+
+    useEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
+        const W = el.clientWidth || 400;
+        const H = 280;
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xeef2ff);
+
+        const camera = new THREE.PerspectiveCamera(50, W / H, 0.1, 2000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(W, H);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        el.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.08;
+
+        scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+        const dl = new THREE.DirectionalLight(0xffffff, 0.9);
+        dl.position.set(10, 20, 10);
+        scene.add(dl);
+        const dl2 = new THREE.DirectionalLight(0x88aaff, 0.3);
+        dl2.position.set(-10, 5, -10);
+        scene.add(dl2);
+
+        const group = new THREE.Group();
+        construirFigura3D(figura, group);
+        scene.add(group);
+
+        // Grid + camera auto-fit
+        const box3 = new THREE.Box3().setFromObject(group);
+        const center = box3.getCenter(new THREE.Vector3());
+        const size3 = box3.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size3.x, size3.y, size3.z);
+
+        const grid = new THREE.GridHelper(maxDim * 4, 10, 0xbbbbbb, 0xdddddd);
+        grid.position.y = box3.min.y - 0.01;
+        scene.add(grid);
+
+        const dist = maxDim * 2.5;
+        camera.position.set(center.x + dist * 0.7, center.y + dist * 0.6, center.z + dist * 0.7);
+        controls.target.copy(center);
+        controls.update();
+
+        let animId;
+        const animate = () => { animId = requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); };
+        animate();
+
+        const onResize = () => {
+            const nW = el.clientWidth;
+            renderer.setSize(nW, H);
+            camera.aspect = nW / H;
+            camera.updateProjectionMatrix();
+        };
+        window.addEventListener('resize', onResize);
+
+        return () => {
+            cancelAnimationFrame(animId);
+            window.removeEventListener('resize', onResize);
+            controls.dispose();
+            renderer.dispose();
+            if (el.contains(renderer.domElement)) el.removeChild(renderer.domElement);
+        };
+    }, [figura.id]);
+
+    return <div ref={containerRef} style={{ width: '100%', height: 280, borderRadius: 12, overflow: 'hidden', cursor: 'grab' }} />;
+}
+
+function ModalFigurasCompuestas({ usuario, onClose }) {
+    const [figura, setFigura] = useState(() => bibliotecaGeometria[Math.floor(Math.random() * bibliotecaGeometria.length)]);
+    const [inputArea, setInputArea] = useState('');
+    const [inputVol, setInputVol] = useState('');
+    const [resultado, setResultado] = useState(null);
+    const [mostrarEnvio, setMostrarEnvio] = useState(false);
+    const [codigoProfe, setCodigoProfe] = useState('');
+    const [enviando, setEnviando] = useState(false);
+    const [enviado, setEnviado] = useState(false);
+    const [errorEnvio, setErrorEnvio] = useState('');
+
+    const nuevaFigura = () => {
+        setFigura(bibliotecaGeometria[Math.floor(Math.random() * bibliotecaGeometria.length)]);
+        setInputArea(''); setInputVol(''); setResultado(null);
+        setMostrarEnvio(false); setEnviado(false); setErrorEnvio('');
+    };
+
+    const comprobar = () => {
+        const a = parseFloat(inputArea.replace(',', '.'));
+        const v = parseFloat(inputVol.replace(',', '.'));
+        if (isNaN(a) || isNaN(v)) return;
+        const tolA = Math.max(figura.area * 0.02, 0.5);
+        const tolV = Math.max(figura.volumen * 0.02, 0.5);
+        setResultado({
+            areaOk: Math.abs(a - figura.area) <= tolA,
+            volOk: Math.abs(v - figura.volumen) <= tolV,
+            areaEsp: figura.area.toFixed(2),
+            volEsp: figura.volumen.toFixed(2),
+        });
+    };
+
+    const enviarAlProfe = async () => {
+        if (!codigoProfe.trim()) return;
+        setEnviando(true); setErrorEnvio('');
+        try {
+            const snap = await getDoc(doc(db, 'codigos_profesor', codigoProfe.toUpperCase().trim()));
+            if (!snap.exists()) { setErrorEnvio('Código de profesor no encontrado.'); setEnviando(false); return; }
+            const res = resultado.areaOk && resultado.volOk ? '100%' : !resultado.areaOk && !resultado.volOk ? 'Falla área y volumen' : !resultado.areaOk ? 'Falla área' : 'Falla volumen';
+            await addDoc(collection(db, 'informes_juegos'), {
+                tipo: 'GEOMETRIX_COMPUESTO', modalidad: 'Individual',
+                codigoProfesor: codigoProfe.toUpperCase().trim(),
+                profesorUid: snap.data().uid || null,
+                alumno: usuario?.displayName || 'Anónimo', alumnoUid: usuario?.uid || null,
+                figuraId: figura.id, figuraNombre: figura.nombre,
+                areaOk: resultado.areaOk, volumenOk: resultado.volOk, resultado: res,
+                fecha: new Date().toISOString(), timestamp: Date.now(),
+            });
+            setEnviado(true);
+        } catch { setErrorEnvio('Error al enviar. Inténtalo de nuevo.'); }
+        setEnviando(false);
+    };
+
+    const borderColor = (ok) => ok ? '#2ecc71' : '#e74c3c';
+
+    return (
+        <div style={sLive.overlay}>
+            <div style={{ ...sLive.modal, maxWidth: 560, position: 'relative' }}>
+                <button onClick={onClose} style={{ position: 'absolute', top: 12, right: 14, background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#aaa' }}>✕</button>
+                <h2 style={{ textAlign: 'center', color: '#2c3e50', margin: '0 0 4px', fontSize: '1.3rem' }}>🏗️ Figuras Compuestas</h2>
+                <div style={{ textAlign: 'center', marginBottom: 14 }}>
+                    <span style={{ fontWeight: 'bold', color: '#009688', fontSize: '0.82rem' }}>{figura.id}</span>{' — '}
+                    <span style={{ fontWeight: 'bold', fontSize: '1rem', color: '#2c3e50' }}>{figura.nombre}</span>
+                    <div style={{ color: '#888', fontSize: '0.78rem', marginTop: 2 }}>Componentes: {figura.componentes.join(' + ')}</div>
+                </div>
+
+                {/* 3D figure viewer */}
+                <div style={{ marginBottom: 10 }}>
+                    <Figura3D figura={figura} />
+                    <p style={{ textAlign: 'center', margin: '4px 0 0', fontSize: '0.75rem', color: '#aaa' }}>🖱️ Arrastra para rotar · Rueda para zoom</p>
+                </div>
+
+                {/* Medidas */}
+                <div style={{ background: '#f8f9fa', borderRadius: 10, padding: '8px 14px', marginBottom: 12, fontSize: '0.8rem', color: '#555', textAlign: 'center' }}>
+                    <strong>Medidas: </strong>
+                    {Object.entries(figura.medidas).map(([k, v]) => `${k} = ${v}`).join(' | ')}
+                    <span style={{ color: '#aaa' }}> (u)</span>
+                </div>
+
+                {/* Inputs */}
+                <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
+                    <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: '0.83rem', fontWeight: 'bold', color: '#555', display: 'block', marginBottom: 4 }}>📐 Área (u²)</label>
+                        <input type="number" step="0.01" value={inputArea} onChange={e => setInputArea(e.target.value)}
+                            placeholder="Tu respuesta..." style={{ width: '100%', padding: '9px', borderRadius: 8, border: `2px solid ${resultado ? borderColor(resultado.areaOk) : '#ccc'}`, fontSize: '1rem', outline: 'none', boxSizing: 'border-box' }} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: '0.83rem', fontWeight: 'bold', color: '#555', display: 'block', marginBottom: 4 }}>🧊 Volumen (u³)</label>
+                        <input type="number" step="0.01" value={inputVol} onChange={e => setInputVol(e.target.value)}
+                            placeholder="Tu respuesta..." style={{ width: '100%', padding: '9px', borderRadius: 8, border: `2px solid ${resultado ? borderColor(resultado.volOk) : '#ccc'}`, fontSize: '1rem', outline: 'none', boxSizing: 'border-box' }} />
+                    </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: 10, marginBottom: 14, justifyContent: 'center' }}>
+                    <button onClick={comprobar} disabled={!inputArea || !inputVol}
+                        style={{ background: '#009688', color: 'white', border: 'none', padding: '10px 24px', borderRadius: 20, fontWeight: 'bold', cursor: 'pointer', fontSize: '0.95rem' }}>
+                        ✔️ Comprobar
+                    </button>
+                    <button onClick={nuevaFigura}
+                        style={{ background: '#9b59b6', color: 'white', border: 'none', padding: '10px 20px', borderRadius: 20, fontWeight: 'bold', cursor: 'pointer', fontSize: '0.95rem' }}>
+                        🔀 Nueva figura
+                    </button>
+                </div>
+
+                {/* Feedback */}
+                {resultado && (
+                    <div style={{ marginBottom: 14 }}>
+                        <div style={{ background: resultado.areaOk ? '#d4edda' : '#fde8e8', border: `2px solid ${borderColor(resultado.areaOk)}`, borderRadius: 10, padding: '10px 14px', marginBottom: 8 }}>
+                            <div style={{ fontWeight: 'bold', color: resultado.areaOk ? '#27ae60' : '#c0392b' }}>
+                                {resultado.areaOk ? `✅ Área correcta (${resultado.areaEsp} u²)` : `❌ Área incorrecta — esperado: ${resultado.areaEsp} u²`}
+                            </div>
+                            {!resultado.areaOk && (
+                                <pre style={{ margin: '6px 0 0', fontSize: '0.78rem', color: '#c0392b', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{figura.feedback.pasosArea}</pre>
+                            )}
+                        </div>
+                        <div style={{ background: resultado.volOk ? '#d4edda' : '#fde8e8', border: `2px solid ${borderColor(resultado.volOk)}`, borderRadius: 10, padding: '10px 14px' }}>
+                            <div style={{ fontWeight: 'bold', color: resultado.volOk ? '#27ae60' : '#c0392b' }}>
+                                {resultado.volOk ? `✅ Volumen correcto (${resultado.volEsp} u³)` : `❌ Volumen incorrecto — esperado: ${resultado.volEsp} u³`}
+                            </div>
+                            {!resultado.volOk && (
+                                <pre style={{ margin: '6px 0 0', fontSize: '0.78rem', color: '#c0392b', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{figura.feedback.pasosVolumen}</pre>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Enviar al profe */}
+                {resultado && !enviado && (
+                    <div>
+                        {!mostrarEnvio ? (
+                            <button onClick={() => setMostrarEnvio(true)}
+                                style={{ width: '100%', background: 'linear-gradient(135deg,#27ae60,#2ecc71)', color: 'white', border: 'none', padding: '11px 20px', borderRadius: 20, fontWeight: 'bold', cursor: 'pointer', fontSize: '0.95rem' }}>
+                                📤 Enviar al profesor
+                            </button>
+                        ) : (
+                            <div style={{ background: '#f0faf5', border: '1px solid #2ecc71', borderRadius: 12, padding: 14 }}>
+                                <p style={{ margin: '0 0 8px', fontWeight: 'bold', fontSize: '0.88rem', color: '#2c3e50' }}>Código del profesor:</p>
+                                <div style={{ display: 'flex', gap: 8 }}>
+                                    <input type="text" value={codigoProfe} onChange={e => setCodigoProfe(e.target.value.toUpperCase())}
+                                        placeholder="XXXXXX" maxLength={6}
+                                        style={{ flex: 1, padding: '9px 12px', borderRadius: 8, border: '2px solid #2ecc71', textAlign: 'center', fontSize: '1.1rem', outline: 'none', letterSpacing: 3 }} />
+                                    <button onClick={enviarAlProfe} disabled={enviando || !codigoProfe.trim()}
+                                        style={{ background: '#27ae60', color: 'white', border: 'none', padding: '9px 18px', borderRadius: 8, fontWeight: 'bold', cursor: 'pointer' }}>
+                                        {enviando ? '⏳' : '📤 Enviar'}
+                                    </button>
+                                </div>
+                                {errorEnvio && <p style={{ color: '#e74c3c', fontSize: '0.83rem', margin: '6px 0 0' }}>{errorEnvio}</p>}
+                            </div>
+                        )}
+                    </div>
+                )}
+                {enviado && (
+                    <div style={{ background: '#d4edda', border: '2px solid #2ecc71', borderRadius: 12, padding: 12, textAlign: 'center', color: '#27ae60', fontWeight: 'bold', fontSize: '0.95rem' }}>
+                        ✅ Informe enviado al profesor
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
 const generarCodigo = () => Array.from({ length: 6 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
 
 // Genera un problema garantizando que no se repite la misma figura con las mismas medidas en la sesión
@@ -255,6 +561,7 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
     const [isMobile, setIsMobile] = useState(false);
     const [drawMode, setDrawMode] = useState(false);
     const [showCalc, setShowCalc] = useState(false);
+    const [showFigurasCompuestas, setShowFigurasCompuestas] = useState(false);
 
     // Modo 3 config
     const [showGameConfig, setShowGameConfig] = useState(false);
@@ -457,6 +764,11 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
     return (
         <div style={sLocal.container}>
 
+            {/* ── MODAL FIGURAS COMPUESTAS ── */}
+            {showFigurasCompuestas && (
+                <ModalFigurasCompuestas usuario={usuario} onClose={() => setShowFigurasCompuestas(false)} />
+            )}
+
             {/* ── MODAL CONFIG MODO 3 ── */}
             {showGameConfig && (
                 <div style={sLive.overlay}>
@@ -558,6 +870,11 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
                         {/* Modo 3 */}
                         <button onClick={abrirConfigModo3} style={{ ...sLocal.btnPrimary, background: '#009688' }}>
                             ⚙️ Modo Configurado <span style={{ fontSize: '0.8rem', opacity: 0.85 }}>(elige tipos y figuras)</span>
+                        </button>
+
+                        {/* Figuras Compuestas */}
+                        <button onClick={() => setShowFigurasCompuestas(true)} style={{ ...sLocal.btnPrimary, background: '#e74c3c' }}>
+                            🏗️ Figuras Compuestas <span style={{ fontSize: '0.8rem', opacity: 0.85 }}>(área y volumen)</span>
                         </button>
 
                         <div style={{ width: '100%', maxWidth: 320, height: 2, background: '#eee', margin: '6px 0' }} />

@@ -4,7 +4,8 @@ import { signOut, onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import ProfesorDashboard from './ProfesorDashboard';
 import StudentDashboard2 from './StudentDashboard2';
-import Login from './Login'; // <--- IMPORTAMOS EL NUEVO DISEÑO
+import Login from './Login';
+import GamePlayer from './GamePlayer';
 
 function App() {
     const [usuario, setUsuario] = useState(null);
@@ -13,12 +14,29 @@ function App() {
 
     // ESTADO PARA EL TOKEN DE DRIVE
     const [googleToken, setGoogleToken] = useState(null);
+    const [deepLinkGame, setDeepLinkGame] = useState(null);
 
     // ESTADOS PARA UBICACIÓN
     const [pais, setPais] = useState("");
     const [region, setRegion] = useState("");
     const [poblacion, setPoblacion] = useState("");
     const [temas, setTemas] = useState("");
+    // DETECTAR DEEP LINK AL MONTAR (funciona para todos: registrados, sin registrar, invitados)
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const recursoId = params.get('r');
+        if (!recursoId) return;
+        getDoc(doc(db, 'resources', recursoId)).then(snap => {
+            if (snap.exists()) {
+                setDeepLinkGame({
+                    recurso: { id: snap.id, ...snap.data() },
+                    hoja: params.get('h') || 'General',
+                    modoInicial: params.get('m') || null
+                });
+            }
+        }).catch(e => console.error('Deep link error:', e));
+    }, []);
+
     // 1. ESCUCHAR SI EL USUARIO YA ESTABA LOGUEADO
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -83,7 +101,19 @@ function App() {
         setPais(""); setRegion(""); setPoblacion("");
     };
 
-    if (cargando) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Cargando...</div>;
+    if (cargando && !deepLinkGame) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Cargando...</div>;
+
+    // DEEP LINK: abrir juego directamente (funciona para todos, incluso sin cuenta)
+    if (deepLinkGame) {
+        return <GamePlayer
+            recurso={deepLinkGame.recurso}
+            usuario={usuario}
+            alTerminar={() => setDeepLinkGame(null)}
+            autoStart={true}
+            hojaInicial={deepLinkGame.hoja}
+            modoInicial={deepLinkGame.modoInicial}
+        />;
+    }
 
     // SI NO HAY USUARIO, MOSTRAMOS EL NUEVO LOGIN
     if (!usuario) {

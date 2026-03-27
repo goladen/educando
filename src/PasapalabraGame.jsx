@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect, useRef } from 'react';
 import { db } from './firebase';
-import { doc, updateDoc, addDoc, collection, query, where, getDocs, orderBy, limit, getCountFromServer,increment } from 'firebase/firestore';
+import { doc, updateDoc, addDoc, getDoc, collection, query, where, getDocs, orderBy, limit, getCountFromServer,increment } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
 
 // --- IMPORTACIÓN DE AUDIOS ---
@@ -157,7 +157,75 @@ const STYLES = `
   @media (max-width: 700px) { #game-container { transform: scale(0.6); } }
 `;
 
-export default function PasapalabraGame({ recurso, usuario, alTerminar, modoOlimpico = false, tiempoOlimpico = null, onOlimpicoFinish = null, hojaOlimpica = 'General'  }) {
+// ─── Modal Enviar al Profesor ─────────────────────────────────────────────────
+function ModalEnviarProfe({ datos, onClose }) {
+    const [codigo, setCodigo]   = useState('');
+    const [nombre, setNombre]   = useState('');
+    const [curso,  setCurso]    = useState('');
+    const [enviando, setEnviando] = useState(false);
+    const [enviado,  setEnviado]  = useState(false);
+    const [error,    setError]    = useState('');
+
+    const enviar = async () => {
+        const code = codigo.trim().toUpperCase();
+        if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+        if (!code) { setError('Escribe el código del profesor.'); return; }
+        setEnviando(true); setError('');
+        try {
+            const codigoDoc = await getDoc(doc(db, 'codigos_profesor', code));
+            if (!codigoDoc.exists()) { setError('Código no encontrado.'); setEnviando(false); return; }
+            await addDoc(collection(db, 'informes_juegos'), {
+                tipo: 'PASAPALABRA', modalidad: 'Individual', fecha: new Date(),
+                recursoId: datos.recursoId, recursoTitulo: datos.recursoTitulo,
+                hoja: datos.hoja, codigoProfesor: code,
+                jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), aciertos: datos.aciertos, fallos: datos.fallos, hoja: datos.hoja }],
+            });
+            setEnviado(true);
+        } catch(e) { setError('Error: ' + e.message); }
+        setEnviando(false);
+    };
+
+    return (
+        <div className="modal-overlay" style={{ zIndex: 10000 }}>
+            <div style={{ background: '#1e272e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, width: '100%', maxWidth: 380, padding: '26px 28px', boxShadow: '0 30px 80px rgba(0,0,0,0.7)', color: 'white', fontFamily: "'Segoe UI', sans-serif" }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+                    <h3 style={{ margin: 0, fontSize: '1.05rem', color: '#f1c40f' }}>📤 Enviar al profesor</h3>
+                    <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#aaa', fontSize: '1.2rem' }}>✕</button>
+                </div>
+                {enviado ? (
+                    <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                        <div style={{ fontSize: '3rem', marginBottom: 10 }}>✅</div>
+                        <div style={{ color: '#2ecc71', fontWeight: 700, fontSize: '1.1rem' }}>¡Informe enviado!</div>
+                        <div style={{ marginTop: 8, color: '#aaa', fontSize: '0.9rem' }}>{datos.aciertos} aciertos · {datos.fallos} fallos</div>
+                        <button onClick={onClose} style={{ marginTop: 16, padding: '9px 22px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer', color: 'white', fontFamily: 'inherit' }}>Cerrar</button>
+                    </div>
+                ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {[['nombre', 'Nombre y apellido', nombre, setNombre, 'Tu nombre completo', false],
+                          ['curso',  'Curso',             curso,  setCurso,  'Ej: 3º ESO A',       false],
+                          ['codigo', 'Código del profesor', codigo, v => setCodigo(v.toUpperCase()), 'Ej: PROF01', true]
+                        ].map(([key, label, val, setter, ph, mono]) => (
+                            <div key={key}>
+                                <label style={{ fontSize: '0.78rem', color: '#aaa', fontWeight: 600, display: 'block', marginBottom: 4 }}>{label}</label>
+                                <input value={val} onChange={e => setter(e.target.value)} placeholder={ph} maxLength={key==='codigo'?10:undefined}
+                                    style={{ padding: '9px 12px', borderRadius: 9, border: '1.5px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: 'white', fontSize: '0.9rem', outline: 'none', width: '100%', boxSizing: 'border-box', fontFamily: 'inherit', letterSpacing: mono ? 2 : 0, fontWeight: mono ? 700 : 400 }}/>
+                            </div>
+                        ))}
+                        {error && <div style={{ color: '#e74c3c', fontSize: '0.8rem' }}>⚠ {error}</div>}
+                        <div style={{ display: 'flex', gap: 9, marginTop: 4 }}>
+                            <button onClick={onClose} style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', cursor: 'pointer', color: 'white', fontFamily: 'inherit' }}>Cancelar</button>
+                            <button onClick={enviar} disabled={enviando} style={{ flex: 2, padding: '10px', borderRadius: 10, border: 'none', background: enviando ? '#555' : 'linear-gradient(135deg,#3498db,#2980b9)', color: 'white', fontWeight: 700, cursor: enviando ? 'default' : 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+                                {enviando ? 'Enviando…' : '📤 Enviar'}
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+export default function PasapalabraGame({ recurso, usuario, alTerminar, modoOlimpico = false, tiempoOlimpico = null, onOlimpicoFinish = null, hojaOlimpica = 'General', autoStart = false, hojaInicial = null }) {
     const [fase, setFase] = useState('SETUP');
     const [modoDuelo, setModoDuelo] = useState(false);
     const [hojaSeleccionada, setHojaSeleccionada] = useState('General');
@@ -192,14 +260,13 @@ export default function PasapalabraGame({ recurso, usuario, alTerminar, modoOlim
         }
     };
     
-    // --- 1. AUTO-START MODO OLÍMPICO ---
+    // --- 1. AUTO-START MODO OLÍMPICO y ENLACE DIRECTO ---
     useEffect(() => {
-        // En tu juego, la fase inicial es SETUP, y para arrancar hay que llamar a iniciar()
-        // para que cree el rosco y los jugadores correctamente.
-        if (modoOlimpico && recurso && fase === 'SETUP') {
-            iniciar(false, hojaOlimpica || 'General');
+        if (recurso && fase === 'SETUP') {
+            if (modoOlimpico) iniciar(false, hojaOlimpica || 'General');
+            else if (autoStart) iniciar(false, hojaInicial || 'General');
         }
-    }, [modoOlimpico, recurso, fase]);
+    }, [modoOlimpico, autoStart, recurso, fase]);
 
     // --- 2. INTERCEPTOR FINAL MODO OLÍMPICO ---
    
@@ -333,7 +400,8 @@ export default function PasapalabraGame({ recurso, usuario, alTerminar, modoOlim
                     hoja={hojaSeleccionada}
                     usuario={usuario}
                     modoDuelo={modoDuelo}
-                    esInvitado={esInvitado} // Pasar estado invitado
+                    modoOlimpico={modoOlimpico}
+                    esInvitado={esInvitado}
                     playSound={playSound}
                     onExit={alTerminar}
                 />
@@ -345,7 +413,17 @@ export default function PasapalabraGame({ recurso, usuario, alTerminar, modoOlim
 // --- PANTALLAS AUXILIARES ---
 const PantallaSetup = ({ recurso, onStart, onRanking, onExit }) => {
     const [hoja, setHoja] = useState('General');
+    const [copiado, setCopiado] = useState(false);
     const hojasDisponibles = recurso.hojas ? recurso.hojas.map(h => h.nombreHoja) : [];
+
+    const copiarEnlace = () => {
+        const url = `${window.location.origin}/?r=${recurso.id}&h=${encodeURIComponent(hoja)}`;
+        navigator.clipboard.writeText(url).then(() => {
+            setCopiado(true);
+            setTimeout(() => setCopiado(false), 2500);
+        });
+    };
+
     return (
         <div className="card-menu">
             <h1 style={{ color: '#f1c40f', fontFamily: 'sans-serif', margin: 0 }}>Pasapalabra</h1>
@@ -362,6 +440,10 @@ const PantallaSetup = ({ recurso, onStart, onRanking, onExit }) => {
             <button className="btn-primary" onClick={() => onStart(false, hoja)}>👤 1 JUGADOR</button>
             <button className="btn-duel" onClick={() => onStart(true, hoja)}>⚔️ DUELO (2J)</button>
             <button className="btn-ranking" onClick={onRanking}>🏆 RANKING</button>
+            <button onClick={copiarEnlace}
+                style={{ width: '100%', padding: '11px', marginBottom: '12px', border: '1.5px solid rgba(255,255,255,0.25)', borderRadius: '30px', background: copiado ? 'rgba(39,174,96,0.3)' : 'rgba(255,255,255,0.08)', color: copiado ? '#2ecc71' : '#ccc', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.95rem', transition: '0.3s' }}>
+                {copiado ? '✅ ¡Enlace copiado!' : '🔗 Copiar enlace directo'}
+            </button>
             <button className="btn-back" onClick={onExit}>Volver</button>
         </div>
     );
@@ -626,9 +708,10 @@ const Tablero = ({ jugadores, setJugadores, turno, setTurno, modoDuelo, playSoun
 
 // --- PANTALLA FIN ---
 // --- PANTALLA FIN ---
-const PantallaFin = ({ jugadores, recurso, hoja, usuario, modoDuelo, esInvitado, playSound, onExit }) => {
+const PantallaFin = ({ jugadores, recurso, hoja, usuario, modoDuelo, modoOlimpico, esInvitado, playSound, onExit }) => {
     const [guardando, setGuardando] = useState(false);
-    const [nombreInvitado, setNombreInvitado] = useState(''); // <--- NUEVO ESTADO PARA INVITADOS
+    const [nombreInvitado, setNombreInvitado] = useState('');
+    const [mostrarEnvio, setMostrarEnvio] = useState(false);
 
     useEffect(() => {
         playSound('WIN');
@@ -761,9 +844,25 @@ const PantallaFin = ({ jugadores, recurso, hoja, usuario, modoDuelo, esInvitado,
                 </>
             )}
 
+            {/* Enviar al profesor — solo modo individual (no duelo, no olímpico) */}
+            {!modoDuelo && !modoOlimpico && (
+                <button className="btn-primary"
+                    style={{ background: 'linear-gradient(135deg,#27ae60,#2ecc71)', marginTop: 6 }}
+                    onClick={() => setMostrarEnvio(true)}>
+                    📤 Enviar al profesor
+                </button>
+            )}
+
             <button className="btn-back" onClick={onExit}>
                 {modoDuelo ? 'Salir' : 'Salir sin guardar'}
             </button>
+
+            {mostrarEnvio && (
+                <ModalEnviarProfe
+                    datos={{ recursoId: recurso.id, recursoTitulo: recurso.titulo, hoja, aciertos: jugadores[0].aciertos, fallos: jugadores[0].fallos }}
+                    onClose={() => setMostrarEnvio(false)}
+                />
+            )}
         </div>
     );
 };

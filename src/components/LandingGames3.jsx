@@ -1,7 +1,7 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, setDoc } from 'firebase/firestore';
-import { Search, Key, Filter, Zap, Play, Home, ChevronDown, ChevronUp, Mail } from 'lucide-react';
+import { Search, Key, Filter, Zap, Play, Home, ChevronDown, ChevronUp, Mail, Link2 } from 'lucide-react';
 import GamePlayer from '../GamePlayer';
 import ThinkHootGame from '../ThinkHootGame';
 import RuletaGame from '../RuletaGame';
@@ -386,7 +386,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
     };
     const abrirJuego = (appId) => {
 
-        
+
             // Si pinchan en el portal, cambiamos de pantalla y CREAMOS LA URL
         if (appId === 'MATH_WORLD_PORTAL') {
             setZonaActiva('MATH');
@@ -398,6 +398,12 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
         if (appInfo) {
             window.history.pushState({}, '', `/${appInfo.name.toLowerCase()}`);
             window.dispatchEvent(new Event('popstate'));
+        }
+
+        // Para apps de Math World (isMath), activar el juego directamente
+        if (appInfo?.isMath) {
+            setJuegoActivo({ tipoJuego: appId });
+            return;
         }
     };
 
@@ -503,6 +509,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
 if (juegoActivo.tipoJuego === 'SINTAXIS')  return <SintaxisGame  usuario={usuario} onExit={() => setJuegoActivo(null)} />;
 if (juegoActivo.tipoJuego === 'LISTENING') return <Listening     usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.modoEspecial === 'PIKATRON') return <PikatronRun recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.modoEspecial === 'PLATAFORMAS') return <Plataformas onExit={() => setJuegoActivo(null)} recursoInicial={juegoActivo} />;
         if (juegoActivo.tipoJuego === 'RULETA') return <RuletaGame recurso={juegoActivo} usuario={null} alTerminar={() => setJuegoActivo(null)} />;
 
         // --- CORRECCIÓN: Quitamos appData porque aquí no existe ---
@@ -574,6 +581,7 @@ return <GamePlayer recurso={juegoActivo} usuario={null} alTerminar={() => setJue
                                 <>
                                     <button onClick={() => { setJuegoActivo({ ...recursoParaElegir, modoEspecial: 'CAZABURBUJAS' }); setRecursoParaElegir(null); }} style={{ padding: '15px', background: '#E91E63', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>🔵 Cazaburbujas Clásico</button>
                                     <button onClick={() => { setJuegoActivo({ ...recursoParaElegir, modoEspecial: 'PIKATRON' }); setRecursoParaElegir(null); }} style={{ padding: '15px', background: '#2196F3', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>⚡ Pikatron Run (Runner)</button>
+                                    <button onClick={() => { setJuegoActivo({ ...recursoParaElegir, modoEspecial: 'PLATAFORMAS' }); setRecursoParaElegir(null); }} style={{ padding: '15px', background: '#8e44ad', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>🕹️ Plataformas</button>
                                 </>
                             ) : (
                                     <>
@@ -734,9 +742,31 @@ return <GamePlayer recurso={juegoActivo} usuario={null} alTerminar={() => setJue
 export const ResourceCard = ({ r, onClick }) => {
     const appInfo = getAppInfo(r.tipoJuego);
     const isLive = esJuegoEnVivo(r);
+    const [mostrarOpciones, setMostrarOpciones] = useState(false);
+    const [copiado, setCopiado] = useState(null);
+    const esBurbujasPikatron = r.tipoJuego === 'CAZABURBUJAS' || r.tipoJuego === 'PIKATRON';
+    const [modoEnlace, setModoEnlace] = useState(r.tipoJuego === 'PIKATRON' ? 'PIKATRON' : 'BURBUJAS');
+
+    const hojas = ['General', ...(r.hojas?.map(h => h.nombreHoja).filter(Boolean) || [])];
+
+    const copiarEnlace = (e, hoja) => {
+        e.stopPropagation();
+        let url = `${window.location.origin}/?r=${r.id}&h=${encodeURIComponent(hoja)}`;
+        if (esBurbujasPikatron) url += `&m=${modoEnlace}`;
+        navigator.clipboard.writeText(url).then(() => {
+            setCopiado(hoja);
+            setMostrarOpciones(false);
+            setTimeout(() => setCopiado(null), 2500);
+        });
+    };
+
+    const toggleOpciones = (e) => {
+        e.stopPropagation();
+        setMostrarOpciones(v => !v);
+    };
 
     return (
-        <div onClick={onClick} style={{ background: '#e3f2fd', padding: '15px', borderRadius: '12px', borderLeft: `6px solid ${appInfo.color}`, cursor: 'pointer', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', height: '80%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: '1px solid #eee' }}>
+        <div onClick={onClick} style={{ background: '#e3f2fd', padding: '15px', borderRadius: '12px', borderLeft: `6px solid ${appInfo.color}`, cursor: 'pointer', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', height: '80%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: '1px solid #eee', position: 'relative' }}>
             <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                     <h4 style={{ margin: 0, color: '#333', fontSize: '1.05rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '75%' }} title={r.titulo}>{r.titulo}</h4>
@@ -751,11 +781,55 @@ export const ResourceCard = ({ r, onClick }) => {
                     </div>
                 </div>
             </div>
+
             <div style={{ marginTop: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ background: '#eee', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold', color: '#555' }}>
                     <Key size={12} style={{ verticalAlign: 'middle' }} /> {r.accessCode || '---'}
                 </span>
-                {isLive ? <Zap size={20} color={appInfo.color} style={{ opacity: 0.8 }} /> : <Play size={20} color={appInfo.color} style={{ opacity: 0.8 }} />}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {/* Botón enlace directo */}
+                    <div style={{ position: 'relative' }}>
+                        <button
+                            onClick={toggleOpciones}
+                            title="Copiar enlace directo"
+                            style={{ background: copiado ? '#27ae60' : '#f0f4ff', border: `1.5px solid ${copiado ? '#27ae60' : '#c5cfe8'}`, borderRadius: 8, padding: '4px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.72rem', fontWeight: 700, color: copiado ? 'white' : '#3d5afe', transition: 'all 0.2s' }}>
+                            <Link2 size={13}/>
+                            {copiado ? `✅ Copiado` : 'Enlace'}
+                        </button>
+
+                        {/* Dropdown de hojas */}
+                        {mostrarOpciones && (
+                            <div onClick={e => e.stopPropagation()}
+                                style={{ position: 'absolute', bottom: '110%', right: 0, background: 'white', border: '1.5px solid #dce3f5', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.15)', zIndex: 999, minWidth: 175, overflow: 'hidden' }}>
+                                {esBurbujasPikatron && (
+                                    <div style={{ padding: '8px 10px', borderBottom: '1px solid #f0f0f0' }}>
+                                        <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#888', marginBottom: 5, textTransform: 'uppercase', letterSpacing: 1 }}>Modo</div>
+                                        <div style={{ display: 'flex', gap: 4 }}>
+                                            {[['BURBUJAS', '🔵 Burbujas'], ['TEST', '📝 Test'], ['PIKATRON', '⚡ Pikatron'], ['PLATAFORMAS', '🕹️ Plat.']].map(([m, label]) => (
+                                                <button key={m} onClick={e => { e.stopPropagation(); setModoEnlace(m); }}
+                                                    style={{ flex: 1, padding: '4px 2px', border: `1.5px solid ${modoEnlace === m ? '#3d5afe' : '#ddd'}`, borderRadius: 6, background: modoEnlace === m ? '#f0f4ff' : 'white', fontSize: '0.62rem', cursor: 'pointer', fontWeight: modoEnlace === m ? 700 : 400, color: modoEnlace === m ? '#3d5afe' : '#555', whiteSpace: 'nowrap' }}>
+                                                    {label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                <div style={{ padding: '7px 12px', fontSize: '0.7rem', fontWeight: 700, color: '#888', borderBottom: '1px solid #f0f0f0', textTransform: 'uppercase', letterSpacing: 1 }}>
+                                    Elegir hoja
+                                </div>
+                                {hojas.map(hoja => (
+                                    <button key={hoja} onClick={e => copiarEnlace(e, hoja)}
+                                        style={{ display: 'block', width: '100%', padding: '9px 14px', border: 'none', background: 'transparent', textAlign: 'left', cursor: 'pointer', fontSize: '0.85rem', color: '#333', fontFamily: 'inherit' }}
+                                        onMouseEnter={e => e.currentTarget.style.background = '#f0f4ff'}
+                                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                        🔗 {hoja}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                    {isLive ? <Zap size={20} color={appInfo.color} style={{ opacity: 0.8 }} /> : <Play size={20} color={appInfo.color} style={{ opacity: 0.8 }} />}
+                </div>
             </div>
         </div>
     );
@@ -1047,6 +1121,7 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={null} onExit={onHo
                                 <>
                                     <button onClick={() => { setJuegoActivo({ ...recursoParaElegir, modoEspecial: 'CAZABURBUJAS' }); setRecursoParaElegir(null); }} style={{ padding: '15px', background: '#E91E63', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>🔵 Cazaburbujas Clásico</button>
                                     <button onClick={() => { setJuegoActivo({ ...recursoParaElegir, modoEspecial: 'PIKATRON' }); setRecursoParaElegir(null); }} style={{ padding: '15px', background: '#2196F3', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>⚡ Pikatron Run (Runner)</button>
+                                    <button onClick={() => { setJuegoActivo({ ...recursoParaElegir, modoEspecial: 'PLATAFORMAS' }); setRecursoParaElegir(null); }} style={{ padding: '15px', background: '#8e44ad', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>🕹️ Plataformas</button>
                                 </>
                             ) : (
                                     <>

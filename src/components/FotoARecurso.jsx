@@ -41,19 +41,34 @@ const JUEGOS = [
         desc: 'Quiz competitivo tipo Kahoot',
         ejemplo: '[{"pregunta":"...","correcta":"...","incorrectas":["...","...","..."]}]',
     },
+    {
+        id: 'PILIVE_PRO',
+        label: 'Pi Live Pro',
+        emoji: '🎯',
+        color: '#00897B',
+        colorLight: '#E0F2F1',
+        desc: 'Mix de tipos: opción múltiple, respuesta corta, ordenar, rellenar, dibujo',
+        ejemplo: '[{"tipo":"MULTIPLE","pregunta":"...","correcta":"...","incorrectas":["...","...","..."]}]',
+    },
 ];
 
 const MODELOS_GEMINI = ['gemini-2.0-flash', 'gemini-2.5-flash'];
 
 // Instrucciones comunes a todos los prompts
 const INSTRUCCIONES_COMUNES = `
+⚠️ OUTPUT LANGUAGE RULE (HIGHEST PRIORITY — NEVER IGNORE):
+Detect the language of the document image. ALL JSON field values (pregunta, respuesta, correcta, incorrectas, terminoA, terminoB, bloques, etc.) MUST be written in THAT SAME language.
+- Document in English → write every value in English. NEVER translate to Spanish.
+- Document in French → write every value in French.
+- Document in Spanish → write every value in Spanish.
+This rule overrides everything else. The JSON keys remain as specified, but the VALUES use the document's language.
+
 REGLAS ESTRICTAS DE CALIDAD (aplícalas antes de incluir cualquier pregunta):
-1. IDIOMA: Detecta el idioma del documento y mantén ese mismo idioma en todas las preguntas y respuestas.
-2. AUTOSUFICIENCIA: Cada pregunta debe poder responderse SIN ver el documento. Si la pregunta dice "¿Cuál es el resultado del ejercicio anterior?" o "¿Qué hace el personaje en el párrafo 3?" o hace referencia a algo que no está en ella misma → DESCÁRTALA completamente.
-3. LONGITUD: La pregunta (enunciado) no debe superar 15 palabras. Si es más larga, reformúlala de forma concisa manteniendo el significado, o descártala si no es posible.
-4. NIVEL ESO: El lenguaje debe ser adecuado para alumnos de secundaria (12-16 años).
-5. REFORMULACIÓN: Si en el documento hay un ejercicio del tipo "Calcula 3x + 5 = 20" → transfórmalo en una pregunta directa: "¿Cuánto vale x si 3x + 5 = 20?". Si hay una definición, conviértela en "¿Qué es...?" o "¿Cómo se llama...?".
-6. COMPLETO: La respuesta correcta debe estar contenida o deducirse directamente del enunciado de la pregunta, nunca de contexto externo.
+1. AUTOSUFICIENCIA: Cada pregunta debe poder responderse SIN ver el documento. Si hace referencia a "el ejercicio anterior", "el párrafo 3" o algo externo → DESCÁRTALA.
+2. LONGITUD: El enunciado no debe superar 15 palabras. Reformúlalo si es necesario.
+3. NIVEL ESO: Lenguaje adecuado para alumnos de secundaria (12-16 años).
+4. REFORMULACIÓN: Ejercicios tipo "Calcula 3x+5=20" → pregunta directa "¿Cuánto vale x si 3x+5=20?".
+5. COMPLETO: La respuesta correcta debe deducirse del enunciado, nunca de contexto externo.
 `;
 
 const PROMPTS = {
@@ -104,6 +119,37 @@ TAREA:
 Devuelve ÚNICAMENTE un JSON array válido (sin markdown, sin texto extra):
 [{"pregunta":"Pregunta autosuficiente (máx 15 palabras)","correcta":"Respuesta","incorrectas":["Opción2","Opción3","Opción4"]}, ...]
 Si no hay contenido aprovechable responde exactamente: {"error":"No se pudo extraer contenido"}`,
+
+    PILIVE_PRO: `You are an assistant that converts educational documents into a mixed set of interactive questions for secondary school students (ESO / 12-16 years old).
+${INSTRUCCIONES_COMUNES}
+TASK:
+- Read the entire document image.
+- For each question, exercise or concept found, choose the BEST question type from the list below and produce the matching JSON object.
+- Generate a variety of types when the document allows it.
+
+QUESTION TYPES AND THEIR EXACT JSON FORMAT:
+
+1. MULTIPLE — Multiple-choice question (use when there is one clear correct answer and plausible wrong options can be invented):
+   {"tipo":"MULTIPLE","pregunta":"Question (max 15 words)","correcta":"Correct answer","incorrectas":["Wrong1","Wrong2","Wrong3"],"tiempo":20,"puntosMax":100,"puntosMin":10}
+
+2. SIMPLE — Short answer (use for definitions, calculations with a single numerical/textual answer, or when inventing wrong options is hard):
+   {"tipo":"SIMPLE","pregunta":"Question (max 15 words)","respuesta":"Correct answer","tiempo":30,"puntosMax":100,"puntosMin":10}
+
+3. ORDENAR — Put items in order (use when the document has steps, sequences, chronological events or processes to sort):
+   {"tipo":"ORDENAR","pregunta":"Order the following steps / Put in chronological order...","bloques":["Item1","Item2","Item3","Item4"],"numBloques":4,"tiempo":45,"puntosMax":100,"puntosMin":10}
+   IMPORTANT: "bloques" must list items in their CORRECT order. The game will shuffle them for the student.
+   Use between 3 and 6 bloques. Set numBloques to match the length of bloques.
+
+4. RELLENAR — Fill in the blank (use for sentences with a key term missing, vocabulary, formulas):
+   {"tipo":"RELLENAR","pregunta":"Complete sentence with ___ where the blank goes","respuesta":"Word that fills the blank","tiempo":25,"puntosMax":100,"puntosMin":10}
+   IMPORTANT: use exactly three underscores ___ to mark the blank in the sentence. The sentence must be self-contained.
+
+5. DIBUJO — Drawing prompt (use ONLY when the document explicitly asks to draw, sketch or diagram something):
+   {"tipo":"DIBUJO","pregunta":"Draw / Sketch / Label the diagram of...","tiempo":120,"puntosMax":100,"puntosMin":10}
+
+Return ONLY a valid JSON array (no markdown, no extra text):
+[{...}, {...}, ...]
+If no usable educational content is found, respond exactly: {"error":"No se pudo extraer contenido"}`,
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -124,6 +170,7 @@ const validarPreguntas = (json, tipoJuego) => {
     if (tipoJuego === 'PASAPALABRA') return item.letra && item.pregunta && item.respuesta;
     if (tipoJuego === 'CAZABURBUJAS' || tipoJuego === 'THINKHOOT') return item.pregunta && item.correcta;
     if (tipoJuego === 'APAREJADOS') return item.terminoA && item.terminoB;
+    if (tipoJuego === 'PILIVE_PRO') return item.tipo && item.pregunta;
     return false;
 };
 
@@ -245,9 +292,10 @@ export default function FotoARecurso({ usuario, perfilProfesor }) {
     };
 
     // ── Construir hoja a partir de las preguntas ─────────────────────────────
-    const construirHoja = (nombre) => juegoSel === 'APAREJADOS'
-        ? { nombreHoja: nombre, parejas: preguntas }
-        : { nombreHoja: nombre, preguntas };
+    const construirHoja = (nombre) => {
+        if (juegoSel === 'APAREJADOS') return { nombreHoja: nombre, parejas: preguntas };
+        return { nombreHoja: nombre, preguntas };
+    };
 
     // ── Abrir modal de destino ────────────────────────────────────────────────
     const abrirModalDestino = async () => {
@@ -276,7 +324,9 @@ export default function FotoARecurso({ usuario, perfilProfesor }) {
                     profesorNombre: perfilProfesor?.nombre || usuario.displayName || '',
                     pais: perfilProfesor?.pais || '', region: perfilProfesor?.region || '',
                     poblacion: perfilProfesor?.poblacion || '',
-                    hojas: [construirHoja('Desde foto')], config: {},
+                    hojas: [construirHoja('Desde foto')],
+                    config: juegoSel === 'PILIVE_PRO' ? { aleatorio: true, numPreguntas: preguntas.length } : {},
+                    ...(juegoSel === 'PILIVE_PRO' && { tipo: 'PRO' }),
                     isPrivate: true, origen: 'foto-ia',
                     accessCode: generarCodigo(), playCount: 0, fechaCreacion: new Date(),
                 });
@@ -674,6 +724,44 @@ function PreguntaCard({ pregunta: p, juego, juegoDef, index }) {
             </div>
         </div>
     );
+
+    if (juego === 'PILIVE_PRO') {
+        const TIPO_META = {
+            MULTIPLE:  { icon: '🔵', label: 'Opción múltiple', bg: '#E8EAF6', col: '#3F51B5' },
+            SIMPLE:    { icon: '✏️',  label: 'Respuesta corta', bg: '#E8F5E9', col: '#2E7D32' },
+            ORDENAR:   { icon: '🔢', label: 'Ordenar',          bg: '#FFF8E1', col: '#F57F17' },
+            RELLENAR:  { icon: '📝', label: 'Rellenar hueco',   bg: '#F3E5F5', col: '#7B1FA2' },
+            DIBUJO:    { icon: '🎨', label: 'Dibujo',           bg: '#FBE9E7', col: '#BF360C' },
+        };
+        const meta = TIPO_META[p.tipo] || { icon: '❓', label: p.tipo, bg: '#f5f5f5', col: '#555' };
+        return (
+            <div style={st.row}>
+                <div style={{ ...st.idx, background: '#00897B' }}>{index + 1}</div>
+                <div style={{ flex: 1 }}>
+                    <span style={{ background: meta.bg, color: meta.col, fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: 6, marginBottom: 4, display: 'inline-block' }}>
+                        {meta.icon} {meta.label}
+                    </span>
+                    <div style={{ color: '#2c3e50', marginBottom: 3 }}>{p.pregunta}</div>
+                    {p.tipo === 'MULTIPLE' && <>
+                        <div style={st.ok}>✓ {p.correcta}</div>
+                        {p.incorrectas?.map((inc, k) => <div key={k} style={st.fail}>✗ {inc}</div>)}
+                    </>}
+                    {p.tipo === 'SIMPLE' && <div style={st.ok}>→ {p.respuesta}</div>}
+                    {p.tipo === 'ORDENAR' && (
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 3 }}>
+                            {(p.bloques || []).map((b, k) => (
+                                <span key={k} style={{ background: '#FFF8E1', border: '1px solid #F57F17', borderRadius: 6, padding: '1px 8px', fontSize: '0.75rem', color: '#E65100' }}>
+                                    {k + 1}. {b}
+                                </span>
+                            ))}
+                        </div>
+                    )}
+                    {p.tipo === 'RELLENAR' && <div style={st.ok}>→ {p.respuesta}</div>}
+                    {p.tipo === 'DIBUJO' && <div style={{ color: '#BF360C', fontSize: '0.75rem' }}>🎨 Pregunta de dibujo libre</div>}
+                </div>
+            </div>
+        );
+    }
 
     return null;
 }

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { db } from './firebase';
-import { collection, getDocs, query, where, limit } from 'firebase/firestore';
+import { collection, getDocs, query, where, limit, addDoc, doc, getDoc } from 'firebase/firestore';
 
 import pikatronImgSrc  from './assets/pikatron-sprite.png';
 // ── Imagen del enemigo: cambia esta ruta por la de tu personaje enemigo ──
@@ -874,9 +874,77 @@ function PantallaIntro({ materia, nivel, total, hasEnemigos, onStart, onBack }) 
   );
 }
 
-function PantallaFin({ materia, score, aciertos, total, onReintentar, onSiguiente, onMenu, hayMas }) {
+function ModalEnviarProfe({ datos, onClose }) {
+  const [codigo, setCodigo] = useState('');
+  const [nombre, setNombre] = useState('');
+  const [curso,  setCurso]  = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const [enviado,  setEnviado]  = useState(false);
+  const [error,    setError]    = useState('');
+
+  const enviar = async () => {
+    const code = codigo.trim().toUpperCase();
+    if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+    if (!code) { setError('Escribe el código del profesor.'); return; }
+    setEnviando(true); setError('');
+    try {
+      const codigoDoc = await getDoc(doc(db, 'codigos_profesor', code));
+      if (!codigoDoc.exists()) { setError('Código no encontrado.'); setEnviando(false); return; }
+      await addDoc(collection(db, 'informes_juegos'), {
+        tipo: 'PLATAFORMAS', modalidad: 'Individual', fecha: new Date(),
+        recursoId: datos.recursoId, recursoTitulo: datos.recursoTitulo,
+        hoja: datos.hoja, codigoProfesor: code,
+        jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), aciertos: datos.aciertos, fallos: 0, hoja: datos.hoja }],
+      });
+      setEnviado(true);
+    } catch(e) { setError('Error: ' + e.message); }
+    setEnviando(false);
+  };
+
+  return (
+    <div style={{ position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.75)', zIndex:10000, display:'flex', justifyContent:'center', alignItems:'center' }}>
+      <div style={{ background:'#1e272e', border:'1px solid rgba(255,255,255,0.15)', borderRadius:20, width:'100%', maxWidth:380, padding:'26px 28px', boxShadow:'0 30px 80px rgba(0,0,0,0.7)', color:'white', fontFamily:"'Segoe UI', sans-serif" }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:18 }}>
+          <h3 style={{ margin:0, fontSize:'1.05rem', color:'#f1c40f' }}>📤 Enviar al profesor</h3>
+          <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', color:'#aaa', fontSize:'1.2rem' }}>✕</button>
+        </div>
+        {enviado ? (
+          <div style={{ textAlign:'center', padding:'20px 0' }}>
+            <div style={{ fontSize:'3rem', marginBottom:10 }}>✅</div>
+            <div style={{ color:'#2ecc71', fontWeight:700, fontSize:'1.1rem' }}>¡Informe enviado!</div>
+            <div style={{ marginTop:8, color:'#aaa', fontSize:'0.9rem' }}>{datos.aciertos} aciertos</div>
+            <button onClick={onClose} style={{ marginTop:16, padding:'9px 22px', borderRadius:10, border:'none', background:'rgba(255,255,255,0.1)', cursor:'pointer', color:'white', fontFamily:'inherit' }}>Cerrar</button>
+          </div>
+        ) : (
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            {[['nombre','Nombre y apellido',nombre,setNombre,'Tu nombre completo',false],
+              ['curso','Curso',curso,setCurso,'Ej: 3º ESO A',false],
+              ['codigo','Código del profesor',codigo,v=>setCodigo(v.toUpperCase()),'Ej: PROF01',true]
+            ].map(([key,label,val,setter,ph,mono])=>(
+              <div key={key}>
+                <label style={{ fontSize:'0.78rem', color:'#aaa', fontWeight:600, display:'block', marginBottom:4 }}>{label}</label>
+                <input value={val} onChange={e=>setter(e.target.value)} placeholder={ph} maxLength={key==='codigo'?10:undefined}
+                  style={{ padding:'9px 12px', borderRadius:9, border:'1.5px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.08)', color:'white', fontSize:'0.9rem', outline:'none', width:'100%', boxSizing:'border-box', fontFamily:'inherit', letterSpacing:mono?2:0, fontWeight:mono?700:400 }}/>
+              </div>
+            ))}
+            {error && <div style={{ color:'#e74c3c', fontSize:'0.8rem' }}>⚠ {error}</div>}
+            <div style={{ display:'flex', gap:9, marginTop:4 }}>
+              <button onClick={onClose} style={{ flex:1, padding:'10px', borderRadius:10, border:'1px solid rgba(255,255,255,0.2)', background:'transparent', cursor:'pointer', color:'white', fontFamily:'inherit' }}>Cancelar</button>
+              <button onClick={enviar} disabled={enviando} style={{ flex:2, padding:'10px', borderRadius:10, border:'none', background:enviando?'#555':'linear-gradient(135deg,#3498db,#2980b9)', color:'white', fontWeight:700, cursor:enviando?'default':'pointer', fontFamily:'inherit' }}>
+                {enviando?'Enviando…':'📤 Enviar'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PantallaFin({ materia, score, aciertos, total, onReintentar, onSiguiente, onMenu, hayMas, recurso, hoja }) {
   const pct=Math.round(Math.max(0,aciertos)/Math.max(total,1)*100);
   const stars=pct>=80?'⭐⭐⭐':pct>=50?'⭐⭐':'⭐';
+  const [mostrarEnvio, setMostrarEnvio] = useState(false);
   return (
     <Scr>
       <div style={{ fontSize:'3rem' }}>🏆</div>
@@ -895,8 +963,17 @@ function PantallaFin({ materia, score, aciertos, total, onReintentar, onSiguient
       <div style={{ display:'flex', gap:10, flexWrap:'wrap', justifyContent:'center' }}>
         {hayMas && <button onClick={onSiguiente} style={{ padding:'10px 22px', borderRadius:20, border:'none', background:'#f1c40f', color:'#1a1a2e', fontWeight:'bold', cursor:'pointer', fontFamily:'inherit' }}>Siguiente →</button>}
         <button onClick={onReintentar} style={{ padding:'10px 18px', borderRadius:20, border:'none', background:'#3498db', color:'white', fontWeight:'bold', cursor:'pointer', fontFamily:'inherit' }}>🔄 Reintentar</button>
+        {recurso && (
+          <button onClick={() => setMostrarEnvio(true)} style={{ padding:'10px 18px', borderRadius:20, border:'none', background:'linear-gradient(135deg,#27ae60,#2ecc71)', color:'white', fontWeight:'bold', cursor:'pointer', fontFamily:'inherit' }}>📤 Enviar al profesor</button>
+        )}
         <button onClick={onMenu} style={{ padding:'10px 18px', borderRadius:20, border:'2px solid rgba(255,255,255,0.2)', background:'transparent', color:'white', cursor:'pointer', fontFamily:'inherit' }}>🏠 Menú</button>
       </div>
+      {mostrarEnvio && recurso && (
+        <ModalEnviarProfe
+          datos={{ recursoId: recurso.id, recursoTitulo: recurso.titulo, hoja: hoja || 'General', aciertos }}
+          onClose={() => setMostrarEnvio(false)}
+        />
+      )}
     </Scr>
   );
 }
@@ -1073,7 +1150,7 @@ function PantallaResumen({ materia, recurso, levelStats, onMenu }) {
 // ══════════════════════════════════════════════════════════════════════════════
 //  COMPONENTE PRINCIPAL
 // ══════════════════════════════════════════════════════════════════════════════
-export default function QuizPlataformas({ onExit }) {
+export default function QuizPlataformas({ onExit, recursoInicial = null, hojaInicial = null }) {
   const [fase,       setFase]       = useState('MENU');
   const [materia,    setMateria]    = useState(null);
   const [nivelIdx,   setNivelIdx]   = useState(0);
@@ -1741,6 +1818,19 @@ export default function QuizPlataformas({ onExit }) {
     setFase('INTRO_REC');
   },[recursoActivo, recursoModo, nivelIdx, buildLevel]);
 
+  // --- AUTO-START DEEP LINK ---
+  useEffect(() => {
+    if (recursoInicial && fase === 'MENU') {
+      const hojas = recursoInicial.hojas || [];
+      let hojaIdx = 0;
+      if (hojaInicial && hojaInicial !== 'General') {
+        const idx = hojas.findIndex(h => h.nombreHoja === hojaInicial);
+        if (idx >= 0) hojaIdx = idx;
+      }
+      iniciarRecurso({ recurso: recursoInicial, modo: 'HOJA', hojaIdx });
+    }
+  }, [recursoInicial, iniciarRecurso]);
+
   const totalNivelesActuales = recursoActivo && recursoModo==='PANTALLAS'
     ? Math.min((recursoActivo.hojas||[]).length, 4)
     : (recursoActivo ? 1 : 4);
@@ -1753,7 +1843,10 @@ export default function QuizPlataformas({ onExit }) {
     hayMas={nivelIdx+1<totalNivelesActuales}
     onSiguiente={recursoActivo ? siguienteNivelRecurso : ()=>{ setNivelIdx(nivelIdx+1); setFase('INTRO'); }}
     onReintentar={()=>setFase(recursoActivo?'INTRO_REC':'INTRO')}
-    onMenu={()=>{ setRecursoActivo(null); setFase('MENU'); }}/>;
+    onMenu={()=>{ setRecursoActivo(null); setFase('MENU'); }}
+    recurso={recursoActivo}
+    hoja={recursoActivo ? (recursoActivo.hojas?.[recursoHojaIdx]?.nombreHoja || 'General') : null}
+  />;
 
   const mat = materia ? MATERIAS[materia] : null;
   return (

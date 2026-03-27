@@ -4,7 +4,7 @@ import {
     collection, addDoc, doc, setDoc, updateDoc, onSnapshot, getDoc
 } from 'firebase/firestore';
 import {
-    Volume2, Play, Pause, RotateCcw, Send, Users, Monitor,
+    Volume2, Play, Pause, RotateCcw, Send, Users,
     ChevronRight, ArrowLeft, Trophy, Clock, Loader, CheckCircle, XCircle, Headphones
 } from 'lucide-react';
 import { NIVELES_LISTENING, LISTENING_ITEMS } from './BibliotecaListening';
@@ -292,10 +292,100 @@ function TranscriptView({ segmentos, modo, respuestas, onRespuesta, frasesRevela
     );
 }
 
-// ─── Pantalla principal: selección de tema ────────────────────────────────────
-function PantallaSeleccion({ onSel, onLive, onUnirse, onBack }) {
+// ─── Pantalla selección de idioma ─────────────────────────────────────────────
+function PantallaIdioma({ onIngles, onBack }) {
+    return (
+        <div style={{ minHeight:'100vh', background:'linear-gradient(135deg,#1a1a2e,#16213e)', fontFamily:"'Segoe UI',sans-serif", display:'flex', flexDirection:'column' }}>
+            <div style={{ background:'rgba(255,255,255,0.05)', padding:'20px 24px', display:'flex', alignItems:'center', gap:12 }}>
+                {onBack && <button onClick={onBack} style={{ background:'rgba(255,255,255,0.1)', border:'none', borderRadius:10, padding:'8px 14px', color:'white', cursor:'pointer', display:'flex', alignItems:'center', gap:6, fontSize:'0.88rem' }}>
+                    <ArrowLeft size={16}/> Volver
+                </button>}
+                <Headphones size={28} color="#3498db"/>
+                <div>
+                    <div style={{ color:'white', fontWeight:800, fontSize:'1.2rem' }}>Listening</div>
+                    <div style={{ color:'rgba(255,255,255,0.5)', fontSize:'0.78rem' }}>Selecciona el idioma</div>
+                </div>
+            </div>
+            <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', padding:32 }}>
+                <div style={{ display:'flex', gap:24, flexWrap:'wrap', justifyContent:'center' }}>
+                    <button onClick={onIngles}
+                        style={{ width:220, padding:'32px 24px', borderRadius:24, border:'2px solid rgba(52,152,219,0.5)', background:'rgba(52,152,219,0.12)', cursor:'pointer', color:'white', fontFamily:'inherit', textAlign:'center', transition:'all 0.2s' }}
+                        onMouseEnter={e=>{e.currentTarget.style.background='rgba(52,152,219,0.25)';e.currentTarget.style.borderColor='#3498db';}}
+                        onMouseLeave={e=>{e.currentTarget.style.background='rgba(52,152,219,0.12)';e.currentTarget.style.borderColor='rgba(52,152,219,0.5)';}}>
+                        <div style={{ fontSize:'3rem', marginBottom:12 }}>🇬🇧</div>
+                        <div style={{ fontWeight:800, fontSize:'1.3rem', marginBottom:6 }}>English</div>
+                        <div style={{ fontSize:'0.8rem', color:'rgba(255,255,255,0.5)' }}>Listening Practice · 95 topics</div>
+                    </button>
+                    <div style={{ width:220, padding:'32px 24px', borderRadius:24, border:'2px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.03)', color:'rgba(255,255,255,0.3)', fontFamily:'inherit', textAlign:'center' }}>
+                        <div style={{ fontSize:'3rem', marginBottom:12, opacity:0.5 }}>🇫🇷</div>
+                        <div style={{ fontWeight:800, fontSize:'1.3rem', marginBottom:6 }}>Français</div>
+                        <div style={{ fontSize:'0.8rem', color:'rgba(255,255,255,0.25)', marginBottom:14 }}>Écouter</div>
+                        <span style={{ background:'rgba(230,126,34,0.2)', border:'1px solid rgba(230,126,34,0.4)', borderRadius:20, padding:'4px 12px', fontSize:'0.75rem', color:'#e67e22' }}>Próximamente</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─── Hub inglés: 3 opciones ────────────────────────────────────────────────────
+function PantallaInglesHub({ onExplorar, onCrearSala, onUnirse, onBack }) {
+    return (
+        <div style={{ minHeight:'100vh', background:'linear-gradient(135deg,#1a1a2e,#16213e)', fontFamily:"'Segoe UI',sans-serif", display:'flex', flexDirection:'column' }}>
+            <div style={{ background:'rgba(255,255,255,0.05)', padding:'20px 24px', display:'flex', alignItems:'center', gap:12 }}>
+                <button onClick={onBack} style={{ background:'rgba(255,255,255,0.1)', border:'none', borderRadius:10, padding:'8px 14px', color:'white', cursor:'pointer', display:'flex', alignItems:'center', gap:6, fontSize:'0.88rem' }}>
+                    <ArrowLeft size={16}/> Volver
+                </button>
+                <span style={{ fontSize:'1.4rem' }}>🇬🇧</span>
+                <div>
+                    <div style={{ color:'white', fontWeight:800, fontSize:'1.2rem' }}>English Listening</div>
+                    <div style={{ color:'rgba(255,255,255,0.5)', fontSize:'0.78rem' }}>Listen a Minute · 95 topics</div>
+                </div>
+            </div>
+            <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', padding:32 }}>
+                <div style={{ display:'flex', flexDirection:'column', gap:16, maxWidth:480, width:'100%' }}>
+                    <button onClick={onExplorar}
+                        style={{ padding:'24px 28px', borderRadius:20, border:'2px solid rgba(52,152,219,0.4)', background:'rgba(52,152,219,0.1)', cursor:'pointer', color:'white', fontFamily:'inherit', textAlign:'left', display:'flex', alignItems:'center', gap:18, transition:'background 0.2s' }}
+                        onMouseEnter={e=>e.currentTarget.style.background='rgba(52,152,219,0.22)'}
+                        onMouseLeave={e=>e.currentTarget.style.background='rgba(52,152,219,0.1)'}>
+                        <span style={{ fontSize:'2.2rem', flexShrink:0 }}>🎧</span>
+                        <div style={{ flex:1 }}>
+                            <div style={{ fontWeight:800, fontSize:'1.1rem', marginBottom:4 }}>Explorar</div>
+                            <div style={{ fontSize:'0.82rem', color:'rgba(255,255,255,0.5)' }}>Practica con cualquier listening de la colección</div>
+                        </div>
+                        <ChevronRight size={20} color="rgba(255,255,255,0.3)"/>
+                    </button>
+                    <button onClick={onCrearSala}
+                        style={{ padding:'24px 28px', borderRadius:20, border:'2px solid rgba(39,174,96,0.4)', background:'rgba(39,174,96,0.1)', cursor:'pointer', color:'white', fontFamily:'inherit', textAlign:'left', display:'flex', alignItems:'center', gap:18, transition:'background 0.2s' }}
+                        onMouseEnter={e=>e.currentTarget.style.background='rgba(39,174,96,0.22)'}
+                        onMouseLeave={e=>e.currentTarget.style.background='rgba(39,174,96,0.1)'}>
+                        <span style={{ fontSize:'2.2rem', flexShrink:0 }}>🖥️</span>
+                        <div style={{ flex:1 }}>
+                            <div style={{ fontWeight:800, fontSize:'1.1rem', marginBottom:4 }}>Crear sala en vivo</div>
+                            <div style={{ fontSize:'0.82rem', color:'rgba(255,255,255,0.5)' }}>Gestiona una sesión con tus alumnos en tiempo real</div>
+                        </div>
+                        <ChevronRight size={20} color="rgba(255,255,255,0.3)"/>
+                    </button>
+                    <button onClick={onUnirse}
+                        style={{ padding:'24px 28px', borderRadius:20, border:'2px solid rgba(155,89,182,0.4)', background:'rgba(155,89,182,0.1)', cursor:'pointer', color:'white', fontFamily:'inherit', textAlign:'left', display:'flex', alignItems:'center', gap:18, transition:'background 0.2s' }}
+                        onMouseEnter={e=>e.currentTarget.style.background='rgba(155,89,182,0.22)'}
+                        onMouseLeave={e=>e.currentTarget.style.background='rgba(155,89,182,0.1)'}>
+                        <span style={{ fontSize:'2.2rem', flexShrink:0 }}>🙋</span>
+                        <div style={{ flex:1 }}>
+                            <div style={{ fontWeight:800, fontSize:'1.1rem', marginBottom:4 }}>Unirse a sala en vivo</div>
+                            <div style={{ fontSize:'0.82rem', color:'rgba(255,255,255,0.5)' }}>Introduce el código de sala y tu nombre</div>
+                        </div>
+                        <ChevronRight size={20} color="rgba(255,255,255,0.3)"/>
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─── Pantalla explorar: colección completa ─────────────────────────────────────
+function PantallaExplorar({ onSel, onBack }) {
     const [filtro, setFiltro] = useState(null);
-    const [joinCode, setJoinCode] = useState('');
     const [busqueda, setBusqueda] = useState('');
 
     const items = LISTENING_ITEMS.filter(it => {
@@ -309,21 +399,19 @@ function PantallaSeleccion({ onSel, onLive, onUnirse, onBack }) {
     return (
         <div style={{ minHeight:'100vh', background:'linear-gradient(135deg,#1a1a2e,#16213e)', fontFamily:"'Segoe UI',sans-serif", padding:'0 0 40px' }}>
             <div style={{ background:'rgba(255,255,255,0.05)', padding:'20px 24px', display:'flex', alignItems:'center', gap:12 }}>
-                {onBack && <button onClick={onBack} style={{ background:'rgba(255,255,255,0.1)', border:'none', borderRadius:10, padding:'8px 14px', color:'white', cursor:'pointer', display:'flex', alignItems:'center', gap:6, fontSize:'0.88rem', marginRight:4 }}>
+                <button onClick={onBack} style={{ background:'rgba(255,255,255,0.1)', border:'none', borderRadius:10, padding:'8px 14px', color:'white', cursor:'pointer', display:'flex', alignItems:'center', gap:6, fontSize:'0.88rem', marginRight:4 }}>
                     <ArrowLeft size={16}/> Volver
-                </button>}
+                </button>
                 <Headphones size={28} color="#3498db"/>
                 <div>
-                    <div style={{ color:'white', fontWeight:800, fontSize:'1.2rem' }}>Listening Practice</div>
+                    <div style={{ color:'white', fontWeight:800, fontSize:'1.2rem' }}>Explorar Listening</div>
                     <div style={{ color:'rgba(255,255,255,0.5)', fontSize:'0.78rem' }}>Listen a Minute · 95 topics</div>
                 </div>
             </div>
-
             <div style={{ maxWidth:800, margin:'0 auto', padding:'20px 16px' }}>
-                {/* Filtros */}
                 <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:16 }}>
                     {NIVELES_LISTENING.map(n => (
-                        <button key={String(n.id)} onClick={() => setFiltro(n.id)}
+                        <button key={String(n.id)} onClick={() => setFiltro(f => f===n.id ? null : n.id)}
                             style={{ padding:'6px 14px', borderRadius:20, border:`2px solid ${filtro===n.id?n.color:'rgba(255,255,255,0.15)'}`, background: filtro===n.id?n.color:'transparent', color:'white', cursor:'pointer', fontFamily:'inherit', fontWeight: filtro===n.id?700:400, fontSize:'0.82rem' }}>
                             {n.emoji} {n.label}
                         </button>
@@ -331,9 +419,7 @@ function PantallaSeleccion({ onSel, onLive, onUnirse, onBack }) {
                     <input value={busqueda} onChange={e=>setBusqueda(e.target.value)} placeholder="🔍 Search topic..."
                         style={{ marginLeft:'auto', padding:'6px 14px', borderRadius:20, border:'2px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.08)', color:'white', outline:'none', fontSize:'0.82rem', fontFamily:'inherit', minWidth:160 }}/>
                 </div>
-
-                {/* Grid de topics */}
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))', gap:10, marginBottom:28 }}>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))', gap:10 }}>
                     {items.map(it => (
                         <button key={it.id} onClick={() => onSel(it)}
                             style={{ padding:'14px 12px', borderRadius:14, border:'1.5px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.06)', cursor:'pointer', color:'white', fontFamily:'inherit', textAlign:'left', transition:'all 0.18s', display:'flex', flexDirection:'column', gap:4 }}
@@ -345,24 +431,59 @@ function PantallaSeleccion({ onSel, onLive, onUnirse, onBack }) {
                         </button>
                     ))}
                 </div>
+            </div>
+        </div>
+    );
+}
 
-                {/* Online */}
-                <div style={{ background:'rgba(255,255,255,0.05)', borderRadius:16, padding:'18px 20px', border:'1.5px solid rgba(255,255,255,0.1)' }}>
-                    <div style={{ color:'white', fontWeight:700, marginBottom:12, display:'flex', alignItems:'center', gap:8 }}>
-                        <Monitor size={18} color="#27ae60"/> Sesión Online
-                    </div>
-                    <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
-                        <button onClick={onLive} style={{ padding:'10px 18px', borderRadius:10, border:'none', background:'#27ae60', color:'white', fontWeight:700, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:6 }}>
-                            <Users size={15}/> Crear sala
-                        </button>
-                        <div style={{ display:'flex', gap:8, flex:1 }}>
-                            <input value={joinCode} onChange={e=>setJoinCode(e.target.value.toUpperCase())} placeholder="CÓDIGO SALA" maxLength={6}
-                                style={{ flex:1, padding:'10px 14px', borderRadius:10, border:'1.5px solid rgba(255,255,255,0.2)', background:'rgba(255,255,255,0.08)', color:'white', outline:'none', fontSize:'0.9rem', letterSpacing:2, fontFamily:'inherit', textAlign:'center' }}/>
-                            <button onClick={() => { if(joinCode.length===6) onUnirse(joinCode); }}
-                                style={{ padding:'10px 16px', borderRadius:10, border:'none', background:'#3498db', color:'white', fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
-                                Unirse
-                            </button>
+// ─── Pantalla unirse a sala ────────────────────────────────────────────────────
+function PantallaUnirse({ onUnirse, onBack }) {
+    const [codigo, setCodigo] = useState('');
+    const [nombre, setNombre] = useState(() => localStorage.getItem('pikt_guest_name') || '');
+    const [error, setError] = useState('');
+
+    const intentarUnirse = () => {
+        if (codigo.trim().length < 6) { setError('El código debe tener 6 caracteres.'); return; }
+        if (nombre.trim().length < 3) { setError('El nombre debe tener al menos 3 caracteres.'); return; }
+        setError('');
+        localStorage.setItem('pikt_guest_name', nombre.trim());
+        onUnirse(codigo.trim().toUpperCase(), nombre.trim());
+    };
+
+    const listo = codigo.trim().length === 6 && nombre.trim().length >= 3;
+
+    return (
+        <div style={{ minHeight:'100vh', background:'linear-gradient(135deg,#1a1a2e,#16213e)', fontFamily:"'Segoe UI',sans-serif", display:'flex', flexDirection:'column' }}>
+            <div style={{ background:'rgba(255,255,255,0.05)', padding:'20px 24px', display:'flex', alignItems:'center', gap:12 }}>
+                <button onClick={onBack} style={{ background:'rgba(255,255,255,0.1)', border:'none', borderRadius:10, padding:'8px 14px', color:'white', cursor:'pointer', display:'flex', alignItems:'center', gap:6, fontSize:'0.88rem' }}>
+                    <ArrowLeft size={16}/> Volver
+                </button>
+                <Users size={22} color="#9b59b6"/>
+                <div style={{ color:'white', fontWeight:800, fontSize:'1.1rem' }}>Unirse a sala en vivo</div>
+            </div>
+            <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', padding:32 }}>
+                <div style={{ background:'rgba(255,255,255,0.06)', borderRadius:24, padding:'32px 28px', maxWidth:380, width:'100%' }}>
+                    <div style={{ fontSize:'3rem', textAlign:'center', marginBottom:20 }}>🙋</div>
+                    <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+                        <div>
+                            <label style={{ color:'rgba(255,255,255,0.6)', fontSize:'0.78rem', fontWeight:600, display:'block', marginBottom:6 }}>Código de sala</label>
+                            <input value={codigo} onChange={e=>setCodigo(e.target.value.toUpperCase())} placeholder="XXXXXX" maxLength={6}
+                                onKeyDown={e=>e.key==='Enter'&&intentarUnirse()}
+                                style={{ width:'100%', padding:'13px 16px', borderRadius:12, border:'1.5px solid rgba(255,255,255,0.2)', background:'rgba(255,255,255,0.08)', color:'white', outline:'none', fontSize:'1.2rem', letterSpacing:5, textAlign:'center', fontWeight:700, fontFamily:'inherit', boxSizing:'border-box' }}/>
                         </div>
+                        <div>
+                            <label style={{ color:'rgba(255,255,255,0.6)', fontSize:'0.78rem', fontWeight:600, display:'block', marginBottom:6 }}>
+                                Tu nombre <span style={{ color:'rgba(255,255,255,0.3)', fontWeight:400 }}>(mín. 3 caracteres)</span>
+                            </label>
+                            <input value={nombre} onChange={e=>setNombre(e.target.value)} placeholder="Tu nombre"
+                                onKeyDown={e=>e.key==='Enter'&&intentarUnirse()}
+                                style={{ width:'100%', padding:'13px 16px', borderRadius:12, border:'1.5px solid rgba(255,255,255,0.2)', background:'rgba(255,255,255,0.08)', color:'white', outline:'none', fontSize:'1rem', fontFamily:'inherit', boxSizing:'border-box' }}/>
+                        </div>
+                        {error && <div style={{ color:'#e74c3c', fontSize:'0.82rem', background:'rgba(231,76,60,0.1)', borderRadius:8, padding:'8px 12px' }}>⚠ {error}</div>}
+                        <button onClick={intentarUnirse} disabled={!listo}
+                            style={{ padding:'14px', borderRadius:12, border:'none', background: listo ? 'linear-gradient(135deg,#9b59b6,#8e44ad)' : 'rgba(255,255,255,0.1)', color:'white', fontWeight:700, fontSize:'1rem', cursor: listo ? 'pointer' : 'default', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', gap:8, opacity: listo ? 1 : 0.5 }}>
+                            <Users size={16}/> Unirse a la sala
+                        </button>
                     </div>
                 </div>
             </div>
@@ -599,6 +720,12 @@ function ListeningLiveHost({ codigoSala, onExit }) {
                 {/* LOBBY */}
                 {sala.estado === 'LOBBY' && (
                     <div>
+                        {/* Código de sala grande */}
+                        <div style={{ textAlign:'center', marginBottom:24, background:'rgba(255,255,255,0.05)', borderRadius:20, padding:'20px 24px', border:'2px dashed rgba(255,255,255,0.15)' }}>
+                            <div style={{ fontSize:'0.78rem', color:'rgba(255,255,255,0.4)', fontWeight:600, letterSpacing:2, marginBottom:6 }}>CÓDIGO DE SALA</div>
+                            <div style={{ fontSize:'3rem', fontWeight:900, letterSpacing:10, color:'white', fontFamily:'monospace' }}>{codigoSala}</div>
+                            <div style={{ fontSize:'0.78rem', color:'rgba(255,255,255,0.4)', marginTop:6 }}>Comparte este código con tus alumnos</div>
+                        </div>
                         <h2 style={{ marginBottom:20 }}>Selecciona un listening para la clase</h2>
                         {/* Config modo + tiempo */}
                         <div style={{ background:'rgba(255,255,255,0.06)', borderRadius:14, padding:'14px 18px', marginBottom:20, display:'flex', flexDirection:'column', gap:12 }}>
@@ -720,11 +847,12 @@ function ListeningLiveHost({ codigoSala, onExit }) {
 }
 
 // ─── MODO ONLINE: CLIENT ─────────────────────────────────────────────────────
-function ListeningLiveClient({ codigoSala, onExit, usuario }) {
+function ListeningLiveClient({ codigoSala, onExit, usuario, initialNombre }) {
     const [sala, setSala] = useState(null);
-    const [nombre, setNombre] = useState(() => localStorage.getItem('pikt_guest_name') || '');
+    const [nombre, setNombre] = useState(() => initialNombre || localStorage.getItem('pikt_guest_name') || '');
     const [uid] = useState(() => localStorage.getItem('pikt_guest_id') || ('guest_' + Math.random().toString(36).slice(2)));
     const [joined, setJoined] = useState(false);
+    const autoJoinDone = useRef(false);
     const [respuestas, setRespuestas] = useState({});
     const [enviado, setEnviado] = useState(false);
     const [mostrarEnvio, setMostrarEnvio] = useState(false);
@@ -746,14 +874,23 @@ function ListeningLiveClient({ codigoSala, onExit, usuario }) {
         return () => unsub();
     }, [codigoSala]);
 
-    const unirse = async () => {
-        if (!nombre.trim()) return;
-        localStorage.setItem('pikt_guest_name', nombre.trim());
+    const unirse = async (nombreFinal) => {
+        const n = (nombreFinal || nombre).trim();
+        if (!n) return;
+        localStorage.setItem('pikt_guest_name', n);
         await updateDoc(doc(db, 'live_games', codigoSala), {
-            [`jugadores.${uid}`]: { uid, nombre: nombre.trim(), puntos: 0, aciertos: 0 }
+            [`jugadores.${uid}`]: { uid, nombre: n, puntos: 0, aciertos: 0 }
         });
         setJoined(true);
     };
+
+    // Auto-join si viene de PantallaUnirse con nombre pre-cargado
+    useEffect(() => {
+        if (initialNombre && sala && !joined && !autoJoinDone.current) {
+            autoJoinDone.current = true;
+            unirse(initialNombre);
+        }
+    }, [sala, initialNombre, joined]);
 
     const enviarRespuestas = async () => {
         if (enviado || !sala?.itemActual) return;
@@ -904,11 +1041,12 @@ async function crearSalaListening() {
 
 // ─── Export principal ─────────────────────────────────────────────────────────
 export default function ListeningGame({ onExit, isHost, codigoSala: codigoExterno, usuario }) {
-    const [pantalla, setPantalla]         = useState('SELECCION');
+    const [pantalla, setPantalla]         = useState('IDIOMA');
     const [itemSel, setItemSel]           = useState(null);
     const [modo, setModo]                 = useState(null);
     const [internalHost, setInternalHost] = useState(null);
     const [internalClient, setInternalClient] = useState(null);
+    const [clientNombre, setClientNombre] = useState('');
 
     // Modo externo (desde LandingGames)
     if (isHost && codigoExterno) return <ListeningLiveHost codigoSala={codigoExterno} onExit={onExit || (()=>{})} />;
@@ -916,30 +1054,30 @@ export default function ListeningGame({ onExit, isHost, codigoSala: codigoExtern
 
     // Modo interno
     if (internalHost) return <ListeningLiveHost codigoSala={internalHost} onExit={() => setInternalHost(null)}/>;
-    if (internalClient) return <ListeningLiveClient codigoSala={internalClient} onExit={() => setInternalClient(null)} usuario={usuario}/>;
+    if (internalClient) return <ListeningLiveClient codigoSala={internalClient} onExit={() => { setInternalClient(null); setClientNombre(''); }} usuario={usuario} initialNombre={clientNombre}/>;
 
     if (pantalla === 'MODO' && itemSel) {
-        return (
-            <PantallaModo item={itemSel} onBack={() => setPantalla('SELECCION')}
-                onModo={m => { setModo(m); setPantalla('JUEGO'); }}/>
-        );
+        return <PantallaModo item={itemSel} onBack={() => setPantalla('EXPLORAR')}
+            onModo={m => { setModo(m); setPantalla('JUEGO'); }}/>;
     }
     if (pantalla === 'JUEGO' && itemSel && modo) {
-        return (
-            <JuegoIndividual item={itemSel} modo={modo}
-                onBack={() => { setModo(null); setPantalla('SELECCION'); }}/>
-        );
+        return <JuegoIndividual item={itemSel} modo={modo}
+            onBack={() => { setModo(null); setPantalla('EXPLORAR'); }}/>;
     }
-
-    return (
-        <PantallaSeleccion
-            onBack={onExit}
-            onSel={item => { setItemSel(item); setPantalla('MODO'); }}
-            onLive={async () => {
-                const codigo = await crearSalaListening();
-                setInternalHost(codigo);
-            }}
-            onUnirse={code => setInternalClient(code)}
-        />
-    );
+    if (pantalla === 'EXPLORAR') {
+        return <PantallaExplorar onBack={() => setPantalla('INGLES_HUB')}
+            onSel={item => { setItemSel(item); setPantalla('MODO'); }}/>;
+    }
+    if (pantalla === 'UNIRSE') {
+        return <PantallaUnirse onBack={() => setPantalla('INGLES_HUB')}
+            onUnirse={(code, nombre) => { setClientNombre(nombre); setInternalClient(code); }}/>;
+    }
+    if (pantalla === 'INGLES_HUB') {
+        return <PantallaInglesHub
+            onBack={() => setPantalla('IDIOMA')}
+            onExplorar={() => setPantalla('EXPLORAR')}
+            onCrearSala={async () => { const c = await crearSalaListening(); setInternalHost(c); }}
+            onUnirse={() => setPantalla('UNIRSE')}/>;
+    }
+    return <PantallaIdioma onBack={onExit} onIngles={() => setPantalla('INGLES_HUB')}/>;
 }

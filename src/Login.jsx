@@ -54,7 +54,6 @@ export default function Login({ setGoogleToken }) {
     const handleLogin = async () => {
         setLoading(true); setError(null);
         const provider = new GoogleAuthProvider();
-        provider.addScope('https://www.googleapis.com/auth/drive.readonly');
         provider.addScope('https://www.googleapis.com/auth/drive.file');
         provider.addScope('https://www.googleapis.com/auth/forms.body');
 

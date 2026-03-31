@@ -24,7 +24,7 @@ import TextWordleGame from './TextWordleGame';
 import SintaxisGame from './SintaxisGamen2';
 
 
-import { MousePointer2, Rocket, Search as SearchIcon } from 'lucide-react';
+import { MousePointer2, Rocket, Search as SearchIcon, Car } from 'lucide-react';
 import InformesJuegos from './components/InformesJuegos2';
 import EditorProBurbujasPikatron from './components/EditorProBurbujasPikatron';
 import EditorQuestionSender from './components/EditorQuestionSender';
@@ -1420,6 +1420,23 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                                     }}
                                 >
                                     <Rocket size={24} /> Pikatron Run
+                                </button>
+
+                                {/* OPCIÓN 3: KARTING */}
+                                <button
+                                    onClick={() => {
+                                        probarJuego({ ...recursoParaElegirModo, tipoJuego: 'KARTINGED' });
+                                        setRecursoParaElegirModo(null);
+                                    }}
+                                    style={{
+                                        padding: '15px', borderRadius: '15px', border: 'none',
+                                        background: 'linear-gradient(135deg, #FF6B00 0%, #CC4400 100%)',
+                                        color: 'white', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+                                        boxShadow: '0 4px 15px rgba(255, 107, 0, 0.3)'
+                                    }}
+                                >
+                                    <Car size={24} /> Karting
                                 </button>
                             </>
                         ) : (

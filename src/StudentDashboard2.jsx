@@ -19,6 +19,7 @@ const getColor = (t) => {
     if (tipo === 'CAZABURBUJAS') return '#E91E63';
     if (tipo === 'RULETA') return '#f1c40f';
     if (tipo === 'QUESTION_SENDER') return '#2c3e50';
+    if (tipo === 'KARTINGED') return '#FF6B00';
     return '#E91E63';
 };
 
@@ -31,6 +32,7 @@ const getNombreJuego = (tipo) => {
     if (t === 'THINKHOOT') return 'PiLive';
     if (t === 'RULETA') return 'La Ruleta';
     if (t === 'QUESTION_SENDER') return 'Question Sender';
+    if (t === 'KARTINGED') return 'Karting';
     return t;
 };
 

@@ -1,4 +1,14 @@
 {
+  "headers": [
+    {
+      "source": "/kartinged/Build/(.*).wasm",
+      "headers": [{ "key": "Content-Type", "value": "application/wasm" }]
+    },
+    {
+      "source": "/kartinged/Build/(.*).js",
+      "headers": [{ "key": "Content-Type", "value": "application/javascript" }]
+    }
+  ],
   "rewrites": [
     {
       "source": "/(.*)",

@@ -7,6 +7,7 @@ import Plataformas from './Plataformas2';
 import AparejadosGame from './AparejadosGame';
 import ThinkHootGame from './ThinkHootGame';
 import RuletaGame from './RuletaGame';
+import KartingedGame from './KartingedGame';
 
 export default function GamePlayer({ recurso, usuario, alTerminar, autoStart = false, hojaInicial = null, modoInicial = null }) {
 
@@ -63,6 +64,10 @@ export default function GamePlayer({ recurso, usuario, alTerminar, autoStart = f
                     usuario={usuario}
                     onExit={alTerminar}
                 />
+            )}
+
+            {recurso.tipoJuego === 'KARTINGED' && (
+                <KartingedGame alTerminar={alTerminar} />
             )}
         </>
     );

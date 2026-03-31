@@ -3,6 +3,7 @@ import { db } from '../firebase';
 import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, setDoc } from 'firebase/firestore';
 import { Search, Key, Filter, Zap, Play, Home, ChevronDown, ChevronUp, Mail, Link2 } from 'lucide-react';
 import GamePlayer from '../GamePlayer';
+import KartingedGame from '../KartingedGame';
 import ThinkHootGame from '../ThinkHootGame';
 import RuletaGame from '../RuletaGame';
 import MathLive from '../MathLive';
@@ -42,13 +43,20 @@ export const APPS = [
     { id: 'PASAPALABRA', name: 'Pasapalabra', desc: 'Adivina la palabra con cada letra del abecedario.', color: '#0A0E45', img: imgPasapalabra },
     { id: 'CAZABURBUJAS', name: 'Burbujas', desc: 'Explota la burbuja con la respuesta correcta.', color: '#de896e', img: imgBurbujas },
     { id: 'PIKATRON', name: 'Pikatron', desc: 'Juego tipo runner con preguntas.', color: '#2196F3', img: imgPikatron },
- {
+    {
         id: 'PIKATRON_2',
         name: 'Pikatron_2',
         desc: 'Salta y corre, acierta. Por plataformas',
         color: '#2196F3',
         img: imgPikatron2,
         isSpecial: false
+    },
+    {
+        id: 'KARTINGED',
+        name: 'Karting',
+        desc: 'Carreras de karts con preguntas en los checkpoints.',
+        color: '#FF6B00',
+        emoji: '🚗'
     },
 
 
@@ -210,6 +218,7 @@ const getAppInfo = (tipoJuego) => {
     if (app) return app;
     if (tipoJuego === 'PRO') return { name: 'PiLive', color: '#9C27B0' };
     if (tipoJuego === 'QUESTION_SENDER') return { name: 'Q-Sender', color: '#2c3e50' };
+    if (tipoJuego === 'KARTINGED') return { name: 'Karting', color: '#FF6B00' };
     return { name: tipoJuego, color: '#999' };
 };
 
@@ -394,6 +403,12 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
             return;
         }
 
+        // Karting: lanzar directamente (la pantalla previa busca los recursos)
+        if (appId === 'KARTINGED') {
+            setJuegoActivo({ tipoJuego: 'KARTINGED' });
+            return;
+        }
+
         const appInfo = APPS.find(a => a.id === appId);
         if (appInfo) {
             window.history.pushState({}, '', `/${appInfo.name.toLowerCase()}`);
@@ -457,6 +472,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
         if (esJuegoEnVivo(r)) lanzarComoGestor(r);
         else if (r.tipoJuego === 'CAZABURBUJAS' || r.tipoJuego === 'PIKATRON' || r.tipoJuego === 'WORDLE' || r.tipoJuego === 'SOPA') setRecursoParaElegir(r);
         else if (r.tipoJuego === 'ETIQUETAS') setJuegoActivo(r);
+        else if (r.tipoJuego === 'KARTINGED') setJuegoActivo(r);
         else setJuegoActivo(r);
     };
 
@@ -508,6 +524,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
         // ------------------------
 if (juegoActivo.tipoJuego === 'SINTAXIS')  return <SintaxisGame  usuario={usuario} onExit={() => setJuegoActivo(null)} />;
 if (juegoActivo.tipoJuego === 'LISTENING') return <Listening     usuario={usuario} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'KARTINGED') return <KartingedGame usuario={null} alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.modoEspecial === 'PIKATRON') return <PikatronRun recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.modoEspecial === 'PLATAFORMAS') return <Plataformas onExit={() => setJuegoActivo(null)} recursoInicial={juegoActivo} />;
         if (juegoActivo.tipoJuego === 'RULETA') return <RuletaGame recurso={juegoActivo} usuario={null} alTerminar={() => setJuegoActivo(null)} />;

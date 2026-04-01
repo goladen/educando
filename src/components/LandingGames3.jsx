@@ -4,6 +4,7 @@ import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, setDoc 
 import { Search, Key, Filter, Zap, Play, Home, ChevronDown, ChevronUp, Mail, Link2 } from 'lucide-react';
 import GamePlayer from '../GamePlayer';
 import KartingedGame from '../KartingedGame';
+import KartingedMultiGame from '../KartingedMultiGame';
 import ThinkHootGame from '../ThinkHootGame';
 import RuletaGame from '../RuletaGame';
 import MathLive from '../MathLive';
@@ -57,6 +58,13 @@ export const APPS = [
         desc: 'Carreras de karts con preguntas en los checkpoints.',
         color: '#FF6B00',
         emoji: '🚗'
+    },
+    {
+        id: 'KARTINGED_MULTI',
+        name: 'Karting Multi',
+        desc: 'Compite contra otros jugadores en tiempo real.',
+        color: '#E65100',
+        emoji: '🏎️'
     },
 
 
@@ -409,6 +417,11 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
             return;
         }
 
+        if (appId === 'KARTINGED_MULTI') {
+            setJuegoActivo({ tipoJuego: 'KARTINGED_MULTI' });
+            return;
+        }
+
         const appInfo = APPS.find(a => a.id === appId);
         if (appInfo) {
             window.history.pushState({}, '', `/${appInfo.name.toLowerCase()}`);
@@ -525,6 +538,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
 if (juegoActivo.tipoJuego === 'SINTAXIS')  return <SintaxisGame  usuario={usuario} onExit={() => setJuegoActivo(null)} />;
 if (juegoActivo.tipoJuego === 'LISTENING') return <Listening     usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'KARTINGED') return <KartingedGame usuario={null} alTerminar={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'KARTINGED_MULTI') return <KartingedMultiGame alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.modoEspecial === 'PIKATRON') return <PikatronRun recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.modoEspecial === 'PLATAFORMAS') return <Plataformas onExit={() => setJuegoActivo(null)} recursoInicial={juegoActivo} />;
         if (juegoActivo.tipoJuego === 'RULETA') return <RuletaGame recurso={juegoActivo} usuario={null} alTerminar={() => setJuegoActivo(null)} />;

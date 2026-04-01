@@ -334,6 +334,46 @@ function PantallaInstrucciones({ recurso, hoja, onEmpezar }) {
 }
 
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// IFRAME FULLSCREEN LANDSCAPE
+// ─────────────────────────────────────────────
+function PantallaIframe({ src, onSalir }) {
+    const containerRef = useRef(null);
+
+    useEffect(() => {
+        const requestFullscreen = async () => {
+            try {
+                const el = containerRef.current;
+                if (el?.requestFullscreen)            await el.requestFullscreen();
+                else if (el?.webkitRequestFullscreen) el.webkitRequestFullscreen();
+                if (screen.orientation?.lock)
+                    await screen.orientation.lock('landscape').catch(() => {});
+            } catch (e) {
+                console.warn('Fullscreen no disponible:', e);
+            }
+        };
+        requestFullscreen();
+
+        const onFsChange = () => { if (!document.fullscreenElement) onSalir?.(); };
+        document.addEventListener('fullscreenchange', onFsChange);
+        return () => document.removeEventListener('fullscreenchange', onFsChange);
+    }, []);
+
+    return (
+        <div ref={containerRef} style={{ width: '100vw', height: '100vh', position: 'fixed', top: 0, left: 0, zIndex: 9999, background: '#000' }}>
+            <iframe
+                key={src}
+                src={src}
+                title="Kartinged"
+                style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
+                allow="fullscreen; pointer-lock"
+                sandbox="allow-scripts allow-same-origin allow-pointer-lock"
+            />
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────
 // COMPONENTE PRINCIPAL
 // ─────────────────────────────────────────────
 export default function KartingedGame({ usuario, alTerminar }) {
@@ -373,16 +413,5 @@ export default function KartingedGame({ usuario, alTerminar }) {
     const hojaParam = encodeURIComponent(hoja);
     const iframeSrc = `/kartinged/index.html?recursoId=${recurso.id}&hoja=${hojaParam}`;
 
-    return (
-        <div style={{ width: '100vw', height: '100vh', background: '#000', overflow: 'hidden' }}>
-            <iframe
-                key={iframeSrc}
-                src={iframeSrc}
-                title="Kartinged"
-                style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
-                allow="fullscreen"
-                sandbox="allow-scripts allow-same-origin allow-pointer-lock"
-            />
-        </div>
-    );
+    return <PantallaIframe src={iframeSrc} onSalir={alTerminar} />;
 }

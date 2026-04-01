@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import useGameFullscreen from './hooks/useGameFullscreen';
 import { db } from './firebase';
 import { doc, getDoc, collection, query, where, orderBy, limit, getDocs, addDoc, updateDoc, getCountFromServer } from 'firebase/firestore';
 
@@ -339,22 +340,12 @@ function PantallaInstrucciones({ recurso, hoja, onEmpezar }) {
 // ─────────────────────────────────────────────
 function PantallaIframe({ src, onSalir }) {
     const containerRef = useRef(null);
-    const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
-
-    useEffect(() => {
-        // Solo pedir fullscreen en escritorio — en móvil el CSS ya cubre toda la pantalla
-        // y el fullscreen API puede interrumpir los eventos táctiles
-        if (!isMobile) {
-            const el = containerRef.current;
-            if (el?.requestFullscreen) el.requestFullscreen().catch(() => {});
-            else if (el?.webkitRequestFullscreen) el.webkitRequestFullscreen();
-        }
-    }, []);
+    useGameFullscreen();
 
     return (
         <div
             ref={containerRef}
-            style={{ width: '100vw', height: '100vh', position: 'fixed', top: 0, left: 0, zIndex: 9999, background: '#000' }}
+            style={{ width: '100vw', height: '100dvh', position: 'fixed', top: 0, left: 0, zIndex: 9999, background: '#000' }}
         >
             <iframe
                 key={src}

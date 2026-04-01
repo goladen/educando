@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import useGameFullscreen from './hooks/useGameFullscreen';
 import { db } from './firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 
@@ -196,6 +197,7 @@ function PantallaEspera({ codigo, isHost, recurso, hoja, nombre, onIniciar, onSa
 function PantallaJuego({ codigo, isHost, recursoId, hoja, nombre, onTerminar }) {
     const iframeRef = useRef(null);
     const containerRef = useRef(null);
+    useGameFullscreen();
 
     useEffect(() => {
         const handler = (e) => {
@@ -204,16 +206,6 @@ function PantallaJuego({ codigo, isHost, recursoId, hoja, nombre, onTerminar }) 
         window.addEventListener('message', handler);
         return () => window.removeEventListener('message', handler);
     }, [onTerminar]);
-
-    // Solo fullscreen en escritorio — en móvil el CSS ya ocupa toda la pantalla
-    useEffect(() => {
-        const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
-        if (!isMobile) {
-            const el = containerRef.current;
-            if (el?.requestFullscreen) el.requestFullscreen().catch(() => {});
-            else if (el?.webkitRequestFullscreen) el.webkitRequestFullscreen();
-        }
-    }, []);
 
     const params = new URLSearchParams({
         roomCode: codigo,
@@ -228,7 +220,7 @@ function PantallaJuego({ codigo, isHost, recursoId, hoja, nombre, onTerminar }) 
     return (
         <div
             ref={containerRef}
-            style={{ width: '100vw', height: '100vh', position: 'fixed', top: 0, left: 0, zIndex: 9999, background: '#000' }}
+            style={{ width: '100vw', height: '100dvh', position: 'fixed', top: 0, left: 0, zIndex: 9999, background: '#000' }}
         >
             <iframe
                 ref={iframeRef}

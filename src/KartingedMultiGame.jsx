@@ -205,31 +205,14 @@ function PantallaJuego({ codigo, isHost, recursoId, hoja, nombre, onTerminar }) 
         return () => window.removeEventListener('message', handler);
     }, [onTerminar]);
 
-    // Solicitar pantalla completa + landscape al montar
+    // Solo fullscreen en escritorio — en móvil el CSS ya ocupa toda la pantalla
     useEffect(() => {
-        const requestFullscreen = async () => {
-            try {
-                const el = containerRef.current;
-                if (el?.requestFullscreen)          await el.requestFullscreen();
-                else if (el?.webkitRequestFullscreen) el.webkitRequestFullscreen();
-
-                // Forzar landscape si la API está disponible
-                if (screen.orientation?.lock) {
-                    await screen.orientation.lock('landscape').catch(() => {});
-                }
-            } catch (e) {
-                // El navegador puede rechazar fullscreen si no viene de un gesto del usuario
-                console.warn('Fullscreen no disponible:', e);
-            }
-        };
-        requestFullscreen();
-
-        // Al salir de fullscreen, volver a la app
-        const onFullscreenChange = () => {
-            if (!document.fullscreenElement) onTerminar(null);
-        };
-        document.addEventListener('fullscreenchange', onFullscreenChange);
-        return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
+        const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+        if (!isMobile) {
+            const el = containerRef.current;
+            if (el?.requestFullscreen) el.requestFullscreen().catch(() => {});
+            else if (el?.webkitRequestFullscreen) el.webkitRequestFullscreen();
+        }
     }, []);
 
     const params = new URLSearchParams({

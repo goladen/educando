@@ -339,28 +339,23 @@ function PantallaInstrucciones({ recurso, hoja, onEmpezar }) {
 // ─────────────────────────────────────────────
 function PantallaIframe({ src, onSalir }) {
     const containerRef = useRef(null);
+    const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
 
     useEffect(() => {
-        const requestFullscreen = async () => {
-            try {
-                const el = containerRef.current;
-                if (el?.requestFullscreen)            await el.requestFullscreen();
-                else if (el?.webkitRequestFullscreen) el.webkitRequestFullscreen();
-                if (screen.orientation?.lock)
-                    await screen.orientation.lock('landscape').catch(() => {});
-            } catch (e) {
-                console.warn('Fullscreen no disponible:', e);
-            }
-        };
-        requestFullscreen();
-
-        const onFsChange = () => { if (!document.fullscreenElement) onSalir?.(); };
-        document.addEventListener('fullscreenchange', onFsChange);
-        return () => document.removeEventListener('fullscreenchange', onFsChange);
+        // Solo pedir fullscreen en escritorio — en móvil el CSS ya cubre toda la pantalla
+        // y el fullscreen API puede interrumpir los eventos táctiles
+        if (!isMobile) {
+            const el = containerRef.current;
+            if (el?.requestFullscreen) el.requestFullscreen().catch(() => {});
+            else if (el?.webkitRequestFullscreen) el.webkitRequestFullscreen();
+        }
     }, []);
 
     return (
-        <div ref={containerRef} style={{ width: '100vw', height: '100vh', position: 'fixed', top: 0, left: 0, zIndex: 9999, background: '#000' }}>
+        <div
+            ref={containerRef}
+            style={{ width: '100vw', height: '100vh', position: 'fixed', top: 0, left: 0, zIndex: 9999, background: '#000' }}
+        >
             <iframe
                 key={src}
                 src={src}

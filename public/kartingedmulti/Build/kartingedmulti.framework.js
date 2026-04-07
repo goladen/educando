@@ -1740,11 +1740,6 @@ function dbg(text) {
           return buffer;
       }
 
-  function _IsMobileBrowser() {
-          var hasTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-          return hasTouch ? 1 : 0;
-      }
-
   var JS_Accelerometer = null;
   
   var JS_Accelerometer_callback = 0;
@@ -18035,7 +18030,6 @@ var wasmImports = {
   "GetJSLoadTimeInfo": _GetJSLoadTimeInfo,
   "GetJSMemoryInfo": _GetJSMemoryInfo,
   "GetUrlParam": _GetUrlParam,
-  "IsMobileBrowser": _IsMobileBrowser,
   "JS_Accelerometer_IsRunning": _JS_Accelerometer_IsRunning,
   "JS_Accelerometer_Start": _JS_Accelerometer_Start,
   "JS_Accelerometer_Stop": _JS_Accelerometer_Stop,

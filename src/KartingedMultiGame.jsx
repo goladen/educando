@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import useGameFullscreen from './hooks/useGameFullscreen';
+import GameLauncher from './components/GameLauncher';
 import { db } from './firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 
@@ -192,21 +192,9 @@ function PantallaEspera({ codigo, isHost, recurso, hoja, nombre, onIniciar, onSa
 }
 
 // ─────────────────────────────────────────
-// PASO 4 — iframe de Unity
+// PASO 4 — iframe de Unity via GameLauncher
 // ─────────────────────────────────────────
 function PantallaJuego({ codigo, isHost, recursoId, hoja, nombre, onTerminar }) {
-    const iframeRef = useRef(null);
-    const containerRef = useRef(null);
-    useGameFullscreen();
-
-    useEffect(() => {
-        const handler = (e) => {
-            if (e.data?.type === 'KARTINGED_RESULT') onTerminar(e.data.data);
-        };
-        window.addEventListener('message', handler);
-        return () => window.removeEventListener('message', handler);
-    }, [onTerminar]);
-
     const params = new URLSearchParams({
         roomCode: codigo,
         isHost: isHost ? '1' : '0',
@@ -214,23 +202,15 @@ function PantallaJuego({ codigo, isHost, recursoId, hoja, nombre, onTerminar }) 
         recursoId,
         hoja,
     });
-
     const src = `/kartingedmulti/index.html?${params.toString()}`;
 
     return (
-        <div
-            ref={containerRef}
-            style={{ width: '100vw', height: '100dvh', position: 'fixed', top: 0, left: 0, zIndex: 9999, background: '#000' }}
-        >
-            <iframe
-                ref={iframeRef}
-                src={src}
-                style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
-                allow="pointer-lock; fullscreen"
-                sandbox="allow-scripts allow-same-origin allow-pointer-lock"
-                title="Karting Multi"
-            />
-        </div>
+        <GameLauncher
+            src={src}
+            title="Karting Multi"
+            onMessage={(data) => { if (data.type === 'KARTINGED_RESULT') onTerminar(data.data); }}
+            onSalir={() => onTerminar(null)}
+        />
     );
 }
 

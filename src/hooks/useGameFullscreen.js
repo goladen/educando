@@ -1,42 +1,21 @@
-import { useEffect } from 'react';
-
 /**
- * Fuerza landscape + oculta la barra de navegación del móvil
- * mientras el componente está montado. Al desmontar restaura todo.
+ * Solicita fullscreen + landscape sobre un elemento.
+ * Debe llamarse DENTRO de un handler de evento del usuario (click/tap).
  */
-export default function useGameFullscreen() {
-    useEffect(() => {
-        const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+export async function requestGameFullscreen(element) {
+    try {
+        const el = element || document.documentElement;
+        if (el.requestFullscreen)            await el.requestFullscreen();
+        else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+        if (screen.orientation?.lock)
+            await screen.orientation.lock('landscape').catch(() => {});
+    } catch (e) {
+        console.warn('Fullscreen:', e);
+    }
+}
 
-        // Forzar landscape
-        if (screen.orientation?.lock) {
-            screen.orientation.lock('landscape').catch(() => {});
-        }
-
-        // Ocultar barra de navegación del navegador en móvil
-        // Se consigue haciendo scroll a 0 y usando height: 100dvh
-        if (isMobile) {
-            document.documentElement.style.setProperty('--game-height', `${window.innerHeight}px`);
-            window.scrollTo(0, 1); // fuerza al navegador a ocultar la barra
-
-            // Reajustar si rota la pantalla
-            const onResize = () => {
-                document.documentElement.style.setProperty('--game-height', `${window.innerHeight}px`);
-                window.scrollTo(0, 1);
-            };
-            window.addEventListener('resize', onResize);
-            window.addEventListener('orientationchange', onResize);
-
-            return () => {
-                window.removeEventListener('resize', onResize);
-                window.removeEventListener('orientationchange', onResize);
-                screen.orientation?.unlock?.();
-                document.documentElement.style.removeProperty('--game-height');
-            };
-        }
-
-        return () => {
-            screen.orientation?.unlock?.();
-        };
-    }, []);
+export function exitGameFullscreen() {
+    if (document.exitFullscreen)            document.exitFullscreen().catch(() => {});
+    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+    screen.orientation?.unlock?.();
 }

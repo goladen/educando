@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import useGameFullscreen from './hooks/useGameFullscreen';
+import GameLauncher from './components/GameLauncher';
 import { db } from './firebase';
 import { doc, getDoc, collection, query, where, orderBy, limit, getDocs, addDoc, updateDoc, getCountFromServer } from 'firebase/firestore';
 
@@ -334,30 +334,6 @@ function PantallaInstrucciones({ recurso, hoja, onEmpezar }) {
     );
 }
 
-// ─────────────────────────────────────────────
-// ─────────────────────────────────────────────
-// IFRAME FULLSCREEN LANDSCAPE
-// ─────────────────────────────────────────────
-function PantallaIframe({ src, onSalir }) {
-    const containerRef = useRef(null);
-    useGameFullscreen();
-
-    return (
-        <div
-            ref={containerRef}
-            style={{ width: '100vw', height: '100dvh', position: 'fixed', top: 0, left: 0, zIndex: 9999, background: '#000' }}
-        >
-            <iframe
-                key={src}
-                src={src}
-                title="Kartinged"
-                style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
-                allow="fullscreen; pointer-lock"
-                sandbox="allow-scripts allow-same-origin allow-pointer-lock"
-            />
-        </div>
-    );
-}
 
 // ─────────────────────────────────────────────
 // COMPONENTE PRINCIPAL
@@ -399,5 +375,12 @@ export default function KartingedGame({ usuario, alTerminar }) {
     const hojaParam = encodeURIComponent(hoja);
     const iframeSrc = `/kartinged/index.html?recursoId=${recurso.id}&hoja=${hojaParam}`;
 
-    return <PantallaIframe src={iframeSrc} onSalir={alTerminar} />;
+    return (
+        <GameLauncher
+            src={iframeSrc}
+            title="Karting Educativo"
+            onMessage={(data) => { if (data.type === 'KARTINGED_RESULT') setResultado(data.data); }}
+            onSalir={alTerminar}
+        />
+    );
 }

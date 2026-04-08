@@ -24,6 +24,7 @@ import GeometriaAnalitica from '../Funciones2'
 import Plataformas from '../Plataformas2';
 
 import EtiquetaMe from '../EtiquetaMe';
+import OmninteractiveApp from '../OmninteractiveApp';
 import imgPasapalabra from '../assets/icono_pasapal.png'; // Revisa si es .png o .jpg
 import imgBurbujas from '../assets/icono_burbujas.png';
 import imgPikatron from '../assets/icono_pikatron.png';
@@ -81,9 +82,10 @@ export const APPS = [
         name: 'Q-Sender',
         desc: 'Envía tus preguntas al profesor para crear un juego.',
         color: '#2c3e50',
-        img: null, // Usaremos el icono Mail si es null
+        img: null,
         emoji: '📮',
-        isSpecial: true
+        isSpecial: true,
+        isHerramienta: true
     },
     {
         id: 'SINTAXIS',
@@ -91,26 +93,26 @@ export const APPS = [
         desc: 'Analiza frases de distintos niveles.',
         color: '#3498db',
         emoji: '🖍️',
-        isSpecial: false
+        isSpecial: false,
+        isHerramienta: true
     },
-
     {
         id: 'LISTENING',
         name: 'Listening',
         desc: 'Escucha y completa.',
         color: '#3498db',
         emoji: '🙉​',
-        isSpecial: false
+        isSpecial: false,
+        isHerramienta: true
     },
-
-
     {
         id: 'MATH_WORLD_PORTAL',
         name: 'Math World',
         desc: 'Entra a la zona exclusiva de aplicaciones matemáticas.',
         color: '#009688',
         emoji: '🌍',
-        isPortal: true
+        isPortal: true,
+        isHerramienta: true
     },
     // --- JUEGOS DE MATEMÁTICAS (Saldrán en la segunda pantalla) ---
     { id: 'GEOMETRIX', name: 'Geometrix', desc: 'Áreas, volúmenes y regla virtual.', color: '#009688', emoji: '📐', isMath: true },
@@ -127,8 +129,9 @@ export const APPS = [
         name: 'EtiquetaMe',
         desc: 'Identifica las partes de un diagrama poniendo las etiquetas correctas.',
         color: '#e74c3c',
-         img: imgEtiquetas,
-        isSpecial: false
+        img: imgEtiquetas,
+        isSpecial: false,
+        isHerramienta: true
     },
 
 
@@ -269,6 +272,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
 
     const [juegoActivo, setJuegoActivo] = useState(null);
     const [recursoParaElegir, setRecursoParaElegir] = useState(null);
+    const [omninteractivo, setOmninteractivo] = useState(false);
 
     // Estados Live Alumno
     const [liveModeAlumno, setLiveModeAlumno] = useState(false);
@@ -512,6 +516,8 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
     }
 
     
+    if (omninteractivo) return <OmninteractiveApp onBack={() => setOmninteractivo(false)} />;
+
     // 3. Single Player
     if (juegoActivo) {
         if (juegoActivo.tipoJuego === 'QUESTION_SENDER') {
@@ -731,7 +737,7 @@ return <GamePlayer recurso={juegoActivo} usuario={null} alTerminar={() => setJue
 
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '15px', marginBottom: '40px' }}>
-                {APPS.filter(app => !app.isLive && !app.isMath).map(app => (
+                {APPS.filter(app => !app.isLive && !app.isMath && !app.isHerramienta).map(app => (
                     <div key={app.id} onClick={() => abrirJuego(app.id)} style={{ background: '#ffffbf', borderRadius: '15px', padding: '15px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transition: 'transform 0.2s' }}>
                         <div style={{ width: '60px', height: '60px', margin: '0 auto 10px auto', background: 'transparent', borderRadius: '15px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'white' }}>
                             {app.img ? (
@@ -745,6 +751,33 @@ return <GamePlayer recurso={juegoActivo} usuario={null} alTerminar={() => setJue
                     </div>
                 ))}
             </div>
+            {/* --- SECCIÓN: HERRAMIENTAS CLASE --- */}
+            <h2 style={{ color: 'white', textShadow: '0 2px 4px rgba(0,0,0,0.5)', textAlign: 'center', marginBottom: '20px', marginTop: '30px' }}>
+                🛠️ Herramientas Clase
+            </h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '15px', marginBottom: '40px', maxWidth: '900px', margin: '0 auto 40px auto' }}>
+                {[
+                    { id: 'SINTAXIS',        label: 'Sintaxis',        emoji: '🖍️',  color: '#3498db', action: () => setJuegoActivo({ tipoJuego: 'SINTAXIS' }) },
+                    { id: 'MATH_WORLD',      label: 'Math World',      emoji: '🌍',  color: '#009688', action: () => abrirJuego('MATH_WORLD_PORTAL') },
+                    { id: 'LISTENING',       label: 'Listening',       emoji: '🙉',  color: '#8E44AD', action: () => setJuegoActivo({ tipoJuego: 'LISTENING' }) },
+                    { id: 'ETIQUETAS',       label: 'EtiquetaMe',      img: imgEtiquetas, color: '#e74c3c', action: () => abrirJuego('ETIQUETAS') },
+                    { id: 'QUESTION_SENDER', label: 'Q-Sender',        emoji: '📮',  color: '#2c3e50', action: () => setJuegoActivo({ tipoJuego: 'QUESTION_SENDER' }) },
+                    { id: 'OMNINTERACTIVE',  label: 'Omninteractive',  emoji: '📚',  color: '#6D28D9', action: () => setOmninteractivo(true) },
+                ].map(tool => (
+                    <div key={tool.id} onClick={tool.action} style={{ background: '#ffffbf', borderRadius: '15px', padding: '15px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transition: 'transform 0.2s', border: `2px solid ${tool.color}20` }}
+                        onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-3px)'}
+                        onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
+                        <div style={{ width: '52px', height: '52px', margin: '0 auto 10px auto', display: 'flex', justifyContent: 'center', alignItems: 'center', background: `${tool.color}18`, borderRadius: '12px' }}>
+                            {tool.img
+                                ? <img src={tool.img} alt={tool.label} style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
+                                : <span style={{ fontSize: '28px', lineHeight: 1 }}>{tool.emoji}</span>
+                            }
+                        </div>
+                        <h4 style={{ margin: 0, color: tool.color, fontSize: '0.88rem', fontWeight: 700 }}>{tool.label}</h4>
+                    </div>
+                ))}
+            </div>
+
             {/* ========================================= */}
             {/* FOOTER DE LICENCIA (PANTALLA PRINCIPAL) */}
             {/* ========================================= */}

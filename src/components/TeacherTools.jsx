@@ -1,20 +1,21 @@
 import React, { useState } from 'react';
-import { Wrench, Table, FileQuestion, RefreshCw, Camera, BarChart2 } from 'lucide-react';
+import { Wrench, Table, FileQuestion, RefreshCw, Camera, BarChart2, BookOpen } from 'lucide-react';
 
 import ToolExportarGoogleSheets from './ToolExportarGoogleSheets';
 import ToolGeneradorGoogleForms from './ToolGeneradorGoogleForms';
 import ToolConversorRecursos from './ToolConversorRecursos';
-import FotoARecurso from './FotoARecurso';
+import FotoARecurso from './FotoARecurso';      // para Pasapalabra, Aparejados, etc.
+import FotoAOmni from './FotoAOmni';            // para Omninteractive
 import InformesJuegos from './InformesJuegos2';
 
-export default function TeacherTools({ usuario, googleToken, perfilProfesor }) {
+export default function TeacherTools({ usuario, googleToken, perfilProfesor, onOpenEditorOmni }) {
     const [herramientaActiva, setHerramientaActiva] = useState(null);
+    const [showFotoOmni, setShowFotoOmni] = useState(false);
 
     if (herramientaActiva === 'SHEETS')    return <ToolExportarGoogleSheets usuario={usuario} googleToken={googleToken} onBack={() => setHerramientaActiva(null)} />;
     if (herramientaActiva === 'FORMS')     return <ToolGeneradorGoogleForms  usuario={usuario} googleToken={googleToken} onBack={() => setHerramientaActiva(null)} />;
     if (herramientaActiva === 'CONVERSOR') return <ToolConversorRecursos     usuario={usuario} onBack={() => setHerramientaActiva(null)} />;
-
-    if (herramientaActiva === 'INFORMES') return <InformesJuegos usuario={usuario} />;
+    if (herramientaActiva === 'INFORMES')  return <InformesJuegos usuario={usuario} />;
 
     if (herramientaActiva === 'FOTO') {
         return (
@@ -30,6 +31,17 @@ export default function TeacherTools({ usuario, googleToken, perfilProfesor }) {
 
     return (
         <div style={{ padding: '20px', maxWidth: '1000px', margin: '0 auto' }}>
+
+            {/* Foto → Omni: overlay modal */}
+            {showFotoOmni && (
+                <FotoAOmni
+                    onClose={() => setShowFotoOmni(false)}
+                    onResourceExtracted={recurso => {
+                        setShowFotoOmni(false);
+                        onOpenEditorOmni?.(recurso);
+                    }}
+                />
+            )}
 
             <div style={{ textAlign: 'center', marginBottom: '40px' }}>
                 <h2 style={{ color: '#2c3e50', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
@@ -70,13 +82,25 @@ export default function TeacherTools({ usuario, googleToken, perfilProfesor }) {
                     </p>
                 </div>
 
+                {/* ── Foto → Recurso clásico (Pasapalabra, Aparejados…) ── */}
                 <div onClick={() => setHerramientaActiva('FOTO')} style={cardStyle}>
                     <div style={{ background: '#FFF8E1', padding: '15px', borderRadius: '50%', marginBottom: '15px' }}>
                         <Camera size={32} color="#e67e22" />
                     </div>
                     <h3 style={{ margin: '0 0 10px 0', color: '#2c3e50' }}>Foto → Recurso</h3>
                     <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>
-                        Fotografía un examen o ficha y la IA extrae las preguntas automáticamente.
+                        Fotografía un examen o ficha y la IA extrae las preguntas para Pasapalabra, Aparejados, Quiz...
+                    </p>
+                </div>
+
+                {/* ── Foto → Recurso Omni (Omninteractive) ── */}
+                <div onClick={() => setShowFotoOmni(true)} style={{ ...cardStyle, borderLeft: '4px solid #6D28D9' }}>
+                    <div style={{ background: '#EDE9FE', padding: '15px', borderRadius: '50%', marginBottom: '15px' }}>
+                        <BookOpen size={32} color="#6D28D9" />
+                    </div>
+                    <h3 style={{ margin: '0 0 10px 0', color: '#6D28D9' }}>Foto → Recurso Omni</h3>
+                    <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>
+                        Fotografía una ficha de ejercicios y la IA la convierte en un recurso Omninteractive editable.
                     </p>
                 </div>
 
@@ -87,16 +111,6 @@ export default function TeacherTools({ usuario, googleToken, perfilProfesor }) {
                     <h3 style={{ margin: '0 0 10px 0', color: '#2c3e50' }}>Informes de Juegos</h3>
                     <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>
                         Consulta los resultados que tus alumnos han enviado desde los juegos.
-                    </p>
-                </div>
-
-                <div style={{ ...cardStyle, opacity: 0.5, cursor: 'default' }}>
-                    <div style={{ background: '#f5f5f5', padding: '15px', borderRadius: '50%', marginBottom: '15px' }}>
-                        <Wrench size={32} color="#bdc3c7" />
-                    </div>
-                    <h3 style={{ margin: '0 0 10px 0', color: '#7f8c8d' }}>Próximamente...</h3>
-                    <p style={{ margin: 0, color: '#999', fontSize: '0.9rem' }}>
-                        Más herramientas en camino.
                     </p>
                 </div>
 

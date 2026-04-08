@@ -12,6 +12,7 @@ import PikatronRun from '../PikatronRun';
 import TextWordleGame from '../TextWordleGame';
 import MathWordleGame from '../MathWordleGame';
 import SopaDeLetrasGame from '../SopaDeLetrasGame';
+import OmninteractiveApp from '../OmninteractiveApp';
 import imgPasapalabra from '../assets/icono_pasapal.png'; 
 import imgBurbujas from '../assets/icono_burbujas.png';
 import imgPikatron from '../assets/icono_pikatron.png';
@@ -98,6 +99,7 @@ export default function LandingGames4({ onLoginRequest, onOpenQuestionSender, us
 
     const [juegoActivo, setJuegoActivo] = useState(null);
     const [recursoParaElegir, setRecursoParaElegir] = useState(null);
+    const [omninteractivo, setOmninteractivo] = useState(false);
 
     const [liveModeAlumno, setLiveModeAlumno] = useState(false);
     const [joinLiveCode, setJoinLiveCode] = useState('');
@@ -293,6 +295,8 @@ export default function LandingGames4({ onLoginRequest, onOpenQuestionSender, us
         return <ThinkHootGame isHost={false} codigoSala={codigoFinal} usuario={usuarioFinal} onExit={() => setLiveModeAlumno(false)} />;
     }
 
+    if (omninteractivo) return <OmninteractiveApp onBack={() => setOmninteractivo(false)} />;
+
     if (juegoActivo) {
         if (juegoActivo.tipoJuego === 'QUESTION_SENDER') return <QuestionSenderClient usuario={usuario} onBack={() => setJuegoActivo(null)} codigoInicial={juegoActivo.codigoInicial} />;
         if (juegoActivo.modoEspecial === 'PIKATRON') return <PikatronRun recurso={juegoActivo} onExit={() => setJuegoActivo(null)} usuario={usuario} />;
@@ -408,6 +412,19 @@ export default function LandingGames4({ onLoginRequest, onOpenQuestionSender, us
                         <p style={{ margin: '10px 0 0 0', fontSize: '0.9rem', color: '#555', lineHeight: '1.3' }}>{app.desc}</p>
                     </div>
                 ))}
+            </div>
+
+            <h2 style={{ color: 'white', textShadow: '0 2px 4px rgba(0,0,0,0.5)', textAlign: 'center', marginBottom: '20px', marginTop: '20px' }}>
+                📝 Ejercicios Interactivos
+            </h2>
+            <div style={{ maxWidth: '320px', margin: '0 auto 40px auto' }}>
+                <div onClick={() => setOmninteractivo(true)} style={{ background: 'linear-gradient(135deg, #4338CA, #6D28D9)', borderRadius: '20px', padding: '20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(67,56,202,0.4)', transition: 'transform 0.2s', display: 'flex', flexDirection: 'column', alignItems: 'center' }}
+                    onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-3px)'}
+                    onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
+                    <span style={{ fontSize: '48px', marginBottom: '10px' }}>📚</span>
+                    <h3 style={{ margin: '0 0 6px', color: 'white', fontSize: '1.3rem', fontWeight: 800 }}>Omninteractive</h3>
+                    <p style={{ margin: 0, fontSize: '0.85rem', color: 'rgba(255,255,255,0.8)', lineHeight: 1.3 }}>Ejercicios autocorregibles: fill-in, choice, order, match y más.</p>
+                </div>
             </div>
 
             <h2 style={{ color: 'white', textShadow: '0 2px 4px rgba(0,0,0,0.5)', textAlign: 'center', marginBottom: '20px', marginTop: '20px' }}>

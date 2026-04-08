@@ -34,6 +34,8 @@ import EditorWordle from './components/EditorWordle';
 import EditorOlympic from './components/EditorOlympic';
 import EditorSintaxis from './components/EditorSintaxis';
 import EditorEtiquetas from './components/EditorEtiquetas';
+import EditorOmni from './components/EditorOmni';
+import OmninteractiveApp from './OmninteractiveApp';
 import * as XLSX from 'xlsx'; // <--- IMPORTANTE
 // ==============================================================================
 //  ZONA DE CLAVES (SEGURA)
@@ -66,9 +68,8 @@ const TIPOS_JUEGOS = {
     QUESTION_SENDER: { id: 'QUESTION_SENDER', label: 'Question Sender', color: '#2c3e50', camposConfig: [{ key: 'numPreguntas', label: 'Preguntas a pedir', type: 'number', default: 3 }] },
     // Añade dentro del objeto TIPOS_JUEGOS:
     ETIQUETAS: { id: 'ETIQUETAS', label: 'Etiquetas', color: '#e74c3c', camposConfig: [] },
-SINTAXIS: { id: 'SINTAXIS', label: 'Sintaxis', color: '#3498db', camposConfig: [] }
-
-
+SINTAXIS: { id: 'SINTAXIS', label: 'Sintaxis', color: '#3498db', camposConfig: [] },
+OMNINTERACTIVE: { id: 'OMNINTERACTIVE', label: 'Omninteractive', color: '#6D28D9', camposConfig: [] },
 };
 
 // MENSAJES DE AYUDA VACÍO
@@ -106,6 +107,8 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
     // Añade junto a los otros useState de editores:
     const [mostrandoEditorSintaxis, setMostrandoEditorSintaxis] = useState(false);
     const [mostrandoEditorEtiquetas, setMostrandoEditorEtiquetas] = useState(false);
+    const [mostrandoEditorOmni, setMostrandoEditorOmni] = useState(false);
+    const [recursoOmniInicial, setRecursoOmniInicial] = useState(null);
     // Añade este estado junto a los demás en ProfesorDashboard
     const [qSenderAMigrar, setQsenderAMigrar] = useState(null);
 
@@ -231,6 +234,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             if (juegoSeleccionado === 'OLYMPICLIVE') return iniciarCreacionOlympic();
             if (juegoSeleccionado === 'SINTAXIS') return iniciarCreacionSintaxis();
             if (juegoSeleccionado === 'ETIQUETAS') return iniciarCreacionEtiquetas();
+            if (juegoSeleccionado === 'OMNINTERACTIVE') { setRecursoOmniInicial(null); return setMostrandoEditorOmni(true); }
         }
 
 
@@ -913,6 +917,11 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             );
         }
 
+        // CASO OMNINTERACTIVE
+        if (recursoProbando.tipoJuego === 'OMNINTERACTIVE') {
+            return <OmninteractiveApp recursoDirecto={recursoProbando} onBack={() => setRecursoProbando(null)} />;
+        }
+
         // CASO 3: RECURSOS CLÁSICOS (Usa el reproductor antiguo GamePlayer)
         return (
             <div style={{ background: '#2f3640', minHeight: '100vh' }}>
@@ -999,7 +1008,15 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
 
             {/* 2. HERRAMIENTAS */}
             {modoDashboard === 'HERRAMIENTAS' && (
-                <TeacherTools usuario={usuario} googleToken={googleToken} />
+                <TeacherTools
+                    usuario={usuario}
+                    googleToken={googleToken}
+                    perfilProfesor={perfilProfesor}
+                    onOpenEditorOmni={recurso => {
+                        setRecursoOmniInicial(recurso || null);
+                        setMostrandoEditorOmni(true);
+                    }}
+                />
             )}
             {modoDashboard === 'INFORMES' && <InformesJuegos usuario={usuario} />}
 
@@ -1134,6 +1151,14 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                                         }}>
                                         <Crosshair size={16} /> <span className="btn-text">Etiquetas</span>
                                     </button>
+                                    <button onClick={() => setJuegoSeleccionado('OMNINTERACTIVE')} className="header-btn"
+                                        style={{
+                                            padding: '8px 20px', borderRadius: '20px',
+                                            background: juegoSeleccionado === 'OMNINTERACTIVE' ? '#6D28D9' : 'white',
+                                            color: juegoSeleccionado === 'OMNINTERACTIVE' ? 'white' : '#555'
+                                        }}>
+                                        <FileText size={16} /> <span className="btn-text">Omni</span>
+                                    </button>
 
                                 </>
                             )}
@@ -1178,7 +1203,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                         {(vista === 'MIS_RECURSOS' ? recursos : getRecursosFiltrados()).map((r, i) => (<div key={r.id || i} style={{
                             background: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', position: 'relative',
                             display: 'flex',
-                            flexDirection: 'column', borderLeft: `6px solid ${TIPOS_JUEGOS[juegoSeleccionado].color}`
+                            flexDirection: 'column', borderLeft: `6px solid ${(TIPOS_JUEGOS[juegoSeleccionado] || { color: '#6D28D9' }).color}`
                         }}>{juegoSeleccionado !== 'QUESTION_SENDER' && <div style={{ position: 'absolute', top: '10px', right: '10px', background: '#f1c40f', padding: '2px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: 'bold' }}><Users size={12} /> {r.playCount || 0}</div>}<h3 style={{ margin: '0 0 5px 0' }}>{r.titulo}</h3>
 
                             <div style={{ display: 'flex', gap: '5px', marginTop: '10px' }}>{juegoSeleccionado === 'QUESTION_SENDER' ? (<><button onClick={() => setQsenderAMigrar(r)} style={btnStyle('#E8F5E9', '#2E7D32')} title="Migrar a Juego"><Send size={18} /></button><button onClick={() => abrirEdicion(r)} style={btnStyle('#E3F2FD', '#1565C0')}><Pencil size={18} /></button><button onClick={() => eliminarRecurso(r.id)} style={btnStyle('#FFEBEE', '#C62828')}><Trash2 size={18} /></button></>) : (vista === 'MIS_RECURSOS' ? (<>
@@ -1338,6 +1363,14 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                     onClose={() => setMostrandoEditorOlympic(false)}
                     onSave={guardarRecursoFinal}
                     usuario={perfilProfesor || usuario}
+                />
+            )}
+
+            {mostrandoEditorOmni && (
+                <EditorOmni
+                    recursoInicial={recursoOmniInicial}
+                    usuario={perfilProfesor || usuario}
+                    onBack={() => { setMostrandoEditorOmni(false); setRecursoOmniInicial(null); }}
                 />
             )}
 

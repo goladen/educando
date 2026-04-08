@@ -60,14 +60,14 @@ REGLAS ESTRICTAS:
 
 async function generarConGemini({ youtubeUrl, idioma, numSlides, conEjercicios, promptExtra }) {
     const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${GEMINI_KEY}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
         {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 contents: [{
                     parts: [
-                        { fileData: { fileUri: youtubeUrl } },
+                        { fileData: { mimeType: 'video/mp4', fileUri: youtubeUrl } },
                         { text: buildPrompt({ idioma, numSlides, conEjercicios, promptExtra }) }
                     ]
                 }],
@@ -486,7 +486,7 @@ export default function VideoAPresentacion({ onBack }) {
                 </button>
 
                 <p style={{ textAlign: 'center', color: '#9CA3AF', fontSize: '0.78rem', margin: '10px 0 0' }}>
-                    Usa Gemini 1.5 Pro para analizar el video · Puede tardar hasta 1 minuto
+                    Usa Gemini 2.0 Flash para analizar el video · Puede tardar hasta 1 minuto
                 </p>
             </div>
         </div>

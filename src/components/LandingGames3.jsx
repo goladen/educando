@@ -516,7 +516,11 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
     }
 
     
-    if (omninteractivo) return <OmninteractiveApp onBack={() => setOmninteractivo(false)} />;
+    if (omninteractivo) return (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#F8FAFC', overflowY: 'auto' }}>
+            <OmninteractiveApp onBack={() => setOmninteractivo(false)} />
+        </div>
+    );
 
     // 3. Single Player
     if (juegoActivo) {

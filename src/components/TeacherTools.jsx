@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Wrench, Table, FileQuestion, RefreshCw, Camera, BarChart2, BookOpen } from 'lucide-react';
+import { Wrench, Table, FileQuestion, RefreshCw, Camera, BarChart2, BookOpen, Tv2 } from 'lucide-react';
 
 import ToolExportarGoogleSheets from './ToolExportarGoogleSheets';
 import ToolGeneradorGoogleForms from './ToolGeneradorGoogleForms';
 import ToolConversorRecursos from './ToolConversorRecursos';
 import FotoARecurso from './FotoARecurso';      // para Pasapalabra, Aparejados, etc.
 import FotoAOmni from './FotoAOmni';            // para Omninteractive
+import VideoAPre from './VideoAPresentacion';
 import InformesJuegos from './InformesJuegos2';
 
 export default function TeacherTools({ usuario, googleToken, perfilProfesor, onOpenEditorOmni }) {
@@ -16,6 +17,7 @@ export default function TeacherTools({ usuario, googleToken, perfilProfesor, onO
     if (herramientaActiva === 'FORMS')     return <ToolGeneradorGoogleForms  usuario={usuario} googleToken={googleToken} onBack={() => setHerramientaActiva(null)} />;
     if (herramientaActiva === 'CONVERSOR') return <ToolConversorRecursos     usuario={usuario} onBack={() => setHerramientaActiva(null)} />;
     if (herramientaActiva === 'INFORMES')  return <InformesJuegos usuario={usuario} />;
+    if (herramientaActiva === 'VIDEO')     return <VideoAPre onBack={() => setHerramientaActiva(null)} />;
 
     if (herramientaActiva === 'FOTO') {
         return (
@@ -32,6 +34,9 @@ export default function TeacherTools({ usuario, googleToken, perfilProfesor, onO
     return (
         <div style={{ padding: '20px', maxWidth: '1000px', margin: '0 auto' }}>
 
+           
+           
+           
             {/* Foto → Omni: overlay modal */}
             {showFotoOmni && (
                 <FotoAOmni
@@ -42,6 +47,7 @@ export default function TeacherTools({ usuario, googleToken, perfilProfesor, onO
                     }}
                 />
             )}
+            
 
             <div style={{ textAlign: 'center', marginBottom: '40px' }}>
                 <h2 style={{ color: '#2c3e50', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
@@ -101,6 +107,17 @@ export default function TeacherTools({ usuario, googleToken, perfilProfesor, onO
                     <h3 style={{ margin: '0 0 10px 0', color: '#6D28D9' }}>Foto → Recurso Omni</h3>
                     <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>
                         Fotografía una ficha de ejercicios y la IA la convierte en un recurso Omninteractive editable.
+                    </p>
+                </div>
+
+                {/* ── Video → Presentación ── */}
+                <div onClick={() => setHerramientaActiva('VIDEO')} style={{ ...cardStyle, borderLeft: '4px solid #DC2626' }}>
+                    <div style={{ background: '#FEE2E2', padding: '15px', borderRadius: '50%', marginBottom: '15px' }}>
+                        <Tv2 size={32} color="#DC2626" />
+                    </div>
+                    <h3 style={{ margin: '0 0 10px 0', color: '#DC2626' }}>Video → Presentación</h3>
+                    <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>
+                        Pega una URL de YouTube y la IA genera una presentación PPTX lista para usar.
                     </p>
                 </div>
 

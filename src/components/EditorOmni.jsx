@@ -5,7 +5,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
-import { Save, ArrowLeft, Plus, Trash2, ChevronDown, ChevronUp, Image as ImgIcon } from 'lucide-react';
+import { Save, ArrowLeft, Plus, Trash2, ChevronDown, ChevronUp, Image as ImgIcon, Globe, Lock } from 'lucide-react';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 const uid = () => 'ex_' + Math.random().toString(36).slice(2, 8);
@@ -390,7 +390,7 @@ export default function EditorOmni({ recursoInicial = null, usuario, onBack }) {
         ejercicios: sanitizeEjercicios(recurso.ejercicios),
         tipoJuego: 'OMNINTERACTIVE',
         tipo: 'OMNI',
-        isFinished: true,
+        isFinished: !!recurso.isFinished,
         profesorUid: usuario?.uid || 'anon',
         profesorNombre: usuario?.displayName || 'Anon',
         pais: recurso.pais || usuario?.pais || '',
@@ -432,6 +432,22 @@ export default function EditorOmni({ recursoInicial = null, usuario, onBack }) {
         </div>
         <button onClick={() => setShowConfig(c => !c)} style={{ border: '1px solid #E2E8F0', background: showConfig ? '#EEF2FF' : 'white', color: showConfig ? '#4338CA' : '#64748B', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
           ⚙ Configuración
+        </button>
+        {/* Toggle publicar */}
+        <button
+          onClick={() => setRecurso(r => ({ ...r, isFinished: !r.isFinished }))}
+          title={recurso.isFinished ? 'Publicado — visible en buscadores' : 'Borrador — no aparece en buscadores'}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 7,
+            border: `1.5px solid ${recurso.isFinished ? '#059669' : '#E2E8F0'}`,
+            background: recurso.isFinished ? '#ECFDF5' : 'white',
+            color: recurso.isFinished ? '#059669' : '#94A3B8',
+            borderRadius: 9, padding: '7px 14px', cursor: 'pointer',
+            fontWeight: 700, fontSize: 13, transition: 'all 0.2s'
+          }}
+        >
+          {recurso.isFinished ? <Globe size={15} /> : <Lock size={15} />}
+          {recurso.isFinished ? 'Publicado' : 'Borrador'}
         </button>
         <button onClick={save} disabled={saving} style={{ border: 'none', background: recurso.color || '#6D28D9', color: 'white', borderRadius: 9, padding: '9px 20px', cursor: 'pointer', fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', gap: 7, opacity: saving ? 0.7 : 1 }}>
           <Save size={16} /> {saving ? 'Guardando…' : 'Guardar'}

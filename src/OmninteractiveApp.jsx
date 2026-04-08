@@ -474,125 +474,179 @@ function PlayScreen({ recurso, onBack }) {
   const pct = score ? Math.round((score.c / score.t) * 100) : 0;
   const scol = !score ? recurso.color : pct === 100 ? '#059669' : pct >= 60 ? '#D97706' : '#DC2626';
   const info = TIPO_INFO[ex.tipo] || {};
+  const totalEx = recurso.ejercicios.length;
+
+  // Global progress (ejercicios completados)
+  const completados = recurso.ejercicios.filter(e => checked[e.id]).length;
+  const globalPct = totalEx > 0 ? Math.round((completados / totalEx) * 100) : 0;
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F8FAFC', fontFamily: 'inherit' }}>
-      {/* Header */}
-      <div style={{ background: 'white', borderBottom: '1px solid #E2E8F0', padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
-        <button onClick={onBack} style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 20, padding: '0 4px', color: '#64748B' }}>←</button>
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 16, color: '#0F172A' }}>{recurso.titulo}</div>
-          <div style={{ fontSize: 12, color: '#94A3B8' }}>{recurso.nivel} · {recurso.asignatura}</div>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#F1F5F9', fontFamily: 'inherit', overflow: 'hidden' }}>
+
+      {/* ── Top bar ──────────────────────────────────────────────── */}
+      <div style={{ background: 'white', borderBottom: '2px solid #E2E8F0', padding: '0 20px', display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0, height: 56 }}>
+        <button onClick={onBack} style={{
+          border: 'none', background: `${recurso.color}15`, borderRadius: 8,
+          cursor: 'pointer', padding: '6px 12px', color: recurso.color,
+          fontWeight: 700, fontSize: 15, display: 'flex', alignItems: 'center', gap: 4
+        }}>← Salir</button>
+
+        {/* Título */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 800, fontSize: 15, color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{recurso.titulo}</div>
+          <div style={{ fontSize: 11, color: '#94A3B8' }}>{recurso.nivel} · {recurso.asignatura}</div>
         </div>
-        {/* Overall progress dots */}
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 5, alignItems: 'center' }}>
-          {recurso.ejercicios.map((e, i) => {
-            const s = answers[e.id] && checked[e.id] ? calcScore(e, answers[e.id]) : null;
-            const p = s ? Math.round((s.c / s.t) * 100) : -1;
-            const bg = !s ? '#E2E8F0' : p === 100 ? '#059669' : p >= 60 ? '#D97706' : '#DC2626';
-            return (
-              <div key={e.id} onClick={() => setExIdx(i)} style={{
-                width: 8, height: 8, borderRadius: '50%', background: bg,
-                cursor: 'pointer', transform: i === exIdx ? 'scale(1.6)' : 'scale(1)',
-                transition: 'transform 0.15s', border: i === exIdx ? `2px solid ${recurso.color}` : '2px solid transparent',
-              }} />
-            );
-          })}
+
+        {/* Progreso global */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 11, color: '#94A3B8', lineHeight: 1 }}>Progreso</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: recurso.color }}>{completados}/{totalEx}</div>
+          </div>
+          <div style={{ width: 80, height: 8, background: '#E2E8F0', borderRadius: 4, overflow: 'hidden' }}>
+            <div style={{ width: `${globalPct}%`, height: '100%', background: recurso.color, borderRadius: 4, transition: 'width 0.4s' }} />
+          </div>
         </div>
       </div>
 
-      {/* Exercise tabs */}
-      <div style={{ background: 'white', borderBottom: '1px solid #E2E8F0', overflowX: 'auto' }}>
-        <div style={{ display: 'flex', padding: '0 12px' }}>
+      {/* ── Layout: sidebar + contenido ──────────────────────────── */}
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+
+        {/* Sidebar de ejercicios */}
+        <div style={{
+          width: 200, flexShrink: 0, background: 'white', borderRight: '1px solid #E2E8F0',
+          overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4, padding: '12px 8px'
+        }}>
           {recurso.ejercicios.map((e, i) => {
-            const ti = TIPO_INFO[e.tipo] || {};
+            const s = answers[e.id] && checked[e.id] ? calcScore(e, answers[e.id]) : null;
+            const p = s ? Math.round((s.c / s.t) * 100) : -1;
+            const dotColor = !s ? '#CBD5E1' : p === 100 ? '#059669' : p >= 60 ? '#D97706' : '#DC2626';
             const active = i === exIdx;
+            const ti = TIPO_INFO[e.tipo] || {};
             return (
               <button key={e.id} onClick={() => setExIdx(i)} style={{
-                padding: '10px 14px', border: 'none', background: 'transparent',
-                borderBottom: active ? `2px solid ${recurso.color}` : '2px solid transparent',
-                color: active ? recurso.color : '#94A3B8', fontWeight: active ? 600 : 400,
-                cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, whiteSpace: 'nowrap',
-                transition: 'color 0.15s',
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '9px 10px', borderRadius: 10, border: 'none',
+                background: active ? `${recurso.color}12` : 'transparent',
+                outline: active ? `2px solid ${recurso.color}` : '2px solid transparent',
+                cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+                transition: 'background 0.15s, outline 0.15s',
               }}>
-                {e.titulo}
+                <div style={{
+                  width: 26, height: 26, borderRadius: 8, flexShrink: 0,
+                  background: active ? recurso.color : dotColor,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: 'white', fontSize: 11, fontWeight: 700
+                }}>{i + 1}</div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: active ? 700 : 500, color: active ? recurso.color : '#374151', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 120 }}>{e.titulo}</div>
+                  <div style={{ fontSize: 10, color: ti.color || '#94A3B8', marginTop: 1 }}>{ti.label}</div>
+                </div>
               </button>
             );
           })}
         </div>
-      </div>
 
-      {/* Exercise card */}
-      <div style={{ maxWidth: 820, margin: '20px auto', padding: '0 16px 40px' }}>
-        {ex.imagen && (
-          <div style={{ marginBottom: 16, borderRadius: 12, overflow: 'hidden', border: '1px solid #E2E8F0' }}>
-            <img src={ex.imagen} alt="" style={{ width: '100%', display: 'block' }} />
-          </div>
-        )}
-        <div style={{ background: 'white', borderRadius: 16, border: '1px solid #E2E8F0', overflow: 'hidden', boxShadow: '0 1px 8px rgba(0,0,0,0.04)' }}>
-          {/* Exercise header */}
-          <div style={{ background: `${recurso.color}0d`, borderBottom: `1px solid ${recurso.color}30`, padding: '18px 24px', display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: recurso.color, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
-              {exIdx + 1}
+        {/* Contenido principal */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px 40px' }}>
+
+          {ex.imagen && (
+            <div style={{ marginBottom: 18, borderRadius: 14, overflow: 'hidden', border: '1px solid #E2E8F0', maxHeight: 300 }}>
+              <img src={ex.imagen} alt="" style={{ width: '100%', display: 'block', objectFit: 'cover' }} />
             </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                <span style={{ fontWeight: 700, fontSize: 16, color: '#0F172A' }}>{ex.titulo}</span>
-                <span style={{ padding: '2px 10px', borderRadius: 20, background: `${info.color}18`, color: info.color, fontSize: 11, fontWeight: 600 }}>{info.label}</span>
+          )}
+
+          <div style={{ background: 'white', borderRadius: 18, border: '1px solid #E2E8F0', overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+
+            {/* Cabecera del ejercicio */}
+            <div style={{
+              background: `linear-gradient(135deg, ${recurso.color}18, ${recurso.color}08)`,
+              borderBottom: `2px solid ${recurso.color}25`,
+              padding: '20px 28px',
+              display: 'flex', gap: 16, alignItems: 'flex-start'
+            }}>
+              <div style={{
+                width: 44, height: 44, borderRadius: 12, background: recurso.color,
+                color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontWeight: 800, fontSize: 18, flexShrink: 0, boxShadow: `0 4px 12px ${recurso.color}55`
+              }}>{exIdx + 1}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
+                  <span style={{ fontWeight: 800, fontSize: 18, color: '#0F172A' }}>{ex.titulo}</span>
+                  <span style={{
+                    padding: '3px 12px', borderRadius: 20,
+                    background: `${info.color || recurso.color}20`,
+                    color: info.color || recurso.color, fontSize: 11, fontWeight: 700,
+                    textTransform: 'uppercase', letterSpacing: 0.5
+                  }}>{info.label}</span>
+                </div>
+                <p style={{ margin: 0, fontSize: 14, color: '#475569', lineHeight: 1.6 }}>{ex.enunciado}</p>
               </div>
-              <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748B', lineHeight: 1.5 }}>{ex.enunciado}</p>
             </div>
-          </div>
 
-          {/* Exercise body */}
-          <div style={{ padding: '24px' }}>
-            <ExRenderer ex={ex} ans={exAns} setAns={setAns} checked={isChecked} />
-          </div>
+            {/* Cuerpo */}
+            <div style={{ padding: '28px' }}>
+              <ExRenderer ex={ex} ans={exAns} setAns={setAns} checked={isChecked} />
+            </div>
 
-          {/* Footer */}
-          <div style={{ padding: '14px 24px', borderTop: '1px solid #F1F5F9', background: '#FAFAFA', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-            {score ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                <div style={{ fontSize: 24, fontWeight: 800, color: scol }}>{score.c}/{score.t}</div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: scol, marginBottom: 5 }}>
-                    {pct === 100 ? '🎉 Perfect!' : pct >= 80 ? '👍 Very good!' : pct >= 60 ? '🙂 Good effort!' : '📚 Keep practising!'}
-                  </div>
-                  <div style={{ width: 130, height: 6, background: '#E2E8F0', borderRadius: 3, overflow: 'hidden' }}>
-                    <div style={{ width: `${pct}%`, height: '100%', background: scol, borderRadius: 3, transition: 'width 0.5s' }} />
+            {/* Footer */}
+            <div style={{
+              padding: '16px 28px', borderTop: '1px solid #F1F5F9',
+              background: '#FAFBFC', display: 'flex', alignItems: 'center',
+              justifyContent: 'space-between', gap: 12, flexWrap: 'wrap'
+            }}>
+              {score ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                  <div style={{ fontSize: 30, fontWeight: 900, color: scol, lineHeight: 1 }}>{score.c}<span style={{ fontSize: 16, color: '#94A3B8' }}>/{score.t}</span></div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: scol, marginBottom: 6 }}>
+                      {pct === 100 ? '🎉 Perfect!' : pct >= 80 ? '👍 Very good!' : pct >= 60 ? '🙂 Good effort!' : '📚 Keep practising!'}
+                    </div>
+                    <div style={{ width: 160, height: 8, background: '#E2E8F0', borderRadius: 4, overflow: 'hidden' }}>
+                      <div style={{ width: `${pct}%`, height: '100%', background: scol, borderRadius: 4, transition: 'width 0.5s' }} />
+                    </div>
                   </div>
                 </div>
+              ) : (
+                <span style={{ fontSize: 12, color: '#94A3B8' }}>{ex.items.length} {ex.items.length === 1 ? 'pregunta' : 'preguntas'}</span>
+              )}
+
+              <div style={{ display: 'flex', gap: 10 }}>
+                {isChecked && (
+                  <button onClick={() => { setChecked(p => ({ ...p, [ex.id]: false })); setAnswers(p => ({ ...p, [ex.id]: {} })); }} style={{
+                    padding: '10px 20px', borderRadius: 10, border: '1.5px solid #E2E8F0', background: 'white',
+                    color: '#374151', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  }}>Retry</button>
+                )}
+                {!isChecked && (
+                  <button onClick={() => setChecked(p => ({ ...p, [ex.id]: true }))} style={{
+                    padding: '10px 26px', borderRadius: 10, border: 'none', background: recurso.color,
+                    color: 'white', fontFamily: 'inherit', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                    boxShadow: `0 4px 14px ${recurso.color}55`,
+                  }}>Check answers ✓</button>
+                )}
+                {exIdx < totalEx - 1 && (
+                  <button onClick={() => setExIdx(exIdx + 1)} style={{
+                    padding: '10px 20px', borderRadius: 10, border: `1.5px solid ${recurso.color}`,
+                    background: 'white', color: recurso.color, fontFamily: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                  }}>Next →</button>
+                )}
               </div>
-            ) : (
-              <span style={{ fontSize: 12, color: '#94A3B8' }}>{ex.items.length} questions</span>
-            )}
-            <div style={{ display: 'flex', gap: 8 }}>
-              {isChecked && (
-                <button onClick={() => { setChecked(p => ({ ...p, [ex.id]: false })); setAnswers(p => ({ ...p, [ex.id]: {} })); }} style={{
-                  padding: '9px 18px', borderRadius: 9, border: '1.5px solid #E2E8F0', background: 'white',
-                  color: '#374151', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                }}>Retry</button>
-              )}
-              {!isChecked && (
-                <button onClick={() => setChecked(p => ({ ...p, [ex.id]: true }))} style={{
-                  padding: '9px 22px', borderRadius: 9, border: 'none', background: recurso.color,
-                  color: 'white', fontFamily: 'inherit', fontSize: 14, fontWeight: 700, cursor: 'pointer',
-                  boxShadow: `0 3px 10px ${recurso.color}55`,
-                }}>Check answers</button>
-              )}
             </div>
           </div>
-        </div>
 
-        {/* Next exercise button */}
-        {exIdx < recurso.ejercicios.length - 1 && (
-          <div style={{ textAlign: 'center', marginTop: 16 }}>
-            <button onClick={() => setExIdx(exIdx + 1)} style={{
-              padding: '8px 20px', borderRadius: 9, border: '1.5px solid #E2E8F0',
-              background: 'white', color: '#64748B', fontFamily: 'inherit', fontSize: 13, cursor: 'pointer',
-            }}>Next exercise →</button>
-          </div>
-        )}
+          {/* Fin del recurso */}
+          {completados === totalEx && totalEx > 0 && (
+            <div style={{
+              marginTop: 20, background: 'white', borderRadius: 16, padding: '24px',
+              textAlign: 'center', border: `2px solid #059669`, boxShadow: '0 4px 20px #05966920'
+            }}>
+              <div style={{ fontSize: 36, marginBottom: 8 }}>🎉</div>
+              <div style={{ fontWeight: 800, fontSize: 18, color: '#059669' }}>¡Recurso completado!</div>
+              <div style={{ color: '#64748B', fontSize: 13, marginTop: 4 }}>Has terminado todos los ejercicios.</div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

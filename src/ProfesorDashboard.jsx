@@ -401,6 +401,10 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             else if (dataFresca.tipoJuego === 'ETIQUETAS') {
                 setMostrandoEditorEtiquetas(true);
             }
+            else if (dataFresca.tipoJuego === 'OMNINTERACTIVE' || dataFresca.tipo === 'OMNI') {
+                setRecursoOmniInicial(dataFresca);
+                setMostrandoEditorOmni(true);
+            }
             else {
                 setMostrandoEditorManual(true); // Clásico
             }
@@ -1032,7 +1036,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                 <>{modoDashboard === 'CLASICO' && (
                     <div className="game-type-scroll" style={{ marginBottom: '20px' }}>
                         {Object.values(TIPOS_JUEGOS)
-                            .filter(j => j.id !== 'MATHLIVE' && j.id !== 'WORDLE' && j.id !== 'OLYMPICLIVE' && j.id !== 'SINTAXIS' && j.id !== 'ETIQUETAS')
+                            .filter(j => j.id !== 'MATHLIVE' && j.id !== 'WORDLE' && j.id !== 'OLYMPICLIVE' && j.id !== 'SINTAXIS' && j.id !== 'ETIQUETAS' && j.id !== 'OMNINTERACTIVE')
                             .map(j => (
                                 <button key={j.id} onClick={() => setJuegoSeleccionado(j.id)} style={{ padding: '8px 16px', borderRadius: '20px', border: 'none', background: juegoSeleccionado === j.id ? j.color : 'white', color: juegoSeleccionado === j.id ? 'white' : '#555', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
                                     {j.label}

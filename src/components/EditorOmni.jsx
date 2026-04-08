@@ -368,6 +368,18 @@ export default function EditorOmni({ recursoInicial = null, usuario, onBack }) {
     setRecurso(r => ({ ...r, ejercicios: exs }));
   };
 
+  // Firestore no admite arrays anidados: convierte alts [[a,b],[c]] → ["a|b","c"]
+  const sanitizeEjercicios = (ejercicios) => ejercicios.map(ex => ({
+    ...ex,
+    items: (ex.items || []).map(item => {
+      const clean = { ...item };
+      if (Array.isArray(item.alts)) {
+        clean.alts = item.alts.map(a => Array.isArray(a) ? a.join('|') : (a || ''));
+      }
+      return clean;
+    }),
+  }));
+
   const save = async () => {
     if (!recurso.titulo.trim()) return alert('Añade un título al recurso.');
     if (!recurso.ejercicios.length) return alert('El recurso necesita al menos un ejercicio.');
@@ -375,6 +387,7 @@ export default function EditorOmni({ recursoInicial = null, usuario, onBack }) {
     try {
       const data = {
         ...recurso,
+        ejercicios: sanitizeEjercicios(recurso.ejercicios),
         tipoJuego: 'OMNINTERACTIVE',
         tipo: 'OMNI',
         isFinished: true,

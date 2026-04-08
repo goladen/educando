@@ -18,8 +18,16 @@ const nm = (s = '') =>
     .replace(/hadn't|had not/g, 'hadnot').replace(/wouldn't|would not/g, 'wouldnot')
     .replace(/mustn't|must not/g, 'mustnot').replace(/shouldn't|should not/g, 'shouldnot');
 
+// normaliza alts: admite array de strings, array de arrays, o string con "|"
+const parseAlts = (alts) => {
+  if (!alts) return [];
+  return alts.flatMap(a =>
+    Array.isArray(a) ? a : typeof a === 'string' ? a.split('|').map(s => s.trim()).filter(Boolean) : [a]
+  );
+};
+
 const okAns = (user, correct, alts = []) =>
-  !!(user?.trim()) && [correct, ...(alts || [])].some(a => nm(String(a)) === nm(user));
+  !!(user?.trim()) && [correct, ...parseAlts(alts)].some(a => nm(String(a)) === nm(user));
 
 function calcScore(ex, ans) {
   let c = 0, t = 0;

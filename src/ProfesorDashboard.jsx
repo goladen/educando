@@ -149,8 +149,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             const s = await getDocs(q);
             const docs = s.docs.map(d => ({ ...d.data(), id: d.id })).filter(r => {
                 if (modoDashboard === 'PRO') {
-                    // CAMBIO AQUÍ: Aceptamos 'PRO' y 'PRO-BURBUJAS'
-                    return r.tipo === 'PRO' || r.tipo === 'PRO-BURBUJAS' || r.tipo === 'OLYMPIC' || r.tipo === 'SINTAXIS'||r.tipo === 'ETIQUETAS';
+                    return r.tipo === 'PRO' || r.tipo === 'PRO-BURBUJAS' || r.tipo === 'OLYMPIC' || r.tipo === 'SINTAXIS' || r.tipo === 'ETIQUETAS' || r.tipo === 'OMNI';
                 }
 
                 if (modoDashboard === 'LIVE') {
@@ -160,7 +159,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
 
 
                 // En clásico mostramos los que NO sean de ningún tipo PRO
-                return !r.tipo || (r.tipo !== 'PRO' && r.tipo !== 'PRO-BURBUJAS' && r.tipo !== 'OLYMPIC');
+                return !r.tipo || (r.tipo !== 'PRO' && r.tipo !== 'PRO-BURBUJAS' && r.tipo !== 'OLYMPIC' && r.tipo !== 'SINTAXIS' && r.tipo !== 'ETIQUETAS' && r.tipo !== 'OMNI');
             });
             setRecursos(docs);
         } catch (e) { console.error(e) }

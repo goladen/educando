@@ -297,6 +297,12 @@ function ExercisePanel({ ex, idx, total, onUpdate, onDelete, onMove, color }) {
               <label style={lbl}>Título del ejercicio</label>
               <input style={inp} value={ex.titulo} onChange={e => updateField('titulo', e.target.value)} placeholder="Complete the sentences…" />
             </div>
+            <div>
+              <label style={lbl}>Tiempo límite (segundos, 0 = sin límite)</label>
+              <input style={inp} type="number" min="0" max="300" value={ex.tiempo || 0}
+                onChange={e => updateField('tiempo', Math.max(0, parseInt(e.target.value) || 0))}
+                placeholder="30" />
+            </div>
           </div>
           <div style={{ marginBottom: 12 }}>
             <label style={lbl}>Enunciado / instrucciones</label>
@@ -511,6 +517,18 @@ export default function EditorOmni({ recursoInicial = null, usuario, onBack }) {
               <div>
                 <label style={lbl}>Localidad</label>
                 <input style={inp} value={recurso.poblacion} onChange={e => setField('poblacion', e.target.value)} />
+              </div>
+              <div style={{ gridColumn: '1/-1' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: recurso.soloUnIntento ? '#FFF7ED' : '#F8FAFC', borderRadius: 10, border: `1px solid ${recurso.soloUnIntento ? '#FED7AA' : '#E2E8F0'}`, cursor: 'pointer' }}
+                  onClick={() => setField('soloUnIntento', !recurso.soloUnIntento)}>
+                  <div style={{ width: 20, height: 20, borderRadius: 5, border: `2px solid ${recurso.soloUnIntento ? '#EA580C' : '#CBD5E1'}`, background: recurso.soloUnIntento ? '#EA580C' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    {recurso.soloUnIntento && <span style={{ color: 'white', fontSize: 13, fontWeight: 700, lineHeight: 1 }}>✓</span>}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: recurso.soloUnIntento ? '#EA580C' : '#334155' }}>Solo un intento por dispositivo</div>
+                    <div style={{ fontSize: 11, color: '#94A3B8' }}>El alumno solo podrá hacer el test una vez desde el mismo navegador. No aparecerá el botón de reintentar.</div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

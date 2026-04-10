@@ -304,7 +304,25 @@ function ExercisePanel({ ex, idx, total, onUpdate, onDelete, onMove, color, onCa
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 export default function EditorVideoQuizz({ recursoInicial = null, usuario, onBack }) {
   const [recurso,    setRecurso]    = useState(() => {
-    if (recursoInicial) return { ...RECURSO_BASE, ...recursoInicial };
+    if (recursoInicial) {
+      return {
+        ...RECURSO_BASE,
+        ...recursoInicial,
+        ejercicios: (recursoInicial.ejercicios || []).map(ex => ({
+          ...ex,
+          tiempo: ex.tiempo ?? 0,
+          items: (ex.items || []).map(item => {
+            if (!Array.isArray(item.alts)) return item;
+            return {
+              ...item,
+              alts: item.alts.map(a =>
+                Array.isArray(a) ? a : (typeof a === 'string' ? a.split('|').map(s => s.trim()).filter(Boolean) : [])
+              ),
+            };
+          }),
+        })),
+      };
+    }
     return { ...RECURSO_BASE };
   });
   const [saving,     setSaving]     = useState(false);

@@ -35,8 +35,11 @@ import EditorOlympic from './components/EditorOlympic';
 import EditorSintaxis from './components/EditorSintaxis';
 import EditorEtiquetas from './components/EditorEtiquetas';
 import EditorOmni from './components/EditorOmni';
+import EditorPaginaProfesor from './components/EditorPaginaProfesor';
+import PaginaProfesor from './components/PaginaProfesor';
 import EditorVideoQuizz from './components/EditorVideoQuizz';
 import OmninteractiveApp from './OmninteractiveApp';
+import VideoQuizzApp from './VideoQuizzApp';
 import * as XLSX from 'xlsx'; // <--- IMPORTANTE
 // ==============================================================================
 //  ZONA DE CLAVES (SEGURA)
@@ -71,6 +74,7 @@ const TIPOS_JUEGOS = {
     ETIQUETAS: { id: 'ETIQUETAS', label: 'Etiquetas', color: '#e74c3c', camposConfig: [] },
 SINTAXIS: { id: 'SINTAXIS', label: 'Sintaxis', color: '#3498db', camposConfig: [] },
 OMNINTERACTIVE: { id: 'OMNINTERACTIVE', label: 'Omninteractive', color: '#6D28D9', camposConfig: [] },
+VIDEOQUIZZ: { id: 'VIDEOQUIZZ', label: 'VideoQuizz', color: '#DC2626', camposConfig: [] },
 };
 
 // MENSAJES DE AYUDA VACÍO
@@ -112,6 +116,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
     const [recursoOmniInicial, setRecursoOmniInicial] = useState(null);
     const [mostrandoEditorVideoQuizz, setMostrandoEditorVideoQuizz] = useState(false);
     const [recursoVQInicial, setRecursoVQInicial] = useState(null);
+    const [paginaProfesorPreview, setPaginaProfesorPreview] = useState(null);
     // Añade este estado junto a los demás en ProfesorDashboard
     const [qSenderAMigrar, setQsenderAMigrar] = useState(null);
 
@@ -152,7 +157,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             const s = await getDocs(q);
             const docs = s.docs.map(d => ({ ...d.data(), id: d.id })).filter(r => {
                 if (modoDashboard === 'PRO') {
-                    return r.tipo === 'PRO' || r.tipo === 'PRO-BURBUJAS' || r.tipo === 'OLYMPIC' || r.tipo === 'SINTAXIS' || r.tipo === 'ETIQUETAS' || r.tipo === 'OMNI';
+                    return r.tipo === 'PRO' || r.tipo === 'PRO-BURBUJAS' || r.tipo === 'OLYMPIC' || r.tipo === 'SINTAXIS' || r.tipo === 'ETIQUETAS' || r.tipo === 'OMNI' || r.tipo === 'VIDEOQUIZZ';
                 }
 
                 if (modoDashboard === 'LIVE') {
@@ -409,7 +414,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                 setRecursoOmniInicial(dataFresca);
                 setMostrandoEditorOmni(true);
             }
-            else if (dataFresca.tipoJuego === 'VIDEOQUIZZ' || dataFresca.tipo === 'VIDEOQUIZZ') {
+            else if (dataFresca.tipoJuego === 'VIDEOQUIZZ' || dataFresca.tipo === 'VIDEOQUIZZ' || dataFresca.youtubeUrl) {
                 setRecursoVQInicial(dataFresca);
                 setMostrandoEditorVideoQuizz(true);
             }
@@ -933,6 +938,11 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             return <OmninteractiveApp recursoDirecto={recursoProbando} onBack={() => setRecursoProbando(null)} />;
         }
 
+        // CASO VIDEOQUIZZ
+        if (recursoProbando.tipoJuego === 'VIDEOQUIZZ' || recursoProbando.tipo === 'VIDEOQUIZZ' || recursoProbando.youtubeUrl) {
+            return <VideoQuizzApp recursoDirecto={recursoProbando} onBack={() => setRecursoProbando(null)} />;
+        }
+
         // CASO 3: RECURSOS CLÁSICOS (Usa el reproductor antiguo GamePlayer)
         return (
             <div style={{ background: '#2f3640', minHeight: '100vh' }}>
@@ -981,6 +991,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                     <li style={styles.menuItem} onClick={() => navegar('LIVE')}>Recursos Live</li>   {/* ← NUEVO */}
                     <li style={styles.menuItem} onClick={() => navegar('BUSCADOR_GLOBAL')}>Buscador de Recursos</li>
                     <li style={styles.menuItem} onClick={() => navegar('HERRAMIENTAS')}>Herramientas del Profesor</li>
+                    <li style={styles.menuItem} onClick={() => navegar('MI_PAGINA')}>🌐 Mi Página</li>
 
                     {/* --- CAMBIA ESTAS DOS LÍNEAS PARA LOS ENLACES EXTERNOS --- */}
                     <li style={styles.menuItem} onClick={() => {
@@ -1030,6 +1041,20 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                 />
             )}
             {modoDashboard === 'INFORMES' && <InformesJuegos usuario={usuario} />}
+
+            {/* MI PÁGINA */}
+            {modoDashboard === 'MI_PAGINA' && !paginaProfesorPreview && (
+                <EditorPaginaProfesor
+                    usuario={perfilProfesor || usuario}
+                    onPreview={(uid) => setPaginaProfesorPreview(uid)}
+                />
+            )}
+            {modoDashboard === 'MI_PAGINA' && paginaProfesorPreview && (
+                <PaginaProfesor
+                    uid={paginaProfesorPreview}
+                    onBack={() => setPaginaProfesorPreview(null)}
+                />
+            )}
 
             {/* 3. LEGAL / INFO */}
             {(modoDashboard === 'LEGAL' || modoDashboard === 'INFO') && (

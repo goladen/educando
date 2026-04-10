@@ -10,6 +10,8 @@ import LandingGames, { APPS, SpecificGamePage, ResourceCard } from './components
 import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from './firebase';
 import SopaDeLetrasGame from './SopaDeLetrasGame';
+import BuscadorPaginas from './components/BuscadorPaginas';
+import PaginaProfesor from './components/PaginaProfesor';
 
 export default function Login({ setGoogleToken }) {
     const [error, setError] = useState(null);
@@ -19,6 +21,7 @@ export default function Login({ setGoogleToken }) {
     // VISTAS: 'MAIN', 'POPULARES', o el ID del juego (ej: 'PASAPALABRA', 'WORDLE', etc.)
     const [vistaActual, setVistaActual] = useState('MAIN');
     const [topGames, setTopGames] = useState([]);
+    const [paginaProfesorSlug, setPaginaProfesorSlug] = useState(null);
 
     // --- DETECTOR DE RUTAS (ESTO HACE QUE SE ABRA LA PANTALLA COMPLETA) ---
     useEffect(() => {
@@ -83,9 +86,23 @@ export default function Login({ setGoogleToken }) {
 
 
         else if (opcion === 'privacidad') window.open('https://www.pikt.es/politica.html', '_blank');
+        else if (opcion === 'paginas-profesores') setVistaActual('PAGINAS_PROFESORES');
     };
 
     // --- RENDERIZADO CONDICIONAL DE VISTAS ---
+
+    // PÁGINA INDIVIDUAL DE PROFESOR (desde buscador)
+    if (paginaProfesorSlug) {
+        return <PaginaProfesor slug={paginaProfesorSlug} onBack={() => setPaginaProfesorSlug(null)} />;
+    }
+
+    // BUSCADOR DE PÁGINAS DE PROFESORES
+    if (vistaActual === 'PAGINAS_PROFESORES') {
+        return <BuscadorPaginas
+            onSelect={slug => setPaginaProfesorSlug(slug)}
+            onBack={() => setVistaActual('MAIN')}
+        />;
+    }
 
     // 1. VISTA DE LOS MÁS POPULARES
     if (vistaActual === 'POPULARES') {
@@ -151,6 +168,7 @@ export default function Login({ setGoogleToken }) {
                         <ul style={styles.menuList}>
                             <li style={styles.menuItem} onClick={() => handleMenuClick('inicio')}>🏠 Inicio</li>
                             <li style={styles.menuItem} onClick={() => handleMenuClick('populares')}>🔥 Los juegos más populares</li>
+                            <li style={styles.menuItem} onClick={() => handleMenuClick('paginas-profesores')}>👨‍🏫 Páginas de profesores</li>
                             <li style={styles.menuItem} onClick={() => handleMenuClick('que-hacer')}>❓ ¿Qué puedo hacer?</li>
                             <li style={styles.menuItem} onClick={() => handleMenuClick('privacidad')}>🔒 Política de privacidad</li>
                         </ul>

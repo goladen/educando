@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { auth, db } from './firebase';
 import { signOut, onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, query, where, getDocs } from "firebase/firestore";
 import ProfesorDashboard from './ProfesorDashboard';
 import StudentDashboard2 from './StudentDashboard2';
 import Login from './Login';
 import GamePlayer from './GamePlayer';
+import PaginaProfesor from './components/PaginaProfesor';
 
 function App() {
     const [usuario, setUsuario] = useState(null);
@@ -21,6 +22,29 @@ function App() {
     const [region, setRegion] = useState("");
     const [poblacion, setPoblacion] = useState("");
     const [temas, setTemas] = useState("");
+    // DETECTAR PÁGINA PÚBLICA DE PROFESOR — por slug (/nombre) o por ?p=uid
+    const [paginaTarget, setPaginaTarget] = useState(null); // { uid } | { slug }
+
+    useEffect(() => {
+      const params = new URLSearchParams(window.location.search);
+      const uid = params.get('p');
+      if (uid) { setPaginaTarget({ uid }); return; }
+      const slug = window.location.pathname.replace('/','').trim().toLowerCase();
+      const RUTAS_RESERVADAS = new Set([
+        'populares','inicio','pasapalabra','cazaburbujas','burbujas','pikatron','pikatron_2',
+        'kartinged','karting','kartinged_multi','karting_multi','aparejados','aparejados',
+        'ruleta','wordle','mathle','thinkhoot','pilive','mathlive','olympiclive','olympic_live',
+        'sopa','sopa_letras','question_sender','q-sender','omninteractive','videoquizz',
+        'wordle','sintaxis','etiquetas',
+      ]);
+      if (slug && !RUTAS_RESERVADAS.has(slug)) {
+        // Check if it's a professor page slug
+        getDocs(query(collection(db,'paginas_profesores'), where('slug','==',slug), where('publicada','==',true)))
+          .then(snap => { if (!snap.empty) setPaginaTarget({ slug, uid: snap.docs[0].id }); })
+          .catch(()=>{});
+      }
+    }, []);
+
     // DETECTAR DEEP LINK AL MONTAR (funciona para todos: registrados, sin registrar, invitados)
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -100,6 +124,9 @@ function App() {
         signOut(auth);
         setPais(""); setRegion(""); setPoblacion("");
     };
+
+    // PÁGINA PÚBLICA DEL PROFESOR (no requiere login)
+    if (paginaTarget) return <PaginaProfesor uid={paginaTarget.uid} onBack={() => { setPaginaTarget(null); window.history.back(); }} />;
 
     if (cargando && !deepLinkGame) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Cargando...</div>;
 

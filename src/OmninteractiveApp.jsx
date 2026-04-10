@@ -675,7 +675,16 @@ function SummaryScreen({ recurso, shuffledEj, answers, onBack, onRetry }) {
 // ── Play Screen (single player) ───────────────────────────────────────────────
 function PlayScreen({ recurso, onBack }) {
   const isMobile = useIsMobile();
-  const [shuffledEj]    = useState(() => recurso.ejercicios.map(ex => ({ ...ex, items: shuffleArr(ex.items) })));
+  const [shuffledEj]    = useState(() => (recurso.ejercicios || []).map(ex => ({
+    ...ex,
+    items: shuffleArr((ex.items || []).map(item => {
+      // Restore alts from Firestore flat format ["a|b"] → [["a","b"]]
+      if (Array.isArray(item.alts)) {
+        return { ...item, alts: item.alts.map(a => Array.isArray(a) ? a : (typeof a === 'string' ? a.split('|').map(s => s.trim()).filter(Boolean) : [])) };
+      }
+      return item;
+    })),
+  })));
   const [exIdx,          setExIdx]      = useState(0);
   const [answers,        setAnswers]    = useState({});
   const [checked,        setChecked]    = useState({});
@@ -686,16 +695,18 @@ function PlayScreen({ recurso, onBack }) {
   const attemptKey    = `omni_done_${recurso.id || recurso.titulo}`;
   const alreadyDone   = soloUnIntento && !!localStorage.getItem(attemptKey);
 
-  const ex        = shuffledEj[exIdx];
-  const exAns     = answers[ex.id] || {};
-  const isChecked = !!checked[ex.id];
+  const ex        = shuffledEj[exIdx] || shuffledEj[0];
+  const exAns     = ex ? (answers[ex.id] || {}) : {};
+  const isChecked = ex ? !!checked[ex.id] : false;
   const totalEx   = shuffledEj.length;
   const completados = shuffledEj.filter(e => checked[e.id]).length;
   const globalPct   = totalEx > 0 ? Math.round(completados / totalEx * 100) : 0;
-  const score = isChecked ? calcScore(ex, exAns) : null;
+  const score = (ex && isChecked) ? calcScore(ex, exAns) : null;
   const pct   = score ? Math.round(score.c / score.t * 100) : 0;
   const scol  = !score ? recurso.color : pct === 100 ? '#059669' : pct >= 60 ? '#D97706' : '#DC2626';
-  const info  = TIPO_INFO[ex.tipo] || {};
+  const info  = TIPO_INFO[ex?.tipo] || { label: '', color: recurso.color };
+
+  if (!ex) return null;
 
   // Init timer when switching exercises
   useEffect(() => {
@@ -1178,7 +1189,7 @@ function OmniClientExercise({ ex, startTime, subFase, myResult, forceCheck, onSu
   const score   = submitted ? calcScore(ex, answers) : null;
   const pct     = score ? Math.round(score.c / score.t * 100) : 0;
   const scol    = !score ? '#6D28D9' : pct === 100 ? '#059669' : pct >= 60 ? '#D97706' : '#DC2626';
-  const info    = TIPO_INFO[ex.tipo] || {};
+  const info    = TIPO_INFO[ex?.tipo] || { label: '', color: '#6D28D9' };
   const sRatio  = myResult?.ratio ?? null;
 
   return (

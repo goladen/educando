@@ -1596,7 +1596,7 @@ function Desglose({ tokens, results }) {
             <h3 style={{margin:'0 0 12px',color:'#2c3e50',fontSize:'0.9rem',fontWeight:'bold'}}>📋 Desglose</h3>
             <div style={{display:'flex',flexDirection:'column',gap:6}}>
                 {results.map((r,i) => (
-                    <div key={i} style={{display:'flex',alignItems:'center',gap:10,background:'white',borderRadius:10,
+                    <div key={i} style={{display:'flex',alignItems:'center',gap:10,borderRadius:10,
                         padding:'8px 12px',borderLeft:`4px solid ${r.ok?'#27ae60':'#e74c3c'}`,
                         background:r.ok?'#f0fdf4':'#fef2f2'}}>
                         <span style={{background:correctBg(r.esp),color:'white',padding:'2px 8px',borderRadius:6,fontWeight:'bold',fontSize:'0.88rem',minWidth:40,textAlign:'center'}}>

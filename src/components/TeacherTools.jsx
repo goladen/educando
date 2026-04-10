@@ -18,7 +18,7 @@ export default function TeacherTools({ usuario, googleToken, perfilProfesor, onO
     if (herramientaActiva === 'FORMS')       return <ToolGeneradorGoogleForms  usuario={usuario} googleToken={googleToken} onBack={() => setHerramientaActiva(null)} />;
     if (herramientaActiva === 'CONVERSOR')   return <ToolConversorRecursos     usuario={usuario} onBack={() => setHerramientaActiva(null)} />;
     if (herramientaActiva === 'INFORMES')    return <InformesJuegos usuario={usuario} />;
-    if (herramientaActiva === 'VIDEO')       return <VideoAPre onBack={() => setHerramientaActiva(null)} />;
+    if (herramientaActiva === 'VIDEO')       return <VideoAPre onBack={() => setHerramientaActiva(null)} usuario={usuario} />;
     if (herramientaActiva === 'VIDEOQUIZZ')  return <EditorVideoQuizz usuario={usuario} onBack={() => setHerramientaActiva(null)} />;
 
     if (herramientaActiva === 'FOTO') {

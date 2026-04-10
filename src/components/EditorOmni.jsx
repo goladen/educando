@@ -58,7 +58,7 @@ function generarCodigo() {
 
 // ─── sub-editors por tipo ─────────────────────────────────────────────────────
 
-function ItemEditorFill({ item, onChange }) {
+function ItemEditorFill({ item, onChange, onMerge }) {
   const nb = item.parts.length - 1;
   return (
     <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -75,18 +75,21 @@ function ItemEditorFill({ item, onChange }) {
           }} placeholder={`Parte ${i + 1}`} />
           {item.parts.length > 2 && i > 0 && i < item.parts.length - 1 && (
             <button style={btnSm} onClick={() => {
-              const np = item.parts.filter((_, j) => j !== i);
-              const na = item.ans.filter((_, j) => j !== i - 1);
-              const nl = item.alts.filter((_, j) => j !== i - 1);
-              onChange('parts', np); onChange('ans', na); onChange('alts', nl);
+              onMerge({
+                parts: item.parts.filter((_, j) => j !== i),
+                ans:   item.ans.filter((_, j) => j !== i - 1),
+                alts:  item.alts.filter((_, j) => j !== i - 1),
+              });
             }}>✕</button>
           )}
         </div>
       ))}
       <button style={btnAdd} onClick={() => {
-        onChange('parts', [...item.parts.slice(0, -1), '', item.parts[item.parts.length - 1]]);
-        onChange('ans', [...item.ans, '']);
-        onChange('alts', [...item.alts, []]);
+        onMerge({
+          parts: [...item.parts.slice(0, -1), '', item.parts[item.parts.length - 1]],
+          ans:   [...item.ans, ''],
+          alts:  [...item.alts, []],
+        });
       }}>+ añadir hueco</button>
       {item.ans.map((a, i) => (
         <div key={i}>
@@ -224,11 +227,11 @@ function ItemEditorError({ item, onChange }) {
   );
 }
 
-function ItemEditor({ tipo, item, onChange }) {
+function ItemEditor({ tipo, item, onChange, onMerge }) {
   switch (tipo) {
-    case 'fill':        return <ItemEditorFill item={item} onChange={onChange} />;
+    case 'fill':        return <ItemEditorFill item={item} onChange={onChange} onMerge={onMerge} />;
     case 'choice':      return <ItemEditorChoice item={item} onChange={onChange} />;
-    case 'wordbank':    return <ItemEditorFill item={item} onChange={onChange} />;
+    case 'wordbank':    return <ItemEditorFill item={item} onChange={onChange} onMerge={onMerge} />;
     case 'construct':   return <ItemEditorConstruct item={item} onChange={onChange} />;
     case 'match':       return <ItemEditorMatch item={item} onChange={onChange} />;
     case 'order':       return <ItemEditorOrder item={item} onChange={onChange} />;
@@ -336,7 +339,9 @@ function ExercisePanel({ ex, idx, total, onUpdate, onDelete, onMove, color }) {
                 </div>
                 {openItems[i] && (
                   <div style={{ padding: '10px 12px' }}>
-                    <ItemEditor tipo={ex.tipo} item={item} onChange={(field, val) => updateItem(i, field, val)} />
+                    <ItemEditor tipo={ex.tipo} item={item}
+                      onChange={(field, val) => updateItem(i, field, val)}
+                      onMerge={(patch) => { const items = ex.items.map((it, j) => j === i ? { ...it, ...patch } : it); onUpdate({ ...ex, items }); }} />
                   </div>
                 )}
               </div>
@@ -352,7 +357,24 @@ function ExercisePanel({ ex, idx, total, onUpdate, onDelete, onMove, color }) {
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 export default function EditorOmni({ recursoInicial = null, usuario, onBack }) {
   const [recurso, setRecurso] = useState(() => {
-    if (recursoInicial) return { ...RECURSO_BASE, ...recursoInicial };
+    if (recursoInicial) {
+      // Firestore stores alts as ["a|b","c"]; restore to [["a","b"],["c"]]
+      const deserializado = {
+        ...RECURSO_BASE,
+        ...recursoInicial,
+        ejercicios: (recursoInicial.ejercicios || []).map(ex => ({
+          ...ex,
+          items: (ex.items || []).map(item => {
+            if (!Array.isArray(item.alts)) return item;
+            const altsRestored = item.alts.map(a =>
+              Array.isArray(a) ? a : (typeof a === 'string' ? a.split('|').map(s => s.trim()).filter(Boolean) : [])
+            );
+            return { ...item, alts: altsRestored };
+          }),
+        })),
+      };
+      return deserializado;
+    }
     return { ...RECURSO_BASE };
   });
   const [saving, setSaving] = useState(false);

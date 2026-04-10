@@ -368,7 +368,12 @@ export default function EditorVideoQuizz({ recursoInicial = null, usuario, onBac
     ...ex,
     items:(ex.items||[]).map(item=>{
       const clean={...item};
+      // Firestore no admite arrays anidados: convierte alts [[a,b],[c]] → ["a|b","c"]
       if(Array.isArray(item.alts)) clean.alts=item.alts.map(a=>Array.isArray(a)?a.join('|'):(a||''));
+      // Idem para cualquier otro campo que pudiera ser array de arrays
+      Object.keys(clean).forEach(k=>{
+        if(Array.isArray(clean[k])) clean[k]=clean[k].map(v=>Array.isArray(v)?v.join('|'):v);
+      });
       return clean;
     }),
   }));
@@ -399,7 +404,7 @@ export default function EditorVideoQuizz({ recursoInicial = null, usuario, onBac
       };
       delete data.id;
       if (recurso.id && !recurso.id.startsWith('auto_')) {
-        await updateDoc(doc(db,'recursos',recurso.id), data);
+        await updateDoc(doc(db,'resources',recurso.id), data);
         alert('Recurso actualizado.');
       } else {
         await addDoc(collection(db,'resources'), data);

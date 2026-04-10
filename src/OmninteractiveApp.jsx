@@ -5,6 +5,7 @@
 import FotoARecurso from './FotoARecurso';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
+import MathText from './components/MathText';
 import { BIBLIOTECA } from './BibliotecaOmni';
 import { db } from './firebase';
 import { doc, setDoc, updateDoc, onSnapshot, increment, collection, addDoc, getDoc, getDocs, query, where } from 'firebase/firestore';
@@ -109,7 +110,7 @@ function FillEx({ ex, ans, setAns, checked }) {
         const nb = item.parts.length - 1;
         const nodes = [];
         item.parts.forEach((part, i) => {
-          nodes.push(<span key={`p${i}`}>{part}</span>);
+          nodes.push(<MathText key={`p${i}`} text={part} />);
           if (i < nb) {
             const val = ans[`${item.id}-${i}`] || '';
             const correct = item.ans[i];
@@ -157,7 +158,7 @@ function ChoiceEx({ ex, ans, setAns, checked }) {
           <div key={item.id} style={{ display: 'flex', gap: 10, marginBottom: 12, alignItems: 'flex-start' }}>
             <ItemLabel lbl={item.lbl} color={ex.color} />
             <span style={{ lineHeight: 2.5, fontSize: 14 }}>
-              <span>{item.parts[0]}</span>
+              <MathText text={item.parts[0]} />
               {item.opts.map(opt => {
                 let bg = 'transparent', border = '#D1D5DB', color = '#6B7280', fw = 400;
                 if (!checked && opt === sel) { bg = '#EFF6FF'; border = '#3B82F6'; color = '#1D4ED8'; fw = 500; }
@@ -171,10 +172,10 @@ function ChoiceEx({ ex, ans, setAns, checked }) {
                     border: `1.5px solid ${border}`, background: bg, color, fontWeight: fw,
                     cursor: checked ? 'default' : 'pointer', fontFamily: 'inherit', fontSize: 13,
                     transition: 'all 0.15s', verticalAlign: 'middle',
-                  }}>{opt}</button>
+                  }}><MathText text={opt} /></button>
                 );
               })}
-              <span>{item.parts[1]}</span>
+              <MathText text={item.parts[1]} />
             </span>
           </div>
         );
@@ -339,7 +340,7 @@ function TrueFalseEx({ ex, ans, setAns, checked }) {
           <div key={item.id} style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'flex-start' }}>
             <ItemLabel lbl={item.lbl} color={ex.color} />
             <div style={{ flex: 1 }}>
-              <p style={{ margin: '0 0 7px', fontSize: 14, lineHeight: 1.5, color: '#0F172A' }}>{item.statement}</p>
+              <p style={{ margin: '0 0 7px', fontSize: 14, lineHeight: 1.5, color: '#0F172A' }}><MathText text={item.statement} /></p>
               <div style={{ display: 'flex', gap: 8 }}>
                 {['true', 'false'].map(opt => {
                   const label = opt === 'true' ? 'True' : 'False';
@@ -378,7 +379,7 @@ function MultiChoiceEx({ ex, ans, setAns, checked }) {
           <div key={item.id} style={{ marginBottom: 20 }}>
             <div style={{ display: 'flex', gap: 10, marginBottom: 10, alignItems: 'flex-start' }}>
               <ItemLabel lbl={item.lbl} color={ex.color} />
-              <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, fontWeight: 500 }}>{item.question}</p>
+              <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, fontWeight: 500 }}><MathText text={item.question} /></p>
             </div>
             <div style={{ paddingLeft: 32, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
               {item.opts.map((opt, idx) => {
@@ -399,7 +400,7 @@ function MultiChoiceEx({ ex, ans, setAns, checked }) {
                     display: 'flex', gap: 8, alignItems: 'center',
                   }}>
                     <span style={{ fontWeight: 600, opacity: 0.6, minWidth: 14 }}>{letter}</span>
-                    <span>{opt}</span>
+                    <MathText text={opt} />
                   </button>
                 );
               })}
@@ -806,7 +807,7 @@ function PlayScreen({ recurso, onBack }) {
                   <span style={{ fontWeight:800, fontSize:isMobile ? 15 : 18, color:'#0F172A' }}>{ex.titulo}</span>
                   <span style={{ padding:'2px 10px', borderRadius:20, background:`${info.color || recurso.color}20`, color:info.color || recurso.color, fontSize:10, fontWeight:700, textTransform:'uppercase' }}>{info.label}</span>
                 </div>
-                <p style={{ margin:0, fontSize:isMobile ? 13 : 14, color:'#475569', lineHeight:1.5 }}>{ex.enunciado}</p>
+                <p style={{ margin:0, fontSize:isMobile ? 13 : 14, color:'#475569', lineHeight:1.5 }}><MathText text={ex.enunciado} /></p>
                 {/* Timer bar */}
                 {(ex.tiempo || 0) > 0 && startTimes[ex.id] && !isChecked && (
                   <TimerBar tiempo={ex.tiempo} startTime={startTimes[ex.id]} onTimeUp={() => autoCheck(ex.id)} />
@@ -1010,7 +1011,7 @@ function OmniLiveHost({ recurso, codigoSala, onExit }) {
               <div style={sLive.questionCard}>
                 <div style={{ color:'rgba(255,255,255,0.6)', fontSize:12, marginBottom:6 }}>Ejercicio {(gameData?.indicePregunta || 0) + 1}</div>
                 <div style={{ fontWeight:800, fontSize:'1.15rem', color:'white', marginBottom:4 }}>{ex.titulo}</div>
-                <div style={{ color:'rgba(255,255,255,0.8)', fontSize:14, marginBottom:14 }}>{ex.enunciado}</div>
+                <div style={{ color:'rgba(255,255,255,0.8)', fontSize:14, marginBottom:14 }}><MathText text={ex.enunciado} /></div>
                 <div style={{ height:8, background:'rgba(255,255,255,0.15)', borderRadius:4, overflow:'hidden', marginBottom:10 }}>
                   <div style={{ width:`${timerPct}%`, height:'100%', background:timerPct > 50 ? '#10B981' : timerPct > 20 ? '#F59E0B' : '#EF4444', transition:'width 0.5s' }} />
                 </div>
@@ -1187,7 +1188,7 @@ function OmniClientExercise({ ex, startTime, subFase, myResult, forceCheck, onSu
           <span style={{ fontWeight:800, color:'white', fontSize:15 }}>{ex.titulo}</span>
           <span style={{ padding:'2px 10px', borderRadius:20, background:`${info.color || '#6D28D9'}30`, color:info.color || '#a78bfa', fontSize:10, fontWeight:700, textTransform:'uppercase' }}>{info.label}</span>
         </div>
-        <p style={{ margin:0, color:'rgba(255,255,255,0.8)', fontSize:13 }}>{ex.enunciado}</p>
+        <p style={{ margin:0, color:'rgba(255,255,255,0.8)', fontSize:13 }}><MathText text={ex.enunciado} /></p>
         {subFase === 'RESPONDING' && !submitted && (ex.tiempo || 0) > 0 && startTime && (
           <TimerBar tiempo={ex.tiempo} startTime={startTime} onTimeUp={doSubmit} />
         )}

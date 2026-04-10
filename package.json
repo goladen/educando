@@ -13,6 +13,7 @@
         "@google/generative-ai": "^0.24.1",
         "canvas-confetti": "^1.9.4",
         "firebase": "^10.7.1",
+        "katex": "^0.16.45",
         "lucide-react": "^0.563.0",
         "pptxgenjs": "^4.0.1",
         "react": "^18.2.0",

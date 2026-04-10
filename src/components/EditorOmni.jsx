@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
 import { Save, ArrowLeft, Plus, Trash2, ChevronDown, ChevronUp, Image as ImgIcon, Globe, Lock } from 'lucide-react';
+import MathInput from './MathInput';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 const uid = () => 'ex_' + Math.random().toString(36).slice(2, 8);
@@ -94,7 +95,7 @@ function ItemEditorFill({ item, onChange, onMerge }) {
       {item.ans.map((a, i) => (
         <div key={i}>
           <label style={lbl}>Respuesta correcta {nb > 1 ? `(hueco ${i + 1})` : ''}</label>
-          <input style={inp} value={a} onChange={e => { const n = [...item.ans]; n[i] = e.target.value; onChange('ans', n); }} placeholder="respuesta" />
+          <MathInput value={a} onChange={v => { const n = [...item.ans]; n[i] = v; onChange('ans', n); }} placeholder="respuesta" />
           <label style={{ ...lbl, marginTop: 4 }}>Alternativas válidas (separadas por |)</label>
           <input style={inp} value={(item.alts?.[i] || []).join('|')} onChange={e => {
             const n = [...(item.alts || [])];
@@ -309,7 +310,7 @@ function ExercisePanel({ ex, idx, total, onUpdate, onDelete, onMove, color }) {
           </div>
           <div style={{ marginBottom: 12 }}>
             <label style={lbl}>Enunciado / instrucciones</label>
-            <textarea style={{ ...inp, height: 56, resize: 'vertical' }} value={ex.enunciado} onChange={e => updateField('enunciado', e.target.value)} placeholder="Complete the answers with the verbs in brackets." />
+            <MathInput multiline value={ex.enunciado} onChange={v => updateField('enunciado', v)} placeholder="Complete the answers with the verbs in brackets. Usa $\frac{a}{b}$ para mates." />
           </div>
           <div style={{ marginBottom: 16, display: 'flex', gap: 8, alignItems: 'center' }}>
             <ImgIcon size={14} color="#94A3B8" />

@@ -292,67 +292,71 @@ export default function PaginaProfesor({ uid, slug, onBack }) {
       )}
 
       {/* Contenido */}
-      <div style={{ maxWidth:960, margin:'0 auto', padding:'28px 20px' }}>
+      <div style={{ maxWidth:720, margin:'0 auto', padding:'28px 16px' }}>
         {!cursoActivo && <p style={{ textAlign:'center', color:'#94A3B8', fontSize:15 }}>Esta página no tiene cursos todavía.</p>}
 
         {cursoActivo && (
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 360px', gap:32, alignItems:'start' }}>
+          <div style={{ display:'flex', flexDirection:'column', gap:28 }}>
 
-            {/* Izquierda: Recursos + Juegos */}
-            <div>
-              {recursosDelCurso.length>0 && (
-                <div style={{ marginBottom:28 }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14 }}>
-                    <BookOpen size={18} color={cursoActivo.color}/>
-                    <h2 style={{ margin:0, fontSize:17, fontWeight:700, color:'#0F172A' }}>Recursos</h2>
-                    <span style={{ fontSize:12, color:'#94A3B8' }}>{recursosDelCurso.length} actividades</span>
-                  </div>
-                  <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(170px,1fr))', gap:12 }}>
-                    {recursosDelCurso.map(r=><RecursoCard key={r.id} recurso={r}/>)}
-                  </div>
-                </div>
-              )}
-
-              {juegosDelCurso.length>0 && (
-                <div>
-                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14 }}>
-                    <Gamepad2 size={18} color={cursoActivo.color}/>
-                    <h2 style={{ margin:0, fontSize:17, fontWeight:700, color:'#0F172A' }}>Juegos</h2>
-                    <span style={{ fontSize:12, color:'#94A3B8' }}>{juegosDelCurso.length} juegos</span>
-                  </div>
-                  <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(170px,1fr))', gap:12 }}>
-                    {juegosDelCurso.map(id=><JuegoCard key={id} juegoId={id} color={cursoActivo.color}/>)}
-                  </div>
-                </div>
-              )}
-
-              {recursosDelCurso.length===0 && juegosDelCurso.length===0 && (
-                <p style={{ color:'#94A3B8', fontSize:14 }}>No hay actividades en este curso.</p>
-              )}
-            </div>
-
-            {/* Derecha: Temas con tareas */}
-            <div>
-              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:16 }}>
-                <ClipboardList size={18} color={cursoActivo.color}/>
-                <h2 style={{ margin:0, fontSize:17, fontWeight:700, color:'#0F172A' }}>Tareas</h2>
-                <span style={{ fontSize:12, color:'#94A3B8' }}>{totalTareas}</span>
+            {/* 1. Bienvenida */}
+            {cursoActivo.bienvenida && (
+              <div style={{ background:'white', borderRadius:14, padding:'18px 20px', border:'1px solid #E2E8F0', boxShadow:'0 2px 8px rgba(0,0,0,0.04)', borderLeft:`4px solid ${cursoActivo.color||'#6D28D9'}` }}>
+                <p style={{ margin:0, fontSize:15, color:'#334155', lineHeight:1.7, whiteSpace:'pre-wrap' }}>{cursoActivo.bienvenida}</p>
               </div>
+            )}
 
-              {totalTareas===0 && <p style={{ color:'#94A3B8', fontSize:14 }}>Sin tareas asignadas.</p>}
-
-              {/* Temas nuevos */}
-              {temasDelCurso.map(tema=>(
-                <TemaSection key={tema.id} tema={tema} color={cursoActivo.color}/>
-              ))}
-
-              {/* Tareas legacy (formato antiguo sin temas) */}
-              {tareasLegacy.length>0 && (
-                <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                  {tareasLegacy.map(t=><TareaCard key={t.id} tarea={t} color={cursoActivo.color}/>)}
+            {/* 2. Recursos */}
+            {recursosDelCurso.length>0 && (
+              <div>
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14 }}>
+                  <BookOpen size={18} color={cursoActivo.color}/>
+                  <h2 style={{ margin:0, fontSize:17, fontWeight:700, color:'#0F172A' }}>Recursos</h2>
+                  <span style={{ fontSize:12, color:'#94A3B8' }}>{recursosDelCurso.length} actividades</span>
                 </div>
-              )}
-            </div>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))', gap:12 }}>
+                  {recursosDelCurso.map(r=><RecursoCard key={r.id} recurso={r}/>)}
+                </div>
+              </div>
+            )}
+
+            {/* 3. Juegos */}
+            {juegosDelCurso.length>0 && (
+              <div>
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14 }}>
+                  <Gamepad2 size={18} color={cursoActivo.color}/>
+                  <h2 style={{ margin:0, fontSize:17, fontWeight:700, color:'#0F172A' }}>Juegos</h2>
+                  <span style={{ fontSize:12, color:'#94A3B8' }}>{juegosDelCurso.length} juegos</span>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))', gap:12 }}>
+                  {juegosDelCurso.map(id=><JuegoCard key={id} juegoId={id} color={cursoActivo.color}/>)}
+                </div>
+              </div>
+            )}
+
+            {/* 4. Temas con tareas */}
+            {(temasDelCurso.length>0 || tareasLegacy.length>0) && (
+              <div>
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:16 }}>
+                  <ClipboardList size={18} color={cursoActivo.color}/>
+                  <h2 style={{ margin:0, fontSize:17, fontWeight:700, color:'#0F172A' }}>Tareas</h2>
+                  <span style={{ fontSize:12, color:'#94A3B8' }}>{totalTareas}</span>
+                </div>
+
+                {temasDelCurso.map(tema=>(
+                  <TemaSection key={tema.id} tema={tema} color={cursoActivo.color}/>
+                ))}
+
+                {tareasLegacy.length>0 && (
+                  <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                    {tareasLegacy.map(t=><TareaCard key={t.id} tarea={t} color={cursoActivo.color}/>)}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {recursosDelCurso.length===0 && juegosDelCurso.length===0 && totalTareas===0 && (
+              <p style={{ color:'#94A3B8', fontSize:14, textAlign:'center' }}>No hay contenido en este curso todavía.</p>
+            )}
 
           </div>
         )}

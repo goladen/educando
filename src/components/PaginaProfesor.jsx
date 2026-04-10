@@ -256,7 +256,7 @@ export default function PaginaProfesor({ uid, slug, onBack }) {
   const temasDelCurso    = cursoActivo?.temas||[];
   // Backward compat: cursos viejos con tareas planas
   const tareasLegacy     = cursoActivo?.tareas||[];
-  const totalTareas      = temasDelCurso.reduce((acc,t)=>acc+(t.tareas?.length||0),0) + tareasLegacy.length;
+  const totalTareas      = temasDelCurso.filter(t=>!t.oculto).reduce((acc,t)=>acc+(t.tareas?.length||0),0) + tareasLegacy.length;
 
   return (
     <div style={{ minHeight:'100vh', background:'#F8FAFC', fontFamily:'inherit' }}>
@@ -342,7 +342,7 @@ export default function PaginaProfesor({ uid, slug, onBack }) {
                   <span style={{ fontSize:12, color:'#94A3B8' }}>{totalTareas}</span>
                 </div>
 
-                {temasDelCurso.map(tema=>(
+                {temasDelCurso.filter(t=>!t.oculto).map(tema=>(
                   <TemaSection key={tema.id} tema={tema} color={cursoActivo.color}/>
                 ))}
 

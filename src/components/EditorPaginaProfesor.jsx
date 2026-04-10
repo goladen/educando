@@ -399,6 +399,15 @@ export default function EditorPaginaProfesor({ usuario, onPreview }) {
   const addCurso = () => { const c=newCurso(); setPagina(p=>({...p,cursos:[...p.cursos,c]})); setTab(c.id); };
   const updateCurso = (id,f,v) => setPagina(p=>({...p,cursos:p.cursos.map(c=>c.id===id?{...c,[f]:v}:c)}));
   const deleteCurso = (id) => { setPagina(p=>({...p,cursos:p.cursos.filter(c=>c.id!==id)})); if(tab===id) setTab(null); };
+  const duplicateCurso = (id) => setPagina(p=>{
+    const orig=p.cursos.find(c=>c.id===id); if(!orig) return p;
+    const copy={...orig, id:'c_'+Math.random().toString(36).slice(2,8), nombre:orig.nombre+' (copia)',
+      temas:(orig.temas||[]).map(t=>({...t,id:'tm_'+Math.random().toString(36).slice(2,8),
+        tareas:(t.tareas||[]).map(ta=>({...ta,id:'ta_'+Math.random().toString(36).slice(2,8)}))}))};
+    const idx=p.cursos.findIndex(c=>c.id===id);
+    const arr=[...p.cursos]; arr.splice(idx+1,0,copy);
+    return {...p,cursos:arr};
+  });
   const moveCurso = (id,dir) => setPagina(p=>{
     const arr=[...p.cursos]; const i=arr.findIndex(c=>c.id===id); const j=i+dir;
     if(j<0||j>=arr.length) return p; [arr[i],arr[j]]=[arr[j],arr[i]]; return {...p,cursos:arr};
@@ -421,6 +430,18 @@ export default function EditorPaginaProfesor({ usuario, onPreview }) {
     ...c,temas:(c.temas||[]).map(t=>t.id!==tid?t:{...t,[f]:v})})}));
   const deleteTema = (cid,tid) => setPagina(p=>({...p,cursos:p.cursos.map(c=>c.id!==cid?c:{
     ...c,temas:(c.temas||[]).filter(t=>t.id!==tid)})}));
+  const duplicateTema = (cid,tid) => setPagina(p=>{
+    const ci=p.cursos.findIndex(c=>c.id===cid); if(ci<0) return p;
+    const temas=[...(p.cursos[ci].temas||[])];
+    const idx=temas.findIndex(t=>t.id===tid); if(idx<0) return p;
+    const orig=temas[idx];
+    const copy={...orig, id:'tm_'+Math.random().toString(36).slice(2,8), titulo:orig.titulo+' (copia)',
+      tareas:(orig.tareas||[]).map(ta=>({...ta,id:'ta_'+Math.random().toString(36).slice(2,8)}))};
+    temas.splice(idx+1,0,copy);
+    const cursos=[...p.cursos]; cursos[ci]={...cursos[ci],temas}; return {...p,cursos};
+  });
+  const toggleOcultoTema = (cid,tid) => setPagina(p=>({...p,cursos:p.cursos.map(c=>c.id!==cid?c:{
+    ...c,temas:(c.temas||[]).map(t=>t.id!==tid?t:{...t,oculto:!t.oculto})})}));
   const moveTema = (cid,tid,dir) => setPagina(p=>{
     const ci=p.cursos.findIndex(c=>c.id===cid); if(ci<0) return p;
     const temas=[...(p.cursos[ci].temas||[])]; const i=temas.findIndex(t=>t.id===tid); const j=i+dir;
@@ -537,9 +558,10 @@ export default function EditorPaginaProfesor({ usuario, onPreview }) {
                 ))}
               </div>
               <div style={{ display:'flex', gap:4 }}>
-                <button onClick={()=>moveCurso(cursoActivo.id,-1)} style={btnIcon}>←</button>
-                <button onClick={()=>moveCurso(cursoActivo.id,1)} style={btnIcon}>→</button>
-                <button onClick={()=>deleteCurso(cursoActivo.id)} style={{...btnIcon,color:'#DC2626',borderColor:'#FCA5A5'}}><Trash2 size={13}/></button>
+                <button onClick={()=>moveCurso(cursoActivo.id,-1)} style={btnIcon} title="Mover izquierda">←</button>
+                <button onClick={()=>moveCurso(cursoActivo.id,1)} style={btnIcon} title="Mover derecha">→</button>
+                <button onClick={()=>{ if(window.confirm('¿Duplicar este curso?')) { duplicateCurso(cursoActivo.id); } }} style={{...btnIcon,fontSize:14}} title="Duplicar curso">⧉</button>
+                <button onClick={()=>{ if(window.confirm('¿Eliminar este curso?')) deleteCurso(cursoActivo.id); }} style={{...btnIcon,color:'#DC2626',borderColor:'#FCA5A5'}} title="Eliminar curso"><Trash2 size={13}/></button>
               </div>
             </div>
 
@@ -608,15 +630,23 @@ export default function EditorPaginaProfesor({ usuario, onPreview }) {
                 {(cursoActivo.temas||[]).map((tema,ti)=>{
                   const isOpen=temasExpanded.has(tema.id);
                   return (
-                    <div key={tema.id} style={{ border:`1.5px solid ${isOpen?cursoActivo.color:'#E2E8F0'}`, borderRadius:10, overflow:'hidden' }}>
-                      <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 12px', background:isOpen?`${cursoActivo.color}08`:'#FAFAFA', cursor:'pointer' }}
+                    <div key={tema.id} style={{ border:`1.5px solid ${isOpen?cursoActivo.color:tema.oculto?'#FCD34D':'#E2E8F0'}`, borderRadius:10, overflow:'hidden' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 12px', background:isOpen?`${cursoActivo.color}08`:tema.oculto?'#FEF9C3':'#FAFAFA', cursor:'pointer' }}
                         onClick={()=>toggleExpandTema(tema.id)}>
                         <span style={{ fontSize:12 }}>{isOpen?'▾':'▸'}</span>
                         <input value={tema.titulo} onChange={e=>{e.stopPropagation();updateTema(cursoActivo.id,tema.id,'titulo',e.target.value);}}
                           onClick={e=>e.stopPropagation()}
-                          style={{ flex:1,border:'none',background:'transparent',fontWeight:700,fontSize:14,color:'#0F172A',outline:'none',fontFamily:'inherit'}}
+                          style={{ flex:1,border:'none',background:'transparent',fontWeight:700,fontSize:14,color:tema.oculto?'#92400E':'#0F172A',outline:'none',fontFamily:'inherit'}}
                           placeholder="Título del tema"/>
-                        <div style={{ display:'flex', gap:4 }} onClick={e=>e.stopPropagation()}>
+                        {tema.oculto && <span style={{ fontSize:10, color:'#92400E', fontWeight:700, background:'#FEF3C7', borderRadius:4, padding:'1px 5px', flexShrink:0 }}>Oculto</span>}
+                        <div style={{ display:'flex', gap:3 }} onClick={e=>e.stopPropagation()}>
+                          <button onClick={()=>toggleOcultoTema(cursoActivo.id,tema.id)}
+                            title={tema.oculto?'Mostrar al público':'Ocultar al público'}
+                            style={{...btnIcon,width:22,height:22,fontSize:13,background:tema.oculto?'#FEF3C7':'white',borderColor:tema.oculto?'#FCD34D':'#E2E8F0'}}>
+                            {tema.oculto?'👁':'🙈'}
+                          </button>
+                          <button onClick={()=>duplicateTema(cursoActivo.id,tema.id)} title="Duplicar tema"
+                            style={{...btnIcon,width:22,height:22,fontSize:12}}>⧉</button>
                           <button onClick={()=>moveTema(cursoActivo.id,tema.id,-1)} disabled={ti===0} style={{...btnIcon,width:22,height:22,fontSize:11,opacity:ti===0?0.3:1}}>↑</button>
                           <button onClick={()=>moveTema(cursoActivo.id,tema.id,1)} disabled={ti===(cursoActivo.temas.length-1)} style={{...btnIcon,width:22,height:22,fontSize:11,opacity:ti===(cursoActivo.temas.length-1)?0.3:1}}>↓</button>
                           <button onClick={()=>deleteTema(cursoActivo.id,tema.id)} style={{...btnIcon,width:22,height:22,color:'#DC2626',borderColor:'#FCA5A5'}}><Trash2 size={11}/></button>

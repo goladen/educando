@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useRef } from 'react';
 import { db } from './firebase';
 // AÑADIDO: 'increment' para el contador de partidas
-import { doc, addDoc, collection, query, where, getDocs, updateDoc, getCountFromServer, increment } from 'firebase/firestore';
+import { doc, addDoc, getDoc, collection, query, where, getDocs, updateDoc, getCountFromServer, increment } from 'firebase/firestore';
 import Confetti from 'react-confetti';
 import { Save, CircleDollarSign, Mic, Type, Skull, Trophy, Crown, Medal, User } from 'lucide-react';
 
@@ -45,12 +45,87 @@ const BONO_RESOLVER = 250;
 const clean = (t) => t ? t.toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "") : "";
 const esVocal = (letra) => "aeiouáéíóú".includes(letra.toLowerCase());
 
+// ─── Modal Enviar al Profesor ─────────────────────────────────────────────────
+function ModalEnviarProfe({ datos, onClose }) {
+    const [codigo,   setCodigo]   = useState('');
+    const [nombre,   setNombre]   = useState('');
+    const [curso,    setCurso]    = useState('');
+    const [enviando, setEnviando] = useState(false);
+    const [enviado,  setEnviado]  = useState(false);
+    const [error,    setError]    = useState('');
+
+    const enviar = async () => {
+        const code = codigo.trim().toUpperCase();
+        if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+        if (!code) { setError('Escribe el código del profesor.'); return; }
+        setEnviando(true); setError('');
+        try {
+            const codigoDoc = await getDoc(doc(db, 'codigos_profesor', code));
+            if (!codigoDoc.exists()) { setError('Código no encontrado.'); setEnviando(false); return; }
+            await addDoc(collection(db, 'informes_juegos'), {
+                tipo: 'RULETA', modalidad: datos.jugadores.length > 1 ? 'Multijugador' : 'Individual',
+                fecha: new Date(),
+                recursoId: datos.recursoId, recursoTitulo: datos.recursoTitulo,
+                codigoProfesor: code,
+                jugadores: datos.jugadores.map(j => ({
+                    nombre: j.nombre === datos.jugadores[0].nombre ? nombre.trim() : j.nombre,
+                    curso: curso.trim(), puntos: j.puntos,
+                })),
+            });
+            setEnviado(true);
+        } catch(e) { setError('Error: ' + e.message); }
+        setEnviando(false);
+    };
+
+    return (
+        <div style={{ position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.7)', zIndex:10000, display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <div style={{ background:'#1e272e', border:'1px solid rgba(255,255,255,0.15)', borderRadius:20, width:'100%', maxWidth:380, padding:'26px 28px', boxShadow:'0 30px 80px rgba(0,0,0,0.7)', color:'white', fontFamily:"'Segoe UI', sans-serif" }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:18 }}>
+                    <h3 style={{ margin:0, fontSize:'1.05rem', color:'#f1c40f' }}>📤 Enviar al profesor</h3>
+                    <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', color:'#aaa', fontSize:'1.2rem' }}>✕</button>
+                </div>
+                {enviado ? (
+                    <div style={{ textAlign:'center', padding:'20px 0' }}>
+                        <div style={{ fontSize:'3rem', marginBottom:10 }}>✅</div>
+                        <div style={{ color:'#2ecc71', fontWeight:700, fontSize:'1.1rem' }}>¡Informe enviado!</div>
+                        <div style={{ marginTop:8, color:'#aaa', fontSize:'0.9rem' }}>
+                            {datos.jugadores.map(j=>`${j.nombre}: ${j.puntos} €`).join(' · ')}
+                        </div>
+                        <button onClick={onClose} style={{ marginTop:16, padding:'9px 22px', borderRadius:10, border:'none', background:'rgba(255,255,255,0.1)', cursor:'pointer', color:'white', fontFamily:'inherit' }}>Cerrar</button>
+                    </div>
+                ) : (
+                    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                        {[['nombre','Tu nombre y apellido',nombre,setNombre,'Tu nombre completo',false],
+                          ['curso','Curso',curso,setCurso,'Ej: 4º ESO A',false],
+                          ['codigo','Código del profesor',codigo,v=>setCodigo(v.toUpperCase()),'Ej: PROF01',true]
+                        ].map(([key,label,val,setter,ph,mono])=>(
+                            <div key={key}>
+                                <label style={{ fontSize:'0.78rem', color:'#aaa', fontWeight:600, display:'block', marginBottom:4 }}>{label}</label>
+                                <input value={val} onChange={e=>setter(e.target.value)} placeholder={ph} maxLength={key==='codigo'?10:undefined}
+                                    style={{ padding:'9px 12px', borderRadius:9, border:'1.5px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.08)', color:'white', fontSize:'0.9rem', outline:'none', width:'100%', boxSizing:'border-box', fontFamily:'inherit', letterSpacing:mono?2:0, fontWeight:mono?700:400 }}/>
+                            </div>
+                        ))}
+                        {error && <div style={{ color:'#e74c3c', fontSize:'0.8rem' }}>⚠ {error}</div>}
+                        <div style={{ display:'flex', gap:9, marginTop:4 }}>
+                            <button onClick={onClose} style={{ flex:1, padding:'10px', borderRadius:10, border:'1px solid rgba(255,255,255,0.2)', background:'transparent', cursor:'pointer', color:'white', fontFamily:'inherit' }}>Cancelar</button>
+                            <button onClick={enviar} disabled={enviando} style={{ flex:2, padding:'10px', borderRadius:10, border:'none', background:enviando?'#555':'linear-gradient(135deg,#f1c40f,#e67e22)', color:'#1e272e', fontWeight:700, cursor:enviando?'default':'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', gap:7 }}>
+                                {enviando ? 'Enviando…' : '📤 Enviar'}
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
 export default function RuletaGame({ recurso, usuario, alTerminar }) {
     // ESTADOS
     const [fase, setFase] = useState('SETUP');
     const [jugadores, setJugadores] = useState([]);
     const [turno, setTurno] = useState(0);
     const [mensajeCentral, setMensajeCentral] = useState('');
+    const [modalEnviar, setModalEnviar] = useState(false);
 
     const esInvitado = !usuario || !usuario.email;
 
@@ -466,6 +541,7 @@ export default function RuletaGame({ recurso, usuario, alTerminar }) {
     }
 
     return (
+        <>
         <div className="ruleta-container">
             <EstilosRuleta />
 
@@ -635,12 +711,26 @@ export default function RuletaGame({ recurso, usuario, alTerminar }) {
                                     </button>
                                     )
                                 )}
+                            <button onClick={() => setModalEnviar(true)} style={{ margin:'6px 0', padding:'12px 24px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#f1c40f,#e67e22)', color:'#1e272e', fontWeight:700, fontSize:'1rem', cursor:'pointer', display:'flex', alignItems:'center', gap:8, justifyContent:'center' }}>
+                                📤 Enviar al profesor
+                            </button>
                             <button className="btn-salir-premium" onClick={alTerminar}>Salir</button>
                         </div>
                     </div>
                 </div>
             )}
         </div>
+        {modalEnviar && (
+            <ModalEnviarProfe
+                datos={{
+                    recursoId: recurso?.id || '',
+                    recursoTitulo: recurso?.titulo || 'Ruleta',
+                    jugadores: jugadores,
+                }}
+                onClose={() => setModalEnviar(false)}
+            />
+        )}
+        </>
     );
 }
 

@@ -1,9 +1,8 @@
 // PaginaProfesor.jsx — Página pública del profesor
-// Accesible via ?p=uid
 import { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { BookOpen, ClipboardList, Calendar, Globe, ArrowLeft } from 'lucide-react';
+import { BookOpen, ClipboardList, Calendar, Globe, ArrowLeft, Gamepad2, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
 
 const TIPO_EMOJI = {
   PASAPALABRA:'🔤', CAZABURBUJAS:'🫧', APAREJADOS:'🃏', THINKHOOT:'⚡',
@@ -11,22 +10,65 @@ const TIPO_EMOJI = {
   RULETA:'🎡', SINTAXIS:'✏️', ETIQUETAS:'🏷️', MATHLIVE:'📐',
 };
 
+const JUEGOS_INFO = {
+  pasapalabra:     { nombre:'Pasapalabra',          emoji:'🔤', url:'/pasapalabra' },
+  cazaburbujas:    { nombre:'Cazaburbujas',          emoji:'🫧', url:'/cazaburbujas' },
+  aparejados:      { nombre:'AparejaDOS',            emoji:'🃏', url:'/aparejados' },
+  ruleta:          { nombre:'La Ruleta',             emoji:'🎡', url:'/ruleta' },
+  sopa:            { nombre:'Sopa de Letras',        emoji:'🔍', url:'/sopa_letras' },
+  wordle:          { nombre:'WordLe',                emoji:'🟩', url:'/wordle' },
+  mathle:          { nombre:'MathLe',                emoji:'🔢', url:'/mathle' },
+  omninteractive:  { nombre:'OmniInteractive',       emoji:'📚', url:'/omninteractive' },
+  videoquizz:      { nombre:'VideoQuizz',            emoji:'🎬', url:'/videoquizz' },
+  sintaxis:        { nombre:'Sintaxis',              emoji:'🖍️', url:'/sintaxis' },
+  listening:       { nombre:'Listening',             emoji:'🙉', url:'/listening' },
+  etiquetas:       { nombre:'EtiquetaMe',            emoji:'🏷️', url:'/etiquetas' },
+  pikatron:        { nombre:'Pikatron',              emoji:'⚡', url:'/pikatron' },
+  pikatron_2:      { nombre:'Plataformas',           emoji:'🏃', url:'/pikatron_2' },
+  kartinged:       { nombre:'Karting',               emoji:'🚗', url:'/kartinged' },
+  kartinged_multi: { nombre:'Karting Multi',         emoji:'🏎️', url:'/kartinged_multi' },
+  pilive:          { nombre:'PiLive',                emoji:'🎯', url:'/thinkhoot' },
+  mathlive:        { nombre:'MathLive',              emoji:'📊', url:'/mathlive' },
+  olympiclive:     { nombre:'Olympic Live',          emoji:'🏅', url:'/olympiclive' },
+  geometrix:       { nombre:'Geometrix',             emoji:'📐', url:'/geometrix' },
+  calculo:         { nombre:'Cálculo',               emoji:'🧠', url:'/calculo' },
+  funciones:       { nombre:'Funciones',             emoji:'📈', url:'/funciones' },
+  geom_analitica:  { nombre:'Geometría Analítica',   emoji:'♐', url:'/geometria_analitica' },
+  ecuaciones:      { nombre:'Ecuaciones',            emoji:'⚖️', url:'/ecuaciones' },
+  oca:             { nombre:'Oca Matemática',        emoji:'🎲', url:'/oca' },
+};
+
+function getYouTubeEmbed(url) {
+  if (!url) return null;
+  const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  return m ? `https://www.youtube.com/embed/${m[1]}` : null;
+}
+
+function getTareaJuegoUrl(tarea) {
+  if (tarea.juegoId) {
+    if (tarea.recursoId) return `${window.location.origin}/?r=${tarea.recursoId}`;
+    const info = JUEGOS_INFO[tarea.juegoId];
+    return info ? `${window.location.origin}${info.url}` : null;
+  }
+  if (tarea.juegoUrl) {
+    if (tarea.juegoUrl.startsWith('http')) return tarea.juegoUrl;
+    return `${window.location.origin}${tarea.juegoUrl.startsWith('/')?'':'/'}${tarea.juegoUrl}`;
+  }
+  return null;
+}
+
+// ─── Tarjeta de recurso ───────────────────────────────────────────────────────
 function RecursoCard({ recurso }) {
   const emoji = TIPO_EMOJI[recurso.tipoJuego] || '🎮';
-  const handleOpen = () => {
-    const url = `${window.location.origin}${window.location.pathname}?r=${recurso.id}`;
-    window.open(url, '_blank');
-  };
+  const handleOpen = () => window.open(`${window.location.origin}/?r=${recurso.id}`, '_blank');
   return (
     <div onClick={handleOpen} style={{
       background:'white', borderRadius:12, padding:'14px 16px',
       border:'1px solid #E2E8F0', cursor:'pointer', transition:'all 0.2s',
-      display:'flex', flexDirection:'column', gap:6,
-      boxShadow:'0 2px 8px rgba(0,0,0,0.04)',
+      display:'flex', flexDirection:'column', gap:6, boxShadow:'0 2px 8px rgba(0,0,0,0.04)',
     }}
-    onMouseEnter={e=>{ e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 6px 18px rgba(0,0,0,0.1)'; }}
-    onMouseLeave={e=>{ e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.04)'; }}
-    >
+    onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.boxShadow='0 6px 18px rgba(0,0,0,0.1)';}}
+    onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.04)';}}>
       <div style={{ fontSize:24 }}>{emoji}</div>
       <div style={{ fontWeight:700, fontSize:14, color:'#0F172A', lineHeight:1.3 }}>{recurso.titulo}</div>
       {recurso.descripcion && <div style={{ fontSize:12, color:'#64748B', lineHeight:1.4 }}>{recurso.descripcion.slice(0,80)}{recurso.descripcion.length>80?'…':''}</div>}
@@ -35,30 +77,125 @@ function RecursoCard({ recurso }) {
   );
 }
 
-function TareaCard({ tarea }) {
+// ─── Tarjeta de juego completo ────────────────────────────────────────────────
+function JuegoCard({ juegoId, color }) {
+  const info = JUEGOS_INFO[juegoId];
+  if (!info) return null;
+  return (
+    <div onClick={()=>window.open(`${window.location.origin}${info.url}`,'_blank')} style={{
+      background:'white', borderRadius:12, padding:'14px 16px',
+      border:'1px solid #E2E8F0', cursor:'pointer', transition:'all 0.2s',
+      display:'flex', flexDirection:'column', gap:6, boxShadow:'0 2px 8px rgba(0,0,0,0.04)',
+    }}
+    onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.boxShadow='0 6px 18px rgba(0,0,0,0.1)';}}
+    onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.04)';}}>
+      <div style={{ fontSize:24 }}>{info.emoji}</div>
+      <div style={{ fontWeight:700, fontSize:14, color:'#0F172A', lineHeight:1.3 }}>{info.nombre}</div>
+      <div style={{ fontSize:11, color:color||'#6D28D9', fontWeight:600, marginTop:'auto', display:'flex', alignItems:'center', gap:4 }}>
+        <Gamepad2 size={11}/> Juego completo
+      </div>
+    </div>
+  );
+}
+
+// ─── Tarjeta de tarea ─────────────────────────────────────────────────────────
+function TareaCard({ tarea, color }) {
   const hoy = new Date();
   const fecha = tarea.fechaEntrega ? new Date(tarea.fechaEntrega) : null;
   const vencida = fecha && fecha < hoy;
   const proxima = fecha && !vencida && (fecha - hoy) < 7*24*60*60*1000;
+  const ytEmbed  = getYouTubeEmbed(tarea.videoUrl);
+  const juegoUrl = getTareaJuegoUrl(tarea);
+  const juegoInfo = tarea.juegoId ? JUEGOS_INFO[tarea.juegoId] : null;
+  const [juegoAbierto, setJuegoAbierto] = useState(false);
+
   return (
     <div style={{
-      background:'white', borderRadius:10, padding:'12px 16px',
+      background:'white', borderRadius:12, padding:'14px 16px',
       border:`1.5px solid ${vencida?'#FCA5A5':proxima?'#FCD34D':'#E2E8F0'}`,
-      display:'flex', flexDirection:'column', gap:4,
+      display:'flex', flexDirection:'column', gap:8, boxShadow:'0 2px 8px rgba(0,0,0,0.04)',
     }}>
-      <div style={{ fontWeight:700, fontSize:14, color:'#0F172A' }}>{tarea.titulo || 'Tarea sin título'}</div>
+      <div style={{ fontWeight:700, fontSize:15, color:'#0F172A' }}>{tarea.titulo||'Tarea sin título'}</div>
       {tarea.descripcion && <div style={{ fontSize:13, color:'#475569', lineHeight:1.5 }}>{tarea.descripcion}</div>}
+
       {fecha && (
-        <div style={{ display:'flex', alignItems:'center', gap:5, fontSize:12, marginTop:4, color: vencida?'#DC2626':proxima?'#D97706':'#64748B' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:5, fontSize:12, color:vencida?'#DC2626':proxima?'#D97706':'#64748B' }}>
           <Calendar size={12}/>
           Entrega: {fecha.toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})}
-          {vencida && ' · Vencida'}{proxima && ' · Esta semana'}
+          {vencida&&' · Vencida'}{proxima&&' · Esta semana'}
+        </div>
+      )}
+
+      {tarea.imagenUrl && (
+        <img src={tarea.imagenUrl} alt="Imagen" style={{ width:'100%', borderRadius:8, maxHeight:220, objectFit:'cover', border:'1px solid #E2E8F0' }}
+          onError={e=>{e.currentTarget.style.display='none';}}/>
+      )}
+
+      {ytEmbed && (
+        <div style={{ borderRadius:8, overflow:'hidden', border:'1px solid #E2E8F0' }}>
+          <iframe src={ytEmbed} title="Video" width="100%" height="200" frameBorder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen style={{ display:'block' }}/>
+        </div>
+      )}
+      {tarea.videoUrl && !ytEmbed && (
+        <video src={tarea.videoUrl} controls style={{ width:'100%', borderRadius:8, maxHeight:220, border:'1px solid #E2E8F0' }}/>
+      )}
+
+      {tarea.enlaceUrl && (
+        <a href={tarea.enlaceUrl} target="_blank" rel="noreferrer"
+          style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:9, background:color||'#6D28D9', color:'white', fontWeight:600, fontSize:13, textDecoration:'none', width:'fit-content' }}>
+          <ExternalLink size={13}/> {tarea.enlaceTitulo||'Abrir enlace'}
+        </a>
+      )}
+
+      {juegoUrl && !juegoAbierto && (
+        <button onClick={()=>setJuegoAbierto(true)} style={{ display:'flex', alignItems:'center', gap:6, padding:'10px 16px', borderRadius:9, border:`2px solid ${color||'#6D28D9'}`, background:'white', color:color||'#6D28D9', fontWeight:700, fontSize:13, cursor:'pointer', width:'fit-content', fontFamily:'inherit' }}>
+          {juegoInfo ? <span>{juegoInfo.emoji}</span> : <Gamepad2 size={14}/>}
+          {juegoInfo ? `Jugar — ${juegoInfo.nombre}` : '¡Jugar ahora!'}
+        </button>
+      )}
+      {juegoUrl && juegoAbierto && (
+        <div style={{ borderRadius:10, overflow:'hidden', border:`2px solid ${color||'#6D28D9'}` }}>
+          <div style={{ background:color||'#6D28D9', padding:'6px 12px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <span style={{ color:'white', fontSize:12, fontWeight:600 }}>{juegoInfo?`${juegoInfo.emoji} ${juegoInfo.nombre}`:'🎮 Juego'}</span>
+            <button onClick={()=>setJuegoAbierto(false)} style={{ background:'rgba(255,255,255,0.2)', border:'none', borderRadius:6, color:'white', cursor:'pointer', fontSize:11, padding:'2px 8px', fontFamily:'inherit' }}>✕ Cerrar</button>
+          </div>
+          <iframe src={juegoUrl} title="Juego" width="100%" height="520" frameBorder="0" style={{ display:'block' }} allow="autoplay"/>
         </div>
       )}
     </div>
   );
 }
 
+// ─── Sección de un tema ───────────────────────────────────────────────────────
+function TemaSection({ tema, color }) {
+  const [abierto, setAbierto] = useState(true);
+  if (!tema.tareas?.length && !tema.descripcion) return null;
+
+  return (
+    <div style={{ marginBottom:20 }}>
+      <div onClick={()=>setAbierto(!abierto)} style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer', marginBottom:abierto?12:0 }}>
+        <div style={{ width:4, height:22, borderRadius:2, background:color||'#6D28D9', flexShrink:0 }}/>
+        <h3 style={{ margin:0, fontSize:16, fontWeight:800, color:'#0F172A', flex:1 }}>{tema.titulo||'Tema'}</h3>
+        <span style={{ color:'#94A3B8' }}>{abierto?<ChevronUp size={16}/>:<ChevronDown size={16}/>}</span>
+      </div>
+      {abierto && (
+        <>
+          {tema.descripcion && (
+            <div style={{ background:'#F8FAFC', borderRadius:8, padding:'10px 14px', marginBottom:12, fontSize:13, color:'#475569', lineHeight:1.6, borderLeft:`3px solid ${color||'#6D28D9'}` }}>
+              {tema.descripcion}
+            </div>
+          )}
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            {(tema.tareas||[]).map(t=><TareaCard key={t.id} tarea={t} color={color}/>)}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Componente principal ─────────────────────────────────────────────────────
 export default function PaginaProfesor({ uid, slug, onBack }) {
   const [pagina,   setPagina]   = useState(null);
   const [recursos, setRecursos] = useState({});
@@ -71,7 +208,7 @@ export default function PaginaProfesor({ uid, slug, onBack }) {
       let snap;
       if (uid) {
         snap = await getDoc(doc(db,'paginas_profesores',uid));
-        if (!snap.exists() || !snap.data().publicada) { setLoading(false); return; }
+        if (!snap.exists()||!snap.data().publicada) { setLoading(false); return; }
       } else {
         const q = query(collection(db,'paginas_profesores'), where('slug','==',slug), where('publicada','==',true));
         const res = await getDocs(q);
@@ -80,18 +217,17 @@ export default function PaginaProfesor({ uid, slug, onBack }) {
       }
       const data = snap.data();
       setPagina(data);
-      setTabActivo(data.cursos?.[0]?.id || null);
+      setTabActivo(data.cursos?.[0]?.id||null);
 
-      // Load all resources referenced in any course
       const allIds = [...new Set((data.cursos||[]).flatMap(c=>c.recursos||[]))].filter(id=>typeof id==='string'&&id.length>0);
-      if (allIds.length > 0) {
+      if (allIds.length>0) {
         const chunks = [];
-        for (let i=0; i<allIds.length; i+=10) chunks.push(allIds.slice(i,i+10));
+        for (let i=0;i<allIds.length;i+=10) chunks.push(allIds.slice(i,i+10));
         const found = {};
-        await Promise.all(chunks.map(async chunk => {
+        await Promise.all(chunks.map(async chunk=>{
           const q = query(collection(db,'resources'), where('__name__','in',chunk));
           const s = await getDocs(q);
-          s.docs.forEach(d => { found[d.id] = { ...d.data(), id:d.id }; });
+          s.docs.forEach(d=>{ found[d.id]={...d.data(),id:d.id}; });
         }));
         setRecursos(found);
       }
@@ -114,87 +250,106 @@ export default function PaginaProfesor({ uid, slug, onBack }) {
     </div>
   );
 
-  const cursoActivo = (pagina.cursos||[]).find(c=>c.id===tabActivo);
+  const cursoActivo      = (pagina.cursos||[]).find(c=>c.id===tabActivo);
   const recursosDelCurso = (cursoActivo?.recursos||[]).map(id=>recursos[id]).filter(Boolean);
-  const tareasDelCurso = cursoActivo?.tareas || [];
+  const juegosDelCurso   = cursoActivo?.juegos||[];
+  const temasDelCurso    = cursoActivo?.temas||[];
+  // Backward compat: cursos viejos con tareas planas
+  const tareasLegacy     = cursoActivo?.tareas||[];
+  const totalTareas      = temasDelCurso.reduce((acc,t)=>acc+(t.tareas?.length||0),0) + tareasLegacy.length;
 
   return (
     <div style={{ minHeight:'100vh', background:'#F8FAFC', fontFamily:'inherit' }}>
       {/* Hero */}
       <div style={{ background:'linear-gradient(135deg,#4338CA,#6D28D9)', padding:'40px 20px 32px', color:'white' }}>
         {onBack && (
-          <div style={{ maxWidth:860, margin:'0 auto', marginBottom:20 }}>
+          <div style={{ maxWidth:960, margin:'0 auto', marginBottom:20 }}>
             <button onClick={onBack} style={{ background:'rgba(255,255,255,0.15)', border:'none', borderRadius:8, padding:'6px 14px', color:'white', cursor:'pointer', fontSize:13, display:'flex', alignItems:'center', gap:5 }}>
               <ArrowLeft size={14}/> Volver
             </button>
           </div>
         )}
-        <div style={{ maxWidth:860, margin:'0 auto', display:'flex', gap:20, alignItems:'center' }}>
-          <div style={{ width:72, height:72, borderRadius:'50%', background:'rgba(255,255,255,0.2)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:30, flexShrink:0 }}>
-            👨‍🏫
-          </div>
+        <div style={{ maxWidth:960, margin:'0 auto', display:'flex', gap:20, alignItems:'center' }}>
+          <div style={{ width:72, height:72, borderRadius:'50%', background:'rgba(255,255,255,0.2)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:30, flexShrink:0 }}>👨‍🏫</div>
           <div>
-            <h1 style={{ margin:'0 0 4px', fontSize:26, fontWeight:800 }}>{pagina.nombre || 'Profesor'}</h1>
+            <h1 style={{ margin:'0 0 4px', fontSize:26, fontWeight:800 }}>{pagina.nombre||'Profesor'}</h1>
             {pagina.asignatura && <div style={{ opacity:0.8, fontSize:14, marginBottom:6 }}>{pagina.asignatura}</div>}
             {pagina.descripcion && <p style={{ margin:0, opacity:0.85, fontSize:14, lineHeight:1.6, maxWidth:600 }}>{pagina.descripcion}</p>}
           </div>
         </div>
       </div>
 
-      {/* Tabs de cursos */}
-      {(pagina.cursos||[]).length > 0 && (
+      {/* Tabs */}
+      {(pagina.cursos||[]).length>0 && (
         <div style={{ background:'white', borderBottom:'1px solid #E2E8F0', padding:'0 20px' }}>
-          <div style={{ maxWidth:860, margin:'0 auto', display:'flex', gap:2, overflowX:'auto' }}>
-            {(pagina.cursos||[]).map(c => (
-              <button key={c.id} onClick={()=>setTabActivo(c.id)} style={{
-                padding:'14px 20px', border:'none', background:'none', cursor:'pointer',
-                fontWeight:700, fontSize:14, fontFamily:'inherit',
-                color: tabActivo===c.id ? c.color : '#94A3B8',
-                borderBottom: tabActivo===c.id ? `3px solid ${c.color}` : '3px solid transparent',
-                whiteSpace:'nowrap', transition:'all 0.15s',
-              }}>{c.nombre}</button>
+          <div style={{ maxWidth:960, margin:'0 auto', display:'flex', gap:2, overflowX:'auto' }}>
+            {(pagina.cursos||[]).map(c=>(
+              <button key={c.id} onClick={()=>setTabActivo(c.id)} style={{ padding:'14px 20px', border:'none', background:'none', cursor:'pointer', fontWeight:700, fontSize:14, fontFamily:'inherit',
+                color:tabActivo===c.id?c.color:'#94A3B8', borderBottom:tabActivo===c.id?`3px solid ${c.color}`:'3px solid transparent', whiteSpace:'nowrap', transition:'all 0.15s' }}>{c.nombre}</button>
             ))}
           </div>
         </div>
       )}
 
-      {/* Contenido del curso */}
-      <div style={{ maxWidth:860, margin:'0 auto', padding:'28px 20px' }}>
-        {!cursoActivo && (
-          <p style={{ textAlign:'center', color:'#94A3B8', fontSize:15 }}>Esta página no tiene cursos todavía.</p>
-        )}
+      {/* Contenido */}
+      <div style={{ maxWidth:960, margin:'0 auto', padding:'28px 20px' }}>
+        {!cursoActivo && <p style={{ textAlign:'center', color:'#94A3B8', fontSize:15 }}>Esta página no tiene cursos todavía.</p>}
 
         {cursoActivo && (
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 320px', gap:28, alignItems:'start' }}>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 360px', gap:32, alignItems:'start' }}>
 
-            {/* Recursos */}
+            {/* Izquierda: Recursos + Juegos */}
             <div>
-              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:16 }}>
-                <BookOpen size={18} color={cursoActivo.color}/>
-                <h2 style={{ margin:0, fontSize:17, fontWeight:700, color:'#0F172A' }}>Recursos</h2>
-                <span style={{ fontSize:12, color:'#94A3B8', fontWeight:500 }}>{recursosDelCurso.length} actividades</span>
-              </div>
-              {recursosDelCurso.length === 0 ? (
-                <p style={{ color:'#94A3B8', fontSize:14 }}>No hay recursos en este curso.</p>
-              ) : (
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))', gap:12 }}>
-                  {recursosDelCurso.map(r => <RecursoCard key={r.id} recurso={r} />)}
+              {recursosDelCurso.length>0 && (
+                <div style={{ marginBottom:28 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14 }}>
+                    <BookOpen size={18} color={cursoActivo.color}/>
+                    <h2 style={{ margin:0, fontSize:17, fontWeight:700, color:'#0F172A' }}>Recursos</h2>
+                    <span style={{ fontSize:12, color:'#94A3B8' }}>{recursosDelCurso.length} actividades</span>
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(170px,1fr))', gap:12 }}>
+                    {recursosDelCurso.map(r=><RecursoCard key={r.id} recurso={r}/>)}
+                  </div>
                 </div>
+              )}
+
+              {juegosDelCurso.length>0 && (
+                <div>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14 }}>
+                    <Gamepad2 size={18} color={cursoActivo.color}/>
+                    <h2 style={{ margin:0, fontSize:17, fontWeight:700, color:'#0F172A' }}>Juegos</h2>
+                    <span style={{ fontSize:12, color:'#94A3B8' }}>{juegosDelCurso.length} juegos</span>
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(170px,1fr))', gap:12 }}>
+                    {juegosDelCurso.map(id=><JuegoCard key={id} juegoId={id} color={cursoActivo.color}/>)}
+                  </div>
+                </div>
+              )}
+
+              {recursosDelCurso.length===0 && juegosDelCurso.length===0 && (
+                <p style={{ color:'#94A3B8', fontSize:14 }}>No hay actividades en este curso.</p>
               )}
             </div>
 
-            {/* Tareas */}
+            {/* Derecha: Temas con tareas */}
             <div>
               <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:16 }}>
                 <ClipboardList size={18} color={cursoActivo.color}/>
                 <h2 style={{ margin:0, fontSize:17, fontWeight:700, color:'#0F172A' }}>Tareas</h2>
-                <span style={{ fontSize:12, color:'#94A3B8', fontWeight:500 }}>{tareasDelCurso.length}</span>
+                <span style={{ fontSize:12, color:'#94A3B8' }}>{totalTareas}</span>
               </div>
-              {tareasDelCurso.length === 0 ? (
-                <p style={{ color:'#94A3B8', fontSize:14 }}>Sin tareas asignadas.</p>
-              ) : (
+
+              {totalTareas===0 && <p style={{ color:'#94A3B8', fontSize:14 }}>Sin tareas asignadas.</p>}
+
+              {/* Temas nuevos */}
+              {temasDelCurso.map(tema=>(
+                <TemaSection key={tema.id} tema={tema} color={cursoActivo.color}/>
+              ))}
+
+              {/* Tareas legacy (formato antiguo sin temas) */}
+              {tareasLegacy.length>0 && (
                 <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                  {tareasDelCurso.map(t => <TareaCard key={t.id} tarea={t} />)}
+                  {tareasLegacy.map(t=><TareaCard key={t.id} tarea={t} color={cursoActivo.color}/>)}
                 </div>
               )}
             </div>

@@ -18,8 +18,22 @@ export default function GameLauncher({ src, title = 'Juego', onMessage, onSalir 
     const [launched, setLaunched] = useState(!isMobile); // escritorio lanza directo
 
     const launch = async () => {
-        await requestGameFullscreen(containerRef.current);
+        // Lanzar primero para que el iframe esté en el DOM antes de fullscreen
         setLaunched(true);
+
+        // Pedir fullscreen después de un tick para que React haya renderizado el iframe
+        setTimeout(async () => {
+            try {
+                const el = containerRef.current || document.documentElement;
+                if (el.requestFullscreen)            await el.requestFullscreen();
+                else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+            } catch (e) {
+                console.warn('Fullscreen no disponible:', e);
+            }
+            try {
+                if (screen.orientation?.lock) await screen.orientation.lock('landscape');
+            } catch (_) { /* iOS no soporta orientation.lock */ }
+        }, 50);
 
         // Al salir de fullscreen volver a la app
         const onFsChange = () => {
@@ -79,8 +93,9 @@ export default function GameLauncher({ src, title = 'Juego', onMessage, onSalir 
                     title={title}
                     onLoad={handleIframeLoad}
                     style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
-                    allow="fullscreen; pointer-lock"
-                    sandbox="allow-scripts allow-same-origin allow-pointer-lock"
+                    allow="fullscreen; pointer-lock; autoplay"
+                    allowFullScreen
+                    sandbox="allow-scripts allow-same-origin allow-pointer-lock allow-fullscreen"
                 />
             )}
         </div>

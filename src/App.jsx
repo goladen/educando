@@ -31,11 +31,18 @@ function App() {
       if (uid) { setPaginaTarget({ uid }); return; }
       const slug = window.location.pathname.replace('/','').trim().toLowerCase();
       const RUTAS_RESERVADAS = new Set([
-        'populares','inicio','pasapalabra','cazaburbujas','burbujas','pikatron','pikatron_2',
-        'kartinged','karting','kartinged_multi','karting_multi','aparejados','aparejados',
-        'ruleta','wordle','mathle','thinkhoot','pilive','mathlive','olympiclive','olympic_live',
-        'sopa','sopa_letras','question_sender','q-sender','omninteractive','videoquizz',
-        'wordle','sintaxis','etiquetas',
+        'populares','inicio',
+        'pasapalabra','cazaburbujas','burbujas',
+        'pikatron','pikatron_2','plataformas',
+        'kartinged','karting','kartinged_multi','karting_multi',
+        'aparejados','ruleta','wordle','mathle',
+        'thinkhoot','pilive','mathlive','olympiclive','olympic_live',
+        'sopa','sopa_letras','question_sender','q-sender',
+        'omninteractive','videoquizz','sintaxis','listening',
+        'etiquetas','etiquetame',
+        'geometrix','calculo','funciones','funciones2','geometria_analitica','geometriaanalitica',
+        'ecuaciones','oca',
+        'api','admin','login','app',
       ]);
       if (slug && !RUTAS_RESERVADAS.has(slug)) {
         // Check if it's a professor page slug

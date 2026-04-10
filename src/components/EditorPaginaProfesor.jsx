@@ -47,7 +47,7 @@ export default function EditorPaginaProfesor({ usuario, onPreview }) {
       }
     });
     const q = query(collection(db,'resources'), where('profesorUid','==',usuario.uid), where('isFinished','==',true));
-    getDocs(q).then(snap => setMisRecursos(snap.docs.map(d => ({ id:d.id, ...d.data() }))));
+    getDocs(q).then(snap => setMisRecursos(snap.docs.map(d => ({ ...d.data(), id:d.id }))));
   }, [usuario?.uid]);
 
   const SLUGS_RESERVADOS = new Set([

@@ -83,7 +83,7 @@ export default function PaginaProfesor({ uid, slug, onBack }) {
       setTabActivo(data.cursos?.[0]?.id || null);
 
       // Load all resources referenced in any course
-      const allIds = [...new Set((data.cursos||[]).flatMap(c=>c.recursos||[]))];
+      const allIds = [...new Set((data.cursos||[]).flatMap(c=>c.recursos||[]))].filter(id=>typeof id==='string'&&id.length>0);
       if (allIds.length > 0) {
         const chunks = [];
         for (let i=0; i<allIds.length; i+=10) chunks.push(allIds.slice(i,i+10));
@@ -91,7 +91,7 @@ export default function PaginaProfesor({ uid, slug, onBack }) {
         await Promise.all(chunks.map(async chunk => {
           const q = query(collection(db,'resources'), where('__name__','in',chunk));
           const s = await getDocs(q);
-          s.docs.forEach(d => { found[d.id] = { id:d.id, ...d.data() }; });
+          s.docs.forEach(d => { found[d.id] = { ...d.data(), id:d.id }; });
         }));
         setRecursos(found);
       }

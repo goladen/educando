@@ -537,7 +537,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
        
         if (juegoActivo.tipoJuego === 'ETIQUETAS') return <EtiquetaMe recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
 
-        if (juegoActivo.tipoJuego === 'GEOMETRIX') return <Geometrix usuario={usuario} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'GEOMETRIX') return <Geometrix usuario={null} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'CALCULO') return <CalculoMental usuario={null} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'ECUACIONES') return <Ecuaciones usuario={null} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'FUNCIONES') return <Funciones onExit={() => setJuegoActivo(null)} />;
@@ -545,8 +545,8 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
         
         
         // ------------------------
-if (juegoActivo.tipoJuego === 'SINTAXIS')  return <SintaxisGame  usuario={usuario} onExit={() => setJuegoActivo(null)} />;
-if (juegoActivo.tipoJuego === 'LISTENING') return <Listening     usuario={usuario} onExit={() => setJuegoActivo(null)} />;
+if (juegoActivo.tipoJuego === 'SINTAXIS')  return <SintaxisGame  usuario={null} onExit={() => setJuegoActivo(null)} />;
+if (juegoActivo.tipoJuego === 'LISTENING') return <Listening     usuario={null} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'KARTINGED') return <KartingedGame usuario={null} alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'KARTINGED_MULTI') return <KartingedMultiGame alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.modoEspecial === 'PIKATRON') return <PikatronRun recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;

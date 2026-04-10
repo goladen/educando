@@ -22,7 +22,7 @@ const TIPO_COLOR = {
   match: '#0F766E', order: '#C2410C', truefalse: '#0369A1', multichoice: '#7E22CE', error: '#B91C1C',
 };
 const NIVELES = ['1 ESO', '2 ESO', '3 ESO', '4 ESO', '1 Bach', '2 Bach', 'Primaria', 'FP', 'Otros'];
-const COLORES = ['#6D28D9', '#1D4ED8', '#047857', '#0F766E', '#C2410C', '#B45309', '#0369A1', '#7E22CE', '#B91C1C', '#0369A1'];
+const COLORES = ['#6D28D9', '#1D4ED8', '#047857', '#0F766E', '#C2410C', '#B45309', '#0369A1', '#7E22CE', '#B91C1C', '#BE185D'];
 
 function newItem(tipo) {
   const id = itemUid();

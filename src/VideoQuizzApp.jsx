@@ -715,7 +715,7 @@ function BrowseScreen({ onSelect, onBack }) {
   useEffect(() => {
     (async () => {
       try {
-        const q    = fsQuery(collection(db,'recursos'), where('tipoJuego','==','VIDEOQUIZZ'), where('isFinished','==',true));
+        const q    = fsQuery(collection(db,'resources'), where('tipoJuego','==','VIDEOQUIZZ'), where('isFinished','==',true));
         const snap = await getDocs(q);
         const fromFirestore = snap.docs.map(d => ({ id:d.id, ...d.data() }));
         // Merge: Firestore first, then biblioteca (avoid duplicates by id)

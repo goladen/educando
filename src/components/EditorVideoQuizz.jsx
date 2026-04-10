@@ -402,7 +402,7 @@ export default function EditorVideoQuizz({ recursoInicial = null, usuario, onBac
         await updateDoc(doc(db,'recursos',recurso.id), data);
         alert('Recurso actualizado.');
       } else {
-        await addDoc(collection(db,'recursos'), data);
+        await addDoc(collection(db,'resources'), data);
         alert('Recurso guardado correctamente.');
       }
       onBack?.();

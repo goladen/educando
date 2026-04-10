@@ -443,7 +443,7 @@ function ModoVideoQuizz({ onBack, usuario }) {
     if (!resultado) return;
     setSaving(true);
     try {
-      await addDoc(collection(db,'recursos'),{
+      await addDoc(collection(db,'resources'),{
         ...resultado,
         tipoJuego:'VIDEOQUIZZ', tipo:'VIDEOQUIZZ',
         isFinished: false,

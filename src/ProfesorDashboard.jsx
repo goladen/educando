@@ -35,6 +35,7 @@ import EditorOlympic from './components/EditorOlympic';
 import EditorSintaxis from './components/EditorSintaxis';
 import EditorEtiquetas from './components/EditorEtiquetas';
 import EditorOmni from './components/EditorOmni';
+import EditorVideoQuizz from './components/EditorVideoQuizz';
 import OmninteractiveApp from './OmninteractiveApp';
 import * as XLSX from 'xlsx'; // <--- IMPORTANTE
 // ==============================================================================
@@ -109,6 +110,8 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
     const [mostrandoEditorEtiquetas, setMostrandoEditorEtiquetas] = useState(false);
     const [mostrandoEditorOmni, setMostrandoEditorOmni] = useState(false);
     const [recursoOmniInicial, setRecursoOmniInicial] = useState(null);
+    const [mostrandoEditorVideoQuizz, setMostrandoEditorVideoQuizz] = useState(false);
+    const [recursoVQInicial, setRecursoVQInicial] = useState(null);
     // Añade este estado junto a los demás en ProfesorDashboard
     const [qSenderAMigrar, setQsenderAMigrar] = useState(null);
 
@@ -234,6 +237,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             if (juegoSeleccionado === 'SINTAXIS') return iniciarCreacionSintaxis();
             if (juegoSeleccionado === 'ETIQUETAS') return iniciarCreacionEtiquetas();
             if (juegoSeleccionado === 'OMNINTERACTIVE') { setRecursoOmniInicial(null); return setMostrandoEditorOmni(true); }
+            if (juegoSeleccionado === 'VIDEOQUIZZ') { setRecursoVQInicial(null); return setMostrandoEditorVideoQuizz(true); }
         }
 
 
@@ -404,6 +408,10 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             else if (dataFresca.tipoJuego === 'OMNINTERACTIVE' || dataFresca.tipo === 'OMNI') {
                 setRecursoOmniInicial(dataFresca);
                 setMostrandoEditorOmni(true);
+            }
+            else if (dataFresca.tipoJuego === 'VIDEOQUIZZ' || dataFresca.tipo === 'VIDEOQUIZZ') {
+                setRecursoVQInicial(dataFresca);
+                setMostrandoEditorVideoQuizz(true);
             }
             else {
                 setMostrandoEditorManual(true); // Clásico
@@ -1162,6 +1170,14 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                                         }}>
                                         <FileText size={16} /> <span className="btn-text">Omni</span>
                                     </button>
+                                    <button onClick={() => setJuegoSeleccionado('VIDEOQUIZZ')} className="header-btn"
+                                        style={{
+                                            padding: '8px 20px', borderRadius: '20px',
+                                            background: juegoSeleccionado === 'VIDEOQUIZZ' ? '#DC2626' : 'white',
+                                            color: juegoSeleccionado === 'VIDEOQUIZZ' ? 'white' : '#555'
+                                        }}>
+                                        <FileText size={16} /> <span className="btn-text">VideoQuizz</span>
+                                    </button>
 
                                 </>
                             )}
@@ -1374,6 +1390,14 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                     recursoInicial={recursoOmniInicial}
                     usuario={perfilProfesor || usuario}
                     onBack={() => { setMostrandoEditorOmni(false); setRecursoOmniInicial(null); }}
+                />
+            )}
+
+            {mostrandoEditorVideoQuizz && (
+                <EditorVideoQuizz
+                    recursoInicial={recursoVQInicial}
+                    usuario={perfilProfesor || usuario}
+                    onBack={() => { setMostrandoEditorVideoQuizz(false); setRecursoVQInicial(null); }}
                 />
             )}
 

@@ -7,7 +7,7 @@ import FotoARecurso from './FotoARecurso';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { BIBLIOTECA } from './BibliotecaOmni';
 import { db } from './firebase';
-import { doc, setDoc, updateDoc, onSnapshot, increment, collection, addDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, onSnapshot, increment, collection, addDoc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import piHappy from './assets/Pi-contento.png';
 import piAngry from './assets/Pi-enfadado.png';
 import piNeutral from './assets/Pi-neutro.png';
@@ -1241,25 +1241,35 @@ const sLive = {
 
 // ── Browse Screen ─────────────────────────────────────────────────────────────
 function BrowseScreen({ onSelect, onBack, onLiveHost, onLiveJoin }) {
-  const [query,    setQuery]    = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [nivel,    setNivel]    = useState('');
   const [tema,     setTema]     = useState('');
   const [showLive, setShowLive] = useState(false);
   const [joinCode, setJoinCode] = useState('');
   const [joinName, setJoinName] = useState('');
+  const [recursos, setRecursos] = useState(BIBLIOTECA);
 
-  const niveles = [...new Set(BIBLIOTECA.map(r => r.nivel))].sort();
-  const temas   = [...new Set(BIBLIOTECA.map(r => r.tema))].sort();
+  useEffect(() => {
+    const q = query(collection(db, 'resources'), where('isFinished', '==', true), where('tipoJuego', '==', 'OMNINTERACTIVE'));
+    getDocs(q).then(snap => {
+      const fromFs = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+      const fsIds = new Set(fromFs.map(r => r.id));
+      setRecursos([...fromFs, ...BIBLIOTECA.filter(r => !fsIds.has(r.id))]);
+    }).catch(() => {});
+  }, []);
 
-  const filtered = useMemo(() => BIBLIOTECA.filter(r => {
+  const niveles = [...new Set(recursos.map(r => r.nivel).filter(Boolean))].sort();
+  const temas   = [...new Set(recursos.map(r => r.tema).filter(Boolean))].sort();
+
+  const filtered = useMemo(() => recursos.filter(r => {
     if (nivel && r.nivel !== nivel) return false;
     if (tema  && r.tema  !== tema)  return false;
-    if (query) {
-      const q = query.toLowerCase();
-      return r.titulo.toLowerCase().includes(q) || r.descripcion.toLowerCase().includes(q) || (r.tags || []).some(t => t.toLowerCase().includes(q));
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      return r.titulo.toLowerCase().includes(q) || (r.descripcion||'').toLowerCase().includes(q) || (r.tags || []).some(t => t.toLowerCase().includes(q));
     }
     return true;
-  }), [query, nivel, tema]);
+  }), [searchQuery, nivel, tema, recursos]);
 
   return (
     <div style={{ minHeight:'100vh', background:'#F0F4FF', fontFamily:'inherit' }}>
@@ -1273,7 +1283,7 @@ function BrowseScreen({ onSelect, onBack, onLiveHost, onLiveJoin }) {
               <div style={{ fontSize:12, opacity:0.75 }}>Interactive exercises · pikt.es</div>
             </div>
           </div>
-          <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search resources…"
+          <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search resources…"
             style={{ display:'block', width:'100%', boxSizing:'border-box', height:42, padding:'0 16px', borderRadius:12, border:'none', outline:'none', fontSize:14, fontFamily:'inherit', background:'rgba(255,255,255,0.95)', color:'#0F172A', boxShadow:'0 2px 12px rgba(0,0,0,0.15)' }} />
         </div>
       </div>

@@ -1,23 +1,25 @@
-import React, { useState } from 'react';
-import { Wrench, Table, FileQuestion, RefreshCw, Camera, BarChart2, BookOpen, Tv2 } from 'lucide-react';
+import { useState } from 'react';
+import { Wrench, Table, FileQuestion, RefreshCw, Camera, BarChart2, BookOpen, Tv2, Clapperboard } from 'lucide-react';
 
 import ToolExportarGoogleSheets from './ToolExportarGoogleSheets';
 import ToolGeneradorGoogleForms from './ToolGeneradorGoogleForms';
 import ToolConversorRecursos from './ToolConversorRecursos';
-import FotoARecurso from './FotoARecurso';      // para Pasapalabra, Aparejados, etc.
-import FotoAOmni from './FotoAOmni';            // para Omninteractive
+import FotoARecurso from './FotoARecurso';
+import FotoAOmni from './FotoAOmni';
 import VideoAPre from './VideoAPresentacion';
 import InformesJuegos from './InformesJuegos2';
+import EditorVideoQuizz from './EditorVideoQuizz';
 
 export default function TeacherTools({ usuario, googleToken, perfilProfesor, onOpenEditorOmni }) {
     const [herramientaActiva, setHerramientaActiva] = useState(null);
     const [showFotoOmni, setShowFotoOmni] = useState(false);
 
-    if (herramientaActiva === 'SHEETS')    return <ToolExportarGoogleSheets usuario={usuario} googleToken={googleToken} onBack={() => setHerramientaActiva(null)} />;
-    if (herramientaActiva === 'FORMS')     return <ToolGeneradorGoogleForms  usuario={usuario} googleToken={googleToken} onBack={() => setHerramientaActiva(null)} />;
-    if (herramientaActiva === 'CONVERSOR') return <ToolConversorRecursos     usuario={usuario} onBack={() => setHerramientaActiva(null)} />;
-    if (herramientaActiva === 'INFORMES')  return <InformesJuegos usuario={usuario} />;
-    if (herramientaActiva === 'VIDEO')     return <VideoAPre onBack={() => setHerramientaActiva(null)} />;
+    if (herramientaActiva === 'SHEETS')      return <ToolExportarGoogleSheets usuario={usuario} googleToken={googleToken} onBack={() => setHerramientaActiva(null)} />;
+    if (herramientaActiva === 'FORMS')       return <ToolGeneradorGoogleForms  usuario={usuario} googleToken={googleToken} onBack={() => setHerramientaActiva(null)} />;
+    if (herramientaActiva === 'CONVERSOR')   return <ToolConversorRecursos     usuario={usuario} onBack={() => setHerramientaActiva(null)} />;
+    if (herramientaActiva === 'INFORMES')    return <InformesJuegos usuario={usuario} />;
+    if (herramientaActiva === 'VIDEO')       return <VideoAPre onBack={() => setHerramientaActiva(null)} />;
+    if (herramientaActiva === 'VIDEOQUIZZ')  return <EditorVideoQuizz usuario={usuario} onBack={() => setHerramientaActiva(null)} />;
 
     if (herramientaActiva === 'FOTO') {
         return (
@@ -118,6 +120,17 @@ export default function TeacherTools({ usuario, googleToken, perfilProfesor, onO
                     <h3 style={{ margin: '0 0 10px 0', color: '#DC2626' }}>Video → Presentación</h3>
                     <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>
                         Pega una URL de YouTube y la IA genera una presentación PPTX lista para usar.
+                    </p>
+                </div>
+
+                {/* ── VideoQuizz editor ── */}
+                <div onClick={() => setHerramientaActiva('VIDEOQUIZZ')} style={{ ...cardStyle, borderLeft: '4px solid #991B1B' }}>
+                    <div style={{ background: '#FEE2E2', padding: '15px', borderRadius: '50%', marginBottom: '15px' }}>
+                        <Clapperboard size={32} color="#DC2626" />
+                    </div>
+                    <h3 style={{ margin: '0 0 10px 0', color: '#DC2626' }}>Crear VideoQuizz</h3>
+                    <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>
+                        Añade ejercicios interactivos a un vídeo de YouTube que aparecen en momentos concretos.
                     </p>
                 </div>
 

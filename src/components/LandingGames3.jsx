@@ -25,6 +25,7 @@ import Plataformas from '../Plataformas2';
 
 import EtiquetaMe from '../EtiquetaMe';
 import OmninteractiveApp from '../OmninteractiveApp';
+import VideoQuizzApp from '../VideoQuizzApp';
 import imgPasapalabra from '../assets/icono_pasapal.png'; // Revisa si es .png o .jpg
 import imgBurbujas from '../assets/icono_burbujas.png';
 import imgPikatron from '../assets/icono_pikatron.png';
@@ -273,6 +274,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
     const [juegoActivo, setJuegoActivo] = useState(null);
     const [recursoParaElegir, setRecursoParaElegir] = useState(null);
     const [omninteractivo, setOmninteractivo] = useState(false);
+    const [videoQuizz,     setVideoQuizz]     = useState(false);
 
     // Estados Live Alumno
     const [liveModeAlumno, setLiveModeAlumno] = useState(false);
@@ -516,6 +518,12 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
     }
 
     
+    if (videoQuizz) return (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, overflowY: 'auto' }}>
+            <VideoQuizzApp onBack={() => setVideoQuizz(false)} />
+        </div>
+    );
+
     if (omninteractivo) return (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#F8FAFC', overflowY: 'auto' }}>
             <OmninteractiveApp onBack={() => setOmninteractivo(false)} />
@@ -767,6 +775,7 @@ return <GamePlayer recurso={juegoActivo} usuario={null} alTerminar={() => setJue
                     { id: 'ETIQUETAS',       label: 'EtiquetaMe',      img: imgEtiquetas, color: '#e74c3c', action: () => abrirJuego('ETIQUETAS') },
                     { id: 'QUESTION_SENDER', label: 'Q-Sender',        emoji: '📮',  color: '#2c3e50', action: () => setJuegoActivo({ tipoJuego: 'QUESTION_SENDER' }) },
                     { id: 'OMNINTERACTIVE',  label: 'Omninteractive',  emoji: '📚',  color: '#6D28D9', action: () => setOmninteractivo(true) },
+                    { id: 'VIDEOQUIZZ',      label: 'VideoQuizz',      emoji: '🎬',  color: '#DC2626', action: () => setVideoQuizz(true) },
                 ].map(tool => (
                     <div key={tool.id} onClick={tool.action} style={{ background: '#ffffbf', borderRadius: '15px', padding: '15px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transition: 'transform 0.2s', border: `2px solid ${tool.color}20` }}
                         onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-3px)'}

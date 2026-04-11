@@ -87,23 +87,16 @@
       // JS_FileSystem_Sync() behavior, but in future Unity version, this will be
       // expected to change.
 
-      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-        // Mobile device style: fill the whole browser client area with the game canvas:
+      var isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
+      if (isMobile) {
         var meta = document.createElement('meta');
         meta.name = 'viewport';
         meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
         document.getElementsByTagName('head')[0].appendChild(meta);
         document.querySelector("#unity-container").className = "unity-mobile";
         canvas.className = "unity-mobile";
-
-        // To lower canvas resolution on mobile devices to gain some
-        // performance, uncomment the following line:
-        // config.devicePixelRatio = 1;
-
-
       } else {
-        // Desktop style: Render the game canvas in a window that can be maximized to fullscreen:
         canvas.style.width = "960px";
         canvas.style.height = "600px";
       }
@@ -115,16 +108,53 @@
       script.onload = () => {
         createUnityInstance(canvas, config, (progress) => {
           document.querySelector("#unity-progress-bar-full").style.width = 100 * progress + "%";
-              }).then((unityInstance) => {
-                document.querySelector("#unity-loading-bar").style.display = "none";
-                document.querySelector("#unity-fullscreen-button").onclick = () => {
-                  unityInstance.SetFullscreen(1);
-                };
+        }).then((unityInstance) => {
+          document.querySelector("#unity-loading-bar").style.display = "none";
+          document.querySelector("#unity-fullscreen-button").onclick = () => {
+            unityInstance.SetFullscreen(1);
+          };
 
-              }).catch((message) => {
-                alert(message);
-              });
-            };
+          if (isMobile) {
+            // Overlay propio: evita el "Touch to play" de Unity y gestiona fullscreen + audio
+            var overlay = document.createElement('div');
+            overlay.style.cssText = [
+              'position:fixed', 'inset:0', 'z-index:9999',
+              'background:linear-gradient(135deg,#1a1a2e,#0f3460)',
+              'display:flex', 'flex-direction:column',
+              'align-items:center', 'justify-content:center',
+              'color:white', 'font-family:sans-serif', 'cursor:pointer',
+              'user-select:none', '-webkit-user-select:none'
+            ].join(';');
+            overlay.innerHTML = [
+              '<div style="font-size:4rem;margin-bottom:20px">🏎️</div>',
+              '<div style="font-size:1.6rem;font-weight:900;margin-bottom:10px;',
+                'background:linear-gradient(90deg,#FF6B00,#FFD700);',
+                '-webkit-background-clip:text;-webkit-text-fill-color:transparent">',
+                'Toca para jugar</div>',
+              '<div style="font-size:0.9rem;opacity:0.6;margin-top:4px">',
+                'Se abrirá en pantalla completa</div>',
+              '<div style="margin-top:30px;width:60px;height:60px;border-radius:50%;',
+                'background:linear-gradient(135deg,#FF6B00,#FFD700);',
+                'display:flex;align-items:center;justify-content:center;',
+                'font-size:1.8rem;box-shadow:0 0 30px rgba(255,107,0,0.6)">▶</div>'
+            ].join('');
+            document.body.appendChild(overlay);
+
+            overlay.addEventListener('click', function() {
+              overlay.remove();
+              // Pedir pantalla completa (requiere gesto del usuario)
+              var el = document.documentElement;
+              if (el.requestFullscreen) el.requestFullscreen().catch(function(){});
+              else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+              // Desbloquear AudioContext de Unity con el gesto
+              canvas.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+            }, { once: true });
+          }
+
+        }).catch((message) => {
+          alert(message);
+        });
+      };
 
       document.body.appendChild(script);
 

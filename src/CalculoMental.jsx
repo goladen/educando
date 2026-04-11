@@ -10,6 +10,7 @@ const DEFAULT_CONFIG = {
     minNum: 1,
     maxNum: 50,
     tiempo: 120,
+    numEjercicios: null, // null = modo tiempo libre; número = modo ejercicios fijos
     tipos: { positivos: true, negativos: false, decimales: false, fracciones: false },
     operaciones: { suma: true, resta: true, multiplicacion: false, division: false },
 };
@@ -17,25 +18,29 @@ const DEFAULT_CONFIG = {
 // Configuraciones de los modos predefinidos
 const MODOS_PRESET = [
     {
-        id: 'EASY', icon: '👶', label: 'Sencillo', desc: 'Sumas y restas · números positivos', color: '#2ecc71',
-        cfg: { minNum: 1, maxNum: 50, tiempo: 120,
+        id: 'EASY', icon: '👶', label: 'Sencillo', desc: 'Resultado siempre positivo', color: '#2ecc71',
+        ops: ['+', '−'],
+        cfg: { minNum: 1, maxNum: 50, tiempo: 120, numEjercicios: null,
                tipos: { positivos: true, negativos: false, decimales: false, fracciones: false },
                operaciones: { suma: true, resta: true, multiplicacion: false, division: false } }
     },
     {
-        id: 'MEDIUM', icon: '🤓', label: 'Medio', desc: 'Todas las operaciones · negativos', color: '#f39c12',
-        cfg: { minNum: 1, maxNum: 100, tiempo: 120,
+        id: 'MEDIUM', icon: '🤓', label: 'Medio', desc: 'Con negativos · números hasta 100', color: '#f39c12',
+        ops: ['+', '−', '×', '÷'],
+        cfg: { minNum: 1, maxNum: 100, tiempo: 120, numEjercicios: null,
                tipos: { positivos: true, negativos: true, decimales: false, fracciones: false },
                operaciones: { suma: true, resta: true, multiplicacion: true, division: true } }
     },
     {
         id: 'HARD', icon: '🔥', label: 'Difícil', desc: 'Decimales y fracciones incluidos', color: '#e74c3c',
-        cfg: { minNum: 1, maxNum: 100, tiempo: 120,
+        ops: ['+', '−', '×', '÷', '0.5', '½'],
+        cfg: { minNum: 1, maxNum: 100, tiempo: 120, numEjercicios: null,
                tipos: { positivos: true, negativos: true, decimales: true, fracciones: true },
                operaciones: { suma: true, resta: true, multiplicacion: true, division: true } }
     },
     {
-        id: 'CUSTOM', icon: '⚙️', label: 'Personalizado', desc: 'Elige tú los números y operaciones', color: '#9b59b6',
+        id: 'CUSTOM', icon: '⚙️', label: 'Configurado', desc: 'Elige operaciones, rango y tiempo', color: '#9b59b6',
+        ops: null,
         cfg: null // abre el modal
     },
 ];
@@ -130,10 +135,18 @@ const generarProblema = (cfg) => {
             answer = a + b;
             text = b >= 0 ? `${a} + ${b}` : `${a} + (${b})`;
         } else if (op === 'resta') {
-            const a = allowNeg ? rInt(-maxNum, maxNum) : rInt(minNum, maxNum);
-            const b = allowNeg ? rInt(-maxNum, maxNum) : rInt(1, maxNum);
-            answer = a - b;
-            text = b >= 0 ? `${a} − ${b}` : `${a} − (${b})`;
+            if (allowNeg) {
+                const a = rInt(-maxNum, maxNum);
+                const b = rInt(-maxNum, maxNum);
+                answer = a - b;
+                text = b >= 0 ? `${a} − ${b}` : `${a} − (${b})`;
+            } else {
+                // Resultado siempre positivo o cero en modo positivos
+                const a = rInt(minNum, maxNum);
+                const b = rInt(minNum, a);
+                answer = a - b;
+                text = `${a} − ${b}`;
+            }
         } else if (op === 'multiplicacion') {
             const lim = Math.min(maxNum, 20);
             const a = allowNeg ? rInt(-lim, lim) : rInt(minNum, lim);
@@ -157,93 +170,116 @@ const generarProblema = (cfg) => {
     return { text, answer, hasDecimals, displayAnswer };
 };
 
-// ─── Componente Modal de Configuración ───────────────────────────────────────
+// ─── Componente Modal de Configuración (estilo Geometrix) ────────────────────
 const ConfigModal = ({ config, onChange, onStart, onClose }) => {
-    const [local, setLocal] = useState(config);
+    const [local, setLocal] = useState({ ...DEFAULT_CONFIG, ...config });
+    const [modoConteo, setModoConteo] = useState(config.numEjercicios ? 'ejercicios' : 'tiempo');
 
     const setField = (key, val) => setLocal(prev => ({ ...prev, [key]: val }));
-    const setTipo = (k) => setLocal(prev => ({ ...prev, tipos: { ...prev.tipos, [k]: !prev.tipos[k] } }));
-    const setOp = (k) => setLocal(prev => ({ ...prev, operaciones: { ...prev.operaciones, [k]: !prev.operaciones[k] } }));
+    const toggleTipo = (k) => {
+        const next = { ...local.tipos, [k]: !local.tipos[k] };
+        if (!Object.values(next).some(Boolean)) return; // al menos 1
+        setLocal(prev => ({ ...prev, tipos: next }));
+    };
+    const toggleOp = (k) => {
+        const next = { ...local.operaciones, [k]: !local.operaciones[k] };
+        if (!Object.values(next).some(Boolean)) return; // al menos 1
+        setLocal(prev => ({ ...prev, operaciones: next }));
+    };
 
-    const TIPOS = [
-        { key: 'positivos', label: 'Positivos', emoji: '➕' },
-        { key: 'negativos', label: 'Negativos', emoji: '➖' },
-        { key: 'decimales', label: 'Decimales', emoji: '🔢' },
-        { key: 'fracciones', label: 'Fracciones', emoji: '½' },
-    ];
-    const OPS = [
-        { key: 'suma', label: 'Suma (+)', color: '#3498db' },
-        { key: 'resta', label: 'Resta (−)', color: '#e74c3c' },
-        { key: 'multiplicacion', label: 'Multiplicación (×)', color: '#f39c12' },
-        { key: 'division', label: 'División (÷)', color: '#9b59b6' },
-    ];
-    const TIEMPOS = [60, 90, 120, 180, 300];
+    const Chip = ({ active, onClick, children, color = '#E91E63' }) => (
+        <button onClick={onClick} style={{
+            padding: '8px 16px', borderRadius: 20, border: 'none', cursor: 'pointer',
+            fontWeight: 'bold', fontSize: '0.9rem', transition: 'all 0.15s',
+            background: active ? color : '#f0f0f0',
+            color: active ? 'white' : '#555',
+            boxShadow: active ? `0 3px 8px ${color}55` : 'none',
+        }}>{children}</button>
+    );
+
+    const Section = ({ label, children }) => (
+        <div style={{ marginBottom: 18 }}>
+            <div style={{ fontWeight: 700, color: '#555', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>{label}</div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center' }}>{children}</div>
+        </div>
+    );
+
+    const handleStart = () => {
+        const finalCfg = {
+            ...local,
+            numEjercicios: modoConteo === 'ejercicios' ? (local.numEjercicios || 10) : null,
+        };
+        onChange(finalCfg);
+        onStart(finalCfg);
+    };
 
     return (
-        <div style={mStyles.overlay}>
-            <div style={mStyles.modal}>
-                <h2 style={mStyles.modalTitle}>⚙️ Configurar Partida</h2>
-
-                {/* Rango de números */}
-                <div style={mStyles.section}>
-                    <div style={mStyles.sectionTitle}>Rango de números</div>
-                    <div style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
-                        <label style={mStyles.label}>Mínimo
-                            <input type="number" value={local.minNum} min={0} max={local.maxNum - 1}
-                                onChange={e => setField('minNum', Math.max(0, parseInt(e.target.value) || 0))}
-                                style={mStyles.numInput} />
-                        </label>
-                        <span style={{ fontSize: '1.5rem', color: '#aaa' }}>—</span>
-                        <label style={mStyles.label}>Máximo
-                            <input type="number" value={local.maxNum} min={local.minNum + 1} max={9999}
-                                onChange={e => setField('maxNum', Math.max(local.minNum + 1, parseInt(e.target.value) || 10))}
-                                style={mStyles.numInput} />
-                        </label>
-                    </div>
-                </div>
-
-                {/* Tiempo */}
-                <div style={mStyles.section}>
-                    <div style={mStyles.sectionTitle}>Tiempo de juego</div>
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
-                        {TIEMPOS.map(t => (
-                            <button key={t} onClick={() => setField('tiempo', t)}
-                                style={{ ...mStyles.chip, background: local.tiempo === t ? '#E91E63' : '#f0f0f0', color: local.tiempo === t ? 'white' : '#555' }}>
-                                {t < 60 ? `${t}s` : `${t / 60} min`}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Tipos de números */}
-                <div style={mStyles.section}>
-                    <div style={mStyles.sectionTitle}>Tipos de números</div>
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
-                        {TIPOS.map(({ key, label, emoji }) => (
-                            <button key={key} onClick={() => setTipo(key)}
-                                style={{ ...mStyles.chip, background: local.tipos[key] ? '#E91E63' : '#f0f0f0', color: local.tipos[key] ? 'white' : '#555' }}>
-                                {emoji} {label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+            <div style={{ background: 'white', borderRadius: 22, padding: '28px 24px', maxWidth: 480, width: '100%', maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 25px 70px rgba(0,0,0,0.3)' }}>
+                <h2 style={{ textAlign: 'center', color: '#2c3e50', fontSize: '1.3rem', marginTop: 0, marginBottom: 22 }}>⚙️ Modo Configurado</h2>
 
                 {/* Operaciones */}
-                <div style={mStyles.section}>
-                    <div style={mStyles.sectionTitle}>Operaciones</div>
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
-                        {OPS.map(({ key, label, color }) => (
-                            <button key={key} onClick={() => setOp(key)}
-                                style={{ ...mStyles.chip, background: local.operaciones[key] ? color : '#f0f0f0', color: local.operaciones[key] ? 'white' : '#555' }}>
-                                {label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
+                <Section label="🔢 Operaciones">
+                    <Chip active={local.operaciones.suma} onClick={() => toggleOp('suma')} color="#3498db">➕ Suma</Chip>
+                    <Chip active={local.operaciones.resta} onClick={() => toggleOp('resta')} color="#e74c3c">➖ Resta</Chip>
+                    <Chip active={local.operaciones.multiplicacion} onClick={() => toggleOp('multiplicacion')} color="#f39c12">✖️ Multiplicación</Chip>
+                    <Chip active={local.operaciones.division} onClick={() => toggleOp('division')} color="#9b59b6">➗ División</Chip>
+                </Section>
 
-                <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 24 }}>
-                    <button onClick={onClose} style={mStyles.btnSecondary}>Cancelar</button>
-                    <button onClick={() => { onChange(local); onStart(local); }} style={mStyles.btnPrimary}>
+                {/* Tipos de números */}
+                <Section label="🔵 Tipos de números">
+                    <Chip active={local.tipos.positivos} onClick={() => toggleTipo('positivos')} color="#2ecc71">➕ Positivos</Chip>
+                    <Chip active={local.tipos.negativos} onClick={() => toggleTipo('negativos')} color="#e74c3c">➖ Negativos</Chip>
+                    <Chip active={local.tipos.decimales} onClick={() => toggleTipo('decimales')} color="#f39c12">🔢 Decimales</Chip>
+                    <Chip active={local.tipos.fracciones} onClick={() => toggleTipo('fracciones')} color="#9b59b6">½ Fracciones</Chip>
+                </Section>
+
+                {/* Rango */}
+                <Section label="📏 Rango de números">
+                    <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, fontWeight: 'bold', color: '#555', fontSize: '0.85rem' }}>
+                        Mínimo
+                        <input type="number" value={local.minNum} min={0} max={local.maxNum - 1}
+                            onChange={e => setField('minNum', Math.max(0, parseInt(e.target.value) || 0))}
+                            style={{ width: 70, padding: '7px', fontSize: '1rem', textAlign: 'center', borderRadius: 8, border: '2px solid #ddd', outline: 'none' }} />
+                    </label>
+                    <span style={{ fontSize: '1.3rem', color: '#aaa', alignSelf: 'flex-end', marginBottom: 6 }}>—</span>
+                    <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, fontWeight: 'bold', color: '#555', fontSize: '0.85rem' }}>
+                        Máximo
+                        <input type="number" value={local.maxNum} min={local.minNum + 1} max={9999}
+                            onChange={e => setField('maxNum', Math.max(local.minNum + 1, parseInt(e.target.value) || 10))}
+                            style={{ width: 70, padding: '7px', fontSize: '1rem', textAlign: 'center', borderRadius: 8, border: '2px solid #ddd', outline: 'none' }} />
+                    </label>
+                </Section>
+
+                {/* Modo: tiempo vs ejercicios */}
+                <Section label="⏱ Modo de juego">
+                    <Chip active={modoConteo === 'tiempo'} onClick={() => setModoConteo('tiempo')} color="#E91E63">⏱ Por tiempo</Chip>
+                    <Chip active={modoConteo === 'ejercicios'} onClick={() => setModoConteo('ejercicios')} color="#009688">🔢 Por ejercicios</Chip>
+                </Section>
+
+                {modoConteo === 'tiempo' ? (
+                    <Section label="⏱ Tiempo de juego">
+                        {[60, 90, 120, 180, 300].map(t => (
+                            <Chip key={t} active={local.tiempo === t} onClick={() => setField('tiempo', t)} color="#E91E63">
+                                {t < 60 ? `${t}s` : `${t / 60} min`}
+                            </Chip>
+                        ))}
+                    </Section>
+                ) : (
+                    <Section label="🔢 Número de ejercicios">
+                        {[5, 10, 15, 20, 30].map(n => (
+                            <Chip key={n} active={(local.numEjercicios || 10) === n} onClick={() => setField('numEjercicios', n)} color="#009688">{n}</Chip>
+                        ))}
+                        <input type="number" min="1" max="100" placeholder="···"
+                            value={![5,10,15,20,30].includes(local.numEjercicios || 10) ? (local.numEjercicios || '') : ''}
+                            onChange={e => { const v = parseInt(e.target.value); if (v > 0) setField('numEjercicios', v); }}
+                            style={{ width: 52, padding: '6px 8px', borderRadius: 20, border: `2px solid ${![5,10,15,20,30].includes(local.numEjercicios || 10) ? '#009688' : '#ccc'}`, textAlign: 'center', fontSize: '0.9rem', outline: 'none', fontWeight: 'bold', color: '#333' }} />
+                    </Section>
+                )}
+
+                <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 20 }}>
+                    <button onClick={onClose} style={{ padding: '12px 24px', background: '#f0f0f0', color: '#555', border: 'none', borderRadius: 30, fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer' }}>Cancelar</button>
+                    <button onClick={handleStart} style={{ padding: '12px 28px', background: '#9b59b6', color: 'white', border: 'none', borderRadius: 30, fontSize: '1.05rem', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 12px #9b59b655' }}>
                         ▶ Empezar
                     </button>
                 </div>
@@ -329,6 +365,7 @@ export default function CalculoMentalGame({ usuario, onExit }) {
     const [score, setScore] = useState(0);
     const [aciertos, setAciertos] = useState(0);
     const [skips, setSkips] = useState(0);
+    const [ejercicioActual, setEjercicioActual] = useState(0); // para modo ejercicios fijos
 
     const [currentProblem, setCurrentProblem] = useState(null);
     const [currentAnswer, setCurrentAnswer] = useState(0);
@@ -338,22 +375,27 @@ export default function CalculoMentalGame({ usuario, onExit }) {
     const timerRef = useRef(null);
     const isMobile = typeof window !== 'undefined' && window.innerWidth <= 600;
 
-    // Temporizador
+    const modoEjercicios = !!config.numEjercicios;
+
+    // Temporizador (solo en modo tiempo)
     useEffect(() => {
-        if (gameState === 'PLAYING' && timeLeft > 0) {
-            timerRef.current = setInterval(() => setTimeLeft(p => p - 1), 1000);
-        } else if (timeLeft <= 0 && gameState === 'PLAYING') {
-            clearInterval(timerRef.current);
-            setGameState('END');
+        if (!modoEjercicios) {
+            if (gameState === 'PLAYING' && timeLeft > 0) {
+                timerRef.current = setInterval(() => setTimeLeft(p => p - 1), 1000);
+            } else if (timeLeft <= 0 && gameState === 'PLAYING') {
+                clearInterval(timerRef.current);
+                setGameState('END');
+            }
         }
         return () => clearInterval(timerRef.current);
-    }, [gameState, timeLeft]);
+    }, [gameState, timeLeft, modoEjercicios]);
 
     const startGame = (cfg = config) => {
         setConfig(cfg);
         setScore(0);
         setAciertos(0);
         setSkips(0);
+        setEjercicioActual(1);
         setTimeLeft(cfg.tiempo);
         setCurrentProblem(generarProblema(cfg));
         setCurrentAnswer(0);
@@ -368,6 +410,18 @@ export default function CalculoMentalGame({ usuario, onExit }) {
 
     const resetAnswer = () => setCurrentAnswer(0);
 
+    const avanzarEjercicio = (cfg) => {
+        const nextNum = ejercicioActual + 1;
+        if (cfg.numEjercicios && nextNum > cfg.numEjercicios) {
+            setGameState('END');
+        } else {
+            setEjercicioActual(nextNum);
+            setCurrentAnswer(0);
+            setCurrentProblem(generarProblema(cfg));
+            setShowSolution(false);
+        }
+    };
+
     const checkAnswer = () => {
         if (!currentProblem || showSolution) return;
         const isCorrect = Math.abs(currentAnswer - currentProblem.answer) < 0.001;
@@ -377,9 +431,8 @@ export default function CalculoMentalGame({ usuario, onExit }) {
             setFeedback('CORRECT');
             setTimeout(() => {
                 setFeedback(null);
-                setCurrentAnswer(0);
-                setCurrentProblem(generarProblema(config));
-                setShowSolution(false);
+                if (modoEjercicios) avanzarEjercicio(config);
+                else { setCurrentAnswer(0); setCurrentProblem(generarProblema(config)); setShowSolution(false); }
             }, 600);
         } else {
             setScore(s => Math.max(0, s - 3));
@@ -396,9 +449,8 @@ export default function CalculoMentalGame({ usuario, onExit }) {
         setFeedback('SKIP');
         setTimeout(() => {
             setFeedback(null);
-            setCurrentAnswer(0);
-            setCurrentProblem(generarProblema(config));
-            setShowSolution(false);
+            if (modoEjercicios) avanzarEjercicio(config);
+            else { setCurrentAnswer(0); setCurrentProblem(generarProblema(config)); setShowSolution(false); }
         }, 2000);
     };
 
@@ -446,9 +498,15 @@ export default function CalculoMentalGame({ usuario, onExit }) {
                 <button onClick={handleExit} style={st.btnVolver}><RotateCcw size={16} /> Salir</button>
                 {gameState === 'PLAYING' && (
                     <div style={st.scoreFlex}>
-                        <div style={{ ...st.scoreBoard, color: timeLeft <= 10 ? '#e74c3c' : '#333' }}>
-                            <Clock size={16} /> {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
-                        </div>
+                        {modoEjercicios ? (
+                            <div style={{ ...st.scoreBoard, color: '#009688' }}>
+                                🔢 {ejercicioActual}/{config.numEjercicios}
+                            </div>
+                        ) : (
+                            <div style={{ ...st.scoreBoard, color: timeLeft <= 10 ? '#e74c3c' : '#333' }}>
+                                <Clock size={16} /> {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+                            </div>
+                        )}
                         <div style={{ ...st.scoreBoard, color: '#E91E63' }}>
                             <Trophy size={16} /> {score}
                         </div>
@@ -457,57 +515,68 @@ export default function CalculoMentalGame({ usuario, onExit }) {
                         </div>
                     </div>
                 )}
-
             </div>
 
             {/* INICIO */}
             {gameState === 'START' && (
                 <div style={{ ...st.centerCard, maxWidth: 560 }}>
-                    <Brain size={55} color="#E91E63" style={{ marginBottom: 12 }} />
-                    <h1 style={{ color: '#2c3e50', fontSize: isMobile ? '1.8rem' : '2.4rem', margin: '8px 0' }}>Cálculo Mental</h1>
-                    <p style={{ color: '#666', marginBottom: 24, fontSize: '1rem', lineHeight: 1.5 }}>
-                        Resuelve tantas operaciones como puedas antes de que se acabe el tiempo.
+                    <Brain size={52} color="#E91E63" style={{ marginBottom: 10 }} />
+                    <h1 style={{ color: '#2c3e50', fontSize: isMobile ? '1.8rem' : '2.3rem', margin: '6px 0 4px' }}>Cálculo Mental</h1>
+                    <p style={{ color: '#999', marginBottom: 22, fontSize: '0.9rem' }}>
+                        Resuelve operaciones a contrarreloj o por ejercicios
                     </p>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                         {MODOS_PRESET.map(m => (
                             <button key={m.id}
                                 onClick={() => m.cfg ? startGame(m.cfg) : setShowConfig(true)}
-                                style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px',
-                                    background: 'white', border: `2px solid ${m.color}`, borderRadius: 14,
-                                    cursor: 'pointer', textAlign: 'left', transition: 'transform 0.15s',
-                                    boxShadow: '0 3px 10px rgba(0,0,0,0.07)' }}
-                                onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'}
-                                onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                                style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px',
+                                    background: 'white', border: `2px solid ${m.color}`, borderRadius: 16,
+                                    cursor: 'pointer', textAlign: 'left', transition: 'transform 0.15s, box-shadow 0.15s',
+                                    boxShadow: '0 3px 10px rgba(0,0,0,0.07)', width: '100%' }}
+                                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 8px 20px ${m.color}33`; }}
+                                onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 3px 10px rgba(0,0,0,0.07)'; }}
                             >
-                                <span style={{ fontSize: '2rem', minWidth: 36 }}>{m.icon}</span>
-                                <div>
-                                    <div style={{ fontWeight: 'bold', color: m.color, fontSize: '1.05rem' }}>{m.label}</div>
-                                    <div style={{ color: '#888', fontSize: '0.85rem' }}>{m.desc}</div>
+                                {/* Icono con fondo de color */}
+                                <div style={{ background: m.color, borderRadius: 12, width: 46, height: 46, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', flexShrink: 0 }}>
+                                    {m.icon}
                                 </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ fontWeight: 'bold', color: '#2c3e50', fontSize: '1rem', marginBottom: 3 }}>{m.label}</div>
+                                    <div style={{ color: '#888', fontSize: '0.82rem', marginBottom: m.ops ? 6 : 0 }}>{m.desc}</div>
+                                    {m.ops && (
+                                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                                            {m.ops.map(op => (
+                                                <span key={op} style={{ background: m.color + '22', color: m.color, border: `1px solid ${m.color}55`, borderRadius: 6, padding: '1px 7px', fontSize: '0.78rem', fontWeight: 700 }}>{op}</span>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                                <span style={{ color: m.color, fontSize: '1.3rem', flexShrink: 0 }}>›</span>
                             </button>
                         ))}
 
                         {/* Separador */}
-                        <div style={{ display:'flex', alignItems:'center', gap:10, margin:'4px 0' }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:10, margin:'2px 0' }}>
                             <div style={{ flex:1, height:1, background:'#eee' }} />
-                            <span style={{ color:'#bbb', fontSize:'0.78rem' }}>juego de mesa</span>
+                            <span style={{ color:'#bbb', fontSize:'0.75rem' }}>juego de mesa</span>
                             <div style={{ flex:1, height:1, background:'#eee' }} />
                         </div>
 
                         {/* Oca Matemática */}
                         <button onClick={() => setShowOca(true)}
-                            style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 20px',
-                                background:'white', border:'2px solid #e67e22', borderRadius:14,
-                                cursor:'pointer', textAlign:'left', transition:'transform 0.15s',
-                                boxShadow:'0 3px 10px rgba(0,0,0,0.07)' }}
-                            onMouseEnter={e => e.currentTarget.style.transform='scale(1.02)'}
-                            onMouseLeave={e => e.currentTarget.style.transform='scale(1)'}
+                            style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 18px',
+                                background:'white', border:'2px solid #e67e22', borderRadius:16,
+                                cursor:'pointer', textAlign:'left', transition:'transform 0.15s, box-shadow 0.15s',
+                                boxShadow:'0 3px 10px rgba(0,0,0,0.07)', width:'100%' }}
+                            onMouseEnter={e => { e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 8px 20px #e67e2233'; }}
+                            onMouseLeave={e => { e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow='0 3px 10px rgba(0,0,0,0.07)'; }}
                         >
-                            <span style={{ fontSize:'2rem', minWidth:36 }}>🦆</span>
-                            <div>
-                                <div style={{ fontWeight:'bold', color:'#e67e22', fontSize:'1.05rem' }}>La Oca Matemática</div>
-                                <div style={{ color:'#888', fontSize:'0.85rem' }}>Hasta 4 jugadores · tablero · fracciones, decimales…</div>
+                            <div style={{ background:'#e67e22', borderRadius:12, width:46, height:46, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.5rem', flexShrink:0 }}>🦆</div>
+                            <div style={{ flex:1 }}>
+                                <div style={{ fontWeight:'bold', color:'#2c3e50', fontSize:'1rem', marginBottom:3 }}>La Oca Matemática</div>
+                                <div style={{ color:'#888', fontSize:'0.82rem' }}>Hasta 4 jugadores · tablero · fracciones, decimales…</div>
                             </div>
+                            <span style={{ color:'#e67e22', fontSize:'1.3rem' }}>›</span>
                         </button>
                     </div>
                 </div>
@@ -568,8 +637,13 @@ export default function CalculoMentalGame({ usuario, onExit }) {
             {gameState === 'END' && (
                 <div style={st.centerCard}>
                     {score >= 80 && <Confetti recycle={false} />}
-                    <Clock size={70} color="#f1c40f" style={{ marginBottom: 16 }} />
-                    <h1 style={{ color: '#2c3e50', fontSize: isMobile ? '1.8rem' : '2.2rem' }}>¡Tiempo Agotado!</h1>
+                    {modoEjercicios
+                        ? <Trophy size={70} color="#f1c40f" style={{ marginBottom: 16 }} />
+                        : <Clock size={70} color="#f1c40f" style={{ marginBottom: 16 }} />
+                    }
+                    <h1 style={{ color: '#2c3e50', fontSize: isMobile ? '1.8rem' : '2.2rem' }}>
+                        {modoEjercicios ? '¡Ejercicios completados!' : '¡Tiempo Agotado!'}
+                    </h1>
                     <div style={{ fontSize: '3.5rem', fontWeight: 'bold', color: '#E91E63', margin: '8px 0' }}>{score}</div>
                     <p style={{ color: '#999', marginBottom: 6 }}>Puntos Totales</p>
                     <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginBottom: 28, flexWrap: 'wrap' }}>

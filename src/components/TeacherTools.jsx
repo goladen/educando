@@ -115,9 +115,9 @@ export default function TeacherTools({ usuario, googleToken, perfilProfesor, onO
                     <div style={{ background: '#FEE2E2', padding: '15px', borderRadius: '50%', marginBottom: '15px' }}>
                         <Tv2 size={32} color="#DC2626" />
                     </div>
-                    <h3 style={{ margin: '0 0 10px 0', color: '#DC2626' }}>Video → Presentación</h3>
+                    <h3 style={{ margin: '0 0 10px 0', color: '#DC2626' }}>Video → Presentaciones y Quizz</h3>
                     <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>
-                        Pega una URL de YouTube y la IA genera una presentación PPTX lista para usar.
+                        Pega una URL de YouTube y la IA genera presentaciones y videoquizz.
                     </p>
                 </div>
 

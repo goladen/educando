@@ -16,7 +16,6 @@ export default function GameLauncher({ src, title = 'Juego', onMessage, onSalir 
                     onLoad={handleIframeLoad}
                     style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
                     allow="pointer-lock"
-                    sandbox="allow-scripts allow-same-origin allow-pointer-lock"
                 />
                 <button
                     onClick={onSalir}

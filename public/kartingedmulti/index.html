@@ -148,17 +148,17 @@
           '<div class="play-btn">▶</div>';
         document.body.appendChild(overlay);
 
-        overlay.addEventListener('touchend', function(e) {
-          e.preventDefault();
+        var launched = false;
+        function doLaunch(e) {
+          if (launched) return;
+          launched = true;
+          if (e) e.preventDefault();
           overlay.remove();
           launchUnity();
-        }, { once: true, passive: false });
+        }
 
-        // Fallback click
-        overlay.addEventListener('click', function() {
-          overlay.remove();
-          launchUnity();
-        }, { once: true });
+        overlay.addEventListener('touchend', doLaunch, { passive: false });
+        overlay.addEventListener('click', doLaunch);
 
       } else {
         launchUnity();

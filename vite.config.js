@@ -14,6 +14,8 @@ export default defineConfig({
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api/],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MiB
+        skipWaiting: true,
+        clientsClaim: true,
       },
     }),
   ],

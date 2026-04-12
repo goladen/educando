@@ -103,10 +103,8 @@ const EDGE_MARGIN = 80;
 
 // Bloques de respuesta ocupan exactamente el 60% del ancho de su plataforma
 const ANS_GAP  = 14;
-const ANS_H    = 42;
-const ANS_ABOVE = 132;  // px sobre la plataforma (separación respecto al tope)
-// Para que no roce: el jugador (58px) sube 115-58=57px ENCIMA de la plataforma antes de rozar los bloques
-// La separación real entre el tope de la plataforma y los bloques es ANS_ABOVE - ANS_H = 89px → espacio de sobra
+const ANS_H    = 56;
+const ANS_ABOVE = 152;  // px sobre la plataforma (separación respecto al tope)
 
 function getAnsLayout(platW) {
   const blockW = Math.max(36, Math.floor((platW * 0.69 - 3 * ANS_GAP) / 4));
@@ -1181,6 +1179,46 @@ export default function QuizPlataformas({ onExit, recursoInicial = null, hojaIni
     [bg1Src,bg2Src,bg3Src,bg4Src].forEach((src,i)=>{ const img=new Image(); img.src=src; bgRefs.current[i]=img; });
   },[]);
 
+  // ── Pantalla completa ──
+  const [fullscreen, setFullscreen] = useState(false);
+  const [canvasScale, setCanvasScale] = useState(1);
+  const gameContainerRef = useRef(null);
+
+  const toggleFullscreen = useCallback(async ()=>{
+    if (!fullscreen) {
+      setFullscreen(true);
+      try {
+        await gameContainerRef.current?.requestFullscreen?.({ navigationUI:'hide' });
+        screen.orientation?.lock?.('landscape').catch(()=>{});
+      } catch(_) {}
+    } else {
+      setFullscreen(false);
+      if (document.fullscreenElement) document.exitFullscreen?.();
+      screen.orientation?.unlock?.();
+    }
+  },[fullscreen]);
+
+  useEffect(()=>{
+    const onFS = ()=>{ if (!document.fullscreenElement) setFullscreen(false); };
+    document.addEventListener('fullscreenchange', onFS);
+    return ()=> document.removeEventListener('fullscreenchange', onFS);
+  },[]);
+
+  useEffect(()=>{
+    const update = ()=>{
+      if (fullscreen) {
+        setCanvasScale(Math.min(window.innerWidth/CW, window.innerHeight/CH));
+      } else {
+        setCanvasScale(1);
+      }
+    };
+    update();
+    window.addEventListener('resize', update);
+    const oc = ()=> setTimeout(update, 200);
+    window.addEventListener('orientationchange', oc);
+    return ()=>{ window.removeEventListener('resize', update); window.removeEventListener('orientationchange', oc); };
+  },[fullscreen]);
+
   const g = useRef({
     player:{ x:100,y:700, vx:0,vy:0, onGround:false, facing:1, frameX:0,frameY:0,ft:0, coyote:0,jumpBuffer:0, invulnerable:0 },
     keys:  { left:false, right:false },
@@ -1528,7 +1566,7 @@ export default function QuizPlataformas({ onExit, recursoInicial = null, hojaIni
         grd.addColorStop(0,BG_THEMES[nivelIdx%4]); grd.addColorStop(1,'#000015');
         ctx.fillStyle=grd; ctx.fillRect(0,0,CW,CH);
       }
-      ctx.fillStyle='rgba(0,0,0,0.42)'; ctx.fillRect(0,0,CW,CH);
+      ctx.fillStyle='rgba(0,0,0,0.18)'; ctx.fillRect(0,0,CW,CH);
 
       // ─ Plataformas ─
       for (const plat of ref.platforms) {
@@ -1617,35 +1655,41 @@ export default function QuizPlataformas({ onExit, recursoInicial = null, hojaIni
         if (sy<-80||sy>CH+30) continue;
 
         ctx.save();
-        ctx.font='bold 11px Arial';
+        const qLen = st.qText.length;
+        const QFONT = qLen > 45 ? 9 : qLen > 28 ? 10 : 11;
+        ctx.font=`bold ${QFONT}px Arial`;
 
-        // ── Word-wrap hasta 3 líneas ───────────────────────────────────
-        const MAX_W = Math.min(300, CW - 40);
-        const LINE_H = 14;
-        const words = st.qText.split(' ');
+        // ── Word-wrap hasta 4 líneas ──
+        const MAX_W = Math.min(370, CW - 24);
+        const LINE_H = QFONT + 4;
+        const qwords = st.qText.split(' ');
         const lines = [];
         let cur = '';
-        for (const w of words) {
+        for (const w of qwords) {
           const test = cur ? cur+' '+w : w;
           if (ctx.measureText(test).width > MAX_W && cur) {
             lines.push(cur); cur = w;
-            if (lines.length === 2) { cur = cur+'…'; break; } // max 3 lines
+            if (lines.length === 3) {
+              while (cur.length>1 && ctx.measureText(cur+'…').width>MAX_W) cur=cur.slice(0,-1);
+              cur += '…'; break;
+            }
           } else { cur = test; }
         }
-        if (lines.length < 3 && cur) lines.push(cur);
+        if (lines.length < 4 && cur) lines.push(cur);
 
-        const bw = Math.min(Math.max(...lines.map(l=>ctx.measureText(l).width)) + 18, CW - 20);
+        const bw = Math.min(Math.max(...lines.map(l=>ctx.measureText(l).width)) + 20, CW - 16);
         const bh = lines.length * LINE_H + 10;
+        const bx = Math.max(8, Math.min(CW - bw - 8, sx - bw/2));
         const by = sy - bh / 2;
 
-        ctx.fillStyle='rgba(0,0,0,0.88)';
-        rr(ctx, sx-bw/2, by, bw, bh, 6); ctx.fill();
+        ctx.fillStyle='rgba(0,0,0,0.9)';
+        rr(ctx, bx, by, bw, bh, 6); ctx.fill();
         ctx.strokeStyle='#f1c40f'; ctx.lineWidth=1.5;
-        rr(ctx, sx-bw/2, by, bw, bh, 6); ctx.stroke();
+        rr(ctx, bx, by, bw, bh, 6); ctx.stroke();
 
         ctx.fillStyle='#f1c40f'; ctx.textAlign='center'; ctx.textBaseline='middle';
         lines.forEach((line, i) => {
-          ctx.fillText(line, sx, by + (i + 0.5) * LINE_H + 5);
+          ctx.fillText(line, bx + bw/2, by + (i + 0.5) * LINE_H + 5);
         });
         ctx.restore();
       }
@@ -1670,29 +1714,30 @@ export default function QuizPlataformas({ onExit, recursoInicial = null, hojaIni
         ctx.strokeStyle='rgba(0,0,0,0.35)'; ctx.lineWidth=1.5;
         rr(ctx,sx,sy,blk.w,blk.h,6); ctx.stroke();
 
-        // Word-wrap hasta 2 líneas, texto negro nítido
-        const FONT_SZ=12, LINE_H=16, PAD=5;
+        // Word-wrap adaptativo hasta 3 líneas
+        const txtLen=blk.text.length;
+        const FONT_SZ=txtLen>22?10:12, LINE_H=FONT_SZ+4, PAD=5;
         const maxTW = blk.w - PAD*2;
         ctx.font=`bold ${FONT_SZ}px Arial`;
         ctx.textAlign='center'; ctx.textBaseline='middle';
-        const words=blk.text.split(' ');
-        const lines=[]; let cur='';
-        for (const w of words) {
-          const test=cur?cur+' '+w:w;
-          if (ctx.measureText(test).width>maxTW && cur) { lines.push(cur); cur=w; }
-          else { cur=test; }
-          if (lines.length===2) { cur=''; break; }
+        const bwords=blk.text.split(' ');
+        const blines=[]; let bcur='';
+        for (const w of bwords) {
+          const test=bcur?bcur+' '+w:w;
+          if (ctx.measureText(test).width>maxTW && bcur) { blines.push(bcur); bcur=w; }
+          else { bcur=test; }
+          if (blines.length===3) { bcur=''; break; }
         }
-        if (lines.length<2 && cur) lines.push(cur);
-        // Truncar 2ª línea si sigue siendo larga
-        if (lines[1] && ctx.measureText(lines[1]).width>maxTW) {
-          let l=lines[1];
+        if (blines.length<3 && bcur) blines.push(bcur);
+        const lastI=blines.length-1;
+        if (blines[lastI] && ctx.measureText(blines[lastI]).width>maxTW) {
+          let l=blines[lastI];
           while (l.length>1 && ctx.measureText(l+'…').width>maxTW) l=l.slice(0,-1);
-          lines[1]=l+'…';
+          blines[lastI]=l+'…';
         }
-        const totalH=lines.length*LINE_H;
+        const totalH=blines.length*LINE_H;
         const startY=sy+blk.h/2-totalH/2+LINE_H/2;
-        lines.forEach((line,i)=>{
+        blines.forEach((line,i)=>{
           const ty=startY+i*LINE_H;
           ctx.fillStyle='rgba(255,255,255,0.55)'; ctx.fillText(line,sx+blk.w/2+0.5,ty+0.5);
           ctx.fillStyle='#111'; ctx.fillText(line,sx+blk.w/2,ty);
@@ -1849,61 +1894,119 @@ export default function QuizPlataformas({ onExit, recursoInicial = null, hojaIni
   />;
 
   const mat = materia ? MATERIAS[materia] : null;
+  const scaledW = Math.round(CW * canvasScale);
+  const scaledH = Math.round(CH * canvasScale);
+  const btnSz   = Math.max(50, Math.round(Math.min(scaledW, scaledH) * 0.13));
+
+  const exitFS = ()=>{ setFullscreen(false); if(document.fullscreenElement) document.exitFullscreen?.(); screen.orientation?.unlock?.(); };
+
   return (
-    <div style={{ width:'100%', minHeight:'100vh', background:'#0a0a0a', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', userSelect:'none', WebkitUserSelect:'none', touchAction:'none' }}>
+    <div ref={gameContainerRef} style={{
+      ...(fullscreen ? { position:'fixed', inset:0, zIndex:9999 } : { width:'100%', minHeight:'100vh' }),
+      background:'#0a0a0a', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+      userSelect:'none', WebkitUserSelect:'none', touchAction:'none',
+    }}>
 
-      <div style={{ width:'100%', maxWidth:CW, display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 10px', boxSizing:'border-box' }}>
-        <button onClick={()=>setFase('MENU')} style={{ padding:'3px 10px', borderRadius:18, border:'1.5px solid rgba(255,255,255,0.14)', background:'transparent', color:'rgba(255,255,255,0.38)', cursor:'pointer', fontSize:'0.74rem', fontFamily:'inherit' }}>← Menú</button>
-        <span style={{ color:'rgba(255,255,255,0.45)', fontSize:'0.76rem' }}>
-          {mat ? `${mat.emoji} ${mat.label}` : (recursoActivo?.titulo||'Recurso')} · Nivel {nivelIdx+1}
-        </span>
-        <div style={{ display:'flex', gap:6, alignItems:'center' }}>
-          {/* Contador de aciertos (solo preguntas) */}
-          <span style={{ background:'#2980b9', color:'white', padding:'2px 9px', borderRadius:18, fontWeight:'bold', fontSize:'0.82rem' }}>
-            ✔ {aciertos}/{totalQ}
+      {/* Barra superior — solo en modo normal */}
+      {!fullscreen && (
+        <div style={{ width:'100%', maxWidth:CW, display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 10px', boxSizing:'border-box' }}>
+          <button onClick={()=>setFase('MENU')} style={{ padding:'3px 10px', borderRadius:18, border:'1.5px solid rgba(255,255,255,0.14)', background:'transparent', color:'rgba(255,255,255,0.38)', cursor:'pointer', fontSize:'0.74rem', fontFamily:'inherit' }}>← Menú</button>
+          <span style={{ color:'rgba(255,255,255,0.45)', fontSize:'0.76rem' }}>
+            {mat ? `${mat.emoji} ${mat.label}` : (recursoActivo?.titulo||'Recurso')} · Nivel {nivelIdx+1}
           </span>
-          {/* Puntos totales */}
-          <span style={{ background:'#f1c40f', color:'#1a1a2e', padding:'2px 9px', borderRadius:18, fontWeight:'bold', fontSize:'0.82rem' }}>
-            ⭐ {Math.max(0,score)}
-          </span>
+          <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+            <span style={{ background:'#2980b9', color:'white', padding:'2px 9px', borderRadius:18, fontWeight:'bold', fontSize:'0.82rem' }}>✔ {aciertos}/{totalQ}</span>
+            <span style={{ background:'#f1c40f', color:'#1a1a2e', padding:'2px 9px', borderRadius:18, fontWeight:'bold', fontSize:'0.82rem' }}>⭐ {Math.max(0,score)}</span>
+            <button onClick={toggleFullscreen} title="Pantalla completa"
+              style={{ padding:'3px 9px', borderRadius:8, border:'1.5px solid rgba(255,255,255,0.25)', background:'rgba(255,255,255,0.08)', color:'white', cursor:'pointer', fontSize:'1rem', lineHeight:'1.2', fontFamily:'Arial' }}>
+              ⛶
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
-      <div style={{ position:'relative', touchAction:'none' }}>
-        <canvas ref={canvasRef} style={{ display:'block', maxWidth:'100%', borderRadius:8, boxShadow:'0 0 36px rgba(0,0,0,0.7)', border:'2px solid #1a1a1a', touchAction:'none' }}/>
-        {feedUI&&(
+      {/* Canvas + overlays */}
+      <div style={{ position:'relative', flexShrink:0, touchAction:'none',
+        width: fullscreen ? scaledW : undefined, height: fullscreen ? scaledH : undefined }}>
+        <canvas ref={canvasRef} style={{ display:'block', touchAction:'none',
+          borderRadius: fullscreen ? 0 : 8,
+          boxShadow: fullscreen ? 'none' : '0 0 36px rgba(0,0,0,0.7)',
+          border: fullscreen ? 'none' : '2px solid #1a1a1a',
+          ...(fullscreen
+            ? { width:scaledW, height:scaledH }
+            : { maxWidth:'100vw' })
+        }}/>
+
+        {/* Feedback */}
+        {feedUI && (
           <div style={{ position:'absolute', top:'36%', left:'50%', transform:'translate(-50%,-50%)',
             background:feedUI.ok?'rgba(39,174,96,0.93)':'rgba(192,57,43,0.93)',
-            color:'white', padding:'10px 22px', borderRadius:12, fontSize:'1.05rem',
+            color:'white', padding:'10px 22px', borderRadius:12,
+            fontSize: fullscreen ? `${Math.round(btnSz*0.32)}px` : '1.05rem',
             fontWeight:'bold', fontFamily:'Arial', pointerEvents:'none', whiteSpace:'nowrap',
-            boxShadow:'0 4px 16px rgba(0,0,0,0.4)' }}>{feedUI.text}
+            boxShadow:'0 4px 16px rgba(0,0,0,0.4)', zIndex:3 }}>{feedUI.text}
           </div>
         )}
+
+        {/* HUD + mandos en pantalla completa */}
+        {fullscreen && (<>
+          {/* HUD superior */}
+          <div style={{ position:'absolute', top:0, left:0, right:0, zIndex:3,
+            display:'flex', justifyContent:'space-between', alignItems:'center',
+            padding:`${Math.round(scaledH*0.018)}px ${Math.round(scaledW*0.015)}px`,
+            background:'rgba(0,0,0,0.5)' }}>
+            <button onClick={()=>{ exitFS(); setFase('MENU'); }}
+              style={{ padding:'3px 10px', borderRadius:14, border:'1.5px solid rgba(255,255,255,0.2)', background:'transparent', color:'rgba(255,255,255,0.55)', cursor:'pointer', fontSize:`${Math.round(btnSz*0.24)}px`, fontFamily:'inherit' }}>← Menú</button>
+            <span style={{ color:'rgba(255,255,255,0.6)', fontSize:`${Math.round(btnSz*0.24)}px` }}>
+              {mat ? `${mat.emoji} ${mat.label}` : (recursoActivo?.titulo||'Recurso')} · Nivel {nivelIdx+1}
+            </span>
+            <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+              <span style={{ background:'#2980b9', color:'white', padding:'2px 8px', borderRadius:12, fontWeight:'bold', fontSize:`${Math.round(btnSz*0.26)}px` }}>✔ {aciertos}/{totalQ}</span>
+              <span style={{ background:'#f1c40f', color:'#1a1a2e', padding:'2px 8px', borderRadius:12, fontWeight:'bold', fontSize:`${Math.round(btnSz*0.26)}px` }}>⭐ {Math.max(0,score)}</span>
+              <button onClick={exitFS}
+                style={{ padding:'2px 8px', borderRadius:8, border:'1.5px solid rgba(255,255,255,0.25)', background:'rgba(255,255,255,0.1)', color:'white', cursor:'pointer', fontSize:`${Math.round(btnSz*0.3)}px`, lineHeight:'1.2', fontFamily:'Arial' }}>✕</button>
+            </div>
+          </div>
+
+          {/* Mandos izquierda */}
+          <div style={{ position:'absolute', bottom:Math.round(scaledH*0.04), left:Math.round(scaledW*0.02), zIndex:3, display:'flex', gap:Math.round(scaledW*0.018) }}>
+            <Btn size={btnSz} onDown={e=>ptrL(e,true)} onUp={e=>ptrL(e,false)}>◀</Btn>
+            <Btn size={btnSz} onDown={e=>ptrR(e,true)} onUp={e=>ptrR(e,false)}>▶</Btn>
+          </div>
+          {/* Botón saltar derecha */}
+          <div style={{ position:'absolute', bottom:Math.round(scaledH*0.04), right:Math.round(scaledW*0.02), zIndex:3 }}>
+            <Btn size={btnSz} wide onDown={ptrJ} accent>▲</Btn>
+          </div>
+        </>)}
       </div>
 
-      {/* Controles táctiles */}
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', width:'100%', maxWidth:CW, padding:'8px 12px', boxSizing:'border-box' }}>
-        <div style={{ display:'flex', gap:8 }}>
-          <Btn onDown={e=>ptrL(e,true)} onUp={e=>ptrL(e,false)}>◀</Btn>
-          <Btn onDown={e=>ptrR(e,true)} onUp={e=>ptrR(e,false)}>▶</Btn>
+      {/* Controles normales — solo en modo normal */}
+      {!fullscreen && (<>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', width:'100%', maxWidth:CW, padding:'8px 12px', boxSizing:'border-box' }}>
+          <div style={{ display:'flex', gap:8 }}>
+            <Btn onDown={e=>ptrL(e,true)} onUp={e=>ptrL(e,false)}>◀</Btn>
+            <Btn onDown={e=>ptrR(e,true)} onUp={e=>ptrR(e,false)}>▶</Btn>
+          </div>
+          <Btn onDown={ptrJ} accent>▲ SALTAR</Btn>
         </div>
-        <Btn onDown={ptrJ} accent>▲ SALTAR</Btn>
-      </div>
-
-      <div style={{ color:'rgba(255,255,255,0.18)', fontSize:'0.64rem', marginTop:2 }}>
-        ← → moverse · ↑/Espacio saltar · golpea los bloques desde abajo
-      </div>
+        <div style={{ color:'rgba(255,255,255,0.18)', fontSize:'0.64rem', marginTop:2 }}>
+          ← → moverse · ↑/Espacio saltar · golpea los bloques desde abajo
+        </div>
+      </>)}
     </div>
   );
 }
 
-function Btn({ children, onDown, onUp=()=>{}, accent=false }) {
+function Btn({ children, onDown, onUp=()=>{}, accent=false, size=null, wide=false }) {
+  const h = size || 50;
+  const w = size ? (wide ? Math.round(size*1.8) : size) : (accent ? 120 : 56);
+  const fs = size ? `${Math.round(size*0.38)}px` : (accent ? '0.85rem' : '1.3rem');
   return (
     <button
       onPointerDown={onDown} onPointerUp={onUp} onPointerCancel={onUp}
-      style={{ width:accent?120:56, height:50, borderRadius:10, border:'none',
+      style={{ width:w, height:h, borderRadius:size?Math.round(h*0.16):10, border:'none',
         background:accent?'#f1c40f':'#2c3e50', color:accent?'#1a1a2e':'white',
-        fontWeight:'bold', fontSize:accent?'0.85rem':'1.3rem', cursor:'pointer',
+        fontWeight:'bold', fontSize:fs, cursor:'pointer',
         userSelect:'none', WebkitUserSelect:'none', fontFamily:'Arial',
         boxShadow:'0 3px 10px rgba(0,0,0,0.4)', touchAction:'none' }}>
       {children}

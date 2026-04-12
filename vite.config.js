@@ -10,12 +10,31 @@ export default defineConfig({
       registerType: 'autoUpdate',
       manifest: false, // usamos el manifest.json de /public
       workbox: {
+        // Excluir MP3/audio (usan Range requests incompatibles con el SW cache)
+        // Excluir archivos Unity (sin hash en nombre → SW sirve versiones viejas)
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        globIgnores: [
+          '**/kartinged/**',
+          '**/kartingedmulti/**',
+          '**/*.mp3',
+          '**/*.mp4',
+          '**/*.ogg',
+          '**/*.wav',
+        ],
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api/],
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MiB
+        // Excluir rutas Unity del navigate fallback — sin esto el SW sirve
+        // el index.html de React dentro del iframe de Unity
+        navigateFallbackDenylist: [/^\/api/, /^\/kartinged/, /^\/kartingedmulti/],
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         skipWaiting: true,
         clientsClaim: true,
+        // No cachear audio (Range requests)
+        runtimeCaching: [
+          {
+            urlPattern: /\.(?:mp3|mp4|ogg|wav)$/i,
+            handler: 'NetworkOnly',
+          },
+        ],
       },
     }),
   ],

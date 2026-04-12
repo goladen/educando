@@ -47,7 +47,7 @@ export default function GameLauncher({ src, title = 'Juego', onMessage, onSalir 
                         src={bustSrc}
                         title={title}
                         style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
-                        allow="pointer-lock"
+                        allow="pointer-lock *"
                     />
                 )}
                 <button

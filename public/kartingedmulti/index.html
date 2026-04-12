@@ -105,6 +105,14 @@
           }).then((unityInstance) => {
             document.querySelector("#unity-loading-bar").style.display = "none";
 
+            // Quit limpio cuando el padre React destruye el iframe
+            window.addEventListener('message', function(e) {
+              if (e.data === 'UNITY_QUIT') unityInstance.Quit().catch(function(){});
+            });
+            window.addEventListener('beforeunload', function() {
+              unityInstance.Quit().catch(function(){});
+            });
+
             // Profiler y Unload solo en escritorio
             if (!isMobile) {
               var profile = unityProfiler.createButton(unityInstance);

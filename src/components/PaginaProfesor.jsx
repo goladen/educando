@@ -155,12 +155,12 @@ function TareaCard({ tarea, color }) {
         </button>
       )}
       {juegoUrl && juegoAbierto && (
-        <div style={{ borderRadius:10, overflow:'hidden', border:`2px solid ${color||'#6D28D9'}` }}>
-          <div style={{ background:color||'#6D28D9', padding:'6px 12px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-            <span style={{ color:'white', fontSize:12, fontWeight:600 }}>{juegoInfo?`${juegoInfo.emoji} ${juegoInfo.nombre}`:'🎮 Juego'}</span>
-            <button onClick={()=>setJuegoAbierto(false)} style={{ background:'rgba(255,255,255,0.2)', border:'none', borderRadius:6, color:'white', cursor:'pointer', fontSize:11, padding:'2px 8px', fontFamily:'inherit' }}>✕ Cerrar</button>
+        <div style={{ position:'fixed', inset:0, zIndex:9999, background:'#000', display:'flex', flexDirection:'column' }}>
+          <div style={{ background:color||'#6D28D9', padding:'6px 14px', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
+            <span style={{ color:'white', fontSize:13, fontWeight:700 }}>{juegoInfo?`${juegoInfo.emoji} ${juegoInfo.nombre}`:'🎮 Juego'}</span>
+            <button onClick={()=>setJuegoAbierto(false)} style={{ background:'rgba(255,255,255,0.2)', border:'none', borderRadius:8, color:'white', cursor:'pointer', fontSize:13, fontWeight:700, padding:'4px 14px', fontFamily:'inherit' }}>✕ Cerrar</button>
           </div>
-          <iframe src={juegoUrl} title="Juego" width="100%" height="520" frameBorder="0" style={{ display:'block' }} allow="autoplay"/>
+          <iframe src={juegoUrl} title="Juego" style={{ flex:1, width:'100%', border:'none', display:'block' }} allow="autoplay; fullscreen; pointer-lock *"/>
         </div>
       )}
     </div>

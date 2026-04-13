@@ -123,7 +123,17 @@ function TareaCard({ tarea, color }) {
   const juegoInfo = tarea.juegoId ? JUEGOS_INFO[tarea.juegoId] : null;
   const pptxEmbed = getPresentacionEmbed(tarea.pptxUrl);
   const [juegoAbierto, setJuegoAbierto] = useState(false);
-  const [pptxAbierto, setPptxAbierto] = useState(false);
+  const [juegoListo,   setJuegoListo]   = useState(false);
+  const [pptxAbierto, setPptxAbierto]   = useState(false);
+
+  const abrirJuego = () => { setJuegoAbierto(true); setJuegoListo(false); };
+  const cerrarJuego = () => { setJuegoAbierto(false); setJuegoListo(false); if (document.fullscreenElement) document.exitFullscreen(); };
+  const entrarFullscreen = () => {
+    const el = document.documentElement;
+    if (el.requestFullscreen) el.requestFullscreen();
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+    setJuegoListo(true);
+  };
 
   return (
     <div style={{
@@ -186,18 +196,31 @@ function TareaCard({ tarea, color }) {
       )}
 
       {juegoUrl && !juegoAbierto && (
-        <button onClick={()=>setJuegoAbierto(true)} style={{ display:'flex', alignItems:'center', gap:6, padding:'10px 16px', borderRadius:9, border:`2px solid ${color||'#6D28D9'}`, background:'white', color:color||'#6D28D9', fontWeight:700, fontSize:13, cursor:'pointer', width:'fit-content', fontFamily:'inherit' }}>
+        <button onClick={abrirJuego} style={{ display:'flex', alignItems:'center', gap:6, padding:'10px 16px', borderRadius:9, border:`2px solid ${color||'#6D28D9'}`, background:'white', color:color||'#6D28D9', fontWeight:700, fontSize:13, cursor:'pointer', width:'fit-content', fontFamily:'inherit' }}>
           {juegoInfo ? <span>{juegoInfo.emoji}</span> : <Gamepad2 size={14}/>}
           {juegoInfo ? `Jugar — ${juegoInfo.nombre}` : '¡Jugar ahora!'}
         </button>
       )}
       {juegoUrl && juegoAbierto && (
         <div style={{ position:'fixed', inset:0, zIndex:9999, background:'#000', display:'flex', flexDirection:'column' }}>
+          {/* Barra superior */}
           <div style={{ background:color||'#6D28D9', padding:'6px 14px', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
             <span style={{ color:'white', fontSize:13, fontWeight:700 }}>{juegoInfo?`${juegoInfo.emoji} ${juegoInfo.nombre}`:'🎮 Juego'}</span>
-            <button onClick={()=>setJuegoAbierto(false)} style={{ background:'rgba(255,255,255,0.2)', border:'none', borderRadius:8, color:'white', cursor:'pointer', fontSize:13, fontWeight:700, padding:'4px 14px', fontFamily:'inherit' }}>✕ Cerrar</button>
+            <button onClick={cerrarJuego} style={{ background:'rgba(255,255,255,0.2)', border:'none', borderRadius:8, color:'white', cursor:'pointer', fontSize:13, fontWeight:700, padding:'4px 14px', fontFamily:'inherit' }}>✕ Cerrar</button>
           </div>
-          <iframe src={juegoUrl} title="Juego" style={{ flex:1, width:'100%', border:'none', display:'block' }} allow="autoplay; fullscreen; pointer-lock *"/>
+          {/* Splash "toca para jugar" */}
+          {!juegoListo && (
+            <div onClick={entrarFullscreen} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:20, cursor:'pointer', userSelect:'none' }}>
+              <div style={{ fontSize:64 }}>{juegoInfo?.emoji||'🎮'}</div>
+              <div style={{ fontSize:22, fontWeight:800, color:'white' }}>{juegoInfo?.nombre||'Juego'}</div>
+              <div style={{ fontSize:15, color:'rgba(255,255,255,0.7)', textAlign:'center', maxWidth:280 }}>Toca la pantalla para jugar<br/>a pantalla completa</div>
+              <div style={{ marginTop:8, padding:'12px 32px', borderRadius:50, background:color||'#6D28D9', color:'white', fontWeight:700, fontSize:15 }}>▶ Jugar</div>
+            </div>
+          )}
+          {/* Iframe del juego */}
+          {juegoListo && (
+            <iframe src={juegoUrl} title="Juego" style={{ flex:1, width:'100%', border:'none', display:'block' }} allow="autoplay; fullscreen; pointer-lock *"/>
+          )}
         </div>
       )}
     </div>

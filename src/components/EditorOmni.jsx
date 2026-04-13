@@ -61,6 +61,21 @@ function generarCodigo() {
 
 function ItemEditorFill({ item, onChange, onMerge }) {
   const nb = item.parts.length - 1;
+
+  // Delete gap[i]: merge parts[i] + parts[i+1] into one segment, remove ans[i]
+  const deleteGap = (i) => {
+    const newParts = [
+      ...item.parts.slice(0, i),
+      item.parts[i] + item.parts[i + 1],
+      ...item.parts.slice(i + 2),
+    ];
+    onMerge({
+      parts: newParts,
+      ans:   item.ans.filter((_, j) => j !== i),
+      alts:  item.alts.filter((_, j) => j !== i),
+    });
+  };
+
   return (
     <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 6 }}>
       <label style={lbl}>Etiqueta</label>
@@ -70,19 +85,12 @@ function ItemEditorFill({ item, onChange, onMerge }) {
       <label style={lbl}>Partes de la frase (el hueco va entre partes)</label>
       {item.parts.map((p, i) => (
         <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <span style={{ fontSize: 11, color: '#94A3B8', minWidth: 50 }}>{i === 0 ? 'Inicio' : i < item.parts.length - 1 ? `Parte ${i}` : 'Final'}</span>
+          <span style={{ fontSize: 11, color: '#94A3B8', minWidth: 50 }}>
+            {i === 0 ? 'Inicio' : i < item.parts.length - 1 ? `Parte ${i}` : 'Final'}
+          </span>
           <input style={{ ...inp, flex: 1 }} value={p} onChange={e => {
             const np = [...item.parts]; np[i] = e.target.value; onChange('parts', np);
-          }} placeholder={`Parte ${i + 1}`} />
-          {item.parts.length > 2 && i > 0 && i < item.parts.length - 1 && (
-            <button style={btnSm} onClick={() => {
-              onMerge({
-                parts: item.parts.filter((_, j) => j !== i),
-                ans:   item.ans.filter((_, j) => j !== i - 1),
-                alts:  item.alts.filter((_, j) => j !== i - 1),
-              });
-            }}>✕</button>
-          )}
+          }} placeholder={i === 0 ? 'Texto inicial…' : i < item.parts.length - 1 ? 'Texto entre huecos…' : 'Texto final…'} />
         </div>
       ))}
       <button style={btnAdd} onClick={() => {
@@ -93,8 +101,13 @@ function ItemEditorFill({ item, onChange, onMerge }) {
         });
       }}>+ añadir hueco</button>
       {item.ans.map((a, i) => (
-        <div key={i}>
-          <label style={lbl}>Respuesta correcta {nb > 1 ? `(hueco ${i + 1})` : ''}</label>
+        <div key={i} style={{ border: '1px solid #E2E8F0', borderRadius: 8, padding: '8px 10px', background: '#FAFAFA', display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+            <label style={{ ...lbl, margin: 0 }}>Hueco {nb > 1 ? i + 1 : ''} — respuesta correcta</label>
+            {nb > 1 && (
+              <button style={btnSm} title="Eliminar este hueco" onClick={() => deleteGap(i)}>✕ Eliminar hueco {i + 1}</button>
+            )}
+          </div>
           <MathInput value={a} onChange={v => { const n = [...item.ans]; n[i] = v; onChange('ans', n); }} placeholder="respuesta" />
           <label style={{ ...lbl, marginTop: 4 }}>Alternativas válidas (separadas por |)</label>
           <input style={inp} value={(item.alts?.[i] || []).join('|')} onChange={e => {

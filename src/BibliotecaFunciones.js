@@ -16,7 +16,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=2', 'Sí, T=4', 'Sí, T=π'] },
       cortes:    { correcta: '(2,0), (0,-4)', incorrectas: ['(2,0)', '(0,4) y (2,0)', '(-2,0) y (0,-4)'] },
       monotonia: { correcta: 'C: (-∞, ∞) D: ∅', incorrectas: ['C: ∅ D: (-∞, ∞)', 'C: (0, ∞) D: (-∞, 0)', 'C: (-4, ∞) D: ∅'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,-4)', 'Máx(2,0)', 'Mín(2,0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,-4)', 'Máx(2,0)', 'Mín(2,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -32,7 +33,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=3', 'Sí, T=6', 'Sí, T=π'] },
       cortes:    { correcta: '(2,0), (0,6)', incorrectas: ['(2,0)', '(-2,0) y (0,6)', '(0,2) y (6,0)'] },
       monotonia: { correcta: 'C: ∅ D: (-∞, ∞)', incorrectas: ['C: (-∞, ∞) D: ∅', 'C: (0, ∞) D: (-∞, 0)', 'C: (-∞, 0) D: (0, ∞)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(0,6)', 'Mín(2,0)', 'Máx(2,0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(0,6)', 'Mín(2,0)', 'Máx(2,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -48,7 +50,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=3', 'Sí, T=1', 'Sí, T=π'] },
       cortes:    { correcta: '(-3,0), (0,3)', incorrectas: ['(3,0) y (0,3)', '(0,3)', '(-3,0)'] },
       monotonia: { correcta: 'C: (-∞, ∞) D: ∅', incorrectas: ['C: ∅ D: (-∞, ∞)', 'C: (0, ∞) D: (-∞, 0)', 'C: (-3, ∞) D: ∅'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(0,3)', 'Mín(-3,0)', 'Mín(0,3)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(0,3)', 'Mín(-3,0)', 'Mín(0,3)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -64,7 +67,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=2', 'Sí, T=π', 'Sí, T=1'] },
       cortes:    { correcta: '(2,0), (0,1)', incorrectas: ['(2,0)', '(-2,0) y (0,1)', '(0,2) y (1,0)'] },
       monotonia: { correcta: 'C: ∅ D: (-∞, ∞)', incorrectas: ['C: (-∞, ∞) D: ∅', 'C: (0, ∞) D: (-∞, 0)', 'C: (-∞, 0) D: (0, ∞)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(0,1)', 'Mín(2,0)', 'Máx(2,0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(0,1)', 'Mín(2,0)', 'Máx(2,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -80,7 +84,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=3', 'Sí, T=1', 'Sí, T=π'] },
       cortes:    { correcta: '(-1,0), (0,3)', incorrectas: ['(-1,0)', '(3,0) y (0,-1)', '(1,0) y (0,3)'] },
       monotonia: { correcta: 'C: (-∞, ∞) D: ∅', incorrectas: ['C: ∅ D: (-∞, ∞)', 'C: (0, ∞) D: (-∞, 0)', 'C: (-3, ∞) D: ∅'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(-1,0)', 'Máx(0,3)', 'Mín(0,3)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(-1,0)', 'Máx(0,3)', 'Mín(0,3)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -96,7 +101,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=2', 'Sí, T=π', 'Sí, T=1'] },
       cortes:    { correcta: '(-1,0), (0,-2)', incorrectas: ['(-2,0) y (0,-2)', '(1,0) y (0,-2)', '(-1,0)'] },
       monotonia: { correcta: 'C: ∅ D: (-∞, ∞)', incorrectas: ['C: (-∞, ∞) D: ∅', 'C: (0, ∞) D: (-∞, 0)', 'C: (-1, ∞) D: ∅'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(-1,0)', 'Máx(0,-2)', 'Mín(-1,0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(-1,0)', 'Máx(0,-2)', 'Mín(-1,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -112,7 +118,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=4', 'Sí, T=2', 'Sí, T=π'] },
       cortes:    { correcta: '(4,0), (0,-2)', incorrectas: ['(4,0)', '(-4,0) y (0,-2)', '(2,0) y (0,-1)'] },
       monotonia: { correcta: 'C: (-∞, ∞) D: ∅', incorrectas: ['C: ∅ D: (-∞, ∞)', 'C: (0, ∞) D: (-∞, 0)', 'C: (4, ∞) D: ∅'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,-2)', 'Máx(4,0)', 'Mín(4,0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,-2)', 'Máx(4,0)', 'Mín(4,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -128,7 +135,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=2', 'Sí, T=4', 'Sí, T=π'] },
       cortes:    { correcta: '(-2,0), (2,0), (0,4)', incorrectas: ['(-2,0) y (2,0)', '(0,4)', '(0,-4) y (±2,0)'] },
       monotonia: { correcta: 'C: (-∞, 0) D: (0, ∞)', incorrectas: ['C: (0, ∞) D: (-∞, 0)', 'C: (-∞, ∞) D: ∅', 'C: ∅ D: (-∞, ∞)'] },
-      extremos:  { correcta: 'Máx(0,4)', incorrectas: ['Mín(0,4)', 'Máx(-2,0) Mín(2,0)', 'No tiene'] }
+      extremos:  { correcta: 'Máx(0,4)', incorrectas: ['Mín(0,4)', 'Máx(-2,0) Mín(2,0)', 'No tiene'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -144,7 +152,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=1', 'Sí, T=2', 'Sí, T=π'] },
       cortes:    { correcta: '(-1,0), (1,0), (0,-1)', incorrectas: ['(-1,0) y (1,0)', '(0,-1)', '(1,0) y (-1,0)'] },
       monotonia: { correcta: 'C: (0, ∞) D: (-∞, 0)', incorrectas: ['C: (-∞, 0) D: (0, ∞)', 'C: (-∞, ∞) D: ∅', 'C: ∅ D: (-∞, ∞)'] },
-      extremos:  { correcta: 'Mín(0,-1)', incorrectas: ['Máx(0,-1)', 'Máx(-1,0) Mín(1,0)', 'No tiene'] }
+      extremos:  { correcta: 'Mín(0,-1)', incorrectas: ['Máx(0,-1)', 'Máx(-1,0) Mín(1,0)', 'No tiene'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -160,7 +169,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=2', 'Sí, T=π', 'Sí, T=4'] },
       cortes:    { correcta: '(2,0), (0,4)', incorrectas: ['(-2,0) y (0,4)', '(2,0)', '(0,2) y (4,0)'] },
       monotonia: { correcta: 'C: (2, ∞) D: (-∞, 2)', incorrectas: ['C: (-∞, 2) D: (2, ∞)', 'C: (0, ∞) D: (-∞, 0)', 'C: (-∞, ∞) D: ∅'] },
-      extremos:  { correcta: 'Mín(2,0)', incorrectas: ['Máx(2,0)', 'Mín(0,4)', 'No tiene'] }
+      extremos:  { correcta: 'Mín(2,0)', incorrectas: ['Máx(2,0)', 'Mín(0,4)', 'No tiene'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -176,7 +186,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=3', 'Sí, T=4', 'Sí, T=π'] },
       cortes:    { correcta: '(-3,0), (1,0), (0,3)', incorrectas: ['(-3,0) y (1,0)', '(-1,4) y (0,3)', '(3,0) y (-1,0) y (0,3)'] },
       monotonia: { correcta: 'C: (-∞, -1) D: (-1, ∞)', incorrectas: ['C: (-1, ∞) D: (-∞, -1)', 'C: (-∞, ∞) D: ∅', 'C: ∅ D: (-∞, ∞)'] },
-      extremos:  { correcta: 'Máx(-1,4)', incorrectas: ['Mín(-1,4)', 'Máx(0,3)', 'Máx(-3,0) Mín(1,0)'] }
+      extremos:  { correcta: 'Máx(-1,4)', incorrectas: ['Mín(-1,4)', 'Máx(0,3)', 'Máx(-3,0) Mín(1,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -192,7 +203,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=2', 'Sí, T=4', 'Sí, T=π'] },
       cortes:    { correcta: '(-2,0), (2,0), (0,-8)', incorrectas: ['(-2,0) y (2,0)', '(0,-8)', '(±4,0) y (0,-8)'] },
       monotonia: { correcta: 'C: (0, ∞) D: (-∞, 0)', incorrectas: ['C: (-∞, 0) D: (0, ∞)', 'C: (-∞, ∞) D: ∅', 'C: ∅ D: (-∞, ∞)'] },
-      extremos:  { correcta: 'Mín(0,-8)', incorrectas: ['Máx(0,-8)', 'Mín(-2,0) Máx(2,0)', 'No tiene'] }
+      extremos:  { correcta: 'Mín(0,-8)', incorrectas: ['Máx(0,-8)', 'Mín(-2,0) Máx(2,0)', 'No tiene'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -208,7 +220,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=2', 'Sí, T=π', 'Sí, T=1'] },
       cortes:    { correcta: '(0,0), (2,0)', incorrectas: ['(0,0)', '(0,0) y (1,0)', '(2,0) y (0,2)'] },
       monotonia: { correcta: 'C: (-∞, 1) D: (1, ∞)', incorrectas: ['C: (1, ∞) D: (-∞, 1)', 'C: (-∞, ∞) D: ∅', 'C: ∅ D: (-∞, ∞)'] },
-      extremos:  { correcta: 'Máx(1,1)', incorrectas: ['Mín(1,1)', 'Máx(0,0)', 'Máx(2,0)'] }
+      extremos:  { correcta: 'Máx(1,1)', incorrectas: ['Mín(1,1)', 'Máx(0,0)', 'Máx(2,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -224,7 +237,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=4', 'Sí, T=5', 'Sí, T=π'] },
       cortes:    { correcta: '(1,0), (5,0), (0,5)', incorrectas: ['(1,0) y (5,0)', '(0,5)', '(-1,0) y (5,0) y (0,5)'] },
       monotonia: { correcta: 'C: (3, ∞) D: (-∞, 3)', incorrectas: ['C: (-∞, 3) D: (3, ∞)', 'C: (0, ∞) D: (-∞, 0)', 'C: (-∞, ∞) D: ∅'] },
-      extremos:  { correcta: 'Mín(3,-4)', incorrectas: ['Máx(3,-4)', 'Mín(1,0)', 'No tiene'] }
+      extremos:  { correcta: 'Mín(3,-4)', incorrectas: ['Máx(3,-4)', 'Mín(1,0)', 'No tiene'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -240,7 +254,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=3', 'Sí, T=4', 'Sí, T=π'] },
       cortes:    { correcta: '(-3,0), (-1,0), (0,3)', incorrectas: ['(-3,0) y (-1,0)', '(0,3)', '(-2,-1) y (0,3)'] },
       monotonia: { correcta: 'C: (-2, ∞) D: (-∞, -2)', incorrectas: ['C: (-∞, -2) D: (-2, ∞)', 'C: (-∞, ∞) D: ∅', 'C: ∅ D: (-∞, ∞)'] },
-      extremos:  { correcta: 'Mín(-2,-1)', incorrectas: ['Máx(-2,-1)', 'Mín(0,3)', 'No tiene'] }
+      extremos:  { correcta: 'Mín(-2,-1)', incorrectas: ['Máx(-2,-1)', 'Mín(0,3)', 'No tiene'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -256,7 +271,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=3', 'Sí, T=2', 'Sí, T=π'] },
       cortes:    { correcta: '(0,0)', incorrectas: ['(1,1) y (-1,-1)', '(3,0)', 'No tiene'] },
       monotonia: { correcta: 'C: (-∞, ∞) D: ∅', incorrectas: ['C: ∅ D: (-∞, ∞)', 'C: (0, ∞) D: (-∞, 0)', 'C: (-∞, 0) D: (0, ∞)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(0,0)', 'Mín(0,0)', 'Punto inflexión (1,1)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(0,0)', 'Mín(0,0)', 'Punto inflexión (1,1)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -272,7 +288,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=3', 'Sí, T=1', 'Sí, T=2'] },
       cortes:    { correcta: '(1,0), (0,1)', incorrectas: ['(-1,0) y (0,1)', '(0,0)', 'No tiene'] },
       monotonia: { correcta: 'C: ∅ D: (-∞, ∞)', incorrectas: ['C: (-∞, ∞) D: ∅', 'C: (0, ∞) D: (-∞, 0)', 'C: (-∞, 1) D: (1, ∞)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(0,1)', 'Mín(1,0)', 'Mín(0,1)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(0,1)', 'Mín(1,0)', 'Mín(0,1)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -288,7 +305,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=3', 'Sí, T=2', 'Sí, T=π'] },
       cortes:    { correcta: '(-2,0), (1,0), (0,2)', incorrectas: ['(-2,0) y (1,0)', '(-1,4) y (1,0)', '(0,0) y (2,0)'] },
       monotonia: { correcta: 'C: (-∞,-1) U (1,∞) D: (-1,1)', incorrectas: ['C: (-1,1) D: (-∞,-1) U (1,∞)', 'C: (-∞,∞) D: ∅', 'C: ∅ D: (-∞,∞)'] },
-      extremos:  { correcta: 'Máx(-1,4) Mín(1,0)', incorrectas: ['Mín(-1,4) Máx(1,0)', 'No tiene', 'Máx(-2,0) Mín(0,2)'] }
+      extremos:  { correcta: 'Máx(-1,4) Mín(1,0)', incorrectas: ['Mín(-1,4) Máx(1,0)', 'No tiene', 'Máx(-2,0) Mín(0,2)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -304,7 +322,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=3', 'Sí, T=4', 'Sí, T=π'] },
       cortes:    { correcta: '(-2,0), (1,0), (0,-4)', incorrectas: ['(-2,0) y (1,0)', '(0,-4)', '(-1,0) y (2,0) y (0,-4)'] },
       monotonia: { correcta: 'C: (-∞,-2) U (0,∞) D: (-2,0)', incorrectas: ['C: (-2,0) D: (-∞,-2) U (0,∞)', 'C: (-∞,∞) D: ∅', 'C: ∅ D: (-∞,∞)'] },
-      extremos:  { correcta: 'Máx(-2,0) Mín(0,-4)', incorrectas: ['Mín(-2,0) Máx(0,-4)', 'No tiene', 'Máx(1,0) Mín(-4,0)'] }
+      extremos:  { correcta: 'Máx(-2,0) Mín(0,-4)', incorrectas: ['Mín(-2,0) Máx(0,-4)', 'No tiene', 'Máx(1,0) Mín(-4,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -320,7 +339,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=3', 'Sí, T=6', 'Sí, T=π'] },
       cortes:    { correcta: '(0,0), (3,0)', incorrectas: ['(0,0) y (3,0) y (4,0)', '(1,4) y (3,0)', '(0,0) y (9,0)'] },
       monotonia: { correcta: 'C: (-∞,1) U (3,∞) D: (1,3)', incorrectas: ['C: (1,3) D: (-∞,1) U (3,∞)', 'C: (-∞,∞) D: ∅', 'C: ∅ D: (-∞,∞)'] },
-      extremos:  { correcta: 'Máx(1,4) Mín(3,0)', incorrectas: ['Mín(1,4) Máx(3,0)', 'No tiene', 'Máx(0,0) Mín(3,0)'] }
+      extremos:  { correcta: 'Máx(1,4) Mín(3,0)', incorrectas: ['Mín(1,4) Máx(3,0)', 'No tiene', 'Máx(0,0) Mín(3,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -336,7 +356,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=12', 'Sí, T=4', 'Sí, T=π'] },
       cortes:    { correcta: '(0,0), (±3.46,0)', incorrectas: ['(0,0)', '(0,0) y (±4,0)', '(±3.46,0)'] },
       monotonia: { correcta: 'C: (-∞,-2) U (2,∞) D: (-2,2)', incorrectas: ['C: (-2,2) D: (-∞,-2) U (2,∞)', 'C: (-∞,∞) D: ∅', 'C: ∅ D: (-∞,∞)'] },
-      extremos:  { correcta: 'Máx(-2,16) Mín(2,-16)', incorrectas: ['Mín(-2,16) Máx(2,-16)', 'No tiene', 'Máx(0,0) Mín(3.46,0)'] }
+      extremos:  { correcta: 'Máx(-2,16) Mín(2,-16)', incorrectas: ['Mín(-2,16) Máx(2,-16)', 'No tiene', 'Máx(0,0) Mín(3.46,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -352,7 +373,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=3', 'Sí, T=2', 'Sí, T=π'] },
       cortes:    { correcta: '(0,0), (±1.73,0)', incorrectas: ['(0,0) y (±3,0)', '(0,0)', '(±1,0)'] },
       monotonia: { correcta: 'C: (-1,1) D: (-∞,-1) U (1,∞)', incorrectas: ['C: (-∞,-1) U (1,∞) D: (-1,1)', 'C: (-∞,∞) D: ∅', 'C: ∅ D: (-∞,∞)'] },
-      extremos:  { correcta: 'Máx(1,2) Mín(-1,-2)', incorrectas: ['Mín(1,2) Máx(-1,-2)', 'No tiene', 'Máx(-1,2) Mín(1,-2)'] }
+      extremos:  { correcta: 'Máx(1,2) Mín(-1,-2)', incorrectas: ['Mín(1,2) Máx(-1,-2)', 'No tiene', 'Máx(-1,2) Mín(1,-2)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -368,7 +390,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=3', 'Sí, T=4', 'Sí, T=π'] },
       cortes:    { correcta: '(-2,0), (-1,0), (2,0), (0,-4)', incorrectas: ['(-2,0) y (2,0)', '(-1,0) y (2,0)', '(0,0) y (-4,0)'] },
       monotonia: { correcta: 'C: (-∞,-1.54) U (0.87,∞) D: (-1.54,0.87)', incorrectas: ['C: (-1.54,0.87) D: (-∞,-1.54) U (0.87,∞)', 'C: (-∞,∞) D: ∅', 'C: ∅ D: (-∞,∞)'] },
-      extremos:  { correcta: 'Máx(-1.54,0.88) Mín(0.87,-6.06)', incorrectas: ['Mín(-1.54,0.88) Máx(0.87,-6.06)', 'No tiene', 'Máx(0,-4) Mín(-2,0)'] }
+      extremos:  { correcta: 'Máx(-1.54,0.88) Mín(0.87,-6.06)', incorrectas: ['Mín(-1.54,0.88) Máx(0.87,-6.06)', 'No tiene', 'Máx(0,-4) Mín(-2,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -384,7 +407,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=2', 'Sí, T=4', 'Sí, T=π'] },
       cortes:    { correcta: '(0,0)', incorrectas: ['No tiene', '(1,0) y (-1,0)', '(0,0) y (1,0)'] },
       monotonia: { correcta: 'C: (0, ∞) D: (-∞, 0)', incorrectas: ['C: (-∞, 0) D: (0, ∞)', 'C: (-∞, ∞) D: ∅', 'C: ∅ D: (-∞, ∞)'] },
-      extremos:  { correcta: 'Mín(0,0)', incorrectas: ['Máx(0,0)', 'No tiene', 'Mín(1,1)'] }
+      extremos:  { correcta: 'Mín(0,0)', incorrectas: ['Máx(0,0)', 'No tiene', 'Mín(1,1)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -400,7 +424,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=2', 'Sí, T=4', 'Sí, T=π'] },
       cortes:    { correcta: '(-2,0), (-1,0), (1,0), (2,0), (0,4)', incorrectas: ['(-2,0) y (2,0)', '(-1,0) y (1,0)', '(0,0)'] },
       monotonia: { correcta: 'C: (-1.58,0) U (1.58,∞) D: (-∞,-1.58) U (0,1.58)', incorrectas: ['C: (-∞,-1.58) U (0,1.58) D: (-1.58,0) U (1.58,∞)', 'C: (-∞,∞) D: ∅', 'C: ∅ D: (-∞,∞)'] },
-      extremos:  { correcta: 'Máx(0,4) Mín(±1.58,-2.25)', incorrectas: ['Mín(0,4) Máx(±1.58,-2.25)', 'No tiene', 'Máx(±2,0) Mín(0,4)'] }
+      extremos:  { correcta: 'Máx(0,4) Mín(±1.58,-2.25)', incorrectas: ['Mín(0,4) Máx(±1.58,-2.25)', 'No tiene', 'Máx(±2,0) Mín(0,4)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -416,7 +441,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=2', 'Sí, T=4', 'Sí, T=π'] },
       cortes:    { correcta: '(0,0), (2,0)', incorrectas: ['(0,0)', '(0,0) y (2,0) y (1,1)', '(1,1) y (2,0)'] },
       monotonia: { correcta: 'C: (0,1) U (2,∞) D: (-∞,0) U (1,2)', incorrectas: ['C: (-∞,0) U (1,2) D: (0,1) U (2,∞)', 'C: (-∞,∞) D: ∅', 'C: ∅ D: (-∞,∞)'] },
-      extremos:  { correcta: 'Mín(0,0) Máx(1,1) Mín(2,0)', incorrectas: ['Máx(0,0) Mín(1,1) Máx(2,0)', 'No tiene', 'Mín(1,1) Máx(0,0)'] }
+      extremos:  { correcta: 'Mín(0,0) Máx(1,1) Mín(2,0)', incorrectas: ['Máx(0,0) Mín(1,1) Máx(2,0)', 'No tiene', 'Mín(1,1) Máx(0,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -432,7 +458,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=2', 'Sí, T=4', 'Sí, T=π'] },
       cortes:    { correcta: '(-2,0), (0,0), (2,0)', incorrectas: ['(-2,0) y (2,0)', '(0,0)', '(±1.41,4)'] },
       monotonia: { correcta: 'C: (-∞,-1.41) U (0,1.41) D: (-1.41,0) U (1.41,∞)', incorrectas: ['C: (-1.41,0) U (1.41,∞) D: (-∞,-1.41) U (0,1.41)', 'C: (-∞,∞) D: ∅', 'C: ∅ D: (-∞,∞)'] },
-      extremos:  { correcta: 'Máx(-1.41,4) Mín(0,0) Máx(1.41,4)', incorrectas: ['Mín(±1.41,4) Máx(0,0)', 'No tiene', 'Máx(0,0) Mín(±2,0)'] }
+      extremos:  { correcta: 'Máx(-1.41,4) Mín(0,0) Máx(1.41,4)', incorrectas: ['Mín(±1.41,4) Máx(0,0)', 'No tiene', 'Máx(0,0) Mín(±2,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -448,7 +475,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=2', 'Sí, T=4', 'Sí, T=π'] },
       cortes:    { correcta: '(-2,0), (2,0), (0,16)', incorrectas: ['(-2,0) y (2,0)', '(0,16)', '(±4,0) y (0,16)'] },
       monotonia: { correcta: 'C: (-2,0) U (2,∞) D: (-∞,-2) U (0,2)', incorrectas: ['C: (-∞,-2) U (0,2) D: (-2,0) U (2,∞)', 'C: (-∞,∞) D: ∅', 'C: ∅ D: (-∞,∞)'] },
-      extremos:  { correcta: 'Mín(-2,0) Máx(0,16) Mín(2,0)', incorrectas: ['Máx(-2,0) Mín(0,16) Máx(2,0)', 'No tiene', 'Mín(0,16) Máx(±2,0)'] }
+      extremos:  { correcta: 'Mín(-2,0) Máx(0,16) Mín(2,0)', incorrectas: ['Máx(-2,0) Mín(0,16) Máx(2,0)', 'No tiene', 'Mín(0,16) Máx(±2,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -464,7 +492,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=2', 'Sí, T=4', 'Sí, T=π'] },
       cortes:    { correcta: '(-2.65,0), (-1,0), (1,0), (2.65,0), (0,7)', incorrectas: ['(-1,0) y (1,0)', '(0,7)', '(±2.65,0) y (±1,0)'] },
       monotonia: { correcta: 'C: (-2,0) U (2,∞) D: (-∞,-2) U (0,2)', incorrectas: ['C: (-∞,-2) U (0,2) D: (-2,0) U (2,∞)', 'C: (-∞,∞) D: ∅', 'C: ∅ D: (-∞,∞)'] },
-      extremos:  { correcta: 'Mín(±2,-9) Máx(0,7)', incorrectas: ['Máx(±2,-9) Mín(0,7)', 'No tiene', 'Mín(0,7) Máx(±2,-9)'] }
+      extremos:  { correcta: 'Mín(±2,-9) Máx(0,7)', incorrectas: ['Máx(±2,-9) Mín(0,7)', 'No tiene', 'Mín(0,7) Máx(±2,-9)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -480,7 +509,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=2', 'Sí, T=4', 'Sí, T=π'] },
       cortes:    { correcta: '(-1.73,0), (1.73,0), (0,3)', incorrectas: ['(-2,0) y (2,0)', '(0,3)', '(±1,4) y (0,3)'] },
       monotonia: { correcta: 'C: (-∞,-1) U (0,1) D: (-1,0) U (1,∞)', incorrectas: ['C: (-1,0) U (1,∞) D: (-∞,-1) U (0,1)', 'C: (-∞,∞) D: ∅', 'C: ∅ D: (-∞,∞)'] },
-      extremos:  { correcta: 'Máx(-1,4) Mín(0,3) Máx(1,4)', incorrectas: ['Mín(-1,4) Máx(0,3) Mín(1,4)', 'No tiene', 'Máx(0,3) Mín(±1,4)'] }
+      extremos:  { correcta: 'Máx(-1,4) Mín(0,3) Máx(1,4)', incorrectas: ['Mín(-1,4) Máx(0,3) Mín(1,4)', 'No tiene', 'Máx(0,3) Mín(±1,4)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -496,7 +526,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=1', 'Sí, T=2', 'Sí, T=π'] },
       cortes:    { correcta: '(-1.0,0), (0,-1.0)', incorrectas: ['(0,0)', '(1,0)', 'No tiene'] },
       monotonia: { correcta: 'C: ∅ D: (-∞, 1) U (1, ∞)', incorrectas: ['C: (-∞, 1) U (1, ∞) D: ∅', 'C: (-∞, ∞) D: ∅', 'C: (1, ∞) D: (-∞, 1)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(1,1)', 'Mín(1,1)', 'Máx(0,-1.0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(1,1)', 'Mín(1,1)', 'Máx(0,-1.0)'] },
+      continua:  { correcta: 'No', incorrectas: ['Sí'] }
     }
   }
 ,
@@ -512,7 +543,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=1', 'Sí, T=2', 'Sí, T=π'] },
       cortes:    { correcta: 'No tiene', incorrectas: ['(0,0)', '(0,0)', 'No tiene'] },
       monotonia: { correcta: 'C: ∅ D: (-∞, 0) U (0, ∞)', incorrectas: ['C: (-∞, 0) U (0, ∞) D: ∅', 'C: (-∞, ∞) D: ∅', 'C: (0, ∞) D: (-∞, 0)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(0,0)', 'Mín(0,0)', 'Máx(0,0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(0,0)', 'Mín(0,0)', 'Máx(0,0)'] },
+      continua:  { correcta: 'No', incorrectas: ['Sí'] }
     }
   }
 ,
@@ -528,7 +560,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=1', 'Sí, T=2', 'Sí, T=π'] },
       cortes:    { correcta: 'No tiene corte X, (0,-0.5)', incorrectas: ['(0,0)', '(-2,0)', 'No tiene'] },
       monotonia: { correcta: 'C: (-∞, -2) U (-2, ∞) D: ∅', incorrectas: ['C: ∅ D: (-∞, -2) U (-2, ∞)', 'C: (-∞, ∞) D: ∅', 'C: (-2, ∞) D: (-∞, -2)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(-2,0)', 'Mín(-2,0)', 'Máx(0,-0.5)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(-2,0)', 'Mín(-2,0)', 'Máx(0,-0.5)'] },
+      continua:  { correcta: 'No', incorrectas: ['Sí'] }
     }
   }
 ,
@@ -544,7 +577,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=1', 'Sí, T=2', 'Sí, T=π'] },
       cortes:    { correcta: 'No tiene corte X, (0,-1.5)', incorrectas: ['(0,0)', '(2,0)', 'No tiene'] },
       monotonia: { correcta: 'C: ∅ D: (-∞, 2) U (2, ∞)', incorrectas: ['C: (-∞, 2) U (2, ∞) D: ∅', 'C: (-∞, ∞) D: ∅', 'C: (2, ∞) D: (-∞, 2)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(2,0)', 'Mín(2,0)', 'Máx(0,-1.5)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(2,0)', 'Mín(2,0)', 'Máx(0,-1.5)'] },
+      continua:  { correcta: 'No', incorrectas: ['Sí'] }
     }
   }
 ,
@@ -560,7 +594,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=1', 'Sí, T=2', 'Sí, T=π'] },
       cortes:    { correcta: '(-0.5,0)', incorrectas: ['(0,0)', '(0,0)', 'No tiene'] },
       monotonia: { correcta: 'C: ∅ D: (-∞, 0) U (0, ∞)', incorrectas: ['C: (-∞, 0) U (0, ∞) D: ∅', 'C: (-∞, ∞) D: ∅', 'C: (0, ∞) D: (-∞, 0)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(0,2)', 'Mín(0,2)', 'Máx(0,0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(0,2)', 'Mín(0,2)', 'Máx(0,0)'] },
+      continua:  { correcta: 'No', incorrectas: ['Sí'] }
     }
   }
 ,
@@ -576,7 +611,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=1', 'Sí, T=2', 'Sí, T=π'] },
       cortes:    { correcta: '(1.67,0), (0,5.0)', incorrectas: ['(0,0)', '(1,0)', 'No tiene'] },
       monotonia: { correcta: 'C: (-∞, 1) U (1, ∞) D: ∅', incorrectas: ['C: ∅ D: (-∞, 1) U (1, ∞)', 'C: (-∞, ∞) D: ∅', 'C: (1, ∞) D: (-∞, 1)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(1,3)', 'Mín(1,3)', 'Máx(0,5.0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(1,3)', 'Mín(1,3)', 'Máx(0,5.0)'] },
+      continua:  { correcta: 'No', incorrectas: ['Sí'] }
     }
   }
 ,
@@ -592,7 +628,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=1', 'Sí, T=2', 'Sí, T=π'] },
       cortes:    { correcta: '(7.0,0), (0,-2.33)', incorrectas: ['(0,0)', '(3,0)', 'No tiene'] },
       monotonia: { correcta: 'C: ∅ D: (-∞, 3) U (3, ∞)', incorrectas: ['C: (-∞, 3) U (3, ∞) D: ∅', 'C: (-∞, ∞) D: ∅', 'C: (3, ∞) D: (-∞, 3)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(3,-1)', 'Mín(3,-1)', 'Máx(0,-2.3)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(3,-1)', 'Mín(3,-1)', 'Máx(0,-2.3)'] },
+      continua:  { correcta: 'No', incorrectas: ['Sí'] }
     }
   }
 ,
@@ -608,7 +645,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=1', 'Sí, T=2', 'Sí, T=π'] },
       cortes:    { correcta: '(1.0,0)', incorrectas: ['(0,0)', '(0,0)', 'No tiene'] },
       monotonia: { correcta: 'C: (-∞, 0) U (0, ∞) D: ∅', incorrectas: ['C: ∅ D: (-∞, 0) U (0, ∞)', 'C: (-∞, ∞) D: ∅', 'C: (0, ∞) D: (-∞, 0)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(0,1)', 'Mín(0,1)', 'Máx(0,0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(0,1)', 'Mín(0,1)', 'Máx(0,0)'] },
+      continua:  { correcta: 'No', incorrectas: ['Sí'] }
     }
   }
 ,
@@ -624,7 +662,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=1', 'Sí, T=2', 'Sí, T=π'] },
       cortes:    { correcta: 'No tiene corte X, (0,2.0)', incorrectas: ['(0,0)', '(-1,0)', 'No tiene'] },
       monotonia: { correcta: 'C: ∅ D: (-∞, -1) U (-1, ∞)', incorrectas: ['C: (-∞, -1) U (-1, ∞) D: ∅', 'C: (-∞, ∞) D: ∅', 'C: (-1, ∞) D: (-∞, -1)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(-1,0)', 'Mín(-1,0)', 'Máx(0,2.0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(-1,0)', 'Mín(-1,0)', 'Máx(0,2.0)'] },
+      continua:  { correcta: 'No', incorrectas: ['Sí'] }
     }
   }
 ,
@@ -640,7 +679,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=1', 'Sí, T=2', 'Sí, T=π'] },
       cortes:    { correcta: '(2.5,0), (0,-2.5)', incorrectas: ['(0,0)', '(2,0)', 'No tiene'] },
       monotonia: { correcta: 'C: ∅ D: (-∞, 2) U (2, ∞)', incorrectas: ['C: (-∞, 2) U (2, ∞) D: ∅', 'C: (-∞, ∞) D: ∅', 'C: (2, ∞) D: (-∞, 2)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(2,-2)', 'Mín(2,-2)', 'Máx(0,-2.5)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(2,-2)', 'Mín(2,-2)', 'Máx(0,-2.5)'] },
+      continua:  { correcta: 'No', incorrectas: ['Sí'] }
     }
   }
 ,
@@ -656,7 +696,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=1', 'Sí, T=2', 'Sí, T=π'] },
       cortes:    { correcta: '(1.5,0)', incorrectas: ['(0,0)', '(0,0)', 'No tiene'] },
       monotonia: { correcta: 'C: (-∞, 0) U (0, ∞) D: ∅', incorrectas: ['C: ∅ D: (-∞, 0) U (0, ∞)', 'C: (-∞, ∞) D: ∅', 'C: (0, ∞) D: (-∞, 0)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(0,2)', 'Mín(0,2)', 'Máx(0,0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(0,2)', 'Mín(0,2)', 'Máx(0,0)'] },
+      continua:  { correcta: 'No', incorrectas: ['Sí'] }
     }
   }
 ,
@@ -672,7 +713,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=1', 'Sí, T=2', 'Sí, T=π'] },
       cortes:    { correcta: '(2.0,0)', incorrectas: ['(0,0)', '(0,0)', 'No tiene'] },
       monotonia: { correcta: 'C: ∅ D: (-∞, 0) U (0, ∞)', incorrectas: ['C: (-∞, 0) U (0, ∞) D: ∅', 'C: (-∞, ∞) D: ∅', 'C: (0, ∞) D: (-∞, 0)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(0,-1)', 'Mín(0,-1)', 'Máx(0,0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(0,-1)', 'Mín(0,-1)', 'Máx(0,0)'] },
+      continua:  { correcta: 'No', incorrectas: ['Sí'] }
     }
   }
 ,
@@ -688,7 +730,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=1', 'Sí, T=2', 'Sí, T=π'] },
       cortes:    { correcta: '(-4.0,0), (0,1.33)', incorrectas: ['(0,0)', '(-3,0)', 'No tiene'] },
       monotonia: { correcta: 'C: ∅ D: (-∞, -3) U (-3, ∞)', incorrectas: ['C: (-∞, -3) U (-3, ∞) D: ∅', 'C: (-∞, ∞) D: ∅', 'C: (-3, ∞) D: (-∞, -3)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(-3,1)', 'Mín(-3,1)', 'Máx(0,1.3)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(-3,1)', 'Mín(-3,1)', 'Máx(0,1.3)'] },
+      continua:  { correcta: 'No', incorrectas: ['Sí'] }
     }
   }
 ,
@@ -704,7 +747,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=1', 'Sí, T=2', 'Sí, T=π'] },
       cortes:    { correcta: '(4.0,0), (0,2.0)', incorrectas: ['(0,0)', '(2,0)', 'No tiene'] },
       monotonia: { correcta: 'C: (-∞, 2) U (2, ∞) D: ∅', incorrectas: ['C: ∅ D: (-∞, 2) U (2, ∞)', 'C: (-∞, ∞) D: ∅', 'C: (2, ∞) D: (-∞, 2)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(2,1)', 'Mín(2,1)', 'Máx(0,2.0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(2,1)', 'Mín(2,1)', 'Máx(0,2.0)'] },
+      continua:  { correcta: 'No', incorrectas: ['Sí'] }
     }
   }
 ,
@@ -720,7 +764,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=1', 'Sí, T=2', 'Sí, T=π'] },
       cortes:    { correcta: '(0.5,0), (0,1.0)', incorrectas: ['(0,0)', '(-1,0)', 'No tiene'] },
       monotonia: { correcta: 'C: ∅ D: (-∞, -1) U (-1, ∞)', incorrectas: ['C: (-∞, -1) U (-1, ∞) D: ∅', 'C: (-∞, ∞) D: ∅', 'C: (-1, ∞) D: (-∞, -1)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(-1,-2)', 'Mín(-1,-2)', 'Máx(0,1.0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(-1,-2)', 'Mín(-1,-2)', 'Máx(0,1.0)'] },
+      continua:  { correcta: 'No', incorrectas: ['Sí'] }
     }
   }
 ,
@@ -736,7 +781,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=e', 'Sí, T=10', 'Sí, T=π'] },
       cortes:    { correcta: '(1.0,0)', incorrectas: ['(0,0)', '(1,0)', 'No tiene'] },
       monotonia: { correcta: 'C: (0, ∞) D: ∅', incorrectas: ['C: ∅ D: (0, ∞)', 'C: (-∞, ∞) D: ∅', 'C: (1, ∞) D: (0, 1)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(1,0)', 'Máx(1.0,0)', 'Mín(0,0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(1,0)', 'Máx(1.0,0)', 'Mín(0,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -752,7 +798,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=e', 'Sí, T=10', 'Sí, T=π'] },
       cortes:    { correcta: '(-1.0,0), (0,0.69)', incorrectas: ['(1,0)', '(0,0)', 'No tiene'] },
       monotonia: { correcta: 'C: (-2, ∞) D: ∅', incorrectas: ['C: ∅ D: (-2, ∞)', 'C: (-∞, ∞) D: ∅', 'C: (1, ∞) D: (0, 1)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(1,0)', 'Máx(-1.0,0)', 'Mín(0,0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(1,0)', 'Máx(-1.0,0)', 'Mín(0,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -768,7 +815,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=e', 'Sí, T=10', 'Sí, T=π'] },
       cortes:    { correcta: '(0.37,0)', incorrectas: ['(0,0)', '(1,1)', 'No tiene'] },
       monotonia: { correcta: 'C: (0, ∞) D: ∅', incorrectas: ['C: ∅ D: (0, ∞)', 'C: (-∞, ∞) D: ∅', 'C: (1, ∞) D: (0, 1)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(1,0)', 'Máx(0.37,0)', 'Mín(0,0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(1,0)', 'Máx(0.37,0)', 'Mín(0,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -784,7 +832,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=e', 'Sí, T=10', 'Sí, T=π'] },
       cortes:    { correcta: '(1.0,0)', incorrectas: ['(0,0)', '(1,0)', 'No tiene'] },
       monotonia: { correcta: 'C: ∅ D: (0, ∞)', incorrectas: ['C: (0, ∞) D: ∅', 'C: (-∞, ∞) D: ∅', 'C: (1, ∞) D: (0, 1)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(1,0)', 'Máx(1.0,0)', 'Mín(0,0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(1,0)', 'Máx(1.0,0)', 'Mín(0,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -800,7 +849,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=e', 'Sí, T=10', 'Sí, T=π'] },
       cortes:    { correcta: '(1.0,0)', incorrectas: ['(0,0)', '(1,0)', 'No tiene'] },
       monotonia: { correcta: 'C: (0, ∞) D: ∅', incorrectas: ['C: ∅ D: (0, ∞)', 'C: (-∞, ∞) D: ∅', 'C: (1, ∞) D: (0, 1)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(1,0)', 'Máx(1.0,0)', 'Mín(0,0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(1,0)', 'Máx(1.0,0)', 'Mín(0,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -816,7 +866,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=e', 'Sí, T=10', 'Sí, T=π'] },
       cortes:    { correcta: '(10.0,0)', incorrectas: ['(0,0)', '(1,-1)', 'No tiene'] },
       monotonia: { correcta: 'C: (0, ∞) D: ∅', incorrectas: ['C: ∅ D: (0, ∞)', 'C: (-∞, ∞) D: ∅', 'C: (1, ∞) D: (0, 1)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(1,0)', 'Máx(10.0,0)', 'Mín(0,0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(1,0)', 'Máx(10.0,0)', 'Mín(0,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -832,7 +883,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=e', 'Sí, T=10', 'Sí, T=π'] },
       cortes:    { correcta: '(1.0,0)', incorrectas: ['(0,0)', '(1,0)', 'No tiene'] },
       monotonia: { correcta: 'C: (0, ∞) D: ∅', incorrectas: ['C: ∅ D: (0, ∞)', 'C: (-∞, ∞) D: ∅', 'C: (1, ∞) D: (0, 1)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(1,0)', 'Máx(1.0,0)', 'Mín(0,0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(1,0)', 'Máx(1.0,0)', 'Mín(0,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -848,7 +900,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=e', 'Sí, T=10', 'Sí, T=π'] },
       cortes:    { correcta: '(0.37,0)', incorrectas: ['(0,0)', '(1,-1)', 'No tiene'] },
       monotonia: { correcta: 'C: ∅ D: (0, ∞)', incorrectas: ['C: (0, ∞) D: ∅', 'C: (-∞, ∞) D: ∅', 'C: (1, ∞) D: (0, 1)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(1,0)', 'Máx(0.37,0)', 'Mín(0,0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(1,0)', 'Máx(0.37,0)', 'Mín(0,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -864,7 +917,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=e', 'Sí, T=10', 'Sí, T=π'] },
       cortes:    { correcta: '(1.0,0)', incorrectas: ['(0,0)', '(1,0)', 'No tiene'] },
       monotonia: { correcta: 'C: (0, ∞) D: ∅', incorrectas: ['C: ∅ D: (0, ∞)', 'C: (-∞, ∞) D: ∅', 'C: (1, ∞) D: (0, 1)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(1,0)', 'Máx(1.0,0)', 'Mín(0,0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(1,0)', 'Máx(1.0,0)', 'Mín(0,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -880,7 +934,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=e', 'Sí, T=10', 'Sí, T=π'] },
       cortes:    { correcta: '(0.5,0)', incorrectas: ['(0,0)', '(1,1)', 'No tiene'] },
       monotonia: { correcta: 'C: (0, ∞) D: ∅', incorrectas: ['C: ∅ D: (0, ∞)', 'C: (-∞, ∞) D: ∅', 'C: (1, ∞) D: (0, 1)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(1,0)', 'Máx(0.5,0)', 'Mín(0,0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(1,0)', 'Máx(0.5,0)', 'Mín(0,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -896,7 +951,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=e', 'Sí, T=10', 'Sí, T=π'] },
       cortes:    { correcta: '(1.0,0)', incorrectas: ['(0,0)', '(1,0)', 'No tiene'] },
       monotonia: { correcta: 'C: (0, ∞) D: ∅', incorrectas: ['C: ∅ D: (0, ∞)', 'C: (-∞, ∞) D: ∅', 'C: (1, ∞) D: (0, 1)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(1,0)', 'Máx(1.0,0)', 'Mín(0,0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(1,0)', 'Máx(1.0,0)', 'Mín(0,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -912,7 +968,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=e', 'Sí, T=10', 'Sí, T=π'] },
       cortes:    { correcta: '(1.0,0)', incorrectas: ['(0,0)', '(1,0)', 'No tiene'] },
       monotonia: { correcta: 'C: (0, ∞) D: ∅', incorrectas: ['C: ∅ D: (0, ∞)', 'C: (-∞, ∞) D: ∅', 'C: (1, ∞) D: (0, 1)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(1,0)', 'Máx(1.0,0)', 'Mín(0,0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(1,0)', 'Máx(1.0,0)', 'Mín(0,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -928,7 +985,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=e', 'Sí, T=10', 'Sí, T=π'] },
       cortes:    { correcta: '(1.0,0)', incorrectas: ['(0,0)', '(1,0)', 'No tiene'] },
       monotonia: { correcta: 'C: ∅ D: (0, ∞)', incorrectas: ['C: (0, ∞) D: ∅', 'C: (-∞, ∞) D: ∅', 'C: (1, ∞) D: (0, 1)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(1,0)', 'Máx(1.0,0)', 'Mín(0,0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(1,0)', 'Máx(1.0,0)', 'Mín(0,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -944,7 +1002,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=e', 'Sí, T=10', 'Sí, T=π'] },
       cortes:    { correcta: '(0.0,0), (0,0.0)', incorrectas: ['(1,0)', '(0,0)', 'No tiene'] },
       monotonia: { correcta: 'C: (-1, ∞) D: ∅', incorrectas: ['C: ∅ D: (-1, ∞)', 'C: (-∞, ∞) D: ∅', 'C: (1, ∞) D: (0, 1)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(1,0)', 'Máx(0.0,0)', 'Mín(0,0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(1,0)', 'Máx(0.0,0)', 'Mín(0,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -960,7 +1019,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=e', 'Sí, T=10', 'Sí, T=π'] },
       cortes:    { correcta: '(0.14,0)', incorrectas: ['(0,0)', '(1,2)', 'No tiene'] },
       monotonia: { correcta: 'C: (0, ∞) D: ∅', incorrectas: ['C: ∅ D: (0, ∞)', 'C: (-∞, ∞) D: ∅', 'C: (1, ∞) D: (0, 1)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(1,0)', 'Máx(0.14,0)', 'Mín(0,0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(1,0)', 'Máx(0.14,0)', 'Mín(0,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -976,7 +1036,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=e', 'Sí, T=1', 'Sí, T=π'] },
       cortes:    { correcta: '(0,1)', incorrectas: ['(0,0)', '(1,2.72)', 'No tiene'] },
       monotonia: { correcta: 'C: (-∞, ∞) D: ∅', incorrectas: ['C: ∅ D: (-∞, ∞)', 'C: (0, ∞) D: (-∞, 0)', 'C: (-∞, 0) D: (0, ∞)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,1)', 'Máx(0,1)', 'Mín(0,0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,1)', 'Máx(0,1)', 'Mín(0,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -992,7 +1053,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=e', 'Sí, T=1', 'Sí, T=π'] },
       cortes:    { correcta: '(0,1)', incorrectas: ['(0,0)', '(1,2)', 'No tiene'] },
       monotonia: { correcta: 'C: (-∞, ∞) D: ∅', incorrectas: ['C: ∅ D: (-∞, ∞)', 'C: (0, ∞) D: (-∞, 0)', 'C: (-∞, 0) D: (0, ∞)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,1)', 'Máx(0,1)', 'Mín(0,0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,1)', 'Máx(0,1)', 'Mín(0,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1008,7 +1070,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=e', 'Sí, T=1', 'Sí, T=π'] },
       cortes:    { correcta: '(0,1)', incorrectas: ['(0,0)', '(1,0.5)', 'No tiene'] },
       monotonia: { correcta: 'C: ∅ D: (-∞, ∞)', incorrectas: ['C: (-∞, ∞) D: ∅', 'C: (0, ∞) D: (-∞, 0)', 'C: (-∞, 0) D: (0, ∞)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,1)', 'Máx(0,1)', 'Mín(0,0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,1)', 'Máx(0,1)', 'Mín(0,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1024,7 +1087,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=e', 'Sí, T=1', 'Sí, T=π'] },
       cortes:    { correcta: '(0,-1)', incorrectas: ['(0,0)', '(1,-2.72)', 'No tiene'] },
       monotonia: { correcta: 'C: ∅ D: (-∞, ∞)', incorrectas: ['C: (-∞, ∞) D: ∅', 'C: (0, ∞) D: (-∞, 0)', 'C: (-∞, 0) D: (0, ∞)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,-1)', 'Máx(0,-1)', 'Mín(0,0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,-1)', 'Máx(0,-1)', 'Mín(0,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1040,7 +1104,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=e', 'Sí, T=1', 'Sí, T=π'] },
       cortes:    { correcta: '(1.58,0), (0,-2)', incorrectas: ['(0,0)', '(1,-1)', 'No tiene'] },
       monotonia: { correcta: 'C: (-∞, ∞) D: ∅', incorrectas: ['C: ∅ D: (-∞, ∞)', 'C: (0, ∞) D: (-∞, 0)', 'C: (-∞, 0) D: (0, ∞)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,-2)', 'Máx(0,-2)', 'Mín(0,-3)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,-2)', 'Máx(0,-2)', 'Mín(0,-3)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1056,7 +1121,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=e', 'Sí, T=1', 'Sí, T=π'] },
       cortes:    { correcta: '(0,3)', incorrectas: ['(0,0)', '(1,4.72)', 'No tiene'] },
       monotonia: { correcta: 'C: (-∞, ∞) D: ∅', incorrectas: ['C: ∅ D: (-∞, ∞)', 'C: (0, ∞) D: (-∞, 0)', 'C: (-∞, 0) D: (0, ∞)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,3)', 'Máx(0,3)', 'Mín(0,2)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,3)', 'Máx(0,3)', 'Mín(0,2)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1072,7 +1138,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=e', 'Sí, T=1', 'Sí, T=π'] },
       cortes:    { correcta: '(0,-1)', incorrectas: ['(0,0)', '(1,-2)', 'No tiene'] },
       monotonia: { correcta: 'C: ∅ D: (-∞, ∞)', incorrectas: ['C: (-∞, ∞) D: ∅', 'C: (0, ∞) D: (-∞, 0)', 'C: (-∞, 0) D: (0, ∞)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,-1)', 'Máx(0,-1)', 'Mín(0,0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,-1)', 'Máx(0,-1)', 'Mín(0,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1088,7 +1155,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=e', 'Sí, T=1', 'Sí, T=π'] },
       cortes:    { correcta: '(0,2)', incorrectas: ['(0,0)', '(1,5.44)', 'No tiene'] },
       monotonia: { correcta: 'C: (-∞, ∞) D: ∅', incorrectas: ['C: ∅ D: (-∞, ∞)', 'C: (0, ∞) D: (-∞, 0)', 'C: (-∞, 0) D: (0, ∞)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,2)', 'Máx(0,2)', 'Mín(0,0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,2)', 'Máx(0,2)', 'Mín(0,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1104,7 +1172,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=e', 'Sí, T=1', 'Sí, T=π'] },
       cortes:    { correcta: '(0,1)', incorrectas: ['(0,0)', '(1,3)', 'No tiene'] },
       monotonia: { correcta: 'C: (-∞, ∞) D: ∅', incorrectas: ['C: ∅ D: (-∞, ∞)', 'C: (0, ∞) D: (-∞, 0)', 'C: (-∞, 0) D: (0, ∞)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,1)', 'Máx(0,1)', 'Mín(0,0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,1)', 'Máx(0,1)', 'Mín(0,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1120,7 +1189,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=e', 'Sí, T=1', 'Sí, T=π'] },
       cortes:    { correcta: '(0.63,0), (0,-1)', incorrectas: ['(0,0)', '(1,1)', 'No tiene'] },
       monotonia: { correcta: 'C: (-∞, ∞) D: ∅', incorrectas: ['C: ∅ D: (-∞, ∞)', 'C: (0, ∞) D: (-∞, 0)', 'C: (-∞, 0) D: (0, ∞)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,-1)', 'Máx(0,-1)', 'Mín(0,-2)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,-1)', 'Máx(0,-1)', 'Mín(0,-2)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1136,7 +1206,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=e', 'Sí, T=1', 'Sí, T=π'] },
       cortes:    { correcta: '(0.69,0), (0,1)', incorrectas: ['(0,0)', '(1,-0.72)', 'No tiene'] },
       monotonia: { correcta: 'C: ∅ D: (-∞, ∞)', incorrectas: ['C: (-∞, ∞) D: ∅', 'C: (0, ∞) D: (-∞, 0)', 'C: (-∞, 0) D: (0, ∞)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,1)', 'Máx(0,1)', 'Mín(0,2)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,1)', 'Máx(0,1)', 'Mín(0,2)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1152,7 +1223,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=e', 'Sí, T=1', 'Sí, T=π'] },
       cortes:    { correcta: '(0,2)', incorrectas: ['(0,0)', '(1,3)', 'No tiene'] },
       monotonia: { correcta: 'C: (-∞, ∞) D: ∅', incorrectas: ['C: ∅ D: (-∞, ∞)', 'C: (0, ∞) D: (-∞, 0)', 'C: (-∞, 0) D: (0, ∞)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,2)', 'Máx(0,2)', 'Mín(0,1)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,2)', 'Máx(0,2)', 'Mín(0,1)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1168,7 +1240,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=e', 'Sí, T=1', 'Sí, T=π'] },
       cortes:    { correcta: '(1.58,0), (0,2)', incorrectas: ['(0,0)', '(1,1)', 'No tiene'] },
       monotonia: { correcta: 'C: ∅ D: (-∞, ∞)', incorrectas: ['C: (-∞, ∞) D: ∅', 'C: (0, ∞) D: (-∞, 0)', 'C: (-∞, 0) D: (0, ∞)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,2)', 'Máx(0,2)', 'Mín(0,3)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,2)', 'Máx(0,2)', 'Mín(0,3)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1184,7 +1257,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=e', 'Sí, T=1', 'Sí, T=π'] },
       cortes:    { correcta: '(0.0,0), (0,0)', incorrectas: ['(0,0)', '(1,1.72)', 'No tiene'] },
       monotonia: { correcta: 'C: (-∞, ∞) D: ∅', incorrectas: ['C: ∅ D: (-∞, ∞)', 'C: (0, ∞) D: (-∞, 0)', 'C: (-∞, 0) D: (0, ∞)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,0)', 'Máx(0,0)', 'Mín(0,-1)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,0)', 'Máx(0,0)', 'Mín(0,-1)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1200,7 +1274,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=e', 'Sí, T=1', 'Sí, T=π'] },
       cortes:    { correcta: '(0,2)', incorrectas: ['(0,0)', '(1,4)', 'No tiene'] },
       monotonia: { correcta: 'C: (-∞, ∞) D: ∅', incorrectas: ['C: ∅ D: (-∞, ∞)', 'C: (0, ∞) D: (-∞, 0)', 'C: (-∞, 0) D: (0, ∞)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,2)', 'Máx(0,2)', 'Mín(0,0)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,2)', 'Máx(0,2)', 'Mín(0,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1216,7 +1291,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'Sí, T=2π', incorrectas: ['Sí, T=π', 'Sí, T=2', 'No'] },
       cortes:    { correcta: '(0,0), (±kπ,0)', incorrectas: ['(0,1), (±kπ,0)', '(0,0), (±π/2,0)', 'No tiene'] },
       monotonia: { correcta: 'C: (-π/2+2kπ, π/2+2kπ) D: (π/2+2kπ, 3π/2+2kπ)', incorrectas: ['C: (0,π) D: (π,2π)', 'C: (-∞,∞) D: ∅', 'C: ∅ D: (-∞,∞)'] },
-      extremos:  { correcta: 'Máx(π/2,1) Mín(-π/2,-1)', incorrectas: ['Máx(0,0)', 'Máx(π/2,2)', 'No tiene'] }
+      extremos:  { correcta: 'Máx(π/2,1) Mín(-π/2,-1)', incorrectas: ['Máx(0,0)', 'Máx(π/2,2)', 'No tiene'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1232,7 +1308,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'Sí, T=2π', incorrectas: ['Sí, T=π', 'Sí, T=2', 'No'] },
       cortes:    { correcta: '(0,1), (π/2+kπ,0)', incorrectas: ['(0,0), (±kπ,0)', '(0,1), (±kπ,0)', 'No tiene'] },
       monotonia: { correcta: 'C: (π+2kπ, 2π+2kπ) D: (0+2kπ, π+2kπ)', incorrectas: ['C: (0,π) D: (π,2π)', 'C: (-∞,∞) D: ∅', 'C: ∅ D: (-∞,∞)'] },
-      extremos:  { correcta: 'Máx(0,1) Mín(π,-1)', incorrectas: ['Mín(0,1)', 'Máx(π,-1)', 'No tiene'] }
+      extremos:  { correcta: 'Máx(0,1) Mín(π,-1)', incorrectas: ['Mín(0,1)', 'Máx(π,-1)', 'No tiene'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1248,7 +1325,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'Sí, T=2π', incorrectas: ['Sí, T=π', 'Sí, T=2', 'No'] },
       cortes:    { correcta: '(0,0), (±kπ,0)', incorrectas: ['(0,2), (±kπ,0)', '(0,0), (±π/2,0)', 'No tiene'] },
       monotonia: { correcta: 'C: (-π/2+2kπ, π/2+2kπ) D: (π/2+2kπ, 3π/2+2kπ)', incorrectas: ['C: (0,π) D: (π,2π)', 'C: (-∞,∞) D: ∅', 'C: ∅ D: (-∞,∞)'] },
-      extremos:  { correcta: 'Máx(π/2,2) Mín(-π/2,-2)', incorrectas: ['Máx(0,0)', 'Máx(π/2,1)', 'No tiene'] }
+      extremos:  { correcta: 'Máx(π/2,2) Mín(-π/2,-2)', incorrectas: ['Máx(0,0)', 'Máx(π/2,1)', 'No tiene'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1264,7 +1342,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'Sí, T=π', incorrectas: ['Sí, T=2π', 'Sí, T=π/2', 'No'] },
       cortes:    { correcta: '(0,0), (kπ/2,0)', incorrectas: ['(0,0), (±kπ,0)', '(0,1), (kπ/2,0)', 'No tiene'] },
       monotonia: { correcta: 'C: (-π/4+kπ, π/4+kπ) D: (π/4+kπ, 3π/4+kπ)', incorrectas: ['C: (0,π/2) D: (π/2,π)', 'C: (-∞,∞) D: ∅', 'C: ∅ D: (-∞,∞)'] },
-      extremos:  { correcta: 'Máx(π/4,1) Mín(-π/4,-1)', incorrectas: ['Máx(π/2,1)', 'Máx(π/4,2)', 'No tiene'] }
+      extremos:  { correcta: 'Máx(π/4,1) Mín(-π/4,-1)', incorrectas: ['Máx(π/2,1)', 'Máx(π/4,2)', 'No tiene'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1280,7 +1359,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'Sí, T=2π', incorrectas: ['Sí, T=π', 'Sí, T=2', 'No'] },
       cortes:    { correcta: '(0,2), (π+2kπ,0)', incorrectas: ['(0,0), (±kπ,0)', '(0,2), (±kπ,0)', 'No tiene'] },
       monotonia: { correcta: 'C: (π+2kπ, 2π+2kπ) D: (0+2kπ, π+2kπ)', incorrectas: ['C: (0,π) D: (π,2π)', 'C: (-∞,∞) D: ∅', 'C: ∅ D: (-∞,∞)'] },
-      extremos:  { correcta: 'Máx(0,2) Mín(π,0)', incorrectas: ['Mín(0,2)', 'Máx(π,0)', 'No tiene'] }
+      extremos:  { correcta: 'Máx(0,2) Mín(π,0)', incorrectas: ['Mín(0,2)', 'Máx(π,0)', 'No tiene'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1296,7 +1376,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'Sí, T=2π', incorrectas: ['Sí, T=π', 'Sí, T=2', 'No'] },
       cortes:    { correcta: '(0,0), (±kπ,0)', incorrectas: ['(0,-1), (±kπ,0)', '(0,0), (±π/2,0)', 'No tiene'] },
       monotonia: { correcta: 'C: (π/2+2kπ, 3π/2+2kπ) D: (-π/2+2kπ, π/2+2kπ)', incorrectas: ['C: (-π/2,π/2) D: (π/2,3π/2)', 'C: (-∞,∞) D: ∅', 'C: ∅ D: (-∞,∞)'] },
-      extremos:  { correcta: 'Mín(π/2,-1) Máx(-π/2,1)', incorrectas: ['Máx(π/2,-1)', 'Mín(-π/2,1)', 'No tiene'] }
+      extremos:  { correcta: 'Mín(π/2,-1) Máx(-π/2,1)', incorrectas: ['Máx(π/2,-1)', 'Mín(-π/2,1)', 'No tiene'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1312,7 +1393,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'Sí, T=π', incorrectas: ['Sí, T=2π', 'Sí, T=π/2', 'No'] },
       cortes:    { correcta: '(0,1), (π/4+kπ/2,0)', incorrectas: ['(0,0), (±kπ,0)', '(0,1), (kπ,0)', 'No tiene'] },
       monotonia: { correcta: 'C: (π/2+kπ, π+kπ) D: (0+kπ, π/2+kπ)', incorrectas: ['C: (0,π/2) D: (π/2,π)', 'C: (-∞,∞) D: ∅', 'C: ∅ D: (-∞,∞)'] },
-      extremos:  { correcta: 'Máx(0,1) Mín(π/2,-1)', incorrectas: ['Mín(0,1)', 'Máx(π/2,-1)', 'No tiene'] }
+      extremos:  { correcta: 'Máx(0,1) Mín(π/2,-1)', incorrectas: ['Mín(0,1)', 'Máx(π/2,-1)', 'No tiene'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1328,7 +1410,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'Sí, T=π', incorrectas: ['Sí, T=2π', 'Sí, T=π/2', 'No'] },
       cortes:    { correcta: '(0,0), (kπ,0)', incorrectas: ['(0,1), (±π/2,0)', '(0,0)', 'No tiene'] },
       monotonia: { correcta: 'C: En cada intervalo D: ∅', incorrectas: ['C: ∅ D: En cada intervalo', 'C: (-∞,∞) D: ∅', 'Alterna'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(1,1)', 'Mín(0,0)', 'Máx(1) Mín(-1)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(1,1)', 'Mín(0,0)', 'Máx(1) Mín(-1)'] },
+      continua:  { correcta: 'No', incorrectas: ['Sí'] }
     }
   }
 ,
@@ -1344,7 +1427,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'Sí, T=2π', incorrectas: ['Sí, T=π', 'Sí, T=2', 'No'] },
       cortes:    { correcta: '(0,2), (π/2+kπ,0)', incorrectas: ['(0,0), (kπ,0)', '(0,2), (kπ,0)', 'No tiene'] },
       monotonia: { correcta: 'C: (π+2kπ, 2π+2kπ) D: (0+2kπ, π+2kπ)', incorrectas: ['C: (0,π) D: (π,2π)', 'C: (-∞,∞) D: ∅', 'C: ∅ D: (-∞,∞)'] },
-      extremos:  { correcta: 'Máx(0,2) Mín(π,-2)', incorrectas: ['Mín(0,2)', 'Máx(π,-2)', 'No tiene'] }
+      extremos:  { correcta: 'Máx(0,2) Mín(π,-2)', incorrectas: ['Mín(0,2)', 'Máx(π,-2)', 'No tiene'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1360,7 +1444,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'Sí, T=2π', incorrectas: ['Sí, T=π', 'Sí, T=2', 'No'] },
       cortes:    { correcta: '(0,1), (-π+2kπ,0) y (0+2kπ... ver gráfica)', incorrectas: ['(0,0), (±kπ,0)', '(0,1)', 'No tiene'] },
       monotonia: { correcta: 'C: (-π/2+2kπ, π/2+2kπ) D: (π/2+2kπ, 3π/2+2kπ)', incorrectas: ['C: (π/2,3π/2) D: (-π/2,π/2)', 'C: (-∞,∞) D: ∅', 'C: ∅ D: (-∞,∞)'] },
-      extremos:  { correcta: 'Máx(π/2,2) Mín(-π/2,0)', incorrectas: ['Máx(0,1)', 'Mín(π/2,0)', 'No tiene'] }
+      extremos:  { correcta: 'Máx(π/2,2) Mín(-π/2,0)', incorrectas: ['Máx(0,1)', 'Mín(π/2,0)', 'No tiene'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1376,7 +1461,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'Sí, T=4π', incorrectas: ['Sí, T=2π', 'Sí, T=π', 'No'] },
       cortes:    { correcta: '(0,0), (±2kπ,0)', incorrectas: ['(0,0), (±kπ,0)', '(0,1), (±2kπ,0)', 'No tiene'] },
       monotonia: { correcta: 'C: (-π+4kπ, π+4kπ) D: (π+4kπ, 3π+4kπ)', incorrectas: ['C: (0,2π) D: (2π,4π)', 'C: (-∞,∞) D: ∅', 'C: ∅ D: (-∞,∞)'] },
-      extremos:  { correcta: 'Máx(π,1) Mín(-π,-1)', incorrectas: ['Máx(π/2,1)', 'Máx(2π,1)', 'No tiene'] }
+      extremos:  { correcta: 'Máx(π,1) Mín(-π,-1)', incorrectas: ['Máx(π/2,1)', 'Máx(2π,1)', 'No tiene'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1392,7 +1478,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'Sí, T=2π', incorrectas: ['Sí, T=π', 'Sí, T=2', 'No'] },
       cortes:    { correcta: '(0,0), (±kπ,0)', incorrectas: ['(0,3), (±kπ,0)', '(0,0), (±π/2,0)', 'No tiene'] },
       monotonia: { correcta: 'C: (-π/2+2kπ, π/2+2kπ) D: (π/2+2kπ, 3π/2+2kπ)', incorrectas: ['C: (0,π) D: (π,2π)', 'C: (-∞,∞) D: ∅', 'C: ∅ D: (-∞,∞)'] },
-      extremos:  { correcta: 'Máx(π/2,3) Mín(-π/2,-3)', incorrectas: ['Máx(0,0)', 'Máx(π/2,1)', 'No tiene'] }
+      extremos:  { correcta: 'Máx(π/2,3) Mín(-π/2,-3)', incorrectas: ['Máx(0,0)', 'Máx(π/2,1)', 'No tiene'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1408,7 +1495,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'Sí, T=2π', incorrectas: ['Sí, T=π', 'Sí, T=2', 'No'] },
       cortes:    { correcta: '(0,-1), (π/2+kπ,0)', incorrectas: ['(0,0), (±kπ,0)', '(0,-1), (kπ,0)', 'No tiene'] },
       monotonia: { correcta: 'C: (0+2kπ, π+2kπ) D: (π+2kπ, 2π+2kπ)', incorrectas: ['C: (π,2π) D: (0,π)', 'C: (-∞,∞) D: ∅', 'C: ∅ D: (-∞,∞)'] },
-      extremos:  { correcta: 'Mín(0,-1) Máx(π,1)', incorrectas: ['Máx(0,-1)', 'Mín(π,1)', 'No tiene'] }
+      extremos:  { correcta: 'Mín(0,-1) Máx(π,1)', incorrectas: ['Máx(0,-1)', 'Mín(π,1)', 'No tiene'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1424,7 +1512,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'Sí, T=2π', incorrectas: ['Sí, T=π', 'Sí, T=2', 'No'] },
       cortes:    { correcta: '(0,0), — solo toca eje X en x=2kπ', incorrectas: ['(0,-1), (π/2+kπ,0)', '(0,0), (kπ,0)', 'No tiene'] },
       monotonia: { correcta: 'C: (π+2kπ, 2π+2kπ) D: (0+2kπ, π+2kπ)', incorrectas: ['C: (0,π) D: (π,2π)', 'C: (-∞,∞) D: ∅', 'C: ∅ D: (-∞,∞)'] },
-      extremos:  { correcta: 'Máx(0,0) Mín(π,-2)', incorrectas: ['Mín(0,0)', 'Máx(π,-2)', 'No tiene'] }
+      extremos:  { correcta: 'Máx(0,0) Mín(π,-2)', incorrectas: ['Mín(0,0)', 'Máx(π,-2)', 'No tiene'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1440,7 +1529,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'Sí, T=2π', incorrectas: ['Sí, T=π', 'Sí, T=2', 'No'] },
       cortes:    { correcta: '(0,-1), (±0.52+2kπ,0)', incorrectas: ['(0,0), (±kπ,0)', '(0,-1)', 'No tiene'] },
       monotonia: { correcta: 'C: (-π/2+2kπ, π/2+2kπ) D: (π/2+2kπ, 3π/2+2kπ)', incorrectas: ['C: (π/2,3π/2) D: (-π/2,π/2)', 'C: (-∞,∞) D: ∅', 'C: ∅ D: (-∞,∞)'] },
-      extremos:  { correcta: 'Máx(π/2,1) Mín(-π/2,-3)', incorrectas: ['Máx(0,-1)', 'Mín(π/2,1)', 'No tiene'] }
+      extremos:  { correcta: 'Máx(π/2,1) Mín(-π/2,-3)', incorrectas: ['Máx(0,-1)', 'Mín(π/2,1)', 'No tiene'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1456,7 +1546,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=1', 'Sí, T=2', 'Sí, T=π'] },
       cortes:    { correcta: '(0,0)', incorrectas: ['(1,0)', '(0,0) y (1,1)', 'No tiene'] },
       monotonia: { correcta: 'C: (0, ∞) D: ∅', incorrectas: ['C: ∅ D: (0, ∞)', 'C: (-∞, ∞) D: ∅', 'C: (1, ∞) D: (0, 1)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,0)', 'Máx(0,0)', 'Mín(1,1)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,0)', 'Máx(0,0)', 'Mín(1,1)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1472,7 +1563,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=1', 'Sí, T=2', 'Sí, T=π'] },
       cortes:    { correcta: '(0,0)', incorrectas: ['(1,0)', '(0,0) y (1,-1)', 'No tiene'] },
       monotonia: { correcta: 'C: ∅ D: (0, ∞)', incorrectas: ['C: (0, ∞) D: ∅', 'C: (-∞, ∞) D: ∅', 'C: (1, ∞) D: (0, 1)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(0,0)', 'Mín(0,0)', 'Mín(1,-1)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(0,0)', 'Mín(0,0)', 'Mín(1,-1)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1488,7 +1580,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=1', 'Sí, T=2', 'Sí, T=π'] },
       cortes:    { correcta: '(1,0)', incorrectas: ['(0,1)', '(1,0) y (0,-1)', 'No tiene'] },
       monotonia: { correcta: 'C: (1, ∞) D: ∅', incorrectas: ['C: ∅ D: (1, ∞)', 'C: (-∞, ∞) D: ∅', 'C: (2, ∞) D: (1, 2)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(1,0)', 'Máx(1,0)', 'Mín(0,1)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(1,0)', 'Máx(1,0)', 'Mín(0,1)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1504,7 +1597,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=1', 'Sí, T=2', 'Sí, T=π'] },
       cortes:    { correcta: '(-2,0), (0,1.41)', incorrectas: ['(2,0)', '(-2,0)', 'No tiene'] },
       monotonia: { correcta: 'C: (-2, ∞) D: ∅', incorrectas: ['C: ∅ D: (-2, ∞)', 'C: (-∞, ∞) D: ∅', 'C: (0, ∞) D: (-2, 0)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(-2,0)', 'Máx(-2,0)', 'Mín(0,1.41)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(-2,0)', 'Máx(-2,0)', 'Mín(0,1.41)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1520,7 +1614,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=1', 'Sí, T=2', 'Sí, T=π'] },
       cortes:    { correcta: '(0,0)', incorrectas: ['(2,0)', '(0,0) y (1,2)', 'No tiene'] },
       monotonia: { correcta: 'C: (0, ∞) D: ∅', incorrectas: ['C: ∅ D: (0, ∞)', 'C: (-∞, ∞) D: ∅', 'C: (1, ∞) D: (0, 1)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,0)', 'Máx(0,0)', 'Mín(1,2)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,0)', 'Máx(0,0)', 'Mín(1,2)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1536,7 +1631,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=1', 'Sí, T=2', 'Sí, T=π'] },
       cortes:    { correcta: '(4,0), (0,2)', incorrectas: ['(4,0)', '(0,4)', 'No tiene'] },
       monotonia: { correcta: 'C: ∅ D: (-∞, 4)', incorrectas: ['C: (-∞, 4) D: ∅', 'C: (-∞, ∞) D: ∅', 'C: (0, 4) D: (-∞, 0)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(4,0)', 'Máx(4,0)', 'Mín(0,2)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(4,0)', 'Máx(4,0)', 'Mín(0,2)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1552,7 +1648,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=1', 'Sí, T=2', 'Sí, T=π'] },
       cortes:    { correcta: '(0,0)', incorrectas: ['No tiene', '(1,0) y (-1,0)', '(0,0) y (±1,1)'] },
       monotonia: { correcta: 'C: (0, ∞) D: (-∞, 0)', incorrectas: ['C: (-∞, 0) D: (0, ∞)', 'C: (-∞, ∞) D: ∅', 'C: ∅ D: (-∞, ∞)'] },
-      extremos:  { correcta: 'Mín(0,0)', incorrectas: ['Máx(0,0)', 'No tiene', 'Mín(1,1)'] }
+      extremos:  { correcta: 'Mín(0,0)', incorrectas: ['Máx(0,0)', 'No tiene', 'Mín(1,1)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1568,7 +1665,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=1', 'Sí, T=2', 'Sí, T=π'] },
       cortes:    { correcta: '(0,1)', incorrectas: ['(0,0)', '(1,0) y (0,1)', 'No tiene'] },
       monotonia: { correcta: 'C: (0, ∞) D: ∅', incorrectas: ['C: ∅ D: (0, ∞)', 'C: (-∞, ∞) D: ∅', 'C: (1, ∞) D: (0, 1)'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,0)', 'Mín(0,1)', 'Máx(0,1)'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,0)', 'Mín(0,1)', 'Máx(0,1)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1584,7 +1682,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=1', 'Sí, T=2', 'Sí, T=π'] },
       cortes:    { correcta: '(-1,0), (1,0), (0,1)', incorrectas: ['(0,1)', '(-1,0) y (1,0)', 'No tiene'] },
       monotonia: { correcta: 'C: (-1, 0) D: (0, 1)', incorrectas: ['C: (0, 1) D: (-1, 0)', 'C: (-∞, ∞) D: ∅', 'C: ∅ D: (-∞, ∞)'] },
-      extremos:  { correcta: 'Máx(0,1)', incorrectas: ['Mín(0,1)', 'Máx(-1,0) Mín(1,0)', 'No tiene'] }
+      extremos:  { correcta: 'Máx(0,1)', incorrectas: ['Mín(0,1)', 'Máx(-1,0) Mín(1,0)', 'No tiene'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ,
@@ -1600,7 +1699,8 @@ export const FUNCIONES_DB = [
       periodica: { correcta: 'No', incorrectas: ['Sí, T=1', 'Sí, T=2', 'Sí, T=π'] },
       cortes:    { correcta: '(-1,0), (1,0)', incorrectas: ['(0,0)', '(-1,0) y (1,0) y (0,-1)', 'No tiene'] },
       monotonia: { correcta: 'C: (-∞,-1) U (1,∞) D: ∅', incorrectas: ['C: ∅ D: (-∞,-1) U (1,∞)', 'C: (-∞, ∞) D: ∅', 'C: (-1,1) D: ∅'] },
-      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(-1,0) Mín(1,0)', 'Máx(-1,0) Máx(1,0)', 'No tiene'] }
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(-1,0) Mín(1,0)', 'Máx(-1,0) Máx(1,0)', 'No tiene'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
 ];

@@ -51,10 +51,11 @@ function calcScore(ex, ans) {
     if (ex.tipo === 'choice') {
       t++; if ((ans[String(item.id)] || '') === item.ans) c++;
     } else if (ex.tipo === 'fill' || ex.tipo === 'wordbank') {
-      const nb = item.parts.length - 1;
+      const ansLen = Array.isArray(item.ans) ? item.ans.length : 1;
+      const nb = Math.max((item.parts || ['']).length - 1, ansLen);
       for (let i = 0; i < nb; i++) {
         t++;
-        if (okAns(ans[`${item.id}-${i}`] || '', item.ans[i], item.alts?.[i] || [])) c++;
+        if (okAns(ans[`${item.id}-${i}`] || '', (item.ans || [])[i] || '', item.alts?.[i] || [])) c++;
       }
     } else if (ex.tipo === 'construct') {
       t++; if (okAns(ans[String(item.id)] || '', item.ans, item.alts || [])) c++;
@@ -107,9 +108,15 @@ function FillEx({ ex, ans, setAns, checked }) {
   return (
     <div>
       {ex.items.map(item => {
-        const nb = item.parts.length - 1;
+        // Defensive: ensure parts has at least (ans.length + 1) elements
+        const ansLen = Array.isArray(item.ans) ? item.ans.length : 1;
+        const rawParts = Array.isArray(item.parts) ? item.parts : [''];
+        const parts = rawParts.length <= ansLen
+          ? [...rawParts, ...Array(ansLen - rawParts.length + 1).fill('')]
+          : rawParts;
+        const nb = parts.length - 1;
         const nodes = [];
-        item.parts.forEach((part, i) => {
+        parts.forEach((part, i) => {
           nodes.push(<MathText key={`p${i}`} text={part} />);
           if (i < nb) {
             const val = ans[`${item.id}-${i}`] || '';

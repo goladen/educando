@@ -54,22 +54,216 @@ function renderLatex(str) {
     return merged.length===1&&typeof merged[0]==='string' ? merged[0] : merged;
 }
 
+// ─── PARSERS PARA RESALTADO ───────────────────────────────────────────────────
+function parseIntervals(str) {
+    if (!str || str.trim() === '∅' || str.trim() === '') return [];
+    return str.split(/\s*[U∪]\s*/).map(part => {
+        part = part.trim();
+        const nums = part.replace(/[()[\]∞]/g,'').split(',').map(s => {
+            s = s.trim();
+            if (s === '' || s === '+') return Infinity;
+            if (s === '-') return -Infinity;
+            const v = parseFloat(s);
+            return isNaN(v) ? (s.startsWith('-') ? -Infinity : Infinity) : v;
+        });
+        // handle -∞ and ∞ written as part of the original string
+        const a = part.includes('-∞') ? -Infinity : nums[0];
+        const b = (part.slice(part.indexOf(',')+1) || '').includes('∞') && !part.slice(part.indexOf(',')+1).includes('-∞') ? Infinity : nums[1];
+        return { a, b };
+    }).filter(iv => iv.a !== undefined && iv.b !== undefined);
+}
+function parsePoints(str) {
+    if (!str) return [];
+    const matches = [...str.matchAll(/\(([^)]+)\)/g)];
+    return matches.map(m => {
+        const parts = m[1].split(',').map(s => parseFloat(s.trim()));
+        return { x: parts[0], y: parts[1] };
+    }).filter(p => !isNaN(p.x) && !isNaN(p.y));
+}
+function parseExtrema(str) {
+    if (!str || str.trim() === 'No tiene') return [];
+    const result = [];
+    for (const m of str.matchAll(/M[áa]x\(([^)]+)\)/gi)) {
+        const p = m[1].split(',').map(s => parseFloat(s.trim()));
+        if (!isNaN(p[0]) && !isNaN(p[1])) result.push({ x:p[0], y:p[1], type:'max' });
+    }
+    for (const m of str.matchAll(/M[íi]n\(([^)]+)\)/gi)) {
+        const p = m[1].split(',').map(s => parseFloat(s.trim()));
+        if (!isNaN(p[0]) && !isNaN(p[1])) result.push({ x:p[0], y:p[1], type:'min' });
+    }
+    return result;
+}
+function parseMonotonia(str) {
+    const cm = str.match(/C:\s*(.+?)(?:\s+D:|$)/);
+    const dm = str.match(/D:\s*(.+?)$/);
+    return {
+        crece:   cm ? parseIntervals(cm[1].trim()) : [],
+        decrece: dm ? parseIntervals(dm[1].trim()) : [],
+    };
+}
+function parsePeriod(str) {
+    if (!str) return null;
+    str = str.trim();
+    // "2π", "π/2", "π", "3.14", "2"
+    const mFrac = str.match(/^([\d.]+)?\s*π\s*\/\s*([\d.]+)$/);
+    if (mFrac) return (mFrac[1] ? parseFloat(mFrac[1]) : 1) * Math.PI / parseFloat(mFrac[2]);
+    const mPi = str.match(/^([\d.]+)?\s*π$/);
+    if (mPi) return (mPi[1] ? parseFloat(mPi[1]) : 1) * Math.PI;
+    const v = parseFloat(str);
+    return isNaN(v) ? null : v;
+}
+
 // ─── PLOTTER ──────────────────────────────────────────────────────────────────
-function FunctionPlotter({ fn, range = 7 }) {
+function FunctionPlotter({ fn, range = 7, highlights = [], caracteristicas = {} }) {
     const canvasRef = useRef(null);
     const CS = 400, SCALE = CS/(range*2), OX = CS/2, OY = CS/2;
-    const toCanvas = (mx,my) => ({ x: OX+mx*SCALE, y: OY-my*SCALE });
+    const cx_ = mx => OX + mx * SCALE;
+    const cy_ = my => OY - my * SCALE;
     useEffect(() => {
         const canvas = canvasRef.current; if (!canvas) return;
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0,0,CS,CS);
         ctx.fillStyle='#f8f9ff'; ctx.fillRect(0,0,CS,CS);
+
+        // ── Grid ──
         ctx.strokeStyle='#dde1f5'; ctx.lineWidth=1;
         for (let v=-range; v<=range; v++) {
-            const {x}=toCanvas(v,0), {y}=toCanvas(0,v);
-            ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,CS); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(CS,y); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(cx_(v),0); ctx.lineTo(cx_(v),CS); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0,cy_(v)); ctx.lineTo(CS,cy_(v)); ctx.stroke();
         }
+
+        // ── HIGHLIGHTS ──
+        const BAR = 18; // brush width
+        const has = k => highlights.includes(k);
+
+        // Dominio — eje X azul
+        if (has('dominio')) {
+            const ivs = parseIntervals(caracteristicas.dominio?.correcta || '');
+            ctx.save(); ctx.globalAlpha = 0.38; ctx.fillStyle = '#2980b9';
+            for (const {a,b} of ivs) {
+                const x1 = a === -Infinity ? 0 : Math.max(0, cx_(a));
+                const x2 = b === Infinity  ? CS : Math.min(CS, cx_(b));
+                ctx.beginPath();
+                ctx.roundRect ? ctx.roundRect(x1, OY-BAR/2, x2-x1, BAR, BAR/2)
+                              : ctx.rect(x1, OY-BAR/2, x2-x1, BAR);
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+
+        // Recorrido — eje Y rosa
+        if (has('recorrido')) {
+            const ivs = parseIntervals(caracteristicas.recorrido?.correcta || '');
+            ctx.save(); ctx.globalAlpha = 0.38; ctx.fillStyle = '#e91e8c';
+            for (const {a,b} of ivs) {
+                const y1 = b === Infinity  ? 0  : Math.max(0, cy_(b));
+                const y2 = a === -Infinity ? CS : Math.min(CS, cy_(a));
+                ctx.beginPath();
+                ctx.roundRect ? ctx.roundRect(OX-BAR/2, y1, BAR, y2-y1, BAR/2)
+                              : ctx.rect(OX-BAR/2, y1, BAR, y2-y1);
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+
+        // Monotonía — eje X azul (crece) y naranja (decrece)
+        if (has('monotonia')) {
+            const {crece, decrece} = parseMonotonia(caracteristicas.monotonia?.correcta || '');
+            ctx.save(); ctx.globalAlpha = 0.42;
+            for (const {a,b} of crece) {
+                ctx.fillStyle = '#2980b9';
+                const x1 = a === -Infinity ? 0 : Math.max(0, cx_(a));
+                const x2 = b === Infinity  ? CS : Math.min(CS, cx_(b));
+                ctx.fillRect(x1, OY-BAR/2, x2-x1, BAR);
+            }
+            for (const {a,b} of decrece) {
+                ctx.fillStyle = '#e67e22';
+                const x1 = a === -Infinity ? 0 : Math.max(0, cx_(a));
+                const x2 = b === Infinity  ? CS : Math.min(CS, cx_(b));
+                ctx.fillRect(x1, OY-BAR/2, x2-x1, BAR);
+            }
+            ctx.restore();
+        }
+
+        // Simetría — par (eje Y) / impar (giro 180°)
+        if (has('simetria')) {
+            const sim = (caracteristicas.simetria?.correcta || '').toLowerCase();
+            ctx.save();
+            if (sim === 'par') {
+                // shade both halves in violet
+                ctx.globalAlpha = 0.09; ctx.fillStyle = '#8e44ad';
+                ctx.fillRect(0, 0, OX, CS);
+                ctx.fillRect(OX, 0, CS - OX, CS);
+                // dashed fold line on Y axis
+                ctx.globalAlpha = 0.65; ctx.strokeStyle = '#8e44ad'; ctx.lineWidth = 3;
+                ctx.setLineDash([8, 5]);
+                ctx.beginPath(); ctx.moveTo(OX, 6); ctx.lineTo(OX, CS - 6); ctx.stroke();
+                ctx.setLineDash([]);
+                // arrow label
+                ctx.globalAlpha = 0.9; ctx.fillStyle = '#8e44ad';
+                ctx.font = 'bold 13px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+                ctx.fillText('◄ eje Y ►', OX, 6);
+            } else if (sim === 'impar') {
+                // shade Q1+Q3 in coral
+                ctx.globalAlpha = 0.10; ctx.fillStyle = '#e74c3c';
+                ctx.fillRect(OX, 0, CS - OX, OY);   // Q1
+                ctx.fillRect(0, OY, OX, CS - OY);   // Q3
+                // diagonal axis of rotation
+                ctx.globalAlpha = 0.5; ctx.strokeStyle = '#e74c3c'; ctx.lineWidth = 2;
+                ctx.setLineDash([6, 4]);
+                ctx.beginPath(); ctx.moveTo(OX - CS * 0.42, OY + CS * 0.42); ctx.lineTo(OX + CS * 0.42, OY - CS * 0.42); ctx.stroke();
+                ctx.setLineDash([]);
+                // circle at origin
+                ctx.globalAlpha = 0.9;
+                ctx.beginPath(); ctx.arc(OX, OY, 6, 0, Math.PI * 2);
+                ctx.fillStyle = '#e74c3c'; ctx.fill();
+                // label
+                ctx.fillStyle = '#e74c3c'; ctx.font = 'bold 12px Arial'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+                ctx.fillText('↺ 180°', OX + 9, 6);
+            }
+            ctx.restore();
+        }
+
+        // Periódica — rectángulo base=T, altura=recorrido
+        if (has('periodica')) {
+            const perStr = caracteristicas.periodica?.correcta || '';
+            const tMatch = perStr.match(/T=([^,\s]+)/i);
+            if (tMatch) {
+                const T = parsePeriod(tMatch[1]);
+                if (T && T > 0) {
+                    const recIvs = parseIntervals(caracteristicas.recorrido?.correcta || '');
+                    let yMin = -range, yMax = range;
+                    if (recIvs.length > 0) {
+                        const allA = recIvs.map(iv => iv.a).filter(v => isFinite(v));
+                        const allB = recIvs.map(iv => iv.b).filter(v => isFinite(v));
+                        if (allA.length) yMin = Math.min(...allA);
+                        if (allB.length) yMax = Math.max(...allB);
+                    }
+                    const rx1 = cx_(0), rx2 = Math.min(CS, cx_(T));
+                    const ry1 = Math.max(0, cy_(yMax)), ry2 = Math.min(CS, cy_(yMin));
+                    ctx.save();
+                    ctx.globalAlpha = 0.18; ctx.fillStyle = '#1abc9c';
+                    ctx.fillRect(rx1, ry1, rx2 - rx1, ry2 - ry1);
+                    ctx.globalAlpha = 0.75; ctx.strokeStyle = '#16a085'; ctx.lineWidth = 2.5;
+                    ctx.setLineDash([6, 4]);
+                    ctx.strokeRect(rx1, ry1, rx2 - rx1, ry2 - ry1);
+                    ctx.setLineDash([]);
+                    // period label below x axis
+                    ctx.globalAlpha = 0.95; ctx.fillStyle = '#16a085';
+                    ctx.font = 'bold 12px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+                    ctx.fillText('T', (rx1 + rx2) / 2, Math.min(CS - 16, ry2 + 4));
+                    // arrow markers at x=0 and x=T on the bottom
+                    const arrowY = Math.min(CS - 4, ry2 + 14);
+                    ctx.lineWidth = 1.5; ctx.globalAlpha = 0.8;
+                    ctx.beginPath(); ctx.moveTo(rx1, arrowY); ctx.lineTo(rx2, arrowY); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(rx1, arrowY - 4); ctx.lineTo(rx1, arrowY + 4); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(rx2, arrowY - 4); ctx.lineTo(rx2, arrowY + 4); ctx.stroke();
+                    ctx.restore();
+                }
+            }
+        }
+
+        // ── Axes ──
         ctx.strokeStyle='#2c3e50'; ctx.lineWidth=2;
         ctx.beginPath(); ctx.moveTo(0,OY); ctx.lineTo(CS,OY); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(OX,0); ctx.lineTo(OX,CS); ctx.stroke();
@@ -79,21 +273,60 @@ function FunctionPlotter({ fn, range = 7 }) {
         ctx.fillStyle='#7f8c8d'; ctx.font='11px Arial'; ctx.textAlign='center';
         for (let v=-range+1; v<=range-1; v++) {
             if(v===0) continue;
-            ctx.fillText(v, toCanvas(v,0).x, OY+14);
-            ctx.textAlign='right'; ctx.fillText(v, OX-4, toCanvas(0,v).y+4); ctx.textAlign='center';
+            ctx.fillText(v, cx_(v), OY+14);
+            ctx.textAlign='right'; ctx.fillText(v, OX-4, cy_(v)+4); ctx.textAlign='center';
         }
+
+        // ── Curve ──
         ctx.strokeStyle='#e74c3c'; ctx.lineWidth=2.5; ctx.beginPath();
         let prevY=null;
         for (let px=0; px<=CS; px++) {
             const mx=(px-OX)/SCALE, my=fn(mx);
             if(my===null||isNaN(my)||!isFinite(my)){ctx.stroke();ctx.beginPath();prevY=null;continue;}
-            const {y:py}=toCanvas(mx,my);
+            const py=cy_(my);
             if(prevY!==null&&Math.abs(py-prevY)>CS/2){ctx.stroke();ctx.beginPath();ctx.moveTo(px,py);}
             else{if(prevY===null)ctx.moveTo(px,py);else ctx.lineTo(px,py);}
             prevY=py;
         }
         ctx.stroke();
-    }, [fn, range]);
+
+        // ── POINT HIGHLIGHTS (on top of curve) ──
+
+        // Cortes — puntos amarillos
+        if (has('cortes')) {
+            const pts = parsePoints(caracteristicas.cortes?.correcta || '');
+            ctx.save();
+            for (const {x,y} of pts) {
+                const px=cx_(x), py=cy_(y);
+                if(px<0||px>CS||py<0||py>CS) continue;
+                ctx.beginPath(); ctx.arc(px,py,9,0,Math.PI*2);
+                ctx.globalAlpha=0.85; ctx.fillStyle='#f1c40f'; ctx.fill();
+                ctx.globalAlpha=1; ctx.strokeStyle='#e67e22'; ctx.lineWidth=2; ctx.stroke();
+                ctx.fillStyle='#7d4c00'; ctx.font='bold 9px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle';
+                ctx.globalAlpha=1; ctx.fillText('✕',px,py);
+            }
+            ctx.restore();
+        }
+
+        // Extremos — verde (máx) y rojo (mín)
+        if (has('extremos')) {
+            const pts = parseExtrema(caracteristicas.extremos?.correcta || '');
+            ctx.save();
+            for (const {x,y,type} of pts) {
+                const px=cx_(x), py=cy_(y);
+                if(px<-10||px>CS+10||py<-10||py>CS+10) continue;
+                ctx.beginPath(); ctx.arc(px,py,10,0,Math.PI*2);
+                ctx.globalAlpha=0.88;
+                ctx.fillStyle = type==='max' ? '#2ecc71' : '#e74c3c'; ctx.fill();
+                ctx.globalAlpha=1;
+                ctx.strokeStyle = type==='max' ? '#27ae60' : '#c0392b'; ctx.lineWidth=2.5; ctx.stroke();
+                ctx.fillStyle='white'; ctx.font='bold 10px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle';
+                ctx.fillText(type==='max'?'▲':'▼',px,py);
+            }
+            ctx.restore();
+        }
+
+    }, [fn, range, highlights, caracteristicas]);
     return <canvas ref={canvasRef} width={CS} height={CS} style={{borderRadius:8,border:'2px solid #bdc3c7',boxShadow:'0 4px 10px rgba(0,0,0,0.1)',background:'white',maxWidth:'100%'}}/>;
 }
 
@@ -348,7 +581,10 @@ function AnalisisFuncion({ modoEscritura, tipoSeleccionado, idInicial, onVolver 
     const [activeInput,setActive]  = useState(null);
     const [mostrarEnvio,setMostrarEnvio]   = useState(false);
     const [mostrarRevision,setMostrarRevision] = useState(false);
+    const [highlights, setHighlights] = useState([]);
     const inputRefs = useRef({});
+    // Shuffle options once per function (stable across re-renders)
+    const shuffledOptsRef = useRef({});
     if (!lista.length) return <div style={{color:'#2c3e50',textAlign:'center',padding:50}}>No hay funciones de este tipo.</div>;
     const fnData = lista[idx];
     const keys   = Object.keys(fnData.caracteristicas);
@@ -380,6 +616,8 @@ function AnalisisFuncion({ modoEscritura, tipoSeleccionado, idInicial, onVolver 
         return norm(c);
     };
     const isAnswerCorrect = (k) => {
+        // continua uses radio buttons in both modes
+        if (k==='continua') return norm(resp.continua||'') === norm(fnData.caracteristicas.continua.correcta);
         if (!modoEscritura) return norm(resp[k]||'') === norm(fnData.caracteristicas[k].correcta);
         const userAns = getUserAnswer(k);
         const realAns = getRealAnswer(k);
@@ -393,7 +631,7 @@ function AnalisisFuncion({ modoEscritura, tipoSeleccionado, idInicial, onVolver 
         setNota(Math.round(ok/keys.length*100));
         setEvaluado(true);
     };
-    const siguiente = () => { setRespRaw({}); setEvaluado(false); setActive(null); setIdx(p=>(p+1)%lista.length); };
+    const siguiente = () => { setRespRaw({}); setEvaluado(false); setActive(null); shuffledOptsRef.current={}; setHighlights([]); setIdx(p=>(p+1)%lista.length); };
 
     const insertSymbol = (sym) => {
         const targetKey = activeInput || keys.find(k=>!['simetria','periodica'].includes(k)) || keys[0];
@@ -474,6 +712,18 @@ function AnalisisFuncion({ modoEscritura, tipoSeleccionado, idInicial, onVolver 
                 {evaluado&&!isOk&&<div style={{fontSize:'0.78rem',color:'#e74c3c'}}>Máx: {extractMax(data.correcta)} / Mín: {extractMin(data.correcta)}</div>}
             </div>);
         }
+        if (k==='continua') {
+            // Binary choice — same rendering in both modes
+            return (<div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:4}}>
+                {['Sí','No'].map(op => {
+                    const sel=resp.continua===op, correct=evaluado&&op===data.correcta, wrong=evaluado&&sel&&op!==data.correcta;
+                    return (<label key={op} style={{display:'flex',alignItems:'center',gap:5,cursor:evaluado?'default':'pointer',padding:'6px 18px',borderRadius:20,border:`2px solid ${correct?'#2ecc71':wrong?'#e74c3c':sel?'#3498db':'#ddd'}`,background:correct?'#eafaf1':wrong?'#fdecea':sel?'#eaf4fd':'white',fontWeight:sel||correct?600:400,fontSize:'0.88rem'}}>
+                        <input type="radio" name={`continua_${idx}`} value={op} checked={sel} onChange={()=>setR('continua',op)} disabled={evaluado} style={{accentColor:'#3498db'}}/>{op}
+                    </label>);
+                })}
+                {evaluado&&!isOk&&<div style={{fontSize:'0.78rem',color:'#e74c3c',width:'100%'}}>Correcto: {data.correcta}</div>}
+            </div>);
+        }
         if (modoEscritura) {
             return (<div>
                 <input ref={el=>inputRefs.current[k]=el} onFocus={()=>setActive(k)}
@@ -483,7 +733,12 @@ function AnalisisFuncion({ modoEscritura, tipoSeleccionado, idInicial, onVolver 
                 {evaluado&&!isOk&&<div style={{fontSize:'0.78rem',color:'#e74c3c'}}>Correcto: {data.correcta}</div>}
             </div>);
         }
-        const opciones=[data.correcta,...data.incorrectas].sort((a,b)=>a.localeCompare(b));
+        // Deduplicate + barajar una vez por función (estable mientras se responde)
+        if (!shuffledOptsRef.current[k]) {
+            const pool = [data.correcta, ...data.incorrectas.filter(o => o !== data.correcta)];
+            shuffledOptsRef.current[k] = pool.sort(() => Math.random() - 0.5);
+        }
+        const opciones = shuffledOptsRef.current[k];
         const seleccionoAlgo = resp[k] !== undefined;
         const acerto = evaluado && norm(resp[k]||'') === norm(data.correcta);
 
@@ -501,8 +756,8 @@ function AnalisisFuncion({ modoEscritura, tipoSeleccionado, idInicial, onVolver 
         </div>);
     };
 
-    const keyLabel = {dominio:'Dominio',recorrido:'Recorrido (Im)',simetria:'Simetría',periodica:'Periodicidad',cortes:'Cortes con ejes',monotonia:'Monotonía',extremos:'Extremos relativos'};
-    const keyIcon  = {dominio:'🎯',recorrido:'📊',simetria:'🔄',periodica:'🔁',cortes:'✂️',monotonia:'📈',extremos:'🏔️'};
+    const keyLabel = {dominio:'Dominio',recorrido:'Recorrido (Im)',simetria:'Simetría',periodica:'Periodicidad',cortes:'Cortes con ejes',monotonia:'Monotonía',extremos:'Extremos relativos',continua:'Continuidad'};
+    const keyIcon  = {dominio:'🎯',recorrido:'📊',simetria:'🔄',periodica:'🔁',cortes:'✂️',monotonia:'📈',extremos:'🏔️',continua:'〰️'};
 
     return (
         <div style={{width:'100%',maxWidth:1050,margin:'0 auto',display:'flex',gap:20,flexWrap:'wrap',justifyContent:'center'}}>
@@ -517,7 +772,7 @@ function AnalisisFuncion({ modoEscritura, tipoSeleccionado, idInicial, onVolver 
                         {renderLatex(fnData.latex)}
                     </div>
                 </div>
-                <FunctionPlotter fn={fnData.fn} range={fnData.range}/>
+                <FunctionPlotter fn={fnData.fn} range={fnData.range} highlights={highlights} caracteristicas={fnData.caracteristicas}/>
                 {modoEscritura && !evaluado && (
                     <div style={{background:'white',padding:'10px 14px',borderRadius:10,border:'1.5px solid #dde',display:'flex',flexWrap:'wrap',gap:8,justifyContent:'center'}}>
                         {['∞','-∞','U','∅','π','±','(',')','[',']'].map(s=>(
@@ -527,18 +782,50 @@ function AnalisisFuncion({ modoEscritura, tipoSeleccionado, idInicial, onVolver 
                     </div>
                 )}
                 {/* Botones post-evaluación */}
-                {evaluado && (
-                    <div style={{display:'flex',gap:8,flexWrap:'wrap',justifyContent:'center'}}>
-                        <button onClick={()=>setMostrarEnvio(true)}
-                            style={{padding:'10px 18px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#3498db,#2980b9)',color:'white',fontWeight:700,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:7,fontSize:'0.88rem'}}>
-                            <Send size={15}/> Enviar al Profe
-                        </button>
-                        <button onClick={()=>setMostrarRevision(true)}
-                            style={{padding:'10px 18px',borderRadius:10,border:'1.5px solid #e67e22',background:'white',color:'#e67e22',fontWeight:700,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:7,fontSize:'0.88rem'}}>
-                            <AlertTriangle size={15}/> Revisar función
-                        </button>
-                    </div>
-                )}
+                {evaluado && (() => {
+                    const HIGHLIGHT_KEYS = [
+                        { k:'dominio',   label:'Dominio',   color:'#2980b9' },
+                        { k:'recorrido', label:'Recorrido', color:'#e91e8c' },
+                        { k:'monotonia', label:'Monotonía', color:'#e67e22' },
+                        { k:'cortes',    label:'Cortes',    color:'#f39c12' },
+                        { k:'extremos',  label:'Extremos',  color:'#27ae60' },
+                        { k:'simetria',  label:'Simetría',  color:'#8e44ad',
+                          hidden: ['sin simetría','sin simetria'].includes((fnData.caracteristicas.simetria?.correcta||'').toLowerCase()) },
+                        { k:'periodica', label:'Periódica', color:'#16a085',
+                          hidden: !(fnData.caracteristicas.periodica?.correcta||'').match(/T=/i) },
+                    ].filter(h => fnData.caracteristicas[h.k] && !h.hidden);
+                    const toggle = (k) => setHighlights(prev => prev.includes(k) ? prev.filter(x=>x!==k) : [...prev, k]);
+                    return (
+                        <div style={{display:'flex',flexDirection:'column',gap:8,width:'100%',maxWidth:380,alignItems:'center'}}>
+                            <div style={{fontSize:'0.75rem',color:'#95a5a6',fontWeight:600,letterSpacing:0.5}}>RESALTAR EN GRÁFICA</div>
+                            <div style={{display:'flex',gap:6,flexWrap:'wrap',justifyContent:'center'}}>
+                                {HIGHLIGHT_KEYS.map(({k,label,color})=>{
+                                    const active = highlights.includes(k);
+                                    return (
+                                        <button key={k} onClick={()=>toggle(k)}
+                                            style={{padding:'7px 13px',borderRadius:20,border:`2px solid ${color}`,
+                                                background: active ? color : 'white',
+                                                color: active ? 'white' : color,
+                                                fontWeight:700,cursor:'pointer',fontFamily:'inherit',fontSize:'0.8rem',
+                                                transition:'all 0.15s',opacity: active ? 1 : 0.75}}>
+                                            {label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            <div style={{display:'flex',gap:8,flexWrap:'wrap',justifyContent:'center',marginTop:2}}>
+                                <button onClick={()=>setMostrarEnvio(true)}
+                                    style={{padding:'9px 16px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#3498db,#2980b9)',color:'white',fontWeight:700,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:7,fontSize:'0.85rem'}}>
+                                    <Send size={14}/> Enviar al Profe
+                                </button>
+                                <button onClick={()=>setMostrarRevision(true)}
+                                    style={{padding:'9px 16px',borderRadius:10,border:'1.5px solid #e67e22',background:'white',color:'#e67e22',fontWeight:700,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:7,fontSize:'0.85rem'}}>
+                                    <AlertTriangle size={14}/> Revisar función
+                                </button>
+                            </div>
+                        </div>
+                    );
+                })()}
             </div>
 
             {/* Columna preguntas */}

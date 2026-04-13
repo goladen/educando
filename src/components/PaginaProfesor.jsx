@@ -98,6 +98,20 @@ function JuegoCard({ juegoId, color }) {
   );
 }
 
+// ─── Convierte cualquier URL de presentación en URL embebible ────────────────
+function getPresentacionEmbed(url) {
+  if (!url) return null;
+  // Google Slides: /pub?… → ya es embebible; /edit o /present → convertir
+  const gsMatch = url.match(/docs\.google\.com\/presentation\/d\/([^/]+)/);
+  if (gsMatch) {
+    // Si ya es /pub devolvemos tal cual (puede tener ?start=false&loop=false&delayms=…)
+    if (url.includes('/pub')) return url.includes('output=embed') ? url : url + (url.includes('?') ? '&' : '?') + 'output=embed';
+    return `https://docs.google.com/presentation/d/${gsMatch[1]}/embed?start=false&loop=false&delayms=3000`;
+  }
+  // PPTX directo o OneDrive → Office Online viewer
+  return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`;
+}
+
 // ─── Tarjeta de tarea ─────────────────────────────────────────────────────────
 function TareaCard({ tarea, color }) {
   const hoy = new Date();
@@ -107,7 +121,9 @@ function TareaCard({ tarea, color }) {
   const ytEmbed  = getYouTubeEmbed(tarea.videoUrl);
   const juegoUrl = getTareaJuegoUrl(tarea);
   const juegoInfo = tarea.juegoId ? JUEGOS_INFO[tarea.juegoId] : null;
+  const pptxEmbed = getPresentacionEmbed(tarea.pptxUrl);
   const [juegoAbierto, setJuegoAbierto] = useState(false);
+  const [pptxAbierto, setPptxAbierto] = useState(false);
 
   return (
     <div style={{
@@ -148,6 +164,27 @@ function TareaCard({ tarea, color }) {
         </a>
       )}
 
+      {pptxEmbed && (
+        <button onClick={()=>setPptxAbierto(true)}
+          style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:9, border:`2px solid ${color||'#6D28D9'}`, background:'white', color:color||'#6D28D9', fontWeight:700, fontSize:13, cursor:'pointer', width:'fit-content', fontFamily:'inherit' }}>
+          📊 Ver presentación
+        </button>
+      )}
+      {pptxEmbed && pptxAbierto && (
+        <div style={{ position:'fixed', inset:0, zIndex:9999, background:'#1e1e1e', display:'flex', flexDirection:'column' }}>
+          <div style={{ background:color||'#6D28D9', padding:'6px 14px', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
+            <span style={{ color:'white', fontSize:13, fontWeight:700 }}>📊 Presentación</span>
+            <button onClick={()=>setPptxAbierto(false)}
+              style={{ background:'rgba(255,255,255,0.2)', border:'none', borderRadius:8, color:'white', cursor:'pointer', fontSize:13, fontWeight:700, padding:'4px 14px', fontFamily:'inherit' }}>
+              ✕ Cerrar
+            </button>
+          </div>
+          <iframe src={pptxEmbed} title="Presentación"
+            style={{ flex:1, width:'100%', border:'none', display:'block' }}
+            allow="fullscreen" allowFullScreen/>
+        </div>
+      )}
+
       {juegoUrl && !juegoAbierto && (
         <button onClick={()=>setJuegoAbierto(true)} style={{ display:'flex', alignItems:'center', gap:6, padding:'10px 16px', borderRadius:9, border:`2px solid ${color||'#6D28D9'}`, background:'white', color:color||'#6D28D9', fontWeight:700, fontSize:13, cursor:'pointer', width:'fit-content', fontFamily:'inherit' }}>
           {juegoInfo ? <span>{juegoInfo.emoji}</span> : <Gamepad2 size={14}/>}
@@ -168,28 +205,36 @@ function TareaCard({ tarea, color }) {
 }
 
 // ─── Sección de un tema ───────────────────────────────────────────────────────
-function TemaSection({ tema, color }) {
-  const [abierto, setAbierto] = useState(true);
+function TemaSection({ tema, cursoColor }) {
+  const [abierto, setAbierto] = useState(false);
+  const color = tema.color || cursoColor || '#6D28D9';
   if (!tema.tareas?.length && !tema.descripcion) return null;
 
   return (
-    <div style={{ marginBottom:20 }}>
-      <div onClick={()=>setAbierto(!abierto)} style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer', marginBottom:abierto?12:0 }}>
-        <div style={{ width:4, height:22, borderRadius:2, background:color||'#6D28D9', flexShrink:0 }}/>
-        <h3 style={{ margin:0, fontSize:16, fontWeight:800, color:'#0F172A', flex:1 }}>{tema.titulo||'Tema'}</h3>
-        <span style={{ color:'#94A3B8' }}>{abierto?<ChevronUp size={16}/>:<ChevronDown size={16}/>}</span>
+    <div style={{ marginBottom:12, borderRadius:12, border:`1.5px solid ${abierto ? color : '#E2E8F0'}`, overflow:'hidden', transition:'border-color 0.2s' }}>
+      <div onClick={()=>setAbierto(!abierto)}
+        style={{ display:'flex', alignItems:'center', gap:10, cursor:'pointer', padding:'12px 16px',
+          background: abierto ? `${color}0d` : 'white' }}>
+        <div style={{ width:4, height:20, borderRadius:2, background:color, flexShrink:0 }}/>
+        <h3 style={{ margin:0, fontSize:15, fontWeight:800, color:'#0F172A', flex:1 }}>{tema.titulo||'Tema'}</h3>
+        {!abierto && tema.tareas?.length > 0 && (
+          <span style={{ fontSize:11, color:'#94A3B8', fontWeight:600 }}>{tema.tareas.length} tarea{tema.tareas.length!==1?'s':''}</span>
+        )}
+        <span style={{ color, transition:'transform 0.2s', display:'inline-flex' }}>
+          {abierto ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
+        </span>
       </div>
       {abierto && (
-        <>
+        <div style={{ padding:'0 16px 16px' }}>
           {tema.descripcion && (
-            <div style={{ background:'#F8FAFC', borderRadius:8, padding:'10px 14px', marginBottom:12, fontSize:13, color:'#475569', lineHeight:1.6, borderLeft:`3px solid ${color||'#6D28D9'}` }}>
+            <div style={{ background:'#F8FAFC', borderRadius:8, padding:'10px 14px', marginBottom:12, marginTop:8, fontSize:13, color:'#475569', lineHeight:1.6, borderLeft:`3px solid ${color}`, whiteSpace:'pre-wrap' }}>
               {tema.descripcion}
             </div>
           )}
           <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
             {(tema.tareas||[]).map(t=><TareaCard key={t.id} tarea={t} color={color}/>)}
           </div>
-        </>
+        </div>
       )}
     </div>
   );
@@ -298,10 +343,24 @@ export default function PaginaProfesor({ uid, slug, onBack }) {
         {cursoActivo && (
           <div style={{ display:'flex', flexDirection:'column', gap:28 }}>
 
-            {/* 1. Bienvenida */}
-            {cursoActivo.bienvenida && (
+            {/* 1. Bienvenida + enlaces */}
+            {(cursoActivo.bienvenida || (cursoActivo.enlaces||[]).length > 0) && (
               <div style={{ background:'white', borderRadius:14, padding:'18px 20px', border:'1px solid #E2E8F0', boxShadow:'0 2px 8px rgba(0,0,0,0.04)', borderLeft:`4px solid ${cursoActivo.color||'#6D28D9'}` }}>
-                <p style={{ margin:0, fontSize:15, color:'#334155', lineHeight:1.7, whiteSpace:'pre-wrap' }}>{cursoActivo.bienvenida}</p>
+                {cursoActivo.bienvenida && (
+                  <p style={{ margin:0, fontSize:15, color:'#334155', lineHeight:1.7, whiteSpace:'pre-wrap', marginBottom:(cursoActivo.enlaces||[]).length>0?14:0 }}>{cursoActivo.bienvenida}</p>
+                )}
+                {(cursoActivo.enlaces||[]).length > 0 && (
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
+                    {(cursoActivo.enlaces||[]).filter(en=>en.url).map(en=>(
+                      <a key={en.id} href={en.url} target="_blank" rel="noreferrer"
+                        style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:9,
+                          background:cursoActivo.color||'#6D28D9', color:'white', fontWeight:600, fontSize:13,
+                          textDecoration:'none', boxShadow:`0 2px 8px ${cursoActivo.color||'#6D28D9'}40` }}>
+                        <ExternalLink size={13}/> {en.titulo||en.url}
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -343,7 +402,7 @@ export default function PaginaProfesor({ uid, slug, onBack }) {
                 </div>
 
                 {temasDelCurso.filter(t=>!t.oculto).map(tema=>(
-                  <TemaSection key={tema.id} tema={tema} color={cursoActivo.color}/>
+                  <TemaSection key={tema.id} tema={tema} cursoColor={cursoActivo.color}/>
                 ))}
 
                 {tareasLegacy.length>0 && (

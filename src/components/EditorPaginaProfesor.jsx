@@ -55,14 +55,17 @@ function migrateCurso(c) {
   return { juegos:[], bienvenida:'', ...rest, temas };
 }
 function newCurso() {
-  return { id:'c_'+Math.random().toString(36).slice(2,8), nombre:'Nuevo curso', color:'#6D28D9', bienvenida:'', recursos:[], juegos:[], temas:[] };
+  return { id:'c_'+Math.random().toString(36).slice(2,8), nombre:'Nuevo curso', color:'#6D28D9', bienvenida:'', recursos:[], juegos:[], temas:[], enlaces:[] };
+}
+function newEnlaceCurso() {
+  return { id:'en_'+Math.random().toString(36).slice(2,8), titulo:'', url:'' };
 }
 function newTema() {
   return { id:'tm_'+Math.random().toString(36).slice(2,8), titulo:'Nuevo tema', descripcion:'', tareas:[] };
 }
 function newTarea() {
   return { id:'ta_'+Math.random().toString(36).slice(2,8), titulo:'', descripcion:'', fechaEntrega:'',
-    imagenUrl:'', videoUrl:'', enlaceUrl:'', enlaceTitulo:'', juegoId:'', recursoId:'' };
+    imagenUrl:'', videoUrl:'', enlaceUrl:'', enlaceTitulo:'', pptxUrl:'', juegoId:'', recursoId:'' };
 }
 function slugify(text) {
   return text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
@@ -307,7 +310,7 @@ function TareaEditor({ tarea, misRecursos, onUpdate, onDelete }) {
           <Gamepad2 size={12}/> {juegoInfo?'Cambiar juego':'+ Juego'}
         </button>
         <button onClick={()=>setExpanded(!expanded)} style={btnSmall}>
-          {expanded?<ChevronUp size={12}/>:<ChevronDown size={12}/>} Imagen/Video/Enlace
+          {expanded?<ChevronUp size={12}/>:<ChevronDown size={12}/>} Imagen/Video/Enlace/PPT
         </button>
       </div>
 
@@ -329,6 +332,14 @@ function TareaEditor({ tarea, misRecursos, onUpdate, onDelete }) {
             <div>
               <label style={lbl}>Texto del botón</label>
               <input style={inp} value={tarea.enlaceTitulo||''} onChange={e=>onUpdate({enlaceTitulo:e.target.value})} placeholder="Ver recurso"/>
+            </div>
+          </div>
+          <div>
+            <label style={lbl}>📊 URL de presentación (.pptx / Google Slides)</label>
+            <input style={inp} value={tarea.pptxUrl||''} onChange={e=>onUpdate({pptxUrl:e.target.value})}
+              placeholder="https://docs.google.com/presentation/… o enlace directo .pptx"/>
+            <div style={{ fontSize:11, color:'#94A3B8', marginTop:3 }}>
+              Google Slides: Archivo → Publicar en la web → Insertar → copia la URL. PPTX: sube a OneDrive/Drive y copia el enlace público.
             </div>
           </div>
         </div>
@@ -412,6 +423,8 @@ export default function EditorPaginaProfesor({ usuario, onPreview }) {
     const arr=[...p.cursos]; const i=arr.findIndex(c=>c.id===id); const j=i+dir;
     if(j<0||j>=arr.length) return p; [arr[i],arr[j]]=[arr[j],arr[i]]; return {...p,cursos:arr};
   });
+
+  const updateCursoEnlaces = (cid, enlaces) => updateCurso(cid, 'enlaces', enlaces);
 
   const toggleRecurso = (cid,rid) => setPagina(p=>({...p,cursos:p.cursos.map(c=>{
     if(c.id!==cid) return c; const t=c.recursos.includes(rid);
@@ -574,6 +587,32 @@ export default function EditorPaginaProfesor({ usuario, onPreview }) {
                 placeholder="Escribe un mensaje para tus alumnos de este curso…"/>
             </div>
 
+            {/* Enlaces del curso */}
+            <div style={{ marginBottom:14 }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+                <label style={{...lbl,margin:0}}>🔗 Enlace rápidos del curso</label>
+                <button onClick={()=>updateCursoEnlaces(cursoActivo.id,[...(cursoActivo.enlaces||[]),newEnlaceCurso()])}
+                  style={{...btnPrimary,background:cursoActivo.color,padding:'5px 11px',fontSize:12}}>
+                  <Plus size={11}/> Añadir enlace
+                </button>
+              </div>
+              {(cursoActivo.enlaces||[]).length===0 && (
+                <p style={{ fontSize:12, color:'#94A3B8', margin:0 }}>Añade enlaces que aparecerán como botones debajo del mensaje de bienvenida.</p>
+              )}
+              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                {(cursoActivo.enlaces||[]).map((en,ei)=>(
+                  <div key={en.id} style={{ display:'flex', gap:6, alignItems:'center' }}>
+                    <input style={{...inp,flex:'0 0 140px'}} value={en.titulo} placeholder="Texto del botón"
+                      onChange={e=>{const arr=[...(cursoActivo.enlaces||[])];arr[ei]={...en,titulo:e.target.value};updateCursoEnlaces(cursoActivo.id,arr);}}/>
+                    <input style={{...inp,flex:1}} value={en.url} placeholder="https://…"
+                      onChange={e=>{const arr=[...(cursoActivo.enlaces||[])];arr[ei]={...en,url:e.target.value};updateCursoEnlaces(cursoActivo.id,arr);}}/>
+                    <button onClick={()=>updateCursoEnlaces(cursoActivo.id,(cursoActivo.enlaces||[]).filter((_,j)=>j!==ei))}
+                      style={{ background:'none',border:'none',cursor:'pointer',color:'#DC2626',flexShrink:0,padding:'0 2px' }}><Trash2 size={14}/></button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {/* Actividades (recursos + juegos) */}
             <div style={{ marginBottom:14 }}>
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
@@ -630,8 +669,8 @@ export default function EditorPaginaProfesor({ usuario, onPreview }) {
                 {(cursoActivo.temas||[]).map((tema,ti)=>{
                   const isOpen=temasExpanded.has(tema.id);
                   return (
-                    <div key={tema.id} style={{ border:`1.5px solid ${isOpen?cursoActivo.color:tema.oculto?'#FCD34D':'#E2E8F0'}`, borderRadius:10, overflow:'hidden' }}>
-                      <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 12px', background:isOpen?`${cursoActivo.color}08`:tema.oculto?'#FEF9C3':'#FAFAFA', cursor:'pointer' }}
+                    <div key={tema.id} style={{ border:`1.5px solid ${isOpen?(tema.color||cursoActivo.color):tema.oculto?'#FCD34D':'#E2E8F0'}`, borderRadius:10, overflow:'hidden' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 12px', background:isOpen?`${tema.color||cursoActivo.color}08`:tema.oculto?'#FEF9C3':'#FAFAFA', cursor:'pointer' }}
                         onClick={()=>toggleExpandTema(tema.id)}>
                         <span style={{ fontSize:12 }}>{isOpen?'▾':'▸'}</span>
                         <input value={tema.titulo} onChange={e=>{e.stopPropagation();updateTema(cursoActivo.id,tema.id,'titulo',e.target.value);}}
@@ -653,7 +692,20 @@ export default function EditorPaginaProfesor({ usuario, onPreview }) {
                         </div>
                       </div>
                       {isOpen && (
-                        <div style={{ padding:'10px 12px', borderTop:`1px solid ${cursoActivo.color}20` }}>
+                        <div style={{ padding:'10px 12px', borderTop:`1px solid ${(tema.color||cursoActivo.color)}20` }}>
+                          {/* Color del tema */}
+                          <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:8 }}>
+                            <span style={{ fontSize:11, fontWeight:600, color:'#64748B' }}>Color:</span>
+                            {COLORES_CURSO.map(col=>(
+                              <div key={col} onClick={()=>updateTema(cursoActivo.id,tema.id,'color',col)}
+                                style={{ width:18,height:18,borderRadius:'50%',background:col,cursor:'pointer',
+                                  border:(tema.color||cursoActivo.color)===col?'3px solid #0F172A':'2px solid transparent',flexShrink:0}}/>
+                            ))}
+                            {tema.color && tema.color!==cursoActivo.color && (
+                              <button onClick={()=>updateTema(cursoActivo.id,tema.id,'color','')}
+                                style={{ fontSize:11,color:'#94A3B8',background:'none',border:'none',cursor:'pointer',marginLeft:2,padding:0 }}>↩ reset</button>
+                            )}
+                          </div>
                           <textarea style={{...inp,height:52,resize:'none',marginBottom:10}}
                             value={tema.descripcion} onChange={e=>updateTema(cursoActivo.id,tema.id,'descripcion',e.target.value)}
                             placeholder="Descripción o índice del tema…"/>
@@ -665,7 +717,7 @@ export default function EditorPaginaProfesor({ usuario, onPreview }) {
                             ))}
                           </div>
                           <button onClick={()=>addTarea(cursoActivo.id,tema.id)}
-                            style={{ marginTop:8,width:'100%',padding:'8px',borderRadius:8,border:`1px dashed ${cursoActivo.color}`,background:'white',color:cursoActivo.color,cursor:'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit' }}>
+                            style={{ marginTop:8,width:'100%',padding:'8px',borderRadius:8,border:`1px dashed ${tema.color||cursoActivo.color}`,background:'white',color:tema.color||cursoActivo.color,cursor:'pointer',fontSize:13,fontWeight:600,fontFamily:'inherit' }}>
                             + Añadir tarea
                           </button>
                         </div>

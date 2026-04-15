@@ -5,6 +5,7 @@ import { Search, Key, Filter, Zap, Play, Home, ChevronDown, ChevronUp, Mail, Lin
 import GamePlayer from '../GamePlayer';
 import KartingedGame from '../KartingedGame';
 import KartingedMultiGame from '../KartingedMultiGame';
+import RacingGame3D from '../RacingGame3D';
 import ThinkHootGame from '../ThinkHootGame';
 import RuletaGame from '../RuletaGame';
 import MathLive from '../MathLive';
@@ -26,6 +27,7 @@ import Plataformas from '../Plataformas2';
 import EtiquetaMe from '../EtiquetaMe';
 import OmninteractiveApp from '../OmninteractiveApp';
 import VideoQuizzApp from '../VideoQuizzApp';
+import FuncionesEjecutivas from '../FuncionesEjecutivas';
 import imgPasapalabra from '../assets/icono_pasapal.png'; // Revisa si es .png o .jpg
 import imgBurbujas from '../assets/icono_burbujas.png';
 import imgPikatron from '../assets/icono_pikatron.png';
@@ -67,6 +69,13 @@ export const APPS = [
         desc: 'Compite contra otros jugadores en tiempo real.',
         color: '#E65100',
         emoji: '🏎️'
+    },
+    {
+        id: 'RACING3D',
+        name: 'Racing 3D',
+        desc: 'Carreras 3D con preguntas en los checkpoints. 4 vueltas, 3 AI.',
+        color: '#00C6FF',
+        emoji: '🏁'
     },
 
 
@@ -275,6 +284,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
     const [recursoParaElegir, setRecursoParaElegir] = useState(null);
     const [omninteractivo, setOmninteractivo] = useState(false);
     const [videoQuizz,     setVideoQuizz]     = useState(false);
+    const [funcionesEjecutivas, setFuncionesEjecutivas] = useState(false);
 
     // Estados Live Alumno
     const [liveModeAlumno, setLiveModeAlumno] = useState(false);
@@ -428,6 +438,11 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
             return;
         }
 
+        if (appId === 'RACING3D') {
+            setJuegoActivo({ tipoJuego: 'RACING3D' });
+            return;
+        }
+
         const appInfo = APPS.find(a => a.id === appId);
         if (appInfo) {
             window.history.pushState({}, '', `/${appInfo.name.toLowerCase()}`);
@@ -524,6 +539,12 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
         </div>
     );
 
+    if (funcionesEjecutivas) return (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, overflowY: 'auto' }}>
+            <FuncionesEjecutivas onBack={() => setFuncionesEjecutivas(false)} />
+        </div>
+    );
+
     if (omninteractivo) return (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#F8FAFC', overflowY: 'auto' }}>
             <OmninteractiveApp onBack={() => setOmninteractivo(false)} />
@@ -557,6 +578,7 @@ if (juegoActivo.tipoJuego === 'SINTAXIS')  return <SintaxisGame  usuario={null} 
 if (juegoActivo.tipoJuego === 'LISTENING') return <Listening     usuario={null} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'KARTINGED') return <KartingedGame usuario={null} alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'KARTINGED_MULTI') return <KartingedMultiGame alTerminar={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'RACING3D') return <RacingGame3D usuario={null} alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.modoEspecial === 'PIKATRON') return <PikatronRun recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.modoEspecial === 'PLATAFORMAS') return <Plataformas onExit={() => setJuegoActivo(null)} recursoInicial={juegoActivo} />;
         if (juegoActivo.tipoJuego === 'RULETA') return <RuletaGame recurso={juegoActivo} usuario={null} alTerminar={() => setJuegoActivo(null)} />;
@@ -776,6 +798,7 @@ return <GamePlayer recurso={juegoActivo} usuario={null} alTerminar={() => setJue
                     { id: 'QUESTION_SENDER', label: 'Q-Sender',        emoji: '📮',  color: '#2c3e50', action: () => setJuegoActivo({ tipoJuego: 'QUESTION_SENDER' }) },
                     { id: 'OMNINTERACTIVE',  label: 'Omninteractive',  emoji: '📚',  color: '#6D28D9', action: () => setOmninteractivo(true) },
                     { id: 'VIDEOQUIZZ',      label: 'VideoQuizz',      emoji: '🎬',  color: '#DC2626', action: () => setVideoQuizz(true) },
+                    { id: 'FUNCIONES_EJECUTIVAS', label: 'Funciones Ejecutivas', emoji: '🧠', color: '#FF5722', action: () => setFuncionesEjecutivas(true) },
                 ].map(tool => (
                     <div key={tool.id} onClick={tool.action} style={{ background: '#ffffbf', borderRadius: '15px', padding: '15px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transition: 'transform 0.2s', border: `2px solid ${tool.color}20` }}
                         onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-3px)'}

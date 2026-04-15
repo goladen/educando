@@ -16,6 +16,7 @@ export default defineConfig({
         globIgnores: [
           '**/kartinged/**',
           '**/kartingedmulti/**',
+          '**/racing3d/**',
           '**/*.mp3',
           '**/*.mp4',
           '**/*.ogg',
@@ -24,7 +25,7 @@ export default defineConfig({
         navigateFallback: '/index.html',
         // Excluir rutas Unity del navigate fallback — sin esto el SW sirve
         // el index.html de React dentro del iframe de Unity
-        navigateFallbackDenylist: [/^\/api/, /^\/kartinged/, /^\/kartingedmulti/],
+        navigateFallbackDenylist: [/^\/api/, /^\/kartinged/, /^\/kartingedmulti/, /^\/racing3d/],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         skipWaiting: true,
         clientsClaim: true,

@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
 import { addDoc, collection, doc, getDoc } from 'firebase/firestore';
+import { Share2 } from 'lucide-react';
 import JuegoMemoria from './JuegoMemoria';
 
 const FuncionesEjecutivas = ({ onBack }) => {
   const [juegoActivo, setJuegoActivo] = useState(false);
   const [juegoSeleccionado, setJuegoSeleccionado] = useState(null); // 'atencion' o 'memoria'
+  const [shareMessage, setShareMessage] = useState('');
   const [preguntaActual, setPreguntaActual] = useState(0);
   const [aciertos, setAciertos] = useState(0);
   const [tiempo, setTiempo] = useState(0);
@@ -149,7 +151,7 @@ const FuncionesEjecutivas = ({ onBack }) => {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '20px',
+    padding: '16px',
     fontFamily: 'Arial, sans-serif',
     color: '#fff'
   };
@@ -158,11 +160,12 @@ const FuncionesEjecutivas = ({ onBack }) => {
     background: 'rgba(255, 255, 255, 0.1)',
     backdropFilter: 'blur(10px)',
     borderRadius: '20px',
-    padding: '30px',
+    padding: '24px',
     boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-    maxWidth: '800px',
+    maxWidth: '100%',
     width: '100%',
-    textAlign: 'center'
+    textAlign: 'center',
+    boxSizing: 'border-box'
   };
 
   const buttonStyle = {
@@ -181,14 +184,32 @@ const FuncionesEjecutivas = ({ onBack }) => {
 
   const backButtonStyle = {
     position: 'absolute',
-    top: '20px',
-    left: '20px',
+    top: '16px',
+    left: '16px',
     background: 'rgba(255, 255, 255, 0.2)',
     border: 'none',
     borderRadius: '50%',
-    width: '50px',
-    height: '50px',
-    fontSize: '20px',
+    width: '44px',
+    height: '44px',
+    fontSize: '18px',
+    color: '#fff',
+    cursor: 'pointer',
+    boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
+    transition: 'transform 0.3s'
+  };
+
+  const shareButtonStyle = {
+    position: 'absolute',
+    top: '16px',
+    right: '16px',
+    background: 'rgba(255, 255, 255, 0.2)',
+    border: 'none',
+    borderRadius: '50%',
+    width: '44px',
+    height: '44px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     color: '#fff',
     cursor: 'pointer',
     boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
@@ -215,8 +236,8 @@ const FuncionesEjecutivas = ({ onBack }) => {
 
   const renderFigura = (forma, color) => {
     const estilo = {
-      width: '100px',
-      height: '100px',
+      width: '90px',
+      height: '90px',
       backgroundColor: coloresHex[color],
       display: 'flex',
       justifyContent: 'center',
@@ -224,7 +245,7 @@ const FuncionesEjecutivas = ({ onBack }) => {
       cursor: 'pointer',
       borderRadius: forma === 'círculo' ? '50%' : forma === 'triángulo' ? '0' : '15px',
       clipPath: forma === 'triángulo' ? 'polygon(50% 0%, 0% 100%, 100% 100%)' : forma === 'hexágono' ? 'polygon(50% 0%, 93.3% 25%, 93.3% 75%, 50% 100%, 6.7% 75%, 6.7% 25%)' : 'none',
-      margin: '15px',
+      margin: '12px',
       boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
       transition: 'transform 0.3s, box-shadow 0.3s',
       border: '3px solid #fff'
@@ -243,6 +264,26 @@ const FuncionesEjecutivas = ({ onBack }) => {
         }}
       ></div>
     );
+  };
+
+  const compartirApp = async () => {
+    const url = `${window.location.origin}/funcionesejecutivas`;
+    const title = 'PiKT - Funciones Ejecutivas';
+    const text = 'Abre el juego de Funciones Ejecutivas en PiKT';
+
+    try {
+      if (navigator.share) {
+        await navigator.share({ title, text, url });
+        setShareMessage('Compartido con éxito');
+      } else {
+        await navigator.clipboard.writeText(url);
+        setShareMessage('Enlace copiado al portapapeles');
+      }
+    } catch (error) {
+      setShareMessage('No se pudo compartir, copia el enlace manualmente');
+    }
+
+    setTimeout(() => setShareMessage(''), 2500);
   };
 
   const abrirModalEnvio = () => {
@@ -373,7 +414,11 @@ const FuncionesEjecutivas = ({ onBack }) => {
       <div style={containerStyle}>
         <div style={cardStyle}>
           <button style={backButtonStyle} onClick={onBack} onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'} onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}>←</button>
-          <h1 style={{ fontSize: '48px', marginBottom: '30px', textShadow: '2px 2px 4px rgba(0,0,0,0.5)' }}>Funciones Ejecutivas</h1>
+          <button style={shareButtonStyle} onClick={compartirApp} onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'} onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'} title="Compartir">
+            <Share2 size={20} />
+          </button>
+          <h1 style={{ fontSize: '48px', marginBottom: '10px', textShadow: '2px 2px 4px rgba(0,0,0,0.5)' }}>Funciones Ejecutivas</h1>
+          {shareMessage && <div style={{ margin: '0 auto 16px', background: 'rgba(255,255,255,0.18)', padding: '10px 14px', borderRadius: '14px', color: '#fff', maxWidth: '320px' }}>{shareMessage}</div>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', maxWidth: '500px', margin: '0 auto' }}>
             <button 
               style={{ ...buttonStyle, background: 'linear-gradient(45deg, #FF6B6B, #4ECDC4)', fontSize: '20px', padding: '20px' }} 
@@ -412,7 +457,7 @@ const FuncionesEjecutivas = ({ onBack }) => {
           <p style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '20px', background: 'rgba(255, 255, 255, 0.2)', padding: '15px', borderRadius: '15px' }}>{enunciado}</p>
           <div style={{ fontSize: '36px', fontWeight: 'bold', color: coloresHex[colorTexto], marginBottom: '30px', textShadow: '2px 2px 4px rgba(0,0,0,0.5)' }}>{palabra}</div>
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start', gap: '20px', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: '15px', maxWidth: 'calc(100% - 200px)' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: '15px', maxWidth: '100%' }}>
               {opciones.map((opcion, index) => (
                 <div key={index}>
                   {renderFigura(opcion.forma, opcion.color)}

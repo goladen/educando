@@ -7,6 +7,7 @@ import StudentDashboard2 from './StudentDashboard2';
 import Login from './Login';
 import GamePlayer from './GamePlayer';
 import PaginaProfesor from './components/PaginaProfesor';
+import FuncionesEjecutivas from './FuncionesEjecutivas';
 
 function App() {
     const [usuario, setUsuario] = useState(null);
@@ -16,6 +17,7 @@ function App() {
     // ESTADO PARA EL TOKEN DE DRIVE
     const [googleToken, setGoogleToken] = useState(null);
     const [deepLinkGame, setDeepLinkGame] = useState(null);
+    const [rutaPublica, setRutaPublica] = useState(null);
 
     // ESTADOS PARA UBICACIÓN
     const [pais, setPais] = useState("");
@@ -29,7 +31,11 @@ function App() {
       const params = new URLSearchParams(window.location.search);
       const uid = params.get('p');
       if (uid) { setPaginaTarget({ uid }); return; }
-      const slug = window.location.pathname.replace('/','').trim().toLowerCase();
+      const slug = window.location.pathname.replace(/^\//, '').replace(/\/$/, '').trim().toLowerCase();
+      if (slug === 'funcionesejecutivas') {
+        setRutaPublica(slug);
+        return;
+      }
       const RUTAS_RESERVADAS = new Set([
         'populares','inicio',
         'pasapalabra','cazaburbujas','burbujas',
@@ -131,6 +137,9 @@ function App() {
         signOut(auth);
         setPais(""); setRegion(""); setPoblacion("");
     };
+
+    // RUTA PÚBLICA ESPECIAL: /funcionesejecutivas
+    if (rutaPublica === 'funcionesejecutivas') return <FuncionesEjecutivas onBack={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
 
     // PÁGINA PÚBLICA DEL PROFESOR (no requiere login)
     if (paginaTarget) return <PaginaProfesor uid={paginaTarget.uid} onBack={() => { setPaginaTarget(null); window.history.back(); }} />;

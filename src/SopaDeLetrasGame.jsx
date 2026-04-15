@@ -1,7 +1,8 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
 import { db } from './firebase';
 import { collection, addDoc, query, where, orderBy, limit, getDocs, doc, getDoc } from 'firebase/firestore';
-import { X, Settings, Trophy, Search, BookOpen, Globe, ArrowLeft } from 'lucide-react';
+import { X, Settings, Trophy, Search, BookOpen, Globe, ArrowLeft, Share2, Check } from 'lucide-react';
+
 import Confetti from 'react-confetti';
 import SopaDeLetras from './SopaDeLetras'; // <--- Importamos el motor de la sopa que ya creamos
 
@@ -13,6 +14,8 @@ const LANGUAGES = {
     FR: { label: 'Français', url: 'https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/fr/fr_50k.txt' }
 
 };
+
+const PALABRAS_PREVIEW = ['SUMA', 'RESTA', 'MULTIPLICACION', 'DIVISION'];
 
 function ModalEnviarProfe({ datos, onClose }) {
     const [codigo, setCodigo]   = useState('');
@@ -80,6 +83,82 @@ function ModalEnviarProfe({ datos, onClose }) {
     );
 }
 
+// ─── Modal de opciones para compartir ────────────────────────────────────────
+function ShareModal({ url, titulo, onClose }) {
+    const [copiado, setCopiado] = useState(false);
+
+    const copiar = () => {
+        navigator.clipboard.writeText(url).catch(() => {});
+        setCopiado(true);
+        setTimeout(() => setCopiado(false), 2000);
+    };
+
+    const texto = encodeURIComponent(`🔤 Juega a esta Sopa de Letras: ${titulo}\n${url}`);
+
+    const opciones = [
+        {
+            label: 'Copiar enlace',
+            icon: copiado ? '✅' : '🔗',
+            color: '#2c3e50',
+            bg: copiado ? '#e8f5e9' : '#f4f6f8',
+            action: copiar,
+        },
+        {
+            label: 'WhatsApp',
+            icon: '💬',
+            color: '#25D366',
+            bg: '#e8f8ee',
+            action: () => window.open(`https://wa.me/?text=${texto}`, '_blank'),
+        },
+        {
+            label: 'Telegram',
+            icon: '✈️',
+            color: '#0088cc',
+            bg: '#e8f4fb',
+            action: () => window.open(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(`🔤 ${titulo}`)}`, '_blank'),
+        },
+        {
+            label: 'Correo',
+            icon: '📧',
+            color: '#e74c3c',
+            bg: '#fdecea',
+            action: () => window.open(`mailto:?subject=${encodeURIComponent(`Sopa de letras: ${titulo}`)}&body=${texto}`, '_blank'),
+        },
+        {
+            label: 'Google Classroom',
+            icon: '🎓',
+            color: '#1565C0',
+            bg: '#e3f2fd',
+            action: () => window.open(`https://classroom.google.com/share?url=${encodeURIComponent(url)}`, '_blank'),
+        },
+    ];
+
+    return (
+        <div style={{ position:'fixed', inset:0, zIndex:4000, background:'rgba(0,0,0,0.55)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }} onClick={onClose}>
+            <div style={{ background:'white', borderRadius:20, width:'100%', maxWidth:360, padding:24, boxShadow:'0 20px 50px rgba(0,0,0,0.3)' }} onClick={e => e.stopPropagation()}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+                    <h3 style={{ margin:0, color:'#2c3e50', fontSize:'1.05rem' }}>🔤 Compartir sopa</h3>
+                    <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', color:'#95a5a6', padding:4 }}>✕</button>
+                </div>
+                {/* URL preview */}
+                <div style={{ background:'#f4f6f8', borderRadius:10, padding:'8px 12px', fontSize:'0.75rem', color:'#7f8c8d', wordBreak:'break-all', marginBottom:16 }}>
+                    {url}
+                </div>
+                {/* Opciones */}
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                    {opciones.map(op => (
+                        <button key={op.label} onClick={op.action}
+                            style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:12, border:`1.5px solid ${op.color}22`, background:op.bg, cursor:'pointer', textAlign:'left', fontSize:'0.93rem', fontWeight:600, color:op.color }}>
+                            <span style={{ fontSize:'1.2rem', width:24, textAlign:'center' }}>{op.icon}</span>
+                            {op.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function SopaDeLetrasGame({ usuario, onExit, recurso, modoOlimpico = false, tiempoOlimpico = null, hojaOlimpica = 'General', onOlimpicoFinish = null }) { // --- ESTADOS DE PANTALLA ---
 
 
@@ -114,6 +193,9 @@ export default function SopaDeLetrasGame({ usuario, onExit, recurso, modoOlimpic
     const [playerName, setPlayerName] = useState(usuario?.displayName || '');
     const [mostrarEnvio, setMostrarEnvio] = useState(false);
     const [ranking, setRanking] = useState([]);
+    const [shareModal, setShareModal] = useState(null); // { url, titulo } o null
+    const [showModal, setShowModal] = useState(false); // Para el modal simple
+    const [isSimpleMode, setIsSimpleMode] = useState(false);
 
 
 
@@ -185,6 +267,18 @@ export default function SopaDeLetrasGame({ usuario, onExit, recurso, modoOlimpic
         }
     }, [recurso, modoOlimpico]);
 
+    // Carga automática cuando se llega con ?sopa=RESOURCE_ID
+    useEffect(() => {
+        if (recurso || modoOlimpico) return; // Ya tiene recurso por prop
+        const params = new URLSearchParams(window.location.search);
+        const sopaId = params.get('sopa');
+        if (!sopaId) return;
+        getDoc(doc(db, 'resources', sopaId)).then(snap => {
+            if (snap.exists()) procesarRecurso({ id: snap.id, ...snap.data() });
+        }).catch(console.error);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     // =========================================================
     // 1. LÓGICA DE DICCIONARIOS Y PREPARACIÓN
     // =========================================================
@@ -252,7 +346,7 @@ export default function SopaDeLetrasGame({ usuario, onExit, recurso, modoOlimpic
                 snap = await getDocs(q);
             }
             if (snap.empty) throw new Error("Código no encontrado");
-            const data = snap.docs[0].data();
+            const data = { id: snap.docs[0].id, ...snap.docs[0].data() };
             if (data.tipoJuego !== 'SOPA') throw new Error("Este código no es de una Sopa de Letras");
             
             procesarRecurso(data);
@@ -260,6 +354,11 @@ export default function SopaDeLetrasGame({ usuario, onExit, recurso, modoOlimpic
             alert(e.message);
             setScreen('CONFIG');
         }
+    };
+
+    const compartirRecurso = (id, titulo) => {
+        const url = `${window.location.origin}${window.location.pathname}?sopa=${id}`;
+        setShareModal({ url, titulo: titulo || 'Sopa de Letras' });
     };
 
     const buscarRecursosPublicos = async () => {
@@ -298,6 +397,11 @@ export default function SopaDeLetrasGame({ usuario, onExit, recurso, modoOlimpic
 
     const procesarRecurso = (data) => {
         setRecursoActual(data);
+        setIsCustomGame(!!data.id); // Cualquier recurso con ID guarda en ranking por recurso
+        // Actualizar URL para que sea compartible
+        if (data.id) {
+            window.history.replaceState({}, '', `?sopa=${data.id}`);
+        }
         // Si hay más de 1 hoja, mostramos el selector. Si no, jugamos directamente 'General'
         if (data.hojas && data.hojas.length > 1) {
             setRecursoPendiente(data);
@@ -512,14 +616,25 @@ export default function SopaDeLetrasGame({ usuario, onExit, recurso, modoOlimpic
                 
                 <div style={styles.scrollX}>
                     {biblioteca.map(r => (
-                        <div key={r.id} onClick={() => procesarRecurso(r)} style={styles.miniCard}>
+                        <div key={r.id} style={{ ...styles.miniCard, position:'relative' }}>
                             <h4 style={{ margin: '0 0 5px 0', color: '#2e7d32', fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.titulo}</h4>
                             <div style={{ fontSize: '11px', color: '#555' }}>🏫 {r.ciclo}</div>
-                            <button style={styles.miniPlayBtn}>JUGAR</button>
+                            <div style={{ display:'flex', gap:6, marginTop:6 }}>
+                                <button onClick={() => procesarRecurso(r)} style={{ ...styles.miniPlayBtn, flex:1 }}>JUGAR</button>
+                                <button
+                                    onClick={e => { e.stopPropagation(); compartirRecurso(r.id, r.titulo); }}
+                                    title="Compartir"
+                                    style={{ padding:'5px 8px', borderRadius:6, border:'1px solid #81c784', background:'white', cursor:'pointer', display:'flex', alignItems:'center', color:'#2e7d32' }}
+                                >
+                                    <Share2 size={13}/>
+                                </button>
+                            </div>
                         </div>
                     ))}
                 </div>
             </div>
+            {shareModal && <ShareModal url={shareModal.url} titulo={shareModal.titulo} onClose={() => setShareModal(null)} />}
+            {showModal && <ModalSopaSimple palabras={PALABRAS_PREVIEW} onClose={() => setShowModal(false)} onApply={() => { setIsSimpleMode(true); setShowModal(false); }} />}
         </div>
     );
 
@@ -541,9 +656,22 @@ export default function SopaDeLetrasGame({ usuario, onExit, recurso, modoOlimpic
                 <h2 style={{ color: 'white', margin: 0, fontSize: '1.2rem' }}>{modoOlimpico ? 'Torneo Olímpico' : isCustomGame ? 'Desafío PRO' : 'Modo Libre'}</h2>
 
                 {!modoOlimpico && (
-                    <div style={{ cursor: 'pointer' }} onClick={() => setScreen('CONFIG')}><X color="white" /></div>
+                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                        {isCustomGame && recursoActual?.id && (
+                            <button
+                                onClick={() => compartirRecurso(recursoActual.id, recursoActual.titulo)}
+                                title="Compartir"
+                                style={{ background:'rgba(255,255,255,0.15)', border:'none', borderRadius:8, padding:'5px 8px', cursor:'pointer', display:'flex', alignItems:'center', color:'white' }}
+                            >
+                                <Share2 size={16}/>
+                            </button>
+                        )}
+                        <div style={{ cursor:'pointer' }} onClick={() => setScreen('CONFIG')}><X color="white" /></div>
+                    </div>
                 )}
             </div>
+
+            {shareModal && <ShareModal url={shareModal.url} titulo={shareModal.titulo} onClose={() => setShareModal(null)} />}
 
             {/* AQUI INYECTAMOS EL MOTOR DE LA SOPA */}
             <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', width: '100%' }}>
@@ -552,6 +680,7 @@ export default function SopaDeLetrasGame({ usuario, onExit, recurso, modoOlimpic
                     mostrarLista={true}
                     onTerminar={handleVictoria}
                     onPalabraEncontrada={() => setPuntos(p => p + 1)} // <--- CLAVE PARA EL MODO OLÍMPICO
+                    isSimpleMode={isSimpleMode}
                 />
             </div>
         </div>
@@ -593,6 +722,14 @@ export default function SopaDeLetrasGame({ usuario, onExit, recurso, modoOlimpic
                     </div>
 
                     <button style={{ ...styles.btn, background: 'transparent', color: 'white', border: '2px solid white', marginTop: '15px' }} onClick={cargarRanking}>Ver Ranking</button>
+                    {isCustomGame && recursoActual?.id && (
+                        <button
+                            style={{ ...styles.btn, background:'white', color:'#2c3e50', border:'2px solid #27ae60', marginTop:'15px', display:'flex', alignItems:'center', gap:6, justifyContent:'center' }}
+                            onClick={() => compartirRecurso(recursoActual.id, recursoActual.titulo)}
+                        >
+                            <Share2 size={15}/> Compartir sopa
+                        </button>
+                    )}
                     <button style={{ ...styles.btn, background: 'linear-gradient(135deg,#27ae60,#2ecc71)', color: 'white', marginTop: '15px' }} onClick={() => setMostrarEnvio(true)}>📤 Enviar al profesor</button>
                     <button style={{ ...styles.btn, ...styles.btnPrimary, background: 'white', color: '#27ae60', marginTop: '15px' }} onClick={() => setScreen('CONFIG')}>Jugar otra vez</button>
                 </>
@@ -602,6 +739,7 @@ export default function SopaDeLetrasGame({ usuario, onExit, recurso, modoOlimpic
                 </div>
                 )}
             {mostrarEnvio && <ModalEnviarProfe datos={{ recursoId: recurso?.id, recursoTitulo: recurso?.titulo, palabras: screen === 'VICTORY' ? palabrasJuego.length : puntos }} onClose={() => setMostrarEnvio(false)} />}
+            {shareModal && <ShareModal url={shareModal.url} titulo={shareModal.titulo} onClose={() => setShareModal(null)} />}
         </div>
     );
 
@@ -634,11 +772,117 @@ export default function SopaDeLetrasGame({ usuario, onExit, recurso, modoOlimpic
                 )}
             </div>
 
-            <button style={{ ...styles.btn, ...styles.btnPrimary, marginTop: '30px' }} onClick={() => setScreen('CONFIG')}>Volver al Menú</button>
+            <div style={{ display:'flex', gap:10, marginTop:'30px', flexWrap:'wrap', justifyContent:'center' }}>
+                {isCustomGame && recursoActual?.id && (
+                    <button
+                        style={{ ...styles.btn, background:'white', color:'#2c3e50', border:'2px solid #f1c40f', display:'flex', alignItems:'center', gap:6 }}
+                        onClick={() => compartirRecurso(recursoActual.id, recursoActual.titulo)}
+                    >
+                        <Share2 size={15}/> Compartir sopa
+                    </button>
+                )}
+                <button style={{ ...styles.btn, ...styles.btnPrimary }} onClick={() => setScreen('CONFIG')}>Volver al Menú</button>
+            </div>
+            {shareModal && <ShareModal url={shareModal.url} titulo={shareModal.titulo} onClose={() => setShareModal(null)} />}
         </div>
     );
 
     return null;
+}
+
+// ─── MODAL SOPA SIMPLE ────────────────────────────────────────────────────────
+function ModalSopaSimple({ palabras, onClose, onApply }) {
+    const [grid, setGrid] = useState([]);
+    const [primerasLetras, setPrimerasLetras] = useState([]);
+    const [pistasActivadas, setPistasActivadas] = useState(false);
+
+    useEffect(() => {
+        const DIRECCIONES = [[1,0], [-1,0], [0,1], [0,-1]]; // Solo horizontal y vertical
+        const size = 9;
+        const palabrasMapeadas = palabras.map(p => ({ original: p, limpia: p.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase() }));
+        let tablero = Array(size).fill(null).map(() => Array(size).fill(''));
+        let nuevasPrimeras = [];
+
+        const intentarColocar = (item) => {
+            let colocada = false;
+            let intentos = 0;
+            while (!colocada && intentos < 100) {
+                intentos++;
+                const dir = DIRECCIONES[Math.floor(Math.random() * DIRECCIONES.length)];
+                const filaInicio = Math.floor(Math.random() * size);
+                const colInicio = Math.floor(Math.random() * size);
+                let cabe = true;
+                for (let i = 0; i < item.limpia.length; i++) {
+                    const f = filaInicio + (dir[0] * i);
+                    const c = colInicio + (dir[1] * i);
+                    if (f < 0 || f >= size || c < 0 || c >= size || (tablero[f][c] !== '' && tablero[f][c] !== item.limpia[i])) {
+                        cabe = false;
+                        break;
+                    }
+                }
+                if (cabe) {
+                    nuevasPrimeras.push({ f: filaInicio, c: colInicio });
+                    for (let i = 0; i < item.limpia.length; i++) {
+                        const f = filaInicio + (dir[0] * i);
+                        const c = colInicio + (dir[1] * i);
+                        tablero[f][c] = item.limpia[i];
+                    }
+                    colocada = true;
+                }
+            }
+        };
+
+        palabrasMapeadas.forEach(intentarColocar);
+
+        // Rellenar huecos
+        const letras = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        for (let f = 0; f < size; f++) {
+            for (let c = 0; c < size; c++) {
+                if (tablero[f][c] === '') tablero[f][c] = letras[Math.floor(Math.random() * letras.length)];
+            }
+        }
+
+        setGrid(tablero);
+        setPrimerasLetras(nuevasPrimeras);
+    }, [palabras]);
+
+    return (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.75)', zIndex: 10000, display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={onClose}>
+            <div style={{ background: '#2c3e50', borderRadius: '20px', padding: '20px', maxWidth: '600px', width: '90%', maxHeight: '80vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                    <h2 style={{ color: '#f1c40f', margin: 0 }}>🔍 Sopa Simple (9x9)</h2>
+                    <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'white', fontSize: '1.5rem', cursor: 'pointer' }}>✕</button>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
+                    <button onClick={() => setPistasActivadas(true)} disabled={pistasActivadas} style={{ padding: '10px 20px', background: pistasActivadas ? '#7f8c8d' : '#e74c3c', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: pistasActivadas ? 'not-allowed' : 'pointer', marginRight: '10px' }}>
+                        {pistasActivadas ? 'Pistas Activadas' : 'Pista'}
+                    </button>
+                    <button onClick={onApply} style={{ padding: '10px 20px', background: '#3498db', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>
+                        Aplicar Modo Simple
+                    </button>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: `repeat(9, 1fr)`, gap: '3px', background: '#bdc3c7', padding: '5px', borderRadius: '8px', justifyContent: 'center' }}>
+                    {grid.map((fila, f) =>
+                        fila.map((letra, c) => {
+                            const esPrimera = primerasLetras.some(p => p.f === f && p.c === c);
+                            return (
+                                <div key={`${f}-${c}`} style={{
+                                    display: 'flex', justifyContent: 'center', alignItems: 'center',
+                                    fontWeight: 'bold', fontSize: '1.5rem',
+                                    borderRadius: '4px', cursor: 'pointer',
+                                    background: pistasActivadas && esPrimera ? '#f1c40f' : 'white',
+                                    color: pistasActivadas && esPrimera ? '#2c3e50' : '#2c3e50',
+                                    width: '40px', height: '40px'
+                                }}>
+                                    {letra}
+                                </div>
+                            );
+                        })
+                    )}
+                </div>
+            </div>
+        </div>
+    );
 }
 
 const styles = {

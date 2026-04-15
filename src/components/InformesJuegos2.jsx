@@ -7,8 +7,27 @@ import {
 import {
     BarChart2, Users, Calendar, TrendingUp, RefreshCw,
     ChevronDown, ChevronUp, Filter, Save, Edit2, CheckCircle,
-    Trash2, AlertTriangle, X, Clock
+    Trash2, AlertTriangle, X, Clock,
+    Flame, Sword, Shield, Skull, Heart, Star, CloudRain, Sun, Zap, Ghost,
+    Key, Map, Compass, Anchor, Bell, Book, Camera, Car, Castle, Crown,
+    Droplet, Eye, Feather, Flag, Gift, Hammer, Home, Leaf, Moon, Music,
+    Rocket, Scissors, Smile, Frown, Snowflake, Tent, Trees, Trophy, Umbrella,
+    Wand, Watch, Wind, Wrench, Bug, Cat, Dog, Bird, Fish, Coffee, Mountain,
+    Bike, Train, Plane
 } from 'lucide-react';
+
+const STORY_ICONS = {
+    Flame, Sword, Shield, Skull, Heart, Star, CloudRain, Sun, Zap, Ghost,
+    Key, Map, Compass, Anchor, Bell, Book, Camera, Car, Castle, Crown,
+    Droplet, Eye, Feather, Flag, Gift, Hammer, Home, Leaf, Moon, Music,
+    Rocket, Scissors, Smile, Frown, Snowflake, Tent, Trees, Trophy, Umbrella,
+    Wand, Watch, Wind, Wrench, Bug, Cat, Dog, Bird, Fish, Coffee, Mountain,
+    Bike, Train, Plane,
+};
+const DiceIcon = ({ name }) => {
+    const Icon = STORY_ICONS[name];
+    return Icon ? <Icon size={26} strokeWidth={1.5} /> : <span style={{ fontSize:'0.75rem' }}>{name}</span>;
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const pctColor = (p) => p >= 80 ? '#27ae60' : p >= 50 ? '#e67e22' : '#e74c3c';
@@ -19,8 +38,8 @@ const fmtFecha = (f) => {
     return d.toLocaleDateString('es-ES', { day:'2-digit', month:'2-digit', year:'numeric' })
          + ' ' + d.toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' });
 };
-const TIPO_LABEL  = { OCA:'🦆 Oca Matemática', CAZABURBUJAS:'🔵 Cazaburbujas', PIKATRON:'⚡ Pikatron', SOPA:'🔤 Sopa de Letras', WORDLE:'🟩 Wordle', PASAPALABRA:'🔠 Pasapalabra', FUNCIONES:'∫ Funciones', APAREJADOS:'🃏 Aparejados' };
-const TIPO_ICON   = { OCA:'🦆', CAZABURBUJAS:'🔵', PIKATRON:'⚡', SOPA:'🔤', WORDLE:'🟩', PASAPALABRA:'🔠', FUNCIONES:'∫', APAREJADOS:'🃏' };
+const TIPO_LABEL  = { OCA:'🦆 Oca Matemática', CAZABURBUJAS:'🔵 Cazaburbujas', PIKATRON:'⚡ Pikatron', SOPA:'🔤 Sopa de Letras', WORDLE:'🟩 Wordle', PASAPALABRA:'🔠 Pasapalabra', FUNCIONES:'∫ Funciones', APAREJADOS:'🃏 Aparejados', STORYCUBES:'🎲 Story Cubes' };
+const TIPO_ICON   = { OCA:'🦆', CAZABURBUJAS:'🔵', PIKATRON:'⚡', SOPA:'🔤', WORDLE:'🟩', PASAPALABRA:'🔠', FUNCIONES:'∫', APAREJADOS:'🃏', STORYCUBES:'🎲' };
 const tipoLabel   = (t) => TIPO_LABEL[t] || ('🎮 ' + (t||'Juego'));
 const tipoIcon    = (t) => TIPO_ICON[t]  || '🎮';
 
@@ -366,17 +385,30 @@ export default function InformesJuegos({ usuario }) {
                         <EmptyCard msg={codigoProf ? 'Aún no hay informes con este código.' : 'Configura tu código de profesor para recibir informes.'} />
                     ) : (
                         <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:28 }}>
-                            {informesFilt.map(inf => (
-                                <InformeCard
-                                    key={inf.id} inf={inf}
-                                    expandido={expandido===inf.id}
-                                    onToggle={()=>setExpandido(expandido===inf.id?null:inf.id)}
-                                    onBorrar={()=>borrar(inf.id)}
-                                    borrando={borrando===inf.id}
-                                    borradoOk={borrandoOk===inf.id}
-                                    canDelete={true}
-                                />
-                            ))}
+                            {informesFilt.map(inf => {
+                                const tipo = inf._tipoJuego || inf.tipo || '';
+                                if (tipo === 'STORYCUBES') return (
+                                    <StoryCubesCard
+                                        key={inf.id} inf={inf}
+                                        expandido={expandido===inf.id}
+                                        onToggle={()=>setExpandido(expandido===inf.id?null:inf.id)}
+                                        onBorrar={()=>borrar(inf.id)}
+                                        borrando={borrando===inf.id}
+                                        borradoOk={borrandoOk===inf.id}
+                                    />
+                                );
+                                return (
+                                    <InformeCard
+                                        key={inf.id} inf={inf}
+                                        expandido={expandido===inf.id}
+                                        onToggle={()=>setExpandido(expandido===inf.id?null:inf.id)}
+                                        onBorrar={()=>borrar(inf.id)}
+                                        borrando={borrando===inf.id}
+                                        borradoOk={borrandoOk===inf.id}
+                                        canDelete={true}
+                                    />
+                                );
+                            })}
                         </div>
                     )}
 
@@ -511,6 +543,94 @@ const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, 
                             </tr>
                         </tfoot>
                     </table>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// ─── Tarjeta especial para Story Cubes ───────────────────────────────────────
+const StoryCubesCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk }) => {
+    const [confirmar, setConfirmar] = useState(false);
+    const historia = inf.historia || [];
+    const autores  = [...new Set(historia.map(s => s.autor))];
+
+    return (
+        <div style={{ background:'white', borderRadius:13, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', overflow:'hidden', border:'1.5px solid #e8d5f5' }}>
+
+            {/* Cabecera */}
+            <div onClick={onToggle} style={{ padding:'11px 15px', cursor:'pointer', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+                <span style={{ fontSize:'1.4rem' }}>🎲</span>
+                <div style={{ flex:1, minWidth:100 }}>
+                    <div style={{ fontWeight:700, color:'#2c3e50', fontSize:'0.92rem' }}>
+                        Story Cubes
+                        <span style={{ marginLeft:8, fontWeight:400, color:'#7f8c8d', fontSize:'0.8rem' }}>Colaborativo Online</span>
+                    </div>
+                    <div style={{ fontSize:'0.74rem', color:'#95a5a6', marginTop:1, display:'flex', alignItems:'center', gap:4 }}>
+                        <Clock size={10}/>{fmtFecha(inf.fecha)}
+                        {inf.nombreEnviador && <span style={{ marginLeft:6 }}>· Enviado por <strong>{inf.nombreEnviador}</strong>{inf.cursoEnviador ? ` (${inf.cursoEnviador})` : ''}</span>}
+                    </div>
+                </div>
+                {/* Autores */}
+                <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
+                    {autores.slice(0,3).map((a,i) => (
+                        <span key={i} style={{ padding:'2px 7px', borderRadius:20, background:'#f3e8fd', fontSize:'0.72rem', color:'#8e44ad' }}>{a}</span>
+                    ))}
+                    {autores.length > 3 && <span style={{ padding:'2px 7px', borderRadius:20, background:'#f3e8fd', fontSize:'0.72rem', color:'#8e44ad' }}>+{autores.length-3}</span>}
+                </div>
+                <span style={{ padding:'3px 9px', borderRadius:20, background:'#f3e8fd', color:'#8e44ad', fontWeight:700, fontSize:'0.8rem', flexShrink:0 }}>
+                    {historia.length} fragmentos
+                </span>
+                <button
+                    onClick={e=>{ e.stopPropagation(); setConfirmar(true); }}
+                    style={{ padding:'4px 7px', borderRadius:7, border:'1px solid #fdd', background:'#fdecea', color:'#e74c3c', cursor:'pointer', flexShrink:0 }}
+                    title="Eliminar informe"
+                ><Trash2 size={13}/></button>
+                {expandido ? <ChevronUp size={16} color="#aaa"/> : <ChevronDown size={16} color="#aaa"/>}
+            </div>
+
+            {/* Confirmación borrado */}
+            {confirmar && (
+                <div style={{ background:'#fdecea', borderTop:'1px solid #fdd', padding:'10px 15px', display:'flex', alignItems:'center', gap:10, fontSize:'0.83rem' }}>
+                    <AlertTriangle size={14} color="#e74c3c"/>
+                    <span style={{ flex:1, color:'#c0392b' }}>¿Eliminar este informe? Esta acción no se puede deshacer.</span>
+                    <button onClick={()=>{ setConfirmar(false); onBorrar(); }} disabled={borrando} style={{ padding:'4px 12px', borderRadius:7, border:'none', background:'#e74c3c', color:'white', cursor:'pointer', fontWeight:700, fontSize:'0.8rem' }}>
+                        {borrando?'Borrando…':'Eliminar'}
+                    </button>
+                    <button onClick={()=>setConfirmar(false)} style={{ padding:'4px 10px', borderRadius:7, border:'1px solid #ddd', background:'white', cursor:'pointer', fontSize:'0.8rem' }}>Cancelar</button>
+                </div>
+            )}
+            {borradoOk && <div style={{ background:'#e8f5e9', padding:'8px 15px', fontSize:'0.8rem', color:'#27ae60', display:'flex', alignItems:'center', gap:6 }}><CheckCircle size={13}/>Eliminado</div>}
+
+            {/* Historia expandida */}
+            {expandido && (
+                <div style={{ borderTop:'2px solid #f3e8fd', padding:'16px 18px', background:'#fdfaff' }}>
+                    <div style={{ fontWeight:700, color:'#8e44ad', fontSize:'0.8rem', textTransform:'uppercase', letterSpacing:1, marginBottom:14 }}>
+                        📖 Historia completa
+                    </div>
+                    {historia.map((seg, idx) => (
+                        <div key={idx} style={{ marginBottom:16, background:'white', borderRadius:10, padding:'12px 14px', borderLeft:'4px solid #8e44ad', boxShadow:'0 1px 4px rgba(0,0,0,0.05)' }}>
+                            {/* Autor */}
+                            <div style={{ fontSize:'0.78rem', color:'#8e44ad', fontWeight:700, textTransform:'uppercase', letterSpacing:0.6, marginBottom:8 }}>
+                                ✍️ {seg.autor}
+                            </div>
+                            {/* Dados */}
+                            {seg.dados?.length > 0 && (
+                                <div style={{ display:'flex', gap:8, marginBottom:8 }}>
+                                    {seg.dados.map((d, i) => (
+                                        <div key={i} style={{ width:52, height:52, background:'white', border:'2px solid #d6aef5', borderRadius:10, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:2, color:'#6c3483', boxShadow:'0 2px 6px rgba(142,68,173,0.12)' }}>
+                                            <DiceIcon name={d} />
+                                            <span style={{ fontSize:'0.55rem', color:'#a569bd', textTransform:'uppercase', letterSpacing:0.3 }}>{d}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            {/* Texto */}
+                            <div style={{ fontSize:'0.95rem', color:'#2c3e50', lineHeight:1.7, whiteSpace:'pre-wrap', fontStyle: seg.texto==='(sin texto)' ? 'italic' : 'normal', color: seg.texto==='(sin texto)' ? '#bdc3c7' : '#2c3e50' }}>
+                                {seg.texto || '(sin texto)'}
+                            </div>
+                        </div>
+                    ))}
                 </div>
             )}
         </div>

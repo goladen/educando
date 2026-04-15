@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, RefreshCw, CheckCircle, Activity, Edit3, List, Send, Search, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, RefreshCw, CheckCircle, Activity, Edit3, List, Send, Search, AlertTriangle, Share2 } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { db } from './firebase';
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from 'firebase/auth';
@@ -870,6 +870,19 @@ function AnalisisFuncion({ modoEscritura, tipoSeleccionado, idInicial, onVolver 
 
 // ─── PANTALLA PRINCIPAL ───────────────────────────────────────────────────────
 export default function Funciones({ onExit }) {
+    const handleCompartir = async () => {
+        const url = `${window.location.origin}/funciones`;
+        if (navigator.share) {
+            try {
+                await navigator.share({ title: 'PiKT - Funciones', text: 'Juega Funciones en PiKT', url });
+            } catch (e) { console.log('Share cancelled'); }
+        } else {
+            try {
+                await navigator.clipboard.writeText(url);
+                alert('Enlace copiado al portapapeles');
+            } catch (e) { console.error(e); }
+        }
+    };
     const [seccion,   setSeccion]   = useState(null);
     const [modoEsc,   setModoEsc]   = useState(false);
     const [tipo,      setTipo]      = useState('Todas');

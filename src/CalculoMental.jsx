@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from './firebase';
 import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
-import { RotateCcw, CheckCircle, Trophy, Clock, Brain, Delete, Settings, SkipForward } from 'lucide-react';
+import { RotateCcw, CheckCircle, Trophy, Clock, Brain, Delete, Settings, SkipForward, Share2 } from 'lucide-react';
 import Confetti from 'react-confetti';
 import OcaMatematica from './OcaMatematica';
 
@@ -463,6 +463,19 @@ export default function CalculoMentalGame({ usuario, onExit }) {
         else window.location.href = '/';
     };
 
+    const compartir = () => {
+        const url = 'pikt.es/calculo';
+        if (navigator.share) {
+            navigator.share({ 
+                title: 'Cálculo Mental', 
+                text: 'Juega aquí', 
+                url: window.location.href 
+            }).catch(() => {});
+        } else {
+            navigator.clipboard.writeText(url).then(() => alert('✅ Enlace copiado'));
+        }
+    };
+
     // Botones de ajuste dinámicos según tipo de problema
     const getBotones = () => {
         const has = currentProblem?.hasDecimals;
@@ -496,6 +509,9 @@ export default function CalculoMentalGame({ usuario, onExit }) {
             {/* HEADER */}
             <div style={st.header}>
                 <button onClick={handleExit} style={st.btnVolver}><RotateCcw size={16} /> Salir</button>
+                <button onClick={compartir} style={st.btnVolver} title="Compartir">
+                    <Share2 size={16} />
+                </button>
                 {gameState === 'PLAYING' && (
                     <div style={st.scoreFlex}>
                         {modoEjercicios ? (

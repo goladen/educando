@@ -1,18 +1,14 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
-// --- PALABRAS MATEMÁTICAS DE PRUEBA ---
-const PALABRAS_PRUEBA = [
-    'SUMA', 'RESTA', 'DIVISION', 'FRACCION', 'DECIMAL',
-    'ECUACION', 'GEOMETRIA', 'ALGEBRA', 'PORCENTAJE', 'ANGULO'
-];
+const PALABRAS_PRUEBA = ['SUMA', 'RESTA', 'DIVISION', 'FRACCION', 'DECIMAL', 'ECUACION', 'ALGEBRA', 'ANGULO'];
 
-// --- DIRECCIONES POSIBLES (x, y) ---
-const DIRECCIONES = [
-    [1, 0], [-1, 0], [0, 1], [0, -1], // Horizontal y Vertical
-    [1, 1], [-1, -1], [1, -1], [-1, 1]  // Diagonales
-];
+const DIRS_NORMAL = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,-1],[1,-1],[-1,1]];
+const DIRS_SIMPLE = [[1,0],[0,1]]; // solo derecha y abajo
 
-const COLORES = ['#e74c3c', '#3498db', '#f1c40f', '#2ecc71', '#9b59b6', '#e67e22', '#1abc9c', '#e84393'];
+const COLORES = ['#e74c3c','#3498db','#f1c40f','#2ecc71','#9b59b6','#e67e22','#1abc9c','#e84393'];
+const COLOR_PISTA = '#f39c12';
+
+const GRID_SIZE = 9;
 
 export default function SopaDeLetras({
     palabras = PALABRAS_PRUEBA,
@@ -20,114 +16,99 @@ export default function SopaDeLetras({
     onTerminar = () => alert('¡Sopa completada!'),
     onPalabraEncontrada = null
 }) {
-    const [grid, setGrid] = useState([]);
-    const [palabrasActivas, setPalabrasActivas] = useState([]);
+    const [grid,                setGrid]                = useState([]);
+    const [palabrasActivas,     setPalabrasActivas]     = useState([]);
     const [palabrasEncontradas, setPalabrasEncontradas] = useState([]);
-    const [trazosEncontrados, setTrazosEncontrados] = useState([]); // Guarda las celdas de las palabras acertadas
-    const [seleccion, setSeleccion] = useState([]); // Celdas siendo arrastradas actualmente
-    const [isDragging, setIsDragging] = useState(false);
-
-
-    const [mostrarSolucion, setMostrarSolucion] = useState(false);
-    const [solucionesCeldas, setSolucionesCeldas] = useState([]);
+    const [trazosEncontrados,   setTrazosEncontrados]   = useState([]);
+    const [seleccion,           setSeleccion]           = useState([]);
+    const [isDragging,          setIsDragging]          = useState(false);
+    const [mostrarSolucion,     setMostrarSolucion]     = useState(false);
+    const [solucionesCeldas,    setSolucionesCeldas]    = useState([]);
+    const [modoSimple,          setModoSimple]          = useState(false);
+    const [pistaActiva,         setPistaActiva]         = useState(false);
 
     const startCell = useRef(null);
-    const gridRef = useRef(null);
+    const gridRef   = useRef(null);
 
-    // --- 1. GENERADOR DE LA SOPA ---
+    // ── Generador ─────────────────────────────────────────────────────────────
     useEffect(() => {
-        // 1. Mapeamos las palabras para no perder la original al limpiarla y ordenarlas
-        const palabrasMapeadas = palabras.map(p => ({
+        const direcciones = modoSimple ? DIRS_SIMPLE : DIRS_NORMAL;
+
+        const mapeadas = palabras.map(p => ({
             original: p,
-            limpia: p.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase()
+            limpia: p.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase()
         })).sort((a, b) => b.limpia.length - a.limpia.length);
 
-        const maxLength = palabrasMapeadas.length > 0 ? palabrasMapeadas[0].limpia.length : 0;
-        const size = Math.max(10, maxLength +2);
-
+        const size = GRID_SIZE;
         let tablero = Array(size).fill(null).map(() => Array(size).fill(''));
-        let colocadasExitosamente = []; // <--- Lista de las que SÍ entran
-        let nuevasSoluciones = [];
+        let colocadas = [];
+        let soluciones = [];
+
         const intentarColocar = (item) => {
-            let colocada = false;
-            let intentos = 0;
+            let colocada = false, intentos = 0;
             while (!colocada && intentos < 2000) {
                 intentos++;
-                const dir = DIRECCIONES[Math.floor(Math.random() * DIRECCIONES.length)];
-                const filaInicio = Math.floor(Math.random() * size);
-                const colInicio = Math.floor(Math.random() * size);
-
+                const dir = direcciones[Math.floor(Math.random() * direcciones.length)];
+                const fi  = Math.floor(Math.random() * size);
+                const ci  = Math.floor(Math.random() * size);
                 let cabe = true;
                 for (let i = 0; i < item.limpia.length; i++) {
-                    const f = filaInicio + (dir[0] * i);
-                    const c = colInicio + (dir[1] * i);
-                    if (f < 0 || f >= size || c < 0 || c >= size || (tablero[f][c] !== '' && tablero[f][c] !== item.limpia[i])) {
-                        cabe = false;
-                        break;
+                    const f = fi + dir[0]*i, c = ci + dir[1]*i;
+                    if (f < 0 || f >= size || c < 0 || c >= size ||
+                        (tablero[f][c] !== '' && tablero[f][c] !== item.limpia[i])) {
+                        cabe = false; break;
                     }
                 }
-
                 if (cabe) {
-                    let celdasDePalabra = []; // <--- NUEVO
+                    let celdas = [];
                     for (let i = 0; i < item.limpia.length; i++) {
-                        const f = filaInicio + (dir[0] * i);
-                        const c = colInicio + (dir[1] * i);
+                        const f = fi + dir[0]*i, c = ci + dir[1]*i;
                         tablero[f][c] = item.limpia[i];
-                        celdasDePalabra.push({ f, c }); // <--- NUEVO: Guardamos cada letra
+                        celdas.push({ f, c });
                     }
                     colocada = true;
-                    colocadasExitosamente.push(item.original);
-                    // <--- NUEVO: Guardamos la palabra y sus celdas
-                    nuevasSoluciones.push({ palabra: item.limpia, celdas: celdasDePalabra });
+                    colocadas.push(item.original);
+                    soluciones.push({ palabra: item.limpia, celdas });
                 }
             }
-            if (!colocada) console.warn("Se quedó fuera por falta de espacio: ", item.original);
+            if (!colocada) console.warn('No cupo:', item.original);
         };
 
-        palabrasMapeadas.forEach(intentarColocar);
+        mapeadas.forEach(intentarColocar);
 
-        // Rellenar huecos con letras aleatorias
-        const letras = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        for (let f = 0; f < size; f++) {
-            for (let c = 0; c < size; c++) {
-                if (tablero[f][c] === '') tablero[f][c] = letras[Math.floor(Math.random() * letras.length)];
-            }
-        }
+        const abc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        for (let f = 0; f < size; f++)
+            for (let c = 0; c < size; c++)
+                if (tablero[f][c] === '') tablero[f][c] = abc[Math.floor(Math.random() * 26)];
 
         setGrid(tablero);
-        setPalabrasActivas(colocadasExitosamente); // <--- Guardamos la lista definitiva en el estado
-        setSolucionesCeldas(nuevasSoluciones);
-    }, [palabras]);
+        setPalabrasActivas(colocadas);
+        setSolucionesCeldas(soluciones);
+        setPalabrasEncontradas([]);
+        setTrazosEncontrados([]);
+        setSeleccion([]);
+        setMostrarSolucion(false);
+        setPistaActiva(false);
+    }, [palabras, modoSimple]);
 
-    // --- NUEVO: Bloquear el scroll en móviles de forma segura ---
+    // ── Bloquear scroll táctil ────────────────────────────────────────────────
     useEffect(() => {
-        const gridElement = gridRef.current;
-        if (!gridElement) return;
-
-        // Esta función bloquea el scroll nativo
-        const preventScroll = (e) => e.preventDefault();
-
-        // Le decimos al navegador que NO sea pasivo ({ passive: false })
-        gridElement.addEventListener('touchmove', preventScroll, { passive: false });
-
-        return () => gridElement.removeEventListener('touchmove', preventScroll);
+        const el = gridRef.current;
+        if (!el) return;
+        const stop = e => e.preventDefault();
+        el.addEventListener('touchmove', stop, { passive: false });
+        return () => el.removeEventListener('touchmove', stop);
     }, []);
 
-    // --- 2. LÓGICA DE SELECCIÓN ---
+    // ── Selección ─────────────────────────────────────────────────────────────
     const getCeldasLinea = (f1, c1, f2, c2) => {
-        const df = f2 - f1;
-        const dc = c2 - c1;
-        // Obligar a que sea línea recta o diagonal perfecta
+        const df = f2-f1, dc = c2-c1;
         if (df !== 0 && dc !== 0 && Math.abs(df) !== Math.abs(dc)) return [];
-
         const pasos = Math.max(Math.abs(df), Math.abs(dc));
-        const stepF = df === 0 ? 0 : df / pasos;
-        const stepC = dc === 0 ? 0 : dc / pasos;
-
+        const sf = df===0 ? 0 : df/pasos;
+        const sc = dc===0 ? 0 : dc/pasos;
         let linea = [];
-        for (let i = 0; i <= pasos; i++) {
-            linea.push({ f: f1 + (stepF * i), c: c1 + (stepC * i) });
-        }
+        for (let i = 0; i <= pasos; i++) linea.push({ f: f1+sf*i, c: c1+sc*i });
         return linea;
     };
 
@@ -140,100 +121,96 @@ export default function SopaDeLetras({
 
     const moverTrazo = (f, c) => {
         if (!isDragging || !startCell.current) return;
-        const nuevaLinea = getCeldasLinea(startCell.current.f, startCell.current.c, f, c);
-        if (nuevaLinea.length > 0) setSeleccion(nuevaLinea);
+        const linea = getCeldasLinea(startCell.current.f, startCell.current.c, f, c);
+        if (linea.length > 0) setSeleccion(linea);
     };
 
     const finalizarTrazo = () => {
         if (!isDragging) return;
         setIsDragging(false);
-
         if (seleccion.length > 1) {
-            // Extraer la palabra formada
-            const palabraSeleccionada = seleccion.map(celda => grid[celda.f][celda.c]).join('');
-            const palabraInvertida = palabraSeleccionada.split('').reverse().join('');
-            
-            const palabrasLimpias = palabrasActivas.map(p => p.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase());
-            const coincidencia = palabrasLimpias.find(p => p === palabraSeleccionada || p === palabraInvertida);
-
-            if (coincidencia && !palabrasEncontradas.includes(coincidencia)) {
-                // ¡ACIERTO!
-                setPalabrasEncontradas([...palabrasEncontradas, coincidencia]);
+            const sel = seleccion.map(s => grid[s.f][s.c]).join('');
+            const inv = sel.split('').reverse().join('');
+            const limpias = palabrasActivas.map(p => p.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase());
+            const ok = limpias.find(p => p === sel || p === inv);
+            if (ok && !palabrasEncontradas.includes(ok)) {
+                const nuevas = [...palabrasEncontradas, ok];
+                setPalabrasEncontradas(nuevas);
                 const color = COLORES[palabrasEncontradas.length % COLORES.length];
                 setTrazosEncontrados([...trazosEncontrados, ...seleccion.map(s => ({ ...s, color }))]);
-
                 if (onPalabraEncontrada) onPalabraEncontrada();
-
-                // Comprobar victoria (contra palabrasActivas, no palabras, por si alguna no cupó)
-                if (palabrasEncontradas.length + 1 === palabrasActivas.length) {
-                    setTimeout(onTerminar, 500);
-                }
-            } else {
-                // FALLO (Aquí meteremos la lógica de restar puntos después)
-                // Reproducir sonido error, etc.
+                if (nuevas.length === palabrasActivas.length) setTimeout(onTerminar, 500);
             }
         }
         setSeleccion([]);
         startCell.current = null;
     };
 
-    // --- 3. LÓGICA TÁCTIL (MÓVILES) ---
     const handleTouchMove = (e) => {
         if (!isDragging || mostrarSolucion) return;
-        // Prevenir scroll
-       
-
-        const touch = e.touches[0];
-        const elemento = document.elementFromPoint(touch.clientX, touch.clientY);
-        if (elemento && elemento.dataset.f && elemento.dataset.c) {
-            moverTrazo(parseInt(elemento.dataset.f), parseInt(elemento.dataset.c));
-        }
+        const t = e.touches[0];
+        const el = document.elementFromPoint(t.clientX, t.clientY);
+        if (el?.dataset.f && el?.dataset.c)
+            moverTrazo(parseInt(el.dataset.f), parseInt(el.dataset.c));
     };
 
-    // --- RENDERIZADO ---
-    const isCeldaSeleccionada = (f, c) => seleccion.some(s => s.f === f && s.c === c);
-    const getTrazoEncontrado = (f, c) => trazosEncontrados.find(s => s.f === f && s.c === c);
-    // --- NUEVO: Función para dar un color distinto a cada palabra no encontrada ---
+    // ── Color de cada celda ───────────────────────────────────────────────────
+    const isSel    = (f, c) => seleccion.some(s => s.f===f && s.c===c);
+    const getTrazo = (f, c) => trazosEncontrados.find(s => s.f===f && s.c===c);
+
     const getColorSolucion = (f, c) => {
         if (!mostrarSolucion) return null;
-
-        // Buscamos a qué palabra pertenece esta celda
-        const solucion = solucionesCeldas.find(sol =>
-            !palabrasEncontradas.includes(sol.palabra) &&
-            sol.celdas.some(celda => celda.f === f && celda.c === c)
+        const sol = solucionesCeldas.find(s =>
+            !palabrasEncontradas.includes(s.palabra) &&
+            s.celdas.some(cd => cd.f===f && cd.c===c)
         );
-
-        if (solucion) {
-            // Usamos la posición de la palabra para elegir uno de tus colores predefinidos
-            const index = solucionesCeldas.indexOf(solucion);
-            return COLORES[index % COLORES.length];
-        }
-        return null;
+        return sol ? COLORES[solucionesCeldas.indexOf(sol) % COLORES.length] : null;
     };
 
+    const esPistaCelda = (f, c) => {
+        if (!pistaActiva) return false;
+        return solucionesCeldas.some(sol =>
+            !palabrasEncontradas.includes(sol.palabra) &&
+            sol.celdas[0].f === f && sol.celdas[0].c === c
+        );
+    };
 
-
-    if (grid.length === 0) return <div>Generando sopa de letras...</div>;
+    if (grid.length === 0) return <div style={{ color:'white', padding:20 }}>Generando sopa…</div>;
 
     return (
-        <div style={styles.container}>
-            <h2 style={styles.title}>🔍 Encuentra las palabras</h2>
+        <div style={st.container}>
 
-          
-            {/* LISTA DE PALABRAS (Depende de la dificultad) */}
+            {/* ── Botones de modo ──────────────────────────────────────────── */}
+            <div style={{ display:'flex', gap:10, marginBottom:14, flexWrap:'wrap', justifyContent:'center' }}>
+                <button
+                    onClick={() => setModoSimple(false)}
+                    style={{ ...st.modeBtn,
+                        background: !modoSimple ? '#3498db' : 'rgba(255,255,255,0.15)',
+                        border: !modoSimple ? 'none' : '1.5px solid rgba(255,255,255,0.3)' }}
+                >
+                    ↕ Modo Normal
+                </button>
+                <button
+                    onClick={() => setModoSimple(true)}
+                    style={{ ...st.modeBtn,
+                        background: modoSimple ? '#27ae60' : 'rgba(255,255,255,0.15)',
+                        border: modoSimple ? 'none' : '1.5px solid rgba(255,255,255,0.3)' }}
+                >
+                    → Modo Simple
+                </button>
+            </div>
+
+            {/* ── Lista de palabras ─────────────────────────────────────────── */}
             {mostrarLista && (
-                <div style={styles.wordList}>
-                    {/* CORRECCIÓN: Mapeamos palabrasActivas */}
+                <div style={st.wordList}>
                     {palabrasActivas.map((p, i) => {
-                        const limpia = p.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
-                        const encontrada = palabrasEncontradas.includes(limpia);
+                        const limpia = p.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+                        const enc = palabrasEncontradas.includes(limpia);
                         return (
-                            <span key={i} style={{
-                                ...styles.wordBadge,
-                                background: encontrada ? '#2ecc71' : 'rgba(255,255,255,0.2)',
-                                textDecoration: encontrada ? 'line-through' : 'none',
-                                opacity: encontrada ? 0.6 : 1
-                            }}>
+                            <span key={i} style={{ ...st.badge,
+                                background: enc ? '#2ecc71' : 'rgba(255,255,255,0.2)',
+                                textDecoration: enc ? 'line-through' : 'none',
+                                opacity: enc ? 0.6 : 1 }}>
                                 {p}
                             </span>
                         );
@@ -241,101 +218,104 @@ export default function SopaDeLetras({
                 </div>
             )}
 
-            {/* TABLERO */}
+            {/* ── Tablero ──────────────────────────────────────────────────── */}
             <div
                 ref={gridRef}
-                style={{
-                    ...styles.grid,
-                    gridTemplateColumns: `repeat(${grid.length}, 1fr)`,
-                }}
+                style={{ ...st.grid, gridTemplateColumns: `repeat(${grid.length}, 1fr)` }}
                 onMouseLeave={finalizarTrazo}
                 onMouseUp={finalizarTrazo}
                 onTouchEnd={finalizarTrazo}
-                onTouchMove={handleTouchMove} // Magia táctil
+                onTouchMove={handleTouchMove}
             >
-                {grid.map((fila, f) =>
-                    fila.map((letra, c) => {
-                        const seleccionada = isCeldaSeleccionada(f, c);
-                        const encontrada = getTrazoEncontrado(f, c);
-                        const colorSolucion = getColorSolucion(f, c);
+                {grid.map((fila, f) => fila.map((letra, c) => {
+                    const sel      = isSel(f, c);
+                    const trazo    = getTrazo(f, c);
+                    const solColor = getColorSolucion(f, c);
+                    const pista    = esPistaCelda(f, c);
 
-                        let bg = 'white';
-                        let color = '#2c3e50';
-                        if (seleccionada) { bg = '#3498db'; color = 'white'; }
-                        else if (encontrada) { bg = encontrada.color; color = 'white'; }
-                        else if (colorSolucion) { bg = colorSolucion; color = 'white'; } // <--- ACTUALIZADO
-                        return (
-                            <div
-                                key={`${f}-${c}`}
-                                data-f={f} data-c={c}
-                                onMouseDown={() => iniciarTrazo(f, c)}
-                                onMouseEnter={() => moverTrazo(f, c)}
-                                onTouchStart={() => iniciarTrazo(f, c)}
-                                style={{
-                                    ...styles.cell,
-                                    background: bg,
-                                    color: color,
-                                    transform: seleccionada ? 'scale(1.1)' : 'scale(1)'
-                                }}
-                            >
-                                {letra}
-                            </div>
-                        );
-                    })
-                )}
+                    let bg = 'white', color = '#2c3e50';
+                    if (sel)      { bg = '#3498db';   color = 'white'; }
+                    else if (trazo)   { bg = trazo.color; color = 'white'; }
+                    else if (solColor){ bg = solColor;    color = 'white'; }
+                    else if (pista)   { bg = COLOR_PISTA; color = 'white'; }
+
+                    return (
+                        <div
+                            key={`${f}-${c}`}
+                            data-f={f} data-c={c}
+                            onMouseDown={() => iniciarTrazo(f, c)}
+                            onMouseEnter={() => moverTrazo(f, c)}
+                            onTouchStart={() => iniciarTrazo(f, c)}
+                            style={{ ...st.cell, background:bg, color,
+                                transform: sel ? 'scale(1.1)' : 'scale(1)' }}
+                        >
+                            {letra}
+                        </div>
+                    );
+                }))}
             </div>
 
-            <button
-                onClick={() => setMostrarSolucion(true)}
-                disabled={mostrarSolucion}
-                style={{
-                    marginTop: '20px',
-                    padding: '12px 24px',
-                    background: mostrarSolucion ? '#7f8c8d' : '#e74c3c',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '10px',
-                    fontWeight: 'bold',
-                    cursor: mostrarSolucion ? 'not-allowed' : 'pointer',
-                    fontSize: '1rem',
-                    boxShadow: mostrarSolucion ? 'none' : '0 4px 6px rgba(0,0,0,0.2)',
-                    transition: 'all 0.2s'
-                }}
-            >
-                {mostrarSolucion ? 'Juego Terminado' : '👀 Rendirse y Ver Solución'}
-            </button>
+            {/* ── Botones inferiores ────────────────────────────────────────── */}
+            <div style={{ display:'flex', gap:10, marginTop:18, flexWrap:'wrap', justifyContent:'center' }}>
+                <button
+                    onClick={() => setPistaActiva(v => !v)}
+                    disabled={mostrarSolucion}
+                    style={{ ...st.btn,
+                        background: pistaActiva ? COLOR_PISTA : '#8e44ad',
+                        opacity: mostrarSolucion ? 0.5 : 1,
+                        cursor: mostrarSolucion ? 'not-allowed' : 'pointer' }}
+                >
+                    💡 {pistaActiva ? 'Ocultar pista' : 'Pista'}
+                </button>
+                <button
+                    onClick={() => setMostrarSolucion(true)}
+                    disabled={mostrarSolucion}
+                    style={{ ...st.btn,
+                        background: mostrarSolucion ? '#7f8c8d' : '#e74c3c',
+                        cursor: mostrarSolucion ? 'not-allowed' : 'pointer' }}
+                >
+                    {mostrarSolucion ? 'Juego terminado' : '👀 Ver solución'}
+                </button>
+            </div>
 
-
-            <style>{` body { touch-action: none; /* Crucial para que el móvil no haga scroll al jugar */ } `}</style>
+            <style>{`body { touch-action: none; }`}</style>
         </div>
     );
 }
 
-const styles = {
+const st = {
     container: {
-        display: 'flex', flexDirection: 'column', alignItems: 'center', background: '#2c3e50', padding: '20px',
-        paddingBottom: '40px',
-        marginBottom: '30px',
-
-        borderRadius: '20px', color: 'white', fontFamily: 'Roboto, sans-serif', maxWidth: '100%', overflow: 'hidden'
+        display:'flex', flexDirection:'column', alignItems:'center',
+        background:'#2c3e50', padding:'20px', paddingBottom:'40px',
+        marginBottom:'30px', borderRadius:'20px', color:'white',
+        fontFamily:'Roboto, sans-serif', maxWidth:'100%', overflow:'hidden'
     },
-    title: { color: '#f1c40f', margin: '0 0 20px 0' },
-    wordList: { display: 'flex', flexWrap: 'wrap', gap: '10px', justifyContent: 'center', marginBottom: '20px', width: '100%', maxWidth: '600px' },
-    wordBadge: { padding: '8px 15px', borderRadius: '20px', fontWeight: 'bold', fontSize: '0.9rem', transition: 'all 0.3s' },
-
-    // CORRECCIÓN MÓVIL: Reducimos gap y ajustamos anchos
+    modeBtn: {
+        padding:'8px 18px', borderRadius:20, fontWeight:'bold', color:'white',
+        cursor:'pointer', fontSize:'0.88rem', transition:'all 0.2s'
+    },
+    wordList: {
+        display:'flex', flexWrap:'wrap', gap:'10px', justifyContent:'center',
+        marginBottom:'16px', width:'100%', maxWidth:'600px'
+    },
+    badge: {
+        padding:'8px 15px', borderRadius:'20px', fontWeight:'bold',
+        fontSize:'0.9rem', transition:'all 0.3s'
+    },
     grid: {
-        display: 'grid', gap: '2px', background: '#bdc3c7', padding: '3px',
-        borderRadius: '8px', touchAction: 'none', userSelect: 'none',
-        maxWidth: '500px', width: '100%', aspectRatio: '1/1'
+        display:'grid', gap:'3px', background:'#bdc3c7', padding:'4px',
+        borderRadius:'10px', touchAction:'none', userSelect:'none',
+        maxWidth:'460px', width:'100%', aspectRatio:'1/1'
     },
-
-
-    // CORRECCIÓN MÓVIL: La fuente usa clamp para adaptarse mágicamente al tamaño de la celda
     cell: {
-        display: 'flex', justifyContent: 'center', alignItems: 'center',
-        fontWeight: 'bold', fontSize: 'clamp(0.7rem, 4vw, 1.2rem)',
-        borderRadius: '3px', cursor: 'pointer', transition: 'all 0.1s',
-        userSelect: 'none', aspectRatio: '1/1'
+        display:'flex', justifyContent:'center', alignItems:'center',
+        fontWeight:'bold', fontSize:'clamp(0.9rem, 4.5vw, 1.4rem)',
+        borderRadius:'4px', cursor:'pointer', transition:'all 0.1s',
+        userSelect:'none', aspectRatio:'1/1'
+    },
+    btn: {
+        padding:'11px 22px', color:'white', border:'none', borderRadius:'10px',
+        fontWeight:'bold', fontSize:'0.95rem',
+        boxShadow:'0 4px 6px rgba(0,0,0,0.2)', transition:'all 0.2s'
     }
 };

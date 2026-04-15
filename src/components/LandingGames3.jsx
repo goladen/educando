@@ -1,7 +1,7 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, setDoc } from 'firebase/firestore';
-import { Search, Key, Filter, Zap, Play, Home, ChevronDown, ChevronUp, Mail, Link2 } from 'lucide-react';
+import { Search, Key, Filter, Zap, Play, Home, ChevronDown, ChevronUp, Mail, Link2, Share2 } from 'lucide-react';
 import GamePlayer from '../GamePlayer';
 import KartingedGame from '../KartingedGame';
 import KartingedMultiGame from '../KartingedMultiGame';
@@ -23,6 +23,7 @@ import Ecuaciones from '../Ecuaciones';
 import Funciones from '../Funciones';
 import GeometriaAnalitica from '../Funciones2'
 import Plataformas from '../Plataformas2';
+import StoryCubes from '../StoryCubes';
 
 import EtiquetaMe from '../EtiquetaMe';
 import OmninteractiveApp from '../OmninteractiveApp';
@@ -86,7 +87,7 @@ export const APPS = [
     { id: 'THINKHOOT', name: 'PiLive', desc: 'Diviértete en vivo con tus compañeros.', color: '#9C27B0', img: imgPilive, isLive: true },
     { id: 'MATHLIVE', name: 'MathLive', desc: 'Juega con las mates en tiempo real.', color: '#009688', img: imgMathlive, isLive: true },
     { id: 'OLYMPICLIVE', name: 'Olympic_Live', desc: 'Compite en minijuegos y cálculo.', color: '#D32F2F', img: imgOlympic, isLive: true },
-    { id: 'SOPA', name: 'Sopa_letras', desc: 'Encuentra las palabras ocultas.', color: '#e67e22', img: imgSopa },
+    { id: 'SOPA', name: 'Sopa_letras', desc: 'Encuentra las palabras ocultas.', color: '#e67e22', img: imgSopa, shareable: true },
     {
         id: 'QUESTION_SENDER',
         name: 'Q-Sender',
@@ -157,7 +158,9 @@ export const APPS = [
     { id: 'GEOMETRÍA_ANALÍTICA', name: 'Geometría_Analítica', desc: 'Rectas, parábolas y análisis gráfico.', color: '#4CAF50', emoji: '♐​', isMath: true },
 
 
-    { id: 'POLINOMIOS', name: 'Álgebra', desc: 'Operaciones con polinomios.', color: '#FF9800', emoji: '✖️', isMath: true, comingSoon: true }
+    { id: 'POLINOMIOS', name: 'Álgebra', desc: 'Operaciones con polinomios.', color: '#FF9800', emoji: '✖️', isMath: true, comingSoon: true },
+
+    { id: 'STORYCUBES', name: 'Story Cubes', desc: 'Crea historias en equipo usando dados con imágenes.', color: '#8e44ad', emoji: '🎲' },
 
 ];
 
@@ -252,6 +255,49 @@ const cleanText = (str) => {
         .toLowerCase()
         .trim();
 };
+
+// ─── Modal de opciones para compartir ────────────────────────────────────────
+function ShareModal({ url, titulo, onClose }) {
+    const [copiado, setCopiado] = React.useState(false);
+
+    const copiar = () => {
+        navigator.clipboard.writeText(url).catch(() => {});
+        setCopiado(true);
+        setTimeout(() => setCopiado(false), 2000);
+    };
+
+    const texto = encodeURIComponent(`🔤 ${titulo}\n${url}`);
+
+    const opciones = [
+        { label: 'Copiar enlace',     icon: copiado ? '✅' : '🔗', color: '#2c3e50', bg: copiado ? '#e8f5e9' : '#f4f6f8', action: copiar },
+        { label: 'WhatsApp',          icon: '💬', color: '#25D366', bg: '#e8f8ee',  action: () => window.open(`https://wa.me/?text=${texto}`, '_blank') },
+        { label: 'Telegram',          icon: '✈️', color: '#0088cc', bg: '#e8f4fb',  action: () => window.open(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(titulo)}`, '_blank') },
+        { label: 'Correo',            icon: '📧', color: '#e74c3c', bg: '#fdecea',  action: () => window.open(`mailto:?subject=${encodeURIComponent(titulo)}&body=${texto}`, '_blank') },
+        { label: 'Google Classroom',  icon: '🎓', color: '#1565C0', bg: '#e3f2fd',  action: () => window.open(`https://classroom.google.com/share?url=${encodeURIComponent(url)}`, '_blank') },
+    ];
+
+    return (
+        <div style={{ position:'fixed', inset:0, zIndex:9000, background:'rgba(0,0,0,0.55)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }} onClick={onClose}>
+            <div style={{ background:'white', borderRadius:20, width:'100%', maxWidth:360, padding:24, boxShadow:'0 20px 50px rgba(0,0,0,0.3)' }} onClick={e => e.stopPropagation()}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+                    <h3 style={{ margin:0, color:'#2c3e50', fontSize:'1.05rem' }}>Compartir</h3>
+                    <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', color:'#95a5a6', fontSize:'1.2rem', padding:4 }}>✕</button>
+                </div>
+                <div style={{ background:'#f4f6f8', borderRadius:10, padding:'8px 12px', fontSize:'0.75rem', color:'#7f8c8d', wordBreak:'break-all', marginBottom:16 }}>{url}</div>
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                    {opciones.map(op => (
+                        <button key={op.label} onClick={op.action}
+                            style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:12, border:`1.5px solid ${op.color}22`, background:op.bg, cursor:'pointer', textAlign:'left', fontSize:'0.93rem', fontWeight:600, color:op.color }}>
+                            <span style={{ fontSize:'1.2rem', width:24, textAlign:'center' }}>{op.icon}</span>
+                            {op.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
     // --- AÑADE ESTA LÍNEA AQUÍ ---
     const [zonaActiva, setZonaActiva] = useState('MAIN');
@@ -260,6 +306,20 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
     useEffect(() => {
         const checkURL = () => {
             const path = window.location.pathname.toLowerCase().replace('/', '');
+            // Detectar recurso compartido de Sopa de Letras (?sopa=ID)
+            const params = new URLSearchParams(window.location.search);
+            const sopaId = params.get('sopa');
+            if (sopaId) {
+                getDoc(doc(db, 'resources', sopaId)).then(snap => {
+                    if (snap.exists()) setJuegoActivo({ id: snap.id, ...snap.data() });
+                }).catch(console.error);
+                return;
+            }
+            const juegoParam = params.get('juego');
+            if (juegoParam) {
+                setJuegoActivo({ tipoJuego: juegoParam.toUpperCase() });
+                return;
+            }
             if (path === 'math_world') {
                 setZonaActiva('MATH');
             } else if (path === '' || path === 'inicio') {
@@ -281,6 +341,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
     const [buscando, setBuscando] = useState(false);
 
     const [juegoActivo, setJuegoActivo] = useState(null);
+    const [shareModal, setShareModal] = useState(null); // { url, titulo }
     const [recursoParaElegir, setRecursoParaElegir] = useState(null);
     const [omninteractivo, setOmninteractivo] = useState(false);
     const [videoQuizz,     setVideoQuizz]     = useState(false);
@@ -443,6 +504,11 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
             return;
         }
 
+        if (appId === 'STORYCUBES') {
+            setJuegoActivo({ tipoJuego: 'STORYCUBES' });
+            return;
+        }
+
         const appInfo = APPS.find(a => a.id === appId);
         if (appInfo) {
             window.history.pushState({}, '', `/${appInfo.name.toLowerCase()}`);
@@ -574,8 +640,9 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
         
         
         // ------------------------
-if (juegoActivo.tipoJuego === 'SINTAXIS')  return <SintaxisGame  usuario={null} onExit={() => setJuegoActivo(null)} />;
-if (juegoActivo.tipoJuego === 'LISTENING') return <Listening     usuario={null} onExit={() => setJuegoActivo(null)} />;
+if (juegoActivo.tipoJuego === 'SINTAXIS')    return <SintaxisGame  usuario={null} onExit={() => setJuegoActivo(null)} />;
+if (juegoActivo.tipoJuego === 'LISTENING')   return <Listening     usuario={null} onExit={() => setJuegoActivo(null)} />;
+if (juegoActivo.tipoJuego === 'STORYCUBES')  return <StoryCubes    usuario={null} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'KARTINGED') return <KartingedGame usuario={null} alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'KARTINGED_MULTI') return <KartingedMultiGame alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'RACING3D') return <RacingGame3D usuario={null} alTerminar={() => setJuegoActivo(null)} />;
@@ -587,7 +654,7 @@ if (juegoActivo.tipoJuego === 'LISTENING') return <Listening     usuario={null} 
         if (juegoActivo.tipoJuego === 'MATHLE') return <MathWordleGame usuario={null} onExit={() => setJuegoActivo(null)} />;
         // --- AÑADIDO: Distinguir Wordle y Sopa ---
         if (juegoActivo.modoEspecial === 'WORDLE' || (juegoActivo.tipoJuego === 'WORDLE' && !juegoActivo.modoEspecial)) return <TextWordleGame recursoInicial={juegoActivo} usuario={null} onExit={() => setJuegoActivo(null)} />;
-        if (juegoActivo.modoEspecial === 'SOPA' || (juegoActivo.tipoJuego === 'SOPA' && !juegoActivo.modoEspecial)) return <SopaDeLetrasGame recursoInicial={juegoActivo} usuario={null} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.modoEspecial === 'SOPA' || (juegoActivo.tipoJuego === 'SOPA' && !juegoActivo.modoEspecial)) return <SopaDeLetrasGame recurso={juegoActivo} usuario={null} onExit={() => setJuegoActivo(null)} />;
 
 return <GamePlayer recurso={juegoActivo} usuario={null} alTerminar={() => setJuegoActivo(null)} />;
     }
@@ -666,6 +733,8 @@ return <GamePlayer recurso={juegoActivo} usuario={null} alTerminar={() => setJue
                     </div>
                 </div>
             )}
+
+            {shareModal && <ShareModal url={shareModal.url} titulo={shareModal.titulo} onClose={() => setShareModal(null)} />}
 
             {/* BUSCADOR PRINCIPAL (MÁS ANCHO) */}
             <div style={{ background: 'rgba(255,255,255,0.95)', padding: '30px', borderRadius: '20px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', marginBottom: '30px', maxWidth: '900px', margin: '0 auto 30px auto' }}>
@@ -772,14 +841,27 @@ return <GamePlayer recurso={juegoActivo} usuario={null} alTerminar={() => setJue
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '15px', marginBottom: '40px' }}>
                 {APPS.filter(app => !app.isLive && !app.isMath && !app.isHerramienta).map(app => (
-                    <div key={app.id} onClick={() => abrirJuego(app.id)} style={{ background: '#ffffbf', borderRadius: '15px', padding: '15px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transition: 'transform 0.2s' }}>
+                    <div key={app.id} style={{ position:'relative', background: '#ffffbf', borderRadius: '15px', padding: '15px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transition: 'transform 0.2s' }}
+                        onClick={() => abrirJuego(app.id)}>
+                        {app.shareable && (
+                            <button
+                                onClick={e => {
+                                    e.stopPropagation();
+                                    const url = `${window.location.origin}${window.location.pathname}?juego=${app.id.toLowerCase()}`;
+                                    setShareModal({ url, titulo: app.name });
+                                }}
+                                title="Compartir"
+                                style={{ position:'absolute', top:6, right:6, background:'rgba(255,255,255,0.8)', border:'none', borderRadius:6, padding:'3px 5px', cursor:'pointer', display:'flex', alignItems:'center', color: app.color }}
+                            >
+                                <Share2 size={13}/>
+                            </button>
+                        )}
                         <div style={{ width: '60px', height: '60px', margin: '0 auto 10px auto', background: 'transparent', borderRadius: '15px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'white' }}>
                             {app.img ? (
                             <img src={app.img} alt={app.name} style={{ width: '60px', height: '60px', objectFit: 'contain', borderRadius: '15px' }} onError={(e) => e.target.style.display = 'none'} />
                             ) : (
                                     <span style={{ fontSize: '45px', lineHeight: '1' }}>{app.emoji}</span>
                                 )}
-
                         </div>
                         <h4 style={{ margin: 0, color: '#333', fontSize: '0.9rem' }}>{app.name}</h4>
                     </div>

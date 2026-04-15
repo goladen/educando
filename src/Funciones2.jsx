@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { ArrowLeft, RefreshCw, CheckCircle, XCircle, TrendingUp, BarChart2, Monitor, Users, Play, Loader, Send } from 'lucide-react';
+import { ArrowLeft, RefreshCw, CheckCircle, XCircle, TrendingUp, BarChart2, Monitor, Users, Play, Loader, Send, Share2 } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { db } from './firebase';
 import { doc, setDoc, updateDoc, onSnapshot, increment, collection, addDoc, getDoc } from 'firebase/firestore';
@@ -2727,6 +2727,19 @@ export default function Funciones({ isHost = false, codigoSala: codigoExterno = 
         else { setInternalClientUser(userObj); setInternalClient(code); }
     };
 
+    const compartir = () => {
+        const url = 'pikt.es/funciones2';
+        if (navigator.share) {
+            navigator.share({ 
+                title: 'Funciones', 
+                text: 'Juega aquí', 
+                url: window.location.href 
+            }).catch(() => {});
+        } else {
+            navigator.clipboard.writeText(url).then(() => alert('✅ Enlace copiado'));
+        }
+    };
+
     return (
         <div style={st.pagina}>
             {showLiveConfig && (
@@ -2738,11 +2751,16 @@ export default function Funciones({ isHost = false, codigoSala: codigoExterno = 
 
             {/* Header */}
             <div style={st.header}>
-                {onExit && (
-                    <button onClick={onExit} style={{ background:'rgba(255,255,255,0.1)', border:'none', borderRadius:10, padding:'8px 14px', color:'white', cursor:'pointer', display:'flex', alignItems:'center', gap:6, fontSize:'0.9rem', marginBottom:8, alignSelf:'flex-start' }}>
-                        <ArrowLeft size={16}/> Volver
+                <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+                    {onExit && (
+                        <button onClick={onExit} style={{ background:'rgba(255,255,255,0.1)', border:'none', borderRadius:10, padding:'8px 14px', color:'white', cursor:'pointer', display:'flex', alignItems:'center', gap:6, fontSize:'0.9rem', marginBottom:8, alignSelf:'flex-start' }}>
+                            <ArrowLeft size={16}/> Volver
+                        </button>
+                    )}
+                    <button onClick={compartir} style={{ background:'rgba(255,255,255,0.1)', border:'none', borderRadius:10, padding:'8px 14px', color:'white', cursor:'pointer', display:'flex', alignItems:'center', gap:6, fontSize:'0.9rem', marginBottom:8, alignSelf:'flex-start' }} title="Compartir">
+                        <Share2 size={16}/>
                     </button>
-                )}
+                </div>
                 <div style={st.headerIcon}>∫</div>
                 <div>
                     <div style={st.headerTitulo}>Funciones</div>

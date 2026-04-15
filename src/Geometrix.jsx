@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-import { RotateCcw, CheckCircle, XCircle, Trophy, ArrowRight, Calculator, Ruler, Play, Users, Loader, Monitor, Copy, Save, ArrowUp } from 'lucide-react';
+import { RotateCcw, CheckCircle, XCircle, Trophy, ArrowRight, Calculator, Ruler, Play, Users, Loader, Monitor, Copy, Save, ArrowUp, Share2 } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { db } from './firebase';
 import { doc, setDoc, updateDoc, onSnapshot, increment, collection, writeBatch, addDoc, getDoc } from 'firebase/firestore';
@@ -548,6 +548,19 @@ export default function GeometriaGame({ usuario, onExit, isHost, codigoSala }) {
 // MENU Y MODO LOCAL
 // ─────────────────────────────────────────────────────────────────────────────
 function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
+    const handleCompartir = async () => {
+        const url = `${window.location.origin}/geometrix`;
+        if (navigator.share) {
+            try {
+                await navigator.share({ title: 'PiKT - Geometrix', text: 'Juega Geometrix en PiKT', url });
+            } catch (e) { console.log('Share cancelled'); }
+        } else {
+            try {
+                await navigator.clipboard.writeText(url);
+                alert('Enlace copiado al portapapeles');
+            } catch (e) { console.error(e); }
+        }
+    };
     const [gameState, setGameState] = useState('START');
     const [modoRegla, setModoRegla] = useState(false);
     const [score, setScore] = useState(0);
@@ -664,6 +677,20 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
             window.dispatchEvent(new Event('popstate'));
         }
     };
+
+    const compartir = () => {
+        const url = 'pikt.es/geometrix';
+        if (navigator.share) {
+            navigator.share({ 
+                title: 'Geometrix', 
+                text: 'Juega aquí', 
+                url: window.location.href 
+            }).catch(() => {});
+        } else {
+            navigator.clipboard.writeText(url).then(() => alert('✅ Enlace copiado'));
+        }
+    };
+
     const crearSalaEnVivo = async () => {
         setCreandoSala(true);
         try {
@@ -844,6 +871,9 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
 
             <div style={sLocal.header}>
                 <button onClick={handleExit} style={sLocal.btnVolver}><RotateCcw size={16} /> Salir</button>
+                <button onClick={compartir} style={sLocal.btnVolver} title="Compartir">
+                    <Share2 size={16} />
+                </button>
                 {gameState !== 'START' && (
                     <div style={sLocal.scoreBoard}>
                         <span>{questionNum}/{gameConfig.numEjercicios}</span>

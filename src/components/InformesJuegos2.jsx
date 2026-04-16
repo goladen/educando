@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import GruposTab from './GruposTab';
 import { db } from '../firebase';
 import {
     collection, query, where, getDocs, getDoc, doc,
@@ -246,8 +247,30 @@ export default function InformesJuegos({ usuario }) {
 
     const filtrosActivos = !!(filtroTipo||filtroMod||filtroFecDes||filtroFecHas);
 
+    const [pestañaActiva, setPestañaActiva] = useState('informes');
+
     return (
         <div style={{ fontFamily:'Arial,sans-serif', padding:'4px 0 40px' }}>
+
+            {/* ── Pestañas ──────────────────────────────────────────────── */}
+            <div style={{ display:'flex', gap:4, marginBottom:24, borderBottom:'2px solid #e0e4f0' }}>
+                {[
+                    { id:'informes', label:'📋 Informes' },
+                    { id:'grupos',   label:'👥 Grupos' },
+                ].map(t => (
+                    <button key={t.id} onClick={() => setPestañaActiva(t.id)}
+                        style={{ padding:'10px 22px', border:'none', background:'none', fontWeight: pestañaActiva===t.id ? 700 : 400,
+                            color: pestañaActiva===t.id ? '#1565C0' : '#7f8c8d', cursor:'pointer', fontSize:'0.95rem',
+                            borderBottom: pestañaActiva===t.id ? '3px solid #1565C0' : '3px solid transparent',
+                            marginBottom:-2, transition:'all 0.15s' }}>
+                        {t.label}
+                    </button>
+                ))}
+            </div>
+
+            {/* ── Tab Grupos ────────────────────────────────────────────── */}
+            {pestañaActiva === 'grupos' && <GruposTab usuario={usuario} />}
+            {pestañaActiva !== 'grupos' && <>
 
             {/* ── Cabecera ─────────────────────────────────────────────── */}
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:22, flexWrap:'wrap', gap:10 }}>
@@ -427,6 +450,7 @@ export default function InformesJuegos({ usuario }) {
             <style>{`
                 @keyframes spin { 100% { transform: rotate(360deg); } }
             `}</style>
+            </>}
         </div>
     );
 }

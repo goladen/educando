@@ -29,6 +29,7 @@ import EtiquetaMe from '../EtiquetaMe';
 import OmninteractiveApp from '../OmninteractiveApp';
 import VideoQuizzApp from '../VideoQuizzApp';
 import FuncionesEjecutivas from '../FuncionesEjecutivas';
+import IrregularVerbsTest from '../IrregularVerbsTest';
 import imgPasapalabra from '../assets/icono_pasapal.png'; // Revisa si es .png o .jpg
 import imgBurbujas from '../assets/icono_burbujas.png';
 import imgPikatron from '../assets/icono_pikatron.png';
@@ -121,6 +122,15 @@ export const APPS = [
         emoji: '🙉​',
         isSpecial: false,
         isHerramienta: true,
+        shareable: true
+    },
+    {
+        id: 'IRREGULAR_VERBS',
+        name:'Irregular_Verbs',
+        desc: 'Test de verbos irregulares en inglés.',
+        color: '#8B5CF6',
+        emoji: '📚',
+        isSpecial: false,
         shareable: true
     },
     {
@@ -357,6 +367,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
     const [omninteractivo, setOmninteractivo] = useState(false);
     const [videoQuizz,     setVideoQuizz]     = useState(false);
     const [funcionesEjecutivas, setFuncionesEjecutivas] = useState(false);
+    const [irregularVerbs,      setIrregularVerbs]      = useState(false);
 
     // Estados Live Alumno
     const [liveModeAlumno, setLiveModeAlumno] = useState(false);
@@ -619,6 +630,15 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
     if (funcionesEjecutivas) return (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, overflowY: 'auto' }}>
             <FuncionesEjecutivas onBack={() => setFuncionesEjecutivas(false)} />
+        </div>
+    );
+
+    if (irregularVerbs) return (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'white', overflowY: 'auto' }}>
+            <button onClick={() => setIrregularVerbs(false)} style={{ position: 'fixed', top: 14, left: 14, zIndex: 10000, background: '#1f2937', color: 'white', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>
+                ← Volver
+            </button>
+            <IrregularVerbsTest />
         </div>
     );
 
@@ -892,6 +912,7 @@ return <GamePlayer recurso={juegoActivo} usuario={null} alTerminar={() => setJue
                     { id: 'OMNINTERACTIVE',  label: 'Omninteractive',  emoji: '📚',  color: '#6D28D9', action: () => setOmninteractivo(true), shareable: true },
                     { id: 'VIDEOQUIZZ',      label: 'VideoQuizz',      emoji: '🎬',  color: '#DC2626', action: () => setVideoQuizz(true), shareable: true },
                     { id: 'FUNCIONES_EJECUTIVAS', label: 'Funciones Ejecutivas', emoji: '🧠', color: '#FF5722', action: () => setFuncionesEjecutivas(true), shareable: true },
+                    { id: 'IRREGULAR_VERBS',     label: 'Irregular Verbs',     emoji: '📝', color: '#0369a1', action: () => setIrregularVerbs(true), shareable: false },
                 ].map(tool => (
                     <div key={tool.id} onClick={tool.action} style={{ background: '#ffffbf', borderRadius: '15px', padding: '15px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transition: 'transform 0.2s', border: `2px solid ${tool.color}20`, position: 'relative' }}
                         onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-3px)'}

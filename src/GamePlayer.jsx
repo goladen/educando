@@ -8,6 +8,7 @@ import AparejadosGame from './AparejadosGame';
 import ThinkHootGame from './ThinkHootGame';
 import RuletaGame from './RuletaGame';
 import KartingedGame from './KartingedGame';
+import IrregularVerbsTest from './IrregularVerbsTest';
 
 export default function GamePlayer({ recurso, usuario, alTerminar, autoStart = false, hojaInicial = null, modoInicial = null }) {
 
@@ -68,6 +69,10 @@ export default function GamePlayer({ recurso, usuario, alTerminar, autoStart = f
 
             {recurso.tipoJuego === 'KARTINGED' && (
                 <KartingedGame alTerminar={alTerminar} />
+            )}
+
+            {recurso.tipoJuego === 'IRREGULAR_VERBS' && (
+                <IrregularVerbsTest />
             )}
         </>
     );

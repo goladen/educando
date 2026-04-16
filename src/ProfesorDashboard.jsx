@@ -1040,7 +1040,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                     }}
                 />
             )}
-            {modoDashboard === 'INFORMES' && <InformesJuegos usuario={usuario} />}
+            {modoDashboard === 'INFORMES' && <InformesJuegos usuario={usuario} googleToken={googleToken} />}
 
             {/* MI PÁGINA */}
             {modoDashboard === 'MI_PAGINA' && !paginaProfesorPreview && (

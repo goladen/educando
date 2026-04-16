@@ -5,24 +5,37 @@ import {
     setDoc, updateDoc, deleteDoc, serverTimestamp
 } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
+import useDrivePicker from 'react-google-drive-picker';
 import {
     Users, Plus, Trash2, Edit2, Upload, Save, X,
     ChevronLeft, ChevronRight, Eye, EyeOff, CheckCircle, RefreshCw
 } from 'lucide-react';
+
+const GOOGLE_CLIENT_ID    = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+const GOOGLE_DEVELOPER_KEY = import.meta.env.VITE_GOOGLE_DEVELOPER_KEY;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const uid = () => Math.random().toString(36).slice(2, 10);
 const sortAlpha = arr => [...arr].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 
 // ─── Modal Crear / Editar Grupo ───────────────────────────────────────────────
-function ModalCrearGrupo({ profesorUid, onClose, onSaved, grupoExistente }) {
-    const [nombre,      setNombre]      = useState(grupoExistente?.nombre || '');
-    const [alumnos,     setAlumnos]     = useState(grupoExistente?.alumnos || []);
-    const [inputNombre, setInputNombre] = useState('');
-    const [inputGrupo,  setInputGrupo]  = useState('');
-    const [guardando,   setGuardando]   = useState(false);
-    const [error,       setError]       = useState('');
+function ModalCrearGrupo({ profesorUid, onClose, onSaved, grupoExistente, googleToken }) {
+    const [nombre,         setNombre]         = useState(grupoExistente?.nombre || '');
+    const [alumnos,        setAlumnos]        = useState(grupoExistente?.alumnos || []);
+    const [columnas,       setColumnas]       = useState(
+        (grupoExistente?.columnas || []).map(c => ({
+            oculta: false, porcentaje: null, esFormula: false, formula: '', ...c
+        }))
+    );
+    const [celdas,         setCeldas]         = useState(grupoExistente?.celdas || {});
+    const [inputNombre,    setInputNombre]    = useState('');
+    const [inputGrupo,     setInputGrupo]     = useState('');
+    const [guardando,      setGuardando]      = useState(false);
+    const [error,          setError]          = useState('');
+    const [importando,     setImportando]     = useState(false);
+    const [resumenImport,  setResumenImport]  = useState(null); // { alumnos, cols }
     const fileRef = useRef();
+    const [openPicker] = useDrivePicker();
 
     const añadirManual = () => {
         const n = inputNombre.trim();
@@ -33,6 +46,74 @@ function ModalCrearGrupo({ profesorUid, onClose, onSaved, grupoExistente }) {
 
     const eliminarAlumno = (id) => setAlumnos(prev => prev.filter(a => a.id !== id));
 
+    // ── Procesador común de filas ─────────────────────────────────────────────
+    // Formato: fila 0 = cabeceras (col0=Nombre, col1=Grupo, col2+=calificaciones)
+    //          filas 1+ = datos
+    const procesarRows = (rows, alumnosActuales) => {
+        if (!rows.length) throw new Error('El archivo está vacío.');
+
+        const cabecera = rows[0].map(h => h?.toString().trim());
+        // Detectar si la fila 0 es realmente una cabecera o son datos
+        // (si col0 es un nombre con letras, asumimos cabecera)
+        const tieneCabecera = isNaN(parseFloat(cabecera[0]));
+        const dataRows  = tieneCabecera ? rows.slice(1) : rows;
+        const colHeaders = tieneCabecera ? cabecera.slice(2).filter(Boolean) : [];
+
+        // Crear columnas para col 2+
+        const newCols = colHeaders.map(h => ({
+            id: uid(), header: h,
+            oculta: false, porcentaje: null, esFormula: false, formula: ''
+        }));
+
+        // Construir alumnos fusionando con existentes
+        const listado = [...alumnosActuales];
+        const nuevasCeldas = {};
+
+        dataRows.forEach(r => {
+            const nombreStr = r[0]?.toString().trim();
+            if (!nombreStr) return;
+            const grupoStr  = r[1]?.toString().trim() || '';
+
+            // Reusar alumno existente (por nombre normalizado) o crear nuevo
+            let alumno = listado.find(a =>
+                a.nombre.trim().toLowerCase() === nombreStr.toLowerCase()
+            );
+            if (!alumno) {
+                alumno = { id: uid(), nombre: nombreStr, grupo: grupoStr };
+                listado.push(alumno);
+            }
+
+            // Celdas de calificación (col 2+)
+            newCols.forEach((col, j) => {
+                const val = r[j + 2]?.toString().trim() ?? '';
+                nuevasCeldas[`${alumno.id}__${col.id}`] = val;
+            });
+        });
+
+        return {
+            todosAlumnos: sortAlpha(listado),
+            newCols,
+            nuevasCeldas
+        };
+    };
+
+    const aplicarImport = (rows) => {
+        const { todosAlumnos, newCols, nuevasCeldas } = procesarRows(rows, alumnos);
+        setAlumnos(todosAlumnos);
+        if (newCols.length > 0) {
+            setColumnas(prev => {
+                // Evitar duplicados por nombre de cabecera
+                const existentes = new Set(prev.map(c => c.header.toLowerCase()));
+                return [...prev, ...newCols.filter(c => !existentes.has(c.header.toLowerCase()))];
+            });
+            setCeldas(prev => ({ ...prev, ...nuevasCeldas }));
+        }
+        setResumenImport({
+            alumnos: todosAlumnos.length,
+            cols: newCols.map(c => c.header)
+        });
+    };
+
     const onFileChange = (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -42,23 +123,59 @@ function ModalCrearGrupo({ profesorUid, onClose, onSaved, grupoExistente }) {
                 const wb = XLSX.read(ev.target.result, { type: 'binary' });
                 const ws = wb.Sheets[wb.SheetNames[0]];
                 const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-                const nuevos = rows.slice(1)
-                    .filter(r => r[0]?.toString().trim())
-                    .map(r => ({
-                        id: uid(),
-                        nombre: r[0].toString().trim(),
-                        grupo:  r[1]?.toString().trim() || ''
-                    }));
-                setAlumnos(prev => sortAlpha([
-                    ...prev,
-                    ...nuevos.filter(n => !prev.some(p => p.nombre === n.nombre))
-                ]));
-            } catch {
-                setError('No se pudo leer el archivo. Usa .xlsx o .csv');
+                aplicarImport(rows);
+            } catch (err) {
+                setError(err.message || 'No se pudo leer el archivo.');
             }
         };
         reader.readAsBinaryString(file);
         e.target.value = '';
+    };
+
+    const importarDesdeSheets = async (fileId, mimeType) => {
+        if (!googleToken) { setError('No hay sesión de Google activa.'); return; }
+        setImportando(true); setError(''); setResumenImport(null);
+        try {
+            const url = mimeType === 'application/vnd.google-apps.spreadsheet'
+                ? `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
+                : `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
+            const res = await fetch(url, { headers: { Authorization: `Bearer ${googleToken}` } });
+            if (!res.ok) throw new Error(`Error ${res.status} al acceder al archivo.`);
+            const ab = await res.arrayBuffer();
+            const wb = XLSX.read(ab, { type: 'array' });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+            aplicarImport(rows);
+        } catch (e) {
+            setError('Error al importar: ' + e.message);
+        }
+        setImportando(false);
+    };
+
+    const abrirPickerDrive = () => {
+        if (!googleToken) {
+            setError('Para importar de Drive debes iniciar sesión con Google. Cierra sesión y vuelve a entrar con tu cuenta de Google.');
+            return;
+        }
+        openPicker({
+            clientId: GOOGLE_CLIENT_ID,
+            developerKey: GOOGLE_DEVELOPER_KEY,
+            viewId: 'SPREADSHEETS',
+            token: googleToken,
+            showUploadView: false,
+            supportDrives: true,
+            multiselect: false,
+            mimetypes: [
+                'application/vnd.google-apps.spreadsheet',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            ],
+            callbackFunction: (data) => {
+                if (data.action === 'picked') {
+                    const d = data.docs[0];
+                    importarDesdeSheets(d.id, d.mimeType);
+                }
+            }
+        });
     };
 
     const guardar = async () => {
@@ -72,8 +189,8 @@ function ModalCrearGrupo({ profesorUid, onClose, onSaved, grupoExistente }) {
                 profesorUid,
                 nombre: nombre.trim(),
                 alumnos: sortAlpha(alumnos),
-                columnas: grupoExistente?.columnas || [],
-                celdas:   grupoExistente?.celdas   || {},
+                columnas,
+                celdas,
                 fechaCreacion: grupoExistente?.fechaCreacion || serverTimestamp(),
             }, { merge: true });
             onSaved();
@@ -115,14 +232,35 @@ function ModalCrearGrupo({ profesorUid, onClose, onSaved, grupoExistente }) {
                 </div>
 
                 <div style={{ marginBottom:16 }}>
-                    <label style={ms.label}>O subir hoja de cálculo (.xlsx / .csv)</label>
-                    <div style={{ fontSize:'0.75rem', color:'#95a5a6', marginBottom:6 }}>
-                        Columna A: Nombre alumno · Columna B: Grupo (la primera fila es cabecera)
+                    <label style={ms.label}>O importar desde hoja de cálculo</label>
+                    <div style={{ fontSize:'0.75rem', color:'#95a5a6', marginBottom:8 }}>
+                        Fila 1: cabeceras · Col A: Nombre · Col B: Grupo · Col C en adelante: calificaciones
                     </div>
-                    <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display:'none' }} onChange={onFileChange}/>
-                    <button onClick={() => fileRef.current.click()} style={ms.btnBlue}>
-                        <Upload size={15}/> Subir archivo
-                    </button>
+                    <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display:'none' }} onChange={onFileChange}/>
+                        <button onClick={() => fileRef.current.click()} style={ms.btnBlue} disabled={importando}>
+                            <Upload size={15}/> Subir archivo
+                        </button>
+                        <button onClick={abrirPickerDrive} style={ms.btnGoogle} disabled={importando}>
+                            {importando
+                                ? <><RefreshCw size={14} style={{ animation:'spin 1s linear infinite' }}/> Importando…</>
+                                : <><img src="https://ssl.gstatic.com/docs/spreadsheets/favicon3.ico" width={15} height={15} style={{ borderRadius:2 }} alt=""/> Importar de Drive</>
+                            }
+                        </button>
+                    </div>
+                    {resumenImport && (
+                        <div style={{ marginTop:10, padding:'8px 12px', background:'#e8f5e9', borderRadius:8, fontSize:'0.78rem', color:'#1b5e20' }}>
+                            ✓ {resumenImport.alumnos} alumnos importados
+                            {resumenImport.cols.length > 0 && (
+                                <> · Columnas: <strong>{resumenImport.cols.join(', ')}</strong></>
+                            )}
+                        </div>
+                    )}
+                    {columnas.length > 0 && !resumenImport && (
+                        <div style={{ marginTop:8, fontSize:'0.73rem', color:'#7f8c8d' }}>
+                            {columnas.length} columna{columnas.length > 1 ? 's' : ''} de calificación guardada{columnas.length > 1 ? 's' : ''}: {columnas.map(c => c.header).join(', ')}
+                        </div>
+                    )}
                 </div>
 
                 {alumnos.length > 0 && (
@@ -617,7 +755,7 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
 }
 
 // ─── Tab principal de Grupos ──────────────────────────────────────────────────
-export default function GruposTab({ usuario }) {
+export default function GruposTab({ usuario, googleToken }) {
     const [grupos,           setGrupos]           = useState([]);
     const [cargando,         setCargando]         = useState(true);
     const [modalCrear,       setModalCrear]       = useState(false);
@@ -807,6 +945,7 @@ export default function GruposTab({ usuario }) {
                 <ModalCrearGrupo
                     profesorUid={usuario.uid}
                     grupoExistente={grupoEditar}
+                    googleToken={googleToken}
                     onClose={() => { setModalCrear(false); setGrupoEditar(null); }}
                     onSaved={() => { setModalCrear(false); setGrupoEditar(null); cargar(); }}
                 />
@@ -827,6 +966,7 @@ const ms = {
     input:        { padding:'9px 12px', borderRadius:8, border:'1.5px solid #e0e4f0', fontSize:'0.9rem', outline:'none', width:'100%', boxSizing:'border-box', fontFamily:'inherit' },
     btnGreen:     { display:'flex', alignItems:'center', gap:6, padding:'9px 16px', borderRadius:9, border:'none', background:'#27ae60', color:'white', fontWeight:700, cursor:'pointer', fontSize:'0.88rem' },
     btnBlue:      { display:'flex', alignItems:'center', gap:6, padding:'9px 16px', borderRadius:9, border:'none', background:'#1565C0', color:'white', fontWeight:700, cursor:'pointer', fontSize:'0.88rem' },
+    btnGoogle:    { display:'flex', alignItems:'center', gap:6, padding:'9px 16px', borderRadius:9, border:'1.5px solid #34a853', background:'white', color:'#188038', fontWeight:700, cursor:'pointer', fontSize:'0.88rem' },
     btnSecundario:{ padding:'9px 16px', borderRadius:9, border:'1px solid #bdc3c7', background:'white', color:'#7f8c8d', fontWeight:700, cursor:'pointer', fontSize:'0.88rem' },
     th:           { padding:'8px 10px', textAlign:'left', fontWeight:600, fontSize:'0.78rem', color:'#7f8c8d' },
     td:           { padding:'7px 10px', color:'#2c3e50' },

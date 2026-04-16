@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import GruposTab from './GruposTab';
+import ModalAgregarAGrupo from './ModalAgregarAGrupo';
 import { db } from '../firebase';
 import {
     collection, query, where, getDocs, getDoc, doc,
@@ -48,7 +49,7 @@ const tipoIcon    = (t) => TIPO_ICON[t]  || '🎮';
 const inp = { padding:'7px 10px', borderRadius:8, border:'1.5px solid #e0e4f0', fontSize:'0.85rem', outline:'none', fontFamily:'inherit' };
 
 // ─── Componente principal ──────────────────────────────────────────────────────
-export default function InformesJuegos({ usuario }) {
+export default function InformesJuegos({ usuario, googleToken }) {
     // Estado del código de profesor
     const [codigoProf,    setCodigoProf]    = useState('');
     const [codigoEdit,    setCodigoEdit]    = useState('');
@@ -74,6 +75,7 @@ export default function InformesJuegos({ usuario }) {
     const [expandido,    setExpandido]    = useState(null);
     const [borrando,     setBorrando]     = useState(null);  // id del informe a borrar
     const [borrandoOk,   setBorrandoOk]   = useState(null);
+    const [modalAgregar, setModalAgregar] = useState(null);  // informe seleccionado para añadir a grupo
 
     // ── Carga del código de profesor desde users collection ──────────────────
     const cargarCodigo = async () => {
@@ -269,7 +271,7 @@ export default function InformesJuegos({ usuario }) {
             </div>
 
             {/* ── Tab Grupos ────────────────────────────────────────────── */}
-            {pestañaActiva === 'grupos' && <GruposTab usuario={usuario} />}
+            {pestañaActiva === 'grupos' && <GruposTab usuario={usuario} googleToken={googleToken} />}
             {pestañaActiva !== 'grupos' && <>
 
             {/* ── Cabecera ─────────────────────────────────────────────── */}
@@ -418,6 +420,7 @@ export default function InformesJuegos({ usuario }) {
                                         onBorrar={()=>borrar(inf.id)}
                                         borrando={borrando===inf.id}
                                         borradoOk={borrandoOk===inf.id}
+                                        onAgregarAGrupo={()=>setModalAgregar(inf)}
                                     />
                                 );
                                 return (
@@ -429,6 +432,7 @@ export default function InformesJuegos({ usuario }) {
                                         borrando={borrando===inf.id}
                                         borradoOk={borrandoOk===inf.id}
                                         canDelete={true}
+                                        onAgregarAGrupo={()=>setModalAgregar(inf)}
                                     />
                                 );
                             })}
@@ -451,6 +455,16 @@ export default function InformesJuegos({ usuario }) {
                 @keyframes spin { 100% { transform: rotate(360deg); } }
             `}</style>
             </>}
+
+            {/* ── Modal añadir a grupo ────────────────────────────────────── */}
+            {modalAgregar && (
+                <ModalAgregarAGrupo
+                    informe={modalAgregar}
+                    profesorUid={usuario.uid}
+                    googleToken={googleToken}
+                    onClose={() => setModalAgregar(null)}
+                />
+            )}
         </div>
     );
 }
@@ -474,7 +488,7 @@ const EmptyCard = ({ msg }) => (
 const pctColor2 = (p) => p >= 80 ? '#27ae60' : p >= 50 ? '#e67e22' : '#e74c3c';
 const pctBg2    = (p) => p >= 80 ? '#e8f5e9' : p >= 50 ? '#fff8e1' : '#fdecea';
 
-const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, canDelete }) => {
+const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, canDelete, onAgregarAGrupo }) => {
     const [confirmar, setConfirmar] = useState(false);
     const jugs   = inf.jugadores || [];
     const totInt = jugs.reduce((s,j)=>s+(j.intentos||0), 0);
@@ -502,6 +516,13 @@ const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, 
                     {jugs.length>3 && <span style={{ padding:'2px 7px', borderRadius:20, background:'#f0f0f0', fontSize:'0.72rem', color:'#555' }}>+{jugs.length-3}</span>}
                 </div>
                 <span style={{ padding:'3px 9px', borderRadius:20, background:pctBg2(pct), color:pctColor2(pct), fontWeight:700, fontSize:'0.8rem', flexShrink:0 }}>{pct}%</span>
+                <button
+                    onClick={e=>{ e.stopPropagation(); onAgregarAGrupo?.(); }}
+                    style={{ padding:'4px 9px', borderRadius:7, border:'1px solid #c8e6c9', background:'#e8f5e9', color:'#27ae60', cursor:'pointer', flexShrink:0, fontWeight:600, fontSize:'0.75rem', display:'flex', alignItems:'center', gap:4 }}
+                    title="Añadir calificación a un grupo"
+                >
+                    <Users size={12}/> Añadir a grupo
+                </button>
                 {canDelete && (
                     <button
                         onClick={e=>{ e.stopPropagation(); setConfirmar(true); }}
@@ -574,7 +595,7 @@ const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, 
 };
 
 // ─── Tarjeta especial para Story Cubes ───────────────────────────────────────
-const StoryCubesCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk }) => {
+const StoryCubesCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, onAgregarAGrupo }) => {
     const [confirmar, setConfirmar] = useState(false);
     const historia = inf.historia || [];
     const autores  = [...new Set(historia.map(s => s.autor))];
@@ -605,6 +626,13 @@ const StoryCubesCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoO
                 <span style={{ padding:'3px 9px', borderRadius:20, background:'#f3e8fd', color:'#8e44ad', fontWeight:700, fontSize:'0.8rem', flexShrink:0 }}>
                     {historia.length} fragmentos
                 </span>
+                <button
+                    onClick={e=>{ e.stopPropagation(); onAgregarAGrupo?.(); }}
+                    style={{ padding:'4px 9px', borderRadius:7, border:'1px solid #c8e6c9', background:'#e8f5e9', color:'#27ae60', cursor:'pointer', flexShrink:0, fontWeight:600, fontSize:'0.75rem', display:'flex', alignItems:'center', gap:4 }}
+                    title="Añadir calificación a un grupo"
+                >
+                    <Users size={12}/> Añadir a grupo
+                </button>
                 <button
                     onClick={e=>{ e.stopPropagation(); setConfirmar(true); }}
                     style={{ padding:'4px 7px', borderRadius:7, border:'1px solid #fdd', background:'#fdecea', color:'#e74c3c', cursor:'pointer', flexShrink:0 }}

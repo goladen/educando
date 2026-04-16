@@ -5,37 +5,36 @@ import {
     setDoc, updateDoc, deleteDoc, serverTimestamp
 } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import useDrivePicker from 'react-google-drive-picker';
 import {
     Users, Plus, Trash2, Edit2, Upload, Save, X,
-    ChevronLeft, ChevronRight, Eye, EyeOff, CheckCircle, RefreshCw
+    ChevronLeft, ChevronRight, Eye, EyeOff, CheckCircle, RefreshCw, Link
 } from 'lucide-react';
-
-const GOOGLE_CLIENT_ID    = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-const GOOGLE_DEVELOPER_KEY = import.meta.env.VITE_GOOGLE_DEVELOPER_KEY;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const uid = () => Math.random().toString(36).slice(2, 10);
 const sortAlpha = arr => [...arr].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 
 // ─── Modal Crear / Editar Grupo ───────────────────────────────────────────────
-function ModalCrearGrupo({ profesorUid, onClose, onSaved, grupoExistente, googleToken }) {
+function ModalCrearGrupo({ profesorUid, onClose, onSaved, grupoExistente }) {
     const [nombre,         setNombre]         = useState(grupoExistente?.nombre || '');
     const [alumnos,        setAlumnos]        = useState(grupoExistente?.alumnos || []);
     const [columnas,       setColumnas]       = useState(
-        (grupoExistente?.columnas || []).map(c => ({
-            oculta: false, porcentaje: null, esFormula: false, formula: '', ...c
+        (grupoExistente?.hojas?.[0]?.columnas || grupoExistente?.columnas || []).map((c, i) => ({
+            num: c.num || (i + 1), oculta: false, porcentaje: null, esFormula: false, formula: '', ...c
         }))
     );
-    const [celdas,         setCeldas]         = useState(grupoExistente?.celdas || {});
+    const [celdas,         setCeldas]         = useState(
+        grupoExistente?.hojas?.[0]?.celdas || grupoExistente?.celdas || {}
+    );
     const [inputNombre,    setInputNombre]    = useState('');
     const [inputGrupo,     setInputGrupo]     = useState('');
     const [guardando,      setGuardando]      = useState(false);
     const [error,          setError]          = useState('');
     const [importando,     setImportando]     = useState(false);
-    const [resumenImport,  setResumenImport]  = useState(null); // { alumnos, cols }
+    const [resumenImport,  setResumenImport]  = useState(null);
+    const [sheetsUrl,      setSheetsUrl]      = useState('');
+    const [mostrarUrl,     setMostrarUrl]     = useState(false);
     const fileRef = useRef();
-    const [openPicker] = useDrivePicker();
 
     const añadirManual = () => {
         const n = inputNombre.trim();
@@ -132,50 +131,35 @@ function ModalCrearGrupo({ profesorUid, onClose, onSaved, grupoExistente, google
         e.target.value = '';
     };
 
-    const importarDesdeSheets = async (fileId, mimeType) => {
-        if (!googleToken) { setError('No hay sesión de Google activa.'); return; }
+    // Extrae el ID de una URL de Google Sheets
+    const extraerSheetId = (url) => {
+        const m = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+        return m ? m[1] : null;
+    };
+
+    const importarDesdeUrl = async () => {
+        const sheetId = extraerSheetId(sheetsUrl.trim());
+        if (!sheetId) {
+            setError('URL no válida. Pega el enlace completo de la hoja de Google Sheets.');
+            return;
+        }
         setImportando(true); setError(''); setResumenImport(null);
         try {
-            const url = mimeType === 'application/vnd.google-apps.spreadsheet'
-                ? `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
-                : `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
-            const res = await fetch(url, { headers: { Authorization: `Bearer ${googleToken}` } });
-            if (!res.ok) throw new Error(`Error ${res.status} al acceder al archivo.`);
+            // Exportar como CSV sin autenticación (requiere que la hoja sea pública)
+            const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=xlsx&id=${sheetId}`;
+            const res = await fetch(csvUrl);
+            if (!res.ok) throw new Error('No se pudo acceder. Asegúrate de que la hoja está compartida como "Cualquiera con el enlace puede ver".');
             const ab = await res.arrayBuffer();
             const wb = XLSX.read(ab, { type: 'array' });
             const ws = wb.Sheets[wb.SheetNames[0]];
             const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
             aplicarImport(rows);
+            setSheetsUrl('');
+            setMostrarUrl(false);
         } catch (e) {
-            setError('Error al importar: ' + e.message);
+            setError('Error: ' + e.message);
         }
         setImportando(false);
-    };
-
-    const abrirPickerDrive = () => {
-        if (!googleToken) {
-            setError('Para importar de Drive debes iniciar sesión con Google. Cierra sesión y vuelve a entrar con tu cuenta de Google.');
-            return;
-        }
-        openPicker({
-            clientId: GOOGLE_CLIENT_ID,
-            developerKey: GOOGLE_DEVELOPER_KEY,
-            viewId: 'SPREADSHEETS',
-            token: googleToken,
-            showUploadView: false,
-            supportDrives: true,
-            multiselect: false,
-            mimetypes: [
-                'application/vnd.google-apps.spreadsheet',
-                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            ],
-            callbackFunction: (data) => {
-                if (data.action === 'picked') {
-                    const d = data.docs[0];
-                    importarDesdeSheets(d.id, d.mimeType);
-                }
-            }
-        });
     };
 
     const guardar = async () => {
@@ -184,13 +168,19 @@ function ModalCrearGrupo({ profesorUid, onClose, onSaved, grupoExistente, google
         setGuardando(true); setError('');
         try {
             const id = grupoExistente?.id || uid();
+            const firstHoja = {
+                id: grupoExistente?.hojas?.[0]?.id || uid(),
+                nombre: grupoExistente?.hojas?.[0]?.nombre || '1ª Evaluación',
+                columnas: columnas.map((c, i) => ({ num: c.num ?? (i + 1), ...c })),
+                celdas
+            };
+            const otrasHojas = grupoExistente?.hojas?.slice(1) || [];
             await setDoc(doc(db, 'grupos_profesor', id), {
                 id,
                 profesorUid,
                 nombre: nombre.trim(),
                 alumnos: sortAlpha(alumnos),
-                columnas,
-                celdas,
+                hojas: [firstHoja, ...otrasHojas],
                 fechaCreacion: grupoExistente?.fechaCreacion || serverTimestamp(),
             }, { merge: true });
             onSaved();
@@ -241,13 +231,24 @@ function ModalCrearGrupo({ profesorUid, onClose, onSaved, grupoExistente, google
                         <button onClick={() => fileRef.current.click()} style={ms.btnBlue} disabled={importando}>
                             <Upload size={15}/> Subir archivo
                         </button>
-                        <button onClick={abrirPickerDrive} style={ms.btnGoogle} disabled={importando}>
-                            {importando
-                                ? <><RefreshCw size={14} style={{ animation:'spin 1s linear infinite' }}/> Importando…</>
-                                : <><img src="https://ssl.gstatic.com/docs/spreadsheets/favicon3.ico" width={15} height={15} style={{ borderRadius:2 }} alt=""/> Importar de Drive</>
-                            }
+                        <button onClick={() => setMostrarUrl(v => !v)} style={ms.btnGoogle} disabled={importando}>
+                            <img src="https://ssl.gstatic.com/docs/spreadsheets/favicon3.ico" width={15} height={15} style={{ borderRadius:2 }} alt=""/> Importar de Google Sheets
                         </button>
                     </div>
+                    {mostrarUrl && (
+                        <div style={{ marginTop:8, display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
+                            <input
+                                type="text"
+                                placeholder="Pega el enlace de la hoja de Google Sheets…"
+                                value={sheetsUrl}
+                                onChange={e => setSheetsUrl(e.target.value)}
+                                style={{ ...ms.input, flex:1, minWidth:200 }}
+                            />
+                            <button onClick={importarDesdeUrl} style={ms.btnGreen} disabled={importando || !sheetsUrl.trim()}>
+                                {importando ? <><RefreshCw size={14} style={{ animation:'spin 1s linear infinite' }}/> Importando…</> : 'Importar'}
+                            </button>
+                        </div>
+                    )}
                     {resumenImport && (
                         <div style={{ marginTop:10, padding:'8px 12px', background:'#e8f5e9', borderRadius:8, fontSize:'0.78rem', color:'#1b5e20' }}>
                             ✓ {resumenImport.alumnos} alumnos importados
@@ -311,46 +312,74 @@ function ModalCrearGrupo({ profesorUid, onClose, onSaved, grupoExistente, google
     );
 }
 
-// ─── TablaGrupo ───────────────────────────────────────────────────────────────
-// Columna shape: { id, header, oculta, porcentaje, esFormula, formula }
-function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
-    const [columnas,   setColumnas]   = useState(
-        (grupo.columnas || []).map(c => ({
-            oculta: false, porcentaje: null, esFormula: false, formula: '', ...c
-        }))
-    );
-    const [celdas,     setCeldas]     = useState(grupo.celdas   || {});
-    const [alumnos,    setAlumnos]    = useState(sortAlpha(grupo.alumnos || []));
-    const [guardando,    setGuardando]    = useState(false);
-    const [guardadoOk,   setGuardadoOk]   = useState(false);
-    const [editHeader,   setEditHeader]   = useState(null);
-    const [tempHeader,   setTempHeader]   = useState('');
-    const [ocultarGrupo, setOcultarGrupo] = useState(grupo.grupoColOculta || false);
-    const [isDirty,      setIsDirty]      = useState(false);
+// ─── Normalizar grupo (migración desde formato antiguo) ───────────────────────
+const normalizarGrupo = (grupo) => {
+    if (grupo.hojas?.length > 0) {
+        return {
+            ...grupo,
+            hojas: grupo.hojas.map(h => ({
+                ...h,
+                columnas: (h.columnas || []).map((c, i) => ({
+                    num: c.num ?? (i + 1), oculta: false, porcentaje: null,
+                    esFormula: false, formula: '', ...c
+                }))
+            }))
+        };
+    }
+    const colsMigradas = (grupo.columnas || []).map((c, i) => ({
+        num: i + 1, oculta: false, porcentaje: null, esFormula: false, formula: '', ...c
+    }));
+    return {
+        ...grupo,
+        hojas: [{ id: uid(), nombre: '1ª Evaluación', columnas: colsMigradas, celdas: grupo.celdas || {} }]
+    };
+};
 
-    // Notificar al padre cuando cambia el estado dirty
+// ─── TablaGrupo ───────────────────────────────────────────────────────────────
+function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
+    const gNorm = normalizarGrupo(grupo);
+    const [hojas,             setHojas]             = useState(gNorm.hojas);
+    const [hojaIdx,           setHojaIdx]           = useState(0);
+    const [alumnos,           setAlumnos]           = useState(sortAlpha(grupo.alumnos || []));
+    const [guardando,         setGuardando]         = useState(false);
+    const [guardadoOk,        setGuardadoOk]        = useState(false);
+    const [editHeader,        setEditHeader]        = useState(null);
+    const [tempHeader,        setTempHeader]        = useState('');
+    const [ocultarGrupo,      setOcultarGrupo]      = useState(grupo.grupoColOculta || false);
+    const [isDirty,           setIsDirty]           = useState(false);
+    const [editAlumno,        setEditAlumno]        = useState(null);
+    const [tempNombreAlumno,  setTempNombreAlumno]  = useState('');
+    const [editHojaNombre,    setEditHojaNombre]    = useState(null);
+    const [tempNombreHoja,    setTempNombreHoja]    = useState('');
+
+    const hoja     = hojas[hojaIdx] || hojas[0];
+    const columnas = hoja?.columnas || [];
+
     useEffect(() => { onDirtyChange?.(isDirty); }, [isDirty, onDirtyChange]);
 
     const celdaKey = (aId, cId) => `${aId}__${cId}`;
+
+    const getCeldaEnHoja = (h, aId, cId) => h.celdas?.[celdaKey(aId, cId)] ?? '';
+    const getCelda = (aId, cId) => getCeldaEnHoja(hoja, aId, cId);
+
     const setCelda = (aId, cId, val) => {
-        setCeldas(prev => ({ ...prev, [celdaKey(aId, cId)]: val }));
+        setHojas(prev => prev.map((h, i) => i === hojaIdx
+            ? { ...h, celdas: { ...h.celdas, [celdaKey(aId, cId)]: val } } : h));
         setIsDirty(true);
     };
-    const getCelda = (aId, cId) => celdas[celdaKey(aId, cId)] ?? '';
 
-    // ── Auto-guardado del estado oculta ──────────────────────────────────────
-    const autoGuardarOculta = useCallback(async (newColumnas, newGrupoOculta) => {
-        try {
-            await updateDoc(doc(db, 'grupos_profesor', grupo.id), {
-                columnas: newColumnas,
-                grupoColOculta: newGrupoOculta
-            });
-        } catch (e) { console.error('Error al guardar visibilidad:', e); }
-    }, [grupo.id]);
+    // Encuentra la columna con num dado en cualquier hoja
+    const getColByNum = (num) => {
+        for (const h of hojas) {
+            const col = h.columnas.find(c => c.num === num);
+            if (col) return { col, h };
+        }
+        return null;
+    };
 
-    // ── Evaluador de fórmulas ────────────────────────────────────────────────
-    // Soporta: PROMEDIO(Col1,Col2,...), MAX(...), MIN(...), o número literal
-    const evaluarFormula = (formula, alumnoId, depth = 0) => {
+    // ── Evaluador de fórmulas (referencias por número de columna) ─────────────
+    // Sintaxis: PROMEDIO(1,2,3), MAX(1,5), MIN(2,7)  —  números = nº de columna global
+    const evaluarFormula = useCallback((formula, alumnoId, depth = 0) => {
         if (depth > 5 || !formula.trim()) return '';
         const match = formula.trim().match(/^(PROMEDIO|MAX|MIN)\((.+)\)$/i);
         if (!match) {
@@ -358,28 +387,28 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
             return isNaN(n) ? '' : String(n);
         }
         const fn = match[1].toUpperCase();
-        const nombres = match[2].split(',').map(s => s.trim());
-        const vals = nombres
-            .map(name => columnas.find(c => c.header === name))
-            .filter(Boolean)
-            .map(c => {
-                const raw = c.esFormula
-                    ? evaluarFormula(c.formula || '', alumnoId, depth + 1)
-                    : getCelda(alumnoId, c.id);
-                return parseFloat(raw);
-            })
-            .filter(v => !isNaN(v));
+        const nums = match[2].split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+        const vals = nums.map(num => {
+            const found = getColByNum(num);
+            if (!found) return NaN;
+            const { col, h } = found;
+            const raw = col.esFormula
+                ? evaluarFormula(col.formula || '', alumnoId, depth + 1)
+                : getCeldaEnHoja(h, alumnoId, col.id);
+            return parseFloat(raw);
+        }).filter(v => !isNaN(v));
         if (!vals.length) return '';
         if (fn === 'PROMEDIO') return (vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(2);
         if (fn === 'MAX') return Math.max(...vals).toFixed(2);
         if (fn === 'MIN') return Math.min(...vals).toFixed(2);
         return '';
-    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [hojas]);
 
     const getValor = (alumnoId, col) =>
         col.esFormula ? evaluarFormula(col.formula || '', alumnoId) : getCelda(alumnoId, col.id);
 
-    // ── Nota Final ponderada ─────────────────────────────────────────────────
+    // ── Nota Final ponderada (hoja activa) ────────────────────────────────────
     const notaFinal = (alumnoId) => {
         const colsConPct = columnas.filter(c => c.porcentaje != null && Number(c.porcentaje) > 0);
         if (!colsConPct.length) return '';
@@ -403,65 +432,112 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
         return (vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(2);
     };
 
-    // ── Acciones de columna ──────────────────────────────────────────────────
+    // ── Número global siguiente para columnas ─────────────────────────────────
+    const nextColNum = () => {
+        const all = hojas.flatMap(h => h.columnas.map(c => c.num || 0));
+        return all.length ? Math.max(...all) + 1 : 1;
+    };
+
+    // ── Auto-guardado de visibilidad ──────────────────────────────────────────
+    const autoGuardarOculta = useCallback(async (newHojas, newGrupoOculta) => {
+        try {
+            await updateDoc(doc(db, 'grupos_profesor', grupo.id), {
+                hojas: newHojas, grupoColOculta: newGrupoOculta
+            });
+        } catch (e) { console.error('Error al guardar visibilidad:', e); }
+    }, [grupo.id]);
+
+    // ── Operaciones de columna ────────────────────────────────────────────────
+    const updateColumnas = (fn, autoSave = false) => {
+        setHojas(prev => {
+            const newHojas = prev.map((h, i) => i === hojaIdx ? { ...h, columnas: fn(h.columnas) } : h);
+            if (autoSave) autoGuardarOculta(newHojas, ocultarGrupo);
+            return newHojas;
+        });
+        if (!autoSave) setIsDirty(true);
+    };
+
     const añadirColumna = () => {
-        setColumnas(prev => [...prev, {
-            id: uid(), header: `Tarea ${prev.length + 1}`,
+        const num = nextColNum();
+        updateColumnas(cols => [...cols, {
+            id: uid(), num, header: `T${num}`,
             oculta: false, porcentaje: null, esFormula: false, formula: ''
         }]);
-        setIsDirty(true);
     };
 
     const eliminarColumna = (id) => {
-        setColumnas(prev => prev.filter(c => c.id !== id));
-        setCeldas(prev => {
-            const n = { ...prev };
-            Object.keys(n).forEach(k => { if (k.endsWith(`__${id}`)) delete n[k]; });
-            return n;
-        });
+        setHojas(prev => prev.map((h, i) => i !== hojaIdx ? h : {
+            ...h,
+            columnas: h.columnas.filter(c => c.id !== id),
+            celdas: Object.fromEntries(Object.entries(h.celdas || {}).filter(([k]) => !k.endsWith(`__${id}`)))
+        }));
         setIsDirty(true);
     };
 
     const actualizarColumna = (id, changes) => {
         const esOculta = 'oculta' in changes;
-        setColumnas(prev => {
-            const newCols = prev.map(c => c.id === id ? { ...c, ...changes } : c);
-            if (esOculta) autoGuardarOculta(newCols, ocultarGrupo);
-            return newCols;
+        updateColumnas(cols => cols.map(c => c.id === id ? { ...c, ...changes } : c), esOculta);
+    };
+
+    const moverColumna = (id, dir) => {
+        updateColumnas(cols => {
+            const idx = cols.findIndex(c => c.id === id);
+            const newIdx = idx + dir;
+            if (newIdx < 0 || newIdx >= cols.length) return cols;
+            const arr = [...cols];
+            [arr[idx], arr[newIdx]] = [arr[newIdx], arr[idx]];
+            return arr;
         });
-        if (!esOculta) setIsDirty(true);
     };
 
     const toggleOcultarGrupo = (val) => {
         setOcultarGrupo(val);
-        // usar columnas actuales (las dinámicas no cambian aquí)
-        setColumnas(prev => { autoGuardarOculta(prev, val); return prev; });
+        setHojas(prev => { autoGuardarOculta(prev, val); return prev; });
     };
 
     const ocultarTodas = () => {
-        setColumnas(prev => {
-            const newCols = prev.map(c => ({ ...c, oculta: true }));
-            autoGuardarOculta(newCols, true);
-            return newCols;
-        });
         setOcultarGrupo(true);
+        setHojas(prev => {
+            const newHojas = prev.map((h, i) => i === hojaIdx
+                ? { ...h, columnas: h.columnas.map(c => ({ ...c, oculta: true })) } : h);
+            autoGuardarOculta(newHojas, true);
+            return newHojas;
+        });
     };
 
     const mostrarTodas = () => {
-        setColumnas(prev => {
-            const newCols = prev.map(c => ({ ...c, oculta: false }));
-            autoGuardarOculta(newCols, false);
-            return newCols;
-        });
         setOcultarGrupo(false);
+        setHojas(prev => {
+            const newHojas = prev.map((h, i) => i === hojaIdx
+                ? { ...h, columnas: h.columnas.map(c => ({ ...c, oculta: false })) } : h);
+            autoGuardarOculta(newHojas, false);
+            return newHojas;
+        });
     };
 
-    // ── Guardar / Exportar ───────────────────────────────────────────────────
+    // ── Operaciones de hojas ──────────────────────────────────────────────────
+    const añadirHoja = () => {
+        setHojas(prev => {
+            const newHoja = { id: uid(), nombre: `Evaluación ${prev.length + 1}`, columnas: [], celdas: {} };
+            setHojaIdx(prev.length);
+            return [...prev, newHoja];
+        });
+        setIsDirty(true);
+    };
+
+    const eliminarHoja = (idx) => {
+        if (hojas.length <= 1) return;
+        setHojas(prev => prev.filter((_, i) => i !== idx));
+        setHojaIdx(prev => Math.min(prev, hojas.length - 2));
+        setIsDirty(true);
+    };
+
+    // ── Guardar / Exportar ────────────────────────────────────────────────────
     const guardar = async () => {
         setGuardando(true);
         try {
             await updateDoc(doc(db, 'grupos_profesor', grupo.id), {
-                columnas, celdas, grupoColOculta: ocultarGrupo
+                hojas, alumnos, grupoColOculta: ocultarGrupo
             });
             setGuardadoOk(true);
             setIsDirty(false);
@@ -472,26 +548,30 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
     };
 
     const exportar = () => {
-        const cabecera = ['Nombre', 'Grupo', ...columnas.map(c => c.header), 'Nota Final'];
-        const filas = alumnos.map(a => [
-            a.nombre, a.grupo,
-            ...columnas.map(c => getValor(a.id, c)),
-            notaFinal(a.id)
-        ]);
-        const mediaFila = ['Media clase', '', ...columnas.map(c => mediaCol(c)), notaFinalMedia()];
-        const ws = XLSX.utils.aoa_to_sheet([cabecera, ...filas, [], mediaFila]);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, grupo.nombre);
+        hojas.forEach(h => {
+            const cab = ['Nombre', 'Grupo', ...h.columnas.map(c => `[${c.num}] ${c.header}`), 'Nota Final'];
+            const filas = alumnos.map(a => [
+                a.nombre, a.grupo,
+                ...h.columnas.map(c => c.esFormula
+                    ? evaluarFormula(c.formula || '', a.id)
+                    : getCeldaEnHoja(h, a.id, c.id)),
+                notaFinal(a.id)
+            ]);
+            const media = ['Media', '', ...h.columnas.map(c => mediaCol(c)), notaFinalMedia()];
+            const ws = XLSX.utils.aoa_to_sheet([cab, ...filas, [], media]);
+            XLSX.utils.book_append_sheet(wb, ws, h.nombre.slice(0, 31));
+        });
         XLSX.writeFile(wb, `${grupo.nombre}.xlsx`);
     };
 
-    // ── Render cabecera de columna dinámica ──────────────────────────────────
-    const renderTh = (col) => {
+    // ── Render cabecera de columna ────────────────────────────────────────────
+    const renderTh = (col, colIdx) => {
         if (col.oculta) {
             return (
                 <th key={col.id}
                     style={{ ...tt.thDin, minWidth:24, maxWidth:24, width:24, padding:'4px 2px', cursor:'pointer' }}
-                    title={`${col.header} — clic para mostrar`}
+                    title={`[${col.num}] ${col.header} — clic para mostrar`}
                     onClick={() => actualizarColumna(col.id, { oculta: false })}>
                     <div style={{ writingMode:'vertical-rl', transform:'rotate(180deg)', fontSize:'0.6rem', lineHeight:1.1, userSelect:'none' }}>
                         {col.header.slice(0, 8)}
@@ -502,6 +582,10 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
         }
         return (
             <th key={col.id} style={{ ...tt.thDin, minWidth:130, verticalAlign:'top' }}>
+                {/* Número global */}
+                <div style={{ fontSize:'0.62rem', opacity:0.55, textAlign:'center', marginBottom:2, letterSpacing:1 }}>
+                    #{col.num}
+                </div>
                 {/* Nombre editable */}
                 {editHeader === col.id ? (
                     <input autoFocus value={tempHeader}
@@ -528,8 +612,8 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
                     <input
                         value={col.formula}
                         onChange={e => actualizarColumna(col.id, { formula: e.target.value })}
-                        placeholder="PROMEDIO(T1,T2)"
-                        title="Fórmulas: PROMEDIO(Col1,Col2), MAX(...), MIN(...)"
+                        placeholder="MAX(1,5)"
+                        title="Fórmulas: PROMEDIO(1,2), MAX(1,5), MIN(2,7) — número de columna global"
                         style={tt.formulaInput}
                     />
                 ) : (
@@ -539,8 +623,7 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
                             type="number" min={0} max={100}
                             value={col.porcentaje ?? ''}
                             onChange={e => {
-                                const v = e.target.value === ''
-                                    ? null
+                                const v = e.target.value === '' ? null
                                     : Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
                                 actualizarColumna(col.id, { porcentaje: v });
                             }}
@@ -552,22 +635,25 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
                 )}
 
                 {/* Botones */}
-                <div style={{ display:'flex', gap:2, justifyContent:'center', marginTop:3 }}>
-                    <button
-                        onClick={() => actualizarColumna(col.id, { esFormula: !col.esFormula })}
+                <div style={{ display:'flex', gap:2, justifyContent:'center', marginTop:3, flexWrap:'wrap' }}>
+                    <button onClick={() => moverColumna(col.id, -1)} title="Mover izquierda"
+                        disabled={colIdx === 0} style={{ ...tt.thBtn, opacity: colIdx === 0 ? 0.3 : 1 }}>
+                        <ChevronLeft size={10}/>
+                    </button>
+                    <button onClick={() => moverColumna(col.id, 1)} title="Mover derecha"
+                        disabled={colIdx === columnas.length - 1}
+                        style={{ ...tt.thBtn, opacity: colIdx === columnas.length - 1 ? 0.3 : 1 }}>
+                        <ChevronRight size={10}/>
+                    </button>
+                    <button onClick={() => actualizarColumna(col.id, { esFormula: !col.esFormula })}
                         title={col.esFormula ? 'Modo valor manual' : 'Modo fórmula'}
                         style={{ ...tt.thBtn, background: col.esFormula ? 'rgba(243,156,18,0.55)' : 'rgba(255,255,255,0.15)', fontSize:'0.75rem', fontWeight:700 }}>
                         ƒ
                     </button>
-                    <button
-                        onClick={() => actualizarColumna(col.id, { oculta: true })}
-                        title="Ocultar columna"
-                        style={tt.thBtn}>
+                    <button onClick={() => actualizarColumna(col.id, { oculta: true })} title="Ocultar" style={tt.thBtn}>
                         <EyeOff size={10}/>
                     </button>
-                    <button
-                        onClick={() => eliminarColumna(col.id)}
-                        title="Eliminar columna"
+                    <button onClick={() => eliminarColumna(col.id)} title="Eliminar"
                         style={{ ...tt.thBtn, background:'rgba(231,76,60,0.45)' }}>
                         <X size={10}/>
                     </button>
@@ -578,9 +664,60 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
 
     const hayPorcentajes = columnas.some(c => c.porcentaje != null && Number(c.porcentaje) > 0);
     const totalPct = columnas.reduce((s, c) => s + (Number(c.porcentaje) || 0), 0);
+    const todasLasColumnas = hojas.flatMap(h => h.columnas.map(c => ({ ...c, hojaNombre: h.nombre })));
 
     return (
         <div>
+            {/* ── Pestañas de hojas ── */}
+            <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:14, borderBottom:'2px solid #e0e4f0', paddingBottom:0, flexWrap:'wrap' }}>
+                {hojas.map((h, i) => (
+                    <div key={h.id} style={{ display:'flex', alignItems:'center' }}>
+                        {editHojaNombre === i ? (
+                            <input autoFocus value={tempNombreHoja}
+                                onChange={e => setTempNombreHoja(e.target.value)}
+                                onBlur={() => {
+                                    if (tempNombreHoja.trim()) {
+                                        setHojas(prev => prev.map((hh, ii) => ii === i ? { ...hh, nombre: tempNombreHoja.trim() } : hh));
+                                        setIsDirty(true);
+                                    }
+                                    setEditHojaNombre(null);
+                                }}
+                                onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') e.target.blur(); }}
+                                style={{ padding:'5px 8px', borderRadius:'8px 8px 0 0', border:'2px solid #1565C0', borderBottom:'none', fontSize:'0.82rem', width:130 }}
+                            />
+                        ) : (
+                            <button
+                                onClick={() => setHojaIdx(i)}
+                                onDoubleClick={() => { setEditHojaNombre(i); setTempNombreHoja(h.nombre); }}
+                                title="Clic: cambiar · Doble clic: renombrar"
+                                style={{
+                                    padding:'6px 14px', borderRadius:'8px 8px 0 0', border:'none',
+                                    borderBottom: i === hojaIdx ? '2px solid #1565C0' : '2px solid transparent',
+                                    cursor:'pointer', background: i === hojaIdx ? '#1565C0' : '#e8f0fe',
+                                    color: i === hojaIdx ? 'white' : '#1565C0',
+                                    fontWeight: i === hojaIdx ? 700 : 400, fontSize:'0.82rem',
+                                    display:'flex', alignItems:'center', gap:5
+                                }}>
+                                {h.nombre}
+                                {i === hojaIdx && hojas.length > 1 && (
+                                    <span onClick={e => { e.stopPropagation(); eliminarHoja(i); }}
+                                        style={{ marginLeft:2, opacity:0.7, lineHeight:1, cursor:'pointer' }}
+                                        title="Eliminar hoja">
+                                        <X size={11}/>
+                                    </span>
+                                )}
+                            </button>
+                        )}
+                    </div>
+                ))}
+                <button onClick={añadirHoja}
+                    style={{ padding:'6px 12px', borderRadius:'8px 8px 0 0', border:'2px dashed #1565C0',
+                        borderBottom:'none', background:'transparent', color:'#1565C0',
+                        cursor:'pointer', fontSize:'0.82rem', fontWeight:700 }}>
+                    + Hoja
+                </button>
+            </div>
+
             {/* Barra de herramientas */}
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16, flexWrap:'wrap', gap:10 }}>
                 <div style={{ display:'flex', alignItems:'center', gap:10 }}>
@@ -650,7 +787,7 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
                                     </div>
                                 </th>
                             )}
-                            {columnas.map(col => renderTh(col))}
+                            {columnas.map((col, colIdx) => renderTh(col, colIdx))}
                             <th style={tt.thMedia}>
                                 Nota Final
                                 {hayPorcentajes && (
@@ -664,7 +801,31 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
                             const nf = notaFinal(a.id);
                             return (
                                 <tr key={a.id} style={{ background: i%2===0 ? 'white' : '#f8f9fa' }}>
-                                    <td style={tt.tdFijo}>{a.nombre}</td>
+                                    <td style={tt.tdFijo}>
+                                    {editAlumno === a.id ? (
+                                        <input
+                                            autoFocus
+                                            value={tempNombreAlumno}
+                                            onChange={e => setTempNombreAlumno(e.target.value)}
+                                            onBlur={() => {
+                                                const n = tempNombreAlumno.trim();
+                                                if (n && n !== a.nombre) {
+                                                    setAlumnos(prev => prev.map(al => al.id === a.id ? { ...al, nombre: n } : al));
+                                                    setIsDirty(true);
+                                                }
+                                                setEditAlumno(null);
+                                            }}
+                                            onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') e.target.blur(); }}
+                                            style={{ ...tt.cellInput, fontWeight:500, width:'100%' }}
+                                        />
+                                    ) : (
+                                        <div style={{ display:'flex', alignItems:'center', gap:4, cursor:'pointer' }}
+                                            onClick={() => { setEditAlumno(a.id); setTempNombreAlumno(a.nombre); }}>
+                                            {a.nombre}
+                                            <Edit2 size={10} style={{ opacity:0.35, flexShrink:0 }}/>
+                                        </div>
+                                    )}
+                                </td>
                                     {ocultarGrupo
                                         ? <td style={tt.tdOculto}/>
                                         : <td style={{ ...tt.tdFijo, color:'#7f8c8d', textAlign:'center' }}>{a.grupo}</td>}
@@ -745,8 +906,21 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
 
             {/* Leyenda fórmulas */}
             <div style={{ marginTop:10, fontSize:'0.72rem', color:'#95a5a6' }}>
-                Fórmulas disponibles: <code>PROMEDIO(Col1,Col2)</code> · <code>MAX(Col1,Col2)</code> · <code>MIN(Col1,Col2)</code>
-                {' · usa el nombre exacto de la columna'}
+                Fórmulas (número de columna): <code>PROMEDIO(1,2)</code> · <code>MAX(1,5)</code> · <code>MIN(2,7)</code>
+                {' · referencias cruzadas entre hojas'}
+                {todasLasColumnas.length > 0 && (
+                    <details style={{ marginTop:4 }}>
+                        <summary style={{ cursor:'pointer', color:'#7f8c8d' }}>Ver columnas disponibles ({todasLasColumnas.length})</summary>
+                        <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:6 }}>
+                            {todasLasColumnas.map(c => (
+                                <span key={c.id} style={{ background:'#e8f0fe', padding:'2px 7px', borderRadius:4, fontSize:'0.7rem', color:'#1565C0' }}>
+                                    <strong>#{c.num}</strong> {c.header}
+                                    <span style={{ opacity:0.55 }}> ({c.hojaNombre})</span>
+                                </span>
+                            ))}
+                        </div>
+                    </details>
+                )}
             </div>
 
             <style>{`@keyframes spin { 100%{ transform:rotate(360deg); } }`}</style>

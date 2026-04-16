@@ -46,47 +46,51 @@ import imgOlympic from '../assets/icono_olympic.png';
 
 // --- CONFIGURACIÓN DE APLICACIONES Y COLORES ---
 export const APPS = [
-    { id: 'PASAPALABRA', name: 'Pasapalabra', desc: 'Adivina la palabra con cada letra del abecedario.', color: '#0A0E45', img: imgPasapalabra },
-    { id: 'CAZABURBUJAS', name: 'Burbujas', desc: 'Explota la burbuja con la respuesta correcta.', color: '#de896e', img: imgBurbujas },
-    { id: 'PIKATRON', name: 'Pikatron', desc: 'Juego tipo runner con preguntas.', color: '#2196F3', img: imgPikatron },
+    { id: 'PASAPALABRA', name: 'Pasapalabra', desc: 'Adivina la palabra con cada letra del abecedario.', color: '#0A0E45', img: imgPasapalabra, shareable: true },
+    { id: 'CAZABURBUJAS', name: 'Burbujas', desc: 'Explota la burbuja con la respuesta correcta.', color: '#de896e', img: imgBurbujas, shareable: true },
+    { id: 'PIKATRON', name: 'Pikatron', desc: 'Juego tipo runner con preguntas.', color: '#2196F3', img: imgPikatron, shareable: true },
     {
         id: 'PIKATRON_2',
         name: 'Pikatron_2',
         desc: 'Salta y corre, acierta. Por plataformas',
         color: '#2196F3',
         img: imgPikatron2,
-        isSpecial: false
+        isSpecial: false,
+        shareable: true
     },
     {
         id: 'KARTINGED',
         name: 'Karting',
         desc: 'Carreras de karts con preguntas en los checkpoints.',
         color: '#FF6B00',
-        emoji: '🚗'
+        emoji: '🚗',
+        shareable: true
     },
     {
         id: 'KARTINGED_MULTI',
         name: 'Karting Multi',
         desc: 'Compite contra otros jugadores en tiempo real.',
         color: '#E65100',
-        emoji: '🏎️'
+        emoji: '🏎️',
+        shareable: true
     },
     {
         id: 'RACING3D',
         name: 'Racing 3D',
         desc: 'Carreras 3D con preguntas en los checkpoints. 4 vueltas, 3 AI.',
         color: '#00C6FF',
-        emoji: '🏁'
+        emoji: '🏁',
+        shareable: true
     },
 
 
-{ id: 'APAREJADOS', name: 'AparejaDOS', desc: 'Encuentra las parejas correctas.', color: '#FF9800', img: imgAparejados },
-    { id: 'RULETA', name: 'Ruleta', desc: 'Resuelve el panel oculto.', color: '#f1c40f', img: imgRuleta },
-    { id: 'WORDLE', name: 'WordLe', desc: 'Adivina la palabra en 6 intentos.', color: '#2e7d32', img: imgWordle },
-    { id: 'MATHLE', name: 'MathLe', desc: 'Adivina la ecuación matemática oculta.', color: '#1565C0', img: imgMathle },
-    { id: 'THINKHOOT', name: 'PiLive', desc: 'Diviértete en vivo con tus compañeros.', color: '#9C27B0', img: imgPilive, isLive: true },
-    { id: 'MATHLIVE', name: 'MathLive', desc: 'Juega con las mates en tiempo real.', color: '#009688', img: imgMathlive, isLive: true },
-    { id: 'OLYMPICLIVE', name: 'Olympic_Live', desc: 'Compite en minijuegos y cálculo.', color: '#D32F2F', img: imgOlympic, isLive: true },
+{ id: 'APAREJADOS', name: 'AparejaDOS', desc: 'Encuentra las parejas correctas.', color: '#FF9800', img: imgAparejados, shareable: true },
+    { id: 'RULETA', name: 'Ruleta', desc: 'Resuelve el panel oculto.', color: '#f1c40f', img: imgRuleta, shareable: true },
+    { id: 'WORDLE', name: 'WordLe', desc: 'Adivina la palabra en 6 intentos.', color: '#2e7d32', img: imgWordle, shareable: true },
+    { id: 'MATHLE', name: 'MathLe', desc: 'Adivina la ecuación matemática oculta.', color: '#1565C0', img: imgMathle, shareable: true },
+    { id: 'THINKHOOT', name: 'PiLive', desc: 'Diviértete en vivo con tus compañeros.', color: '#9C27B0', img: imgPilive, isLive: true, shareable: true },
+    { id: 'MATHLIVE', name: 'MathLive', desc: 'Juega con las mates en tiempo real.', color: '#009688', img: imgMathlive, isLive: true, shareable: true },
+    { id: 'OLYMPICLIVE', name: 'Olympic_Live', desc: 'Compite en minijuegos y cálculo.', color: '#D32F2F', img: imgOlympic, isLive: true, shareable: true },
     { id: 'SOPA', name: 'Sopa_letras', desc: 'Encuentra las palabras ocultas.', color: '#e67e22', img: imgSopa, shareable: true },
     {
         id: 'QUESTION_SENDER',
@@ -96,7 +100,8 @@ export const APPS = [
         img: null,
         emoji: '📮',
         isSpecial: true,
-        isHerramienta: true
+        isHerramienta: true,
+        shareable: true
     },
     {
         id: 'SINTAXIS',
@@ -105,7 +110,8 @@ export const APPS = [
         color: '#3498db',
         emoji: '🖍️',
         isSpecial: false,
-        isHerramienta: true
+        isHerramienta: true,
+        shareable: true
     },
     {
         id: 'LISTENING',
@@ -114,7 +120,8 @@ export const APPS = [
         color: '#3498db',
         emoji: '🙉​',
         isSpecial: false,
-        isHerramienta: true
+        isHerramienta: true,
+        shareable: true
     },
     {
         id: 'MATH_WORLD_PORTAL',
@@ -123,17 +130,19 @@ export const APPS = [
         color: '#009688',
         emoji: '🌍',
         isPortal: true,
-        isHerramienta: true
+        isHerramienta: true,
+        shareable: true
     },
     // --- JUEGOS DE MATEMÁTICAS (Saldrán en la segunda pantalla) ---
-    { id: 'GEOMETRIX', name: 'Geometrix', desc: 'Áreas, volúmenes y regla virtual.', color: '#009688', emoji: '📐', isMath: true },
+    { id: 'GEOMETRIX', name: 'Geometrix', desc: 'Áreas, volúmenes y regla virtual.', color: '#009688', emoji: '📐', isMath: true, shareable: true },
     {
         id: 'CALCULO',
         name: 'Calculo',
         desc: 'Agilidad mental y operaciones con tiempo.',
         color: '#E91E63',
         emoji: '🧠',
-        isMath: true
+        isMath: true,
+        shareable: true
     },
     {
         id: 'ETIQUETAS',
@@ -142,7 +151,8 @@ export const APPS = [
         color: '#e74c3c',
         img: imgEtiquetas,
         isSpecial: false,
-        isHerramienta: true
+        isHerramienta: true,
+        shareable: true
     },
 
 
@@ -152,15 +162,16 @@ export const APPS = [
         desc: 'Despeja la X paso a paso.',
         color: '#3F51B5',
         emoji: '⚖️',
-        isMath: true
+        isMath: true,
+        shareable: true
     },
-    { id: 'FUNCIONES', name: 'Funciones', desc: 'Características de funciones, Representación', color: '#4CAF50', emoji: '📈', isMath: true },
-    { id: 'GEOMETRÍA_ANALÍTICA', name: 'Geometría_Analítica', desc: 'Rectas, parábolas y análisis gráfico.', color: '#4CAF50', emoji: '♐​', isMath: true },
+    { id: 'FUNCIONES', name: 'Funciones', desc: 'Características de funciones, Representación', color: '#4CAF50', emoji: '📈', isMath: true, shareable: true },
+    { id: 'GEOMETRÍA_ANALÍTICA', name: 'Geometría_Analítica', desc: 'Rectas, parábolas y análisis gráfico.', color: '#4CAF50', emoji: '♐​', isMath: true, shareable: true },
 
 
-    { id: 'POLINOMIOS', name: 'Álgebra', desc: 'Operaciones con polinomios.', color: '#FF9800', emoji: '✖️', isMath: true, comingSoon: true },
+    { id: 'POLINOMIOS', name: 'Álgebra', desc: 'Operaciones con polinomios.', color: '#FF9800', emoji: '✖️', isMath: true, comingSoon: true, shareable: true },
 
-    { id: 'STORYCUBES', name: 'Story Cubes', desc: 'Crea historias en equipo usando dados con imágenes.', color: '#8e44ad', emoji: '🎲' },
+    { id: 'STORYCUBES', name: 'Story Cubes', desc: 'Crea historias en equipo usando dados con imágenes.', color: '#8e44ad', emoji: '🎲', shareable: true },
 
 ];
 
@@ -873,18 +884,31 @@ return <GamePlayer recurso={juegoActivo} usuario={null} alTerminar={() => setJue
             </h2>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '15px', marginBottom: '40px', maxWidth: '900px', margin: '0 auto 40px auto' }}>
                 {[
-                    { id: 'SINTAXIS',        label: 'Sintaxis',        emoji: '🖍️',  color: '#3498db', action: () => setJuegoActivo({ tipoJuego: 'SINTAXIS' }) },
-                    { id: 'MATH_WORLD',      label: 'Math World',      emoji: '🌍',  color: '#009688', action: () => abrirJuego('MATH_WORLD_PORTAL') },
-                    { id: 'LISTENING',       label: 'Listening',       emoji: '🙉',  color: '#8E44AD', action: () => setJuegoActivo({ tipoJuego: 'LISTENING' }) },
-                    { id: 'ETIQUETAS',       label: 'EtiquetaMe',      img: imgEtiquetas, color: '#e74c3c', action: () => abrirJuego('ETIQUETAS') },
-                    { id: 'QUESTION_SENDER', label: 'Q-Sender',        emoji: '📮',  color: '#2c3e50', action: () => setJuegoActivo({ tipoJuego: 'QUESTION_SENDER' }) },
-                    { id: 'OMNINTERACTIVE',  label: 'Omninteractive',  emoji: '📚',  color: '#6D28D9', action: () => setOmninteractivo(true) },
-                    { id: 'VIDEOQUIZZ',      label: 'VideoQuizz',      emoji: '🎬',  color: '#DC2626', action: () => setVideoQuizz(true) },
-                    { id: 'FUNCIONES_EJECUTIVAS', label: 'Funciones Ejecutivas', emoji: '🧠', color: '#FF5722', action: () => setFuncionesEjecutivas(true) },
+                    { id: 'SINTAXIS',        label: 'Sintaxis',        emoji: '🖍️',  color: '#3498db', action: () => setJuegoActivo({ tipoJuego: 'SINTAXIS' }), shareable: true },
+                    { id: 'MATH_WORLD',      label: 'Math World',      emoji: '🌍',  color: '#009688', action: () => abrirJuego('MATH_WORLD_PORTAL'), shareable: true },
+                    { id: 'LISTENING',       label: 'Listening',       emoji: '🙉',  color: '#8E44AD', action: () => setJuegoActivo({ tipoJuego: 'LISTENING' }), shareable: true },
+                    { id: 'ETIQUETAS',       label: 'EtiquetaMe',      img: imgEtiquetas, color: '#e74c3c', action: () => abrirJuego('ETIQUETAS'), shareable: true },
+                    { id: 'QUESTION_SENDER', label: 'Q-Sender',        emoji: '📮',  color: '#2c3e50', action: () => setJuegoActivo({ tipoJuego: 'QUESTION_SENDER' }), shareable: true },
+                    { id: 'OMNINTERACTIVE',  label: 'Omninteractive',  emoji: '📚',  color: '#6D28D9', action: () => setOmninteractivo(true), shareable: true },
+                    { id: 'VIDEOQUIZZ',      label: 'VideoQuizz',      emoji: '🎬',  color: '#DC2626', action: () => setVideoQuizz(true), shareable: true },
+                    { id: 'FUNCIONES_EJECUTIVAS', label: 'Funciones Ejecutivas', emoji: '🧠', color: '#FF5722', action: () => setFuncionesEjecutivas(true), shareable: true },
                 ].map(tool => (
-                    <div key={tool.id} onClick={tool.action} style={{ background: '#ffffbf', borderRadius: '15px', padding: '15px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transition: 'transform 0.2s', border: `2px solid ${tool.color}20` }}
+                    <div key={tool.id} onClick={tool.action} style={{ background: '#ffffbf', borderRadius: '15px', padding: '15px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transition: 'transform 0.2s', border: `2px solid ${tool.color}20`, position: 'relative' }}
                         onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-3px)'}
                         onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
+                        {tool.shareable && (
+                            <button
+                                onClick={e => {
+                                    e.stopPropagation();
+                                    const url = `${window.location.origin}${window.location.pathname}?juego=${tool.id.toLowerCase()}`;
+                                    setShareModal({ url, titulo: tool.label });
+                                }}
+                                title="Compartir"
+                                style={{ position:'absolute', top:6, right:6, background:'rgba(255,255,255,0.8)', border:'none', borderRadius:6, padding:'3px 5px', cursor:'pointer', display:'flex', alignItems:'center', color: tool.color }}
+                            >
+                                <Share2 size={13}/>
+                            </button>
+                        )}
                         <div style={{ width: '52px', height: '52px', margin: '0 auto 10px auto', display: 'flex', justifyContent: 'center', alignItems: 'center', background: `${tool.color}18`, borderRadius: '12px' }}>
                             {tool.img
                                 ? <img src={tool.img} alt={tool.label} style={{ width: '40px', height: '40px', objectFit: 'contain' }} />

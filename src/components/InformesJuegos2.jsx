@@ -40,8 +40,9 @@ const fmtFecha = (f) => {
     return d.toLocaleDateString('es-ES', { day:'2-digit', month:'2-digit', year:'numeric' })
          + ' ' + d.toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' });
 };
-const TIPO_LABEL  = { OCA:'🦆 Oca Matemática', CAZABURBUJAS:'🔵 Cazaburbujas', PIKATRON:'⚡ Pikatron', SOPA:'🔤 Sopa de Letras', WORDLE:'🟩 Wordle', PASAPALABRA:'🔠 Pasapalabra', FUNCIONES:'∫ Funciones', APAREJADOS:'🃏 Aparejados', STORYCUBES:'🎲 Story Cubes' };
-const TIPO_ICON   = { OCA:'🦆', CAZABURBUJAS:'🔵', PIKATRON:'⚡', SOPA:'🔤', WORDLE:'🟩', PASAPALABRA:'🔠', FUNCIONES:'∫', APAREJADOS:'🃏', STORYCUBES:'🎲' };
+const TIPO_LABEL  = { OCA:'🦆 Oca Matemática', CAZABURBUJAS:'🔵 Cazaburbujas', PIKATRON:'⚡ Pikatron', SOPA:'🔤 Sopa de Letras', WORDLE:'🟩 Wordle', PASAPALABRA:'🔠 Pasapalabra', FUNCIONES:'∫ Funciones', APAREJADOS:'🃏 Aparejados', STORYCUBES:'🎲 Story Cubes', THINKHOOT:'🦉 PiLive', MATHLIVE:'🧮 MathLive', OLYMPICLIVE:'🏅 OlympicLive' };
+const TIPO_ICON   = { OCA:'🦆', CAZABURBUJAS:'🔵', PIKATRON:'⚡', SOPA:'🔤', WORDLE:'🟩', PASAPALABRA:'🔠', FUNCIONES:'∫', APAREJADOS:'🃏', STORYCUBES:'🎲', THINKHOOT:'🦉', MATHLIVE:'🧮', OLYMPICLIVE:'🏅' };
+const TIPO_LIVE = new Set(['THINKHOOT', 'MATHLIVE', 'OLYMPICLIVE']);
 const tipoLabel   = (t) => TIPO_LABEL[t] || ('🎮 ' + (t||'Juego'));
 const tipoIcon    = (t) => TIPO_ICON[t]  || '🎮';
 
@@ -553,26 +554,48 @@ const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, 
                         <thead>
                             <tr style={{ color:'#95a5a6', fontSize:'0.72rem' }}>
                                 <th style={{ textAlign:'left', padding:'4px 6px', fontWeight:600 }}>Jugador</th>
-                                <th style={{ textAlign:'center', padding:'4px 6px', fontWeight:600 }}>Intentos</th>
-                                <th style={{ textAlign:'center', padding:'4px 6px', fontWeight:600 }}>Aciertos</th>
-                                <th style={{ textAlign:'center', padding:'4px 6px', fontWeight:600 }}>%</th>
-                                <th style={{ padding:'4px 6px' }}></th>
+                                {TIPO_LIVE.has(tipo)
+                                    ? <>
+                                        <th style={{ textAlign:'center', padding:'4px 6px', fontWeight:600, color:'#f1c40f' }}>Puntos</th>
+                                        <th style={{ textAlign:'center', padding:'4px 6px', fontWeight:600, color:'#27ae60' }}>✓</th>
+                                        <th style={{ textAlign:'center', padding:'4px 6px', fontWeight:600, color:'#e74c3c' }}>✗</th>
+                                        <th style={{ textAlign:'center', padding:'4px 6px', fontWeight:600 }}>%</th>
+                                    </>
+                                    : <>
+                                        <th style={{ textAlign:'center', padding:'4px 6px', fontWeight:600 }}>Intentos</th>
+                                        <th style={{ textAlign:'center', padding:'4px 6px', fontWeight:600 }}>Aciertos</th>
+                                        <th style={{ textAlign:'center', padding:'4px 6px', fontWeight:600 }}>%</th>
+                                        <th style={{ padding:'4px 6px' }}></th>
+                                    </>
+                                }
                             </tr>
                         </thead>
                         <tbody>
                             {jugs.map((j,k)=>(
                                 <tr key={k} style={{ borderTop:'1px solid #f8f9fa' }}>
                                     <td style={{ padding:'6px 6px', color:'#2c3e50', fontWeight:600 }}>{j.nombre}</td>
-                                    <td style={{ padding:'6px 6px', textAlign:'center', color:'#7f8c8d' }}>{j.intentos??'—'}</td>
-                                    <td style={{ padding:'6px 6px', textAlign:'center', color:'#27ae60', fontWeight:700 }}>{j.aciertos??'—'}</td>
-                                    <td style={{ padding:'6px 6px', textAlign:'center' }}>
-                                        <span style={{ padding:'2px 7px', borderRadius:12, background:pctBg2(j.porcentaje), color:pctColor2(j.porcentaje), fontWeight:700, fontSize:'0.78rem' }}>{j.porcentaje}%</span>
-                                    </td>
-                                    <td style={{ padding:'6px 6px' }}>
-                                        <div style={{ height:6, background:'#ecf0f1', borderRadius:3, overflow:'hidden', minWidth:60 }}>
-                                            <div style={{ height:'100%', width:`${j.porcentaje}%`, background:pctColor2(j.porcentaje), borderRadius:3 }}/>
-                                        </div>
-                                    </td>
+                                    {TIPO_LIVE.has(tipo)
+                                        ? <>
+                                            <td style={{ padding:'6px 6px', textAlign:'center', color:'#e67e22', fontWeight:700 }}>{j.puntos??'—'}</td>
+                                            <td style={{ padding:'6px 6px', textAlign:'center', color:'#27ae60', fontWeight:700 }}>{j.aciertos??'—'}</td>
+                                            <td style={{ padding:'6px 6px', textAlign:'center', color:'#e74c3c', fontWeight:700 }}>{j.fallos??'—'}</td>
+                                            <td style={{ padding:'6px 6px', textAlign:'center' }}>
+                                                <span style={{ padding:'2px 7px', borderRadius:12, background:pctBg2(j.precision??j.porcentaje), color:pctColor2(j.precision??j.porcentaje), fontWeight:700, fontSize:'0.78rem' }}>{j.precision??j.porcentaje??'—'}{(j.precision!=null||j.porcentaje!=null)?'%':''}</span>
+                                            </td>
+                                        </>
+                                        : <>
+                                            <td style={{ padding:'6px 6px', textAlign:'center', color:'#7f8c8d' }}>{j.intentos??'—'}</td>
+                                            <td style={{ padding:'6px 6px', textAlign:'center', color:'#27ae60', fontWeight:700 }}>{j.aciertos??'—'}</td>
+                                            <td style={{ padding:'6px 6px', textAlign:'center' }}>
+                                                <span style={{ padding:'2px 7px', borderRadius:12, background:pctBg2(j.porcentaje), color:pctColor2(j.porcentaje), fontWeight:700, fontSize:'0.78rem' }}>{j.porcentaje}%</span>
+                                            </td>
+                                            <td style={{ padding:'6px 6px' }}>
+                                                <div style={{ height:6, background:'#ecf0f1', borderRadius:3, overflow:'hidden', minWidth:60 }}>
+                                                    <div style={{ height:'100%', width:`${j.porcentaje}%`, background:pctColor2(j.porcentaje), borderRadius:3 }}/>
+                                                </div>
+                                            </td>
+                                        </>
+                                    }
                                 </tr>
                             ))}
                         </tbody>

@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect, useRef, useMemo, memo } from 'react';
 import { db } from './firebase';
-import { doc, updateDoc, onSnapshot, increment, deleteField, collection, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, addDoc, updateDoc, onSnapshot, increment, deleteField, collection, writeBatch } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
 import { MessageSquare, X, UserX, ThumbsUp, ThumbsDown, ArrowUp, Users, Play, Send, Loader, Trophy, CheckCircle, XCircle, Medal, Save, Monitor, Delete, ArrowLeftRight } from 'lucide-react';
 // --- AUDIOS ---
@@ -151,7 +151,9 @@ function OlympicLiveHost({ codigoSala, onExit, usuario }) {
 
 
 
-    const [guardandoGlobal, setGuardandoGlobal] = useState(false);
+    const [guardandoGlobal,  setGuardandoGlobal]  = useState(false);
+    const [enviandoInforme,  setEnviandoInforme]  = useState(false);
+    const [informeEnviado,   setInformeEnviado]   = useState(false);
 
     const [stats, setStats] = useState({ aciertos: 0, total: 0, pct: 0 });
     const [avatarMood, setAvatarMood] = useState('neutral');
@@ -339,31 +341,65 @@ function OlympicLiveHost({ codigoSala, onExit, usuario }) {
     };
 
     const guardarResultadosGlobales = async () => {
-        if (!usuario?.uid) return alert("Debes iniciar sesión para guardar resultados en tu cuenta."); // Bloqueamos guardado si es invitado
+        if (!usuario?.uid) return alert("Debes iniciar sesión para guardar resultados en tu cuenta.");
         if (guardandoGlobal) return;
         setGuardandoGlobal(true);
         try {
+            const resFinales = gameData.resultadosFinales || {};
             const batch = writeBatch(db);
             const rankingRef = collection(db, 'ranking');
             jugadores.forEach(j => {
+                const rf = resFinales[j.uid] || {};
                 const newDocRef = doc(rankingRef);
                 batch.set(newDocRef, {
                     recursoId: gameData.recursoId,
-                    recursoTitulo: gameData.titulo || "Juego en Vivo",
-                    tipoJuego: 'THINKHOOT',
-                    juego: 'ThinkHoot',
+                    recursoTitulo: gameData.recursoTitulo || "Juego en Vivo",
+                    tipoJuego: 'OLYMPICLIVE',
+                    juego: 'OlympicLive',
                     categoria: 'General',
                     email: 'alumno@clase.com',
                     jugador: j.nombre,
-                    aciertos: j.puntos,
+                    puntos: j.puntos || 0,
+                    aciertos: rf.aciertos ?? j.aciertos ?? 0,
+                    fallos:   rf.fallos   ?? j.fallos   ?? 0,
+                    precision: rf.pct ?? 0,
                     fecha: new Date(),
                     medalla: ''
                 });
             });
             await batch.commit();
-            alert(`✅ Resultados guardados.`);
+            alert(`✅ Resultados guardados (${jugadores.length} jugadores).`);
         } catch (error) { alert("Error al guardar resultados."); }
         setGuardandoGlobal(false);
+    };
+
+    const enviarInformeProfesor = async () => {
+        if (!usuario?.uid) return alert("Debes iniciar sesión para enviar a informes.");
+        if (enviandoInforme) return;
+        setEnviandoInforme(true);
+        try {
+            const userSnap = await getDoc(doc(db, 'users', usuario.uid));
+            const codigoProfesor = userSnap.exists() ? userSnap.data().codigoProfesor : null;
+            if (!codigoProfesor) {
+                alert("No tienes un código de profesor configurado. Ve a Informes > Configurar código.");
+                setEnviandoInforme(false); return;
+            }
+            const resFinales = gameData.resultadosFinales || {};
+            const listaJugadores = jugadores.map(j => {
+                const rf = resFinales[j.uid] || {};
+                const ac = rf.aciertos ?? j.aciertos ?? 0;
+                const fa = rf.fallos   ?? j.fallos   ?? 0;
+                return { nombre: j.nombre, puntos: j.puntos || 0, aciertos: ac, fallos: fa, precision: ac + fa > 0 ? Math.round(ac / (ac + fa) * 100) : 0 };
+            });
+            await addDoc(collection(db, 'informes_juegos'), {
+                tipo: 'OLYMPICLIVE', modalidad: 'Online', fecha: new Date(),
+                recursoId: gameData.recursoId || '', recursoTitulo: gameData.recursoTitulo || 'OlympicLive',
+                hoja: gameData.hojaNombre || '', codigoProfesor, jugadores: listaJugadores,
+            });
+            setInformeEnviado(true);
+            alert(`✅ Informe enviado a tu sección de Informes (${listaJugadores.length} jugadores).`);
+        } catch (e) { alert("Error al enviar informe: " + e.message); }
+        setEnviandoInforme(false);
     };
 
     const resolverDuda = async (accion) => {
@@ -633,9 +669,18 @@ function OlympicLiveHost({ codigoSala, onExit, usuario }) {
                     <div className="podium-screen">
                         <h1>🏆 PODIO FINAL 🏆</h1>
                         <PodiumDisplay jugadores={jugadores} final={true} playSound={playSound} />
-                        <div style={{ display: 'flex', gap: 15, marginTop: 30 }}>
+                        <div style={{ display: 'flex', gap: 15, marginTop: 30, flexWrap: 'wrap', justifyContent: 'center' }}>
+                            {!informeEnviado ? (
+                                <button className="btn-save-global" onClick={enviarInformeProfesor} disabled={enviandoInforme} style={{ background: enviandoInforme ? '#555' : '#9C27B0' }}>
+                                    <Send size={20} /> {enviandoInforme ? 'Enviando…' : 'Enviar a Informes'}
+                                </button>
+                            ) : (
+                                <div style={{ padding: '12px 20px', background: 'rgba(46,204,113,0.2)', border: '2px solid #2ecc71', borderRadius: 12, color: '#2ecc71', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <CheckCircle size={18}/> Informe enviado
+                                </div>
+                            )}
                             <button className="btn-save-global" onClick={guardarResultadosGlobales} disabled={guardandoGlobal}>
-                                <Save size={20} /> Guardar Resultados
+                                <Save size={20} /> Guardar en Ranking
                             </button>
                             <button className="btn-exit-big" onClick={onExit}>Cerrar Sala</button>
                         </div>
@@ -653,11 +698,15 @@ function OlympicLiveClient({ codigoSala, usuario, onExit }) {
     const [gameData, setGameData] = useState(null);
     const [fase, setFase] = useState('LOBBY');
     const [subFase, setSubFase] = useState('RESPONDING');
-    const [puntuacion, setPuntuacion] = useState(0);
-    const [myResult, setMyResult] = useState(null);
-    const [myRank, setMyRank] = useState(null);
-    const [textoDuda, setTextoDuda] = useState('');
+    const [puntuacion,    setPuntuacion]    = useState(0);
+    const [aciertos,      setAciertos]      = useState(0);
+    const [fallos,        setFallos]        = useState(0);
+    const [myResult,      setMyResult]      = useState(null);
+    const [myRank,        setMyRank]        = useState(null);
+    const [textoDuda,     setTextoDuda]     = useState('');
     const [showDudaModal, setShowDudaModal] = useState(false);
+    const [enviandoProfe, setEnviandoProfe] = useState(false);
+    const [enviadoProfe,  setEnviadoProfe]  = useState(false);
     const joiningRef = useRef(false);
 
     const guestId = useMemo(() => {
@@ -719,10 +768,29 @@ function OlympicLiveClient({ codigoSala, usuario, onExit }) {
             timestamp: Date.now(),
             processed: false
         };
-        // Si hay dibujo, lo adjuntamos
         if (dibujoBase64) respuestaData.dibujo = dibujoBase64;
-        await updateDoc(doc(db, "live_games", codigoSala), { [`respuestasRonda.${myUid}`]: respuestaData });
+        const campoContador = esCorrecta ? `jugadores.${myUid}.aciertos` : `jugadores.${myUid}.fallos`;
+        await updateDoc(doc(db, "live_games", codigoSala), {
+            [`respuestasRonda.${myUid}`]: respuestaData,
+            [campoContador]: increment(1)
+        });
     };
+
+    const enviarAlProfesor = async () => {
+        if (enviandoProfe || enviadoProfe) return;
+        setEnviandoProfe(true);
+        try {
+            await updateDoc(doc(db, "live_games", codigoSala), {
+                [`resultadosFinales.${myUid}`]: {
+                    uid: myUid, nombre: myName,
+                    puntos: puntuacion, aciertos, fallos,
+                    precision: aciertos + fallos > 0 ? Math.round(aciertos / (aciertos + fallos) * 100) : 0
+                }
+            });
+            setEnviadoProfe(true);
+        } finally { setEnviandoProfe(false); }
+    };
+
     // --- NUEVO: ENVIAR PUNTOS DE MINIJUEGO ---
     const handleMinijuegoTerminado = async (puntosConseguidos) => {
         const respuestaData = {
@@ -773,6 +841,8 @@ function OlympicLiveClient({ codigoSala, usuario, onExit }) {
                 <button className="btn-exit" onClick={onExit} style={{ position: 'absolute', left: 10 }}>X</button>
                 <div className="client-score-wrapper">
                     <div className="score-badge blue-pill">{puntuacion} pts</div>
+                    <div className="score-badge" style={{ background: '#27ae60' }}>✓ {aciertos}</div>
+                    <div className="score-badge" style={{ background: '#e74c3c' }}>✗ {fallos}</div>
                     <button className="client-msg-btn" onClick={() => setShowDudaModal(true)}><Send size={20} color="white" /></button>
                 </div>
             </div>
@@ -824,15 +894,23 @@ function OlympicLiveClient({ codigoSala, usuario, onExit }) {
                     <h1 className="final-title">¡FIN DE PARTIDA!</h1>
                     <div className="final-card-client">
                         <p className="final-text-intro">Enhorabuena <span className="highlight-name">{myName}</span></p>
-
-                        <p className="final-text-body">
-                            has quedado en<br />
-                            <span className="highlight-rank">{myRank}º posición</span>
-                        </p>
-
-                        <p className="final-text-body">
-                            con <span className="highlight-score">{puntuacion} puntos</span>
-                        </p>
+                        <p className="final-text-body">has quedado en<br /><span className="highlight-rank">{myRank}º posición</span></p>
+                        <p className="final-text-body">con <span className="highlight-score">{puntuacion} puntos</span></p>
+                        <div style={{ display:'flex', gap:12, justifyContent:'center', margin:'12px 0' }}>
+                            <div style={{ background:'#27ae60', borderRadius:10, padding:'8px 18px', color:'white', fontWeight:'bold' }}>✓ {aciertos} aciertos</div>
+                            <div style={{ background:'#e74c3c', borderRadius:10, padding:'8px 18px', color:'white', fontWeight:'bold' }}>✗ {fallos} fallos</div>
+                            <div style={{ background:'#8e44ad', borderRadius:10, padding:'8px 18px', color:'white', fontWeight:'bold' }}>
+                                {aciertos+fallos>0 ? Math.round(aciertos/(aciertos+fallos)*100) : 0}%
+                            </div>
+                        </div>
+                        {!enviadoProfe ? (
+                            <button onClick={enviarAlProfesor} disabled={enviandoProfe}
+                                style={{ marginTop:10, padding:'10px 24px', background:'#e67e22', color:'white', border:'none', borderRadius:8, fontWeight:'bold', fontSize:'1rem', cursor:'pointer' }}>
+                                {enviandoProfe ? 'Enviando...' : '📤 Enviar al Profesor'}
+                            </button>
+                        ) : (
+                            <div style={{ marginTop:10, color:'#2ecc71', fontWeight:'bold', fontSize:'1.1rem' }}>✅ Resultados enviados al profesor</div>
+                        )}
                     </div>
                 </div>
             )}

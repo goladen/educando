@@ -131,6 +131,7 @@ export const APPS = [
         color: '#8B5CF6',
         emoji: '📚',
         isSpecial: false,
+         isHerramienta: true,
         shareable: true
     },
     {
@@ -544,21 +545,23 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
         }
     };
 
-    const lanzarComoGestor = async (r) => {
+    const lanzarComoGestor = async (r, hojaForzada = null) => {
         if (!window.confirm("¿Quieres iniciar una sesión en vivo como presentador de este juego?")) return;
         try {
             const sala = Math.floor(100000 + Math.random() * 900000).toString();
             const limitePreguntas = parseInt(r.config?.numPreguntas) || 10;
             let pool = [];
-            if (r.hojas) r.hojas.forEach(h => pool.push(...h.preguntas));
+            if (hojaForzada) {
+                pool = hojaForzada.preguntas ? [...hojaForzada.preguntas] : [];
+            } else if (r.hojas) {
+                r.hojas.forEach(h => pool.push(...(h.preguntas || [])));
+            }
 
             if (r.config?.aleatorio !== false) pool.sort(() => Math.random() - 0.5);
 
             if (!pool.length) return alert("El recurso no tiene preguntas válidas.");
 
             const pFin = pool.slice(0, limitePreguntas).map(p => {
-                // Protegemos los juegos PRO y OLYMPIC para que no destruya el tipo de pregunta
-                // Añadimos también tipoJuego por si creaste el recurso antes de la actualización
                 if (r.tipo !== 'PRO' && r.tipo !== 'OLYMPIC' && r.tipoJuego !== 'OLYMPICLIVE') {
                     return { ...p, q: p.pregunta, a: p.correcta || p.respuesta, tipo: (p.incorrectas?.length > 0) ? 'MULTIPLE' : 'SIMPLE', opcionesFijas: (p.incorrectas?.length > 0) ? [p.correcta || p.respuesta, ...p.incorrectas].sort(() => Math.random() - 0.5) : [] };
                 }
@@ -569,6 +572,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
                 hostId: "host_invitado_" + Date.now(),
                 recursoId: r.id || 'temp_id',
                 recursoTitulo: r.titulo,
+                hojaNombre: hojaForzada ? (hojaForzada.nombreHoja || hojaForzada.nombre || '') : '',
                 profesorNombre: "Profe Invitado",
                 config: r.config || {},
                 preguntas: pFin,
@@ -674,6 +678,12 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
 if (juegoActivo.tipoJuego === 'SINTAXIS')    return <SintaxisGame  usuario={null} onExit={() => setJuegoActivo(null)} />;
 if (juegoActivo.tipoJuego === 'LISTENING')   return <Listening     usuario={null} onExit={() => setJuegoActivo(null)} />;
 if (juegoActivo.tipoJuego === 'STORYCUBES')  return <StoryCubes    usuario={null} onExit={() => setJuegoActivo(null)} />;
+if (juegoActivo.tipoJuego === 'SOLAR_SYSTEM') return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#000', display: 'flex', flexDirection: 'column' }}>
+        <button onClick={() => setJuegoActivo(null)} style={{ position: 'absolute', top: 10, left: 10, zIndex: 10000, background: 'rgba(0,0,0,0.7)', color: 'white', border: '1px solid rgba(255,255,255,0.4)', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.95rem' }}>← Salir</button>
+        <iframe src="/SolarSystem/index.html" title="Sistema Solar" style={{ flex: 1, border: 'none', width: '100%', height: '100%' }} allow="fullscreen" />
+    </div>
+);
         if (juegoActivo.tipoJuego === 'KARTINGED') return <KartingedGame usuario={null} alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'KARTINGED_MULTI') return <KartingedMultiGame alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'RACING3D') return <RacingGame3D usuario={null} alTerminar={() => setJuegoActivo(null)} />;
@@ -913,6 +923,7 @@ return <GamePlayer recurso={juegoActivo} usuario={null} alTerminar={() => setJue
                     { id: 'VIDEOQUIZZ',      label: 'VideoQuizz',      emoji: '🎬',  color: '#DC2626', action: () => setVideoQuizz(true), shareable: true },
                     { id: 'FUNCIONES_EJECUTIVAS', label: 'Funciones Ejecutivas', emoji: '🧠', color: '#FF5722', action: () => setFuncionesEjecutivas(true), shareable: true },
                     { id: 'IRREGULAR_VERBS',     label: 'Irregular Verbs',     emoji: '📝', color: '#0369a1', action: () => setIrregularVerbs(true), shareable: false },
+                    { id: 'SOLAR_SYSTEM',        label: 'Sistema Solar',        emoji: '🪐', color: '#3B82F6', action: () => setJuegoActivo({ tipoJuego: 'SOLAR_SYSTEM' }), shareable: false },
                 ].map(tool => (
                     <div key={tool.id} onClick={tool.action} style={{ background: '#ffffbf', borderRadius: '15px', padding: '15px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transition: 'transform 0.2s', border: `2px solid ${tool.color}20`, position: 'relative' }}
                         onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-3px)'}
@@ -1143,6 +1154,7 @@ const [entrando, setEntrando] = useState(false);
     const [hostRoomCode, setHostRoomCode] = useState('');
     const [juegoActivo, setJuegoActivo] = useState(null);
     const [recursoParaElegir, setRecursoParaElegir] = useState(null);
+    const [selectorHojaRecurso, setSelectorHojaRecurso] = useState(null); // { recurso, hojas }
     // --- NUEVAS FUNCIONES DE SALIDA DIRECTA ---
     const handleExitGame = () => {
         if (appData.isMath) {
@@ -1263,13 +1275,17 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={null} onExit={onHo
         } catch (e) { console.error(e); }
     };
 
-    const lanzarComoGestor = async (r) => {
+    const lanzarComoGestor = async (r, hojaForzada = null) => {
         if (!window.confirm("¿Quieres iniciar una sesión en vivo como presentador de este juego?")) return;
         try {
             const sala = Math.floor(100000 + Math.random() * 900000).toString();
             const limitePreguntas = parseInt(r.config?.numPreguntas) || 10;
             let pool = [];
-            if (r.hojas) r.hojas.forEach(h => pool.push(...h.preguntas));
+            if (hojaForzada) {
+                pool = hojaForzada.preguntas ? [...hojaForzada.preguntas] : [];
+            } else if (r.hojas) {
+                r.hojas.forEach(h => pool.push(...(h.preguntas || [])));
+            }
             if (r.config?.aleatorio !== false) pool.sort(() => Math.random() - 0.5);
 
             const pFin = pool.slice(0, limitePreguntas).map(p => {
@@ -1285,6 +1301,7 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={null} onExit={onHo
                 hostId: "host_invitado_" + Date.now(),
                 recursoId: r.id || 'temp_id',
                 recursoTitulo: r.titulo,
+                hojaNombre: hojaForzada ? (hojaForzada.nombreHoja || hojaForzada.nombre || '') : '',
                 profesorNombre: "Profe Invitado",
                 config: r.config || {},
                 preguntas: pFin,
@@ -1302,8 +1319,14 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={null} onExit={onHo
     };
 
     const procesarClickTarjeta = (r) => {
-        if (appData.isLive) lanzarComoGestor(r);
-        else if (r.tipoJuego === 'CAZABURBUJAS' || r.tipoJuego === 'WORDLE' || r.tipoJuego === 'SOPA') setRecursoParaElegir(r);
+        if (appData.isLive) {
+            // Si el recurso tiene múltiples hojas, mostrar selector primero
+            if (r.hojas && r.hojas.length > 1) {
+                setSelectorHojaRecurso(r);
+            } else {
+                lanzarComoGestor(r);
+            }
+        } else if (r.tipoJuego === 'CAZABURBUJAS' || r.tipoJuego === 'WORDLE' || r.tipoJuego === 'SOPA') setRecursoParaElegir(r);
         else if (r.tipoJuego === 'ETIQUETAS') setJuegoActivo(r);
         else setJuegoActivo(r);
     };
@@ -1337,6 +1360,39 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={null} onExit={onHo
 
     return (
         <div style={{ width: '100%', minHeight: '100vh', background: '#f0f2f5', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
+
+            {/* MODAL SELECTOR DE HOJA */}
+            {selectorHojaRecurso && (
+                <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.8)', zIndex: 5000, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                    <div style={{ background: 'white', padding: '30px', borderRadius: '20px', textAlign: 'center', maxWidth: '440px', width: '90%' }}>
+                        <h2 style={{ color: '#2c3e50', margin: '0 0 8px 0' }}>📋 Elige una hoja</h2>
+                        <p style={{ color: '#7f8c8d', fontSize: '0.9rem', margin: '0 0 20px 0' }}>
+                            <strong>{selectorHojaRecurso.titulo}</strong> tiene {selectorHojaRecurso.hojas.length} hojas.
+                            Selecciona cuál quieres presentar o lanza todas.
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: 300, overflowY: 'auto', marginBottom: 16 }}>
+                            {selectorHojaRecurso.hojas.map((h, i) => (
+                                <button key={i}
+                                    onClick={() => { lanzarComoGestor(selectorHojaRecurso, h); setSelectorHojaRecurso(null); }}
+                                    style={{ padding: '12px 16px', background: appData.color, color: 'white', border: 'none', borderRadius: '10px', fontSize: '1rem', cursor: 'pointer', fontWeight: 'bold', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span>📄 {h.nombreHoja || h.nombre || `Hoja ${i + 1}`}</span>
+                                    <span style={{ opacity: 0.75, fontSize: '0.8rem' }}>{h.preguntas?.length || 0} preguntas</span>
+                                </button>
+                            ))}
+                        </div>
+                        <div style={{ display: 'flex', gap: 10 }}>
+                            <button onClick={() => { lanzarComoGestor(selectorHojaRecurso, null); setSelectorHojaRecurso(null); }}
+                                style={{ flex: 1, padding: '11px', background: '#27ae60', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>
+                                🔀 Todas las hojas
+                            </button>
+                            <button onClick={() => setSelectorHojaRecurso(null)}
+                                style={{ padding: '11px 16px', background: '#eee', border: 'none', borderRadius: '10px', cursor: 'pointer', color: '#555' }}>
+                                Cancelar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* MODAL ELEGIR MODO BURBUJAS/PIKATRON */}
             {recursoParaElegir && (

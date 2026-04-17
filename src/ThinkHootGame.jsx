@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect, useRef, useMemo, memo } from 'react';
 import { db } from './firebase';
-import { doc, updateDoc, onSnapshot, increment, deleteField, collection, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, addDoc, updateDoc, onSnapshot, increment, deleteField, collection, writeBatch } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
 import { MessageSquare, X, UserX, ThumbsUp, ThumbsDown, ArrowUp, Users, Play, Send, Loader, Trophy, CheckCircle, XCircle, Medal, Save, Monitor } from 'lucide-react';
 import MathLive from './MathLive';
@@ -72,7 +72,9 @@ function ThinkHootHost({ codigoSala, onExit, usuario }) {
 
 
 
-    const [guardandoGlobal, setGuardandoGlobal] = useState(false);
+    const [guardandoGlobal,   setGuardandoGlobal]   = useState(false);
+    const [enviandoInforme,   setEnviandoInforme]   = useState(false);
+    const [informeEnviado,    setInformeEnviado]     = useState(false);
 
     const [stats, setStats] = useState({ aciertos: 0, total: 0, pct: 0 });
     const [avatarMood, setAvatarMood] = useState('neutral');
@@ -283,31 +285,81 @@ function ThinkHootHost({ codigoSala, onExit, usuario }) {
     };
 
     const guardarResultadosGlobales = async () => {
-        if (!usuario?.uid) return alert("Debes iniciar sesión para guardar resultados en tu cuenta."); // Bloqueamos guardado si es invitado
+        if (!usuario?.uid) return alert("Debes iniciar sesión para guardar resultados en tu cuenta.");
         if (guardandoGlobal) return;
         setGuardandoGlobal(true);
         try {
+            // Fusionar datos de jugadores con los enviados por los alumnos (resultadosFinales)
+            const resFinales = gameData.resultadosFinales || {};
             const batch = writeBatch(db);
             const rankingRef = collection(db, 'ranking');
             jugadores.forEach(j => {
+                const rf = resFinales[j.uid] || {};
                 const newDocRef = doc(rankingRef);
                 batch.set(newDocRef, {
                     recursoId: gameData.recursoId,
-                    recursoTitulo: gameData.titulo || "Juego en Vivo",
+                    recursoTitulo: gameData.titulo || gameData.recursoTitulo || "Juego en Vivo",
                     tipoJuego: 'THINKHOOT',
                     juego: 'ThinkHoot',
                     categoria: 'General',
                     email: 'alumno@clase.com',
                     jugador: j.nombre,
-                    aciertos: j.puntos,
+                    puntos: j.puntos || 0,
+                    aciertos: rf.aciertos ?? j.aciertos ?? 0,
+                    fallos:   rf.fallos   ?? j.fallos   ?? 0,
+                    precision: rf.pct ?? (j.aciertos + j.fallos > 0 ? Math.round(j.aciertos / (j.aciertos + j.fallos) * 100) : 0),
                     fecha: new Date(),
                     medalla: ''
                 });
             });
             await batch.commit();
-            alert(`✅ Resultados guardados.`);
+            alert(`✅ Resultados guardados (${jugadores.length} jugadores).`);
         } catch (error) { alert("Error al guardar resultados."); }
         setGuardandoGlobal(false);
+    };
+
+    const enviarInformeProfesor = async () => {
+        if (!usuario?.uid) return alert("Debes iniciar sesión para enviar a informes.");
+        if (enviandoInforme) return;
+        setEnviandoInforme(true);
+        try {
+            // Obtener el código de profesor del perfil del usuario
+            const userSnap = await getDoc(doc(db, 'users', usuario.uid));
+            const codigoProfesor = userSnap.exists() ? userSnap.data().codigoProfesor : null;
+            if (!codigoProfesor) {
+                alert("No tienes un código de profesor configurado. Ve a Informes > Configurar código.");
+                setEnviandoInforme(false); return;
+            }
+
+            const resFinales = gameData.resultadosFinales || {};
+            const listaJugadores = jugadores.map(j => {
+                const rf = resFinales[j.uid] || {};
+                const ac = rf.aciertos ?? j.aciertos ?? 0;
+                const fa = rf.fallos   ?? j.fallos   ?? 0;
+                return {
+                    nombre:    j.nombre,
+                    puntos:    j.puntos  || 0,
+                    aciertos:  ac,
+                    fallos:    fa,
+                    precision: ac + fa > 0 ? Math.round(ac / (ac + fa) * 100) : 0,
+                };
+            });
+
+            await addDoc(collection(db, 'informes_juegos'), {
+                tipo:           'THINKHOOT',
+                modalidad:      'Online',
+                fecha:          new Date(),
+                recursoId:      gameData.recursoId    || '',
+                recursoTitulo:  gameData.recursoTitulo || 'PiLive',
+                hoja:           gameData.hojaNombre   || '',
+                codigoProfesor,
+                jugadores:      listaJugadores,
+            });
+
+            setInformeEnviado(true);
+            alert(`✅ Informe enviado a tu sección de Informes (${listaJugadores.length} jugadores).`);
+        } catch (e) { alert("Error al enviar informe: " + e.message); }
+        setEnviandoInforme(false);
     };
 
     const resolverDuda = async (accion) => {
@@ -530,9 +582,21 @@ function ThinkHootHost({ codigoSala, onExit, usuario }) {
                     <div className="podium-screen">
                         <h1>🏆 PODIO FINAL 🏆</h1>
                         <PodiumDisplay jugadores={jugadores} final={true} playSound={playSound} />
-                        <div style={{ display: 'flex', gap: 15, marginTop: 30 }}>
+                        <div style={{ display: 'flex', gap: 15, marginTop: 30, flexWrap: 'wrap', justifyContent: 'center' }}>
+                            {!informeEnviado ? (
+                                <button className="btn-save-global"
+                                    onClick={enviarInformeProfesor}
+                                    disabled={enviandoInforme}
+                                    style={{ background: enviandoInforme ? '#555' : '#9C27B0' }}>
+                                    <Send size={20} /> {enviandoInforme ? 'Enviando…' : 'Enviar a Informes'}
+                                </button>
+                            ) : (
+                                <div style={{ padding: '12px 20px', background: 'rgba(46,204,113,0.2)', border: '2px solid #2ecc71', borderRadius: 12, color: '#2ecc71', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <CheckCircle size={18}/> Informe enviado
+                                </div>
+                            )}
                             <button className="btn-save-global" onClick={guardarResultadosGlobales} disabled={guardandoGlobal}>
-                                <Save size={20} /> Guardar Resultados
+                                <Save size={20} /> Guardar en Ranking
                             </button>
                             <button className="btn-exit-big" onClick={onExit}>Cerrar Sala</button>
                         </div>
@@ -551,10 +615,14 @@ function ThinkHootClient({ codigoSala, usuario, onExit }) {
     const [fase, setFase] = useState('LOBBY');
     const [subFase, setSubFase] = useState('RESPONDING');
     const [puntuacion, setPuntuacion] = useState(0);
-    const [myResult, setMyResult] = useState(null);
-    const [myRank, setMyRank] = useState(null);
+    const [aciertos,  setAciertos]  = useState(0);
+    const [fallos,    setFallos]    = useState(0);
+    const [myResult,  setMyResult]  = useState(null);
+    const [myRank,    setMyRank]    = useState(null);
     const [textoDuda, setTextoDuda] = useState('');
     const [showDudaModal, setShowDudaModal] = useState(false);
+    const [enviandoProfe, setEnviandoProfe] = useState(false);
+    const [enviadoProfe,  setEnviadoProfe]  = useState(false);
     const joiningRef = useRef(false);
 
     const guestId = useMemo(() => {
@@ -582,13 +650,15 @@ function ThinkHootClient({ codigoSala, usuario, onExit }) {
 
                 const jugadoresMap = data.jugadores || {};
                 if (jugadoresMap[myUid]) {
-                    setPuntuacion(jugadoresMap[myUid].puntos || 0);
+                    setPuntuacion(jugadoresMap[myUid].puntos   || 0);
+                    setAciertos(jugadoresMap[myUid].aciertos   || 0);
+                    setFallos(jugadoresMap[myUid].fallos       || 0);
                 } else {
                     // CORRECCIÓN: Permitimos unirse en LOBBY o en JUEGO (para los tardones)
                     if ((data.estado === 'LOBBY' || data.estado === 'JUEGO') && !joiningRef.current) {
                         joiningRef.current = true;
                         await updateDoc(doc(db, "live_games", codigoSala), {
-                            [`jugadores.${myUid}`]: { uid: myUid, nombre: myName, puntos: 0, joinedAt: Date.now() }
+                            [`jugadores.${myUid}`]: { uid: myUid, nombre: myName, puntos: 0, aciertos: 0, fallos: 0, joinedAt: Date.now() }
                         });
                         joiningRef.current = false;
                     }
@@ -613,9 +683,12 @@ function ThinkHootClient({ codigoSala, usuario, onExit }) {
             timestamp: Date.now(),
             processed: false
         };
-        // Si hay dibujo, lo adjuntamos
         if (dibujoBase64) respuestaData.dibujo = dibujoBase64;
-        await updateDoc(doc(db, "live_games", codigoSala), { [`respuestasRonda.${myUid}`]: respuestaData });
+        const updates = { [`respuestasRonda.${myUid}`]: respuestaData };
+        // Incrementar aciertos o fallos directamente en el mapa del jugador
+        if (esCorrecta) updates[`jugadores.${myUid}.aciertos`] = increment(1);
+        else            updates[`jugadores.${myUid}.fallos`]   = increment(1);
+        await updateDoc(doc(db, "live_games", codigoSala), updates);
     };
 
     const enviarDuda = async () => {
@@ -623,6 +696,25 @@ function ThinkHootClient({ codigoSala, usuario, onExit }) {
         const dudaId = `msg_${Date.now()}`;
         await updateDoc(doc(db, "live_games", codigoSala), { [`mensajes.${dudaId}`]: { uid: myUid, alumno: myName, texto: textoDuda, timestamp: Date.now() } });
         setTextoDuda(''); setShowDudaModal(false); alert("Enviado");
+    };
+
+    const enviarAlProfesor = async () => {
+        setEnviandoProfe(true);
+        try {
+            await updateDoc(doc(db, "live_games", codigoSala), {
+                [`resultadosFinales.${myUid}`]: {
+                    nombre: myName,
+                    puntos: puntuacion,
+                    aciertos,
+                    fallos,
+                    total: aciertos + fallos,
+                    pct: aciertos + fallos > 0 ? Math.round(aciertos / (aciertos + fallos) * 100) : 0,
+                    enviadoAt: Date.now()
+                }
+            });
+            setEnviadoProfe(true);
+        } catch (e) { alert("Error al enviar."); }
+        setEnviandoProfe(false);
     };
 
     if (!gameData) return <div style={{ color: 'white', padding: 20 }}>Conectando...</div>;
@@ -650,6 +742,12 @@ function ThinkHootClient({ codigoSala, usuario, onExit }) {
                 <button className="btn-exit" onClick={onExit} style={{ position: 'absolute', left: 10 }}>X</button>
                 <div className="client-score-wrapper">
                     <div className="score-badge blue-pill">{puntuacion} pts</div>
+                    <div className="score-badge" style={{ background: '#27ae60', borderRadius: 0, padding: '10px 12px', fontWeight: 700, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <CheckCircle size={14}/> {aciertos}
+                    </div>
+                    <div className="score-badge" style={{ background: '#e74c3c', borderRadius: 0, padding: '10px 12px', fontWeight: 700, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <XCircle size={14}/> {fallos}
+                    </div>
                     <button className="client-msg-btn" onClick={() => setShowDudaModal(true)}><Send size={20} color="white" /></button>
                 </div>
             </div>
@@ -690,15 +788,47 @@ function ThinkHootClient({ codigoSala, usuario, onExit }) {
                     <h1 className="final-title">¡FIN DE PARTIDA!</h1>
                     <div className="final-card-client">
                         <p className="final-text-intro">Enhorabuena <span className="highlight-name">{myName}</span></p>
-
                         <p className="final-text-body">
                             has quedado en<br />
                             <span className="highlight-rank">{myRank}º posición</span>
                         </p>
-
                         <p className="final-text-body">
                             con <span className="highlight-score">{puntuacion} puntos</span>
                         </p>
+
+                        {/* Contador aciertos / fallos */}
+                        <div style={{ display: 'flex', justifyContent: 'center', gap: 12, margin: '16px 0' }}>
+                            <div style={{ background: 'rgba(39,174,96,0.2)', border: '2px solid #2ecc71', borderRadius: 12, padding: '10px 20px', textAlign: 'center' }}>
+                                <div style={{ fontSize: '2rem', fontWeight: 700, color: '#2ecc71' }}>{aciertos}</div>
+                                <div style={{ color: '#ccc', fontSize: '0.85rem' }}>Aciertos</div>
+                            </div>
+                            <div style={{ background: 'rgba(231,76,60,0.2)', border: '2px solid #e74c3c', borderRadius: 12, padding: '10px 20px', textAlign: 'center' }}>
+                                <div style={{ fontSize: '2rem', fontWeight: 700, color: '#e74c3c' }}>{fallos}</div>
+                                <div style={{ color: '#ccc', fontSize: '0.85rem' }}>Fallos</div>
+                            </div>
+                            {aciertos + fallos > 0 && (
+                                <div style={{ background: 'rgba(241,196,15,0.2)', border: '2px solid #f1c40f', borderRadius: 12, padding: '10px 20px', textAlign: 'center' }}>
+                                    <div style={{ fontSize: '2rem', fontWeight: 700, color: '#f1c40f' }}>
+                                        {Math.round(aciertos / (aciertos + fallos) * 100)}%
+                                    </div>
+                                    <div style={{ color: '#ccc', fontSize: '0.85rem' }}>Precisión</div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Botón enviar al profesor */}
+                        {!enviadoProfe ? (
+                            <button
+                                onClick={enviarAlProfesor}
+                                disabled={enviandoProfe}
+                                style={{ marginTop: 8, width: '100%', padding: '14px', border: 'none', borderRadius: 30, background: enviandoProfe ? '#555' : '#9C27B0', color: 'white', fontWeight: 700, fontSize: '1.1rem', cursor: enviandoProfe ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                                <Send size={18}/> {enviandoProfe ? 'Enviando…' : 'Enviar al Profesor'}
+                            </button>
+                        ) : (
+                            <div style={{ marginTop: 8, padding: '12px', background: 'rgba(46,204,113,0.15)', border: '2px solid #2ecc71', borderRadius: 12, color: '#2ecc71', fontWeight: 700, textAlign: 'center' }}>
+                                ✓ Resultados enviados al profesor
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
@@ -1103,13 +1233,51 @@ function PodiumDisplay({ jugadores, final, playSound }) {
                     );
                 })}
             </div>
-            <div className="runners-up-grid">
-                {runnerUps.map((j, i) => (
-                    <div key={j.uid} className="runner-up-card"><span className="r-rank">{i + 4}º</span><span className="r-name">{j.nombre}</span><span className="r-score">{j.puntos}</span></div>
-                ))}
-            </div>
-            {rest.length > 0 && (
-                <div className="rest-list">{rest.map((j, i) => (<div key={j.uid} className="rest-row"><span>{i + 6}º {j.nombre}</span><span>{j.puntos}</span></div>))}</div>
+            {/* Tabla completa de resultados */}
+            {final && sorted.length > 0 && (
+                <div style={{ width: '100%', maxWidth: 600, marginTop: 20, overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem', color: 'white' }}>
+                        <thead>
+                            <tr style={{ background: 'rgba(255,255,255,0.1)', textTransform: 'uppercase', fontSize: '0.72rem', letterSpacing: 1 }}>
+                                <th style={{ padding: '8px 10px', textAlign: 'left' }}>#</th>
+                                <th style={{ padding: '8px 10px', textAlign: 'left' }}>Nombre</th>
+                                <th style={{ padding: '8px 10px', textAlign: 'center', color: '#f1c40f' }}>Pts</th>
+                                <th style={{ padding: '8px 10px', textAlign: 'center', color: '#2ecc71' }}>✓</th>
+                                <th style={{ padding: '8px 10px', textAlign: 'center', color: '#e74c3c' }}>✗</th>
+                                <th style={{ padding: '8px 10px', textAlign: 'center', color: '#3498db' }}>%</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {sorted.map((j, i) => {
+                                const ac = j.aciertos || 0;
+                                const fa = j.fallos   || 0;
+                                const pct = ac + fa > 0 ? Math.round(ac / (ac + fa) * 100) : '—';
+                                return (
+                                    <tr key={j.uid} style={{ background: i % 2 === 0 ? 'rgba(255,255,255,0.05)' : 'transparent', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                                        <td style={{ padding: '7px 10px', fontWeight: 700 }}>{i + 1}º</td>
+                                        <td style={{ padding: '7px 10px' }}>{j.nombre}</td>
+                                        <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 700, color: '#f1c40f' }}>{j.puntos}</td>
+                                        <td style={{ padding: '7px 10px', textAlign: 'center', color: '#2ecc71', fontWeight: 700 }}>{ac}</td>
+                                        <td style={{ padding: '7px 10px', textAlign: 'center', color: '#e74c3c', fontWeight: 700 }}>{fa}</td>
+                                        <td style={{ padding: '7px 10px', textAlign: 'center', color: '#3498db' }}>{pct}{pct !== '—' ? '%' : ''}</td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+            {!final && (
+                <>
+                    <div className="runners-up-grid">
+                        {runnerUps.map((j, i) => (
+                            <div key={j.uid} className="runner-up-card"><span className="r-rank">{i + 4}º</span><span className="r-name">{j.nombre}</span><span className="r-score">{j.puntos}</span></div>
+                        ))}
+                    </div>
+                    {rest.length > 0 && (
+                        <div className="rest-list">{rest.map((j, i) => (<div key={j.uid} className="rest-row"><span>{i + 6}º {j.nombre}</span><span>{j.puntos}</span></div>))}</div>
+                    )}
+                </>
             )}
         </div>
     );
@@ -1120,6 +1288,10 @@ const EstilosComunes = () => (<style>{` @import url('https://fonts.googleapis.co
 const EstilosThinkHoot = () => (
     <style>{`
         .game-container { width: 100vw; height: 100vh; background: #2c3e50; display: flex; flex-direction: column; justify-content: center; align-items: center; overflow: hidden; position: relative; font-family: 'Roboto', sans-serif; }
+        .lobby-wait { display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; text-align: center; gap: 12px; animation: popIn 0.4s; }
+        .lobby-wait h1, .lobby-wait h2 { color: #f1c40f; font-family: 'Righteous', sans-serif; margin: 0; text-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+        .lobby-wait p { color: #ecf0f1; font-size: 1.2rem; margin: 0; opacity: 0.85; }
+        .avatar-wait { font-size: 4rem; margin-top: 10px; animation: bounce 1.5s infinite; }
         
         /* AVATAR PI - HOST (Top Left) */
         .pi-avatar-container-host { position: absolute; top: 80px; left: 20px; z-index: 50; display: flex; flex-direction: column; align-items: center; transition: all 0.3s; }

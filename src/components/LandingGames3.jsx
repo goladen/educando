@@ -45,6 +45,74 @@ import imgSopa from '../assets/icono_sopa.png';
 import imgOlympic from '../assets/icono_olympic.png';
 
 
+// --- VISOR SISTEMA SOLAR ---
+function SolarSystemViewer({ onExit }) {
+    const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+    const [isLandscape, setIsLandscape] = React.useState(
+        () => window.innerWidth > window.innerHeight
+    );
+    const [showLandscapeHint, setShowLandscapeHint] = React.useState(
+        () => isMobile && window.innerWidth <= window.innerHeight
+    );
+    const iframeRef = React.useRef(null);
+
+    React.useEffect(() => {
+        // Solicitar pantalla completa en móvil
+        if (isMobile && document.documentElement.requestFullscreen) {
+            document.documentElement.requestFullscreen().catch(() => {});
+        }
+        // Intentar bloquear orientación landscape
+        if (isMobile && screen.orientation?.lock) {
+            screen.orientation.lock('landscape').catch(() => {});
+        }
+        const handleResize = () => {
+            const landscape = window.innerWidth > window.innerHeight;
+            setIsLandscape(landscape);
+            if (landscape) setShowLandscapeHint(false);
+        };
+        window.addEventListener('resize', handleResize);
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            if (document.fullscreenElement && document.exitFullscreen) {
+                document.exitFullscreen().catch(() => {});
+            }
+            if (screen.orientation?.unlock) screen.orientation.unlock();
+        };
+    }, []);
+
+    return (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#000', display: 'flex', flexDirection: 'column' }}>
+            {/* Aviso orientación landscape en móvil */}
+            {showLandscapeHint && (
+                <div style={{ position: 'absolute', inset: 0, zIndex: 10001, background: 'rgba(0,0,0,0.92)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'white', gap: 16 }}>
+                    <div style={{ fontSize: 64 }}>📱↔️</div>
+                    <p style={{ fontSize: '1.3rem', fontWeight: 'bold', textAlign: 'center', margin: 0 }}>Gira el dispositivo</p>
+                    <p style={{ fontSize: '1rem', color: '#aaa', textAlign: 'center', margin: 0 }}>Para una mejor experiencia usa la vista horizontal</p>
+                    <button onClick={() => setShowLandscapeHint(false)}
+                        style={{ marginTop: 8, padding: '10px 28px', background: '#3B82F6', color: 'white', border: 'none', borderRadius: 10, fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer' }}>
+                        Continuar de todos modos
+                    </button>
+                    <button onClick={onExit}
+                        style={{ background: 'transparent', color: '#aaa', border: 'none', cursor: 'pointer', fontSize: '0.9rem' }}>
+                        Cancelar
+                    </button>
+                </div>
+            )}
+            <button onClick={onExit}
+                style={{ position: 'absolute', top: 10, left: 10, zIndex: 10000, background: 'rgba(0,0,0,0.7)', color: 'white', border: '1px solid rgba(255,255,255,0.4)', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.95rem' }}>
+                ← Salir
+            </button>
+            <iframe
+                ref={iframeRef}
+                src="/SolarSystem/index.html"
+                title="Sistema Solar"
+                style={{ flex: 1, border: 'none', width: '100%', height: '100%' }}
+                allow="fullscreen"
+            />
+        </div>
+    );
+}
+
 // --- CONFIGURACIÓN DE APLICACIONES Y COLORES ---
 export const APPS = [
     { id: 'PASAPALABRA', name: 'Pasapalabra', desc: 'Adivina la palabra con cada letra del abecedario.', color: '#0A0E45', img: imgPasapalabra, shareable: true },
@@ -678,12 +746,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
 if (juegoActivo.tipoJuego === 'SINTAXIS')    return <SintaxisGame  usuario={null} onExit={() => setJuegoActivo(null)} />;
 if (juegoActivo.tipoJuego === 'LISTENING')   return <Listening     usuario={null} onExit={() => setJuegoActivo(null)} />;
 if (juegoActivo.tipoJuego === 'STORYCUBES')  return <StoryCubes    usuario={null} onExit={() => setJuegoActivo(null)} />;
-if (juegoActivo.tipoJuego === 'SOLAR_SYSTEM') return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#000', display: 'flex', flexDirection: 'column' }}>
-        <button onClick={() => setJuegoActivo(null)} style={{ position: 'absolute', top: 10, left: 10, zIndex: 10000, background: 'rgba(0,0,0,0.7)', color: 'white', border: '1px solid rgba(255,255,255,0.4)', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.95rem' }}>← Salir</button>
-        <iframe src="/SolarSystem/index.html" title="Sistema Solar" style={{ flex: 1, border: 'none', width: '100%', height: '100%' }} allow="fullscreen" />
-    </div>
-);
+if (juegoActivo.tipoJuego === 'SOLAR_SYSTEM') return <SolarSystemViewer onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'KARTINGED') return <KartingedGame usuario={null} alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'KARTINGED_MULTI') return <KartingedMultiGame alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'RACING3D') return <RacingGame3D usuario={null} alTerminar={() => setJuegoActivo(null)} />;

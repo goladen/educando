@@ -701,7 +701,7 @@ const StoryCubesCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoO
                                 </div>
                             )}
                             {/* Texto */}
-                            <div style={{ fontSize:'0.95rem', color:'#2c3e50', lineHeight:1.7, whiteSpace:'pre-wrap', fontStyle: seg.texto==='(sin texto)' ? 'italic' : 'normal', color: seg.texto==='(sin texto)' ? '#bdc3c7' : '#2c3e50' }}>
+                            <div style={{ fontSize:'0.95rem', lineHeight:1.7, whiteSpace:'pre-wrap', fontStyle: seg.texto==='(sin texto)' ? 'italic' : 'normal', color: seg.texto==='(sin texto)' ? '#bdc3c7' : '#2c3e50' }}>
                                 {seg.texto || '(sin texto)'}
                             </div>
                         </div>

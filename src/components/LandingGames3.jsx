@@ -81,11 +81,12 @@ function SsSection({ titulo, children }) {
     );
 }
 
-function SolarSystemViewer({ onExit, recursoConfig, onShare }) {
+function SolarSystemViewer({ onExit, recursoConfig }) {
     const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
     const [pantalla, setPantalla] = React.useState('intro');
-    const [toursBuscados, setToursBuscados] = React.useState(null); // null=no buscado, []=[resultados]
+    const [toursBuscados, setToursBuscados] = React.useState(null);
     const [buscandoTours, setBuscandoTours] = React.useState(false);
+    const [localShare, setLocalShare] = React.useState(null);
     const [showLandscapeHint, setShowLandscapeHint] = React.useState(
         () => isMobile && window.innerWidth <= window.innerHeight
     );
@@ -182,17 +183,25 @@ function SolarSystemViewer({ onExit, recursoConfig, onShare }) {
         }
     };
 
+    const abrirShareModal = (url) => {
+        if (navigator.share) {
+            navigator.share({ title: 'Sistema Solar Interactivo', url }).catch(() => setLocalShare(url));
+        } else {
+            setLocalShare(url);
+        }
+    };
+
     const compartirConfig = () => {
-        if (!onShare) return;
         const planetas = Object.entries(seleccion).map(([nombre, v]) => ({ nombre, texto: v.texto || '', activo: v.activo ?? true }));
         const config = { planetas, musicaUrl: musica, duracionEscena: duracion, comparativa: { activa: compActiva, texto: compTexto, duracion: compDuracion } };
         const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(config))));
         const url = `${window.location.origin}${window.location.pathname}?juego=solar_system&tourconfig=${encoded}`;
-        onShare(url);
+        abrirShareModal(url);
     };
 
     // ── INTRO ─────────────────────────────────────────────────────────────────
     if (pantalla === 'intro') return (
+        <>
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: SS_BG, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'white', overflow: 'auto', padding: '24px 16px' }}>
             <button onClick={onExit} style={{ position: 'absolute', top: 16, left: 16, background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, padding: '8px 14px', cursor: 'pointer', fontWeight: 'bold' }}>✕ Cerrar</button>
             <div style={{ maxWidth: 560, width: '100%', textAlign: 'center' }}>
@@ -218,18 +227,19 @@ function SolarSystemViewer({ onExit, recursoConfig, onShare }) {
                     <button onClick={buscarTours} disabled={buscandoTours} style={{ padding: '14px 28px', background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 12, cursor: 'pointer', fontWeight: 700, fontSize: '1rem' }}>
                         {buscandoTours ? '⏳ Buscando...' : '🔍 Buscar un tour'}
                     </button>
-                    {onShare && (
-                        <button onClick={compartirConfig} style={{ padding: '14px 28px', background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 12, cursor: 'pointer', fontWeight: 700, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: 8 }}>
-                            🔗 Compartir tour
-                        </button>
-                    )}
+                    <button onClick={compartirConfig} style={{ padding: '14px 28px', background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 12, cursor: 'pointer', fontWeight: 700, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        🔗 Compartir tour
+                    </button>
                 </div>
             </div>
         </div>
+        {localShare && <ShareModal url={localShare} titulo="Sistema Solar" onClose={() => setLocalShare(null)} />}
+        </>
     );
 
     // ── BUSCAR TOUR ───────────────────────────────────────────────────────────
     if (pantalla === 'buscar') return (
+        <>
         <div style={{ position:'fixed', inset:0, zIndex:9999, background:SS_BG, color:'white', overflowY:'auto' }}>
             <div style={{ maxWidth:700, margin:'0 auto', padding:'24px 16px 80px' }}>
                 <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:28 }}>
@@ -276,13 +286,12 @@ function SolarSystemViewer({ onExit, recursoConfig, onShare }) {
                                         >
                                             🚀 Lanzar tour
                                         </button>
-                                        {onShare && (
+                                        {r.tourConfig && (
                                             <button
                                                 onClick={() => {
-                                                    if (!r.tourConfig) return;
                                                     const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(r.tourConfig))));
                                                     const url = `${window.location.origin}${window.location.pathname}?juego=solar_system&tourconfig=${encoded}`;
-                                                    onShare(url);
+                                                    abrirShareModal(url);
                                                 }}
                                                 title="Compartir este tour"
                                                 style={{ padding:'10px 14px', background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.2)', color:'white', borderRadius:10, cursor:'pointer', fontSize:'1rem' }}
@@ -298,6 +307,8 @@ function SolarSystemViewer({ onExit, recursoConfig, onShare }) {
                 )}
             </div>
         </div>
+        {localShare && <ShareModal url={localShare} titulo="Sistema Solar" onClose={() => setLocalShare(null)} />}
+        </>
     );
 
     // ── CONFIG ────────────────────────────────────────────────────────────────
@@ -726,7 +737,12 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
                 if (tcParam) {
                     try { tourConfig = JSON.parse(atob(tcParam)); } catch {}
                 }
-                setJuegoActivo({ tipoJuego: juegoParam.toUpperCase(), tourConfig });
+                let verbInitialConfig = null;
+                const vcParam = params.get('verbconfig');
+                if (vcParam) {
+                    try { verbInitialConfig = JSON.parse(decodeURIComponent(Array.from(atob(vcParam)).map(c=>('%'+('00'+c.charCodeAt(0).toString(16)).slice(-2))).join(''))); } catch {}
+                }
+                setJuegoActivo({ tipoJuego: juegoParam.toUpperCase(), tourConfig, verbInitialConfig });
                 return;
             }
             if (path === 'math_world') {
@@ -1065,7 +1081,13 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
 if (juegoActivo.tipoJuego === 'SINTAXIS')    return <SintaxisGame  usuario={null} onExit={() => setJuegoActivo(null)} />;
 if (juegoActivo.tipoJuego === 'LISTENING')   return <Listening     usuario={null} onExit={() => setJuegoActivo(null)} />;
 if (juegoActivo.tipoJuego === 'STORYCUBES')  return <StoryCubes    usuario={null} onExit={() => setJuegoActivo(null)} />;
-if (juegoActivo.tipoJuego === 'SOLAR_SYSTEM') return <SolarSystemViewer recursoConfig={juegoActivo.tourConfig || null} onExit={() => setJuegoActivo(null)} onShare={(url) => setShareModal({ url, titulo: 'Sistema Solar' })} />;
+if (juegoActivo.tipoJuego === 'SOLAR_SYSTEM') return <SolarSystemViewer recursoConfig={juegoActivo.tourConfig || null} onExit={() => setJuegoActivo(null)} />;
+if (juegoActivo.tipoJuego === 'IRREGULAR_VERBS') return (
+    <div style={{ position:'fixed', inset:0, zIndex:9999, background:'#0f0f1a', overflowY:'auto' }}>
+        <button onClick={() => setJuegoActivo(null)} style={{ position:'fixed', top:14, left:14, zIndex:10000, background:'rgba(255,255,255,0.1)', color:'white', border:'none', borderRadius:8, padding:'8px 16px', cursor:'pointer', fontWeight:700, fontSize:'0.9rem' }}>← Volver</button>
+        <IrregularVerbsTest initialConfig={juegoActivo.verbInitialConfig || null} />
+    </div>
+);
         if (juegoActivo.tipoJuego === 'KARTINGED') return <KartingedGame usuario={null} alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'KARTINGED_MULTI') return <KartingedMultiGame alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'RACING3D') return <RacingGame3D usuario={null} alTerminar={() => setJuegoActivo(null)} />;
@@ -1304,7 +1326,7 @@ return <GamePlayer recurso={juegoActivo} usuario={null} alTerminar={() => setJue
                     { id: 'OMNINTERACTIVE',  label: 'Omninteractive',  emoji: '📚',  color: '#6D28D9', action: () => setOmninteractivo(true), shareable: true },
                     { id: 'VIDEOQUIZZ',      label: 'VideoQuizz',      emoji: '🎬',  color: '#DC2626', action: () => setVideoQuizz(true), shareable: true },
                     { id: 'FUNCIONES_EJECUTIVAS', label: 'Funciones Ejecutivas', emoji: '🧠', color: '#FF5722', action: () => setFuncionesEjecutivas(true), shareable: true },
-                    { id: 'IRREGULAR_VERBS',     label: 'Irregular Verbs',     emoji: '📝', color: '#0369a1', action: () => setIrregularVerbs(true), shareable: false },
+                    { id: 'IRREGULAR_VERBS',     label: 'Irregular Verbs',     emoji: '📝', color: '#0369a1', action: () => setIrregularVerbs(true), shareable: true },
                     { id: 'SOLAR_SYSTEM',        label: 'Sistema Solar',        emoji: '🪐', color: '#3B82F6', action: () => setJuegoActivo({ tipoJuego: 'SOLAR_SYSTEM' }), shareable: true },
                 ].map(tool => (
                     <div key={tool.id} onClick={tool.action} style={{ background: '#ffffbf', borderRadius: '15px', padding: '15px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transition: 'transform 0.2s', border: `2px solid ${tool.color}20`, position: 'relative' }}

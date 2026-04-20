@@ -38,6 +38,7 @@ import EditorOmni from './components/EditorOmni';
 import EditorPaginaProfesor from './components/EditorPaginaProfesor';
 import PaginaProfesor from './components/PaginaProfesor';
 import EditorVideoQuizz from './components/EditorVideoQuizz';
+import EditorSolarSystem from './components/EditorSolarSystem';
 import OmninteractiveApp from './OmninteractiveApp';
 import VideoQuizzApp from './VideoQuizzApp';
 import * as XLSX from 'xlsx'; // <--- IMPORTANTE
@@ -75,6 +76,7 @@ const TIPOS_JUEGOS = {
 SINTAXIS: { id: 'SINTAXIS', label: 'Sintaxis', color: '#3498db', camposConfig: [] },
 OMNINTERACTIVE: { id: 'OMNINTERACTIVE', label: 'Omninteractive', color: '#6D28D9', camposConfig: [] },
 VIDEOQUIZZ: { id: 'VIDEOQUIZZ', label: 'VideoQuizz', color: '#DC2626', camposConfig: [] },
+SOLAR_SYSTEM: { id: 'SOLAR_SYSTEM', label: 'Sistema Solar', color: '#0f0c29', camposConfig: [] },
 };
 
 // MENSAJES DE AYUDA VACÍO
@@ -85,7 +87,8 @@ const INSTRUCCIONES_CREACION = {
     RULETA: "Define una frase oculta y preguntas cuyas respuestas den pistas para resolverla.",
     APAREJADOS: "Crea parejas de conceptos (Ej: País - Capital). Los alumnos deberán unirlas.",
     QUESTION_SENDER: "Crea un buzón para que tus alumnos te envíen preguntas desde sus dispositivos.",
-    OLYMPICLIVE: "Combina minijuegos y rondas de matemáticas en un evento en vivo espectacular." // <--- AÑADE ESTO
+    OLYMPICLIVE: "Combina minijuegos y rondas de matemáticas en un evento en vivo espectacular.",
+    SOLAR_SYSTEM: "Diseña un tour guiado por el sistema solar. Elige los planetas, el texto de narración y la música de fondo."
 
 
 
@@ -116,6 +119,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
     const [recursoOmniInicial, setRecursoOmniInicial] = useState(null);
     const [mostrandoEditorVideoQuizz, setMostrandoEditorVideoQuizz] = useState(false);
     const [recursoVQInicial, setRecursoVQInicial] = useState(null);
+    const [mostrandoEditorSolarSystem, setMostrandoEditorSolarSystem] = useState(false);
     const [paginaProfesorPreview, setPaginaProfesorPreview] = useState(null);
     // Añade este estado junto a los demás en ProfesorDashboard
     const [qSenderAMigrar, setQsenderAMigrar] = useState(null);
@@ -157,7 +161,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             const s = await getDocs(q);
             const docs = s.docs.map(d => ({ ...d.data(), id: d.id })).filter(r => {
                 if (modoDashboard === 'PRO') {
-                    return r.tipo === 'PRO' || r.tipo === 'PRO-BURBUJAS' || r.tipo === 'OLYMPIC' || r.tipo === 'SINTAXIS' || r.tipo === 'ETIQUETAS' || r.tipo === 'OMNI' || r.tipo === 'VIDEOQUIZZ';
+                    return r.tipo === 'PRO' || r.tipo === 'PRO-BURBUJAS' || r.tipo === 'OLYMPIC' || r.tipo === 'SINTAXIS' || r.tipo === 'ETIQUETAS' || r.tipo === 'OMNI' || r.tipo === 'VIDEOQUIZZ' || r.tipo === 'SOLAR_SYSTEM';
                 }
 
                 if (modoDashboard === 'LIVE') {
@@ -167,7 +171,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
 
 
                 // En clásico mostramos los que NO sean de ningún tipo PRO
-                return !r.tipo || (r.tipo !== 'PRO' && r.tipo !== 'PRO-BURBUJAS' && r.tipo !== 'OLYMPIC' && r.tipo !== 'SINTAXIS' && r.tipo !== 'ETIQUETAS' && r.tipo !== 'OMNI');
+                return !r.tipo || (r.tipo !== 'PRO' && r.tipo !== 'PRO-BURBUJAS' && r.tipo !== 'OLYMPIC' && r.tipo !== 'SINTAXIS' && r.tipo !== 'ETIQUETAS' && r.tipo !== 'OMNI' && r.tipo !== 'VIDEOQUIZZ' && r.tipo !== 'SOLAR_SYSTEM');
             });
             setRecursos(docs);
         } catch (e) { console.error(e) }
@@ -243,6 +247,10 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             if (juegoSeleccionado === 'ETIQUETAS') return iniciarCreacionEtiquetas();
             if (juegoSeleccionado === 'OMNINTERACTIVE') { setRecursoOmniInicial(null); return setMostrandoEditorOmni(true); }
             if (juegoSeleccionado === 'VIDEOQUIZZ') { setRecursoVQInicial(null); return setMostrandoEditorVideoQuizz(true); }
+            if (juegoSeleccionado === 'SOLAR_SYSTEM') {
+                setDatosEditor({ id: null, titulo: '', temas: '', profesorNombre: (perfilProfesor?.nombre) || usuario.displayName, pais: perfilProfesor?.pais || '', region: perfilProfesor?.region || '', poblacion: perfilProfesor?.poblacion || '', config: {}, hojas: [], tourConfig: null });
+                return setMostrandoEditorSolarSystem(true);
+            }
         }
 
 
@@ -418,6 +426,10 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                 setRecursoVQInicial(dataFresca);
                 setMostrandoEditorVideoQuizz(true);
             }
+            else if (dataFresca.tipoJuego === 'SOLAR_SYSTEM' || dataFresca.tipo === 'SOLAR_SYSTEM') {
+                setDatosEditor(dataFresca);
+                setMostrandoEditorSolarSystem(true);
+            }
             else {
                 setMostrandoEditorManual(true); // Clásico
             }
@@ -443,7 +455,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
 
     const guardarRecursoFinal = async () => {
         if (!datosEditor.titulo) return alert("Falta Título");
-        if (datosEditor.hojas.length === 0) return alert("Falta Hoja");
+        if (datosEditor.hojas.length === 0 && datosEditor.tipoJuego !== 'SOLAR_SYSTEM') return alert("Falta Hoja");
 
         // --- VALIDACIÓN DIFERENCIADA POR TIPO DE JUEGO ---
 
@@ -457,6 +469,11 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
         // CASO 2: QUESTION SENDER (No requiere preguntas iniciales)
         else if (juegoSeleccionado === 'QUESTION_SENDER') {
             // Pasa sin validar contenido, ya que se llena después
+        }
+
+        // CASO SOLAR_SYSTEM (Validación propia en EditorSolarSystem)
+        else if (datosEditor.tipoJuego === 'SOLAR_SYSTEM') {
+            // Ya validado en el editor
         }
 
         
@@ -1069,7 +1086,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                 <>{modoDashboard === 'CLASICO' && (
                     <div className="game-type-scroll" style={{ marginBottom: '20px' }}>
                         {Object.values(TIPOS_JUEGOS)
-                            .filter(j => j.id !== 'MATHLIVE' && j.id !== 'WORDLE' && j.id !== 'OLYMPICLIVE' && j.id !== 'SINTAXIS' && j.id !== 'ETIQUETAS' && j.id !== 'OMNINTERACTIVE')
+                            .filter(j => j.id !== 'MATHLIVE' && j.id !== 'WORDLE' && j.id !== 'OLYMPICLIVE' && j.id !== 'SINTAXIS' && j.id !== 'ETIQUETAS' && j.id !== 'OMNINTERACTIVE' && j.id !== 'VIDEOQUIZZ' && j.id !== 'SOLAR_SYSTEM')
                             .map(j => (
                                 <button key={j.id} onClick={() => setJuegoSeleccionado(j.id)} style={{ padding: '8px 16px', borderRadius: '20px', border: 'none', background: juegoSeleccionado === j.id ? j.color : 'white', color: juegoSeleccionado === j.id ? 'white' : '#555', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
                                     {j.label}
@@ -1202,6 +1219,14 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                                             color: juegoSeleccionado === 'VIDEOQUIZZ' ? 'white' : '#555'
                                         }}>
                                         <FileText size={16} /> <span className="btn-text">VideoQuizz</span>
+                                    </button>
+                                    <button onClick={() => setJuegoSeleccionado('SOLAR_SYSTEM')} className="header-btn"
+                                        style={{
+                                            padding: '8px 20px', borderRadius: '20px',
+                                            background: juegoSeleccionado === 'SOLAR_SYSTEM' ? '#0f0c29' : 'white',
+                                            color: juegoSeleccionado === 'SOLAR_SYSTEM' ? 'white' : '#555'
+                                        }}>
+                                        <span style={{fontSize:14}}>🪐</span> <span className="btn-text">Solar</span>
                                     </button>
 
                                 </>
@@ -1423,6 +1448,16 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                     recursoInicial={recursoVQInicial}
                     usuario={perfilProfesor || usuario}
                     onBack={() => { setMostrandoEditorVideoQuizz(false); setRecursoVQInicial(null); }}
+                />
+            )}
+
+            {mostrandoEditorSolarSystem && (
+                <EditorSolarSystem
+                    datos={datosEditor}
+                    setDatos={setDatosEditor}
+                    onClose={() => setMostrandoEditorSolarSystem(false)}
+                    onSave={guardarRecursoFinal}
+                    usuario={perfilProfesor || usuario}
                 />
             )}
 

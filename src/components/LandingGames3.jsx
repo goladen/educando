@@ -45,70 +45,384 @@ import imgSopa from '../assets/icono_sopa.png';
 import imgOlympic from '../assets/icono_olympic.png';
 
 
-// --- VISOR SISTEMA SOLAR ---
-function SolarSystemViewer({ onExit }) {
-    const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
-    const [isLandscape, setIsLandscape] = React.useState(
-        () => window.innerWidth > window.innerHeight
+// ─── SOLAR SYSTEM APP ────────────────────────────────────────────────────────
+
+const SS_BG = 'linear-gradient(135deg, #080818 0%, #0c1530 60%, #080818 100%)';
+
+const SS_PLANETAS = [
+    { id: 'Sol',      emoji: '☀️',  texto: 'El Sol es la estrella central de nuestro sistema solar. Con 1,4 millones de kilómetros de diámetro, en su interior cabrían más de un millón de Tierras. Su temperatura superficial alcanza los 5.500 grados Celsius.' },
+    { id: 'Mercurio', emoji: '🪨',  texto: 'Mercurio es el planeta más pequeño y el más cercano al Sol. Carece de atmósfera, lo que provoca temperaturas extremas: 430 grados de día y -180 de noche. Un año en Mercurio dura solo 88 días terrestres.' },
+    { id: 'Venus',    emoji: '🌫️', texto: 'Venus es el planeta más caliente, con 465 grados Celsius. Su densa atmósfera de CO₂ genera un efecto invernadero extremo. Un día en Venus dura más que su propio año.' },
+    { id: 'Tierra',   emoji: '🌍',  texto: 'La Tierra es el único planeta conocido con vida. Su atmósfera protectora y el agua líquida la hacen única en el sistema solar. Orbita el Sol a 150 millones de kilómetros.' },
+    { id: 'Luna',     emoji: '🌙',  texto: 'La Luna es el único satélite natural de la Tierra. Está a 384.400 km y tarda 27 días en orbitar nuestro planeta. Es el único lugar fuera de la Tierra donde el ser humano ha pisado.' },
+    { id: 'Jupiter',  emoji: '🪐',  texto: 'Júpiter es el planeta más grande del sistema solar. La Gran Mancha Roja es una tormenta activa desde hace más de 350 años. Tiene 95 lunas conocidas.' },
+    { id: 'Saturno',  emoji: '💫',  texto: 'Saturno es famoso por sus anillos de hielo y roca. Es tan poco denso que flotaría en el agua. Tiene más de 80 lunas conocidas y su día dura solo 10 horas.' },
+    { id: 'Urano',    emoji: '🔵',  texto: 'Urano gira de lado con una inclinación de 98 grados, probablemente por una colisión gigante en el pasado. Es el planeta más frío, con -224 grados Celsius.' },
+    { id: 'Neptuno',  emoji: '🌀',  texto: 'Neptuno posee los vientos más rápidos del sistema solar, superando los 2.100 km/h. Está a 4.500 millones de km del Sol y un año aquí dura 165 años terrestres.' },
+];
+
+const SS_LINKS = [
+    { emoji: '🚀', titulo: 'NASA Solar System', desc: 'Exploración oficial de la NASA', url: 'https://solarsystem.nasa.gov/', bg: '#1e3a5f' },
+    { emoji: '🌍', titulo: 'Solar System Scope', desc: 'Simulador 3D interactivo online', url: 'https://www.solarsystemscope.com/', bg: '#1a3a2a' },
+    { emoji: '🔭', titulo: 'Stellarium Web', desc: 'Planetario virtual gratuito', url: 'https://stellarium-web.org/', bg: '#2a1a3a' },
+    { emoji: '👁️', titulo: 'NASA Eyes', desc: 'Visualizador 3D de misiones NASA', url: 'https://eyes.nasa.gov/apps/solar-system/', bg: '#3a1a1a' },
+    { emoji: '🪐', titulo: 'Universe Sandbox', desc: 'Simulador de física espacial', url: 'https://universesandbox.com/', bg: '#1a2a3a' },
+    { emoji: '📡', titulo: 'Space.com', desc: 'Noticias y ciencia espacial', url: 'https://www.space.com/', bg: '#2a2a1a' },
+];
+
+function SsSection({ titulo, children }) {
+    return (
+        <div style={{ marginBottom: 24 }}>
+            <h3 style={{ margin: '0 0 12px', fontSize: '1rem', fontWeight: 700, color: '#CBD5E1' }}>{titulo}</h3>
+            <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: 16 }}>
+                {children}
+            </div>
+        </div>
     );
+}
+
+function SolarSystemViewer({ onExit, recursoConfig, onShare }) {
+    const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+    const [pantalla, setPantalla] = React.useState('intro');
+    const [toursBuscados, setToursBuscados] = React.useState(null); // null=no buscado, []=[resultados]
+    const [buscandoTours, setBuscandoTours] = React.useState(false);
     const [showLandscapeHint, setShowLandscapeHint] = React.useState(
         () => isMobile && window.innerWidth <= window.innerHeight
     );
     const iframeRef = React.useRef(null);
 
+    const [seleccion, setSeleccion] = React.useState(() => {
+        if (recursoConfig?.planetas) {
+            const map = {};
+            recursoConfig.planetas.forEach(p => { map[p.nombre] = { activo: p.activo ?? true, texto: p.texto || '' }; });
+            return map;
+        }
+        return Object.fromEntries(SS_PLANETAS.map(p => [p.id, { activo: true, texto: p.texto }]));
+    });
+    const [musica, setMusica] = React.useState(recursoConfig?.musicaUrl || 'https://www.youtube.com/watch?v=7GlsxNI4LVI');
+    const [duracion, setDuracion] = React.useState(recursoConfig?.duracionEscena || 8);
+    const [compActiva, setCompActiva] = React.useState(recursoConfig?.comparativa?.activa ?? true);
+    const [compTexto, setCompTexto] = React.useState(recursoConfig?.comparativa?.texto || '');
+    const [compDuracion, setCompDuracion] = React.useState(recursoConfig?.comparativa?.duracion || 14);
+
     React.useEffect(() => {
-        // Solicitar pantalla completa en móvil
-        if (isMobile && document.documentElement.requestFullscreen) {
-            document.documentElement.requestFullscreen().catch(() => {});
+        if (recursoConfig) {
+            lanzarPersonalizadoConConfig(recursoConfig);
         }
-        // Intentar bloquear orientación landscape
-        if (isMobile && screen.orientation?.lock) {
-            screen.orientation.lock('landscape').catch(() => {});
-        }
-        const handleResize = () => {
-            const landscape = window.innerWidth > window.innerHeight;
-            setIsLandscape(landscape);
-            if (landscape) setShowLandscapeHint(false);
-        };
-        window.addEventListener('resize', handleResize);
-        return () => {
-            window.removeEventListener('resize', handleResize);
-            if (document.fullscreenElement && document.exitFullscreen) {
-                document.exitFullscreen().catch(() => {});
-            }
-            if (screen.orientation?.unlock) screen.orientation.unlock();
-        };
     }, []);
 
-    return (
+    React.useEffect(() => {
+        if (pantalla !== 'playing') return;
+        if (isMobile && document.documentElement.requestFullscreen)
+            document.documentElement.requestFullscreen().catch(() => {});
+        if (isMobile && screen.orientation?.lock)
+            screen.orientation.lock('landscape').catch(() => {});
+        const onResize = () => { if (window.innerWidth > window.innerHeight) setShowLandscapeHint(false); };
+        window.addEventListener('resize', onResize);
+        return () => {
+            window.removeEventListener('resize', onResize);
+            if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+            if (screen.orientation?.unlock) screen.orientation.unlock();
+        };
+    }, [pantalla]);
+
+    const lanzarPersonalizadoConConfig = (config) => {
+        localStorage.setItem('solarTourConfig', JSON.stringify(config));
+        setPantalla('playing');
+    };
+
+    const lanzarDefault = () => {
+        localStorage.removeItem('solarTourConfig');
+        setPantalla('playing');
+    };
+
+    const lanzarPersonalizado = () => {
+        const planetas = SS_PLANETAS
+            .filter(p => seleccion[p.id]?.activo)
+            .map(p => ({ nombre: p.id, texto: seleccion[p.id]?.texto || '' }));
+        if (!planetas.length) return;
+        localStorage.setItem('solarTourConfig', JSON.stringify({
+            planetas,
+            musicaUrl: musica,
+            duracionEscena: duracion,
+            comparativa: { activa: compActiva, texto: compTexto, duracion: compDuracion },
+        }));
+        setPantalla('playing');
+    };
+
+    const salirDeUnity = () => {
+        localStorage.removeItem('solarTourConfig');
+        setPantalla('outro');
+    };
+
+    const togglePlaneta = id => setSeleccion(prev => ({ ...prev, [id]: { ...prev[id], activo: !prev[id].activo } }));
+    const setTexto = (id, texto) => setSeleccion(prev => ({ ...prev, [id]: { ...prev[id], texto } }));
+    const nActivos = SS_PLANETAS.filter(p => seleccion[p.id]?.activo).length;
+
+    const buscarTours = async () => {
+        if (toursBuscados !== null) { setPantalla('buscar'); return; }
+        setBuscandoTours(true);
+        try {
+            const q = query(collection(db, 'resources'), where('tipoJuego', '==', 'SOLAR_SYSTEM'));
+            const snap = await getDocs(q);
+            const docs = snap.docs
+                .map(d => ({ id: d.id, ...d.data() }))
+                .filter(r => !r.isPrivate);
+            setToursBuscados(docs);
+        } catch (e) { console.error(e); setToursBuscados([]); }
+        setBuscandoTours(false);
+        setPantalla('buscar');
+    };
+
+    const lanzarTourGuardado = (r) => {
+        if (r.tourConfig) {
+            lanzarPersonalizadoConConfig(r.tourConfig);
+        } else {
+            lanzarDefault();
+        }
+    };
+
+    const compartirConfig = () => {
+        if (!onShare) return;
+        const planetas = Object.entries(seleccion).map(([nombre, v]) => ({ nombre, texto: v.texto || '', activo: v.activo ?? true }));
+        const config = { planetas, musicaUrl: musica, duracionEscena: duracion, comparativa: { activa: compActiva, texto: compTexto, duracion: compDuracion } };
+        const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(config))));
+        const url = `${window.location.origin}${window.location.pathname}?juego=solar_system&tourconfig=${encoded}`;
+        onShare(url);
+    };
+
+    // ── INTRO ─────────────────────────────────────────────────────────────────
+    if (pantalla === 'intro') return (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: SS_BG, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'white', overflow: 'auto', padding: '24px 16px' }}>
+            <button onClick={onExit} style={{ position: 'absolute', top: 16, left: 16, background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, padding: '8px 14px', cursor: 'pointer', fontWeight: 'bold' }}>✕ Cerrar</button>
+            <div style={{ maxWidth: 560, width: '100%', textAlign: 'center' }}>
+                <div style={{ fontSize: 72, marginBottom: 8 }}>🌌</div>
+                <h1 style={{ fontSize: 'clamp(1.6rem,4vw,2.4rem)', fontWeight: 800, margin: '0 0 12px', background: 'linear-gradient(90deg,#FCD34D,#3B82F6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                    Sistema Solar Interactivo
+                </h1>
+                <p style={{ fontSize: '1.05rem', color: '#94A3B8', marginBottom: 32, lineHeight: 1.6 }}>
+                    Explora el sistema solar con un tour guiado, narración por voz y escenas comparativas de tamaño
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 36, textAlign: 'left' }}>
+                    {[['🔭','Tour guiado con cámara orbital'],['🗣️','Narración por voz en cada planeta'],['📏','Escena comparativa de tamaños reales'],['🎵','Música de fondo personalizable']].map(([icon, txt], i) => (
+                        <div key={i} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: 14, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                            <span style={{ fontSize: 22 }}>{icon}</span>
+                            <span style={{ fontSize: '0.85rem', color: '#CBD5E1', lineHeight: 1.4 }}>{txt}</span>
+                        </div>
+                    ))}
+                </div>
+                <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <button onClick={lanzarDefault} style={{ padding: '14px 28px', background: 'linear-gradient(135deg,#3B82F6,#2563EB)', color: 'white', border: 'none', borderRadius: 12, cursor: 'pointer', fontWeight: 700, fontSize: '1rem', boxShadow: '0 4px 20px rgba(59,130,246,0.4)' }}>
+                        🚀 Explorar ahora
+                    </button>
+                    <button onClick={buscarTours} disabled={buscandoTours} style={{ padding: '14px 28px', background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 12, cursor: 'pointer', fontWeight: 700, fontSize: '1rem' }}>
+                        {buscandoTours ? '⏳ Buscando...' : '🔍 Buscar un tour'}
+                    </button>
+                    {onShare && (
+                        <button onClick={compartirConfig} style={{ padding: '14px 28px', background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 12, cursor: 'pointer', fontWeight: 700, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+                            🔗 Compartir tour
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+
+    // ── BUSCAR TOUR ───────────────────────────────────────────────────────────
+    if (pantalla === 'buscar') return (
+        <div style={{ position:'fixed', inset:0, zIndex:9999, background:SS_BG, color:'white', overflowY:'auto' }}>
+            <div style={{ maxWidth:700, margin:'0 auto', padding:'24px 16px 80px' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:28 }}>
+                    <button onClick={() => setPantalla('intro')} style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.2)', color:'white', borderRadius:8, padding:'8px 14px', cursor:'pointer', fontWeight:'bold' }}>← Volver</button>
+                    <h2 style={{ margin:0, fontSize:'1.4rem', fontWeight:800 }}>🔍 Tours guardados por profesores</h2>
+                </div>
+
+                {buscandoTours && (
+                    <div style={{ textAlign:'center', padding:60, color:'#94A3B8', fontSize:'1.1rem' }}>⏳ Cargando tours...</div>
+                )}
+
+                {!buscandoTours && toursBuscados?.length === 0 && (
+                    <div style={{ textAlign:'center', padding:60, color:'#94A3B8' }}>
+                        <div style={{ fontSize:48, marginBottom:12 }}>🪐</div>
+                        <p>Todavía no hay tours publicados por profesores.</p>
+                        <p style={{ fontSize:'0.9rem' }}>Los profesores pueden crear y publicar tours desde el Panel Docente.</p>
+                    </div>
+                )}
+
+                {!buscandoTours && toursBuscados?.length > 0 && (
+                    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))', gap:16 }}>
+                        {toursBuscados.map(r => {
+                            const planetas = r.tourConfig?.planetas?.filter(p => p.activo) || [];
+                            return (
+                                <div key={r.id} style={{ background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.12)', borderRadius:16, padding:20, display:'flex', flexDirection:'column', gap:12 }}>
+                                    <div>
+                                        <div style={{ fontWeight:700, fontSize:'1.05rem', marginBottom:4 }}>{r.titulo || 'Tour sin título'}</div>
+                                        {r.profesorNombre && <div style={{ fontSize:'0.8rem', color:'#94A3B8' }}>por {r.profesorNombre}</div>}
+                                        {r.temas && <div style={{ fontSize:'0.8rem', color:'#64748B', marginTop:2 }}>{r.temas}</div>}
+                                    </div>
+                                    {planetas.length > 0 && (
+                                        <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                                            {planetas.map(p => (
+                                                <span key={p.nombre} style={{ background:'rgba(59,130,246,0.2)', border:'1px solid rgba(59,130,246,0.3)', borderRadius:20, padding:'2px 10px', fontSize:'0.78rem' }}>
+                                                    {p.nombre}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
+                                    <div style={{ display:'flex', gap:8, marginTop:'auto' }}>
+                                        <button
+                                            onClick={() => lanzarTourGuardado(r)}
+                                            style={{ flex:1, padding:'10px', background:'linear-gradient(135deg,#3B82F6,#2563EB)', color:'white', border:'none', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:'0.9rem' }}
+                                        >
+                                            🚀 Lanzar tour
+                                        </button>
+                                        {onShare && (
+                                            <button
+                                                onClick={() => {
+                                                    if (!r.tourConfig) return;
+                                                    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(r.tourConfig))));
+                                                    const url = `${window.location.origin}${window.location.pathname}?juego=solar_system&tourconfig=${encoded}`;
+                                                    onShare(url);
+                                                }}
+                                                title="Compartir este tour"
+                                                style={{ padding:'10px 14px', background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.2)', color:'white', borderRadius:10, cursor:'pointer', fontSize:'1rem' }}
+                                            >
+                                                🔗
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+
+    // ── CONFIG ────────────────────────────────────────────────────────────────
+    if (pantalla === 'config') return (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: SS_BG, color: 'white', overflowY: 'auto' }}>
+            <div style={{ maxWidth: 680, margin: '0 auto', padding: '24px 16px 100px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 28 }}>
+                    <button onClick={() => setPantalla('intro')} style={{ background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, padding: '8px 14px', cursor: 'pointer', fontWeight: 'bold', whiteSpace: 'nowrap' }}>← Volver</button>
+                    <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800 }}>⚙️ Personalizar el Tour</h2>
+                </div>
+
+                <SsSection titulo="🎵 Música de fondo">
+                    <label style={{ fontSize: '0.82rem', color: '#94A3B8', display: 'block', marginBottom: 6 }}>URL de YouTube o enlace directo a audio (MP3, OGG…)</label>
+                    <input value={musica} onChange={e => setMusica(e.target.value)} placeholder="https://www.youtube.com/watch?v=..."
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.07)', color: 'white', fontSize: '0.9rem', boxSizing: 'border-box' }} />
+                </SsSection>
+
+                <SsSection titulo="⏱️ Duración por planeta">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                        <input type="range" min={4} max={20} value={duracion} onChange={e => setDuracion(+e.target.value)} style={{ flex: 1, accentColor: '#3B82F6' }} />
+                        <span style={{ minWidth: 50, textAlign: 'center', fontWeight: 700, fontSize: '1.1rem', color: '#FCD34D' }}>{duracion}s</span>
+                    </div>
+                    <p style={{ fontSize: '0.8rem', color: '#64748B', margin: '6px 0 0' }}>Tiempo de rotación orbital en torno a cada planeta</p>
+                </SsSection>
+
+                <SsSection titulo={`🪐 Planetas del tour (${nActivos} seleccionados)`}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {SS_PLANETAS.map(p => {
+                            const act = !!seleccion[p.id]?.activo;
+                            return (
+                                <div key={p.id} style={{ background: act ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.03)', border: `1px solid ${act ? 'rgba(59,130,246,0.4)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 10, overflow: 'hidden' }}>
+                                    <div onClick={() => togglePlaneta(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', cursor: 'pointer' }}>
+                                        <div style={{ width: 22, height: 22, borderRadius: 6, border: `2px solid ${act ? '#3B82F6' : 'rgba(255,255,255,0.3)'}`, background: act ? '#3B82F6' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.2s' }}>
+                                            {act && <span style={{ fontSize: 13, color: 'white' }}>✓</span>}
+                                        </div>
+                                        <span style={{ fontSize: 20 }}>{p.emoji}</span>
+                                        <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>{p.id === 'Jupiter' ? 'Júpiter' : p.id}</span>
+                                    </div>
+                                    {act && (
+                                        <div style={{ padding: '0 14px 12px' }}>
+                                            <textarea value={seleccion[p.id]?.texto || ''} onChange={e => setTexto(p.id, e.target.value)}
+                                                rows={3} placeholder="Texto de narración para este planeta..."
+                                                style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(0,0,0,0.3)', color: 'white', fontSize: '0.85rem', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </SsSection>
+
+                <SsSection titulo="📏 Escena comparativa de tamaños">
+                    <div onClick={() => setCompActiva(!compActiva)} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: compActiva ? 14 : 0, cursor: 'pointer' }}>
+                        <div style={{ width: 44, height: 24, borderRadius: 12, background: compActiva ? '#3B82F6' : 'rgba(255,255,255,0.2)', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
+                            <div style={{ position: 'absolute', top: 2, left: compActiva ? 22 : 2, width: 20, height: 20, borderRadius: '50%', background: 'white', transition: 'left 0.2s' }} />
+                        </div>
+                        <span style={{ fontSize: '0.9rem', color: compActiva ? 'white' : '#64748B' }}>
+                            {compActiva ? 'Activa — aparece al final del tour' : 'Desactivada'}
+                        </span>
+                    </div>
+                    {compActiva && (<>
+                        <textarea value={compTexto} onChange={e => setCompTexto(e.target.value)} rows={3}
+                            placeholder="Narración personalizada (vacío = generada automáticamente)..."
+                            style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(0,0,0,0.3)', color: 'white', fontSize: '0.85rem', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit', marginBottom: 12 }} />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                            <span style={{ fontSize: '0.85rem', color: '#94A3B8', whiteSpace: 'nowrap' }}>Duración:</span>
+                            <input type="range" min={6} max={30} value={compDuracion} onChange={e => setCompDuracion(+e.target.value)} style={{ flex: 1, accentColor: '#F59E0B' }} />
+                            <span style={{ minWidth: 50, textAlign: 'center', fontWeight: 700, color: '#FCD34D' }}>{compDuracion}s</span>
+                        </div>
+                    </>)}
+                </SsSection>
+
+                <div style={{ position: 'sticky', bottom: 0, padding: '12px 0 4px', background: 'linear-gradient(to top,#080818 75%,transparent)' }}>
+                    <button onClick={lanzarPersonalizado} disabled={nActivos === 0}
+                        style={{ width: '100%', padding: 15, background: nActivos > 0 ? 'linear-gradient(135deg,#3B82F6,#2563EB)' : 'rgba(255,255,255,0.1)', color: nActivos > 0 ? 'white' : '#64748B', border: 'none', borderRadius: 12, cursor: nActivos > 0 ? 'pointer' : 'not-allowed', fontWeight: 700, fontSize: '1rem', boxShadow: nActivos > 0 ? '0 4px 20px rgba(59,130,246,0.4)' : 'none', transition: 'all 0.2s' }}>
+                        {nActivos > 0 ? `🚀 Iniciar tour (${nActivos} planetas)` : 'Selecciona al menos un planeta'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+
+    // ── PLAYING ───────────────────────────────────────────────────────────────
+    if (pantalla === 'playing') return (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#000', display: 'flex', flexDirection: 'column' }}>
-            {/* Aviso orientación landscape en móvil */}
             {showLandscapeHint && (
                 <div style={{ position: 'absolute', inset: 0, zIndex: 10001, background: 'rgba(0,0,0,0.92)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'white', gap: 16 }}>
                     <div style={{ fontSize: 64 }}>📱↔️</div>
                     <p style={{ fontSize: '1.3rem', fontWeight: 'bold', textAlign: 'center', margin: 0 }}>Gira el dispositivo</p>
                     <p style={{ fontSize: '1rem', color: '#aaa', textAlign: 'center', margin: 0 }}>Para una mejor experiencia usa la vista horizontal</p>
-                    <button onClick={() => setShowLandscapeHint(false)}
-                        style={{ marginTop: 8, padding: '10px 28px', background: '#3B82F6', color: 'white', border: 'none', borderRadius: 10, fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer' }}>
-                        Continuar de todos modos
-                    </button>
-                    <button onClick={onExit}
-                        style={{ background: 'transparent', color: '#aaa', border: 'none', cursor: 'pointer', fontSize: '0.9rem' }}>
-                        Cancelar
-                    </button>
+                    <button onClick={() => setShowLandscapeHint(false)} style={{ marginTop: 8, padding: '10px 28px', background: '#3B82F6', color: 'white', border: 'none', borderRadius: 10, fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer' }}>Continuar de todos modos</button>
+                    <button onClick={salirDeUnity} style={{ background: 'transparent', color: '#aaa', border: 'none', cursor: 'pointer', fontSize: '0.9rem' }}>Cancelar</button>
                 </div>
             )}
-            <button onClick={onExit}
-                style={{ position: 'absolute', top: 10, left: 10, zIndex: 10000, background: 'rgba(0,0,0,0.7)', color: 'white', border: '1px solid rgba(255,255,255,0.4)', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.95rem' }}>
+            <button onClick={salirDeUnity} style={{ position: 'absolute', top: 10, left: 10, zIndex: 10000, background: 'rgba(0,0,0,0.7)', color: 'white', border: '1px solid rgba(255,255,255,0.4)', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.95rem' }}>
                 ← Salir
             </button>
-            <iframe
-                ref={iframeRef}
-                src="/SolarSystem/index.html"
-                title="Sistema Solar"
-                style={{ flex: 1, border: 'none', width: '100%', height: '100%' }}
-                allow="fullscreen"
-            />
+            <iframe ref={iframeRef} src="/SolarSystem/index.html" title="Sistema Solar"
+                style={{ flex: 1, border: 'none', width: '100%', height: '100%' }} allow="fullscreen" />
+        </div>
+    );
+
+    // ── OUTRO ─────────────────────────────────────────────────────────────────
+    return (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: SS_BG, color: 'white', overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px 16px 48px' }}>
+            <div style={{ maxWidth: 640, width: '100%', textAlign: 'center' }}>
+                <div style={{ fontSize: 64, marginBottom: 12 }}>🎉</div>
+                <h2 style={{ fontSize: 'clamp(1.4rem,3vw,2rem)', fontWeight: 800, margin: '0 0 8px' }}>¡Exploración completada!</h2>
+                <p style={{ color: '#94A3B8', marginBottom: 32, fontSize: '1rem' }}>Continúa descubriendo el universo con estos recursos</p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(175px,1fr))', gap: 12, marginBottom: 36, textAlign: 'left' }}>
+                    {SS_LINKS.map((l, i) => (
+                        <a key={i} href={l.url} target="_blank" rel="noopener noreferrer"
+                            onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-3px)'}
+                            onMouseLeave={e => e.currentTarget.style.transform = 'none'}
+                            style={{ background: l.bg, border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '16px 14px', textDecoration: 'none', color: 'white', display: 'flex', flexDirection: 'column', gap: 6, transition: 'transform 0.15s' }}>
+                            <span style={{ fontSize: 28 }}>{l.emoji}</span>
+                            <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>{l.titulo}</span>
+                            <span style={{ fontSize: '0.78rem', color: '#94A3B8', lineHeight: 1.3 }}>{l.desc}</span>
+                        </a>
+                    ))}
+                </div>
+                <button onClick={onExit} style={{ padding: '14px 32px', background: 'linear-gradient(135deg,#3B82F6,#2563EB)', color: 'white', border: 'none', borderRadius: 12, cursor: 'pointer', fontWeight: 700, fontSize: '1rem', boxShadow: '0 4px 20px rgba(59,130,246,0.4)' }}>
+                    🏠 Volver a herramientas
+                </button>
+            </div>
         </div>
     );
 }
@@ -407,7 +721,12 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
             }
             const juegoParam = params.get('juego');
             if (juegoParam) {
-                setJuegoActivo({ tipoJuego: juegoParam.toUpperCase() });
+                let tourConfig = null;
+                const tcParam = params.get('tourconfig');
+                if (tcParam) {
+                    try { tourConfig = JSON.parse(atob(tcParam)); } catch {}
+                }
+                setJuegoActivo({ tipoJuego: juegoParam.toUpperCase(), tourConfig });
                 return;
             }
             if (path === 'math_world') {
@@ -746,7 +1065,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
 if (juegoActivo.tipoJuego === 'SINTAXIS')    return <SintaxisGame  usuario={null} onExit={() => setJuegoActivo(null)} />;
 if (juegoActivo.tipoJuego === 'LISTENING')   return <Listening     usuario={null} onExit={() => setJuegoActivo(null)} />;
 if (juegoActivo.tipoJuego === 'STORYCUBES')  return <StoryCubes    usuario={null} onExit={() => setJuegoActivo(null)} />;
-if (juegoActivo.tipoJuego === 'SOLAR_SYSTEM') return <SolarSystemViewer onExit={() => setJuegoActivo(null)} />;
+if (juegoActivo.tipoJuego === 'SOLAR_SYSTEM') return <SolarSystemViewer recursoConfig={juegoActivo.tourConfig || null} onExit={() => setJuegoActivo(null)} onShare={(url) => setShareModal({ url, titulo: 'Sistema Solar' })} />;
         if (juegoActivo.tipoJuego === 'KARTINGED') return <KartingedGame usuario={null} alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'KARTINGED_MULTI') return <KartingedMultiGame alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'RACING3D') return <RacingGame3D usuario={null} alTerminar={() => setJuegoActivo(null)} />;
@@ -986,7 +1305,7 @@ return <GamePlayer recurso={juegoActivo} usuario={null} alTerminar={() => setJue
                     { id: 'VIDEOQUIZZ',      label: 'VideoQuizz',      emoji: '🎬',  color: '#DC2626', action: () => setVideoQuizz(true), shareable: true },
                     { id: 'FUNCIONES_EJECUTIVAS', label: 'Funciones Ejecutivas', emoji: '🧠', color: '#FF5722', action: () => setFuncionesEjecutivas(true), shareable: true },
                     { id: 'IRREGULAR_VERBS',     label: 'Irregular Verbs',     emoji: '📝', color: '#0369a1', action: () => setIrregularVerbs(true), shareable: false },
-                    { id: 'SOLAR_SYSTEM',        label: 'Sistema Solar',        emoji: '🪐', color: '#3B82F6', action: () => setJuegoActivo({ tipoJuego: 'SOLAR_SYSTEM' }), shareable: false },
+                    { id: 'SOLAR_SYSTEM',        label: 'Sistema Solar',        emoji: '🪐', color: '#3B82F6', action: () => setJuegoActivo({ tipoJuego: 'SOLAR_SYSTEM' }), shareable: true },
                 ].map(tool => (
                     <div key={tool.id} onClick={tool.action} style={{ background: '#ffffbf', borderRadius: '15px', padding: '15px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transition: 'transform 0.2s', border: `2px solid ${tool.color}20`, position: 'relative' }}
                         onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-3px)'}

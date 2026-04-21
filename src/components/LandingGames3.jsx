@@ -1041,8 +1041,8 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
     );
 
     if (irregularVerbs) return (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'white', overflowY: 'auto' }}>
-            <button onClick={() => setIrregularVerbs(false)} style={{ position: 'fixed', top: 14, left: 14, zIndex: 10000, background: '#1f2937', color: 'white', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#0f0f1a', overflowY: 'auto' }}>
+            <button onClick={() => setIrregularVerbs(false)} style={{ position: 'fixed', top: 14, left: 14, zIndex: 10000, background: 'rgba(255,255,255,0.1)', color: 'white', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>
                 ← Volver
             </button>
             <IrregularVerbsTest />

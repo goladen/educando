@@ -7,7 +7,7 @@ import confetti from 'canvas-confetti';
 import correctSoundFile from './assets/correct-choice-43861.mp3';
 import wrongSoundFile from './assets/negative_beeps-6008.mp3';
 import winSoundFile from './assets/applause-small-audience-97257.mp3';
-import startSoundFile from './assets/inicio juego.mp3'; // NUEVO
+import startSoundFile from './assets/inicio-juego.mp3'; // NUEVO
 
 // URL externa para el reloj (Tic-Tac)
 const TICK_SOUND_URL = 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_73686360b7.mp3?filename=clock-ticking-2-106637.mp3';

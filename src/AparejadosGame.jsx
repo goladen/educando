@@ -5,7 +5,7 @@ import { doc, getDoc, setDoc, addDoc, collection, query, where, getDocs, orderBy
 import confetti from 'canvas-confetti';
 
 // --- IMPORTACIÓN DE AUDIOS ---
-import startSoundFile from './assets/inicio juego.mp3';
+import startSoundFile from './assets/inicio-juego.mp3';
 import correctSoundFile from './assets/correct-choice-43861.mp3';
 import winSoundFile from './assets/applause-small-audience-97257.mp3';
 

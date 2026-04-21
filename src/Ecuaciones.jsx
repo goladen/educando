@@ -9,7 +9,7 @@ import piNeutral from './assets/Pi-neutro.png';
 import correctSoundFile from './assets/correct-choice-43861.mp3';
 import wrongSoundFile from './assets/negative_beeps-6008.mp3';
 import winSoundFile from './assets/applause-small-audience-97257.mp3';
-import startSoundFile from './assets/inicio juego.mp3';
+import startSoundFile from './assets/inicio-juego.mp3';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const rInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;

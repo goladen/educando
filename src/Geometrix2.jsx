@@ -8,7 +8,7 @@ import { doc, setDoc, updateDoc, onSnapshot, increment, collection, writeBatch }
 import correctSoundFile from './assets/correct-choice-43861.mp3';
 import wrongSoundFile from './assets/negative_beeps-6008.mp3';
 import winSoundFile from './assets/applause-small-audience-97257.mp3';
-import startSoundFile from './assets/inicio juego.mp3';
+import startSoundFile from './assets/inicio-juego.mp3';
 import piHappy from './assets/Pi-contento.png';
 import piAngry from './assets/Pi-enfadado.png';
 import piNeutral from './assets/Pi-neutro.png';

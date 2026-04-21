@@ -12,7 +12,7 @@ import { doc, setDoc, updateDoc, onSnapshot, increment, collection, addDoc, getD
 import piHappy from './assets/Pi-contento.png';
 import piAngry from './assets/Pi-enfadado.png';
 import piNeutral from './assets/Pi-neutro.png';
-import startSoundFile from './assets/inicio juego.mp3';
+import startSoundFile from './assets/inicio-juego.mp3';
 import correctSoundFile from './assets/correct-choice-43861.mp3';
 import wrongSoundFile from './assets/wrong.mp3';
 

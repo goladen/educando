@@ -3,7 +3,7 @@ import { auth, db } from './firebase';
 import { signOut, onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, setDoc, collection, query, where, getDocs } from "firebase/firestore";
 import ProfesorDashboard from './ProfesorDashboard';
-import StudentDashboard2 from './StudentDashboard2';
+import LandingGames from './components/landinggames3';
 import Login from './Login';
 import GamePlayer from './GamePlayer';
 import PaginaProfesor from './components/PaginaProfesor';
@@ -209,15 +209,10 @@ function App() {
                     ) : (
                             <div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 20px', background: '#2c3e5050', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', alignItems: 'center' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-
-                                        
-
-                                        <span>Alumno: <b>{usuario.displayName}</b></span>
-                                    </div>
+                                    <span>Alumno: <b>{usuario.displayName}</b></span>
                                     <button onClick={handleLogout} style={{ border: 'none', background: 'none', color: '#666', cursor: 'pointer' }}>Salir</button>
                                 </div>
-                                <StudentDashboard2 usuario={usuario} />
+                                <LandingGames usuario={usuario} />
                             </div>
                         )}
                 </div>

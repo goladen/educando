@@ -11,7 +11,7 @@ import EditorManual from './components/EditorManual';
 import EditorPro from './components/EditorPro';
 import RuletaGame from './RuletaGame';
 import UserProfile from './components/UserProfile';
-import StudentDashboard from './StudentDashboard';
+import LandingGames from './components/landinggames3';
 import GlobalSearch from './components/GlobalSearch'; // <--- NUEVO
 import TeacherTools from './components/TeacherTools'; // <--- NUEVO
 import EditorMathLive from './components/EditorMathLive';
@@ -975,7 +975,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             </div>
         );
     }
-    if (modoVista === 'ALUMNO') return (<div style={{ position: 'relative' }}><div style={{ position: 'fixed', top: 20, right: 20, zIndex: 9999 }}><button onClick={() => setModoVista('PROFESOR')} style={{ background: '#e74c3c', color: 'white', padding: '10px 20px', borderRadius: '30px', border: 'none', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}><LogOut size={20} /> SALIR MODO ALUMNO</button></div><StudentDashboard usuario={usuario} /></div>);
+    if (modoVista === 'ALUMNO') return (<div style={{ position: 'relative' }}><div style={{ position: 'fixed', top: 20, right: 20, zIndex: 9999 }}><button onClick={() => setModoVista('PROFESOR')} style={{ background: '#e74c3c', color: 'white', padding: '10px 20px', borderRadius: '30px', border: 'none', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}><LogOut size={20} /> SALIR MODO ALUMNO</button></div><LandingGames usuario={usuario} /></div>);
 
     if (mostrandoMathWordle) {
         return (

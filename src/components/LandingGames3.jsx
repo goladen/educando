@@ -24,6 +24,7 @@ import Funciones from '../Funciones';
 import GeometriaAnalitica from '../Funciones2'
 import Plataformas from '../Plataformas2';
 import StoryCubes from '../StoryCubes';
+import UserProfile from './UserProfile';
 
 import EtiquetaMe from '../EtiquetaMe';
 import OmninteractiveApp from '../OmninteractiveApp';
@@ -713,7 +714,7 @@ function ShareModal({ url, titulo, onClose }) {
     );
 }
 
-export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
+export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usuario = null }) {
     // --- AÑADE ESTA LÍNEA AQUÍ ---
     const [zonaActiva, setZonaActiva] = useState('MAIN');
 
@@ -772,6 +773,27 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
     const [videoQuizz,     setVideoQuizz]     = useState(false);
     const [funcionesEjecutivas, setFuncionesEjecutivas] = useState(false);
     const [irregularVerbs,      setIrregularVerbs]      = useState(false);
+
+    // Estados alumno logueado
+    const [vistaAlumno,    setVistaAlumno]    = useState('MAIN'); // 'MAIN' | 'RECORDS'
+    const [records,        setRecords]        = useState([]);
+    const [loadingRecords, setLoadingRecords] = useState(false);
+    const [showPerfil,     setShowPerfil]     = useState(false);
+
+    const cargarRecords = async () => {
+        if (!usuario?.email) return;
+        setLoadingRecords(true);
+        try {
+            const q = query(collection(db, 'ranking'), where('email', '==', usuario.email), orderBy('fecha', 'desc'));
+            const snap = await getDocs(q);
+            setRecords(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        } catch(e) { console.error(e); }
+        setLoadingRecords(false);
+    };
+
+    useEffect(() => {
+        if (vistaAlumno === 'RECORDS') cargarRecords();
+    }, [vistaAlumno]);
 
     // Estados Live Alumno
     const [liveModeAlumno, setLiveModeAlumno] = useState(false);
@@ -1009,7 +1031,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
 
     // 1. Host (Profesor/Gestor)
     if (liveModeHost && hostRoomCode) {
-        const tempUser = { uid: "host_invitado_" + Date.now(), displayName: "Profe Invitado", email: null };
+        const tempUser = usuario || { uid: "host_invitado_" + Date.now(), displayName: "Profe Invitado", email: null };
         // --- CORRECCIÓN: USAMOS EL ESTADO ---
         if (hostTipoJuego === 'OLYMPICLIVE') return <OlympicLive isHost={true} codigoSala={hostRoomCode} usuario={tempUser} onExit={() => setLiveModeHost(false)} />;
         // ------------------------------------
@@ -1060,48 +1082,43 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
         if (juegoActivo.tipoJuego === 'QUESTION_SENDER') {
             return (
                 <QuestionSenderClient
-                    usuario={null} // O el usuario si lo tienes
+                    usuario={usuario}
                     onBack={() => setJuegoActivo(null)}
-                    codigoInicial={juegoActivo.codigoInicial} // Pasamos el código para que no tenga que escribirlo de nuevo
+                    codigoInicial={juegoActivo.codigoInicial}
                 />
             );
         }
-       
-       
+
         if (juegoActivo.tipoJuego === 'ETIQUETAS') return <EtiquetaMe recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
 
-        if (juegoActivo.tipoJuego === 'GEOMETRIX') return <Geometrix usuario={null} onExit={() => setJuegoActivo(null)} />;
-        if (juegoActivo.tipoJuego === 'CALCULO') return <CalculoMental usuario={null} onExit={() => setJuegoActivo(null)} />;
-        if (juegoActivo.tipoJuego === 'ECUACIONES') return <Ecuaciones usuario={null} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'GEOMETRIX') return <Geometrix usuario={usuario} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'CALCULO') return <CalculoMental usuario={usuario} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'ECUACIONES') return <Ecuaciones usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'FUNCIONES') return <Funciones onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'GEOMETRÍA_ANALÍTICA') return <GeometriaAnalitica onExit={() => setJuegoActivo(null)} />;
-        
-        
-        // ------------------------
-if (juegoActivo.tipoJuego === 'SINTAXIS')    return <SintaxisGame  usuario={null} onExit={() => setJuegoActivo(null)} />;
-if (juegoActivo.tipoJuego === 'LISTENING')   return <Listening     usuario={null} onExit={() => setJuegoActivo(null)} />;
-if (juegoActivo.tipoJuego === 'STORYCUBES')  return <StoryCubes    usuario={null} onExit={() => setJuegoActivo(null)} />;
-if (juegoActivo.tipoJuego === 'SOLAR_SYSTEM') return <SolarSystemViewer recursoConfig={juegoActivo.tourConfig || null} onExit={() => setJuegoActivo(null)} />;
-if (juegoActivo.tipoJuego === 'IRREGULAR_VERBS') return (
-    <div style={{ position:'fixed', inset:0, zIndex:9999, background:'#0f0f1a', overflowY:'auto' }}>
-        <button onClick={() => setJuegoActivo(null)} style={{ position:'fixed', top:14, left:14, zIndex:10000, background:'rgba(255,255,255,0.1)', color:'white', border:'none', borderRadius:8, padding:'8px 16px', cursor:'pointer', fontWeight:700, fontSize:'0.9rem' }}>← Volver</button>
-        <IrregularVerbsTest initialConfig={juegoActivo.verbInitialConfig || null} />
-    </div>
-);
-        if (juegoActivo.tipoJuego === 'KARTINGED') return <KartingedGame usuario={null} alTerminar={() => setJuegoActivo(null)} />;
+
+        if (juegoActivo.tipoJuego === 'SINTAXIS')    return <SintaxisGame  usuario={usuario} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'LISTENING')   return <Listening     usuario={usuario} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'STORYCUBES')  return <StoryCubes    usuario={usuario} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'SOLAR_SYSTEM') return <SolarSystemViewer recursoConfig={juegoActivo.tourConfig || null} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'IRREGULAR_VERBS') return (
+            <div style={{ position:'fixed', inset:0, zIndex:9999, background:'#0f0f1a', overflowY:'auto' }}>
+                <button onClick={() => setJuegoActivo(null)} style={{ position:'fixed', top:14, left:14, zIndex:10000, background:'rgba(255,255,255,0.1)', color:'white', border:'none', borderRadius:8, padding:'8px 16px', cursor:'pointer', fontWeight:700, fontSize:'0.9rem' }}>← Volver</button>
+                <IrregularVerbsTest initialConfig={juegoActivo.verbInitialConfig || null} />
+            </div>
+        );
+        if (juegoActivo.tipoJuego === 'KARTINGED') return <KartingedGame usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'KARTINGED_MULTI') return <KartingedMultiGame alTerminar={() => setJuegoActivo(null)} />;
-        if (juegoActivo.tipoJuego === 'RACING3D') return <RacingGame3D usuario={null} alTerminar={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'RACING3D') return <RacingGame3D usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.modoEspecial === 'PIKATRON') return <PikatronRun recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.modoEspecial === 'PLATAFORMAS') return <Plataformas onExit={() => setJuegoActivo(null)} recursoInicial={juegoActivo} />;
-        if (juegoActivo.tipoJuego === 'RULETA') return <RuletaGame recurso={juegoActivo} usuario={null} alTerminar={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'RULETA') return <RuletaGame recurso={juegoActivo} usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
 
-        // --- CORRECCIÓN: Quitamos appData porque aquí no existe ---
-        if (juegoActivo.tipoJuego === 'MATHLE') return <MathWordleGame usuario={null} onExit={() => setJuegoActivo(null)} />;
-        // --- AÑADIDO: Distinguir Wordle y Sopa ---
-        if (juegoActivo.modoEspecial === 'WORDLE' || (juegoActivo.tipoJuego === 'WORDLE' && !juegoActivo.modoEspecial)) return <TextWordleGame recursoInicial={juegoActivo} usuario={null} onExit={() => setJuegoActivo(null)} />;
-        if (juegoActivo.modoEspecial === 'SOPA' || (juegoActivo.tipoJuego === 'SOPA' && !juegoActivo.modoEspecial)) return <SopaDeLetrasGame recurso={juegoActivo} usuario={null} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'MATHLE') return <MathWordleGame usuario={usuario} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.modoEspecial === 'WORDLE' || (juegoActivo.tipoJuego === 'WORDLE' && !juegoActivo.modoEspecial)) return <TextWordleGame recursoInicial={juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.modoEspecial === 'SOPA' || (juegoActivo.tipoJuego === 'SOPA' && !juegoActivo.modoEspecial)) return <SopaDeLetrasGame recurso={juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} />;
 
-return <GamePlayer recurso={juegoActivo} usuario={null} alTerminar={() => setJuegoActivo(null)} />;
+        return <GamePlayer recurso={juegoActivo} usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
     }
 
     // --- PANTALLA EXCLUSIVA MATH WORLD ---
@@ -1151,6 +1168,55 @@ return <GamePlayer recurso={juegoActivo} usuario={null} alTerminar={() => setJue
     }
 
 
+    // Vista perfil
+    if (showPerfil && usuario) return (
+        <UserProfile usuario={usuario} onClose={() => setShowPerfil(false)} showSupport={false} />
+    );
+
+    // Vista récords
+    if (usuario && vistaAlumno === 'RECORDS') {
+        const fmtFecha = (f) => f?.toDate ? f.toDate().toLocaleDateString('es-ES') : (f ? new Date(f).toLocaleDateString('es-ES') : '—');
+        const medalFor = (r) => {
+            if (r._rank === 1 || r.rank === 1) return '🥇';
+            if (r._rank === 2 || r.rank === 2) return '🥈';
+            if (r._rank === 3 || r.rank === 3) return '🥉';
+            return null;
+        };
+        return (
+            <div style={{ width:'100%', padding:'20px', maxWidth:700, margin:'0 auto' }}>
+                {showPerfil && <UserProfile usuario={usuario} onClose={() => setShowPerfil(false)} showSupport={false} />}
+                <button onClick={() => setVistaAlumno('MAIN')} style={{ background:'none', border:'none', cursor:'pointer', color:'#2c3e50', fontWeight:'bold', marginBottom:16, display:'flex', alignItems:'center', gap:6 }}>
+                    ← Volver
+                </button>
+                <h2 style={{ color:'#2c3e50', marginBottom:20 }}>📊 Mis Récords</h2>
+                {loadingRecords ? (
+                    <div style={{ textAlign:'center', padding:40, color:'#7f8c8d' }}>Cargando...</div>
+                ) : records.length === 0 ? (
+                    <div style={{ textAlign:'center', padding:40, color:'#7f8c8d' }}>No tienes récords todavía. ¡Juega para aparecer aquí!</div>
+                ) : (
+                    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                        {records.map((r, i) => {
+                            const medal = medalFor(r);
+                            const pts = r.aciertos ?? r.puntuacion ?? '—';
+                            return (
+                                <div key={r.id || i} style={{ display:'flex', alignItems:'center', gap:12, background:'white', borderRadius:12, padding:'12px 16px', boxShadow:'0 2px 8px rgba(0,0,0,0.07)' }}>
+                                    <div style={{ fontSize:'1.5rem', minWidth:32, textAlign:'center' }}>{medal || '🎮'}</div>
+                                    <div style={{ flex:1, minWidth:0 }}>
+                                        <div style={{ fontWeight:700, color:'#2c3e50', fontSize:'0.95rem', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                                            {r.recursoTitulo || r.titulo || 'Juego'}
+                                        </div>
+                                        <div style={{ fontSize:'0.78rem', color:'#7f8c8d' }}>{r.tipoJuego || r.juego || '—'} · {fmtFecha(r.fecha)}</div>
+                                    </div>
+                                    <div style={{ fontWeight:800, color:'#2c3e50', fontSize:'1.1rem' }}>{pts}</div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+        );
+    }
+
     return (
         <div style={{ width: '100%', marginTop: '20px' }}>
 
@@ -1180,6 +1246,23 @@ return <GamePlayer recurso={juegoActivo} usuario={null} alTerminar={() => setJue
             )}
 
             {shareModal && <ShareModal url={shareModal.url} titulo={shareModal.titulo} onClose={() => setShareModal(null)} />}
+            {showPerfil && usuario && <UserProfile usuario={usuario} onClose={() => setShowPerfil(false)} showSupport={false} />}
+
+            {/* BARRA DE USUARIO LOGUEADO */}
+            {usuario && (
+                <div style={{ display:'flex', alignItems:'center', gap:10, background:'rgba(255,255,255,0.15)', backdropFilter:'blur(8px)', borderRadius:14, padding:'8px 16px', marginBottom:16, flexWrap:'wrap' }}>
+                    {usuario.photoURL && <img src={usuario.photoURL} alt="avatar" style={{ width:34, height:34, borderRadius:'50%', border:'2px solid rgba(255,255,255,0.6)' }} />}
+                    <span style={{ color:'white', fontWeight:700, fontSize:'0.9rem', flex:1 }}>{usuario.displayName}</span>
+                    <button onClick={() => setVistaAlumno('RECORDS')}
+                        style={{ background:'rgba(255,255,255,0.2)', border:'1px solid rgba(255,255,255,0.35)', color:'white', borderRadius:10, padding:'6px 14px', cursor:'pointer', fontWeight:600, fontSize:'0.82rem', display:'flex', alignItems:'center', gap:5 }}>
+                        📊 Mis Récords
+                    </button>
+                    <button onClick={() => setShowPerfil(true)}
+                        style={{ background:'rgba(255,255,255,0.2)', border:'1px solid rgba(255,255,255,0.35)', color:'white', borderRadius:10, padding:'6px 14px', cursor:'pointer', fontWeight:600, fontSize:'0.82rem', display:'flex', alignItems:'center', gap:5 }}>
+                        👤 Mi Perfil
+                    </button>
+                </div>
+            )}
 
             {/* BUSCADOR PRINCIPAL (MÁS ANCHO) */}
             <div style={{ background: 'rgba(255,255,255,0.95)', padding: '30px', borderRadius: '20px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', marginBottom: '30px', maxWidth: '900px', margin: '0 auto 30px auto' }}>

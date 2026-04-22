@@ -3,7 +3,7 @@ import { auth, db } from './firebase';
 import { signOut, onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, setDoc, collection, query, where, getDocs } from "firebase/firestore";
 import ProfesorDashboard from './ProfesorDashboard';
-import LandingGames from './components/landinggames3';
+import LandingGames from './components/LandingGames3';
 import Login from './Login';
 import GamePlayer from './GamePlayer';
 import PaginaProfesor from './components/PaginaProfesor';

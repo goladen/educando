@@ -5,6 +5,7 @@ import { db } from './firebase';
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from 'firebase/auth';
 import { collection, addDoc, getDoc, doc } from 'firebase/firestore';
 import { FUNCIONES_DB } from './BibliotecaFunciones';
+import RepresentacionElementales from './RepresentacionElementales';
 
 const auth = getAuth();
 
@@ -883,7 +884,7 @@ export default function Funciones({ onExit }) {
             } catch (e) { console.error(e); }
         }
     };
-    const [seccion,   setSeccion]   = useState(null);
+    const [seccion,   setSeccion]   = useState(null); // null | 'SELECTOR_TIPO' | 'CARACTERISTICAS' | 'ELEMENTALES'
     const [modoEsc,   setModoEsc]   = useState(false);
     const [tipo,      setTipo]      = useState('Todas');
     const [buscarId,  setBuscarId]  = useState('');
@@ -901,6 +902,9 @@ export default function Funciones({ onExit }) {
         setSeccion('CARACTERISTICAS');
     };
 
+    if (seccion === 'ELEMENTALES') return (
+        <RepresentacionElementales onExit={() => setSeccion(null)} />
+    );
     if (seccion === 'SELECTOR_TIPO') return (
         <div style={{minHeight:'100vh',background:'#f0f3fb',display:'flex',justifyContent:'center',alignItems:'center',padding:20}}>
             <SelectorTipo onStart={(t,esE)=>{setTipo(t);setModoEsc(esE);setIdInicial(null);setSeccion('CARACTERISTICAS');}} onBack={()=>setSeccion(null)}/>
@@ -926,6 +930,12 @@ export default function Funciones({ onExit }) {
                     <button onClick={()=>setSeccion('SELECTOR_TIPO')}
                         style={{padding:'16px 24px',borderRadius:14,border:'none',background:'#3498db',color:'white',fontWeight:700,fontSize:'1rem',cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',gap:10}}>
                         <Activity size={20}/> Características desde gráfica
+                    </button>
+
+                    {/* Botón Representación de Funciones Elementales */}
+                    <button onClick={()=>setSeccion('ELEMENTALES')}
+                        style={{padding:'16px 24px',borderRadius:14,border:'none',background:'linear-gradient(135deg,#27ae60,#1e8449)',color:'white',fontWeight:700,fontSize:'1rem',cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',gap:10}}>
+                        <Edit3 size={20}/> Representación de funciones elementales
                     </button>
 
                     {/* Buscar por ID */}

@@ -1703,4 +1703,344 @@ export const FUNCIONES_DB = [
       continua:  { correcta: 'Sí', incorrectas: ['No'] }
     }
   }
+,
+  {
+    id: 101, tipo: 'Compuesta', grado: 'Compuesta',
+    latex: 'f(x) = 9 - 4x^{2}',
+    fn: (x) => 9 - 4*x*x,
+    range: 4,
+    caracteristicas: {
+      dominio:   { correcta: '(-∞, ∞)', incorrectas: ['(-3/2, 3/2)', '(0, ∞)', '[0, 9]'] },
+      recorrido: { correcta: '(-∞, 9]', incorrectas: ['(-∞, ∞)', '[0, 9]', '(-∞, 0]'] },
+      simetria:  { correcta: 'Par', incorrectas: ['Impar', 'Sin simetría', 'Respecto al eje X'] },
+      periodica: { correcta: 'No', incorrectas: ['Sí, T=2', 'Sí, T=π', 'Sí, T=4'] },
+      cortes:    { correcta: '(-1.5,0), (1.5,0), (0,9)', incorrectas: ['(0,9)', '(3,0) y (-3,0)', '(±3,0)'] },
+      monotonia: { correcta: 'C: (-∞,0) D: (0,∞)', incorrectas: ['C: (-∞,∞) D: ∅', 'C: (0,∞) D: (-∞,0)', 'C: ∅ D: (-∞,∞)'] },
+      extremos:  { correcta: 'Máx(0,9)', incorrectas: ['Mín(0,9)', 'Máx(1.5,0)', 'No tiene'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
+    }
+  }
+,
+  {
+    id: 102, tipo: 'Compuesta', grado: 'Compuesta',
+    latex: 'g(x) = \\frac{x}{7-x^{2}}',
+    fn: (x) => (Math.abs(7 - x*x) > 0.001) ? x / (7 - x*x) : null,
+    range: 5,
+    caracteristicas: {
+      dominio:   { correcta: 'ℝ - {-√7, √7}', incorrectas: ['(-∞, ∞)', 'ℝ - {0}', '(-√7, √7)'] },
+      recorrido: { correcta: '(-∞, ∞)', incorrectas: ['(-∞,0)∪(0,∞)', '[-1,1]', '(0,∞)'] },
+      simetria:  { correcta: 'Impar', incorrectas: ['Par', 'Sin simetría', 'Respecto al eje Y'] },
+      periodica: { correcta: 'No', incorrectas: ['Sí, T=π', 'Sí, T=√7', 'Sí, T=2'] },
+      cortes:    { correcta: '(0,0)', incorrectas: ['(√7,0) y (-√7,0)', 'No tiene', '(0,7)'] },
+      monotonia: { correcta: 'C: todo el dominio D: ∅', incorrectas: ['C: ∅ D: todo el dominio', 'C: (0,√7) D: fuera', 'C: (-√7,√7) D: resto'] },
+      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(0,0)', 'Mín(√7,0)', 'Mín(0,0)'] },
+      continua:  { correcta: 'No', incorrectas: ['Sí'] }
+    }
+  }
+,
+  {
+    id: 103, tipo: 'Compuesta', grado: 'Compuesta',
+    latex: 'h(x) = \\frac{x-1}{x^{3}-2x^{2}-5x+6}',
+    fn: (x) => (Math.abs(x+2)>0.001 && Math.abs(x-1)>0.001 && Math.abs(x-3)>0.001) ? (x-1)/(Math.pow(x,3)-2*x*x-5*x+6) : null,
+    range: 6,
+    caracteristicas: {
+      dominio:   { correcta: 'ℝ - {-2, 1, 3}', incorrectas: ['ℝ - {-3, 1, 2}', 'ℝ - {1, 3}', '(-∞, ∞)'] },
+      recorrido: { correcta: 'ℝ - {0}', incorrectas: ['(-∞, ∞)', '(-∞,0)∪(0,∞) - {-1/6}', '[0, ∞)'] },
+      simetria:  { correcta: 'Sin simetría', incorrectas: ['Par', 'Impar', 'Respecto al origen'] },
+      periodica: { correcta: 'No', incorrectas: ['Sí, T=1', 'Sí, T=2', 'Sí, T=π'] },
+      cortes:    { correcta: 'No tiene en x; (0,-1/6) en y', incorrectas: ['(1,0)', '(0,0)', 'No tiene'] },
+      monotonia: { correcta: 'D: en cada intervalo C: ∅', incorrectas: ['C: (-∞,∞) D: ∅', 'C: (1,3) D: resto', 'C: ∅ D: ∅'] },
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(0,-1/6)', 'Máx(1,0)', 'Mín(1,0)'] },
+      continua:  { correcta: 'No', incorrectas: ['Sí'] }
+    }
+  }
+,
+  {
+    id: 104, tipo: 'Compuesta', grado: 'Compuesta',
+    latex: 'y = 1 + \\frac{1}{x} - \\frac{x}{x-1}',
+    fn: (x) => (Math.abs(x)>0.001 && Math.abs(x-1)>0.001) ? -1/(x*(x-1)) : null,
+    range: 6,
+    caracteristicas: {
+      dominio:   { correcta: 'ℝ - {0, 1}', incorrectas: ['(-∞, ∞)', 'ℝ - {1}', '(0, ∞)'] },
+      recorrido: { correcta: '(-∞,0) ∪ [4,+∞)', incorrectas: ['(-∞, ∞)', '(-∞,0)∪(0,∞)', '[0,+∞)'] },
+      simetria:  { correcta: 'Sin simetría', incorrectas: ['Par', 'Impar', 'Respecto al eje Y'] },
+      periodica: { correcta: 'No', incorrectas: ['Sí, T=1', 'Sí, T=2', 'Sí, T=π'] },
+      cortes:    { correcta: 'No tiene', incorrectas: ['(0,0)', '(1,0)', '(0,1)'] },
+      monotonia: { correcta: 'C: (1/2,1)∪(1,∞) D: (-∞,0)∪(0,1/2)', incorrectas: ['C: (-∞,∞) D: ∅', 'C: ∅ D: (-∞,0)∪(0,∞)', 'C: (0,∞) D: (-∞,0)'] },
+      extremos:  { correcta: 'Mín(1/2, 4)', incorrectas: ['Máx(1/2,4)', 'Mín(0,0)', 'No tiene'] },
+      continua:  { correcta: 'No', incorrectas: ['Sí'] }
+    }
+  }
+,
+  {
+    id: 105, tipo: 'Compuesta', grado: 'Compuesta',
+    latex: 'f(x) = ⁵√(\\frac{x}{7-x^{2}})',
+    fn: (x) => { const d=7-x*x; if(Math.abs(d)<0.001) return null; const v=x/d; return v>=0 ? Math.pow(v,0.2) : -Math.pow(-v,0.2); },
+    range: 5,
+    caracteristicas: {
+      dominio:   { correcta: 'ℝ - {-√7, √7}', incorrectas: ['(-∞, ∞)', '(0, ∞)', 'ℝ - {0}'] },
+      recorrido: { correcta: '(-∞, ∞)', incorrectas: ['(0, ∞)', '[-1,1]', '(-∞,0)∪(0,∞)'] },
+      simetria:  { correcta: 'Impar', incorrectas: ['Par', 'Sin simetría', 'Respecto al eje Y'] },
+      periodica: { correcta: 'No', incorrectas: ['Sí, T=π', 'Sí, T=√7', 'Sí, T=2'] },
+      cortes:    { correcta: '(0,0)', incorrectas: ['(√7,0) y (-√7,0)', 'No tiene', '(7,0)'] },
+      monotonia: { correcta: 'C: todo el dominio D: ∅', incorrectas: ['C: ∅ D: todo el dominio', 'C: (-√7,√7) D: resto', 'C: ∅ D: (-∞,∞)'] },
+      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(0,0)', 'Mín(0,0)', 'Máx(√7,1)'] },
+      continua:  { correcta: 'No', incorrectas: ['Sí'] }
+    }
+  }
+,
+  {
+    id: 106, tipo: 'Compuesta', grado: 'Compuesta',
+    latex: 'f(x) = x - \\frac{2}{√x}',
+    fn: (x) => (x > 0.001) ? x - 2/Math.sqrt(x) : null,
+    range: 6,
+    caracteristicas: {
+      dominio:   { correcta: '(0, ∞)', incorrectas: ['(-∞, ∞)', '[0, ∞)', '(-∞,0)∪(0,∞)'] },
+      recorrido: { correcta: '(-∞, ∞)', incorrectas: ['[0, ∞)', '(-∞,0)', '(-2,∞)'] },
+      simetria:  { correcta: 'Sin simetría', incorrectas: ['Par', 'Impar', 'Respecto al origen'] },
+      periodica: { correcta: 'No', incorrectas: ['Sí, T=2', 'Sí, T=4', 'Sí, T=π'] },
+      cortes:    { correcta: '(∛4, 0); no corta al eje Y', incorrectas: ['(0,0)', '(2,0)', '(4,0) y (0,-2)'] },
+      monotonia: { correcta: 'C: (0,∞) D: ∅', incorrectas: ['C: ∅ D: (0,∞)', 'C: (∛4,∞) D: (0,∛4)', 'C: (0,2) D: (2,∞)'] },
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(∛4,0)', 'Máx(0,0)', 'Mín(0,-2)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
+    }
+  }
+,
+  {
+    id: 107, tipo: 'Compuesta', grado: 'Compuesta',
+    latex: 'y = √(x^{2}-5x+6)',
+    fn: (x) => { const v=x*x-5*x+6; return v>=0 ? Math.sqrt(v) : null; },
+    range: 6,
+    caracteristicas: {
+      dominio:   { correcta: '(-∞,2] ∪ [3,+∞)', incorrectas: ['(-∞,∞)', '(2,3)', '[2,3]'] },
+      recorrido: { correcta: '[0, ∞)', incorrectas: ['(-∞,∞)', '(0,∞)', '(-∞,0]'] },
+      simetria:  { correcta: 'Sin simetría', incorrectas: ['Par', 'Impar', 'Respecto a x=2.5'] },
+      periodica: { correcta: 'No', incorrectas: ['Sí, T=1', 'Sí, T=3', 'Sí, T=π'] },
+      cortes:    { correcta: '(2,0), (3,0), (0,√6)', incorrectas: ['(2,0) y (3,0)', '(0,0)', '(±√6,0)'] },
+      monotonia: { correcta: 'C: [3,+∞) D: (-∞,2]', incorrectas: ['C: (-∞,∞) D: ∅', 'C: (-∞,2] D: [3,∞)', 'C: (2,3) D: resto'] },
+      extremos:  { correcta: 'Mín(2,0) y Mín(3,0)', incorrectas: ['Máx(2.5,0)', 'Mín(2.5,0)', 'No tiene'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
+    }
+  }
+,
+  {
+    id: 108, tipo: 'Compuesta', grado: 'Compuesta',
+    latex: 'y = \\frac{-2}{√(x^{2}-5x+6)}',
+    fn: (x) => { const v=x*x-5*x+6; return v>0.001 ? -2/Math.sqrt(v) : null; },
+    range: 6,
+    caracteristicas: {
+      dominio:   { correcta: '(-∞,2) ∪ (3,+∞)', incorrectas: ['(-∞,∞)', '(-∞,2]∪[3,∞)', '[2,3]'] },
+      recorrido: { correcta: '(-∞, 0)', incorrectas: ['(-∞,∞)', '(-∞,0]', '(0,∞)'] },
+      simetria:  { correcta: 'Sin simetría', incorrectas: ['Par', 'Impar', 'Respecto a x=2.5'] },
+      periodica: { correcta: 'No', incorrectas: ['Sí, T=1', 'Sí, T=3', 'Sí, T=π'] },
+      cortes:    { correcta: 'No tiene en x; (0,-2/√6) en y', incorrectas: ['(2,0) y (3,0)', 'No tiene', '(0,0)'] },
+      monotonia: { correcta: 'C: (3,+∞) D: (-∞,2)', incorrectas: ['C: (-∞,2) D: (3,∞)', 'C: (-∞,∞) D: ∅', 'C: ∅ D: (-∞,2)∪(3,∞)'] },
+      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(2.5,-2)', 'Mín(2,-2)', 'Mín(3,-2)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
+    }
+  }
+,
+  {
+    id: 109, tipo: 'Compuesta', grado: 'Compuesta',
+    latex: 'y = \\frac{-2}{∛(x^{2}-5x+6)}',
+    fn: (x) => { const v=x*x-5*x+6; if(Math.abs(v)<0.001) return null; const cbrt=v>0?Math.pow(v,1/3):-Math.pow(-v,1/3); return -2/cbrt; },
+    range: 6,
+    caracteristicas: {
+      dominio:   { correcta: 'ℝ - {2, 3}', incorrectas: ['(-∞,∞)', '(-∞,2)∪(3,∞)', 'ℝ - {2.5}'] },
+      recorrido: { correcta: 'ℝ - {0}', incorrectas: ['(-∞,∞)', '(-∞,0)', '(0,∞)'] },
+      simetria:  { correcta: 'Sin simetría', incorrectas: ['Par', 'Impar', 'Respecto a x=2.5'] },
+      periodica: { correcta: 'No', incorrectas: ['Sí, T=1', 'Sí, T=3', 'Sí, T=π'] },
+      cortes:    { correcta: 'No tiene en x; (0,-2/∛6) en y', incorrectas: ['(2,0) y (3,0)', 'No tiene', '(0,0)'] },
+      monotonia: { correcta: 'D: (-∞,2)∪(2,5/2) C: (5/2,3)∪(3,∞)', incorrectas: ['C: (-∞,∞) D: ∅', 'C: ∅ D: (-∞,2)∪(3,∞)', 'D: todo el dominio C: ∅'] },
+      extremos:  { correcta: 'Mín(2.5, 2∛4)', incorrectas: ['Máx(2.5,0)', 'No tiene', 'Mín(2,0)'] },
+      continua:  { correcta: 'No', incorrectas: ['Sí'] }
+    }
+  }
+,
+  {
+    id: 110, tipo: 'Compuesta', grado: 'Compuesta',
+    latex: 'f(x) = √(\\frac{x+2}{3x-5})',
+    fn: (x) => { const d=3*x-5; if(Math.abs(d)<0.001) return null; const v=(x+2)/d; return v>=0 ? Math.sqrt(v) : null; },
+    range: 6,
+    caracteristicas: {
+      dominio:   { correcta: '(-∞,-2] ∪ (5/3,+∞)', incorrectas: ['(-∞,∞)', '(-2,5/3)', '[-2,5/3]'] },
+      recorrido: { correcta: '[0,+∞)', incorrectas: ['(-∞,∞)', '(0,∞)', '[1/3,∞)'] },
+      simetria:  { correcta: 'Sin simetría', incorrectas: ['Par', 'Impar', 'Respecto al eje Y'] },
+      periodica: { correcta: 'No', incorrectas: ['Sí, T=2', 'Sí, T=π', 'Sí, T=3'] },
+      cortes:    { correcta: '(-2,0); no corta al eje Y', incorrectas: ['(5/3,0)', '(0,0)', '(-2,0) y (5/3,0)'] },
+      monotonia: { correcta: 'D: (-∞,-2)∪(5/3,+∞) C: ∅', incorrectas: ['C: (-∞,-2)∪(5/3,∞) D: ∅', 'C: (5/3,∞) D: (-∞,-2)', 'C: (-∞,∞) D: ∅'] },
+      extremos:  { correcta: 'Mín(-2,0)', incorrectas: ['Máx(-2,0)', 'No tiene', 'Mín(5/3,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
+    }
+  }
+,
+  {
+    id: 111, tipo: 'Compuesta', grado: 'Compuesta',
+    latex: 'g(x) = ⁴√(x^{2}+5x+8)',
+    fn: (x) => Math.pow(x*x+5*x+8, 0.25),
+    range: 5,
+    caracteristicas: {
+      dominio:   { correcta: '(-∞, ∞)', incorrectas: ['[-5/2,∞)', '[-2,-1/2]', '(0,∞)'] },
+      recorrido: { correcta: '[⁴√(7/4), ∞) ≈ [1.15, ∞)', incorrectas: ['(-∞,∞)', '[0,∞)', '[1,∞)'] },
+      simetria:  { correcta: 'Sin simetría', incorrectas: ['Par', 'Impar', 'Respecto al eje Y'] },
+      periodica: { correcta: 'No', incorrectas: ['Sí, T=1', 'Sí, T=2', 'Sí, T=π'] },
+      cortes:    { correcta: 'No tiene en x; (0,⁴√8) en y', incorrectas: ['(0,0)', '(-2,0) y (-3,0)', 'No tiene'] },
+      monotonia: { correcta: 'D: (-∞,-5/2) C: (-5/2,+∞)', incorrectas: ['C: (-∞,∞) D: ∅', 'C: (-∞,-5/2) D: (-5/2,∞)', 'D: (-∞,∞) C: ∅'] },
+      extremos:  { correcta: 'Mín(-2.5, ⁴√(7/4))', incorrectas: ['Máx(-2.5,0)', 'No tiene', 'Mín(0,⁴√8)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
+    }
+  }
+,
+  {
+    id: 112, tipo: 'Compuesta', grado: 'Compuesta',
+    latex: 'l(x) = √(3+2x-x^{2})',
+    fn: (x) => { const v=3+2*x-x*x; return v>=0 ? Math.sqrt(v) : null; },
+    range: 5,
+    caracteristicas: {
+      dominio:   { correcta: '[-1, 3]', incorrectas: ['(-∞,∞)', '[-3,1]', '(-1,3)'] },
+      recorrido: { correcta: '[0, 2]', incorrectas: ['(-∞,∞)', '[0,√3]', '[0,∞)'] },
+      simetria:  { correcta: 'Sin simetría', incorrectas: ['Par', 'Impar', 'Respecto a x=1'] },
+      periodica: { correcta: 'No', incorrectas: ['Sí, T=2', 'Sí, T=4', 'Sí, T=π'] },
+      cortes:    { correcta: '(-1,0), (3,0), (0,√3)', incorrectas: ['(0,0)', '(-1,0) y (3,0)', '(1,2) y (0,√3)'] },
+      monotonia: { correcta: 'C: [-1,1] D: [1,3]', incorrectas: ['C: [-1,3] D: ∅', 'C: [1,3] D: [-1,1]', 'D: [-1,3] C: ∅'] },
+      extremos:  { correcta: 'Máx(1,2)', incorrectas: ['Mín(1,2)', 'Máx(0,√3)', 'No tiene'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
+    }
+  }
+,
+  {
+    id: 113, tipo: 'Compuesta', grado: 'Compuesta',
+    latex: 'm(x) = \\frac{√(9-x^{2})}{x+1}',
+    fn: (x) => { const v=9-x*x; if(v<0 || Math.abs(x+1)<0.001) return null; return Math.sqrt(v)/(x+1); },
+    range: 5,
+    caracteristicas: {
+      dominio:   { correcta: '[-3,3] - {-1}', incorrectas: ['[-3,3]', '(-3,3)', '(-∞,∞) - {-1}'] },
+      recorrido: { correcta: '(-∞, ∞)', incorrectas: ['[0,∞)', '(-3,3)', '[-3,3]'] },
+      simetria:  { correcta: 'Sin simetría', incorrectas: ['Par', 'Impar', 'Respecto al origen'] },
+      periodica: { correcta: 'No', incorrectas: ['Sí, T=2π', 'Sí, T=6', 'Sí, T=π'] },
+      cortes:    { correcta: '(-3,0), (3,0), (0,3)', incorrectas: ['(0,3)', '(0,0)', '(-3,0) y (3,0) y (0,-3)'] },
+      monotonia: { correcta: 'D: [-3,-1)∪(-1,3] C: ∅', incorrectas: ['C: [-3,3] D: ∅', 'C: (-1,3] D: [-3,-1)', 'C: ∅ D: [-3,3]'] },
+      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(0,3)', 'Mín(-3,0)', 'Máx(-1,∞)'] },
+      continua:  { correcta: 'No', incorrectas: ['Sí'] }
+    }
+  }
+,
+  {
+    id: 114, tipo: 'Compuesta', grado: 'Compuesta',
+    latex: 'y = e^{1/x} + 2^{-1/(x-7)}',
+    fn: (x) => (Math.abs(x)>0.001 && Math.abs(x-7)>0.001) ? Math.exp(1/x) + Math.pow(2, -1/(x-7)) : null,
+    range: 10,
+    caracteristicas: {
+      dominio:   { correcta: 'ℝ - {0, 7}', incorrectas: ['(-∞,∞)', 'ℝ - {0}', '(0,7)'] },
+      recorrido: { correcta: '(0, ∞)', incorrectas: ['(-∞,∞)', '(-∞,0)', '[2,∞)'] },
+      simetria:  { correcta: 'Sin simetría', incorrectas: ['Par', 'Impar', 'Respecto al eje Y'] },
+      periodica: { correcta: 'No', incorrectas: ['Sí, T=7', 'Sí, T=π', 'Sí, T=2'] },
+      cortes:    { correcta: 'No tiene en x ni en y', incorrectas: ['(0,2)', '(7,2)', '(0,0)'] },
+      monotonia: { correcta: 'D: (-∞,0)∪(0,7) C: (7,∞)', incorrectas: ['C: (-∞,∞) D: ∅', 'C: (0,7) D: resto', 'D: todo el dominio C: ∅'] },
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(7,2)', 'Máx(0,2)', 'Mín(3.5,2)'] },
+      continua:  { correcta: 'No', incorrectas: ['Sí'] }
+    }
+  }
+,
+  {
+    id: 115, tipo: 'Compuesta', grado: 'Compuesta',
+    latex: 'ñ(x) = ln(2x+3)',
+    fn: (x) => (2*x+3 > 0) ? Math.log(2*x+3) : null,
+    range: 5,
+    caracteristicas: {
+      dominio:   { correcta: '(-3/2, ∞)', incorrectas: ['(-∞,∞)', '(0,∞)', '(-3,∞)'] },
+      recorrido: { correcta: '(-∞, ∞)', incorrectas: ['[0,∞)', '(-∞,0)', '(0,∞)'] },
+      simetria:  { correcta: 'Sin simetría', incorrectas: ['Par', 'Impar', 'Respecto al eje Y'] },
+      periodica: { correcta: 'No', incorrectas: ['Sí, T=2π', 'Sí, T=3', 'Sí, T=1'] },
+      cortes:    { correcta: '(-1,0), (0,ln3)', incorrectas: ['(0,0)', '(-3/2,0)', '(-1,0) y (0,3)'] },
+      monotonia: { correcta: 'C: (-3/2,∞) D: ∅', incorrectas: ['C: ∅ D: (-3/2,∞)', 'C: (0,∞) D: (-3/2,0)', 'D: (-3/2,∞) C: ∅'] },
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(-1,0)', 'Mín(0,ln3)', 'Máx(-1,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
+    }
+  }
+,
+  {
+    id: 116, tipo: 'Compuesta', grado: 'Compuesta',
+    latex: 'k(x) = ln(2x+3) + \\frac{1}{x}',
+    fn: (x) => (2*x+3 > 0 && Math.abs(x)>0.001) ? Math.log(2*x+3) + 1/x : null,
+    range: 5,
+    caracteristicas: {
+      dominio:   { correcta: '(-3/2,0) ∪ (0,+∞)', incorrectas: ['(-3/2,∞)', '(0,∞)', '(-∞,∞)'] },
+      recorrido: { correcta: '(-∞, ∞)', incorrectas: ['[0,∞)', '(-∞,0)', '(0,∞)'] },
+      simetria:  { correcta: 'Sin simetría', incorrectas: ['Par', 'Impar', 'Respecto al eje Y'] },
+      periodica: { correcta: 'No', incorrectas: ['Sí, T=2π', 'Sí, T=3', 'Sí, T=1'] },
+      cortes:    { correcta: 'No tiene corte con eje Y', incorrectas: ['(0,0)', '(0,ln3)', '(-1,0)'] },
+      monotonia: { correcta: 'C: (0,∞) D: compleja en (-3/2,0)', incorrectas: ['C: (-3/2,∞) D: ∅', 'C: ∅ D: todo el dominio', 'C: (-3/2,0) D: (0,∞)'] },
+      extremos:  { correcta: 'Posible mínimo en (-3/2,0)', incorrectas: ['No tiene', 'Mín(0,∞)', 'Máx(-1,0)'] },
+      continua:  { correcta: 'No', incorrectas: ['Sí'] }
+    }
+  }
+,
+  {
+    id: 117, tipo: 'Compuesta', grado: 'Compuesta',
+    latex: 'f(x) = sen(√(1-x^{2}))',
+    fn: (x) => { const v=1-x*x; return v>=0 ? Math.sin(Math.sqrt(v)) : null; },
+    range: 2,
+    caracteristicas: {
+      dominio:   { correcta: '[-1, 1]', incorrectas: ['(-∞,∞)', '(-1,1)', '[0,1]'] },
+      recorrido: { correcta: '[0, sen(1)] ≈ [0, 0.84]', incorrectas: ['[-1,1]', '[0,1]', '(-∞,∞)'] },
+      simetria:  { correcta: 'Par', incorrectas: ['Impar', 'Sin simetría', 'Respecto al eje X'] },
+      periodica: { correcta: 'No', incorrectas: ['Sí, T=2π', 'Sí, T=1', 'Sí, T=π'] },
+      cortes:    { correcta: '(-1,0), (1,0), (0,sen1)', incorrectas: ['(0,0)', '(0,1)', '(0,sen1) solo'] },
+      monotonia: { correcta: 'C: [-1,0] D: [0,1]', incorrectas: ['C: [-1,1] D: ∅', 'C: [0,1] D: [-1,0]', 'D: [-1,1] C: ∅'] },
+      extremos:  { correcta: 'Máx(0, sen1)', incorrectas: ['Mín(0,0)', 'Máx(0,1)', 'No tiene'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
+    }
+  }
+,
+  {
+    id: 118, tipo: 'Compuesta', grado: 'Compuesta',
+    latex: 'f(x) = x^{2} - 3x + ln(5^{cos x})',
+    fn: (x) => x*x - 3*x + Math.cos(x)*Math.log(5),
+    range: 8,
+    caracteristicas: {
+      dominio:   { correcta: '(-∞, ∞)', incorrectas: ['(0,∞)', '[-1,1]', 'ℝ - {π/2+kπ}'] },
+      recorrido: { correcta: '(-∞, ∞)', incorrectas: ['[0,∞)', '[-9/4-ln5, ∞)', '[-1,1]'] },
+      simetria:  { correcta: 'Sin simetría', incorrectas: ['Par', 'Impar', 'Respecto a x=3/2'] },
+      periodica: { correcta: 'No', incorrectas: ['Sí, T=2π', 'Sí, T=π', 'Sí, T=1'] },
+      cortes:    { correcta: '(0, ln5) en y', incorrectas: ['(0,0)', '(0,1)', '(3/2,0)'] },
+      monotonia: { correcta: 'Alterna: depende de x²-3x y cos', incorrectas: ['C: (-∞,∞) D: ∅', 'C: (3/2,∞) D: (-∞,3/2)', 'D: (-∞,∞) C: ∅'] },
+      extremos:  { correcta: 'Mínimos locales múltiples', incorrectas: ['No tiene', 'Mín(3/2,-9/4)', 'Máx(0,ln5)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
+    }
+  }
+,
+  {
+    id: 119, tipo: 'Compuesta', grado: 'Compuesta',
+    latex: 'h(x) = \\frac{log(25-x^{2})}{√(x^{2}+3x-4)}',
+    fn: (x) => { const la=25-x*x; const sa=x*x+3*x-4; if(la<=0||sa<=0.001) return null; return Math.log10(la)/Math.sqrt(sa); },
+    range: 6,
+    caracteristicas: {
+      dominio:   { correcta: '(-5,-4) ∪ (1,5)', incorrectas: ['(-5,5)', '(-4,1)', '(-∞,∞)'] },
+      recorrido: { correcta: '(-∞, ∞)', incorrectas: ['[0,∞)', '(-∞,0)', '[log9,∞)'] },
+      simetria:  { correcta: 'Sin simetría', incorrectas: ['Par', 'Impar', 'Respecto al eje Y'] },
+      periodica: { correcta: 'No', incorrectas: ['Sí, T=5', 'Sí, T=π', 'Sí, T=2'] },
+      cortes:    { correcta: '(±2√6, 0) ≈ (±4.9, 0); no corte en y', incorrectas: ['(0,0)', '(5,0) y (-5,0)', 'No tiene'] },
+      monotonia: { correcta: 'Decreciente en cada intervalo del dominio', incorrectas: ['C: (-∞,∞) D: ∅', 'C: todo el dominio D: ∅', 'C: (1,5) D: (-5,-4)'] },
+      extremos:  { correcta: 'No tiene', incorrectas: ['Máx(0,log25)', 'Mín(±5,0)', 'Mín(1,0)'] },
+      continua:  { correcta: 'Sí', incorrectas: ['No'] }
+    }
+  }
+,
+  {
+    id: 120, tipo: 'Compuesta', grado: 'Compuesta',
+    latex: 'y = tg(2x-3)',
+    fn: (x) => { const a=2*x-3; const c=Math.cos(a); return Math.abs(c)>0.01 ? Math.sin(a)/c : null; },
+    range: 8,
+    caracteristicas: {
+      dominio:   { correcta: 'ℝ - {3/2+(2k+1)π/4, k∈ℤ}', incorrectas: ['(-∞,∞)', 'ℝ - {π/2+kπ}', 'ℝ - {3/2+kπ}'] },
+      recorrido: { correcta: '(-∞, ∞)', incorrectas: ['[-1,1]', '(0,∞)', '(-π/2,π/2)'] },
+      simetria:  { correcta: 'Sin simetría', incorrectas: ['Par', 'Impar', 'Respecto al origen'] },
+      periodica: { correcta: 'Sí, T=π/2', incorrectas: ['Sí, T=π', 'Sí, T=2π', 'No'] },
+      cortes:    { correcta: '(3/2,0) y (0,tg(-3)≈0.14)', incorrectas: ['(0,0)', '(3,0)', 'No tiene'] },
+      monotonia: { correcta: 'C: en cada intervalo del dominio D: ∅', incorrectas: ['C: ∅ D: todo', 'C: (-∞,∞) D: ∅', 'D: en cada intervalo C: ∅'] },
+      extremos:  { correcta: 'No tiene', incorrectas: ['Mín(3/2,0)', 'Máx(0,0.14)', 'Mín(0,0)'] },
+      continua:  { correcta: 'No', incorrectas: ['Sí'] }
+    }
+  }
 ];

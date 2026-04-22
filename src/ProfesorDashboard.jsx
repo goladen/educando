@@ -11,7 +11,7 @@ import EditorManual from './components/EditorManual';
 import EditorPro from './components/EditorPro';
 import RuletaGame from './RuletaGame';
 import UserProfile from './components/UserProfile';
-import LandingGames from './components/landinggames3';
+import LandingGames from './components/LandingGames3';
 import GlobalSearch from './components/GlobalSearch'; // <--- NUEVO
 import TeacherTools from './components/TeacherTools'; // <--- NUEVO
 import EditorMathLive from './components/EditorMathLive';

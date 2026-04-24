@@ -56,15 +56,13 @@
           return;
         }
         if (e.data && e.data.type === 'MANSION_PREGUNTAS') {
-          // Guardar siempre, por si MansionListo() aún no ha disparado
-          preguntasGuardadas = JSON.stringify({ arrayPreguntas: e.data.preguntas });
-          console.log('[Mansion] Preguntas recibidas de React (' + e.data.preguntas.length + ')');
-
-          // Si PreguntasManager ya llamó a MansionListo() antes de que llegaran las preguntas
-          // (poco probable pero posible), enviar directamente
-          if (unityInstance && e.data.preguntas.length > 0) {
-            // Intentar de todas formas — si el objeto no existe Unity lo ignora
-            enviarAUnity(preguntasGuardadas);
+          var arr = e.data.preguntas || [];
+          console.log('[Mansion] Preguntas recibidas de React (' + arr.length + ')');
+          if (arr.length > 0) {
+            preguntasGuardadas = JSON.stringify({ arrayPreguntas: arr });
+            if (unityInstance) {
+              enviarAUnity(preguntasGuardadas);
+            }
           }
         }
       });

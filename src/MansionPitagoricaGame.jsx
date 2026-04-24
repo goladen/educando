@@ -33,7 +33,7 @@ async function fetchPreguntas(recurso, hoja) {
 
     return shuffle(preguntas).map((p, i) => ({
         pregunta:              p.pregunta    || p.question || '',
-        respuestaCorrecta:     p.respuesta   || p.answer   || '',
+        respuestaCorrecta:     p.correcta    || p.respuesta || p.answer || '',
         respuestasIncorrectas: p.incorrectas || p.respuestasIncorrectas || [],
         nivel:                 p.nivel ?? 1,
     })).filter(p => p.pregunta && p.respuestaCorrecta);
@@ -315,8 +315,13 @@ function MansionLauncher({ recurso, hoja, onResultado, onSalir }) {
     const enviarPreguntas = async () => {
         if (enviadoRef.current) return;
         enviadoRef.current = true;
-        setCargando(false);
         const preguntas = await fetchPreguntas(recurso, hoja);
+        if (preguntas.length === 0) {
+            enviadoRef.current = false;
+            console.warn('[Mansion] fetchPreguntas devolvió 0 — reintento posible');
+            return;
+        }
+        setCargando(false);
         iframeRef.current?.contentWindow?.postMessage(
             { type: 'MANSION_PREGUNTAS', preguntas },
             '*'

@@ -1,15 +1,86 @@
 <!DOCTYPE html>
-<html lang="en-us">
+<html lang="es">
   <head>
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Unity WebGL Player | La Mansion Pitagórica para movil</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>La Mansión Pitagórica</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { background: #0d0221; overflow: hidden; }
+      #unityContainer { width: 100vw; height: 100dvh; }
+      #unityContainer canvas { width: 100% !important; height: 100% !important; }
+    </style>
     <script src="Build/UnityLoader.js"></script>
     <script>
-      UnityLoader.instantiate("unityContainer", "Build/build nuevo.json");
+      var unityInstance = null;
+
+      // Guardamos las preguntas aquí en cuanto React las envía
+      // PreguntasManager.Start() las recoge llamando a MansionListo()
+      var preguntasGuardadas = null;
+
+      function enviarAUnity(payload) {
+        try {
+          unityInstance.SendMessage('PreguntasManager', 'CargarPreguntasDesdeWeb', payload);
+          console.log('[Mansion] Preguntas enviadas a PreguntasManager');
+        } catch(err) {
+          console.warn('[Mansion] SendMessage error:', err);
+        }
+      }
+
+      // ── Llamado desde PreguntasManager.Start() via Application.ExternalCall("MansionListo") ──
+      // Este es el momento correcto: PreguntasManager ya existe en la escena
+      function MansionListo() {
+        console.log('[Mansion] PreguntasManager listo — enviando preguntas');
+        window.parent.postMessage({ type: 'MANSION_LISTO' }, '*');
+
+        // Si React ya había enviado las preguntas, enviarlas ahora
+        if (preguntasGuardadas) {
+          enviarAUnity(preguntasGuardadas);
+        }
+      }
+
+      // ── Llamado desde Unity cuando termina la partida ──
+      // Application.ExternalCall("MansionResultado", jsonString)
+      function MansionResultado(jsonString) {
+        try {
+          var data = JSON.parse(jsonString);
+          window.parent.postMessage({ type: 'MANSION_RESULTADO', data: data }, '*');
+        } catch(e) { console.error('[Mansion] MansionResultado parse error:', e); }
+      }
+
+      // ── Mensajes desde React padre ───────────────────────────────────────────
+      window.addEventListener('message', function(e) {
+        if (e.data === 'UNITY_QUIT') {
+          try { if (unityInstance && unityInstance.Quit) unityInstance.Quit(); } catch(_) {}
+          return;
+        }
+        if (e.data && e.data.type === 'MANSION_PREGUNTAS') {
+          // Guardar siempre, por si MansionListo() aún no ha disparado
+          preguntasGuardadas = JSON.stringify({ arrayPreguntas: e.data.preguntas });
+          console.log('[Mansion] Preguntas recibidas de React (' + e.data.preguntas.length + ')');
+
+          // Si PreguntasManager ya llamó a MansionListo() antes de que llegaran las preguntas
+          // (poco probable pero posible), enviar directamente
+          if (unityInstance && e.data.preguntas.length > 0) {
+            // Intentar de todas formas — si el objeto no existe Unity lo ignora
+            enviarAUnity(preguntasGuardadas);
+          }
+        }
+      });
+
+      // ── Inicializar Unity (API 2019.x — NO devuelve Promise) ─────────────────
+      unityInstance = UnityLoader.instantiate('unityContainer', 'Build/build nuevo.json', {
+        onProgress: function(gameInstance, progress) {
+          if (progress === 1) {
+            unityInstance = gameInstance;
+            console.log('[Mansion] Unity cargado. Esperando MansionListo() desde C#...');
+          }
+        }
+      });
     </script>
   </head>
   <body>
-    <div id="unityContainer" style="width: 960px; height: 600px; margin: auto"></div>
+    <div id="unityContainer"></div>
   </body>
 </html>

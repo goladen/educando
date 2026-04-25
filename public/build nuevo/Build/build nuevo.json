@@ -3,7 +3,7 @@
 "productName": "La Mansion Pitagórica para movil",
 "productVersion": "0.1",
 "dataUrl": "build nuevo.data.unityweb",
-"wasmCodeUrl": "build nuevo.wasm.code.unityweb",
+"wasmCodeUrl": "build nuevo.wasm",
 "wasmFrameworkUrl": "build nuevo.wasm.framework.unityweb",
 "graphicsAPI": ["WebGL 2.0","WebGL 1.0"],
 "webglContextAttributes": {"preserveDrawingBuffer": false},

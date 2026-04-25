@@ -306,8 +306,9 @@ function MansionLauncher({ recurso, hoja, onResultado, onSalir }) {
     const iframeRef  = useRef(null);
     const [listo,    setListo]    = useState(!isMobile());
     const [cargando, setCargando] = useState(true);
-    const enviadoRef = useRef(false);   // ref para evitar doble envío entre handler y timeout
+    const enviadoRef = useRef(false);
     const [saliendo, setSaliendo] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(false);
 
     // Cache-bust URL — fijo en el mount para que no cambie con re-renders
     const src = useMemo(() => `/build nuevo/index.html?_t=${Date.now()}`, []);
@@ -352,25 +353,45 @@ function MansionLauncher({ recurso, hoja, onResultado, onSalir }) {
     const handleSalir = () => {
         if (saliendo) return;
         setSaliendo(true);
-        if (document.fullscreenElement) { try { document.exitFullscreen(); } catch (_) {} }
+        if (document.fullscreenElement || document.webkitFullscreenElement) {
+            try { document.exitFullscreen?.() || document.webkitExitFullscreen?.(); } catch (_) {}
+        }
         try { iframeRef.current?.contentWindow?.postMessage('UNITY_QUIT', '*'); } catch (_) {}
         try { iframeRef.current.src = 'about:blank'; } catch (_) {}
-        setTimeout(() => onSalir(), 900);
+        setTimeout(() => {
+            if (isMobile()) window.location.reload();
+            else onSalir();
+        }, 900);
     };
 
-    const entrarFullscreen = () => {
-        const el = document.documentElement;
-        if (el.requestFullscreen) el.requestFullscreen();
-        else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+    const toggleFullscreen = () => {
+        if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+            const el = document.documentElement;
+            if (el.requestFullscreen) el.requestFullscreen();
+            else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+        } else {
+            if (document.exitFullscreen) document.exitFullscreen();
+            else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+        }
         setListo(true);
     };
+
+    useEffect(() => {
+        const onChange = () => setIsFullscreen(!!(document.fullscreenElement || document.webkitFullscreenElement));
+        document.addEventListener('fullscreenchange', onChange);
+        document.addEventListener('webkitfullscreenchange', onChange);
+        return () => {
+            document.removeEventListener('fullscreenchange', onChange);
+            document.removeEventListener('webkitfullscreenchange', onChange);
+        };
+    }, []);
 
     return (
         <div style={{ width: '100vw', height: '100dvh', position: 'fixed', top: 0, left: 0, zIndex: 9999, background: '#000' }}>
 
             {/* Splash móvil */}
             {!listo && (
-                <div onClick={entrarFullscreen} style={{ position: 'absolute', inset: 0, zIndex: 10, background: '#0d0221', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white' }}>
+                <div onClick={toggleFullscreen} style={{ position: 'absolute', inset: 0, zIndex: 10, background: '#0d0221', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white' }}>
                     <div style={{ fontSize: '4rem', marginBottom: 16 }}>🏛️</div>
                     <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#a855f7' }}>La Mansión Pitagórica</div>
                     <div style={{ marginTop: 24, padding: '14px 36px', borderRadius: 14, background: 'linear-gradient(135deg,#a855f7,#7c3aed)', fontWeight: 700, fontSize: '1rem' }}>
@@ -388,6 +409,10 @@ function MansionLauncher({ recurso, hoja, onResultado, onSalir }) {
 
             <button onClick={handleSalir} style={{ position: 'absolute', top: 12, left: 12, zIndex: 20, background: 'rgba(0,0,0,0.7)', border: '1.5px solid rgba(255,255,255,0.3)', borderRadius: '50%', width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white', fontSize: '1.1rem' }} title="Salir">
                 ⬅
+            </button>
+
+            <button onClick={toggleFullscreen} style={{ position: 'absolute', top: 12, right: 12, zIndex: 20, background: 'rgba(0,0,0,0.7)', border: '1.5px solid rgba(255,255,255,0.3)', borderRadius: '50%', width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white', fontSize: '1.1rem' }} title={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}>
+                {isFullscreen ? '⛶' : '⤢'}
             </button>
 
             <iframe

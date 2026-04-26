@@ -97,12 +97,34 @@
   </head>
   <body>
     <div id="unityContainer"></div>
-    <div id="mobileBackBtn" style="display:none;position:fixed;top:12px;left:12px;z-index:9999;">
-      <button onclick="window.history.back()" style="width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,0.7);border:1.5px solid rgba(255,255,255,0.3);color:white;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;">⬅</button>
+    <div id="mobileUI" style="display:none;">
+      <button id="backBtn" onclick="window.history.back()" style="position:fixed;top:12px;left:12px;z-index:9999;width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,0.7);border:1.5px solid rgba(255,255,255,0.3);color:white;font-size:1.1rem;cursor:pointer;">⬅</button>
+      <button id="fsBtn" onclick="toggleFS()" style="position:fixed;top:12px;right:12px;z-index:9999;width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,0.7);border:1.5px solid rgba(255,255,255,0.3);color:white;font-size:1.1rem;cursor:pointer;">⤢</button>
     </div>
     <script>
+      function toggleFS() {
+        var btn = document.getElementById('fsBtn');
+        var el = document.documentElement;
+        if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+          if (el.requestFullscreen) el.requestFullscreen();
+          else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+          btn.textContent = '⛶';
+        } else {
+          if (document.exitFullscreen) document.exitFullscreen();
+          else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+          btn.textContent = '⤢';
+        }
+      }
+      document.addEventListener('fullscreenchange', function() {
+        document.getElementById('fsBtn').textContent =
+          document.fullscreenElement ? '⛶' : '⤢';
+      });
+      document.addEventListener('webkitfullscreenchange', function() {
+        document.getElementById('fsBtn').textContent =
+          document.webkitFullscreenElement ? '⛶' : '⤢';
+      });
       if (window.self === window.top) {
-        document.getElementById('mobileBackBtn').style.display = 'block';
+        document.getElementById('mobileUI').style.display = 'block';
       }
     </script>
   </body>

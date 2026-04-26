@@ -312,7 +312,7 @@ function MansionLauncher({ recurso, hoja, onResultado, onSalir }) {
     const [isFullscreen, setIsFullscreen] = useState(false);
 
     // Cache-bust URL — fijo en el mount para que no cambie con re-renders
-    const src = useMemo(() => `/build nuevo/index.html?_t=${Date.now()}`, []);
+    const src = useMemo(() => `/build%20nuevo/index.html?_t=${Date.now()}`, []);
 
     // MOBILE: navegar directamente a la página del juego (evita el bug de WASM en iOS)
     useEffect(() => {
@@ -327,7 +327,7 @@ function MansionLauncher({ recurso, hoja, onResultado, onSalir }) {
                 recursoTitulo: recurso.titulo,
                 hoja
             }));
-            window.location.href = `/build nuevo/index.html?_t=${Date.now()}`;
+            window.location.href = `/build%20nuevo/index.html?_t=${Date.now()}`;
         })();
     }, []);
 

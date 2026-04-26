@@ -304,7 +304,8 @@ function ModalEnviarProfe({ resultado, recurso, onClose }) {
 // ─── LANZADOR DEL JUEGO (iframe + comunicación) ───────────────────────────────
 function MansionLauncher({ recurso, hoja, onResultado, onSalir }) {
     const iframeRef  = useRef(null);
-    const [listo,    setListo]    = useState(!isMobile());
+    const mobile     = useMemo(() => isMobile(), []);
+    const [listo,    setListo]    = useState(!mobile);
     const [cargando, setCargando] = useState(true);
     const enviadoRef = useRef(false);
     const [saliendo, setSaliendo] = useState(false);
@@ -312,6 +313,23 @@ function MansionLauncher({ recurso, hoja, onResultado, onSalir }) {
 
     // Cache-bust URL — fijo en el mount para que no cambie con re-renders
     const src = useMemo(() => `/build nuevo/index.html?_t=${Date.now()}`, []);
+
+    // MOBILE: navegar directamente a la página del juego (evita el bug de WASM en iOS)
+    useEffect(() => {
+        if (!mobile) return;
+        (async () => {
+            const preguntas = await fetchPreguntas(recurso, hoja);
+            if (preguntas.length > 0) {
+                sessionStorage.setItem('mansionPreguntas', JSON.stringify({ arrayPreguntas: preguntas }));
+            }
+            sessionStorage.setItem('mansionContext', JSON.stringify({
+                recursoId: recurso.id,
+                recursoTitulo: recurso.titulo,
+                hoja
+            }));
+            window.location.href = `/build nuevo/index.html?_t=${Date.now()}`;
+        })();
+    }, []);
 
     const enviarPreguntas = async () => {
         if (enviadoRef.current) return;
@@ -329,11 +347,11 @@ function MansionLauncher({ recurso, hoja, onResultado, onSalir }) {
         );
     };
 
-    // Escuchar mensajes de Unity / index.html
+    // Escuchar mensajes de Unity / index.html (solo desktop — iframe)
     useEffect(() => {
+        if (mobile) return;
         const handler = (e) => {
             if (e.data?.type === 'MANSION_LISTO') {
-                // Unity terminó de cargar — enviar preguntas ahora
                 enviarPreguntas();
             }
             if (e.data?.type === 'MANSION_RESULTADO') {
@@ -344,8 +362,9 @@ function MansionLauncher({ recurso, hoja, onResultado, onSalir }) {
         return () => window.removeEventListener('message', handler);
     }, []);
 
-    // Fallback: si MANSION_LISTO no llega en 10 s, enviar de todas formas
+    // Fallback: si MANSION_LISTO no llega en 10 s, enviar de todas formas (solo desktop)
     useEffect(() => {
+        if (mobile) return;
         const t = setTimeout(enviarPreguntas, 10000);
         return () => clearTimeout(t);
     }, []);
@@ -358,10 +377,7 @@ function MansionLauncher({ recurso, hoja, onResultado, onSalir }) {
         }
         try { iframeRef.current?.contentWindow?.postMessage('UNITY_QUIT', '*'); } catch (_) {}
         try { iframeRef.current.src = 'about:blank'; } catch (_) {}
-        setTimeout(() => {
-            if (isMobile()) window.location.reload();
-            else onSalir();
-        }, 900);
+        setTimeout(() => onSalir(), 900);
     };
 
     const toggleFullscreen = () => {
@@ -432,6 +448,25 @@ export default function MansionPitagoricaGame({ alTerminar }) {
     const [recurso,   setRecurso]   = useState(null);
     const [hoja,      setHoja]      = useState('General');
     const [resultado, setResultado] = useState(null);
+
+    // Recuperar resultado guardado por la navegación móvil (full-page mode)
+    useEffect(() => {
+        const resultadoStr = sessionStorage.getItem('mansionResultado');
+        const ctxStr = sessionStorage.getItem('mansionContext');
+        if (resultadoStr && ctxStr) {
+            sessionStorage.removeItem('mansionResultado');
+            sessionStorage.removeItem('mansionContext');
+            try {
+                const data = JSON.parse(resultadoStr);
+                const ctx  = JSON.parse(ctxStr);
+                const rec  = { id: ctx.recursoId, titulo: ctx.recursoTitulo };
+                setRecurso(rec);
+                setHoja(ctx.hoja);
+                setResultado({ ...data, hoja: ctx.hoja });
+                setFase('RESULTADO');
+            } catch (e) { console.error('[Mansion] Error leyendo sessionStorage:', e); }
+        }
+    }, []);
 
     const iniciar = (rec, hojaElegida) => {
         setRecurso(rec);

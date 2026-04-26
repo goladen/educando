@@ -19,6 +19,16 @@
       // PreguntasManager.Start() las recoge llamando a MansionListo()
       var preguntasGuardadas = null;
 
+      // MOBILE: preguntas guardadas en sessionStorage por React antes de navegar aquí
+      (function() {
+        var stored = sessionStorage.getItem('mansionPreguntas');
+        if (stored) {
+          preguntasGuardadas = stored;
+          sessionStorage.removeItem('mansionPreguntas');
+          console.log('[Mansion] Preguntas cargadas desde sessionStorage (mobile)');
+        }
+      })();
+
       function enviarAUnity(payload) {
         try {
           unityInstance.SendMessage('PreguntasManager', 'CargarPreguntasDesdeWeb', payload);
@@ -45,7 +55,14 @@
       function MansionResultado(jsonString) {
         try {
           var data = JSON.parse(jsonString);
-          window.parent.postMessage({ type: 'MANSION_RESULTADO', data: data }, '*');
+          if (window.self === window.top) {
+            // Mobile full-page mode: guardar resultado y volver a React
+            sessionStorage.setItem('mansionResultado', jsonString);
+            window.history.back();
+          } else {
+            // Desktop iframe mode: enviar al padre
+            window.parent.postMessage({ type: 'MANSION_RESULTADO', data: data }, '*');
+          }
         } catch(e) { console.error('[Mansion] MansionResultado parse error:', e); }
       }
 
@@ -80,5 +97,13 @@
   </head>
   <body>
     <div id="unityContainer"></div>
+    <div id="mobileBackBtn" style="display:none;position:fixed;top:12px;left:12px;z-index:9999;">
+      <button onclick="window.history.back()" style="width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,0.7);border:1.5px solid rgba(255,255,255,0.3);color:white;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;">⬅</button>
+    </div>
+    <script>
+      if (window.self === window.top) {
+        document.getElementById('mobileBackBtn').style.display = 'block';
+      }
+    </script>
   </body>
 </html>

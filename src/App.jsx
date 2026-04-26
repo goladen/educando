@@ -8,6 +8,8 @@ import Login from './Login';
 import GamePlayer from './GamePlayer';
 import PaginaProfesor from './components/PaginaProfesor';
 import FuncionesEjecutivas from './FuncionesEjecutivas';
+import IrregularVerbsTest from './IrregularVerbsTest';
+import { SolarSystemViewer } from './components/LandingGames3';
 
 function App() {
     const [usuario, setUsuario] = useState(null);
@@ -32,7 +34,7 @@ function App() {
       const uid = params.get('p');
       if (uid) { setPaginaTarget({ uid }); return; }
       const slug = window.location.pathname.replace(/^\//, '').replace(/\/$/, '').trim().toLowerCase();
-      if (slug === 'funcionesejecutivas') {
+      if (slug === 'funcionesejecutivas' || slug === 'irregular_verbs' || slug === 'sistema_solar') {
         setRutaPublica(slug);
         return;
       }
@@ -49,6 +51,7 @@ function App() {
         'geometrix','calculo','funciones','funciones2','geometria_analitica','geometriaanalitica',
         'ecuaciones','oca',
         'api','admin','login','app',
+        'irregular_verbs','sistema_solar',
       ]);
       if (slug && !RUTAS_RESERVADAS.has(slug)) {
         // Check if it's a professor page slug
@@ -97,7 +100,7 @@ function App() {
 
         if (docSnap.exists()) {
             const data = docSnap.data();
-            setRol(data.role);
+            setRol(data.role?.toLowerCase() || null);
             setPais(data.pais || "");
             setRegion(data.region || "");
             setPoblacion(data.poblacion || "");
@@ -138,8 +141,9 @@ function App() {
         setPais(""); setRegion(""); setPoblacion("");
     };
 
-    // RUTA PÚBLICA ESPECIAL: /funcionesejecutivas
     if (rutaPublica === 'funcionesejecutivas') return <FuncionesEjecutivas onBack={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
+    if (rutaPublica === 'irregular_verbs') return <IrregularVerbsTest />;
+    if (rutaPublica === 'sistema_solar') return <SolarSystemViewer onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
 
     // PÁGINA PÚBLICA DEL PROFESOR (no requiere login)
     if (paginaTarget) return <PaginaProfesor uid={paginaTarget.uid} onBack={() => { setPaginaTarget(null); window.history.back(); }} />;
@@ -186,7 +190,7 @@ function App() {
                     <p style={{ fontWeight: 'bold' }}>¿Cómo vas a usar la app?</p>
                     <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
                         <button onClick={() => completarRegistro('profesor')} style={{ padding: '12px 24px', background: '#2196F3', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}>👨‍🏫 Soy Profesor</button>
-                        <button onClick={() => completarRegistro('Alumno')} style={{ padding: '12px 24px', background: '#FF9800', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}>🎓 Soy Alumno</button>
+                        <button onClick={() => completarRegistro('alumno')} style={{ padding: '12px 24px', background: '#FF9800', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}>🎓 Soy Alumno</button>
                     </div>
                     <button onClick={handleLogout} style={{ marginTop: '20px', background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer' }}>Cancelar</button>
                 </div>
@@ -195,7 +199,7 @@ function App() {
             {/* Si ya tiene rol, mostramos el Dashboard correspondiente */}
             {rol && (
                 <div>
-                    {rol === 'profesor' || rol === 'Profesor' ? (
+                    {rol?.toLowerCase() === 'profesor' ? (
                         <div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 20px', background: '#fff', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', alignItems: 'center' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -207,10 +211,10 @@ function App() {
                             <ProfesorDashboard usuario={usuario} googleToken={googleToken} />
                         </div>
                     ) : (
-                            <div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 20px', background: '#2c3e5050', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', alignItems: 'center' }}>
-                                    <span>Alumno: <b>{usuario.displayName}</b></span>
-                                    <button onClick={handleLogout} style={{ border: 'none', background: 'none', color: '#666', cursor: 'pointer' }}>Salir</button>
+                            <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg, #e8f0fe 0%, #dbeafe 50%, #ede9fe 100%)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 20px', background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(8px)', boxShadow: '0 2px 8px rgba(59,130,246,0.1)', alignItems: 'center' }}>
+                                    <span style={{ color: '#1e40af' }}>Alumno: <b>{usuario.displayName}</b></span>
+                                    <button onClick={handleLogout} style={{ border: 'none', background: 'none', color: '#6b7280', cursor: 'pointer' }}>Salir</button>
                                 </div>
                                 <LandingGames usuario={usuario} />
                             </div>

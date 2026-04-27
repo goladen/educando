@@ -463,14 +463,6 @@ export const APPS = [
         shareable: true
     },
     {
-        id: 'KARTINGED_MULTI',
-        name: 'Karting Multi',
-        desc: 'Compite contra otros jugadores en tiempo real.',
-        color: '#E65100',
-        emoji: '🏎️',
-        shareable: true
-    },
-    {
         id: 'RACING3D',
         name: 'Racing 3D',
         desc: 'Carreras 3D con preguntas en los checkpoints. 4 vueltas, 3 AI.',

@@ -407,19 +407,34 @@ function MansionLauncher({ recurso, hoja, onResultado, onSalir }) {
 
             {/* Splash móvil */}
             {!listo && (
-                <div onClick={toggleFullscreen} style={{ position: 'absolute', inset: 0, zIndex: 10, background: '#0d0221', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white' }}>
-                    <div style={{ fontSize: '4rem', marginBottom: 16 }}>🏛️</div>
-                    <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#a855f7' }}>La Mansión Pitagórica</div>
-                    <div style={{ marginTop: 24, padding: '14px 36px', borderRadius: 14, background: 'linear-gradient(135deg,#a855f7,#7c3aed)', fontWeight: 700, fontSize: '1rem' }}>
+                <div onClick={toggleFullscreen} style={{ position: 'absolute', inset: 0, zIndex: 10, background: '#0d0221', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white', fontFamily: "'Segoe UI',sans-serif", padding: '0 24px' }}>
+                    <div style={{ fontSize: '4rem', marginBottom: 12 }}>🏛️</div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#a855f7', marginBottom: 8 }}>La Mansión Pitagórica</div>
+                    <div style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.55)', textAlign: 'center', maxWidth: 280, marginBottom: 16, lineHeight: 1.5 }}>
+                        ⏳ El tiempo de carga puede ser de <b style={{ color: '#ffd700' }}>1–2 min</b>. Mejor experiencia en <b style={{ color: '#ffd700' }}>ordenador</b>.
+                    </div>
+                    <div style={{ padding: '14px 36px', borderRadius: 14, background: 'linear-gradient(135deg,#a855f7,#7c3aed)', fontWeight: 700, fontSize: '1rem' }}>
                         ▶ Toca para jugar a pantalla completa
                     </div>
                 </div>
             )}
 
             {cargando && listo && (
-                <div style={{ position: 'absolute', inset: 0, zIndex: 5, background: 'rgba(13,2,33,0.9)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'white', pointerEvents: 'none' }}>
-                    <div style={{ fontSize: '3rem', marginBottom: 12 }}>🏛️</div>
-                    <div style={{ color: '#a855f7', fontWeight: 700 }}>Cargando preguntas…</div>
+                <div style={{ position: 'absolute', inset: 0, zIndex: 5, background: 'rgba(13,2,33,0.95)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'white', fontFamily: "'Segoe UI',sans-serif" }}>
+                    <div style={{ fontSize: '3.5rem', marginBottom: 14 }}>🏛️</div>
+                    <div style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: 6 }}>La Mansión Pitagórica</div>
+                    <div style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.6)', marginBottom: 28 }}>Cargando juego Unity…</div>
+                    <div style={{ width: 280, height: 8, background: 'rgba(255,255,255,0.1)', borderRadius: 99, overflow: 'hidden', marginBottom: 22 }}>
+                        <div style={{ height: '100%', borderRadius: 99, background: 'linear-gradient(90deg,#a855f7,#ec4899)', animation: 'glProgressShimmer 18s ease-out forwards' }} />
+                    </div>
+                    <div style={{ background: 'rgba(255,200,0,0.1)', border: '1px solid rgba(255,200,0,0.3)', borderRadius: 10, padding: '10px 18px', maxWidth: 300, textAlign: 'center' }}>
+                        <div style={{ fontSize: '0.82rem', color: '#ffd700', fontWeight: 700, marginBottom: 4 }}>⏳ Carga lenta en móvil</div>
+                        <div style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.65)', lineHeight: 1.5 }}>
+                            El tiempo de carga puede ser de <b>1–2 minutos</b>.<br/>
+                            Para mejor experiencia usa <b>ordenador</b>.
+                        </div>
+                    </div>
+                    <style>{`@keyframes glProgressShimmer{0%{width:8%}40%{width:55%}70%{width:75%}100%{width:82%}}`}</style>
                 </div>
             )}
 

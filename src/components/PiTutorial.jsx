@@ -137,7 +137,7 @@ export default function PiTutorial({ usuario, tutorialId, pasos = [], inline = f
                 PANEL ABIERTO (siempre position:fixed)
             ═══════════════════════════════════════ */}
             {estado === 'visible' && (
-                <div style={{
+                <div className="pi-panel" style={{
                     ...panelStyle,
                     zIndex: 9999,
                     display: 'flex',
@@ -147,7 +147,7 @@ export default function PiTutorial({ usuario, tutorialId, pasos = [], inline = f
                     animation: 'piSlideIn 0.35s cubic-bezier(0.34,1.56,0.64,1)',
                 }}>
                     {/* Burbuja */}
-                    <div onClick={handleSkip} style={{
+                    <div className="pi-panel-bubble" onClick={handleSkip} style={{
                         background: '#fff',
                         borderRadius: '18px 18px 4px 18px', // esquina inferior-derecha apunta a Pi
                         padding: '14px 16px',
@@ -196,6 +196,7 @@ export default function PiTutorial({ usuario, tutorialId, pasos = [], inline = f
 
                     {/* Pi (GIF animado o imagen estática según estado escritura) */}
                     <img
+                        className="pi-mascot"
                         src={piPanelSrc}
                         alt="Pi"
                         style={{
@@ -289,6 +290,23 @@ export default function PiTutorial({ usuario, tutorialId, pasos = [], inline = f
                     45%  { transform: scale(2.2); }
                     75%  { transform: scale(1.7); }
                     100% { transform: scale(1);   }
+                }
+                @media (max-width: 520px) {
+                    .pi-panel {
+                        left: 8px !important;
+                        right: 8px !important;
+                        bottom: 12px !important;
+                        top: auto !important;
+                        width: auto !important;
+                    }
+                    .pi-panel-bubble {
+                        flex: 1 !important;
+                        max-width: none !important;
+                        min-width: 0 !important;
+                    }
+                    .pi-mascot {
+                        width: 64px !important;
+                    }
                 }
             `}</style>
         </>

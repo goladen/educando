@@ -1,7 +1,14 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { Save, X, Trash2, Plus, Settings, RotateCcw, HelpCircle, ArrowUp, ArrowDown } from 'lucide-react'; // <--- AÑADIDO HelpCircle
-import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore'; 
+import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase'; // Asegúrate de importar db
+import PiTutorial from './PiTutorial';
+
+const TUTORIAL_CREAR_RECURSO = [
+    { texto: '¡Hola! Soy Pi 👋 Para añadir preguntas, pulsa el botón "＋ Añadir Pregunta" en la parte inferior. Cada pregunta tiene un enunciado y una o varias respuestas según el tipo de juego.' },
+    { texto: 'Recuerda configurar el tiempo de juego y los puntos desde el botón de ajustes ⚙️ en la esquina superior derecha del editor.' },
+    { texto: '¡MUY IMPORTANTE! 🚨 Cuando termines, asegúrate de activar "Publicado" en la configuración del recurso. Sin publicar, tus alumnos no podrán acceder al juego.' },
+];
 const JUEGOS_DESTINO = [
     { id: 'PASAPALABRA', label: 'Pasapalabra' },
     { id: 'CAZABURBUJAS', label: 'CazaBurbujas' },
@@ -278,8 +285,7 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
                         <input value={datos.titulo} onChange={(e) => setDatos({ ...datos, titulo: e.target.value })} style={styles.titleInput} placeholder="Título del Recurso" />
                     </div>
                     <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                        {/* --- NUEVO BOTÓN DE AYUDA --- */}
-                        <button onClick={() => setMostrandoAyuda(true)} style={styles.iconBtn} title="Ayuda"><HelpCircle size={24} /></button>
+                        <PiTutorial usuario={usuario} tutorialId="crear_recurso" pasos={TUTORIAL_CREAR_RECURSO} inline={true} />
 
                         <button onClick={() => setMostrandoConfig(true)} style={styles.iconBtn} title="Configuración"><Settings size={24} /></button>
                         <button onClick={onSave} style={styles.saveBtn}><Save size={20} /> <span className="hide-mobile">Guardar</span></button>

@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect } from 'react';
 import { db } from './firebase';
 import { collection, query, where, getDocs, deleteDoc, doc, addDoc, updateDoc, getDoc, setDoc, orderBy } from 'firebase/firestore';
-import { Trash2, Plus, FileSpreadsheet, Bot, BarChart2, Save, X, Pencil, Key, Gamepad2, Edit3, Globe, Search, Copy, Eye, Users, RotateCcw, Send, Zap, UserCircle, LogOut, Menu, HelpCircle, Shield, Info, FileText, Calculator, Medal, Crosshair } from 'lucide-react';
+import { Trash2, Plus, FileSpreadsheet, Bot, BarChart2, Save, X, Pencil, Key, Gamepad2, Edit3, Globe, Search, Copy, Eye, Users, RotateCcw, Send, Zap, UserCircle, LogOut, Menu, Shield, Info, FileText, Calculator, Medal, Crosshair } from 'lucide-react';
 import useDrivePicker from 'react-google-drive-picker';
 import { procesarArchivoExcel } from './ExcelParser';
 import { generarPreguntasGemini } from './GeminiGenerator';
@@ -26,6 +26,13 @@ import SintaxisGame from './SintaxisGamen2';
 
 import { MousePointer2, Rocket, Search as SearchIcon, Car } from 'lucide-react';
 import InformesJuegos from './components/InformesJuegos2';
+import PiTutorial from './components/PiTutorial';
+
+const TUTORIAL_PROFESOR = [
+    { texto: '¡Hola! Soy Pi 👋 Bienvenido/a a pikt.es. En el menú lateral izquierdo encontrarás los distintos tipos de recursos educativos que puedes crear y gestionar para tus alumnos.' },
+    { texto: 'Desde la sección de informes puedes consultar y gestionar los resultados de tus alumnos en los distintos juegos.' },
+    { texto: '"Herramientas para el profesor" dispone de utilidades adicionales: generador con IA, importación desde Excel, Google Drive y más. ¡Mucho éxito!' },
+];
 import EditorProBurbujasPikatron from './components/EditorProBurbujasPikatron';
 import EditorQuestionSender from './components/EditorQuestionSender';
 import ModalMigrarQsender from './components/ModalMigrarQsender';
@@ -1032,8 +1039,13 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                     <BarChart2 size={20} color="white" />
                 </button>
 
+                <PiTutorial
+                    usuario={usuario}
+                    tutorialId="bienvenida_profesor"
+                    pasos={TUTORIAL_PROFESOR}
+                    inline={true}
+                />
 
-                <button onClick={() => setMostrandoAyudaDashboard(true)} style={styles.helpButtonTop} title="Ayuda"><HelpCircle size={24} color="#1565C0" /></button>
                 <button onClick={() => setModoVista('ALUMNO')} style={{ background: 'white', color: '#1565C0', border: 'none', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', boxShadow:'0 2px 5px rgba(0,0,0,0.1)' }}><Eye size={18} /> Vista Alumno</button>
                 <button onClick={() => setMostrandoPerfil(true)} style={{ background: 'white', color: '#8E24AA', border: 'none', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', boxShadow:'0 2px 5px rgba(0,0,0,0.1)' }}><UserCircle size={18} /> Mi Perfil</button>
             </div>

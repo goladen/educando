@@ -10,6 +10,16 @@ import PaginaProfesor from './components/PaginaProfesor';
 import FuncionesEjecutivas from './FuncionesEjecutivas';
 import IrregularVerbsTest from './IrregularVerbsTest';
 import { SolarSystemViewer } from './components/LandingGames3';
+import PiTutorial from './components/PiTutorial';
+
+const TUTORIAL_ALUMNO = [
+    {
+        texto: '¡Hola! Soy Pi 👋 Bienvenido/a a pikt.es. Aquí encontrarás juegos y actividades preparados por tus profesores para aprender de forma divertida.'
+    },
+    {
+        texto: 'Puedes guardar tus resultados para que tu profesor los vea, y modificar tu perfil desde el menú superior. ¡A jugar!'
+    },
+];
 
 function App() {
     const [usuario, setUsuario] = useState(null);
@@ -217,6 +227,11 @@ function App() {
                                     <button onClick={handleLogout} style={{ border: 'none', background: 'none', color: '#6b7280', cursor: 'pointer' }}>Salir</button>
                                 </div>
                                 <LandingGames usuario={usuario} />
+                                <PiTutorial
+                                    usuario={usuario}
+                                    tutorialId="bienvenida_alumno"
+                                    pasos={TUTORIAL_ALUMNO}
+                                />
                             </div>
                         )}
                 </div>

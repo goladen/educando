@@ -49,7 +49,8 @@ function ModalEnviarProfe({ datos, onClose }) {
                 tipo: 'WORDLE', modalidad: 'Individual', fecha: new Date(),
                 recursoId: datos.recursoId, recursoTitulo: datos.recursoTitulo,
                 codigoProfesor: code,
-                jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), aciertos: datos.score }],
+                config: { idioma: datos.idioma, longitud: datos.longitud, modo: datos.modo },
+                jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), aciertos: datos.score, tiempo: datos.tiempo, intentos: datos.intentos }],
             });
             setEnviado(true);
         } catch(e) { setError('Error: ' + e.message); }
@@ -616,7 +617,7 @@ export default function TextWordleGame({ usuario, onExit, recurso, modoOlimpico 
                         Enviando {score} puntos al profesor... 🚀
                 </div>
                 )}
-            {mostrarEnvio && <ModalEnviarProfe datos={{ recursoId: recurso?.id, recursoTitulo: recurso?.titulo, score }} onClose={() => setMostrarEnvio(false)} />}
+            {mostrarEnvio && <ModalEnviarProfe datos={{ recursoId: recurso?.id, recursoTitulo: recurso?.titulo, score, idioma: config.lang, longitud: config.length, modo: gameMode, tiempo: elapsedTime, intentos: guesses.length }} onClose={() => setMostrarEnvio(false)} />}
         </div>
     );
 

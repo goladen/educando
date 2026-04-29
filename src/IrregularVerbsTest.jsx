@@ -5,7 +5,7 @@ import { collection, addDoc, doc, getDoc } from 'firebase/firestore';
 import { Share2, Send } from 'lucide-react';
 
 // Modal para enviar al profesor
-function ModalEnviarProfe({ onClose, score }) {
+function ModalEnviarProfe({ onClose, score, config }) {
   const [codigo, setCodigo] = useState('');
   const [nombre, setNombre] = useState('');
   const [curso, setCurso] = useState('');
@@ -25,7 +25,8 @@ function ModalEnviarProfe({ onClose, score }) {
         tipo: 'IRREGULAR_VERBS', modalidad: 'Individual', fecha: new Date(),
         recursoId: 'irregular-verbs-test', recursoTitulo: 'Test de Verbos Irregulares',
         codigoProfesor: code,
-        jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), puntuacion: score.points, maxPuntuacion: score.maxPoints }],
+        config: { nivel: config?.level, numVerbos: config?.numVerbs, modo: config?.columnsMode },
+        jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), aciertos: score.points, intentos: score.maxPoints }],
       });
       setEnviado(true);
     } catch(e) { setError('Error: ' + e.message); }
@@ -310,7 +311,7 @@ export default function IrregularVerbsTest() {
 
   return (
     <>
-      {showModalEnviar && <ModalEnviarProfe onClose={() => setShowModalEnviar(false)} score={score} />}
+      {showModalEnviar && <ModalEnviarProfe onClose={() => setShowModalEnviar(false)} score={score} config={config} />}
       <div style={{ maxWidth: '56rem', margin: '0 auto', marginTop: '40px', padding: '16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <h2 style={{ fontSize: '24px', fontWeight: 'bold' }}>Test de Verbos Irregulares</h2>

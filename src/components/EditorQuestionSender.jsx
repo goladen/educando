@@ -2,6 +2,7 @@
 import { Save, X, Trash2, Plus, Settings, RotateCcw, RefreshCw, Mail, Link } from 'lucide-react';
 import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
+import PublicarModal from './PublicarModal';
 
 // CONFIGURACIÓN DE LOS JUEGOS DE DESTINO
 const JUEGOS_DESTINO = [
@@ -18,6 +19,7 @@ export default function EditorQuestionSender({ datos, setDatos, onClose, onSave 
     const [mostrandoConfig, setMostrandoConfig] = useState(false);
     const [cargandoMensajes, setCargandoMensajes] = useState(false);
     const [mostrandoAvisoCierre, setMostrandoAvisoCierre] = useState(false);
+    const [modalPublicar, setModalPublicar] = useState(null);
     // 1. INICIALIZACIÓN
     useEffect(() => {
         if (!datos.hojas || datos.hojas.length === 0) {
@@ -283,7 +285,7 @@ export default function EditorQuestionSender({ datos, setDatos, onClose, onSave 
                             <RefreshCw size={18} className={cargandoMensajes ? 'spin' : ''} /> {cargandoMensajes ? '...' : 'Comprobar Buzón'}
                         </button>
                         <button onClick={() => setMostrandoConfig(true)} style={styles.iconBtn}><Settings /></button>
-                        <button onClick={onSave} style={styles.saveBtn}><Save size={18} /> Guardar</button>
+                        <button onClick={() => datos.isFinished ? onSave() : setModalPublicar('guardar')} style={styles.saveBtn}><Save size={18} /> Guardar</button>
 
 
                         {/* Al hacer clic, abrimos el aviso en lugar de cerrar directo */}
@@ -404,18 +406,24 @@ export default function EditorQuestionSender({ datos, setDatos, onClose, onSave 
                             </p>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                {/* Opción 1: Guardar y Salir */}
+                                {/* Guardar, publicar y salir (solo si no está publicado) */}
+                                {!datos.isFinished && (
+                                    <button
+                                        onClick={async () => { setDatos(prev => ({ ...prev, isFinished: true })); await onSave(); onClose(); }}
+                                        style={{ ...styles.saveBtnFull, background: '#6366f1', marginTop: 0, fontSize: '1.1rem' }}
+                                    >
+                                        <Save size={18} style={{ marginRight: '8px' }} /> Guardar, publicar y salir
+                                    </button>
+                                )}
+                                {/* Guardar y Salir */}
                                 <button
-                                    onClick={async () => {
-                                        await onSave(); // Guardamos
-                                        onClose();      // Y cerramos
-                                    }}
+                                    onClick={async () => { await onSave(); onClose(); }}
                                     style={{ ...styles.saveBtnFull, background: '#27ae60', marginTop: 0, fontSize: '1.1rem' }}
                                 >
-                                    <Save size={18} style={{ marginRight: '8px' }} /> Guardar
+                                    <Save size={18} style={{ marginRight: '8px' }} /> Guardar y Salir
                                 </button>
 
-                                {/* Opción 2: Salir sin guardar */}
+                                {/* Salir sin guardar */}
                                 <button
                                     onClick={onClose}
                                     style={{ ...styles.saveBtnFull, background: '#e74c3c', marginTop: 0 }}
@@ -423,7 +431,7 @@ export default function EditorQuestionSender({ datos, setDatos, onClose, onSave 
                                     Salir sin guardar
                                 </button>
 
-                                {/* Opción 3: Cancelar (quedarse) */}
+                                {/* Cancelar */}
                                 <button
                                     onClick={() => setMostrandoAvisoCierre(false)}
                                     style={{ background: 'none', border: 'none', color: '#999', cursor: 'pointer', marginTop: '10px', textDecoration: 'underline' }}
@@ -433,6 +441,15 @@ export default function EditorQuestionSender({ datos, setDatos, onClose, onSave 
                             </div>
                         </div>
                     </div>
+                )}
+                {modalPublicar && (
+                    <PublicarModal
+                        modo={modalPublicar}
+                        onGuardarPublicar={async () => { setDatos(prev => ({ ...prev, isFinished: true })); await onSave(); setModalPublicar(null); }}
+                        onGuardarSolo={async () => { await onSave(); setModalPublicar(null); }}
+                        onSalirSinGuardar={() => { setModalPublicar(null); onClose(); }}
+                        onCancelar={() => setModalPublicar(null)}
+                    />
                 )}
                 {/* MODAL CONFIGURACIÓN (Solo para elegir destino) */}
                 {mostrandoConfig && (

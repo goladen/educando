@@ -1,11 +1,13 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { Save, X, Trash2, FolderPlus, Settings, Plus, FileText, Globe } from 'lucide-react';
+import PublicarModal from './PublicarModal';
 
 // Aceptamos la prop 'usuario' para poder leer sus datos
 export default function EditorWordle({ datos, setDatos, onClose, onSave, usuario }) {
     const [hojaActiva, setHojaActiva] = useState(0);
     const [mostrandoConfig, setMostrandoConfig] = useState(false);
     const [tempPalabras, setTempPalabras] = useState("");
+    const [modalPublicar, setModalPublicar] = useState(null);
 
     // 1. INICIALIZACIÓN DE DATOS (Con Autocompletado)
     useEffect(() => {
@@ -119,8 +121,8 @@ export default function EditorWordle({ datos, setDatos, onClose, onSave, usuario
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
                         <button onClick={() => setMostrandoConfig(true)} style={styles.iconBtn}><Settings size={22} /></button>
-                        <button onClick={onSave} style={styles.saveBtn}><Save size={18} /> Guardar</button>
-                        <button onClick={onClose} style={styles.iconBtn}><X size={22} /></button>
+                        <button onClick={() => datos.isFinished ? onSave() : setModalPublicar('guardar')} style={styles.saveBtn}><Save size={18} /> Guardar</button>
+                        <button onClick={() => !datos.isFinished ? setModalPublicar('cerrar') : onClose()} style={styles.iconBtn}><X size={22} /></button>
                     </div>
                 </div>
 
@@ -192,6 +194,15 @@ export default function EditorWordle({ datos, setDatos, onClose, onSave, usuario
                 </div>
 
                 {/* MODAL CONFIGURACIÓN */}
+                {modalPublicar && (
+                    <PublicarModal
+                        modo={modalPublicar}
+                        onGuardarPublicar={async () => { setDatos(prev => ({ ...prev, isFinished: true })); await onSave(); setModalPublicar(null); }}
+                        onGuardarSolo={async () => { await onSave(); setModalPublicar(null); }}
+                        onSalirSinGuardar={() => { setModalPublicar(null); onClose(); }}
+                        onCancelar={() => setModalPublicar(null)}
+                    />
+                )}
                 {mostrandoConfig && (
                     <div style={styles.modalOverlay}>
                         <div style={styles.modal}>

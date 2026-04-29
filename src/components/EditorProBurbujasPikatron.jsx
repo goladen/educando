@@ -1,10 +1,12 @@
 ﻿import { useState, useEffect } from 'react';
 import { Save, X, Trash2, FolderPlus, ArrowUp, ArrowDown, Clock, Trophy, Settings, Calculator, Plus, Minus, X as Multiply, Divide, Star, CheckCircle, AlertOctagon } from 'lucide-react';
+import PublicarModal from './PublicarModal';
 
 
 export default function EditorProBurbujasPikatron({ datos, setDatos, onClose, onSave, usuario }) {
     const [hojaActiva, setHojaActiva] = useState(0);
     const [mostrandoConfig, setMostrandoConfig] = useState(false);
+    const [modalPublicar, setModalPublicar] = useState(null);
 
     // --- NUEVOS ESTADOS PARA PREGUNTA ESPECIAL ---
     const [tempCorrecta, setTempCorrecta] = useState("");
@@ -521,10 +523,10 @@ export default function EditorProBurbujasPikatron({ datos, setDatos, onClose, on
                         <button onClick={() => setMostrandoConfig(true)} style={styles.iconBtn} title="Configuración Global">
                             <Settings size={22} />
                         </button>
-                        <button onClick={onSave} style={styles.saveBtn}>
+                        <button onClick={() => datos.isFinished ? onSave() : setModalPublicar('guardar')} style={styles.saveBtn}>
                             <Save size={18} /> Guardar
                         </button>
-                        <button onClick={onClose} style={styles.iconBtn}>
+                        <button onClick={() => !datos.isFinished ? setModalPublicar('cerrar') : onClose()} style={styles.iconBtn}>
                             <X size={22} />
                         </button>
                     </div>
@@ -647,6 +649,15 @@ export default function EditorProBurbujasPikatron({ datos, setDatos, onClose, on
                 </div>
 
                 {/* MODAL CONFIGURACIÓN GLOBAL */}
+                {modalPublicar && (
+                    <PublicarModal
+                        modo={modalPublicar}
+                        onGuardarPublicar={async () => { setDatos(prev => ({ ...prev, isFinished: true })); await onSave(); setModalPublicar(null); }}
+                        onGuardarSolo={async () => { await onSave(); setModalPublicar(null); }}
+                        onSalirSinGuardar={() => { setModalPublicar(null); onClose(); }}
+                        onCancelar={() => setModalPublicar(null)}
+                    />
+                )}
                 {mostrandoConfig && (
                     <div style={styles.configOverlay}>
                         <div style={styles.configModal}>

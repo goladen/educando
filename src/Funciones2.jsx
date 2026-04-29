@@ -395,6 +395,7 @@ function ModalEnviarProfe({ datos, onClose }) {
                 modalidad:      esLive ? 'Online' : datos.tipoEjercicio || 'Individual',
                 fecha:          new Date(),
                 codigoProfesor: code,
+                config:         datos.tipoEjercicio ? { tipoEjercicio: datos.tipoEjercicio } : undefined,
                 jugadores:      jugadoresInforme,
             });
             setEnviado(true);

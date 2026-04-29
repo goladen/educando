@@ -5,6 +5,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { db } from '../firebase';
 import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
 import { Save, ArrowLeft, Plus, Trash2, ChevronDown, ChevronUp, Image as ImgIcon, Globe, Lock, Play } from 'lucide-react';
+import PublicarModal from './PublicarModal';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 const uid     = () => 'ex_' + Math.random().toString(36).slice(2, 8);
@@ -327,6 +328,7 @@ export default function EditorVideoQuizz({ recursoInicial = null, usuario, onBac
   });
   const [saving,     setSaving]     = useState(false);
   const [showConfig, setShowConfig] = useState(!recursoInicial);
+  const [modalPublicar, setModalPublicar] = useState(null);
 
   // YouTube preview player
   const previewPlayerRef = useRef(null);
@@ -396,33 +398,34 @@ export default function EditorVideoQuizz({ recursoInicial = null, usuario, onBac
     }),
   }));
 
-  const save = async () => {
+  const save = async (extraRecurso = {}) => {
     if (!recurso.titulo.trim()) return alert('Añade un título al recurso.');
     if (!recurso.youtubeUrl.trim()) return alert('Añade la URL del vídeo de YouTube.');
     if (!recurso.ejercicios.length) return alert('El recurso necesita al menos un ejercicio.');
+    const recursoEfectivo = { ...recurso, ...extraRecurso };
     setSaving(true);
     try {
       const data = {
-        ...recurso,
-        ejercicios: sanitizeEjercicios(recurso.ejercicios),
+        ...recursoEfectivo,
+        ejercicios: sanitizeEjercicios(recursoEfectivo.ejercicios),
         tipoJuego: 'VIDEOQUIZZ',
         tipo: 'VIDEOQUIZZ',
-        isFinished: !!recurso.isFinished,
+        isFinished: !!recursoEfectivo.isFinished,
         profesorUid: usuario?.uid||'anon',
         profesorNombre: usuario?.displayName||'Anon',
-        pais: recurso.pais||usuario?.pais||'',
-        region: recurso.region||usuario?.region||'',
-        poblacion: recurso.poblacion||usuario?.poblacion||'',
-        ciclo: recurso.ciclo||'Secundaria',
-        temas: recurso.tema||'',
+        pais: recursoEfectivo.pais||usuario?.pais||'',
+        region: recursoEfectivo.region||usuario?.region||'',
+        poblacion: recursoEfectivo.poblacion||usuario?.poblacion||'',
+        ciclo: recursoEfectivo.ciclo||'Secundaria',
+        temas: recursoEfectivo.tema||'',
         playCount: 0,
         fechaCreacion: new Date(),
         accessCode: generarCodigo(),
         origen: 'editor_videoquizz',
       };
       delete data.id;
-      if (recurso.id && !recurso.id.startsWith('auto_')) {
-        await updateDoc(doc(db,'resources',recurso.id), data);
+      if (recursoEfectivo.id && !recursoEfectivo.id.startsWith('auto_')) {
+        await updateDoc(doc(db,'resources',recursoEfectivo.id), data);
         alert('Recurso actualizado.');
       } else {
         await addDoc(collection(db,'resources'), data);
@@ -442,7 +445,7 @@ export default function EditorVideoQuizz({ recursoInicial = null, usuario, onBac
     <div style={{minHeight:'100vh',background:'#F0F4FF',fontFamily:'inherit'}}>
       {/* Top bar */}
       <div style={{background:'white',borderBottom:'1px solid #E2E8F0',padding:'12px 20px',display:'flex',alignItems:'center',gap:12,position:'sticky',top:0,zIndex:100}}>
-        <button onClick={onBack} style={{border:'none',background:'transparent',cursor:'pointer',color:'#64748B',display:'flex',alignItems:'center',gap:4,fontSize:14}}>
+        <button onClick={() => setModalPublicar('cerrar')} style={{border:'none',background:'transparent',cursor:'pointer',color:'#64748B',display:'flex',alignItems:'center',gap:4,fontSize:14}}>
           <ArrowLeft size={18}/> Volver
         </button>
         <div style={{flex:1}}>
@@ -457,9 +460,19 @@ export default function EditorVideoQuizz({ recursoInicial = null, usuario, onBac
           {recurso.isFinished?<Globe size={15}/>:<Lock size={15}/>}
           {recurso.isFinished?'Publicado':'Borrador'}
         </button>
-        <button onClick={save} disabled={saving} style={{border:'none',background:recurso.color||'#DC2626',color:'white',borderRadius:9,padding:'9px 20px',cursor:'pointer',fontWeight:700,fontSize:14,display:'flex',alignItems:'center',gap:7,opacity:saving?0.7:1}}>
+        <button onClick={() => recurso.isFinished ? save() : setModalPublicar('guardar')} disabled={saving} style={{border:'none',background:recurso.color||'#DC2626',color:'white',borderRadius:9,padding:'9px 20px',cursor:'pointer',fontWeight:700,fontSize:14,display:'flex',alignItems:'center',gap:7,opacity:saving?0.7:1}}>
           <Save size={16}/> {saving?'Guardando…':'Guardar'}
         </button>
+        {modalPublicar && (
+          <PublicarModal
+            modo={modalPublicar}
+            yaPublicado={!!recurso.isFinished}
+            onGuardarPublicar={async () => { await save({ isFinished: true }); setModalPublicar(null); }}
+            onGuardarSolo={async () => { await save(); setModalPublicar(null); }}
+            onSalirSinGuardar={() => { setModalPublicar(null); onBack?.(); }}
+            onCancelar={() => setModalPublicar(null)}
+          />
+        )}
       </div>
 
       <div style={{maxWidth:900,margin:'24px auto',padding:'0 16px 60px'}}>

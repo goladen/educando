@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '../firebase';
 import {
     collection, query, where, getDocs, getDoc, doc,
     updateDoc, deleteDoc, setDoc
 } from 'firebase/firestore';
+import { PASOS, INSTRUMENTOS_SEQ } from '../musicUtils';
 import {
     BarChart2, Users, Calendar, TrendingUp, RefreshCw,
     ChevronDown, ChevronUp, Filter, Save, Edit2, CheckCircle,
@@ -38,10 +39,11 @@ export default function InformesJuegos({ usuario }) {
     const [codOK,         setCodOK]         = useState(false);
 
     // Datos
-    const [informes,     setInformes]     = useState([]);  // enviados con código
-    const [ranking,      setRanking]      = useState([]);  // de recursos propios
-    const [cargando,     setCargando]     = useState(true);
-    const [error,        setError]        = useState('');
+    const [informes,        setInformes]        = useState([]);  // enviados con código
+    const [ranking,         setRanking]         = useState([]);  // de recursos propios
+    const [ritmosGuardados, setRitmosGuardados] = useState([]);  // ritmos colaborativos
+    const [cargando,        setCargando]        = useState(true);
+    const [error,           setError]           = useState('');
 
     // Filtros
     const [filtroTipo,   setFiltroTipo]   = useState('');
@@ -133,7 +135,34 @@ export default function InformesJuegos({ usuario }) {
 
             setInformes(resultados);
 
-            // 2. Entradas de ranking de recursos propios
+            // 2. Ritmos colaborativos recibidos
+            if (codigo) {
+                try {
+                    const ritmosSnap = await getDocs(query(
+                        collection(db, 'ritmos_guardados'),
+                        where('codigoProfesor', '==', codigo)
+                    ));
+                    const ritmos = ritmosSnap.docs
+                        .map(d => {
+                            const data = d.data();
+                            // grid guardado como array plano (64) → reconstruir 4×16
+                            if (Array.isArray(data.grid) && !Array.isArray(data.grid[0])) {
+                                data.grid = Array.from({ length: 4 }, (_, i) =>
+                                    data.grid.slice(i * 16, (i + 1) * 16).map(Boolean)
+                                );
+                            }
+                            return { id: d.id, ...data };
+                        })
+                        .sort((a, b) => {
+                            const fa = a.creadoEn?.toDate ? a.creadoEn.toDate() : new Date(a.creadoEn || 0);
+                            const fb = b.creadoEn?.toDate ? b.creadoEn.toDate() : new Date(b.creadoEn || 0);
+                            return fb - fa;
+                        });
+                    setRitmosGuardados(ritmos);
+                } catch (e) { console.error('ritmos_guardados:', e); }
+            }
+
+            // 3. Entradas de ranking de recursos propios
             const misRes = await getDocs(query(
                 collection(db, 'resources'),
                 where('profesorUid', '==', usuario.uid)
@@ -220,10 +249,11 @@ export default function InformesJuegos({ usuario }) {
     // Resumen global
     const totPartidas  = informesFilt.length;
     const totJugadores = informesFilt.reduce((s,i)=>s+(i.jugadores?.length||0),0);
-    const totInt       = informesFilt.reduce((s,i)=>s+(i.jugadores||[]).reduce((a,j)=>a+j.intentos,0),0);
-    const totAci       = informesFilt.reduce((s,i)=>s+(i.jugadores||[]).reduce((a,j)=>a+j.aciertos,0),0);
+    const totInt       = informesFilt.reduce((s,i)=>s+(i.jugadores||[]).reduce((a,j)=>a+(j.intentos||0),0),0);
+    const totAci       = informesFilt.reduce((s,i)=>s+(i.jugadores||[]).reduce((a,j)=>a+(j.aciertos||0),0),0);
     const pctGlobal    = totInt>0 ? Math.round(totAci/totInt*100) : null;
     const totRanking   = rankingFilt.length;
+    const totRitmos    = ritmosGuardados.length;
 
     const filtrosActivos = !!(filtroTipo||filtroMod||filtroFecDes||filtroFecHas);
 
@@ -293,7 +323,7 @@ export default function InformesJuegos({ usuario }) {
             {error && <div style={{ background:'#fdecea', border:'1px solid #e74c3c', borderRadius:8, padding:'10px 14px', color:'#c0392b', marginBottom:16, fontSize:'0.85rem' }}>{error}</div>}
 
             {/* ── Tarjetas de resumen ───────────────────────────────────── */}
-            {!cargando && (totPartidas > 0 || totRanking > 0) && (
+            {!cargando && (totPartidas > 0 || totRanking > 0 || totRitmos > 0) && (
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(110px,1fr))', gap:10, marginBottom:20 }}>
                     {[
                         { icon:'📋', val:totPartidas,   lbl:'Partidas (código)' },
@@ -301,6 +331,7 @@ export default function InformesJuegos({ usuario }) {
                         { icon:'✅', val:`${totAci}/${totInt}`, lbl:'Aciertos' },
                         { icon:'📊', val:pctGlobal!=null?`${pctGlobal}%`:'—', lbl:'% acierto', color:pctGlobal!=null?pctColor(pctGlobal):undefined },
                         { icon:'🏆', val:totRanking,    lbl:'En ranking' },
+                        { icon:'🥁', val:totRitmos,     lbl:'Ritmos' },
                     ].map((c,k)=>(
                         <div key={k} style={{ background:'white', borderRadius:12, padding:'12px', boxShadow:'0 2px 8px rgba(0,0,0,0.05)', textAlign:'center' }}>
                             <div style={{ fontSize:'1.3rem', marginBottom:2 }}>{c.icon}</div>
@@ -380,6 +411,16 @@ export default function InformesJuegos({ usuario }) {
                         </div>
                     )}
 
+                    {/* ── Sección: Ritmos colaborativos ──────────────────── */}
+                    <SectionTitle icon="🥁" title="Ritmos de alumnos" count={totRitmos} />
+                    {totRitmos === 0 ? (
+                        <EmptyCard msg={codigoProf ? 'Aún no has recibido ningún ritmo.' : 'Configura tu código para recibir ritmos.'} />
+                    ) : (
+                        <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:28 }}>
+                            {ritmosGuardados.map(r => <RitmoCard key={r.id} ritmo={r} />)}
+                        </div>
+                    )}
+
                     {/* ── Sección: Ranking de recursos propios ───────────── */}
                     <SectionTitle icon="🏆" title="Ranking de tus recursos" count={rankingFilt.length} subtitle="Solo lectura — pertenecen al ranking global" />
                     {rankingFilt.length === 0 ? (
@@ -421,9 +462,9 @@ const pctBg2    = (p) => p >= 80 ? '#e8f5e9' : p >= 50 ? '#fff8e1' : '#fdecea';
 const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, canDelete }) => {
     const [confirmar, setConfirmar] = useState(false);
     const jugs   = inf.jugadores || [];
-    const totInt = jugs.reduce((s,j)=>s+j.intentos, 0);
-    const totAci = jugs.reduce((s,j)=>s+j.aciertos, 0);
-    const pct    = totInt > 0 ? Math.round(totAci/totInt*100) : 0;
+    const totInt = jugs.reduce((s,j)=>s+(j.intentos||0), 0);
+    const totAci = jugs.reduce((s,j)=>s+(j.aciertos||0), 0);
+    const pct    = totInt > 0 ? Math.round(totAci/totInt*100) : (jugs.length>0 ? Math.round(jugs.reduce((s,j)=>s+(j.porcentaje||0),0)/jugs.length) : 0);
     const tipo   = inf._tipoJuego || inf.tipo || '';
 
     return (
@@ -502,8 +543,8 @@ const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, 
                         <tfoot>
                             <tr style={{ borderTop:'2px solid #ecf0f1', fontWeight:700 }}>
                                 <td style={{ padding:'6px 6px', color:'#2c3e50', fontSize:'0.78rem' }}>TOTAL</td>
-                                <td style={{ padding:'6px 6px', textAlign:'center', color:'#7f8c8d' }}>{totInt}</td>
-                                <td style={{ padding:'6px 6px', textAlign:'center', color:'#27ae60' }}>{totAci}</td>
+                                <td style={{ padding:'6px 6px', textAlign:'center', color:'#7f8c8d' }}>{totInt||'—'}</td>
+                                <td style={{ padding:'6px 6px', textAlign:'center', color:'#27ae60' }}>{totAci||'—'}</td>
                                 <td style={{ padding:'6px 6px', textAlign:'center' }}>
                                     <span style={{ padding:'2px 7px', borderRadius:12, background:pctBg2(pct), color:pctColor2(pct), fontWeight:700, fontSize:'0.78rem' }}>{pct}%</span>
                                 </td>
@@ -516,6 +557,127 @@ const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, 
         </div>
     );
 };
+
+// ─── Ritmo Card ───────────────────────────────────────────────────────────────
+
+const RitmoCard = ({ ritmo }) => {
+    const [playing,    setPlaying]    = useState(false);
+    const [pulso,      setPulso]      = useState(-1);
+    const [bpm,        setBpm]        = useState(ritmo.bpm || 120);
+    const [expandido,  setExpandido]  = useState(false);
+    const gridRef = useRef(ritmo.grid);
+    useEffect(() => { gridRef.current = ritmo.grid; }, [ritmo.grid]);
+
+    useEffect(() => {
+        if (!playing) { setPulso(-1); return; }
+        const ms = Math.round(60000 / bpm / 4);
+        const id = setInterval(() => {
+            setPulso(p => {
+                const next = (p + 1) % PASOS;
+                gridRef.current?.forEach((fila, i) => { if (fila[next]) INSTRUMENTOS_SEQ[i].play(); });
+                return next;
+            });
+        }, ms);
+        return () => { clearInterval(id); };
+    }, [playing, bpm]);
+
+    const participantes = ritmo.participantes || [];
+    const fecha = ritmo.creadoEn?.toDate ? ritmo.creadoEn.toDate() : ritmo.creadoEn ? new Date(ritmo.creadoEn) : null;
+
+    return (
+        <div style={{ background:'white', borderRadius:13, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', overflow:'hidden', border:'1px solid #f0f0f0' }}>
+            <div style={{ padding:'11px 15px', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+                <span style={{ fontSize:'1.3rem' }}>🥁</span>
+                <div style={{ flex:1, minWidth:120 }}>
+                    <div style={{ fontWeight:700, color:'#2c3e50', fontSize:'0.92rem' }}>
+                        Ritmo colaborativo
+                        <span style={{ marginLeft:8, color:'#7f8c8d', fontSize:'0.78rem', fontWeight:400 }}>
+                            {participantes.length} participante{participantes.length !== 1 ? 's' : ''}
+                        </span>
+                    </div>
+                    <div style={{ fontSize:'0.74rem', color:'#95a5a6', marginTop:2 }}>
+                        {participantes.map(p => p.nombre).join(' · ')}
+                        {fecha ? ' · ' + fmtFecha(fecha) : ''}
+                    </div>
+                </div>
+
+                {/* Play / Stop */}
+                <button
+                    onClick={() => setPlaying(p => !p)}
+                    style={{ padding:'6px 18px', borderRadius:8, border:'none', background: playing ? '#e74c3c' : '#27ae60', color:'white', fontWeight:700, cursor:'pointer', fontSize:'0.85rem', flexShrink:0 }}
+                >
+                    {playing ? '⏹' : '▶'}
+                </button>
+
+                {/* BPM slider */}
+                <div style={{ display:'flex', alignItems:'center', gap:6, minWidth:140 }}>
+                    <span style={{ fontSize:'0.72rem', color:'#7f8c8d', whiteSpace:'nowrap' }}>
+                        BPM <b style={{ color:'#e67e22' }}>{bpm}</b>
+                    </span>
+                    <input type="range" min="60" max="200" value={bpm}
+                        onChange={e => setBpm(Number(e.target.value))}
+                        style={{ width:80, accentColor:'#e67e22', cursor:'pointer' }} />
+                </div>
+
+                {/* Toggle grid */}
+                <button
+                    onClick={() => setExpandido(e => !e)}
+                    style={{ padding:'4px 10px', borderRadius:6, border:'1px solid #ddd', background:'#f8f9fa', cursor:'pointer', fontSize:'0.78rem', color:'#555', flexShrink:0 }}
+                >
+                    {expandido ? '▲ Ocultar' : '▼ Ver grid'}
+                </button>
+            </div>
+
+            {/* Pulse strip (always visible when playing) */}
+            {playing && (
+                <div style={{ display:'flex', gap:2, padding:'0 15px 8px', paddingLeft:15 }}>
+                    {Array.from({ length: PASOS }, (_, i) => (
+                        <div key={i} style={{ flex:1, height:3, borderRadius:2, background: pulso === i ? '#e67e22' : i % 4 === 0 ? '#ddd' : '#f0f0f0', transition:'background 0.05s' }} />
+                    ))}
+                </div>
+            )}
+
+            {expandido && (
+                <div style={{ borderTop:'1px solid #f0f0f0', padding:'12px 15px', overflowX:'auto' }}>
+                    <MiniGrid grid={ritmo.grid || []} pulso={pulso} />
+                </div>
+            )}
+        </div>
+    );
+};
+
+const MiniGrid = ({ grid, pulso }) => (
+    <div style={{ minWidth:440 }}>
+        <div style={{ display:'flex', gap:2, marginBottom:5, paddingLeft:58 }}>
+            {Array.from({ length: PASOS }, (_, i) => (
+                <div key={i} style={{ flex:1, height:3, borderRadius:2, background: pulso === i ? '#e67e22' : i % 4 === 0 ? '#d0d0d0' : '#ececec' }} />
+            ))}
+        </div>
+        {INSTRUMENTOS_SEQ.map((inst, fi) => (
+            <div key={inst.nombre} style={{ display:'flex', alignItems:'center', gap:2, marginBottom:3 }}>
+                <div style={{ width:54, flexShrink:0, display:'flex', alignItems:'center', gap:3 }}>
+                    <span style={{ fontSize:14 }}>{inst.emoji}</span>
+                    <span style={{ color:inst.color, fontSize:'0.62rem', fontWeight:700 }}>{inst.nombre}</span>
+                </div>
+                {(grid[fi] || Array(PASOS).fill(false)).map((activa, ci) => (
+                    <div key={ci} style={{
+                        flex:1, height:22, borderRadius:3,
+                        background: activa ? inst.color : pulso === ci ? '#e8e8e8' : ci % 4 === 0 ? '#efefef' : '#f7f7f7',
+                        outline: pulso === ci && !activa ? `1.5px solid ${inst.color}40` : 'none',
+                        transition:'background 0.05s',
+                    }} />
+                ))}
+            </div>
+        ))}
+        <div style={{ display:'flex', gap:2, marginTop:3, paddingLeft:58 }}>
+            {Array.from({ length: PASOS }, (_, i) => (
+                <div key={i} style={{ flex:1, textAlign:'center', fontSize:'0.52rem', color: i % 4 === 0 ? '#e67e22' : '#bbb', fontWeight: i % 4 === 0 ? 700 : 400 }}>
+                    {i % 4 === 0 ? String(i / 4 + 1) : '·'}
+                </div>
+            ))}
+        </div>
+    </div>
+);
 
 const RankingCard = ({ r }) => (
     <div style={{ background:'white', borderRadius:11, padding:'10px 14px', boxShadow:'0 1px 5px rgba(0,0,0,0.05)', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', border:'1px solid #f0f0f0' }}>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import GruposTab from './GruposTab';
 import ModalAgregarAGrupo from './ModalAgregarAGrupo';
 import { db } from '../firebase';
@@ -6,6 +6,7 @@ import {
     collection, query, where, getDocs, getDoc, doc,
     updateDoc, deleteDoc, setDoc
 } from 'firebase/firestore';
+import { PASOS, INSTRUMENTOS_SEQ } from '../musicUtils';
 import {
     BarChart2, Users, Calendar, TrendingUp, RefreshCw,
     ChevronDown, ChevronUp, Filter, Save, Edit2, CheckCircle,
@@ -40,14 +41,40 @@ const fmtFecha = (f) => {
     return d.toLocaleDateString('es-ES', { day:'2-digit', month:'2-digit', year:'numeric' })
          + ' ' + d.toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' });
 };
-const TIPO_LABEL  = { OCA:'🦆 Oca Matemática', CAZABURBUJAS:'🔵 Cazaburbujas', PIKATRON:'⚡ Pikatron', SOPA:'🔤 Sopa de Letras', WORDLE:'🟩 Wordle', PASAPALABRA:'🔠 Pasapalabra', FUNCIONES:'∫ Funciones', APAREJADOS:'🃏 Aparejados', STORYCUBES:'🎲 Story Cubes', THINKHOOT:'🦉 PiLive', MATHLIVE:'🧮 MathLive', OLYMPICLIVE:'🏅 OlympicLive' };
-const TIPO_ICON   = { OCA:'🦆', CAZABURBUJAS:'🔵', PIKATRON:'⚡', SOPA:'🔤', WORDLE:'🟩', PASAPALABRA:'🔠', FUNCIONES:'∫', APAREJADOS:'🃏', STORYCUBES:'🎲', THINKHOOT:'🦉', MATHLIVE:'🧮', OLYMPICLIVE:'🏅' };
+const fmtTiempo = (s) => {
+    if (s == null) return '—';
+    const m = Math.floor(s / 60), sec = s % 60;
+    return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
+};
+const ConfigBadge = ({ icon, label }) => (
+    <span style={{ display:'inline-flex', alignItems:'center', gap:3, padding:'2px 8px', borderRadius:20, background:'#eef2ff', color:'#3b4fcc', fontSize:'0.72rem', fontWeight:600 }}>
+        {icon} {label}
+    </span>
+);
+const TIPO_LABEL  = { OCA:'🦆 Oca Matemática', CAZABURBUJAS:'🔵 Cazaburbujas', PIKATRON:'⚡ Pikatron', SOPA:'🔤 Sopa de Letras', WORDLE:'🟩 Wordle', MATHLE:'🔢 Mathle', PASAPALABRA:'🔠 Pasapalabra', FUNCIONES:'∫ Funciones', FUNCIONES_ANALISIS:'📈 Análisis de Funciones', APAREJADOS:'🃏 Aparejados', STORYCUBES:'🎲 Story Cubes', IRREGULAR_VERBS:'🇬🇧 Verbos Irregulares', THINKHOOT:'🦉 PiLive', MATHLIVE:'🧮 MathLive', OLYMPICLIVE:'🏅 OlympicLive' };
+const TIPO_ICON   = { OCA:'🦆', CAZABURBUJAS:'🔵', PIKATRON:'⚡', SOPA:'🔤', WORDLE:'🟩', MATHLE:'🔢', PASAPALABRA:'🔠', FUNCIONES:'∫', FUNCIONES_ANALISIS:'📈', APAREJADOS:'🃏', STORYCUBES:'🎲', IRREGULAR_VERBS:'🇬🇧', THINKHOOT:'🦉', MATHLIVE:'🧮', OLYMPICLIVE:'🏅' };
 const TIPO_LIVE = new Set(['THINKHOOT', 'MATHLIVE', 'OLYMPICLIVE']);
 const tipoLabel   = (t) => TIPO_LABEL[t] || ('🎮 ' + (t||'Juego'));
 const tipoIcon    = (t) => TIPO_ICON[t]  || '🎮';
 
 // ─── Colores de los filtros ───────────────────────────────────────────────────
 const inp = { padding:'7px 10px', borderRadius:8, border:'1.5px solid #e0e4f0', fontSize:'0.85rem', outline:'none', fontFamily:'inherit' };
+
+// ─── Búsqueda difusa de nombres ──────────────────────────────────────────────
+const normNombre = s => (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
+const similarNombre = (a, b) => {
+    const na = normNombre(a), nb = normNombre(b);
+    if (!na || !nb) return 0;
+    if (na.includes(nb) || nb.includes(na)) return 1;
+    const bigs = s => { const r=new Set(); for(let i=0;i<s.length-1;i++) r.add(s.slice(i,i+2)); return r; };
+    const ba=bigs(na), bb=bigs(nb);
+    const common=[...ba].filter(g=>bb.has(g)).length;
+    return (2*common)/(ba.size+bb.size);
+};
+const jugadoresDeInforme = inf => {
+    if (inf.historia) return inf.historia.map(s=>s.autor||'');
+    return (inf.jugadores||[]).map(j=>typeof j==='string'?j:(j.nombre||''));
+};
 
 // ─── Componente principal ──────────────────────────────────────────────────────
 export default function InformesJuegos({ usuario, googleToken }) {
@@ -60,10 +87,11 @@ export default function InformesJuegos({ usuario, googleToken }) {
     const [codOK,         setCodOK]         = useState(false);
 
     // Datos
-    const [informes,     setInformes]     = useState([]);  // enviados con código
-    const [ranking,      setRanking]      = useState([]);  // de recursos propios
-    const [cargando,     setCargando]     = useState(true);
-    const [error,        setError]        = useState('');
+    const [informes,        setInformes]        = useState([]);
+    const [ranking,         setRanking]         = useState([]);
+    const [ritmosGuardados, setRitmosGuardados] = useState([]);
+    const [cargando,        setCargando]        = useState(true);
+    const [error,           setError]           = useState('');
 
     // Filtros
     const [filtroTipo,   setFiltroTipo]   = useState('');
@@ -74,9 +102,17 @@ export default function InformesJuegos({ usuario, googleToken }) {
 
     // UI
     const [expandido,    setExpandido]    = useState(null);
-    const [borrando,     setBorrando]     = useState(null);  // id del informe a borrar
+    const [borrando,     setBorrando]     = useState(null);
     const [borrandoOk,   setBorrandoOk]   = useState(null);
-    const [modalAgregar, setModalAgregar] = useState(null);  // informe seleccionado para añadir a grupo
+    const [modalAgregar, setModalAgregar] = useState(null);
+
+    // Selección en lote
+    const [modoSeleccion,   setModoSeleccion]   = useState(false);
+    const [seleccionados,   setSeleccionados]   = useState(new Set());
+    const [borrandoLote,    setBorrandoLote]    = useState(false);
+
+    // Búsqueda por jugador
+    const [busquedaJugador, setBusquedaJugador] = useState('');
 
     // ── Carga del código de profesor desde users collection ──────────────────
     const cargarCodigo = async () => {
@@ -156,7 +192,33 @@ export default function InformesJuegos({ usuario, googleToken }) {
 
             setInformes(resultados);
 
-            // 2. Entradas de ranking de recursos propios
+            // 2. Ritmos colaborativos recibidos
+            if (codigo) {
+                try {
+                    const ritmosSnap = await getDocs(query(
+                        collection(db, 'ritmos_guardados'),
+                        where('codigoProfesor', '==', codigo)
+                    ));
+                    const ritmos = ritmosSnap.docs
+                        .map(d => {
+                            const data = d.data();
+                            if (Array.isArray(data.grid) && !Array.isArray(data.grid[0])) {
+                                data.grid = Array.from({ length: 4 }, (_, i) =>
+                                    data.grid.slice(i * 16, (i + 1) * 16).map(Boolean)
+                                );
+                            }
+                            return { id: d.id, ...data };
+                        })
+                        .sort((a, b) => {
+                            const fa = a.creadoEn?.toDate ? a.creadoEn.toDate() : new Date(a.creadoEn || 0);
+                            const fb = b.creadoEn?.toDate ? b.creadoEn.toDate() : new Date(b.creadoEn || 0);
+                            return fb - fa;
+                        });
+                    setRitmosGuardados(ritmos);
+                } catch (e) { console.error('ritmos_guardados:', e); }
+            }
+
+            // 3. Entradas de ranking de recursos propios
             const misRes = await getDocs(query(
                 collection(db, 'resources'),
                 where('profesorUid', '==', usuario.uid)
@@ -206,7 +268,7 @@ export default function InformesJuegos({ usuario, googleToken }) {
 
     useEffect(() => { cargarCodigo(); }, []);
 
-    // ── Borrar informe (solo los de código) ───────────────────────────────────
+    // ── Borrar informe individual ─────────────────────────────────────────────
     const borrar = async (id) => {
         setBorrando(id);
         try {
@@ -216,6 +278,24 @@ export default function InformesJuegos({ usuario, googleToken }) {
         } catch(e) { alert('Error al borrar: ' + e.message); }
         setBorrando(null);
     };
+
+    // ── Borrar en lote ────────────────────────────────────────────────────────
+    const borrarLote = async () => {
+        setBorrandoLote(true);
+        try {
+            await Promise.all([...seleccionados].map(id => deleteDoc(doc(db, 'informes_juegos', id))));
+            setInformes(prev => prev.filter(i => !seleccionados.has(i.id)));
+            setSeleccionados(new Set());
+            setModoSeleccion(false);
+        } catch(e) { alert('Error al borrar: ' + e.message); }
+        setBorrandoLote(false);
+    };
+
+    const toggleSeleccion = (id) => setSeleccionados(prev => {
+        const next = new Set(prev);
+        next.has(id) ? next.delete(id) : next.add(id);
+        return next;
+    });
 
     // ── Filtrado combinado ────────────────────────────────────────────────────
     const filtrarItem = (item) => {
@@ -235,6 +315,10 @@ export default function InformesJuegos({ usuario, googleToken }) {
     const informesFilt = informes.filter(filtrarItem);
     const rankingFilt  = ranking.filter(filtrarItem);
 
+    const informesFiltFinal = busquedaJugador
+        ? informesFilt.filter(inf => jugadoresDeInforme(inf).some(n => similarNombre(n, busquedaJugador) >= 0.5))
+        : informesFilt;
+
     // Opciones de filtro
     const todosItems = [...informes, ...ranking];
     const tiposOpts  = [...new Set(todosItems.map(i=>i._tipoJuego||i.tipo).filter(Boolean))];
@@ -247,6 +331,7 @@ export default function InformesJuegos({ usuario, googleToken }) {
     const totAci       = informesFilt.reduce((s,i)=>s+(i.jugadores||[]).reduce((a,j)=>a+(j.aciertos||0),0),0);
     const pctGlobal    = totInt>0 ? Math.round(totAci/totInt*100) : null;
     const totRanking   = rankingFilt.length;
+    const totRitmos    = ritmosGuardados.length;
 
     const filtrosActivos = !!(filtroTipo||filtroMod||filtroFecDes||filtroFecHas);
 
@@ -338,7 +423,7 @@ export default function InformesJuegos({ usuario, googleToken }) {
             {error && <div style={{ background:'#fdecea', border:'1px solid #e74c3c', borderRadius:8, padding:'10px 14px', color:'#c0392b', marginBottom:16, fontSize:'0.85rem' }}>{error}</div>}
 
             {/* ── Tarjetas de resumen ───────────────────────────────────── */}
-            {!cargando && (totPartidas > 0 || totRanking > 0) && (
+            {!cargando && (totPartidas > 0 || totRanking > 0 || totRitmos > 0) && (
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(110px,1fr))', gap:10, marginBottom:20 }}>
                     {[
                         { icon:'📋', val:totPartidas,   lbl:'Partidas (código)' },
@@ -346,6 +431,7 @@ export default function InformesJuegos({ usuario, googleToken }) {
                         { icon:'✅', val:`${totAci}/${totInt}`, lbl:'Aciertos' },
                         { icon:'📊', val:pctGlobal!=null?`${pctGlobal}%`:'—', lbl:'% acierto', color:pctGlobal!=null?pctColor(pctGlobal):undefined },
                         { icon:'🏆', val:totRanking,    lbl:'En ranking' },
+                        { icon:'🥁', val:totRitmos,     lbl:'Ritmos' },
                     ].map((c,k)=>(
                         <div key={k} style={{ background:'white', borderRadius:12, padding:'12px', boxShadow:'0 2px 8px rgba(0,0,0,0.05)', textAlign:'center' }}>
                             <div style={{ fontSize:'1.3rem', marginBottom:2 }}>{c.icon}</div>
@@ -406,37 +492,87 @@ export default function InformesJuegos({ usuario, googleToken }) {
             ) : (
                 <>
                     {/* ── Sección: Informes por código ───────────────────── */}
-                    <SectionTitle icon="📋" title="Enviados con código" count={informesFilt.length} />
-                    {informesFilt.length === 0 ? (
-                        <EmptyCard msg={codigoProf ? 'Aún no hay informes con este código.' : 'Configura tu código de profesor para recibir informes.'} />
+                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10, flexWrap:'wrap' }}>
+                        <SectionTitle icon="📋" title="Enviados con código" count={informesFiltFinal.length} />
+                        <div style={{ flex:1 }}/>
+                        {/* Toolbar selección */}
+                        <button onClick={() => { setModoSeleccion(!modoSeleccion); setSeleccionados(new Set()); }}
+                            style={{ padding:'5px 11px', borderRadius:7, border:`1.5px solid ${modoSeleccion?'#e74c3c':'#bdc3c7'}`, background:modoSeleccion?'#fdecea':'white', color:modoSeleccion?'#e74c3c':'#555', cursor:'pointer', fontSize:'0.78rem', fontWeight:600 }}>
+                            {modoSeleccion ? '✕ Cancelar' : '☑ Seleccionar'}
+                        </button>
+                        {modoSeleccion && (
+                            <button onClick={() => setSeleccionados(new Set(informesFiltFinal.map(i=>i.id)))}
+                                style={{ padding:'5px 11px', borderRadius:7, border:'1.5px solid #1565C0', background:'#e8f0fe', color:'#1565C0', cursor:'pointer', fontSize:'0.78rem', fontWeight:600 }}>
+                                Seleccionar todo
+                            </button>
+                        )}
+                        {modoSeleccion && seleccionados.size > 0 && (
+                            <button onClick={() => { if(window.confirm(`¿Eliminar ${seleccionados.size} informe(s)? Esta acción no se puede deshacer.`)) borrarLote(); }}
+                                disabled={borrandoLote}
+                                style={{ padding:'5px 11px', borderRadius:7, border:'none', background: borrandoLote?'#aaa':'#e74c3c', color:'white', cursor:'pointer', fontSize:'0.78rem', fontWeight:700 }}>
+                                {borrandoLote ? 'Eliminando…' : `🗑 Eliminar ${seleccionados.size}`}
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Banner búsqueda jugador */}
+                    {busquedaJugador && (
+                        <div style={{ background:'#e8f0fe', borderRadius:10, padding:'9px 14px', marginBottom:10, display:'flex', alignItems:'center', gap:10 }}>
+                            <span style={{ fontSize:'0.84rem', color:'#1565C0', flex:1 }}>
+                                🔍 Resultados de <strong>"{busquedaJugador}"</strong> — {informesFiltFinal.length} partida(s)
+                            </span>
+                            <button onClick={()=>setBusquedaJugador('')}
+                                style={{ background:'none', border:'none', cursor:'pointer', color:'#1565C0', fontSize:'1rem', padding:0 }}>✕</button>
+                        </div>
+                    )}
+
+                    {informesFiltFinal.length === 0 ? (
+                        <EmptyCard msg={codigoProf ? (busquedaJugador ? 'Sin resultados para ese jugador.' : 'Aún no hay informes con este código.') : 'Configura tu código de profesor para recibir informes.'} />
                     ) : (
                         <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:28 }}>
-                            {informesFilt.map(inf => {
+                            {informesFiltFinal.map(inf => {
                                 const tipo = inf._tipoJuego || inf.tipo || '';
+                                const selec = seleccionados.has(inf.id);
                                 if (tipo === 'STORYCUBES') return (
                                     <StoryCubesCard
                                         key={inf.id} inf={inf}
-                                        expandido={expandido===inf.id}
-                                        onToggle={()=>setExpandido(expandido===inf.id?null:inf.id)}
                                         onBorrar={()=>borrar(inf.id)}
                                         borrando={borrando===inf.id}
                                         borradoOk={borrandoOk===inf.id}
                                         onAgregarAGrupo={()=>setModalAgregar(inf)}
+                                        modoSeleccion={modoSeleccion}
+                                        seleccionado={selec}
+                                        onSeleccionar={()=>toggleSeleccion(inf.id)}
+                                        onBuscarJugador={setBusquedaJugador}
                                     />
                                 );
                                 return (
                                     <InformeCard
                                         key={inf.id} inf={inf}
                                         expandido={expandido===inf.id}
-                                        onToggle={()=>setExpandido(expandido===inf.id?null:inf.id)}
+                                        onToggle={()=>{ if(!modoSeleccion) setExpandido(expandido===inf.id?null:inf.id); else toggleSeleccion(inf.id); }}
                                         onBorrar={()=>borrar(inf.id)}
                                         borrando={borrando===inf.id}
                                         borradoOk={borrandoOk===inf.id}
                                         canDelete={true}
                                         onAgregarAGrupo={()=>setModalAgregar(inf)}
+                                        modoSeleccion={modoSeleccion}
+                                        seleccionado={selec}
+                                        onSeleccionar={()=>toggleSeleccion(inf.id)}
+                                        onBuscarJugador={setBusquedaJugador}
                                     />
                                 );
                             })}
+                        </div>
+                    )}
+
+                    {/* ── Sección: Ritmos colaborativos ──────────────────── */}
+                    <SectionTitle icon="🥁" title="Ritmos de alumnos" count={totRitmos} />
+                    {totRitmos === 0 ? (
+                        <EmptyCard msg={codigoProf ? 'Aún no has recibido ningún ritmo.' : 'Configura tu código para recibir ritmos.'} />
+                    ) : (
+                        <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:28 }}>
+                            {ritmosGuardados.map(r => <RitmoCard key={r.id} ritmo={r} />)}
                         </div>
                     )}
 
@@ -489,7 +625,7 @@ const EmptyCard = ({ msg }) => (
 const pctColor2 = (p) => p >= 80 ? '#27ae60' : p >= 50 ? '#e67e22' : '#e74c3c';
 const pctBg2    = (p) => p >= 80 ? '#e8f5e9' : p >= 50 ? '#fff8e1' : '#fdecea';
 
-const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, canDelete, onAgregarAGrupo }) => {
+const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, canDelete, onAgregarAGrupo, modoSeleccion, seleccionado, onSeleccionar, onBuscarJugador }) => {
     const [confirmar, setConfirmar] = useState(false);
     const jugs   = inf.jugadores || [];
     const totInt = jugs.reduce((s,j)=>s+(j.intentos||0), 0);
@@ -498,8 +634,13 @@ const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, 
     const tipo   = inf._tipoJuego || inf.tipo || '';
 
     return (
-        <div style={{ background:'white', borderRadius:13, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', overflow:'hidden', border:'1px solid #f0f0f0' }}>
-            <div onClick={onToggle} style={{ padding:'11px 15px', cursor:'pointer', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+        <div style={{ background:'white', borderRadius:13, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', overflow:'hidden', border: seleccionado ? '2px solid #1565C0' : '1px solid #f0f0f0', transition:'border 0.1s' }}>
+            <div onClick={onToggle} style={{ padding:'11px 15px', cursor:'pointer', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', background: seleccionado ? '#f0f4ff' : 'white' }}>
+                {modoSeleccion && (
+                    <input type="checkbox" checked={seleccionado} onChange={e=>{e.stopPropagation();onSeleccionar();}}
+                        onClick={e=>e.stopPropagation()}
+                        style={{ width:17, height:17, cursor:'pointer', accentColor:'#1565C0', flexShrink:0 }}/>
+                )}
                 <span style={{ fontSize:'1.3rem' }}>{tipoIcon(tipo)}</span>
                 <div style={{ flex:1, minWidth:100 }}>
                     <div style={{ fontWeight:700, color:'#2c3e50', fontSize:'0.92rem' }}>
@@ -511,27 +652,33 @@ const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, 
                     </div>
                 </div>
                 <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
-                    {jugs.slice(0,3).map((j,k)=>(
-                        <span key={k} style={{ padding:'2px 7px', borderRadius:20, background:'#f0f0f0', fontSize:'0.72rem', color:'#555' }}>{j.nombre}</span>
-                    ))}
+                    {jugs.slice(0,3).map((j,k)=> j.nombre ? (
+                        <span key={k} onClick={e=>{ e.stopPropagation(); onBuscarJugador?.(j.nombre); }}
+                            style={{ padding:'2px 7px', borderRadius:20, background:'#f0f0f0', fontSize:'0.72rem', color:'#555', cursor:'pointer' }}
+                            title={`Ver todos los resultados de ${j.nombre}`}>
+                            {j.nombre}
+                        </span>
+                    ) : null)}
                     {jugs.length>3 && <span style={{ padding:'2px 7px', borderRadius:20, background:'#f0f0f0', fontSize:'0.72rem', color:'#555' }}>+{jugs.length-3}</span>}
                 </div>
                 <span style={{ padding:'3px 9px', borderRadius:20, background:pctBg2(pct), color:pctColor2(pct), fontWeight:700, fontSize:'0.8rem', flexShrink:0 }}>{pct}%</span>
-                <button
-                    onClick={e=>{ e.stopPropagation(); onAgregarAGrupo?.(); }}
-                    style={{ padding:'4px 9px', borderRadius:7, border:'1px solid #c8e6c9', background:'#e8f5e9', color:'#27ae60', cursor:'pointer', flexShrink:0, fontWeight:600, fontSize:'0.75rem', display:'flex', alignItems:'center', gap:4 }}
-                    title="Añadir calificación a un grupo"
-                >
-                    <Users size={12}/> Añadir a grupo
-                </button>
-                {canDelete && (
+                {!modoSeleccion && (
+                    <button
+                        onClick={e=>{ e.stopPropagation(); onAgregarAGrupo?.(); }}
+                        style={{ padding:'4px 9px', borderRadius:7, border:'1px solid #c8e6c9', background:'#e8f5e9', color:'#27ae60', cursor:'pointer', flexShrink:0, fontWeight:600, fontSize:'0.75rem', display:'flex', alignItems:'center', gap:4 }}
+                        title="Añadir calificación a un grupo"
+                    >
+                        <Users size={12}/> Añadir a grupo
+                    </button>
+                )}
+                {canDelete && !modoSeleccion && (
                     <button
                         onClick={e=>{ e.stopPropagation(); setConfirmar(true); }}
                         style={{ padding:'4px 7px', borderRadius:7, border:'1px solid #fdd', background:'#fdecea', color:'#e74c3c', cursor:'pointer', flexShrink:0 }}
                         title="Eliminar informe"
                     ><Trash2 size={13}/></button>
                 )}
-                {expandido ? <ChevronUp size={16} color="#aaa"/> : <ChevronDown size={16} color="#aaa"/>}
+                {!modoSeleccion && (expandido ? <ChevronUp size={16} color="#aaa"/> : <ChevronDown size={16} color="#aaa"/>)}
             </div>
 
             {/* Confirmación borrado */}
@@ -550,6 +697,38 @@ const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, 
             {/* Detalle */}
             {expandido && (
                 <div style={{ borderTop:'1px solid #f0f0f0', padding:'12px 15px' }}>
+                    {/* Config badges */}
+                    {(() => {
+                        const cfg = inf.config || {};
+                        const jugador0 = (inf.jugadores || [])[0] || {};
+                        const badges = [];
+                        if (tipo === 'MATHLE') {
+                            if (cfg.operacion) badges.push(<ConfigBadge key="op" icon="➕" label={cfg.operacion}/>);
+                            if (cfg.cifras)    badges.push(<ConfigBadge key="cif" icon="🔢" label={`${cfg.cifras} cifras`}/>);
+                        } else if (tipo === 'WORDLE') {
+                            if (cfg.idioma)   badges.push(<ConfigBadge key="id" icon="🌐" label={cfg.idioma}/>);
+                            if (cfg.longitud) badges.push(<ConfigBadge key="lon" icon="🔤" label={`${cfg.longitud} letras`}/>);
+                            if (cfg.modo)     badges.push(<ConfigBadge key="modo" icon="🎮" label={cfg.modo}/>);
+                        } else if (tipo === 'SOPA') {
+                            if (cfg.idioma)      badges.push(<ConfigBadge key="id" icon="🌐" label={cfg.idioma}/>);
+                            if (cfg.numPalabras) badges.push(<ConfigBadge key="np" icon="📝" label={`${cfg.numPalabras} palabras`}/>);
+                        } else if (tipo === 'IRREGULAR_VERBS') {
+                            if (cfg.nivel)     badges.push(<ConfigBadge key="niv" icon="📊" label={cfg.nivel}/>);
+                            if (cfg.numVerbos) badges.push(<ConfigBadge key="nv" icon="🔢" label={`${cfg.numVerbos} verbos`}/>);
+                            if (cfg.modo)      badges.push(<ConfigBadge key="modo" icon="📝" label={cfg.modo}/>);
+                        } else if (tipo === 'FUNCIONES_ANALISIS') {
+                            const tf = cfg.tipoFuncion || jugador0.tipoEjercicio;
+                            const id = cfg.idFuncion   || jugador0.idFuncion;
+                            if (tf) badges.push(<ConfigBadge key="tf" icon="📈" label={tf}/>);
+                            if (id) badges.push(<ConfigBadge key="id" icon="🔖" label={`Ejercicio #${id}`}/>);
+                        } else if (tipo === 'FUNCIONES') {
+                            const te = cfg.tipoEjercicio || jugador0.tipoEjercicio;
+                            if (te) badges.push(<ConfigBadge key="te" icon="∫" label={te}/>);
+                        }
+                        return badges.length > 0 ? (
+                            <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginBottom:10 }}>{badges}</div>
+                        ) : null;
+                    })()}
                     <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'0.83rem' }}>
                         <thead>
                             <tr style={{ color:'#95a5a6', fontSize:'0.72rem' }}>
@@ -564,6 +743,7 @@ const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, 
                                     : <>
                                         <th style={{ textAlign:'center', padding:'4px 6px', fontWeight:600 }}>Intentos</th>
                                         <th style={{ textAlign:'center', padding:'4px 6px', fontWeight:600 }}>Aciertos</th>
+                                        {jugs.some(j=>j.tiempo!=null) && <th style={{ textAlign:'center', padding:'4px 6px', fontWeight:600, color:'#7f8c8d' }}>⏱ Tiempo</th>}
                                         <th style={{ textAlign:'center', padding:'4px 6px', fontWeight:600 }}>%</th>
                                         <th style={{ padding:'4px 6px' }}></th>
                                     </>
@@ -573,7 +753,9 @@ const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, 
                         <tbody>
                             {jugs.map((j,k)=>(
                                 <tr key={k} style={{ borderTop:'1px solid #f8f9fa' }}>
-                                    <td style={{ padding:'6px 6px', color:'#2c3e50', fontWeight:600 }}>{j.nombre}</td>
+                                    <td style={{ padding:'6px 6px', color:'#2c3e50', fontWeight:600 }}>
+                                        <span onClick={()=>onBuscarJugador?.(j.nombre)} style={{ cursor:'pointer', borderBottom:'1px dotted #aaa' }} title="Ver todos sus resultados">{j.nombre}</span>
+                                    </td>
                                     {TIPO_LIVE.has(tipo)
                                         ? <>
                                             <td style={{ padding:'6px 6px', textAlign:'center', color:'#e67e22', fontWeight:700 }}>{j.puntos??'—'}</td>
@@ -586,6 +768,9 @@ const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, 
                                         : <>
                                             <td style={{ padding:'6px 6px', textAlign:'center', color:'#7f8c8d' }}>{j.intentos??'—'}</td>
                                             <td style={{ padding:'6px 6px', textAlign:'center', color:'#27ae60', fontWeight:700 }}>{j.aciertos??'—'}</td>
+                                            {jugs.some(j2=>j2.tiempo!=null) && (
+                                                <td style={{ padding:'6px 6px', textAlign:'center', color:'#7f8c8d' }}>{fmtTiempo(j.tiempo)}</td>
+                                            )}
                                             <td style={{ padding:'6px 6px', textAlign:'center' }}>
                                                 <span style={{ padding:'2px 7px', borderRadius:12, background:pctBg2(j.porcentaje), color:pctColor2(j.porcentaje), fontWeight:700, fontSize:'0.78rem' }}>{j.porcentaje}%</span>
                                             </td>
@@ -604,6 +789,7 @@ const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, 
                                 <td style={{ padding:'6px 6px', color:'#2c3e50', fontSize:'0.78rem' }}>TOTAL</td>
                                 <td style={{ padding:'6px 6px', textAlign:'center', color:'#7f8c8d' }}>{totInt||'—'}</td>
                                 <td style={{ padding:'6px 6px', textAlign:'center', color:'#27ae60' }}>{totAci}</td>
+                                {jugs.some(j=>j.tiempo!=null) && <td/>}
                                 <td style={{ padding:'6px 6px', textAlign:'center' }}>
                                     <span style={{ padding:'2px 7px', borderRadius:12, background:pctBg2(pct), color:pctColor2(pct), fontWeight:700, fontSize:'0.78rem' }}>{pct}%</span>
                                 </td>
@@ -618,16 +804,21 @@ const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, 
 };
 
 // ─── Tarjeta especial para Story Cubes ───────────────────────────────────────
-const StoryCubesCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, onAgregarAGrupo }) => {
+const StoryCubesCard = ({ inf, onBorrar, borrando, borradoOk, onAgregarAGrupo, modoSeleccion, seleccionado, onSeleccionar, onBuscarJugador }) => {
     const [confirmar, setConfirmar] = useState(false);
     const historia = inf.historia || [];
     const autores  = [...new Set(historia.map(s => s.autor))];
 
     return (
-        <div style={{ background:'white', borderRadius:13, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', overflow:'hidden', border:'1.5px solid #e8d5f5' }}>
+        <div style={{ background:'white', borderRadius:13, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', overflow:'hidden', border: seleccionado ? '2px solid #1565C0' : '1.5px solid #e8d5f5', transition:'border 0.1s' }}>
 
             {/* Cabecera */}
-            <div onClick={onToggle} style={{ padding:'11px 15px', cursor:'pointer', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+            <div onClick={modoSeleccion ? onSeleccionar : undefined} style={{ padding:'11px 15px', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', cursor: modoSeleccion ? 'pointer' : 'default', background: seleccionado ? '#f0f4ff' : 'white' }}>
+                {modoSeleccion && (
+                    <input type="checkbox" checked={seleccionado} onChange={e=>{e.stopPropagation();onSeleccionar();}}
+                        onClick={e=>e.stopPropagation()}
+                        style={{ width:17, height:17, cursor:'pointer', accentColor:'#1565C0', flexShrink:0 }}/>
+                )}
                 <span style={{ fontSize:'1.4rem' }}>🎲</span>
                 <div style={{ flex:1, minWidth:100 }}>
                     <div style={{ fontWeight:700, color:'#2c3e50', fontSize:'0.92rem' }}>
@@ -641,27 +832,31 @@ const StoryCubesCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoO
                 </div>
                 {/* Autores */}
                 <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
-                    {autores.slice(0,3).map((a,i) => (
-                        <span key={i} style={{ padding:'2px 7px', borderRadius:20, background:'#f3e8fd', fontSize:'0.72rem', color:'#8e44ad' }}>{a}</span>
+                    {autores.map((a,i) => (
+                        <span key={i} onClick={e=>{ e.stopPropagation(); onBuscarJugador?.(a); }}
+                            style={{ padding:'2px 7px', borderRadius:20, background:'#f3e8fd', fontSize:'0.72rem', color:'#8e44ad', cursor:'pointer' }}
+                            title={`Ver todos los resultados de ${a}`}>{a}</span>
                     ))}
-                    {autores.length > 3 && <span style={{ padding:'2px 7px', borderRadius:20, background:'#f3e8fd', fontSize:'0.72rem', color:'#8e44ad' }}>+{autores.length-3}</span>}
                 </div>
                 <span style={{ padding:'3px 9px', borderRadius:20, background:'#f3e8fd', color:'#8e44ad', fontWeight:700, fontSize:'0.8rem', flexShrink:0 }}>
                     {historia.length} fragmentos
                 </span>
-                <button
-                    onClick={e=>{ e.stopPropagation(); onAgregarAGrupo?.(); }}
-                    style={{ padding:'4px 9px', borderRadius:7, border:'1px solid #c8e6c9', background:'#e8f5e9', color:'#27ae60', cursor:'pointer', flexShrink:0, fontWeight:600, fontSize:'0.75rem', display:'flex', alignItems:'center', gap:4 }}
-                    title="Añadir calificación a un grupo"
-                >
-                    <Users size={12}/> Añadir a grupo
-                </button>
-                <button
-                    onClick={e=>{ e.stopPropagation(); setConfirmar(true); }}
-                    style={{ padding:'4px 7px', borderRadius:7, border:'1px solid #fdd', background:'#fdecea', color:'#e74c3c', cursor:'pointer', flexShrink:0 }}
-                    title="Eliminar informe"
-                ><Trash2 size={13}/></button>
-                {expandido ? <ChevronUp size={16} color="#aaa"/> : <ChevronDown size={16} color="#aaa"/>}
+                {!modoSeleccion && (
+                    <button
+                        onClick={e=>{ e.stopPropagation(); onAgregarAGrupo?.(); }}
+                        style={{ padding:'4px 9px', borderRadius:7, border:'1px solid #c8e6c9', background:'#e8f5e9', color:'#27ae60', cursor:'pointer', flexShrink:0, fontWeight:600, fontSize:'0.75rem', display:'flex', alignItems:'center', gap:4 }}
+                        title="Añadir calificación a un grupo"
+                    >
+                        <Users size={12}/> Añadir a grupo
+                    </button>
+                )}
+                {!modoSeleccion && (
+                    <button
+                        onClick={e=>{ e.stopPropagation(); setConfirmar(true); }}
+                        style={{ padding:'4px 7px', borderRadius:7, border:'1px solid #fdd', background:'#fdecea', color:'#e74c3c', cursor:'pointer', flexShrink:0 }}
+                        title="Eliminar informe"
+                    ><Trash2 size={13}/></button>
+                )}
             </div>
 
             {/* Confirmación borrado */}
@@ -677,40 +872,157 @@ const StoryCubesCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoO
             )}
             {borradoOk && <div style={{ background:'#e8f5e9', padding:'8px 15px', fontSize:'0.8rem', color:'#27ae60', display:'flex', alignItems:'center', gap:6 }}><CheckCircle size={13}/>Eliminado</div>}
 
-            {/* Historia expandida */}
-            {expandido && (
-                <div style={{ borderTop:'2px solid #f3e8fd', padding:'16px 18px', background:'#fdfaff' }}>
-                    <div style={{ fontWeight:700, color:'#8e44ad', fontSize:'0.8rem', textTransform:'uppercase', letterSpacing:1, marginBottom:14 }}>
-                        📖 Historia completa
-                    </div>
-                    {historia.map((seg, idx) => (
-                        <div key={idx} style={{ marginBottom:16, background:'white', borderRadius:10, padding:'12px 14px', borderLeft:'4px solid #8e44ad', boxShadow:'0 1px 4px rgba(0,0,0,0.05)' }}>
-                            {/* Autor */}
-                            <div style={{ fontSize:'0.78rem', color:'#8e44ad', fontWeight:700, textTransform:'uppercase', letterSpacing:0.6, marginBottom:8 }}>
-                                ✍️ {seg.autor}
-                            </div>
-                            {/* Dados */}
-                            {seg.dados?.length > 0 && (
-                                <div style={{ display:'flex', gap:8, marginBottom:8 }}>
-                                    {seg.dados.map((d, i) => (
-                                        <div key={i} style={{ width:52, height:52, background:'white', border:'2px solid #d6aef5', borderRadius:10, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:2, color:'#6c3483', boxShadow:'0 2px 6px rgba(142,68,173,0.12)' }}>
-                                            <DiceIcon name={d} />
-                                            <span style={{ fontSize:'0.55rem', color:'#a569bd', textTransform:'uppercase', letterSpacing:0.3 }}>{d}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                            {/* Texto */}
-                            <div style={{ fontSize:'0.95rem', lineHeight:1.7, whiteSpace:'pre-wrap', fontStyle: seg.texto==='(sin texto)' ? 'italic' : 'normal', color: seg.texto==='(sin texto)' ? '#bdc3c7' : '#2c3e50' }}>
-                                {seg.texto || '(sin texto)'}
-                            </div>
+            {/* Historia completa — siempre visible */}
+            <div style={{ borderTop:'2px solid #f3e8fd', padding:'16px 18px', background:'#fdfaff' }}>
+                <div style={{ fontWeight:700, color:'#8e44ad', fontSize:'0.8rem', textTransform:'uppercase', letterSpacing:1, marginBottom:14 }}>
+                    📖 Historia completa
+                </div>
+                {historia.length === 0 ? (
+                    <div style={{ color:'#95a5a6', fontStyle:'italic', fontSize:'0.85rem' }}>Sin fragmentos guardados.</div>
+                ) : historia.map((seg, idx) => (
+                    <div key={idx} style={{ marginBottom:14, background:'white', borderRadius:10, padding:'12px 14px', borderLeft:'4px solid #8e44ad', boxShadow:'0 1px 4px rgba(0,0,0,0.05)' }}>
+                        {/* Autor */}
+                        <div style={{ fontSize:'0.78rem', color:'#8e44ad', fontWeight:700, textTransform:'uppercase', letterSpacing:0.6, marginBottom:8 }}>
+                            ✍️ <span onClick={()=>onBuscarJugador?.(seg.autor)} style={{ cursor:'pointer', borderBottom:'1px dotted #8e44ad' }} title="Ver todos sus resultados">{seg.autor}</span>
                         </div>
+                        {/* Dados */}
+                        {seg.dados?.length > 0 && (
+                            <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
+                                {seg.dados.map((d, i) => (
+                                    <div key={i} style={{ width:44, height:44, background:'white', border:'2px solid #d6aef5', borderRadius:9, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:1, color:'#6c3483', boxShadow:'0 2px 6px rgba(142,68,173,0.12)' }}>
+                                        <DiceIcon name={d} />
+                                        <span style={{ fontSize:'0.5rem', color:'#a569bd', textTransform:'uppercase', letterSpacing:0.3 }}>{d}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        {/* Texto */}
+                        <div style={{ fontSize:'0.95rem', lineHeight:1.7, whiteSpace:'pre-wrap', fontStyle: seg.texto==='(sin texto)' ? 'italic' : 'normal', color: seg.texto==='(sin texto)' ? '#bdc3c7' : '#2c3e50' }}>
+                            {seg.texto || '(sin texto)'}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+// ─── Ritmo Card ───────────────────────────────────────────────────────────────
+
+const RitmoCard = ({ ritmo }) => {
+    const [playing,   setPlaying]   = useState(false);
+    const [pulso,     setPulso]     = useState(-1);
+    const [bpm,       setBpm]       = useState(ritmo.bpm || 120);
+    const [expandido, setExpandido] = useState(false);
+    const gridRef = useRef(ritmo.grid);
+    useEffect(() => { gridRef.current = ritmo.grid; }, [ritmo.grid]);
+
+    useEffect(() => {
+        if (!playing) { setPulso(-1); return; }
+        const ms = Math.round(60000 / bpm / 4);
+        const id = setInterval(() => {
+            setPulso(p => {
+                const next = (p + 1) % PASOS;
+                gridRef.current?.forEach((fila, i) => { if (fila[next]) INSTRUMENTOS_SEQ[i].play(); });
+                return next;
+            });
+        }, ms);
+        return () => clearInterval(id);
+    }, [playing, bpm]);
+
+    const participantes = ritmo.participantes || [];
+    const fecha = ritmo.creadoEn?.toDate ? ritmo.creadoEn.toDate() : ritmo.creadoEn ? new Date(ritmo.creadoEn) : null;
+
+    return (
+        <div style={{ background:'white', borderRadius:13, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', overflow:'hidden', border:'1px solid #f0f0f0' }}>
+            <div style={{ padding:'11px 15px', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+                <span style={{ fontSize:'1.3rem' }}>🥁</span>
+                <div style={{ flex:1, minWidth:120 }}>
+                    <div style={{ fontWeight:700, color:'#2c3e50', fontSize:'0.92rem' }}>
+                        Ritmo colaborativo
+                        <span style={{ marginLeft:8, color:'#7f8c8d', fontSize:'0.78rem', fontWeight:400 }}>
+                            {participantes.length} participante{participantes.length !== 1 ? 's' : ''}
+                        </span>
+                    </div>
+                    <div style={{ fontSize:'0.74rem', color:'#95a5a6', marginTop:2 }}>
+                        {participantes.map(p => p.nombre).join(' · ')}
+                        {fecha ? ' · ' + fmtFecha(fecha) : ''}
+                    </div>
+                </div>
+
+                <button
+                    onClick={() => setPlaying(p => !p)}
+                    style={{ padding:'6px 18px', borderRadius:8, border:'none', background: playing ? '#e74c3c' : '#27ae60', color:'white', fontWeight:700, cursor:'pointer', fontSize:'0.85rem', flexShrink:0 }}
+                >
+                    {playing ? '⏹' : '▶'}
+                </button>
+
+                <div style={{ display:'flex', alignItems:'center', gap:6, minWidth:140 }}>
+                    <span style={{ fontSize:'0.72rem', color:'#7f8c8d', whiteSpace:'nowrap' }}>
+                        BPM <b style={{ color:'#e67e22' }}>{bpm}</b>
+                    </span>
+                    <input type="range" min="60" max="200" value={bpm}
+                        onChange={e => setBpm(Number(e.target.value))}
+                        style={{ width:80, accentColor:'#e67e22', cursor:'pointer' }} />
+                </div>
+
+                <button
+                    onClick={() => setExpandido(e => !e)}
+                    style={{ padding:'4px 10px', borderRadius:6, border:'1px solid #ddd', background:'#f8f9fa', cursor:'pointer', fontSize:'0.78rem', color:'#555', flexShrink:0 }}
+                >
+                    {expandido ? '▲ Ocultar' : '▼ Ver grid'}
+                </button>
+            </div>
+
+            {playing && (
+                <div style={{ display:'flex', gap:2, padding:'0 15px 8px' }}>
+                    {Array.from({ length: PASOS }, (_, i) => (
+                        <div key={i} style={{ flex:1, height:3, borderRadius:2, background: pulso === i ? '#e67e22' : i % 4 === 0 ? '#ddd' : '#f0f0f0', transition:'background 0.05s' }} />
                     ))}
+                </div>
+            )}
+
+            {expandido && (
+                <div style={{ borderTop:'1px solid #f0f0f0', padding:'12px 15px', overflowX:'auto' }}>
+                    <MiniGrid grid={ritmo.grid || []} pulso={pulso} />
                 </div>
             )}
         </div>
     );
 };
+
+const MiniGrid = ({ grid, pulso }) => (
+    <div style={{ minWidth:440 }}>
+        <div style={{ display:'flex', gap:2, marginBottom:5, paddingLeft:58 }}>
+            {Array.from({ length: PASOS }, (_, i) => (
+                <div key={i} style={{ flex:1, height:3, borderRadius:2, background: pulso === i ? '#e67e22' : i % 4 === 0 ? '#d0d0d0' : '#ececec' }} />
+            ))}
+        </div>
+        {INSTRUMENTOS_SEQ.map((inst, fi) => (
+            <div key={inst.nombre} style={{ display:'flex', alignItems:'center', gap:2, marginBottom:3 }}>
+                <div style={{ width:54, flexShrink:0, display:'flex', alignItems:'center', gap:3 }}>
+                    <span style={{ fontSize:14 }}>{inst.emoji}</span>
+                    <span style={{ color:inst.color, fontSize:'0.62rem', fontWeight:700 }}>{inst.nombre}</span>
+                </div>
+                {(grid[fi] || Array(PASOS).fill(false)).map((activa, ci) => (
+                    <div key={ci} style={{
+                        flex:1, height:22, borderRadius:3,
+                        background: activa ? inst.color : pulso === ci ? '#e8e8e8' : ci % 4 === 0 ? '#efefef' : '#f7f7f7',
+                        outline: pulso === ci && !activa ? `1.5px solid ${inst.color}40` : 'none',
+                        transition:'background 0.05s',
+                    }} />
+                ))}
+            </div>
+        ))}
+        <div style={{ display:'flex', gap:2, marginTop:3, paddingLeft:58 }}>
+            {Array.from({ length: PASOS }, (_, i) => (
+                <div key={i} style={{ flex:1, textAlign:'center', fontSize:'0.52rem', color: i % 4 === 0 ? '#e67e22' : '#bbb', fontWeight: i % 4 === 0 ? 700 : 400 }}>
+                    {i % 4 === 0 ? String(i / 4 + 1) : '·'}
+                </div>
+            ))}
+        </div>
+    </div>
+);
 
 const RankingCard = ({ r }) => (
     <div style={{ background:'white', borderRadius:11, padding:'10px 14px', boxShadow:'0 1px 5px rgba(0,0,0,0.05)', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', border:'1px solid #f0f0f0' }}>

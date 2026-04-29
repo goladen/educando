@@ -3,6 +3,7 @@ import { Save, X, Trash2, Plus, Settings, RotateCcw, HelpCircle, ArrowUp, ArrowD
 import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase'; // Asegúrate de importar db
 import PiTutorial from './PiTutorial';
+import PublicarModal from './PublicarModal';
 
 const TUTORIAL_CREAR_RECURSO = [
     { texto: '¡Hola! Soy Pi 👋 Para añadir preguntas, pulsa el botón "＋ Añadir Pregunta" en la parte inferior. Cada pregunta tiene un enunciado y una o varias respuestas según el tipo de juego.' },
@@ -32,6 +33,7 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
     const [mostrandoConfig, setMostrandoConfig] = useState(false);
     const [mostrandoAyuda, setMostrandoAyuda] = useState(false); // <--- ESTADO NUEVO
     const [mostrandoAvisoCierre, setMostrandoAvisoCierre] = useState(false);
+    const [modalPublicar, setModalPublicar] = useState(null); // null | 'guardar' | 'cerrar'
     useEffect(() => {
         // Inicializar hojas si no existen
         if (!datos.hojas || datos.hojas.length === 0) {
@@ -288,8 +290,7 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
                         <PiTutorial usuario={usuario} tutorialId="crear_recurso" pasos={TUTORIAL_CREAR_RECURSO} inline={true} />
 
                         <button onClick={() => setMostrandoConfig(true)} style={styles.iconBtn} title="Configuración"><Settings size={24} /></button>
-                        <button onClick={onSave} style={styles.saveBtn}><Save size={20} /> <span className="hide-mobile">Guardar</span></button>
-                        {/* Al hacer clic, activamos el aviso en vez de cerrar directo */}
+                        <button onClick={() => datos.isFinished ? onSave() : setModalPublicar('guardar')} style={styles.saveBtn}><Save size={20} /> <span className="hide-mobile">Guardar</span></button>
                         <button onClick={() => setMostrandoAvisoCierre(true)} style={styles.iconBtn}><X size={24} /></button>
 
                     </div>
@@ -465,6 +466,20 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
                 </div>
 
                 {/* --- MODAL DE AVISO AL CERRAR --- */}
+                {modalPublicar && (
+                    <PublicarModal
+                        modo={modalPublicar}
+                        onGuardarPublicar={async () => {
+                            setDatos(prev => ({ ...prev, isFinished: true }));
+                            await onSave();
+                            setModalPublicar(null);
+                        }}
+                        onGuardarSolo={async () => { await onSave(); setModalPublicar(null); }}
+                        onSalirSinGuardar={() => { setModalPublicar(null); onClose(); }}
+                        onCancelar={() => setModalPublicar(null)}
+                    />
+                )}
+
                 {mostrandoAvisoCierre && (
                     <div style={styles.configOverlay}> {/* Reutilizamos el estilo de overlay existente */}
                         <div style={{ ...styles.configModal, width: '350px', textAlign: 'center', height: 'auto', maxHeight: 'none' }}>
@@ -475,7 +490,21 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
                                 </p>
 
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                    {/* Opción 1: Guardar y Salir */}
+                                    {/* Guardar y publicar y salir (solo si no está publicado) */}
+                                    {!datos.isFinished && (
+                                        <button
+                                            onClick={async () => {
+                                                setDatos(prev => ({ ...prev, isFinished: true }));
+                                                await onSave();
+                                                onClose();
+                                            }}
+                                            style={{ width: '100%', padding: '12px', background: '#6366f1', color: 'white', border: 'none', borderRadius: '5px', fontSize: '1.1rem', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }}
+                                        >
+                                            <Save size={18} /> Guardar, publicar y salir
+                                        </button>
+                                    )}
+
+                                    {/* Guardar y Salir */}
                                     <button
                                         onClick={async () => {
                                             await onSave();
@@ -486,7 +515,7 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
                                         <Save size={18} /> Guardar y Salir
                                     </button>
 
-                                    {/* Opción 2: Salir sin guardar */}
+                                    {/* Salir sin guardar */}
                                     <button
                                         onClick={onClose}
                                         style={{ width: '100%', padding: '12px', background: '#e74c3c', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
@@ -494,7 +523,7 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
                                         Salir sin guardar
                                     </button>
 
-                                    {/* Opción 3: Cancelar */}
+                                    {/* Cancelar */}
                                     <button
                                         onClick={() => setMostrandoAvisoCierre(false)}
                                         style={{ background: 'none', border: 'none', color: '#999', cursor: 'pointer', marginTop: '10px', textDecoration: 'underline' }}

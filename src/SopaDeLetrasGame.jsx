@@ -37,7 +37,8 @@ function ModalEnviarProfe({ datos, onClose }) {
                 tipo: 'SOPA', modalidad: 'Individual', fecha: new Date(),
                 recursoId: datos.recursoId, recursoTitulo: datos.recursoTitulo,
                 codigoProfesor: code,
-                jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), aciertos: datos.palabras }],
+                config: { idioma: datos.idioma, numPalabras: datos.numPalabras },
+                jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), aciertos: datos.palabras, tiempo: datos.tiempo }],
             });
             setEnviado(true);
         } catch(e) { setError('Error: ' + e.message); }
@@ -738,7 +739,7 @@ export default function SopaDeLetrasGame({ usuario, onExit, recurso, modoOlimpic
                         Enviando {puntos} puntos al profesor... 🚀
                 </div>
                 )}
-            {mostrarEnvio && <ModalEnviarProfe datos={{ recursoId: recurso?.id, recursoTitulo: recurso?.titulo, palabras: screen === 'VICTORY' ? palabrasJuego.length : puntos }} onClose={() => setMostrarEnvio(false)} />}
+            {mostrarEnvio && <ModalEnviarProfe datos={{ recursoId: recurso?.id, recursoTitulo: recurso?.titulo, palabras: screen === 'VICTORY' ? palabrasJuego.length : puntos, idioma: config.lang, numPalabras: config.numWords, tiempo: elapsedTime }} onClose={() => setMostrarEnvio(false)} />}
             {shareModal && <ShareModal url={shareModal.url} titulo={shareModal.titulo} onClose={() => setShareModal(null)} />}
         </div>
     );

@@ -23,7 +23,8 @@ function ModalEnviarProfe({ datos, onClose }) {
             await addDoc(collection(db, 'informes_juegos'), {
                 tipo: 'MATHLE', modalidad: 'Individual', fecha: new Date(),
                 codigoProfesor: code,
-                jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), tiempo: datos.tiempo }],
+                config: { operacion: datos.operacion, cifras: datos.cifras },
+                jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), tiempo: datos.tiempo, intentos: datos.intentos }],
             });
             setEnviado(true);
         } catch(e) { setError('Error: ' + e.message); }
@@ -428,7 +429,7 @@ export default function MathWordleGame({ usuario, onExit }) {
             </div>
             <button style={{ ...styles.btn, background: 'linear-gradient(135deg,#27ae60,#2ecc71)', color: 'white' }} onClick={() => setMostrarEnvio(true)}>📤 Enviar al profesor</button>
             <button style={{ ...styles.btn, ...styles.btnSecondary }} onClick={() => setScreen('CONFIG')}>Jugar de Nuevo</button>
-            {mostrarEnvio && <ModalEnviarProfe datos={{ tiempo: elapsedTime }} onClose={() => setMostrarEnvio(false)} />}
+            {mostrarEnvio && <ModalEnviarProfe datos={{ tiempo: elapsedTime, operacion: gameMode, cifras: digits, intentos: guesses.length }} onClose={() => setMostrarEnvio(false)} />}
         </div>
     );
 

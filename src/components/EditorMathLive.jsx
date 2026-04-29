@@ -1,8 +1,10 @@
 ﻿import { useState, useEffect } from 'react';
 import { Save, X, Trash2, FolderPlus, ArrowUp, ArrowDown, Clock, Trophy, GripVertical, Image as ImageIcon, Calculator, Percent, Hash, Divide, Plus, Minus, Settings } from 'lucide-react';
+import PublicarModal from './PublicarModal';
 export default function EditorMathLive({ datos, setDatos, onClose, onSave, usuario }) {
     const [hojaActiva, setHojaActiva] = useState(0);
     const [mostrandoConfig, setMostrandoConfig] = useState(false);
+    const [modalPublicar, setModalPublicar] = useState(null);
 
     // Inicialización: Asegurar tipo MATHLIVE y configuración base
     useEffect(() => {
@@ -256,8 +258,8 @@ export default function EditorMathLive({ datos, setDatos, onClose, onSave, usuar
                     </div>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                         <button onClick={() => setMostrandoConfig(true)} style={styles.iconBtn} title="Configuración"><Settings size={22} /></button>
-                        <button onClick={onSave} style={styles.saveBtn}><Save size={18} /> <span className="hide-mobile">Guardar</span></button>
-                        <button onClick={onClose} style={styles.iconBtn}><X size={22} /></button>
+                        <button onClick={() => datos.isFinished ? onSave() : setModalPublicar('guardar')} style={styles.saveBtn}><Save size={18} /> <span className="hide-mobile">Guardar</span></button>
+                        <button onClick={() => !datos.isFinished ? setModalPublicar('cerrar') : onClose()} style={styles.iconBtn}><X size={22} /></button>
                     </div>
                 </div>
 
@@ -308,6 +310,15 @@ export default function EditorMathLive({ datos, setDatos, onClose, onSave, usuar
                 </div>
 
                 {/* MODAL CONFIGURACIÓN (MISMO QUE EDITOR PRO) */}
+                {modalPublicar && (
+                    <PublicarModal
+                        modo={modalPublicar}
+                        onGuardarPublicar={async () => { setDatos(prev => ({ ...prev, isFinished: true })); await onSave(); setModalPublicar(null); }}
+                        onGuardarSolo={async () => { await onSave(); setModalPublicar(null); }}
+                        onSalirSinGuardar={() => { setModalPublicar(null); onClose(); }}
+                        onCancelar={() => setModalPublicar(null)}
+                    />
+                )}
                 {mostrandoConfig && (
                     <div style={styles.configOverlay}>
                         <div style={styles.configModal}>

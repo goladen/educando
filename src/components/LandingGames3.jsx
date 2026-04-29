@@ -32,6 +32,7 @@ import OmninteractiveApp from '../OmninteractiveApp';
 import VideoQuizzApp from '../VideoQuizzApp';
 import FuncionesEjecutivas from '../FuncionesEjecutivas';
 import IrregularVerbsTest from '../IrregularVerbsTest';
+import MusicApp from '../MusicApp';
 import imgPasapalabra from '../assets/icono_pasapal.png'; // Revisa si es .png o .jpg
 import imgBurbujas from '../assets/icono_burbujas.png';
 import imgPikatron from '../assets/icono_pikatron.png';
@@ -774,6 +775,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
     const [videoQuizz,     setVideoQuizz]     = useState(false);
     const [funcionesEjecutivas, setFuncionesEjecutivas] = useState(false);
     const [irregularVerbs,      setIrregularVerbs]      = useState(false);
+    const [musicApp,            setMusicApp]            = useState(false);
 
     // Estados alumno logueado
     const [vistaAlumno,    setVistaAlumno]    = useState('MAIN'); // 'MAIN' | 'RECORDS'
@@ -1073,6 +1075,12 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                 ← Volver
             </button>
             <IrregularVerbsTest />
+        </div>
+    );
+
+    if (musicApp) return (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, overflowY: 'auto' }}>
+            <MusicApp onBack={() => setMusicApp(false)} usuario={usuario} />
         </div>
     );
 
@@ -1417,6 +1425,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                     { id: 'FUNCIONES_EJECUTIVAS', label: 'Funciones Ejecutivas', emoji: '🧠', color: '#FF5722', action: () => setFuncionesEjecutivas(true), shareable: true },
                     { id: 'IRREGULAR_VERBS',     label: 'Irregular Verbs',     emoji: '📝', color: '#0369a1', action: () => setIrregularVerbs(true), shareable: true },
                     { id: 'SOLAR_SYSTEM',        label: 'Sistema Solar',        emoji: '🪐', color: '#3B82F6', action: () => setJuegoActivo({ tipoJuego: 'SOLAR_SYSTEM' }), shareable: true },
+                    { id: 'MUSICA',              label: 'Música',               emoji: '🎵', color: '#8b5cf6', action: () => setMusicApp(true), shareable: false },
                 ].map(tool => (
                     <div key={tool.id} onClick={tool.action} style={{ background: '#ffffbf', borderRadius: '15px', padding: '15px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transition: 'transform 0.2s', border: `2px solid ${tool.color}20`, position: 'relative' }}
                         onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-3px)'}

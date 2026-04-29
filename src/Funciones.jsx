@@ -353,6 +353,7 @@ function ModalEnviarProfe({ datos, onClose }) {
                 modalidad: 'Individual',
                 fecha: new Date(),
                 codigoProfesor: code,
+                config: { tipoFuncion: datos.tipoFuncion, idFuncion: datos.idFuncion },
                 jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), porcentaje: datos.porcentaje, tipoEjercicio: datos.tipoFuncion, idFuncion: datos.idFuncion, puntos: datos.porcentaje }],
             });
             setEnviado(true);

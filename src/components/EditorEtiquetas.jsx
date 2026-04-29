@@ -6,6 +6,7 @@ import {
     Search, Move, Crosshair, CheckCircle, RefreshCw, AlertCircle,
     Paintbrush, Eraser, Slash
 } from 'lucide-react';
+import PublicarModal from './PublicarModal';
 
 // ──────────────────────────────────────────────────────────
 // HELPERS
@@ -22,6 +23,7 @@ export default function EditorEtiquetas({ datos, setDatos, onClose, usuario }) {
     const [hojaActiva, setHojaActiva]           = useState(0);
     const [mostrandoConfig, setMostrandoConfig] = useState(false);
     const [guardando, setGuardando]             = useState(false);
+    const [modalPublicar, setModalPublicar]     = useState(null);
     const [guardadoOk, setGuardadoOk]           = useState(false);
 
     // Buscador de imágenes
@@ -56,11 +58,12 @@ export default function EditorEtiquetas({ datos, setDatos, onClose, usuario }) {
     }, []);
 
     // ── Guardar en Firestore ────────────────────────────
-    const guardar = async () => {
+    const guardar = async (extraDatos = {}) => {
         if (!datos.titulo?.trim()) return alert('Introduce un título para el recurso.');
         const hojas = datos.hojas || [];
         const conImagen = hojas.filter(h => h.imageUrl && h.markers?.length > 0);
         if (conImagen.length === 0) return alert('Añade al menos una imagen con etiquetas antes de guardar.');
+        const datosEfectivos = { ...datos, ...extraDatos };
 
         setGuardando(true);
         try {
@@ -77,12 +80,12 @@ export default function EditorEtiquetas({ datos, setDatos, onClose, usuario }) {
             if (!docId) docId = `etiq_${Date.now()}`;
 
             const payload = {
-                ...datos,
+                ...datosEfectivos,
                 id:            docId,
                 accessCode:    code,
                 profesorUid:   usuario?.uid || '',
                 hojas,
-                creadoEn:      datos.creadoEn || Date.now(),
+                creadoEn:      datosEfectivos.creadoEn || Date.now(),
                 actualizadoEn: Date.now(),
             };
 
@@ -228,13 +231,13 @@ export default function EditorEtiquetas({ datos, setDatos, onClose, usuario }) {
                         <button onClick={() => setMostrandoConfig(true)} style={st.iconBtn} title="Configuración">
                             <Settings size={20} />
                         </button>
-                        <button onClick={guardar} disabled={guardando} style={st.saveBtn}>
+                        <button onClick={() => datos.isFinished ? guardar() : setModalPublicar('guardar')} disabled={guardando} style={st.saveBtn}>
                             {guardando
                                 ? <RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} />
                                 : <Save size={16} />}
                             {guardando ? 'Guardando...' : 'Guardar'}
                         </button>
-                        <button onClick={onClose} style={st.iconBtn}><X size={22} /></button>
+                        <button onClick={() => !datos.isFinished ? setModalPublicar('cerrar') : onClose()} style={st.iconBtn}><X size={22} /></button>
                     </div>
                 </div>
 
@@ -552,6 +555,15 @@ export default function EditorEtiquetas({ datos, setDatos, onClose, usuario }) {
                 </div>{/* end body */}
 
                 {/* ── MODAL CONFIGURACIÓN ── */}
+                {modalPublicar && (
+                    <PublicarModal
+                        modo={modalPublicar}
+                        onGuardarPublicar={async () => { await guardar({ isFinished: true }); setModalPublicar(null); if (modalPublicar === 'cerrar') onClose(); }}
+                        onGuardarSolo={async () => { await guardar(); setModalPublicar(null); if (modalPublicar === 'cerrar') onClose(); }}
+                        onSalirSinGuardar={() => { setModalPublicar(null); onClose(); }}
+                        onCancelar={() => setModalPublicar(null)}
+                    />
+                )}
                 {mostrandoConfig && (
                     <div style={st.modalOverlay}>
                         <div style={st.modal}>

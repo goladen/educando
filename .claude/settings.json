@@ -3,7 +3,12 @@
     "allow": [
       "Bash(npm run:*)",
       "Bash(python3 -)",
-      "Bash(node -e ':*)"
+      "Bash(node -e ':*)",
+      "Read(//c/Users/Asus  6/.claude/**)",
+      "Read(//c/Users/Asus  6/**)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\Asus  6\\.claude"
     ]
   }
 }

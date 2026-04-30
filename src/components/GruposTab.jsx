@@ -312,6 +312,222 @@ function ModalCrearGrupo({ profesorUid, onClose, onSaved, grupoExistente }) {
     );
 }
 
+// ─── HTML para imprimir agrupación ────────────────────────────────────────────
+const htmlImpresion = (titulo, subgrupos, grupoNombre) => `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>${titulo}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; padding: 24px; color: #2c3e50; }
+  .encabezado { text-align: center; border-bottom: 3px solid #1565C0; padding-bottom: 16px; margin-bottom: 24px; }
+  .titulo { font-size: 1.8rem; font-weight: 900; color: #1565C0; }
+  .subtitulo { font-size: 0.95rem; color: #7f8c8d; margin-top: 6px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }
+  .card { border: 2px solid #1565C0; border-radius: 10px; overflow: hidden; break-inside: avoid; }
+  .card-head { background: #1565C0; color: white; padding: 10px 14px; }
+  .card-nombre { font-weight: 700; font-size: 1rem; }
+  .card-tarea { font-size: 0.82rem; opacity: 0.88; margin-top: 4px; font-style: italic; }
+  .card-body { padding: 10px 14px; }
+  .miembro { padding: 4px 0; border-bottom: 1px solid #f0f0f0; font-size: 0.88rem; }
+  .miembro:last-child { border-bottom: none; }
+  .btn-print { display: block; margin: 0 auto 20px; padding: 10px 28px; background: #1565C0; color: white; border: none; border-radius: 8px; font-size: 1rem; font-weight: 700; cursor: pointer; }
+  @media print { .btn-print { display: none; } }
+</style>
+</head>
+<body>
+<button class="btn-print" onclick="window.print()">🖨 Imprimir</button>
+<div class="encabezado">
+  <div class="titulo">${titulo}</div>
+  <div class="subtitulo">${grupoNombre} · ${subgrupos.length} subgrupos · ${subgrupos.reduce((s, sg) => s + (sg.miembros?.length || 0), 0)} alumnos</div>
+</div>
+<div class="grid">
+${subgrupos.map(sg => `  <div class="card">
+    <div class="card-head">
+      <div class="card-nombre">${sg.nombre}</div>
+      ${sg.tarea ? `<div class="card-tarea">${sg.tarea}</div>` : ''}
+    </div>
+    <div class="card-body">
+      ${(sg.miembros || []).map(m => `<div class="miembro">• ${m}</div>`).join('\n      ')}
+    </div>
+  </div>`).join('\n')}
+</div>
+</body>
+</html>`;
+
+// ─── Modal Crear / Editar Agrupación ─────────────────────────────────────────
+function ModalCrearAgrupacion({ grupo, alumnos, profesorUid, onClose, onSaved, agrupacionExistente }) {
+    const [titulo,    setTitulo]    = useState(agrupacionExistente?.titulo || '');
+    const [tamano,    setTamano]    = useState(agrupacionExistente?.tamano || 4);
+    const [subgrupos, setSubgrupos] = useState(agrupacionExistente?.subgrupos || []);
+    const [generado,  setGenerado]  = useState(!!agrupacionExistente);
+    const [guardando, setGuardando] = useState(false);
+    const [error,     setError]     = useState('');
+
+    const generar = () => {
+        const k = Math.max(1, parseInt(tamano) || 4);
+        const shuffled = [...alumnos].sort(() => Math.random() - 0.5);
+        const n = shuffled.length;
+        if (n === 0) { setError('Este grupo no tiene alumnos.'); return; }
+        // floor(n/k) grupos garantiza tamaño mínimo k (algunos tendrán k+1)
+        const numGrupos = Math.max(1, Math.floor(n / k));
+        const base  = Math.floor(n / numGrupos);
+        const extra = n - base * numGrupos; // primeros 'extra' grupos tienen base+1
+        let offset = 0;
+        const generated = Array.from({ length: numGrupos }, (_, i) => {
+            const size = i < extra ? base + 1 : base;
+            const miembros = shuffled.slice(offset, offset + size).map(a => a.nombre);
+            offset += size;
+            return { id: uid(), nombre: `Grupo ${i + 1}`, tarea: '', miembros };
+        });
+        setSubgrupos(generated);
+        setGenerado(true);
+        setError('');
+    };
+
+    const updateSubgrupo  = (id, changes) => setSubgrupos(prev => prev.map(sg => sg.id === id ? { ...sg, ...changes } : sg));
+    const updateMiembro   = (sgId, idx, val) => setSubgrupos(prev => prev.map(sg => sg.id === sgId ? { ...sg, miembros: sg.miembros.map((m, i) => i === idx ? val : m) } : sg));
+    const añadirMiembro   = (sgId) => setSubgrupos(prev => prev.map(sg => sg.id === sgId ? { ...sg, miembros: [...sg.miembros, ''] } : sg));
+    const eliminarMiembro = (sgId, idx) => setSubgrupos(prev => prev.map(sg => sg.id === sgId ? { ...sg, miembros: sg.miembros.filter((_, i) => i !== idx) } : sg));
+
+    const guardar = async () => {
+        if (!titulo.trim()) { setError('Escribe un título para la agrupación.'); return; }
+        if (!subgrupos.length) { setError('Genera los subgrupos primero.'); return; }
+        setGuardando(true); setError('');
+        try {
+            const id = agrupacionExistente?.id || uid();
+            await setDoc(doc(db, 'agrupaciones_profesor', id), {
+                id, profesorUid,
+                grupoId: grupo.id,
+                grupoNombre: grupo.nombre,
+                titulo: titulo.trim(),
+                tamano: parseInt(tamano) || tamano,
+                subgrupos,
+                fechaCreacion: agrupacionExistente?.fechaCreacion || serverTimestamp()
+            }, { merge: true });
+            onSaved?.();
+        } catch (e) { setError('Error al guardar: ' + e.message); }
+        setGuardando(false);
+    };
+
+    const verImprimir = () => {
+        const w = window.open('', '_blank');
+        w.document.write(htmlImpresion(titulo || '(sin título)', subgrupos, grupo.nombre));
+        w.document.close();
+    };
+
+    const numGruposEstimado = tamano > 0 && alumnos.length > 0 ? Math.max(1, Math.floor(alumnos.length / parseInt(tamano))) : null;
+
+    return (
+        <div style={ms.overlay} onClick={onClose}>
+            <div style={{ ...ms.panel, maxWidth:700 }} onClick={e => e.stopPropagation()}>
+                <div style={ms.header}>
+                    <h3 style={{ margin:0, color:'#2c3e50', fontSize:'1.1rem' }}>
+                        🗂 {agrupacionExistente ? 'Editar Agrupación' : 'Crear Agrupación'} — {grupo.nombre}
+                    </h3>
+                    <button onClick={onClose} style={ms.closeBtn}><X size={18}/></button>
+                </div>
+
+                <div style={{ display:'flex', gap:12, marginBottom:16, flexWrap:'wrap' }}>
+                    <div style={{ flex:2, minWidth:180 }}>
+                        <label style={ms.label}>Título / Encabezado general</label>
+                        <input value={titulo} onChange={e => setTitulo(e.target.value)}
+                            placeholder="Ej: Los seres vivos" style={ms.input}/>
+                    </div>
+                    {!generado && (
+                        <div style={{ minWidth:130 }}>
+                            <label style={ms.label}>Tamaño de subgrupo</label>
+                            <input type="number" min={1} max={alumnos.length || 99}
+                                value={tamano} onChange={e => setTamano(e.target.value)}
+                                style={{ ...ms.input, textAlign:'center' }}/>
+                        </div>
+                    )}
+                </div>
+
+                {!generado ? (
+                    <div style={{ textAlign:'center', padding:'20px 0' }}>
+                        <div style={{ color:'#7f8c8d', fontSize:'0.85rem', marginBottom:14 }}>
+                            {alumnos.length} alumnos · grupos de {tamano || '?'}
+                            {numGruposEstimado && ` → ${numGruposEstimado} subgrupos`}
+                        </div>
+                        <button onClick={generar}
+                            style={{ ...ms.btnGreen, margin:'0 auto', justifyContent:'center' }}>
+                            ✨ Generar Subgrupos
+                        </button>
+                    </div>
+                ) : (
+                    <>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+                            <span style={{ fontSize:'0.8rem', color:'#7f8c8d' }}>
+                                {subgrupos.length} subgrupos · {subgrupos.reduce((s, sg) => s + (sg.miembros?.length || 0), 0)} alumnos
+                            </span>
+                            {!agrupacionExistente && (
+                                <button onClick={() => { setGenerado(false); setSubgrupos([]); }}
+                                    style={{ ...ms.btnSecundario, padding:'5px 10px', fontSize:'0.78rem' }}>
+                                    ↺ Regenerar
+                                </button>
+                            )}
+                        </div>
+                        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(190px, 1fr))', gap:10, maxHeight:380, overflowY:'auto', marginBottom:16, padding:2 }}>
+                            {subgrupos.map(sg => (
+                                <div key={sg.id} style={{ border:'2px solid #1565C0', borderRadius:10, overflow:'hidden' }}>
+                                    <div style={{ background:'#1565C0', padding:'8px 12px' }}>
+                                        <input value={sg.nombre}
+                                            onChange={e => updateSubgrupo(sg.id, { nombre: e.target.value })}
+                                            style={{ background:'transparent', border:'none', color:'white', fontWeight:700, fontSize:'0.9rem', width:'100%', outline:'none' }}/>
+                                        <input value={sg.tarea}
+                                            onChange={e => updateSubgrupo(sg.id, { tarea: e.target.value })}
+                                            placeholder="Tarea / subtema…"
+                                            style={{ background:'rgba(255,255,255,0.18)', border:'none', borderRadius:4, color:'white', fontSize:'0.78rem', width:'100%', outline:'none', marginTop:5, padding:'3px 7px', fontStyle:'italic' }}/>
+                                    </div>
+                                    <div style={{ padding:'8px 10px', background:'#f8faff' }}>
+                                        {(sg.miembros || []).map((m, idx) => (
+                                            <div key={idx} style={{ display:'flex', alignItems:'center', gap:4, marginBottom:3 }}>
+                                                <input value={m}
+                                                    onChange={e => updateMiembro(sg.id, idx, e.target.value)}
+                                                    style={{ flex:1, border:'1px solid #e0e4f0', borderRadius:4, padding:'3px 6px', fontSize:'0.8rem', outline:'none', fontFamily:'inherit' }}/>
+                                                <button onClick={() => eliminarMiembro(sg.id, idx)}
+                                                    style={{ background:'none', border:'none', cursor:'pointer', color:'#e74c3c', padding:'2px', flexShrink:0 }}>
+                                                    <X size={11}/>
+                                                </button>
+                                            </div>
+                                        ))}
+                                        <button onClick={() => añadirMiembro(sg.id)}
+                                            style={{ marginTop:4, background:'none', border:'1px dashed #1565C0', color:'#1565C0', borderRadius:4, padding:'2px 8px', cursor:'pointer', fontSize:'0.75rem', width:'100%' }}>
+                                            + Añadir miembro
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </>
+                )}
+
+                {error && <div style={{ color:'#e74c3c', fontSize:'0.83rem', marginBottom:10 }}>⚠ {error}</div>}
+
+                <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+                    <button onClick={onClose} style={ms.btnSecundario}>Cancelar</button>
+                    {generado && (
+                        <button onClick={verImprimir}
+                            style={{ display:'flex', alignItems:'center', gap:6, padding:'9px 16px', borderRadius:9, border:'none', background:'#7f8c8d', color:'white', fontWeight:700, cursor:'pointer', fontSize:'0.88rem' }}>
+                            🖨 Ver / Imprimir
+                        </button>
+                    )}
+                    {generado && (
+                        <button onClick={guardar} disabled={guardando}
+                            style={{ ...ms.btnGreen, flex:1, justifyContent:'center' }}>
+                            {guardando
+                                ? <><RefreshCw size={14} style={{ animation:'spin 1s linear infinite' }}/> Guardando…</>
+                                : <><Save size={15}/> {agrupacionExistente ? 'Actualizar' : 'Guardar Agrupación'}</>}
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // ─── Normalizar grupo (migración desde formato antiguo) ───────────────────────
 const normalizarGrupo = (grupo) => {
     if (grupo.hojas?.length > 0) {
@@ -351,6 +567,7 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
     const [tempNombreAlumno,  setTempNombreAlumno]  = useState('');
     const [editHojaNombre,    setEditHojaNombre]    = useState(null);
     const [tempNombreHoja,    setTempNombreHoja]    = useState('');
+    const [modalAgrupacion,   setModalAgrupacion]   = useState(false);
 
     const hoja     = hojas[hojaIdx] || hojas[0];
     const columnas = hoja?.columnas || [];
@@ -532,6 +749,18 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
         setIsDirty(true);
     };
 
+    const moverHoja = (idx, dir) => {
+        const newIdx = idx + dir;
+        if (newIdx < 0 || newIdx >= hojas.length) return;
+        setHojas(prev => {
+            const arr = [...prev];
+            [arr[idx], arr[newIdx]] = [arr[newIdx], arr[idx]];
+            return arr;
+        });
+        setHojaIdx(prev => prev === idx ? newIdx : prev === newIdx ? idx : prev);
+        setIsDirty(true);
+    };
+
     // ── Guardar / Exportar ────────────────────────────────────────────────────
     const guardar = async () => {
         setGuardando(true);
@@ -700,11 +929,27 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
                                 }}>
                                 {h.nombre}
                                 {i === hojaIdx && hojas.length > 1 && (
-                                    <span onClick={e => { e.stopPropagation(); eliminarHoja(i); }}
-                                        style={{ marginLeft:2, opacity:0.7, lineHeight:1, cursor:'pointer' }}
-                                        title="Eliminar hoja">
-                                        <X size={11}/>
-                                    </span>
+                                    <>
+                                        {i > 0 && (
+                                            <span onClick={e => { e.stopPropagation(); moverHoja(i, -1); }}
+                                                style={{ marginLeft:3, opacity:0.7, lineHeight:1, cursor:'pointer' }}
+                                                title="Mover hoja a la izquierda">
+                                                <ChevronLeft size={11}/>
+                                            </span>
+                                        )}
+                                        {i < hojas.length - 1 && (
+                                            <span onClick={e => { e.stopPropagation(); moverHoja(i, 1); }}
+                                                style={{ marginLeft:1, opacity:0.7, lineHeight:1, cursor:'pointer' }}
+                                                title="Mover hoja a la derecha">
+                                                <ChevronRight size={11}/>
+                                            </span>
+                                        )}
+                                        <span onClick={e => { e.stopPropagation(); eliminarHoja(i); }}
+                                            style={{ marginLeft:3, opacity:0.7, lineHeight:1, cursor:'pointer' }}
+                                            title="Eliminar hoja">
+                                            <X size={11}/>
+                                        </span>
+                                    </>
                                 )}
                             </button>
                         )}
@@ -743,6 +988,9 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
                     </button>
                     <button onClick={mostrarTodas} style={bt.secondary} title="Mostrar todas las columnas">
                         <Eye size={13}/> Mostrar todo
+                    </button>
+                    <button onClick={() => setModalAgrupacion(true)} style={bt.secondary}>
+                        🗂 Agrupaciones
                     </button>
                     <button onClick={añadirColumna} style={bt.primary}>
                         <Plus size={14}/> Columna
@@ -924,6 +1172,16 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
             </div>
 
             <style>{`@keyframes spin { 100%{ transform:rotate(360deg); } }`}</style>
+
+            {modalAgrupacion && (
+                <ModalCrearAgrupacion
+                    grupo={grupo}
+                    alumnos={alumnos}
+                    profesorUid={profesorUid}
+                    onClose={() => setModalAgrupacion(false)}
+                    onSaved={() => setModalAgrupacion(false)}
+                />
+            )}
         </div>
     );
 }
@@ -1166,3 +1424,156 @@ const tt = {
     tdOculto:    { minWidth:24, maxWidth:24, width:24, padding:0, borderBottom:'1px solid #f0f0f0', background:'#f4f6f8' },
     cellInput:   { width:'100%', border:'none', borderRadius:4, padding:'5px 7px', fontSize:'0.83rem', textAlign:'center', background:'transparent', outline:'none', boxSizing:'border-box', color:'#2c3e50', fontFamily:'inherit' },
 };
+
+// ─── Tab de Agrupaciones (exportado para InformesJuegos2) ─────────────────────
+export function AgrupacionesTab({ usuario }) {
+    const [agrupaciones,  setAgrupaciones]  = useState([]);
+    const [cargando,      setCargando]      = useState(true);
+    const [editando,      setEditando]      = useState(null);
+    const [confirmBorrar, setConfirmBorrar] = useState(null);
+    const [borrando,      setBorrando]      = useState(null);
+
+    const cargar = useCallback(async () => {
+        setCargando(true);
+        try {
+            const snap = await getDocs(query(
+                collection(db, 'agrupaciones_profesor'),
+                where('profesorUid', '==', usuario.uid)
+            ));
+            const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+                .sort((a, b) => (b.fechaCreacion?.seconds || 0) - (a.fechaCreacion?.seconds || 0));
+            setAgrupaciones(docs);
+        } catch (e) { console.error(e); }
+        setCargando(false);
+    }, [usuario.uid]);
+
+    useEffect(() => { cargar(); }, [cargar]);
+
+    const borrar = async (id) => {
+        setBorrando(id);
+        try {
+            await deleteDoc(doc(db, 'agrupaciones_profesor', id));
+            setAgrupaciones(prev => prev.filter(a => a.id !== id));
+        } catch (e) { alert('Error: ' + e.message); }
+        setBorrando(null); setConfirmBorrar(null);
+    };
+
+    const verImprimir = (agr) => {
+        const w = window.open('', '_blank');
+        w.document.write(htmlImpresion(agr.titulo, agr.subgrupos || [], agr.grupoNombre));
+        w.document.close();
+    };
+
+    const porGrupo = agrupaciones.reduce((acc, a) => {
+        const k = a.grupoNombre || 'Sin grupo';
+        if (!acc[k]) acc[k] = [];
+        acc[k].push(a);
+        return acc;
+    }, {});
+
+    if (cargando) return (
+        <div style={{ textAlign:'center', padding:'50px 0', color:'#95a5a6' }}>
+            <RefreshCw size={28} style={{ animation:'spin 1s linear infinite', display:'block', margin:'0 auto 12px' }}/>
+            Cargando agrupaciones…
+            <style>{`@keyframes spin{100%{transform:rotate(360deg);}}`}</style>
+        </div>
+    );
+
+    return (
+        <div>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
+                <h2 style={{ margin:0, color:'#2c3e50', fontSize:'1.3rem' }}>🗂 Agrupaciones guardadas</h2>
+                <button onClick={cargar} style={bt.secondary}>
+                    <RefreshCw size={13}/> Actualizar
+                </button>
+            </div>
+
+            {agrupaciones.length === 0 ? (
+                <div style={{ background:'white', borderRadius:14, padding:'40px 20px', textAlign:'center', color:'#95a5a6', boxShadow:'0 2px 8px rgba(0,0,0,0.05)' }}>
+                    <div style={{ fontSize:'2.5rem', marginBottom:10 }}>🗂</div>
+                    <div style={{ fontWeight:600, marginBottom:6 }}>Sin agrupaciones todavía</div>
+                    <div style={{ fontSize:'0.85rem' }}>Ve a la pestaña Grupos, abre un grupo y usa el botón "🗂 Agrupaciones".</div>
+                </div>
+            ) : (
+                Object.entries(porGrupo).map(([grupoNombre, agrs]) => (
+                    <div key={grupoNombre} style={{ marginBottom:28 }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+                            <span style={{ fontSize:'1rem' }}>👥</span>
+                            <span style={{ fontWeight:700, color:'#2c3e50' }}>{grupoNombre}</span>
+                            <span style={{ background:'#e8f0fe', color:'#1565C0', borderRadius:20, padding:'1px 8px', fontSize:'0.75rem', fontWeight:700 }}>{agrs.length}</span>
+                        </div>
+                        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                            {agrs.map(agr => (
+                                <div key={agr.id} style={{ background:'white', borderRadius:12, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', overflow:'hidden', border:'1px solid #f0f0f0' }}>
+                                    {/* Cabecera de la agrupación */}
+                                    <div style={{ padding:'12px 16px', display:'flex', alignItems:'center', gap:12, flexWrap:'wrap', borderBottom:'1px solid #f0f0f0' }}>
+                                        <div style={{ flex:1 }}>
+                                            <div style={{ fontWeight:700, color:'#1565C0', fontSize:'1rem' }}>{agr.titulo}</div>
+                                            <div style={{ fontSize:'0.75rem', color:'#95a5a6', marginTop:2 }}>
+                                                {agr.subgrupos?.length || 0} subgrupos
+                                                {' · '}{agr.subgrupos?.reduce((s, sg) => s + (sg.miembros?.length || 0), 0) || 0} alumnos
+                                                {agr.fechaCreacion?.seconds && ` · ${new Date(agr.fechaCreacion.seconds * 1000).toLocaleDateString('es-ES')}`}
+                                            </div>
+                                        </div>
+                                        <div style={{ display:'flex', gap:6, flexShrink:0, flexWrap:'wrap' }}>
+                                            <button onClick={() => verImprimir(agr)} style={{ ...bt.secondary, padding:'5px 10px', fontSize:'0.78rem' }}>
+                                                🖨 Imprimir
+                                            </button>
+                                            <button onClick={() => setEditando(agr)}
+                                                style={{ padding:'5px 10px', borderRadius:7, border:'none', background:'#fff8e1', color:'#f39c12', cursor:'pointer', fontWeight:600, fontSize:'0.78rem', display:'flex', alignItems:'center', gap:4 }}>
+                                                <Edit2 size={12}/> Editar
+                                            </button>
+                                            {confirmBorrar === agr.id ? (
+                                                <>
+                                                    <button onClick={() => borrar(agr.id)} disabled={borrando === agr.id}
+                                                        style={{ padding:'5px 10px', borderRadius:7, border:'none', background:'#e74c3c', color:'white', cursor:'pointer', fontWeight:700, fontSize:'0.78rem' }}>
+                                                        {borrando === agr.id ? '…' : 'Confirmar'}
+                                                    </button>
+                                                    <button onClick={() => setConfirmBorrar(null)}
+                                                        style={{ padding:'5px 8px', borderRadius:7, border:'1px solid #ddd', background:'white', cursor:'pointer', fontSize:'0.78rem' }}>
+                                                        No
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <button onClick={() => setConfirmBorrar(agr.id)}
+                                                    style={{ padding:'5px 8px', borderRadius:7, border:'1px solid #fdd', background:'#fdecea', color:'#e74c3c', cursor:'pointer' }}>
+                                                    <Trash2 size={13}/>
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Preview de subgrupos */}
+                                    <div style={{ padding:'10px 16px', display:'flex', flexWrap:'wrap', gap:8 }}>
+                                        {(agr.subgrupos || []).map(sg => (
+                                            <div key={sg.id} style={{ background:'#f0f4ff', borderRadius:8, padding:'7px 11px', minWidth:130, maxWidth:220 }}>
+                                                <div style={{ fontWeight:700, color:'#1565C0', fontSize:'0.82rem', marginBottom:2 }}>{sg.nombre}</div>
+                                                {sg.tarea && <div style={{ fontSize:'0.72rem', color:'#7f8c8d', fontStyle:'italic', marginBottom:4 }}>{sg.tarea}</div>}
+                                                <div style={{ fontSize:'0.72rem', color:'#555', lineHeight:1.4 }}>
+                                                    {(sg.miembros || []).join(' · ')}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ))
+            )}
+
+            {editando && (
+                <ModalCrearAgrupacion
+                    grupo={{ id: editando.grupoId, nombre: editando.grupoNombre }}
+                    alumnos={[]}
+                    profesorUid={usuario.uid}
+                    agrupacionExistente={editando}
+                    onClose={() => setEditando(null)}
+                    onSaved={() => { setEditando(null); cargar(); }}
+                />
+            )}
+
+            <style>{`@keyframes spin{100%{transform:rotate(360deg);}}`}</style>
+        </div>
+    );
+}

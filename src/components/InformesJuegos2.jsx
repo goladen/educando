@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import GruposTab from './GruposTab';
+import GruposTab, { AgrupacionesTab } from './GruposTab';
+import MapaAula from './MapaAula';
 import ModalAgregarAGrupo from './ModalAgregarAGrupo';
 import { db } from '../firebase';
 import {
@@ -343,8 +344,10 @@ export default function InformesJuegos({ usuario, googleToken }) {
             {/* ── Pestañas ──────────────────────────────────────────────── */}
             <div style={{ display:'flex', gap:4, marginBottom:24, borderBottom:'2px solid #e0e4f0' }}>
                 {[
-                    { id:'informes', label:'📋 Informes' },
-                    { id:'grupos',   label:'👥 Grupos' },
+                    { id:'informes',     label:'📋 Informes' },
+                    { id:'grupos',       label:'👥 Grupos' },
+                    { id:'agrupaciones', label:'🗂 Agrupaciones' },
+                    { id:'plano',        label:'🪑 Plano' },
                 ].map(t => (
                     <button key={t.id} onClick={() => setPestañaActiva(t.id)}
                         style={{ padding:'10px 22px', border:'none', background:'none', fontWeight: pestañaActiva===t.id ? 700 : 400,
@@ -358,7 +361,11 @@ export default function InformesJuegos({ usuario, googleToken }) {
 
             {/* ── Tab Grupos ────────────────────────────────────────────── */}
             {pestañaActiva === 'grupos' && <GruposTab usuario={usuario} googleToken={googleToken} />}
-            {pestañaActiva !== 'grupos' && <>
+            {/* ── Tab Agrupaciones ──────────────────────────────────────── */}
+            {pestañaActiva === 'agrupaciones' && <AgrupacionesTab usuario={usuario} />}
+            {/* ── Tab Plano de clase ────────────────────────────────────── */}
+            {pestañaActiva === 'plano' && <MapaAula usuario={usuario} />}
+            {pestañaActiva !== 'grupos' && pestañaActiva !== 'agrupaciones' && pestañaActiva !== 'plano' && <>
 
             {/* ── Cabecera ─────────────────────────────────────────────── */}
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:22, flexWrap:'wrap', gap:10 }}>

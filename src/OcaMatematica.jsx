@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Dices, Trophy, Clock, RotateCcw, Play, AlertCircle, Send, CheckCircle } from 'lucide-react';
+import { Dices, Trophy, Clock, RotateCcw, Play, AlertCircle, Send, CheckCircle, Share2 } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { db } from './firebase';
 import { collection, addDoc, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
@@ -721,6 +721,13 @@ export default function OcaMatematica({ onExit }) {
                     </div>
                     <div style={{display:'flex',gap:10}}>
                         {onExit&&<button onClick={onExit} style={{padding:'12px 15px',borderRadius:12,border:'1.5px solid rgba(255,255,255,0.16)',background:'transparent',color:'rgba(255,255,255,0.42)',cursor:'pointer',fontFamily:'inherit'}}>← Volver</button>}
+                        <button onClick={()=>{
+                            const url='https://pikt.es/?juego=OCA';
+                            if(navigator.share) navigator.share({title:'La Oca Matemática',text:'¡Juega a la Oca Matemática!',url}).catch(()=>{});
+                            else navigator.clipboard.writeText(url).then(()=>alert('✅ Enlace copiado'));
+                        }} style={{padding:'12px 14px',borderRadius:12,border:'1.5px solid rgba(255,255,255,0.16)',background:'transparent',color:'rgba(255,255,255,0.55)',cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:6}}>
+                            <Share2 size={15}/> Compartir
+                        </button>
                         <button onClick={iniciar} style={{flex:1,padding:'13px',borderRadius:12,border:'none',background:'linear-gradient(135deg,#f1c40f,#e67e22)',color:'#1a1a2e',fontWeight:900,fontSize:'1.03rem',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:8,fontFamily:'inherit',boxShadow:'0 4px 18px rgba(241,196,15,0.4)'}}><Play size={19}/> ¡Empezar!</button>
                     </div>
                 </div>

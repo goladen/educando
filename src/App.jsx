@@ -59,7 +59,7 @@ function App() {
         'omninteractive','videoquizz','sintaxis','listening',
         'etiquetas','etiquetame',
         'geometrix','calculo','funciones','funciones2','geometria_analitica','geometriaanalitica',
-        'ecuaciones','oca',
+        'ecuaciones','oca','domino','musica',
         'api','admin','login','app',
         'irregular_verbs','sistema_solar',
       ]);

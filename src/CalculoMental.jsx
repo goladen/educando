@@ -4,6 +4,7 @@ import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
 import { RotateCcw, CheckCircle, Trophy, Clock, Brain, Delete, Settings, SkipForward, Share2 } from 'lucide-react';
 import Confetti from 'react-confetti';
 import OcaMatematica from './OcaMatematica';
+import DominoMatematico from './dominofracciones';
 
 // ─── Configuración por defecto ────────────────────────────────────────────────
 const DEFAULT_CONFIG = {
@@ -358,6 +359,7 @@ function ModalEnviarProfe({ datos, onClose }) {
 export default function CalculoMentalGame({ usuario, onExit }) {
     const [gameState, setGameState] = useState('START');
     const [showOca, setShowOca] = useState(false);
+    const [showDomino, setShowDomino] = useState(false);
     const [mostrarEnvio, setMostrarEnvio] = useState(false);
     const [config, setConfig] = useState(DEFAULT_CONFIG);
     const [showConfig, setShowConfig] = useState(false);
@@ -455,6 +457,7 @@ export default function CalculoMentalGame({ usuario, onExit }) {
     };
 
     if (showOca) return <OcaMatematica onExit={() => setShowOca(false)} />;
+    if (showDomino) return <DominoMatematico onExit={() => setShowDomino(false)} />;
 
     const handleExit = () => {
         clearInterval(timerRef.current);
@@ -593,6 +596,23 @@ export default function CalculoMentalGame({ usuario, onExit }) {
                                 <div style={{ color:'#888', fontSize:'0.82rem' }}>Hasta 4 jugadores · tablero · fracciones, decimales…</div>
                             </div>
                             <span style={{ color:'#e67e22', fontSize:'1.3rem' }}>›</span>
+                        </button>
+
+                        {/* Dominó Matemático */}
+                        <button onClick={() => setShowDomino(true)}
+                            style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 18px',
+                                background:'white', border:'2px solid #8e44ad', borderRadius:16,
+                                cursor:'pointer', textAlign:'left', transition:'transform 0.15s, box-shadow 0.15s',
+                                boxShadow:'0 3px 10px rgba(0,0,0,0.07)', width:'100%' }}
+                            onMouseEnter={e => { e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 8px 20px #8e44ad33'; }}
+                            onMouseLeave={e => { e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow='0 3px 10px rgba(0,0,0,0.07)'; }}
+                        >
+                            <div style={{ background:'#8e44ad', borderRadius:12, width:46, height:46, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.5rem', flexShrink:0 }}>🁣</div>
+                            <div style={{ flex:1 }}>
+                                <div style={{ fontWeight:'bold', color:'#2c3e50', fontSize:'1rem', marginBottom:3 }}>Dominó Matemático</div>
+                                <div style={{ color:'#888', fontSize:'0.82rem' }}>Hasta 4 jugadores · naturales, fracciones, ecuaciones…</div>
+                            </div>
+                            <span style={{ color:'#8e44ad', fontSize:'1.3rem' }}>›</span>
                         </button>
                     </div>
                 </div>

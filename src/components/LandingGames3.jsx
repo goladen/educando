@@ -29,6 +29,8 @@ import MansionPitagoricaGame from '../MansionPitagoricaGame';
 
 import EtiquetaMe from '../EtiquetaMe';
 import OmninteractiveApp from '../OmninteractiveApp';
+import OcaMatematicaDirect from '../OcaMatematica';
+import DominoMatematicoDirect from '../dominofracciones';
 import VideoQuizzApp from '../VideoQuizzApp';
 import FuncionesEjecutivas from '../FuncionesEjecutivas';
 import IrregularVerbsTest from '../IrregularVerbsTest';
@@ -1078,9 +1080,9 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
         </div>
     );
 
-    if (musicApp) return (
+    if (musicApp || juegoActivo?.tipoJuego === 'MUSICA') return (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, overflowY: 'auto' }}>
-            <MusicApp onBack={() => setMusicApp(false)} usuario={usuario} />
+            <MusicApp onBack={() => { setMusicApp(false); setJuegoActivo(null); }} usuario={usuario} />
         </div>
     );
 
@@ -1106,6 +1108,8 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
 
         if (juegoActivo.tipoJuego === 'GEOMETRIX') return <Geometrix usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'CALCULO') return <CalculoMental usuario={usuario} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'OCA') return <OcaMatematicaDirect onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'DOMINO') return <DominoMatematicoDirect onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'ECUACIONES') return <Ecuaciones usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'FUNCIONES') return <Funciones onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'GEOMETRÍA_ANALÍTICA') return <GeometriaAnalitica onExit={() => setJuegoActivo(null)} />;
@@ -1425,7 +1429,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                     { id: 'FUNCIONES_EJECUTIVAS', label: 'Funciones Ejecutivas', emoji: '🧠', color: '#FF5722', action: () => setFuncionesEjecutivas(true), shareable: true },
                     { id: 'IRREGULAR_VERBS',     label: 'Irregular Verbs',     emoji: '📝', color: '#0369a1', action: () => setIrregularVerbs(true), shareable: true },
                     { id: 'SOLAR_SYSTEM',        label: 'Sistema Solar',        emoji: '🪐', color: '#3B82F6', action: () => setJuegoActivo({ tipoJuego: 'SOLAR_SYSTEM' }), shareable: true },
-                    { id: 'MUSICA',              label: 'Música',               emoji: '🎵', color: '#8b5cf6', action: () => setMusicApp(true), shareable: false },
+                    { id: 'MUSICA',              label: 'Música',               emoji: '🎵', color: '#8b5cf6', action: () => setMusicApp(true), shareable: true },
                 ].map(tool => (
                     <div key={tool.id} onClick={tool.action} style={{ background: '#ffffbf', borderRadius: '15px', padding: '15px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transition: 'transform 0.2s', border: `2px solid ${tool.color}20`, position: 'relative' }}
                         onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-3px)'}

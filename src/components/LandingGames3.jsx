@@ -35,6 +35,7 @@ import VideoQuizzApp from '../VideoQuizzApp';
 import FuncionesEjecutivas from '../FuncionesEjecutivas';
 import IrregularVerbsTest from '../IrregularVerbsTest';
 import MusicApp from '../MusicApp';
+import AlgebraApp from '../Algebra';
 import imgPasapalabra from '../assets/icono_pasapal.png'; // Revisa si es .png o .jpg
 import imgBurbujas from '../assets/icono_burbujas.png';
 import imgPikatron from '../assets/icono_pikatron.png';
@@ -578,7 +579,7 @@ export const APPS = [
     { id: 'GEOMETRÍA_ANALÍTICA', name: 'Geometría_Analítica', desc: 'Rectas, parábolas y análisis gráfico.', color: '#4CAF50', emoji: '♐​', isMath: true, shareable: true },
 
 
-    { id: 'POLINOMIOS', name: 'Álgebra', desc: 'Operaciones con polinomios.', color: '#FF9800', emoji: '✖️', isMath: true, comingSoon: true, shareable: true },
+    { id: 'POLINOMIOS', name: 'Álgebra', desc: 'Operaciones con polinomios.', color: '#FF9800', emoji: '✖️', isMath: true, shareable: true },
 
     { id: 'STORYCUBES', name: 'Story Cubes', desc: 'Crea historias en equipo usando dados con imágenes.', color: '#8e44ad', emoji: '🎲', shareable: true },
 
@@ -1113,6 +1114,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
         if (juegoActivo.tipoJuego === 'ECUACIONES') return <Ecuaciones usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'FUNCIONES') return <Funciones onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'GEOMETRÍA_ANALÍTICA') return <GeometriaAnalitica onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'POLINOMIOS') return <AlgebraApp usuario={usuario} onExit={() => setJuegoActivo(null)} />;
 
         if (juegoActivo.tipoJuego === 'SINTAXIS')    return <SintaxisGame  usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'LISTENING')   return <Listening     usuario={usuario} onExit={() => setJuegoActivo(null)} />;
@@ -1687,6 +1689,7 @@ const [entrando, setEntrando] = useState(false);
         if (appData.id === 'ECUACIONES' || juegoActivo.tipoJuego === 'ECUACIONES') return <Ecuaciones onExit={handleExitGame} />;
         if (appData.id === 'FUNCIONES' || juegoActivo.tipoJuego === 'FUNCIONES') return <Funciones usuario={null} onExit={handleExitGame} />;
         if (appData.id === 'GEOMETRÍA_ANALÍTICA' || juegoActivo.tipoJuego === 'GEOMETRÍA_ANALÍTICA') return <GeometriaAnalitica usuario={null} onExit={handleExitGame} />;
+        if (appData.id === 'POLINOMIOS' || juegoActivo.tipoJuego === 'POLINOMIOS') return <AlgebraApp usuario={null} onExit={handleExitGame} />;
 
     }
     // --- NUEVO: ATAJO PARA JUEGOS CON MENÚ PROPIO ---

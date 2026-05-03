@@ -60,6 +60,7 @@ function App() {
         'etiquetas','etiquetame',
         'geometrix','calculo','funciones','funciones2','geometria_analitica','geometriaanalitica',
         'ecuaciones','oca','domino','musica',
+        'algebra','polinomios',
         'api','admin','login','app',
         'irregular_verbs','sistema_solar',
       ]);

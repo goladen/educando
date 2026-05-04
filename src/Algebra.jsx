@@ -1,8 +1,8 @@
 // Algebra.jsx — 7-module interactive algebra practice for ESO
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { db } from './firebase';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { CheckCircle, XCircle, RefreshCw, Send, Share2, ChevronDown, ChevronUp } from 'lucide-react';
+import { addDoc, collection, doc, getDoc } from 'firebase/firestore';
+import { CheckCircle, XCircle, RefreshCw, Send, Share2, ChevronDown, ChevronUp, Maximize2, Minimize2 } from 'lucide-react';
 
 // ─── Math utilities ───────────────────────────────────────────────────────────
 const SUP = { 0:'', 1:'', 2:'²', 3:'³', 4:'⁴', 5:'⁵' };
@@ -61,10 +61,31 @@ function factorStr(root) {
 // ─── PolyInput component ──────────────────────────────────────────────────────
 function PolyInput({ value, onChange, maxDeg=4 }) {
     const ensure = d => { const a=[...value]; while(a.length<=d) a.push(0); return a; };
-    const bump = (d,delta) => { const a=ensure(d); a[d]=Math.max(-30,Math.min(30,a[d]+delta)); onChange(a); };
+    const bump = (d, delta) => { onChange(prev => { const a=[...prev]; while(a.length<=d) a.push(0); a[d]=a[d]+delta; return a; }); };
     const reset = () => onChange(Array(maxDeg+1).fill(0));
 
-    const btnS = bg => ({ padding:'5px 9px', borderRadius:7, border:'none', color:'white', cursor:'pointer', fontWeight:700, fontSize:'0.78rem', minWidth:40, background:bg });
+    const holdRef = useRef(null);
+    const startHold = (d, delta) => {
+        bump(d, delta);
+        holdRef.current = setTimeout(() => {
+            holdRef.current = setInterval(() => bump(d, delta), 60);
+        }, 350);
+    };
+    const stopHold = () => {
+        clearTimeout(holdRef.current);
+        clearInterval(holdRef.current);
+        holdRef.current = null;
+    };
+
+    const btnS = bg => ({ padding:'5px 9px', borderRadius:7, border:'none', color:'white', cursor:'pointer', fontWeight:700, fontSize:'0.78rem', minWidth:40, background:bg, userSelect:'none' });
+    const holdProps = (d, delta) => ({
+        onMouseDown: () => startHold(d, delta),
+        onMouseUp: stopHold,
+        onMouseLeave: stopHold,
+        onTouchStart: (e) => { e.preventDefault(); startHold(d, delta); },
+        onTouchEnd: stopHold,
+    });
+
     return (
         <div style={{display:'flex',flexDirection:'column',gap:8,alignItems:'center'}}>
             <div style={{background:'#0d1117',borderRadius:10,padding:'9px 22px',fontWeight:700,fontSize:'1.15rem',color:'#f39c12',minWidth:200,textAlign:'center',border:'2px solid rgba(243,156,18,0.3)',minHeight:42,display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -75,8 +96,8 @@ function PolyInput({ value, onChange, maxDeg=4 }) {
                     const lbl=d===0?'1':d===1?'x':`x${SUP[d]||`^${d}`}`;
                     return (
                         <div key={d} style={{display:'flex',flexDirection:'column',gap:3}}>
-                            <button style={btnS('#27ae60')} onClick={()=>bump(d,1)}>+{lbl}</button>
-                            <button style={btnS('#c0392b')} onClick={()=>bump(d,-1)}>−{lbl}</button>
+                            <button style={btnS('#27ae60')} {...holdProps(d, 1)}>+{lbl}</button>
+                            <button style={btnS('#c0392b')} {...holdProps(d,-1)}>−{lbl}</button>
                         </div>
                     );
                 })}
@@ -396,50 +417,63 @@ function M4_Polinomios({ onScore }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // MODULE 5 — División de Ruffini
 // ═══════════════════════════════════════════════════════════════════════════════
-function RuffiniTable({ descCoeffs, root, studentRow, onCellChange, checked }) {
+function RuffiniTable({ descCoeffs, root, inputs, onUpdate, checked }) {
     const n = descCoeffs.length;
-    const correctRow = ruffiniRow(descCoeffs, root);
-    const middleRow = correctRow.map((q,i) => i===0 ? null : root*correctRow[i-1]);
+    const correctRow  = ruffiniRow(descCoeffs, root);
+    const correctProds = correctRow.map((_,i) => i===0 ? null : root*correctRow[i-1]);
 
-    const cellS = (extra={}) => ({ padding:'8px 14px', minWidth:52, textAlign:'center', fontWeight:700, fontSize:'1rem', ...extra });
+    const inpS = (ok) => ({
+        width:52, padding:'6px 4px', borderRadius:6, textAlign:'center',
+        fontWeight:700, fontSize:'0.95rem', background:'#161b22',
+        border:`1.5px solid ${ok===undefined?'#566573':ok?'#27ae60':'#e74c3c'}`,
+        color: ok===undefined?'#e6edf3':ok?'#2ecc71':'#e74c3c',
+    });
+    const cellP = { padding:'4px 5px', textAlign:'center' };
+    const vline = { borderRight:'2px solid #f39c12' };
+    const cline = i => i>0?{borderLeft:'1px solid #30363d'}:{};
 
-    const cellColor = (i) => {
-        if(!checked) return '#e6edf3';
-        return studentRow[i] === correctRow[i] ? '#2ecc71' : '#e74c3c';
-    };
+    const chk = (val, expected) => checked ? parseInt(val)===expected : undefined;
 
     return (
         <div style={{overflowX:'auto',marginTop:8}}>
             <table style={{borderCollapse:'collapse',margin:'0 auto',background:'#0d1117',borderRadius:10,overflow:'hidden',border:'1px solid #30363d'}}>
                 <tbody>
-                    {/* Top row: dividend coefficients */}
+                    {/* Fila 1 — coeficientes del dividendo (alumno los escribe) */}
                     <tr style={{borderBottom:'1px solid #30363d'}}>
-                        <td style={cellS({borderRight:'2px solid #f39c12',color:'#f39c12'})}>{root>0?`+${root}`:root}</td>
-                        {descCoeffs.map((c,i)=>(
-                            <td key={i} style={cellS({color:'#e6edf3',borderLeft:i>0?'1px solid #30363d':'none'})}>{c}</td>
-                        ))}
-                    </tr>
-                    {/* Middle row: products (shown after check) */}
-                    <tr style={{borderBottom:'2px solid #566573'}}>
-                        <td style={cellS({borderRight:'2px solid #f39c12'})}></td>
-                        {descCoeffs.map((_,i)=>(
-                            <td key={i} style={cellS({color:'#3498db',borderLeft:i>0?'1px solid #30363d':'none',fontSize:'0.9rem'})}>
-                                {checked && i>0 ? middleRow[i] : ''}
+                        <td style={{...cellP,...vline,minWidth:60}}></td>
+                        {Array(n).fill(0).map((_,i)=>(
+                            <td key={i} style={{...cellP,...cline(i)}}>
+                                <input type="number" value={inputs.row1[i]??''} disabled={checked}
+                                    onChange={e=>onUpdate('row1',i,e.target.value)}
+                                    style={inpS(chk(inputs.row1[i], descCoeffs[i]))}/>
                             </td>
                         ))}
                     </tr>
-                    {/* Bottom row: student input */}
+                    {/* Fila 2 — a la izquierda: divisor a; a la derecha: productos */}
+                    <tr style={{borderBottom:'2px solid #566573'}}>
+                        <td style={{...cellP,...vline}}>
+                            <input type="number" value={inputs.rootInput??''} disabled={checked}
+                                onChange={e=>onUpdate('rootInput',null,e.target.value)}
+                                style={{...inpS(chk(inputs.rootInput, root)), background:'#1a1a2e', borderColor: checked?(parseInt(inputs.rootInput)===root?'#27ae60':'#e74c3c'):'#f39c1288'}}/>
+                        </td>
+                        {Array(n).fill(0).map((_,i)=>(
+                            <td key={i} style={{...cellP,...cline(i)}}>
+                                {i===0 ? null : (
+                                    <input type="number" value={inputs.row2[i]??''} disabled={checked}
+                                        onChange={e=>onUpdate('row2',i,e.target.value)}
+                                        style={{...inpS(chk(inputs.row2[i], correctProds[i])), color: checked?undefined:'#3498db', borderColor: checked?undefined:'#1a4a6e'}}/>
+                                )}
+                            </td>
+                        ))}
+                    </tr>
+                    {/* Fila 3 — cociente y resto */}
                     <tr>
-                        <td style={cellS({borderRight:'2px solid #f39c12'})}></td>
-                        {descCoeffs.map((_,i)=>(
-                            <td key={i} style={{padding:'4px',borderLeft:i>0?'1px solid #30363d':'none',textAlign:'center'}}>
-                                <input
-                                    type="number"
-                                    value={studentRow[i]??''}
-                                    onChange={e=>onCellChange(i,parseInt(e.target.value)||0)}
-                                    disabled={!!checked}
-                                    style={{width:52,padding:'6px 4px',borderRadius:6,border:`1.5px solid ${!checked?'#566573':studentRow[i]===correctRow[i]?'#27ae60':'#e74c3c'}`,background:'#161b22',color:cellColor(i),textAlign:'center',fontWeight:700,fontSize:'0.95rem'}}
-                                />
+                        <td style={{...cellP,...vline}}></td>
+                        {Array(n).fill(0).map((_,i)=>(
+                            <td key={i} style={{...cellP,...cline(i)}}>
+                                <input type="number" value={inputs.row3[i]??''} disabled={checked}
+                                    onChange={e=>onUpdate('row3',i,e.target.value)}
+                                    style={inpS(chk(inputs.row3[i], correctRow[i]))}/>
                             </td>
                         ))}
                     </tr>
@@ -458,44 +492,70 @@ function RuffiniTable({ descCoeffs, root, studentRow, onCellChange, checked }) {
 function M5_Ruffini({ onScore }) {
     const genEj = () => {
         const root = rInt(-5,5,0);
-        // Generate quotient poly of degree 2 with non-zero leading coeff
-        const qAsc = [rInt(-4,4), rInt(-4,4), rInt(1,4)]; // ax²+bx+c (ascending)
-        const divisorAsc = [-root, 1]; // (x - root)
-        const dividendAsc = mulPoly(qAsc, divisorAsc);
+        const qAsc = [rInt(-4,4), rInt(-4,4), rInt(1,4)];
+        const dividendAsc = mulPoly(qAsc, [-root, 1]);
         const descDiv = toDesc(dividendAsc);
-        return { descDiv, root, correctRow: ruffiniRow(descDiv, root) };
+        return { descDiv, root };
     };
-    const [ej, setEj] = useState(genEj);
-    const [cells, setCells] = useState(() => Array(ej.descDiv.length).fill(''));
-    const [checked, setChecked] = useState(false);
-    const [result, setResult] = useState(null);
-    const [score, setScore] = useState({ok:0,total:0});
 
-    const onCell = (i,v) => setCells(c => { const n=[...c]; n[i]=v; return n; });
+    const initInputs = (e) => ({
+        row1:      Array(e.descDiv.length).fill(''),
+        rootInput: '',
+        row2:      Array(e.descDiv.length).fill(''),
+        row3:      Array(e.descDiv.length).fill(''),
+    });
+
+    const [ej, setEj]         = useState(genEj);
+    const [inputs, setInputs] = useState(() => initInputs(ej));
+    const [checked, setChecked] = useState(false);
+    const [result, setResult]   = useState(null);
+    const [score, setScore]     = useState({ok:0,total:0});
+
+    const onUpdate = (field, idx, val) => setInputs(prev => {
+        if(idx===null) return {...prev, [field]: val};
+        const arr=[...prev[field]]; arr[idx]=val;
+        return {...prev, [field]: arr};
+    });
 
     const comprobar = () => {
-        const ok = cells.every((v,i) => parseInt(v) === ej.correctRow[i]);
+        const { descDiv, root } = ej;
+        const correctRow  = ruffiniRow(descDiv, root);
+        const correctProds = correctRow.map((_,i) => i===0 ? null : root*correctRow[i-1]);
+
+        const r1ok = inputs.row1.every((v,i) => parseInt(v)===descDiv[i]);
+        const rkOk = parseInt(inputs.rootInput)===root;
+        const r2ok = inputs.row2.every((v,i) => i===0 ? true : parseInt(v)===correctProds[i]);
+        const r3ok = inputs.row3.every((v,i) => parseInt(v)===correctRow[i]);
+        const ok   = r1ok && rkOk && r2ok && r3ok;
+
         setChecked(true);
-        setResult({ok, msg:ok?'¡Correcto!':'Hay valores incorrectos en la tabla (marcados en rojo).'});
-        setScore(s=>({ok:s.ok+(ok?1:0),total:s.total+1}));
-        onScore(ok?1:0,1);
+        setResult({ok, msg: ok?'¡Correcto!':'Hay valores incorrectos (marcados en rojo).'});
+        setScore(s=>({ok:s.ok+(ok?1:0), total:s.total+1}));
+        onScore(ok?1:0, 1);
     };
 
-    const nuevo = () => { const e=genEj(); setEj(e); setCells(Array(e.descDiv.length).fill('')); setChecked(false); setResult(null); };
+    const nuevo = () => { const e=genEj(); setEj(e); setInputs(initInputs(e)); setChecked(false); setResult(null); };
 
-    const dividend = polyStr(toAsc(ej.descDiv));
+    const dividend   = polyStr(toAsc(ej.descDiv));
     const divisorStr = ej.root>0 ? `x − ${ej.root}` : `x + ${Math.abs(ej.root)}`;
 
     return (
         <div style={{display:'flex',flexDirection:'column',gap:16}}>
-            <p style={{margin:0,color:'#8b949e',fontSize:'0.9rem'}}>Aplica el algoritmo de Ruffini para dividir el polinomio. Rellena la fila inferior de la tabla.</p>
+            <p style={{margin:0,color:'#8b949e',fontSize:'0.9rem'}}>
+                Aplica el algoritmo de Ruffini. Rellena toda la tabla tú mismo.
+            </p>
             <div style={{...CARD,textAlign:'center'}}>
                 <div style={{fontSize:'1.15rem',fontWeight:700,color:'#e6edf3',fontFamily:'Georgia,serif'}}>
                     <span style={{color:'#f39c12'}}>{dividend}</span> ÷ <span style={{color:'#e74c3c'}}>({divisorStr})</span>
                 </div>
             </div>
-            <div style={{fontSize:'0.82rem',color:'#8b949e'}}>La fila de arriba son los coeficientes del dividendo (orden descendente). La última celda de la fila inferior es el resto.</div>
-            <RuffiniTable descCoeffs={ej.descDiv} root={ej.root} studentRow={cells} onCellChange={onCell} checked={checked}/>
+            <div style={{fontSize:'0.82rem',color:'#8b949e',lineHeight:1.6}}>
+                <b style={{color:'#e6edf3'}}>Fila 1:</b> coeficientes del dividendo (orden descendente).<br/>
+                <b style={{color:'#f39c12'}}>Izq. de la línea:</b> el valor <em>a</em> del divisor (x − a).<br/>
+                <b style={{color:'#3498db'}}>Fila 2 (derecha):</b> productos de <em>a</em> por cada valor de la fila 3.<br/>
+                <b style={{color:'#e6edf3'}}>Fila 3:</b> cociente (coeficientes) y resto (última celda).
+            </div>
+            <RuffiniTable descCoeffs={ej.descDiv} root={ej.root} inputs={inputs} onUpdate={onUpdate} checked={checked}/>
             {!result
                 ? <button style={BTN('#f39c12','#111')} onClick={comprobar}>Comprobar</button>
                 : <FeedbackBlock result={result} onNext={nuevo}/>
@@ -719,8 +779,28 @@ function M7_Factorizacion({ onScore }) {
 export default function AlgebraApp({ onExit, usuario }) {
     const [modIdx, setModIdx] = useState(0);
     const [totals, setTotals] = useState(Array(7).fill(null).map(()=>({ok:0,total:0})));
-    const [enviado, setEnviado] = useState(false);
-    const [enviando, setEnviando] = useState(false);
+    const [showEnviar, setShowEnviar] = useState(false);
+    const [enviado,   setEnviado]   = useState(false);
+    const [enviando,  setEnviando]  = useState(false);
+    const [errorEnv,  setErrorEnv]  = useState('');
+    const [codigoInput, setCodigoInput] = useState('');
+    const [nombreInput, setNombreInput] = useState('');
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const appRef = useRef(null);
+
+    useEffect(() => {
+        const onChange = () => setIsFullscreen(!!document.fullscreenElement);
+        document.addEventListener('fullscreenchange', onChange);
+        return () => document.removeEventListener('fullscreenchange', onChange);
+    }, []);
+
+    const toggleFullscreen = () => {
+        if(!document.fullscreenElement) {
+            appRef.current?.requestFullscreen?.();
+        } else {
+            document.exitFullscreen?.();
+        }
+    };
 
     const handleScore = (modI) => (ok, total) => {
         setTotals(t => { const n=[...t]; n[modI]={ok:n[modI].ok+ok, total:n[modI].total+total}; return n; });
@@ -729,24 +809,41 @@ export default function AlgebraApp({ onExit, usuario }) {
     const totalOk    = totals.reduce((s,t)=>s+t.ok,0);
     const totalTotal = totals.reduce((s,t)=>s+t.total,0);
 
+    const modulosPracticados = totals.map((t,i)=>({...t, label:MODULES[i].label})).filter(t=>t.total>0);
+
     const enviar = async () => {
-        if(!usuario) { alert('Necesitas iniciar sesión para enviar resultados.'); return; }
-        setEnviando(true);
+        const code = codigoInput.trim().toUpperCase();
+        if(!code) { setErrorEnv('Escribe el código del profesor.'); return; }
+        const nombre = usuario?.displayName || nombreInput.trim() || 'Alumno';
+        if(!usuario && !nombreInput.trim()) { setErrorEnv('Escribe tu nombre.'); return; }
+        setEnviando(true); setErrorEnv('');
         try {
-            await addDoc(collection(db,'results'),{
-                uid: usuario.uid,
-                nombre: usuario.displayName || 'Alumno',
-                email: usuario.email || '',
-                tipoJuego: 'ALGEBRA',
-                puntuacion: totalOk,
+            const codigoDoc = await getDoc(doc(db, 'codigos_profesor', code));
+            if(!codigoDoc.exists()) { setErrorEnv('Código no encontrado.'); setEnviando(false); return; }
+            await addDoc(collection(db,'informes_juegos'), {
+                tipo: 'ALGEBRA',
+                codigoProfesor: code,
+                fecha: new Date(),
+                uid:   usuario?.uid   || null,
+                email: usuario?.email || null,
                 aciertos: totalOk,
-                total: totalTotal,
-                modulos: totals.map((t,i)=>({modulo:MODULES[i].label,...t})),
-                fecha: serverTimestamp(),
+                total:    totalTotal,
+                jugadores: [{
+                    nombre,
+                    aciertos:   totalOk,
+                    intentos:   totalTotal,
+                    porcentaje: totalTotal>0 ? Math.round(totalOk/totalTotal*100) : 0,
+                    modulos: modulosPracticados.map(t=>({
+                        nombre:     t.label,
+                        aciertos:   t.ok,
+                        intentos:   t.total,
+                        porcentaje: t.total>0 ? Math.round(t.ok/t.total*100) : 0,
+                    })),
+                }],
             });
             setEnviado(true);
-        } catch(e) { alert('Error al enviar: '+e.message); }
-        finally { setEnviando(false); }
+        } catch(e) { setErrorEnv('Error al enviar: '+e.message); }
+        setEnviando(false);
     };
 
     const compartir = () => {
@@ -768,7 +865,7 @@ export default function AlgebraApp({ onExit, usuario }) {
     ];
 
     return (
-        <div style={{minHeight:'100vh',background:'#0d1117',color:'#e6edf3',fontFamily:"'Segoe UI',sans-serif",display:'flex',flexDirection:'column'}}>
+        <div ref={appRef} style={{minHeight:'100vh',background:'#0d1117',color:'#e6edf3',fontFamily:"'Segoe UI',sans-serif",display:'flex',flexDirection:'column'}}>
             {/* Header */}
             <div style={{padding:'12px 16px',background:'#161b22',borderBottom:'1px solid #30363d',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
                 <div style={{display:'flex',alignItems:'center',gap:12}}>
@@ -780,9 +877,12 @@ export default function AlgebraApp({ onExit, usuario }) {
                     <button onClick={compartir} style={{background:'transparent',border:'1px solid #30363d',color:'#8b949e',padding:'6px 10px',borderRadius:7,cursor:'pointer',display:'flex',alignItems:'center',gap:5}}>
                         <Share2 size={14}/> Compartir
                     </button>
-                    <button onClick={enviar} disabled={enviando||enviado||totalTotal===0}
+                    <button onClick={toggleFullscreen} title={isFullscreen?'Salir de pantalla completa':'Pantalla completa'} style={{background:'transparent',border:'1px solid #30363d',color:'#8b949e',padding:'6px 10px',borderRadius:7,cursor:'pointer',display:'flex',alignItems:'center',gap:5}}>
+                        {isFullscreen ? <Minimize2 size={14}/> : <Maximize2 size={14}/>}
+                    </button>
+                    <button onClick={()=>{ if(modulosPracticados.length===0){alert('Aún no has resuelto ningún ejercicio.');return;} setShowEnviar(true); }}
                         style={{...BTN(enviado?'#27ae60':totalTotal===0?'#21262d':'#3498db'),display:'flex',alignItems:'center',gap:6,opacity:totalTotal===0?0.5:1}}>
-                        <Send size={14}/>{enviado?'Enviado':'Enviar al profesor'}
+                        <Send size={14}/>{enviado?'Enviado ✓':'Enviar al profesor'}
                     </button>
                 </div>
             </div>
@@ -814,6 +914,64 @@ export default function AlgebraApp({ onExit, usuario }) {
                 </div>
                 {MODS_JSX[modIdx]}
             </div>
+
+            {/* Modal: enviar al profesor con código */}
+            {showEnviar && (
+                <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+                    <div style={{background:'#161b22',borderRadius:14,padding:24,maxWidth:460,width:'100%',border:'1px solid #30363d',boxShadow:'0 20px 60px rgba(0,0,0,0.5)'}}>
+                        <div style={{fontWeight:700,fontSize:'1.1rem',color:'#f39c12',marginBottom:16}}>📤 Enviar al profesor</div>
+
+                        {/* Resumen de módulos */}
+                        <div style={{background:'#0d1117',borderRadius:10,padding:14,marginBottom:16,border:'1px solid #30363d'}}>
+                            <div style={{fontSize:'0.78rem',color:'#8b949e',fontWeight:700,marginBottom:10,letterSpacing:.5}}>RESUMEN — {new Date().toLocaleDateString('es-ES')}</div>
+                            {modulosPracticados.map((t,i)=>(
+                                <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'4px 0',borderBottom:'1px solid #21262d',fontSize:'0.85rem'}}>
+                                    <span style={{color:'#e6edf3'}}>{t.label}</span>
+                                    <span style={{color: t.total>0&&Math.round(t.ok/t.total*100)>=70?'#2ecc71':'#f39c12',fontWeight:700}}>
+                                        {t.ok}/{t.total} ({t.total>0?Math.round(t.ok/t.total*100):0}%)
+                                    </span>
+                                </div>
+                            ))}
+                            <div style={{display:'flex',justifyContent:'space-between',marginTop:8,fontSize:'0.85rem',fontWeight:700}}>
+                                <span style={{color:'#8b949e'}}>Total</span>
+                                <span style={{color:'#e6edf3'}}>{totalOk}/{totalTotal}</span>
+                            </div>
+                        </div>
+
+                        {enviado ? (
+                            <div style={{display:'flex',alignItems:'center',gap:8,color:'#2ecc71',fontWeight:700,justifyContent:'center',padding:'12px 0'}}>
+                                <CheckCircle size={20}/> ¡Informe enviado correctamente!
+                            </div>
+                        ) : (
+                            <>
+                                {!usuario && (
+                                    <input
+                                        value={nombreInput} onChange={e=>setNombreInput(e.target.value)}
+                                        placeholder="Tu nombre"
+                                        style={{width:'100%',boxSizing:'border-box',padding:'10px 12px',borderRadius:9,border:'1.5px solid #30363d',background:'#0d1117',color:'#e6edf3',fontSize:'0.9rem',marginBottom:10,outline:'none'}}
+                                    />
+                                )}
+                                <div style={{display:'flex',gap:8,marginBottom:8}}>
+                                    <input
+                                        value={codigoInput} onChange={e=>setCodigoInput(e.target.value.toUpperCase())}
+                                        placeholder="Código del profesor"
+                                        maxLength={8}
+                                        style={{flex:1,padding:'10px 12px',borderRadius:9,border:'1.5px solid #30363d',background:'#0d1117',color:'#e6edf3',fontSize:'0.9rem',letterSpacing:2,outline:'none'}}
+                                    />
+                                    <button onClick={enviar} disabled={enviando} style={{...BTN('#3498db'),display:'flex',alignItems:'center',gap:6,opacity:enviando?0.6:1}}>
+                                        <Send size={14}/>{enviando?'Enviando…':'Enviar'}
+                                    </button>
+                                </div>
+                                {errorEnv && <div style={{color:'#e74c3c',fontSize:'0.8rem',marginBottom:8}}>{errorEnv}</div>}
+                            </>
+                        )}
+
+                        <div style={{display:'flex',justifyContent:'flex-end',marginTop:8}}>
+                            <button onClick={()=>{ setShowEnviar(false); setErrorEnv(''); }} style={BTN('#30363d')}>Cerrar</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

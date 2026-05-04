@@ -504,7 +504,7 @@ export default function CalculoMentalGame({ usuario, onExit }) {
                 <ConfigModal
                     config={config}
                     onChange={setConfig}
-                    onStart={startGame}
+                    onStart={(cfg) => { startGame(cfg); setShowConfig(false); }}
                     onClose={() => setShowConfig(false)}
                 />
             )}

@@ -52,8 +52,8 @@ const ConfigBadge = ({ icon, label }) => (
         {icon} {label}
     </span>
 );
-const TIPO_LABEL  = { OCA:'🦆 Oca Matemática', CAZABURBUJAS:'🔵 Cazaburbujas', PIKATRON:'⚡ Pikatron', SOPA:'🔤 Sopa de Letras', WORDLE:'🟩 Wordle', MATHLE:'🔢 Mathle', PASAPALABRA:'🔠 Pasapalabra', FUNCIONES:'∫ Funciones', FUNCIONES_ANALISIS:'📈 Análisis de Funciones', APAREJADOS:'🃏 Aparejados', STORYCUBES:'🎲 Story Cubes', IRREGULAR_VERBS:'🇬🇧 Verbos Irregulares', THINKHOOT:'🦉 PiLive', MATHLIVE:'🧮 MathLive', OLYMPICLIVE:'🏅 OlympicLive' };
-const TIPO_ICON   = { OCA:'🦆', CAZABURBUJAS:'🔵', PIKATRON:'⚡', SOPA:'🔤', WORDLE:'🟩', MATHLE:'🔢', PASAPALABRA:'🔠', FUNCIONES:'∫', FUNCIONES_ANALISIS:'📈', APAREJADOS:'🃏', STORYCUBES:'🎲', IRREGULAR_VERBS:'🇬🇧', THINKHOOT:'🦉', MATHLIVE:'🧮', OLYMPICLIVE:'🏅' };
+const TIPO_LABEL  = { OCA:'🦆 Oca Matemática', CAZABURBUJAS:'🔵 Cazaburbujas', PIKATRON:'⚡ Pikatron', SOPA:'🔤 Sopa de Letras', WORDLE:'🟩 Wordle', MATHLE:'🔢 Mathle', PASAPALABRA:'🔠 Pasapalabra', FUNCIONES:'∫ Funciones', FUNCIONES_ANALISIS:'📈 Análisis de Funciones', APAREJADOS:'🃏 Aparejados', STORYCUBES:'🎲 Story Cubes', IRREGULAR_VERBS:'🇬🇧 Verbos Irregulares', THINKHOOT:'🦉 PiLive', MATHLIVE:'🧮 MathLive', OLYMPICLIVE:'🏅 OlympicLive', ALGEBRA:'✖️ Álgebra', DOMINO:'🁣 Dominó', ESTADISTICA:'📊 Estadística' };
+const TIPO_ICON   = { OCA:'🦆', CAZABURBUJAS:'🔵', PIKATRON:'⚡', SOPA:'🔤', WORDLE:'🟩', MATHLE:'🔢', PASAPALABRA:'🔠', FUNCIONES:'∫', FUNCIONES_ANALISIS:'📈', APAREJADOS:'🃏', STORYCUBES:'🎲', IRREGULAR_VERBS:'🇬🇧', THINKHOOT:'🦉', MATHLIVE:'🧮', OLYMPICLIVE:'🏅', ALGEBRA:'✖️', DOMINO:'🁣', ESTADISTICA:'📊' };
 const TIPO_LIVE = new Set(['THINKHOOT', 'MATHLIVE', 'OLYMPICLIVE']);
 const tipoLabel   = (t) => TIPO_LABEL[t] || ('🎮 ' + (t||'Juego'));
 const tipoIcon    = (t) => TIPO_ICON[t]  || '🎮';
@@ -804,6 +804,21 @@ const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, 
                             </tr>
                         </tfoot>
                     </table>
+                    {/* Desglose de módulos para ALGEBRA */}
+                    {tipo === 'ALGEBRA' && jugs.some(j => j.modulos?.length > 0) && (
+                        <div style={{ marginTop:12, padding:'10px 12px', background:'#f8f9fa', borderRadius:10, border:'1px solid #ecf0f1' }}>
+                            <div style={{ fontSize:'0.72rem', color:'#7f8c8d', fontWeight:700, letterSpacing:.5, marginBottom:8 }}>DESGLOSE POR MÓDULO</div>
+                            {jugs[0].modulos.map((m,i) => (
+                                <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 0', borderBottom:'1px solid #ecf0f1', fontSize:'0.82rem' }}>
+                                    <span style={{ color:'#2c3e50' }}>{m.nombre}</span>
+                                    <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                                        <span style={{ color:'#7f8c8d' }}>{m.aciertos}/{m.intentos}</span>
+                                        <span style={{ padding:'2px 7px', borderRadius:12, background:pctBg2(m.porcentaje), color:pctColor2(m.porcentaje), fontWeight:700, fontSize:'0.75rem' }}>{m.porcentaje}%</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
         </div>

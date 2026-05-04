@@ -81,6 +81,7 @@ export default function DominoMatematico({ onExit }) {
     const [extremoDer, setExtremoDer] = useState(null);
 
     const [ganador, setGanador] = useState(null);
+    const [bloqueado, setBloqueado] = useState(false);
 
     const iniciarJuego = () => {
         const todasLasFichas = generarFichas(modo);
@@ -103,6 +104,7 @@ export default function DominoMatematico({ onExit }) {
         setTurno(0);
         setMensajeError('');
         setGanador(null);
+        setBloqueado(false);
         setPantalla('ESCONDIDO');
     };
 
@@ -123,7 +125,7 @@ export default function DominoMatematico({ onExit }) {
         return () => clearTimeout(timerRef.current);
     }, [timeLeft, pantalla]);
 
-    const pasarTurnoNormal = (nuevosJugadores = jugadores) => {
+    const pasarTurnoNormal = (nuevosJugadores = jugadores, pozoActual = pozo, izq = extremoIzq, der = extremoDer) => {
         const ganadorEncontrado = nuevosJugadores.find(j => j.fichas.length === 0);
         if (ganadorEncontrado) {
             setGanador(ganadorEncontrado);
@@ -131,6 +133,21 @@ export default function DominoMatematico({ onExit }) {
             audio.victoria();
             setPantalla('FIN');
             return;
+        }
+        // Detectar bloqueo: pozo vacío y ningún jugador puede colocar ninguna ficha
+        if (pozoActual.length === 0 && izq !== null) {
+            const puedeJugar = (j) => j.fichas.some(f =>
+                f.valA === izq || f.valB === izq || f.valA === der || f.valB === der
+            );
+            if (nuevosJugadores.every(j => !puedeJugar(j))) {
+                const sorted = [...nuevosJugadores].sort((a, b) => a.fichas.length - b.fichas.length);
+                setGanador(sorted[0]);
+                setJugadores(nuevosJugadores);
+                setBloqueado(true);
+                audio.victoria();
+                setPantalla('FIN');
+                return;
+            }
         }
         setJugadores(nuevosJugadores);
         setTurno(t => (t + 1) % numJ);
@@ -152,11 +169,13 @@ export default function DominoMatematico({ onExit }) {
         const jActual = jugadores[turno];
         let esValido = false;
         let fichaVolteada = false;
+        let nuevoExtremoIzq = extremoIzq;
+        let nuevoExtremoDer = extremoDer;
 
         if (tablero.length === 0) {
             esValido = true;
-            setExtremoIzq(fichaSeleccionada.valA);
-            setExtremoDer(fichaSeleccionada.valB);
+            nuevoExtremoIzq = fichaSeleccionada.valA;
+            nuevoExtremoDer = fichaSeleccionada.valB;
         } else {
             const targetVal = lado === 'IZQ' ? extremoIzq : extremoDer;
             if (fichaSeleccionada.valB === targetVal) { esValido = true; fichaVolteada = lado === 'DER'; }
@@ -169,15 +188,17 @@ export default function DominoMatematico({ onExit }) {
             let nuevoTablero = [...tablero];
             if (lado === 'IZQ' || tablero.length === 0) {
                 nuevoTablero.unshift(nuevaFichaTablero);
-                if (tablero.length > 0) setExtremoIzq(fichaVolteada ? fichaSeleccionada.valB : fichaSeleccionada.valA);
+                if (tablero.length > 0) nuevoExtremoIzq = fichaVolteada ? fichaSeleccionada.valB : fichaSeleccionada.valA;
             } else {
                 nuevoTablero.push(nuevaFichaTablero);
-                if (tablero.length > 0) setExtremoDer(fichaVolteada ? fichaSeleccionada.valA : fichaSeleccionada.valB);
+                if (tablero.length > 0) nuevoExtremoDer = fichaVolteada ? fichaSeleccionada.valA : fichaSeleccionada.valB;
             }
+            setExtremoIzq(nuevoExtremoIzq);
+            setExtremoDer(nuevoExtremoDer);
             const nuevasFichasMano = jActual.fichas.filter(f => f.id !== fichaSeleccionada.id);
             const nuevosJugadores = jugadores.map((j, i) => i === turno ? { ...j, fichas: nuevasFichasMano } : j);
             setTablero(nuevoTablero);
-            pasarTurnoNormal(nuevosJugadores);
+            pasarTurnoNormal(nuevosJugadores, pozo, nuevoExtremoIzq, nuevoExtremoDer);
         } else {
             audio.error();
             handlePenalizacion('¡Error! Esta ficha no encaja con el resultado matemático. Pierdes el turno.');
@@ -195,9 +216,9 @@ export default function DominoMatematico({ onExit }) {
                 i === turno ? { ...j, fichas: [...j.fichas, nuevaFicha] } : j
             );
             setPozo(nuevoPozo);
-            pasarTurnoNormal(nuevosJugadores);
+            pasarTurnoNormal(nuevosJugadores, nuevoPozo, extremoIzq, extremoDer);
         } else {
-            pasarTurnoNormal();
+            pasarTurnoNormal(jugadores, [], extremoIzq, extremoDer);
         }
     };
 
@@ -318,7 +339,9 @@ export default function DominoMatematico({ onExit }) {
                 {/* Nombre ganador */}
                 <div style={{ background: winner.color, padding: '6px 28px', borderRadius: 40, fontSize: '0.85rem', fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 12, opacity: 0.9 }}>¡GANADOR!</div>
                 <h1 style={{ fontSize: '3rem', margin: '0 0 6px', textShadow: `0 0 30px ${winner.color}` }}>{winner.nombre}</h1>
-                <p style={{ opacity: 0.7, margin: '0 0 32px' }}>Se quedó sin fichas primero 🎉</p>
+                <p style={{ opacity: 0.7, margin: '0 0 32px' }}>
+                    {bloqueado ? '🔒 Juego bloqueado — gana quien menos fichas tiene' : 'Se quedó sin fichas primero 🎉'}
+                </p>
 
                 {/* Clasificación */}
                 <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 16, padding: '16px 24px', marginBottom: 28, width: '100%', maxWidth: 340 }}>

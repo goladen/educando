@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Play, RefreshCw, CheckCircle, BrainCircuit, Lock } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { ArrowLeft, Play, RefreshCw, CheckCircle, BrainCircuit, Lock, Grid3X3, Eraser, Edit3, Clock } from 'lucide-react';
 import Confetti from 'react-confetti';
 
 // ─── NIVELES DEL JUEGO (Tableros) ─────────────────────────────────────────────
@@ -598,9 +598,254 @@ function ConectaLibre({ levelData, onWin, onVolver, isLastLevel }) {
     );
 }
 
+// ─── MOTOR DE SUDOKU ──────────────────────────────────────────────────────────
+const isValidSudokuPlacement = (board, r, c, num) => {
+    for (let i = 0; i < 9; i++) {
+        if (board[r][i] === num && i !== c) return false;
+        if (board[i][c] === num && i !== r) return false;
+    }
+    const sr = Math.floor(r / 3) * 3, sc = Math.floor(c / 3) * 3;
+    for (let i = 0; i < 3; i++)
+        for (let j = 0; j < 3; j++)
+            if (board[sr + i][sc + j] === num && (sr + i !== r || sc + j !== c)) return false;
+    return true;
+};
+
+const solveSudoku = (board) => {
+    for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+            if (board[r][c] === 0) {
+                const nums = [1,2,3,4,5,6,7,8,9].sort(() => Math.random() - 0.5);
+                for (let n of nums) {
+                    if (isValidSudokuPlacement(board, r, c, n)) {
+                        board[r][c] = n;
+                        if (solveSudoku(board)) return true;
+                        board[r][c] = 0;
+                    }
+                }
+                return false;
+            }
+        }
+    }
+    return true;
+};
+
+const generateSudoku = (difficulty) => {
+    const board = Array(9).fill(0).map(() => Array(9).fill(0));
+    solveSudoku(board);
+    const initial = board.map(row => [...row]);
+    let remove = difficulty === 'FÁCIL' ? 35 : difficulty === 'MEDIO' ? 45 : 55;
+    while (remove > 0) {
+        const r = Math.floor(Math.random() * 9), c = Math.floor(Math.random() * 9);
+        if (initial[r][c] !== 0) { initial[r][c] = 0; remove--; }
+    }
+    return { initial, full: board };
+};
+
+const fmtTime = (s) => `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
+
+// ─── COMPONENTE SUDOKU ────────────────────────────────────────────────────────
+function JuegoSudoku({ onVolver }) {
+    const [difficulty, setDifficulty] = useState(null);
+    const [board, setBoard] = useState([]);
+    const [initialBoard, setInitialBoard] = useState([]);
+    const [notes, setNotes] = useState([]);
+    const [selected, setSelected] = useState({ r: null, c: null });
+    const [notesMode, setNotesMode] = useState(false);
+    const [isWon, setIsWon] = useState(false);
+    const [seconds, setSeconds] = useState(0);
+
+    useEffect(() => {
+        if (!difficulty || isWon) return;
+        const id = setInterval(() => setSeconds(s => s + 1), 1000);
+        return () => clearInterval(id);
+    }, [difficulty, isWon]);
+
+    const initGame = (diff) => {
+        const { initial } = generateSudoku(diff);
+        setInitialBoard(initial.map(r => [...r]));
+        setBoard(initial.map(r => [...r]));
+        setNotes(Array(9).fill(null).map(() => Array(9).fill([])));
+        setDifficulty(diff); setIsWon(false);
+        setSelected({ r: 0, c: 0 }); setSeconds(0); setNotesMode(false);
+    };
+
+    const checkWin = (b) => {
+        for (let r = 0; r < 9; r++)
+            for (let c = 0; c < 9; c++)
+                if (b[r][c] === 0 || !isValidSudokuPlacement(b, r, c, b[r][c])) return false;
+        return true;
+    };
+
+    const autoCleanNotes = (cur, r, c, num) => {
+        const n = cur.map(row => row.map(cell => [...cell]));
+        for (let i = 0; i < 9; i++) {
+            n[r][i] = n[r][i].filter(x => x !== num);
+            n[i][c] = n[i][c].filter(x => x !== num);
+        }
+        const sr = Math.floor(r/3)*3, sc = Math.floor(c/3)*3;
+        for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++)
+            n[sr+i][sc+j] = n[sr+i][sc+j].filter(x => x !== num);
+        return n;
+    };
+
+    const handleNum = useCallback((num) => {
+        if (isWon || selected.r === null || initialBoard[selected.r]?.[selected.c] !== 0) return;
+        const { r, c } = selected;
+        if (num === 0) {
+            const b = board.map(row => [...row]); b[r][c] = 0; setBoard(b); return;
+        }
+        if (notesMode) {
+            const n = notes.map(row => row.map(cell => [...cell]));
+            n[r][c] = n[r][c].includes(num) ? n[r][c].filter(x => x !== num) : [...n[r][c], num].sort();
+            setNotes(n);
+            if (board[r][c] !== 0) { const b = board.map(row => [...row]); b[r][c] = 0; setBoard(b); }
+        } else {
+            const b = board.map(row => [...row]); b[r][c] = num; setBoard(b);
+            setNotes(autoCleanNotes(notes, r, c, num));
+            if (checkWin(b)) setIsWon(true);
+        }
+    }, [isWon, selected, initialBoard, notesMode, notes, board]);
+
+    useEffect(() => {
+        const onKey = (e) => {
+            if (!difficulty || isWon) return;
+            const { r, c } = selected;
+            if (e.key === 'ArrowUp')    setSelected({ r: Math.max(0, r-1), c });
+            if (e.key === 'ArrowDown')  setSelected({ r: Math.min(8, r+1), c });
+            if (e.key === 'ArrowLeft')  setSelected({ r, c: Math.max(0, c-1) });
+            if (e.key === 'ArrowRight') setSelected({ r, c: Math.min(8, c+1) });
+            if (e.key >= '1' && e.key <= '9') handleNum(parseInt(e.key));
+            if (e.key === 'Backspace' || e.key === 'Delete') handleNum(0);
+            if (e.key.toLowerCase() === 'n') setNotesMode(p => !p);
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [difficulty, isWon, selected, handleNum]);
+
+    if (!difficulty) return (
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', width:'100%', maxWidth:400 }}>
+            <div style={{ display:'flex', justifyContent:'flex-start', width:'100%', marginBottom:30 }}>
+                <button onClick={onVolver} style={st.btnSecundario}><ArrowLeft size={16}/> Volver</button>
+            </div>
+            <Grid3X3 size={60} color="#3498db" style={{ marginBottom:20 }} />
+            <h2 style={{ color:'white', marginBottom:30 }}>Selecciona la Dificultad</h2>
+            <div style={{ display:'flex', flexDirection:'column', gap:15, width:'100%' }}>
+                <button onClick={() => initGame('FÁCIL')}  style={{ ...st.btnLevel, background:'#2ecc71' }}>Sencillo</button>
+                <button onClick={() => initGame('MEDIO')}  style={{ ...st.btnLevel, background:'#f39c12' }}>Medio</button>
+                <button onClick={() => initGame('DIFÍCIL')} style={{ ...st.btnLevel, background:'#e74c3c' }}>Difícil</button>
+            </div>
+        </div>
+    );
+
+    return (
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', width:'100%' }}>
+            {isWon && <Confetti recycle={false} numberOfPieces={300} />}
+
+            <div style={{ display:'flex', justifyContent:'space-between', width:'100%', maxWidth:450, marginBottom:15, alignItems:'center' }}>
+                <button onClick={() => setDifficulty(null)} style={st.btnSecundario}><ArrowLeft size={16}/> Atrás</button>
+                <div style={{ textAlign:'center' }}>
+                    <div style={{ fontSize:'1rem', fontWeight:'bold', color:'white', letterSpacing:1 }}>{difficulty}</div>
+                    <div style={{ fontSize:'0.85rem', color:'#bdc3c7', display:'flex', alignItems:'center', gap:5 }}>
+                        <Clock size={12}/> {fmtTime(seconds)}
+                    </div>
+                </div>
+                <button onClick={() => initGame(difficulty)} style={st.btnRefresh}><RefreshCw size={18}/></button>
+            </div>
+
+            {/* Tablero */}
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(9,1fr)', width:'100%', maxWidth:450, aspectRatio:'1/1', background:'#2c3e50', border:'3px solid #1a252f', borderRadius:8, overflow:'hidden', boxShadow:'0 10px 30px rgba(0,0,0,0.4)', userSelect:'none' }}>
+                {board.map((row, r) => row.map((val, c) => {
+                    const isInit = initialBoard[r][c] !== 0;
+                    const isSel  = selected.r === r && selected.c === c;
+                    const inZone = selected.r !== null && (selected.r === r || selected.c === c || (Math.floor(r/3)===Math.floor(selected.r/3) && Math.floor(c/3)===Math.floor(selected.c/3)));
+                    const selVal = selected.r !== null ? board[selected.r][selected.c] : 0;
+                    const sameNum = val !== 0 && selVal === val;
+                    const conflict = !isInit && val !== 0 && !isValidSudokuPlacement(board, r, c, val);
+                    let bg = 'white';
+                    if (isSel) bg = '#bbdefb';
+                    else if (sameNum) bg = '#aed6f1';
+                    else if (inZone) bg = '#ebf5fb';
+                    else if (isInit) bg = '#f8f9fa';
+                    let tx = isInit ? '#2c3e50' : '#2980b9';
+                    if (conflict) { bg = '#fadbd8'; tx = '#c0392b'; }
+                    return (
+                        <div key={`${r}-${c}`} onClick={() => !isWon && setSelected({ r, c })}
+                            style={{ display:'flex', alignItems:'center', justifyContent:'center', position:'relative',
+                                background:bg, color:tx,
+                                borderBottom: (r===2||r===5) ? '3px solid #1a252f' : '1px solid #bdc3c7',
+                                borderRight:  (c===2||c===5) ? '3px solid #1a252f' : '1px solid #bdc3c7',
+                                fontSize:'clamp(1.1rem,5vw,1.6rem)', fontWeight: isInit ? 900 : 600,
+                                cursor: isWon ? 'default' : 'pointer', transition:'background 0.1s' }}
+                        >
+                            {val !== 0 ? val : ''}
+                            {val === 0 && notes[r][c].length > 0 && (
+                                <div style={{ position:'absolute', inset:2, display:'grid', gridTemplateColumns:'repeat(3,1fr)', gridTemplateRows:'repeat(3,1fr)', pointerEvents:'none' }}>
+                                    {[1,2,3,4,5,6,7,8,9].map(n => (
+                                        <div key={n} style={{ display:'flex', alignItems:'center', justifyContent:'center', fontSize:'clamp(0.4rem,2vw,0.6rem)', color:'#7f8c8d', fontWeight:'bold' }}>
+                                            {notes[r][c].includes(n) ? n : ''}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    );
+                }))}
+            </div>
+
+            {/* Controles */}
+            <div style={{ width:'100%', maxWidth:450, marginTop:20, display:'flex', flexDirection:'column', gap:12 }}>
+                <div style={{ display:'flex', gap:10 }}>
+                    <button onClick={() => handleNum(0)} style={{ ...st.btnAction, flex:1 }}><Eraser size={18}/> Borrar</button>
+                    <button onClick={() => setNotesMode(p => !p)} style={{ ...st.btnAction, flex:2, background: notesMode ? '#3498db' : '#34495e', color:'white' }}>
+                        <Edit3 size={18}/> {notesMode ? 'Notas: ON' : 'Notas: OFF'}
+                    </button>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(9,1fr)', gap:5 }}>
+                    {[1,2,3,4,5,6,7,8,9].map(n => (
+                        <button key={n} onClick={() => handleNum(n)} style={st.btnNumpad}>{n}</button>
+                    ))}
+                </div>
+            </div>
+
+            {isWon && (
+                <div style={st.winBadge}><CheckCircle size={22}/> ¡Completado en {fmtTime(seconds)}!</div>
+            )}
+        </div>
+    );
+}
+
+// ─── BOTÓN COMPARTIR ─────────────────────────────────────────────────────────
+function BtnCompartir({ path, title = 'pikt.es · Sala de Retos' }) {
+    const [copiado, setCopiado] = useState(false);
+    const compartir = async (e) => {
+        e.stopPropagation();
+        const url = `https://pikt.es/${path}`;
+        if (navigator.share) {
+            try { await navigator.share({ title, url }); } catch (_) {}
+        } else {
+            navigator.clipboard.writeText(url).catch(() => {});
+            setCopiado(true);
+            setTimeout(() => setCopiado(false), 2200);
+        }
+    };
+    return (
+        <button onClick={compartir} style={{
+            background: copiado ? 'rgba(46,204,113,0.18)' : 'rgba(255,255,255,0.07)',
+            border: `1px solid ${copiado ? '#2ecc71' : 'rgba(255,255,255,0.18)'}`,
+            color: copiado ? '#2ecc71' : 'rgba(255,255,255,0.65)',
+            padding: '5px 12px', borderRadius: 20, cursor: 'pointer',
+            fontSize: '0.78rem', fontWeight: 700,
+            display: 'inline-flex', alignItems: 'center', gap: 5, transition: 'all 0.2s'
+        }}>
+            {copiado ? '✓ Copiado' : '🔗 Compartir'}
+        </button>
+    );
+}
+
 // ─── MENÚ PRINCIPAL DE RETOS ──────────────────────────────────────────────────
-export default function Retos({ onExit }) {
-    const [activeGame, setActiveGame] = useState(null); // 'CONECTA'
+export default function Retos({ onExit, initialGame = null }) {
+    const [activeGame, setActiveGame] = useState(initialGame); // 'CONECTA' | 'SUDOKU' | null
     const [currentLevelIdx, setCurrentLevelIdx] = useState(0);
     const [nivelesDesbloqueados, setNivelesDesbloqueados] = useState(1);
 
@@ -627,10 +872,17 @@ export default function Retos({ onExit }) {
         );
     }
 
+    if (activeGame === 'SUDOKU') return (
+        <div style={st.containerGame}>
+            <JuegoSudoku onVolver={() => setActiveGame(null)} />
+        </div>
+    );
+
     return (
         <div style={st.container}>
-            <div style={st.header}>
+            <div style={{ ...st.header, justifyContent: 'space-between', alignItems: 'center' }}>
                 <button onClick={onExit} style={st.btnVolver}><ArrowLeft size={16}/> Salir al menú</button>
+                <BtnCompartir path="retos" />
             </div>
 
             <div style={{ textAlign: 'center', marginBottom: 40 }}>
@@ -653,9 +905,12 @@ export default function Retos({ onExit }) {
                             Topología
                         </div>
                     </div>
-                    <h2 style={{ color: 'white', margin: '0 0 10px', fontSize: '1.5rem' }}>Conecta los Puntos</h2>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <h2 style={{ color: 'white', margin: 0, fontSize: '1.5rem' }}>Conecta los Puntos</h2>
+                        <BtnCompartir path="conectapuntos" />
+                    </div>
                     <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', lineHeight: 1.5, marginBottom: 20 }}>
-                        Une los puntos del mismo color trazando tuberías sin que se crucen entre ellas. ¡Debes rellenar todo el tablero!
+                        Une los puntos del mismo color trazando tuberías sin que se crucen entre ellas.
                     </p>
 
                     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -676,13 +931,26 @@ export default function Retos({ onExit }) {
                     </div>
                 </div>
 
-                {/* TARJETA PROXIMAMENTE */}
-                <div style={{ ...st.card, border: '2px dashed rgba(255,255,255,0.2)', background: 'transparent' }}>
-                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', flexDirection: 'column', opacity: 0.5 }}>
-                        <Lock size={40} color="white" style={{ marginBottom: 15 }} />
-                        <h2 style={{ color: 'white', margin: 0 }}>Próximamente</h2>
-                        <p style={{ color: 'white', textAlign: 'center', fontSize: '0.9rem' }}>Nuevos retos de lógica y matemáticas en camino.</p>
+                {/* TARJETA SUDOKU */}
+                <div style={st.card}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:15 }}>
+                        <div style={{ background:'#3498db', padding:12, borderRadius:14 }}>
+                            <Grid3X3 size={24} color="white" />
+                        </div>
+                        <div style={{ background:'rgba(255,255,255,0.1)', padding:'4px 10px', borderRadius:20, fontSize:'0.8rem', color:'white', fontWeight:'bold' }}>
+                            Lógica Numérica
+                        </div>
                     </div>
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+                        <h2 style={{ color:'white', margin:0, fontSize:'1.5rem' }}>Sudoku Infinito</h2>
+                        <BtnCompartir path="sudoku" />
+                    </div>
+                    <p style={{ color:'rgba(255,255,255,0.6)', fontSize:'0.9rem', lineHeight:1.5, marginBottom:20 }}>
+                        El reto clásico: rellena la cuadrícula sin repetir números. Con modo notas, teclado y tres niveles de dificultad.
+                    </p>
+                    <button onClick={() => setActiveGame('SUDOKU')} style={{ width:'100%', padding:'12px', background:'#3498db', color:'white', border:'none', borderRadius:10, fontWeight:'bold', fontSize:'1.1rem', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+                        <Play size={18}/> Jugar Sudoku
+                    </button>
                 </div>
 
             </div>
@@ -721,5 +989,24 @@ const st = {
     card: {
         background: 'rgba(255,255,255,0.05)', borderRadius: 20, padding: 30, border: '1px solid rgba(255,255,255,0.1)',
         boxShadow: '0 15px 35px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column'
+    },
+    winBadge: {
+        marginTop: 25, background: '#27ae60', color: 'white', padding: '15px 30px', borderRadius: 30,
+        fontSize: '1.1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 10
+    },
+    btnLevel: {
+        padding: '15px', border: 'none', borderRadius: 12, color: 'white', fontWeight: 'bold',
+        fontSize: '1.2rem', cursor: 'pointer', boxShadow: '0 5px 15px rgba(0,0,0,0.2)'
+    },
+    btnNumpad: {
+        background: '#ecf0f1', border: 'none', borderRadius: 8, color: '#2c3e50',
+        fontSize: 'clamp(1.1rem,4vw,1.4rem)', fontWeight: 'bold', padding: '10px 0',
+        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+    },
+    btnAction: {
+        border: 'none', borderRadius: 10, padding: '12px 15px', fontSize: '0.9rem', fontWeight: 'bold',
+        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+        background: '#ecf0f1', color: '#34495e', boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
     }
 };

@@ -11,6 +11,7 @@ import FuncionesEjecutivas from './FuncionesEjecutivas';
 import IrregularVerbsTest from './IrregularVerbsTest';
 import { SolarSystemViewer } from './components/LandingGames3';
 import PiTutorial from './components/PiTutorial';
+import Retos from './Retos';
 
 const TUTORIAL_ALUMNO = [
     {
@@ -44,7 +45,8 @@ function App() {
       const uid = params.get('p');
       if (uid) { setPaginaTarget({ uid }); return; }
       const slug = window.location.pathname.replace(/^\//, '').replace(/\/$/, '').trim().toLowerCase();
-      if (slug === 'funcionesejecutivas' || slug === 'irregular_verbs' || slug === 'sistema_solar') {
+      if (slug === 'funcionesejecutivas' || slug === 'irregular_verbs' || slug === 'sistema_solar'
+          || slug === 'retos' || slug === 'conectapuntos' || slug === 'sudoku') {
         setRutaPublica(slug);
         return;
       }
@@ -63,6 +65,7 @@ function App() {
         'algebra','polinomios','estadistica',
         'api','admin','login','app',
         'irregular_verbs','sistema_solar',
+        'retos','conectapuntos','sudoku',
       ]);
       if (slug && !RUTAS_RESERVADAS.has(slug)) {
         // Check if it's a professor page slug
@@ -155,6 +158,9 @@ function App() {
     if (rutaPublica === 'funcionesejecutivas') return <FuncionesEjecutivas onBack={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
     if (rutaPublica === 'irregular_verbs') return <IrregularVerbsTest />;
     if (rutaPublica === 'sistema_solar') return <SolarSystemViewer onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
+    if (rutaPublica === 'retos') return <Retos onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
+    if (rutaPublica === 'conectapuntos') return <Retos initialGame="CONECTA" onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
+    if (rutaPublica === 'sudoku') return <Retos initialGame="SUDOKU" onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
 
     // PÁGINA PÚBLICA DEL PROFESOR (no requiere login)
     if (paginaTarget) return <PaginaProfesor uid={paginaTarget.uid} onBack={() => { setPaginaTarget(null); window.history.back(); }} />;

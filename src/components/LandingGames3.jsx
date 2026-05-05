@@ -37,6 +37,7 @@ import IrregularVerbsTest from '../IrregularVerbsTest';
 import MusicApp from '../MusicApp';
 import AlgebraApp from '../Algebra';
 import EstadisticaApp from '../Estadistica';
+import RetosApp from '../Retos';
 import imgPasapalabra from '../assets/icono_pasapal.png'; // Revisa si es .png o .jpg
 import imgBurbujas from '../assets/icono_burbujas.png';
 import imgPikatron from '../assets/icono_pikatron.png';
@@ -584,6 +585,7 @@ export const APPS = [
     { id: 'ESTADISTICA',  name: 'Estadística',  desc: 'Tablas, parámetros y representación gráfica.', color: '#9C27B0', emoji: '📊', isMath: true, shareable: true },
 
     { id: 'STORYCUBES', name: 'Story Cubes', desc: 'Crea historias en equipo usando dados con imágenes.', color: '#8e44ad', emoji: '🎲', shareable: true },
+    { id: 'RETOS', name: 'Retos', desc: 'Conecta puntos y puzzles de lógica.', color: '#f39c12', emoji: '🧩', shareable: true },
 
 ];
 
@@ -969,6 +971,11 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
             return;
         }
 
+        if (appId === 'RETOS') {
+            setJuegoActivo({ tipoJuego: 'RETOS' });
+            return;
+        }
+
         const appInfo = APPS.find(a => a.id === appId);
         if (appInfo) {
             window.history.pushState({}, '', `/${appInfo.name.toLowerCase()}`);
@@ -1122,6 +1129,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
         if (juegoActivo.tipoJuego === 'SINTAXIS')    return <SintaxisGame  usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'LISTENING')   return <Listening     usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'STORYCUBES')  return <StoryCubes    usuario={usuario} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'RETOS')        return <RetosApp                        onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'SOLAR_SYSTEM') return <SolarSystemViewer recursoConfig={juegoActivo.tourConfig || null} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'IRREGULAR_VERBS') return (
             <div style={{ position:'fixed', inset:0, zIndex:9999, background:'#0f0f1a', overflowY:'auto' }}>
@@ -1694,6 +1702,7 @@ const [entrando, setEntrando] = useState(false);
         if (appData.id === 'GEOMETRÍA_ANALÍTICA' || juegoActivo.tipoJuego === 'GEOMETRÍA_ANALÍTICA') return <GeometriaAnalitica usuario={null} onExit={handleExitGame} />;
         if (appData.id === 'POLINOMIOS'  || juegoActivo.tipoJuego === 'POLINOMIOS')  return <AlgebraApp     usuario={null} onExit={handleExitGame} />;
         if (appData.id === 'ESTADISTICA' || juegoActivo.tipoJuego === 'ESTADISTICA') return <EstadisticaApp usuario={null} onExit={handleExitGame} />;
+        if (appData.id === 'RETOS'       || juegoActivo.tipoJuego === 'RETOS')       return <RetosApp                             onExit={handleExitGame} />;
 
     }
     // --- NUEVO: ATAJO PARA JUEGOS CON MENÚ PROPIO ---

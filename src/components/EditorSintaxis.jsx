@@ -24,6 +24,12 @@ export default function EditorSintaxis({ datos, setDatos, onClose, usuario }) {
     const [hojaActiva, setHojaActiva]         = useState(0);
     const [mostrandoConfig, setMostrandoConfig] = useState(false);
     const [guardando, setGuardando]           = useState(false);
+    const [mediaTipoPres, setMediaTipoPres]   = useState(() => datos.presentacion?.video ? 'video' : 'imagen');
+    const [modoBuscadorPres, setModoBuscadorPres] = useState(false);
+    const [searchQueryPres, setSearchQueryPres]   = useState('');
+    const [searchResultsPres, setSearchResultsPres] = useState([]);
+    const [isSearchingPres, setIsSearchingPres]   = useState(false);
+    const [mostrandoPreviewPres, setMostrandoPreviewPres] = useState(false);
     const [modalPublicar, setModalPublicar]   = useState(null);
     const [guardadoOk, setGuardadoOk]         = useState(false);
 
@@ -186,6 +192,33 @@ export default function EditorSintaxis({ datos, setDatos, onClose, usuario }) {
     const limpiarConstructor = () => {
         setFraseEnConstruccion(fraseVacia());
         setTokenActivo(null);
+    };
+
+    const toEmbedUrl = (url) => {
+        if (!url) return '';
+        let m = url.match(/youtube\.com\/watch\?(?:.*&)?v=([^&]+)/);
+        if (m) return `https://www.youtube.com/embed/${m[1]}`;
+        m = url.match(/youtu\.be\/([^?&]+)/);
+        if (m) return `https://www.youtube.com/embed/${m[1]}`;
+        m = url.match(/vimeo\.com\/(\d+)/);
+        if (m) return `https://player.vimeo.com/video/${m[1]}`;
+        return url;
+    };
+    const buscarImagenesPres = async () => {
+        if (!searchQueryPres.trim()) return;
+        setIsSearchingPres(true);
+        try {
+            const res = await fetch(`https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrnamespace=6&gsrsearch=${encodeURIComponent(searchQueryPres)}&gsrlimit=24&prop=imageinfo&iiprop=url&iiurlwidth=400&format=json&origin=*`);
+            const data = await res.json();
+            const pages = data.query?.pages || {};
+            const urls = Object.values(pages).map(p => { const i = p.imageinfo?.[0]; return i?.thumburl || i?.url; }).filter(u => u && /\.(jpe?g|png|gif|webp|svg)(\?|$)/i.test(u));
+            setSearchResultsPres(urls);
+        } catch { alert('Error buscando imágenes.'); }
+        setIsSearchingPres(false);
+    };
+    const setPresentacionImg = (url) => {
+        setDatos(p => ({ ...p, presentacion: { ...(p.presentacion || {}), imagen: url } }));
+        setModoBuscadorPres(false); setSearchResultsPres([]); setSearchQueryPres('');
     };
 
     // ── Render ──────────────────────────────────────────
@@ -563,8 +596,51 @@ export default function EditorSintaxis({ datos, setDatos, onClose, usuario }) {
                                         </div>
                                     ))}
                                 </div>
+
+                                {/* ── PRESENTACIÓN PREVIA ── */}
+                                <SectionTitle>🎬 Presentación previa</SectionTitle>
+                                <p style={{ fontSize:'0.75rem', color:'#999', marginTop:0 }}>Pantalla introductoria antes de que empiece el juego.</p>
+                                <InputConf label="Título" val={datos.presentacion?.titulo} set={v=>setDatos(p=>({...p,presentacion:{...(p.presentacion||{}),titulo:v}}))}/>
+                                <div style={{ marginBottom:12 }}>
+                                    <label style={{ display:'block', fontSize:'0.75rem', fontWeight:'bold', color:'#555', marginBottom:6 }}>Media</label>
+                                    <div style={{ display:'flex', borderRadius:8, overflow:'hidden', border:'1px solid #ddd', marginBottom:8 }}>
+                                        {[['imagen','🖼️ Imagen'],['video','▶️ Vídeo']].map(([tipo,lbl])=>(
+                                            <button key={tipo} onClick={()=>{setMediaTipoPres(tipo);setModoBuscadorPres(false);setSearchResultsPres([]);}}
+                                                style={{flex:1,padding:'7px 0',border:'none',cursor:'pointer',fontWeight:700,fontSize:'0.82rem',background:mediaTipoPres===tipo?'#3498db':'#f5f5f5',color:mediaTipoPres===tipo?'white':'#555'}}>{lbl}</button>
+                                        ))}
+                                    </div>
+                                    {mediaTipoPres==='imagen' && (<>
+                                        {datos.presentacion?.imagen && (<div style={{position:'relative',marginBottom:8}}><img src={datos.presentacion.imagen} alt="" onError={e=>{e.target.style.display='none'}} style={{width:'100%',borderRadius:8,maxHeight:110,objectFit:'cover',display:'block'}}/><button onClick={()=>setDatos(p=>({...p,presentacion:{...(p.presentacion||{}),imagen:''}}))} style={{position:'absolute',top:4,right:4,background:'rgba(0,0,0,0.6)',border:'none',color:'white',borderRadius:'50%',width:22,height:22,cursor:'pointer',fontSize:13}}>✕</button></div>)}
+                                        <button onClick={()=>setModoBuscadorPres(p=>!p)} style={{...st.input,background:'#e8f4fc',color:'#1565c0',fontWeight:'bold',border:'1px dashed #3498db',cursor:'pointer',textAlign:'center',marginBottom:6}}>🔍 {modoBuscadorPres?'Cerrar buscador':'Buscar imagen'}</button>
+                                        {modoBuscadorPres && (<div style={{background:'#f5f5f5',borderRadius:8,padding:10,marginBottom:8}}>
+                                            <div style={{display:'flex',gap:6,marginBottom:8}}><input value={searchQueryPres} onChange={e=>setSearchQueryPres(e.target.value)} onKeyDown={e=>e.key==='Enter'&&buscarImagenesPres()} placeholder="Buscar en Wikimedia Commons..." style={{...st.input,flex:1}}/><button onClick={buscarImagenesPres} style={{background:'#3498db',color:'white',border:'none',borderRadius:6,padding:'0 12px',cursor:'pointer',fontWeight:'bold',whiteSpace:'nowrap'}}>{isSearchingPres?'...':'Buscar'}</button></div>
+                                            <input placeholder="O pega una URL..." style={{...st.input,fontSize:'0.75rem',marginBottom:8}} onBlur={e=>{if(e.target.value.startsWith('http'))setPresentacionImg(e.target.value);}} onKeyDown={e=>{if(e.key==='Enter'&&e.target.value.startsWith('http'))setPresentacionImg(e.target.value);}}/>
+                                            {searchResultsPres.length>0&&(<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(72px,1fr))',gap:5,maxHeight:170,overflowY:'auto'}}>{searchResultsPres.map((url,i)=><img key={i} src={url} alt="" onClick={()=>setPresentacionImg(url)} onError={e=>{e.target.style.display='none'}} style={{width:'100%',height:60,objectFit:'cover',borderRadius:5,cursor:'pointer',border:'2px solid transparent'}} onMouseEnter={e=>{e.target.style.border='2px solid #3498db'}} onMouseLeave={e=>{e.target.style.border='2px solid transparent'}}/>)}</div>)}
+                                        </div>)}
+                                    </>)}
+                                    {mediaTipoPres==='video' && (<>
+                                        <input value={datos.presentacion?.video||''} onChange={e=>setDatos(p=>({...p,presentacion:{...(p.presentacion||{}),video:e.target.value}}))} placeholder="https://www.youtube.com/watch?v=..." style={{...st.input,marginBottom:8}}/>
+                                        {datos.presentacion?.video&&toEmbedUrl(datos.presentacion.video)&&(<div style={{position:'relative',paddingBottom:'56.25%',borderRadius:8,overflow:'hidden',background:'#000',marginBottom:6}}><iframe src={toEmbedUrl(datos.presentacion.video)} style={{position:'absolute',inset:0,width:'100%',height:'100%',border:'none'}} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen title="preview"/></div>)}
+                                        {datos.presentacion?.video&&<button onClick={()=>setDatos(p=>({...p,presentacion:{...(p.presentacion||{}),video:''}}))} style={{background:'#ffebee',border:'none',color:'#c62828',borderRadius:6,padding:'4px 10px',cursor:'pointer',fontSize:'0.75rem',fontWeight:700}}>✕ Quitar vídeo</button>}
+                                    </>)}
+                                </div>
+                                <div style={{marginBottom:12}}><label style={{display:'block',fontSize:'0.75rem',fontWeight:'bold',color:'#555',marginBottom:4}}>Descripción</label><textarea value={datos.presentacion?.descripcion||''} onChange={e=>setDatos(p=>({...p,presentacion:{...(p.presentacion||{}),descripcion:e.target.value}}))} style={{...st.input,resize:'vertical',minHeight:58,fontFamily:'inherit'}} placeholder="Texto introductorio para los alumnos..."/></div>
+                                {datos.presentacion?.titulo&&<button onClick={()=>setMostrandoPreviewPres(true)} style={{width:'100%',padding:10,background:'#8e44ad',color:'white',border:'none',borderRadius:8,fontWeight:'bold',cursor:'pointer',marginBottom:4}}>👁️ Vista previa</button>}
                             </div>
                             <button onClick={() => setMostrandoConfig(false)} style={st.closeBtn}>Aceptar</button>
+                        </div>
+                    </div>
+                )}
+
+                {mostrandoPreviewPres && (
+                    <div style={{ position: 'fixed', inset: 0, zIndex: 6000, background: 'linear-gradient(160deg,#0f0c29 0%,#302b63 55%,#24243e 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 20px', overflowY: 'auto', boxSizing: 'border-box' }}>
+                        <button onClick={() => setMostrandoPreviewPres(false)} style={{ position: 'fixed', top: 16, right: 16, background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', color: 'white', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 'bold', zIndex: 10 }}>✕ Cerrar</button>
+                        <div style={{ width: '100%', maxWidth: 560, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22 }}>
+                            <h1 style={{ color: 'white', margin: 0, fontSize: 'clamp(1.6rem,5vw,2.8rem)', textAlign: 'center', fontWeight: 900, lineHeight: 1.2 }}>{datos.presentacion?.titulo}</h1>
+                            {datos.presentacion?.video && toEmbedUrl(datos.presentacion.video) ? (<div style={{ width: '100%', borderRadius: 18, overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,0.65)', position: 'relative', paddingBottom: '56.25%', background: '#000' }}><iframe src={toEmbedUrl(datos.presentacion.video)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen title="presentación" /></div>) : datos.presentacion?.imagen ? (<div style={{ width: '100%', borderRadius: 18, overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,0.65)' }}><img src={datos.presentacion.imagen} alt="" style={{ width: '100%', height: 'auto', display: 'block', maxHeight: '42vh', objectFit: 'cover' }} /></div>) : null}
+                            {datos.presentacion?.descripcion && <p style={{ color: 'rgba(255,255,255,0.88)', margin: 0, fontSize: 'clamp(0.95rem,2.5vw,1.1rem)', textAlign: 'center', lineHeight: 1.7 }}>{datos.presentacion.descripcion}</p>}
+                            <button style={{ background: 'linear-gradient(135deg,#667eea 0%,#764ba2 100%)', color: 'white', border: 'none', borderRadius: 50, padding: '16px 52px', fontSize: '1.1rem', fontWeight: 800, cursor: 'default', opacity: 0.85 }}>▶ ¡Empezar!</button>
+                            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem', margin: 0 }}>— Vista previa —</p>
                         </div>
                     </div>
                 )}

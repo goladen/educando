@@ -43,12 +43,49 @@ const checkFuzzyMatch = (text, search) => {
 };
 
 // ─────────────────────────────────────────────
+// PANTALLA PRESENTACIÓN
+// ─────────────────────────────────────────────
+function PantallaPresentacionEtiqueta({ presentacion, onEmpezar, onExit }) {
+    const toEmbed = (url) => {
+        if (!url) return '';
+        let m = url.match(/youtube\.com\/watch\?(?:.*&)?v=([^&]+)/);
+        if (m) return `https://www.youtube.com/embed/${m[1]}`;
+        m = url.match(/youtu\.be\/([^?&]+)/);
+        if (m) return `https://www.youtube.com/embed/${m[1]}`;
+        m = url.match(/vimeo\.com\/(\d+)/);
+        if (m) return `https://player.vimeo.com/video/${m[1]}`;
+        return url;
+    };
+    const video = presentacion.video && toEmbed(presentacion.video);
+    return (
+        <div style={{ position: 'fixed', inset: 0, background: 'linear-gradient(160deg,#0d2137 0%,#16a085 55%,#1abc9c 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 9998, padding: '24px 20px', overflowY: 'auto', fontFamily: 'Arial,sans-serif', boxSizing: 'border-box' }}>
+            {onExit && <button onClick={onExit} style={{ position: 'fixed', top: 10, left: 10, background: 'white', border: '2px solid #333', borderRadius: '50%', width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 9999, fontSize: 18, boxShadow: '0 4px 6px rgba(0,0,0,0.3)' }}>←</button>}
+            <div style={{ width: '100%', maxWidth: 580, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22 }}>
+                <h1 style={{ color: 'white', margin: 0, fontSize: 'clamp(1.6rem,5vw,2.8rem)', textAlign: 'center', fontWeight: 900, lineHeight: 1.2, textShadow: '0 0 40px rgba(255,255,255,0.22)' }}>{presentacion.titulo}</h1>
+                {video ? (
+                    <div style={{ width: '100%', borderRadius: 18, overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,0.65)', position: 'relative', paddingBottom: '56.25%', background: '#000' }}>
+                        <iframe src={video} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen title={presentacion.titulo} />
+                    </div>
+                ) : presentacion.imagen ? (
+                    <div style={{ width: '100%', borderRadius: 18, overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,0.65)' }}>
+                        <img src={presentacion.imagen} alt={presentacion.titulo} style={{ width: '100%', height: 'auto', display: 'block', maxHeight: '42vh', objectFit: 'cover' }} />
+                    </div>
+                ) : null}
+                {presentacion.descripcion && <p style={{ color: 'rgba(255,255,255,0.88)', margin: 0, fontSize: 'clamp(0.95rem,2.5vw,1.1rem)', textAlign: 'center', lineHeight: 1.7 }}>{presentacion.descripcion}</p>}
+                <button onClick={onEmpezar} style={{ background: 'linear-gradient(135deg,#16a085 0%,#1abc9c 100%)', color: 'white', border: 'none', borderRadius: 50, padding: '16px 52px', fontSize: '1.1rem', fontWeight: 800, cursor: 'pointer', boxShadow: '0 8px 30px rgba(22,160,133,0.55)', display: 'flex', alignItems: 'center', gap: 10 }}>▶ ¡Empezar!</button>
+            </div>
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────
 // COMPONENTE PRINCIPAL
 // ─────────────────────────────────────────────
 export default function EtiquetaMe({ onExit, recurso: recursoInicial = null }) {
     // Si llega recurso desde LandingGames, saltamos la busqueda
     const [pantalla, setPantalla]           = useState(() => {
         if (!recursoInicial) return 'BUSQUEDA';
+        if (recursoInicial.presentacion?.titulo) return 'PRESENTACION';
         return (recursoInicial.hojas?.length || 0) <= 1 ? 'JUGANDO' : 'ELECCION';
     });
     const [recursoActivo, setRecursoActivo] = useState(recursoInicial);
@@ -63,7 +100,21 @@ export default function EtiquetaMe({ onExit, recurso: recursoInicial = null }) {
 
     const elegirRecurso = (r) => {
         setRecursoActivo(r);
+        if (r.presentacion?.titulo) {
+            setPantalla('PRESENTACION');
+            return;
+        }
         // Si solo hay una hoja, saltamos directo al juego
+        if ((r.hojas?.length || 0) <= 1) {
+            setHojaActiva(r.hojas?.[0] || null);
+            setPantalla('JUGANDO');
+        } else {
+            setPantalla('ELECCION');
+        }
+    };
+
+    const empezarTrasPresentation = () => {
+        const r = recursoActivo;
         if ((r.hojas?.length || 0) <= 1) {
             setHojaActiva(r.hojas?.[0] || null);
             setPantalla('JUGANDO');
@@ -78,6 +129,16 @@ export default function EtiquetaMe({ onExit, recurso: recursoInicial = null }) {
         setHojaActiva(hojaFinal);
         setPantalla('JUGANDO');
     };
+
+    if (pantalla === 'PRESENTACION' && recursoActivo?.presentacion?.titulo) {
+        return (
+            <PantallaPresentacionEtiqueta
+                presentacion={recursoActivo.presentacion}
+                onEmpezar={empezarTrasPresentation}
+                onExit={onExit}
+            />
+        );
+    }
 
     if (pantalla === 'ELECCION') {
         return (

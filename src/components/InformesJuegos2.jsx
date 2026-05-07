@@ -52,8 +52,8 @@ const ConfigBadge = ({ icon, label }) => (
         {icon} {label}
     </span>
 );
-const TIPO_LABEL  = { OCA:'🦆 Oca Matemática', CAZABURBUJAS:'🔵 Cazaburbujas', PIKATRON:'⚡ Pikatron', SOPA:'🔤 Sopa de Letras', WORDLE:'🟩 Wordle', MATHLE:'🔢 Mathle', PASAPALABRA:'🔠 Pasapalabra', FUNCIONES:'∫ Funciones', FUNCIONES_ANALISIS:'📈 Análisis de Funciones', APAREJADOS:'🃏 Aparejados', STORYCUBES:'🎲 Story Cubes', IRREGULAR_VERBS:'🇬🇧 Verbos Irregulares', THINKHOOT:'🦉 PiLive', MATHLIVE:'🧮 MathLive', OLYMPICLIVE:'🏅 OlympicLive', ALGEBRA:'✖️ Álgebra', DOMINO:'🁣 Dominó', ESTADISTICA:'📊 Estadística' };
-const TIPO_ICON   = { OCA:'🦆', CAZABURBUJAS:'🔵', PIKATRON:'⚡', SOPA:'🔤', WORDLE:'🟩', MATHLE:'🔢', PASAPALABRA:'🔠', FUNCIONES:'∫', FUNCIONES_ANALISIS:'📈', APAREJADOS:'🃏', STORYCUBES:'🎲', IRREGULAR_VERBS:'🇬🇧', THINKHOOT:'🦉', MATHLIVE:'🧮', OLYMPICLIVE:'🏅', ALGEBRA:'✖️', DOMINO:'🁣', ESTADISTICA:'📊' };
+const TIPO_LABEL  = { OCA:'🦆 Oca Matemática', CAZABURBUJAS:'🔵 Cazaburbujas', PIKATRON:'⚡ Pikatron', SOPA:'🔤 Sopa de Letras', WORDLE:'🟩 Wordle', MATHLE:'🔢 Mathle', PASAPALABRA:'🔠 Pasapalabra', FUNCIONES:'∫ Funciones', FUNCIONES_ANALISIS:'📈 Análisis de Funciones', APAREJADOS:'🃏 Aparejados', STORYCUBES:'🎲 Story Cubes', IRREGULAR_VERBS:'🇬🇧 Verbos Irregulares', THINKHOOT:'🦉 PiLive', MATHLIVE:'🧮 MathLive', OLYMPICLIVE:'🏅 OlympicLive', ALGEBRA:'✖️ Álgebra', DOMINO:'🁣 Dominó', ESTADISTICA:'📊 Estadística', MUSIC_COMPASS:'🎵 Entrenamiento Auditivo' };
+const TIPO_ICON   = { OCA:'🦆', CAZABURBUJAS:'🔵', PIKATRON:'⚡', SOPA:'🔤', WORDLE:'🟩', MATHLE:'🔢', PASAPALABRA:'🔠', FUNCIONES:'∫', FUNCIONES_ANALISIS:'📈', APAREJADOS:'🃏', STORYCUBES:'🎲', IRREGULAR_VERBS:'🇬🇧', THINKHOOT:'🦉', MATHLIVE:'🧮', OLYMPICLIVE:'🏅', ALGEBRA:'✖️', DOMINO:'🁣', ESTADISTICA:'📊', MUSIC_COMPASS:'🎵' };
 const TIPO_LIVE = new Set(['THINKHOOT', 'MATHLIVE', 'OLYMPICLIVE']);
 const tipoLabel   = (t) => TIPO_LABEL[t] || ('🎮 ' + (t||'Juego'));
 const tipoIcon    = (t) => TIPO_ICON[t]  || '🎮';
@@ -540,6 +540,18 @@ export default function InformesJuegos({ usuario, googleToken }) {
                             {informesFiltFinal.map(inf => {
                                 const tipo = inf._tipoJuego || inf.tipo || '';
                                 const selec = seleccionados.has(inf.id);
+                                if (tipo === 'MUSIC_COMPASS') return (
+                                    <MusicCompassCard
+                                        key={inf.id} inf={inf}
+                                        onBorrar={()=>borrar(inf.id)}
+                                        borrando={borrando===inf.id}
+                                        borradoOk={borrandoOk===inf.id}
+                                        modoSeleccion={modoSeleccion}
+                                        seleccionado={selec}
+                                        onSeleccionar={()=>toggleSeleccion(inf.id)}
+                                        onBuscarJugador={setBusquedaJugador}
+                                    />
+                                );
                                 if (tipo === 'STORYCUBES') return (
                                     <StoryCubesCard
                                         key={inf.id} inf={inf}
@@ -819,6 +831,185 @@ const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, 
                             ))}
                         </div>
                     )}
+                </div>
+            )}
+        </div>
+    );
+};
+
+// ─── Tarjeta especial para Entrenamiento Auditivo (MusicCompass) ─────────────
+const MusicCompassCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccionado, onSeleccionar, onBuscarJugador }) => {
+    const [expandido,  setExpandido]  = useState(false);
+    const [confirmar,  setConfirmar]  = useState(false);
+    const [borrando2,  setBorrando2]  = useState(false);
+
+    const jugadores = inf.jugadores || [];
+
+    const puntoColor = (pts, sinPuntos) => {
+        if (sinPuntos) return '#94a3b8';
+        if (pts >= 8)  return '#22c55e';
+        if (pts >= 4)  return '#f59e0b';
+        return '#ef4444';
+    };
+    const puntoBg = (pts, sinPuntos) => {
+        if (sinPuntos) return '#f1f5f9';
+        if (pts >= 8)  return '#f0fdf4';
+        if (pts >= 4)  return '#fffbeb';
+        return '#fef2f2';
+    };
+
+    const handleBorrar = async () => {
+        setBorrando2(true);
+        await onBorrar();
+        setBorrando2(false);
+    };
+
+    return (
+        <div style={{ background: 'white', borderRadius: 13, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', overflow: 'hidden', border: seleccionado ? '2px solid #1565C0' : '1.5px solid #dbeafe', transition: 'border 0.1s' }}>
+
+            {/* Cabecera */}
+            <div
+                onClick={modoSeleccion ? onSeleccionar : () => setExpandido(p => !p)}
+                style={{ padding: '11px 15px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', cursor: 'pointer', background: seleccionado ? '#f0f4ff' : 'white' }}
+            >
+                {modoSeleccion && (
+                    <input type="checkbox" checked={seleccionado} onChange={e => { e.stopPropagation(); onSeleccionar(); }}
+                        onClick={e => e.stopPropagation()} style={{ width: 17, height: 17, cursor: 'pointer', accentColor: '#1565C0', flexShrink: 0 }} />
+                )}
+                <span style={{ fontSize: '1.4rem' }}>🎵</span>
+                <div style={{ flex: 1, minWidth: 120 }}>
+                    <div style={{ fontWeight: 700, color: '#1e293b', fontSize: '0.92rem' }}>
+                        Entrenamiento Auditivo
+                        <span style={{ marginLeft: 8, fontWeight: 400, color: '#7f8c8d', fontSize: '0.8rem' }}>Individual</span>
+                    </div>
+                    <div style={{ fontSize: '0.74rem', color: '#95a5a6', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <Clock size={10} />{fmtFecha(inf.fecha)}
+                    </div>
+                </div>
+
+                {/* Chips de jugadores */}
+                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                    {jugadores.map((j, i) => (
+                        <span key={i}
+                            onClick={e => { e.stopPropagation(); onBuscarJugador?.(j.nombre); }}
+                            title={`Ver todos los resultados de ${j.nombre}`}
+                            style={{ padding: '2px 8px', borderRadius: 20, background: '#e0f2fe', fontSize: '0.72rem', color: '#0369a1', cursor: 'pointer', fontWeight: 600 }}>
+                            {j.nombre}{j.curso ? ` · ${j.curso}` : ''}
+                        </span>
+                    ))}
+                </div>
+
+                {/* Total pts */}
+                {jugadores[0] && (
+                    <span style={{ padding: '3px 10px', borderRadius: 20, background: '#f0fdf4', color: '#15803d', fontWeight: 800, fontSize: '0.82rem', flexShrink: 0 }}>
+                        {jugadores[0].puntuacionTotal ?? '—'} pts
+                    </span>
+                )}
+                {/* Ejercicios */}
+                {jugadores[0]?.ejerciciosCompletados != null && (
+                    <span style={{ padding: '3px 9px', borderRadius: 20, background: '#f8fafc', color: '#64748b', fontWeight: 600, fontSize: '0.78rem', flexShrink: 0 }}>
+                        {jugadores[0].ejerciciosCompletados} ejerc.
+                    </span>
+                )}
+
+                {/* Borrar */}
+                {!modoSeleccion && (
+                    <button onClick={e => { e.stopPropagation(); setConfirmar(true); }}
+                        style={{ padding: '4px 7px', borderRadius: 7, border: '1px solid #fdd', background: '#fdecea', color: '#e74c3c', cursor: 'pointer', flexShrink: 0 }}
+                        title="Eliminar informe"><Trash2 size={13} /></button>
+                )}
+                {!modoSeleccion && (expandido ? <ChevronUp size={16} color="#aaa" /> : <ChevronDown size={16} color="#aaa" />)}
+            </div>
+
+            {/* Confirmación borrado */}
+            {confirmar && (
+                <div style={{ background: '#fdecea', borderTop: '1px solid #fdd', padding: '10px 15px', display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.83rem' }}>
+                    <AlertTriangle size={14} color="#e74c3c" />
+                    <span style={{ flex: 1, color: '#c0392b' }}>¿Eliminar este informe? Esta acción no se puede deshacer.</span>
+                    <button onClick={() => { setConfirmar(false); handleBorrar(); }} disabled={borrando2}
+                        style={{ padding: '4px 12px', borderRadius: 7, border: 'none', background: '#e74c3c', color: 'white', cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem' }}>
+                        {borrando2 ? 'Borrando…' : 'Eliminar'}
+                    </button>
+                    <button onClick={() => setConfirmar(false)}
+                        style={{ padding: '4px 10px', borderRadius: 7, border: '1px solid #ddd', background: 'white', cursor: 'pointer', fontSize: '0.8rem' }}>Cancelar</button>
+                </div>
+            )}
+            {borradoOk && <div style={{ background: '#e8f5e9', padding: '8px 15px', fontSize: '0.8rem', color: '#27ae60', display: 'flex', alignItems: 'center', gap: 6 }}><CheckCircle size={13} />Eliminado</div>}
+
+            {/* Detalle expandido */}
+            {expandido && (
+                <div style={{ borderTop: '1px solid #f0f0f0', padding: '14px 16px' }}>
+                    {jugadores.map((jugador, ji) => {
+                        const detalle = jugador.detalle || [];
+                        const puntosValidos = detalle.filter(e => !e.sinPuntos);
+                        const totalPts = puntosValidos.reduce((s, e) => s + (e.puntos || 0), 0);
+                        const maxPts   = puntosValidos.length * 10;
+                        const pct      = maxPts > 0 ? Math.round(totalPts / maxPts * 100) : 0;
+
+                        return (
+                            <div key={ji} style={{ marginBottom: ji < jugadores.length - 1 ? 20 : 0 }}>
+                                {/* Resumen jugador */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, padding: '8px 12px', background: '#f8fafc', borderRadius: 9, flexWrap: 'wrap' }}>
+                                    <span style={{ fontWeight: 700, color: '#1e293b', fontSize: '0.9rem' }}>{jugador.nombre}</span>
+                                    {jugador.curso && <span style={{ color: '#64748b', fontSize: '0.8rem' }}>{jugador.curso}</span>}
+                                    <span style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                                        <span style={{ fontWeight: 700, color: '#0369a1', fontSize: '0.85rem' }}>{jugador.puntuacionTotal ?? totalPts} pts totales</span>
+                                        <span style={{ fontWeight: 700, color: '#64748b', fontSize: '0.82rem' }}>{detalle.length} ejercicios</span>
+                                        {maxPts > 0 && (
+                                            <span style={{ padding: '2px 8px', borderRadius: 12, background: pct >= 80 ? '#f0fdf4' : pct >= 50 ? '#fffbeb' : '#fef2f2', color: pct >= 80 ? '#15803d' : pct >= 50 ? '#b45309' : '#dc2626', fontWeight: 700, fontSize: '0.78rem' }}>
+                                                {pct}%
+                                            </span>
+                                        )}
+                                    </span>
+                                </div>
+
+                                {/* Tabla de ejercicios */}
+                                {detalle.length > 0 ? (
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
+                                        <thead>
+                                            <tr style={{ background: '#f1f5f9' }}>
+                                                <th style={{ padding: '6px 10px', textAlign: 'left', fontWeight: 700, color: '#475569', fontSize: '0.72rem', borderRadius: '6px 0 0 0' }}>Ejercicio</th>
+                                                <th style={{ padding: '6px 10px', textAlign: 'center', fontWeight: 700, color: '#475569', fontSize: '0.72rem' }}>Intentos</th>
+                                                <th style={{ padding: '6px 10px', textAlign: 'center', fontWeight: 700, color: '#475569', fontSize: '0.72rem', borderRadius: '0 6px 0 0' }}>Puntuación</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {detalle.map((e, ei) => (
+                                                <tr key={ei} style={{ borderTop: '1px solid #f1f5f9', background: ei % 2 === 0 ? 'white' : '#fafafa' }}>
+                                                    <td style={{ padding: '7px 10px', color: '#334155', fontWeight: 600 }}>
+                                                        🎵 Ejercicio {e.ejercicio ?? ei + 1}
+                                                    </td>
+                                                    <td style={{ padding: '7px 10px', textAlign: 'center', color: '#64748b' }}>
+                                                        {e.intentos ?? '—'} {e.intentos === 1 ? 'intento' : 'intentos'}
+                                                    </td>
+                                                    <td style={{ padding: '7px 10px', textAlign: 'center' }}>
+                                                        <span style={{ padding: '3px 10px', borderRadius: 12, background: puntoBg(e.puntos, e.sinPuntos), color: puntoColor(e.puntos, e.sinPuntos), fontWeight: 700, fontSize: '0.82rem' }}>
+                                                            {e.sinPuntos ? 'sin pts' : `+${e.puntos ?? 0} pts`}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr style={{ borderTop: '2px solid #e2e8f0', background: '#f8fafc' }}>
+                                                <td style={{ padding: '7px 10px', fontWeight: 700, color: '#1e293b', fontSize: '0.8rem' }}>TOTAL</td>
+                                                <td style={{ padding: '7px 10px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>
+                                                    {detalle.reduce((s, e) => s + (e.intentos || 0), 0)} intentos
+                                                </td>
+                                                <td style={{ padding: '7px 10px', textAlign: 'center' }}>
+                                                    <span style={{ padding: '3px 10px', borderRadius: 12, background: pct >= 80 ? '#f0fdf4' : pct >= 50 ? '#fffbeb' : '#fef2f2', color: pct >= 80 ? '#15803d' : pct >= 50 ? '#b45309' : '#dc2626', fontWeight: 800, fontSize: '0.82rem' }}>
+                                                        {jugador.puntuacionTotal ?? totalPts} pts
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                ) : (
+                                    <div style={{ color: '#94a3b8', fontSize: '0.82rem', padding: '8px 10px' }}>Sin detalle de ejercicios.</div>
+                                )}
+                            </div>
+                        );
+                    })}
                 </div>
             )}
         </div>

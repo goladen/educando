@@ -96,10 +96,43 @@ function ModalEnviarProfe({ datos, onClose }) {
     );
 }
 
+function PantallaPresentacionWordle({ presentacion, onEmpezar, onExit }) {
+    const toEmbed = (url) => {
+        if (!url) return '';
+        let m = url.match(/youtube\.com\/watch\?(?:.*&)?v=([^&]+)/);
+        if (m) return `https://www.youtube.com/embed/${m[1]}`;
+        m = url.match(/youtu\.be\/([^?&]+)/);
+        if (m) return `https://www.youtube.com/embed/${m[1]}`;
+        m = url.match(/vimeo\.com\/(\d+)/);
+        if (m) return `https://player.vimeo.com/video/${m[1]}`;
+        return url;
+    };
+    return (
+        <div style={{ position: 'fixed', inset: 0, background: 'linear-gradient(160deg,#0f0c29 0%,#302b63 55%,#24243e 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 9998, padding: '24px 20px', overflowY: 'auto', fontFamily: 'Arial,sans-serif', boxSizing: 'border-box' }}>
+            {onExit && <button onClick={onExit} style={{ position: 'fixed', top: 10, left: 10, background: 'white', border: '2px solid #333', borderRadius: '50%', width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 9999, fontSize: 18, boxShadow: '0 4px 6px rgba(0,0,0,0.3)' }}>←</button>}
+            <div style={{ width: '100%', maxWidth: 580, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22 }}>
+                <h1 style={{ color: 'white', margin: 0, fontSize: 'clamp(1.6rem,5vw,2.8rem)', textAlign: 'center', fontWeight: 900, lineHeight: 1.2, textShadow: '0 0 40px rgba(255,255,255,0.22)' }}>{presentacion.titulo}</h1>
+                {presentacion.video && toEmbed(presentacion.video) ? (
+                    <div style={{ width: '100%', borderRadius: 18, overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,0.65)', position: 'relative', paddingBottom: '56.25%', background: '#000' }}>
+                        <iframe src={toEmbed(presentacion.video)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen title={presentacion.titulo} />
+                    </div>
+                ) : presentacion.imagen ? (
+                    <div style={{ width: '100%', borderRadius: 18, overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,0.65)' }}>
+                        <img src={presentacion.imagen} alt={presentacion.titulo} style={{ width: '100%', height: 'auto', display: 'block', maxHeight: '42vh', objectFit: 'cover' }} />
+                    </div>
+                ) : null}
+                {presentacion.descripcion && <p style={{ color: 'rgba(255,255,255,0.88)', margin: 0, fontSize: 'clamp(0.95rem,2.5vw,1.1rem)', textAlign: 'center', lineHeight: 1.7 }}>{presentacion.descripcion}</p>}
+                <button onClick={onEmpezar} style={{ background: 'linear-gradient(135deg,#667eea 0%,#764ba2 100%)', color: 'white', border: 'none', borderRadius: 50, padding: '16px 52px', fontSize: '1.1rem', fontWeight: 800, cursor: 'pointer', boxShadow: '0 8px 30px rgba(102,126,234,0.55)', display: 'flex', alignItems: 'center', gap: 10 }}>▶ ¡Empezar!</button>
+            </div>
+        </div>
+    );
+}
+
 export default function TextWordleGame({ usuario, onExit, recurso, modoOlimpico = false, tiempoOlimpico = null, hojaOlimpica = 'General', onOlimpicoFinish = null }) {
 
     // --- ESTADOS DE PANTALLA ---
     const [screen, setScreen] = useState('CONFIG'); // CONFIG, LOADING, MODE_SELECT, GAME, VICTORY, RANKING_VIEW, TIMEOUT
+    const [presentacionVista, setPresentacionVista] = useState(() => !recurso?.presentacion?.titulo);
 
     // --- CONFIGURACIÓN Y JUEGO ---
     const [config, setConfig] = useState({ lang: 'ES', length: 5 });
@@ -494,6 +527,14 @@ export default function TextWordleGame({ usuario, onExit, recurso, modoOlimpico 
     // =========================================================
     // VISTAS
     // =========================================================
+
+    if (!presentacionVista) return (
+        <PantallaPresentacionWordle
+            presentacion={recurso.presentacion}
+            onEmpezar={() => setPresentacionVista(true)}
+            onExit={onExit}
+        />
+    );
 
     if (screen === 'LOADING') return <div style={styles.screen}><div className="spin" style={{ border: '4px solid white', borderTop: '4px solid #333', borderRadius: '50%', width: '40px', height: '40px' }}></div></div>;
 

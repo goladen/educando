@@ -48,6 +48,7 @@ import EditorVideoQuizz from './components/EditorVideoQuizz';
 import EditorSolarSystem from './components/EditorSolarSystem';
 import OmninteractiveApp from './OmninteractiveApp';
 import VideoQuizzApp from './VideoQuizzApp';
+import BuzonNovedades from './components/BuzonNovedades';
 import * as XLSX from 'xlsx'; // <--- IMPORTANTE
 // ==============================================================================
 //  ZONA DE CLAVES (SEGURA)
@@ -1045,6 +1046,8 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                     pasos={TUTORIAL_PROFESOR}
                     inline={true}
                 />
+
+                <BuzonNovedades usuario={usuario} />
 
                 <button onClick={() => setModoVista('ALUMNO')} style={{ background: 'white', color: '#1565C0', border: 'none', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', boxShadow:'0 2px 5px rgba(0,0,0,0.1)' }}><Eye size={18} /> Vista Alumno</button>
                 <button onClick={() => setMostrandoPerfil(true)} style={{ background: 'white', color: '#8E24AA', border: 'none', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', boxShadow:'0 2px 5px rgba(0,0,0,0.1)' }}><UserCircle size={18} /> Mi Perfil</button>

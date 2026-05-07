@@ -1,22 +1,25 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { PASOS, NOTAS, NOTAS_STAFF, INSTRUMENTOS_SEQ, playTone } from './musicUtils';
 import CreadorRitmosColab from './CreadorRitmosColab';
+import EarTrainingGame from './MusicCompass';
 
 // ─── Hub ─────────────────────────────────────────────────────────────────────
 
 export default function MusicApp({ onBack, usuario = null }) {
     const [app, setApp] = useState(null);
 
-    if (app === 'lluvia') return <LluviaDeNotas onBack={() => setApp(null)} />;
-    if (app === 'simon')  return <SimonDiceMusical onBack={() => setApp(null)} />;
-    if (app === 'ritmos') return <CreadorDeRitmos onBack={() => setApp(null)} usuario={usuario} />;
-    if (app === 'colab')  return <CreadorRitmosColab onBack={() => setApp(null)} usuario={usuario} />;
+    if (app === 'lluvia')  return <LluviaDeNotas onBack={() => setApp(null)} />;
+    if (app === 'simon')   return <SimonDiceMusical onBack={() => setApp(null)} />;
+    if (app === 'ritmos')  return <CreadorDeRitmos onBack={() => setApp(null)} usuario={usuario} />;
+    if (app === 'colab')   return <CreadorRitmosColab onBack={() => setApp(null)} usuario={usuario} />;
+    if (app === 'compass') return <EarTrainingGame onBack={() => setApp(null)} />;
 
     const APPS_MUSICA = [
-        { id: 'lluvia', titulo: 'Lluvia de Notas',       desc: 'Lee la nota en el pentagrama y responde antes de que se acabe el tiempo.', emoji: '🎼', color: '#6366f1' },
-        { id: 'simon',  titulo: 'Simón Dice Musical',    desc: 'Escucha y repite la secuencia musical. ¿Cuántos niveles puedes superar?',   emoji: '🎹', color: '#10b981' },
-        { id: 'ritmos', titulo: 'Creador de Ritmos',     desc: 'Programa tu propio beat con bombo, caja, hi-hat y melodía.',                emoji: '🥁', color: '#f59e0b' },
-        { id: 'colab',  titulo: 'Ritmos Colaborativos',  desc: 'Cread un beat entre varios. Cada uno añade su parte por turnos.',           emoji: '🎶', color: '#8b5cf6' },
+        { id: 'lluvia',   titulo: 'Lluvia de Notas',          desc: 'Lee la nota en el pentagrama y responde antes de que se acabe el tiempo.', emoji: '🎼', color: '#6366f1' },
+        { id: 'simon',    titulo: 'Simón Dice Musical',       desc: 'Escucha y repite la secuencia musical. ¿Cuántos niveles puedes superar?',   emoji: '🎹', color: '#10b981' },
+        { id: 'ritmos',   titulo: 'Creador de Ritmos',        desc: 'Programa tu propio beat con bombo, caja, hi-hat y melodía.',                emoji: '🥁', color: '#f59e0b' },
+        { id: 'colab',    titulo: 'Ritmos Colaborativos',     desc: 'Cread un beat entre varios. Cada uno añade su parte por turnos.',           emoji: '🎶', color: '#8b5cf6' },
+        { id: 'compass',  titulo: 'Entrenamiento Auditivo',   desc: 'Escucha una secuencia rítmica e identifica qué figuras la componen.',       emoji: '🎧', color: '#fb7185' },
     ];
 
     return (

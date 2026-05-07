@@ -31,9 +31,16 @@ const HELP_CONTENT = {
 export default function EditorManual({ datos, setDatos, configJuego, onClose, onSave, usuario }) {
     const [indiceHojaActiva, setIndiceHojaActiva] = useState(0);
     const [mostrandoConfig, setMostrandoConfig] = useState(false);
-    const [mostrandoAyuda, setMostrandoAyuda] = useState(false); // <--- ESTADO NUEVO
+    const [mostrandoAyuda, setMostrandoAyuda] = useState(false);
     const [mostrandoAvisoCierre, setMostrandoAvisoCierre] = useState(false);
-    const [modalPublicar, setModalPublicar] = useState(null); // null | 'guardar' | 'cerrar'
+    const [modalPublicar, setModalPublicar] = useState(null);
+    // Estados buscador de imágenes para presentación
+    const [mediaTipoPres, setMediaTipoPres] = useState(() => datos.presentacion?.video ? 'video' : 'imagen');
+    const [modoBuscadorPres, setModoBuscadorPres] = useState(false);
+    const [searchQueryPres, setSearchQueryPres] = useState('');
+    const [searchResultsPres, setSearchResultsPres] = useState([]);
+    const [isSearchingPres, setIsSearchingPres] = useState(false);
+    const [mostrandoPreviewPres, setMostrandoPreviewPres] = useState(false);
     useEffect(() => {
         // Inicializar hojas si no existen
         if (!datos.hojas || datos.hojas.length === 0) {
@@ -202,8 +209,50 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
     // --- TOGGLES ---
     const togglePermitirCopia = () => setDatos(prev => ({ ...prev, isPrivate: !prev.isPrivate }));
     const toggleTerminado = () => setDatos(prev => ({ ...prev, isFinished: !prev.isFinished }));
-    // NUEVO TOGGLE: ORDEN ALEATORIO
     const toggleAleatorio = () => setDatos(prev => ({ ...prev, config: { ...prev.config, aleatorio: !prev.config?.aleatorio } }));
+
+    // --- BUSCADOR DE IMÁGENES PARA PRESENTACIÓN ---
+    const buscarImagenesPres = async () => {
+        if (!searchQueryPres.trim()) return;
+        setIsSearchingPres(true);
+        try {
+            // iiurlwidth=400 hace que la API devuelva thumburl (miniatura 400px)
+            const res = await fetch(
+                `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrnamespace=6&gsrsearch=${encodeURIComponent(searchQueryPres)}&gsrlimit=24&prop=imageinfo&iiprop=url&iiurlwidth=400&format=json&origin=*`
+            );
+            const data = await res.json();
+            const pages = data.query?.pages || {};
+            const urls = Object.values(pages)
+                .map(p => {
+                    const info = p.imageinfo?.[0];
+                    // thumburl existe cuando iiurlwidth está activado; fallback a url original
+                    return info?.thumburl || info?.url;
+                })
+                .filter(u => u && /\.(jpe?g|png|gif|webp|svg)(\?|$)/i.test(u));
+            setSearchResultsPres(urls);
+        } catch {
+            alert('Error buscando imágenes. Prueba a pegar la URL directamente.');
+        }
+        setIsSearchingPres(false);
+    };
+
+    const setPresentacionImg = (url) => {
+        setDatos(p => ({ ...p, presentacion: { ...(p.presentacion || {}), imagen: url } }));
+        setModoBuscadorPres(false);
+        setSearchResultsPres([]);
+        setSearchQueryPres('');
+    };
+
+    const toEmbedUrl = (url) => {
+        if (!url) return '';
+        let m = url.match(/youtube\.com\/watch\?(?:.*&)?v=([^&]+)/);
+        if (m) return `https://www.youtube.com/embed/${m[1]}`;
+        m = url.match(/youtu\.be\/([^?&]+)/);
+        if (m) return `https://www.youtube.com/embed/${m[1]}`;
+        m = url.match(/vimeo\.com\/(\d+)/);
+        if (m) return `https://player.vimeo.com/video/${m[1]}`;
+        return url;
+    };
 
     const hojaActual = datos.hojas[indiceHojaActiva] || { preguntas: [] };
     const esQuestionSender = configJuego.id === 'QUESTION_SENDER';
@@ -612,8 +661,214 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
                                     <div><div style={{ fontWeight: 'bold' }}>Terminado</div><div style={{ fontSize: '12px', color: '#666' }}>Visible para alumnos.</div></div>
                                     <button onClick={toggleTerminado} style={{ ...styles.toggleBtn, background: datos.isFinished ? '#2196F3' : '#ccc', justifyContent: datos.isFinished ? 'flex-end' : 'flex-start' }}><div style={styles.toggleCircle}></div></button>
                                 </div>
+
+                                {/* ── PRESENTACIÓN PREVIA ── */}
+                                <h4 style={styles.sectionTitle}>🎬 Presentación previa</h4>
+                                <p style={{ fontSize: '0.78rem', color: '#888', margin: '0 0 12px', lineHeight: 1.4 }}>
+                                    Si se configura, aparece una pantalla introductoria antes de que empiece el juego.
+                                </p>
+
+                                {/* Título */}
+                                <InputConfig
+                                    label="Título"
+                                    val={datos.presentacion?.titulo}
+                                    set={v => setDatos(p => ({ ...p, presentacion: { ...(p.presentacion || {}), titulo: v } }))}
+                                />
+
+                                {/* Imagen / Vídeo — selector de tipo de media */}
+                                <div style={{ marginBottom: 10 }}>
+                                    <label style={{ display: 'block', fontSize: '12px', color: '#666', fontWeight: 'bold', marginBottom: 6 }}>Media</label>
+
+                                    {/* Tabs Imagen | Vídeo */}
+                                    <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid #ddd', marginBottom: 10 }}>
+                                        {[['imagen', '🖼️ Imagen'], ['video', '▶️ Vídeo']].map(([tipo, label]) => (
+                                            <button key={tipo} onClick={() => {
+                                                setMediaTipoPres(tipo);
+                                                setModoBuscadorPres(false);
+                                                setSearchResultsPres([]);
+                                            }}
+                                                style={{ flex: 1, padding: '7px 0', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '0.82rem', background: mediaTipoPres === tipo ? '#3F51B5' : '#f5f5f5', color: mediaTipoPres === tipo ? 'white' : '#555', transition: '0.15s' }}
+                                            >{label}</button>
+                                        ))}
+                                    </div>
+
+                                    {/* ── IMAGEN ── */}
+                                    {mediaTipoPres === 'imagen' && (<>
+                                        {datos.presentacion?.imagen && (
+                                            <div style={{ position: 'relative', marginBottom: 8 }}>
+                                                <img
+                                                    src={datos.presentacion.imagen}
+                                                    alt="preview"
+                                                    onError={e => { e.target.style.display = 'none'; }}
+                                                    style={{ width: '100%', borderRadius: 8, maxHeight: 140, objectFit: 'cover', display: 'block' }}
+                                                />
+                                                <button
+                                                    onClick={() => setDatos(p => ({ ...p, presentacion: { ...(p.presentacion || {}), imagen: '' } }))}
+                                                    style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.6)', border: 'none', color: 'white', borderRadius: '50%', width: 24, height: 24, cursor: 'pointer', fontSize: 14, lineHeight: 1 }}
+                                                    title="Quitar imagen"
+                                                >✕</button>
+                                            </div>
+                                        )}
+                                        <button
+                                            onClick={() => setModoBuscadorPres(p => !p)}
+                                            style={{ ...styles.input, background: '#e8eaf6', color: '#3F51B5', fontWeight: 'bold', border: '1px dashed #3F51B5', cursor: 'pointer', textAlign: 'center', marginBottom: 6 }}
+                                        >
+                                            🔍 {modoBuscadorPres ? 'Cerrar buscador' : 'Buscar imagen'}
+                                        </button>
+                                        {modoBuscadorPres && (
+                                            <div style={{ background: '#f5f5f5', borderRadius: 8, padding: 10, marginBottom: 8 }}>
+                                                <p style={{ margin: '0 0 8px', fontSize: '0.75rem', color: '#555' }}>Wikimedia Commons — imágenes libres de derechos</p>
+                                                <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                                                    <input
+                                                        value={searchQueryPres}
+                                                        onChange={e => setSearchQueryPres(e.target.value)}
+                                                        onKeyDown={e => e.key === 'Enter' && buscarImagenesPres()}
+                                                        placeholder="Ej: sistema solar, célula, mapa Europa..."
+                                                        style={{ ...styles.input, flex: 1 }}
+                                                    />
+                                                    <button onClick={buscarImagenesPres} style={{ background: '#3F51B5', color: 'white', border: 'none', borderRadius: 6, padding: '0 14px', cursor: 'pointer', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                                                        {isSearchingPres ? '...' : 'Buscar'}
+                                                    </button>
+                                                </div>
+                                                <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                                                    <input
+                                                        placeholder="O pega una URL directamente..."
+                                                        style={{ ...styles.input, flex: 1, fontSize: '0.78rem' }}
+                                                        onBlur={e => { if (e.target.value.startsWith('http')) setPresentacionImg(e.target.value); }}
+                                                        onKeyDown={e => { if (e.key === 'Enter' && e.target.value.startsWith('http')) setPresentacionImg(e.target.value); }}
+                                                    />
+                                                </div>
+                                                {searchResultsPres.length > 0 && (
+                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 6, maxHeight: 200, overflowY: 'auto' }}>
+                                                        {searchResultsPres.map((url, i) => (
+                                                            <img key={i} src={url} alt="resultado"
+                                                                onClick={() => setPresentacionImg(url)}
+                                                                onError={e => { e.target.style.display = 'none'; }}
+                                                                style={{ width: '100%', height: 70, objectFit: 'cover', borderRadius: 6, cursor: 'pointer', border: '2px solid transparent', transition: '0.15s' }}
+                                                                onMouseEnter={e => { e.target.style.border = '2px solid #3F51B5'; }}
+                                                                onMouseLeave={e => { e.target.style.border = '2px solid transparent'; }}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                {searchResultsPres.length === 0 && !isSearchingPres && searchQueryPres && (
+                                                    <p style={{ textAlign: 'center', color: '#999', fontSize: '0.8rem' }}>Sin resultados. Prueba otro término.</p>
+                                                )}
+                                            </div>
+                                        )}
+                                    </>)}
+
+                                    {/* ── VÍDEO ── */}
+                                    {mediaTipoPres === 'video' && (<>
+                                        <p style={{ margin: '0 0 8px', fontSize: '0.75rem', color: '#555', lineHeight: 1.4 }}>
+                                            Pega la URL de YouTube o Vimeo. El vídeo se mostrará en la pantalla de presentación en lugar de la imagen.
+                                        </p>
+                                        <input
+                                            value={datos.presentacion?.video || ''}
+                                            onChange={e => setDatos(p => ({ ...p, presentacion: { ...(p.presentacion || {}), video: e.target.value } }))}
+                                            placeholder="https://www.youtube.com/watch?v=..."
+                                            style={{ ...styles.input, marginBottom: 8 }}
+                                        />
+                                        {datos.presentacion?.video && (() => {
+                                            const embed = toEmbedUrl(datos.presentacion.video);
+                                            return embed ? (
+                                                <div style={{ position: 'relative', paddingBottom: '56.25%', borderRadius: 8, overflow: 'hidden', background: '#000', marginBottom: 6 }}>
+                                                    <iframe
+                                                        src={embed}
+                                                        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
+                                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                                        allowFullScreen
+                                                        title="preview"
+                                                    />
+                                                </div>
+                                            ) : null;
+                                        })()}
+                                        {datos.presentacion?.video && (
+                                            <button
+                                                onClick={() => setDatos(p => ({ ...p, presentacion: { ...(p.presentacion || {}), video: '' } }))}
+                                                style={{ background: '#ffebee', border: 'none', color: '#c62828', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 700 }}
+                                            >✕ Quitar vídeo</button>
+                                        )}
+                                    </>)}
+                                </div>
+
+                                {/* Descripción */}
+                                <div style={{ marginBottom: 10 }}>
+                                    <label style={{ display: 'block', fontSize: '12px', color: '#666', fontWeight: 'bold', marginBottom: 4 }}>Descripción</label>
+                                    <textarea
+                                        value={datos.presentacion?.descripcion || ''}
+                                        onChange={e => setDatos(p => ({ ...p, presentacion: { ...(p.presentacion || {}), descripcion: e.target.value } }))}
+                                        style={{ ...styles.input, resize: 'vertical', minHeight: 72, fontFamily: 'inherit' }}
+                                        placeholder="Texto introductorio que verán los alumnos..."
+                                    />
+                                </div>
+
+                                {/* Botón vista previa */}
+                                {datos.presentacion?.titulo && (
+                                    <button
+                                        onClick={() => setMostrandoPreviewPres(true)}
+                                        style={{ width: '100%', padding: '10px', background: '#673AB7', color: 'white', border: 'none', borderRadius: 8, fontWeight: 'bold', cursor: 'pointer', marginBottom: 4 }}
+                                    >
+                                        👁️ Vista previa de la presentación
+                                    </button>
+                                )}
                             </div>
                             <button onClick={() => setMostrandoConfig(false)} style={styles.closeConfigBtn}>Aceptar</button>
+                        </div>
+                    </div>
+                )}
+
+                {/* MODAL VISTA PREVIA PRESENTACIÓN */}
+                {mostrandoPreviewPres && (
+                    <div style={{ position: 'fixed', inset: 0, zIndex: 6000, background: 'linear-gradient(160deg,#0f0c29 0%,#302b63 55%,#24243e 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 20px', overflowY: 'auto', boxSizing: 'border-box' }}>
+                        {/* Botón cerrar */}
+                        <button
+                            onClick={() => setMostrandoPreviewPres(false)}
+                            style={{ position: 'fixed', top: 16, right: 16, background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', color: 'white', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 'bold', zIndex: 10 }}
+                        >
+                            ✕ Cerrar
+                        </button>
+
+                        <div style={{ width: '100%', maxWidth: 560, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22 }}>
+                            {/* Título */}
+                            <h1 style={{ color: 'white', margin: 0, fontSize: 'clamp(1.6rem,5vw,2.8rem)', textAlign: 'center', fontWeight: 900, lineHeight: 1.2, textShadow: '0 0 40px rgba(255,255,255,0.22)' }}>
+                                {datos.presentacion?.titulo}
+                            </h1>
+
+                            {/* Vídeo o Imagen */}
+                            {datos.presentacion?.video && toEmbedUrl(datos.presentacion.video) ? (
+                                <div style={{ width: '100%', borderRadius: 18, overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,0.65)', position: 'relative', paddingBottom: '56.25%', background: '#000' }}>
+                                    <iframe
+                                        src={toEmbedUrl(datos.presentacion.video)}
+                                        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                        allowFullScreen
+                                        title="presentación"
+                                    />
+                                </div>
+                            ) : datos.presentacion?.imagen ? (
+                                <div style={{ width: '100%', borderRadius: 18, overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,0.65)' }}>
+                                    <img
+                                        src={datos.presentacion.imagen}
+                                        alt={datos.presentacion.titulo}
+                                        style={{ width: '100%', height: 'auto', display: 'block', maxHeight: '42vh', objectFit: 'cover' }}
+                                    />
+                                </div>
+                            ) : null}
+
+                            {/* Descripción */}
+                            {datos.presentacion?.descripcion && (
+                                <p style={{ color: 'rgba(255,255,255,0.88)', margin: 0, fontSize: 'clamp(0.95rem,2.5vw,1.1rem)', textAlign: 'center', lineHeight: 1.7 }}>
+                                    {datos.presentacion.descripcion}
+                                </p>
+                            )}
+
+                            {/* Botón (decorativo en preview) */}
+                            <button style={{ background: 'linear-gradient(135deg,#667eea 0%,#764ba2 100%)', color: 'white', border: 'none', borderRadius: 50, padding: '16px 52px', fontSize: '1.1rem', fontWeight: 800, cursor: 'default', boxShadow: '0 8px 30px rgba(102,126,234,0.55)', display: 'flex', alignItems: 'center', gap: 10, opacity: 0.85 }}>
+                                ▶ ¡Empezar!
+                            </button>
+
+                            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem', margin: 0 }}>— Vista previa — los alumnos verán esta pantalla antes de jugar —</p>
                         </div>
                     </div>
                 )}

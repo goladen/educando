@@ -5,7 +5,9 @@
       "Bash(python3 -)",
       "Bash(node -e ':*)",
       "Read(//c/Users/Asus  6/.claude/**)",
-      "Read(//c/Users/Asus  6/**)"
+      "Read(//c/Users/Asus  6/**)",
+      "Bash(grep -n \"const.*=.*['\\\\\"].*[A-Za-z0-9]\\\\{20,\\\\}\" \"c:\\\\Users\\\\Asus  6\\\\educando\\\\src\\\\firebase.js\")",
+      "Bash(grep -rE \"apiKey.*[:=].*[\\\\\"\\\\'][A-Za-z0-9_-]{20,}[\\\\\"\\\\']\" \"c:\\\\Users\\\\Asus  6\\\\educando\\\\src\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\Asus  6\\.claude"

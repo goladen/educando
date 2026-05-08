@@ -3,8 +3,8 @@
 import { useState, useRef } from 'react';
 
 // ─── modelo Gemini ──────────────────────────────────────────────────────────
+import { callGeminiProxy, extractText } from '../geminiProxy.js';
 const GEMINI_MODEL = 'gemini-2.0-flash';
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 // ─── prompt de extracción ──────────────────────────────────────────────────
 const buildPrompt = ({ idioma = 'English', nivel = '3 ESO', asignatura = 'English', promptExtra = '' } = {}) => `You are an expert educational content extractor.
@@ -371,8 +371,6 @@ export default function FotoARecurso({ onResourceExtracted, onClose, apiKey }) {
   const [progress, setProgress] = useState(0);
   const [loadingMsg, setLoadingMsg] = useState('Analizando imagen…');
 
-  const geminiKey = import.meta.env.VITE_GEMINI_API_KEY || apiKey || '';
-
   const handleFile = file => {
     const reader = new FileReader();
     reader.onload = e => {
@@ -389,10 +387,7 @@ export default function FotoARecurso({ onResourceExtracted, onClose, apiKey }) {
   };
 
   const analyze = async () => {
-    if (!geminiKey) {
-      setError('Gemini API key no configurada. Añade VITE_GEMINI_API_KEY en el archivo .env de tu proyecto.');
-      setStep('error'); return;
-    }
+    if (!imgData) { setStep('error'); return; }
     setStep('loading'); setProgress(0);
 
     const prompt = buildPrompt(config);
@@ -402,28 +397,19 @@ export default function FotoARecurso({ onResourceExtracted, onClose, apiKey }) {
     const progInterval = setInterval(() => setProgress(p => Math.min(p + Math.random() * 7 + 1, 87)), 380);
 
     try {
-      const res = await fetch(`${GEMINI_URL}?key=${geminiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [
-            { text: prompt },
-            { inline_data: { mime_type: imgData.mime, data: imgData.b64 } },
-          ]}],
-          generationConfig: { temperature: 0.1 },
-        }),
+      const data = await callGeminiProxy({
+        model: GEMINI_MODEL,
+        contents: [{ parts: [
+          { text: prompt },
+          { inline_data: { mime_type: imgData.mime, data: imgData.b64 } },
+        ]}],
+        generationConfig: { temperature: 0.1 },
       });
 
       clearInterval(msgInterval); clearInterval(progInterval);
       setProgress(100);
 
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error?.message || `Gemini API error ${res.status}`);
-      }
-
-      const data = await res.json();
-      const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      const raw = extractText(data);
       const clean = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       const extracted = JSON.parse(clean);
 

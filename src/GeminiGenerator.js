@@ -1,18 +1,14 @@
-﻿import { GoogleGenerativeAI } from "@google/generative-ai";
+import { callGeminiProxy, extractText } from './geminiProxy.js';
 
-export const generarPreguntasGemini = async (apiKey, tema, tipoJuego) => {
-    // SOLO ponemos los modelos que salían en tu lista JSON oficial
+export const generarPreguntasGemini = async (_apiKey, tema, tipoJuego) => {
+    // _apiKey ignorado — la clave reside en el servidor (api/gemini.js)
     const MODELOS = ["gemini-2.0-flash", "gemini-2.5-flash"];
-
     let errorFinal = null;
 
     for (const modelo of MODELOS) {
         try {
             console.log(`📡 Probando modelo: ${modelo}...`);
-            const genAI = new GoogleGenerativeAI(apiKey);
-            const aiModel = genAI.getGenerativeModel({ model: modelo });
 
-            // Definimos formato según el juego
             let formato = "";
             switch (tipoJuego) {
                 case 'PASAPALABRA':
@@ -38,30 +34,25 @@ export const generarPreguntasGemini = async (apiKey, tema, tipoJuego) => {
         Estructura: ${formato}
       `;
 
-            const result = await aiModel.generateContent(prompt);
-            const response = await result.response;
-            const text = response.text();
-
+            const data = await callGeminiProxy({
+                model: modelo,
+                contents: [{ parts: [{ text: prompt }] }],
+            });
+            const text = extractText(data);
             console.log(`✅ ¡Éxito con ${modelo}!`);
 
-            // Limpieza del JSON
             const jsonLimpio = text.replace(/```json/g, '').replace(/```/g, '').trim();
             return [{ nombreHoja: `IA ${tema}`, preguntas: JSON.parse(jsonLimpio) }];
 
         } catch (error) {
             console.warn(`❌ Falló ${modelo}:`, error.message);
-
-            // Si el error es 429, es que nos hemos pasado de velocidad.
             if (error.message.includes("429")) {
                 alert("⏳ La IA está saturada (Error 429). Espera 1 minuto y vuelve a probar.");
                 throw new Error("Límite de cuota excedido. Espera un poco.");
             }
-
             errorFinal = error;
-            // Si falla, el bucle intentará automáticamente con el siguiente modelo de la lista
         }
     }
 
-    // Si llegamos aquí, fallaron el 2.0 y el 2.5
     throw new Error(`No se pudo generar. Último error: ${errorFinal ? errorFinal.message : 'Desconocido'}`);
 };

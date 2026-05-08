@@ -3,8 +3,7 @@ import PptxGenJS from 'pptxgenjs';
 import { Youtube, Loader2, Download, Eye, CheckCircle2, Clapperboard, Presentation } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, addDoc } from 'firebase/firestore';
-
-const GEMINI_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+import { callGeminiProxy, extractText } from '../geminiProxy.js';
 
 const IDIOMAS    = ['Español', 'English', 'Français', 'Deutsch', 'Italiano', 'Português', 'Català', 'Euskera', 'Galego'];
 const NUM_SLIDES = [5, 8, 10, 12, 15, 20];
@@ -68,28 +67,16 @@ REGLAS: Solo JSON válido. Cada diapositiva 3-5 puntos (max 15 palabras c/u). To
 }
 
 async function callGemini(youtubeUrl, promptText) {
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { fileData: { mimeType: 'video/mp4', fileUri: youtubeUrl } },
-            { text: promptText }
-          ]
-        }],
-        generationConfig: { temperature: 0.6, maxOutputTokens: 8192 }
-      })
-    }
-  );
-  if (!res.ok) {
-    const errData = await res.json().catch(() => ({}));
-    throw new Error(errData.error?.message || `Error ${res.status}`);
-  }
-  const data = await res.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const data = await callGeminiProxy({
+    contents: [{
+      parts: [
+        { fileData: { mimeType: 'video/mp4', fileUri: youtubeUrl } },
+        { text: promptText }
+      ]
+    }],
+    generationConfig: { temperature: 0.6, maxOutputTokens: 8192 }
+  });
+  const text = extractText(data);
   const clean = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
   return JSON.parse(clean);
 }
@@ -225,7 +212,6 @@ function ModoPresentacion({ onBack }) {
 
   const handleGenerar = async () => {
     if (!urlValida) { setError('Introduce una URL válida de YouTube.'); return; }
-    if (!GEMINI_KEY) { setError('No se encontró la clave de Gemini (VITE_GEMINI_API_KEY).'); return; }
     setError(''); setStep('loading');
     setLoadingMsg('Analizando el video con IA… Esto puede tardar 30-60 segundos.');
     try {
@@ -423,7 +409,6 @@ function ModoVideoQuizz({ onBack, usuario }) {
 
   const handleGenerar = async () => {
     if (!urlValida) { setError('Introduce una URL válida de YouTube.'); return; }
-    if (!GEMINI_KEY) { setError('No se encontró la clave de Gemini.'); return; }
     setError(''); setStep('loading');
     try {
       const sorted = [...ejercicios].sort((a,b)=>a.segundos-b.segundos);

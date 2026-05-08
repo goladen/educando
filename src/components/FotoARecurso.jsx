@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { callGeminiProxy, extractText } from '../geminiProxy.js';
 import { db } from '../firebase';
 import { collection, addDoc, getDocs, query, where, doc, updateDoc, arrayUnion } from 'firebase/firestore';
 
@@ -178,7 +178,6 @@ const validarPreguntas = (json, tipoJuego) => {
 export default function FotoARecurso({ usuario, perfilProfesor }) {
     const [paso, setPaso] = useState(1); // 1=juego, 2=foto, 3=resultado
     const [juegoSel, setJuegoSel] = useState(null);
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
     const [imagen, setImagen] = useState(null);      // { file, dataUrl }
     const [procesando, setProcesando] = useState(false);
     const [progreso, setProgreso] = useState('');
@@ -230,7 +229,7 @@ export default function FotoARecurso({ usuario, perfilProfesor }) {
 
     // ── Llamar a Gemini con visión ────────────────────────────────────────────
     const procesarConGemini = async () => {
-        if (!apiKey) { setError('API Key no configurada en el servidor. Contacta al administrador.'); return; }
+
         if (!imagen) { setError('Sube una imagen primero'); return; }
 
         setProcesando(true);
@@ -244,15 +243,15 @@ export default function FotoARecurso({ usuario, perfilProfesor }) {
         for (const modelo of MODELOS_GEMINI) {
             try {
                 setProgreso(`🔍 Analizando imagen con ${modelo}...`);
-                const genAI = new GoogleGenerativeAI(apiKey);
-                const aiModel = genAI.getGenerativeModel({ model: modelo });
+                const data = await callGeminiProxy({
+                    model: modelo,
+                    contents: [{ parts: [
+                        { text: PROMPTS[juegoSel] },
+                        { inline_data: { mime_type: mimeType, data: base64 } },
+                    ]}],
+                });
 
-                const result = await aiModel.generateContent([
-                    { text: PROMPTS[juegoSel] },
-                    { inlineData: { mimeType, data: base64 } },
-                ]);
-
-                const texto = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+                const texto = extractText(data).replace(/```json/g, '').replace(/```/g, '').trim();
 
                 // Detectar error explícito de Gemini
                 if (texto.includes('"error"')) {

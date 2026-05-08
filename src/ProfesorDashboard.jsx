@@ -53,7 +53,6 @@ import * as XLSX from 'xlsx'; // <--- IMPORTANTE
 // ==============================================================================
 //  ZONA DE CLAVES (SEGURA)
 // ==============================================================================
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const GOOGLE_DEVELOPER_KEY = import.meta.env.VITE_GOOGLE_DEVELOPER_KEY;
 // ==============================================================================
@@ -545,7 +544,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
         }
     };
     const handleFileUpload = async (e) => { const f = e.target.files[0]; if (f) { try { const h = await procesarArchivoExcel(f, juegoSeleccionado); setDatosEditor(p => ({ ...p, hojas: h, titulo: f.name.split('.')[0] })); setMostrandoCrear(false); setMostrandoEditorManual(true); } catch (err) { alert(err.message); } } };
-    const procesarCreacionIA = async () => { const t = prompt("Tema:"); if (t) { try { alert("Generando..."); const h = await generarPreguntasGemini(GEMINI_API_KEY, t, juegoSeleccionado); setDatosEditor(p => ({ ...p, hojas: h, titulo: t })); setMostrandoCrear(false); setMostrandoEditorManual(true); } catch (e) { alert(e.message); } } };
+    const procesarCreacionIA = async () => { const t = prompt("Tema:"); if (t) { try { alert("Generando..."); const h = await generarPreguntasGemini(null, t, juegoSeleccionado); setDatosEditor(p => ({ ...p, hojas: h, titulo: t })); setMostrandoCrear(false); setMostrandoEditorManual(true); } catch (e) { alert(e.message); } } };
 
 
     // --- NUEVA FUNCIÓN PARA LEER EL ARCHIVO DE DRIVE ---

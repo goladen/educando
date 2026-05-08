@@ -35,6 +35,7 @@ import VideoQuizzApp from '../VideoQuizzApp';
 import FuncionesEjecutivas from '../FuncionesEjecutivas';
 import IrregularVerbsTest from '../IrregularVerbsTest';
 import MusicApp from '../MusicApp';
+import HerramientasClase from '../GestionAula';
 import AlgebraApp from '../Algebra';
 import EstadisticaApp from '../Estadistica';
 import RetosApp from '../Retos';
@@ -783,6 +784,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
     const [funcionesEjecutivas, setFuncionesEjecutivas] = useState(false);
     const [irregularVerbs,      setIrregularVerbs]      = useState(false);
     const [musicApp,            setMusicApp]            = useState(false);
+    const [gestionAula,         setGestionAula]         = useState(false);
 
     // Estados alumno logueado
     const [vistaAlumno,    setVistaAlumno]    = useState('MAIN'); // 'MAIN' | 'RECORDS'
@@ -1094,6 +1096,10 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, overflowY: 'auto' }}>
             <MusicApp onBack={() => { setMusicApp(false); setJuegoActivo(null); }} usuario={usuario} />
         </div>
+    );
+
+    if (gestionAula) return (
+        <HerramientasClase onExit={() => setGestionAula(false)} />
     );
 
     if (omninteractivo) return (
@@ -1443,6 +1449,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                     { id: 'IRREGULAR_VERBS',     label: 'Irregular Verbs',     emoji: '📝', color: '#0369a1', action: () => setIrregularVerbs(true), shareable: true },
                     { id: 'SOLAR_SYSTEM',        label: 'Sistema Solar',        emoji: '🪐', color: '#3B82F6', action: () => setJuegoActivo({ tipoJuego: 'SOLAR_SYSTEM' }), shareable: true },
                     { id: 'MUSICA',              label: 'Música',               emoji: '🎵', color: '#8b5cf6', action: () => setMusicApp(true), shareable: true },
+                    { id: 'GESTION_AULA',        label: 'Gestión Aula',         emoji: '🏫', color: '#e67e22', action: () => setGestionAula(true), shareable: false },
                 ].map(tool => (
                     <div key={tool.id} onClick={tool.action} style={{ background: '#ffffbf', borderRadius: '15px', padding: '15px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transition: 'transform 0.2s', border: `2px solid ${tool.color}20`, position: 'relative' }}
                         onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-3px)'}

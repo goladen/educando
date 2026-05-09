@@ -8,6 +8,8 @@ import {
     Move, Maximize2, Minimize2, Image as ImageIcon, ZoomIn, ZoomOut
 } from 'lucide-react';
 import Confetti from 'react-confetti';
+import { db } from './firebase';
+import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 
 // ─── UTILIDADES MATEMÁTICAS ───────────────────────────────────────────────────
 // Formatea una expresión amigable a código evaluable por JS
@@ -575,6 +577,18 @@ const drawAccidental = (ctx, item) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+const COLORES_PARTICIPANTES = ['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6','#1abc9c','#e67e22','#c0392b'];
+const genCodigo = () => Math.random().toString(36).substring(2, 8).toUpperCase();
+
+const serializarElems = (elems) => elems
+    .filter(e => e.t !== 'image')
+    .map(e => JSON.parse(JSON.stringify(e)));
+
+// Firestore no soporta arrays anidados: cada página se serializa como JSON string
+const serializarPaginas = (pgs) => pgs.map(p => JSON.stringify(serializarElems(p)));
+const deserializarPaginas = (arr) => (arr || []).map(s => { try { return JSON.parse(s); } catch { return []; } });
+
+// ─────────────────────────────────────────────────────────────────────────────
 function PizarraApp() {
     const canvasRef      = useRef(null);
     const contenedorRef  = useRef(null);
@@ -609,7 +623,170 @@ function PizarraApp() {
     const [selIdxs,   setSelIdxs]   = useState([]);
     const [lassoRect, setLassoRect] = useState(null);
 
+    // ── Pizarra compartida ───────────────────────────────────────────────────
+    const [compartirModal,       setCompartirModal]       = useState(false);
+    const [modoCompartir,        setModoCompartir]        = useState(null);   // 'ver' | 'editar' | null
+    const [codigoCompartir,      setCodigoCompartir]      = useState('');
+    const [esCreador,            setEsCreador]            = useState(false);
+    const [miId,                 setMiId]                 = useState('');
+    const [miColorParticipante,  setMiColorParticipante]  = useState('');
+    const [participantes,        setParticipantes]        = useState([]);
+    const [nombreUnirse,         setNombreUnirse]         = useState('');
+    const [codigoUnirseInput,    setCodigoUnirseInput]    = useState('');
+    const [errorCompartir,       setErrorCompartir]       = useState('');
+    const [juntandose,           setJuntandose]           = useState(false);
+    const syncIntervalRef        = useRef(null);
+    const miIdRef                = useRef('');
+    const miColorRef             = useRef('');
+    const codigoRef              = useRef('');
+    const modoRef                = useRef(null);
+    const paginasRef             = useRef(paginas);
+
     const triggerRedraw = () => setRedrawTick(t => t + 1);
+
+    // Keep paginasRef in sync for access inside intervals
+    useEffect(() => { paginasRef.current = paginas; }, [paginas]);
+
+    // ── Lógica de compartir ──────────────────────────────────────────────────
+    const detenerSync = () => {
+        if (syncIntervalRef.current) { clearInterval(syncIntervalRef.current); syncIntervalRef.current = null; }
+    };
+
+    const iniciarSync = (codigo, modo, id, soyCreador) => {
+        detenerSync();
+        syncIntervalRef.current = setInterval(async () => {
+            try {
+                if (modo === 'ver' && soyCreador) {
+                    // Creador del modo ver → escribe sus páginas
+                    await updateDoc(doc(db, 'pizarras_compartidas', codigo), {
+                        paginas_sync: serializarPaginas(paginasRef.current),
+                        updatedAt: new Date(),
+                    });
+                } else if (modo === 'ver') {
+                    // Espectador → lee y reemplaza todo
+                    const snap = await getDoc(doc(db, 'pizarras_compartidas', codigo));
+                    if (!snap.exists()) return;
+                    const datos = snap.data();
+                    if (datos.paginas_sync) {
+                        setPaginas(deserializarPaginas(datos.paginas_sync));
+                    }
+                } else if (modo === 'editar') {
+                    // Participante colaborativo
+                    const myId = miIdRef.current;
+                    const pg = paginasRef.current[0] || [];
+                    const mios = serializarElems(pg.filter(e => e.autorId === myId));
+                    await updateDoc(doc(db, 'pizarras_compartidas', codigo), {
+                        [`elems.${myId}`]: mios,
+                        updatedAt: new Date(),
+                    });
+                    const snap = await getDoc(doc(db, 'pizarras_compartidas', codigo));
+                    if (!snap.exists()) return;
+                    const datos = snap.data();
+                    setParticipantes(datos.participantes || []);
+                    const elemsRemotos = Object.entries(datos.elems || {})
+                        .filter(([pid]) => pid !== myId)
+                        .flatMap(([, arr]) => arr || []);
+                    setPaginas(prev => {
+                        const pg0 = prev[0] || [];
+                        const miosActuales = pg0.filter(e => e.autorId === myId || !e.autorId);
+                        const merged = [...miosActuales, ...elemsRemotos];
+                        return [merged, ...prev.slice(1)];
+                    });
+                }
+            } catch (_) { /* silencioso */ }
+        }, 2000);
+    };
+
+    const crearSesion = async (modo) => {
+        setErrorCompartir('');
+        const codigo = genCodigo();
+        const id = 'host_' + Date.now();
+        const color = COLORES_PARTICIPANTES[0];
+        miIdRef.current = id;
+        miColorRef.current = color;
+        codigoRef.current = codigo;
+        modoRef.current = modo;
+        const data = {
+            codigo,
+            modo,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            participantes: [{ id, nombre: 'Profesor', color }],
+            ...(modo === 'ver'
+                ? { paginas_sync: serializarPaginas(paginas) }
+                : { elems: { [id]: serializarElems(elementos) } }
+            ),
+        };
+        await setDoc(doc(db, 'pizarras_compartidas', codigo), data);
+        setCodigoCompartir(codigo);
+        setModoCompartir(modo);
+        setEsCreador(true);
+        setMiId(id);
+        setMiColorParticipante(color);
+        setParticipantes([{ id, nombre: 'Profesor', color }]);
+        iniciarSync(codigo, modo, id, true);
+    };
+
+    const unirseASesion = async () => {
+        const codigo = codigoUnirseInput.trim().toUpperCase();
+        const nombre = nombreUnirse.trim();
+        if (!codigo || !nombre) { setErrorCompartir('Introduce código y nombre'); return; }
+        setJuntandose(true); setErrorCompartir('');
+        try {
+            const snap = await getDoc(doc(db, 'pizarras_compartidas', codigo));
+            if (!snap.exists()) { setErrorCompartir('Código no encontrado'); setJuntandose(false); return; }
+            const datos = snap.data();
+            const modo = datos.modo;
+            const usedColors = (datos.participantes || []).map(p => p.color);
+            const color = COLORES_PARTICIPANTES.find(c => !usedColors.includes(c)) || COLORES_PARTICIPANTES[0];
+            const id = 'user_' + Date.now();
+            miIdRef.current = id;
+            miColorRef.current = color;
+            codigoRef.current = codigo;
+            modoRef.current = modo;
+            const nuevoParticipante = { id, nombre, color };
+            if (modo === 'editar') {
+                await updateDoc(doc(db, 'pizarras_compartidas', codigo), {
+                    participantes: [...(datos.participantes || []), nuevoParticipante],
+                    [`elems.${id}`]: [],
+                });
+            }
+            setCodigoCompartir(codigo);
+            setModoCompartir(modo);
+            setEsCreador(false);
+            setMiId(id);
+            setMiColorParticipante(color);
+            setParticipantes([...(datos.participantes || []), nuevoParticipante]);
+            setCompartirModal(false);
+            iniciarSync(codigo, modo, id, false);
+        } catch (e) { setErrorCompartir('Error: ' + e.message); }
+        setJuntandose(false);
+    };
+
+    const pararCompartir = () => {
+        detenerSync();
+        setModoCompartir(null);
+        setCodigoCompartir('');
+        setEsCreador(false);
+        setMiId('');
+        setMiColorParticipante('');
+        setParticipantes([]);
+        miIdRef.current = '';
+        miColorRef.current = '';
+        codigoRef.current = '';
+        modoRef.current = null;
+    };
+
+    // Limpiar interval al desmontar
+    useEffect(() => () => detenerSync(), []);
+
+    // ── Fin lógica compartir ─────────────────────────────────────────────────
+
+    // Tag elem with author in collaborative mode
+    const tagElem = (elem) => {
+        if (modoRef.current !== 'editar' || !miIdRef.current) return elem;
+        return { ...elem, autorId: miIdRef.current, autorColor: miColorRef.current };
+    };
 
     // Fullscreen
     const toggleFullscreen = () => {
@@ -943,19 +1120,24 @@ function PizarraApp() {
 
     // ── Draw events ──────────────────────────────────────────────────────────
     const iniciarDibujo = (e) => {
+        // Espectadores en modo ver no pueden dibujar
+        if (modoCompartir === 'ver' && !esCreador) return;
+
         const pos = getPos(e);
         const { x, y, rawX, rawY } = pos;
+        // En modo colaborativo, el color de trazo es el color del participante
+        const drawColor = modoCompartir === 'editar' ? miColorRef.current || color : color;
 
         if (herramienta === 'paste' && textoPegar) {
-            setElementos(prev => [...prev, { t: 'text', txt: textoPegar, x, y, color, grosor }]);
+            setElementos(prev => [...prev, tagElem({ t: 'text', txt: textoPegar, x, y, color: drawColor, grosor })]);
             setHerramienta('draw'); setTextoPegar(''); return;
         }
         if (herramienta === 'graph' && graficaConfig) {
-            setElementos(prev => [...prev, { t: 'graph', funcStr: graficaConfig.funcStr, scale: graficaConfig.scale, cx: x, cy: y, color, grosor }]);
+            setElementos(prev => [...prev, tagElem({ t: 'graph', funcStr: graficaConfig.funcStr, scale: graficaConfig.scale, cx: x, cy: y, color: drawColor, grosor })]);
             setHerramienta('draw'); setGraficaConfig(null); return;
         }
         if (herramienta === 'axes') {
-            setElementos(prev => [...prev, { t: 'axes', cx: x, cy: y, color, grosor }]);
+            setElementos(prev => [...prev, tagElem({ t: 'axes', cx: x, cy: y, color: drawColor, grosor })]);
             setHerramienta('draw'); return;
         }
         if (herramienta === 'pan') {
@@ -965,7 +1147,7 @@ function PizarraApp() {
 
         // ── Music tools ─────────────────────────────────────────────────
         if (herramienta === 'staff' || herramienta === 'staff_fa') {
-            setElementos(prev => [...prev, { t: 'staff', x, y, w: 680, ls: STAFF_LS, clef: herramienta === 'staff_fa' ? 'fa' : 'sol' }]);
+            setElementos(prev => [...prev, tagElem({ t: 'staff', x, y, w: 680, ls: STAFF_LS, clef: herramienta === 'staff_fa' ? 'fa' : 'sol' })]);
             return;
         }
         if (MUSIC_NOTE_IDS.includes(herramienta)) {
@@ -979,21 +1161,20 @@ function PizarraApp() {
                 snapY  = staff.y + step * half;
                 stemUp = step >= 4; // middle line = step 4
             }
-            setElementos(prev => [...prev, { t: 'note', figura: herramienta, x, y: snapY, color, ls, stemUp }]);
+            setElementos(prev => [...prev, tagElem({ t: 'note', figura: herramienta, x, y: snapY, color: drawColor, ls, stemUp })]);
             return;
         }
         if (MUSIC_REST_IDS.includes(herramienta)) {
             const staff = elementos.find(s => s.t === 'staff' && x >= s.x - 20 && x <= s.x + s.w + 20 && Math.abs(y - (s.y + s.ls * 2)) < s.ls * 4);
             const ls = staff?.ls || STAFF_LS;
-            // Position rests on canonical lines
             const restY = staff
                 ? (herramienta === 's_redonda' ? staff.y + ls     : staff.y + ls * 2)
                 : y;
-            setElementos(prev => [...prev, { t: 'rest', figura: herramienta, x, y: restY, color, ls }]);
+            setElementos(prev => [...prev, tagElem({ t: 'rest', figura: herramienta, x, y: restY, color: drawColor, ls })]);
             return;
         }
         if (MUSIC_ACC_IDS.includes(herramienta)) {
-            setElementos(prev => [...prev, { t: 'acc', figura: herramienta, x, y, color, ls: STAFF_LS }]);
+            setElementos(prev => [...prev, tagElem({ t: 'acc', figura: herramienta, x, y, color: drawColor, ls: STAFF_LS })]);
             return;
         }
         if (herramienta === 'lasso') {
@@ -1014,8 +1195,8 @@ function PizarraApp() {
 
         setDibujando(true);
         setInicioXY({ x, y });
-        if (herramienta === 'draw')   setPreviewElement({ t: 'draw', pts: [{x, y}], color, grosor });
-        if (herramienta === 'eraser') setPreviewElement({ t: 'draw', pts: [{x, y}], color: '#ffffff', grosor: grosor * 5 });
+        if (herramienta === 'draw')   setPreviewElement(tagElem({ t: 'draw', pts: [{x, y}], color: drawColor, grosor }));
+        if (herramienta === 'eraser') setPreviewElement(tagElem({ t: 'draw', pts: [{x, y}], color: '#ffffff', grosor: grosor * 5 }));
     };
 
     const moverDibujo = (e) => {
@@ -1059,7 +1240,14 @@ function PizarraApp() {
         }
         if (!dibujando) return;
         setDibujando(false);
-        if (previewElement) { setElementos(prev => [...prev, previewElement]); setPreviewElement(null); }
+        if (previewElement) {
+            // Shapes (line, rect, circle, …) created via preview need tagging too
+            const tagged = modoRef.current === 'editar' && miIdRef.current
+                ? { ...previewElement, autorId: miIdRef.current, autorColor: miColorRef.current }
+                : previewElement;
+            setElementos(prev => [...prev, tagged]);
+            setPreviewElement(null);
+        }
     };
 
     // ── Pages ────────────────────────────────────────────────────────────────
@@ -1079,7 +1267,12 @@ function PizarraApp() {
     };
     const eliminarSeleccion = () => {
         if (!selIdxs.length) return;
-        setElementos(prev => prev.filter((_, i) => !selIdxs.includes(i)));
+        setElementos(prev => prev.filter((item, i) => {
+            if (!selIdxs.includes(i)) return true;
+            // En modo colaborativo solo puedo borrar mis propios elementos
+            if (modoRef.current === 'editar' && item.autorId && item.autorId !== miIdRef.current) return true;
+            return false;
+        }));
         setSelIdxs([]);
     };
 
@@ -1180,18 +1373,30 @@ function PizarraApp() {
                     </div>
                 </>}
 
-                {/* Color + thickness (common) */}
-                <div style={{ display:'flex', gap:4, alignItems:'center', flexWrap:'wrap' }}>
-                    <input type="color" value={color} onChange={e => setColor(e.target.value)}
-                        style={{ border:'none', width:26, height:26, cursor:'pointer', background:'transparent', padding:0 }} />
-                    {['#2c3e50','#e74c3c','#3498db','#2ecc71','#f1c40f','#9b59b6','#e67e22','#ffffff'].map(c => (
-                        <button key={c} onClick={() => setColor(c)}
-                            style={{ width:18, height:18, borderRadius:'50%', background:c, border: color===c ? '2px solid #3498db' : '2px solid #95a5a6', cursor:'pointer', padding:0, flexShrink:0 }} />
-                    ))}
-                    {modoPizarra === 'general' && (
-                        <input type="range" min="1" max="10" value={grosor} onChange={e => setGrosor(Number(e.target.value))} style={{ width:55 }} />
-                    )}
-                </div>
+                {/* Color + thickness — hidden for collaborative spectators (color fixed) */}
+                {modoCompartir !== 'editar' && (
+                    <div style={{ display:'flex', gap:4, alignItems:'center', flexWrap:'wrap' }}>
+                        <input type="color" value={color} onChange={e => setColor(e.target.value)}
+                            style={{ border:'none', width:26, height:26, cursor:'pointer', background:'transparent', padding:0 }} />
+                        {['#2c3e50','#e74c3c','#3498db','#2ecc71','#f1c40f','#9b59b6','#e67e22','#ffffff'].map(c => (
+                            <button key={c} onClick={() => setColor(c)}
+                                style={{ width:18, height:18, borderRadius:'50%', background:c, border: color===c ? '2px solid #3498db' : '2px solid #95a5a6', cursor:'pointer', padding:0, flexShrink:0 }} />
+                        ))}
+                        {modoPizarra === 'general' && (
+                            <input type="range" min="1" max="10" value={grosor} onChange={e => setGrosor(Number(e.target.value))} style={{ width:55 }} />
+                        )}
+                    </div>
+                )}
+                {/* En modo colaborativo mostrar el color asignado */}
+                {modoCompartir === 'editar' && miColorParticipante && (
+                    <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+                        <div style={{ width:20, height:20, borderRadius:'50%', background:miColorParticipante, border:'2px solid #7f8c8d' }} title="Tu color asignado" />
+                        <span style={{ fontSize:'0.75rem', color:'#555', fontWeight:'bold' }}>Tu color</span>
+                        {modoPizarra === 'general' && (
+                            <input type="range" min="1" max="10" value={grosor} onChange={e => setGrosor(Number(e.target.value))} style={{ width:55 }} />
+                        )}
+                    </div>
+                )}
 
                 {/* Action buttons (common) */}
                 <div style={{ marginLeft:'auto', display:'flex', gap:5, flexWrap:'wrap', alignItems:'center' }}>
@@ -1201,7 +1406,7 @@ function PizarraApp() {
                             🗑 {selIdxs.length}
                         </button>
                     )}
-                    {modoPizarra === 'general' && <>
+                    {modoPizarra === 'general' && modoCompartir !== 'ver' && <>
                         <button onClick={() => setHerramienta('axes')}
                             style={{ padding:'5px 7px', background: herramienta==='axes' ? '#16a085' : '#27ae60', color:'white', border:'none', borderRadius:7, cursor:'pointer', fontWeight:'bold', fontSize:'0.78rem' }}>
                             XY
@@ -1213,27 +1418,43 @@ function PizarraApp() {
                             <CalcIcon size={15}/>
                         </button>
                     </>}
-                    <button onClick={() => fileInputRef.current?.click()} title="Insertar imagen"
-                        style={{ padding:'5px', background:'#16a085', color:'white', border:'none', borderRadius:7, cursor:'pointer' }}>
-                        <ImageIcon size={15}/>
-                    </button>
-                    <input ref={fileInputRef} type="file" accept="image/*" style={{ display:'none' }} onChange={onFileSelected} />
+                    {modoCompartir !== 'ver' && <>
+                        <button onClick={() => fileInputRef.current?.click()} title="Insertar imagen"
+                            style={{ padding:'5px', background:'#16a085', color:'white', border:'none', borderRadius:7, cursor:'pointer' }}>
+                            <ImageIcon size={15}/>
+                        </button>
+                        <input ref={fileInputRef} type="file" accept="image/*" style={{ display:'none' }} onChange={onFileSelected} />
+                    </>}
                     <button onClick={descargarPagina} title="PNG hoja actual"
                         style={{ padding:'5px', background:'#2ecc71', color:'white', border:'none', borderRadius:7, cursor:'pointer' }}>
                         <Camera size={15}/>
                     </button>
-                    <button onClick={descargarTodasPNG}
-                        style={{ padding:'5px 7px', background:'#27ae60', color:'white', border:'none', borderRadius:7, cursor:'pointer', fontSize:'0.75rem', fontWeight:'bold' }}>
-                        PNG×{paginas.length}
-                    </button>
-                    <button onClick={descargarPDF}
-                        style={{ padding:'5px 7px', background:'#c0392b', color:'white', border:'none', borderRadius:7, cursor:'pointer', fontSize:'0.75rem', fontWeight:'bold' }}>
-                        PDF
-                    </button>
-                    <button onClick={() => { setElementos([]); setSelIdxs([]); }}
-                        style={{ padding:'5px 7px', background:'#e74c3c', color:'white', border:'none', borderRadius:7, cursor:'pointer', fontWeight:'bold', fontSize:'0.8rem' }}>
-                        ✕
-                    </button>
+                    {modoCompartir !== 'ver' && <>
+                        <button onClick={descargarTodasPNG}
+                            style={{ padding:'5px 7px', background:'#27ae60', color:'white', border:'none', borderRadius:7, cursor:'pointer', fontSize:'0.75rem', fontWeight:'bold' }}>
+                            PNG×{paginas.length}
+                        </button>
+                        <button onClick={descargarPDF}
+                            style={{ padding:'5px 7px', background:'#c0392b', color:'white', border:'none', borderRadius:7, cursor:'pointer', fontSize:'0.75rem', fontWeight:'bold' }}>
+                            PDF
+                        </button>
+                        <button onClick={() => { setElementos([]); setSelIdxs([]); }}
+                            style={{ padding:'5px 7px', background:'#e74c3c', color:'white', border:'none', borderRadius:7, cursor:'pointer', fontWeight:'bold', fontSize:'0.8rem' }}>
+                            ✕
+                        </button>
+                    </>}
+                    {/* Botón compartir */}
+                    {!modoCompartir ? (
+                        <button onClick={() => { setCompartirModal(true); setErrorCompartir(''); }}
+                            style={{ padding:'5px 9px', background:'#8e44ad', color:'white', border:'none', borderRadius:7, cursor:'pointer', fontWeight:'bold', fontSize:'0.78rem', display:'flex', alignItems:'center', gap:4 }}>
+                            📡 Compartir
+                        </button>
+                    ) : (
+                        <button onClick={() => setCompartirModal(v => !v)}
+                            style={{ padding:'5px 9px', background: modoCompartir === 'ver' ? '#8e44ad' : '#27ae60', color:'white', border:'none', borderRadius:7, cursor:'pointer', fontWeight:'bold', fontSize:'0.78rem', display:'flex', alignItems:'center', gap:4 }}>
+                            {modoCompartir === 'ver' ? '👁' : '✏️'} {codigoCompartir}
+                        </button>
+                    )}
                     <button onClick={toggleFullscreen} title={fullscreen ? 'Salir pantalla completa' : 'Pantalla completa'}
                         style={{ padding:'5px', background:'#34495e', color:'white', border:'none', borderRadius:7, cursor:'pointer' }}>
                         {fullscreen ? <Minimize2 size={15}/> : <Maximize2 size={15}/>}
@@ -1254,6 +1475,114 @@ function PizarraApp() {
             {calcVisible && <CalculadoraFlotante onClose={() => setCalcVisible(false)} onCopiar={res => { setTextoPegar(res); setHerramienta('paste'); setCalcVisible(false); }} />}
             {grafVisible  && <GraficadoraFlotante onClose={() => setGrafVisible(false)} onInsertar={cfg => { setGraficaConfig(cfg); setHerramienta('graph'); setGrafVisible(false); }} />}
             {SHAPES_3D.includes(herramienta) && <Visor3D shape={herramienta} onClose={() => setHerramienta('draw')} />}
+
+            {/* ── Modal compartir ──────────────────────────────────────── */}
+            {compartirModal && (
+                <div style={{ position:'absolute', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.55)', zIndex:300, display:'flex', alignItems:'center', justifyContent:'center' }}
+                    onClick={e => { if (e.target === e.currentTarget) setCompartirModal(false); }}>
+                    <div style={{ background:'white', borderRadius:16, padding:28, maxWidth:440, width:'90%', boxShadow:'0 8px 40px rgba(0,0,0,0.25)', position:'relative' }}>
+                        <button onClick={() => setCompartirModal(false)}
+                            style={{ position:'absolute', top:10, right:12, background:'none', border:'none', fontSize:'1.4rem', cursor:'pointer', color:'#888' }}>×</button>
+
+                        {/* ─ Ya hay sesión activa ─ */}
+                        {modoCompartir && (
+                            <div>
+                                <div style={{ textAlign:'center', marginBottom:14 }}>
+                                    <div style={{ fontSize:'0.85rem', color:'#7f8c8d', marginBottom:4 }}>
+                                        {modoCompartir === 'ver' ? '👁 Solo lectura' : '✏️ Colaborativa'}
+                                        {esCreador ? ' · Creador' : ' · Participante'}
+                                    </div>
+                                    <div style={{ fontSize:'2.2rem', fontWeight:900, letterSpacing:6, color:'#2c3e50', background:'#ecf0f1', borderRadius:10, padding:'10px 20px', display:'inline-block' }}>
+                                        {codigoCompartir}
+                                    </div>
+                                    <div style={{ fontSize:'0.78rem', color:'#95a5a6', marginTop:4 }}>Comparte este código con tus alumnos</div>
+                                </div>
+                                {/* Participantes */}
+                                {participantes.length > 0 && (
+                                    <div style={{ marginBottom:16 }}>
+                                        <div style={{ fontWeight:'bold', fontSize:'0.85rem', color:'#555', marginBottom:6 }}>Participantes ({participantes.length})</div>
+                                        <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                                            {participantes.map(p => (
+                                                <div key={p.id} style={{ display:'flex', alignItems:'center', gap:5, background:'#f4f6f8', borderRadius:20, padding:'4px 10px', border:`2px solid ${p.color}` }}>
+                                                    <div style={{ width:12, height:12, borderRadius:'50%', background:p.color }} />
+                                                    <span style={{ fontSize:'0.82rem', fontWeight:600, color:'#2c3e50' }}>{p.nombre}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                <button onClick={() => { pararCompartir(); setCompartirModal(false); }}
+                                    style={{ width:'100%', padding:'10px', background:'#e74c3c', color:'white', border:'none', borderRadius:10, fontWeight:'bold', cursor:'pointer', fontSize:'0.9rem' }}>
+                                    ⏹ Detener sesión compartida
+                                </button>
+                            </div>
+                        )}
+
+                        {/* ─ Sin sesión activa: crear o unirse ─ */}
+                        {!modoCompartir && (
+                            <div>
+                                <h3 style={{ margin:'0 0 16px', textAlign:'center', color:'#2c3e50' }}>📡 Compartir Pizarra</h3>
+
+                                {/* Crear sesión */}
+                                <div style={{ marginBottom:18 }}>
+                                    <div style={{ fontWeight:'bold', fontSize:'0.88rem', color:'#555', marginBottom:8 }}>Crear sesión</div>
+                                    <div style={{ display:'flex', gap:8 }}>
+                                        <button onClick={() => crearSesion('ver')}
+                                            style={{ flex:1, padding:'11px 8px', background:'#8e44ad', color:'white', border:'none', borderRadius:10, fontWeight:'bold', cursor:'pointer', fontSize:'0.82rem' }}>
+                                            👁 Solo lectura
+                                            <div style={{ fontWeight:'normal', fontSize:'0.72rem', opacity:0.85, marginTop:2 }}>Los demás ven, no editan</div>
+                                        </button>
+                                        <button onClick={() => crearSesion('editar')}
+                                            style={{ flex:1, padding:'11px 8px', background:'#27ae60', color:'white', border:'none', borderRadius:10, fontWeight:'bold', cursor:'pointer', fontSize:'0.82rem' }}>
+                                            ✏️ Colaborativa
+                                            <div style={{ fontWeight:'normal', fontSize:'0.72rem', opacity:0.85, marginTop:2 }}>Todos pueden dibujar</div>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div style={{ borderTop:'1px solid #ecf0f1', margin:'16px 0' }} />
+
+                                {/* Unirse a sesión */}
+                                <div>
+                                    <div style={{ fontWeight:'bold', fontSize:'0.88rem', color:'#555', marginBottom:8 }}>Unirse a sesión</div>
+                                    <input placeholder="Código (ej. AB12CD)" value={codigoUnirseInput} onChange={e => setCodigoUnirseInput(e.target.value.toUpperCase())}
+                                        style={{ width:'100%', padding:'8px 12px', borderRadius:8, border:'2px solid #bdc3c7', fontSize:'1rem', marginBottom:8, boxSizing:'border-box', letterSpacing:4, fontWeight:'bold', textAlign:'center' }} />
+                                    <input placeholder="Tu nombre" value={nombreUnirse} onChange={e => setNombreUnirse(e.target.value)}
+                                        style={{ width:'100%', padding:'8px 12px', borderRadius:8, border:'2px solid #bdc3c7', fontSize:'0.9rem', marginBottom:10, boxSizing:'border-box' }} />
+                                    {errorCompartir && <div style={{ color:'#e74c3c', fontSize:'0.8rem', marginBottom:8 }}>{errorCompartir}</div>}
+                                    <button onClick={unirseASesion} disabled={juntandose}
+                                        style={{ width:'100%', padding:'10px', background:'#3498db', color:'white', border:'none', borderRadius:10, fontWeight:'bold', cursor:'pointer', fontSize:'0.9rem', opacity: juntandose ? 0.7 : 1 }}>
+                                        {juntandose ? 'Uniéndose…' : '🔗 Unirse'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* ── Panel participantes (barra inferior cuando hay sesión colaborativa) */}
+            {modoCompartir === 'editar' && participantes.length > 0 && (
+                <div style={{ background:'#2c3e50', padding:'4px 10px', display:'flex', gap:6, alignItems:'center', flexWrap:'wrap', flexShrink:0 }}>
+                    <span style={{ color:'#95a5a6', fontSize:'0.72rem', fontWeight:'bold' }}>✏️ SESIÓN:</span>
+                    {participantes.map(p => (
+                        <div key={p.id} style={{ display:'flex', alignItems:'center', gap:4, background: p.id === miId ? 'rgba(255,255,255,0.15)' : 'transparent', borderRadius:12, padding:'2px 8px', border:`1.5px solid ${p.color}` }}>
+                            <div style={{ width:9, height:9, borderRadius:'50%', background:p.color }} />
+                            <span style={{ color:'white', fontSize:'0.75rem', fontWeight: p.id === miId ? 700 : 400 }}>{p.nombre}{p.id === miId ? ' (tú)' : ''}</span>
+                        </div>
+                    ))}
+                    <span style={{ color:'#7f8c8d', fontSize:'0.7rem', marginLeft:'auto' }}>Código: <b style={{color:'white'}}>{codigoCompartir}</b></span>
+                </div>
+            )}
+            {modoCompartir === 'ver' && (
+                <div style={{ background: esCreador ? '#8e44ad' : '#6c3483', padding:'3px 10px', display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
+                    <span style={{ color:'white', fontSize:'0.75rem', fontWeight:'bold' }}>
+                        {esCreador ? '📡 Emitiendo en vivo · Código:' : '👁 Viendo en vivo · Código:'}
+                    </span>
+                    <span style={{ color:'#f8c8ff', fontWeight:900, letterSpacing:3 }}>{codigoCompartir}</span>
+                    {esCreador && <span style={{ color:'rgba(255,255,255,0.7)', fontSize:'0.7rem' }}>· Los espectadores ven con ~2s de retardo</span>}
+                </div>
+            )}
 
             {/* Canvas */}
             <canvas

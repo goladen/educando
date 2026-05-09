@@ -2,14 +2,59 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { PASOS, NOTAS, NOTAS_STAFF, INSTRUMENTOS_SEQ, playTone } from './musicUtils';
 import CreadorRitmosColab from './CreadorRitmosColab';
 import EarTrainingGame from './MusicCompass';
+import { db } from './firebase';
+import { collection, addDoc, doc, getDoc } from 'firebase/firestore';
 
 // ─── Hub ─────────────────────────────────────────────────────────────────────
 
 export default function MusicApp({ onBack, usuario = null }) {
     const [app, setApp] = useState(null);
+    const [sesionMusical, setSesionMusical] = useState([]);
+    const [modalEnviar, setModalEnviar] = useState(false);
+    const [mNombre, setMNombre] = useState('');
+    const [mCurso, setMCurso] = useState('');
+    const [mCodigo, setMCodigo] = useState('');
+    const [enviando, setEnviando] = useState(false);
 
-    if (app === 'lluvia')  return <LluviaDeNotas onBack={() => setApp(null)} />;
-    if (app === 'simon')   return <SimonDiceMusical onBack={() => setApp(null)} />;
+    const agregarPartida = (partida) => {
+        setSesionMusical(prev => [...prev, { ...partida, _id: Date.now() }]);
+    };
+
+    const enviarAlProfesor = async () => {
+        if (!mNombre.trim()) { alert('Introduce tu nombre'); return; }
+        const cod = mCodigo.trim().toUpperCase();
+        if (cod.length < 3) { alert('Introduce el código de tu profesor'); return; }
+        if (sesionMusical.length === 0) { alert('No hay partidas guardadas en la sesión'); return; }
+        setEnviando(true);
+        try {
+            const codigoSnap = await getDoc(doc(db, 'codigos_profesor', cod));
+            if (!codigoSnap.exists()) { alert('Código de profesor no encontrado. Pídelo a tu profe.'); setEnviando(false); return; }
+            const totalPuntos = sesionMusical.reduce((s, p) => s + (p.puntos || 0), 0);
+            await addDoc(collection(db, 'informes_juegos'), {
+                tipo: 'MUSIC_GAMES',
+                modalidad: 'Individual',
+                fecha: new Date(),
+                codigoProfesor: cod,
+                jugadores: [{
+                    nombre: mNombre.trim(),
+                    curso: mCurso.trim(),
+                    puntos: totalPuntos,
+                    partidas: sesionMusical.map(p => ({
+                        juego: p.juego, emoji: p.emoji, puntos: p.puntos,
+                        ...(p.nivel !== undefined ? { nivel: p.nivel } : {}),
+                    })),
+                }],
+            });
+            alert(`✅ Sesión enviada al profesor. ${sesionMusical.length} partida(s) incluidas.`);
+            setSesionMusical([]);
+            setModalEnviar(false);
+            setMNombre(''); setMCurso(''); setMCodigo('');
+        } catch (e) { alert('Error al enviar: ' + e.message); }
+        setEnviando(false);
+    };
+
+    if (app === 'lluvia')  return <LluviaDeNotas onBack={() => setApp(null)} onPartidaTerminada={agregarPartida} />;
+    if (app === 'simon')   return <SimonDiceMusical onBack={() => setApp(null)} onPartidaTerminada={agregarPartida} />;
     if (app === 'ritmos')  return <CreadorDeRitmos onBack={() => setApp(null)} usuario={usuario} />;
     if (app === 'colab')   return <CreadorRitmosColab onBack={() => setApp(null)} usuario={usuario} />;
     if (app === 'compass') return <EarTrainingGame onBack={() => setApp(null)} />;
@@ -50,7 +95,91 @@ export default function MusicApp({ onBack, usuario = null }) {
                         </button>
                     ))}
                 </div>
+
+                {/* ── Sesión acumulada ─────────────────────────────────── */}
+                {sesionMusical.length > 0 && (
+                    <div style={{ marginTop: 28, background: 'rgba(255,255,255,0.07)', borderRadius: 16, padding: '18px 20px', border: '1.5px solid rgba(124,58,237,0.4)' }}>
+                        <div style={{ color: '#c4b5fd', fontWeight: 700, fontSize: '0.88rem', letterSpacing: 0.5, marginBottom: 14 }}>🎵 SESIÓN ACTUAL</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 16 }}>
+                            {sesionMusical.map((p) => (
+                                <div key={p._id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'rgba(255,255,255,0.06)', borderRadius: 10 }}>
+                                    <span style={{ fontSize: 20 }}>{p.emoji}</span>
+                                    <span style={{ color: '#cbd5e1', fontSize: '0.88rem', flex: 1 }}>{p.juego}</span>
+                                    {p.nivel !== undefined && (
+                                        <span style={{ color: '#94a3b8', fontSize: '0.78rem' }}>Niv. {p.nivel}</span>
+                                    )}
+                                    <span style={{ color: '#a78bfa', fontWeight: 700, fontSize: '0.95rem', minWidth: 46, textAlign: 'right' }}>{p.puntos} pts</span>
+                                    <button onClick={() => setSesionMusical(prev => prev.filter(x => x._id !== p._id))}
+                                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '1.1rem', padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>×</button>
+                                </div>
+                            ))}
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 14 }}>
+                            <div style={{ color: '#f1f5f9', fontWeight: 700 }}>
+                                Total: <span style={{ color: '#a78bfa', fontSize: '1.1rem' }}>{sesionMusical.reduce((s, p) => s + (p.puntos || 0), 0)} pts</span>
+                            </div>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                                <button onClick={() => setSesionMusical([])}
+                                    style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.18)', background: 'transparent', color: '#94a3b8', cursor: 'pointer', fontSize: '0.82rem' }}>
+                                    🗑 Limpiar
+                                </button>
+                                <button onClick={() => setModalEnviar(true)}
+                                    style={{ padding: '8px 18px', borderRadius: 10, border: 'none', background: '#7c3aed', color: 'white', cursor: 'pointer', fontWeight: 700, fontSize: '0.88rem', boxShadow: '0 4px 14px rgba(124,58,237,0.45)' }}>
+                                    📤 Enviar al Profesor
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
+
+            {/* ── Modal enviar al profesor ─────────────────────────────── */}
+            {modalEnviar && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+                    <div style={{ background: '#1e1b4b', borderRadius: 18, padding: 28, width: '100%', maxWidth: 390, border: '1.5px solid rgba(167,139,250,0.3)', boxShadow: '0 20px 60px rgba(0,0,0,0.6)' }}>
+                        <h3 style={{ margin: '0 0 20px', color: '#f1f5f9', fontSize: '1.1rem', fontWeight: 700 }}>📤 Enviar al Profesor</h3>
+                        <div style={{ marginBottom: 12 }}>
+                            <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.82rem', marginBottom: 5 }}>Tu nombre *</label>
+                            <input value={mNombre} onChange={e => setMNombre(e.target.value)} placeholder="Ej: Ana García"
+                                style={{ width: '100%', padding: '9px 12px', borderRadius: 9, border: '1.5px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: '#f1f5f9', fontSize: '0.92rem', outline: 'none', boxSizing: 'border-box' }} />
+                        </div>
+                        <div style={{ marginBottom: 12 }}>
+                            <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.82rem', marginBottom: 5 }}>Curso (opcional)</label>
+                            <input value={mCurso} onChange={e => setMCurso(e.target.value)} placeholder="Ej: 5ºA"
+                                style={{ width: '100%', padding: '9px 12px', borderRadius: 9, border: '1.5px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: '#f1f5f9', fontSize: '0.92rem', outline: 'none', boxSizing: 'border-box' }} />
+                        </div>
+                        <div style={{ marginBottom: 20 }}>
+                            <label style={{ display: 'block', color: '#94a3b8', fontSize: '0.82rem', marginBottom: 5 }}>Código del Profesor *</label>
+                            <input value={mCodigo} onChange={e => setMCodigo(e.target.value.toUpperCase())} placeholder="Ej: PROF01" maxLength={10}
+                                style={{ width: '100%', padding: '9px 12px', borderRadius: 9, border: '1.5px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: '#f1f5f9', fontSize: '0.95rem', outline: 'none', boxSizing: 'border-box', fontFamily: 'monospace', letterSpacing: 2 }} />
+                        </div>
+                        {/* Resumen sesión */}
+                        <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 10, padding: '12px 14px', marginBottom: 20, fontSize: '0.82rem' }}>
+                            <div style={{ color: '#a78bfa', fontWeight: 700, marginBottom: 8 }}>Resumen — {sesionMusical.length} partida(s)</div>
+                            {sesionMusical.map((p, i) => (
+                                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', color: '#cbd5e1', padding: '3px 0' }}>
+                                    <span>{p.emoji} {p.juego}{p.nivel !== undefined ? ` (Niv. ${p.nivel})` : ''}</span>
+                                    <span style={{ color: '#a78bfa', fontWeight: 600 }}>{p.puntos} pts</span>
+                                </div>
+                            ))}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.1)', marginTop: 8, paddingTop: 8, fontWeight: 700, color: '#f1f5f9' }}>
+                                <span>Total</span>
+                                <span style={{ color: '#a78bfa' }}>{sesionMusical.reduce((s, p) => s + (p.puntos || 0), 0)} pts</span>
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 10 }}>
+                            <button onClick={() => setModalEnviar(false)}
+                                style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1.5px solid rgba(255,255,255,0.18)', background: 'transparent', color: '#94a3b8', cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem' }}>
+                                Cancelar
+                            </button>
+                            <button onClick={enviarAlProfesor} disabled={enviando}
+                                style={{ flex: 2, padding: '10px', borderRadius: 10, border: 'none', background: enviando ? '#4c1d95' : '#7c3aed', color: 'white', cursor: enviando ? 'default' : 'pointer', fontWeight: 700, fontSize: '0.95rem' }}>
+                                {enviando ? 'Enviando…' : '📤 Enviar'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -91,13 +220,14 @@ function Pentagrama({ nota, flash }) {
 
 // ─── 1. LLUVIA DE NOTAS ──────────────────────────────────────────────────────
 
-function LluviaDeNotas({ onBack }) {
-    const [estado, setEstado] = useState('inicio');
-    const [nota,   setNota]   = useState(null);
-    const [puntos, setPuntos] = useState(0);
-    const [vidas,  setVidas]  = useState(3);
-    const [tiempo, setTiempo] = useState(5);
-    const [flash,  setFlash]  = useState(null);   // null | 'ok' | 'error'
+function LluviaDeNotas({ onBack, onPartidaTerminada }) {
+    const [estado,   setEstado]   = useState('inicio');
+    const [nota,     setNota]     = useState(null);
+    const [puntos,   setPuntos]   = useState(0);
+    const [vidas,    setVidas]    = useState(3);
+    const [tiempo,   setTiempo]   = useState(5);
+    const [flash,    setFlash]    = useState(null);   // null | 'ok' | 'error'
+    const [guardada, setGuardada] = useState(false);
 
     const bloqRef  = useRef(false);
     const vidasRef = useRef(3);
@@ -113,6 +243,7 @@ function LluviaDeNotas({ onBack }) {
         setNota(rnd());
         setTiempo(5);
         setEstado('playing');
+        setGuardada(false);
     };
 
     const procesar = useCallback((acerto) => {
@@ -163,7 +294,18 @@ function LluviaDeNotas({ onBack }) {
             <div style={{ textAlign: 'center', paddingTop: 16 }}>
                 <div style={{ fontSize: 60, marginBottom: 12 }}>🎖️</div>
                 <div style={{ color: '#94a3b8', marginBottom: 6 }}>Puntuación final</div>
-                <div style={{ color: '#6366f1', fontWeight: 800, fontSize: '2.4rem', marginBottom: 28 }}>{puntos}</div>
+                <div style={{ color: '#6366f1', fontWeight: 800, fontSize: '2.4rem', marginBottom: 22 }}>{puntos}</div>
+                {onPartidaTerminada && !guardada && (
+                    <div style={{ marginBottom: 14 }}>
+                        <button onClick={() => { onPartidaTerminada({ juego: 'Lluvia de Notas', emoji: '🎼', puntos }); setGuardada(true); }}
+                            style={{ padding: '11px 28px', borderRadius: 12, border: 'none', background: '#7c3aed', color: 'white', fontWeight: 700, fontSize: '0.95rem', cursor: 'pointer', boxShadow: '0 4px 14px rgba(124,58,237,0.4)' }}>
+                            ✓ Guardar en sesión
+                        </button>
+                    </div>
+                )}
+                {guardada && (
+                    <div style={{ color: '#22c55e', fontWeight: 600, marginBottom: 14, fontSize: '0.9rem' }}>✓ Guardado en sesión</div>
+                )}
                 <CenteredBtn onClick={iniciar} color="#6366f1">Jugar de nuevo</CenteredBtn>
             </div>
         </GameScreen>
@@ -218,11 +360,12 @@ function LluviaDeNotas({ onBack }) {
 
 // ─── 2. SIMÓN DICE MUSICAL ───────────────────────────────────────────────────
 
-function SimonDiceMusical({ onBack }) {
+function SimonDiceMusical({ onBack, onPartidaTerminada }) {
     const [secuencia,  setSecuencia]  = useState([]);
     const [turno,      setTurno]      = useState('inicio');  // inicio | mostrando | alumno | ok | gameover
     const [paso,       setPaso]       = useState(0);
     const [iluminada,  setIluminada]  = useState(null);
+    const [guardada,   setGuardada]   = useState(false);
     const tidsRef = useRef([]);
 
     const clearAll = () => { tidsRef.current.forEach(clearTimeout); tidsRef.current = []; };
@@ -244,6 +387,7 @@ function SimonDiceMusical({ onBack }) {
 
     const iniciar = () => {
         clearAll();
+        setGuardada(false);
         const seq = [Math.floor(Math.random() * 7)];
         setSecuencia(seq);
         mostrar(seq);
@@ -313,6 +457,17 @@ function SimonDiceMusical({ onBack }) {
                 })}
             </div>
 
+            {turno === 'gameover' && onPartidaTerminada && !guardada && (
+                <div style={{ textAlign: 'center', marginBottom: 12 }}>
+                    <button onClick={() => { onPartidaTerminada({ juego: 'Simón Dice Musical', emoji: '🎹', puntos: nivel, nivel }); setGuardada(true); }}
+                        style={{ padding: '11px 28px', borderRadius: 12, border: 'none', background: '#7c3aed', color: 'white', fontWeight: 700, fontSize: '0.95rem', cursor: 'pointer', boxShadow: '0 4px 14px rgba(124,58,237,0.4)' }}>
+                        ✓ Guardar en sesión
+                    </button>
+                </div>
+            )}
+            {turno === 'gameover' && guardada && (
+                <div style={{ textAlign: 'center', color: '#22c55e', fontWeight: 600, marginBottom: 12, fontSize: '0.9rem' }}>✓ Guardado en sesión</div>
+            )}
             {(turno === 'inicio' || turno === 'gameover') && (
                 <CenteredBtn onClick={iniciar} color="#10b981">
                     {turno === 'gameover' ? 'Reintentar' : 'Empezar'}

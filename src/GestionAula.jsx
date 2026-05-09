@@ -4,7 +4,8 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import {
     ArrowLeft, Edit3, Settings, Clock, Play, Square, RotateCcw,
     PenTool, Type, Circle, Square as SquareIcon, Triangle, Hexagon,
-    Box, Calculator as CalcIcon, X, Camera, Activity, ChevronDown, ChevronUp
+    Box, Calculator as CalcIcon, X, Camera, Activity, ChevronDown, ChevronUp,
+    Move, Maximize2, Minimize2, Image as ImageIcon, ZoomIn, ZoomOut
 } from 'lucide-react';
 import Confetti from 'react-confetti';
 
@@ -198,25 +199,86 @@ function RelojApp() {
 // ══════════════════════════════════════════════════════════════════════════════
 
 function GraficadoraFlotante({ onClose, onInsertar }) {
-    const [expr, setExpr] = useState('sin(x)');
-    const [scale, setScale] = useState(40);
+    const [expr, setExpr]     = useState('sin(x)');
+    const [scale, setScale]   = useState(40);
+    const previewRef          = useRef(null);
+
+    // Draw preview whenever expr or scale changes
+    useEffect(() => {
+        const canvas = previewRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const W = canvas.width, H = canvas.height;
+        const cx = W / 2, cy = H / 2;
+        ctx.clearRect(0, 0, W, H);
+        ctx.fillStyle = '#1a2535';
+        ctx.fillRect(0, 0, W, H);
+        // Grid
+        ctx.strokeStyle = '#2d3f55'; ctx.lineWidth = 0.5;
+        for (let i = -10; i <= 10; i++) {
+            ctx.beginPath(); ctx.moveTo(cx + i * scale, 0); ctx.lineTo(cx + i * scale, H); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, cy + i * scale); ctx.lineTo(W, cy + i * scale); ctx.stroke();
+        }
+        // Axes
+        ctx.strokeStyle = '#4a6fa5'; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(W, cy); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, H); ctx.stroke();
+        // Tick labels
+        ctx.fillStyle = '#7f9ab5'; ctx.font = '9px Arial'; ctx.textAlign = 'center';
+        for (let i = -8; i <= 8; i++) {
+            if (i === 0) continue;
+            ctx.fillText(i, cx + i * scale, cy + 10);
+        }
+        // Curve
+        ctx.strokeStyle = '#f1c40f'; ctx.lineWidth = 2;
+        ctx.beginPath();
+        let first = true;
+        for (let px = 0; px < W; px++) {
+            const x = (px - cx) / scale;
+            try {
+                // eslint-disable-next-line no-eval
+                const y = eval(prepareMathExpr(expr).replace(/x/g, `(${x})`));
+                if (!Number.isFinite(y)) { first = true; continue; }
+                const py = cy - y * scale;
+                if (py < -H || py > 2 * H) { first = true; continue; }
+                if (first) { ctx.moveTo(px, py); first = false; } else ctx.lineTo(px, py);
+            } catch { first = true; }
+        }
+        ctx.stroke();
+        // Label
+        ctx.fillStyle = '#f1c40f'; ctx.font = 'bold 10px monospace'; ctx.textAlign = 'left';
+        ctx.fillText(`f(x) = ${expr}`, 6, 14);
+    }, [expr, scale]);
 
     return (
-        <div style={{ position: 'absolute', top: 20, right: 300, width: 280, background: '#2c3e50', padding: 15, borderRadius: 12, boxShadow: '0 10px 30px rgba(0,0,0,0.4)', zIndex: 100, color: 'white' }}>
+        <div style={{ position: 'absolute', top: 20, right: 300, width: 290, background: '#2c3e50', padding: 14, borderRadius: 12, boxShadow: '0 10px 30px rgba(0,0,0,0.5)', zIndex: 100, color: 'white' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10, alignItems: 'center' }}>
-                <span style={{ fontWeight: 'bold' }}><Activity size={16} style={{ verticalAlign: 'middle', marginRight: 5 }}/> Graficador f(x)</span>
-                <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer' }}><X size={16}/></button>
+                <span style={{ fontWeight: 'bold' }}><Activity size={15} style={{ verticalAlign: 'middle', marginRight: 5 }}/> Graficador f(x)</span>
+                <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer' }}><X size={15}/></button>
             </div>
-            <div style={{ marginBottom: 10 }}>
-                <label style={{ fontSize: '0.8rem', color: '#bdc3c7' }}>Función f(x) = </label>
-                <input type="text" value={expr} onChange={e => setExpr(e.target.value)} style={{ width: '100%', padding: 8, borderRadius: 5, border: 'none', marginTop: 5, fontFamily: 'monospace', outline: 'none', boxSizing: 'border-box' }} placeholder="Ej: x^2 + 2*x" />
+
+            {/* Preview canvas */}
+            <canvas ref={previewRef} width={262} height={130}
+                style={{ display: 'block', width: '100%', borderRadius: 8, marginBottom: 10, border: '1px solid #34495e' }} />
+
+            <div style={{ marginBottom: 8 }}>
+                <label style={{ fontSize: '0.78rem', color: '#bdc3c7' }}>f(x) = </label>
+                <input type="text" value={expr} onChange={e => setExpr(e.target.value)}
+                    style={{ width: '100%', padding: 7, borderRadius: 5, border: 'none', marginTop: 4, fontFamily: 'monospace', outline: 'none', boxSizing: 'border-box', background: '#1a2535', color: '#f1c40f' }}
+                    placeholder="Ej: sin(x), x^2, cos(x)/x" />
             </div>
-            <div style={{ marginBottom: 10 }}>
-                <label style={{ fontSize: '0.8rem', color: '#bdc3c7' }}>Escala (Zoom): </label>
-                <input type="range" min="10" max="100" value={scale} onChange={e => setScale(Number(e.target.value))} style={{ width: '100%' }} />
+
+            {/* Zoom controls */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <button onClick={() => setScale(s => Math.max(10, s - 5))} style={{ background: '#34495e', border: 'none', color: 'white', borderRadius: 6, padding: '4px 8px', cursor: 'pointer' }}><ZoomOut size={14}/></button>
+                <input type="range" min="8" max="120" value={scale} onChange={e => setScale(Number(e.target.value))} style={{ flex: 1 }} />
+                <button onClick={() => setScale(s => Math.min(120, s + 5))} style={{ background: '#34495e', border: 'none', color: 'white', borderRadius: 6, padding: '4px 8px', cursor: 'pointer' }}><ZoomIn size={14}/></button>
+                <span style={{ fontSize: '0.75rem', color: '#bdc3c7', minWidth: 30 }}>×{scale}</span>
             </div>
-            <button onClick={() => onInsertar({ funcStr: expr, scale })} style={{ width: '100%', padding: 10, border: 'none', borderRadius: 5, background: '#f1c40f', color: '#2c3e50', fontWeight: 'bold', cursor: 'pointer' }}>
-                Insertar en Pizarra
+
+            <button onClick={() => onInsertar({ funcStr: expr, scale })}
+                style={{ width: '100%', padding: 9, border: 'none', borderRadius: 5, background: '#f1c40f', color: '#2c3e50', fontWeight: 'bold', cursor: 'pointer' }}>
+                Insertar en Pizarra (vista actual)
             </button>
         </div>
     );
@@ -422,68 +484,308 @@ function Visor3D({ shape, onClose }) {
     );
 }
 
+// ─── NOTACIÓN MUSICAL ─────────────────────────────────────────────────────────
+const STAFF_LS = 12;
+
+const MUSIC_NOTE_IDS  = ['redonda','blanca','negra','corchea','semicorchea','fusa'];
+const MUSIC_REST_IDS  = ['s_redonda','s_blanca','s_negra','s_corchea'];
+const MUSIC_ACC_IDS   = ['sharp','flat','natural'];
+const ALL_MUSIC_TOOLS = [...MUSIC_NOTE_IDS, ...MUSIC_REST_IDS, ...MUSIC_ACC_IDS, 'staff','staff_fa'];
+
+const drawStaff = (ctx, item) => {
+    const ls = item.ls || STAFF_LS;
+    ctx.save();
+    ctx.strokeStyle = '#111'; ctx.lineWidth = 1.5;
+    for (let i = 0; i < 5; i++) {
+        ctx.beginPath(); ctx.moveTo(item.x, item.y + i * ls); ctx.lineTo(item.x + item.w, item.y + i * ls); ctx.stroke();
+    }
+    ctx.beginPath(); ctx.moveTo(item.x, item.y); ctx.lineTo(item.x, item.y + 4 * ls); ctx.stroke();
+    const clefChar = item.clef === 'fa' ? '𝄢' : '𝄞';
+    const clefSize = item.clef === 'fa' ? ls * 3.2 : ls * 4.8;
+    const clefY    = item.clef === 'fa' ? item.y + ls * 1.8 : item.y + ls * 3.6;
+    ctx.fillStyle = '#111';
+    ctx.font = `${clefSize}px serif`;
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(clefChar, item.x + 5, clefY);
+    ctx.restore();
+};
+
+const drawNote = (ctx, item) => {
+    const ls  = item.ls || STAFF_LS;
+    const rx  = ls * 0.65, ry = ls * 0.44;
+    const { x, y, figura, color: nc = '#111', stemUp = true } = item;
+    const sxOff = stemUp ? rx - 1 : -rx + 1;
+    const stemEndY = y + (stemUp ? -ls * 3.5 : ls * 3.5);
+    ctx.save();
+    ctx.strokeStyle = nc; ctx.fillStyle = nc; ctx.lineWidth = 1.5;
+
+    const head = (filled) => {
+        ctx.beginPath();
+        ctx.ellipse(x, y, rx, ry, -0.25, 0, Math.PI * 2);
+        if (filled) { ctx.fill(); }
+        else { ctx.fillStyle = 'white'; ctx.fill(); ctx.strokeStyle = nc; ctx.stroke(); ctx.fillStyle = nc; }
+    };
+    const stem = () => { ctx.beginPath(); ctx.moveTo(x + sxOff, y); ctx.lineTo(x + sxOff, stemEndY); ctx.strokeStyle = nc; ctx.stroke(); };
+    const flag = (n) => {
+        for (let f = 0; f < n; f++) {
+            const fy = stemEndY + f * ls * 0.8 * (stemUp ? 1 : -1);
+            ctx.beginPath(); ctx.moveTo(x + sxOff, fy);
+            if (stemUp)
+                ctx.bezierCurveTo(x + sxOff + ls*1.8, fy + ls*0.8, x + sxOff + ls*1.4, fy + ls*1.7, x + sxOff + ls*0.2, fy + ls*2.2);
+            else
+                ctx.bezierCurveTo(x + sxOff + ls*1.8, fy - ls*0.8, x + sxOff + ls*1.4, fy - ls*1.7, x + sxOff + ls*0.2, fy - ls*2.2);
+            ctx.strokeStyle = nc; ctx.stroke();
+        }
+    };
+    if (figura === 'redonda')     { head(false); }
+    if (figura === 'blanca')      { head(false); stem(); }
+    if (figura === 'negra')       { head(true);  stem(); }
+    if (figura === 'corchea')     { head(true);  stem(); flag(1); }
+    if (figura === 'semicorchea') { head(true);  stem(); flag(2); }
+    if (figura === 'fusa')        { head(true);  stem(); flag(3); }
+    ctx.restore();
+};
+
+const drawRest = (ctx, item) => {
+    const ls = item.ls || STAFF_LS;
+    const { x, y, figura, color: c = '#111' } = item;
+    ctx.save(); ctx.strokeStyle = c; ctx.fillStyle = c; ctx.lineWidth = 1.5;
+    if (figura === 's_redonda') { ctx.fillRect(x - ls, y, ls * 2, ls * 0.55); }
+    else if (figura === 's_blanca') { ctx.fillRect(x - ls, y - ls * 0.55, ls * 2, ls * 0.55); }
+    else if (figura === 's_negra') {
+        ctx.beginPath();
+        ctx.moveTo(x + ls*0.4, y - ls*1.2); ctx.lineTo(x - ls*0.5, y - ls*0.2);
+        ctx.lineTo(x + ls*0.4, y + ls*0.2); ctx.lineTo(x - ls*0.4, y + ls*1.2);
+        ctx.stroke();
+    } else if (figura === 's_corchea') {
+        ctx.beginPath(); ctx.moveTo(x + ls*0.5, y - ls*0.8); ctx.lineTo(x - ls*0.4, y + ls*0.8); ctx.stroke();
+        ctx.beginPath(); ctx.arc(x + ls*0.5, y - ls*0.5, ls*0.35, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+};
+
+const drawAccidental = (ctx, item) => {
+    const ls = item.ls || STAFF_LS;
+    const sym = item.figura === 'sharp' ? '♯' : item.figura === 'flat' ? '♭' : '♮';
+    ctx.save();
+    ctx.font = `bold ${ls * 1.7}px serif`; ctx.fillStyle = item.color || '#111';
+    ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+    ctx.fillText(sym, item.x, item.y);
+    ctx.restore();
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 function PizarraApp() {
-    const canvasRef = useRef(null);
-    const [herramienta, setHerramienta] = useState('draw');
-    const [color, setColor] = useState('#2c3e50');
-    const [grosor, setGrosor] = useState(3);
-    const [dibujando, setDibujando] = useState(false);
-    const [inicioX, setInicioX] = useState(0);
-    const [inicioY, setInicioY] = useState(0);
-    const [elementos, setElementos] = useState([]); 
-    const [calcVisible, setCalcVisible] = useState(false);
-    const [grafVisible, setGrafVisible] = useState(false);
-    const [textoPegar, setTextoPegar] = useState('');
-    const [graficaConfig, setGraficaConfig] = useState(null);
+    const canvasRef      = useRef(null);
+    const contenedorRef  = useRef(null);
+    const fileInputRef   = useRef(null);
+    const imageCacheRef  = useRef({});
+    const panRef         = useRef({ x: 0, y: 0 });
+    const panStartRef    = useRef(null);
+    const selMoveRef     = useRef(null);
+
+    const [herramienta,    setHerramienta]    = useState('draw');
+    const [color,          setColor]          = useState('#2c3e50');
+    const [grosor,         setGrosor]         = useState(3);
+    const [dibujando,      setDibujando]      = useState(false);
+    const [inicioXY,       setInicioXY]       = useState({ x: 0, y: 0 });
     const [previewElement, setPreviewElement] = useState(null);
+    const [calcVisible,    setCalcVisible]    = useState(false);
+    const [grafVisible,    setGrafVisible]    = useState(false);
+    const [textoPegar,     setTextoPegar]     = useState('');
+    const [graficaConfig,  setGraficaConfig]  = useState(null);
+    const [fullscreen,     setFullscreen]     = useState(false);
+    const [redrawTick,     setRedrawTick]     = useState(0);
+    const [modoPizarra,    setModoPizarra]    = useState('general');
 
-    useEffect(() => { dibujarCanvas(); }, [elementos, previewElement]);
+    // Multi-page
+    const [paginas,   setPaginas]   = useState([[]]);
+    const [paginaIdx, setPaginaIdx] = useState(0);
+    const elementos    = paginas[paginaIdx] ?? [];
+    const setElementos = (fn) => setPaginas(ps => ps.map((p, i) =>
+        i !== paginaIdx ? p : typeof fn === 'function' ? fn(p) : fn));
 
-    const descargarPizarra = () => {
-        const canvas = canvasRef.current;
-        if(!canvas) return;
-        const url = canvas.toDataURL("image/png");
-        const link = document.createElement('a');
-        link.download = 'Pizarra_Clase.png';
-        link.href = url;
-        link.click();
+    // Lasso / selection
+    const [selIdxs,   setSelIdxs]   = useState([]);
+    const [lassoRect, setLassoRect] = useState(null);
+
+    const triggerRedraw = () => setRedrawTick(t => t + 1);
+
+    // Fullscreen
+    const toggleFullscreen = () => {
+        const el = contenedorRef.current;
+        if (!document.fullscreenElement) el.requestFullscreen?.().then(() => setFullscreen(true)).catch(() => {});
+        else document.exitFullscreen?.().then(() => setFullscreen(false)).catch(() => {});
+    };
+    useEffect(() => {
+        const h = () => setFullscreen(!!document.fullscreenElement);
+        document.addEventListener('fullscreenchange', h);
+        return () => document.removeEventListener('fullscreenchange', h);
+    }, []);
+
+    useEffect(() => { dibujarCanvas(); }, [elementos, previewElement, redrawTick, paginaIdx, selIdxs, lassoRect]);
+
+    // ── Image cache ─────────────────────────────────────────────────────────
+    const getOrLoadImg = (item) => {
+        if (imageCacheRef.current[item.id]) return imageCacheRef.current[item.id];
+        const img = new Image();
+        img.src = item.src;
+        img.onload = () => { imageCacheRef.current[item.id] = img; triggerRedraw(); };
+        return null;
+    };
+
+    // ── Save / export ───────────────────────────────────────────────────────
+    const renderPaginaTo = (offCanvas, elemLista) => {
+        const ctx = offCanvas.getContext('2d');
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, offCanvas.width, offCanvas.height);
+        elemLista.forEach(item => dibujarItem(ctx, item, false));
+    };
+
+    const descargarPagina = () => {
+        const canvas = canvasRef.current; if (!canvas) return;
+        Object.assign(document.createElement('a'), { download: `Pizarra_H${paginaIdx + 1}.png`, href: canvas.toDataURL('image/png') }).click();
+    };
+
+    const descargarTodasPNG = () => {
+        paginas.forEach((pg, i) => {
+            const off = Object.assign(document.createElement('canvas'), { width: 1000, height: 500 });
+            renderPaginaTo(off, pg);
+            setTimeout(() => Object.assign(document.createElement('a'), { download: `Pizarra_H${i + 1}.png`, href: off.toDataURL('image/png') }).click(), i * 250);
+        });
+    };
+
+    const descargarPDF = () => {
+        const imgs = paginas.map(pg => {
+            const off = Object.assign(document.createElement('canvas'), { width: 1000, height: 500 });
+            renderPaginaTo(off, pg);
+            return off.toDataURL('image/png');
+        });
+        const w = window.open('', '_blank');
+        w.document.write(`<html><head><title>Pizarra PDF</title><style>
+            body{margin:0}img{width:100%;page-break-after:always;display:block}
+            @media print{img{page-break-after:always}}
+        </style></head><body>
+            ${imgs.map(src => `<img src="${src}"/>`).join('')}
+            <script>window.onload=()=>window.print()<\/script></body></html>`);
+        w.document.close();
+    };
+
+    // ── Insert image from device ─────────────────────────────────────────────
+    const onFileSelected = (e) => {
+        const file = e.target.files[0]; if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const img = new Image();
+            img.onload = () => {
+                const id = Date.now();
+                const maxW = 400, maxH = 300;
+                let w = img.width, h = img.height;
+                if (w > maxW) { h = h * maxW / w; w = maxW; }
+                if (h > maxH) { w = w * maxH / h; h = maxH; }
+                imageCacheRef.current[id] = img;
+                setElementos(prev => [...prev, { t: 'image', id, src: ev.target.result, x: 80 - panRef.current.x, y: 60 - panRef.current.y, w, h }]);
+            };
+            img.src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+        e.target.value = '';
+    };
+
+    // ── Element bounding box / move ──────────────────────────────────────────
+    const getBbox = (item) => {
+        if (item.t === 'draw') {
+            const xs = item.pts.map(p => p.x), ys = item.pts.map(p => p.y);
+            return { x1: Math.min(...xs), y1: Math.min(...ys), x2: Math.max(...xs), y2: Math.max(...ys) };
+        }
+        if (item.t === 'text')  return { x1: item.x, y1: item.y - 24, x2: item.x + 200, y2: item.y + 4 };
+        if (item.t === 'graph' || item.t === 'axes') return { x1: item.cx - 265, y1: item.cy - 265, x2: item.cx + 265, y2: item.cy + 265 };
+        if (item.t === 'image') return { x1: item.x, y1: item.y, x2: item.x + item.w, y2: item.y + item.h };
+        if (item.t === 'staff') { const ls = item.ls||STAFF_LS; return { x1: item.x, y1: item.y - ls, x2: item.x + item.w, y2: item.y + ls*5 }; }
+        if (item.t === 'note' || item.t === 'rest') { const ls = item.ls||STAFF_LS; return { x1: item.x - ls*2, y1: item.y - ls*5, x2: item.x + ls*3, y2: item.y + ls*5 }; }
+        if (item.t === 'acc')   { const ls = item.ls||STAFF_LS; return { x1: item.x - ls, y1: item.y - ls, x2: item.x + ls, y2: item.y + ls }; }
+        if (item.x1 !== undefined) return { x1: Math.min(item.x1, item.x2), y1: Math.min(item.y1, item.y2), x2: Math.max(item.x1, item.x2), y2: Math.max(item.y1, item.y2) };
+        return { x1: 0, y1: 0, x2: 0, y2: 0 };
+    };
+
+    const rectsOverlap = (a, b) => a.x1 <= b.x2 && a.x2 >= b.x1 && a.y1 <= b.y2 && a.y2 >= b.y1;
+
+    const moverSeleccion = (idxs, dx, dy) => {
+        setElementos(prev => prev.map((item, i) => {
+            if (!idxs.includes(i)) return item;
+            if (item.t === 'draw') return { ...item, pts: item.pts.map(p => ({ x: p.x + dx, y: p.y + dy })) };
+            if (item.t === 'text') return { ...item, x: item.x + dx, y: item.y + dy };
+            if (item.t === 'graph' || item.t === 'axes') return { ...item, cx: item.cx + dx, cy: item.cy + dy };
+            if (item.t === 'image') return { ...item, x: item.x + dx, y: item.y + dy };
+            return { ...item, x1: item.x1 + dx, y1: item.y1 + dy, x2: item.x2 + dx, y2: item.y2 + dy };
+        }));
+    };
+
+    // ── Draw pipeline ────────────────────────────────────────────────────────
+    const dibujarItem = (ctx, item, selected) => {
+        ctx.strokeStyle = item.color;
+        ctx.fillStyle   = item.color;
+        ctx.lineWidth   = item.grosor;
+        ctx.lineCap     = 'round';
+        ctx.lineJoin    = 'round';
+
+        if (item.t === 'draw') {
+            ctx.beginPath();
+            ctx.moveTo(item.pts[0].x, item.pts[0].y);
+            item.pts.forEach(p => ctx.lineTo(p.x, p.y));
+            ctx.stroke();
+        } else if (item.t === 'text') {
+            ctx.font = 'bold 24px Arial';
+            ctx.fillText(item.txt, item.x, item.y);
+        } else if (item.t === 'graph') {
+            dibujarCurvaMatematica(ctx, item);
+        } else if (item.t === 'axes') {
+            dibujarEjesCoord(ctx, item);
+        } else if (item.t === 'image') {
+            const img = getOrLoadImg(item);
+            if (img) ctx.drawImage(img, item.x, item.y, item.w, item.h);
+            else { ctx.save(); ctx.strokeStyle = '#bdc3c7'; ctx.lineWidth = 1; ctx.strokeRect(item.x, item.y, item.w, item.h); ctx.restore(); }
+        } else if (item.t === 'staff') {
+            drawStaff(ctx, item);
+        } else if (item.t === 'note') {
+            drawNote(ctx, item);
+        } else if (item.t === 'rest') {
+            drawRest(ctx, item);
+        } else if (item.t === 'acc') {
+            drawAccidental(ctx, item);
+        } else {
+            dibujarForma(ctx, item);
+        }
+
+        if (selected) {
+            const bb = getBbox(item);
+            ctx.save();
+            ctx.strokeStyle = '#3498db'; ctx.lineWidth = 2;
+            ctx.setLineDash([6, 3]);
+            ctx.strokeRect(bb.x1 - 4, bb.y1 - 4, bb.x2 - bb.x1 + 8, bb.y2 - bb.y1 + 8);
+            ctx.setLineDash([]);
+            ctx.restore();
+        }
     };
 
     const dibujarCanvas = () => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
+        const canvas = canvasRef.current; if (!canvas) return;
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        const dibujarItem = (item) => {
-            ctx.strokeStyle = item.color;
-            ctx.fillStyle = item.color;
-            ctx.lineWidth = item.grosor;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
+        ctx.save();
+        ctx.translate(panRef.current.x, panRef.current.y);
+        elementos.forEach((item, idx) => dibujarItem(ctx, item, selIdxs.includes(idx)));
+        if (previewElement) dibujarItem(ctx, previewElement, false);
 
-            if (item.t === 'draw') {
-                ctx.beginPath();
-                ctx.moveTo(item.pts[0].x, item.pts[0].y);
-                item.pts.forEach(p => ctx.lineTo(p.x, p.y));
-                ctx.stroke();
-            } else if (item.t === 'text') {
-                ctx.font = "bold 24px Arial";
-                ctx.fillText(item.txt, item.x, item.y);
-            } else if (item.t === 'graph') {
-                dibujarCurvaMatematica(ctx, item);
-            } else if (item.t === 'axes') {
-                dibujarEjesCoord(ctx, item);
-            } else {
-                dibujarForma(ctx, item);
-            }
-        };
-
-        elementos.forEach(dibujarItem);
-        if (previewElement) dibujarItem(previewElement);
+        if (lassoRect) {
+            ctx.strokeStyle = '#3498db'; ctx.lineWidth = 1.5; ctx.setLineDash([5, 3]);
+            ctx.strokeRect(lassoRect.x1, lassoRect.y1, lassoRect.x2 - lassoRect.x1, lassoRect.y2 - lassoRect.y1);
+            ctx.fillStyle = 'rgba(52,152,219,0.07)';
+            ctx.fillRect(lassoRect.x1, lassoRect.y1, lassoRect.x2 - lassoRect.x1, lassoRect.y2 - lassoRect.y1);
+            ctx.setLineDash([]);
+        }
+        ctx.restore();
     };
 
     const dibujarCurvaMatematica = (ctx, item) => {
@@ -624,6 +926,7 @@ function PizarraApp() {
         ctx.stroke();
     };
 
+    // ── Coordinate helper ────────────────────────────────────────────────────
     const getPos = (e) => {
         const canvas = canvasRef.current;
         const rect = canvas.getBoundingClientRect();
@@ -631,106 +934,328 @@ function PizarraApp() {
         const scaleY = canvas.height / rect.height;
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
         const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+        return {
+            x: (clientX - rect.left) * scaleX - panRef.current.x,
+            y: (clientY - rect.top)  * scaleY - panRef.current.y,
+            rawX: clientX, rawY: clientY,
+        };
     };
 
+    // ── Draw events ──────────────────────────────────────────────────────────
     const iniciarDibujo = (e) => {
-        const { x, y } = getPos(e);
+        const pos = getPos(e);
+        const { x, y, rawX, rawY } = pos;
+
         if (herramienta === 'paste' && textoPegar) {
-            setElementos([...elementos, { t: 'text', txt: textoPegar, x, y, color, grosor }]);
+            setElementos(prev => [...prev, { t: 'text', txt: textoPegar, x, y, color, grosor }]);
             setHerramienta('draw'); setTextoPegar(''); return;
         }
         if (herramienta === 'graph' && graficaConfig) {
-            setElementos([...elementos, { t: 'graph', funcStr: graficaConfig.funcStr, scale: graficaConfig.scale, cx: x, cy: y, color, grosor }]);
+            setElementos(prev => [...prev, { t: 'graph', funcStr: graficaConfig.funcStr, scale: graficaConfig.scale, cx: x, cy: y, color, grosor }]);
             setHerramienta('draw'); setGraficaConfig(null); return;
         }
         if (herramienta === 'axes') {
-            setElementos([...elementos, { t: 'axes', cx: x, cy: y, color, grosor }]);
+            setElementos(prev => [...prev, { t: 'axes', cx: x, cy: y, color, grosor }]);
             setHerramienta('draw'); return;
+        }
+        if (herramienta === 'pan') {
+            panStartRef.current = { rawX, rawY, px: panRef.current.x, py: panRef.current.y };
+            return;
+        }
+
+        // ── Music tools ─────────────────────────────────────────────────
+        if (herramienta === 'staff' || herramienta === 'staff_fa') {
+            setElementos(prev => [...prev, { t: 'staff', x, y, w: 680, ls: STAFF_LS, clef: herramienta === 'staff_fa' ? 'fa' : 'sol' }]);
+            return;
+        }
+        if (MUSIC_NOTE_IDS.includes(herramienta)) {
+            // Snap to nearest staff
+            let snapY = y, stemUp = true, ls = STAFF_LS;
+            const staff = elementos.find(s => s.t === 'staff' && x >= s.x - 20 && x <= s.x + s.w + 20 && y >= s.y - ls * 3 && y <= s.y + ls * 7);
+            if (staff) {
+                ls = staff.ls || STAFF_LS;
+                const half = ls / 2;
+                const step = Math.round((y - staff.y) / half);
+                snapY  = staff.y + step * half;
+                stemUp = step >= 4; // middle line = step 4
+            }
+            setElementos(prev => [...prev, { t: 'note', figura: herramienta, x, y: snapY, color, ls, stemUp }]);
+            return;
+        }
+        if (MUSIC_REST_IDS.includes(herramienta)) {
+            const staff = elementos.find(s => s.t === 'staff' && x >= s.x - 20 && x <= s.x + s.w + 20 && Math.abs(y - (s.y + s.ls * 2)) < s.ls * 4);
+            const ls = staff?.ls || STAFF_LS;
+            // Position rests on canonical lines
+            const restY = staff
+                ? (herramienta === 's_redonda' ? staff.y + ls     : staff.y + ls * 2)
+                : y;
+            setElementos(prev => [...prev, { t: 'rest', figura: herramienta, x, y: restY, color, ls }]);
+            return;
+        }
+        if (MUSIC_ACC_IDS.includes(herramienta)) {
+            setElementos(prev => [...prev, { t: 'acc', figura: herramienta, x, y, color, ls: STAFF_LS }]);
+            return;
+        }
+        if (herramienta === 'lasso') {
+            // Click inside existing selection → start move
+            if (selIdxs.length > 0) {
+                const inside = selIdxs.some(i => {
+                    const bb = getBbox(elementos[i]);
+                    return x >= bb.x1 - 6 && x <= bb.x2 + 6 && y >= bb.y1 - 6 && y <= bb.y2 + 6;
+                });
+                if (inside) { selMoveRef.current = { x, y }; return; }
+            }
+            setSelIdxs([]);
+            setDibujando(true);
+            setInicioXY({ x, y });
+            setLassoRect({ x1: x, y1: y, x2: x, y2: y });
+            return;
         }
 
         setDibujando(true);
-        setInicioX(x); setInicioY(y);
-        if (herramienta === 'draw') setPreviewElement({ t: 'draw', pts: [{x, y}], color, grosor });
+        setInicioXY({ x, y });
+        if (herramienta === 'draw')   setPreviewElement({ t: 'draw', pts: [{x, y}], color, grosor });
         if (herramienta === 'eraser') setPreviewElement({ t: 'draw', pts: [{x, y}], color: '#ffffff', grosor: grosor * 5 });
     };
 
     const moverDibujo = (e) => {
+        const pos = getPos(e);
+        const { x, y, rawX, rawY } = pos;
+
+        // Pan
+        if (herramienta === 'pan' && panStartRef.current) {
+            const canvas = canvasRef.current;
+            const rect = canvas.getBoundingClientRect();
+            panRef.current = {
+                x: panStartRef.current.px + (rawX - panStartRef.current.rawX) * (canvas.width / rect.width),
+                y: panStartRef.current.py + (rawY - panStartRef.current.rawY) * (canvas.height / rect.height),
+            };
+            triggerRedraw(); return;
+        }
+        // Selection move
+        if (herramienta === 'lasso' && selMoveRef.current) {
+            moverSeleccion(selIdxs, x - selMoveRef.current.x, y - selMoveRef.current.y);
+            selMoveRef.current = { x, y }; return;
+        }
+        // Lasso draw
+        if (herramienta === 'lasso' && dibujando) {
+            setLassoRect({ x1: Math.min(inicioXY.x, x), y1: Math.min(inicioXY.y, y), x2: Math.max(inicioXY.x, x), y2: Math.max(inicioXY.y, y) });
+            return;
+        }
         if (!dibujando) return;
-        const { x, y } = getPos(e);
-        if (herramienta === 'draw' || herramienta === 'eraser') setPreviewElement(prev => ({ ...prev, pts: [...prev.pts, {x, y}] }));
-        else setPreviewElement({ t: herramienta, x1: inicioX, y1: inicioY, x2: x, y2: y, color, grosor });
+        if (herramienta === 'draw' || herramienta === 'eraser')
+            setPreviewElement(prev => ({ ...prev, pts: [...prev.pts, {x, y}] }));
+        else
+            setPreviewElement({ t: herramienta, x1: inicioXY.x, y1: inicioXY.y, x2: x, y2: y, color, grosor });
     };
 
     const terminarDibujo = () => {
+        panStartRef.current = null;
+        selMoveRef.current  = null;
+
+        if (herramienta === 'lasso' && dibujando && lassoRect) {
+            const sel = elementos.map((item, idx) => rectsOverlap(lassoRect, getBbox(item)) ? idx : -1).filter(i => i >= 0);
+            setSelIdxs(sel); setLassoRect(null); setDibujando(false); return;
+        }
         if (!dibujando) return;
         setDibujando(false);
-        if (previewElement) { setElementos([...elementos, previewElement]); setPreviewElement(null); }
+        if (previewElement) { setElementos(prev => [...prev, previewElement]); setPreviewElement(null); }
     };
 
+    // ── Pages ────────────────────────────────────────────────────────────────
+    const agregarPagina = () => {
+        setPaginas(ps => [...ps, []]);
+        setPaginaIdx(paginas.length);
+        setSelIdxs([]);
+    };
+    const eliminarPagina = (idx) => {
+        if (paginas.length === 1) return;
+        setPaginas(ps => ps.filter((_, i) => i !== idx));
+        setPaginaIdx(prev => Math.min(prev, paginas.length - 2));
+        setSelIdxs([]);
+    };
+    const cambiarPagina = (idx) => {
+        setPaginaIdx(idx); setSelIdxs([]); setPreviewElement(null); setDibujando(false);
+    };
+    const eliminarSeleccion = () => {
+        if (!selIdxs.length) return;
+        setElementos(prev => prev.filter((_, i) => !selIdxs.includes(i)));
+        setSelIdxs([]);
+    };
+
+    const CURSOR_MAP = { pan: 'grab', lasso: 'crosshair', paste: 'crosshair', graph: 'crosshair', axes: 'crosshair', eraser: 'cell' };
+
     const ToolBtn = ({ id, icon, label }) => (
-        <button onClick={() => setHerramienta(id)} title={label} style={{ padding: 8, background: herramienta === id ? '#3498db' : 'transparent', color: herramienta === id ? 'white' : '#2c3e50', border: 'none', borderRadius: 8, cursor: 'pointer' }}>{icon}</button>
+        <button onClick={() => { setHerramienta(id); setSelIdxs([]); }} title={label}
+            style={{ padding: 7, background: herramienta === id ? '#3498db' : 'transparent', color: herramienta === id ? 'white' : '#2c3e50', border: 'none', borderRadius: 8, cursor: 'pointer', display:'flex', alignItems:'center' }}>
+            {icon}
+        </button>
     );
 
     return (
-        <div style={{ position: 'relative', width: '100%', maxWidth: 1000, margin: '0 auto', border: '2px solid #bdc3c7', borderRadius: 15, background: '#f8f9fa', overflow: 'hidden' }}>
-            {/* Barra de Herramientas */}
-            <div style={{ background: '#ecf0f1', padding: '10px 15px', display: 'flex', gap: 15, alignItems: 'center', borderBottom: '2px solid #bdc3c7', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', gap: 5, borderRight: '2px solid #bdc3c7', paddingRight: 15 }}>
-                    <ToolBtn id="draw" icon={<PenTool size={20}/>} label="Lápiz" />
-                    <ToolBtn id="line" icon={<div style={{width:20, height:2, background:'currentColor', transform:'rotate(-45deg)'}}/>} label="Línea Recta" />
-                    <ToolBtn id="eraser" icon={<span style={{fontSize:'1.1rem', lineHeight:1}}>⌫</span>} label="Goma de borrar" />
-                </div>
-                
-                <div style={{ display: 'flex', gap: 5, borderRight: '2px solid #bdc3c7', paddingRight: 15 }}>
-                    <ToolBtn id="rect" icon={<SquareIcon size={20}/>} label="Rectángulo" />
-                    <ToolBtn id="circle" icon={<Circle size={20}/>} label="Círculo" />
-                    <ToolBtn id="triangle" icon={<Triangle size={20}/>} label="Triángulo" />
-                    <ToolBtn id="pentagon" icon={<Hexagon size={20}/>} label="Polígono" />
+        <div ref={contenedorRef} style={{ position: 'relative', width: '100%', maxWidth: fullscreen ? '100vw' : 1100, margin: '0 auto', border: '2px solid #bdc3c7', borderRadius: 15, background: '#f8f9fa', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+
+            {/* ── Toolbar ──────────────────────────────────────────────── */}
+            <div style={{ background: '#ecf0f1', padding: '7px 10px', display: 'flex', gap: 8, alignItems: 'center', borderBottom: '2px solid #bdc3c7', flexWrap: 'wrap' }}>
+
+                {/* Mode selector */}
+                <select value={modoPizarra} onChange={e => { setModoPizarra(e.target.value); setHerramienta('draw'); setSelIdxs([]); }}
+                    style={{ padding:'4px 8px', borderRadius:8, border:'2px solid #3498db', fontWeight:'bold', cursor:'pointer', background:'white', color:'#2c3e50', fontSize:'0.85rem' }}>
+                    <option value="general">🖌 General</option>
+                    <option value="musica">🎵 Música</option>
+                </select>
+
+                {/* Common tools: draw, eraser, lasso, pan */}
+                <div style={{ display:'flex', gap:3, borderRight:'2px solid #bdc3c7', paddingRight:8 }}>
+                    <ToolBtn id="draw"   icon={<PenTool size={18}/>} label="Lápiz" />
+                    <ToolBtn id="eraser" icon={<span style={{fontSize:'1rem',lineHeight:1}}>⌫</span>} label="Goma" />
+                    <ToolBtn id="lasso"  icon={<span style={{fontSize:'1rem',fontWeight:'bold'}}>⬚</span>} label="Seleccionar" />
+                    <ToolBtn id="pan"    icon={<Move size={18}/>}    label="Mover lienzo" />
                 </div>
 
-                <div style={{ display: 'flex', gap: 5, borderRight: '2px solid #bdc3c7', paddingRight: 15 }}>
-                    <ToolBtn id="prisma" icon={<Box size={20}/>} label="Cubo/Prisma" />
-                    <ToolBtn id="pyramid" icon={<span style={{fontWeight:'bold'}}>▲³</span>} label="Pirámide" />
-                    <ToolBtn id="cylinder" icon={<span style={{fontWeight:'bold'}}>🛢</span>} label="Cilindro" />
-                    <ToolBtn id="cone" icon={<span style={{fontWeight:'bold'}}>◮</span>} label="Cono" />
-                    <ToolBtn id="sphere" icon={<span style={{fontWeight:'bold'}}>⚽</span>} label="Esfera" />
-                </div>
+                {/* ── GENERAL MODE ── */}
+                {modoPizarra === 'general' && <>
+                    <div style={{ display:'flex', gap:3, borderRight:'2px solid #bdc3c7', paddingRight:8 }}>
+                        <ToolBtn id="line"     icon={<div style={{width:18,height:2,background:'currentColor',transform:'rotate(-45deg)',marginTop:8}}/>} label="Línea" />
+                        <ToolBtn id="rect"     icon={<SquareIcon size={18}/>} label="Rectángulo" />
+                        <ToolBtn id="circle"   icon={<Circle size={18}/>}     label="Círculo" />
+                        <ToolBtn id="triangle" icon={<Triangle size={18}/>}   label="Triángulo" />
+                        <ToolBtn id="pentagon" icon={<Hexagon size={18}/>}    label="Polígono" />
+                    </div>
+                    <div style={{ display:'flex', gap:3, borderRight:'2px solid #bdc3c7', paddingRight:8 }}>
+                        <ToolBtn id="prisma"   icon={<Box size={18}/>}                            label="Cubo/Prisma" />
+                        <ToolBtn id="pyramid"  icon={<span style={{fontWeight:'bold'}}>▲³</span>} label="Pirámide" />
+                        <ToolBtn id="cylinder" icon={<span>🛢</span>}                             label="Cilindro" />
+                        <ToolBtn id="cone"     icon={<span>◮</span>}                              label="Cono" />
+                        <ToolBtn id="sphere"   icon={<span>⚽</span>}                             label="Esfera" />
+                    </div>
+                </>}
 
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <input type="color" value={color} onChange={e => setColor(e.target.value)} style={{ border: 'none', width: 28, height: 28, cursor: 'pointer', background: 'transparent', padding: 0 }} />
+                {/* ── MUSIC MODE ── */}
+                {modoPizarra === 'musica' && <>
+                    {/* Staff */}
+                    <div style={{ display:'flex', gap:3, borderRight:'2px solid #bdc3c7', paddingRight:8 }}>
+                        <ToolBtn id="staff"    icon={<span style={{fontSize:'0.75rem',fontWeight:'bold',letterSpacing:-1}}>𝄞═══</span>} label="Pentagrama (clave Sol)" />
+                        <ToolBtn id="staff_fa" icon={<span style={{fontSize:'0.75rem',fontWeight:'bold',letterSpacing:-1}}>𝄢═══</span>} label="Pentagrama (clave Fa)" />
+                    </div>
+                    {/* Notes */}
+                    <div style={{ display:'flex', gap:3, borderRight:'2px solid #bdc3c7', paddingRight:8, alignItems:'center' }}>
+                        <span style={{fontSize:'0.7rem',color:'#7f8c8d',fontWeight:'bold'}}>Notas</span>
+                        {[
+                            { id:'redonda',     sym:'𝅝',   title:'Redonda' },
+                            { id:'blanca',      sym:'𝅗𝅥',  title:'Blanca' },
+                            { id:'negra',       sym:'♩',   title:'Negra' },
+                            { id:'corchea',     sym:'♪',   title:'Corchea' },
+                            { id:'semicorchea', sym:'♬',   title:'Semicorchea' },
+                            { id:'fusa',        sym:'♫♫',  title:'Fusa' },
+                        ].map(n => (
+                            <ToolBtn key={n.id} id={n.id} label={n.title}
+                                icon={<span style={{fontSize:'1.1rem',lineHeight:1}}>{n.sym}</span>} />
+                        ))}
+                    </div>
+                    {/* Rests */}
+                    <div style={{ display:'flex', gap:3, borderRight:'2px solid #bdc3c7', paddingRight:8, alignItems:'center' }}>
+                        <span style={{fontSize:'0.7rem',color:'#7f8c8d',fontWeight:'bold'}}>Silencios</span>
+                        {[
+                            { id:'s_redonda', sym:'▬',  title:'Silencio redonda' },
+                            { id:'s_blanca',  sym:'▭',  title:'Silencio blanca' },
+                            { id:'s_negra',   sym:'𝄽',  title:'Silencio negra' },
+                            { id:'s_corchea', sym:'𝄾',  title:'Silencio corchea' },
+                        ].map(r => (
+                            <ToolBtn key={r.id} id={r.id} label={r.title}
+                                icon={<span style={{fontSize:'1.1rem',lineHeight:1}}>{r.sym}</span>} />
+                        ))}
+                    </div>
+                    {/* Accidentals */}
+                    <div style={{ display:'flex', gap:3, borderRight:'2px solid #bdc3c7', paddingRight:8, alignItems:'center' }}>
+                        <span style={{fontSize:'0.7rem',color:'#7f8c8d',fontWeight:'bold'}}>Acc.</span>
+                        {[
+                            { id:'sharp',   sym:'♯', title:'Sostenido' },
+                            { id:'flat',    sym:'♭', title:'Bemol' },
+                            { id:'natural', sym:'♮', title:'Natural' },
+                        ].map(a => (
+                            <ToolBtn key={a.id} id={a.id} label={a.title}
+                                icon={<span style={{fontSize:'1.2rem',lineHeight:1}}>{a.sym}</span>} />
+                        ))}
+                    </div>
+                </>}
+
+                {/* Color + thickness (common) */}
+                <div style={{ display:'flex', gap:4, alignItems:'center', flexWrap:'wrap' }}>
+                    <input type="color" value={color} onChange={e => setColor(e.target.value)}
+                        style={{ border:'none', width:26, height:26, cursor:'pointer', background:'transparent', padding:0 }} />
                     {['#2c3e50','#e74c3c','#3498db','#2ecc71','#f1c40f','#9b59b6','#e67e22','#ffffff'].map(c => (
                         <button key={c} onClick={() => setColor(c)}
-                            style={{ width: 20, height: 20, borderRadius: '50%', background: c, border: color === c ? '2px solid #3498db' : '2px solid #95a5a6', cursor: 'pointer', padding: 0, flexShrink: 0 }} />
+                            style={{ width:18, height:18, borderRadius:'50%', background:c, border: color===c ? '2px solid #3498db' : '2px solid #95a5a6', cursor:'pointer', padding:0, flexShrink:0 }} />
                     ))}
-                    <input type="range" min="1" max="10" value={grosor} onChange={e => setGrosor(Number(e.target.value))} style={{ width: 60 }} />
+                    {modoPizarra === 'general' && (
+                        <input type="range" min="1" max="10" value={grosor} onChange={e => setGrosor(Number(e.target.value))} style={{ width:55 }} />
+                    )}
                 </div>
 
-                <div style={{ marginLeft: 'auto', display: 'flex', gap: 10 }}>
-                    <button onClick={() => setHerramienta('axes')} title="Ejes de coordenadas (−8 a 8)" style={{ padding: '8px', background: herramienta === 'axes' ? '#16a085' : '#27ae60', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                        XY
+                {/* Action buttons (common) */}
+                <div style={{ marginLeft:'auto', display:'flex', gap:5, flexWrap:'wrap', alignItems:'center' }}>
+                    {selIdxs.length > 0 && (
+                        <button onClick={eliminarSeleccion}
+                            style={{ padding:'5px 8px', background:'#e74c3c', color:'white', border:'none', borderRadius:7, cursor:'pointer', fontWeight:'bold', fontSize:'0.78rem' }}>
+                            🗑 {selIdxs.length}
+                        </button>
+                    )}
+                    {modoPizarra === 'general' && <>
+                        <button onClick={() => setHerramienta('axes')}
+                            style={{ padding:'5px 7px', background: herramienta==='axes' ? '#16a085' : '#27ae60', color:'white', border:'none', borderRadius:7, cursor:'pointer', fontWeight:'bold', fontSize:'0.78rem' }}>
+                            XY
+                        </button>
+                        <button onClick={() => setGrafVisible(v => !v)} style={{ padding:'5px', background:'#e67e22', color:'white', border:'none', borderRadius:7, cursor:'pointer' }} title="Graficar f(x)">
+                            <Activity size={15}/>
+                        </button>
+                        <button onClick={() => setCalcVisible(v => !v)} style={{ padding:'5px', background:'#9b59b6', color:'white', border:'none', borderRadius:7, cursor:'pointer' }} title="Calculadora">
+                            <CalcIcon size={15}/>
+                        </button>
+                    </>}
+                    <button onClick={() => fileInputRef.current?.click()} title="Insertar imagen"
+                        style={{ padding:'5px', background:'#16a085', color:'white', border:'none', borderRadius:7, cursor:'pointer' }}>
+                        <ImageIcon size={15}/>
                     </button>
-                    <button onClick={() => setGrafVisible(!grafVisible)} style={{ padding: '8px', background: '#e67e22', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }} title="Graficar Función">
-                        <Activity size={18}/>
+                    <input ref={fileInputRef} type="file" accept="image/*" style={{ display:'none' }} onChange={onFileSelected} />
+                    <button onClick={descargarPagina} title="PNG hoja actual"
+                        style={{ padding:'5px', background:'#2ecc71', color:'white', border:'none', borderRadius:7, cursor:'pointer' }}>
+                        <Camera size={15}/>
                     </button>
-                    <button onClick={() => setCalcVisible(!calcVisible)} style={{ padding: '8px', background: '#9b59b6', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }} title="Calculadora Científica">
-                        <CalcIcon size={18}/>
+                    <button onClick={descargarTodasPNG}
+                        style={{ padding:'5px 7px', background:'#27ae60', color:'white', border:'none', borderRadius:7, cursor:'pointer', fontSize:'0.75rem', fontWeight:'bold' }}>
+                        PNG×{paginas.length}
                     </button>
-                    <button onClick={descargarPizarra} style={{ padding: '8px', background: '#2ecc71', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }} title="Guardar Pizarra">
-                        <Camera size={18}/>
+                    <button onClick={descargarPDF}
+                        style={{ padding:'5px 7px', background:'#c0392b', color:'white', border:'none', borderRadius:7, cursor:'pointer', fontSize:'0.75rem', fontWeight:'bold' }}>
+                        PDF
                     </button>
-                    <button onClick={() => setElementos([])} style={{ padding: '8px 12px', background: '#e74c3c', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 'bold' }}>Borrar Todo</button>
+                    <button onClick={() => { setElementos([]); setSelIdxs([]); }}
+                        style={{ padding:'5px 7px', background:'#e74c3c', color:'white', border:'none', borderRadius:7, cursor:'pointer', fontWeight:'bold', fontSize:'0.8rem' }}>
+                        ✕
+                    </button>
+                    <button onClick={toggleFullscreen} title={fullscreen ? 'Salir pantalla completa' : 'Pantalla completa'}
+                        style={{ padding:'5px', background:'#34495e', color:'white', border:'none', borderRadius:7, cursor:'pointer' }}>
+                        {fullscreen ? <Minimize2 size={15}/> : <Maximize2 size={15}/>}
+                    </button>
                 </div>
             </div>
 
-            {herramienta === 'paste' && <div style={{ background: '#f1c40f', color: '#2c3e50', padding: 5, textAlign: 'center', fontWeight: 'bold', fontSize: '0.9rem' }}>Haz clic en la pizarra para pegar el resultado: {textoPegar}</div>}
-            {herramienta === 'graph' && <div style={{ background: '#e67e22', color: 'white', padding: 5, textAlign: 'center', fontWeight: 'bold', fontSize: '0.9rem' }}>Haz clic en la pizarra para situar el centro (0,0) de la gráfica f(x).</div>}
-            {herramienta === 'axes' && <div style={{ background: '#16a085', color: 'white', padding: 5, textAlign: 'center', fontWeight: 'bold', fontSize: '0.9rem' }}>Haz clic en la pizarra para colocar el origen (0,0) de los ejes (−8 a 8).</div>}
+            {/* Status hints */}
+            {herramienta === 'paste'  && <div style={{ background:'#f1c40f', color:'#2c3e50', padding:4, textAlign:'center', fontWeight:'bold', fontSize:'0.82rem' }}>Haz clic para pegar: {textoPegar}</div>}
+            {herramienta === 'graph'  && <div style={{ background:'#e67e22', color:'white',   padding:4, textAlign:'center', fontWeight:'bold', fontSize:'0.82rem' }}>Haz clic para situar el origen de la gráfica f(x).</div>}
+            {herramienta === 'axes'   && <div style={{ background:'#16a085', color:'white',   padding:4, textAlign:'center', fontWeight:'bold', fontSize:'0.82rem' }}>Haz clic para colocar el origen (0,0) de los ejes (−8 a 8).</div>}
+            {herramienta === 'pan'    && <div style={{ background:'#34495e', color:'white',   padding:4, textAlign:'center', fontWeight:'bold', fontSize:'0.82rem' }}>Arrastra para mover el lienzo · Doble clic para resetear.</div>}
+            {herramienta === 'lasso'  && <div style={{ background:'#3498db', color:'white',   padding:4, textAlign:'center', fontWeight:'bold', fontSize:'0.82rem' }}>
+                {selIdxs.length > 0 ? `${selIdxs.length} elemento(s). Arrastra para mover · 🗑 para borrar.` : 'Dibuja un rectángulo para seleccionar.'}
+            </div>}
 
-            {calcVisible && <CalculadoraFlotante onClose={() => setCalcVisible(false)} onCopiar={(res) => { setTextoPegar(res); setHerramienta('paste'); setCalcVisible(false); }} />}
-            {grafVisible && <GraficadoraFlotante onClose={() => setGrafVisible(false)} onInsertar={(cfg) => { setGraficaConfig(cfg); setHerramienta('graph'); setGrafVisible(false); }} />}
+            {/* Floating panels */}
+            {calcVisible && <CalculadoraFlotante onClose={() => setCalcVisible(false)} onCopiar={res => { setTextoPegar(res); setHerramienta('paste'); setCalcVisible(false); }} />}
+            {grafVisible  && <GraficadoraFlotante onClose={() => setGrafVisible(false)} onInsertar={cfg => { setGraficaConfig(cfg); setHerramienta('graph'); setGrafVisible(false); }} />}
             {SHAPES_3D.includes(herramienta) && <Visor3D shape={herramienta} onClose={() => setHerramienta('draw')} />}
 
+            {/* Canvas */}
             <canvas
                 ref={canvasRef}
                 width={1000}
@@ -739,11 +1264,35 @@ function PizarraApp() {
                 onMouseMove={moverDibujo}
                 onMouseUp={terminarDibujo}
                 onMouseLeave={terminarDibujo}
+                onDoubleClick={() => { if (herramienta === 'pan') { panRef.current = { x:0, y:0 }; triggerRedraw(); } }}
                 onTouchStart={e => { e.preventDefault(); iniciarDibujo(e); }}
                 onTouchMove={e => { e.preventDefault(); moverDibujo(e); }}
                 onTouchEnd={terminarDibujo}
-                style={{ display: 'block', width: '100%', height: 'auto', cursor: (herramienta === 'paste' || herramienta === 'graph') ? 'crosshair' : 'default' }}
+                style={{ display:'block', width:'100%', height:'auto', cursor: CURSOR_MAP[herramienta] || 'crosshair', touchAction:'none' }}
             />
+
+            {/* ── Page tabs ─────────────────────────────────────────────── */}
+            <div style={{ background:'#dde3ea', borderTop:'2px solid #bdc3c7', padding:'5px 10px', display:'flex', gap:5, alignItems:'center', overflowX:'auto', flexShrink:0 }}>
+                {paginas.map((_, i) => (
+                    <div key={i} style={{ display:'flex', alignItems:'center', gap:2, flexShrink:0 }}>
+                        <button onClick={() => cambiarPagina(i)}
+                            style={{ padding:'3px 12px', borderRadius:7, border:'none', fontWeight:'bold', cursor:'pointer', fontSize:'0.83rem',
+                                background: i===paginaIdx ? '#3498db' : '#f0f0f0', color: i===paginaIdx ? 'white' : '#555' }}>
+                            Hoja {i+1}
+                        </button>
+                        {paginas.length > 1 && (
+                            <button onClick={() => eliminarPagina(i)}
+                                style={{ padding:'1px 5px', borderRadius:5, border:'none', background:'#e74c3c', color:'white', cursor:'pointer', fontSize:'0.7rem' }}>
+                                ×
+                            </button>
+                        )}
+                    </div>
+                ))}
+                <button onClick={agregarPagina} title="Añadir hoja"
+                    style={{ padding:'3px 10px', borderRadius:7, border:'2px dashed #3498db', background:'transparent', color:'#3498db', cursor:'pointer', fontWeight:'bold', fontSize:'1rem', flexShrink:0 }}>
+                    +
+                </button>
+            </div>
         </div>
     );
 }

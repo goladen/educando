@@ -52,8 +52,8 @@ const ConfigBadge = ({ icon, label }) => (
         {icon} {label}
     </span>
 );
-const TIPO_LABEL  = { OCA:'🦆 Oca Matemática', CAZABURBUJAS:'🔵 Cazaburbujas', PIKATRON:'⚡ Pikatron', SOPA:'🔤 Sopa de Letras', WORDLE:'🟩 Wordle', MATHLE:'🔢 Mathle', PASAPALABRA:'🔠 Pasapalabra', FUNCIONES:'∫ Funciones', FUNCIONES_ANALISIS:'📈 Análisis de Funciones', APAREJADOS:'🃏 Aparejados', STORYCUBES:'🎲 Story Cubes', IRREGULAR_VERBS:'🇬🇧 Verbos Irregulares', THINKHOOT:'🦉 PiLive', MATHLIVE:'🧮 MathLive', OLYMPICLIVE:'🏅 OlympicLive', ALGEBRA:'✖️ Álgebra', DOMINO:'🁣 Dominó', ESTADISTICA:'📊 Estadística', MUSIC_COMPASS:'🎵 Entrenamiento Auditivo' };
-const TIPO_ICON   = { OCA:'🦆', CAZABURBUJAS:'🔵', PIKATRON:'⚡', SOPA:'🔤', WORDLE:'🟩', MATHLE:'🔢', PASAPALABRA:'🔠', FUNCIONES:'∫', FUNCIONES_ANALISIS:'📈', APAREJADOS:'🃏', STORYCUBES:'🎲', IRREGULAR_VERBS:'🇬🇧', THINKHOOT:'🦉', MATHLIVE:'🧮', OLYMPICLIVE:'🏅', ALGEBRA:'✖️', DOMINO:'🁣', ESTADISTICA:'📊', MUSIC_COMPASS:'🎵' };
+const TIPO_LABEL  = { OCA:'🦆 Oca Matemática', CAZABURBUJAS:'🔵 Cazaburbujas', PIKATRON:'⚡ Pikatron', SOPA:'🔤 Sopa de Letras', WORDLE:'🟩 Wordle', MATHLE:'🔢 Mathle', PASAPALABRA:'🔠 Pasapalabra', FUNCIONES:'∫ Funciones', FUNCIONES_ANALISIS:'📈 Análisis de Funciones', APAREJADOS:'🃏 Aparejados', STORYCUBES:'🎲 Story Cubes', IRREGULAR_VERBS:'🇬🇧 Verbos Irregulares', THINKHOOT:'🦉 PiLive', MATHLIVE:'🧮 MathLive', OLYMPICLIVE:'🏅 OlympicLive', ALGEBRA:'✖️ Álgebra', DOMINO:'🁣 Dominó', ESTADISTICA:'📊 Estadística', MUSIC_COMPASS:'🎵 Entrenamiento Auditivo', MUSIC_GAMES:'🎼 Juegos Musicales' };
+const TIPO_ICON   = { OCA:'🦆', CAZABURBUJAS:'🔵', PIKATRON:'⚡', SOPA:'🔤', WORDLE:'🟩', MATHLE:'🔢', PASAPALABRA:'🔠', FUNCIONES:'∫', FUNCIONES_ANALISIS:'📈', APAREJADOS:'🃏', STORYCUBES:'🎲', IRREGULAR_VERBS:'🇬🇧', THINKHOOT:'🦉', MATHLIVE:'🧮', OLYMPICLIVE:'🏅', ALGEBRA:'✖️', DOMINO:'🁣', ESTADISTICA:'📊', MUSIC_COMPASS:'🎵', MUSIC_GAMES:'🎼' };
 const TIPO_LIVE = new Set(['THINKHOOT', 'MATHLIVE', 'OLYMPICLIVE']);
 const tipoLabel   = (t) => TIPO_LABEL[t] || ('🎮 ' + (t||'Juego'));
 const tipoIcon    = (t) => TIPO_ICON[t]  || '🎮';
@@ -559,6 +559,18 @@ export default function InformesJuegos({ usuario, googleToken }) {
                                         borrando={borrando===inf.id}
                                         borradoOk={borrandoOk===inf.id}
                                         onAgregarAGrupo={()=>setModalAgregar(inf)}
+                                        modoSeleccion={modoSeleccion}
+                                        seleccionado={selec}
+                                        onSeleccionar={()=>toggleSeleccion(inf.id)}
+                                        onBuscarJugador={setBusquedaJugador}
+                                    />
+                                );
+                                if (tipo === 'MUSIC_GAMES') return (
+                                    <MusicGamesCard
+                                        key={inf.id} inf={inf}
+                                        onBorrar={()=>borrar(inf.id)}
+                                        borrando={borrando===inf.id}
+                                        borradoOk={borrandoOk===inf.id}
                                         modoSeleccion={modoSeleccion}
                                         seleccionado={selec}
                                         onSeleccionar={()=>toggleSeleccion(inf.id)}
@@ -1116,6 +1128,123 @@ const StoryCubesCard = ({ inf, onBorrar, borrando, borradoOk, onAgregarAGrupo, m
                     </div>
                 ))}
             </div>
+        </div>
+    );
+};
+
+// ─── Tarjeta especial para Juegos Musicales (Lluvia de Notas / Simón Dice) ────
+const MusicGamesCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccionado, onSeleccionar, onBuscarJugador }) => {
+    const [expandido, setExpandido] = useState(false);
+    const [confirmar, setConfirmar] = useState(false);
+    const jugadores = inf.jugadores || [];
+    const totalPts  = jugadores.reduce((s, j) => s + (j.puntos || 0), 0);
+
+    return (
+        <div style={{ background:'white', borderRadius:13, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', overflow:'hidden', border: seleccionado ? '2px solid #1565C0' : '1.5px solid #ddd4fe', transition:'border 0.1s' }}>
+
+            {/* Cabecera */}
+            <div onClick={modoSeleccion ? onSeleccionar : () => setExpandido(p => !p)}
+                style={{ padding:'11px 15px', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', cursor:'pointer', background: seleccionado ? '#f0f4ff' : 'white' }}>
+                {modoSeleccion && (
+                    <input type="checkbox" checked={seleccionado} onChange={e=>{e.stopPropagation();onSeleccionar();}}
+                        onClick={e=>e.stopPropagation()}
+                        style={{ width:17, height:17, cursor:'pointer', accentColor:'#1565C0', flexShrink:0 }}/>
+                )}
+                <span style={{ fontSize:'1.4rem' }}>🎼</span>
+                <div style={{ flex:1, minWidth:120 }}>
+                    <div style={{ fontWeight:700, color:'#1e293b', fontSize:'0.92rem' }}>
+                        Juegos Musicales
+                        <span style={{ marginLeft:8, fontWeight:400, color:'#7f8c8d', fontSize:'0.8rem' }}>Individual</span>
+                    </div>
+                    <div style={{ fontSize:'0.74rem', color:'#95a5a6', marginTop:1, display:'flex', alignItems:'center', gap:4 }}>
+                        <Clock size={10}/>{fmtFecha(inf.fecha)}
+                    </div>
+                </div>
+                {/* Chips jugadores */}
+                <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
+                    {jugadores.map((j,i) => (
+                        <span key={i} onClick={e=>{ e.stopPropagation(); onBuscarJugador?.(j.nombre); }}
+                            title={`Ver todos los resultados de ${j.nombre}`}
+                            style={{ padding:'2px 8px', borderRadius:20, background:'#ede9fe', fontSize:'0.72rem', color:'#7c3aed', cursor:'pointer', fontWeight:600 }}>
+                            {j.nombre}{j.curso ? ` · ${j.curso}` : ''}
+                        </span>
+                    ))}
+                </div>
+                <span style={{ padding:'3px 10px', borderRadius:20, background:'#ede9fe', color:'#6d28d9', fontWeight:800, fontSize:'0.82rem', flexShrink:0 }}>
+                    {totalPts} pts
+                </span>
+                {!modoSeleccion && (
+                    <button onClick={e=>{ e.stopPropagation(); setConfirmar(true); }}
+                        style={{ padding:'4px 7px', borderRadius:7, border:'1px solid #fdd', background:'#fdecea', color:'#e74c3c', cursor:'pointer', flexShrink:0 }}
+                        title="Eliminar informe"><Trash2 size={13}/></button>
+                )}
+                {!modoSeleccion && (expandido ? <ChevronUp size={16} color="#aaa"/> : <ChevronDown size={16} color="#aaa"/>)}
+            </div>
+
+            {/* Confirmación borrado */}
+            {confirmar && (
+                <div style={{ background:'#fdecea', borderTop:'1px solid #fdd', padding:'10px 15px', display:'flex', alignItems:'center', gap:10, fontSize:'0.83rem' }}>
+                    <AlertTriangle size={14} color="#e74c3c"/>
+                    <span style={{ flex:1, color:'#c0392b' }}>¿Eliminar este informe? Esta acción no se puede deshacer.</span>
+                    <button onClick={()=>{ setConfirmar(false); onBorrar(); }} disabled={borrando}
+                        style={{ padding:'4px 12px', borderRadius:7, border:'none', background:'#e74c3c', color:'white', cursor:'pointer', fontWeight:700, fontSize:'0.8rem' }}>
+                        {borrando?'Borrando…':'Eliminar'}
+                    </button>
+                    <button onClick={()=>setConfirmar(false)}
+                        style={{ padding:'4px 10px', borderRadius:7, border:'1px solid #ddd', background:'white', cursor:'pointer', fontSize:'0.8rem' }}>Cancelar</button>
+                </div>
+            )}
+            {borradoOk && <div style={{ background:'#e8f5e9', padding:'8px 15px', fontSize:'0.8rem', color:'#27ae60', display:'flex', alignItems:'center', gap:6 }}><CheckCircle size={13}/>Eliminado</div>}
+
+            {/* Detalle expandido */}
+            {expandido && (
+                <div style={{ borderTop:'1px solid #f0f0f0', padding:'14px 16px' }}>
+                    {jugadores.map((jugador, ji) => {
+                        const partidas = jugador.partidas || [];
+                        const total = jugador.puntos ?? partidas.reduce((s, p) => s + (p.puntos || 0), 0);
+                        return (
+                            <div key={ji} style={{ marginBottom: ji < jugadores.length - 1 ? 18 : 0 }}>
+                                <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10, padding:'8px 12px', background:'#faf5ff', borderRadius:9, flexWrap:'wrap' }}>
+                                    <span style={{ fontWeight:700, color:'#1e293b', fontSize:'0.9rem' }}>{jugador.nombre}</span>
+                                    {jugador.curso && <span style={{ color:'#64748b', fontSize:'0.8rem' }}>{jugador.curso}</span>}
+                                    <span style={{ marginLeft:'auto', fontWeight:800, color:'#7c3aed', fontSize:'0.88rem' }}>{total} pts totales</span>
+                                </div>
+                                {partidas.length > 0 ? (
+                                    <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'0.82rem' }}>
+                                        <thead>
+                                            <tr style={{ background:'#f5f3ff' }}>
+                                                <th style={{ textAlign:'left', padding:'5px 8px', fontWeight:600, color:'#6d28d9', fontSize:'0.72rem', borderRadius:'6px 0 0 0' }}>Juego</th>
+                                                <th style={{ textAlign:'center', padding:'5px 8px', fontWeight:600, color:'#6d28d9', fontSize:'0.72rem' }}>Puntos</th>
+                                                <th style={{ textAlign:'center', padding:'5px 8px', fontWeight:600, color:'#6d28d9', fontSize:'0.72rem', borderRadius:'0 6px 0 0' }}>Nivel</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {partidas.map((p, pi) => (
+                                                <tr key={pi} style={{ borderTop:'1px solid #f5f3ff', background: pi%2===0?'white':'#fdfaff' }}>
+                                                    <td style={{ padding:'6px 8px', color:'#2c3e50', fontWeight:600 }}>
+                                                        <span style={{ marginRight:6 }}>{p.emoji}</span>{p.juego}
+                                                    </td>
+                                                    <td style={{ padding:'6px 8px', textAlign:'center', color:'#7c3aed', fontWeight:700 }}>{p.puntos}</td>
+                                                    <td style={{ padding:'6px 8px', textAlign:'center', color:'#64748b' }}>{p.nivel ?? '—'}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr style={{ borderTop:'2px solid #ede9fe', fontWeight:700, background:'#f5f3ff' }}>
+                                                <td style={{ padding:'6px 8px', color:'#2c3e50', fontSize:'0.78rem' }}>TOTAL</td>
+                                                <td style={{ padding:'6px 8px', textAlign:'center', color:'#7c3aed' }}>{total}</td>
+                                                <td/>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                ) : (
+                                    <div style={{ color:'#95a5a6', fontSize:'0.82rem', padding:'6px 8px' }}>Sin detalle de partidas.</div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
         </div>
     );
 };

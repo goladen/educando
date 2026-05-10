@@ -5,7 +5,7 @@ import {
     ArrowLeft, Edit3, Settings, Clock, Play, Square, RotateCcw,
     PenTool, Type, Circle, Square as SquareIcon, Triangle, Hexagon,
     Box, Calculator as CalcIcon, X, Camera, Activity, ChevronDown, ChevronUp,
-    Move, Maximize2, Minimize2, Image as ImageIcon, ZoomIn, ZoomOut
+    Move, Maximize2, Minimize2, Image as ImageIcon, ZoomIn, ZoomOut, Share2
 } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { db } from './firebase';
@@ -200,10 +200,32 @@ function RelojApp() {
 // 3. PIZARRA INTERACTIVA CON CALCULADORA CIENTÍFICA Y GRAFICADOR
 // ══════════════════════════════════════════════════════════════════════════════
 
+// Hook de arrastre para ventanas flotantes
+function useDrag(initX, initY) {
+    const [pos, setPos] = useState({ x: initX, y: initY });
+    const posRef = useRef({ x: initX, y: initY });
+    const startDrag = (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        const ox = e.clientX - posRef.current.x;
+        const oy = e.clientY - posRef.current.y;
+        const move = (me) => {
+            const np = { x: me.clientX - ox, y: Math.max(0, me.clientY - oy) };
+            posRef.current = np;
+            setPos(np);
+        };
+        const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
+        window.addEventListener('mousemove', move);
+        window.addEventListener('mouseup', up);
+    };
+    return [pos, startDrag];
+}
+
 function GraficadoraFlotante({ onClose, onInsertar }) {
     const [expr, setExpr]     = useState('sin(x)');
     const [scale, setScale]   = useState(40);
     const previewRef          = useRef(null);
+    const [pos, startDrag]    = useDrag(Math.max(10, window.innerWidth - 320), 90);
 
     // Draw preview whenever expr or scale changes
     useEffect(() => {
@@ -253,10 +275,10 @@ function GraficadoraFlotante({ onClose, onInsertar }) {
     }, [expr, scale]);
 
     return (
-        <div style={{ position: 'absolute', top: 20, right: 300, width: 290, background: '#2c3e50', padding: 14, borderRadius: 12, boxShadow: '0 10px 30px rgba(0,0,0,0.5)', zIndex: 100, color: 'white' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10, alignItems: 'center' }}>
+        <div style={{ position: 'fixed', left: pos.x, top: pos.y, width: 290, background: '#2c3e50', padding: 14, borderRadius: 12, boxShadow: '0 10px 30px rgba(0,0,0,0.5)', zIndex: 500, color: 'white', userSelect: 'none' }}>
+            <div onMouseDown={startDrag} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10, alignItems: 'center', cursor: 'move' }}>
                 <span style={{ fontWeight: 'bold' }}><Activity size={15} style={{ verticalAlign: 'middle', marginRight: 5 }}/> Graficador f(x)</span>
-                <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer' }}><X size={15}/></button>
+                <button onClick={onClose} onMouseDown={e => e.stopPropagation()} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer' }}><X size={15}/></button>
             </div>
 
             {/* Preview canvas */}
@@ -290,6 +312,7 @@ function CalculadoraFlotante({ onClose, onCopiar }) {
     const [expr, setExpr] = useState('');
     const [res, setRes] = useState('');
     const [isScientific, setIsScientific] = useState(false);
+    const [pos, startDrag] = useDrag(Math.max(10, window.innerWidth - 270), 60);
 
     const calcular = () => {
         try { 
@@ -321,10 +344,10 @@ function CalculadoraFlotante({ onClose, onCopiar }) {
     };
 
     return (
-        <div style={{ position: 'absolute', top: 20, right: 20, width: isScientific ? 320 : 250, background: '#2c3e50', padding: 15, borderRadius: 12, boxShadow: '0 10px 30px rgba(0,0,0,0.4)', zIndex: 100, transition: 'width 0.2s' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'white', marginBottom: 10, alignItems: 'center' }}>
+        <div style={{ position: 'fixed', left: pos.x, top: pos.y, width: isScientific ? 320 : 250, background: '#2c3e50', padding: 15, borderRadius: 12, boxShadow: '0 10px 30px rgba(0,0,0,0.4)', zIndex: 500, transition: 'width 0.2s', userSelect: 'none' }}>
+            <div onMouseDown={startDrag} style={{ display: 'flex', justifyContent: 'space-between', color: 'white', marginBottom: 10, alignItems: 'center', cursor: 'move' }}>
                 <span style={{ fontWeight: 'bold' }}><CalcIcon size={16} style={{ verticalAlign: 'middle', marginRight: 5 }}/> Calculadora</span>
-                <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer' }}><X size={16}/></button>
+                <button onClick={onClose} onMouseDown={e => e.stopPropagation()} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer' }}><X size={16}/></button>
             </div>
             
             <div style={{ background: '#ecf0f1', padding: 10, borderRadius: 8, marginBottom: 10, minHeight: 40, textAlign: 'right', fontSize: '1.2rem', fontFamily: 'monospace', overflowX: 'auto', whiteSpace: 'nowrap' }}>
@@ -382,10 +405,14 @@ const LABEL_MAP = {
     prisma: 'Cubo / Prisma', pyramid: 'Pirámide', cylinder: 'Cilindro', cone: 'Cono', sphere: 'Esfera',
 };
 
-function Visor3D({ shape, onClose }) {
-    const containerRef = useRef(null);
-    const materialRef = useRef(null);
+function Visor3D({ shape, onClose, onPegarEnPizarra }) {
+    const containerRef  = useRef(null);
+    const materialRef   = useRef(null);
+    const rendererRef   = useRef(null);
+    const sceneRef      = useRef(null);
+    const cameraRef     = useRef(null);
     const [colorFig, setColorFig] = useState('#3498db');
+    const [pos, startDrag] = useDrag(Math.max(10, window.innerWidth - 300), 60);
 
     // Actualizar color sin recrear la escena
     useEffect(() => {
@@ -400,9 +427,11 @@ function Visor3D({ shape, onClose }) {
 
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0xf0f4ff);
+        sceneRef.current = scene;
 
         const camera = new THREE.PerspectiveCamera(50, W / H, 0.1, 2000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        cameraRef.current = camera;
+        const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
         renderer.setSize(W, H);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         el.appendChild(renderer.domElement);
@@ -419,6 +448,7 @@ function Visor3D({ shape, onClose }) {
         dl2.position.set(-10, 5, -10);
         scene.add(dl2);
 
+        rendererRef.current = renderer;
         const geo = GEO_MAP[shape]();
         const mat = new THREE.MeshStandardMaterial({ color: colorFig, roughness: 0.4, metalness: 0.05 });
         materialRef.current = mat;
@@ -461,13 +491,22 @@ function Visor3D({ shape, onClose }) {
         };
     }, [shape]); // eslint-disable-line react-hooks/exhaustive-deps
 
+    const pegarEnPizarra = () => {
+        const rend = rendererRef.current;
+        const scene = sceneRef.current;
+        const cam = cameraRef.current;
+        if (!rend || !scene || !cam || !onPegarEnPizarra) return;
+        rend.render(scene, cam);
+        onPegarEnPizarra(rend.domElement.toDataURL('image/png'));
+    };
+
     return (
-        <div style={{ position: 'absolute', top: 60, right: 10, width: 280, background: '#1e293b', borderRadius: 12, boxShadow: '0 8px 30px rgba(0,0,0,0.4)', zIndex: 100, overflow: 'hidden' }}>
-            {/* Header */}
-            <div style={{ padding: '7px 10px', background: '#0f172a', color: 'white', fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ position: 'fixed', left: pos.x, top: pos.y, width: 280, background: '#1e293b', borderRadius: 12, boxShadow: '0 8px 30px rgba(0,0,0,0.4)', zIndex: 500, overflow: 'hidden', userSelect: 'none' }}>
+            {/* Header — drag handle */}
+            <div onMouseDown={startDrag} style={{ padding: '7px 10px', background: '#0f172a', color: 'white', fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, cursor: 'move' }}>
                 <Box size={14} />
                 <span style={{ flex: 1 }}>{LABEL_MAP[shape]} <span style={{ fontWeight: 400, color: '#94a3b8' }}>· arrastra para rotar</span></span>
-                <button onClick={onClose} title="Cerrar" style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 2 }}>
+                <button onClick={onClose} onMouseDown={e => e.stopPropagation()} title="Cerrar" style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 2 }}>
                     <X size={16} />
                 </button>
             </div>
@@ -482,6 +521,13 @@ function Visor3D({ shape, onClose }) {
                 ))}
             </div>
             <div ref={containerRef} style={{ width: '100%', height: 200, cursor: 'grab' }} />
+            {/* Paste to pizarra */}
+            {onPegarEnPizarra && (
+                <button onClick={pegarEnPizarra}
+                    style={{ width: '100%', padding: '7px', background: '#2563eb', color: 'white', border: 'none', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                    <Camera size={14}/> Pegar en Pizarra
+                </button>
+            )}
         </div>
     );
 }
@@ -635,6 +681,7 @@ function PizarraApp() {
     const [codigoUnirseInput,    setCodigoUnirseInput]    = useState('');
     const [errorCompartir,       setErrorCompartir]       = useState('');
     const [juntandose,           setJuntandose]           = useState(false);
+    const [copiadoLink,          setCopiadoLink]          = useState(false);
     const syncIntervalRef        = useRef(null);
     const miIdRef                = useRef('');
     const miColorRef             = useRef('');
@@ -646,6 +693,16 @@ function PizarraApp() {
 
     // Keep paginasRef in sync for access inside intervals
     useEffect(() => { paginasRef.current = paginas; }, [paginas]);
+
+    // Detectar ?pizarra=CODIGO en la URL al montar → pre-rellenar el campo de unirse
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const cod = params.get('pizarra');
+        if (cod) {
+            setCodigoUnirseInput(cod.toUpperCase());
+            setCompartirModal(true);
+        }
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     // ── Lógica de compartir ──────────────────────────────────────────────────
     const detenerSync = () => {
@@ -1276,7 +1333,8 @@ function PizarraApp() {
         setSelIdxs([]);
     };
 
-    const CURSOR_MAP = { pan: 'grab', lasso: 'crosshair', paste: 'crosshair', graph: 'crosshair', axes: 'crosshair', eraser: 'cell' };
+    const ERASER_SVG = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='22'%3E%3Crect x='1' y='1' width='34' height='20' rx='3' fill='%23fde8e8' stroke='%23e74c3c' stroke-width='1.5'/%3E%3Crect x='23' y='1' width='12' height='20' rx='0 3 3 0' fill='%23e74c3c' opacity='0.7'/%3E%3Cline x1='23' y1='1' x2='23' y2='21' stroke='%23e74c3c' stroke-width='1.5'/%3E%3C/svg%3E") 1 20, cell`;
+    const CURSOR_MAP = { pan: 'grab', lasso: 'crosshair', paste: 'crosshair', graph: 'crosshair', axes: 'crosshair', eraser: ERASER_SVG };
 
     const ToolBtn = ({ id, icon, label }) => (
         <button onClick={() => { setHerramienta(id); setSelIdxs([]); }} title={label}
@@ -1438,7 +1496,7 @@ function PizarraApp() {
                             style={{ padding:'5px 7px', background:'#c0392b', color:'white', border:'none', borderRadius:7, cursor:'pointer', fontSize:'0.75rem', fontWeight:'bold' }}>
                             PDF
                         </button>
-                        <button onClick={() => { setElementos([]); setSelIdxs([]); }}
+                        <button onClick={() => { if (window.confirm('¿Borrar todo el contenido de esta hoja?')) { setElementos([]); setSelIdxs([]); } }}
                             style={{ padding:'5px 7px', background:'#e74c3c', color:'white', border:'none', borderRadius:7, cursor:'pointer', fontWeight:'bold', fontSize:'0.8rem' }}>
                             ✕
                         </button>
@@ -1474,7 +1532,21 @@ function PizarraApp() {
             {/* Floating panels */}
             {calcVisible && <CalculadoraFlotante onClose={() => setCalcVisible(false)} onCopiar={res => { setTextoPegar(res); setHerramienta('paste'); setCalcVisible(false); }} />}
             {grafVisible  && <GraficadoraFlotante onClose={() => setGrafVisible(false)} onInsertar={cfg => { setGraficaConfig(cfg); setHerramienta('graph'); setGrafVisible(false); }} />}
-            {SHAPES_3D.includes(herramienta) && <Visor3D shape={herramienta} onClose={() => setHerramienta('draw')} />}
+            {SHAPES_3D.includes(herramienta) && <Visor3D shape={herramienta} onClose={() => setHerramienta('draw')}
+                onPegarEnPizarra={(dataURL) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const id = Date.now();
+                        const maxW = 380, maxH = 260;
+                        let w = img.width, h = img.height;
+                        if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+                        if (h > maxH) { w = Math.round(w * maxH / h); h = maxH; }
+                        imageCacheRef.current[id] = img;
+                        setElementos(prev => [...prev, { t: 'image', id, src: dataURL, x: 60 - panRef.current.x, y: 80 - panRef.current.y, w, h }]);
+                    };
+                    img.src = dataURL;
+                }}
+            />}
 
             {/* ── Modal compartir ──────────────────────────────────────── */}
             {compartirModal && (
@@ -1485,38 +1557,72 @@ function PizarraApp() {
                             style={{ position:'absolute', top:10, right:12, background:'none', border:'none', fontSize:'1.4rem', cursor:'pointer', color:'#888' }}>×</button>
 
                         {/* ─ Ya hay sesión activa ─ */}
-                        {modoCompartir && (
-                            <div>
-                                <div style={{ textAlign:'center', marginBottom:14 }}>
-                                    <div style={{ fontSize:'0.85rem', color:'#7f8c8d', marginBottom:4 }}>
-                                        {modoCompartir === 'ver' ? '👁 Solo lectura' : '✏️ Colaborativa'}
-                                        {esCreador ? ' · Creador' : ' · Participante'}
-                                    </div>
-                                    <div style={{ fontSize:'2.2rem', fontWeight:900, letterSpacing:6, color:'#2c3e50', background:'#ecf0f1', borderRadius:10, padding:'10px 20px', display:'inline-block' }}>
-                                        {codigoCompartir}
-                                    </div>
-                                    <div style={{ fontSize:'0.78rem', color:'#95a5a6', marginTop:4 }}>Comparte este código con tus alumnos</div>
-                                </div>
-                                {/* Participantes */}
-                                {participantes.length > 0 && (
-                                    <div style={{ marginBottom:16 }}>
-                                        <div style={{ fontWeight:'bold', fontSize:'0.85rem', color:'#555', marginBottom:6 }}>Participantes ({participantes.length})</div>
-                                        <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-                                            {participantes.map(p => (
-                                                <div key={p.id} style={{ display:'flex', alignItems:'center', gap:5, background:'#f4f6f8', borderRadius:20, padding:'4px 10px', border:`2px solid ${p.color}` }}>
-                                                    <div style={{ width:12, height:12, borderRadius:'50%', background:p.color }} />
-                                                    <span style={{ fontSize:'0.82rem', fontWeight:600, color:'#2c3e50' }}>{p.nombre}</span>
-                                                </div>
-                                            ))}
+                        {modoCompartir && (() => {
+                            const shareUrl = `${window.location.origin}${window.location.pathname}?pizarra=${codigoCompartir}`;
+                            const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(shareUrl)}&bgcolor=ffffff&color=1a1a2e&margin=6`;
+                            const copiarLink = () => {
+                                navigator.clipboard.writeText(shareUrl).then(() => {
+                                    setCopiadoLink(true);
+                                    setTimeout(() => setCopiadoLink(false), 2000);
+                                });
+                            };
+                            return (
+                                <div>
+                                    {/* Tipo de sesión */}
+                                    <div style={{ textAlign:'center', marginBottom:12 }}>
+                                        <div style={{ fontSize:'0.85rem', color:'#7f8c8d', marginBottom:6 }}>
+                                            {modoCompartir === 'ver' ? '👁 Solo lectura' : '✏️ Colaborativa'}
+                                            {esCreador ? ' · Creador' : ' · Participante'}
+                                        </div>
+                                        {/* Código grande */}
+                                        <div style={{ fontSize:'2rem', fontWeight:900, letterSpacing:6, color:'#2c3e50', background:'#ecf0f1', borderRadius:10, padding:'8px 18px', display:'inline-block' }}>
+                                            {codigoCompartir}
                                         </div>
                                     </div>
-                                )}
-                                <button onClick={() => { pararCompartir(); setCompartirModal(false); }}
-                                    style={{ width:'100%', padding:'10px', background:'#e74c3c', color:'white', border:'none', borderRadius:10, fontWeight:'bold', cursor:'pointer', fontSize:'0.9rem' }}>
-                                    ⏹ Detener sesión compartida
-                                </button>
-                            </div>
-                        )}
+
+                                    {/* Enlace + QR lado a lado */}
+                                    <div style={{ display:'flex', gap:12, alignItems:'flex-start', marginBottom:14 }}>
+                                        {/* QR */}
+                                        <div style={{ textAlign:'center', flexShrink:0 }}>
+                                            <img src={qrSrc} alt="QR" width={100} height={100}
+                                                style={{ borderRadius:8, border:'2px solid #ecf0f1', display:'block' }} />
+                                            <div style={{ fontSize:'0.65rem', color:'#95a5a6', marginTop:3 }}>Escanear para unirse</div>
+                                        </div>
+                                        {/* Link + botones */}
+                                        <div style={{ flex:1, display:'flex', flexDirection:'column', gap:6 }}>
+                                            <div style={{ fontSize:'0.7rem', color:'#7f8c8d', fontWeight:'bold', marginBottom:2 }}>Enlace directo</div>
+                                            <div style={{ background:'#f4f6f8', borderRadius:7, padding:'6px 8px', fontSize:'0.65rem', color:'#555', wordBreak:'break-all', border:'1px solid #dde', lineHeight:1.4 }}>
+                                                {shareUrl}
+                                            </div>
+                                            <button onClick={copiarLink}
+                                                style={{ padding:'7px', background: copiadoLink ? '#27ae60' : '#8e44ad', color:'white', border:'none', borderRadius:8, fontWeight:'bold', cursor:'pointer', fontSize:'0.78rem', transition:'background 0.2s' }}>
+                                                {copiadoLink ? '✓ Enlace copiado' : '🔗 Copiar enlace'}
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Participantes */}
+                                    {participantes.length > 0 && (
+                                        <div style={{ marginBottom:14 }}>
+                                            <div style={{ fontWeight:'bold', fontSize:'0.82rem', color:'#555', marginBottom:5 }}>Participantes ({participantes.length})</div>
+                                            <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
+                                                {participantes.map(p => (
+                                                    <div key={p.id} style={{ display:'flex', alignItems:'center', gap:5, background:'#f4f6f8', borderRadius:20, padding:'4px 10px', border:`2px solid ${p.color}` }}>
+                                                        <div style={{ width:10, height:10, borderRadius:'50%', background:p.color }} />
+                                                        <span style={{ fontSize:'0.8rem', fontWeight:600, color:'#2c3e50' }}>{p.nombre}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <button onClick={() => { pararCompartir(); setCompartirModal(false); }}
+                                        style={{ width:'100%', padding:'10px', background:'#e74c3c', color:'white', border:'none', borderRadius:10, fontWeight:'bold', cursor:'pointer', fontSize:'0.9rem' }}>
+                                        ⏹ Detener sesión compartida
+                                    </button>
+                                </div>
+                            );
+                        })()}
 
                         {/* ─ Sin sesión activa: crear o unirse ─ */}
                         {!modoCompartir && (
@@ -1627,48 +1733,136 @@ function PizarraApp() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// SHARE MODAL (mismo patrón que LandingGames3)
+// ══════════════════════════════════════════════════════════════════════════════
+function ShareModalHerramienta({ url, titulo, onClose }) {
+    const [copiado, setCopiado] = useState(false);
+    const copiar = () => {
+        navigator.clipboard.writeText(url).catch(() => {});
+        setCopiado(true);
+        setTimeout(() => setCopiado(false), 2000);
+    };
+    const texto = encodeURIComponent(`🏫 ${titulo}\n${url}`);
+    const opciones = [
+        { label: 'Copiar enlace',    icon: copiado ? '✅' : '🔗', color: '#2c3e50', bg: copiado ? '#e8f5e9' : '#f4f6f8', action: copiar },
+        { label: 'WhatsApp',         icon: '💬', color: '#25D366', bg: '#e8f8ee', action: () => window.open(`https://wa.me/?text=${texto}`, '_blank') },
+        { label: 'Telegram',         icon: '✈️', color: '#0088cc', bg: '#e8f4fb', action: () => window.open(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(titulo)}`, '_blank') },
+        { label: 'Correo',           icon: '📧', color: '#e74c3c', bg: '#fdecea', action: () => window.open(`mailto:?subject=${encodeURIComponent(titulo)}&body=${texto}`, '_blank') },
+        { label: 'Google Classroom', icon: '🎓', color: '#1565C0', bg: '#e3f2fd', action: () => window.open(`https://classroom.google.com/share?url=${encodeURIComponent(url)}`, '_blank') },
+    ];
+    return (
+        <div style={{ position:'fixed', inset:0, zIndex:9000, background:'rgba(0,0,0,0.55)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }} onClick={onClose}>
+            <div style={{ background:'white', borderRadius:20, width:'100%', maxWidth:360, padding:24, boxShadow:'0 20px 50px rgba(0,0,0,0.3)' }} onClick={e => e.stopPropagation()}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+                    <h3 style={{ margin:0, color:'#2c3e50', fontSize:'1.05rem' }}>Compartir</h3>
+                    <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', color:'#95a5a6', fontSize:'1.2rem', padding:4 }}>✕</button>
+                </div>
+                <div style={{ background:'#f4f6f8', borderRadius:10, padding:'8px 12px', fontSize:'0.75rem', color:'#7f8c8d', wordBreak:'break-all', marginBottom:16 }}>{url}</div>
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                    {opciones.map(op => (
+                        <button key={op.label} onClick={op.action}
+                            style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:12, border:`1.5px solid ${op.color}22`, background:op.bg, cursor:'pointer', textAlign:'left', fontSize:'0.93rem', fontWeight:600, color:op.color }}>
+                            <span style={{ fontSize:'1.2rem', width:24, textAlign:'center' }}>{op.icon}</span>
+                            {op.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL: MENÚ
 // ══════════════════════════════════════════════════════════════════════════════
 export default function HerramientasClase({ onExit }) {
-    const [activa, setActiva] = useState(null);
+    const [activa, setActiva] = useState(() => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('pizarra')) return 'pizarra';
+        const g = params.get('gestion');
+        if (g === 'ruleta' || g === 'pizarra' || g === 'reloj') return g;
+        return null;
+    });
+    const [shareModal, setShareModal] = useState(null); // { url, titulo }
+
+    const shareBase = `${window.location.origin}${window.location.pathname}`;
 
     const HERRAMIENTAS = [
-        { id: 'ruleta', icon: <RotateCcw size={40}/>, titulo: 'Ruleta de Aula', desc: 'Selecciona alumnos al azar desde una lista.', color: '#e67e22' },
-        { id: 'pizarra', icon: <PenTool size={40}/>, titulo: 'Pizarra Científica', desc: 'Funciones, Formas 3D y Captura de pantalla.', color: '#3498db' },
-        { id: 'reloj', icon: <Clock size={40}/>, titulo: 'Gestor de Tiempo', desc: 'Cronómetro y Temporizador de cuenta atrás.', color: '#2ecc71' },
+        { id: 'ruleta',  icon: <RotateCcw size={40}/>, titulo: 'Ruleta de Aula',      desc: 'Selecciona alumnos al azar desde una lista.',       color: '#e67e22' },
+        { id: 'pizarra', icon: <PenTool size={40}/>,   titulo: 'Pizarra Científica',   desc: 'Funciones, Formas 3D y Captura de pantalla.',        color: '#3498db' },
+        { id: 'reloj',   icon: <Clock size={40}/>,      titulo: 'Gestor de Tiempo',     desc: 'Cronómetro y Temporizador de cuenta atrás.',         color: '#2ecc71' },
     ];
 
     return (
-        <div style={{ minHeight: '100vh', background: '#fce4ec', padding: '20px', fontFamily: "'Segoe UI', Tahoma, sans-serif" }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, maxWidth: 1200, margin: '0 auto 30px' }}>
-                <button onClick={activa ? () => setActiva(null) : onExit} style={{ padding: '8px 16px', background: 'white', border: '1px solid #ccc', borderRadius: 30, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 'bold', color: '#333' }}>
-                    <ArrowLeft size={16} /> {activa ? 'Volver a Herramientas' : 'Salir'}
+        <div style={{ minHeight: '100vh', background: '#fce4ec', padding: 'clamp(10px, 3vw, 20px)', boxSizing: 'border-box', fontFamily: "'Segoe UI', Tahoma, sans-serif" }}>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, maxWidth: 1200, margin: '0 auto', marginBottom: 'clamp(14px, 3vw, 30px)' }}>
+                <button onClick={() => {
+                    if (activa === 'pizarra') {
+                        if (!window.confirm('¿Volver al menú? Se perderá todo el contenido de la pizarra.')) return;
+                    }
+                    activa ? setActiva(null) : onExit();
+                }} style={{ padding: '7px 14px', background: 'white', border: '1px solid #ccc', borderRadius: 30, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 'bold', color: '#333', fontSize: 'clamp(0.8rem, 2.5vw, 1rem)', flexShrink: 0 }}>
+                    <ArrowLeft size={15} /> {activa ? 'Volver' : 'Salir'}
                 </button>
-                <div style={{ fontWeight: 'bold', color: '#2c3e50', fontSize: '1.2rem' }}>
-                    {activa ? HERRAMIENTAS.find(h => h.id === activa).titulo : 'Herramientas de Clase'}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ fontWeight: 'bold', color: '#2c3e50', fontSize: 'clamp(0.95rem, 3vw, 1.2rem)' }}>
+                        {activa ? HERRAMIENTAS.find(h => h.id === activa).titulo : 'Herramientas de Clase'}
+                    </div>
+                    {/* Botón compartir — menú principal o herramienta activa */}
+                    <button
+                        onClick={() => {
+                            const url = activa
+                                ? `${shareBase}?gestion=${activa}`
+                                : `${shareBase}?gestion=menu`;
+                            const titulo = activa
+                                ? HERRAMIENTAS.find(h => h.id === activa).titulo
+                                : 'Herramientas de Clase';
+                            setShareModal({ url, titulo });
+                        }}
+                        title="Compartir"
+                        style={{ background: 'white', border: '1px solid #ccc', borderRadius: 20, padding: '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, color: '#e67e22', fontWeight: 'bold', fontSize: '0.82rem' }}>
+                        <Share2 size={14}/> Compartir
+                    </button>
                 </div>
             </div>
 
             {!activa ? (
                 <div style={{ maxWidth: 1000, margin: '0 auto', textAlign: 'center' }}>
-                    <Settings size={50} color="#9b59b6" style={{ marginBottom: 10 }} />
-                    <h1 style={{ color: '#2c3e50', fontSize: '2.5rem', margin: '0 0 30px' }}>Herramientas de Clase</h1>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 20 }}>
+                    <Settings size={44} color="#9b59b6" style={{ marginBottom: 8 }} />
+                    <h1 style={{ color: '#2c3e50', fontSize: 'clamp(1.4rem, 5vw, 2.5rem)', margin: '0 0 clamp(16px, 4vw, 30px)' }}>Herramientas de Clase</h1>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))', gap: 'clamp(12px, 3vw, 20px)' }}>
                         {HERRAMIENTAS.map(h => (
-                            <button key={h.id} onClick={() => setActiva(h.id)} style={{ background: 'white', border: `2px solid ${h.color}`, borderRadius: 20, padding: 30, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', transition: 'transform 0.2s', boxShadow: '0 10px 20px rgba(0,0,0,0.1)' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-5px)'} onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
-                                <div style={{ background: `${h.color}22`, padding: 20, borderRadius: '50%', color: h.color, marginBottom: 15 }}>{h.icon}</div>
-                                <h2 style={{ color: '#2c3e50', margin: '0 0 10px' }}>{h.titulo}</h2>
-                                <p style={{ color: '#7f8c8d', fontSize: '0.95rem', margin: 0, lineHeight: 1.5 }}>{h.desc}</p>
-                            </button>
+                            <div key={h.id} style={{ position: 'relative' }}>
+                                {/* Botón compartir individual por herramienta */}
+                                <button
+                                    onClick={e => { e.stopPropagation(); setShareModal({ url: `${shareBase}?gestion=${h.id}`, titulo: h.titulo }); }}
+                                    title={`Compartir ${h.titulo}`}
+                                    style={{ position: 'absolute', top: 10, right: 10, zIndex: 2, background: 'rgba(255,255,255,0.9)', border: 'none', borderRadius: 8, padding: '4px 6px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: h.color, boxShadow: '0 1px 4px rgba(0,0,0,0.15)' }}>
+                                    <Share2 size={14}/>
+                                </button>
+                                <button onClick={() => setActiva(h.id)}
+                                    style={{ background: 'white', border: `2px solid ${h.color}`, borderRadius: 16, padding: 'clamp(16px, 4vw, 30px)', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', transition: 'transform 0.2s', boxShadow: '0 6px 18px rgba(0,0,0,0.08)', width: '100%', boxSizing: 'border-box' }}
+                                    onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
+                                    onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
+                                    <div style={{ background: `${h.color}22`, padding: 'clamp(12px, 3vw, 20px)', borderRadius: '50%', color: h.color, marginBottom: 12 }}>{h.icon}</div>
+                                    <h2 style={{ color: '#2c3e50', margin: '0 0 8px', fontSize: 'clamp(1rem, 3.5vw, 1.5rem)' }}>{h.titulo}</h2>
+                                    <p style={{ color: '#7f8c8d', fontSize: 'clamp(0.82rem, 2.5vw, 0.95rem)', margin: 0, lineHeight: 1.5 }}>{h.desc}</p>
+                                </button>
+                            </div>
                         ))}
                     </div>
                 </div>
             ) : (
-                <div style={{ background: 'white', maxWidth: 1200, margin: '0 auto', padding: 30, borderRadius: 20, boxShadow: '0 15px 40px rgba(0,0,0,0.1)' }}>
+                <div style={{ background: 'white', maxWidth: 1200, margin: '0 auto', padding: 'clamp(10px, 3vw, 30px)', borderRadius: 16, boxShadow: '0 10px 30px rgba(0,0,0,0.08)', boxSizing: 'border-box' }}>
                     {activa === 'ruleta' && <RuletaApp />}
                     {activa === 'reloj' && <RelojApp />}
                     {activa === 'pizarra' && <PizarraApp />}
                 </div>
+            )}
+
+            {shareModal && (
+                <ShareModalHerramienta url={shareModal.url} titulo={shareModal.titulo} onClose={() => setShareModal(null)} />
             )}
         </div>
     );

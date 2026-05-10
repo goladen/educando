@@ -741,6 +741,11 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                 }).catch(console.error);
                 return;
             }
+            const gestionParam = params.get('gestion');
+            if (gestionParam) {
+                setGestionAula(true);
+                return;
+            }
             const juegoParam = params.get('juego');
             if (juegoParam) {
                 let tourConfig = null;
@@ -784,7 +789,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
     const [funcionesEjecutivas, setFuncionesEjecutivas] = useState(false);
     const [irregularVerbs,      setIrregularVerbs]      = useState(false);
     const [musicApp,            setMusicApp]            = useState(false);
-    const [gestionAula,         setGestionAula]         = useState(false);
+    const [gestionAula,         setGestionAula]         = useState(() => !!new URLSearchParams(window.location.search).get('gestion'));
 
     // Estados alumno logueado
     const [vistaAlumno,    setVistaAlumno]    = useState('MAIN'); // 'MAIN' | 'RECORDS'
@@ -1449,7 +1454,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                     { id: 'IRREGULAR_VERBS',     label: 'Irregular Verbs',     emoji: '📝', color: '#0369a1', action: () => setIrregularVerbs(true), shareable: true },
                     { id: 'SOLAR_SYSTEM',        label: 'Sistema Solar',        emoji: '🪐', color: '#3B82F6', action: () => setJuegoActivo({ tipoJuego: 'SOLAR_SYSTEM' }), shareable: true },
                     { id: 'MUSICA',              label: 'Música',               emoji: '🎵', color: '#8b5cf6', action: () => setMusicApp(true), shareable: true },
-                    { id: 'GESTION_AULA',        label: 'Gestión Aula',         emoji: '🏫', color: '#e67e22', action: () => setGestionAula(true), shareable: false },
+                    { id: 'GESTION_AULA', label: 'Gestión Aula', emoji: '🏫', color: '#e67e22', action: () => setGestionAula(true), shareable: true, shareUrl: `${window.location.origin}${window.location.pathname}?gestion=menu` },
                 ].map(tool => (
                     <div key={tool.id} onClick={tool.action} style={{ background: '#ffffbf', borderRadius: '15px', padding: '15px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transition: 'transform 0.2s', border: `2px solid ${tool.color}20`, position: 'relative' }}
                         onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-3px)'}
@@ -1458,7 +1463,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                             <button
                                 onClick={e => {
                                     e.stopPropagation();
-                                    const url = `${window.location.origin}${window.location.pathname}?juego=${tool.id.toLowerCase()}`;
+                                    const url = tool.shareUrl || `${window.location.origin}${window.location.pathname}?juego=${tool.id.toLowerCase()}`;
                                     setShareModal({ url, titulo: tool.label });
                                 }}
                                 title="Compartir"

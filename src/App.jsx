@@ -12,6 +12,8 @@ import IrregularVerbsTest from './IrregularVerbsTest';
 import { SolarSystemViewer } from './components/LandingGames3';
 import PiTutorial from './components/PiTutorial';
 import Retos from './Retos';
+import AnnotationOverlay from './components/AnnotationOverlay';
+import HerramientasClase from './GestionAula';
 
 const TUTORIAL_ALUMNO = [
     {
@@ -39,6 +41,10 @@ function App() {
     const [temas, setTemas] = useState("");
     // DETECTAR PÁGINA PÚBLICA DE PROFESOR — por slug (/nombre) o por ?p=uid
     const [paginaTarget, setPaginaTarget] = useState(null); // { uid } | { slug }
+
+    // ANNOTATION OVERLAY + PIZARRA DESDE CAPTURA
+    const [annotationOpen,   setAnnotationOpen]   = useState(false);
+    const [pizarraCaptura,   setPizarraCaptura]   = useState(false);
 
     useEffect(() => {
       const params = new URLSearchParams(window.location.search);
@@ -107,6 +113,13 @@ function App() {
         return () => unsubscribe();
     }, []);
 
+    // Escuchar evento de captura de anotación → abrir pizarra
+    useEffect(() => {
+        const handler = () => setPizarraCaptura(true);
+        window.addEventListener('abrirPizarraConCaptura', handler);
+        return () => window.removeEventListener('abrirPizarraConCaptura', handler);
+    }, []);
+
     // 2. BUSCAR DATOS EN FIRESTORE
     const consultarDatosUsuario = async (uid) => {
         const docRef = doc(db, "users", uid);
@@ -155,15 +168,39 @@ function App() {
         setPais(""); setRegion(""); setPoblacion("");
     };
 
-    if (rutaPublica === 'funcionesejecutivas') return <FuncionesEjecutivas onBack={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
-    if (rutaPublica === 'irregular_verbs') return <IrregularVerbsTest />;
-    if (rutaPublica === 'sistema_solar') return <SolarSystemViewer onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
-    if (rutaPublica === 'retos') return <Retos onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
-    if (rutaPublica === 'conectapuntos') return <Retos initialGame="CONECTA" onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
-    if (rutaPublica === 'sudoku') return <Retos initialGame="SUDOKU" onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
+    // Botón flotante + overlays del anotador — se incluye en todas las páginas
+    const anotadorUI = (
+        <>
+            <button
+                onClick={() => setAnnotationOpen(v => !v)}
+                title="Anotador: dibuja encima de la pantalla"
+                style={{
+                    position: 'fixed', bottom: 22, right: 22, zIndex: 9985,
+                    width: 48, height: 48, borderRadius: '50%',
+                    background: annotationOpen ? '#3b82f6' : 'rgba(30,30,30,0.82)',
+                    backdropFilter: 'blur(8px)', border: 'none', cursor: 'pointer',
+                    fontSize: 22, boxShadow: '0 4px 16px rgba(0,0,0,0.35)', color: '#fff',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+            >✏️</button>
+            {annotationOpen && <AnnotationOverlay onClose={() => setAnnotationOpen(false)} />}
+            {pizarraCaptura && (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 9989, background: '#f8f9fa' }}>
+                    <HerramientasClase onExit={() => setPizarraCaptura(false)} />
+                </div>
+            )}
+        </>
+    );
+
+    if (rutaPublica === 'funcionesejecutivas') return <><FuncionesEjecutivas onBack={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
+    if (rutaPublica === 'irregular_verbs') return <><IrregularVerbsTest />{anotadorUI}</>;
+    if (rutaPublica === 'sistema_solar') return <><SolarSystemViewer onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
+    if (rutaPublica === 'retos') return <><Retos onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
+    if (rutaPublica === 'conectapuntos') return <><Retos initialGame="CONECTA" onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
+    if (rutaPublica === 'sudoku') return <><Retos initialGame="SUDOKU" onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
 
     // PÁGINA PÚBLICA DEL PROFESOR (no requiere login)
-    if (paginaTarget) return <PaginaProfesor uid={paginaTarget.uid} onBack={() => { setPaginaTarget(null); window.history.back(); }} />;
+    if (paginaTarget) return <><PaginaProfesor uid={paginaTarget.uid} onBack={() => { setPaginaTarget(null); window.history.back(); }} />{anotadorUI}</>;
 
     if (cargando && !deepLinkGame) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Cargando...</div>;
 
@@ -186,6 +223,7 @@ function App() {
 
     // SI HAY USUARIO, MOSTRAMOS LA APP NORMAL
     return (
+        <>
         <div style={{ fontFamily: 'Arial' }}>
 
             {/* Si aún no tiene rol, mostramos la pantalla de registro de datos */}
@@ -244,6 +282,9 @@ function App() {
                 </div>
             )}
         </div>
+
+        {anotadorUI}
+        </>
     );
 }
 

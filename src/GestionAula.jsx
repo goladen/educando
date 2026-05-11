@@ -713,6 +713,24 @@ function PizarraApp() {
         }
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+    // Captura del anotador: insertar imagen al montar
+    useEffect(() => {
+        const dataURL = sessionStorage.getItem('pizarraCaptura');
+        if (!dataURL) return;
+        sessionStorage.removeItem('pizarraCaptura');
+        const img = new Image();
+        img.onload = () => {
+            const maxW = 700, maxH = 500;
+            let w = img.naturalWidth, h = img.naturalHeight;
+            if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+            if (h > maxH) { w = Math.round(w * maxH / h); h = maxH; }
+            const id = Date.now();
+            imageCacheRef.current[id] = img;
+            setElementos(prev => [...prev, { t: 'image', id, src: dataURL, x: 40, y: 60, w, h }]);
+        };
+        img.src = dataURL;
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
     // ── Lógica de compartir ──────────────────────────────────────────────────
     const detenerSync = () => {
         if (syncIntervalRef.current) { clearInterval(syncIntervalRef.current); syncIntervalRef.current = null; }

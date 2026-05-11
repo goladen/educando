@@ -5,7 +5,8 @@ import {
     ArrowLeft, Edit3, Settings, Clock, Play, Square, RotateCcw,
     PenTool, Type, Circle, Square as SquareIcon, Triangle, Hexagon,
     Box, Calculator as CalcIcon, X, Camera, Activity, ChevronDown, ChevronUp,
-    Move, Maximize2, Minimize2, Image as ImageIcon, ZoomIn, ZoomOut, Share2
+    Move, Maximize2, Minimize2, Image as ImageIcon, ZoomIn, ZoomOut, Share2,
+    Users, LayoutGrid
 } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { db } from './firebase';
@@ -668,6 +669,14 @@ function PizarraApp() {
     // Lasso / selection
     const [selIdxs,   setSelIdxs]   = useState([]);
     const [lassoRect, setLassoRect] = useState(null);
+    const selHandleRef = useRef(null); // { type:'resize'|'rotate', ... }
+
+    // Text tool
+    const [textoInput,       setTextoInput]       = useState('');
+    const [textoFontSize,    setTextoFontSize]    = useState(24);
+    const [emojiPanelOpen,   setEmojiPanelOpen]   = useState(false);
+    const [escuchando,       setEscuchando]       = useState(false);
+    const recognitionRef = useRef(null);
 
     // ── Pizarra compartida ───────────────────────────────────────────────────
     const [compartirModal,       setCompartirModal]       = useState(false);
@@ -845,6 +854,24 @@ function PizarraApp() {
         return { ...elem, autorId: miIdRef.current, autorColor: miColorRef.current };
     };
 
+    // ── Voice input ─────────────────────────────────────────────────────────
+    const toggleVoz = () => {
+        const SRClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SRClass) { alert('Tu navegador no soporta reconocimiento de voz. Prueba con Chrome.'); return; }
+        if (escuchando) { recognitionRef.current?.stop(); setEscuchando(false); return; }
+        const r = new SRClass();
+        r.lang = 'es-ES'; r.continuous = false; r.interimResults = false;
+        r.onresult = (ev) => {
+            const txt = ev.results[0][0].transcript;
+            setTextoInput(prev => prev ? prev + ' ' + txt : txt);
+        };
+        r.onend = () => setEscuchando(false);
+        r.onerror = () => setEscuchando(false);
+        recognitionRef.current = r;
+        r.start();
+        setEscuchando(true);
+    };
+
     // Fullscreen
     const toggleFullscreen = () => {
         const el = contenedorRef.current;
@@ -925,13 +952,59 @@ function PizarraApp() {
         e.target.value = '';
     };
 
+    // ── Geometry helpers ─────────────────────────────────────────────────────
+    const rotatePoint = (px, py, cx, cy, a) => ({
+        x: cx + (px-cx)*Math.cos(a) - (py-cy)*Math.sin(a),
+        y: cy + (px-cx)*Math.sin(a) + (py-cy)*Math.cos(a),
+    });
+
+    const applyRotationToElem = (elem, cx, cy, angle) => {
+        if (elem.t === 'draw') return { ...elem, pts: elem.pts.map(p => rotatePoint(p.x, p.y, cx, cy, angle)) };
+        if (elem.t === 'graph' || elem.t === 'axes') {
+            const np = rotatePoint(elem.cx, elem.cy, cx, cy, angle);
+            return { ...elem, cx: np.x, cy: np.y };
+        }
+        if (elem.t === 'image') {
+            const np = rotatePoint(elem.x + elem.w/2, elem.y + elem.h/2, cx, cy, angle);
+            return { ...elem, x: np.x - elem.w/2, y: np.y - elem.h/2, rotation: (elem.rotation||0) + angle };
+        }
+        if (elem.t === 'text') {
+            const np = rotatePoint(elem.x, elem.y, cx, cy, angle);
+            return { ...elem, x: np.x, y: np.y, rotation: (elem.rotation||0) + angle };
+        }
+        if (elem.t === 'staff' || elem.t === 'note' || elem.t === 'rest' || elem.t === 'acc') {
+            const np = rotatePoint(elem.x, elem.y, cx, cy, angle);
+            return { ...elem, x: np.x, y: np.y };
+        }
+        if (elem.x1 !== undefined) {
+            const ecx = (elem.x1+elem.x2)/2, ecy = (elem.y1+elem.y2)/2;
+            const np = rotatePoint(ecx, ecy, cx, cy, angle);
+            const hw = Math.abs(elem.x2-elem.x1)/2, hh = Math.abs(elem.y2-elem.y1)/2;
+            return { ...elem, x1: np.x-hw, y1: np.y-hh, x2: np.x+hw, y2: np.y+hh, rotation: (elem.rotation||0)+angle };
+        }
+        return elem;
+    };
+
+    const applyScaleToElem = (elem, ox1, oy1, scaleX, scaleY, nx1, ny1) => {
+        const mX = (px) => nx1 + (px - ox1) * scaleX;
+        const mY = (py) => ny1 + (py - oy1) * scaleY;
+        if (elem.t === 'draw') return { ...elem, pts: elem.pts.map(p => ({ x: mX(p.x), y: mY(p.y) })) };
+        if (elem.t === 'graph' || elem.t === 'axes') return { ...elem, cx: mX(elem.cx), cy: mY(elem.cy) };
+        if (elem.t === 'image') return { ...elem, x: mX(elem.x), y: mY(elem.y), w: elem.w * scaleX, h: elem.h * scaleY };
+        if (elem.t === 'text') return { ...elem, x: mX(elem.x), y: mY(elem.y) };
+        if (elem.t === 'staff') return { ...elem, x: mX(elem.x), y: mY(elem.y), w: elem.w * scaleX };
+        if (elem.t === 'note' || elem.t === 'rest' || elem.t === 'acc') return { ...elem, x: mX(elem.x), y: mY(elem.y) };
+        if (elem.x1 !== undefined) return { ...elem, x1: mX(elem.x1), y1: mY(elem.y1), x2: mX(elem.x2), y2: mY(elem.y2) };
+        return elem;
+    };
+
     // ── Element bounding box / move ──────────────────────────────────────────
     const getBbox = (item) => {
         if (item.t === 'draw') {
             const xs = item.pts.map(p => p.x), ys = item.pts.map(p => p.y);
             return { x1: Math.min(...xs), y1: Math.min(...ys), x2: Math.max(...xs), y2: Math.max(...ys) };
         }
-        if (item.t === 'text')  return { x1: item.x, y1: item.y - 24, x2: item.x + 200, y2: item.y + 4 };
+        if (item.t === 'text') { const fs = item.fontSize||24; return { x1: item.x, y1: item.y - fs, x2: item.x + Math.max((item.txt||'').length * fs * 0.6, 60), y2: item.y + 4 }; }
         if (item.t === 'graph' || item.t === 'axes') return { x1: item.cx - 265, y1: item.cy - 265, x2: item.cx + 265, y2: item.cy + 265 };
         if (item.t === 'image') return { x1: item.x, y1: item.y, x2: item.x + item.w, y2: item.y + item.h };
         if (item.t === 'staff') { const ls = item.ls||STAFF_LS; return { x1: item.x, y1: item.y - ls, x2: item.x + item.w, y2: item.y + ls*5 }; }
@@ -950,6 +1023,8 @@ function PizarraApp() {
             if (item.t === 'text') return { ...item, x: item.x + dx, y: item.y + dy };
             if (item.t === 'graph' || item.t === 'axes') return { ...item, cx: item.cx + dx, cy: item.cy + dy };
             if (item.t === 'image') return { ...item, x: item.x + dx, y: item.y + dy };
+            if (item.t === 'staff' || item.t === 'note' || item.t === 'rest' || item.t === 'acc')
+                return { ...item, x: item.x + dx, y: item.y + dy };
             return { ...item, x1: item.x1 + dx, y1: item.y1 + dy, x2: item.x2 + dx, y2: item.y2 + dy };
         }));
     };
@@ -968,16 +1043,25 @@ function PizarraApp() {
             item.pts.forEach(p => ctx.lineTo(p.x, p.y));
             ctx.stroke();
         } else if (item.t === 'text') {
-            ctx.font = 'bold 24px Arial';
-            ctx.fillText(item.txt, item.x, item.y);
+            const fs = item.fontSize || 24;
+            ctx.font = `bold ${fs}px Arial`;
+            if (item.rotation) {
+                ctx.save(); ctx.translate(item.x, item.y); ctx.rotate(item.rotation);
+                ctx.fillText(item.txt, 0, 0); ctx.restore();
+            } else { ctx.fillText(item.txt, item.x, item.y); }
         } else if (item.t === 'graph') {
             dibujarCurvaMatematica(ctx, item);
         } else if (item.t === 'axes') {
             dibujarEjesCoord(ctx, item);
         } else if (item.t === 'image') {
             const img = getOrLoadImg(item);
-            if (img) ctx.drawImage(img, item.x, item.y, item.w, item.h);
-            else { ctx.save(); ctx.strokeStyle = '#bdc3c7'; ctx.lineWidth = 1; ctx.strokeRect(item.x, item.y, item.w, item.h); ctx.restore(); }
+            if (img) {
+                if (item.rotation) {
+                    const cx = item.x + item.w/2, cy = item.y + item.h/2;
+                    ctx.save(); ctx.translate(cx, cy); ctx.rotate(item.rotation);
+                    ctx.drawImage(img, -item.w/2, -item.h/2, item.w, item.h); ctx.restore();
+                } else { ctx.drawImage(img, item.x, item.y, item.w, item.h); }
+            } else { ctx.save(); ctx.strokeStyle = '#bdc3c7'; ctx.lineWidth = 1; ctx.strokeRect(item.x, item.y, item.w, item.h); ctx.restore(); }
         } else if (item.t === 'staff') {
             drawStaff(ctx, item);
         } else if (item.t === 'note') {
@@ -987,7 +1071,11 @@ function PizarraApp() {
         } else if (item.t === 'acc') {
             drawAccidental(ctx, item);
         } else {
-            dibujarForma(ctx, item);
+            if (item.rotation) {
+                const ecx = (item.x1+item.x2)/2, ecy = (item.y1+item.y2)/2;
+                ctx.save(); ctx.translate(ecx, ecy); ctx.rotate(item.rotation); ctx.translate(-ecx, -ecy);
+                dibujarForma(ctx, item); ctx.restore();
+            } else { dibujarForma(ctx, item); }
         }
 
         if (selected) {
@@ -1019,6 +1107,34 @@ function PizarraApp() {
             ctx.fillRect(lassoRect.x1, lassoRect.y1, lassoRect.x2 - lassoRect.x1, lassoRect.y2 - lassoRect.y1);
             ctx.setLineDash([]);
         }
+
+        // ── Handles de redimensión y rotación sobre la selección ─────────────
+        if (selIdxs.length > 0 && herramienta === 'lasso' && !lassoRect) {
+            const bbs = selIdxs.map(i => getBbox(elementos[i]));
+            const bx1 = Math.min(...bbs.map(b => b.x1)) - 6;
+            const by1 = Math.min(...bbs.map(b => b.y1)) - 6;
+            const bx2 = Math.max(...bbs.map(b => b.x2)) + 6;
+            const by2 = Math.max(...bbs.map(b => b.y2)) + 6;
+            const mx = (bx1+bx2)/2, my = (by1+by2)/2;
+            // Rect exterior
+            ctx.strokeStyle = '#2980b9'; ctx.lineWidth = 1.5; ctx.setLineDash([4,2]);
+            ctx.strokeRect(bx1, by1, bx2-bx1, by2-by1); ctx.setLineDash([]);
+            // 8 handles de resize
+            [[bx1,by1],[mx,by1],[bx2,by1],[bx1,my],[bx2,my],[bx1,by2],[mx,by2],[bx2,by2]].forEach(([hx,hy]) => {
+                ctx.fillStyle='white'; ctx.strokeStyle='#2980b9'; ctx.lineWidth=1.5;
+                ctx.fillRect(hx-5,hy-5,10,10); ctx.strokeRect(hx-5,hy-5,10,10);
+            });
+            // Handle de rotación
+            const rotX = mx, rotY = by1 - 22;
+            ctx.beginPath(); ctx.strokeStyle='#bdc3c7'; ctx.lineWidth=1;
+            ctx.moveTo(mx, by1); ctx.lineTo(rotX, rotY+7); ctx.stroke();
+            ctx.beginPath(); ctx.arc(rotX, rotY, 8, 0, 2*Math.PI);
+            ctx.fillStyle='#e67e22'; ctx.fill();
+            ctx.strokeStyle='#d35400'; ctx.lineWidth=1.5; ctx.stroke();
+            ctx.fillStyle='white'; ctx.font='bold 11px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle';
+            ctx.fillText('↻', rotX, rotY+1);
+        }
+
         ctx.restore();
     };
 
@@ -1185,6 +1301,12 @@ function PizarraApp() {
         // En modo colaborativo, el color de trazo es el color del participante
         const drawColor = modoCompartir === 'editar' ? miColorRef.current || color : color;
 
+        if (herramienta === 'text') {
+            if (textoInput.trim()) {
+                setElementos(prev => [...prev, tagElem({ t: 'text', txt: textoInput.trim(), x, y, color: drawColor, grosor, fontSize: textoFontSize })]);
+            }
+            return;
+        }
         if (herramienta === 'paste' && textoPegar) {
             setElementos(prev => [...prev, tagElem({ t: 'text', txt: textoPegar, x, y, color: drawColor, grosor })]);
             setHerramienta('draw'); setTextoPegar(''); return;
@@ -1235,8 +1357,42 @@ function PizarraApp() {
             return;
         }
         if (herramienta === 'lasso') {
-            // Click inside existing selection → start move
             if (selIdxs.length > 0) {
+                const bbs = selIdxs.map(i => getBbox(elementos[i]));
+                const bx1 = Math.min(...bbs.map(b => b.x1)) - 6;
+                const by1 = Math.min(...bbs.map(b => b.y1)) - 6;
+                const bx2 = Math.max(...bbs.map(b => b.x2)) + 6;
+                const by2 = Math.max(...bbs.map(b => b.y2)) + 6;
+                const mx = (bx1+bx2)/2, my = (by1+by2)/2;
+                const cbx = mx, cby = (by1+by2)/2;
+
+                // Rotate handle?
+                if (Math.abs(x - mx) < 11 && Math.abs(y - (by1-22)) < 11) {
+                    selHandleRef.current = {
+                        type: 'rotate', cx: cbx, cy: cby,
+                        startAngle: Math.atan2(y - cby, x - cbx),
+                        origElemsData: selIdxs.map(i => JSON.parse(JSON.stringify(elementos[i]))),
+                    };
+                    return;
+                }
+                // Resize handles?
+                const resizeHandles = [
+                    {id:'tl',x:bx1,y:by1},{id:'tc',x:mx,y:by1},{id:'tr',x:bx2,y:by1},
+                    {id:'ml',x:bx1,y:my},{id:'mr',x:bx2,y:my},
+                    {id:'bl',x:bx1,y:by2},{id:'bc',x:mx,y:by2},{id:'br',x:bx2,y:by2},
+                ];
+                for (const h of resizeHandles) {
+                    if (Math.abs(x - h.x) < 9 && Math.abs(y - h.y) < 9) {
+                        selHandleRef.current = {
+                            type: 'resize', handle: h.id,
+                            origBbox: { x1: bx1, y1: by1, x2: bx2, y2: by2 },
+                            origElemsData: selIdxs.map(i => JSON.parse(JSON.stringify(elementos[i]))),
+                            startX: x, startY: y,
+                        };
+                        return;
+                    }
+                }
+                // Click inside → move
                 const inside = selIdxs.some(i => {
                     const bb = getBbox(elementos[i]);
                     return x >= bb.x1 - 6 && x <= bb.x2 + 6 && y >= bb.y1 - 6 && y <= bb.y2 + 6;
@@ -1270,6 +1426,36 @@ function PizarraApp() {
             };
             triggerRedraw(); return;
         }
+        // Handle drag (resize / rotate)
+        if (herramienta === 'lasso' && selHandleRef.current) {
+            const h = selHandleRef.current;
+            if (h.type === 'rotate') {
+                const angle = Math.atan2(y - h.cy, x - h.cx) - h.startAngle;
+                setElementos(prev => prev.map((item, i) => {
+                    const si = selIdxs.indexOf(i);
+                    if (si < 0) return item;
+                    return applyRotationToElem(h.origElemsData[si], h.cx, h.cy, angle);
+                }));
+            } else if (h.type === 'resize') {
+                const ob = h.origBbox;
+                const origW = ob.x2 - ob.x1, origH = ob.y2 - ob.y1;
+                const dx = x - h.startX, dy = y - h.startY;
+                let nx1 = ob.x1, ny1 = ob.y1, nx2 = ob.x2, ny2 = ob.y2;
+                if (h.handle.includes('l')) nx1 = ob.x1 + dx;
+                if (h.handle.includes('r')) nx2 = ob.x2 + dx;
+                if (h.handle.includes('t')) ny1 = ob.y1 + dy;
+                if (h.handle.includes('b')) ny2 = ob.y2 + dy;
+                const newW = nx2 - nx1, newH = ny2 - ny1;
+                if (Math.abs(newW) < 5 || Math.abs(newH) < 5) return;
+                const scaleX = newW / origW, scaleY = newH / origH;
+                setElementos(prev => prev.map((item, i) => {
+                    const si = selIdxs.indexOf(i);
+                    if (si < 0) return item;
+                    return applyScaleToElem(h.origElemsData[si], ob.x1, ob.y1, scaleX, scaleY, nx1, ny1);
+                }));
+            }
+            return;
+        }
         // Selection move
         if (herramienta === 'lasso' && selMoveRef.current) {
             moverSeleccion(selIdxs, x - selMoveRef.current.x, y - selMoveRef.current.y);
@@ -1288,8 +1474,9 @@ function PizarraApp() {
     };
 
     const terminarDibujo = () => {
-        panStartRef.current = null;
-        selMoveRef.current  = null;
+        panStartRef.current  = null;
+        selMoveRef.current   = null;
+        selHandleRef.current = null;
 
         if (herramienta === 'lasso' && dibujando && lassoRect) {
             const sel = elementos.map((item, idx) => rectsOverlap(lassoRect, getBbox(item)) ? idx : -1).filter(i => i >= 0);
@@ -1334,7 +1521,7 @@ function PizarraApp() {
     };
 
     const ERASER_SVG = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='22'%3E%3Crect x='1' y='1' width='34' height='20' rx='3' fill='%23fde8e8' stroke='%23e74c3c' stroke-width='1.5'/%3E%3Crect x='23' y='1' width='12' height='20' rx='0 3 3 0' fill='%23e74c3c' opacity='0.7'/%3E%3Cline x1='23' y1='1' x2='23' y2='21' stroke='%23e74c3c' stroke-width='1.5'/%3E%3C/svg%3E") 1 20, cell`;
-    const CURSOR_MAP = { pan: 'grab', lasso: 'crosshair', paste: 'crosshair', graph: 'crosshair', axes: 'crosshair', eraser: ERASER_SVG };
+    const CURSOR_MAP = { pan: 'grab', lasso: 'crosshair', paste: 'crosshair', text: 'text', graph: 'crosshair', axes: 'crosshair', eraser: ERASER_SVG };
 
     const ToolBtn = ({ id, icon, label }) => (
         <button onClick={() => { setHerramienta(id); setSelIdxs([]); }} title={label}
@@ -1356,11 +1543,12 @@ function PizarraApp() {
                     <option value="musica">🎵 Música</option>
                 </select>
 
-                {/* Common tools: draw, eraser, lasso, pan */}
+                {/* Common tools: draw, text, eraser, lasso, pan */}
                 <div style={{ display:'flex', gap:3, borderRight:'2px solid #bdc3c7', paddingRight:8 }}>
                     <ToolBtn id="draw"   icon={<PenTool size={18}/>} label="Lápiz" />
+                    <ToolBtn id="text"   icon={<Type size={18}/>}    label="Texto" />
                     <ToolBtn id="eraser" icon={<span style={{fontSize:'1rem',lineHeight:1}}>⌫</span>} label="Goma" />
-                    <ToolBtn id="lasso"  icon={<span style={{fontSize:'1rem',fontWeight:'bold'}}>⬚</span>} label="Seleccionar" />
+                    <ToolBtn id="lasso"  icon={<span style={{fontSize:'1rem',fontWeight:'bold'}}>⬚</span>} label="Seleccionar / Mover / Redimensionar / Girar" />
                     <ToolBtn id="pan"    icon={<Move size={18}/>}    label="Mover lienzo" />
                 </div>
 
@@ -1526,8 +1714,57 @@ function PizarraApp() {
             {herramienta === 'axes'   && <div style={{ background:'#16a085', color:'white',   padding:4, textAlign:'center', fontWeight:'bold', fontSize:'0.82rem' }}>Haz clic para colocar el origen (0,0) de los ejes (−8 a 8).</div>}
             {herramienta === 'pan'    && <div style={{ background:'#34495e', color:'white',   padding:4, textAlign:'center', fontWeight:'bold', fontSize:'0.82rem' }}>Arrastra para mover el lienzo · Doble clic para resetear.</div>}
             {herramienta === 'lasso'  && <div style={{ background:'#3498db', color:'white',   padding:4, textAlign:'center', fontWeight:'bold', fontSize:'0.82rem' }}>
-                {selIdxs.length > 0 ? `${selIdxs.length} elemento(s). Arrastra para mover · 🗑 para borrar.` : 'Dibuja un rectángulo para seleccionar.'}
+                {selIdxs.length > 0 ? `${selIdxs.length} elemento(s). Arrastra para mover · handles para redimensionar y ↻ para girar · 🗑 para borrar.` : 'Dibuja un rectángulo para seleccionar.'}
             </div>}
+
+            {/* ── Panel de texto ───────────────────────────────────────── */}
+            {herramienta === 'text' && (
+                <div style={{ background:'#fef9e7', borderBottom:'2px solid #f1c40f', padding:'6px 10px', display:'flex', flexDirection:'column', gap:6 }}>
+                    <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
+                        {/* Tamaño */}
+                        <select value={textoFontSize} onChange={e => setTextoFontSize(Number(e.target.value))}
+                            style={{ padding:'4px 6px', borderRadius:6, border:'1.5px solid #f1c40f', fontSize:'0.82rem', fontWeight:'bold', background:'white' }}>
+                            {[12,16,20,24,32,40,56].map(s => <option key={s} value={s}>{s}px</option>)}
+                        </select>
+                        {/* Input */}
+                        <input value={textoInput} onChange={e => setTextoInput(e.target.value)}
+                            placeholder="Escribe el texto o usa el micrófono…"
+                            style={{ flex:1, minWidth:160, padding:'5px 10px', borderRadius:7, border:'1.5px solid #f1c40f', fontSize:'0.88rem', fontFamily:'inherit', outline:'none' }}/>
+                        {/* Micrófono */}
+                        <button onClick={toggleVoz} title={escuchando ? 'Detener voz' : 'Dictar texto'}
+                            style={{ padding:'5px 8px', borderRadius:7, border:'none', background: escuchando ? '#e74c3c' : '#3498db', color:'white', cursor:'pointer', fontWeight:'bold', fontSize:'0.9rem', minWidth:34, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                            {escuchando ? '⏹' : '🎤'}
+                        </button>
+                        {/* Emojis */}
+                        <button onClick={() => setEmojiPanelOpen(v => !v)} title="Emojis"
+                            style={{ padding:'5px 8px', borderRadius:7, border:'none', background: emojiPanelOpen ? '#f39c12' : '#ecf0f1', color:'#2c3e50', cursor:'pointer', fontSize:'1rem' }}>
+                            😊
+                        </button>
+                        {textoInput && (
+                            <button onClick={() => setTextoInput('')}
+                                style={{ padding:'5px 7px', borderRadius:7, border:'none', background:'#ecf0f1', color:'#7f8c8d', cursor:'pointer', fontSize:'0.8rem' }}>
+                                ✕
+                            </button>
+                        )}
+                        <span style={{ fontSize:'0.75rem', color:'#7f8c8d' }}>Haz clic en el lienzo para colocar el texto</span>
+                    </div>
+                    {/* Panel de emojis */}
+                    {emojiPanelOpen && (
+                        <div style={{ display:'flex', flexWrap:'wrap', gap:4, padding:'6px 8px', background:'white', borderRadius:8, border:'1.5px solid #f1c40f', maxHeight:110, overflowY:'auto' }}>
+                            {['😀','😂','🥰','😎','😢','😡','🤔','🤩','🥳','😴',
+                              '👍','👎','👋','👏','✌️','❤️','🔥','⭐','🌟','✅',
+                              '❌','💡','📚','✏️','🎯','🎨','🎵','🏆','🎲','🔑',
+                              '🌈','🌊','🌸','🍀','☀️','🌙','🐶','🐱','🦁','🦊',
+                              '🐦','🍎','🍕','⚽','🚀','✈️','🚗','💻','🏠','📝'].map(em => (
+                                <button key={em} onClick={() => setTextoInput(prev => prev + em)}
+                                    style={{ padding:'3px 5px', borderRadius:5, border:'none', background:'transparent', fontSize:'1.3rem', cursor:'pointer', lineHeight:1 }}>
+                                    {em}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* Floating panels */}
             {calcVisible && <CalculadoraFlotante onClose={() => setCalcVisible(false)} onCopiar={res => { setTextoPegar(res); setHerramienta('paste'); setCalcVisible(false); }} />}
@@ -1773,6 +2010,424 @@ function ShareModalHerramienta({ url, titulo, onClose }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// GRUPOS LIBRE — subgrupos aleatorios sin registro
+// ══════════════════════════════════════════════════════════════════════════════
+const COLORES_GRUPOS_LIB = ['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6','#1abc9c','#e67e22','#c0392b','#16a085','#8e44ad'];
+
+function GruposLibre() {
+    const [alumnosTxt, setAlumnosTxt] = useState("Ana, Luis, Carlos, Marta, Sofía, Diego, Elena, Pablo");
+    const [numGrupos, setNumGrupos] = useState(3);
+    // grupos: Array<{ nombre: string, alumnos: string[] }>
+    const [grupos, setGrupos] = useState([]);
+
+    const alumnos = alumnosTxt.split(/[\n,]+/).map(a => a.trim()).filter(Boolean);
+
+    const generar = () => {
+        const n = Math.min(Math.max(1, numGrupos), alumnos.length);
+        if (n === 0) return;
+        const shuffled = [...alumnos].sort(() => Math.random() - 0.5);
+        const result = Array.from({ length: n }, (_, i) => ({
+            nombre: grupos[i]?.nombre || `Grupo ${i + 1}`,
+            alumnos: [],
+        }));
+        shuffled.forEach((a, i) => result[i % n].alumnos.push(a));
+        setGrupos(result);
+    };
+
+    const setNombre = (i, nombre) =>
+        setGrupos(prev => prev.map((g, j) => j === i ? { ...g, nombre } : g));
+
+    const imprimir = () => {
+        const cols = COLORES_GRUPOS_LIB;
+        const cards = grupos.map((g, i) => {
+            const col = cols[i % cols.length];
+            const items = g.alumnos.map(a =>
+                `<div style="padding:5px 10px;border-radius:6px;background:white;font-size:0.85rem;font-weight:600;color:#2c3e50;box-shadow:0 1px 3px rgba(0,0,0,0.08);margin-bottom:4px">${a}</div>`
+            ).join('');
+            return `<div style="background:${col}18;border:2px solid ${col}55;border-radius:12px;padding:14px;break-inside:avoid;page-break-inside:avoid">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+    <span style="font-weight:800;color:${col};font-size:1rem">${g.nombre}</span>
+    <span style="background:${col};color:white;border-radius:12px;padding:2px 9px;font-size:0.72rem;font-weight:700">${g.alumnos.length}</span>
+  </div>
+  ${items}
+</div>`;
+        }).join('');
+
+        const html = `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Grupos de Clase</title>
+<style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;padding:20px;}
+h1{font-size:1.2rem;color:#2c3e50;margin-bottom:14px;}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;}
+.btn{display:block;margin:0 auto 16px;padding:8px 24px;background:#9b59b6;color:white;border:none;border-radius:6px;font-size:0.9rem;font-weight:700;cursor:pointer;}
+@media print{.btn{display:none;}}</style></head>
+<body><button class="btn" onclick="window.print()">🖨 Imprimir</button>
+<h1>Grupos de Clase</h1>
+<div class="grid">${cards}</div></body></html>`;
+
+        const w = window.open('', '_blank');
+        w.document.write(html);
+        w.document.close();
+    };
+
+    return (
+        <div style={{ boxSizing:'border-box' }}>
+            {/* Cabecera de configuración */}
+            <div style={{ display:'flex', gap:16, flexWrap:'wrap', marginBottom:20, alignItems:'stretch' }}>
+                {/* Textarea alumnos */}
+                <div style={{ flex:'1 1 220px', minWidth:0, boxSizing:'border-box' }}>
+                    <label style={{ display:'block', fontWeight:700, color:'#2c3e50', fontSize:'0.85rem', marginBottom:6 }}>
+                        Alumnos <span style={{ fontWeight:400, color:'#95a5a6' }}>(separados por coma)</span>
+                    </label>
+                    <textarea value={alumnosTxt} onChange={e => setAlumnosTxt(e.target.value)} rows={5}
+                        style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e0e4f0', fontSize:'0.88rem', fontFamily:'inherit', outline:'none', resize:'vertical', boxSizing:'border-box', display:'block' }}/>
+                    <div style={{ fontSize:'0.75rem', color:'#95a5a6', marginTop:4 }}>{alumnos.length} alumno{alumnos.length !== 1 ? 's' : ''}</div>
+                </div>
+
+                {/* Panel de control */}
+                <div style={{ flex:'1 1 180px', minWidth:180, boxSizing:'border-box', background:'#f8f9fc', border:'1.5px solid #e0e4f0', borderRadius:12, padding:16, display:'flex', flexDirection:'column', gap:12 }}>
+                    <div>
+                        <div style={{ fontWeight:700, color:'#2c3e50', fontSize:'0.85rem', marginBottom:10 }}>Número de grupos</div>
+                        <div style={{ display:'flex', alignItems:'center', gap:10, justifyContent:'center' }}>
+                            <button onClick={() => setNumGrupos(n => Math.max(1, n-1))}
+                                style={{ width:36, height:36, borderRadius:'50%', border:'1.5px solid #bdc3c7', background:'white', cursor:'pointer', fontSize:'1.2rem', fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>−</button>
+                            <span style={{ fontSize:'1.6rem', fontWeight:800, color:'#9b59b6', minWidth:32, textAlign:'center' }}>{numGrupos}</span>
+                            <button onClick={() => setNumGrupos(n => Math.min(alumnos.length || 1, n+1))}
+                                style={{ width:36, height:36, borderRadius:'50%', border:'1.5px solid #bdc3c7', background:'white', cursor:'pointer', fontSize:'1.2rem', fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>+</button>
+                        </div>
+                    </div>
+                    <button onClick={generar} disabled={alumnos.length === 0}
+                        style={{ width:'100%', padding:'11px', borderRadius:10, border:'none', background:alumnos.length===0?'#ddd':'#9b59b6', color:'white', fontWeight:700, fontSize:'0.92rem', cursor:alumnos.length===0?'default':'pointer', boxSizing:'border-box' }}>
+                        ✨ Generar grupos
+                    </button>
+                    {grupos.length > 0 && (<>
+                        <button onClick={generar}
+                            style={{ width:'100%', padding:'9px', borderRadius:10, border:'1.5px solid #9b59b6', background:'white', color:'#9b59b6', fontWeight:700, fontSize:'0.85rem', cursor:'pointer', boxSizing:'border-box' }}>
+                            🔀 Reorganizar
+                        </button>
+                        <button onClick={imprimir}
+                            style={{ width:'100%', padding:'9px', borderRadius:10, border:'1.5px solid #7f8c8d', background:'white', color:'#555', fontWeight:700, fontSize:'0.85rem', cursor:'pointer', boxSizing:'border-box' }}>
+                            🖨 Imprimir
+                        </button>
+                    </>)}
+                </div>
+            </div>
+
+            {/* Resultado */}
+            {grupos.length > 0 ? (
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(min(180px, 100%), 1fr))', gap:12 }}>
+                    {grupos.map((grupo, i) => {
+                        const col = COLORES_GRUPOS_LIB[i % COLORES_GRUPOS_LIB.length];
+                        return (
+                            <div key={i} style={{ background:col+'18', border:`2px solid ${col}44`, borderRadius:14, padding:14, boxSizing:'border-box' }}>
+                                {/* Nombre editable */}
+                                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10, gap:6 }}>
+                                    <input
+                                        value={grupo.nombre}
+                                        onChange={e => setNombre(i, e.target.value)}
+                                        style={{ flex:1, minWidth:0, fontWeight:800, color:col, fontSize:'0.92rem', border:'none', background:'transparent', outline:'none', fontFamily:'inherit', padding:0, cursor:'text' }}/>
+                                    <span style={{ background:col, color:'white', borderRadius:12, padding:'2px 8px', fontSize:'0.72rem', fontWeight:700, flexShrink:0 }}>{grupo.alumnos.length}</span>
+                                </div>
+                                <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+                                    {grupo.alumnos.map((alumno, j) => (
+                                        <div key={j} style={{ padding:'6px 10px', borderRadius:8, background:'white', fontSize:'0.84rem', fontWeight:600, color:'#2c3e50', boxShadow:'0 1px 4px rgba(0,0,0,0.07)', wordBreak:'break-word' }}>
+                                            {alumno}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            ) : (
+                <div style={{ textAlign:'center', padding:'40px 20px', color:'#95a5a6', background:'#f8f9fc', borderRadius:14, border:'1.5px dashed #e0e4f0' }}>
+                    <div style={{ fontSize:'3rem', marginBottom:10 }}>👥</div>
+                    <div style={{ fontWeight:600, marginBottom:4 }}>Añade alumnos y pulsa "Generar grupos"</div>
+                    <div style={{ fontSize:'0.8rem' }}>Puedes pegar una lista separada por comas</div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PLANO AULA LIBRE — plano de clase sin registro
+// ══════════════════════════════════════════════════════════════════════════════
+const PLANO_rndId = () => Math.random().toString(36).slice(2, 10);
+const PLANO_W = 760, PLANO_H = 520, PLANO_SW = 74, PLANO_SG = 3, PLANO_PAD = 8;
+const plano_deskW = n => n * PLANO_SW + (n - 1) * PLANO_SG + PLANO_PAD;
+
+function defaultLayoutLibre() {
+    const m = [];
+    m.push({ id:PLANO_rndId(), tipo:'profesor', x:Math.round((PLANO_W-180)/2), y:10, asientos:[{ id:PLANO_rndId(), alumno:null }] });
+    const xs = [30, 300, 570], ys = [110, 210, 310, 410];
+    ys.forEach(y => xs.forEach(x =>
+        m.push({ id:PLANO_rndId(), tipo:'alumno', x, y, asientos:[{ id:PLANO_rndId(), alumno:null },{ id:PLANO_rndId(), alumno:null }] })
+    ));
+    return m;
+}
+
+function htmlPlanoLibre(nombre, mesas) {
+    const sc = 0.88, W = Math.round(PLANO_W*sc), H = Math.round(PLANO_H*sc);
+    const asig = mesas.flatMap(m => m.asientos).filter(s => s.alumno).length;
+    const desks = mesas.map(m => {
+        const isP = m.tipo === 'profesor';
+        const w = Math.round((isP ? 180 : plano_deskW(m.asientos.length)) * sc);
+        const seats = m.asientos.map(s =>
+            `<div style="flex:1;border:1px solid ${isP?'#e67e22':'#1565C0'};border-radius:4px;padding:3px;font-size:0.67rem;font-weight:600;min-height:34px;display:flex;align-items:center;justify-content:center;text-align:center;background:${s.alumno?'#e8f5e9':'#f8f9fa'};color:${s.alumno?'#2c3e50':'#bbb'}">${s.alumno||'vacío'}</div>`
+        ).join('');
+        return `<div style="position:absolute;left:${Math.round(m.x*sc)}px;top:${Math.round(m.y*sc)}px;width:${w}px;border:2px solid ${isP?'#e67e22':'#1565C0'};border-radius:8px;overflow:hidden"><div style="background:${isP?'#e67e22':'#1565C0'};color:white;font-size:0.58rem;font-weight:700;padding:2px 6px">${isP?'👨‍🏫 PROFESOR':''}</div><div style="display:flex;gap:3px;padding:3px">${seats}</div></div>`;
+    }).join('');
+    return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>${nombre}</title>
+<style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;padding:20px;}
+h1{font-size:1.3rem;color:#1565C0;margin-bottom:3px;}p{font-size:0.78rem;color:#7f8c8d;margin-bottom:14px;}
+.btn{display:block;margin:0 auto 14px;padding:8px 24px;background:#1565C0;color:white;border:none;border-radius:6px;font-size:0.9rem;font-weight:700;cursor:pointer;}
+@media print{.btn{display:none;}}</style></head><body>
+<button class="btn" onclick="window.print()">🖨 Imprimir</button>
+<h1>${nombre}</h1><p>${asig} alumnos asignados</p>
+<div style="position:relative;width:${W}px;height:${H}px;border:2px solid #e0e4f0;border-radius:10px;background:#f8faff;overflow:hidden">
+<div style="text-align:center;position:absolute;top:3px;left:0;right:0;font-size:0.6rem;color:#bdc3c7;font-weight:700">▲ PIZARRA / FRENTE</div>
+${desks}</div></body></html>`;
+}
+
+function DeskCardLibre({ mesa, selSeat, selUnassign, onStartDrag, onClickSeat, onDelete, onAddSeat, onRemoveSeat }) {
+    const isP = mesa.tipo === 'profesor';
+    const col = isP ? '#e67e22' : '#1565C0';
+    const n = mesa.asientos.length;
+    const w = isP ? 180 : plano_deskW(n);
+    return (
+        <div style={{ position:'absolute', left:mesa.x, top:mesa.y, width:w, borderRadius:10, border:`2px solid ${col}`, background:'white', boxShadow:'0 2px 8px rgba(0,0,0,0.10)', overflow:'hidden', userSelect:'none', zIndex:1 }}>
+            <div onMouseDown={e => { e.preventDefault(); onStartDrag(e, mesa.id); }}
+                style={{ background:col, height:22, cursor:'grab', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 5px', gap:3 }}>
+                <span style={{ color:'white', fontSize:'0.6rem', fontWeight:700, flexShrink:0 }}>{isP ? '👨‍🏫' : '⠿'}</span>
+                {!isP && (
+                    <div style={{ display:'flex', alignItems:'center', gap:3 }} onClick={e => e.stopPropagation()}>
+                        <button onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onRemoveSeat(mesa.id); }} disabled={n<=1}
+                            style={{ background:'rgba(0,0,0,0.25)', border:'none', color:'white', borderRadius:3, width:16, height:16, cursor:n>1?'pointer':'default', fontSize:'0.75rem', fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', opacity:n<=1?0.4:1, padding:0 }}>−</button>
+                        <span style={{ color:'white', fontSize:'0.6rem', fontWeight:700, minWidth:10, textAlign:'center' }}>{n}</span>
+                        <button onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onAddSeat(mesa.id); }}
+                            style={{ background:'rgba(0,0,0,0.25)', border:'none', color:'white', borderRadius:3, width:16, height:16, cursor:'pointer', fontSize:'0.75rem', fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', padding:0 }}>+</button>
+                    </div>
+                )}
+                <button onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onDelete(mesa.id); }}
+                    style={{ background:'none', border:'none', cursor:'pointer', color:'rgba(255,255,255,0.8)', padding:'1px 2px', display:'flex', alignItems:'center', flexShrink:0 }}>
+                    <X size={isP ? 0 : 10}/>
+                </button>
+            </div>
+            <div style={{ display:'flex', gap:PLANO_SG, padding:`4px ${PLANO_PAD/2}px` }}>
+                {mesa.asientos.map((s, idx) => {
+                    const isSel = selSeat?.deskId === mesa.id && selSeat?.seatIdx === idx;
+                    const isTarget = !isSel && selUnassign !== null && !s.alumno;
+                    const bg = isSel ? '#fdecea' : isTarget ? '#e8f0fe' : s.alumno ? '#e8f5e9' : '#f8faff';
+                    const border = isSel ? '2px solid #e74c3c' : isTarget ? '2px dashed #1565C0' : s.alumno ? '1.5px solid #a5d6a7' : '1.5px solid #e0e4f0';
+                    return (
+                        <div key={s.id} onClick={() => onClickSeat(mesa.id, idx)}
+                            style={{ width:PLANO_SW, minHeight:42, borderRadius:6, border, background:bg, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', padding:'2px 3px', textAlign:'center', fontSize:'0.65rem', fontWeight:600, color:'#2c3e50', wordBreak:'break-word', lineHeight:1.2, transition:'all 0.1s' }}>
+                            {s.alumno || <span style={{ color:'#ccc', fontWeight:400 }}>vacío</span>}
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
+function PlanoAulaLibre() {
+    const [alumnosTxt, setAlumnosTxt] = useState("Ana, Luis, Carlos, Marta, Sofía, Diego, Elena, Pablo");
+    const [editandoAlumnos, setEditandoAlumnos] = useState(true);
+    const [mesas, setMesas] = useState(defaultLayoutLibre);
+    const [selSeat, setSelSeat] = useState(null);
+    const [selUnassign, setSelUnassign] = useState(null);
+    const [dragging, setDragging] = useState(null);
+
+    const alumnos = alumnosTxt.split(/[\n,]+/).map(a => a.trim()).filter(Boolean);
+    const asignados = new Set(mesas.flatMap(m => m.asientos.map(s => s.alumno)).filter(Boolean));
+    const noAsignados = alumnos.filter(n => !asignados.has(n));
+    const totalAsientos = mesas.filter(m => m.tipo === 'alumno').reduce((s, m) => s + m.asientos.length, 0);
+    const selAlumno = selSeat ? mesas.find(m => m.id === selSeat.deskId)?.asientos[selSeat.seatIdx]?.alumno : null;
+
+    useEffect(() => {
+        if (!dragging) return;
+        const onMove = e => {
+            const dx = e.clientX - dragging.startMX, dy = e.clientY - dragging.startMY;
+            setMesas(prev => prev.map(m => {
+                if (m.id !== dragging.id) return m;
+                const w = m.tipo === 'profesor' ? 180 : plano_deskW(m.asientos.length);
+                return { ...m, x:Math.max(0, Math.min(PLANO_W-w, dragging.startDX+dx)), y:Math.max(0, Math.min(PLANO_H-74, dragging.startDY+dy)) };
+            }));
+        };
+        const onUp = () => setDragging(null);
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+        return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    }, [dragging]);
+
+    const startDrag = (e, deskId) => {
+        const d = mesas.find(m => m.id === deskId);
+        setDragging({ id:deskId, startMX:e.clientX, startMY:e.clientY, startDX:d.x, startDY:d.y });
+    };
+
+    const addSeat = id => setMesas(prev => prev.map(m => m.id!==id ? m : { ...m, asientos:[...m.asientos, { id:PLANO_rndId(), alumno:null }] }));
+    const removeSeat = id => setMesas(prev => prev.map(m => {
+        if (m.id!==id || m.asientos.length<=1) return m;
+        if (selSeat?.deskId===id && selSeat?.seatIdx===m.asientos.length-1) setSelSeat(null);
+        return { ...m, asientos:m.asientos.slice(0,-1) };
+    }));
+
+    const onClickSeat = (deskId, seatIdx) => {
+        if (dragging) return;
+        if (selUnassign !== null) {
+            setMesas(prev => prev.map(m => m.id!==deskId ? m : { ...m, asientos:m.asientos.map((s,i) => i===seatIdx ? {...s,alumno:selUnassign} : s) }));
+            setSelUnassign(null);
+        } else if (selSeat) {
+            if (selSeat.deskId===deskId && selSeat.seatIdx===seatIdx) { setSelSeat(null); }
+            else {
+                setMesas(prev => {
+                    const next = prev.map(m => ({ ...m, asientos:m.asientos.map(s=>({...s})) }));
+                    const d1 = next.find(m => m.id===selSeat.deskId), d2 = next.find(m => m.id===deskId);
+                    if (!d1||!d2) return next;
+                    const a1 = d1.asientos[selSeat.seatIdx].alumno;
+                    d1.asientos[selSeat.seatIdx].alumno = d2.asientos[seatIdx].alumno;
+                    d2.asientos[seatIdx].alumno = a1;
+                    return next;
+                });
+                setSelSeat(null);
+            }
+        } else { setSelSeat({ deskId, seatIdx }); }
+    };
+
+    const onClickUnassigned = n => { setSelSeat(null); setSelUnassign(prev => prev===n ? null : n); };
+
+    const rellenar = () => {
+        const todos = [...alumnos].sort(() => Math.random() - 0.5);
+        const alumnoMesas = [...mesas].filter(m => m.tipo==='alumno').sort((a,b) => a.y!==b.y ? a.y-b.y : a.x-b.x);
+        const newMesas = mesas.map(m => ({ ...m, asientos:m.asientos.map(s=>({...s,alumno:null})) }));
+        let idx = 0;
+        alumnoMesas.forEach(sm => {
+            const mesa = newMesas.find(m => m.id===sm.id);
+            if (mesa) mesa.asientos.forEach(s => { if (idx<todos.length) s.alumno=todos[idx++]; });
+        });
+        setMesas(newMesas); setSelSeat(null); setSelUnassign(null);
+    };
+
+    const añadirMesa = () => setMesas(prev => [...prev, { id:PLANO_rndId(), tipo:'alumno', x:40, y:50, asientos:[{ id:PLANO_rndId(), alumno:null },{ id:PLANO_rndId(), alumno:null }] }]);
+    const eliminarMesa = id => { setMesas(prev => prev.filter(m => m.id!==id)); setSelSeat(null); };
+    const vaciarAsiento = () => {
+        if (!selSeat) return;
+        setMesas(prev => prev.map(m => m.id!==selSeat.deskId ? m : { ...m, asientos:m.asientos.map((s,i) => i===selSeat.seatIdx ? {...s,alumno:null} : s) }));
+        setSelSeat(null);
+    };
+
+    const imprimir = () => {
+        const w = window.open('', '_blank');
+        w.document.write(htmlPlanoLibre('Plano de Clase', mesas));
+        w.document.close();
+    };
+
+    if (editandoAlumnos) {
+        return (
+            <div style={{ maxWidth:480, margin:'0 auto', textAlign:'center', padding:'0 4px', boxSizing:'border-box' }}>
+                <div style={{ fontSize:'3rem', marginBottom:8 }}>🪑</div>
+                <h2 style={{ color:'#2c3e50', marginBottom:16 }}>Plano de Clase</h2>
+                <label style={{ display:'block', fontWeight:700, color:'#2c3e50', fontSize:'0.85rem', marginBottom:8, textAlign:'left' }}>
+                    Alumnos <span style={{ fontWeight:400, color:'#95a5a6' }}>(separados por coma o salto de línea)</span>
+                </label>
+                <textarea value={alumnosTxt} onChange={e => setAlumnosTxt(e.target.value)} rows={6}
+                    style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e0e4f0', fontSize:'0.88rem', fontFamily:'inherit', outline:'none', resize:'vertical', boxSizing:'border-box', marginBottom:8, display:'block' }}/>
+                <div style={{ fontSize:'0.75rem', color:'#95a5a6', marginBottom:16, textAlign:'left' }}>{alumnos.length} alumno{alumnos.length!==1?'s':''}</div>
+                <button onClick={() => setEditandoAlumnos(false)}
+                    style={{ padding:'11px 28px', borderRadius:12, border:'none', background:'#1565C0', color:'white', fontWeight:700, fontSize:'0.95rem', cursor:'pointer' }}>
+                    ✏️ Abrir plano
+                </button>
+            </div>
+        );
+    }
+
+    return (
+        <div style={{ boxSizing:'border-box' }}>
+            {/* Toolbar — dos grupos: izquierda (acciones) + derecha (imprimir + contador) */}
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:8, marginBottom:12 }}>
+                <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
+                    <button onClick={() => setEditandoAlumnos(true)}
+                        style={{ padding:'7px 12px', borderRadius:8, border:'1px solid #bdc3c7', background:'white', cursor:'pointer', fontSize:'0.82rem', color:'#555', whiteSpace:'nowrap' }}>
+                        ← Alumnos
+                    </button>
+                    <button onClick={rellenar} disabled={alumnos.length===0}
+                        style={{ padding:'7px 14px', borderRadius:8, border:'none', fontWeight:700, fontSize:'0.83rem', cursor:alumnos.length===0?'default':'pointer', background:alumnos.length===0?'#e0e4f0':'#27ae60', color:alumnos.length===0?'#aaa':'white', whiteSpace:'nowrap' }}>
+                        ✨ Rellenar
+                    </button>
+                    <button onClick={añadirMesa}
+                        style={{ padding:'7px 12px', borderRadius:8, border:'1px solid #bdc3c7', background:'white', cursor:'pointer', fontSize:'0.82rem', color:'#555', whiteSpace:'nowrap' }}>
+                        + Mesa
+                    </button>
+                    {selSeat && selAlumno && (
+                        <button onClick={vaciarAsiento}
+                            style={{ display:'flex', alignItems:'center', gap:4, padding:'7px 11px', borderRadius:8, border:'1px solid #e74c3c', background:'#fdecea', color:'#e74c3c', cursor:'pointer', fontSize:'0.82rem', whiteSpace:'nowrap' }}>
+                            <X size={12}/> Vaciar
+                        </button>
+                    )}
+                </div>
+                <div style={{ display:'flex', gap:10, alignItems:'center', flexShrink:0 }}>
+                    <button onClick={imprimir}
+                        style={{ padding:'7px 12px', borderRadius:8, border:'1px solid #bdc3c7', background:'white', cursor:'pointer', fontSize:'0.82rem', color:'#555', whiteSpace:'nowrap' }}>
+                        🖨 Imprimir
+                    </button>
+                    <span style={{ fontSize:'0.74rem', color:'#7f8c8d', fontWeight:600, whiteSpace:'nowrap' }}>
+                        {asignados.size}/{totalAsientos} · {noAsignados.length} sin asignar
+                    </span>
+                </div>
+            </div>
+
+            {/* Canvas + Sidebar — side-by-side en escritorio, apilado en móvil */}
+            <div style={{ display:'flex', gap:14, alignItems:'flex-start', flexWrap:'wrap' }}>
+                {/* Canvas — scroll horizontal en pantallas estrechas */}
+                <div style={{ flex:'1 1 500px', minWidth:0, overflowX:'auto' }}>
+                    <div style={{ position:'relative', width:PLANO_W, height:PLANO_H, background:'linear-gradient(180deg,#f0f4ff 0%,#f8faff 100%)', border:'2px solid #e0e4f0', borderRadius:14, cursor:dragging?'grabbing':'default' }}>
+                        <div style={{ position:'absolute', top:3, left:0, right:0, textAlign:'center', fontSize:'0.62rem', color:'#bdc3c7', fontWeight:700, pointerEvents:'none' }}>▲ PIZARRA / FRENTE DE CLASE</div>
+                        {mesas.map(m => (
+                            <DeskCardLibre key={m.id} mesa={m} selSeat={selSeat} selUnassign={selUnassign}
+                                onStartDrag={startDrag} onClickSeat={onClickSeat}
+                                onDelete={eliminarMesa} onAddSeat={addSeat} onRemoveSeat={removeSeat}/>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Sidebar alumnos sin asignar */}
+                <div style={{ flex:'1 1 160px', minWidth:160, maxWidth:260 }}>
+                    <div style={{ background:'#f8f9fc', border:'1.5px solid #e0e4f0', borderRadius:12, padding:14 }}>
+                        <div style={{ fontWeight:700, color:'#2c3e50', fontSize:'0.85rem', marginBottom:10, display:'flex', alignItems:'center', gap:6 }}>
+                            Sin asignar
+                            <span style={{ background:'#e8f0fe', color:'#1565C0', borderRadius:20, padding:'2px 8px', fontSize:'0.72rem', fontWeight:700 }}>{noAsignados.length}</span>
+                        </div>
+                        {noAsignados.length===0 ? (
+                            <p style={{ color:'#95a5a6', fontSize:'0.8rem', margin:0 }}>
+                                {alumnos.length===0 ? 'Sin alumnos' : '✓ Todos asignados'}
+                            </p>
+                        ) : (
+                            <div style={{ display:'flex', flexDirection:'column', gap:4, maxHeight:280, overflowY:'auto' }}>
+                                {noAsignados.map(n => (
+                                    <div key={n} onClick={() => onClickUnassigned(n)} style={{ padding:'6px 10px', borderRadius:8, cursor:'pointer', background:selUnassign===n?'#1565C0':'#e8f0fe', color:selUnassign===n?'white':'#1565C0', fontSize:'0.8rem', fontWeight:600, transition:'all 0.1s', border:'1.5px solid '+(selUnassign===n?'#1565C0':'transparent'), wordBreak:'break-word' }}>
+                                        {n}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        {(selSeat || selUnassign) && (
+                            <div style={{ marginTop:12, padding:'8px 10px', background:'#fff8e1', borderRadius:8, fontSize:'0.74rem', color:'#856404', lineHeight:1.4 }}>
+                                {selUnassign
+                                    ? `Toca un asiento para colocar a "${selUnassign}"`
+                                    : `"${selAlumno||'vacío'}" — toca otro asiento para intercambiar`}
+                            </div>
+                        )}
+                        <div style={{ marginTop:12, fontSize:'0.7rem', color:'#bdc3c7', lineHeight:1.4 }}>
+                            Arrastra la barra de cada mesa para moverla · usa − / + para cambiar asientos
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL: MENÚ
 // ══════════════════════════════════════════════════════════════════════════════
 export default function HerramientasClase({ onExit }) {
@@ -1780,7 +2435,7 @@ export default function HerramientasClase({ onExit }) {
         const params = new URLSearchParams(window.location.search);
         if (params.get('pizarra')) return 'pizarra';
         const g = params.get('gestion');
-        if (g === 'ruleta' || g === 'pizarra' || g === 'reloj') return g;
+        if (g === 'ruleta' || g === 'pizarra' || g === 'reloj' || g === 'grupos' || g === 'plano') return g;
         return null;
     });
     const [shareModal, setShareModal] = useState(null); // { url, titulo }
@@ -1788,9 +2443,11 @@ export default function HerramientasClase({ onExit }) {
     const shareBase = `${window.location.origin}${window.location.pathname}`;
 
     const HERRAMIENTAS = [
-        { id: 'ruleta',  icon: <RotateCcw size={40}/>, titulo: 'Ruleta de Aula',      desc: 'Selecciona alumnos al azar desde una lista.',       color: '#e67e22' },
-        { id: 'pizarra', icon: <PenTool size={40}/>,   titulo: 'Pizarra Científica',   desc: 'Funciones, Formas 3D y Captura de pantalla.',        color: '#3498db' },
-        { id: 'reloj',   icon: <Clock size={40}/>,      titulo: 'Gestor de Tiempo',     desc: 'Cronómetro y Temporizador de cuenta atrás.',         color: '#2ecc71' },
+        { id: 'ruleta',  icon: <RotateCcw size={40}/>,   titulo: 'Ruleta de Aula',     desc: 'Selecciona alumnos al azar desde una lista.',              color: '#e67e22' },
+        { id: 'pizarra', icon: <PenTool size={40}/>,     titulo: 'Pizarra Científica',  desc: 'Funciones, Formas 3D y Captura de pantalla.',              color: '#3498db' },
+        { id: 'reloj',   icon: <Clock size={40}/>,        titulo: 'Gestor de Tiempo',   desc: 'Cronómetro y Temporizador de cuenta atrás.',               color: '#2ecc71' },
+        { id: 'grupos',  icon: <Users size={40}/>,        titulo: 'Grupos de Clase',    desc: 'Crea subgrupos aleatorios a partir de una lista de alumnos.', color: '#9b59b6' },
+        { id: 'plano',   icon: <LayoutGrid size={40}/>,   titulo: 'Plano de Clase',     desc: 'Organiza los asientos de tu aula con un plano visual.',    color: '#1565C0' },
     ];
 
     return (
@@ -1858,6 +2515,8 @@ export default function HerramientasClase({ onExit }) {
                     {activa === 'ruleta' && <RuletaApp />}
                     {activa === 'reloj' && <RelojApp />}
                     {activa === 'pizarra' && <PizarraApp />}
+                    {activa === 'grupos' && <GruposLibre />}
+                    {activa === 'plano' && <PlanoAulaLibre />}
                 </div>
             )}
 

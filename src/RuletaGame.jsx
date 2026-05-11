@@ -200,27 +200,75 @@ export default function RuletaGame({ recurso, usuario, alTerminar }) {
 
     // --- SETUP ---
     const iniciar = (nombres, hojaNombre) => {
-        let hojaSeleccionada = null;
+        const hojas = recurso.hojas || [];
+        let fraseElegida = null;
+        let pistaElegida = '';
+        let hojaParaPreguntas = null;
 
         if (hojaNombre === 'General') {
-            const hojasDisponibles = recurso.hojas || [];
-            if (hojasDisponibles.length > 0) {
-                hojaSeleccionada = hojasDisponibles[Math.floor(Math.random() * hojasDisponibles.length)];
+            const todasFrases = hojas.flatMap(h =>
+                getFrasesHoja(h).map(f => ({ frase: f, hoja: h }))
+            );
+
+            if (todasFrases.length === 0) {
+                alert("Error: No se encontraron frases para jugar.");
+                return;
             }
+
+            const storageKey = `ruleta_bolsa_${recurso.id}`;
+            let used = [];
+            try { used = JSON.parse(localStorage.getItem(storageKey) || '[]'); } catch {}
+
+            let disponibles = todasFrases.filter(p => !used.includes(p.frase.toUpperCase()));
+            if (disponibles.length === 0) {
+                used = [];
+                localStorage.removeItem(storageKey);
+                disponibles = todasFrases;
+            }
+
+            const elegido = disponibles[Math.floor(Math.random() * disponibles.length)];
+            fraseElegida = elegido.frase;
+            hojaParaPreguntas = elegido.hoja;
+            pistaElegida = elegido.hoja.nombreHoja || 'General';
+
+            used.push(fraseElegida.toUpperCase());
+            try { localStorage.setItem(storageKey, JSON.stringify(used)); } catch {}
+
         } else {
-            hojaSeleccionada = recurso.hojas?.find(h => h.nombreHoja === hojaNombre);
+            hojaParaPreguntas = hojas.find(h => h.nombreHoja === hojaNombre);
+            if (!hojaParaPreguntas) {
+                alert("Error: No se encontraron datos para jugar.");
+                return;
+            }
+
+            const frases = getFrasesHoja(hojaParaPreguntas);
+            if (frases.length === 0) {
+                alert("Error: No se encontraron frases para jugar.");
+                return;
+            }
+
+            const storageKey = `ruleta_bolsa_${recurso.id}_${hojaNombre}`;
+            let used = [];
+            try { used = JSON.parse(localStorage.getItem(storageKey) || '[]'); } catch {}
+
+            let disponibles = frases.filter(f => !used.includes(f.toUpperCase()));
+            if (disponibles.length === 0) {
+                used = [];
+                localStorage.removeItem(storageKey);
+                disponibles = frases;
+            }
+
+            fraseElegida = disponibles[Math.floor(Math.random() * disponibles.length)];
+            pistaElegida = hojaParaPreguntas.nombreHoja || 'General';
+
+            used.push(fraseElegida.toUpperCase());
+            try { localStorage.setItem(storageKey, JSON.stringify(used)); } catch {}
         }
 
-        if (!hojaSeleccionada) {
-            alert("Error: No se encontraron datos para jugar.");
-            return;
-        }
+        setFraseOculta(fraseElegida.toUpperCase());
+        setPista(pistaElegida);
 
-        const frase = hojaSeleccionada.fraseOculta || hojaSeleccionada.frase || "PANEL DE EJEMPLO";
-        setFraseOculta(frase.toUpperCase());
-        setPista(hojaSeleccionada.nombreHoja || "General");
-
-        const poolPreguntas = hojaSeleccionada.preguntas || [];
+        const poolPreguntas = hojaParaPreguntas?.preguntas || [];
         setTodasLasPreguntas(poolPreguntas);
         setColaPreguntas([...poolPreguntas].sort(() => Math.random() - 0.5));
 
@@ -824,6 +872,12 @@ const SetupScreen = ({ recurso, onStart, onExit, usuario, esInvitado }) => {
 };
 
 const mezclar = (p) => [p.respuesta || p.correcta, ...(p.incorrectas || [])].sort(() => Math.random() - 0.5);
+
+const getFrasesHoja = (hoja) => {
+    if (hoja.frasesOcultas?.length > 0) return hoja.frasesOcultas.filter(f => f?.trim());
+    if (hoja.fraseOculta) return [hoja.fraseOculta].filter(Boolean);
+    return [];
+};
 
 const EstilosRuleta = () => (
     <style>{`

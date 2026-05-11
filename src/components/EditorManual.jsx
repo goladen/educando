@@ -153,9 +153,32 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
         setDatos({ ...datos, hojas: nuevasHojas });
     };
 
-    const actualizarFraseRuleta = (val) => {
+    const getFrasesRuleta = (hoja) => {
+        if (hoja.frasesOcultas?.length > 0) return [...hoja.frasesOcultas];
+        if (hoja.fraseOculta) return [hoja.fraseOculta];
+        return [''];
+    };
+
+    const actualizarFrasesRuleta = (idx, val) => {
         const nuevasHojas = [...datos.hojas];
-        nuevasHojas[indiceHojaActiva].fraseOculta = val;
+        const frases = getFrasesRuleta(nuevasHojas[indiceHojaActiva]);
+        frases[idx] = val;
+        nuevasHojas[indiceHojaActiva].frasesOcultas = frases;
+        setDatos({ ...datos, hojas: nuevasHojas });
+    };
+
+    const agregarFraseRuleta = () => {
+        const nuevasHojas = [...datos.hojas];
+        const frases = getFrasesRuleta(nuevasHojas[indiceHojaActiva]);
+        nuevasHojas[indiceHojaActiva].frasesOcultas = [...frases, ''];
+        setDatos({ ...datos, hojas: nuevasHojas });
+    };
+
+    const borrarFraseRuleta = (idx) => {
+        const nuevasHojas = [...datos.hojas];
+        const frases = getFrasesRuleta(nuevasHojas[indiceHojaActiva]);
+        frases.splice(idx, 1);
+        nuevasHojas[indiceHojaActiva].frasesOcultas = frases.length > 0 ? frases : [''];
         setDatos({ ...datos, hojas: nuevasHojas });
     };
 
@@ -371,13 +394,32 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
 
                         {configJuego.id === 'RULETA' && (
                             <div>
-                                <label style={{ ...styles.label, color: '#E91E63' }}>🎯 Frase a Resolver (OBLIGATORIA):</label>
-                                <input
-                                    value={hojaActual.fraseOculta || ''}
-                                    onChange={(e) => actualizarFraseRuleta(e.target.value)}
-                                    style={{ ...styles.input, border: '2px solid #E91E63', fontWeight: 'bold' }}
-                                    placeholder="Ej: LA CAPITAL DE FRANCIA"
-                                />
+                                <label style={{ ...styles.label, color: '#E91E63' }}>🎯 Frases a Resolver (OBLIGATORIO):</label>
+                                {getFrasesRuleta(hojaActual).map((frase, idx) => (
+                                    <div key={idx} style={{ display: 'flex', gap: '8px', marginBottom: '6px', alignItems: 'center' }}>
+                                        <input
+                                            value={frase}
+                                            onChange={(e) => actualizarFrasesRuleta(idx, e.target.value)}
+                                            style={{ ...styles.input, border: '2px solid #E91E63', fontWeight: 'bold', flex: 1 }}
+                                            placeholder="Ej: LA CAPITAL DE FRANCIA"
+                                        />
+                                        {getFrasesRuleta(hojaActual).length > 1 && (
+                                            <button
+                                                onClick={() => borrarFraseRuleta(idx)}
+                                                style={{ background: '#ffebee', border: 'none', color: '#c62828', borderRadius: '5px', padding: '8px', cursor: 'pointer', flexShrink: 0 }}
+                                                title="Eliminar frase"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        )}
+                                    </div>
+                                ))}
+                                <button
+                                    onClick={agregarFraseRuleta}
+                                    style={{ background: 'rgba(233,30,99,0.1)', border: '1px dashed #E91E63', color: '#E91E63', padding: '6px 12px', borderRadius: '5px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', fontWeight: 'bold', marginTop: '4px' }}
+                                >
+                                    <Plus size={14} /> Añadir frase
+                                </button>
                             </div>
                         )}
                     </div>

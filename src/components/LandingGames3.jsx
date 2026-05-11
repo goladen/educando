@@ -741,6 +741,10 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                 }).catch(console.error);
                 return;
             }
+            if (params.get('pizarra')) {
+                setGestionAula(true);
+                return;
+            }
             const gestionParam = params.get('gestion');
             if (gestionParam) {
                 setGestionAula(true);
@@ -789,7 +793,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
     const [funcionesEjecutivas, setFuncionesEjecutivas] = useState(false);
     const [irregularVerbs,      setIrregularVerbs]      = useState(false);
     const [musicApp,            setMusicApp]            = useState(false);
-    const [gestionAula,         setGestionAula]         = useState(() => !!new URLSearchParams(window.location.search).get('gestion'));
+    const [gestionAula,         setGestionAula]         = useState(() => { const p = new URLSearchParams(window.location.search); return !!(p.get('gestion') || p.get('pizarra')); });
 
     // Estados alumno logueado
     const [vistaAlumno,    setVistaAlumno]    = useState('MAIN'); // 'MAIN' | 'RECORDS'

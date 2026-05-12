@@ -9,6 +9,7 @@ import {
     Users, LayoutGrid
 } from 'lucide-react';
 import Confetti from 'react-confetti';
+import GeografiaPanel from './components/GeografiaPanel';
 import { db } from './firebase';
 import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 
@@ -635,6 +636,133 @@ const serializarElems = (elems) => elems
 const serializarPaginas = (pgs) => pgs.map(p => JSON.stringify(serializarElems(p)));
 const deserializarPaginas = (arr) => (arr || []).map(s => { try { return JSON.parse(s); } catch { return []; } });
 
+// ── España: datos geográficos ────────────────────────────────────────────────
+const ESP_GEOJSON_URL = 'https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/spain-provinces.geojson';
+const ESP_LON_MIN = -9.5, ESP_LON_MAX = 4.6, ESP_LAT_MIN = 35.7, ESP_LAT_MAX = 43.9;
+
+const ESP_RIOS = [
+    { nombre:'Ebro',          pts:[[-3.85,42.90],[-1.80,41.70],[0.87,40.73]] },
+    { nombre:'Duero',         pts:[[-2.50,41.77],[-5.20,41.60],[-8.67,41.13]] },
+    { nombre:'Tajo',          pts:[[-1.80,40.45],[-4.50,39.90],[-7.20,39.60],[-8.85,38.70]] },
+    { nombre:'Guadiana',      pts:[[-2.90,38.90],[-5.80,38.70],[-7.00,38.85],[-7.40,37.20]] },
+    { nombre:'Guadalquivir',  pts:[[-2.77,37.80],[-4.60,37.60],[-6.35,37.00]] },
+    { nombre:'Miño',          pts:[[-7.50,42.97],[-8.00,41.90],[-8.67,41.88]] },
+    { nombre:'Segura',        pts:[[-2.60,38.10],[-1.50,37.90],[-0.70,38.07]] },
+    { nombre:'Júcar',         pts:[[-1.80,39.90],[-0.50,39.30],[-0.23,39.18]] },
+];
+const ESP_MONTANAS = [
+    { nombre:'Pirineos',          lon: 0.30, lat:42.60 },
+    { nombre:'Cord. Cantábrica',  lon:-5.20, lat:43.30 },
+    { nombre:'Sistema Central',   lon:-5.00, lat:40.50 },
+    { nombre:'Sistema Ibérico',   lon:-2.00, lat:41.50 },
+    { nombre:'Sierra Nevada',     lon:-3.30, lat:37.05 },
+    { nombre:'Sierra Morena',     lon:-4.50, lat:38.20 },
+    { nombre:'Montes de Toledo',  lon:-4.50, lat:39.60 },
+    { nombre:'Macizo Galaico',    lon:-7.80, lat:42.55 },
+];
+const ESP_CIUDADES = [
+    { nombre:'Madrid',     lon:-3.70, lat:40.42, capital:true },
+    { nombre:'Barcelona',  lon: 2.17, lat:41.38 },
+    { nombre:'Valencia',   lon:-0.38, lat:39.47 },
+    { nombre:'Sevilla',    lon:-5.97, lat:37.39 },
+    { nombre:'Zaragoza',   lon:-0.87, lat:41.65 },
+    { nombre:'Bilbao',     lon:-2.93, lat:43.26 },
+    { nombre:'Málaga',     lon:-4.42, lat:36.72 },
+    { nombre:'A Coruña',   lon:-8.39, lat:43.37 },
+    { nombre:'Murcia',     lon:-1.13, lat:37.99 },
+    { nombre:'Valladolid', lon:-4.73, lat:41.65 },
+];
+const ESP_MARES = [
+    { nombre:'Mar Mediterráneo', lon: 2.50, lat:38.20 },
+    { nombre:'Océano Atlántico', lon:-9.80, lat:40.50 },
+    { nombre:'Mar Cantábrico',   lon:-4.00, lat:44.20 },
+];
+
+// Projection: equirectangular corregida para España
+const _proyEsp = (lon, lat, W, H, pad = 40) => {
+    const cosLat = Math.cos(39.7 * Math.PI / 180);
+    const lonSpan = (ESP_LON_MAX - ESP_LON_MIN) * cosLat;
+    const latSpan = ESP_LAT_MAX - ESP_LAT_MIN;
+    const useW = W - 2 * pad, useH = H - 2 * pad;
+    const scale = Math.min(useW / lonSpan, useH / latSpan);
+    const ox = pad + (useW - lonSpan * scale) / 2;
+    const oy = pad + (useH - latSpan * scale) / 2;
+    return { x: ox + (lon - ESP_LON_MIN) * cosLat * scale, y: oy + (ESP_LAT_MAX - lat) * scale };
+};
+// Draw one GeoJSON feature (Polygon/MultiPolygon) onto ctx using proj function
+const _drawGeoFeature = (ctx, feature, proj) => {
+    const geom = feature.geometry;
+    if (!geom) return;
+    const polys = geom.type === 'Polygon' ? [geom.coordinates] : geom.coordinates;
+    polys.forEach(poly => {
+        ctx.beginPath();
+        poly[0].forEach(([lon, lat], i) => {
+            const { x, y } = proj(lon, lat);
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+    });
+};
+// Centroid of the largest polygon ring
+const _centroidGeo = (feature) => {
+    const geom = feature.geometry;
+    if (!geom) return null;
+    const polys = geom.type === 'Polygon' ? [geom.coordinates] : geom.coordinates;
+    const main = polys.reduce((a, b) => a[0].length >= b[0].length ? a : b);
+    const ring = main[0];
+    let sLon = 0, sLat = 0;
+    ring.forEach(([lon, lat]) => { sLon += lon; sLat += lat; });
+    return { lon: sLon / ring.length, lat: sLat / ring.length };
+};
+
+const CORDILLERAS = [
+    { nombre: 'Andes', region: 'América del Sur' },
+    { nombre: 'Himalaya', region: 'Asia' },
+    { nombre: 'Alpes', region: 'Europa' },
+    { nombre: 'Pirineos', region: 'Europa' },
+    { nombre: 'Montañas Rocosas', region: 'América del Norte' },
+    { nombre: 'Urales', region: 'Europa/Asia' },
+    { nombre: 'Atlas', region: 'África' },
+    { nombre: 'Cárpatos', region: 'Europa' },
+    { nombre: 'Sierra Nevada', region: 'España' },
+    { nombre: 'Cordillera Cantábrica', region: 'España' },
+    { nombre: 'Sistema Central', region: 'España' },
+    { nombre: 'Apeninos', region: 'Europa' },
+    { nombre: 'Cáucaso', region: 'Europa/Asia' },
+    { nombre: 'Karakórum', region: 'Asia' },
+    { nombre: 'Tian Shan', region: 'Asia' },
+    { nombre: 'Grandes Apalaches', region: 'América del Norte' },
+];
+
+const RIOS = [
+    { nombre: 'Amazonas', region: 'América del Sur' },
+    { nombre: 'Nilo', region: 'África' },
+    { nombre: 'Yangtsé', region: 'Asia' },
+    { nombre: 'Misisipi', region: 'América del Norte' },
+    { nombre: 'Danubio', region: 'Europa' },
+    { nombre: 'Rin', region: 'Europa' },
+    { nombre: 'Volga', region: 'Europa' },
+    { nombre: 'Orinoco', region: 'América del Sur' },
+    { nombre: 'Ganges', region: 'Asia' },
+    { nombre: 'Éufrates', region: 'Asia' },
+    { nombre: 'Tigris', region: 'Asia' },
+    { nombre: 'Mekong', region: 'Asia' },
+    { nombre: 'Níger', region: 'África' },
+    { nombre: 'Zambeze', region: 'África' },
+    { nombre: 'Congo', region: 'África' },
+    { nombre: 'Ebro', region: 'España' },
+    { nombre: 'Tajo', region: 'España/Portugal' },
+    { nombre: 'Guadalquivir', region: 'España' },
+    { nombre: 'Duero', region: 'España/Portugal' },
+    { nombre: 'Támesis', region: 'Europa' },
+    { nombre: 'Sena', region: 'Europa' },
+    { nombre: 'Po', region: 'Europa' },
+    { nombre: 'Tíber', region: 'Europa' },
+    { nombre: 'Misuri', region: 'América del Norte' },
+    { nombre: 'Colorado', region: 'América del Norte' },
+];
+
 // ─────────────────────────────────────────────────────────────────────────────
 function PizarraApp() {
     const canvasRef      = useRef(null);
@@ -653,6 +781,17 @@ function PizarraApp() {
     const [previewElement, setPreviewElement] = useState(null);
     const [calcVisible,    setCalcVisible]    = useState(false);
     const [grafVisible,    setGrafVisible]    = useState(false);
+    const [geoVisible,     setGeoVisible]     = useState(false);
+    const [geoTool,        setGeoTool]        = useState(null);
+    const [geoBusqueda,    setGeoBusqueda]    = useState('');
+    const [geoCargando,    setGeoCargando]    = useState(false);
+    const [geoPaisData,    setGeoPaisData]    = useState(null);
+    const [pendingInsert,  setPendingInsert]  = useState(null);
+    const [imgMenuOpen,    setImgMenuOpen]    = useState(false);
+    const [imgBuscador,    setImgBuscador]    = useState(false);
+    const [imgQuery,       setImgQuery]       = useState('');
+    const [imgResults,     setImgResults]     = useState([]);
+    const [imgSearching,   setImgSearching]   = useState(false);
     const [textoPegar,     setTextoPegar]     = useState('');
     const [graficaConfig,  setGraficaConfig]  = useState(null);
     const [fullscreen,     setFullscreen]     = useState(false);
@@ -667,9 +806,10 @@ function PizarraApp() {
         i !== paginaIdx ? p : typeof fn === 'function' ? fn(p) : fn));
 
     // Lasso / selection
-    const [selIdxs,   setSelIdxs]   = useState([]);
-    const [lassoRect, setLassoRect] = useState(null);
-    const selHandleRef = useRef(null); // { type:'resize'|'rotate', ... }
+    const [selIdxs,        setSelIdxs]        = useState([]);
+    const [lassoRect,      setLassoRect]      = useState(null);
+    const [clipboardRegion, setClipboardRegion] = useState(null); // { src, w, h }
+    const selHandleRef = useRef(null);
 
     // Text tool
     const [textoInput,       setTextoInput]       = useState('');
@@ -956,18 +1096,333 @@ function PizarraApp() {
         reader.onload = (ev) => {
             const img = new Image();
             img.onload = () => {
-                const id = Date.now();
                 const maxW = 400, maxH = 300;
                 let w = img.width, h = img.height;
                 if (w > maxW) { h = h * maxW / w; w = maxW; }
                 if (h > maxH) { w = w * maxH / h; h = maxH; }
-                imageCacheRef.current[id] = img;
-                setElementos(prev => [...prev, { t: 'image', id, src: ev.target.result, x: 80 - panRef.current.x, y: 60 - panRef.current.y, w, h }]);
+                setPendingInsert({ type: 'image', src: ev.target.result, w, h });
+                setHerramienta('geo_place');
             };
             img.src = ev.target.result;
         };
         reader.readAsDataURL(file);
         e.target.value = '';
+    };
+
+    // ── Insert image from URL (Wikimedia search or direct URL) ───────────────
+    const insertarImagenDesdeURL = (url) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+            const maxW = 500, maxH = 380;
+            let w = img.naturalWidth || 400, h = img.naturalHeight || 300;
+            if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+            if (h > maxH) { w = Math.round(w * maxH / h); h = maxH; }
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            const src = canvas.toDataURL('image/png');
+            setPendingInsert({ type: 'image', src, w, h });
+            setHerramienta('geo_place');
+        };
+        img.onerror = () => {
+            setPendingInsert({ type: 'image', src: url, w: 300, h: 200 });
+            setHerramienta('geo_place');
+        };
+        img.src = url;
+        setImgBuscador(false);
+        setImgMenuOpen(false);
+        setImgQuery('');
+        setImgResults([]);
+    };
+
+    const buscarImagenesWikimedia = async () => {
+        if (!imgQuery.trim()) return;
+        setImgSearching(true);
+        try {
+            const res = await fetch(
+                `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrnamespace=6&gsrsearch=${encodeURIComponent(imgQuery)}&gsrlimit=24&prop=imageinfo&iiprop=url&iiurlwidth=400&format=json&origin=*`
+            );
+            const data = await res.json();
+            const pages = data.query?.pages || {};
+            const urls = Object.values(pages)
+                .map(p => { const info = p.imageinfo?.[0]; return info?.thumburl || info?.url; })
+                .filter(u => u && /\.(jpe?g|png|gif|webp|svg)(\?|$)/i.test(u));
+            setImgResults(urls);
+        } catch {
+            setImgResults([]);
+        }
+        setImgSearching(false);
+    };
+
+    // ── Geo mode helpers ─────────────────────────────────────────────────────
+    const buscarPaisGeo = async () => {
+        if (!geoBusqueda.trim()) return;
+        setGeoCargando(true); setGeoPaisData(null);
+        try {
+            const res = await fetch(`https://restcountries.com/v3.1/name/${encodeURIComponent(geoBusqueda.trim())}?fields=name,flags,capital,region,population,area,languages,currencies,latlng`);
+            if (!res.ok) throw new Error();
+            const data = await res.json();
+            setGeoPaisData(data[0]);
+        } catch { setGeoPaisData(null); }
+        setGeoCargando(false);
+    };
+
+    const prepararMapaGeo_GeoMode = () => { setGeoVisible(true); };
+
+    const prepararBanderaGeo = () => {
+        if (!geoPaisData?.flags?.png) return;
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+            const maxW = 420;
+            const w = Math.min(img.naturalWidth, maxW);
+            const h = Math.round(img.naturalHeight * w / img.naturalWidth);
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            setPendingInsert({ type: 'image', src: canvas.toDataURL('image/png'), w, h });
+            setHerramienta('geo_place');
+        };
+        img.src = geoPaisData.flags.png;
+    };
+
+    const prepararInfoGeo = () => {
+        if (!geoPaisData) return;
+        const canvas = document.createElement('canvas');
+        canvas.width = 520; canvas.height = 320;
+        const ctx = canvas.getContext('2d');
+        const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        grad.addColorStop(0, '#e8f4fd'); grad.addColorStop(1, '#dbeafe');
+        ctx.fillStyle = grad; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = '#2563eb'; ctx.lineWidth = 3;
+        ctx.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
+        ctx.fillStyle = '#1e3a5f'; ctx.font = 'bold 26px Arial';
+        ctx.fillText(geoPaisData.name?.common || '', 20, 46);
+        ctx.strokeStyle = '#93c5fd'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(20, 58); ctx.lineTo(500, 58); ctx.stroke();
+        const rows = [
+            ['🏙️ Capital',   (geoPaisData.capital||[]).join(', ')||'—'],
+            ['🌎 Región',     geoPaisData.region||'—'],
+            ['👥 Población',  (geoPaisData.population||0).toLocaleString('es-ES')],
+            ['📐 Superficie', `${(geoPaisData.area||0).toLocaleString('es-ES')} km²`],
+            ['🗣️ Idiomas',    Object.values(geoPaisData.languages||{}).join(', ')||'—'],
+            ['💰 Moneda',     Object.values(geoPaisData.currencies||{}).map(c=>c.name).join(', ')||'—'],
+        ];
+        rows.forEach(([k, v], i) => {
+            ctx.fillStyle = '#64748b'; ctx.font = 'bold 14px Arial';
+            ctx.fillText(k, 20, 90 + i * 38);
+            ctx.fillStyle = '#1e293b'; ctx.font = '16px Arial';
+            ctx.fillText(String(v).slice(0, 55), 155, 90 + i * 38);
+        });
+        setPendingInsert({ type: 'image', src: canvas.toDataURL('image/png'), w: 520, h: 320 });
+        setHerramienta('geo_place');
+    };
+
+    // ── Mapas de España ──────────────────────────────────────────────────────
+    const generarMapaProvinciasEspana = async () => {
+        const W = 820, H = 620;
+        const canvas = document.createElement('canvas');
+        canvas.width = W; canvas.height = H;
+        const ctx = canvas.getContext('2d');
+
+        const PROV_COLORS = [
+            '#b3d9ff','#c8e6c9','#fff9c4','#ffccbc','#e1bee7',
+            '#b2dfdb','#f8bbd9','#d7ccc8','#cfd8dc','#ffe0b2',
+            '#dcedc8','#fce4ec','#e8eaf6','#e0f7fa','#f3e5f5',
+            '#e8f5e9','#fff8e1','#fbe9e7','#ede7f6','#e1f5fe',
+            '#ffccbc','#b3d9ff','#c8e6c9','#fff9c4','#e1bee7',
+        ];
+
+        // ── Proyección peninsular (deja 155 px abajo para recuadros) ──────────
+        const PEN_LON_MIN = -9.5, PEN_LON_MAX = 4.6;
+        const PEN_LAT_MAX = 43.9, PEN_LAT_MIN = 35.0;
+        const projPen = (lon, lat) => {
+            const cosLat = Math.cos(39.7 * Math.PI / 180);
+            const lonSpan = (PEN_LON_MAX - PEN_LON_MIN) * cosLat;
+            const latSpan = PEN_LAT_MAX - PEN_LAT_MIN;
+            const pad = 42, titleH = 26;
+            const useW = W - 2 * pad;
+            const useH = H - titleH - pad - 158;
+            const scale = Math.min(useW / lonSpan, useH / latSpan);
+            const ox = pad + (useW - lonSpan * scale) / 2;
+            const oy = titleH + (useH - latSpan * scale) / 2;
+            return { x: ox + (lon - PEN_LON_MIN) * cosLat * scale, y: oy + (PEN_LAT_MAX - lat) * scale };
+        };
+
+        // ── Recuadro Canarias (esquina inferior-izquierda) ────────────────────
+        const INS_X = 14, INS_Y = H - 152, INS_W = 226, INS_H = 134;
+        const CAN_LON_MIN = -18.3, CAN_LON_MAX = -13.2;
+        const CAN_LAT_MIN = 27.4, CAN_LAT_MAX = 29.6;
+        const projCan = (lon, lat) => {
+            const cosLat = Math.cos(28.5 * Math.PI / 180);
+            const lonSpan = (CAN_LON_MAX - CAN_LON_MIN) * cosLat;
+            const latSpan = CAN_LAT_MAX - CAN_LAT_MIN;
+            const pad = 10;
+            const useW = INS_W - 2 * pad, useH = INS_H - 22 - pad;
+            const scale = Math.min(useW / lonSpan, useH / latSpan);
+            const ox = INS_X + pad + (useW - lonSpan * scale) / 2;
+            const oy = INS_Y + 22 + (useH - latSpan * scale) / 2;
+            return { x: ox + (lon - CAN_LON_MIN) * cosLat * scale, y: oy + (CAN_LAT_MAX - lat) * scale };
+        };
+
+        // ── Fondo mar ─────────────────────────────────────────────────────────
+        const seaGrad = ctx.createLinearGradient(0, 0, W, H);
+        seaGrad.addColorStop(0, '#c8dff4'); seaGrad.addColorStop(1, '#a8c8e8');
+        ctx.fillStyle = seaGrad; ctx.fillRect(0, 0, W, H);
+
+        // Recuadro Canarias
+        ctx.fillStyle = '#c0d8ef'; ctx.fillRect(INS_X, INS_Y, INS_W, INS_H);
+        ctx.strokeStyle = '#2c3e50'; ctx.lineWidth = 1.5; ctx.strokeRect(INS_X, INS_Y, INS_W, INS_H);
+        ctx.fillStyle = '#1e3a5f'; ctx.font = 'bold 9px Arial'; ctx.textAlign = 'center';
+        ctx.fillText('Islas Canarias', INS_X + INS_W / 2, INS_Y + 13);
+
+        // Título
+        ctx.fillStyle = '#1e3a5f'; ctx.font = 'bold 17px Arial';
+        ctx.textAlign = 'center'; ctx.fillText('España — Provincias', W / 2, 20);
+
+        try {
+            const geojson = await fetch(ESP_GEOJSON_URL).then(r => r.json());
+
+            // Asignar colores y clasificar cada feature
+            let ceutaData = null, melillaData = null;
+            const classified = geojson.features.map((feat, idx) => {
+                const name = feat.properties?.name || feat.properties?.NOMBRE || feat.properties?.nombre || '';
+                const nameLower = name.toLowerCase();
+                const color = PROV_COLORS[idx % PROV_COLORS.length];
+                const c = _centroidGeo(feat);
+                const isCanary = c && c.lon < -12;
+                const isCeuta = nameLower.includes('ceuta');
+                const isMelilla = nameLower.includes('melilla');
+                if (isCeuta)   { ceutaData   = { color }; return null; }
+                if (isMelilla) { melillaData = { color }; return null; }
+                return { feat, color, isCanary };
+            }).filter(Boolean);
+
+            // Dibujar polígonos
+            classified.forEach(({ feat, color, isCanary }) => {
+                ctx.fillStyle = color;
+                ctx.strokeStyle = '#2c3e50';
+                ctx.lineWidth = isCanary ? 0.5 : 0.7;
+                _drawGeoFeature(ctx, feat, isCanary ? projCan : projPen);
+            });
+
+            // Etiquetas de provincias
+            ctx.textAlign = 'center';
+            classified.forEach(({ feat, isCanary }) => {
+                const name = feat.properties?.name || feat.properties?.NOMBRE || feat.properties?.nombre || '';
+                const c = _centroidGeo(feat); if (!c) return;
+                const { x, y } = (isCanary ? projCan : projPen)(c.lon, c.lat);
+                ctx.fillStyle = '#1a1a2e';
+                ctx.font = isCanary ? '6.5px Arial' : '7.5px Arial';
+                if (x > 10 && x < W - 10 && y > 24 && y < H - 5) ctx.fillText(name, x, y);
+            });
+
+            // ── Ceuta y Melilla: recuadros a la derecha de Canarias ───────────
+            const CM_X = INS_X + INS_W + 10, CM_W = 62, CM_H = 30, CM_GAP = 8;
+            const CM_Y_CEUTA   = INS_Y + (INS_H - 2 * CM_H - CM_GAP) / 2;
+            const CM_Y_MELILLA = CM_Y_CEUTA + CM_H + CM_GAP;
+
+            [[ceutaData?.color   || '#b3d9ff', 'Ceuta',   CM_Y_CEUTA],
+             [melillaData?.color || '#c8e6c9', 'Melilla', CM_Y_MELILLA]
+            ].forEach(([color, label, cy]) => {
+                ctx.fillStyle = color;
+                ctx.fillRect(CM_X, cy, CM_W, CM_H);
+                ctx.strokeStyle = '#2c3e50'; ctx.lineWidth = 1;
+                ctx.strokeRect(CM_X, cy, CM_W, CM_H);
+                ctx.fillStyle = '#1a1a2e'; ctx.font = 'bold 9px Arial'; ctx.textAlign = 'center';
+                ctx.fillText(label, CM_X + CM_W / 2, cy + CM_H / 2 + 4);
+            });
+
+        } catch (_) {
+            ctx.fillStyle = '#e74c3c'; ctx.font = '13px Arial'; ctx.textAlign = 'center';
+            ctx.fillText('Error al cargar provincias. Comprueba la conexión.', W / 2, H / 2);
+        }
+
+        ctx.strokeStyle = '#1e3a5f'; ctx.lineWidth = 2; ctx.strokeRect(1, 1, W - 2, H - 2);
+        setPendingInsert({ type: 'image', src: canvas.toDataURL('image/png'), w: W, h: H });
+        setHerramienta('geo_place');
+    };
+
+    const generarMapaGeoEspana = async () => {
+        const W = 820, H = 620;
+        const canvas = document.createElement('canvas');
+        canvas.width = W; canvas.height = H;
+        const ctx = canvas.getContext('2d');
+        const proj = (lon, lat) => _proyEsp(lon, lat, W, H - 28, 42);
+
+        const seaGrad = ctx.createLinearGradient(0, 0, W, H);
+        seaGrad.addColorStop(0, '#c8dff4'); seaGrad.addColorStop(1, '#a8c8e8');
+        ctx.fillStyle = seaGrad; ctx.fillRect(0, 0, W, H);
+
+        ctx.fillStyle = '#1e3a5f'; ctx.font = 'bold 17px Arial';
+        ctx.textAlign = 'center'; ctx.fillText('España — Elementos Geográficos', W / 2, 22);
+
+        // Fondo terrestre (provincias sin etiquetas)
+        try {
+            const geojson = await fetch(ESP_GEOJSON_URL).then(r => r.json());
+            geojson.features.forEach(feat => {
+                ctx.fillStyle = '#d4e6b5'; ctx.strokeStyle = '#a0b880'; ctx.lineWidth = 0.5;
+                _drawGeoFeature(ctx, feat, proj);
+            });
+        } catch (_) { /* continuar sin silueta */ }
+
+        // Ríos
+        ESP_RIOS.forEach(rio => {
+            ctx.beginPath(); ctx.strokeStyle = '#1565c0'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+            rio.pts.forEach(([lon, lat], i) => { const { x, y } = proj(lon, lat); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
+            ctx.stroke();
+            const mid = rio.pts[Math.floor(rio.pts.length / 2)];
+            const { x: lx, y: ly } = proj(mid[0], mid[1]);
+            ctx.fillStyle = '#0d47a1'; ctx.font = 'bold 9px Arial'; ctx.textAlign = 'left';
+            ctx.fillText(rio.nombre, lx + 4, ly - 3);
+        });
+
+        // Montañas
+        ESP_MONTANAS.forEach(m => {
+            const { x, y } = proj(m.lon, m.lat);
+            ctx.fillStyle = '#5d4037'; ctx.font = 'bold 9px Arial'; ctx.textAlign = 'center';
+            ctx.fillText('△ ' + m.nombre, x, y);
+        });
+
+        // Ciudades
+        ESP_CIUDADES.forEach(c => {
+            const { x, y } = proj(c.lon, c.lat);
+            ctx.beginPath(); ctx.arc(x, y, c.capital ? 5 : 3.5, 0, 2 * Math.PI);
+            ctx.fillStyle = c.capital ? '#e74c3c' : '#2c3e50'; ctx.fill();
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.stroke();
+            ctx.fillStyle = c.capital ? '#c0392b' : '#1a1a2e';
+            ctx.font = c.capital ? 'bold 10px Arial' : '9px Arial'; ctx.textAlign = 'center';
+            ctx.fillText(c.nombre, x, y - 8);
+        });
+
+        // Mares
+        ESP_MARES.forEach(m => {
+            const { x, y } = proj(m.lon, m.lat);
+            if (x > 0 && x < W && y > 0 && y < H) {
+                ctx.fillStyle = '#1565c0'; ctx.font = 'italic 10px Arial'; ctx.textAlign = 'center';
+                ctx.fillText(m.nombre, x, y);
+            }
+        });
+
+        // Leyenda
+        const lx = 14, ly = H - 92;
+        ctx.fillStyle = 'rgba(255,255,255,0.88)'; ctx.fillRect(lx, ly, 160, 84);
+        ctx.strokeStyle = '#bdc3c7'; ctx.lineWidth = 1; ctx.strokeRect(lx, ly, 160, 84);
+        ctx.fillStyle = '#2c3e50'; ctx.font = 'bold 9px Arial'; ctx.textAlign = 'left';
+        ctx.fillText('Leyenda', lx + 6, ly + 14);
+        ctx.strokeStyle = '#1565c0'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(lx + 6, ly + 27); ctx.lineTo(lx + 32, ly + 27); ctx.stroke();
+        ctx.fillStyle = '#2c3e50'; ctx.font = '8px Arial'; ctx.fillText('Ríos', lx + 36, ly + 30);
+        ctx.fillStyle = '#5d4037'; ctx.font = '9px Arial'; ctx.fillText('△ Cordilleras/Sierras', lx + 6, ly + 47);
+        ctx.beginPath(); ctx.arc(lx + 12, ly + 62, 3.5, 0, 2 * Math.PI); ctx.fillStyle = '#2c3e50'; ctx.fill();
+        ctx.fillStyle = '#2c3e50'; ctx.font = '8px Arial'; ctx.fillText('Ciudad', lx + 20, ly + 65);
+        ctx.beginPath(); ctx.arc(lx + 12, ly + 77, 5, 0, 2 * Math.PI); ctx.fillStyle = '#e74c3c'; ctx.fill();
+        ctx.fillText('Capital', lx + 20, ly + 80);
+
+        ctx.strokeStyle = '#1e3a5f'; ctx.lineWidth = 2; ctx.strokeRect(1, 1, W - 2, H - 2);
+        setPendingInsert({ type: 'image', src: canvas.toDataURL('image/png'), w: W, h: H });
+        setHerramienta('geo_place');
     };
 
     // ── Geometry helpers ─────────────────────────────────────────────────────
@@ -1088,6 +1543,12 @@ function PizarraApp() {
             drawRest(ctx, item);
         } else if (item.t === 'acc') {
             drawAccidental(ctx, item);
+        } else if (item.t === 'eraser_rect') {
+            ctx.save();
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(item.x1, item.y1, item.x2 - item.x1, item.y2 - item.y1);
+            ctx.restore();
+            return;
         } else {
             if (item.rotation) {
                 const ecx = (item.x1+item.x2)/2, ecy = (item.y1+item.y2)/2;
@@ -1126,23 +1587,20 @@ function PizarraApp() {
             ctx.setLineDash([]);
         }
 
-        // ── Handles de redimensión y rotación sobre la selección ─────────────
-        if (selIdxs.length > 0 && herramienta === 'lasso' && !lassoRect) {
+        // ── Handles de redimensión y rotación ────────────────────────────────
+        if (selIdxs.length > 0 && herramienta === 'lasso' && !dibujando) {
             const bbs = selIdxs.map(i => getBbox(elementos[i]));
             const bx1 = Math.min(...bbs.map(b => b.x1)) - 6;
             const by1 = Math.min(...bbs.map(b => b.y1)) - 6;
             const bx2 = Math.max(...bbs.map(b => b.x2)) + 6;
             const by2 = Math.max(...bbs.map(b => b.y2)) + 6;
             const mx = (bx1+bx2)/2, my = (by1+by2)/2;
-            // Rect exterior
             ctx.strokeStyle = '#2980b9'; ctx.lineWidth = 1.5; ctx.setLineDash([4,2]);
             ctx.strokeRect(bx1, by1, bx2-bx1, by2-by1); ctx.setLineDash([]);
-            // 8 handles de resize
             [[bx1,by1],[mx,by1],[bx2,by1],[bx1,my],[bx2,my],[bx1,by2],[mx,by2],[bx2,by2]].forEach(([hx,hy]) => {
                 ctx.fillStyle='white'; ctx.strokeStyle='#2980b9'; ctx.lineWidth=1.5;
                 ctx.fillRect(hx-5,hy-5,10,10); ctx.strokeRect(hx-5,hy-5,10,10);
             });
-            // Handle de rotación
             const rotX = mx, rotY = by1 - 22;
             ctx.beginPath(); ctx.strokeStyle='#bdc3c7'; ctx.lineWidth=1;
             ctx.moveTo(mx, by1); ctx.lineTo(rotX, rotY+7); ctx.stroke();
@@ -1333,6 +1791,20 @@ function PizarraApp() {
             setElementos(prev => [...prev, tagElem({ t: 'graph', funcStr: graficaConfig.funcStr, scale: graficaConfig.scale, cx: x, cy: y, color: drawColor, grosor })]);
             setHerramienta('draw'); setGraficaConfig(null); return;
         }
+        if (herramienta === 'geo_place' && pendingInsert) {
+            if (pendingInsert.type === 'image') {
+                const id = Date.now();
+                const img = new Image();
+                img.src = pendingInsert.src;
+                imageCacheRef.current[id] = img;
+                setElementos(prev => [...prev, tagElem({ t: 'image', id, src: pendingInsert.src, x, y, w: pendingInsert.w, h: pendingInsert.h })]);
+            } else if (pendingInsert.type === 'label') {
+                setElementos(prev => [...prev, tagElem({ t: 'text', txt: pendingInsert.icon + ' ' + pendingInsert.txt, x, y, color: pendingInsert.color || '#1e293b', grosor: 2, fontSize: 20 })]);
+            }
+            setPendingInsert(null);
+            setHerramienta('draw');
+            return;
+        }
         if (herramienta === 'axes') {
             setElementos(prev => [...prev, tagElem({ t: 'axes', cx: x, cy: y, color: drawColor, grosor })]);
             setHerramienta('draw'); return;
@@ -1375,31 +1847,29 @@ function PizarraApp() {
             return;
         }
         if (herramienta === 'lasso') {
-            if (selIdxs.length > 0) {
+            if (selIdxs.length > 0 && !dibujando) {
                 const bbs = selIdxs.map(i => getBbox(elementos[i]));
                 const bx1 = Math.min(...bbs.map(b => b.x1)) - 6;
                 const by1 = Math.min(...bbs.map(b => b.y1)) - 6;
                 const bx2 = Math.max(...bbs.map(b => b.x2)) + 6;
                 const by2 = Math.max(...bbs.map(b => b.y2)) + 6;
                 const mx = (bx1+bx2)/2, my = (by1+by2)/2;
-                const cbx = mx, cby = (by1+by2)/2;
-
-                // Rotate handle?
+                // ¿Handle de rotación?
                 if (Math.abs(x - mx) < 11 && Math.abs(y - (by1-22)) < 11) {
                     selHandleRef.current = {
-                        type: 'rotate', cx: cbx, cy: cby,
-                        startAngle: Math.atan2(y - cby, x - cbx),
+                        type: 'rotate', cx: mx, cy: (by1+by2)/2,
+                        startAngle: Math.atan2(y - (by1+by2)/2, x - mx),
                         origElemsData: selIdxs.map(i => JSON.parse(JSON.stringify(elementos[i]))),
                     };
                     return;
                 }
-                // Resize handles?
-                const resizeHandles = [
+                // ¿Handle de resize?
+                const rHandles = [
                     {id:'tl',x:bx1,y:by1},{id:'tc',x:mx,y:by1},{id:'tr',x:bx2,y:by1},
                     {id:'ml',x:bx1,y:my},{id:'mr',x:bx2,y:my},
                     {id:'bl',x:bx1,y:by2},{id:'bc',x:mx,y:by2},{id:'br',x:bx2,y:by2},
                 ];
-                for (const h of resizeHandles) {
+                for (const h of rHandles) {
                     if (Math.abs(x - h.x) < 9 && Math.abs(y - h.y) < 9) {
                         selHandleRef.current = {
                             type: 'resize', handle: h.id,
@@ -1410,14 +1880,13 @@ function PizarraApp() {
                         return;
                     }
                 }
-                // Click inside → move
-                const inside = selIdxs.some(i => {
-                    const bb = getBbox(elementos[i]);
-                    return x >= bb.x1 - 6 && x <= bb.x2 + 6 && y >= bb.y1 - 6 && y <= bb.y2 + 6;
-                });
-                if (inside) { selMoveRef.current = { x, y }; return; }
+                // ¿Click dentro → mover?
+                if (x >= bx1 && x <= bx2 && y >= by1 && y <= by2) {
+                    selMoveRef.current = { x, y }; return;
+                }
             }
-            setSelIdxs([]);
+            // Fuera de la selección → nueva selección
+            setSelIdxs([]); setLassoRect(null);
             setDibujando(true);
             setInicioXY({ x, y });
             setLassoRect({ x1: x, y1: y, x2: x, y2: y });
@@ -1450,8 +1919,7 @@ function PizarraApp() {
             if (h.type === 'rotate') {
                 const angle = Math.atan2(y - h.cy, x - h.cx) - h.startAngle;
                 setElementos(prev => prev.map((item, i) => {
-                    const si = selIdxs.indexOf(i);
-                    if (si < 0) return item;
+                    const si = selIdxs.indexOf(i); if (si < 0) return item;
                     return applyRotationToElem(h.origElemsData[si], h.cx, h.cy, angle);
                 }));
             } else if (h.type === 'resize') {
@@ -1467,8 +1935,7 @@ function PizarraApp() {
                 if (Math.abs(newW) < 5 || Math.abs(newH) < 5) return;
                 const scaleX = newW / origW, scaleY = newH / origH;
                 setElementos(prev => prev.map((item, i) => {
-                    const si = selIdxs.indexOf(i);
-                    if (si < 0) return item;
+                    const si = selIdxs.indexOf(i); if (si < 0) return item;
                     return applyScaleToElem(h.origElemsData[si], ob.x1, ob.y1, scaleX, scaleY, nx1, ny1);
                 }));
             }
@@ -1497,8 +1964,11 @@ function PizarraApp() {
         selHandleRef.current = null;
 
         if (herramienta === 'lasso' && dibujando && lassoRect) {
+            const w = lassoRect.x2 - lassoRect.x1, h = lassoRect.y2 - lassoRect.y1;
+            if (w < 4 || h < 4) { setLassoRect(null); setDibujando(false); return; }
+            // Keep lassoRect visible; compute selIdxs for element-move
             const sel = elementos.map((item, idx) => rectsOverlap(lassoRect, getBbox(item)) ? idx : -1).filter(i => i >= 0);
-            setSelIdxs(sel); setLassoRect(null); setDibujando(false); return;
+            setSelIdxs(sel); setDibujando(false); return;
         }
         if (!dibujando) return;
         setDibujando(false);
@@ -1531,18 +2001,63 @@ function PizarraApp() {
         if (!selIdxs.length) return;
         setElementos(prev => prev.filter((item, i) => {
             if (!selIdxs.includes(i)) return true;
-            // En modo colaborativo solo puedo borrar mis propios elementos
             if (modoRef.current === 'editar' && item.autorId && item.autorId !== miIdRef.current) return true;
             return false;
         }));
         setSelIdxs([]);
     };
 
+    const _extractRegionDataURL = () => {
+        if (!lassoRect) return null;
+        const src = canvasRef.current;
+        // Render a clean offscreen canvas (elements only, no lasso border, no selection highlights)
+        const clean = document.createElement('canvas');
+        clean.width = src.width; clean.height = src.height;
+        const ctx2 = clean.getContext('2d');
+        ctx2.fillStyle = '#ffffff'; ctx2.fillRect(0, 0, clean.width, clean.height);
+        ctx2.save();
+        ctx2.translate(panRef.current.x, panRef.current.y);
+        elementos.forEach(item => dibujarItem(ctx2, item, false));
+        ctx2.restore();
+        // Crop to lasso region
+        const pw = Math.max(1, Math.round(lassoRect.x2 - lassoRect.x1));
+        const ph = Math.max(1, Math.round(lassoRect.y2 - lassoRect.y1));
+        const px1 = Math.round(lassoRect.x1 + panRef.current.x);
+        const py1 = Math.round(lassoRect.y1 + panRef.current.y);
+        const off = document.createElement('canvas');
+        off.width = pw; off.height = ph;
+        off.getContext('2d').drawImage(clean, px1, py1, pw, ph, 0, 0, pw, ph);
+        return { src: off.toDataURL('image/png'), w: pw, h: ph };
+    };
+
+    const copiarRegion = () => {
+        const region = _extractRegionDataURL();
+        if (!region) return;
+        setClipboardRegion(region);
+        setLassoRect(null); setSelIdxs([]);
+    };
+
+    const cortarRegion = () => {
+        const region = _extractRegionDataURL();
+        if (!region) return;
+        setClipboardRegion(region);
+        setElementos(prev => [...prev, tagElem({
+            t: 'eraser_rect', x1: lassoRect.x1, y1: lassoRect.y1, x2: lassoRect.x2, y2: lassoRect.y2,
+        })]);
+        setLassoRect(null); setSelIdxs([]);
+    };
+
+    const pegarRegion = () => {
+        if (!clipboardRegion) return;
+        setPendingInsert({ type: 'image', src: clipboardRegion.src, w: clipboardRegion.w, h: clipboardRegion.h });
+        setHerramienta('geo_place');
+    };
+
     const ERASER_SVG = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='22'%3E%3Crect x='1' y='1' width='34' height='20' rx='3' fill='%23fde8e8' stroke='%23e74c3c' stroke-width='1.5'/%3E%3Crect x='23' y='1' width='12' height='20' rx='0 3 3 0' fill='%23e74c3c' opacity='0.7'/%3E%3Cline x1='23' y1='1' x2='23' y2='21' stroke='%23e74c3c' stroke-width='1.5'/%3E%3C/svg%3E") 1 20, cell`;
     const CURSOR_MAP = { pan: 'grab', lasso: 'crosshair', paste: 'crosshair', text: 'text', graph: 'crosshair', axes: 'crosshair', eraser: ERASER_SVG };
 
     const ToolBtn = ({ id, icon, label }) => (
-        <button onClick={() => { setHerramienta(id); setSelIdxs([]); }} title={label}
+        <button onClick={() => { setHerramienta(id); setSelIdxs([]); setLassoRect(null); }} title={label}
             style={{ padding: 7, background: herramienta === id ? '#3498db' : 'transparent', color: herramienta === id ? 'white' : '#2c3e50', border: 'none', borderRadius: 8, cursor: 'pointer', display:'flex', alignItems:'center' }}>
             {icon}
         </button>
@@ -1555,10 +2070,11 @@ function PizarraApp() {
             <div style={{ background: '#ecf0f1', padding: '7px 10px', display: 'flex', gap: 8, alignItems: 'center', borderBottom: '2px solid #bdc3c7', flexWrap: 'wrap' }}>
 
                 {/* Mode selector */}
-                <select value={modoPizarra} onChange={e => { setModoPizarra(e.target.value); setHerramienta('draw'); setSelIdxs([]); }}
+                <select value={modoPizarra} onChange={e => { setModoPizarra(e.target.value); setHerramienta('draw'); setSelIdxs([]); setGeoTool(null); setGeoPaisData(null); setGeoBusqueda(''); setPendingInsert(null); }}
                     style={{ padding:'4px 8px', borderRadius:8, border:'2px solid #3498db', fontWeight:'bold', cursor:'pointer', background:'white', color:'#2c3e50', fontSize:'0.85rem' }}>
                     <option value="general">🖌 General</option>
                     <option value="musica">🎵 Música</option>
+                    <option value="geo">🌍 Geografía</option>
                 </select>
 
                 {/* Common tools: draw, text, eraser, lasso, pan */}
@@ -1637,6 +2153,142 @@ function PizarraApp() {
                     </div>
                 </>}
 
+                {/* ── GEO MODE ── */}
+                {modoPizarra === 'geo' && (
+                    <div style={{ display:'flex', flexDirection:'column', gap:5, width:'100%' }}>
+                        <div style={{ display:'flex', gap:4, flexWrap:'wrap', alignItems:'center' }}>
+                            {[
+                                { id:'pais_mapa',  icon:'🗺️', label:'Mapa País' },
+                                { id:'continente', icon:'🌍', label:'Continente' },
+                                { id:'bandera',    icon:'🚩', label:'Bandera' },
+                                { id:'info',       icon:'ℹ️',  label:'Información' },
+                            ].map(({ id, icon, label }) => (
+                                <button key={id}
+                                    onClick={() => { setGeoTool(geoTool === id ? null : id); setGeoPaisData(null); setGeoBusqueda(''); setPendingInsert(null); }}
+                                    style={{ padding:'4px 10px', borderRadius:20, border:'none', cursor:'pointer', fontWeight:700, fontSize:'0.78rem',
+                                        background: geoTool === id ? '#1e3a5f' : '#dbeafe',
+                                        color: geoTool === id ? '#fff' : '#1e40af' }}>
+                                    {icon} {label}
+                                </button>
+                            ))}
+                            <div style={{ width:1, height:22, background:'#bdc3c7', margin:'0 4px' }} />
+                            {[
+                                { id:'cordilleras', icon:'⛰️', label:'Cordilleras' },
+                                { id:'rios',        icon:'🌊', label:'Ríos' },
+                                { id:'ciudades',    icon:'🏙️', label:'Ciudades' },
+                            ].map(({ id, icon, label }) => (
+                                <button key={id}
+                                    onClick={() => { setGeoTool(geoTool === id ? null : id); setGeoPaisData(null); setGeoBusqueda(''); setPendingInsert(null); }}
+                                    style={{ padding:'4px 10px', borderRadius:20, border:'none', cursor:'pointer', fontWeight:700, fontSize:'0.78rem',
+                                        background: geoTool === id ? '#14532d' : '#dcfce7',
+                                        color: geoTool === id ? '#fff' : '#166534' }}>
+                                    {icon} {label}
+                                </button>
+                            ))}
+                            <div style={{ width:1, height:22, background:'#bdc3c7', margin:'0 4px' }} />
+                            <button onClick={generarMapaProvinciasEspana}
+                                title="Genera el mapa de provincias de España y lo coloca en la pizarra"
+                                style={{ padding:'4px 10px', borderRadius:20, border:'none', cursor:'pointer', fontWeight:700, fontSize:'0.78rem', background:'#fef3c7', color:'#92400e' }}>
+                                🗾 España Provincias
+                            </button>
+                            <button onClick={generarMapaGeoEspana}
+                                title="Genera el mapa de elementos geográficos de España (ríos, montañas, ciudades)"
+                                style={{ padding:'4px 10px', borderRadius:20, border:'none', cursor:'pointer', fontWeight:700, fontSize:'0.78rem', background:'#fef3c7', color:'#92400e' }}>
+                                🌍 España Geo
+                            </button>
+                        </div>
+                        {(geoTool === 'pais_mapa' || geoTool === 'bandera' || geoTool === 'info') && (
+                            <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap', padding:'6px 8px', background:'#f8faff', borderRadius:8, border:'1px solid #bfdbfe' }}>
+                                <input value={geoBusqueda} onChange={e => setGeoBusqueda(e.target.value)}
+                                    onKeyDown={e => e.key==='Enter' && buscarPaisGeo()}
+                                    placeholder="Nombre del país en inglés (Spain, France...)"
+                                    style={{ padding:'5px 10px', borderRadius:6, border:'1px solid #93c5fd', fontSize:'0.82rem', outline:'none', flex:1, minWidth:160 }} />
+                                <button onClick={buscarPaisGeo}
+                                    style={{ padding:'5px 12px', background:'#2563eb', color:'white', border:'none', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.8rem' }}>
+                                    {geoCargando ? '...' : '🔍'}
+                                </button>
+                                {geoPaisData && geoTool === 'pais_mapa' && (
+                                    <button onClick={prepararMapaGeo_GeoMode}
+                                        style={{ padding:'5px 12px', background:'#1e3a5f', color:'white', border:'none', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.8rem' }}>
+                                        🗺️ Abrir visor de mapa
+                                    </button>
+                                )}
+                                {geoPaisData && geoTool === 'bandera' && (
+                                    <button onClick={prepararBanderaGeo}
+                                        style={{ padding:'5px 12px', background:'#1e3a5f', color:'white', border:'none', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.8rem' }}>
+                                        📌 Colocar
+                                    </button>
+                                )}
+                                {geoPaisData && geoTool === 'info' && (
+                                    <button onClick={prepararInfoGeo}
+                                        style={{ padding:'5px 12px', background:'#1e3a5f', color:'white', border:'none', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.8rem' }}>
+                                        📌 Colocar
+                                    </button>
+                                )}
+                                {geoPaisData && (
+                                    <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                                        {geoPaisData.flags?.svg && <img src={geoPaisData.flags.svg} alt="" style={{ height:20, borderRadius:2 }} />}
+                                        <span style={{ fontSize:'0.8rem', fontWeight:700, color:'#1e3a5f' }}>{geoPaisData.name?.common}</span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        {geoTool === 'continente' && (
+                            <div style={{ display:'flex', gap:4, flexWrap:'wrap', padding:'6px 8px', background:'#f8faff', borderRadius:8, border:'1px solid #bfdbfe', alignItems:'center' }}>
+                                {['África','Asia','Europa','América del Norte','América del Sur','Oceanía','Antártida'].map(label => (
+                                    <button key={label} onClick={() => setGeoVisible(true)}
+                                        style={{ padding:'4px 10px', borderRadius:16, border:'1px solid #93c5fd', background:'#eff6ff', color:'#1e40af', cursor:'pointer', fontSize:'0.78rem', fontWeight:600 }}>
+                                        {label}
+                                    </button>
+                                ))}
+                                <span style={{ fontSize:'0.75rem', color:'#64748b' }}>→ usa el visor de mapa</span>
+                            </div>
+                        )}
+                        {geoTool === 'cordilleras' && (
+                            <div style={{ display:'flex', gap:4, flexWrap:'wrap', padding:'6px 8px', background:'#fefce8', borderRadius:8, border:'1px solid #fde68a', maxHeight:110, overflowY:'auto' }}>
+                                {CORDILLERAS.map(c => (
+                                    <button key={c.nombre}
+                                        onClick={() => { setPendingInsert({ type:'label', txt:c.nombre, icon:'⛰️', color:'#78350f' }); setHerramienta('geo_place'); }}
+                                        title={c.region}
+                                        style={{ padding:'3px 9px', borderRadius:16, border:'1px solid #fbbf24', background:'#fffbeb', color:'#92400e', cursor:'pointer', fontSize:'0.78rem', fontWeight:600, whiteSpace:'nowrap' }}>
+                                        ⛰️ {c.nombre}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        {geoTool === 'rios' && (
+                            <div style={{ display:'flex', gap:4, flexWrap:'wrap', padding:'6px 8px', background:'#eff6ff', borderRadius:8, border:'1px solid #93c5fd', maxHeight:110, overflowY:'auto' }}>
+                                {RIOS.map(r => (
+                                    <button key={r.nombre}
+                                        onClick={() => { setPendingInsert({ type:'label', txt:r.nombre, icon:'🌊', color:'#1d4ed8' }); setHerramienta('geo_place'); }}
+                                        title={r.region}
+                                        style={{ padding:'3px 9px', borderRadius:16, border:'1px solid #93c5fd', background:'#dbeafe', color:'#1e40af', cursor:'pointer', fontSize:'0.78rem', fontWeight:600, whiteSpace:'nowrap' }}>
+                                        🌊 {r.nombre}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        {geoTool === 'ciudades' && (
+                            <div style={{ display:'flex', gap:6, alignItems:'center', padding:'6px 8px', background:'#f0fdf4', borderRadius:8, border:'1px solid #86efac', flexWrap:'wrap' }}>
+                                <input value={geoBusqueda} onChange={e => setGeoBusqueda(e.target.value)}
+                                    onKeyDown={e => { if (e.key==='Enter' && geoBusqueda.trim()) { setPendingInsert({ type:'label', txt:geoBusqueda.trim(), icon:'🏙️', color:'#14532d' }); setHerramienta('geo_place'); setGeoBusqueda(''); } }}
+                                    placeholder="Nombre de ciudad... (Enter para colocar)"
+                                    style={{ padding:'5px 10px', borderRadius:6, border:'1px solid #86efac', fontSize:'0.82rem', outline:'none', flex:1, minWidth:180 }} />
+                                <button onClick={() => { if (geoBusqueda.trim()) { setPendingInsert({ type:'label', txt:geoBusqueda.trim(), icon:'🏙️', color:'#14532d' }); setHerramienta('geo_place'); setGeoBusqueda(''); } }}
+                                    style={{ padding:'5px 12px', background:'#16a34a', color:'white', border:'none', borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.8rem' }}>
+                                    📌 Colocar
+                                </button>
+                            </div>
+                        )}
+                        {pendingInsert && herramienta === 'geo_place' && (
+                            <div style={{ padding:'5px 10px', background:'#fef3c7', borderRadius:6, border:'1px solid #fbbf24', fontSize:'0.8rem', color:'#92400e', fontWeight:600, display:'flex', alignItems:'center', gap:8 }}>
+                                🖱️ Haz clic en el lienzo para colocar
+                                <button onClick={() => { setPendingInsert(null); setHerramienta('draw'); }} style={{ background:'none', border:'none', cursor:'pointer', color:'#ef4444', fontWeight:700, padding:0 }}>✕ Cancelar</button>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* Color + thickness — hidden for collaborative spectators (color fixed) */}
                 {modoCompartir !== 'editar' && (
                     <div style={{ display:'flex', gap:4, alignItems:'center', flexWrap:'wrap' }}>
@@ -1681,12 +2333,40 @@ function PizarraApp() {
                         <button onClick={() => setCalcVisible(v => !v)} style={{ padding:'5px', background:'#9b59b6', color:'white', border:'none', borderRadius:7, cursor:'pointer' }} title="Calculadora">
                             <CalcIcon size={15}/>
                         </button>
+                        <button onClick={() => setGeoVisible(v => !v)} style={{ padding:'5px 7px', background: geoVisible ? '#1e3a5f' : '#1565C0', color:'white', border:'none', borderRadius:7, cursor:'pointer', fontWeight:'bold', fontSize:'0.85rem' }} title="Geografía: mapas, banderas e información de países">
+                            🌍
+                        </button>
                     </>}
                     {modoCompartir !== 'ver' && <>
-                        <button onClick={() => fileInputRef.current?.click()} title="Insertar imagen"
-                            style={{ padding:'5px', background:'#16a085', color:'white', border:'none', borderRadius:7, cursor:'pointer' }}>
-                            <ImageIcon size={15}/>
-                        </button>
+                        {/* Imagen: menú con dos opciones */}
+                        <div style={{ position:'relative' }}>
+                            <button
+                                onClick={() => { setImgMenuOpen(v => !v); setImgBuscador(false); }}
+                                title="Insertar imagen"
+                                style={{ padding:'5px', background: imgMenuOpen ? '#0e6b56' : '#16a085', color:'white', border:'none', borderRadius:7, cursor:'pointer' }}>
+                                <ImageIcon size={15}/>
+                            </button>
+                            {imgMenuOpen && (
+                                <div style={{ position:'absolute', top:'calc(100% + 4px)', right:0, background:'white', border:'1px solid #ccc', borderRadius:8, boxShadow:'0 4px 16px rgba(0,0,0,0.18)', zIndex:600, minWidth:170, overflow:'hidden' }}>
+                                    <button
+                                        onClick={() => { fileInputRef.current?.click(); setImgMenuOpen(false); }}
+                                        style={{ display:'flex', alignItems:'center', gap:8, width:'100%', padding:'9px 14px', background:'none', border:'none', cursor:'pointer', fontSize:'0.85rem', color:'#1e293b', borderBottom:'1px solid #f1f5f9' }}
+                                        onMouseEnter={e => e.currentTarget.style.background='#f8fafc'}
+                                        onMouseLeave={e => e.currentTarget.style.background='none'}
+                                    >
+                                        📁 Desde el dispositivo
+                                    </button>
+                                    <button
+                                        onClick={() => { setImgBuscador(true); setImgMenuOpen(false); }}
+                                        style={{ display:'flex', alignItems:'center', gap:8, width:'100%', padding:'9px 14px', background:'none', border:'none', cursor:'pointer', fontSize:'0.85rem', color:'#1e293b' }}
+                                        onMouseEnter={e => e.currentTarget.style.background='#f8fafc'}
+                                        onMouseLeave={e => e.currentTarget.style.background='none'}
+                                    >
+                                        🔍 Buscar imagen online
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                         <input ref={fileInputRef} type="file" accept="image/*" style={{ display:'none' }} onChange={onFileSelected} />
                     </>}
                     <button onClick={descargarPagina} title="PNG hoja actual"
@@ -1731,9 +2411,24 @@ function PizarraApp() {
             {herramienta === 'graph'  && <div style={{ background:'#e67e22', color:'white',   padding:4, textAlign:'center', fontWeight:'bold', fontSize:'0.82rem' }}>Haz clic para situar el origen de la gráfica f(x).</div>}
             {herramienta === 'axes'   && <div style={{ background:'#16a085', color:'white',   padding:4, textAlign:'center', fontWeight:'bold', fontSize:'0.82rem' }}>Haz clic para colocar el origen (0,0) de los ejes (−8 a 8).</div>}
             {herramienta === 'pan'    && <div style={{ background:'#34495e', color:'white',   padding:4, textAlign:'center', fontWeight:'bold', fontSize:'0.82rem' }}>Arrastra para mover el lienzo · Doble clic para resetear.</div>}
-            {herramienta === 'lasso'  && <div style={{ background:'#3498db', color:'white',   padding:4, textAlign:'center', fontWeight:'bold', fontSize:'0.82rem' }}>
-                {selIdxs.length > 0 ? `${selIdxs.length} elemento(s). Arrastra para mover · handles para redimensionar y ↻ para girar · 🗑 para borrar.` : 'Dibuja un rectángulo para seleccionar.'}
-            </div>}
+            {herramienta === 'lasso' && (
+                <div style={{ background:'#3498db', color:'white', padding:'4px 8px', display:'flex', gap:8, justifyContent:'center', alignItems:'center', fontWeight:'bold', fontSize:'0.82rem', flexWrap:'wrap' }}>
+                    {lassoRect && !dibujando ? (
+                        <>
+                            <span>Región seleccionada.</span>
+                            <button onClick={cortarRegion}  style={{ padding:'2px 12px', background:'#e74c3c', color:'white', border:'none', borderRadius:6, cursor:'pointer', fontWeight:'bold', fontSize:'0.82rem' }}>✂️ Cortar</button>
+                            <button onClick={copiarRegion}  style={{ padding:'2px 12px', background:'rgba(255,255,255,0.22)', color:'white', border:'1px solid rgba(255,255,255,0.45)', borderRadius:6, cursor:'pointer', fontWeight:'bold', fontSize:'0.82rem' }}>📋 Copiar</button>
+                            {clipboardRegion && <button onClick={pegarRegion} style={{ padding:'2px 12px', background:'#f39c12', color:'white', border:'none', borderRadius:6, cursor:'pointer', fontWeight:'bold', fontSize:'0.82rem' }}>📌 Pegar</button>}
+                            <button onClick={() => { setLassoRect(null); setSelIdxs([]); }} style={{ padding:'2px 8px', background:'rgba(255,255,255,0.12)', color:'white', border:'1px solid rgba(255,255,255,0.3)', borderRadius:6, cursor:'pointer', fontSize:'0.82rem' }}>✕</button>
+                        </>
+                    ) : (
+                        <>
+                            <span>Arrastra para seleccionar una región del lienzo.</span>
+                            {clipboardRegion && <button onClick={pegarRegion} style={{ padding:'2px 12px', background:'#f39c12', color:'white', border:'none', borderRadius:6, cursor:'pointer', fontWeight:'bold', fontSize:'0.82rem' }}>📌 Pegar</button>}
+                        </>
+                    )}
+                </div>
+            )}
 
             {/* ── Panel de texto ───────────────────────────────────────── */}
             {herramienta === 'text' && (
@@ -1787,6 +2482,75 @@ function PizarraApp() {
             {/* Floating panels */}
             {calcVisible && <CalculadoraFlotante onClose={() => setCalcVisible(false)} onCopiar={res => { setTextoPegar(res); setHerramienta('paste'); setCalcVisible(false); }} />}
             {grafVisible  && <GraficadoraFlotante onClose={() => setGrafVisible(false)} onInsertar={cfg => { setGraficaConfig(cfg); setHerramienta('graph'); setGrafVisible(false); }} />}
+            {/* ── Buscador de imágenes Wikimedia ──────────────────────────── */}
+            {imgBuscador && (
+                <div style={{ position:'absolute', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.45)', zIndex:400, display:'flex', alignItems:'center', justifyContent:'center' }}
+                    onClick={e => { if (e.target===e.currentTarget) { setImgBuscador(false); setImgResults([]); } }}>
+                    <div style={{ background:'white', borderRadius:14, width:'min(96vw, 580px)', maxHeight:'85vh', display:'flex', flexDirection:'column', boxShadow:'0 8px 40px rgba(0,0,0,0.28)', overflow:'hidden' }}>
+                        {/* Header */}
+                        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 16px', borderBottom:'1px solid #e2e8f0', background:'#1e293b' }}>
+                            <span style={{ color:'white', fontWeight:700, fontSize:'0.95rem' }}>🔍 Buscar imagen — Wikimedia Commons</span>
+                            <button onClick={() => { setImgBuscador(false); setImgResults([]); }} style={{ background:'none', border:'none', color:'#94a3b8', cursor:'pointer', fontSize:18 }}>✕</button>
+                        </div>
+                        {/* Search bar */}
+                        <div style={{ padding:'12px 16px', borderBottom:'1px solid #f1f5f9' }}>
+                            <p style={{ margin:'0 0 8px', fontSize:'0.75rem', color:'#64748b' }}>Imágenes libres de derechos — también puedes pegar una URL directamente</p>
+                            <div style={{ display:'flex', gap:8, marginBottom:8 }}>
+                                <input
+                                    value={imgQuery}
+                                    onChange={e => setImgQuery(e.target.value)}
+                                    onKeyDown={e => e.key==='Enter' && buscarImagenesWikimedia()}
+                                    placeholder="Ej: sistema solar, célula, mapa Europa..."
+                                    style={{ flex:1, padding:'8px 12px', borderRadius:8, border:'1px solid #cbd5e1', fontSize:'0.85rem', outline:'none' }}
+                                    autoFocus
+                                />
+                                <button onClick={buscarImagenesWikimedia}
+                                    style={{ padding:'8px 16px', background:'#2563eb', color:'white', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700, whiteSpace:'nowrap' }}>
+                                    {imgSearching ? '...' : 'Buscar'}
+                                </button>
+                            </div>
+                            <input
+                                placeholder="O pega una URL de imagen directamente y pulsa Enter..."
+                                style={{ width:'100%', boxSizing:'border-box', padding:'7px 12px', borderRadius:8, border:'1px solid #cbd5e1', fontSize:'0.8rem', outline:'none', color:'#475569' }}
+                                onKeyDown={e => { if (e.key==='Enter' && e.target.value.startsWith('http')) { insertarImagenDesdeURL(e.target.value); e.target.value=''; } }}
+                            />
+                        </div>
+                        {/* Results grid */}
+                        <div style={{ flex:1, overflowY:'auto', padding:'12px 16px' }}>
+                            {imgResults.length > 0 ? (
+                                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(100px, 1fr))', gap:8 }}>
+                                    {imgResults.map((url, i) => (
+                                        <img key={i} src={url} alt=""
+                                            onClick={() => insertarImagenDesdeURL(url)}
+                                            onError={e => { e.target.style.display='none'; }}
+                                            style={{ width:'100%', height:80, objectFit:'cover', borderRadius:8, cursor:'pointer', border:'2px solid transparent', transition:'border 0.15s' }}
+                                            onMouseEnter={e => e.target.style.border='2px solid #2563eb'}
+                                            onMouseLeave={e => e.target.style.border='2px solid transparent'}
+                                        />
+                                    ))}
+                                </div>
+                            ) : imgSearching ? (
+                                <p style={{ textAlign:'center', color:'#94a3b8', padding:'30px 0' }}>Buscando...</p>
+                            ) : imgQuery ? (
+                                <p style={{ textAlign:'center', color:'#94a3b8', padding:'30px 0' }}>Sin resultados. Prueba otro término o pega una URL.</p>
+                            ) : (
+                                <p style={{ textAlign:'center', color:'#cbd5e1', padding:'30px 0', fontSize:'0.85rem' }}>Escribe un término y pulsa Buscar</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {geoVisible && (
+                <GeografiaPanel
+                    onClose={() => setGeoVisible(false)}
+                    onPegarEnPizarra={(dataURL, w = 500, h = 340) => {
+                        setPendingInsert({ type: 'image', src: dataURL, w, h });
+                        setHerramienta('geo_place');
+                        setGeoVisible(false);
+                    }}
+                />
+            )}
             {SHAPES_3D.includes(herramienta) && <Visor3D shape={herramienta} onClose={() => setHerramienta('draw')}
                 onPegarEnPizarra={(dataURL) => {
                     const img = new Image();
@@ -2448,8 +3212,9 @@ function PlanoAulaLibre() {
 // ══════════════════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL: MENÚ
 // ══════════════════════════════════════════════════════════════════════════════
-export default function HerramientasClase({ onExit }) {
+export default function HerramientasClase({ onExit, initialTool }) {
     const [activa, setActiva] = useState(() => {
+        if (initialTool) return initialTool;
         const params = new URLSearchParams(window.location.search);
         if (params.get('pizarra')) return 'pizarra';
         const g = params.get('gestion');
@@ -2462,7 +3227,7 @@ export default function HerramientasClase({ onExit }) {
 
     const HERRAMIENTAS = [
         { id: 'ruleta',  icon: <RotateCcw size={40}/>,   titulo: 'Ruleta de Aula',     desc: 'Selecciona alumnos al azar desde una lista.',              color: '#e67e22' },
-        { id: 'pizarra', icon: <PenTool size={40}/>,     titulo: 'Pizarra Científica',  desc: 'Funciones, Formas 3D y Captura de pantalla.',              color: '#3498db' },
+        { id: 'pizarra', icon: <PenTool size={40}/>,     titulo: 'Pizarra Temática',  desc: 'Ciencias, Música, Geografía...',              color: '#3498db' },
         { id: 'reloj',   icon: <Clock size={40}/>,        titulo: 'Gestor de Tiempo',   desc: 'Cronómetro y Temporizador de cuenta atrás.',               color: '#2ecc71' },
         { id: 'grupos',  icon: <Users size={40}/>,        titulo: 'Grupos de Clase',    desc: 'Crea subgrupos aleatorios a partir de una lista de alumnos.', color: '#9b59b6' },
         { id: 'plano',   icon: <LayoutGrid size={40}/>,   titulo: 'Plano de Clase',     desc: 'Organiza los asientos de tu aula con un plano visual.',    color: '#1565C0' },

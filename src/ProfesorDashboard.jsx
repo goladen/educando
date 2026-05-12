@@ -1034,7 +1034,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                 <div style={styles.menuFooter}>PiKT © 2024</div></div></div>)}
 
             {/* BARRA SUPERIOR (PERFIL, AYUDA) */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '15px', marginBottom: '30px', paddingBottom: '15px', marginTop:'60px' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', flexWrap: 'wrap', gap: '10px', marginBottom: '30px', paddingBottom: '15px', marginTop:'60px' }}>
                 <button onClick={() => navegar('INFORMES')} style={{ ...styles.helpButtonTop, background: '#1565C0' }} title="Informes de Juegos">
                     <BarChart2 size={20} color="white" />
                 </button>

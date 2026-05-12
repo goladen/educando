@@ -3,8 +3,9 @@ import { useRef, useState, useEffect } from 'react';
 const COLORS = ['#e74c3c', '#f39c12', '#f1c40f', '#2ecc71', '#3498db', '#9b59b6', '#1abc9c', '#2c3e50', '#ffffff'];
 const SIZES  = [2, 5, 10, 18];
 
-export default function AnnotationOverlay({ onClose }) {
+export default function AnnotationOverlay({ onClose, bgDataURL }) {
     const canvasRef    = useRef(null);
+    const bgImgRef     = useRef(null); // cached background Image object
     const drawingRef   = useRef(false);
     const lastPtRef    = useRef(null);
     const capStartRef  = useRef(null);
@@ -13,6 +14,14 @@ export default function AnnotationOverlay({ onClose }) {
     const [color,       setColor]       = useState('#e74c3c');
     const [size,        setSize]        = useState(5);
     const [captureRect, setCaptureRect] = useState(null);
+
+    // Pre-load background image
+    useEffect(() => {
+        if (!bgDataURL) return;
+        const img = new Image();
+        img.src = bgDataURL;
+        bgImgRef.current = img;
+    }, [bgDataURL]);
 
     // Size canvas to viewport on mount + resize
     useEffect(() => {
@@ -87,15 +96,28 @@ export default function AnnotationOverlay({ onClose }) {
         if (mode === 'capture') {
             const rect = captureRect;
             if (rect && rect.w > 10 && rect.h > 10) {
-                const tmp = document.createElement('canvas');
-                tmp.width  = rect.w;
-                tmp.height = rect.h;
-                tmp.getContext('2d').drawImage(
+                const composite = document.createElement('canvas');
+                composite.width  = rect.w;
+                composite.height = rect.h;
+                const ctx = composite.getContext('2d');
+
+                // 1. Draw background crop (captured before overlay appeared)
+                if (bgImgRef.current && bgImgRef.current.complete) {
+                    ctx.drawImage(
+                        bgImgRef.current,
+                        rect.x, rect.y, rect.w, rect.h,
+                        0,      0,      rect.w, rect.h,
+                    );
+                }
+
+                // 2. Draw annotation strokes on top
+                ctx.drawImage(
                     canvasRef.current,
                     rect.x, rect.y, rect.w, rect.h,
                     0,      0,      rect.w, rect.h,
                 );
-                const dataURL = tmp.toDataURL('image/png');
+
+                const dataURL = composite.toDataURL('image/png');
                 sessionStorage.setItem('pizarraCaptura', dataURL);
                 onClose();
                 window.dispatchEvent(new CustomEvent('abrirPizarraConCaptura'));

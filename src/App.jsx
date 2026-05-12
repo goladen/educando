@@ -44,7 +44,27 @@ function App() {
 
     // ANNOTATION OVERLAY + PIZARRA DESDE CAPTURA
     const [annotationOpen,   setAnnotationOpen]   = useState(false);
+    const [annotationBg,     setAnnotationBg]     = useState(null);
     const [pizarraCaptura,   setPizarraCaptura]   = useState(false);
+
+    const openAnnotation = async () => {
+        if (annotationOpen) { setAnnotationOpen(false); setAnnotationBg(null); return; }
+        try {
+            const h2c = (await import('html2canvas')).default;
+            const canvas = await h2c(document.documentElement, {
+                scale: 1, logging: false, allowTaint: false, useCORS: false,
+                imageTimeout: 2000,
+                x: window.scrollX, y: window.scrollY,
+                width: window.innerWidth, height: window.innerHeight,
+                scrollX: -window.scrollX, scrollY: -window.scrollY,
+                windowWidth: window.innerWidth, windowHeight: window.innerHeight,
+            });
+            setAnnotationBg(canvas.toDataURL('image/jpeg', 0.85));
+        } catch (_) {
+            setAnnotationBg(null);
+        }
+        setAnnotationOpen(true);
+    };
 
     useEffect(() => {
       const params = new URLSearchParams(window.location.search);
@@ -172,7 +192,7 @@ function App() {
     const anotadorUI = (
         <>
             <button
-                onClick={() => setAnnotationOpen(v => !v)}
+                onClick={openAnnotation}
                 title="Anotador: dibuja encima de la pantalla"
                 style={{
                     position: 'fixed', bottom: 22, right: 22, zIndex: 9985,
@@ -183,10 +203,15 @@ function App() {
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}
             >✏️</button>
-            {annotationOpen && <AnnotationOverlay onClose={() => setAnnotationOpen(false)} />}
+            {annotationOpen && (
+                <AnnotationOverlay
+                    bgDataURL={annotationBg}
+                    onClose={() => { setAnnotationOpen(false); setAnnotationBg(null); }}
+                />
+            )}
             {pizarraCaptura && (
                 <div style={{ position: 'fixed', inset: 0, zIndex: 9989, background: '#f8f9fa' }}>
-                    <HerramientasClase onExit={() => setPizarraCaptura(false)} />
+                    <HerramientasClase initialTool="pizarra" onExit={() => setPizarraCaptura(false)} />
                 </div>
             )}
         </>
@@ -218,7 +243,7 @@ function App() {
 
     // SI NO HAY USUARIO, MOSTRAMOS EL NUEVO LOGIN
     if (!usuario) {
-        return <Login setGoogleToken={setGoogleToken} />;
+        return <><Login setGoogleToken={setGoogleToken} />{anotadorUI}</>;
     }
 
     // SI HAY USUARIO, MOSTRAMOS LA APP NORMAL

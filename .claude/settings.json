@@ -7,7 +7,9 @@
       "Read(//c/Users/Asus  6/.claude/**)",
       "Read(//c/Users/Asus  6/**)",
       "Bash(grep -n \"const.*=.*['\\\\\"].*[A-Za-z0-9]\\\\{20,\\\\}\" \"c:\\\\Users\\\\Asus  6\\\\educando\\\\src\\\\firebase.js\")",
-      "Bash(grep -rE \"apiKey.*[:=].*[\\\\\"\\\\'][A-Za-z0-9_-]{20,}[\\\\\"\\\\']\" \"c:\\\\Users\\\\Asus  6\\\\educando\\\\src\")"
+      "Bash(grep -rE \"apiKey.*[:=].*[\\\\\"\\\\'][A-Za-z0-9_-]{20,}[\\\\\"\\\\']\" \"c:\\\\Users\\\\Asus  6\\\\educando\\\\src\")",
+      "Bash(npm install *)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(k,v\\) for k,v in {**d.get\\('dependencies',{}\\), **d.get\\('devDependencies',{}\\)}.items\\(\\)]\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\Asus  6\\.claude"

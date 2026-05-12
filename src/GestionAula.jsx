@@ -787,6 +787,7 @@ function PizarraApp() {
     const [geoCargando,    setGeoCargando]    = useState(false);
     const [geoPaisData,    setGeoPaisData]    = useState(null);
     const [pendingInsert,  setPendingInsert]  = useState(null);
+    const [ladosPoligono,  setLadosPoligono]  = useState(5);
     const [imgMenuOpen,    setImgMenuOpen]    = useState(false);
     const [imgBuscador,    setImgBuscador]    = useState(false);
     const [imgQuery,       setImgQuery]       = useState('');
@@ -1708,8 +1709,8 @@ function PizarraApp() {
         if (t === 'line') { ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); } 
         else if (t === 'rect') { ctx.strokeRect(x1, y1, w, h); } 
         else if (t === 'circle') { const radio = Math.sqrt(Math.pow(w, 2) + Math.pow(h, 2)); ctx.arc(x1, y1, radio, 0, 2 * Math.PI); } 
-        else if (['triangle', 'pentagon', 'hexagon'].includes(t)) {
-            const lados = t === 'triangle' ? 3 : t === 'pentagon' ? 5 : 6;
+        else if (['triangle', 'pentagon', 'hexagon', 'poligono'].includes(t)) {
+            const lados = t === 'triangle' ? 3 : t === 'pentagon' ? 5 : t === 'hexagon' ? 6 : (item.lados || 5);
             for (let i = 0; i < lados; i++) {
                 const angulo = i * (2 * Math.PI / lados) - (Math.PI / 2);
                 const px = cx + r * Math.cos(angulo);
@@ -1955,7 +1956,7 @@ function PizarraApp() {
         if (herramienta === 'draw' || herramienta === 'eraser')
             setPreviewElement(prev => ({ ...prev, pts: [...prev.pts, {x, y}] }));
         else
-            setPreviewElement({ t: herramienta, x1: inicioXY.x, y1: inicioXY.y, x2: x, y2: y, color, grosor });
+            setPreviewElement({ t: herramienta, x1: inicioXY.x, y1: inicioXY.y, x2: x, y2: y, color, grosor, ...(herramienta === 'poligono' ? { lados: ladosPoligono } : {}) });
     };
 
     const terminarDibujo = () => {
@@ -2054,7 +2055,7 @@ function PizarraApp() {
     };
 
     const ERASER_SVG = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='22'%3E%3Crect x='1' y='1' width='34' height='20' rx='3' fill='%23fde8e8' stroke='%23e74c3c' stroke-width='1.5'/%3E%3Crect x='23' y='1' width='12' height='20' rx='0 3 3 0' fill='%23e74c3c' opacity='0.7'/%3E%3Cline x1='23' y1='1' x2='23' y2='21' stroke='%23e74c3c' stroke-width='1.5'/%3E%3C/svg%3E") 1 20, cell`;
-    const CURSOR_MAP = { pan: 'grab', lasso: 'crosshair', paste: 'crosshair', text: 'text', graph: 'crosshair', axes: 'crosshair', eraser: ERASER_SVG };
+    const CURSOR_MAP = { pan: 'grab', lasso: 'crosshair', paste: 'crosshair', text: 'text', graph: 'crosshair', axes: 'crosshair', geo_place: 'crosshair', eraser: ERASER_SVG };
 
     const ToolBtn = ({ id, icon, label }) => (
         <button onClick={() => { setHerramienta(id); setSelIdxs([]); setLassoRect(null); }} title={label}
@@ -2064,7 +2065,7 @@ function PizarraApp() {
     );
 
     return (
-        <div ref={contenedorRef} style={{ position: 'relative', width: '100%', maxWidth: fullscreen ? '100vw' : 1100, margin: '0 auto', border: '2px solid #bdc3c7', borderRadius: 15, background: '#f8f9fa', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div ref={contenedorRef} style={{ position: 'relative', width: '100%', maxWidth: fullscreen ? '100vw' : 1100, height: fullscreen ? '100%' : 'auto', margin: '0 auto', border: '2px solid #bdc3c7', borderRadius: 15, background: '#f8f9fa', overflow: fullscreen ? 'auto' : 'hidden', display: 'flex', flexDirection: 'column' }}>
 
             {/* ── Toolbar ──────────────────────────────────────────────── */}
             <div style={{ background: '#ecf0f1', padding: '7px 10px', display: 'flex', gap: 8, alignItems: 'center', borderBottom: '2px solid #bdc3c7', flexWrap: 'wrap' }}>
@@ -2093,7 +2094,7 @@ function PizarraApp() {
                         <ToolBtn id="rect"     icon={<SquareIcon size={18}/>} label="Rectángulo" />
                         <ToolBtn id="circle"   icon={<Circle size={18}/>}     label="Círculo" />
                         <ToolBtn id="triangle" icon={<Triangle size={18}/>}   label="Triángulo" />
-                        <ToolBtn id="pentagon" icon={<Hexagon size={18}/>}    label="Polígono" />
+                        <ToolBtn id="poligono" icon={<Hexagon size={18}/>}    label="Polígono regular (elige lados)" />
                     </div>
                     <div style={{ display:'flex', gap:3, borderRight:'2px solid #bdc3c7', paddingRight:8 }}>
                         <ToolBtn id="prisma"   icon={<Box size={18}/>}                            label="Cubo/Prisma" />
@@ -2407,6 +2408,18 @@ function PizarraApp() {
             </div>
 
             {/* Status hints */}
+            {herramienta === 'poligono' && (
+                <div style={{ background:'#f1c40f', color:'#78350f', padding:'4px 10px', display:'flex', alignItems:'center', gap:10, fontWeight:'bold', fontSize:'0.82rem', flexWrap:'wrap' }}>
+                    <span>Polígono regular</span>
+                    <label style={{ display:'flex', alignItems:'center', gap:5 }}>
+                        Lados:
+                        <input type="number" min={3} max={20} value={ladosPoligono}
+                            onChange={e => setLadosPoligono(Math.max(3, Math.min(20, parseInt(e.target.value) || 3)))}
+                            style={{ width:52, padding:'1px 6px', borderRadius:5, border:'1px solid #d97706', textAlign:'center', fontWeight:'bold', fontSize:'0.85rem' }} />
+                    </label>
+                    <span style={{ fontWeight:400 }}>— Arrastra en el lienzo para dibujar</span>
+                </div>
+            )}
             {herramienta === 'paste'  && <div style={{ background:'#f1c40f', color:'#2c3e50', padding:4, textAlign:'center', fontWeight:'bold', fontSize:'0.82rem' }}>Haz clic para pegar: {textoPegar}</div>}
             {herramienta === 'graph'  && <div style={{ background:'#e67e22', color:'white',   padding:4, textAlign:'center', fontWeight:'bold', fontSize:'0.82rem' }}>Haz clic para situar el origen de la gráfica f(x).</div>}
             {herramienta === 'axes'   && <div style={{ background:'#16a085', color:'white',   padding:4, textAlign:'center', fontWeight:'bold', fontSize:'0.82rem' }}>Haz clic para colocar el origen (0,0) de los ejes (−8 a 8).</div>}
@@ -2555,13 +2568,12 @@ function PizarraApp() {
                 onPegarEnPizarra={(dataURL) => {
                     const img = new Image();
                     img.onload = () => {
-                        const id = Date.now();
                         const maxW = 380, maxH = 260;
                         let w = img.width, h = img.height;
                         if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
                         if (h > maxH) { w = Math.round(w * maxH / h); h = maxH; }
-                        imageCacheRef.current[id] = img;
-                        setElementos(prev => [...prev, { t: 'image', id, src: dataURL, x: 60 - panRef.current.x, y: 80 - panRef.current.y, w, h }]);
+                        setPendingInsert({ type: 'image', src: dataURL, w, h });
+                        setHerramienta('geo_place');
                     };
                     img.src = dataURL;
                 }}
@@ -2726,7 +2738,7 @@ function PizarraApp() {
             />
 
             {/* ── Page tabs ─────────────────────────────────────────────── */}
-            <div style={{ background:'#dde3ea', borderTop:'2px solid #bdc3c7', padding:'5px 10px', display:'flex', gap:5, alignItems:'center', overflowX:'auto', flexShrink:0 }}>
+            <div style={{ background:'#dde3ea', borderTop:'2px solid #bdc3c7', padding:'5px 10px', display:'flex', gap:5, alignItems:'center', overflowX:'auto', flexShrink:0, position:'sticky', bottom:0, zIndex:5 }}>
                 {paginas.map((_, i) => (
                     <div key={i} style={{ display:'flex', alignItems:'center', gap:2, flexShrink:0 }}>
                         <button onClick={() => cambiarPagina(i)}

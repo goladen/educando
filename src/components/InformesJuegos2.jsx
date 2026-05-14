@@ -52,8 +52,8 @@ const ConfigBadge = ({ icon, label }) => (
         {icon} {label}
     </span>
 );
-const TIPO_LABEL  = { OCA:'🦆 Oca Matemática', CAZABURBUJAS:'🔵 Cazaburbujas', PIKATRON:'⚡ Pikatron', SOPA:'🔤 Sopa de Letras', WORDLE:'🟩 Wordle', MATHLE:'🔢 Mathle', PASAPALABRA:'🔠 Pasapalabra', FUNCIONES:'∫ Funciones', FUNCIONES_ANALISIS:'📈 Análisis de Funciones', APAREJADOS:'🃏 Aparejados', STORYCUBES:'🎲 Story Cubes', IRREGULAR_VERBS:'🇬🇧 Verbos Irregulares', THINKHOOT:'🦉 PiLive', MATHLIVE:'🧮 MathLive', OLYMPICLIVE:'🏅 OlympicLive', ALGEBRA:'✖️ Álgebra', DOMINO:'🁣 Dominó', ESTADISTICA:'📊 Estadística', MUSIC_COMPASS:'🎵 Entrenamiento Auditivo', MUSIC_GAMES:'🎼 Juegos Musicales' };
-const TIPO_ICON   = { OCA:'🦆', CAZABURBUJAS:'🔵', PIKATRON:'⚡', SOPA:'🔤', WORDLE:'🟩', MATHLE:'🔢', PASAPALABRA:'🔠', FUNCIONES:'∫', FUNCIONES_ANALISIS:'📈', APAREJADOS:'🃏', STORYCUBES:'🎲', IRREGULAR_VERBS:'🇬🇧', THINKHOOT:'🦉', MATHLIVE:'🧮', OLYMPICLIVE:'🏅', ALGEBRA:'✖️', DOMINO:'🁣', ESTADISTICA:'📊', MUSIC_COMPASS:'🎵', MUSIC_GAMES:'🎼' };
+const TIPO_LABEL  = { OCA:'🦆 Oca Matemática', CAZABURBUJAS:'🔵 Cazaburbujas', PIKATRON:'⚡ Pikatron', SOPA:'🔤 Sopa de Letras', WORDLE:'🟩 Wordle', MATHLE:'🔢 Mathle', PASAPALABRA:'🔠 Pasapalabra', FUNCIONES:'∫ Funciones', FUNCIONES_ANALISIS:'📈 Análisis de Funciones', APAREJADOS:'🃏 Aparejados', STORYCUBES:'🎲 Story Cubes', IRREGULAR_VERBS:'🇬🇧 Verbos Irregulares', THINKHOOT:'🦉 PiLive', MATHLIVE:'🧮 MathLive', OLYMPICLIVE:'🏅 OlympicLive', ALGEBRA:'✖️ Álgebra', DOMINO:'🁣 Dominó', ESTADISTICA:'📊 Estadística', MUSIC_COMPASS:'🎵 Entrenamiento Auditivo', MUSIC_GAMES:'🎼 Juegos Musicales', GEOGRAFIA:'🌍 Test de Geografía' };
+const TIPO_ICON   = { OCA:'🦆', CAZABURBUJAS:'🔵', PIKATRON:'⚡', SOPA:'🔤', WORDLE:'🟩', MATHLE:'🔢', PASAPALABRA:'🔠', FUNCIONES:'∫', FUNCIONES_ANALISIS:'📈', APAREJADOS:'🃏', STORYCUBES:'🎲', IRREGULAR_VERBS:'🇬🇧', THINKHOOT:'🦉', MATHLIVE:'🧮', OLYMPICLIVE:'🏅', ALGEBRA:'✖️', DOMINO:'🁣', ESTADISTICA:'📊', MUSIC_COMPASS:'🎵', MUSIC_GAMES:'🎼', GEOGRAFIA:'🌍' };
 const TIPO_LIVE = new Set(['THINKHOOT', 'MATHLIVE', 'OLYMPICLIVE']);
 const tipoLabel   = (t) => TIPO_LABEL[t] || ('🎮 ' + (t||'Juego'));
 const tipoIcon    = (t) => TIPO_ICON[t]  || '🎮';
@@ -342,7 +342,7 @@ export default function InformesJuegos({ usuario, googleToken }) {
         <div style={{ fontFamily:'Arial,sans-serif', padding:'4px 0 40px' }}>
 
             {/* ── Pestañas ──────────────────────────────────────────────── */}
-            <div style={{ display:'flex', gap:4, marginBottom:24, borderBottom:'2px solid #e0e4f0' }}>
+            <div style={{ display:'flex', gap:4, marginBottom:24, borderBottom:'2px solid #e0e4f0', overflowX:'auto', WebkitOverflowScrolling:'touch' }}>
                 {[
                     { id:'informes',     label:'📋 Informes' },
                     { id:'grupos',       label:'👥 Grupos' },
@@ -350,10 +350,10 @@ export default function InformesJuegos({ usuario, googleToken }) {
                     { id:'plano',        label:'🪑 Plano' },
                 ].map(t => (
                     <button key={t.id} onClick={() => setPestañaActiva(t.id)}
-                        style={{ padding:'10px 22px', border:'none', background:'none', fontWeight: pestañaActiva===t.id ? 700 : 400,
-                            color: pestañaActiva===t.id ? '#1565C0' : '#7f8c8d', cursor:'pointer', fontSize:'0.95rem',
+                        style={{ padding:'10px 16px', border:'none', background:'none', fontWeight: pestañaActiva===t.id ? 700 : 400,
+                            color: pestañaActiva===t.id ? '#1565C0' : '#7f8c8d', cursor:'pointer', fontSize:'0.9rem',
                             borderBottom: pestañaActiva===t.id ? '3px solid #1565C0' : '3px solid transparent',
-                            marginBottom:-2, transition:'all 0.15s' }}>
+                            marginBottom:-2, transition:'all 0.15s', whiteSpace:'nowrap', flexShrink:0 }}>
                         {t.label}
                     </button>
                 ))}
@@ -747,6 +747,14 @@ const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, 
                             if (cfg.nivel)     badges.push(<ConfigBadge key="niv" icon="📊" label={cfg.nivel}/>);
                             if (cfg.numVerbos) badges.push(<ConfigBadge key="nv" icon="🔢" label={`${cfg.numVerbos} verbos`}/>);
                             if (cfg.modo)      badges.push(<ConfigBadge key="modo" icon="📝" label={cfg.modo}/>);
+                        } else if (tipo === 'GEOGRAFIA') {
+                            const modoLabel = { mundo:'Países del Mundo', provincias:'Provincias ESP', fisico:'Geo. Física', banderas:'Banderas' };
+                            const modoIcon  = { mundo:'🌍', provincias:'🗺️', fisico:'🏔️', banderas:'🚩' };
+                            if (cfg.modoJuego)     badges.push(<ConfigBadge key="mj" icon={modoIcon[cfg.modoJuego]||'🌍'} label={modoLabel[cfg.modoJuego] || cfg.modoJuego}/>);
+                            if (cfg.zona)          badges.push(<ConfigBadge key="z"  icon="📍" label={cfg.zona}/>);
+                            if (cfg.tipoElemento)  badges.push(<ConfigBadge key="te" icon="🌊" label={cfg.tipoElemento}/>);
+                            if (cfg.tipoPregunta)  badges.push(<ConfigBadge key="tp" icon="❓" label={cfg.tipoPregunta}/>);
+                            if (cfg.modoRespuesta) badges.push(<ConfigBadge key="mr" icon="📝" label={cfg.modoRespuesta}/>);
                         } else if (tipo === 'FUNCIONES_ANALISIS') {
                             const tf = cfg.tipoFuncion || jugador0.tipoEjercicio;
                             const id = cfg.idFuncion   || jugador0.idFuncion;

@@ -12,7 +12,8 @@
       "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(k,v\\) for k,v in {**d.get\\('dependencies',{}\\), **d.get\\('devDependencies',{}\\)}.items\\(\\)]\")"
     ],
     "additionalDirectories": [
-      "C:\\Users\\Asus  6\\.claude"
+      "C:\\Users\\Asus  6\\.claude",
+      "C:\\Users\\Asus  6\\TopoClimbing\\Shareclimbing"
     ]
   }
 }

@@ -14,16 +14,22 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f4ff; color: #
 .section { background: white; border-radius: 16px; padding: 25px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
 .section h2 { color: #6c63ff; font-size: 1.5em; margin-bottom: 15px; display: flex; align-items: center; gap: 10px; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; }
 .section h3 { color: #444; font-size: 1.1em; margin: 15px 0 8px 0; }
+.new-badge { display: inline-block; background: #dcfce7; color: #16a34a; border-radius: 20px; padding: 1px 8px; font-size: 0.72em; font-weight: 700; margin-left: 6px; vertical-align: middle; }
 .app-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; margin-top: 15px; }
 .app-card { background: #fafafa; border: 2px solid #e8e8ff; border-radius: 12px; padding: 15px; transition: transform 0.2s, border-color 0.2s; }
 .app-card:hover { transform: translateY(-3px); border-color: #6c63ff; }
+.app-card.new { border-color: #bbf7d0; background: #f0fdf4; }
+.app-card.new:hover { border-color: #16a34a; }
 .app-card .emoji { font-size: 2em; display: block; margin-bottom: 8px; }
 .app-card h4 { color: #6c63ff; font-size: 1em; margin-bottom: 6px; }
+.app-card.new h4 { color: #16a34a; }
 .app-card p { font-size: 0.88em; color: #666; line-height: 1.5; }
 .tag { display: inline-block; background: #ede9fe; color: #7c3aed; border-radius: 20px; padding: 2px 10px; font-size: 0.78em; margin: 3px 2px 0 0; }
 .tag.green { background: #d1fae5; color: #059669; }
 .tag.orange { background: #fef3c7; color: #d97706; }
 .tag.pink { background: #fce7f3; color: #db2777; }
+.tag.red { background: #fee2e2; color: #dc2626; }
+.tag.blue { background: #dbeafe; color: #1d4ed8; }
 .steps { counter-reset: step; padding-left: 0; list-style: none; }
 .steps li { counter-increment: step; display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; padding: 12px; background: #f8f7ff; border-radius: 10px; }
 .steps li::before { content: counter(step); background: #6c63ff; color: white; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85em; font-weight: bold; flex-shrink: 0; }
@@ -33,6 +39,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f4ff; color: #
 .method-card.blue { background: #eff6ff; border: 2px solid #3b82f6; }
 .method-card.purple { background: #faf5ff; border: 2px solid #a855f7; }
 .method-card.yellow { background: #fffbeb; border: 2px solid #f59e0b; }
+.method-card.red { background: #fff1f2; border: 2px solid #dc2626; }
 .method-card h4 { font-size: 0.95em; margin-bottom: 5px; }
 .method-card p { font-size: 0.82em; color: #666; }
 .method-card .icon { font-size: 1.8em; margin-bottom: 6px; }
@@ -40,10 +47,14 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f4ff; color: #
 .btn-item { display: flex; align-items: center; gap: 8px; background: #f9f9f9; border-radius: 8px; padding: 8px 12px; font-size: 0.88em; }
 .btn-dot { width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1em; flex-shrink: 0; }
 .alert { background: #fffbeb; border: 2px solid #fbbf24; border-radius: 12px; padding: 15px; margin-top: 15px; font-size: 0.9em; line-height: 1.6; }
+.alert.green { background: #f0fdf4; border-color: #86efac; }
+.alert.blue { background: #eff6ff; border-color: #93c5fd; }
 .link-btn { display: inline-block; background: #6c63ff; color: white; text-decoration: none; padding: 10px 20px; border-radius: 25px; font-weight: bold; margin-top: 10px; transition: opacity 0.2s; }
 .link-btn:hover { opacity: 0.85; }
+.info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
+.info-box { background: #f8f7ff; border-radius: 8px; padding: 12px; font-size: 0.88em; }
 footer { text-align: center; padding: 20px; font-size: 0.85em; color: #999; }
-@media (max-width: 600px) { .hero h1 { font-size: 1.8em; } .app-grid { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .hero h1 { font-size: 1.8em; } .app-grid { grid-template-columns: 1fr; } .info-grid { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -66,6 +77,8 @@ footer { text-align: center; padding: 20px; font-size: 0.85em; color: #999; }
       <span class="tag green">👨‍🏫 Recursos para profesores</span>
       <span class="tag orange">🕹️ Juegos para alumnos</span>
       <span class="tag pink">🤖 Creación con IA</span>
+      <span class="tag blue">📸 Foto a recurso</span>
+      <span class="tag red">🎬 Video a Quizz</span>
     </div>
   </div>
 
@@ -118,11 +131,11 @@ footer { text-align: center; padding: 20px; font-size: 0.85em; color: #999; }
         <p>Juego tipo "runner" con preguntas. El personaje corre y hay que responder correctamente para superar los obstáculos. Versión 1 original del personaje corredor de PiKT.</p>
         <span class="tag">Runner</span><span class="tag green">Acción y repaso</span>
       </div>
-      <div class="app-card">
-        <span class="emoji">🦸‍♂️</span>
-        <h4>Pikatron 2</h4>
-        <p>Segunda versión del juego runner Pikatron, con mejoras en gráficos y mecánica. Mismo concepto de responder preguntas mientras el personaje avanza corriendo.</p>
-        <span class="tag">Runner mejorado</span><span class="tag orange">Acción</span>
+      <div class="app-card new">
+        <span class="emoji">🏃</span>
+        <h4>Plataformas <span class="new-badge">NUEVO</span></h4>
+        <p>Versión plataformas de Pikatron. El personaje salta entre plataformas y debe responder preguntas para superar obstáculos. Mecánica renovada con física de salto y más acción.</p>
+        <span class="tag green">Plataformas</span><span class="tag orange">Acción</span>
       </div>
       <div class="app-card">
         <span class="emoji">🃏</span>
@@ -161,21 +174,215 @@ footer { text-align: center; padding: 20px; font-size: 0.85em; color: #999; }
         <span class="tag">Lengua</span><span class="tag pink">Análisis sintáctico</span>
       </div>
       <div class="app-card">
-        <span class="emoji">🌍</span>
-        <h4>Math World</h4>
-        <p>Ecosistema de herramientas matemáticas con cuatro módulos: <strong>Geometrix</strong> (áreas, volúmenes y regla virtual), <strong>Cálculo</strong> (agilidad mental y operaciones con tiempo), <strong>Ecuaciones</strong> (despejar la X paso a paso), <strong>Funciones</strong> (rectas, parábolas y análisis gráfico). Álgebra próximamente.</p>
-        <span class="tag">Matemáticas</span><span class="tag orange">Geometría</span><span class="tag green">Álgebra</span>
-      </div>
-      <div class="app-card">
         <span class="emoji">🏷️</span>
         <h4>EtiquetaMe</h4>
         <p>Juego de etiquetar diagramas. El alumno debe identificar y colocar las etiquetas correctas en las partes de un diagrama o imagen. Muy útil para biología, geografía, anatomía, etc.</p>
         <span class="tag">Diagramas</span><span class="tag pink">Identificar partes</span>
       </div>
+      <div class="app-card new">
+        <span class="emoji">🙉</span>
+        <h4>Listening <span class="new-badge">NUEVO</span></h4>
+        <p>Ejercicios de comprensión auditiva. El alumno escucha audios y responde preguntas de comprensión. Pensado para idiomas. El profesor crea el recurso con el audio y las preguntas asociadas.</p>
+        <span class="tag green">Idiomas</span><span class="tag">Comprensión auditiva</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">🎲</span>
+        <h4>Story Cubes <span class="new-badge">NUEVO</span></h4>
+        <p>Dados narrativos digitales para crear historias en equipo. Se lanzan los dados con imágenes y los alumnos construyen una historia a partir de los símbolos que salen. Ideal para expresión oral y escritura creativa.</p>
+        <span class="tag green">Creatividad</span><span class="tag orange">Trabajo en equipo</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">🧩</span>
+        <h4>Retos <span class="new-badge">NUEVO</span></h4>
+        <p>Puzzles y retos de lógica: conecta puntos, resuelve enigmas visuales y pruebas de pensamiento lateral. Ideal para desarrollar el razonamiento lógico y la concentración.</p>
+        <span class="tag green">Lógica</span><span class="tag">Razonamiento</span>
+      </div>
     </div>
   </div>
 
-  <!-- SECCIÓN 4: Q-SENDER -->
+  <!-- SECCIÓN 4: JUEGOS DE ACCIÓN (RACING/KARTING) -->
+  <div class="section">
+    <h2>🚗 Juegos de Acción <span class="new-badge">NUEVOS</span></h2>
+    <p style="margin-bottom:15px;font-size:0.93em;">Juegos de acción con preguntas integradas. El alumno avanza, acelera o gana puntos respondiendo correctamente. Funcionan con recursos del profesor o de la biblioteca.</p>
+    <div class="app-grid">
+      <div class="app-card new">
+        <span class="emoji">🚗</span>
+        <h4>KartingED</h4>
+        <p>Juego de karts con preguntas integradas. El alumno conduce un kart y responde preguntas para acelerar o penalizar al rival. Al terminar puede enviar sus resultados al profesor con su código.</p>
+        <span class="tag green">Acción</span><span class="tag">Preguntas</span><span class="tag orange">Individual</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">🏎️</span>
+        <h4>KartingED Multijugador</h4>
+        <p>Versión multijugador del karting. Varios alumnos compiten en la misma carrera en tiempo real desde distintos dispositivos. Las respuestas correctas dan ventaja en la pista.</p>
+        <span class="tag green">Multijugador</span><span class="tag red">Tiempo real</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">🏁</span>
+        <h4>Racing 3D</h4>
+        <p>Carreras en un entorno 3D con preguntas. El alumno conduce un vehículo en un circuito y responde preguntas para seguir avanzando. Experiencia visual inmersiva.</p>
+        <span class="tag green">3D</span><span class="tag orange">Acción</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">🏛️</span>
+        <h4>Mansión Pitagórica</h4>
+        <p>Juego de aventura matemática. El alumno explora una mansión resolviendo puzzles y ejercicios matemáticos para avanzar por las habitaciones. Ambientación de misterio y resolución de problemas.</p>
+        <span class="tag green">Aventura</span><span class="tag">Matemáticas</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECCIÓN 5: MATH WORLD -->
+  <div class="section">
+    <h2>🌍 Math World (Herramientas Matemáticas)</h2>
+    <p style="margin-bottom:15px;font-size:0.93em;">Ecosistema de herramientas matemáticas completo. Accesible desde la pantalla principal sin código ni registro.</p>
+    <div class="app-grid">
+      <div class="app-card">
+        <span class="emoji">📐</span>
+        <h4>Geometrix</h4>
+        <p>Áreas, volúmenes y regla virtual interactiva. El alumno calcula y visualiza fórmulas geométricas con representación dinámica.</p>
+        <span class="tag">Geometría</span>
+      </div>
+      <div class="app-card">
+        <span class="emoji">🧠</span>
+        <h4>Cálculo Mental</h4>
+        <p>Agilidad mental y operaciones con tiempo. Suma, resta, multiplicación y división contra el reloj. Con niveles de dificultad.</p>
+        <span class="tag orange">Velocidad</span>
+      </div>
+      <div class="app-card">
+        <span class="emoji">⚖️</span>
+        <h4>Ecuaciones</h4>
+        <p>Practica el despeje de la incógnita paso a paso. Incluye ecuaciones de primer y segundo grado con retroalimentación visual.</p>
+        <span class="tag">Álgebra</span>
+      </div>
+      <div class="app-card">
+        <span class="emoji">📈</span>
+        <h4>Funciones</h4>
+        <p>Representación e interpretación de funciones. Rectas, parábolas, características y análisis gráfico interactivo.</p>
+        <span class="tag">Análisis</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">♐</span>
+        <h4>Geometría Analítica <span class="new-badge">NUEVO</span></h4>
+        <p>Rectas, parábolas y cónicas en el plano cartesiano. Representación dinámica e interpretación geométrica de ecuaciones.</p>
+        <span class="tag green">Analítica</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">✖️</span>
+        <h4>Álgebra (Polinomios) <span class="new-badge">NUEVO</span></h4>
+        <p>Operaciones con polinomios: suma, resta, multiplicación y división. Con representación paso a paso para comprender el proceso.</p>
+        <span class="tag green">Polinomios</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">📊</span>
+        <h4>Estadística <span class="new-badge">NUEVO</span></h4>
+        <p>Tablas de frecuencias, parámetros estadísticos (media, mediana, moda, desviación) y representación gráfica: histogramas, diagramas de barras y sectores.</p>
+        <span class="tag green">Estadística</span><span class="tag">Gráficos</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECCIÓN 6: APLICACIONES ESPECIALES -->
+  <div class="section">
+    <h2>📚 Aplicaciones Especiales <span class="new-badge">NUEVOS</span></h2>
+    <p style="margin-bottom:15px;font-size:0.93em;">Aplicaciones educativas completas accesibles desde la pantalla de alumno. Algunas aceptan recursos creados por el profesor; otras funcionan de forma autónoma.</p>
+    <div class="app-grid">
+      <div class="app-card new">
+        <span class="emoji">📚</span>
+        <h4>Omninteractive</h4>
+        <p>Libro de ejercicios interactivos tipo cuaderno digital. Admite 9 tipos de actividades: rellenar huecos, elegir respuesta, banco de palabras, construir frases, emparejar, ordenar, verdadero/falso, opción múltiple y encontrar el error. El profesor crea el recurso con el EditorOmni.</p>
+        <span class="tag green">Idiomas</span><span class="tag blue">Lengua</span><span class="tag orange">9 tipos de ejercicio</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">🎬</span>
+        <h4>VideoQuizz</h4>
+        <p>Quizz interactivo sobre vídeos de YouTube. El alumno ve el vídeo y responde preguntas que aparecen en momentos clave del mismo. El profesor crea el recurso con la URL del vídeo y las preguntas.</p>
+        <span class="tag green">Vídeo</span><span class="tag">Preguntas</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">🪐</span>
+        <h4>Sistema Solar</h4>
+        <p>Tour interactivo animado por el sistema solar. El alumno recorre los planetas con narración de texto y música. El profesor puede personalizar los planetas incluidos, los textos y la música de fondo.</p>
+        <span class="tag green">Ciencias</span><span class="tag">Astronomía</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">🌍</span>
+        <h4>Geografía</h4>
+        <p>Test de geografía interactivo con mapas. El alumno identifica países, capitales y provincias españolas pinchando directamente en el mapa. Incluye modo mundial y modo España. Envía resultados al profesor con código.</p>
+        <span class="tag green">Geografía</span><span class="tag blue">Mapas interactivos</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">🎵</span>
+        <h4>Música</h4>
+        <p>Entrenamiento auditivo y juegos musicales. Incluye entrenamiento de intervalos, acordes y ritmos, y juegos para desarrollar el oído musical. Con envío de resultados al profesor.</p>
+        <span class="tag green">Música</span><span class="tag orange">Oído musical</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">🧠</span>
+        <h4>Funciones Ejecutivas</h4>
+        <p>Ejercicios para trabajar la memoria de trabajo, la inhibición y la flexibilidad cognitiva. Pensado para alumnos con dificultades de atención o como entrenamiento cognitivo general.</p>
+        <span class="tag green">Psicología</span><span class="tag">NEE</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">📝</span>
+        <h4>Irregular Verbs</h4>
+        <p>Test de verbos irregulares en inglés. El alumno practica las formas del pasado simple y participio pasado de los verbos irregulares más comunes. Con opción de enviar resultados al profesor.</p>
+        <span class="tag green">English</span><span class="tag blue">Gramática</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">🦆</span>
+        <h4>Oca Matemática</h4>
+        <p>Versión matemática del juego de la oca. Los alumnos avanzan en el tablero respondiendo preguntas y operaciones matemáticas. Incluye casillas especiales con retos extra.</p>
+        <span class="tag green">Matemáticas</span><span class="tag orange">Tablero</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">🁣</span>
+        <h4>Dominó de Fracciones</h4>
+        <p>Juego de dominó con fracciones y operaciones matemáticas. Los alumnos colocan piezas emparejando resultados de operaciones. Trabaja fracciones, decimales y equivalencias.</p>
+        <span class="tag green">Fracciones</span><span class="tag">Dominó</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECCIÓN 7: GESTIÓN DE AULA -->
+  <div class="section">
+    <h2>🏫 Gestión de Aula <span class="new-badge">NUEVO</span></h2>
+    <p style="margin-bottom:15px;font-size:0.93em;">Conjunto de herramientas de gestión para usar durante la clase, proyectadas en la pizarra o en el dispositivo del profesor. Accesible desde la pantalla principal sin necesidad de cuenta.</p>
+    <div class="app-grid">
+      <div class="app-card new">
+        <span class="emoji">🎡</span>
+        <h4>Ruleta de Aula</h4>
+        <p>Ruleta giratoria para seleccionar alumnos al azar. Escribe la lista de nombres y la ruleta elige. Ideal para participación, sorteos o asignación de tareas.</p>
+        <span class="tag green">Gestión</span><span class="tag">Participación</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">🖊️</span>
+        <h4>Pizarra Temática</h4>
+        <p>Pizarra digital con tres modos: <strong>General</strong> (dibujo libre, texto, formas, visor 3D), <strong>Música</strong> (pentagrama interactivo) y <strong>Geografía</strong> (mapas de España y el mundo con herramientas de anotación). Admite compartición en tiempo real.</p>
+        <span class="tag green">Pizarra</span><span class="tag blue">Compartida</span><span class="tag orange">3 modos</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">⏱️</span>
+        <h4>Gestor de Tiempo</h4>
+        <p>Cronómetro ascendente y temporizador de cuenta atrás configurable. Con alertas visuales y sonoras cuando se acaba el tiempo. Perfecto para exámenes, actividades y debates.</p>
+        <span class="tag green">Tiempo</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">👥</span>
+        <h4>Grupos de Clase</h4>
+        <p>Genera subgrupos aleatorios a partir de una lista de alumnos. Configura el número de grupos o el tamaño de cada grupo. Útil para trabajo cooperativo.</p>
+        <span class="tag green">Cooperativo</span><span class="tag">Aleatorio</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">🪑</span>
+        <h4>Plano de Clase</h4>
+        <p>Diseña el plano visual de tu aula con mesas y asientos arrastrables. Asigna alumnos a los asientos, configura el número de alumnos por mesa y exporta/imprime el plano.</p>
+        <span class="tag green">Aula</span><span class="tag blue">Imprimible</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECCIÓN 8: Q-SENDER -->
   <div class="section">
     <h2>📮 Q-Sender (Buzón de Preguntas)</h2>
     <p style="font-size:0.93em;line-height:1.6;">Herramienta especial que permite a los alumnos <strong>enviar preguntas y respuestas al profesor</strong>. El alumno accede con un código de grupo y envía sus respuestas. El profesor puede ver en tiempo real qué respuestas ha recibido. Es una forma de evaluación informal y participativa. Se vincula a recursos de Pasapalabra existentes del profesor.</p>
@@ -186,7 +393,7 @@ footer { text-align: center; padding: 20px; font-size: 0.85em; color: #999; }
     </div>
   </div>
 
-  <!-- SECCIÓN 5: CÓMO CREAR RECURSOS -->
+  <!-- SECCIÓN 9: CÓMO CREAR RECURSOS -->
   <div class="section">
     <h2>🚀 ¿Cómo crear nuevos recursos?</h2>
     <p style="margin-bottom:15px;font-size:0.93em;">Para crear recursos necesitas <strong>iniciar sesión con Google</strong> pulsando "Entrar" en la esquina superior derecha. Una vez dentro, verás tu panel con "Mis Recursos" organizado por tipo de juego.</p>
@@ -194,10 +401,10 @@ footer { text-align: center; padding: 20px; font-size: 0.85em; color: #999; }
     <h3>Paso a paso para crear un recurso:</h3>
     <ol class="steps">
       <li><span class="step-text"><strong>Entra en pikt.es</strong> y pulsa el botón "Entrar" (Google Sign-In) en la esquina superior derecha.</span></li>
-      <li><span class="step-text"><strong>Selecciona el tipo de juego</strong> en las pestañas superiores de tu panel: Pasapalabra, Burbujas y Pikatron, AparejaDOS, Pi-Live, La Ruleta o Question Sender.</span></li>
+      <li><span class="step-text"><strong>Selecciona el tipo de juego</strong> en las pestañas superiores de tu panel: Pasapalabra, Burbujas/Pikatron, AparejaDOS, Pi-Live, La Ruleta, Omninteractive, VideoQuizz, Sistema Solar u otros.</span></li>
       <li><span class="step-text"><strong>Pulsa el botón verde "+" (Crear Nuevo)</strong>. Se abrirá un modal donde debes escribir el <em>Título</em> del recurso.</span></li>
-      <li><span class="step-text"><strong>Elige el método de creación</strong>: Manual, Importar desde archivo, IA o Google Drive.</span></li>
-      <li><span class="step-text"><strong>Añade tus preguntas</strong> usando el editor. Pulsa "+ Añadir Pregunta" para cada nueva pregunta y rellena los campos.</span></li>
+      <li><span class="step-text"><strong>Elige el método de creación</strong>: Manual, Importar desde archivo, IA, Google Drive o Foto.</span></li>
+      <li><span class="step-text"><strong>Añade tus preguntas o ejercicios</strong> usando el editor correspondiente según el tipo de juego.</span></li>
       <li><span class="step-text"><strong>Configura el recurso</strong> con el icono ⚙️ (ajustes de juego, visibilidad, ciclo educativo, temas, etc.).</span></li>
       <li><span class="step-text"><strong>Guarda</strong> pulsando el botón verde "Guardar".</span></li>
     </ol>
@@ -224,6 +431,11 @@ footer { text-align: center; padding: 20px; font-size: 0.85em; color: #999; }
         <h4>Google Drive</h4>
         <p>Importa el contenido directamente desde una hoja de cálculo de Google Sheets en tu Google Drive.</p>
       </div>
+      <div class="method-card red">
+        <div class="icon">📸</div>
+        <h4>Foto → Recurso</h4>
+        <p>Fotografía un examen o ficha y la IA extrae automáticamente las preguntas. Nuevo método ultrarrápido.</p>
+      </div>
     </div>
 
     <h3 style="margin-top:20px;">Tipo de contenido según el juego:</h3>
@@ -231,15 +443,18 @@ footer { text-align: center; padding: 20px; font-size: 0.85em; color: #999; }
       <li style="background:#f0f4ff;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:0.9em;"><strong>🔤 Pasapalabra / 🎡 La Ruleta:</strong> Pregunta/Definición → Respuesta correcta (1 sola palabra)</li>
       <li style="background:#f0f4ff;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:0.9em;"><strong>🫧 Burbujas / 🦸 Pikatron / 📡 Pi-Live:</strong> Enunciado → Respuesta correcta + hasta 3 respuestas incorrectas (opcional)</li>
       <li style="background:#f0f4ff;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:0.9em;"><strong>🃏 AparejaDOS:</strong> Término A (ej: País) → Término B (ej: Capital)</li>
-      <li style="background:#f0f4ff;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:0.9em;"><strong>🎡 La Ruleta extra:</strong> Además de las preguntas, necesita una <em>Frase a Resolver</em> obligatoria (ej: LA CAPITAL DE FRANCIA)</li>
+      <li style="background:#f0f4ff;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:0.9em;"><strong>🎡 La Ruleta extra:</strong> Además de las preguntas, necesita una <em>Frase a Resolver</em> obligatoria</li>
       <li style="background:#f0f4ff;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:0.9em;"><strong>📮 Q-Sender:</strong> Grupos con nombre + nº de preguntas + código generado para alumnos</li>
+      <li style="background:#e8f5e9;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:0.9em;"><strong>📚 Omninteractive:</strong> Bloques de ejercicios con 9 tipos: rellenar huecos, elegir respuesta, banco de palabras, construir frases, emparejar, ordenar, V/F, opción múltiple y encontrar el error</li>
+      <li style="background:#e8f5e9;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:0.9em;"><strong>🎬 VideoQuizz:</strong> URL de YouTube + preguntas con tiempo de aparición en el vídeo</li>
+      <li style="background:#e8f5e9;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:0.9em;"><strong>🪐 Sistema Solar:</strong> Selección de planetas, texto de narración personalizado, música de fondo y duración de escena</li>
     </ul>
   </div>
 
-  <!-- SECCIÓN 6: GESTIÓN DE RECURSOS -->
+  <!-- SECCIÓN 10: GESTIÓN DE RECURSOS -->
   <div class="section">
     <h2>⚙️ Gestión de tus recursos</h2>
-    <p style="margin-bottom:15px;font-size:0.93em;">Cada recurso creado aparece en tu panel con 5 botones de acción:</p>
+    <p style="margin-bottom:15px;font-size:0.93em;">Cada recurso creado aparece en tu panel con botones de acción:</p>
     <div class="btn-legend">
       <div class="btn-item"><div class="btn-dot" style="background:#e9d5ff;font-size:0.8em;">🎮</div><span><strong>Jugar / Probar:</strong> Lanza el juego para probarlo o usarlo con un código</span></div>
       <div class="btn-item"><div class="btn-dot" style="background:#fef3c7;font-size:0.8em;">🔑</div><span><strong>Código:</strong> Obtén el código o enlace para compartir con alumnos</span></div>
@@ -249,39 +464,33 @@ footer { text-align: center; padding: 20px; font-size: 0.85em; color: #999; }
     </div>
 
     <h3 style="margin-top:20px;">Configuración del recurso (⚙️):</h3>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px;">
-      <div style="background:#f8f7ff;border-radius:8px;padding:12px;font-size:0.88em;">
+    <div class="info-grid">
+      <div class="info-box">
         <strong>📍 Datos de Búsqueda</strong><br>
         País, Región, Localidad, Temas, Ciclo Educativo. Sirve para que otros profesores encuentren tu recurso si lo haces público.
       </div>
-      <div style="background:#f8f7ff;border-radius:8px;padding:12px;font-size:0.88em;">
+      <div class="info-box">
         <strong>🎮 Ajustes de Juego</strong><br>
         Tiempo del rosco (en segundos), Orden Aleatorio (mezclar preguntas).
       </div>
-      <div style="background:#f8f7ff;border-radius:8px;padding:12px;font-size:0.88em;">
+      <div class="info-box">
         <strong>🔓 Permitir Copia</strong><br>
         Activa esta opción para que otros profesores puedan copiar tu recurso desde la Biblioteca.
       </div>
-      <div style="background:#f8f7ff;border-radius:8px;padding:12px;font-size:0.88em;">
+      <div class="info-box">
         <strong>✅ Terminado</strong><br>
         Marca el recurso como "visible para alumnos" cuando esté listo para usarse.
       </div>
     </div>
+
+    <h3 style="margin-top:20px;">Compartir con alumnos:</h3>
+    <p style="font-size:0.9em;line-height:1.6;margin-top:8px;">Desde el botón "Código" o desde la pantalla del juego puedes compartir el recurso directamente por <strong>WhatsApp, Telegram, Correo electrónico o Google Classroom</strong> con un solo clic, o copiar el enlace directo.</p>
   </div>
 
-  <!-- SECCIÓN 7: BIBLIOTECA -->
-  <div class="section">
-    <h2>📚 La Biblioteca</h2>
-    <p style="font-size:0.93em;line-height:1.6;">La Biblioteca es un repositorio de recursos educativos creados por profesores de toda la comunidad. Puedes buscar recursos usando filtros por <strong>Tema, País, Región y Población</strong>. Cada recurso tiene tres opciones: <strong>Probar</strong> (jugarlo sin copiarlo), <strong>Ver</strong> (inspeccionar el contenido) y <strong>Copiar</strong> (añadirlo a tus propios recursos para editarlo o usarlo directamente).</p>
-    <div class="alert">
-      💡 <strong>Consejo:</strong> Si haces público tu recurso activando "Permitir Copia", otros profesores podrán encontrarlo en la Biblioteca y usarlo en sus clases.
-    </div>
-  </div>
-
-  <!-- SECCIÓN 8: HERRAMIENTAS DEL PROFESOR -->
+  <!-- SECCIÓN 11: HERRAMIENTAS DEL PROFESOR -->
   <div class="section">
     <h2>🛠️ Herramientas del Profesor</h2>
-    <p style="margin-bottom:15px;font-size:0.93em;">Utilidades adicionales para gestionar y exportar tus recursos educativos, accesibles desde el menú lateral:</p>
+    <p style="margin-bottom:15px;font-size:0.93em;">Utilidades adicionales para gestionar y exportar tus recursos educativos, accesibles desde el menú lateral del panel del profesor:</p>
     <div class="app-grid">
       <div class="app-card">
         <span class="emoji">📊</span>
@@ -298,23 +507,107 @@ footer { text-align: center; padding: 20px; font-size: 0.85em; color: #999; }
         <h4>Conversor Mágico</h4>
         <p>Transforma un recurso de un tipo de juego a otro. Por ejemplo, convierte un Pasapalabra en una Sopa de Letras o en un Quiz. Ahorra tiempo al reutilizar contenido ya creado.</p>
       </div>
-      <div class="app-card" style="opacity:0.7;">
+      <div class="app-card new">
+        <span class="emoji">📸</span>
+        <h4>Foto → Recurso <span class="new-badge">NUEVO</span></h4>
+        <p>Fotografía un examen, ficha o libro de texto y la IA extrae automáticamente las preguntas para crear un recurso de Pasapalabra, AparejaDOS, Quiz u otros. Sin necesidad de picar nada a mano.</p>
+        <span class="tag green">IA</span><span class="tag">OCR</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">📖</span>
+        <h4>Foto → Recurso Omni <span class="new-badge">NUEVO</span></h4>
+        <p>Fotografía una ficha de ejercicios (gramática, vocabulario, comprensión lectora...) y la IA la convierte directamente en un recurso Omninteractive editable. Especialmente útil para lenguas.</p>
+        <span class="tag green">IA</span><span class="tag blue">Omninteractive</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">🎬</span>
+        <h4>Video → Presentaciones y Quizz <span class="new-badge">NUEVO</span></h4>
+        <p>Pega una URL de YouTube y la IA analiza el vídeo para generar automáticamente presentaciones de diapositivas y un VideoQuizz con preguntas en los momentos clave del contenido.</p>
+        <span class="tag green">IA</span><span class="tag red">YouTube</span>
+      </div>
+      <div class="app-card">
         <span class="emoji">📈</span>
-        <h4>Informes y Gestión (Próximamente)</h4>
-        <p>Generador de informes de rendimiento y gestión de grupos de alumnos. En desarrollo.</p>
+        <h4>Informes de Juegos</h4>
+        <p>Consulta el historial completo de partidas que tus alumnos han enviado usando tu código de profesor. Con filtros por tipo de juego, fecha y búsqueda por nombre de jugador.</p>
+        <span class="tag">Historial</span><span class="tag green">Ranking</span>
       </div>
     </div>
   </div>
 
-  <!-- SECCIÓN 9: CÓMO USAR EN CLASE -->
+  <!-- SECCIÓN 12: INFORMES Y GESTIÓN DE GRUPOS (NUEVO) -->
+  <div class="section">
+    <h2>📊 Informes y Gestión de Grupos <span class="new-badge">NUEVO</span></h2>
+    <p style="margin-bottom:15px;font-size:0.93em;">Accesible desde las <strong>Herramientas del Profesor → Informes</strong>. Centraliza el seguimiento del rendimiento de tus alumnos en cuatro pestañas:</p>
+
+    <h3>📋 Historial de Partidas</h3>
+    <p style="font-size:0.9em;line-height:1.6;margin-bottom:12px;">Registro completo de todas las partidas enviadas al profesor con su código. Incluye nombre del jugador, tipo de juego, fecha, puntuación y tiempo. Puedes <strong>filtrar por tipo, fecha y buscar por jugador</strong>, seleccionar partidas en lote para borrar y agregar resultados directamente a los grupos de alumnos.</p>
+
+    <h3>👥 Gestión de Grupos</h3>
+    <p style="font-size:0.9em;line-height:1.6;margin-bottom:12px;">Crea y gestiona listas de alumnos con columnas de calificaciones totalmente personalizables. Funciones disponibles:</p>
+    <div class="btn-legend">
+      <div class="btn-item"><div class="btn-dot" style="background:#d1fae5;">📤</div><span>Importar alumnos desde Excel o Google Sheets</span></div>
+      <div class="btn-item"><div class="btn-dot" style="background:#dbeafe;">📊</div><span>Columnas de notas con porcentajes y fórmulas</span></div>
+      <div class="btn-item"><div class="btn-dot" style="background:#ede9fe;">💾</div><span>Exportar a Excel con todos los datos</span></div>
+      <div class="btn-item"><div class="btn-dot" style="background:#fef9c3;">🔗</div><span>Importar resultados de juegos directamente</span></div>
+    </div>
+
+    <h3 style="margin-top:15px;">🗺️ Mapa de Aula</h3>
+    <p style="font-size:0.9em;line-height:1.6;margin-bottom:12px;">Diseña el plano de tu aula de forma visual. Arrastra y coloca mesas (de 1 a 4 alumnos), asigna alumnos a los asientos desde tus grupos, guarda múltiples planos e imprímelos.</p>
+
+    <h3>🏆 Ranking</h3>
+    <p style="font-size:0.9em;line-height:1.6;">Visualiza un ranking global de tus alumnos basado en los resultados enviados. Útil para gamificar el seguimiento del progreso.</p>
+
+    <div class="alert green">
+      🔑 <strong>Código de Profesor:</strong> Para recibir resultados de los alumnos debes configurar tu <strong>código personalizado</strong> (ej: PROFA1) desde la sección de Informes. Los alumnos usarán este código al enviar sus resultados desde cualquier juego.
+    </div>
+  </div>
+
+  <!-- SECCIÓN 13: BIBLIOTECA -->
+  <div class="section">
+    <h2>📚 La Biblioteca</h2>
+    <p style="font-size:0.93em;line-height:1.6;">La Biblioteca es un repositorio de recursos educativos creados por profesores de toda la comunidad. Puedes buscar recursos usando filtros por <strong>Tema, País, Región y Población</strong>. Cada recurso tiene tres opciones: <strong>Probar</strong> (jugarlo sin copiarlo), <strong>Ver</strong> (inspeccionar el contenido) y <strong>Copiar</strong> (añadirlo a tus propios recursos para editarlo o usarlo directamente).</p>
+    <div class="alert">
+      💡 <strong>Consejo:</strong> Si haces público tu recurso activando "Permitir Copia", otros profesores podrán encontrarlo en la Biblioteca y usarlo en sus clases.
+    </div>
+  </div>
+
+  <!-- SECCIÓN 14: PÁGINA PÚBLICA DEL PROFESOR (NUEVO) -->
+  <div class="section">
+    <h2>🌐 Página Pública del Profesor <span class="new-badge">NUEVO</span></h2>
+    <p style="font-size:0.93em;line-height:1.6;margin-bottom:15px;">Cada profesor registrado en PiKT puede tener su propia <strong>página pública personalizada</strong> accesible por URL. Los alumnos y familias pueden ver los recursos publicados, las tareas asignadas y los juegos disponibles sin necesidad de registrarse.</p>
+    <div class="info-grid">
+      <div class="info-box">
+        <strong>🔗 URL personalizada</strong><br>
+        Tu página pública tiene una dirección del tipo <code>pikt.es/tu-nombre</code>. La configuras desde tu perfil de profesor.
+      </div>
+      <div class="info-box">
+        <strong>📋 Contenido visible</strong><br>
+        Recursos publicados, tareas con fecha de entrega, juegos directos y presentaciones embebidas.
+      </div>
+      <div class="info-box">
+        <strong>🔍 Buscador de profes</strong><br>
+        Desde la pantalla principal existe un buscador de páginas de profesores para encontrar a tu profe por nombre.
+      </div>
+      <div class="info-box">
+        <strong>📤 Tareas</strong><br>
+        El profesor puede asignar tareas con fecha de entrega y enlace directo a un recurso o juego de PiKT.
+      </div>
+    </div>
+    <div class="alert blue">
+      🎓 <strong>Ideal para flipped classroom:</strong> Publica tus recursos y los alumnos los tienen disponibles desde casa, sin necesidad de que el profesor esté presente.
+    </div>
+  </div>
+
+  <!-- SECCIÓN 15: CÓMO USAR EN CLASE -->
   <div class="section">
     <h2>👩‍🏫 ¿Cómo usar PiKT en clase?</h2>
     <h3>Para los profesores:</h3>
     <ol class="steps">
-      <li><span class="step-text">Crea tu recurso (pasapalabra, quiz, etc.) en tu panel de profesor.</span></li>
-      <li><span class="step-text">Pulsa "Jugar / Probar" para obtener el <strong>código del juego</strong> (6 dígitos).</span></li>
-      <li><span class="step-text">Comparte el código con tus alumnos o proyecta la pantalla de lanzamiento.</span></li>
-      <li><span class="step-text">Para juegos <strong>En Vivo</strong> (PiLive, MathLive): inicia la sesión y los alumnos se unen con el código.</span></li>
+      <li><span class="step-text">Crea tu recurso (pasapalabra, quiz, Omninteractive, etc.) en tu panel de profesor.</span></li>
+      <li><span class="step-text">Pulsa "Jugar / Probar" para obtener el <strong>código del juego</strong> (6 dígitos) o el enlace directo.</span></li>
+      <li><span class="step-text">Comparte el código con tus alumnos, proyecta la pantalla o envíalo por WhatsApp / Google Classroom con un clic.</span></li>
+      <li><span class="step-text">Para juegos <strong>En Vivo</strong> (PiLive, MathLive): inicia la sesión y los alumnos se unen con el código de sala.</span></li>
+      <li><span class="step-text">Para recibir resultados: configura tu <strong>código de profesor</strong> en Informes y compártelo con tus alumnos al inicio de curso.</span></li>
     </ol>
     <h3 style="margin-top:15px;">Para los alumnos:</h3>
     <ol class="steps">
@@ -322,6 +615,7 @@ footer { text-align: center; padding: 20px; font-size: 0.85em; color: #999; }
       <li><span class="step-text">Pulsa en "Código" en la página principal e introduce el <strong>código de 6 dígitos</strong> que te da el profesor.</span></li>
       <li><span class="step-text">O busca directamente el juego en el buscador por tema o título.</span></li>
       <li><span class="step-text">Para juegos En Vivo: escribe tu nombre y espera a que el profesor inicie la partida.</span></li>
+      <li><span class="step-text">Al terminar, si el profe tiene código, introduce tu nombre, curso y el <strong>código del profesor</strong> para enviar tus resultados.</span></li>
     </ol>
     <div class="alert">
       🌐 <strong>Importante:</strong> PiKT funciona en cualquier dispositivo con navegador (móvil, tablet, ordenador). No requiere instalación ni cuenta para los alumnos.

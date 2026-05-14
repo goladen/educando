@@ -35,6 +35,7 @@ import VideoQuizzApp from '../VideoQuizzApp';
 import FuncionesEjecutivas from '../FuncionesEjecutivas';
 import IrregularVerbsTest from '../IrregularVerbsTest';
 import MusicApp from '../MusicApp';
+import GeografiaApp from './GeografiaApp';
 import HerramientasClase from '../GestionAula';
 import AlgebraApp from '../Algebra';
 import EstadisticaApp from '../Estadistica';
@@ -793,6 +794,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
     const [funcionesEjecutivas, setFuncionesEjecutivas] = useState(false);
     const [irregularVerbs,      setIrregularVerbs]      = useState(false);
     const [musicApp,            setMusicApp]            = useState(false);
+    const [geografiaApp,        setGeografiaApp]        = useState(false);
     const [gestionAula,         setGestionAula]         = useState(() => { const p = new URLSearchParams(window.location.search); return !!(p.get('gestion') || p.get('pizarra')); });
 
     // Estados alumno logueado
@@ -1104,6 +1106,12 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
     if (musicApp || juegoActivo?.tipoJuego === 'MUSICA') return (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, overflowY: 'auto' }}>
             <MusicApp onBack={() => { setMusicApp(false); setJuegoActivo(null); }} usuario={usuario} />
+        </div>
+    );
+
+    if (geografiaApp) return (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, overflowY: 'auto' }}>
+            <GeografiaApp onBack={() => setGeografiaApp(false)} />
         </div>
     );
 
@@ -1458,6 +1466,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                     { id: 'IRREGULAR_VERBS',     label: 'Irregular Verbs',     emoji: '📝', color: '#0369a1', action: () => setIrregularVerbs(true), shareable: true },
                     { id: 'SOLAR_SYSTEM',        label: 'Sistema Solar',        emoji: '🪐', color: '#3B82F6', action: () => setJuegoActivo({ tipoJuego: 'SOLAR_SYSTEM' }), shareable: true },
                     { id: 'MUSICA',              label: 'Música',               emoji: '🎵', color: '#8b5cf6', action: () => setMusicApp(true), shareable: true },
+                    { id: 'GEOGRAFIA',           label: 'Geografía',            emoji: '🌍', color: '#0d9488', action: () => setGeografiaApp(true), shareable: true },
                     { id: 'GESTION_AULA', label: 'Gestión Aula', emoji: '🏫', color: '#e67e22', action: () => setGestionAula(true), shareable: true, shareUrl: `${window.location.origin}${window.location.pathname}?gestion=menu` },
                 ].map(tool => (
                     <div key={tool.id} onClick={tool.action} style={{ background: '#ffffbf', borderRadius: '15px', padding: '15px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transition: 'transform 0.2s', border: `2px solid ${tool.color}20`, position: 'relative' }}

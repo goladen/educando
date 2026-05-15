@@ -754,6 +754,8 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
             }
             const juegoParam = params.get('juego');
             if (juegoParam) {
+                if (juegoParam.toLowerCase() === 'geografia') { setGeografiaApp(true); return; }
+                if (juegoParam.toLowerCase() === 'biologia')  { setBiologiaApp(true);  return; }
                 let tourConfig = null;
                 const tcParam = params.get('tourconfig');
                 if (tcParam) {
@@ -1511,7 +1513,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
             <div style={{ textAlign: 'center', padding: '20px', marginTop: '40px', fontSize: '0.85rem', color: '#fff', borderTop: '1px solid rgba(255,255,255,0.2)' }}>
                 <a href="https://github.com/goladen/educando" target="_blank" rel="noopener noreferrer" style={{ color: '#f1c40f', fontWeight: 'bold', textDecoration: 'none' }}>Pikt.es</a>
                 {' '}© 2025 by{' '}
-                <a href="https://pikt.es" target="_blank" rel="noopener noreferrer" style={{ color: '#fff', textDecoration: 'none' }}>Gonzalo Larrocha</a>
+                <a href="https://pikt.es" target="_blank" rel="noopener noreferrer" style={{ color: '#fff', textDecoration: 'none' }}>Pikt</a>
                 {' '}is licensed under{' '}
                 <a href="https://creativecommons.org/licenses/by-nc-nd/4.0/" target="_blank" rel="noopener noreferrer" style={{ color: '#fff', textDecoration: 'underline' }}>Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International</a>
 
@@ -2117,7 +2119,7 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={null} onExit={onHo
                 <div style={{ textAlign: 'center', padding: '20px', marginTop: '40px', fontSize: '0.85rem', color: '#666', borderTop: '1px solid rgba(0,0,0,0.1)' }}>
                     <a href="https://github.com/goladen/educando" target="_blank" rel="noopener noreferrer" style={{ color: '#2c3e50', fontWeight: 'bold', textDecoration: 'none' }}>Pikt.es</a>
                     {' '}© 2025 by{' '}
-                    <a href="https://pikt.es" target="_blank" rel="noopener noreferrer" style={{ color: '#2c3e50', textDecoration: 'none' }}>Gonzalo Larrocha</a>
+                    <a href="https://pikt.es" target="_blank" rel="noopener noreferrer" style={{ color: '#2c3e50', textDecoration: 'none' }}>Pikt</a>
                     {' '}is licensed under{' '}
                     <a href="https://creativecommons.org/licenses/by-nc-nd/4.0/" target="_blank" rel="noopener noreferrer" style={{ color: '#2c3e50', textDecoration: 'underline' }}>Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International</a>
                     <span style={{ display: 'inline-flex', alignItems: 'center', marginLeft: '8px', gap: '3px', verticalAlign: 'middle', filter: 'invert(1)' /* Pone los iconos blancos */ }}>

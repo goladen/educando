@@ -2,6 +2,50 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// Plugin que emula /api/gemini en desarrollo (equivalente a la Vercel function)
+function geminiDevPlugin() {
+  return {
+    name: 'gemini-dev-api',
+    configureServer(server) {
+      server.middlewares.use('/api/gemini', async (req, res) => {
+        if (req.method === 'OPTIONS') {
+          res.writeHead(200); res.end(); return;
+        }
+        if (req.method !== 'POST') {
+          res.writeHead(405); res.end('Method not allowed'); return;
+        }
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'GEMINI_API_KEY no configurada en .env.local' }));
+          return;
+        }
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', async () => {
+          try {
+            const { model = 'gemini-2.0-flash', contents, generationConfig } = JSON.parse(body);
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+            const payload = { contents };
+            if (generationConfig) payload.generationConfig = generationConfig;
+            const upstream = await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
+            const data = await upstream.json();
+            res.writeHead(upstream.status, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(data));
+          } catch (e) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: e.message }));
+          }
+        });
+      });
+    },
+  };
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   build: {
@@ -17,6 +61,7 @@ export default defineConfig({
     },
   },
   plugins: [
+    geminiDevPlugin(),
     react(),
     VitePWA({
       registerType: 'autoUpdate',

@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, addDoc, updateDoc, doc, serverTimestamp, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { callGeminiProxy, extractText } from '../geminiProxy';
 
 // ─── VIDEO URL PARSER ────────────────────────────────────────────────────────
@@ -197,12 +197,13 @@ function ResourcePickerModal({ usuario, onSelect, onClose }) {
     if (!usuario) return;
     getDocs(query(
       collection(db, 'resources'),
-      where('profesorUid', '==', usuario.uid),
-      orderBy('titulo')
+      where('profesorUid', '==', usuario.uid)
     )).then(snap => {
-      setRecursos(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      docs.sort((a, b) => (a.titulo || '').localeCompare(b.titulo || ''));
+      setRecursos(docs);
       setLoading(false);
-    }).catch(() => setLoading(false));
+    }).catch(e => { console.error('Error cargando recursos:', e); setLoading(false); });
   }, [usuario]);
 
   const filtered = recursos.filter(r =>

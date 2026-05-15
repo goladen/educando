@@ -65,6 +65,26 @@ footer { text-align: center; padding: 20px; font-size: 0.85em; color: #999; }
   <a href="https://www.pikt.es" target="_blank" class="link-btn" style="background:white;color:#6c63ff;margin-top:15px;">Ir a PiKT.es →</a>
 </div>
 
+<!-- DEMO ANIMADA -->
+<style>
+.demo-wrap { max-width:900px; margin:0 auto; padding:0 20px; }
+.demo-frame-box { border-radius:16px; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,0.25); margin-top:-10px; position:relative; z-index:10; }
+.demo-frame-box iframe { width:100%; aspect-ratio:16/9; border:none; display:block; }
+@media (max-width:540px) {
+  .demo-frame-box iframe { aspect-ratio:3/4; }
+  .demo-wrap { padding:0 10px; }
+}
+@media (max-width:380px) {
+  .demo-frame-box iframe { aspect-ratio:2/3; }
+}
+</style>
+<div class="demo-wrap">
+  <div class="demo-frame-box">
+    <iframe src="demo-pikt.html" scrolling="no" loading="lazy" title="Demo PiKT.es"></iframe>
+  </div>
+  <p style="text-align:center;font-size:0.8em;color:#999;margin-top:8px;">Demo interactiva · se repite automáticamente · pulsa "siguiente ›" para avanzar</p>
+</div>
+
 <div class="container">
 
   <!-- SECCIÓN 1: QUÉ ES PIKT -->

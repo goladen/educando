@@ -49,6 +49,7 @@ import EditorSolarSystem from './components/EditorSolarSystem';
 import OmninteractiveApp from './OmninteractiveApp';
 import VideoQuizzApp from './VideoQuizzApp';
 import BuzonNovedades from './components/BuzonNovedades';
+import PresentationEditor from './components/PresentationEditor';
 import * as XLSX from 'xlsx'; // <--- IMPORTANTE
 // ==============================================================================
 //  ZONA DE CLAVES (SEGURA)
@@ -141,7 +142,8 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
     const [modoVista, setModoVista] = useState('PROFESOR');
     const [mostrandoPerfil, setMostrandoPerfil] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
-    const [modoDashboard, setModoDashboard] = useState('CLASICO'); // 'CLASICO', 'PRO','LIVE', 'BUSCADOR_GLOBAL', 'HERRAMIENTAS', 'LEGAL', 'INFO'
+    const [modoDashboard, setModoDashboard] = useState('CLASICO'); // 'CLASICO', 'PRO','LIVE', 'BUSCADOR_GLOBAL', 'HERRAMIENTAS', 'LEGAL', 'INFO', 'PRESENTACIONES'
+    const [presentacionEditar, setPresentacionEditar] = useState(null); // null = nueva, obj = editar
     const [mostrandoAyudaDashboard, setMostrandoAyudaDashboard] = useState(false); // <--- Ayuda Global
     const [recursoParaElegirModo, setRecursoParaElegirModo] = useState(null);
     const [openPicker] = useDrivePicker();
@@ -1015,6 +1017,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                     <li style={styles.menuItem} onClick={() => navegar('LIVE')}>Recursos Live</li>   {/* ← NUEVO */}
                     <li style={styles.menuItem} onClick={() => navegar('BUSCADOR_GLOBAL')}>Buscador de Recursos</li>
                     <li style={styles.menuItem} onClick={() => navegar('HERRAMIENTAS')}>Herramientas del Profesor</li>
+                    <li style={styles.menuItem} onClick={() => { setPresentacionEditar(null); navegar('PRESENTACIONES'); }}>📊 Presentaciones</li>
                     <li style={styles.menuItem} onClick={() => navegar('MI_PAGINA')}>🌐 Mi Página</li>
 
                     {/* --- CAMBIA ESTAS DOS LÍNEAS PARA LOS ENLACES EXTERNOS --- */}
@@ -1053,6 +1056,16 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             </div>
 
             {/* --- CONTENIDO SEGÚN MODO --- */}
+
+            {/* 0. PRESENTACIONES */}
+            {modoDashboard === 'PRESENTACIONES' && (
+                <PresentationEditor
+                    usuario={usuario}
+                    presentacionInicial={presentacionEditar}
+                    onClose={() => setModoDashboard('CLASICO')}
+                    onSaved={(id) => setPresentacionEditar(prev => prev ? { ...prev, id } : { id })}
+                />
+            )}
 
             {/* 1. BUSCADOR GLOBAL */}
             {modoDashboard === 'BUSCADOR_GLOBAL' && (

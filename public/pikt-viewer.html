@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>PiKT Presentación</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Inter', 'Segoe UI', Arial, sans-serif; background: #0d0d2b; }
+.stage { position: fixed; inset: 0; overflow: hidden; }
+.scene { position: absolute; inset: 0; display: flex; flex-direction: column; opacity: 0; transform: scale(0.97) translateY(12px); transition: opacity 0.55s ease, transform 0.55s ease; pointer-events: none; }
+.scene.active { opacity: 1; transform: scale(1) translateY(0); pointer-events: auto; }
+.progress-bar { position: absolute; bottom: 32px; left: 0; right: 0; height: 3px; background: rgba(255,255,255,0.1); z-index: 100; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, #6c63ff, #a855f7); width: 0%; transition: width 0.15s linear; }
+.scene-dots { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; z-index: 100; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,0.3); transition: background 0.3s, transform 0.3s; cursor: pointer; }
+.dot.active { background: white; transform: scale(1.4); }
+.skip-btn { position: absolute; bottom: 6px; right: 14px; z-index: 200; background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.75); border: none; border-radius: 20px; padding: 5px 13px; font-size: clamp(0.62rem,2.5vw,0.72rem); cursor: pointer; font-family: inherit; transition: background 0.2s; }
+.skip-btn:hover { background: rgba(255,255,255,0.22); }
+.slide-label { position: absolute; top: 10px; left: 14px; background: rgba(0,0,0,0.4); color: rgba(255,255,255,0.75); font-size: clamp(0.58rem,2vw,0.7rem); font-weight: 700; padding: 3px 10px; border-radius: 12px; text-transform: uppercase; letter-spacing: 1px; z-index: 50; }
+.prev-btn, .next-btn { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.35); color: rgba(255,255,255,0.7); border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 20px; cursor: pointer; z-index: 100; transition: background 0.2s; display: flex; align-items: center; justify-content: center; }
+.prev-btn { left: 12px; }
+.next-btn { right: 12px; }
+.prev-btn:hover, .next-btn:hover { background: rgba(0,0,0,0.6); }
+
+/* Loading */
+.loading { display: flex; align-items: center; justify-content: center; height: 100vh; color: #6c63ff; font-size: 18px; font-weight: 700; }
+.error { display: flex; align-items: center; justify-content: center; height: 100vh; color: #f87171; font-size: 16px; padding: 20px; text-align: center; }
+
+/* Slide content layouts */
+.slide-inner { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+
+/* Title layout */
+.lay-title { align-items: center; justify-content: center; text-align: center; padding: clamp(16px,5vw,40px); gap: clamp(12px,3vw,20px); }
+.title-heading { font-size: clamp(2rem,8vw,5rem); font-weight: 900; letter-spacing: -2px; line-height: 1.1; background: linear-gradient(135deg, var(--accent), #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.title-sub { font-size: clamp(0.78rem,2.5vw,1.1rem); font-weight: 600; letter-spacing: 3px; text-transform: uppercase; color: var(--sub); }
+.title-img { width: min(50%, 300px); border-radius: 12px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+.title-img img { width: 100%; object-fit: cover; display: block; }
+
+/* Content layout */
+.lay-content { padding: clamp(16px,4vw,32px); gap: clamp(10px,2vw,16px); }
+.content-heading { font-size: clamp(1.3rem,4vw,2.2rem); font-weight: 900; color: var(--text); border-bottom: 2px solid var(--accent33); padding-bottom: 8px; flex-shrink: 0; }
+.content-body { flex: 1; display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+.body-item { display: flex; align-items: flex-start; gap: 10px; padding: clamp(6px,1.5vw,10px) clamp(10px,2.5vw,16px); background: var(--card); border: 1px solid var(--cardBorder); border-radius: 10px; color: var(--text); font-size: clamp(0.85rem,2.5vw,1rem); line-height: 1.5; }
+.body-bullet { color: var(--accent); font-weight: 900; flex-shrink: 0; }
+
+/* Image layouts */
+.lay-image { padding: clamp(14px,3.5vw,28px); gap: clamp(10px,2.5vw,20px); flex-direction: row; align-items: center; }
+.lay-image.image-left { flex-direction: row-reverse; }
+.image-text { flex: 1; display: flex; flex-direction: column; gap: clamp(8px,2vw,14px); }
+.image-text .ih { font-size: clamp(1.1rem,3.5vw,2rem); font-weight: 900; color: var(--text); }
+.image-text .ib { font-size: clamp(0.82rem,2.2vw,0.98rem); line-height: 1.7; color: var(--text); opacity: 0.85; flex: 1; }
+.image-box { width: clamp(120px,32%,260px); flex-shrink: 0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.3); background: var(--card); border: 1px solid var(--cardBorder); display: flex; align-items: center; justify-content: center; min-height: clamp(100px,20vh,200px); }
+.image-box img { width: 100%; height: 100%; object-fit: cover; }
+.image-placeholder { font-size: clamp(28px,8vw,48px); }
+
+/* Two col */
+.lay-two-col { padding: clamp(14px,3.5vw,28px); gap: clamp(10px,2vw,14px); }
+.two-col-heading { font-size: clamp(1.1rem,3.5vw,2rem); font-weight: 900; color: var(--text); flex-shrink: 0; }
+.two-col-cols { display: flex; flex: 1; gap: clamp(8px,2vw,16px); min-height: 0; }
+.col-box { flex: 1; background: var(--card); border: 1px solid var(--cardBorder); border-radius: 12px; padding: clamp(10px,2.5vw,16px); display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+.col-item { color: var(--text); font-size: clamp(0.78rem,2vw,0.93rem); line-height: 1.6; display: flex; gap: 8px; }
+
+/* CTA */
+.lay-cta { align-items: center; justify-content: center; text-align: center; padding: clamp(16px,5vw,40px); gap: clamp(12px,3vw,20px); }
+.cta-heading { font-size: clamp(1.5rem,5.5vw,3rem); font-weight: 900; color: var(--text); line-height: 1.2; }
+.cta-sub { font-size: clamp(0.82rem,2.3vw,1.1rem); font-weight: 600; color: var(--sub); }
+.cta-url { background: white; border-radius: 40px; padding: clamp(10px,2.5vw,14px) clamp(22px,6vw,36px); font-size: clamp(1rem,4vw,1.5rem); font-weight: 900; box-shadow: 0 4px 24px rgba(0,0,0,0.25); color: var(--ctaColor); }
+
+/* Map */
+.lay-map { padding: clamp(12px,3vw,20px); gap: 10px; }
+.map-heading { font-size: clamp(1.1rem,3vw,1.8rem); font-weight: 900; color: var(--text); flex-shrink: 0; }
+.map-canvas { flex: 1; position: relative; background: var(--card); border-radius: 12px; border: 1px solid var(--cardBorder); overflow: hidden; }
+.map-node { position: absolute; transform: translate(-50%,-50%); border-radius: 12px; padding: clamp(4px,1.5vw,7px) clamp(10px,2.5vw,16px); font-weight: 600; white-space: nowrap; font-size: clamp(0.7rem,1.8vw,0.88rem); z-index: 2; }
+.map-node.center { border-radius: 20px; font-weight: 800; font-size: clamp(0.8rem,2vw,1rem); }
+
+/* Tags */
+.tags-row { display: flex; flex-wrap: wrap; gap: 6px; flex-shrink: 0; }
+.tag { border-radius: 20px; padding: clamp(3px,1vw,5px) clamp(10px,3vw,14px); font-size: clamp(0.68rem,2vw,0.8rem); font-weight: 600; border: 1px solid; }
+
+/* Animations */
+@keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+@keyframes popIn { from { opacity:0; transform:scale(0.7); } to { opacity:1; transform:scale(1); } }
+.anim-1 { animation: fadeUp 0.5s 0.05s ease both; }
+.anim-2 { animation: fadeUp 0.5s 0.15s ease both; }
+.anim-3 { animation: fadeUp 0.5s 0.25s ease both; }
+.anim-4 { animation: fadeUp 0.5s 0.35s ease both; }
+.anim-pop { animation: popIn 0.5s 0.3s cubic-bezier(.34,1.56,.64,1) both; }
+
+/* Game layout */
+.lay-game { align-items: center; justify-content: center; padding: clamp(16px,5vw,40px); gap: clamp(12px,3vw,20px); }
+.game-card { border-radius: 24px; padding: clamp(20px,5vw,36px) clamp(24px,6vw,48px); text-align: center; max-width: 480px; width: 100%; box-shadow: 0 8px 40px rgba(0,0,0,0.3); animation: fadeUp 0.5s 0.05s ease both; }
+.game-icon { font-size: clamp(2.5rem,10vw,4rem); margin-bottom: 12px; }
+.game-title { font-size: clamp(1.1rem,3.5vw,1.8rem); font-weight: 900; margin-bottom: 8px; }
+.game-badge { border-radius: 20px; padding: 4px 14px; display: inline-block; font-size: clamp(0.7rem,2vw,0.85rem); font-weight: 700; margin-bottom: 14px; }
+.game-sub { font-size: clamp(0.78rem,2vw,0.95rem); margin-bottom: 18px; }
+.game-play-btn { border: none; border-radius: 50px; padding: clamp(12px,3vw,16px) clamp(24px,6vw,40px); font-size: clamp(1rem,3.5vw,1.3rem); font-weight: 900; cursor: pointer; display: inline-flex; align-items: center; gap: 10px; font-family: inherit; }
+.game-actions { display: flex; gap: 10px; justify-content: center; animation: fadeUp 0.5s 0.3s ease both; }
+.game-action-btn { border-radius: 20px; padding: 5px 14px; font-size: 11px; cursor: pointer; font-weight: 700; font-family: inherit; border: 1px solid; }
+
+/* Game overlay */
+.game-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 10000; display: flex; flex-direction: column; }
+.game-overlay-bar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: #111827; border-bottom: 1px solid #374151; flex-shrink: 0; }
+.game-overlay-title { font-weight: 800; color: #fff; font-size: 15px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.game-overlay-sub { font-size: 11px; color: #6b7280; }
+.game-overlay-btn { border: none; border-radius: 8px; padding: 7px 14px; cursor: pointer; font-size: 13px; font-weight: 700; font-family: inherit; }
+.game-overlay iframe { flex: 1; border: none; background: #000; }
+
+/* Video layout */
+.lay-video { padding: clamp(14px,3.5vw,28px); gap: clamp(10px,2.5vw,16px); }
+.video-heading { font-size: clamp(1.1rem,3.5vw,2rem); font-weight: 900; flex-shrink: 0; }
+.video-player-wrap { flex: 1; position: relative; border-radius: 12px; overflow: hidden; background: #000; min-height: 0; }
+.video-iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: none; display: block; }
+.video-direct { width: 100%; height: 100%; display: block; object-fit: contain; background: #000; }
+.video-caption { font-size: clamp(0.75rem,2vw,0.9rem); text-align: center; flex-shrink: 0; font-style: italic; opacity: 0.75; }
+.video-placeholder { display: flex; align-items: center; justify-content: center; height: 100%; min-height: 120px; color: rgba(255,255,255,0.35); font-size: 1rem; gap: 8px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBzPXY7_iFaMjiw824Pa8HnO4nFBtK0r9s",
+  authDomain: "aprendiendo-db0b3.firebaseapp.com",
+  projectId: "aprendiendo-db0b3",
+  storageBucket: "aprendiendo-db0b3.firebasestorage.app",
+  messagingSenderId: "544528054442",
+  appId: "1:544528054442:web:bbf6fef42f94a78307b8d3",
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const TIPO_ICONS = { PASAPALABRA:'🔤', CAZABURBUJAS:'🫧', THINKHOOT:'📡', PILIVE:'📡', MATHLIVE:'🧮', OLYMPICLIVE:'🏅', APAREJADOS:'🃏', RULETA:'🎡', WORDLE:'📝', OMNI:'📚', OMNINTERACTIVE:'📚', VIDEOQUIZZ:'🎬', SOLAR_SYSTEM:'🪐', SINTAXIS:'🖊️', ETIQUETAS:'🏷️' };
+const TIPO_LABELS = { PASAPALABRA:'Pasapalabra', CAZABURBUJAS:'Burbujas/Pikatron', THINKHOOT:'Pi-Live', MATHLIVE:'MathLive', OLYMPICLIVE:'Olympic Live', APAREJADOS:'AparejaDOS', RULETA:'La Ruleta', WORDLE:'Wordle', OMNI:'Omninteractive', OMNINTERACTIVE:'Omninteractive', VIDEOQUIZZ:'VideoQuizz', SOLAR_SYSTEM:'Sistema Solar', SINTAXIS:'Sintaxis', ETIQUETAS:'EtiquetaMe' };
+
+const THEMES = {
+  dark: { bg:'linear-gradient(135deg,#1a0533 0%,#0d1b4a 50%,#0a0a1a 100%)', accent:'#6c63ff', text:'#fff', sub:'rgba(255,255,255,0.65)', card:'rgba(255,255,255,0.07)', cardBorder:'rgba(255,255,255,0.12)', tag:'rgba(108,99,255,0.25)', tagBorder:'rgba(108,99,255,0.5)', tagText:'#a78bfa' },
+  purple: { bg:'linear-gradient(135deg,#6c63ff 0%,#a855f7 60%,#ec4899 100%)', accent:'#fff', text:'#fff', sub:'rgba(255,255,255,0.8)', card:'rgba(255,255,255,0.2)', cardBorder:'rgba(255,255,255,0.3)', tag:'rgba(255,255,255,0.2)', tagBorder:'rgba(255,255,255,0.4)', tagText:'#fff' },
+  light: { bg:'#f0f4ff', accent:'#6c63ff', text:'#1a1a2e', sub:'#555', card:'#fff', cardBorder:'#e8e8ff', tag:'#ede9fe', tagBorder:'#c4b5fd', tagText:'#6c63ff' },
+  blue: { bg:'linear-gradient(160deg,#0A0E45 0%,#0d0d2b 100%)', accent:'#a78bfa', text:'#fff', sub:'rgba(255,255,255,0.65)', card:'rgba(255,255,255,0.08)', cardBorder:'rgba(255,255,255,0.12)', tag:'rgba(108,99,255,0.25)', tagBorder:'rgba(108,99,255,0.5)', tagText:'#a78bfa' },
+  green: { bg:'linear-gradient(135deg,#064e3b 0%,#065f46 100%)', accent:'#34d399', text:'#fff', sub:'rgba(255,255,255,0.75)', card:'rgba(255,255,255,0.1)', cardBorder:'rgba(52,211,153,0.3)', tag:'rgba(52,211,153,0.2)', tagBorder:'rgba(52,211,153,0.5)', tagText:'#6ee7b7' },
+  orange: { bg:'linear-gradient(135deg,#7c2d12 0%,#431407 100%)', accent:'#fb923c', text:'#fff', sub:'rgba(255,255,255,0.75)', card:'rgba(255,255,255,0.1)', cardBorder:'rgba(251,146,60,0.3)', tag:'rgba(251,146,60,0.2)', tagBorder:'rgba(251,146,60,0.5)', tagText:'#fdba74' },
+};
+
+const root = document.getElementById('root');
+const params = new URLSearchParams(window.location.search);
+const presId = params.get('id');
+
+if (!presId) {
+  root.innerHTML = '<div class="error">No se especificó ninguna presentación (falta ?id=...)</div>';
+} else {
+  root.innerHTML = '<div class="loading">⏳ Cargando presentación…</div>';
+  loadPresentation(presId);
+}
+
+let slides = [], current = 0, timer = null;
+
+async function loadPresentation(id) {
+  try {
+    const snap = await getDoc(doc(db, 'presentations', id));
+    if (!snap.exists()) { root.innerHTML = '<div class="error">Presentación no encontrada</div>'; return; }
+    const data = snap.data();
+    slides = data.slides || [];
+    document.title = data.titulo || 'PiKT Presentación';
+    buildStage(data);
+    goTo(0);
+  } catch(e) {
+    root.innerHTML = `<div class="error">Error: ${e.message}</div>`;
+  }
+}
+
+function parseVideoUrl(url) {
+  if (!url || !url.trim()) return null;
+  const u = url.trim();
+  const yt = u.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  if (yt) return { type: 'youtube', embed: `https://www.youtube.com/embed/${yt[1]}?rel=0&modestbranding=1` };
+  const vi = u.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+  if (vi) return { type: 'vimeo', embed: `https://player.vimeo.com/video/${vi[1]}` };
+  if (u.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i)) return { type: 'direct', embed: u };
+  return null;
+}
+
+function tagsHtml(tags, t) {
+  if (!tags?.length) return '';
+  return `<div class="tags-row">${tags.map(tag=>`<span class="tag" style="background:${t.tag};border-color:${t.tagBorder};color:${t.tagText};">${tag}</span>`).join('')}</div>`;
+}
+
+function renderSlide(slide, idx) {
+  const t = THEMES[slide.theme] || THEMES.dark;
+  const accent33 = t.accent + '33';
+  const ctaColor = t.accent === '#ffffff' ? '#6c63ff' : t.accent;
+
+  let content = '';
+  const layout = slide.layout || 'title';
+
+  if (layout === 'title') {
+    const imgHtml = slide.imageBase64 ? `<div class="title-img anim-3"><img src="${slide.imageBase64}" alt=""></div>` : '';
+    content = `<div class="slide-inner lay-title" style="display:flex;">
+      <div class="title-heading anim-1" style="--accent:${t.accent};">${slide.heading||''}</div>
+      ${slide.subheading ? `<div class="title-sub anim-2" style="--sub:${t.sub};">${slide.subheading}</div>` : ''}
+      ${imgHtml}
+      <div class="anim-4">${tagsHtml(slide.tags, t)}</div>
+    </div>`;
+  } else if (layout === 'content') {
+    const lines = (slide.body||'').split('\n').filter(Boolean);
+    const itemsHtml = lines.map((line, i) => {
+      const isBullet = line.startsWith('•');
+      return `<div class="body-item" style="animation:fadeUp 0.5s ${0.1+i*0.1}s ease both;--card:${t.card};--cardBorder:${t.cardBorder};--text:${t.text};--accent:${t.accent};">
+        ${isBullet ? `<span class="body-bullet" style="color:${t.accent}">•</span><span>${line.slice(1).trim()}</span>` : line}
+      </div>`;
+    }).join('');
+    content = `<div class="slide-inner lay-content" style="display:flex;">
+      <div class="content-heading anim-1" style="color:${t.text};border-color:${accent33};">${slide.heading||''}</div>
+      <div class="content-body">${itemsHtml}</div>
+      <div class="anim-4">${tagsHtml(slide.tags, t)}</div>
+    </div>`;
+  } else if (layout === 'image-right' || layout === 'image-left') {
+    const imgHtml = slide.imageBase64
+      ? `<img src="${slide.imageBase64}" alt="">`
+      : `<span class="image-placeholder">🖼️</span>`;
+    const cls = layout === 'image-left' ? 'image-left' : '';
+    content = `<div class="slide-inner lay-image ${cls}" style="display:flex;">
+      <div class="image-text anim-1">
+        <div class="ih" style="color:${t.text};">${slide.heading||''}</div>
+        <div class="ib" style="color:${t.text};">${slide.body||''}</div>
+        ${tagsHtml(slide.tags, t)}
+      </div>
+      <div class="image-box anim-2" style="--card:${t.card};--cardBorder:${t.cardBorder};">${imgHtml}</div>
+    </div>`;
+  } else if (layout === 'two-col') {
+    const col1 = (slide.body||'').split('\n').filter(Boolean);
+    const col2 = (slide.col2||'').split('\n').filter(Boolean);
+    const colHtml = (lines, delay) => lines.map((line, i) => {
+      const isBullet = line.startsWith('•');
+      return `<div class="col-item" style="color:${t.text};animation:fadeUp 0.4s ${delay+i*0.08}s ease both;">
+        ${isBullet ? `<span style="color:${t.accent};flex-shrink:0;">•</span><span>${line.slice(1).trim()}</span>` : `<span>${line}</span>`}
+      </div>`;
+    }).join('');
+    content = `<div class="slide-inner lay-two-col" style="display:flex;">
+      <div class="two-col-heading anim-1" style="color:${t.text};">${slide.heading||''}</div>
+      <div class="two-col-cols">
+        <div class="col-box" style="--card:${t.card};--cardBorder:${t.cardBorder};">${colHtml(col1, 0.1)}</div>
+        <div class="col-box" style="--card:${t.card};--cardBorder:${t.cardBorder};">${colHtml(col2, 0.2)}</div>
+      </div>
+    </div>`;
+  } else if (layout === 'cta') {
+    content = `<div class="slide-inner lay-cta" style="display:flex;">
+      <div class="cta-heading anim-1" style="color:${t.text};">${slide.heading||''}</div>
+      ${slide.subheading ? `<div class="cta-sub anim-2" style="color:${t.sub};">${slide.subheading}</div>` : ''}
+      ${slide.body ? `<div class="cta-url anim-pop" style="--ctaColor:${ctaColor};">${slide.body}</div>` : ''}
+      <div class="anim-4">${tagsHtml(slide.tags, t)}</div>
+    </div>`;
+  } else if (layout === 'game') {
+    const icon = TIPO_ICONS[slide.resourceType] || '🎮';
+    const label = TIPO_LABELS[slide.resourceType] || 'Recurso interactivo';
+    const ctaColor = t.accent !== '#ffffff' ? t.accent : '#6c63ff';
+    const gradBg = `linear-gradient(135deg,${ctaColor},#a855f7)`;
+    if (slide.resourceId) {
+      content = `<div class="slide-inner lay-game" style="display:flex;flex-direction:column;">
+        <div class="game-card" style="background:${t.card};border:2px solid ${t.cardBorder};">
+          <div class="game-icon">${icon}</div>
+          <div class="game-title" style="color:${t.text};">${slide.resourceTitle||slide.heading||'Juego interactivo'}</div>
+          <div class="game-badge" style="background:${t.tag};border:1px solid ${t.tagBorder};color:${t.tagText};">${label}</div>
+          ${slide.subheading ? `<div class="game-sub" style="color:${t.sub};">${slide.subheading}</div>` : ''}
+          <button class="game-play-btn" onclick="openGame('${slide.resourceId}','${(slide.resourceTitle||'').replace(/'/g,"\\'")}','${slide.resourceType||''}')" style="background:${gradBg};color:#fff;box-shadow:0 6px 24px ${ctaColor}55;">
+            <span style="font-size:1.2em;">▶</span> Jugar ahora
+          </button>
+        </div>
+        <div class="game-actions anim-2">
+          <button class="game-action-btn" onclick="openGame('${slide.resourceId}','${(slide.resourceTitle||'').replace(/'/g,"\\'")}','${slide.resourceType||''}')" style="background:${t.card};border-color:${t.cardBorder};color:${t.sub};">⛶ Pantalla completa</button>
+          <button class="game-action-btn" onclick="window.open(location.origin+'/?r=${slide.resourceId}','_blank')" style="background:${t.card};border-color:${t.cardBorder};color:${t.sub};">↗ Nueva pestaña</button>
+        </div>
+      </div>`;
+    } else {
+      content = `<div class="slide-inner lay-game" style="display:flex;flex-direction:column;">
+        <div class="game-card" style="background:${t.card};border:2px solid ${t.cardBorder};">
+          <div class="game-icon">🎮</div>
+          <div class="game-title" style="color:${t.text};">${slide.heading||'Juego interactivo'}</div>
+          <div class="game-sub" style="color:${t.sub};">Sin recurso asignado</div>
+        </div>
+      </div>`;
+    }
+  } else if (layout === 'video') {
+    const parsed = parseVideoUrl(slide.videoUrl);
+    let playerHtml = '';
+    if (parsed?.type === 'youtube' || parsed?.type === 'vimeo') {
+      playerHtml = `<iframe class="video-iframe" src="${parsed.embed}" allowfullscreen allow="autoplay; fullscreen; picture-in-picture" frameborder="0" title="video"></iframe>`;
+    } else if (parsed?.type === 'direct') {
+      playerHtml = `<video class="video-direct" src="${parsed.embed}" controls onplay="setVideoPlaying(true)" onpause="setVideoPlaying(false)" onended="setVideoPlaying(false)"></video>`;
+    } else {
+      playerHtml = `<div class="video-placeholder">🎬 URL de vídeo no configurada</div>`;
+    }
+    content = `<div class="slide-inner lay-video" style="display:flex;flex-direction:column;">
+      ${slide.heading ? `<div class="video-heading anim-1" style="color:${t.text};">${slide.heading}</div>` : ''}
+      <div class="video-player-wrap anim-2">${playerHtml}</div>
+      ${slide.videoCaption ? `<div class="video-caption anim-3" style="color:${t.sub};">${slide.videoCaption}</div>` : ''}
+    </div>`;
+  } else if (layout === 'map') {
+    const nodes = slide.mapNodes || [];
+    const center = nodes.find(n=>n.isCenter) || nodes[0];
+    const lines = nodes.filter(n=>!n.isCenter).map(n => center
+      ? `<line x1="${center.x}%" y1="${center.y}%" x2="${n.x}%" y2="${n.y}%" stroke="${t.cardBorder}" stroke-width="2" stroke-dasharray="5,5"/>`
+      : '').join('');
+    const nodeHtml = nodes.map((node, i) => {
+      const bg = node.isCenter ? t.accent : t.card;
+      const border = node.isCenter ? t.accent : t.cardBorder;
+      const color = node.isCenter ? '#fff' : t.text;
+      const shadow = node.isCenter ? `box-shadow:0 4px 20px ${t.accent}66;` : '';
+      return `<div class="map-node${node.isCenter?' center':''}" style="left:${node.x}%;top:${node.y}%;background:${bg};border:2px solid ${border};color:${color};${shadow}animation:fadeUp 0.4s ${0.05+i*0.08}s ease both;">${node.text}</div>`;
+    }).join('');
+    content = `<div class="slide-inner lay-map" style="display:flex;">
+      <div class="map-heading anim-1" style="color:${t.text};">${slide.heading||''}</div>
+      <div class="map-canvas" style="--card:${t.card};--cardBorder:${t.cardBorder};">
+        <svg style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;">${lines}</svg>
+        ${nodeHtml}
+      </div>
+    </div>`;
+  }
+
+  return `<div class="scene" id="s${idx}" style="background:${t.bg};">
+    <div class="slide-label">📊 ${idx+1}/${slides.length}</div>
+    ${content}
+  </div>`;
+}
+
+function buildStage(data) {
+  const scenesHtml = slides.map((s, i) => renderSlide(s, i)).join('\n');
+  root.innerHTML = `
+    <div class="stage" id="stage">
+      ${scenesHtml}
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="scene-dots" id="sceneDots"></div>
+      <button class="skip-btn" id="skipBtn">siguiente ›</button>
+      <button class="prev-btn" id="prevBtn">‹</button>
+      <button class="next-btn" id="nextBtn">›</button>
+    </div>`;
+
+  // Dots
+  const dotsEl = document.getElementById('sceneDots');
+  slides.forEach((_,i) => {
+    const d = document.createElement('div');
+    d.className = 'dot' + (i===0?' active':'');
+    d.onclick = () => goTo(i);
+    dotsEl.appendChild(d);
+  });
+
+  document.getElementById('skipBtn').onclick = () => { clearTimeout(timer); goTo((current+1)%slides.length); };
+  document.getElementById('nextBtn').onclick = () => { clearTimeout(timer); goTo((current+1)%slides.length); };
+  document.getElementById('prevBtn').onclick = () => { clearTimeout(timer); goTo((current-1+slides.length)%slides.length); };
+
+  document.addEventListener('keydown', e => {
+    if (e.key==='ArrowRight'||e.key===' ') { clearTimeout(timer); goTo((current+1)%slides.length); }
+    if (e.key==='ArrowLeft') { clearTimeout(timer); goTo((current-1+slides.length)%slides.length); }
+  });
+}
+
+let gameOverlayOpen = false;
+let videoPlaying = false;
+
+function setVideoPlaying(val) {
+  videoPlaying = val;
+  if (val) {
+    clearTimeout(timer);
+  } else {
+    clearTimeout(timer);
+    const dur = slides[current]?.duration || 5000;
+    timer = setTimeout(() => goTo((current+1)%slides.length), dur);
+  }
+}
+
+function openGame(resourceId, title, tipo) {
+  gameOverlayOpen = true;
+  clearTimeout(timer);
+  const icon = TIPO_ICONS[tipo] || '🎮';
+  const label = TIPO_LABELS[tipo] || 'Recurso interactivo';
+  const gameUrl = location.origin + '/?r=' + resourceId;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'game-overlay';
+  overlay.id = 'gameOverlay';
+  overlay.innerHTML = `
+    <div class="game-overlay-bar">
+      <span style="font-size:20px;flex-shrink:0;">${icon}</span>
+      <div style="flex:1;min-width:0;">
+        <div class="game-overlay-title">${title||'Juego'}</div>
+        <div class="game-overlay-sub">${label}</div>
+      </div>
+      <button class="game-overlay-btn" style="background:#374151;color:#e5e7eb;" onclick="document.getElementById('gameIframe').requestFullscreen&&document.getElementById('gameIframe').requestFullscreen()">⛶ Pantalla completa</button>
+      <button class="game-overlay-btn" style="background:#374151;color:#e5e7eb;" onclick="window.open('${gameUrl}','_blank')">↗ Nueva pestaña</button>
+      <button class="game-overlay-btn" style="background:#7f1d1d;color:#fca5a5;" onclick="closeGame()">✕ Cerrar</button>
+    </div>
+    <iframe id="gameIframe" src="${gameUrl}" allow="fullscreen" title="${title||'Juego'}"></iframe>`;
+
+  document.body.appendChild(overlay);
+
+  document.addEventListener('keydown', escHandler);
+}
+
+function escHandler(e) {
+  if (e.key === 'Escape') closeGame();
+}
+
+function closeGame() {
+  gameOverlayOpen = false;
+  const overlay = document.getElementById('gameOverlay');
+  if (overlay) overlay.remove();
+  document.removeEventListener('keydown', escHandler);
+  // Resume timer for current slide
+  const dur = slides[current]?.duration || 5000;
+  timer = setTimeout(() => goTo((current+1)%slides.length), dur);
+}
+
+function goTo(idx) {
+  clearTimeout(timer);
+  if (gameOverlayOpen) return; // don't change slide while game is open
+  document.querySelectorAll('.scene').forEach(s=>s.classList.remove('active'));
+  const el = document.getElementById(`s${idx}`);
+  if (!el) return;
+  el.classList.add('active');
+  current = idx;
+
+  // Update dots
+  document.querySelectorAll('.dot').forEach((d,i)=>d.classList.toggle('active',i===idx));
+
+  // Progress bar
+  const pf = document.getElementById('progressFill');
+  const dur = slides[idx]?.duration || 5000;
+  const t = THEMES[slides[idx]?.theme] || THEMES.dark;
+  if (pf) {
+    pf.style.transition = 'none';
+    pf.style.width = '0%';
+    pf.style.background = `linear-gradient(90deg,${t.accent},#a855f7)`;
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      pf.style.transition = `width ${dur}ms linear`;
+      pf.style.width = '100%';
+    }));
+  }
+
+  timer = setTimeout(() => { if (!videoPlaying) goTo((idx+1)%slides.length); }, dur);
+}
+</script>
+</body>
+</html>

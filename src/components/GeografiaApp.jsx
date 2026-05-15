@@ -251,16 +251,16 @@ const PROVINCIAS = [
 
 // ── Physical geography elements ───────────────────────────────────────────────
 const ELEMENTOS_GEO = [
-  { nombre:'Ebro',             tipo:'rio',        ambito:'España',  lon:-0.9,   lat:41.6  },
-  { nombre:'Tajo',             tipo:'rio',        ambito:'España',  lon:-4.0,   lat:39.9  },
-  { nombre:'Duero',            tipo:'rio',        ambito:'España',  lon:-4.5,   lat:41.5  },
-  { nombre:'Guadalquivir',     tipo:'rio',        ambito:'España',  lon:-4.8,   lat:37.5  },
-  { nombre:'Guadiana',         tipo:'rio',        ambito:'España',  lon:-5.5,   lat:38.9  },
-  { nombre:'Miño',             tipo:'rio',        ambito:'España',  lon:-7.9,   lat:42.2  },
-  { nombre:'Segura',           tipo:'rio',        ambito:'España',  lon:-1.2,   lat:38.1  },
-  { nombre:'Júcar',            tipo:'rio',        ambito:'España',  lon:-1.8,   lat:39.4  },
-  { nombre:'Turia',            tipo:'rio',        ambito:'España',  lon:-1.1,   lat:39.8  },
-  { nombre:'Pisuerga',         tipo:'rio',        ambito:'España',  lon:-4.5,   lat:41.7  },
+  { nombre:'Ebro',             tipo:'rio', ambito:'España',  lon:-0.9,   lat:41.6,  lon_inicio:-4.1,  lat_inicio:43.0,  lon_fin:0.8,    lat_fin:40.7  },
+  { nombre:'Tajo',             tipo:'rio', ambito:'España',  lon:-4.0,   lat:39.9,  lon_inicio:-1.5,  lat_inicio:40.4,  lon_fin:-9.0,   lat_fin:38.7  },
+  { nombre:'Duero',            tipo:'rio', ambito:'España',  lon:-4.5,   lat:41.5,  lon_inicio:-2.8,  lat_inicio:41.9,  lon_fin:-8.7,   lat_fin:41.1  },
+  { nombre:'Guadalquivir',     tipo:'rio', ambito:'España',  lon:-4.8,   lat:37.5,  lon_inicio:-2.9,  lat_inicio:37.9,  lon_fin:-6.4,   lat_fin:36.8  },
+  { nombre:'Guadiana',         tipo:'rio', ambito:'España',  lon:-5.5,   lat:38.9,  lon_inicio:-2.9,  lat_inicio:38.9,  lon_fin:-7.4,   lat_fin:37.2  },
+  { nombre:'Miño',             tipo:'rio', ambito:'España',  lon:-7.9,   lat:42.2,  lon_inicio:-7.3,  lat_inicio:43.1,  lon_fin:-8.9,   lat_fin:41.9  },
+  { nombre:'Segura',           tipo:'rio', ambito:'España',  lon:-1.2,   lat:38.1,  lon_inicio:-2.7,  lat_inicio:38.1,  lon_fin:-0.7,   lat_fin:38.1  },
+  { nombre:'Júcar',            tipo:'rio', ambito:'España',  lon:-1.8,   lat:39.4,  lon_inicio:-1.7,  lat_inicio:40.2,  lon_fin:-0.2,   lat_fin:39.2  },
+  { nombre:'Turia',            tipo:'rio', ambito:'España',  lon:-1.1,   lat:39.8,  lon_inicio:-1.4,  lat_inicio:40.5,  lon_fin:-0.3,   lat_fin:39.5  },
+  { nombre:'Pisuerga',         tipo:'rio', ambito:'España',  lon:-4.5,   lat:41.7,  lon_inicio:-4.5,  lat_inicio:42.9,  lon_fin:-4.7,   lat_fin:41.6  },
   { nombre:'Pirineos',         tipo:'cordillera', ambito:'España',  lon:0.3,    lat:42.7  },
   { nombre:'Sierra Nevada',    tipo:'cordillera', ambito:'España',  lon:-3.3,   lat:37.1  },
   { nombre:'Sistema Central',  tipo:'cordillera', ambito:'España',  lon:-3.9,   lat:40.6  },
@@ -269,18 +269,18 @@ const ELEMENTOS_GEO = [
   { nombre:'Sierra Morena',    tipo:'cordillera', ambito:'España',  lon:-4.2,   lat:38.1  },
   { nombre:'Macizo Galaico',   tipo:'cordillera', ambito:'España',  lon:-7.5,   lat:42.5  },
   { nombre:'Montes de Toledo', tipo:'cordillera', ambito:'España',  lon:-4.4,   lat:39.6  },
-  { nombre:'Rin',              tipo:'rio',        ambito:'Europa',  lon:8.2,    lat:50.9  },
-  { nombre:'Danubio',          tipo:'rio',        ambito:'Europa',  lon:18.9,   lat:45.8  },
-  { nombre:'Sena',             tipo:'rio',        ambito:'Europa',  lon:2.3,    lat:48.8  },
-  { nombre:'Támesis',          tipo:'rio',        ambito:'Europa',  lon:-0.5,   lat:51.5  },
-  { nombre:'Loira',            tipo:'rio',        ambito:'Europa',  lon:-1.0,   lat:47.3  },
-  { nombre:'Volga',            tipo:'rio',        ambito:'Europa',  lon:48.8,   lat:51.8  },
-  { nombre:'Elba',             tipo:'rio',        ambito:'Europa',  lon:10.0,   lat:53.4  },
-  { nombre:'Po',               tipo:'rio',        ambito:'Europa',  lon:11.5,   lat:45.0  },
-  { nombre:'Tiber',            tipo:'rio',        ambito:'Europa',  lon:12.3,   lat:41.7  },
-  { nombre:'Vístula',          tipo:'rio',        ambito:'Europa',  lon:21.0,   lat:52.2  },
-  { nombre:'Dniéper',          tipo:'rio',        ambito:'Europa',  lon:32.0,   lat:48.5  },
-  { nombre:'Ródano',           tipo:'rio',        ambito:'Europa',  lon:4.8,    lat:43.5  },
+  { nombre:'Rin',              tipo:'rio', ambito:'Europa',  lon:8.2,    lat:50.9,  lon_inicio:8.7,   lat_inicio:46.6,  lon_fin:4.0,    lat_fin:51.9  },
+  { nombre:'Danubio',          tipo:'rio', ambito:'Europa',  lon:18.9,   lat:45.8,  lon_inicio:8.0,   lat_inicio:48.0,  lon_fin:29.7,   lat_fin:45.2  },
+  { nombre:'Sena',             tipo:'rio', ambito:'Europa',  lon:2.3,    lat:48.8,  lon_inicio:4.7,   lat_inicio:47.8,  lon_fin:0.1,    lat_fin:49.5  },
+  { nombre:'Támesis',          tipo:'rio', ambito:'Europa',  lon:-0.5,   lat:51.5,  lon_inicio:-1.9,  lat_inicio:51.7,  lon_fin:0.7,    lat_fin:51.5  },
+  { nombre:'Loira',            tipo:'rio', ambito:'Europa',  lon:-1.0,   lat:47.3,  lon_inicio:4.2,   lat_inicio:44.8,  lon_fin:-2.2,   lat_fin:47.3  },
+  { nombre:'Volga',            tipo:'rio', ambito:'Europa',  lon:48.8,   lat:51.8,  lon_inicio:33.5,  lat_inicio:57.4,  lon_fin:50.0,   lat_fin:46.0  },
+  { nombre:'Elba',             tipo:'rio', ambito:'Europa',  lon:10.0,   lat:53.4,  lon_inicio:15.6,  lat_inicio:50.7,  lon_fin:8.7,    lat_fin:53.9  },
+  { nombre:'Po',               tipo:'rio', ambito:'Europa',  lon:11.5,   lat:45.0,  lon_inicio:7.1,   lat_inicio:44.7,  lon_fin:12.4,   lat_fin:44.9  },
+  { nombre:'Tiber',            tipo:'rio', ambito:'Europa',  lon:12.3,   lat:41.7,  lon_inicio:12.0,  lat_inicio:43.8,  lon_fin:12.2,   lat_fin:41.7  },
+  { nombre:'Vístula',          tipo:'rio', ambito:'Europa',  lon:21.0,   lat:52.2,  lon_inicio:18.9,  lat_inicio:49.6,  lon_fin:18.9,   lat_fin:54.4  },
+  { nombre:'Dniéper',          tipo:'rio', ambito:'Europa',  lon:32.0,   lat:48.5,  lon_inicio:33.8,  lat_inicio:55.9,  lon_fin:32.7,   lat_fin:46.5  },
+  { nombre:'Ródano',           tipo:'rio', ambito:'Europa',  lon:4.8,    lat:43.5,  lon_inicio:8.3,   lat_inicio:46.5,  lon_fin:4.5,    lat_fin:43.4  },
   { nombre:'Alpes',            tipo:'cordillera', ambito:'Europa',  lon:10.2,   lat:46.8  },
   { nombre:'Cárpatos',         tipo:'cordillera', ambito:'Europa',  lon:23.5,   lat:48.5  },
   { nombre:'Urales',           tipo:'cordillera', ambito:'Europa',  lon:59.5,   lat:57.0  },
@@ -288,44 +288,44 @@ const ELEMENTOS_GEO = [
   { nombre:'Balcanes',         tipo:'cordillera', ambito:'Europa',  lon:24.5,   lat:42.5  },
   { nombre:'Macizo Central',   tipo:'cordillera', ambito:'Europa',  lon:3.0,    lat:45.5  },
   { nombre:'Escandinavos',     tipo:'cordillera', ambito:'Europa',  lon:16.0,   lat:65.0  },
-  { nombre:'Amazonas',         tipo:'rio',        ambito:'América', lon:-60.0,  lat:-3.0  },
-  { nombre:'Misisipi',         tipo:'rio',        ambito:'América', lon:-90.0,  lat:32.0  },
-  { nombre:'Paraná',           tipo:'rio',        ambito:'América', lon:-58.5,  lat:-27.0 },
-  { nombre:'Orinoco',          tipo:'rio',        ambito:'América', lon:-64.5,  lat:7.0   },
-  { nombre:'Colorado',         tipo:'rio',        ambito:'América', lon:-114.5, lat:36.0  },
-  { nombre:'San Lorenzo',      tipo:'rio',        ambito:'América', lon:-71.5,  lat:47.0  },
-  { nombre:'Yukón',            tipo:'rio',        ambito:'América', lon:-139.0, lat:62.5  },
+  { nombre:'Amazonas',         tipo:'rio', ambito:'América', lon:-60.0,  lat:-3.0,  lon_inicio:-77.0, lat_inicio:-10.5, lon_fin:-49.5,  lat_fin:-0.5  },
+  { nombre:'Misisipi',         tipo:'rio', ambito:'América', lon:-90.0,  lat:32.0,  lon_inicio:-95.2, lat_inicio:47.2,  lon_fin:-89.1,  lat_fin:29.1  },
+  { nombre:'Paraná',           tipo:'rio', ambito:'América', lon:-58.5,  lat:-27.0, lon_inicio:-46.5, lat_inicio:-20.5, lon_fin:-58.4,  lat_fin:-34.0 },
+  { nombre:'Orinoco',          tipo:'rio', ambito:'América', lon:-64.5,  lat:7.0,   lon_inicio:-64.0, lat_inicio:2.4,   lon_fin:-62.2,  lat_fin:8.6   },
+  { nombre:'Colorado',         tipo:'rio', ambito:'América', lon:-114.5, lat:36.0,  lon_inicio:-105.6,lat_inicio:40.4,  lon_fin:-114.8, lat_fin:31.9  },
+  { nombre:'San Lorenzo',      tipo:'rio', ambito:'América', lon:-71.5,  lat:47.0,  lon_inicio:-79.0, lat_inicio:43.7,  lon_fin:-64.5,  lat_fin:49.3  },
+  { nombre:'Yukón',            tipo:'rio', ambito:'América', lon:-139.0, lat:62.5,  lon_inicio:-135.0,lat_inicio:60.4,  lon_fin:-164.7, lat_fin:62.6  },
   { nombre:'Andes',            tipo:'cordillera', ambito:'América', lon:-68.0,  lat:-22.0 },
   { nombre:'Mont. Rocosas',    tipo:'cordillera', ambito:'América', lon:-110.0, lat:43.0  },
   { nombre:'Sierra Madre',     tipo:'cordillera', ambito:'América', lon:-103.0, lat:24.0  },
   { nombre:'Apalaches',        tipo:'cordillera', ambito:'América', lon:-82.5,  lat:37.0  },
-  { nombre:'Nilo',             tipo:'rio',        ambito:'África',  lon:32.5,   lat:18.0  },
-  { nombre:'Congo',            tipo:'rio',        ambito:'África',  lon:17.5,   lat:-3.5  },
-  { nombre:'Níger',            tipo:'rio',        ambito:'África',  lon:5.5,    lat:13.0  },
-  { nombre:'Zambeze',          tipo:'rio',        ambito:'África',  lon:33.0,   lat:-15.5 },
-  { nombre:'Orange',           tipo:'rio',        ambito:'África',  lon:25.5,   lat:-28.5 },
+  { nombre:'Nilo',             tipo:'rio', ambito:'África',  lon:32.5,   lat:18.0,  lon_inicio:32.9,  lat_inicio:0.4,   lon_fin:30.5,   lat_fin:31.5  },
+  { nombre:'Congo',            tipo:'rio', ambito:'África',  lon:17.5,   lat:-3.5,  lon_inicio:29.5,  lat_inicio:-11.5, lon_fin:12.4,   lat_fin:-6.1  },
+  { nombre:'Níger',            tipo:'rio', ambito:'África',  lon:5.5,    lat:13.0,  lon_inicio:-10.8, lat_inicio:9.6,   lon_fin:6.4,    lat_fin:5.3   },
+  { nombre:'Zambeze',          tipo:'rio', ambito:'África',  lon:33.0,   lat:-15.5, lon_inicio:24.3,  lat_inicio:-11.5, lon_fin:36.0,   lat_fin:-18.9 },
+  { nombre:'Orange',           tipo:'rio', ambito:'África',  lon:25.5,   lat:-28.5, lon_inicio:27.8,  lat_inicio:-29.4, lon_fin:16.5,   lat_fin:-28.6 },
   { nombre:'Atlas',            tipo:'cordillera', ambito:'África',  lon:-4.0,   lat:32.0  },
   { nombre:'Drakensberg',      tipo:'cordillera', ambito:'África',  lon:29.5,   lat:-29.5 },
   { nombre:'Tibesti',          tipo:'cordillera', ambito:'África',  lon:18.0,   lat:21.0  },
   { nombre:'Ahaggar',          tipo:'cordillera', ambito:'África',  lon:5.5,    lat:23.3  },
-  { nombre:'Yangtsé',          tipo:'rio',        ambito:'Asia',    lon:111.5,  lat:30.5  },
-  { nombre:'Ganges',           tipo:'rio',        ambito:'Asia',    lon:82.0,   lat:24.5  },
-  { nombre:'Huang He',         tipo:'rio',        ambito:'Asia',    lon:105.0,  lat:36.0  },
-  { nombre:'Ob',               tipo:'rio',        ambito:'Asia',    lon:69.0,   lat:62.0  },
-  { nombre:'Éufrates',         tipo:'rio',        ambito:'Asia',    lon:40.0,   lat:34.5  },
-  { nombre:'Indo',             tipo:'rio',        ambito:'Asia',    lon:68.5,   lat:27.5  },
-  { nombre:'Mekong',           tipo:'rio',        ambito:'Asia',    lon:102.5,  lat:17.0  },
-  { nombre:'Lena',             tipo:'rio',        ambito:'Asia',    lon:124.0,  lat:64.0  },
-  { nombre:'Tigris',           tipo:'rio',        ambito:'Asia',    lon:44.0,   lat:33.5  },
+  { nombre:'Yangtsé',          tipo:'rio', ambito:'Asia',    lon:111.5,  lat:30.5,  lon_inicio:91.0,  lat_inicio:33.4,  lon_fin:121.5,  lat_fin:31.4  },
+  { nombre:'Ganges',           tipo:'rio', ambito:'Asia',    lon:82.0,   lat:24.5,  lon_inicio:79.1,  lat_inicio:30.9,  lon_fin:89.0,   lat_fin:21.8  },
+  { nombre:'Huang He',         tipo:'rio', ambito:'Asia',    lon:105.0,  lat:36.0,  lon_inicio:96.0,  lat_inicio:35.1,  lon_fin:118.5,  lat_fin:37.4  },
+  { nombre:'Ob',               tipo:'rio', ambito:'Asia',    lon:69.0,   lat:62.0,  lon_inicio:85.9,  lat_inicio:52.4,  lon_fin:73.5,   lat_fin:66.8  },
+  { nombre:'Éufrates',         tipo:'rio', ambito:'Asia',    lon:40.0,   lat:34.5,  lon_inicio:39.2,  lat_inicio:39.1,  lon_fin:47.5,   lat_fin:30.0  },
+  { nombre:'Indo',             tipo:'rio', ambito:'Asia',    lon:68.5,   lat:27.5,  lon_inicio:81.0,  lat_inicio:31.8,  lon_fin:67.5,   lat_fin:23.6  },
+  { nombre:'Mekong',           tipo:'rio', ambito:'Asia',    lon:102.5,  lat:17.0,  lon_inicio:94.5,  lat_inicio:33.5,  lon_fin:106.5,  lat_fin:9.6   },
+  { nombre:'Lena',             tipo:'rio', ambito:'Asia',    lon:124.0,  lat:64.0,  lon_inicio:107.5, lat_inicio:53.5,  lon_fin:126.5,  lat_fin:72.5  },
+  { nombre:'Tigris',           tipo:'rio', ambito:'Asia',    lon:44.0,   lat:33.5,  lon_inicio:38.4,  lat_inicio:38.5,  lon_fin:47.8,   lat_fin:30.0  },
   { nombre:'Himalaya',         tipo:'cordillera', ambito:'Asia',    lon:84.0,   lat:28.5  },
   { nombre:'Cáucaso',          tipo:'cordillera', ambito:'Asia',    lon:43.5,   lat:42.5  },
   { nombre:'Zagros',           tipo:'cordillera', ambito:'Asia',    lon:48.0,   lat:33.5  },
   { nombre:'Altái',            tipo:'cordillera', ambito:'Asia',    lon:88.0,   lat:50.0  },
   { nombre:'Karakórum',        tipo:'cordillera', ambito:'Asia',    lon:77.0,   lat:35.5  },
-  { nombre:'Murray',           tipo:'rio',        ambito:'Oceanía', lon:143.5,  lat:-34.5 },
-  { nombre:'Darling',          tipo:'rio',        ambito:'Oceanía', lon:145.0,  lat:-31.0 },
-  { nombre:'Gascoyne',         tipo:'rio',        ambito:'Oceanía', lon:115.0,  lat:-25.0 },
-  { nombre:'Lachlan',          tipo:'rio',        ambito:'Oceanía', lon:148.0,  lat:-33.5 },
+  { nombre:'Murray',           tipo:'rio', ambito:'Oceanía', lon:143.5,  lat:-34.5, lon_inicio:148.3, lat_inicio:-36.6, lon_fin:139.0,  lat_fin:-35.6 },
+  { nombre:'Darling',          tipo:'rio', ambito:'Oceanía', lon:145.0,  lat:-31.0, lon_inicio:151.5, lat_inicio:-28.5, lon_fin:142.0,  lat_fin:-34.1 },
+  { nombre:'Gascoyne',         tipo:'rio', ambito:'Oceanía', lon:115.0,  lat:-25.0, lon_inicio:117.8, lat_inicio:-25.6, lon_fin:113.6,  lat_fin:-24.9 },
+  { nombre:'Lachlan',          tipo:'rio', ambito:'Oceanía', lon:148.0,  lat:-33.5, lon_inicio:149.8, lat_inicio:-34.4, lon_fin:145.0,  lat_fin:-34.0 },
   { nombre:'Cord. Divisoria',  tipo:'cordillera', ambito:'Oceanía', lon:149.0,  lat:-31.0 },
   { nombre:'Alpes del Sur',    tipo:'cordillera', ambito:'Oceanía', lon:170.5,  lat:-44.0 },
   { nombre:'Mac.Donnell',      tipo:'cordillera', ambito:'Oceanía', lon:133.5,  lat:-23.7 },
@@ -517,6 +517,45 @@ const drawMarker = (ctx, cx, cy, tipo) => {
   ctx.restore();
 };
 
+const drawRio = (ctx, x1, y1, x2, y2) => {
+  const dx = x2 - x1, dy = y2 - y1;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.45)';
+  ctx.shadowBlur = 6;
+  // River body
+  ctx.strokeStyle = '#1d4ed8';
+  ctx.lineWidth = len < 6 ? 4 : 5;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  // Source circle (nacimiento)
+  ctx.fillStyle = '#93c5fd';
+  ctx.strokeStyle = '#1e3a8a';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(x1, y1, 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  // Arrowhead at mouth (desembocadura)
+  if (len > 3) {
+    const ux = dx / len, uy = dy / len;
+    const ax = x2 - ux * 12, ay = y2 - uy * 12;
+    const px = -uy * 6, py = ux * 6;
+    ctx.fillStyle = '#1d4ed8';
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(ax + px, ay + py);
+    ctx.lineTo(ax - px, ay - py);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+};
+
 const inp = { width:'100%', padding:'9px 12px', borderRadius:9, border:'1.5px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.08)', color:'#f1f5f9', fontSize:'0.92rem', outline:'none', boxSizing:'border-box' };
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -587,8 +626,15 @@ export default function GeografiaApp({ onBack }) {
         const { lonC, latC, lonSpan, latSpan } = viewRef.current;
         const W = canvas.width, H = canvas.height;
         const { fwd } = makeProjFromView(lonC, latC, lonSpan, latSpan, W, H);
-        const { x, y } = fwd(el.lon, el.lat);
-        drawMarker(canvas.getContext('2d'), x, y, el.tipo);
+        const ctx2 = canvas.getContext('2d');
+        if (el.tipo === 'rio' && el.lon_inicio != null) {
+          const { x: x1, y: y1 } = fwd(el.lon_inicio, el.lat_inicio);
+          const { x: x2, y: y2 } = fwd(el.lon_fin, el.lat_fin);
+          drawRio(ctx2, x1, y1, x2, y2);
+        } else {
+          const { x, y } = fwd(el.lon, el.lat);
+          drawMarker(ctx2, x, y, el.tipo);
+        }
       }
     } else {
       const feats = modoJuego === 'provincias' ? espFeats : worldFeats;

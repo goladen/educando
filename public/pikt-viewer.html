@@ -2,13 +2,14 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>PiKT Presentación</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Inter', 'Segoe UI', Arial, sans-serif; background: #0d0d2b; }
-.stage { position: fixed; inset: 0; overflow: hidden; }
+html { width: 100%; height: 100%; height: -webkit-fill-available; overflow: hidden; }
+body { width: 100%; height: 100%; height: -webkit-fill-available; overflow: hidden; overscroll-behavior: none; -webkit-overflow-scrolling: touch; font-family: 'Inter', 'Segoe UI', Arial, sans-serif; background: #0d0d2b; touch-action: none; }
+.stage { position: fixed; inset: 0; inset: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); overflow: hidden; }
 .scene { position: absolute; inset: 0; display: flex; flex-direction: column; opacity: 0; transform: scale(0.97) translateY(12px); transition: opacity 0.55s ease, transform 0.55s ease; pointer-events: none; }
 .scene.active { opacity: 1; transform: scale(1) translateY(0); pointer-events: auto; }
 .progress-bar { position: absolute; bottom: 32px; left: 0; right: 0; height: 3px; background: rgba(255,255,255,0.1); z-index: 100; }
@@ -18,6 +19,9 @@ html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Inter', 
 .dot.active { background: white; transform: scale(1.4); }
 .skip-btn { position: absolute; bottom: 6px; right: 14px; z-index: 200; background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.75); border: none; border-radius: 20px; padding: 5px 13px; font-size: clamp(0.62rem,2.5vw,0.72rem); cursor: pointer; font-family: inherit; transition: background 0.2s; }
 .skip-btn:hover { background: rgba(255,255,255,0.22); }
+.pause-btn { position: absolute; bottom: 6px; left: 14px; z-index: 200; background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.85); border: none; border-radius: 50%; width: 28px; height: 28px; font-size: 11px; cursor: pointer; font-family: inherit; transition: background 0.2s; display: flex; align-items: center; justify-content: center; }
+.pause-btn:hover { background: rgba(255,255,255,0.25); }
+.pause-btn.paused { background: rgba(255,255,255,0.22); color: #fff; }
 .slide-label { position: absolute; top: 10px; left: 14px; background: rgba(0,0,0,0.4); color: rgba(255,255,255,0.75); font-size: clamp(0.58rem,2vw,0.7rem); font-weight: 700; padding: 3px 10px; border-radius: 12px; text-transform: uppercase; letter-spacing: 1px; z-index: 50; }
 .prev-btn, .next-btn { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.35); color: rgba(255,255,255,0.7); border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 20px; cursor: pointer; z-index: 100; transition: background 0.2s; display: flex; align-items: center; justify-content: center; }
 .prev-btn { left: 12px; }
@@ -335,6 +339,7 @@ function buildStage(data) {
       ${scenesHtml}
       <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
       <div class="scene-dots" id="sceneDots"></div>
+      <button class="pause-btn" id="pauseBtn" title="Pausar (Espacio)">⏸</button>
       <button class="skip-btn" id="skipBtn">siguiente ›</button>
       <button class="prev-btn" id="prevBtn">‹</button>
       <button class="next-btn" id="nextBtn">›</button>
@@ -349,27 +354,66 @@ function buildStage(data) {
     dotsEl.appendChild(d);
   });
 
-  document.getElementById('skipBtn').onclick = () => { clearTimeout(timer); goTo((current+1)%slides.length); };
+  document.getElementById('skipBtn').onclick = () => { if (paused) togglePause(); else { clearTimeout(timer); goTo((current+1)%slides.length); } };
   document.getElementById('nextBtn').onclick = () => { clearTimeout(timer); goTo((current+1)%slides.length); };
   document.getElementById('prevBtn').onclick = () => { clearTimeout(timer); goTo((current-1+slides.length)%slides.length); };
+  document.getElementById('pauseBtn').onclick = () => togglePause();
 
   document.addEventListener('keydown', e => {
-    if (e.key==='ArrowRight'||e.key===' ') { clearTimeout(timer); goTo((current+1)%slides.length); }
-    if (e.key==='ArrowLeft') { clearTimeout(timer); goTo((current-1+slides.length)%slides.length); }
+    if (e.key === ' ') { e.preventDefault(); togglePause(); }
+    if (e.key === 'ArrowRight') { clearTimeout(timer); goTo((current+1)%slides.length); }
+    if (e.key === 'ArrowLeft')  { clearTimeout(timer); goTo((current-1+slides.length)%slides.length); }
   });
 }
 
 let gameOverlayOpen = false;
 let videoPlaying = false;
+let paused = false;
+let slideStartedAt = 0;
+let elapsedAtPause = 0;
+
+function togglePause() {
+  const btn = document.getElementById('pauseBtn');
+  const pf  = document.getElementById('progressFill');
+  if (!paused) {
+    // → Pausar
+    paused = true;
+    elapsedAtPause = Date.now() - slideStartedAt;
+    clearTimeout(timer);
+    if (pf) {
+      const cw = parseFloat(getComputedStyle(pf).width) || 0;
+      const pw = pf.parentElement ? parseFloat(getComputedStyle(pf.parentElement).width) : 1;
+      pf.style.transition = 'none';
+      pf.style.width = (pw > 0 ? cw / pw * 100 : 0) + '%';
+    }
+    if (btn) { btn.textContent = '▶'; btn.title = 'Reanudar (Espacio)'; btn.classList.add('paused'); }
+  } else {
+    // → Reanudar
+    paused = false;
+    slideStartedAt = Date.now() - elapsedAtPause;
+    const dur = slides[current]?.duration || 5000;
+    const remaining = Math.max(300, dur - elapsedAtPause);
+    if (pf) {
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        pf.style.transition = `width ${remaining}ms linear`;
+        pf.style.width = '100%';
+      }));
+    }
+    if (btn) { btn.textContent = '⏸'; btn.title = 'Pausar (Espacio)'; btn.classList.remove('paused'); }
+    if (!videoPlaying && !gameOverlayOpen) {
+      timer = setTimeout(() => { if (!videoPlaying && !paused) goTo((current+1)%slides.length); }, remaining);
+    }
+  }
+}
 
 function setVideoPlaying(val) {
   videoPlaying = val;
   if (val) {
     clearTimeout(timer);
-  } else {
+  } else if (!paused && !gameOverlayOpen) {
     clearTimeout(timer);
     const dur = slides[current]?.duration || 5000;
-    timer = setTimeout(() => goTo((current+1)%slides.length), dur);
+    timer = setTimeout(() => { if (!videoPlaying && !paused) goTo((current+1)%slides.length); }, dur);
   }
 }
 
@@ -410,21 +454,24 @@ function closeGame() {
   const overlay = document.getElementById('gameOverlay');
   if (overlay) overlay.remove();
   document.removeEventListener('keydown', escHandler);
-  // Resume timer for current slide
-  const dur = slides[current]?.duration || 5000;
-  timer = setTimeout(() => goTo((current+1)%slides.length), dur);
+  if (!paused && !videoPlaying) {
+    const dur = slides[current]?.duration || 5000;
+    timer = setTimeout(() => { if (!videoPlaying && !paused) goTo((current+1)%slides.length); }, dur);
+  }
 }
 
 function goTo(idx) {
   clearTimeout(timer);
-  if (gameOverlayOpen) return; // don't change slide while game is open
+  if (gameOverlayOpen) return;
   document.querySelectorAll('.scene').forEach(s=>s.classList.remove('active'));
   const el = document.getElementById(`s${idx}`);
   if (!el) return;
   el.classList.add('active');
   current = idx;
+  slideStartedAt = Date.now();
+  elapsedAtPause = 0;
 
-  // Update dots
+  // Dots
   document.querySelectorAll('.dot').forEach((d,i)=>d.classList.toggle('active',i===idx));
 
   // Progress bar
@@ -435,13 +482,17 @@ function goTo(idx) {
     pf.style.transition = 'none';
     pf.style.width = '0%';
     pf.style.background = `linear-gradient(90deg,${t.accent},#a855f7)`;
-    requestAnimationFrame(()=>requestAnimationFrame(()=>{
-      pf.style.transition = `width ${dur}ms linear`;
-      pf.style.width = '100%';
-    }));
+    if (!paused) {
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{
+        pf.style.transition = `width ${dur}ms linear`;
+        pf.style.width = '100%';
+      }));
+    }
   }
 
-  timer = setTimeout(() => { if (!videoPlaying) goTo((idx+1)%slides.length); }, dur);
+  if (!paused && !videoPlaying) {
+    timer = setTimeout(() => { if (!videoPlaying && !paused) goTo((idx+1)%slides.length); }, dur);
+  }
 }
 </script>
 </body>

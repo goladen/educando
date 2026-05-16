@@ -50,6 +50,7 @@ import OmninteractiveApp from './OmninteractiveApp';
 import VideoQuizzApp from './VideoQuizzApp';
 import BuzonNovedades from './components/BuzonNovedades';
 import PresentationEditor from './components/PresentationEditor';
+import PresentationList from './components/PresentationList';
 import * as XLSX from 'xlsx'; // <--- IMPORTANTE
 // ==============================================================================
 //  ZONA DE CLAVES (SEGURA)
@@ -1057,13 +1058,22 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
 
             {/* --- CONTENIDO SEGÚN MODO --- */}
 
-            {/* 0. PRESENTACIONES */}
-            {modoDashboard === 'PRESENTACIONES' && (
+            {/* 0. PRESENTACIONES — lista */}
+            {modoDashboard === 'PRESENTACIONES' && presentacionEditar === null && (
+                <PresentationList
+                    usuario={usuario}
+                    onNew={() => setPresentacionEditar({})}
+                    onEdit={(pres) => setPresentacionEditar(pres)}
+                />
+            )}
+
+            {/* 0b. PRESENTACIONES — editor */}
+            {modoDashboard === 'PRESENTACIONES' && presentacionEditar !== null && (
                 <PresentationEditor
                     usuario={usuario}
                     presentacionInicial={presentacionEditar}
-                    onClose={() => setModoDashboard('CLASICO')}
-                    onSaved={(id) => setPresentacionEditar(prev => prev ? { ...prev, id } : { id })}
+                    onClose={() => setPresentacionEditar(null)}
+                    onSaved={(id) => setPresentacionEditar(prev => ({ ...prev, id }))}
                 />
             )}
 

@@ -12,10 +12,23 @@ const THEME_COLORS = {
 };
 
 function PresentationCard({ pres, onEdit, onPreview, onDelete, deleting }) {
+  const [copied, setCopied] = useState(false);
   const numSlides = pres.slides?.length || 0;
   const theme = THEME_COLORS[pres.slides?.[0]?.theme] || THEME_COLORS.dark;
   const updatedAt = pres.updatedAt?.toDate?.() || (pres.updatedAt ? new Date(pres.updatedAt) : null);
   const dateStr = updatedAt ? updatedAt.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+  const presUrl = `${window.location.origin}/pikt-viewer.html?id=${pres.id}`;
+
+  const handleShare = () => {
+    if (navigator.share) {
+      navigator.share({ title: pres.titulo || 'Presentación PiKT', url: presUrl });
+    } else {
+      navigator.clipboard.writeText(presUrl).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2200);
+      });
+    }
+  };
 
   return (
     <div style={{
@@ -50,6 +63,11 @@ function PresentationCard({ pres, onEdit, onPreview, onDelete, deleting }) {
           {pres.titulo || 'Sin título'}
         </div>
         {dateStr && <div style={{ fontSize: 11, color: '#6b7280' }}>Actualizado: {dateStr}</div>}
+        <a href={presUrl} target="_blank" rel="noreferrer"
+          style={{ fontSize: 10, color: '#6c63ff', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: 'none', marginTop: 1, opacity: 0.8 }}
+          title={presUrl}>
+          🔗 {presUrl.replace(/^https?:\/\//, '')}
+        </a>
       </div>
 
       {/* Actions */}
@@ -59,6 +77,11 @@ function PresentationCard({ pres, onEdit, onPreview, onDelete, deleting }) {
         </button>
         <button onClick={onPreview} style={{ flex: 1, background: '#374151', color: '#e5e7eb', border: 'none', borderRadius: 8, padding: '7px 0', cursor: 'pointer', fontWeight: 700, fontSize: 12 }}>
           👁️ Ver
+        </button>
+        <button onClick={handleShare}
+          style={{ background: copied ? 'rgba(52,211,153,0.15)' : 'rgba(108,99,255,0.15)', color: copied ? '#34d399' : '#a78bfa', border: `1px solid ${copied ? 'rgba(52,211,153,0.3)' : 'rgba(108,99,255,0.3)'}`, borderRadius: 8, padding: '7px 10px', cursor: 'pointer', fontSize: 12, transition: 'all 0.2s' }}
+          title="Compartir enlace">
+          {copied ? '✓' : '📤'}
         </button>
         <button onClick={onDelete} disabled={deleting} style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '7px 10px', cursor: 'pointer', fontSize: 12 }}>
           {deleting ? '…' : '🗑️'}

@@ -28,6 +28,62 @@ const HELP_CONTENT = {
     QUESTION_SENDER: "Esta herramienta no es un juego en sí, sino un 'Buzón'. Comparte el Código de Acceso con tus alumnos para que ellos te envíen preguntas desde sus dispositivos."
 };
 
+function PiKTPresentacionPicker({ usuario, presentacionId, onSelect, onClose }) {
+    const [lista, setLista] = useState([]);
+    const [loading, setLoading] = useState(true);
+    useEffect(() => {
+        if (!usuario?.uid) return;
+        getDocs(query(collection(db, 'presentations'), where('uid', '==', usuario.uid)))
+            .then(snap => {
+                const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                docs.sort((a, b) => (b.updatedAt?.toMillis?.() ?? 0) - (a.updatedAt?.toMillis?.() ?? 0));
+                setLista(docs); setLoading(false);
+            }).catch(() => setLoading(false));
+    }, [usuario?.uid]);
+    return (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+            <div style={{ background: 'white', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 640, maxHeight: '75vh', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 0' }}>
+                    <div style={{ width: 40, height: 4, borderRadius: 2, background: '#E2E8F0' }} />
+                </div>
+                <div style={{ padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontWeight: 800, fontSize: 16, color: '#1E1B4B' }}>📊 Seleccionar presentación PiKT</span>
+                    <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', padding: 4 }}><X size={22} /></button>
+                </div>
+                <div style={{ overflowY: 'auto', flex: 1, padding: '0 20px' }}>
+                    {loading && <div style={{ textAlign: 'center', padding: 30, color: '#94A3B8' }}>⏳ Cargando…</div>}
+                    {!loading && lista.length === 0 && (
+                        <div style={{ textAlign: 'center', padding: 30, color: '#94A3B8', fontSize: 13 }}>
+                            No tienes presentaciones creadas.<br />Créalas desde el menú "📊 Presentaciones".
+                        </div>
+                    )}
+                    {lista.map(p => (
+                        <div key={p.id} onClick={() => onSelect(p.id)}
+                            style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', marginBottom: 6, borderRadius: 10, border: presentacionId === p.id ? '2px solid #6D28D9' : '1.5px solid #E2E8F0', background: presentacionId === p.id ? '#F5F3FF' : 'white', cursor: 'pointer' }}>
+                            <div style={{ width: 40, height: 26, borderRadius: 5, background: 'linear-gradient(135deg,#6c63ff,#a855f7)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>📊</div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontWeight: 700, fontSize: 14, color: '#0F172A', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{p.titulo || 'Sin título'}</div>
+                                <div style={{ fontSize: 11, color: '#94A3B8' }}>{p.slides?.length || 0} diapositivas</div>
+                            </div>
+                            {presentacionId === p.id && <span style={{ color: '#6D28D9', fontWeight: 700, fontSize: 12, flexShrink: 0 }}>✓</span>}
+                        </div>
+                    ))}
+                </div>
+                {presentacionId && (
+                    <div style={{ padding: '8px 20px 0' }}>
+                        <button onClick={() => onSelect('')} style={{ width: '100%', padding: '9px', borderRadius: 10, border: '1px solid #FCA5A5', background: '#FEF2F2', color: '#DC2626', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
+                            ✕ Quitar presentación
+                        </button>
+                    </div>
+                )}
+                <div style={{ padding: '12px 20px 20px' }}>
+                    <button onClick={onClose} style={{ width: '100%', padding: '12px', borderRadius: 12, border: 'none', background: '#6D28D9', color: 'white', fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}>Listo</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function EditorManual({ datos, setDatos, configJuego, onClose, onSave, usuario }) {
     const [indiceHojaActiva, setIndiceHojaActiva] = useState(0);
     const [mostrandoConfig, setMostrandoConfig] = useState(false);
@@ -35,8 +91,9 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
     const [mostrandoAvisoCierre, setMostrandoAvisoCierre] = useState(false);
     const [modalPublicar, setModalPublicar] = useState(null);
     // Estados buscador de imágenes para presentación
-    const [mediaTipoPres, setMediaTipoPres] = useState(() => datos.presentacion?.video ? 'video' : 'imagen');
+    const [mediaTipoPres, setMediaTipoPres] = useState(() => datos.presentacion?.piktPresentacionId ? 'pikt' : datos.presentacion?.video ? 'video' : 'imagen');
     const [modoBuscadorPres, setModoBuscadorPres] = useState(false);
+    const [presPickerAbiertoManual, setPresPickerAbiertoManual] = useState(false);
     const [searchQueryPres, setSearchQueryPres] = useState('');
     const [searchResultsPres, setSearchResultsPres] = useState([]);
     const [isSearchingPres, setIsSearchingPres] = useState(false);
@@ -721,9 +778,9 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
                                 <div style={{ marginBottom: 10 }}>
                                     <label style={{ display: 'block', fontSize: '12px', color: '#666', fontWeight: 'bold', marginBottom: 6 }}>Media</label>
 
-                                    {/* Tabs Imagen | Vídeo */}
+                                    {/* Tabs Imagen | Vídeo | PiKT */}
                                     <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid #ddd', marginBottom: 10 }}>
-                                        {[['imagen', '🖼️ Imagen'], ['video', '▶️ Vídeo']].map(([tipo, label]) => (
+                                        {[['imagen', '🖼️ Imagen'], ['video', '▶️ Vídeo'], ['pikt', '📊 PiKT']].map(([tipo, label]) => (
                                             <button key={tipo} onClick={() => {
                                                 setMediaTipoPres(tipo);
                                                 setModoBuscadorPres(false);
@@ -832,6 +889,28 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
                                             >✕ Quitar vídeo</button>
                                         )}
                                     </>)}
+
+                                    {/* ── PIKT ── */}
+                                    {mediaTipoPres === 'pikt' && (
+                                        <div style={{ marginTop: 4 }}>
+                                            <p style={{ margin: '0 0 8px', fontSize: '0.75rem', color: '#555', lineHeight: 1.4 }}>
+                                                Lanza una presentación PiKT antes de que empiece el juego.
+                                            </p>
+                                            {datos.presentacion?.piktPresentacionId ? (
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#F5F3FF', border: '1px solid #C4B5FD', borderRadius: 8, marginBottom: 6 }}>
+                                                    <span style={{ fontSize: 16 }}>📊</span>
+                                                    <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: '#6D28D9' }}>Presentación PiKT seleccionada</span>
+                                                    <button onClick={() => setPresPickerAbiertoManual(true)} style={{ fontSize: 11, color: '#6D28D9', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, padding: '2px 6px' }}>Cambiar</button>
+                                                    <button onClick={() => setDatos(p => ({ ...p, presentacion: { ...(p.presentacion || {}), piktPresentacionId: '' } }))} style={{ fontSize: 11, color: '#c62828', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, padding: '2px 4px' }}>✕</button>
+                                                </div>
+                                            ) : (
+                                                <button onClick={() => setPresPickerAbiertoManual(true)}
+                                                    style={{ width: '100%', padding: '10px', background: '#F5F3FF', color: '#6D28D9', border: '1.5px dashed #C4B5FD', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13, fontFamily: 'inherit', marginBottom: 6 }}>
+                                                    🎞️ + Seleccionar presentación PiKT
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Descripción */}
@@ -933,6 +1012,15 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
 
             </div>
             <style>{`.hide-mobile { display: inline; } @media (max-width: 600px) { .hide-mobile { display: none; } }`}</style>
+
+            {presPickerAbiertoManual && (
+                <PiKTPresentacionPicker
+                    usuario={usuario}
+                    presentacionId={datos.presentacion?.piktPresentacionId || ''}
+                    onSelect={id => { setDatos(p => ({ ...p, presentacion: { ...(p.presentacion || {}), piktPresentacionId: id } })); setPresPickerAbiertoManual(false); }}
+                    onClose={() => setPresPickerAbiertoManual(false)}
+                />
+            )}
         </div>
     );
 }

@@ -180,6 +180,13 @@ function TareaCard({ tarea, color }) {
           📊 Ver presentación
         </button>
       )}
+
+      {tarea.presentacionId && (
+        <button onClick={()=>window.open(`/pikt-viewer.html?id=${tarea.presentacionId}`,'_blank')}
+          style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:9, border:`2px solid ${color||'#6D28D9'}`, background:'white', color:color||'#6D28D9', fontWeight:700, fontSize:13, cursor:'pointer', width:'fit-content', fontFamily:'inherit' }}>
+          🎞️ Ver presentación PiKT
+        </button>
+      )}
       {pptxEmbed && pptxAbierto && (
         <div style={{ position:'fixed', inset:0, zIndex:9999, background:'#1e1e1e', display:'flex', flexDirection:'column' }}>
           <div style={{ background:color||'#6D28D9', padding:'6px 14px', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
@@ -231,7 +238,7 @@ function TareaCard({ tarea, color }) {
 function TemaSection({ tema, cursoColor }) {
   const [abierto, setAbierto] = useState(false);
   const color = tema.color || cursoColor || '#6D28D9';
-  if (!tema.tareas?.length && !tema.descripcion) return null;
+  if (!tema.tareas?.length && !tema.descripcion && !tema.presentacionId) return null;
 
   return (
     <div style={{ marginBottom:12, borderRadius:12, border:`1.5px solid ${abierto ? color : '#E2E8F0'}`, overflow:'hidden', transition:'border-color 0.2s' }}>
@@ -253,6 +260,12 @@ function TemaSection({ tema, cursoColor }) {
             <div style={{ background:'#F8FAFC', borderRadius:8, padding:'10px 14px', marginBottom:12, marginTop:8, fontSize:13, color:'#475569', lineHeight:1.6, borderLeft:`3px solid ${color}`, whiteSpace:'pre-wrap' }}>
               {tema.descripcion}
             </div>
+          )}
+          {tema.presentacionId && (
+            <button onClick={()=>window.open(`/pikt-viewer.html?id=${tema.presentacionId}`,'_blank')}
+              style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'8px 14px', borderRadius:9, border:`2px solid ${color}`, background:'white', color, fontWeight:700, fontSize:13, cursor:'pointer', width:'fit-content', fontFamily:'inherit', marginBottom:12 }}>
+              🎞️ Presentación del tema
+            </button>
           )}
           <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
             {(tema.tareas||[]).map(t=><TareaCard key={t.id} tarea={t} color={color}/>)}

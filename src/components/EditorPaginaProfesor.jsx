@@ -61,11 +61,11 @@ function newEnlaceCurso() {
   return { id:'en_'+Math.random().toString(36).slice(2,8), titulo:'', url:'' };
 }
 function newTema() {
-  return { id:'tm_'+Math.random().toString(36).slice(2,8), titulo:'Nuevo tema', descripcion:'', tareas:[] };
+  return { id:'tm_'+Math.random().toString(36).slice(2,8), titulo:'Nuevo tema', descripcion:'', tareas:[], presentacionId:'' };
 }
 function newTarea() {
   return { id:'ta_'+Math.random().toString(36).slice(2,8), titulo:'', descripcion:'', fechaEntrega:'',
-    imagenUrl:'', videoUrl:'', enlaceUrl:'', enlaceTitulo:'', pptxUrl:'', juegoId:'', recursoId:'' };
+    imagenUrl:'', videoUrl:'', enlaceUrl:'', enlaceTitulo:'', pptxUrl:'', juegoId:'', recursoId:'', presentacionId:'' };
 }
 function slugify(text) {
   return text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
@@ -181,6 +181,65 @@ function ActividadesPicker({ misRecursos, selRecursos, selJuegos, onToggleRecurs
   );
 }
 
+// ─── Picker de presentación PiKT ─────────────────────────────────────────────
+function PiKTPresentacionPicker({ usuario, presentacionId, onSelect, onClose }) {
+  const [lista, setLista] = useState([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    if (!usuario?.uid) return;
+    getDocs(query(collection(db,'presentations'), where('uid','==',usuario.uid)))
+      .then(snap => {
+        const docs = snap.docs.map(d=>({id:d.id,...d.data()}));
+        docs.sort((a,b)=>(b.updatedAt?.toMillis?.()??0)-(a.updatedAt?.toMillis?.()??0));
+        setLista(docs); setLoading(false);
+      }).catch(()=>setLoading(false));
+  }, [usuario?.uid]);
+  return (
+    <div style={{ position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:9999,display:'flex',alignItems:'flex-end',justifyContent:'center' }}>
+      <div style={{ background:'white',borderRadius:'20px 20px 0 0',width:'100%',maxWidth:640,maxHeight:'75vh',display:'flex',flexDirection:'column' }}>
+        <div style={{ display:'flex',justifyContent:'center',padding:'12px 0 0' }}>
+          <div style={{ width:40,height:4,borderRadius:2,background:'#E2E8F0' }}/>
+        </div>
+        <div style={{ padding:'12px 20px',display:'flex',alignItems:'center',justifyContent:'space-between' }}>
+          <span style={{ fontWeight:800,fontSize:16,color:'#1E1B4B' }}>📊 Seleccionar presentación PiKT</span>
+          <button onClick={onClose} style={{ background:'none',border:'none',cursor:'pointer',color:'#94A3B8',padding:4 }}><X size={22}/></button>
+        </div>
+        <div style={{ overflowY:'auto',flex:1,padding:'0 20px' }}>
+          {loading && <div style={{ textAlign:'center',padding:30,color:'#94A3B8' }}>⏳ Cargando…</div>}
+          {!loading && lista.length===0 && (
+            <div style={{ textAlign:'center',padding:30,color:'#94A3B8',fontSize:13 }}>
+              No tienes presentaciones creadas.<br/>Créalas desde el menú "📊 Presentaciones".
+            </div>
+          )}
+          {lista.map(p=>(
+            <div key={p.id} onClick={()=>onSelect(p.id)}
+              style={{ display:'flex',alignItems:'center',gap:12,padding:'10px 12px',marginBottom:6,
+                borderRadius:10,border:presentacionId===p.id?'2px solid #6D28D9':'1.5px solid #E2E8F0',
+                background:presentacionId===p.id?'#F5F3FF':'white',cursor:'pointer' }}>
+              <div style={{ width:40,height:26,borderRadius:5,background:'linear-gradient(135deg,#6c63ff,#a855f7)',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:14 }}>📊</div>
+              <div style={{ flex:1,minWidth:0 }}>
+                <div style={{ fontWeight:700,fontSize:14,color:'#0F172A',overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis' }}>{p.titulo||'Sin título'}</div>
+                <div style={{ fontSize:11,color:'#94A3B8' }}>{p.slides?.length||0} diapositivas</div>
+              </div>
+              {presentacionId===p.id&&<span style={{ color:'#6D28D9',fontWeight:700,fontSize:12,flexShrink:0 }}>✓</span>}
+            </div>
+          ))}
+        </div>
+        {presentacionId&&(
+          <div style={{ padding:'8px 20px 0' }}>
+            <button onClick={()=>onSelect('')} style={{ width:'100%',padding:'9px',borderRadius:10,border:'1px solid #FCA5A5',background:'#FEF2F2',color:'#DC2626',fontWeight:600,fontSize:13,cursor:'pointer',fontFamily:'inherit' }}>
+              ✕ Quitar presentación
+            </button>
+          </div>
+        )}
+        <div style={{ padding:'12px 20px 20px' }}>
+          <button onClick={onClose} style={{ width:'100%',padding:'12px',borderRadius:12,border:'none',background:'#6D28D9',color:'white',fontWeight:700,fontSize:14,cursor:'pointer',fontFamily:'inherit' }}>Listo</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Picker de juego para tarea ───────────────────────────────────────────────
 function GamePicker({ misRecursos, onSelect, onClose }) {
   const [paso, setPaso] = useState(1);
@@ -277,9 +336,10 @@ function GamePicker({ misRecursos, onSelect, onClose }) {
 }
 
 // ─── Editor de tarea ──────────────────────────────────────────────────────────
-function TareaEditor({ tarea, misRecursos, onUpdate, onDelete }) {
+function TareaEditor({ tarea, misRecursos, usuario, onUpdate, onDelete }) {
   const [expanded, setExpanded] = useState(false);
   const [pickerAbierto, setPickerAbierto] = useState(false);
+  const [presPickerAbierto, setPresPickerAbierto] = useState(false);
   const juegoInfo = tarea.juegoId ? JUEGOS_DISPONIBLES.find(j=>j.id===tarea.juegoId) : null;
   const recursoInfo = tarea.recursoId ? misRecursos.find(r=>r.id===tarea.recursoId) : null;
 
@@ -342,6 +402,22 @@ function TareaEditor({ tarea, misRecursos, onUpdate, onDelete }) {
               Google Slides: Archivo → Publicar en la web → Insertar → copia la URL. PPTX: sube a OneDrive/Drive y copia el enlace público.
             </div>
           </div>
+          <div>
+            <label style={lbl}>🎞️ Presentación PiKT</label>
+            {tarea.presentacionId ? (
+              <div style={{ display:'flex',alignItems:'center',gap:8,padding:'8px 10px',background:'#F5F3FF',border:'1px solid #C4B5FD',borderRadius:8 }}>
+                <span style={{ fontSize:16 }}>📊</span>
+                <span style={{ flex:1,fontSize:13,fontWeight:600,color:'#6D28D9' }}>Presentación PiKT seleccionada</span>
+                <button onClick={()=>setPresPickerAbierto(true)} style={{ fontSize:11,color:'#6D28D9',background:'none',border:'none',cursor:'pointer',fontWeight:700,padding:'2px 6px' }}>Cambiar</button>
+                <button onClick={()=>onUpdate({presentacionId:''})} style={{ fontSize:11,color:'#DC2626',background:'none',border:'none',cursor:'pointer',fontWeight:700,padding:'2px 4px' }}>✕</button>
+              </div>
+            ) : (
+              <button onClick={()=>setPresPickerAbierto(true)}
+                style={{ ...inp,background:'#F5F3FF',color:'#6D28D9',border:'1.5px dashed #C4B5FD',cursor:'pointer',textAlign:'center',fontWeight:600,fontSize:13,fontFamily:'inherit',padding:'10px' }}>
+                🎞️ + Añadir presentación PiKT
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -349,6 +425,11 @@ function TareaEditor({ tarea, misRecursos, onUpdate, onDelete }) {
         <GamePicker misRecursos={misRecursos}
           onSelect={({juegoId,recursoId})=>{onUpdate({juegoId,recursoId});setPickerAbierto(false);}}
           onClose={()=>setPickerAbierto(false)}/>
+      )}
+      {presPickerAbierto && (
+        <PiKTPresentacionPicker usuario={usuario} presentacionId={tarea.presentacionId}
+          onSelect={id=>{onUpdate({presentacionId:id});setPresPickerAbierto(false);}}
+          onClose={()=>setPresPickerAbierto(false)}/>
       )}
     </div>
   );
@@ -367,6 +448,8 @@ export default function EditorPaginaProfesor({ usuario, onPreview }) {
   const [slugStatus, setSlugStatus] = useState(null);
   const [temasExpanded, setTemasExpanded] = useState(new Set());
   const [actividadesPickerAbierto, setActividadesPickerAbierto] = useState(false);
+  const [temaPresPickerAbierto, setTemaPresPickerAbierto] = useState(null); // tema.id o null
+  const [esNuevaPagina, setEsNuevaPagina] = useState(false);
 
   const pageUrl = pagina.slug
     ? `${window.location.origin}/${pagina.slug}`
@@ -379,11 +462,31 @@ export default function EditorPaginaProfesor({ usuario, onPreview }) {
         const data = snap.data();
         setPagina(p=>({...p,...data,cursos:(data.cursos||[]).map(migrateCurso)}));
         if (data.slug) setSlugStatus('ok');
+      } else {
+        setEsNuevaPagina(true);
       }
     });
     const q = query(collection(db,'resources'), where('profesorUid','==',usuario.uid), where('isFinished','==',true));
     getDocs(q).then(snap=>setMisRecursos(snap.docs.map(d=>({...d.data(),id:d.id}))));
   }, [usuario?.uid]);
+
+  const syncMisRecursos = () => {
+    const ids = misRecursos.map(r => r.id);
+    setPagina(p => {
+      const existe = p.cursos.find(c => c.id === 'mis_recursos_auto');
+      if (existe) {
+        return { ...p, cursos: p.cursos.map(c => c.id === 'mis_recursos_auto' ? { ...c, recursos: ids } : c) };
+      }
+      const nuevo = { id:'mis_recursos_auto', nombre:'Mis recursos', color:'#6D28D9', bienvenida:'', recursos:ids, juegos:[], temas:[], enlaces:[] };
+      return { ...p, cursos: [nuevo, ...p.cursos] };
+    });
+  };
+
+  useEffect(() => {
+    if (!esNuevaPagina || misRecursos.length === 0) return;
+    syncMisRecursos();
+    setEsNuevaPagina(false);
+  }, [esNuevaPagina, misRecursos]);
 
   const SLUGS_RESERVADOS = new Set([
     'populares','inicio','pasapalabra','cazaburbujas','burbujas','pikatron','pikatron_2','plataformas',
@@ -493,6 +596,9 @@ export default function EditorPaginaProfesor({ usuario, onPreview }) {
       <div style={{ position:'sticky', top:0, zIndex:100, background:'white', padding:'12px 0', borderBottom:'1px solid #F1F5F9', marginBottom:20, display:'flex', gap:8, flexWrap:'wrap' }}>
         <button onClick={()=>onPreview?.(usuario.uid)} style={btnOutline}><Eye size={14}/> Vista previa</button>
         <button onClick={()=>{navigator.clipboard.writeText(pageUrl);alert('¡Copiado!');}} style={btnOutline}><Link size={14}/> Enlace</button>
+        <button onClick={syncMisRecursos} style={btnOutline} title="Sincronizar curso 'Mis recursos' con todos tus recursos publicados">
+          🔄 Mis recursos
+        </button>
         <div style={{ flex:1 }}/>
         <button onClick={()=>save()} disabled={saving} style={{...btnPrimary,background:'#4F46E5'}}>
           <Save size={14}/> {saving?'…':saved?'✓':'Guardar'}
@@ -709,9 +815,26 @@ export default function EditorPaginaProfesor({ usuario, onPreview }) {
                           <textarea style={{...inp,height:52,resize:'none',marginBottom:10}}
                             value={tema.descripcion} onChange={e=>updateTema(cursoActivo.id,tema.id,'descripcion',e.target.value)}
                             placeholder="Descripción o índice del tema…"/>
+                          {/* Presentación PiKT del tema */}
+                          <div style={{ marginBottom:10 }}>
+                            <label style={{...lbl,marginBottom:4}}>🎞️ Presentación del tema</label>
+                            {tema.presentacionId ? (
+                              <div style={{ display:'flex',alignItems:'center',gap:8,padding:'7px 10px',background:'#F5F3FF',border:'1px solid #C4B5FD',borderRadius:8 }}>
+                                <span>📊</span>
+                                <span style={{ flex:1,fontSize:12,fontWeight:600,color:'#6D28D9' }}>Presentación PiKT</span>
+                                <button onClick={()=>setTemaPresPickerAbierto(tema.id)} style={{ fontSize:11,color:'#6D28D9',background:'none',border:'none',cursor:'pointer',fontWeight:700 }}>Cambiar</button>
+                                <button onClick={()=>updateTema(cursoActivo.id,tema.id,'presentacionId','')} style={{ fontSize:11,color:'#DC2626',background:'none',border:'none',cursor:'pointer',fontWeight:700 }}>✕</button>
+                              </div>
+                            ) : (
+                              <button onClick={()=>setTemaPresPickerAbierto(tema.id)}
+                                style={{ ...inp,background:'#F5F3FF',color:'#6D28D9',border:'1.5px dashed #C4B5FD',cursor:'pointer',textAlign:'center',fontWeight:600,fontSize:12,fontFamily:'inherit',padding:'7px' }}>
+                                🎞️ + Añadir presentación PiKT
+                              </button>
+                            )}
+                          </div>
                           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                             {tema.tareas.map(ta=>(
-                              <TareaEditor key={ta.id} tarea={ta} misRecursos={misRecursos}
+                              <TareaEditor key={ta.id} tarea={ta} misRecursos={misRecursos} usuario={usuario}
                                 onUpdate={patch=>updateTarea(cursoActivo.id,tema.id,ta.id,patch)}
                                 onDelete={()=>deleteTarea(cursoActivo.id,tema.id,ta.id)}/>
                             ))}
@@ -743,6 +866,15 @@ export default function EditorPaginaProfesor({ usuario, onPreview }) {
           onClose={()=>setActividadesPickerAbierto(false)}
         />
       )}
+      {/* Picker de presentación PiKT para tema */}
+      {temaPresPickerAbierto && cursoActivo && (()=>{
+        const tema=cursoActivo.temas?.find(t=>t.id===temaPresPickerAbierto);
+        return tema ? (
+          <PiKTPresentacionPicker usuario={usuario} presentacionId={tema.presentacionId||''}
+            onSelect={id=>{updateTema(cursoActivo.id,temaPresPickerAbierto,'presentacionId',id);setTemaPresPickerAbierto(null);}}
+            onClose={()=>setTemaPresPickerAbierto(null)}/>
+        ) : null;
+      })()}
     </div>
   );
 }

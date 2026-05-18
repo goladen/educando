@@ -77,13 +77,12 @@ function PolyInput({ value, onChange, maxDeg=4 }) {
         holdRef.current = null;
     };
 
-    const btnS = bg => ({ padding:'5px 9px', borderRadius:7, border:'none', color:'white', cursor:'pointer', fontWeight:700, fontSize:'0.78rem', minWidth:40, background:bg, userSelect:'none' });
+    const btnS = bg => ({ padding:'5px 9px', borderRadius:7, border:'none', color:'white', cursor:'pointer', fontWeight:700, fontSize:'0.78rem', minWidth:40, background:bg, userSelect:'none', touchAction:'none' });
     const holdProps = (d, delta) => ({
-        onMouseDown: () => startHold(d, delta),
-        onMouseUp: stopHold,
-        onMouseLeave: stopHold,
-        onTouchStart: (e) => { e.preventDefault(); startHold(d, delta); },
-        onTouchEnd: stopHold,
+        onPointerDown: (e) => { e.currentTarget.setPointerCapture(e.pointerId); startHold(d, delta); },
+        onPointerUp: stopHold,
+        onPointerLeave: stopHold,
+        onPointerCancel: stopHold,
     });
 
     return (

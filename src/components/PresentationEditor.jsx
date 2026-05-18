@@ -695,6 +695,16 @@ export default function PresentationEditor({ usuario, presentacionInicial, onClo
   // Right panel
   const [rightTab, setRightTab] = useState('layout'); // 'layout' | 'theme' | 'settings'
 
+  // Mobile panels
+  const [leftOpen,  setLeftOpen]  = useState(false);
+  const [rightOpen, setRightOpen] = useState(false);
+  const [isMobile,  setIsMobile]  = useState(() => window.innerWidth < 640);
+  useEffect(() => {
+    const fn = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener('resize', fn);
+    return () => window.removeEventListener('resize', fn);
+  }, []);
+
   const activeSlide = slides[activeIdx] || slides[0];
 
   const updateSlide = useCallback((updated) => {
@@ -802,10 +812,19 @@ export default function PresentationEditor({ usuario, presentacionInicial, onClo
         </div>
       </div>
 
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
 
         {/* LEFT: SLIDE LIST */}
-        <div style={{ width: 160, background: '#111827', borderRight: '1px solid #374151', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{
+          width: 160, flexShrink: 0,
+          ...(isMobile ? {
+            position: 'absolute', top: 0, bottom: 0, left: 0, zIndex: 300, width: 200,
+            transform: leftOpen ? 'translateX(0)' : 'translateX(-100%)',
+            transition: 'transform 0.25s cubic-bezier(0.4,0,0.2,1)',
+            boxShadow: leftOpen ? '6px 0 24px rgba(0,0,0,0.6)' : 'none',
+          } : {}),
+          background: '#111827', borderRight: '1px solid #374151', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        }}>
           <div style={{ padding: '10px 10px 6px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>
             Diapositivas ({slides.length})
           </div>
@@ -820,7 +839,22 @@ export default function PresentationEditor({ usuario, presentacionInicial, onClo
         </div>
 
         {/* CENTER: CANVAS */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, background: '#0f172a', overflow: 'auto', gap: 16 }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '8px 10px 16px' : 24, background: '#0f172a', overflow: 'auto', gap: 16 }}>
+
+          {/* Mobile panel toggles */}
+          {isMobile && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', flexShrink: 0 }}>
+              <button onClick={() => { setLeftOpen(o => !o); setRightOpen(false); }}
+                style={{ background: leftOpen ? '#6c63ff' : '#374151', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
+                🖼️ {leftOpen ? 'Ocultar' : 'Slides'}
+              </button>
+              <button onClick={() => { setRightOpen(o => !o); setLeftOpen(false); }}
+                style={{ background: rightOpen ? '#6c63ff' : '#374151', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
+                {rightOpen ? 'Ocultar' : '⚙️ Opciones'}
+              </button>
+            </div>
+          )}
+
           <div style={{ width: '100%', maxWidth: 760 }}>
             {activeSlide && <SlideCanvas slide={activeSlide} onChange={updateSlide} usuario={usuario} />}
           </div>
@@ -833,7 +867,16 @@ export default function PresentationEditor({ usuario, presentacionInicial, onClo
         </div>
 
         {/* RIGHT: PROPERTIES PANEL */}
-        <div style={{ width: 220, background: '#1f2937', borderLeft: '1px solid #374151', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{
+          width: 220, flexShrink: 0,
+          ...(isMobile ? {
+            position: 'absolute', top: 0, bottom: 0, right: 0, zIndex: 300, width: 250,
+            transform: rightOpen ? 'translateX(0)' : 'translateX(100%)',
+            transition: 'transform 0.25s cubic-bezier(0.4,0,0.2,1)',
+            boxShadow: rightOpen ? '-6px 0 24px rgba(0,0,0,0.6)' : 'none',
+          } : {}),
+          background: '#1f2937', borderLeft: '1px solid #374151', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        }}>
           {/* Tabs */}
           <div style={{ display: 'flex', borderBottom: '1px solid #374151' }}>
             {[['layout', '📐'], ['theme', '🎨'], ['settings', '⚙️']].map(([tab, icon]) => (
@@ -919,6 +962,11 @@ export default function PresentationEditor({ usuario, presentacionInicial, onClo
             )}
           </div>
         </div>
+        {/* Mobile backdrop */}
+        {isMobile && (leftOpen || rightOpen) && (
+          <div onClick={() => { setLeftOpen(false); setRightOpen(false); }}
+            style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 200 }}/>
+        )}
       </div>
 
       {/* AI MODAL */}

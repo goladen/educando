@@ -82,7 +82,7 @@ export default defineConfig({
         navigateFallback: '/index.html',
         // Excluir rutas Unity del navigate fallback — sin esto el SW sirve
         // el index.html de React dentro del iframe de Unity
-        navigateFallbackDenylist: [/^\/api/, /^\/kartinged/, /^\/kartingedmulti/, /^\/racing3d/],
+        navigateFallbackDenylist: [/^\/api/, /^\/kartinged/, /^\/kartingedmulti/, /^\/racing3d/, /^\/pikt-viewer\.html/],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         skipWaiting: true,
         clientsClaim: true,

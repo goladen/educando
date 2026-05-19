@@ -201,12 +201,99 @@ function tagsHtml(tags, t) {
   return `<div class="tags-row">${tags.map(tag=>`<span class="tag" style="background:${t.tag};border-color:${t.tagBorder};color:${t.tagText};">${tag}</span>`).join('')}</div>`;
 }
 
+function escHtml(str) {
+  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderFreeSlide(slide, t) {
+  if (!slide.elements?.length) return '<div style="width:100%;height:100%;"></div>';
+  const elHtml = slide.elements.map(el => {
+    const op = el.opacity != null ? el.opacity : 1;
+    const base = `position:absolute;left:${el.x}%;top:${el.y}%;width:${el.w}%;height:${el.h}%;box-sizing:border-box;overflow:hidden;opacity:${op};`;
+
+    if (el.type === 'image') {
+      const fit = el.objectFit || 'cover';
+      const br  = el.borderRadius ? `${el.borderRadius}px` : '0';
+      return `<div style="${base}padding:0;"><img src="${escHtml(el.src)}" alt="" style="width:100%;height:100%;object-fit:${fit};border-radius:${br};display:block;"/></div>`;
+    }
+
+    if (el.type === 'text') {
+      // Support both legacy textStyle and new explicit properties
+      const defColor  = el.textStyle==='cta' ? t.accent : el.textStyle==='sub' ? t.sub : t.text;
+      const defSize   = el.textStyle==='heading' ? '2rem' : el.textStyle==='sub' ? '0.9rem' : '1rem';
+      const defWeight = el.textStyle==='heading' ? '900' : el.textStyle==='sub' ? '600' : 'normal';
+      const defLine   = el.textStyle==='heading' ? 1.2 : 1.5;
+      const defLS     = el.textStyle==='sub' ? '0.1em' : 'normal';
+
+      const ff = el.fontFamily ? `font-family:${el.fontFamily};` : '';
+      const fs = el.fontSize   ? `font-size:${el.fontSize}px;`  : `font-size:${defSize};`;
+      const fw = el.fontWeight ? `font-weight:${el.fontWeight};`: `font-weight:${defWeight};`;
+      const fi = el.fontStyle  ? `font-style:${el.fontStyle};`  : '';
+      const td = el.textDecoration && el.textDecoration !== 'none' ? `text-decoration:${el.textDecoration};` : '';
+      const ta = `text-align:${el.textAlign||'left'};`;
+      const col= `color:${el.color || defColor};`;
+      const lh = `line-height:${el.lineHeight || defLine};`;
+      const ls = `letter-spacing:${defLS};`;
+      const ts = `${ff}${fs}${fw}${fi}${td}${ta}${col}${lh}${ls}`;
+      const lines = (el.text||'').split('\n').map(l => `<div>${escHtml(l)||'&nbsp;'}</div>`).join('');
+      return `<div style="${base}padding:4px 6px;${ts}word-break:break-word;overflow-wrap:break-word;white-space:pre-wrap;">${lines}</div>`;
+    }
+
+    if (el.type === 'youtube') {
+      const ytId = escHtml(el.ytId || '');
+      const embed = `https://www.youtube.com/embed/${ytId}?autoplay=0&rel=0&modestbranding=1`;
+      return `<div style="${base}padding:0;"><iframe src="${embed}" style="width:100%;height:100%;border:none;" allowfullscreen allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture"></iframe></div>`;
+    }
+
+    if (el.type === 'webview') {
+      const src = escHtml(el.src || '');
+      return `<div style="${base}padding:0;"><iframe src="${src}" style="width:100%;height:100%;border:none;" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe></div>`;
+    }
+
+    if (el.type === 'shape') {
+      const fill   = escHtml(el.fill   || '#6c63ff');
+      const stroke = el.stroke && el.stroke !== 'none' ? escHtml(el.stroke) : 'none';
+      const sw     = el.strokeWidth || 2;
+      const br     = el.borderRadius ? `${el.borderRadius}px` : '0';
+
+      if (el.shapeType === 'circle') {
+        return `<div style="${base}"><div style="width:100%;height:100%;background:${fill};border-radius:50%;${stroke!=='none'?`border:${sw}px solid ${stroke};`:''}box-sizing:border-box;"></div></div>`;
+      }
+      if (el.shapeType === 'rect') {
+        return `<div style="${base}"><div style="width:100%;height:100%;background:${fill};border-radius:${br};${stroke!=='none'?`border:${sw}px solid ${stroke};`:''}box-sizing:border-box;"></div></div>`;
+      }
+      if (el.shapeType === 'triangle') {
+        return `<div style="${base}padding:0;"><svg viewBox="0 0 100 100" style="width:100%;height:100%;" preserveAspectRatio="none"><polygon points="50,2 98,98 2,98" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/></svg></div>`;
+      }
+      if (el.shapeType === 'line') {
+        return `<div style="${base}padding:0;"><svg viewBox="0 0 100 10" style="width:100%;height:100%;" preserveAspectRatio="none"><line x1="2" y1="5" x2="98" y2="5" stroke="${fill}" stroke-width="${sw}" stroke-linecap="round"/></svg></div>`;
+      }
+    }
+
+    return '';
+  }).join('');
+  return `<div style="position:relative;width:100%;height:100%;">${elHtml}</div>`;
+}
+
 function renderSlide(slide, idx) {
   const t = THEMES[slide.theme] || THEMES.dark;
   const accent33 = t.accent + '33';
   const ctaColor = t.accent === '#ffffff' ? '#6c63ff' : t.accent;
 
+  // Free (pure element-based) layout
+  if (slide.layout === 'free') {
+    const freeContent = renderFreeSlide(slide, t);
+    return `<div class="scene" id="s${idx}" style="background:${t.bg};">
+      <div class="slide-label">📊 ${idx+1}/${slides.length}</div>
+      ${freeContent}
+    </div>`;
+  }
+
   let content = '';
+  // elements overlay (for non-free layouts with added elements)
+  const elementsOverlay = (slide.elements && slide.elements.length > 0)
+    ? renderFreeSlide(slide, t)
+    : '';
   const layout = slide.layout || 'title';
 
   if (layout === 'title') {
@@ -336,6 +423,7 @@ function renderSlide(slide, idx) {
   return `<div class="scene" id="s${idx}" style="background:${t.bg};">
     <div class="slide-label">📊 ${idx+1}/${slides.length}</div>
     ${content}
+    ${elementsOverlay}
   </div>`;
 }
 
@@ -518,6 +606,12 @@ function goTo(idx) {
     timer = setTimeout(() => { if (!videoPlaying && !paused) goTo((idx+1)%slides.length); }, dur);
   }
 }
+
+// Expose to global scope — required because onclick= attributes in
+// dynamically-generated HTML cannot reach functions inside ES modules.
+window.openGame       = openGame;
+window.closeGame      = closeGame;
+window.setVideoPlaying = setVideoPlaying;
 </script>
 </body>
 </html>

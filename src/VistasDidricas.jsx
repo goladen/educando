@@ -27,6 +27,68 @@ function Cube({ x, y, z }) {
     </g>
   );
 }
+// ── Half-cube wedges ─────────────────────────────────────────────────────────
+// The cut plane goes through (x,y,*) and (x+1,y+1,*) — in isometric this
+// projects to a vertical screen-line, so the cut face is always a clean edge.
+
+// 'fr' — front-right prism (keeps x+1 / y=y corner): top-right triangle visible
+function WedgeFR({ x, y, z }) {
+  return (
+    <g>
+      {face([[x,y,z+1],[x+1,y,z+1],[x+1,y+1,z+1]], '#7dd3fc')}
+      {face([[x+1,y,z],[x+1,y+1,z],[x+1,y+1,z+1],[x+1,y,z+1]], '#1d4ed8')}
+    </g>
+  );
+}
+// 'bl' — back-left prism (keeps x=x / y+1 corner): top-left triangle visible
+function WedgeBL({ x, y, z }) {
+  return (
+    <g>
+      {face([[x,y,z+1],[x,y+1,z+1],[x+1,y+1,z+1]], '#7dd3fc')}
+      {face([[x,y+1,z],[x+1,y+1,z],[x+1,y+1,z+1],[x,y+1,z+1]], '#2563eb')}
+    </g>
+  );
+}
+// 'rx' — ramp: low at x, high at x+1 (slope rises rightward →)
+function WedgeRX({ x, y, z }) {
+  return (
+    <g>
+      {face([[x,y,z],[x+1,y,z+1],[x+1,y+1,z+1],[x,y+1,z]], '#93c5fd')}
+      {face([[x,y+1,z],[x+1,y+1,z],[x+1,y+1,z+1]], '#2563eb')}
+      {face([[x+1,y,z],[x+1,y+1,z],[x+1,y+1,z+1],[x+1,y,z+1]], '#1d4ed8')}
+    </g>
+  );
+}
+// 'rxb' — ramp: high at x, low at x+1 (slope falls rightward →)
+function WedgeRXback({ x, y, z }) {
+  return (
+    <g>
+      {face([[x,y,z+1],[x+1,y,z],[x+1,y+1,z],[x,y+1,z+1]], '#93c5fd')}
+      {face([[x,y+1,z+1],[x,y+1,z],[x+1,y+1,z]], '#2563eb')}
+    </g>
+  );
+}
+// 'ry' — ramp: low at y, high at y+1 (slope rises backward ↑)
+function WedgeRY({ x, y, z }) {
+  return (
+    <g>
+      {face([[x,y,z+1],[x+1,y,z+1],[x+1,y+1,z],[x,y+1,z]], '#93c5fd')}
+      {face([[x+1,y,z],[x+1,y+1,z],[x+1,y,z+1]], '#1d4ed8')}
+    </g>
+  );
+}
+// 'ryb' — ramp: high at y, low at y+1 (slope falls backward)
+function WedgeRYback({ x, y, z }) {
+  return (
+    <g>
+      {face([[x,y,z+1],[x+1,y,z+1],[x+1,y,z],[x,y,z+1]], '#93c5fd')}
+      {face([[x+1,y,z],[x+1,y+1,z],[x+1,y,z+1]], '#1d4ed8')}
+      {face([[x,y+1,z],[x+1,y+1,z],[x+1,y,z],[x,y,z]], '#2563eb')}
+    </g>
+  );
+}
+const WEDGE_MAP = { fr: WedgeFR, bl: WedgeBL, rx: WedgeRX, rxb: WedgeRXback, ry: WedgeRY, ryb: WedgeRYback };
+
 // Arrow helper: line + arrowhead from (x1,y1) → (x2,y2)
 function Arrow({ x1, y1, x2, y2, color, dashed }) {
   const dx = x2-x1, dy = y2-y1, len = Math.sqrt(dx*dx+dy*dy);
@@ -70,9 +132,13 @@ function FloorGrid() {
   return <g>{cells}{lines}</g>;
 }
 
-function IsoView({ cubes }) {
-  // Sort by diagonal depth (x+y) first, then height (z) — better painter's algorithm
-  const sorted = [...cubes].sort((a, b) => (a[0]+a[1]) - (b[0]+b[1]) || a[2] - b[2]);
+function IsoView({ cubes, wedges = [] }) {
+  // Merge cubes ['c',x,y,z] and wedges [type,x,y,z], sort by painter's algorithm
+  const allParts = [
+    ...cubes.map(([x,y,z]) => ['c',x,y,z]),
+    ...wedges.map(([x,y,z,t]) => [t,x,y,z]),
+  ].sort((a,b) => (a[1]+a[2]) - (b[1]+b[2]) || a[3] - b[3]);
+  const sorted = allParts; // renamed for clarity below
 
   // Axis legend origin (bottom-left, clear of the grid)
   const ox = 42, oy = 228, aL = 20;
@@ -90,8 +156,12 @@ function IsoView({ cubes }) {
       {/* ── 4×4 floor grid ── */}
       <FloorGrid />
 
-      {/* ── Cubes ── */}
-      {sorted.map(([x,y,z], i) => <Cube key={i} x={x} y={y} z={z} />)}
+      {/* ── Cubes + Wedges ── */}
+      {sorted.map(([t,x,y,z], i) => {
+        if (t === 'c') return <Cube key={i} x={x} y={y} z={z} />;
+        const W = WEDGE_MAP[t];
+        return W ? <W key={i} x={x} y={y} z={z} /> : null;
+      })}
 
       {/* ── FRONTAL arrow: horizontal from right → front (y=0) face ── */}
       <Arrow x1={fAx} y1={fAy} x2={frontEdge.x + 4} y2={fAy} color="#fb923c" dashed />
@@ -182,10 +252,14 @@ function GridView({ label, grid, onChange, color, hasError }) {
 // ─── FIGURE DATA ─────────────────────────────────────────────────────────────
 // Grids: row 0 = top (max z) or front (min y)
 // alzado: cols=X, rows=Z desc  |  planta: cols=X, rows=Y asc  |  perfil: cols=Y, rows=Z desc
+// alzado: cols=X, rows=Z desc (row0=z_max, row3=z=0)
+// planta: cols=X, rows=Y asc (row0=y=0 front)
+// perfil: cols=Y, rows=Z desc
 const FIGURAS = [
+  // ── FIGURAS DE PRÁCTICA (diseño propio) ──────────────────────────────────
   {
     id: 1, nombre: 'El Escalón', emoji: '🪜', dif: 1,
-    desc: 'Escalera de 3 peldaños, vista desde el frente',
+    desc: 'Escalera de 3 peldaños vista desde el frente',
     cubes: [[0,0,0],[0,0,1],[0,0,2],[1,0,0],[1,0,1],[2,0,0]],
     alzado: [[1,0,0,0],[1,1,0,0],[1,1,1,0],[0,0,0,0]],
     planta:  [[1,1,1,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],
@@ -218,11 +292,10 @@ const FIGURAS = [
   {
     id: 5, nombre: 'El Nicho', emoji: '🏛️', dif: 2,
     desc: 'Dos paredes laterales (2 de fondo) con base, abierto al frente',
-    // Two full walls (x=0 and x=2), each 2 deep × 3 tall, plus floor strip
     cubes: [
-      [0,0,0],[0,1,0],[0,0,1],[0,1,1],[0,0,2],[0,1,2],  // left wall
-      [2,0,0],[2,1,0],[2,0,1],[2,1,1],[2,0,2],[2,1,2],  // right wall
-      [1,0,0],[1,1,0],                                   // floor between walls
+      [0,0,0],[0,1,0],[0,0,1],[0,1,1],[0,0,2],[0,1,2],
+      [2,0,0],[2,1,0],[2,0,1],[2,1,1],[2,0,2],[2,1,2],
+      [1,0,0],[1,1,0],
     ],
     alzado: [[1,0,1,0],[1,0,1,0],[1,1,1,0],[0,0,0,0]],
     planta:  [[1,1,1,0],[1,1,1,0],[0,0,0,0],[0,0,0,0]],
@@ -232,75 +305,118 @@ const FIGURAS = [
     id: 6, nombre: 'La L Grande', emoji: '📐', dif: 2,
     desc: 'Escalera que gira: baja en X y se prolonga en Y con altura',
     cubes: [
-      [0,0,0],[0,0,1],[0,0,2],
-      [1,0,0],[1,0,1],
-      [2,0,0],
-      [0,1,0],[0,1,1],[0,1,2],
-      [0,2,0],
+      [0,0,0],[0,0,1],[0,0,2],[1,0,0],[1,0,1],[2,0,0],
+      [0,1,0],[0,1,1],[0,1,2],[0,2,0],
     ],
     alzado: [[1,0,0,0],[1,1,0,0],[1,1,1,0],[0,0,0,0]],
     planta:  [[1,1,1,0],[1,0,0,0],[1,0,0,0],[0,0,0,0]],
     perfil:  [[1,1,0,0],[1,1,0,0],[1,1,1,0],[0,0,0,0]],
   },
+  // ── FIGURAS DE LA FICHA PDF (figs 1-8) ───────────────────────────────────
   {
-    id: 7, nombre: 'La T', emoji: '🔱', dif: 1,
-    desc: 'Barra superior y tallo central en forma de T plana',
-    cubes: [[0,0,0],[1,0,0],[2,0,0],[1,1,0],[1,2,0]],
-    alzado: [[0,0,0,0],[0,0,0,0],[0,0,0,0],[1,1,1,0]],
-    planta:  [[1,1,1,0],[0,1,0,0],[0,1,0,0],[0,0,0,0]],
-    perfil:  [[0,0,0,0],[0,0,0,0],[0,0,0,0],[1,1,1,0]],
-  },
-  {
-    id: 8, nombre: 'La Pirámide', emoji: '🗻', dif: 2,
-    desc: 'Pirámide escalonada: base 3×2, nivel medio 2×1, cúspide',
+    // PDF fig 1 — symmetric U arch, open at top
+    id: 7, nombre: 'PDF·1 Arco U', emoji: '🏟️', dif: 2,
+    desc: 'Dos pilares sobre una base — abierto por arriba',
     cubes: [
       [0,0,0],[1,0,0],[2,0,0],[0,1,0],[1,1,0],[2,1,0],
-      [0,0,1],[1,0,1],
-      [0,0,2],
+      [0,0,1],[2,0,1],[0,1,1],[2,1,1],
+      [0,0,2],[2,0,2],[0,1,2],[2,1,2],
+    ],
+    alzado: [[0,0,0,0],[1,0,1,0],[1,0,1,0],[1,1,1,0]],
+    planta:  [[1,1,1,0],[1,1,1,0],[0,0,0,0],[0,0,0,0]],
+    perfil:  [[0,0,0,0],[1,1,0,0],[1,1,0,0],[1,1,0,0]],
+  },
+  {
+    // PDF fig 2 — closed rectangular frame
+    id: 8, nombre: 'PDF·2 El Marco', emoji: '🖼️', dif: 2,
+    desc: 'Marco rectangular: base, dos pilares y dintel superior',
+    cubes: [
+      [0,0,0],[1,0,0],[2,0,0],[0,1,0],[1,1,0],[2,1,0],
+      [0,0,1],[2,0,1],[0,1,1],[2,1,1],
+      [0,0,2],[2,0,2],[0,1,2],[2,1,2],
+      [0,0,3],[1,0,3],[2,0,3],[0,1,3],[1,1,3],[2,1,3],
+    ],
+    alzado: [[1,1,1,0],[1,0,1,0],[1,0,1,0],[1,1,1,0]],
+    planta:  [[1,1,1,0],[1,1,1,0],[0,0,0,0],[0,0,0,0]],
+    perfil:  [[1,1,0,0],[1,1,0,0],[1,1,0,0],[1,1,0,0]],
+  },
+  {
+    // PDF fig 3 — C shape
+    id: 9, nombre: 'PDF·3 La C', emoji: '🌙', dif: 2,
+    desc: 'Forma de C: barra inferior, pilar izquierdo y barra superior',
+    cubes: [
+      [0,0,0],[1,0,0],[2,0,0],[0,1,0],[1,1,0],[2,1,0],
+      [0,0,1],[0,1,1],
+      [0,0,2],[1,0,2],[2,0,2],[0,1,2],[1,1,2],[2,1,2],
+    ],
+    alzado: [[0,0,0,0],[1,1,1,0],[1,0,0,0],[1,1,1,0]],
+    planta:  [[1,1,1,0],[1,1,1,0],[0,0,0,0],[0,0,0,0]],
+    perfil:  [[0,0,0,0],[1,1,0,0],[1,1,0,0],[1,1,0,0]],
+  },
+  {
+    // PDF fig 4 — asymmetric U
+    id: 10, nombre: 'PDF·4 U Asimétrica', emoji: '🫙', dif: 2,
+    desc: 'Pilar izquierdo más alto que el derecho sobre base común',
+    cubes: [
+      [0,0,0],[1,0,0],[2,0,0],[0,1,0],[1,1,0],[2,1,0],
+      [0,0,1],[2,0,1],[0,1,1],[2,1,1],
+      [0,0,2],[0,1,2],
+    ],
+    alzado: [[0,0,0,0],[1,0,0,0],[1,0,1,0],[1,1,1,0]],
+    planta:  [[1,1,1,0],[1,1,1,0],[0,0,0,0],[0,0,0,0]],
+    perfil:  [[0,0,0,0],[1,1,0,0],[1,1,0,0],[1,1,0,0]],
+  },
+  {
+    // PDF fig 5 — stepped pyramid
+    id: 11, nombre: 'PDF·5 Pirámide', emoji: '🗻', dif: 2,
+    desc: 'Pirámide escalonada 3×2 → 2×2 → 1×2',
+    cubes: [
+      [0,0,0],[1,0,0],[2,0,0],[0,1,0],[1,1,0],[2,1,0],
+      [0,0,1],[1,0,1],[0,1,1],[1,1,1],
+      [0,0,2],[0,1,2],
     ],
     alzado: [[0,0,0,0],[1,0,0,0],[1,1,0,0],[1,1,1,0]],
     planta:  [[1,1,1,0],[1,1,1,0],[0,0,0,0],[0,0,0,0]],
-    perfil:  [[0,0,0,0],[1,0,0,0],[1,0,0,0],[1,1,0,0]],
+    perfil:  [[0,0,0,0],[1,1,0,0],[1,1,0,0],[1,1,0,0]],
   },
   {
-    id: 9, nombre: 'El Arco', emoji: '🚪', dif: 3,
-    desc: 'Dos pilares de altura 4 unidos por un dintel superior',
+    // PDF fig 6 — L-staircase with diagonal ramp wedges
+    id: 12, nombre: 'PDF·6 Escalera L-X', emoji: '↗️', dif: 3,
+    desc: 'Escalera en L: sube hacia X y se extiende en Y',
     cubes: [
-      [0,0,0],[0,0,1],[0,0,2],[0,0,3],
-      [2,0,0],[2,0,1],[2,0,2],[2,0,3],
-      [1,0,3],
+      [0,0,0],[1,0,0],[2,0,0],[2,1,0],[2,2,0],
+      [0,0,1],[1,0,1],[2,0,1],[2,1,1],
+      [0,0,2],[1,0,2],
     ],
-    alzado: [[1,1,1,0],[1,0,1,0],[1,0,1,0],[1,0,1,0]],
-    planta:  [[1,1,1,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],
-    perfil:  [[1,0,0,0],[1,0,0,0],[1,0,0,0],[1,0,0,0]],
+    alzado: [[0,0,0,0],[1,1,0,0],[1,1,1,0],[1,1,1,0]],
+    planta:  [[1,1,1,0],[0,0,1,0],[0,0,1,0],[0,0,0,0]],
+    perfil:  [[0,0,0,0],[1,0,0,0],[1,1,0,0],[1,1,1,0]],
   },
   {
-    id: 10, nombre: 'El Zigzag', emoji: '⚡', dif: 3,
-    desc: 'Escalera en diagonal: cada peldaño avanza en X e Y a la vez',
-    cubes: [[2,0,0],[1,1,0],[1,1,1],[0,2,0],[0,2,1],[0,2,2]],
-    alzado: [[0,0,0,0],[1,0,0,0],[1,1,0,0],[1,1,1,0]],
-    planta:  [[0,0,1,0],[0,1,0,0],[1,0,0,0],[0,0,0,0]],
-    perfil:  [[0,0,0,0],[0,0,1,0],[0,1,1,0],[1,1,1,0]],
-  },
-  {
-    id: 11, nombre: 'La U Abierta', emoji: '🧲', dif: 2,
-    desc: 'Dos brazos de h=2 con base de h=1, abierta por arriba',
+    // PDF fig 7 — L-staircase in Y+X (rotated)
+    id: 13, nombre: 'PDF·7 Escalera L-Y', emoji: '↙️', dif: 3,
+    desc: 'Escalera en L: sube hacia Y y se extiende en X',
     cubes: [
-      [0,0,0],[0,0,1],[0,1,0],[0,1,1],
-      [2,0,0],[2,0,1],[2,1,0],[2,1,1],
-      [0,2,0],[1,2,0],[2,2,0],
+      [0,0,0],[0,1,0],[0,2,0],[1,2,0],[2,2,0],
+      [0,0,1],[0,1,1],[1,2,1],[2,2,1],
+      [0,0,2],
     ],
-    alzado: [[0,0,0,0],[0,0,0,0],[1,0,1,0],[1,1,1,0]],
-    planta:  [[1,0,1,0],[1,0,1,0],[1,1,1,0],[0,0,0,0]],
-    perfil:  [[0,0,0,0],[0,0,0,0],[1,1,0,0],[1,1,1,0]],
+    alzado: [[0,0,0,0],[1,0,0,0],[1,1,1,0],[1,1,1,0]],
+    planta:  [[1,0,0,0],[1,0,0,0],[1,1,1,0],[0,0,0,0]],
+    perfil:  [[0,0,0,0],[1,0,0,0],[1,1,1,0],[1,1,1,0]],
   },
   {
-    id: 12, nombre: 'El Escalón Doble', emoji: '🎚️', dif: 3,
-    desc: 'Dos torres de distinta altura (h=3 y h=2) separadas por un hueco',
-    cubes: [[0,0,0],[0,0,1],[0,0,2],[1,0,0],[2,0,0],[2,0,1]],
-    alzado: [[0,0,0,0],[1,0,0,0],[1,0,1,0],[1,1,1,0]],
-    planta:  [[1,1,1,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],
-    perfil:  [[0,0,0,0],[1,0,0,0],[1,0,0,0],[1,0,0,0]],
+    // PDF fig 8 — corner stepped solid
+    id: 14, nombre: 'PDF·8 El Rincón', emoji: '📦', dif: 3,
+    desc: 'Sólido escalonado que envuelve la esquina delantera',
+    cubes: [
+      [0,0,0],[1,0,0],[0,1,0],[0,2,0],[1,2,0],
+      [0,0,1],[1,0,1],[0,1,1],
+      [0,0,2],
+    ],
+    alzado: [[0,0,0,0],[1,0,0,0],[1,1,0,0],[1,1,0,0]],
+    planta:  [[1,1,0,0],[1,0,0,0],[1,1,0,0],[0,0,0,0]],
+    perfil:  [[0,0,0,0],[1,0,0,0],[1,1,0,0],[1,1,1,0]],
   },
 ];
 
@@ -434,7 +550,7 @@ export default function VistasDidricas({ onBack }) {
         {/* ISO VIEW */}
         <div style={{ flex: '0 0 auto' }}>
           <div style={{ color: '#60a5fa', fontSize: '0.72rem', fontWeight: 700, textAlign: 'center', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Vista 3D</div>
-          <IsoView cubes={fig.cubes} />
+          <IsoView cubes={fig.cubes} wedges={fig.wedges || []} />
           <div style={{ color: '#475569', fontSize: '0.7rem', textAlign: 'center', marginTop: 5, lineHeight: 1.5 }}>
             La flecha naranja indica la cara <span style={{ color: '#fb923c', fontWeight: 700 }}>FRONTAL</span><br/>
             Ejes: <span style={{ color: '#f87171' }}>X →</span> ancho · <span style={{ color: '#4ade80' }}>Y →</span> profundidad · <span style={{ color: '#7dd3fc' }}>Z →</span> altura

@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>PiKT Presentación</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/soundfont-player/dist/soundfont-player.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -169,7 +172,7 @@ if (!presId) {
   loadPresentation(presId);
 }
 
-let slides = [], current = 0, timer = null;
+let slides = [], current = 0, timer = null, autoPlay = true;
 
 async function loadPresentation(id) {
   try {
@@ -177,6 +180,7 @@ async function loadPresentation(id) {
     if (!snap.exists()) { root.innerHTML = '<div class="error">Presentación no encontrada</div>'; return; }
     const data = snap.data();
     slides = data.slides || [];
+    autoPlay = data.autoPlay !== false;
     document.title = data.titulo || 'PiKT Presentación';
     buildStage(data);
     requestAnimationFrame(() => goTo(0));
@@ -205,6 +209,73 @@ function escHtml(str) {
   return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ── Music playback helpers ────────────────────────────────────────────────────
+const _TREBLE_MIDI = [84,83,81,79,77,76,74,72,71,69,67,65,64,62,60,59,57,55,53,52,50,48,47];
+const _BASS_MIDI   = [62,60,59,57,55,53,52,50,48,47,45,43,41,40,38];
+const NOTE_BEATS   = { redonda:4, blanca:2, negra:1, corchea:0.5, semicorchea:0.25, fusa:0.125, s_redonda:4, s_blanca:2, s_negra:1, s_corchea:0.5 };
+
+function _yToMidi(noteY, staffItem) {
+  if (!staffItem) return 60;
+  const STAFF_LS = 13;
+  const step = Math.round((noteY - staffItem.y) / (STAFF_LS / 2));
+  if (staffItem.clef === 'fa') return _BASS_MIDI[Math.max(0, Math.min(step + 3, _BASS_MIDI.length - 1))];
+  return _TREBLE_MIDI[Math.max(0, Math.min(step + 4, _TREBLE_MIDI.length - 1))];
+}
+
+function _midiToName(midi) {
+  const n = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+  return `${n[midi % 12]}${Math.floor(midi / 12) - 1}`;
+}
+
+let _sfAC = null;
+let _sfPiano = null;
+let _sfLoading = false;
+const _musicStop = {}; // id -> stop fn
+
+async function _loadPiano() {
+  if (_sfPiano) return _sfPiano;
+  if (_sfLoading) { await new Promise(r => { const t = setInterval(() => { if (!_sfLoading) { clearInterval(t); r(); } }, 100); }); return _sfPiano; }
+  _sfLoading = true;
+  if (!_sfAC) _sfAC = new (window.AudioContext || window.webkitAudioContext)();
+  if (_sfAC.state === 'suspended') await _sfAC.resume();
+  _sfPiano = await Soundfont.instrument(_sfAC, 'acoustic_grand_piano', { soundfont: 'MusyngKite' });
+  _sfLoading = false;
+  return _sfPiano;
+}
+
+async function _playMusicEl(btn) {
+  const id = btn.dataset.musicId;
+  // Toggle stop if already playing
+  if (_musicStop[id]) { _musicStop[id](); return; }
+
+  const items = JSON.parse(btn.getAttribute('data-items-json'));
+  const bpm   = parseInt(btn.dataset.bpm) || 90;
+  const seq   = items.filter(i => i.t === 'note' || i.t === 'rest').sort((a, b) => a.x - b.x);
+  if (!seq.length) return;
+
+  btn.textContent = '⏳'; btn.disabled = true;
+  let piano;
+  try { piano = await _loadPiano(); } catch { btn.textContent = '▶'; btn.disabled = false; return; }
+  btn.textContent = '⏹'; btn.disabled = false;
+
+  const staffItem = items.find(i => i.t === 'staff');
+  const secPerBeat = 60 / bpm;
+  let stopped = false;
+  _musicStop[id] = () => { stopped = true; try { piano.stop(); } catch {} delete _musicStop[id]; btn.textContent = '▶'; };
+
+  for (const item of seq) {
+    if (stopped) break;
+    const dur = (NOTE_BEATS[item.figura] || 1) * secPerBeat;
+    if (item.t === 'note') {
+      const name = _midiToName(_yToMidi(item.y, staffItem));
+      piano.play(name, _sfAC.currentTime, { duration: dur * 0.9, gain: 0.85 });
+    }
+    await new Promise(r => setTimeout(r, dur * 1000));
+  }
+  if (!stopped) { delete _musicStop[id]; btn.textContent = '▶'; }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 function renderFreeSlide(slide, t) {
   if (!slide.elements?.length) return '<div style="width:100%;height:100%;"></div>';
   const elHtml = slide.elements.map(el => {
@@ -215,6 +286,17 @@ function renderFreeSlide(slide, t) {
       const fit = el.objectFit || 'cover';
       const br  = el.borderRadius ? `${el.borderRadius}px` : '0';
       return `<div style="${base}padding:0;"><img src="${escHtml(el.src)}" alt="" style="width:100%;height:100%;object-fit:${fit};border-radius:${br};display:block;"/></div>`;
+    }
+
+    if (el.type === 'music') {
+      const itemsJson = escHtml(JSON.stringify(el.items || []));
+      const bpm = el.bpm || 90;
+      return `<div style="${base}padding:0;position:relative;">
+        <img src="${escHtml(el.src)}" alt="" style="width:100%;height:100%;object-fit:contain;display:block;"/>
+        <button data-music-id="${el.id}" data-bpm="${bpm}" data-items-json="${itemsJson}"
+          style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,0.65);border:2px solid rgba(255,255,255,0.5);color:#fff;border-radius:50%;width:40px;height:40px;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;z-index:10;transition:background 0.2s;"
+          title="Reproducir música" onmouseover="this.style.background='rgba(108,99,255,0.8)'" onmouseout="this.style.background='rgba(0,0,0,0.65)'">▶</button>
+      </div>`;
     }
 
     if (el.type === 'text') {
@@ -270,6 +352,12 @@ function renderFreeSlide(slide, t) {
       }
     }
 
+    if (el.type === 'equation') {
+      const col = el.color ? escHtml(el.color) : t.text;
+      const fs  = el.fontSize ? `${el.fontSize}px` : '28px';
+      return `<div style="${base}display:flex;align-items:center;justify-content:center;padding:2px 6px;" data-latex="${escHtml(el.latex||'')}" data-color="${col}" data-fs="${fs}"><span class="katex-placeholder" style="color:${col};font-size:${fs};">${escHtml(el.latex||'')}</span></div>`;
+    }
+
     return '';
   }).join('');
   return `<div style="position:relative;width:100%;height:100%;">${elHtml}</div>`;
@@ -279,11 +367,14 @@ function renderSlide(slide, idx) {
   const t = THEMES[slide.theme] || THEMES.dark;
   const accent33 = t.accent + '33';
   const ctaColor = t.accent === '#ffffff' ? '#6c63ff' : t.accent;
+  const bgStyle = slide.bgImage
+    ? `background:${t.bg};background-image:url(${slide.bgImage});background-size:cover;background-position:center;`
+    : `background:${t.bg};`;
 
   // Free (pure element-based) layout
   if (slide.layout === 'free') {
     const freeContent = renderFreeSlide(slide, t);
-    return `<div class="scene" id="s${idx}" style="background:${t.bg};">
+    return `<div class="scene" id="s${idx}" style="${bgStyle}">
       <div class="slide-label">📊 ${idx+1}/${slides.length}</div>
       ${freeContent}
     </div>`;
@@ -420,7 +511,7 @@ function renderSlide(slide, idx) {
     </div>`;
   }
 
-  return `<div class="scene" id="s${idx}" style="background:${t.bg};">
+  return `<div class="scene" id="s${idx}" style="${bgStyle}">
     <div class="slide-label">📊 ${idx+1}/${slides.length}</div>
     ${content}
     ${elementsOverlay}
@@ -440,6 +531,27 @@ function buildStage(data) {
       <button class="next-btn" id="nextBtn">›</button>
     </div>`;
 
+  // Wire music play buttons
+  document.querySelectorAll('[data-music-id]').forEach(btn => {
+    btn.onclick = (e) => { e.stopPropagation(); _playMusicEl(btn); };
+  });
+
+  // Render KaTeX equations (deferred because katex.js loads async)
+  function renderEquations() {
+    if (typeof katex === 'undefined') { setTimeout(renderEquations, 100); return; }
+    document.querySelectorAll('[data-latex]').forEach(el => {
+      const latex = el.getAttribute('data-latex');
+      const color = el.getAttribute('data-color') || '#fff';
+      const fs    = el.getAttribute('data-fs') || '28px';
+      try {
+        el.innerHTML = katex.renderToString(latex, { throwOnError: false, displayMode: true, output: 'html' });
+        const inner = el.querySelector('.katex');
+        if (inner) { inner.style.color = color; inner.style.fontSize = fs; }
+      } catch {}
+    });
+  }
+  renderEquations();
+
   // Dots
   const dotsEl = document.getElementById('sceneDots');
   slides.forEach((_,i) => {
@@ -453,6 +565,12 @@ function buildStage(data) {
   document.getElementById('nextBtn').onclick = () => { clearTimeout(timer); goTo((current+1)%slides.length); };
   document.getElementById('prevBtn').onclick = () => { clearTimeout(timer); goTo((current-1+slides.length)%slides.length); };
   document.getElementById('pauseBtn').onclick = () => togglePause();
+  // If autoPlay is off, start in paused state
+  if (!autoPlay) {
+    paused = true;
+    const btn = document.getElementById('pauseBtn');
+    if (btn) { btn.textContent = '▶'; btn.title = 'Reanudar (Espacio)'; btn.classList.add('paused'); }
+  }
 
   document.addEventListener('keydown', e => {
     if (e.key === ' ') { e.preventDefault(); togglePause(); }
@@ -512,7 +630,7 @@ function togglePause() {
       }));
     }
     if (btn) { btn.textContent = '⏸'; btn.title = 'Pausar (Espacio)'; btn.classList.remove('paused'); }
-    if (!videoPlaying && !gameOverlayOpen) {
+    if (autoPlay && !videoPlaying && !gameOverlayOpen) {
       timer = setTimeout(() => { if (!videoPlaying && !paused) goTo((current+1)%slides.length); }, remaining);
     }
   }
@@ -522,7 +640,7 @@ function setVideoPlaying(val) {
   videoPlaying = val;
   if (val) {
     clearTimeout(timer);
-  } else if (!paused && !gameOverlayOpen) {
+  } else if (autoPlay && !paused && !gameOverlayOpen) {
     clearTimeout(timer);
     const dur = slides[current]?.duration || 5000;
     timer = setTimeout(() => { if (!videoPlaying && !paused) goTo((current+1)%slides.length); }, dur);
@@ -566,7 +684,7 @@ function closeGame() {
   const overlay = document.getElementById('gameOverlay');
   if (overlay) overlay.remove();
   document.removeEventListener('keydown', escHandler);
-  if (!paused && !videoPlaying) {
+  if (autoPlay && !paused && !videoPlaying) {
     const dur = slides[current]?.duration || 5000;
     timer = setTimeout(() => { if (!videoPlaying && !paused) goTo((current+1)%slides.length); }, dur);
   }
@@ -592,9 +710,9 @@ function goTo(idx) {
   const t = THEMES[slides[idx]?.theme] || THEMES.dark;
   if (pf) {
     pf.style.transition = 'none';
-    pf.style.width = '0%';
-    pf.style.background = `linear-gradient(90deg,${t.accent},#a855f7)`;
-    if (!paused) {
+    pf.style.width = autoPlay ? '0%' : '100%';
+    pf.style.background = autoPlay ? `linear-gradient(90deg,${t.accent},#a855f7)` : 'rgba(255,255,255,0.15)';
+    if (autoPlay && !paused) {
       requestAnimationFrame(()=>requestAnimationFrame(()=>{
         pf.style.transition = `width ${dur}ms linear`;
         pf.style.width = '100%';
@@ -602,7 +720,7 @@ function goTo(idx) {
     }
   }
 
-  if (!paused && !videoPlaying) {
+  if (autoPlay && !paused && !videoPlaying) {
     timer = setTimeout(() => { if (!videoPlaying && !paused) goTo((idx+1)%slides.length); }, dur);
   }
 }

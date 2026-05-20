@@ -84,11 +84,13 @@ function ColorPicker({ value, onChange, label, allowNull }) {
 
 // ─── ELEMENT PROPERTIES PANEL ─────────────────────────────────────────────────
 function ElementProperties({ el, updateEl, onDelete, onDuplicate, onBringFwd, onSendBck }) {
-  const isText    = el.type === 'text';
-  const isShape   = el.type === 'shape';
-  const isImage   = el.type === 'image';
-  const isYT      = el.type === 'youtube';
-  const isWebview = el.type === 'webview';
+  const isText     = el.type === 'text';
+  const isShape    = el.type === 'shape';
+  const isImage    = el.type === 'image';
+  const isYT       = el.type === 'youtube';
+  const isWebview  = el.type === 'webview';
+  const isEquation = el.type === 'equation';
+  const isMusic    = el.type === 'music';
   const active = (condition) => ({
     background: condition ? '#6c63ff' : '#374151', color: '#fff',
     border: 'none', borderRadius: 5, padding: '5px 0', cursor: 'pointer', fontSize: 12, flex: 1,
@@ -98,7 +100,7 @@ function ElementProperties({ el, updateEl, onDelete, onDuplicate, onBringFwd, on
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
         <div style={{ fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 1 }}>
-          {isText ? '📝 Texto' : isShape ? '⬜ Forma' : isYT ? '▶ YouTube' : isWebview ? '🌐 Web' : '🖼️ Imagen'}
+          {isText ? '📝 Texto' : isShape ? '⬜ Forma' : isYT ? '▶ YouTube' : isWebview ? '🌐 Web' : isEquation ? '∑ Ecuación' : isMusic ? '🎵 Música' : '🖼️ Imagen'}
         </div>
         <div style={{ display: 'flex', gap: 4 }}>
           <button onClick={onDuplicate} title="Duplicar (Ctrl+D)" style={{ background: '#374151', color: '#9ca3af', border: 'none', borderRadius: 4, padding: '3px 7px', cursor: 'pointer', fontSize: 11 }}>⧉</button>
@@ -169,6 +171,22 @@ function ElementProperties({ el, updateEl, onDelete, onDuplicate, onBringFwd, on
           </div>
           <input type="range" min={0} max={50} value={el.borderRadius || 0} onChange={e => updateEl({ borderRadius: +e.target.value })}
             style={{ width: '100%', accentColor: '#6c63ff' }} />
+        </div>
+      </>}
+
+      {/* EQUATION PROPS */}
+      {isEquation && <>
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+            <div style={{ fontSize: 10, color: '#9ca3af' }}>TAMAÑO</div>
+            <div style={{ fontSize: 10, color: '#6b7280' }}>{el.fontSize || 28}px</div>
+          </div>
+          <input type="range" min={10} max={80} value={el.fontSize || 28} onChange={e => updateEl({ fontSize: +e.target.value })}
+            style={{ width: '100%', accentColor: '#6c63ff' }} />
+        </div>
+        <ColorPicker label="COLOR" value={el.color} onChange={c => updateEl({ color: c })} allowNull />
+        <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 8, lineHeight: 1.4 }}>
+          Doble clic sobre la ecuación para editarla
         </div>
       </>}
 
@@ -343,7 +361,7 @@ function newSlide(layout = 'title', theme = 'dark') {
 }
 
 // ─── SLIDE PREVIEW (thumbnail) ────────────────────────────────────────────────
-function SlideThumb({ slide, isActive, onClick, index, onDelete }) {
+function SlideThumb({ slide, isActive, onClick, index, onDelete, onMoveUp, onMoveDown, total }) {
   const t = THEMES[slide.theme] || THEMES.dark;
   return (
     <div onClick={onClick} style={{ position: 'relative', cursor: 'pointer', marginBottom: 8 }}>
@@ -386,6 +404,13 @@ function SlideThumb({ slide, isActive, onClick, index, onDelete }) {
         border: 'none', borderRadius: 4, width: 16, height: 16, fontSize: 9, cursor: 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1,
       }}>✕</button>
+      {/* Move up/down */}
+      <div style={{ position: 'absolute', bottom: 2, right: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
+        <button onClick={e => { e.stopPropagation(); onMoveUp?.(); }} disabled={index === 0}
+          style={{ background: index === 0 ? 'rgba(55,65,81,0.5)' : 'rgba(108,99,255,0.8)', color: index === 0 ? '#555' : '#fff', border: 'none', borderRadius: 3, width: 14, height: 12, fontSize: 8, cursor: index === 0 ? 'default' : 'pointer', lineHeight: 1, padding: 0 }}>↑</button>
+        <button onClick={e => { e.stopPropagation(); onMoveDown?.(); }} disabled={index === total - 1}
+          style={{ background: index === total - 1 ? 'rgba(55,65,81,0.5)' : 'rgba(108,99,255,0.8)', color: index === total - 1 ? '#555' : '#fff', border: 'none', borderRadius: 3, width: 14, height: 12, fontSize: 8, cursor: index === total - 1 ? 'default' : 'pointer', lineHeight: 1, padding: 0 }}>↓</button>
+      </div>
     </div>
   );
 }
@@ -642,16 +667,48 @@ const MUSIC_ACCS = [
 ];
 const CNVS_W = 820, CNVS_H = 200;
 
+// ── Staff Y-position → MIDI note ─────────────────────────────────────────────
+// Treble (step 0 = top line = F5=77). Each step = ls/2 down.
+const _TREBLE_MIDI = [84,83,81,79,77,76,74,72,71,69,67,65,64,62,60,59,57,55,53,52,50,48,47];
+// Bass   (step 0 = top line = A3=57). Each step = ls/2 down.
+const _BASS_MIDI   = [62,60,59,57,55,53,52,50,48,47,45,43,41,40,38];
+
+function yToMidi(noteY, staffItem) {
+  if (!staffItem) return 60;
+  const step = Math.round((noteY - staffItem.y) / (STAFF_LS / 2));
+  if (staffItem.clef === 'fa') {
+    return _BASS_MIDI[Math.max(0, Math.min(step + 3, _BASS_MIDI.length - 1))];
+  }
+  return _TREBLE_MIDI[Math.max(0, Math.min(step + 4, _TREBLE_MIDI.length - 1))];
+}
+
+function midiToName(midi) {
+  const n = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+  return `${n[midi % 12]}${Math.floor(midi / 12) - 1}`;
+}
+
+// note-type → duration in beats (quarter = 1)
+const NOTE_BEATS = {
+  redonda: 4, blanca: 2, negra: 1, corchea: 0.5, semicorchea: 0.25, fusa: 0.125,
+  s_redonda: 4, s_blanca: 2, s_negra: 1, s_corchea: 0.5,
+};
+
 function MusicPanel({ onInsert, onClose }) {
   const [items, setItems] = useState([]);
-  const [cursorX, setCursorX] = useState(80);
-  const [staffY, setStaffY] = useState(80);
+  const [staffY] = useState(80);
   const [hasStaff, setHasStaff] = useState(false);
+  const [selectedTool, setSelectedTool] = useState(null);
+  const [cursorX, setCursorX] = useState(null);
+  const [bpm, setBpm] = useState(90);
+  const [isLoadingAudio, setIsLoadingAudio] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [playingIdx, setPlayingIdx] = useState(null);
   const canvasRef = useRef(null);
+  const acRef = useRef(null);
+  const pianoRef = useRef(null);
+  const stopRef = useRef(false);
 
-  const redraw = (its) => {
-    const cv = canvasRef.current; if (!cv) return;
-    const ctx = cv.getContext('2d');
+  const drawAll = (ctx, its, curX, pIdx = null) => {
     ctx.clearRect(0, 0, CNVS_W, CNVS_H);
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, CNVS_W, CNVS_H);
     its.forEach(item => {
@@ -660,96 +717,212 @@ function MusicPanel({ onInsert, onClose }) {
       else if (item.t === 'rest') drawRest(ctx, item);
       else if (item.t === 'acc') drawAccidental(ctx, item);
     });
+    // Cursor line
+    if (curX !== null) {
+      ctx.save(); ctx.strokeStyle = '#6c63ff'; ctx.lineWidth = 1.5;
+      ctx.setLineDash([5, 3]);
+      ctx.beginPath(); ctx.moveTo(curX, 5); ctx.lineTo(curX, CNVS_H - 5); ctx.stroke();
+      ctx.restore();
+    }
+    // Playing highlight
+    if (pIdx !== null) {
+      const seq = its.filter(i => i.t === 'note' || i.t === 'rest').sort((a, b) => a.x - b.x);
+      const pi = seq[pIdx];
+      if (pi) {
+        ctx.save(); ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 2.5;
+        ctx.setLineDash([]);
+        ctx.beginPath(); ctx.arc(pi.x, pi.y, 18, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+      }
+    }
   };
-  useEffect(() => { redraw(items); }, [items]); // eslint-disable-line
+  useEffect(() => {
+    const cv = canvasRef.current; if (!cv) return;
+    drawAll(cv.getContext('2d'), items, cursorX, playingIdx);
+  }, [items, cursorX, playingIdx]); // eslint-disable-line
+
+  // ── Audio ──────────────────────────────────────────────────────────────────
+  const getAC = () => {
+    if (!acRef.current) acRef.current = new (window.AudioContext || window.webkitAudioContext)();
+    if (acRef.current.state === 'suspended') acRef.current.resume();
+    return acRef.current;
+  };
+
+  const loadPiano = async () => {
+    if (pianoRef.current) return pianoRef.current;
+    setIsLoadingAudio(true);
+    try {
+      const { default: Soundfont } = await import('soundfont-player');
+      pianoRef.current = await Soundfont.instrument(getAC(), 'acoustic_grand_piano', { soundfont: 'MusyngKite' });
+    } catch (e) {
+      alert('No se pudo cargar el piano. Comprueba la conexión a internet.'); throw e;
+    } finally { setIsLoadingAudio(false); }
+    return pianoRef.current;
+  };
+
+  const handlePlay = async () => {
+    const seq = items.filter(i => i.t === 'note' || i.t === 'rest').sort((a, b) => a.x - b.x);
+    if (!seq.length) return;
+    const staffItem = items.find(i => i.t === 'staff');
+    let piano;
+    try { piano = await loadPiano(); } catch { return; }
+    setIsPlaying(true); stopRef.current = false;
+    const secPerBeat = 60 / bpm;
+    for (let i = 0; i < seq.length; i++) {
+      if (stopRef.current) break;
+      setPlayingIdx(i);
+      const item = seq[i];
+      const dur = (NOTE_BEATS[item.figura] || 1) * secPerBeat;
+      if (item.t === 'note') {
+        const noteName = midiToName(yToMidi(item.y, staffItem));
+        piano.play(noteName, getAC().currentTime, { duration: dur * 0.9, gain: 0.85 });
+      }
+      await new Promise(r => setTimeout(r, dur * 1000));
+    }
+    setIsPlaying(false); setPlayingIdx(null);
+  };
+
+  const handleStop = () => {
+    stopRef.current = true;
+    if (pianoRef.current) pianoRef.current.stop();
+    setIsPlaying(false); setPlayingIdx(null);
+  };
+
+  const canvasCoords = (e) => {
+    const cv = canvasRef.current; if (!cv) return null;
+    const r = cv.getBoundingClientRect();
+    return {
+      x: Math.round((e.clientX - r.left) * (CNVS_W / r.width)),
+      y: Math.round((e.clientY - r.top)  * (CNVS_H / r.height)),
+    };
+  };
+
+  const handleCanvasClick = (e) => {
+    const pos = canvasCoords(e); if (!pos) return;
+    setCursorX(pos.x);
+    if (!selectedTool) return;
+    if (!hasStaff) { alert('Primero añade un pentagrama'); return; }
+    const { x, y } = pos;
+    if (selectedTool.t === 'note') {
+      setItems(prev => [...prev, { t:'note', figura:selectedTool.figura, x, y, ls:STAFF_LS, color:'#111', stemUp: y >= staffY + STAFF_LS }]);
+    } else if (selectedTool.t === 'rest') {
+      setItems(prev => [...prev, { t:'rest', figura:selectedTool.figura, x, y, ls:STAFF_LS, color:'#111' }]);
+    } else if (selectedTool.t === 'acc') {
+      setItems(prev => [...prev, { t:'acc', figura:selectedTool.figura, x, y, ls:STAFF_LS, color:'#111' }]);
+    }
+  };
 
   const addStaff = (clef) => {
-    const sy = staffY;
-    const newItems = [...items, { t:'staff', x:30, y:sy, w:CNVS_W-60, ls:STAFF_LS, clef }];
-    setItems(newItems); setHasStaff(true); setCursorX(80);
+    setItems(prev => [...prev, { t:'staff', x:30, y:staffY, w:CNVS_W-60, ls:STAFF_LS, clef }]);
+    setHasStaff(true); setCursorX(80);
   };
-  const addNote = (figura) => {
-    if (!hasStaff) { alert('Primero añade un pentagrama'); return; }
-    const noteY = staffY + STAFF_LS * 1.5;
-    setItems(prev => { const n = [...prev, { t:'note', figura, x:cursorX, y:noteY, ls:STAFF_LS, color:'#111', stemUp:true }]; return n; });
-    setCursorX(c => Math.min(c + 44, CNVS_W - 60));
-  };
-  const addRest = (figura) => {
-    if (!hasStaff) { alert('Primero añade un pentagrama'); return; }
-    const restY = staffY + STAFF_LS * 1;
-    setItems(prev => [...prev, { t:'rest', figura, x:cursorX, y:restY, ls:STAFF_LS, color:'#111' }]);
-    setCursorX(c => Math.min(c + 44, CNVS_W - 60));
-  };
-  const addAcc = (figura) => {
-    if (!hasStaff) { alert('Primero añade un pentagrama'); return; }
-    const accY = staffY + STAFF_LS * 1.5;
-    setItems(prev => [...prev, { t:'acc', figura, x:cursorX - 20, y:accY, ls:STAFF_LS, color:'#111' }]);
-  };
-  const undo = () => setItems(prev => { const n = [...prev]; n.pop(); if (n.length === 0) { setHasStaff(false); setCursorX(80); } else if (!n.some(i => i.t === 'staff')) setHasStaff(false); return n; });
-  const clear = () => { setItems([]); setHasStaff(false); setCursorX(80); };
+  const undo = () => setItems(prev => {
+    const n = [...prev]; n.pop();
+    if (!n.some(i => i.t === 'staff')) { setHasStaff(false); setCursorX(null); }
+    return n;
+  });
+  const clear = () => { setItems([]); setHasStaff(false); setCursorX(null); setSelectedTool(null); };
 
   const handleInsert = () => {
     const cv = document.createElement('canvas');
     cv.width = CNVS_W; cv.height = CNVS_H;
-    redraw_to(cv, items);
-    onInsert(cv.toDataURL('image/png'));
-  };
-  const redraw_to = (cv, its) => {
     const ctx = cv.getContext('2d');
-    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
-    its.forEach(item => {
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, CNVS_W, CNVS_H);
+    items.forEach(item => {
       if (item.t === 'staff') drawStaff(ctx, item);
       else if (item.t === 'note') drawNote(ctx, item);
       else if (item.t === 'rest') drawRest(ctx, item);
       else if (item.t === 'acc') drawAccidental(ctx, item);
     });
+    onInsert({ imageData: cv.toDataURL('image/png'), items: [...items], bpm });
   };
 
-  const MB = (label, onClick, bg = '#374151', color = '#e5e7eb') => (
-    <button onClick={onClick} style={{ background:bg, color, border:'none', borderRadius:6, padding:'4px 8px', cursor:'pointer', fontSize:11, fontWeight:700, whiteSpace:'nowrap' }}>{label}</button>
-  );
+  const ToolBtn = ({ label, t, figura }) => {
+    const active = selectedTool?.t === t && selectedTool?.figura === figura;
+    return (
+      <button key={`${t}-${figura}`}
+        onClick={() => setSelectedTool(active ? null : { t, figura })}
+        style={{ background: active ? '#6c63ff' : '#374151', color: '#fff', border: `2px solid ${active ? '#a78bfa' : 'transparent'}`, borderRadius:6, padding:'4px 8px', cursor:'pointer', fontSize:11, fontWeight:700, whiteSpace:'nowrap' }}>
+        {label}
+      </button>
+    );
+  };
 
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:3000 }}>
       <div style={{ background:'#1f2937', borderRadius:16, padding:20, width:'95vw', maxWidth:680, maxHeight:'90vh', overflowY:'auto', border:'1px solid #374151' }}>
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
           <h3 style={{ margin:0, color:'#fff', fontSize:16, fontWeight:900 }}>🎵 Pentagrama Musical</h3>
           <button onClick={onClose} style={{ background:'none', border:'none', color:'#9ca3af', fontSize:20, cursor:'pointer' }}>✕</button>
         </div>
 
-        {/* Pentagrama */}
+        <div style={{ fontSize:11, color: selectedTool ? '#a78bfa' : '#6b7280', marginBottom:10, fontWeight:700, background: selectedTool ? 'rgba(108,99,255,0.12)' : 'transparent', padding:'5px 8px', borderRadius:6 }}>
+          {selectedTool
+            ? `✅ Seleccionado — haz clic en el pentagrama para colocar el símbolo`
+            : 'Selecciona un símbolo y haz clic donde quieras colocarlo en el pentagrama'}
+        </div>
+
+        {/* Staff controls */}
         <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:10 }}>
           <span style={{ fontSize:11, color:'#9ca3af', alignSelf:'center', fontWeight:700 }}>Pentagrama:</span>
-          {MB('𝄞 Clave Sol', () => addStaff('sol'), '#1d4ed8', '#fff')}
-          {MB('𝄢 Clave Fa',  () => addStaff('fa'),  '#1d4ed8', '#fff')}
-          {MB('↩ Deshacer', undo, '#374151', '#9ca3af')}
-          {MB('🗑 Limpiar',  clear, 'rgba(239,68,68,0.2)', '#f87171')}
+          <button key="sol" onClick={() => addStaff('sol')} style={{ background:'#1d4ed8', color:'#fff', border:'none', borderRadius:6, padding:'4px 8px', cursor:'pointer', fontSize:11, fontWeight:700 }}>𝄞 Clave Sol</button>
+          <button key="fa"  onClick={() => addStaff('fa')}  style={{ background:'#1d4ed8', color:'#fff', border:'none', borderRadius:6, padding:'4px 8px', cursor:'pointer', fontSize:11, fontWeight:700 }}>𝄢 Clave Fa</button>
+          <button key="undo" onClick={undo}  style={{ background:'#374151', color:'#9ca3af', border:'none', borderRadius:6, padding:'4px 8px', cursor:'pointer', fontSize:11, fontWeight:700 }}>↩ Deshacer</button>
+          <button key="clr"  onClick={clear} style={{ background:'rgba(239,68,68,0.2)', color:'#f87171', border:'none', borderRadius:6, padding:'4px 8px', cursor:'pointer', fontSize:11, fontWeight:700 }}>🗑 Limpiar</button>
         </div>
 
-        {/* Notes */}
         <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:6 }}>
           <span style={{ fontSize:11, color:'#9ca3af', alignSelf:'center', fontWeight:700 }}>Notas:</span>
-          {MUSIC_NOTES.map(n => MB(`${n.sym} ${n.label}`, () => addNote(n.id)))}
+          {MUSIC_NOTES.map(n => <ToolBtn key={n.id} label={`${n.sym} ${n.label}`} t="note" figura={n.id} />)}
         </div>
-        {/* Rests */}
         <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:6 }}>
           <span style={{ fontSize:11, color:'#9ca3af', alignSelf:'center', fontWeight:700 }}>Silencios:</span>
-          {MUSIC_RESTS.map(r => MB(`${r.sym} ${r.label}`, () => addRest(r.id)))}
+          {MUSIC_RESTS.map(r => <ToolBtn key={r.id} label={`${r.sym} ${r.label}`} t="rest" figura={r.id} />)}
         </div>
-        {/* Accidentals */}
-        <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:12 }}>
+        <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:10 }}>
           <span style={{ fontSize:11, color:'#9ca3af', alignSelf:'center', fontWeight:700 }}>Accidentales:</span>
-          {MUSIC_ACCS.map(a => MB(`${a.sym} ${a.label}`, () => addAcc(a.id)))}
+          {MUSIC_ACCS.map(a => <ToolBtn key={a.id} label={`${a.sym} ${a.label}`} t="acc" figura={a.id} />)}
         </div>
 
-        {/* Canvas preview */}
-        <div style={{ background:'#fff', borderRadius:8, overflow:'hidden', marginBottom:12 }}>
-          <canvas ref={canvasRef} width={CNVS_W} height={CNVS_H} style={{ width:'100%', height:'auto', display:'block' }} />
+        <div style={{ background:'#fff', borderRadius:8, overflow:'hidden', marginBottom:10, cursor: selectedTool ? 'crosshair' : 'default' }}>
+          <canvas ref={canvasRef} width={CNVS_W} height={CNVS_H}
+            style={{ width:'100%', height:'auto', display:'block' }}
+            onClick={handleCanvasClick} />
+        </div>
+
+        {selectedTool && (
+          <div style={{ marginBottom:8, textAlign:'center' }}>
+            <button onClick={() => setSelectedTool(null)} style={{ background:'rgba(108,99,255,0.15)', color:'#a78bfa', border:'1px solid rgba(108,99,255,0.3)', borderRadius:8, padding:'4px 14px', cursor:'pointer', fontSize:11, fontWeight:700 }}>
+              ✕ Deseleccionar
+            </button>
+          </div>
+        )}
+
+        {/* BPM + Play controls */}
+        <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10, background:'rgba(255,255,255,0.04)', borderRadius:10, padding:'8px 12px' }}>
+          <span style={{ fontSize:11, color:'#9ca3af', fontWeight:700, whiteSpace:'nowrap' }}>BPM:</span>
+          <input type="range" min={40} max={200} value={bpm} onChange={e => setBpm(+e.target.value)}
+            style={{ flex:1, accentColor:'#6c63ff' }} />
+          <span style={{ fontSize:12, color:'#e5e7eb', fontWeight:800, minWidth:32, textAlign:'right' }}>{bpm}</span>
+          <div style={{ display:'flex', gap:6 }}>
+            {isPlaying ? (
+              <button onClick={handleStop} style={{ background:'rgba(239,68,68,0.2)', color:'#f87171', border:'1px solid rgba(239,68,68,0.4)', borderRadius:8, padding:'6px 14px', cursor:'pointer', fontWeight:800, fontSize:13 }}>
+                ⏹ Stop
+              </button>
+            ) : (
+              <button onClick={handlePlay}
+                disabled={isLoadingAudio || items.filter(i=>i.t==='note'||i.t==='rest').length === 0}
+                style={{ background: isLoadingAudio || items.filter(i=>i.t==='note'||i.t==='rest').length===0 ? '#374151' : 'rgba(52,211,153,0.2)', color: isLoadingAudio || items.filter(i=>i.t==='note'||i.t==='rest').length===0 ? '#6b7280' : '#34d399', border:'1px solid rgba(52,211,153,0.4)', borderRadius:8, padding:'6px 14px', cursor: isLoadingAudio || items.filter(i=>i.t==='note'||i.t==='rest').length===0 ? 'not-allowed' : 'pointer', fontWeight:800, fontSize:13 }}>
+                {isLoadingAudio ? '⏳' : '▶ Play'}
+              </button>
+            )}
+          </div>
         </div>
 
         <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
           <button onClick={onClose} style={{ background:'#374151', color:'#9ca3af', border:'none', borderRadius:10, padding:'9px 20px', cursor:'pointer', fontWeight:700 }}>Cancelar</button>
-          <button onClick={handleInsert} disabled={items.length === 0} style={{ background: items.length === 0 ? '#374151' : '#6c63ff', color:'#fff', border:'none', borderRadius:10, padding:'9px 24px', cursor: items.length === 0 ? 'not-allowed' : 'pointer', fontWeight:700 }}>
+          <button onClick={handleInsert} disabled={items.length === 0}
+            style={{ background: items.length === 0 ? '#374151' : '#6c63ff', color:'#fff', border:'none', borderRadius:10, padding:'9px 24px', cursor: items.length === 0 ? 'not-allowed' : 'pointer', fontWeight:700 }}>
             📌 Insertar en diapositiva
           </button>
         </div>
@@ -1056,13 +1229,13 @@ const MATH_KEYS = [
   ]},
 ];
 
-function MathEquationModal({ onInsert, onClose }) {
-  const [latex, setLatex] = useState('');
+function MathEquationModal({ onInsert, onClose, initialLatex = '' }) {
+  const [latex, setLatex] = useState(initialLatex);
   const [catIdx, setCatIdx] = useState(0);
   const [error, setError] = useState('');
   const inputRef = useRef(null);
   const previewRef = useRef(null);
-  const hiddenRef = useRef(null);
+  const isEdit = !!initialLatex;
 
   useEffect(() => {
     if (!previewRef.current) return;
@@ -1088,30 +1261,19 @@ function MathEquationModal({ onInsert, onClose }) {
     }, 0);
   };
 
-  const handleInsert = async () => {
+  const handleInsert = () => {
     if (!latex.trim()) return;
-    const node = hiddenRef.current; if (!node) return;
-    try {
-      const html = katex.renderToString(latex, { throwOnError:false, displayMode:true });
-      node.innerHTML = html;
-      node.style.display = 'block';
-      await new Promise(r => setTimeout(r, 80));
-      const canvas = await html2canvas(node, { backgroundColor:'#ffffff', scale:3, logging:false, useCORS:false });
-      node.style.display = 'none';
-      onInsert(canvas.toDataURL('image/png'));
-    } catch(e) { alert('Error renderizando: '+e.message); }
+    onInsert(latex.trim());
   };
 
   const cat = MATH_KEYS[catIdx];
 
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.8)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:3000 }}>
-      {/* Hidden render node */}
-      <div ref={hiddenRef} style={{ position:'fixed', left:-9999, top:-9999, display:'none', background:'#fff', padding:'12px 16px', borderRadius:8, fontSize:20, color:'#111', minWidth:80 }} />
 
       <div style={{ background:'#1f2937', borderRadius:16, padding:20, width:'95vw', maxWidth:680, maxHeight:'90vh', overflowY:'auto', border:'1px solid #374151' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
-          <h3 style={{ margin:0, color:'#fff', fontSize:16, fontWeight:900 }}>∑ Editor de Ecuaciones</h3>
+          <h3 style={{ margin:0, color:'#fff', fontSize:16, fontWeight:900 }}>{isEdit ? '✏️ Editar Ecuación' : '∑ Nueva Ecuación'}</h3>
           <button onClick={onClose} style={{ background:'none', border:'none', color:'#9ca3af', fontSize:20, cursor:'pointer' }}>✕</button>
         </div>
 
@@ -1165,7 +1327,7 @@ function MathEquationModal({ onInsert, onClose }) {
         <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
           <button onClick={onClose} style={{ background:'#374151', color:'#9ca3af', border:'none', borderRadius:10, padding:'9px 20px', cursor:'pointer', fontWeight:700 }}>Cancelar</button>
           <button onClick={handleInsert} disabled={!latex.trim()} style={{ background: latex.trim() ? 'linear-gradient(135deg,#6c63ff,#a855f7)' : '#374151', color:'#fff', border:'none', borderRadius:10, padding:'9px 24px', cursor: latex.trim() ? 'pointer' : 'not-allowed', fontWeight:700, fontSize:14 }}>
-            📌 Insertar ecuación
+            {isEdit ? '✓ Actualizar' : '📌 Insertar ecuación'}
           </button>
         </div>
       </div>
@@ -1285,7 +1447,7 @@ function WebInputModal({ onAdd, onClose }) {
   );
 }
 
-const FreeCanvas = forwardRef(function FreeCanvas({ slide, onChange, onElementSelected }, ref) {
+const FreeCanvas = forwardRef(function FreeCanvas({ slide, onChange, onElementSelected, onEquationEdit }, ref) {
   const t = THEMES[slide.theme] || THEMES.dark;
   const canvasRef = useRef(null);
   const [selectedId, setSelectedId] = useState(null);
@@ -1419,7 +1581,10 @@ const FreeCanvas = forwardRef(function FreeCanvas({ slide, onChange, onElementSe
     return (
       <div key={el.id} {...moveH}
         onClick={e => { e.stopPropagation(); sel(el.id); }}
-        onDoubleClick={() => el.type === 'text' && setEditingId(el.id)}
+        onDoubleClick={() => {
+          if (el.type === 'text') setEditingId(el.id);
+          else if (el.type === 'equation') onEquationEdit?.(el.id);
+        }}
         style={{
           position:'absolute', left:`${el.x}%`, top:`${el.y}%`, width:`${el.w}%`, height:`${el.h}%`,
           border: isSel ? '2px solid #6c63ff' : '2px solid transparent',
@@ -1439,6 +1604,12 @@ const FreeCanvas = forwardRef(function FreeCanvas({ slide, onChange, onElementSe
         )}
         {el.type === 'image' && (
           <img src={el.src} alt="" draggable={false} style={{ width:'100%', height:'100%', objectFit:el.objectFit||'cover', display:'block', borderRadius:`${el.borderRadius||0}px` }} />
+        )}
+        {el.type === 'music' && (
+          <div style={{ width:'100%', height:'100%', position:'relative' }}>
+            <img src={el.src} alt="" draggable={false} style={{ width:'100%', height:'100%', objectFit:'contain', display:'block' }} />
+            <div style={{ position:'absolute', bottom:4, right:4, background:'rgba(0,0,0,0.6)', border:'2px solid rgba(255,255,255,0.5)', color:'#fff', borderRadius:'50%', width:28, height:28, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, pointerEvents:'none', userSelect:'none' }}>▶</div>
+          </div>
         )}
         {el.type === 'youtube' && (
           <div style={{ width:'100%', height:'100%', position:'relative', background:'#000', overflow:'hidden' }}>
@@ -1460,6 +1631,18 @@ const FreeCanvas = forwardRef(function FreeCanvas({ slide, onChange, onElementSe
             <div style={{position:'absolute',inset:0}} />
           </div>
         )}
+        {el.type === 'equation' && (() => {
+          let html = '';
+          try { html = katex.renderToString(el.latex || '', { throwOnError: false, displayMode: true, output: 'html' }); } catch {}
+          return (
+            <div style={{ width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', overflow:'hidden', padding:'2px 6px', boxSizing:'border-box' }}>
+              <div
+                style={{ color: el.color || '#fff', fontSize: `${el.fontSize || 28}px`, lineHeight: 1, userSelect:'none', pointerEvents:'none', maxWidth:'100%', overflow:'hidden' }}
+                dangerouslySetInnerHTML={{ __html: html }}
+              />
+            </div>
+          );
+        })()}
         {el.type === 'shape' && el.shapeType !== 'triangle' && el.shapeType !== 'line' && (
           <div style={{ width:'100%', height:'100%', background:el.fill||'#6c63ff', borderRadius: el.shapeType==='circle' ? '50%' : `${el.borderRadius||0}px`, border: el.stroke && el.stroke!=='none' ? `${el.strokeWidth||2}px solid ${el.stroke}` : 'none', boxSizing:'border-box' }} />
         )}
@@ -1512,6 +1695,7 @@ function SlideCanvas({ slide, onChange, usuario, onElementSelected }) {
   const [showMusic, setShowMusic] = useState(false);
   const [showGeo, setShowGeo] = useState(false);
   const [showMath, setShowMath] = useState(false);
+  const [editEquationId, setEditEquationId] = useState(null);
 
   const mkId = () => `el_${Date.now()}`;
   const mkText = (extra = {}) => ({
@@ -1570,8 +1754,8 @@ function SlideCanvas({ slide, onChange, usuario, onElementSelected }) {
     const el = { id: mkId(), type: 'image', x: 15, y: 10, w: 55, h: 45, src: base64, objectFit: 'contain', borderRadius: 0, opacity: 1 };
     fcRef.current?.addEl(el); setShow3D(null);
   };
-  const handleInsertMusic = (base64) => {
-    const el = { id: mkId(), type: 'image', x: 5, y: 25, w: 88, h: 30, src: base64, objectFit: 'contain', borderRadius: 0, opacity: 1 };
+  const handleInsertMusic = ({ imageData, items, bpm }) => {
+    const el = { id: mkId(), type: 'music', x: 5, y: 25, w: 88, h: 30, src: imageData, items, bpm, objectFit: 'contain', borderRadius: 0, opacity: 1 };
     fcRef.current?.addEl(el); setShowMusic(false);
   };
   const handleInsertGeo = (src, wOrType, h) => {
@@ -1585,9 +1769,14 @@ function SlideCanvas({ slide, onChange, usuario, onElementSelected }) {
     }
     setShowGeo(false);
   };
-  const handleInsertMath = (base64) => {
-    const el = { id: mkId(), type: 'image', x: 20, y: 30, w: 50, h: 25, src: base64, objectFit: 'contain', borderRadius: 4, opacity: 1 };
+  const handleInsertMath = (latex) => {
+    const el = { id: mkId(), type: 'equation', latex, x: 20, y: 30, w: 55, h: 18, fontSize: 28, color: null, opacity: 1 };
     fcRef.current?.addEl(el); setShowMath(false);
+  };
+  const handleEquationEdit = (id) => setEditEquationId(id);
+  const handleEquationUpdate = (latex) => {
+    onChange({ ...slide, elements: (slide.elements || []).map(e => e.id === editEquationId ? { ...e, latex } : e) });
+    setEditEquationId(null);
   };
 
   const upd = (key, val) => onChange({ ...slide, [key]: val });
@@ -1896,7 +2085,7 @@ function SlideCanvas({ slide, onChange, usuario, onElementSelected }) {
 
   return (
     <>
-      <div style={{ position: 'relative', width: '100%', aspectRatio: '16/9', background: t.bg, borderRadius: 16, overflow: 'hidden', boxShadow: '0 8px 40px rgba(0,0,0,0.4)' }}>
+      <div style={{ position: 'relative', width: '100%', aspectRatio: '16/9', background: slide.bgImage ? undefined : t.bg, backgroundImage: slide.bgImage ? `url(${slide.bgImage})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: 16, overflow: 'hidden', boxShadow: '0 8px 40px rgba(0,0,0,0.4)' }}>
         <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImage} />
         <input ref={imageFileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageFile} />
         {!isFree && <div style={{ position: 'relative', zIndex: 1, height: '100%' }}>{renderContent()}</div>}
@@ -1907,7 +2096,7 @@ function SlideCanvas({ slide, onChange, usuario, onElementSelected }) {
             <div style={{fontSize:11,color:t.sub}}>Usa los botones de abajo · Doble clic = editar · Supr = borrar</div>
           </div>
         )}
-        <FreeCanvas ref={fcRef} slide={slide} onChange={onChange} onElementSelected={onElementSelected} />
+        <FreeCanvas ref={fcRef} slide={slide} onChange={onChange} onElementSelected={onElementSelected} onEquationEdit={handleEquationEdit} />
       </div>
 
       {/* ── Add elements toolbar (all layouts) ── */}
@@ -1982,6 +2171,7 @@ function SlideCanvas({ slide, onChange, usuario, onElementSelected }) {
       {showMusic && <MusicPanel onInsert={handleInsertMusic} onClose={()=>setShowMusic(false)} />}
       {showGeo && <GeoPanel onInsert={handleInsertGeo} onClose={()=>setShowGeo(false)} />}
       {showMath && <MathEquationModal onInsert={handleInsertMath} onClose={()=>setShowMath(false)} />}
+      {editEquationId && <MathEquationModal initialLatex={(slide.elements||[]).find(e=>e.id===editEquationId)?.latex||''} onInsert={handleEquationUpdate} onClose={()=>setEditEquationId(null)} />}
     </>
   );
 }
@@ -2046,7 +2236,9 @@ Reglas:
 
 // ─── MAIN EDITOR COMPONENT ────────────────────────────────────────────────────
 export default function PresentationEditor({ usuario, presentacionInicial, onClose, onSaved }) {
+  const bgFileRef = useRef();
   const [titulo, setTitulo] = useState(presentacionInicial?.titulo || 'Nueva presentación');
+  const [autoPlay, setAutoPlay] = useState(presentacionInicial?.autoPlay !== false);
   const [slides, setSlides] = useState(presentacionInicial?.slides || [newSlide('title', 'dark')]);
   const [activeIdx, setActiveIdx] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -2069,11 +2261,27 @@ export default function PresentationEditor({ usuario, presentacionInicial, onClo
   const [leftOpen,  setLeftOpen]  = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
   const [isMobile,  setIsMobile]  = useState(() => window.innerWidth < 640);
+  const centerRef = useRef(null);
+  const [canvasMaxW, setCanvasMaxW] = useState(800);
   useEffect(() => {
     const fn = () => setIsMobile(window.innerWidth < 640);
     window.addEventListener('resize', fn);
     return () => window.removeEventListener('resize', fn);
   }, []);
+  useEffect(() => {
+    const el = centerRef.current; if (!el) return;
+    const compute = () => {
+      const { width, height } = el.getBoundingClientRect();
+      // ~195px: two toolbars (88px) + slide controls (36px) + gaps/padding (71px)
+      const availH = height - 195;
+      const wFromH = availH > 100 ? Math.floor(availH * 16 / 9) : 800;
+      setCanvasMaxW(Math.min(wFromH, width - (isMobile ? 16 : 48)));
+    };
+    compute();
+    const ro = new ResizeObserver(compute);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [isMobile]);
 
   const activeSlide = slides[activeIdx] || slides[0];
 
@@ -2085,6 +2293,13 @@ export default function PresentationEditor({ usuario, presentacionInicial, onClo
   const updateSlide = useCallback((updated) => {
     setSlides(prev => prev.map((s, i) => i === activeIdx ? updated : s));
   }, [activeIdx]);
+
+  const handleBgImageUpload = (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => updateSlide({ ...slides[activeIdx], bgImage: ev.target.result });
+    reader.readAsDataURL(file); e.target.value = '';
+  };
 
   const addSlide = (layout = 'content') => {
     const s = newSlide(layout, activeSlide?.theme || 'dark');
@@ -2113,7 +2328,7 @@ export default function PresentationEditor({ usuario, presentacionInicial, onClo
     if (!usuario) return;
     setSaving(true);
     try {
-      const data = { titulo, slides, uid: usuario.uid, profesorNombre: usuario.displayName || '', updatedAt: serverTimestamp() };
+      const data = { titulo, slides, autoPlay, uid: usuario.uid, profesorNombre: usuario.displayName || '', updatedAt: serverTimestamp() };
       if (presId) {
         await updateDoc(doc(db, 'presentations', presId), data);
       } else {
@@ -2150,7 +2365,7 @@ export default function PresentationEditor({ usuario, presentacionInicial, onClo
     if (!id) {
       setSaving(true);
       try {
-        const data = { titulo, slides, uid: usuario.uid, profesorNombre: usuario.displayName || '', updatedAt: serverTimestamp(), createdAt: serverTimestamp() };
+        const data = { titulo, slides, autoPlay, uid: usuario.uid, profesorNombre: usuario.displayName || '', updatedAt: serverTimestamp(), createdAt: serverTimestamp() };
         const ref = await addDoc(collection(db, 'presentations'), data);
         id = ref.id;
         setPresId(id);
@@ -2242,7 +2457,9 @@ export default function PresentationEditor({ usuario, presentacionInicial, onClo
           </div>
           <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px 8px' }}>
             {slides.map((s, i) => (
-              <SlideThumb key={s.id} slide={s} index={i} isActive={i === activeIdx} onClick={() => setActiveIdx(i)} onDelete={() => deleteSlide(i)} />
+              <SlideThumb key={s.id} slide={s} index={i} isActive={i === activeIdx} total={slides.length}
+                onClick={() => setActiveIdx(i)} onDelete={() => deleteSlide(i)}
+                onMoveUp={() => moveSlide(i, i - 1)} onMoveDown={() => moveSlide(i, i + 1)} />
             ))}
           </div>
           <div style={{ padding: 8, borderTop: '1px solid #374151' }}>
@@ -2251,7 +2468,7 @@ export default function PresentationEditor({ usuario, presentacionInicial, onClo
         </div>
 
         {/* CENTER: CANVAS */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '8px 10px 16px' : 24, background: '#0f172a', overflow: 'auto', gap: 16 }}>
+        <div ref={centerRef} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '8px 10px 16px' : 24, background: '#0f172a', overflow: 'auto', gap: 16 }}>
 
           {/* Mobile panel toggles */}
           {isMobile && (
@@ -2267,7 +2484,7 @@ export default function PresentationEditor({ usuario, presentacionInicial, onClo
             </div>
           )}
 
-          <div style={{ width: '100%', maxWidth: 760 }}>
+          <div style={{ width: '100%', maxWidth: canvasMaxW }}>
             {activeSlide && <SlideCanvas key={activeSlide.id} slide={activeSlide} onChange={updateSlide} usuario={usuario} onElementSelected={setSelectedFreeElId} />}
           </div>
           {/* Slide controls */}
@@ -2384,11 +2601,45 @@ export default function PresentationEditor({ usuario, presentacionInicial, onClo
                     Aplicar a todas
                   </button>
                 </div>
+
+                {/* Background image */}
+                <div style={{ marginTop: 16 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Imagen de fondo</div>
+                  <input ref={bgFileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleBgImageUpload} />
+                  {activeSlide?.bgImage ? (
+                    <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', marginBottom: 8 }}>
+                      <img src={activeSlide.bgImage} alt="" style={{ width: '100%', height: 80, objectFit: 'cover', display: 'block' }} />
+                      <button onClick={() => updateSlide({ ...activeSlide, bgImage: null })}
+                        style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(239,68,68,0.85)', color: '#fff', border: 'none', borderRadius: 6, padding: '2px 8px', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
+                        ✕ Quitar
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 6 }}>Sin imagen de fondo</div>
+                  )}
+                  <button onClick={() => bgFileRef.current?.click()}
+                    style={{ width: '100%', background: '#374151', color: '#e5e7eb', border: '1px dashed #4b5563', borderRadius: 8, padding: '8px 0', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+                    🖼️ Elegir imagen de fondo
+                  </button>
+                </div>
               </div>
             )}
 
             {rightTab === 'settings' && (
               <div>
+                {/* Auto-play toggle */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Reproducción</div>
+                  <button onClick={() => setAutoPlay(v => !v)}
+                    style={{ width: '100%', background: autoPlay ? 'rgba(108,99,255,0.2)' : '#374151', color: autoPlay ? '#a78bfa' : '#9ca3af', border: `1px solid ${autoPlay ? 'rgba(108,99,255,0.4)' : '#4b5563'}`, borderRadius: 8, padding: '8px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 16 }}>{autoPlay ? '▶' : '⏸'}</span>
+                    {autoPlay ? 'Auto-play activado' : 'Auto-play desactivado'}
+                  </button>
+                  <div style={{ fontSize: 10, color: '#6b7280', marginTop: 4 }}>
+                    {autoPlay ? 'Las diapositivas avanzan solas.' : 'Avance manual con las flechas.'}
+                  </div>
+                </div>
+
                 <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Duración de diapositiva</div>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
                   {[3000, 4000, 5000, 7000, 10000].map(d => (

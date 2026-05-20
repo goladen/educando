@@ -49,13 +49,21 @@ function geminiDevPlugin() {
 // https://vite.dev/config/
 export default defineConfig({
   build: {
-    chunkSizeWarningLimit: 3000,
+    chunkSizeWarningLimit: 4000,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-three': ['three'],
-          'vendor-react': ['react', 'react-dom'],
-          'vendor-firebase': ['firebase/app', 'firebase/firestore', 'firebase/auth', 'firebase/storage'],
+        manualChunks(id) {
+          if (id.includes('/node_modules/three'))    return 'vendor-three';
+          if (id.includes('/node_modules/react-dom') || id.includes('/node_modules/react/')) return 'vendor-react';
+          if (id.includes('/node_modules/firebase')) return 'vendor-firebase';
+          // Juegos en vivo (pesados)
+          if (id.includes('ThinkHootGame') || id.includes('MathLive') || id.includes('OlympicLive')) return 'games-live';
+          // Juegos de plataformas / runner
+          if (id.includes('PikatronRun') || id.includes('Plataformas')) return 'games-platform';
+          // Juegos de geometría / matemáticas
+          if (id.includes('Geometrix') || id.includes('Ecuaciones')) return 'games-math';
+          // Juegos varios
+          if (id.includes('OmninteractiveApp') || id.includes('VideoQuizzApp') || id.includes('CazaBurbujasGame') || id.includes('RuletaGame')) return 'games-misc';
         },
       },
     },
@@ -83,16 +91,9 @@ export default defineConfig({
         // Excluir rutas Unity del navigate fallback — sin esto el SW sirve
         // el index.html de React dentro del iframe de Unity
         navigateFallbackDenylist: [/^\/api/, /^\/kartinged/, /^\/kartingedmulti/, /^\/racing3d/, /^\/pikt-viewer\.html/],
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
         skipWaiting: true,
         clientsClaim: true,
-        // No cachear audio (Range requests)
-        runtimeCaching: [
-          {
-            urlPattern: /\.(?:mp3|mp4|ogg|wav)$/i,
-            handler: 'NetworkOnly',
-          },
-        ],
       },
     }),
   ],

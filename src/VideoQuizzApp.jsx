@@ -12,8 +12,9 @@ import piNeutral from './assets/Pi-neutro.png';
 import correctSoundFile from './assets/correct-choice-43861.mp3';
 import wrongSoundFile   from './assets/wrong.mp3';
 
-const audioCorrect = new Audio(correctSoundFile);
-const audioWrong   = new Audio(wrongSoundFile);
+const _mkAudio = src => { let a; return { get currentTime(){ return a?.currentTime??0; }, set currentTime(v){ (a??=new Audio(src)).currentTime=v; }, play(){ return (a??=new Audio(src)).play(); } }; };
+const audioCorrect = _mkAudio(correctSoundFile);
+const audioWrong   = _mkAudio(wrongSoundFile);
 const playAudio = (a) => { try { a.currentTime = 0; a.play().catch(() => {}); } catch {} };
 
 // ─── helpers ──────────────────────────────────────────────────────────────────

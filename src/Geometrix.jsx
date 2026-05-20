@@ -16,10 +16,11 @@ import piHappy from './assets/Pi-contento.png';
 import piAngry from './assets/Pi-enfadado.png';
 import piNeutral from './assets/Pi-neutro.png';
 
-const audioCorrect = new Audio(correctSoundFile);
-const audioWrong = new Audio(wrongSoundFile);
-const audioWin = new Audio(winSoundFile);
-const audioStart = new Audio(startSoundFile);
+const _mkAudio = src => { let a; return { get currentTime(){ return a?.currentTime??0; }, set currentTime(v){ (a??=new Audio(src)).currentTime=v; }, play(){ return (a??=new Audio(src)).play(); } }; };
+const audioCorrect = _mkAudio(correctSoundFile);
+const audioWrong   = _mkAudio(wrongSoundFile);
+const audioWin     = _mkAudio(winSoundFile);
+const audioStart   = _mkAudio(startSoundFile);
 
 const safePlay = (audioObj) => {
     audioObj.currentTime = 0;

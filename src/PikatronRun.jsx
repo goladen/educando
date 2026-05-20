@@ -26,13 +26,13 @@ import looseLifeSoundFile from './assets/wrong.mp3';
 import gameOverSoundFile from './assets/gameover.mp3';
 import respCorrecta from './assets/sonidorespcorrecta.mp3';
 import monedaIncorrecta from './assets/sonidomonedamal.mp3';
-// Pre-carga de audios
-const audioJump = new Audio(jumpSoundFile);
-const audioCorrect = new Audio(correctSoundFile);
-const audioLoseLife = new Audio(looseLifeSoundFile);
-const audioGameOver = new Audio(gameOverSoundFile);
-const audioRespCorrecta = new Audio(respCorrecta);
-const audioMonedaIncorrecta = new Audio(monedaIncorrecta);
+const _mkAudio = src => { let a; return { get currentTime(){ return a?.currentTime??0; }, set currentTime(v){ (a??=new Audio(src)).currentTime=v; }, play(){ return (a??=new Audio(src)).play(); } }; };
+const audioJump             = _mkAudio(jumpSoundFile);
+const audioCorrect          = _mkAudio(correctSoundFile);
+const audioLoseLife         = _mkAudio(looseLifeSoundFile);
+const audioGameOver         = _mkAudio(gameOverSoundFile);
+const audioRespCorrecta     = _mkAudio(respCorrecta);
+const audioMonedaIncorrecta = _mkAudio(monedaIncorrecta);
 
 
 const playSound = (type) => {

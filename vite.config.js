@@ -54,14 +54,14 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.includes('/node_modules/three'))    return 'vendor-three';
-          if (id.includes('/node_modules/react-dom') || id.includes('/node_modules/react/')) return 'vendor-react';
+          if (id.includes('/node_modules/react-dom') || id.includes('/node_modules/react/') ||
+              id.includes('/node_modules/react-confetti') || id.includes('/node_modules/canvas-confetti') ||
+              id.includes('/node_modules/tween-functions')) return 'vendor-react';
           if (id.includes('/node_modules/firebase')) return 'vendor-firebase';
           if (id.includes('/node_modules/react-live') || id.includes('/node_modules/prism-react-renderer') || id.includes('/node_modules/@uiw')) return 'vendor-react-live';
           // lucide-react — usado por todos los chunks de juegos, vendor propio para
           // evitar que quede embebido en games-live y genere dep circular.
           if (id.includes('/node_modules/lucide-react')) return 'vendor-icons';
-          // Librerías de confetti — compartidas por games-live y games-misc.
-          if (id.includes('/node_modules/canvas-confetti') || id.includes('/node_modules/react-confetti')) return 'vendor-misc';
           // MotoMiniJuego importa CazaBurbujasGame (games-misc) → incluirlo en
           // games-misc rompe la dependencia circular games-live ↔ games-misc.
           if (id.includes('MotoMiniJuego')) return 'games-misc';

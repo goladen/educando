@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+﻿import { useState, useEffect, lazy, Suspense } from 'react';
 import { db } from './firebase';
 import { collection, query, where, getDocs, deleteDoc, doc, addDoc, updateDoc, getDoc, setDoc, orderBy } from 'firebase/firestore';
 import { Trash2, Plus, FileSpreadsheet, Bot, BarChart2, Save, X, Pencil, Key, Gamepad2, Edit3, Globe, Search, Copy, Eye, Users, RotateCcw, Send, Zap, UserCircle, LogOut, Menu, Shield, Info, FileText, Calculator, Medal, Crosshair } from 'lucide-react';
@@ -14,7 +14,7 @@ import UserProfile from './components/UserProfile';
 import LandingGames from './components/LandingGames3';
 import GlobalSearch from './components/GlobalSearch';
 import TeacherTools from './components/TeacherTools';
-import MiniAppAdmin from './components/MiniAppAdmin';
+const MiniAppAdmin = lazy(() => import('./components/MiniAppAdmin'));
 import EditorMathLive from './components/EditorMathLive';
 import MathLive from './MathLive';
 import OlympicLive from './OlympicLive';
@@ -1647,7 +1647,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             {/* ── Panel admin mini-apps (solo goladen@gmail.com) ──────────── */}
             {usuario?.email === 'goladen@gmail.com' && (
                 <div style={{ marginTop: 32, borderTop: '2px dashed #e2e8f0', paddingTop: 24 }}>
-                    <MiniAppAdmin usuario={usuario} />
+                    <Suspense fallback={null}><MiniAppAdmin usuario={usuario} /></Suspense>
                 </div>
             )}
         </div>

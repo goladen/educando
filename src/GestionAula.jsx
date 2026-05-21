@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import {
@@ -11,7 +11,7 @@ import {
 import Confetti from 'react-confetti';
 import GeografiaPanel from './components/GeografiaPanel';
 import MusicStaffPanel from './components/MusicStaffPanel';
-import MiniAppCreator from './components/MiniAppCreator';
+const MiniAppCreator = lazy(() => import('./components/MiniAppCreator'));
 import { db } from './firebase';
 import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 
@@ -3420,7 +3420,7 @@ export default function HerramientasClase({ onExit, initialTool }) {
                     {activa === 'pizarra'  && <PizarraApp />}
                     {activa === 'grupos'   && <GruposLibre />}
                     {activa === 'plano'    && <PlanoAulaLibre />}
-                    {activa === 'miniapp'  && <MiniAppCreator onAbrirViewer={(id) => window.open(`/?miniapp=${id}`, '_blank')} />}
+                    {activa === 'miniapp'  && <Suspense fallback={<div style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Cargando…</div>}><MiniAppCreator onAbrirViewer={(id) => window.open(`/?miniapp=${id}`, '_blank')} /></Suspense>}
                 </div>
             )}
 

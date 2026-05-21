@@ -55,6 +55,92 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f4ff; color: #
 .info-box { background: #f8f7ff; border-radius: 8px; padding: 12px; font-size: 0.88em; }
 footer { text-align: center; padding: 20px; font-size: 0.85em; color: #999; }
 @media (max-width: 600px) { .hero h1 { font-size: 1.8em; } .app-grid { grid-template-columns: 1fr; } .info-grid { grid-template-columns: 1fr; } }
+
+/* ─── BOTÓN PDF ─────────────────────────────────────────────────────────── */
+.pdf-btn {
+  position: fixed;
+  bottom: 28px; right: 24px;
+  z-index: 9999;
+  background: linear-gradient(135deg, #6c63ff 0%, #a855f7 100%);
+  color: white;
+  border: none;
+  border-radius: 50px;
+  padding: 13px 20px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(108,99,255,0.45);
+  display: flex; align-items: center; gap: 8px;
+  transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+  text-decoration: none;
+}
+.pdf-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(108,99,255,0.55); }
+.pdf-btn:active { transform: scale(0.96); }
+.pdf-btn-icon { font-size: 1.05rem; }
+@media (max-width: 480px) {
+  .pdf-btn { bottom: 18px; right: 14px; padding: 11px 16px; font-size: 0.82rem; }
+  .pdf-btn-label { display: none; }
+  .pdf-btn-icon { font-size: 1.3rem; }
+}
+
+/* ─── ESTILOS DE IMPRESIÓN / PDF ────────────────────────────────────────── */
+@media print {
+  /* Ocultar elementos interactivos y decorativos */
+  .pdf-btn, .demo-wrap, .skip-btn { display: none !important; }
+
+  /* Fondo limpio */
+  body { background: white; font-size: 11pt; }
+
+  /* Hero simplificado */
+  .hero {
+    background: #6c63ff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    color: white !important;
+    padding: 30px 20px;
+    text-align: center;
+    page-break-after: avoid;
+  }
+  .hero .link-btn { display: none; }
+
+  /* Contenedor */
+  .container { padding: 15px 20px; }
+
+  /* Secciones: sin sombra, borde sutil, evitar corte en medio */
+  .section {
+    box-shadow: none !important;
+    border: 1px solid #e0e4f0;
+    border-radius: 8px;
+    page-break-inside: avoid;
+    margin-bottom: 16px;
+    padding: 18px;
+  }
+
+  /* Tarjetas y grids */
+  .app-card  { page-break-inside: avoid; box-shadow: none; }
+  .app-grid  { grid-template-columns: repeat(2, 1fr) !important; gap: 10px; }
+  .info-grid { grid-template-columns: 1fr 1fr !important; }
+
+  /* Colores de fondo en tags y badges — preservar en PDF */
+  .tag, .new-badge, .s4-badge, .s5-nota, .alert, .info-box,
+  .method-card, .steps li, .btn-item {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Steps: evitar corte */
+  .steps li { page-break-inside: avoid; }
+
+  /* Quitar hover/transform */
+  .app-card:hover { transform: none; }
+
+  /* Footer */
+  footer { margin-top: 20px; border-top: 1px solid #eee; padding-top: 14px; }
+
+  /* Saltos de página antes de secciones largas */
+  #s9, #s12, #s13 { page-break-before: auto; }
+}
 </style>
 </head>
 <body>
@@ -62,7 +148,10 @@ footer { text-align: center; padding: 20px; font-size: 0.85em; color: #999; }
 <div class="hero">
   <h1>🎮 Guía PiKT.es</h1>
   <p>Todo lo que necesitas saber sobre las aplicaciones y cómo crear tus propios recursos</p>
-  <a href="https://www.pikt.es" target="_blank" class="link-btn" style="background:white;color:#6c63ff;margin-top:15px;">Ir a PiKT.es →</a>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:15px;">
+    <a href="https://www.pikt.es" target="_blank" class="link-btn" style="background:white;color:#6c63ff;">Ir a PiKT.es →</a>
+    <button onclick="window.print()" class="link-btn" style="background:rgba(255,255,255,0.15);border:2px solid rgba(255,255,255,0.6);cursor:pointer;font-family:inherit;">📥 Descargar PDF</button>
+  </div>
 </div>
 
 <!-- DEMO ANIMADA -->
@@ -647,6 +736,12 @@ footer { text-align: center; padding: 20px; font-size: 0.85em; color: #999; }
 <footer>
   <p>Guía elaborada para facilitar el uso de <a href="https://www.pikt.es" target="_blank">PiKT.es</a> · Creado por Gonzalo Larrocha · Licencia CC BY-NC-ND 4.0</p>
 </footer>
+
+<!-- BOTÓN DESCARGA PDF -->
+<button class="pdf-btn" onclick="window.print()" title="Descargar guía completa en PDF">
+  <span class="pdf-btn-icon">📥</span>
+  <span class="pdf-btn-label">Descargar PDF</span>
+</button>
 
 </body>
 </html>

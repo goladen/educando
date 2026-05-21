@@ -57,6 +57,21 @@ export default defineConfig({
           if (id.includes('/node_modules/react-dom') || id.includes('/node_modules/react/')) return 'vendor-react';
           if (id.includes('/node_modules/firebase')) return 'vendor-firebase';
           if (id.includes('/node_modules/react-live') || id.includes('/node_modules/prism-react-renderer') || id.includes('/node_modules/@uiw')) return 'vendor-react-live';
+          // lucide-react — usado por todos los chunks de juegos, vendor propio para
+          // evitar que quede embebido en games-live y genere dep circular.
+          if (id.includes('/node_modules/lucide-react')) return 'vendor-icons';
+          // Librerías de confetti — compartidas por games-live y games-misc.
+          if (id.includes('/node_modules/canvas-confetti') || id.includes('/node_modules/react-confetti')) return 'vendor-misc';
+          // MotoMiniJuego importa CazaBurbujasGame (games-misc) → incluirlo en
+          // games-misc rompe la dependencia circular games-live ↔ games-misc.
+          if (id.includes('MotoMiniJuego')) return 'games-misc';
+          // firebase.js local — usado por todos los chunks de juegos.
+          // Ponerlo en shared-core evita que games-live lo absorba y cree dep circular.
+          if ((id.includes('src/firebase') || id.includes('src\\firebase')) && !id.includes('node_modules')) return 'shared-core';
+          // Assets compartidos (audio, imágenes Pi) — usados tanto por games-live
+          // como por games-misc. Ponerlos en shared-assets evita que games-live los
+          // absorba y genere una dependencia circular con games-misc.
+          if (id.match(/[/\\]assets[/\\].*\.(mp3|ogg|wav|png|jpg|jpeg|gif|svg|webp)$/i)) return 'shared-assets';
           // Juegos en vivo (pesados)
           if (id.includes('ThinkHootGame') || id.includes('MathLive') || id.includes('OlympicLive')) return 'games-live';
           // Juegos de plataformas / runner

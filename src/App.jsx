@@ -14,6 +14,7 @@ import PiTutorial from './components/PiTutorial';
 import Retos from './Retos';
 import AnnotationOverlay from './components/AnnotationOverlay';
 import HerramientasClase from './GestionAula';
+import MiniAppViewer from './components/MiniAppViewer';
 
 const TUTORIAL_ALUMNO = [
     {
@@ -41,6 +42,7 @@ function App() {
     const [temas, setTemas] = useState("");
     // DETECTAR PÁGINA PÚBLICA DE PROFESOR — por slug (/nombre) o por ?p=uid
     const [paginaTarget, setPaginaTarget] = useState(null); // { uid } | { slug }
+    const [miniappId,    setMiniappId]    = useState(null);
 
     // ANNOTATION OVERLAY + PIZARRA DESDE CAPTURA
     const [annotationOpen,   setAnnotationOpen]   = useState(false);
@@ -68,6 +70,8 @@ function App() {
 
     useEffect(() => {
       const params = new URLSearchParams(window.location.search);
+      const mid = params.get('miniapp');
+      if (mid) { setMiniappId(mid); return; }
       const uid = params.get('p');
       if (uid) { setPaginaTarget({ uid }); return; }
       const slug = window.location.pathname.replace(/^\//, '').replace(/\/$/, '').trim().toLowerCase();
@@ -223,6 +227,9 @@ function App() {
     if (rutaPublica === 'retos') return <><Retos onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'conectapuntos') return <><Retos initialGame="CONECTA" onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'sudoku') return <><Retos initialGame="SUDOKU" onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
+
+    // Mini-app pública (no requiere login)
+    if (miniappId) return <MiniAppViewer miniappId={miniappId} onBack={() => { setMiniappId(null); window.history.pushState({}, '', '/'); }} />;
 
     // PÁGINA PÚBLICA DEL PROFESOR (no requiere login)
     if (paginaTarget) return <><PaginaProfesor uid={paginaTarget.uid} onBack={() => { setPaginaTarget(null); window.history.back(); }} />{anotadorUI}</>;

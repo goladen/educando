@@ -12,8 +12,9 @@ import EditorPro from './components/EditorPro';
 import RuletaGame from './RuletaGame';
 import UserProfile from './components/UserProfile';
 import LandingGames from './components/LandingGames3';
-import GlobalSearch from './components/GlobalSearch'; // <--- NUEVO
-import TeacherTools from './components/TeacherTools'; // <--- NUEVO
+import GlobalSearch from './components/GlobalSearch';
+import TeacherTools from './components/TeacherTools';
+import MiniAppAdmin from './components/MiniAppAdmin';
 import EditorMathLive from './components/EditorMathLive';
 import MathLive from './MathLive';
 import OlympicLive from './OlympicLive';
@@ -1642,6 +1643,13 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
 
 
             <input type="file" id="input-excel-oculto" accept=".xlsx" style={{ display: 'none' }} onChange={handleFileUpload} />
+
+            {/* ── Panel admin mini-apps (solo goladen@gmail.com) ──────────── */}
+            {usuario?.email === 'goladen@gmail.com' && (
+                <div style={{ marginTop: 32, borderTop: '2px dashed #e2e8f0', paddingTop: 24 }}>
+                    <MiniAppAdmin usuario={usuario} />
+                </div>
+            )}
         </div>
     );
 }

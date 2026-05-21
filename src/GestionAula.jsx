@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import Confetti from 'react-confetti';
 import GeografiaPanel from './components/GeografiaPanel';
+import MusicStaffPanel from './components/MusicStaffPanel';
+import MiniAppCreator from './components/MiniAppCreator';
 import { db } from './firebase';
 import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 
@@ -542,6 +544,21 @@ const MUSIC_REST_IDS  = ['s_redonda','s_blanca','s_negra','s_corchea'];
 const MUSIC_ACC_IDS   = ['sharp','flat','natural'];
 const ALL_MUSIC_TOOLS = [...MUSIC_NOTE_IDS, ...MUSIC_REST_IDS, ...MUSIC_ACC_IDS, 'staff','staff_fa'];
 
+const _TREBLE_MIDI_GA = [84,83,81,79,77,76,74,72,71,69,67,65,64,62,60,59,57,55,53,52,50,48,47];
+const _BASS_MIDI_GA   = [62,60,59,57,55,53,52,50,48,47,45,43,41,40,38];
+const NOTE_BEATS_GA   = { redonda:4, blanca:2, negra:1, corchea:0.5, semicorchea:0.25, fusa:0.125, s_redonda:4, s_blanca:2, s_negra:1, s_corchea:0.5 };
+const _yToMidiGA = (noteY, staffItem) => {
+    if (!staffItem) return 60;
+    const half = (staffItem.ls || STAFF_LS) / 2;
+    const step = Math.round((noteY - staffItem.y) / half);
+    if (staffItem.clef === 'fa') return _BASS_MIDI_GA[Math.max(0, Math.min(step + 3, _BASS_MIDI_GA.length - 1))];
+    return _TREBLE_MIDI_GA[Math.max(0, Math.min(step + 4, _TREBLE_MIDI_GA.length - 1))];
+};
+const _midiToNameGA = (midi) => {
+    const n = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+    return `${n[midi % 12]}${Math.floor(midi / 12) - 1}`;
+};
+
 const drawStaff = (ctx, item) => {
     const ls = item.ls || STAFF_LS;
     ctx.save();
@@ -819,6 +836,14 @@ function PizarraApp() {
     const [escuchando,       setEscuchando]       = useState(false);
     const recognitionRef = useRef(null);
 
+    // ── Music staff with sound ────────────────────────────────────────────────
+    const [showMusicStaff,  setShowMusicStaff]  = useState(false);
+    const [musicPlayingId,  setMusicPlayingId]  = useState(null);
+    const musicPlayHitRef = useRef([]);
+    const sfAcRef         = useRef(null);
+    const sfPianoRef      = useRef(null);
+    const sfStopRef       = useRef(false);
+
     // ── Pizarra compartida ───────────────────────────────────────────────────
     const [compartirModal,       setCompartirModal]       = useState(false);
     const [modoCompartir,        setModoCompartir]        = useState(null);   // 'ver' | 'editar' | null
@@ -1011,6 +1036,52 @@ function PizarraApp() {
     const tagElem = (elem) => {
         if (modoRef.current !== 'editar' || !miIdRef.current) return elem;
         return { ...elem, autorId: miIdRef.current, autorColor: miColorRef.current };
+    };
+
+    // ── Music staff with sound ────────────────────────────────────────────────
+    const _loadSfPiano = async () => {
+        if (sfPianoRef.current) return sfPianoRef.current;
+        if (!sfAcRef.current) sfAcRef.current = new (window.AudioContext || window.webkitAudioContext)();
+        const Soundfont = (await import('soundfont-player')).default;
+        sfPianoRef.current = await Soundfont.instrument(sfAcRef.current, 'acoustic_grand_piano', { soundfont: 'MusyngKite' });
+        return sfPianoRef.current;
+    };
+
+    const stopSfMusic = () => { sfStopRef.current = true; setMusicPlayingId(null); };
+
+    const playSfMusic = async (id, items, bpm) => {
+        stopSfMusic();
+        await new Promise(r => setTimeout(r, 60));
+        sfStopRef.current = false;
+        setMusicPlayingId(id);
+        try {
+            const piano = await _loadSfPiano();
+            const staffItem = items.find(i => i.t === 'staff');
+            const notes = items.filter(i => i.t === 'note' || i.t === 'rest').sort((a, b) => a.x - b.x);
+            if (!notes.length) { setMusicPlayingId(null); return; }
+            const secPerBeat = 60 / (bpm || 90);
+            for (const note of notes) {
+                if (sfStopRef.current) break;
+                const beats = NOTE_BEATS_GA[note.figura] || 1;
+                const dur = beats * secPerBeat;
+                if (note.t === 'note' && staffItem) {
+                    const midi = _yToMidiGA(note.y, staffItem);
+                    piano.play(_midiToNameGA(midi), sfAcRef.current.currentTime, { duration: dur * 0.9 });
+                }
+                await new Promise(r => setTimeout(r, dur * 1000));
+            }
+        } finally {
+            if (!sfStopRef.current) setMusicPlayingId(null);
+        }
+    };
+
+    const handleInsertMusicStaff = ({ imageData, items, bpm }) => {
+        const id = Date.now();
+        const img = new Image();
+        img.src = imageData;
+        imageCacheRef.current[id] = img;
+        setElementos(prev => [...prev, tagElem({ t: 'music_staff', id, src: imageData, items, bpm, x: 40, y: 60, w: 600, h: 160 })]);
+        setShowMusicStaff(false);
     };
 
     // ── Voice input ─────────────────────────────────────────────────────────
@@ -1438,7 +1509,7 @@ function PizarraApp() {
             const np = rotatePoint(elem.cx, elem.cy, cx, cy, angle);
             return { ...elem, cx: np.x, cy: np.y };
         }
-        if (elem.t === 'image') {
+        if (elem.t === 'image' || elem.t === 'music_staff') {
             const np = rotatePoint(elem.x + elem.w/2, elem.y + elem.h/2, cx, cy, angle);
             return { ...elem, x: np.x - elem.w/2, y: np.y - elem.h/2, rotation: (elem.rotation||0) + angle };
         }
@@ -1464,7 +1535,7 @@ function PizarraApp() {
         const mY = (py) => ny1 + (py - oy1) * scaleY;
         if (elem.t === 'draw') return { ...elem, pts: elem.pts.map(p => ({ x: mX(p.x), y: mY(p.y) })) };
         if (elem.t === 'graph' || elem.t === 'axes') return { ...elem, cx: mX(elem.cx), cy: mY(elem.cy) };
-        if (elem.t === 'image') return { ...elem, x: mX(elem.x), y: mY(elem.y), w: elem.w * scaleX, h: elem.h * scaleY };
+        if (elem.t === 'image' || elem.t === 'music_staff') return { ...elem, x: mX(elem.x), y: mY(elem.y), w: elem.w * scaleX, h: elem.h * scaleY };
         if (elem.t === 'text') return { ...elem, x: mX(elem.x), y: mY(elem.y) };
         if (elem.t === 'staff') return { ...elem, x: mX(elem.x), y: mY(elem.y), w: elem.w * scaleX };
         if (elem.t === 'note' || elem.t === 'rest' || elem.t === 'acc') return { ...elem, x: mX(elem.x), y: mY(elem.y) };
@@ -1480,7 +1551,7 @@ function PizarraApp() {
         }
         if (item.t === 'text') { const fs = item.fontSize||24; return { x1: item.x, y1: item.y - fs, x2: item.x + Math.max((item.txt||'').length * fs * 0.6, 60), y2: item.y + 4 }; }
         if (item.t === 'graph' || item.t === 'axes') return { x1: item.cx - 265, y1: item.cy - 265, x2: item.cx + 265, y2: item.cy + 265 };
-        if (item.t === 'image') return { x1: item.x, y1: item.y, x2: item.x + item.w, y2: item.y + item.h };
+        if (item.t === 'image' || item.t === 'music_staff') return { x1: item.x, y1: item.y, x2: item.x + item.w, y2: item.y + item.h };
         if (item.t === 'staff') { const ls = item.ls||STAFF_LS; return { x1: item.x, y1: item.y - ls, x2: item.x + item.w, y2: item.y + ls*5 }; }
         if (item.t === 'note' || item.t === 'rest') { const ls = item.ls||STAFF_LS; return { x1: item.x - ls*2, y1: item.y - ls*5, x2: item.x + ls*3, y2: item.y + ls*5 }; }
         if (item.t === 'acc')   { const ls = item.ls||STAFF_LS; return { x1: item.x - ls, y1: item.y - ls, x2: item.x + ls, y2: item.y + ls }; }
@@ -1496,7 +1567,7 @@ function PizarraApp() {
             if (item.t === 'draw') return { ...item, pts: item.pts.map(p => ({ x: p.x + dx, y: p.y + dy })) };
             if (item.t === 'text') return { ...item, x: item.x + dx, y: item.y + dy };
             if (item.t === 'graph' || item.t === 'axes') return { ...item, cx: item.cx + dx, cy: item.cy + dy };
-            if (item.t === 'image') return { ...item, x: item.x + dx, y: item.y + dy };
+            if (item.t === 'image' || item.t === 'music_staff') return { ...item, x: item.x + dx, y: item.y + dy };
             if (item.t === 'staff' || item.t === 'note' || item.t === 'rest' || item.t === 'acc')
                 return { ...item, x: item.x + dx, y: item.y + dy };
             return { ...item, x1: item.x1 + dx, y1: item.y1 + dy, x2: item.x2 + dx, y2: item.y2 + dy };
@@ -1536,6 +1607,23 @@ function PizarraApp() {
                     ctx.drawImage(img, -item.w/2, -item.h/2, item.w, item.h); ctx.restore();
                 } else { ctx.drawImage(img, item.x, item.y, item.w, item.h); }
             } else { ctx.save(); ctx.strokeStyle = '#bdc3c7'; ctx.lineWidth = 1; ctx.strokeRect(item.x, item.y, item.w, item.h); ctx.restore(); }
+        } else if (item.t === 'music_staff') {
+            const img = getOrLoadImg(item);
+            if (img) {
+                ctx.drawImage(img, item.x, item.y, item.w, item.h);
+            } else {
+                ctx.save(); ctx.strokeStyle = '#bdc3c7'; ctx.lineWidth = 1; ctx.strokeRect(item.x, item.y, item.w, item.h); ctx.restore();
+            }
+            // ▶ / ⏹ play badge
+            const isPlaying = musicPlayingId === item.id;
+            const bx = item.x + item.w - 34, by = item.y + item.h - 34, br = 14;
+            ctx.save();
+            ctx.fillStyle = isPlaying ? 'rgba(239,68,68,0.85)' : 'rgba(0,0,0,0.65)';
+            ctx.beginPath(); ctx.arc(bx + br, by + br, br, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#fff'; ctx.font = 'bold 13px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(isPlaying ? '⏹' : '▶', bx + br, by + br + 1);
+            ctx.restore();
+            musicPlayHitRef.current.push({ id: item.id, items: item.items, bpm: item.bpm, x: bx, y: by, w: br * 2, h: br * 2 });
         } else if (item.t === 'staff') {
             drawStaff(ctx, item);
         } else if (item.t === 'note') {
@@ -1575,6 +1663,7 @@ function PizarraApp() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+        musicPlayHitRef.current = [];
         ctx.save();
         ctx.translate(panRef.current.x, panRef.current.y);
         elementos.forEach((item, idx) => dibujarItem(ctx, item, selIdxs.includes(idx)));
@@ -1777,6 +1866,14 @@ function PizarraApp() {
         const { x, y, rawX, rawY } = pos;
         // En modo colaborativo, el color de trazo es el color del participante
         const drawColor = modoCompartir === 'editar' ? miColorRef.current || color : color;
+
+        // ── Music staff play button ───────────────────────────────────────────
+        for (const h of musicPlayHitRef.current) {
+            if (x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) {
+                if (musicPlayingId === h.id) { stopSfMusic(); } else { playSfMusic(h.id, h.items, h.bpm); }
+                return;
+            }
+        }
 
         if (herramienta === 'text') {
             if (textoInput.trim()) {
@@ -2152,6 +2249,15 @@ function PizarraApp() {
                                 icon={<span style={{fontSize:'1.2rem',lineHeight:1}}>{a.sym}</span>} />
                         ))}
                     </div>
+                    {/* Con sonido */}
+                    <div style={{ display:'flex', gap:3, alignItems:'center', paddingLeft:4 }}>
+                        <button
+                            onClick={() => setShowMusicStaff(true)}
+                            style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 10px', background:'linear-gradient(135deg,#6c63ff,#3b82f6)', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700, fontSize:'0.8rem', whiteSpace:'nowrap', boxShadow:'0 2px 6px rgba(108,99,255,0.4)' }}
+                            title="Crear pentagrama con sonido">
+                            🎵 Con sonido
+                        </button>
+                    </div>
                 </>}
 
                 {/* ── GEO MODE ── */}
@@ -2495,6 +2601,7 @@ function PizarraApp() {
             {/* Floating panels */}
             {calcVisible && <CalculadoraFlotante onClose={() => setCalcVisible(false)} onCopiar={res => { setTextoPegar(res); setHerramienta('paste'); setCalcVisible(false); }} />}
             {grafVisible  && <GraficadoraFlotante onClose={() => setGrafVisible(false)} onInsertar={cfg => { setGraficaConfig(cfg); setHerramienta('graph'); setGrafVisible(false); }} />}
+            {showMusicStaff && <MusicStaffPanel onInsert={handleInsertMusicStaff} onClose={() => setShowMusicStaff(false)} />}
             {/* ── Buscador de imágenes Wikimedia ──────────────────────────── */}
             {imgBuscador && (
                 <div style={{ position:'absolute', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.45)', zIndex:400, display:'flex', alignItems:'center', justifyContent:'center' }}
@@ -3238,11 +3345,12 @@ export default function HerramientasClase({ onExit, initialTool }) {
     const shareBase = `${window.location.origin}${window.location.pathname}`;
 
     const HERRAMIENTAS = [
-        { id: 'ruleta',  icon: <RotateCcw size={40}/>,   titulo: 'Ruleta de Aula',     desc: 'Selecciona alumnos al azar desde una lista.',              color: '#e67e22' },
-        { id: 'pizarra', icon: <PenTool size={40}/>,     titulo: 'Pizarra Temática',  desc: 'Ciencias, Música, Geografía...',              color: '#3498db' },
-        { id: 'reloj',   icon: <Clock size={40}/>,        titulo: 'Gestor de Tiempo',   desc: 'Cronómetro y Temporizador de cuenta atrás.',               color: '#2ecc71' },
-        { id: 'grupos',  icon: <Users size={40}/>,        titulo: 'Grupos de Clase',    desc: 'Crea subgrupos aleatorios a partir de una lista de alumnos.', color: '#9b59b6' },
-        { id: 'plano',   icon: <LayoutGrid size={40}/>,   titulo: 'Plano de Clase',     desc: 'Organiza los asientos de tu aula con un plano visual.',    color: '#1565C0' },
+        { id: 'ruleta',   icon: <RotateCcw size={40}/>,   titulo: 'Ruleta de Aula',     desc: 'Selecciona alumnos al azar desde una lista.',              color: '#e67e22' },
+        { id: 'pizarra',  icon: <PenTool size={40}/>,     titulo: 'Pizarra Temática',   desc: 'Ciencias, Música, Geografía...',                          color: '#3498db' },
+        { id: 'reloj',    icon: <Clock size={40}/>,        titulo: 'Gestor de Tiempo',   desc: 'Cronómetro y Temporizador de cuenta atrás.',               color: '#2ecc71' },
+        { id: 'grupos',   icon: <Users size={40}/>,        titulo: 'Grupos de Clase',    desc: 'Crea subgrupos aleatorios a partir de una lista de alumnos.', color: '#9b59b6' },
+        { id: 'plano',    icon: <LayoutGrid size={40}/>,   titulo: 'Plano de Clase',     desc: 'Organiza los asientos de tu aula con un plano visual.',    color: '#1565C0' },
+        { id: 'miniapp',  icon: <span style={{fontSize:36}}>⚡</span>, titulo: 'App con IA', desc: 'Genera una mini-aplicación interactiva con Claude o Gemini y previsualízala al instante.', color: '#7c3aed' },
     ];
 
     return (
@@ -3307,11 +3415,12 @@ export default function HerramientasClase({ onExit, initialTool }) {
                 </div>
             ) : (
                 <div style={{ background: 'white', maxWidth: 1200, margin: '0 auto', padding: 'clamp(10px, 3vw, 30px)', borderRadius: 16, boxShadow: '0 10px 30px rgba(0,0,0,0.08)', boxSizing: 'border-box' }}>
-                    {activa === 'ruleta' && <RuletaApp />}
-                    {activa === 'reloj' && <RelojApp />}
-                    {activa === 'pizarra' && <PizarraApp />}
-                    {activa === 'grupos' && <GruposLibre />}
-                    {activa === 'plano' && <PlanoAulaLibre />}
+                    {activa === 'ruleta'   && <RuletaApp />}
+                    {activa === 'reloj'    && <RelojApp />}
+                    {activa === 'pizarra'  && <PizarraApp />}
+                    {activa === 'grupos'   && <GruposLibre />}
+                    {activa === 'plano'    && <PlanoAulaLibre />}
+                    {activa === 'miniapp'  && <MiniAppCreator onAbrirViewer={(id) => window.open(`/?miniapp=${id}`, '_blank')} />}
                 </div>
             )}
 

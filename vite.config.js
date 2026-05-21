@@ -56,6 +56,7 @@ export default defineConfig({
           if (id.includes('/node_modules/three'))    return 'vendor-three';
           if (id.includes('/node_modules/react-dom') || id.includes('/node_modules/react/')) return 'vendor-react';
           if (id.includes('/node_modules/firebase')) return 'vendor-firebase';
+          if (id.includes('/node_modules/react-live') || id.includes('/node_modules/prism-react-renderer') || id.includes('/node_modules/@uiw')) return 'vendor-react-live';
           // Juegos en vivo (pesados)
           if (id.includes('ThinkHootGame') || id.includes('MathLive') || id.includes('OlympicLive')) return 'games-live';
           // Juegos de plataformas / runner

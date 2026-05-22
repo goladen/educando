@@ -1,12 +1,13 @@
 ﻿import { useState, useEffect } from 'react';
 import { db } from './firebase';
-// Añade 'addDoc' a los imports
 import { collection, query, where, getDocs, doc, updateDoc, getDoc, addDoc } from 'firebase/firestore';
 import { Send, CheckCircle, AlertCircle, ArrowLeft, User, Info } from 'lucide-react';
 import Confetti from 'react-confetti';
+import TrivialEnvioForm from './components/TrivialEnvioForm';
 export default function QuestionSenderClient({ usuario, onBack, codigoInicial}) {
     const [codigo, setCodigo] = useState(codigoInicial || '');
-    const [fase, setFase] = useState('CODIGO'); // CODIGO, FORMULARIO, EXITO, COMPLETADO
+    const [fase, setFase] = useState('CODIGO'); // CODIGO, FORMULARIO, EXITO, COMPLETADO, TRIVIAL
+
     const [datosHoja, setDatosHoja] = useState(null); // { recursoId, hojaIndex, nombreHoja, profesor, targetGame, config }
     const [respuestas, setRespuestas] = useState([]); // Array de objetos { pregunta, respuesta, letra... }
     const [error, setError] = useState('');
@@ -33,6 +34,13 @@ export default function QuestionSenderClient({ usuario, onBack, codigoInicial}) 
             const snap = await getDocs(q);
 
             if (snap.empty) {
+                // Check if it's a Trivial submission code
+                const trivialSnap = await getDoc(doc(db, 'trivial_envio_codigos', codigo.toUpperCase().trim()));
+                if (trivialSnap.exists()) {
+                    setFase('TRIVIAL');
+                    setEnviando(false);
+                    return;
+                }
                 setEnviando(false);
                 return setError("Código no encontrado. Verifica con tu profesor.");
             }
@@ -163,6 +171,9 @@ export default function QuestionSenderClient({ usuario, onBack, codigoInicial}) 
     };
 
     // --- RENDERIZADO ---
+
+    // Redirect to Trivial submission form
+    if (fase === 'TRIVIAL') return <TrivialEnvioForm codigoInicial={codigo} onBack={onBack} />;
 
     if (fase === 'CODIGO') return (
         <div style={estiloContenedor}>

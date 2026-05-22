@@ -15,6 +15,7 @@ import Retos from './Retos';
 import AnnotationOverlay from './components/AnnotationOverlay';
 import HerramientasClase from './GestionAula';
 import MiniAppViewer from './components/MiniAppViewer';
+import TrivialEnvioForm from './components/TrivialEnvioForm';
 
 const TUTORIAL_ALUMNO = [
     {
@@ -41,8 +42,9 @@ function App() {
     const [poblacion, setPoblacion] = useState("");
     const [temas, setTemas] = useState("");
     // DETECTAR PÁGINA PÚBLICA DE PROFESOR — por slug (/nombre) o por ?p=uid
-    const [paginaTarget, setPaginaTarget] = useState(null); // { uid } | { slug }
-    const [miniappId,    setMiniappId]    = useState(null);
+    const [paginaTarget,    setPaginaTarget]    = useState(null); // { uid } | { slug }
+    const [miniappId,       setMiniappId]       = useState(null);
+    const [trivialEnvioCode,setTrivialEnvioCode]= useState(null);
 
     // ANNOTATION OVERLAY + PIZARRA DESDE CAPTURA
     const [annotationOpen,   setAnnotationOpen]   = useState(false);
@@ -72,6 +74,8 @@ function App() {
       const params = new URLSearchParams(window.location.search);
       const mid = params.get('miniapp');
       if (mid) { setMiniappId(mid); return; }
+      const trivialEnvio = params.get('trivial_envio');
+      if (trivialEnvio) { setTrivialEnvioCode(trivialEnvio.toUpperCase()); return; }
       const uid = params.get('p');
       if (uid) { setPaginaTarget({ uid }); return; }
       const slug = window.location.pathname.replace(/^\//, '').replace(/\/$/, '').trim().toLowerCase();
@@ -230,6 +234,9 @@ function App() {
 
     // Mini-app pública (no requiere login)
     if (miniappId) return <MiniAppViewer miniappId={miniappId} onBack={() => { setMiniappId(null); window.history.pushState({}, '', '/'); }} />;
+
+    // Formulario público de envío de preguntas al Trivial (no requiere login)
+    if (trivialEnvioCode) return <TrivialEnvioForm codigoInicial={trivialEnvioCode} onBack={() => { setTrivialEnvioCode(null); window.history.pushState({}, '', '/'); }} />;
 
     // PÁGINA PÚBLICA DEL PROFESOR (no requiere login)
     if (paginaTarget) return <><PaginaProfesor uid={paginaTarget.uid} onBack={() => { setPaginaTarget(null); window.history.back(); }} />{anotadorUI}</>;

@@ -1,18 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import {
-    collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc,
+    collection, doc, addDoc, setDoc, getDocs, updateDoc, deleteDoc,
     query, where, serverTimestamp, orderBy
 } from 'firebase/firestore';
 
-const CATS = {
-    geo: { hex: '#3498db', name: 'Geografía',    emoji: '🌍' },
-    esp: { hex: '#e84393', name: 'Espectáculos', emoji: '🎬' },
-    his: { hex: '#f1c40f', name: 'Historia',     emoji: '📜' },
-    art: { hex: '#9b59b6', name: 'Arte y Lit.',  emoji: '🎨' },
-    cie: { hex: '#2ecc71', name: 'Ciencias',     emoji: '🔬' },
-    dep: { hex: '#e67e22', name: 'Deportes',     emoji: '⚽' },
+const CAT_HEX = { geo: '#3498db', esp: '#e84393', his: '#f1c40f', art: '#9b59b6', cie: '#2ecc71', dep: '#e67e22' };
+const CAT_IDS = ['geo', 'esp', 'his', 'art', 'cie', 'dep'];
+const CAT_DEFAULTS = {
+    geo: { nombre: 'Geografía',    emoji: '🌍', desc: '' },
+    esp: { nombre: 'Espectáculos', emoji: '🎬', desc: '' },
+    his: { nombre: 'Historia',     emoji: '📜', desc: '' },
+    art: { nombre: 'Arte y Lit.',  emoji: '🎨', desc: '' },
+    cie: { nombre: 'Ciencias',     emoji: '🔬', desc: '' },
+    dep: { nombre: 'Deportes',     emoji: '⚽', desc: '' },
 };
+
+function buildCats(stored) {
+    const out = {};
+    for (const id of CAT_IDS) {
+        out[id] = { imagen: '', ...CAT_DEFAULTS[id], ...(stored?.[id] || {}) };
+    }
+    return out;
+}
 
 function genCode(len = 8) {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -22,68 +32,137 @@ function genCode(len = 8) {
 }
 
 export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
-    const esNuevo = !recurso?.id;
+    const esNuevo   = !recurso?.id;
     const esCreador = esNuevo || recurso?.creadorUid === usuario?.uid;
 
-    // Metadata
-    const [titulo, setTitulo] = useState(recurso?.titulo || '');
-    const [descripcion, setDescripcion] = useState(recurso?.descripcion || '');
-    const [publica, setPublica] = useState(recurso?.publica ?? true);
-    const [recursoId, setRecursoId] = useState(recurso?.id || null);
+    // ── Metadata ──────────────────────────────────────────────────────────────
+    const [titulo,           setTitulo]           = useState(recurso?.titulo        || '');
+    const [descripcion,      setDescripcion]      = useState(recurso?.descripcion   || '');
+    const [publica,          setPublica]          = useState(recurso?.publica       ?? true);
+    const [recursoId,        setRecursoId]        = useState(recurso?.id            || null);
     const [codigosCategoria, setCodigosCategoria] = useState(recurso?.codigosCategoria || null);
-    const [colaboradores, setColaboradores] = useState(recurso?.colaboradores || []);
-    const [codigoJuego, setCodigoJuego] = useState(recurso?.codigoJuego || null);
+    const [colaboradores,    setColaboradores]    = useState(recurso?.colaboradores  || []);
+    const [codigoJuego,      setCodigoJuego]      = useState(recurso?.codigoJuego   || null);
+    const [codigoEnvio,      setCodigoEnvio]      = useState(recurso?.codigoEnvio   || null);
 
-    // Content
-    const [tabActiva, setTabActiva] = useState('geo');
-    const [preguntas, setPreguntas] = useState({ geo: [], esp: [], his: [], art: [], cie: [], dep: [] });
+    // ── Category customisation ─────────────────────────────────────────────────
+    const [categorias, setCategorias] = useState(() => buildCats(recurso?.categorias));
+
+    // ── Questions ─────────────────────────────────────────────────────────────
+    const [tabActiva,         setTabActiva]         = useState('geo');
+    const [preguntas,         setPreguntas]         = useState({ geo:[], esp:[], his:[], art:[], cie:[], dep:[] });
     const [preguntasCargadas, setPreguntasCargadas] = useState({});
     const [cargandoPreguntas, setCargandoPreguntas] = useState(false);
 
-    // Form
-    const [formAbierto, setFormAbierto] = useState(false);
-    const [formQ, setFormQ] = useState('');
-    const [formA, setFormA] = useState('');
-    const [formW, setFormW] = useState(['', '', '']);
-    const [guardandoPregunta, setGuardandoPregunta] = useState(false);
-    const [errorForm, setErrorForm] = useState('');
+    // ── Pending questions (Question Sender submissions) ────────────────────────
+    const [pendientes,        setPendientes]        = useState({ geo:[], esp:[], his:[], art:[], cie:[], dep:[] });
+    const [pendientesCargados,setPendientesCargados]= useState(false);
 
-    // Collaboration panel
-    const [panelColab, setPanelColab] = useState(false);
-    const [emailNuevo, setEmailNuevo] = useState('');
-    const [agregandoColab, setAgregandoColab] = useState(false);
-    const [errorColab, setErrorColab] = useState('');
+    // ── Submission code generation ─────────────────────────────────────────────
+    const [generandoCodigo, setGenerandoCodigo] = useState(false);
 
-    // Save
-    const [guardando, setGuardando] = useState(false);
+    // ── Category config panel ──────────────────────────────────────────────────
+    const [catConfigAbierto, setCatConfigAbierto] = useState(false);
+    const [guardandoCat,     setGuardandoCat]     = useState(false);
+    const [savedCat,         setSavedCat]         = useState(false);
+
+    // ── Add-question form ──────────────────────────────────────────────────────
+    const [formAbierto,        setFormAbierto]      = useState(false);
+    const [formQ,              setFormQ]            = useState('');
+    const [formA,              setFormA]            = useState('');
+    const [formW,              setFormW]            = useState(['', '', '']);
+    const [guardandoPregunta,  setGuardandoPregunta]= useState(false);
+    const [errorForm,          setErrorForm]        = useState('');
+
+    // ── Collaboration ──────────────────────────────────────────────────────────
+    const [panelColab,    setPanelColab]    = useState(false);
+    const [emailNuevo,    setEmailNuevo]    = useState('');
+    const [agregandoColab,setAgregandoColab]= useState(false);
+    const [errorColab,    setErrorColab]    = useState('');
+
+    // ── Save ───────────────────────────────────────────────────────────────────
+    const [guardando,    setGuardando]    = useState(false);
     const [errorGuardar, setErrorGuardar] = useState('');
-    const [copiado, setCopiado] = useState('');
+    const [copiado,      setCopiado]      = useState('');
 
+    // ── Effects ────────────────────────────────────────────────────────────────
     useEffect(() => {
-        if (recursoId && !preguntasCargadas[tabActiva]) {
-            cargarPreguntas(tabActiva);
-        }
+        if (recursoId && !preguntasCargadas[tabActiva]) cargarPreguntas(tabActiva);
     }, [recursoId, tabActiva]);
 
+    useEffect(() => {
+        if (recursoId && !pendientesCargados) cargarPendientes();
+    }, [recursoId]);
+
+    // ── Loaders ────────────────────────────────────────────────────────────────
     const cargarPreguntas = async (cat) => {
         setCargandoPreguntas(true);
         try {
             const snap = await getDocs(
-                query(
-                    collection(db, 'trivial_recursos', recursoId, 'preguntas'),
-                    where('categoria', '==', cat),
-                    orderBy('fechaCreacion', 'asc')
-                )
+                query(collection(db, 'trivial_recursos', recursoId, 'preguntas'),
+                    where('categoria', '==', cat), orderBy('fechaCreacion', 'asc'))
             );
-            const lista = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            setPreguntas(prev => ({ ...prev, [cat]: lista }));
+            setPreguntas(prev => ({ ...prev, [cat]: snap.docs.map(d => ({ id: d.id, ...d.data() })) }));
             setPreguntasCargadas(prev => ({ ...prev, [cat]: true }));
-        } catch (e) {
-            console.error(e);
-        }
+        } catch (e) { console.error(e); }
         setCargandoPreguntas(false);
     };
 
+    const cargarPendientes = async () => {
+        if (!recursoId) return;
+        try {
+            const snap = await getDocs(
+                query(collection(db, 'trivial_recursos', recursoId, 'preguntas_pendientes'),
+                    orderBy('fechaCreacion', 'asc'))
+            );
+            const todas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            const por_cat = { geo:[], esp:[], his:[], art:[], cie:[], dep:[] };
+            for (const p of todas) { if (por_cat[p.categoria]) por_cat[p.categoria].push(p); }
+            setPendientes(por_cat);
+            setPendientesCargados(true);
+        } catch (e) { console.error(e); }
+    };
+
+    // ── Category helpers ───────────────────────────────────────────────────────
+    const updateCat = (field, value) => {
+        setCategorias(prev => ({ ...prev, [tabActiva]: { ...prev[tabActiva], [field]: value } }));
+    };
+
+    const guardarCategoria = async () => {
+        if (!recursoId) return;
+        setGuardandoCat(true);
+        try {
+            await updateDoc(doc(db, 'trivial_recursos', recursoId), { categorias, fechaModificacion: serverTimestamp() });
+            if (codigoEnvio) {
+                await updateDoc(doc(db, 'trivial_envio_codigos', codigoEnvio), { categorias });
+            }
+            setSavedCat(true);
+            setTimeout(() => setSavedCat(false), 1800);
+        } catch (e) { console.error(e); }
+        setGuardandoCat(false);
+    };
+
+    // ── Submission code ────────────────────────────────────────────────────────
+    const generarCodigoEnvio = async () => {
+        if (!recursoId) return;
+        setGenerandoCodigo(true);
+        const code = genCode(8);
+        try {
+            await Promise.all([
+                updateDoc(doc(db, 'trivial_recursos', recursoId), { codigoEnvio: code }),
+                setDoc(doc(db, 'trivial_envio_codigos', code), {
+                    recursoId,
+                    titulo: titulo.trim(),
+                    categorias,
+                    creadorNombre: usuario.displayName || usuario.email,
+                }),
+            ]);
+            setCodigoEnvio(code);
+        } catch (e) { console.error(e); }
+        setGenerandoCodigo(false);
+    };
+
+    // ── Save resource ──────────────────────────────────────────────────────────
     const guardarRecurso = async () => {
         if (!titulo.trim()) { setErrorGuardar('El título es obligatorio.'); return; }
         setGuardando(true);
@@ -91,100 +170,65 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
         try {
             if (esNuevo) {
                 const codigos = {};
-                for (const cat of Object.keys(CATS)) codigos[cat] = genCode(8);
+                for (const cat of CAT_IDS) codigos[cat] = genCode(8);
                 const codigoJ = genCode(6);
-
                 const data = {
-                    titulo: titulo.trim(),
-                    descripcion: descripcion.trim(),
-                    publica,
-                    creadorUid: usuario.uid,
-                    creadorEmail: usuario.email,
+                    titulo: titulo.trim(), descripcion: descripcion.trim(), publica,
+                    categorias,
+                    creadorUid: usuario.uid, creadorEmail: usuario.email,
                     creadorNombre: usuario.displayName || usuario.email,
-                    codigosCategoria: codigos,
-                    codigoJuego: codigoJ,
-                    colaboradores: [],
+                    codigosCategoria: codigos, codigoJuego: codigoJ,
+                    colaboradores: [], colaboradoresUids: [],
                     tipoJuego: 'TRIVIAL',
-                    fechaCreacion: serverTimestamp(),
-                    fechaModificacion: serverTimestamp(),
+                    fechaCreacion: serverTimestamp(), fechaModificacion: serverTimestamp(),
                 };
-
                 const ref = await addDoc(collection(db, 'trivial_recursos'), data);
-
-                await Promise.all(
-                    Object.entries(codigos).map(([cat, code]) =>
-                        setDoc(doc(db, 'trivial_inv_codigos', code), {
-                            recursoId: ref.id,
-                            categoria: cat,
-                            titulo: titulo.trim(),
-                        })
-                    )
-                );
-
+                await Promise.all(Object.entries(codigos).map(([cat, code]) =>
+                    setDoc(doc(db, 'trivial_inv_codigos', code), { recursoId: ref.id, categoria: cat, titulo: titulo.trim() })
+                ));
                 setRecursoId(ref.id);
                 setCodigosCategoria(codigos);
                 setCodigoJuego(codigoJ);
                 if (onSaved) onSaved({ id: ref.id, ...data, codigosCategoria: codigos });
             } else {
                 await updateDoc(doc(db, 'trivial_recursos', recursoId), {
-                    titulo: titulo.trim(),
-                    descripcion: descripcion.trim(),
-                    publica,
-                    fechaModificacion: serverTimestamp(),
+                    titulo: titulo.trim(), descripcion: descripcion.trim(), publica,
+                    categorias, fechaModificacion: serverTimestamp(),
                 });
+                if (codigoEnvio) {
+                    await updateDoc(doc(db, 'trivial_envio_codigos', codigoEnvio), { titulo: titulo.trim(), categorias });
+                }
                 if (onSaved) onSaved({ id: recursoId, titulo: titulo.trim(), descripcion: descripcion.trim(), publica });
             }
-        } catch (e) {
-            console.error(e);
-            setErrorGuardar('Error al guardar. Inténtalo de nuevo.');
-        }
+        } catch (e) { console.error(e); setErrorGuardar('Error al guardar. Inténtalo de nuevo.'); }
         setGuardando(false);
     };
 
+    // ── Questions CRUD ─────────────────────────────────────────────────────────
     const agregarPregunta = async () => {
         setErrorForm('');
         if (!formQ.trim()) { setErrorForm('Escribe la pregunta.'); return; }
         if (!formA.trim()) { setErrorForm('Escribe la respuesta correcta.'); return; }
         if (formW.some(w => !w.trim())) { setErrorForm('Completa las tres respuestas incorrectas.'); return; }
         if (!recursoId) { setErrorGuardar('Guarda el recurso primero (botón "Crear" arriba).'); return; }
-
         setGuardandoPregunta(true);
         try {
-            const ref = await addDoc(
-                collection(db, 'trivial_recursos', recursoId, 'preguntas'),
-                {
-                    categoria: tabActiva,
-                    q: formQ.trim(),
-                    a: formA.trim(),
-                    w: formW.map(s => s.trim()),
-                    autorUid: usuario.uid,
-                    autorNombre: usuario.displayName || usuario.email,
-                    fechaCreacion: serverTimestamp(),
-                }
-            );
+            const ref = await addDoc(collection(db, 'trivial_recursos', recursoId, 'preguntas'), {
+                categoria: tabActiva,
+                q: formQ.trim(), a: formA.trim(), w: formW.map(s => s.trim()),
+                autorUid: usuario.uid, autorNombre: usuario.displayName || usuario.email,
+                fechaCreacion: serverTimestamp(),
+            });
             setPreguntas(prev => ({
                 ...prev,
-                [tabActiva]: [
-                    ...prev[tabActiva],
-                    {
-                        id: ref.id,
-                        categoria: tabActiva,
-                        q: formQ.trim(),
-                        a: formA.trim(),
-                        w: formW.map(s => s.trim()),
-                        autorUid: usuario.uid,
-                        autorNombre: usuario.displayName || usuario.email,
-                    }
-                ]
+                [tabActiva]: [...prev[tabActiva], {
+                    id: ref.id, categoria: tabActiva,
+                    q: formQ.trim(), a: formA.trim(), w: formW.map(s => s.trim()),
+                    autorUid: usuario.uid, autorNombre: usuario.displayName || usuario.email,
+                }]
             }));
-            setFormQ('');
-            setFormA('');
-            setFormW(['', '', '']);
-            setFormAbierto(false);
-        } catch (e) {
-            console.error(e);
-            setErrorForm('Error al guardar la pregunta.');
-        }
+            setFormQ(''); setFormA(''); setFormW(['', '', '']); setFormAbierto(false);
+        } catch (e) { console.error(e); setErrorForm('Error al guardar la pregunta.'); }
         setGuardandoPregunta(false);
     };
 
@@ -193,47 +237,66 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
         if (!window.confirm('¿Eliminar esta pregunta?')) return;
         try {
             await deleteDoc(doc(db, 'trivial_recursos', recursoId, 'preguntas', pregId));
-            setPreguntas(prev => ({
-                ...prev,
-                [tabActiva]: prev[tabActiva].filter(p => p.id !== pregId)
-            }));
-        } catch (e) {
-            console.error(e);
-        }
+            setPreguntas(prev => ({ ...prev, [tabActiva]: prev[tabActiva].filter(p => p.id !== pregId) }));
+        } catch (e) { console.error(e); }
     };
 
+    const cambiarCategoriaPregunta = async (pregId, nuevaCat) => {
+        if (!nuevaCat || nuevaCat === tabActiva) return;
+        const pregData = preguntas[tabActiva].find(p => p.id === pregId);
+        if (!pregData) return;
+        try {
+            await updateDoc(doc(db, 'trivial_recursos', recursoId, 'preguntas', pregId), { categoria: nuevaCat });
+            setPreguntas(prev => {
+                const upd = { ...prev, [tabActiva]: prev[tabActiva].filter(p => p.id !== pregId) };
+                if (preguntasCargadas[nuevaCat]) upd[nuevaCat] = [...prev[nuevaCat], { ...pregData, categoria: nuevaCat }];
+                return upd;
+            });
+        } catch (e) { console.error(e); }
+    };
+
+    // ── Pending questions actions ──────────────────────────────────────────────
+    const aceptarPendiente = async (pend) => {
+        try {
+            const autorNombre = pend.enviadoPor.nombre + (pend.enviadoPor.curso ? ` (${pend.enviadoPor.curso})` : '');
+            const ref = await addDoc(collection(db, 'trivial_recursos', recursoId, 'preguntas'), {
+                q: pend.q, a: pend.a, w: pend.w, categoria: pend.categoria,
+                autorUid: 'externo', autorNombre,
+                fechaCreacion: serverTimestamp(),
+            });
+            await deleteDoc(doc(db, 'trivial_recursos', recursoId, 'preguntas_pendientes', pend.id));
+            const cat = pend.categoria;
+            setPreguntas(prev => ({
+                ...prev,
+                [cat]: preguntasCargadas[cat]
+                    ? [...prev[cat], { id: ref.id, q: pend.q, a: pend.a, w: pend.w, categoria: cat, autorUid: 'externo', autorNombre }]
+                    : prev[cat]
+            }));
+            setPendientes(prev => ({ ...prev, [cat]: prev[cat].filter(p => p.id !== pend.id) }));
+        } catch (e) { console.error(e); }
+    };
+
+    const rechazarPendiente = async (pend) => {
+        if (!window.confirm('¿Rechazar y eliminar esta pregunta?')) return;
+        try {
+            await deleteDoc(doc(db, 'trivial_recursos', recursoId, 'preguntas_pendientes', pend.id));
+            setPendientes(prev => ({ ...prev, [pend.categoria]: prev[pend.categoria].filter(p => p.id !== pend.id) }));
+        } catch (e) { console.error(e); }
+    };
+
+    // ── Collaboration ──────────────────────────────────────────────────────────
     const agregarColaboradorPorEmail = async () => {
         if (!emailNuevo.trim()) return;
-        setAgregandoColab(true);
-        setErrorColab('');
+        setAgregandoColab(true); setErrorColab('');
         try {
-            const snap = await getDocs(
-                query(collection(db, 'users'), where('email', '==', emailNuevo.trim().toLowerCase()))
-            );
-            if (snap.empty) {
-                setErrorColab('No se encontró ningún usuario con ese email.');
-                setAgregandoColab(false);
-                return;
-            }
-            const uid = snap.docs[0].id;
-            const userData = snap.docs[0].data();
-            if (colaboradores.find(c => c.uid === uid)) {
-                setErrorColab('Ya es colaborador.');
-                setAgregandoColab(false);
-                return;
-            }
-            const nuevos = [...colaboradores, {
-                uid,
-                email: userData.email,
-                nombre: userData.displayName || userData.email,
-            }];
+            const snap = await getDocs(query(collection(db, 'users'), where('email', '==', emailNuevo.trim().toLowerCase())));
+            if (snap.empty) { setErrorColab('No se encontró ningún usuario con ese email.'); setAgregandoColab(false); return; }
+            const uid = snap.docs[0].id; const ud = snap.docs[0].data();
+            if (colaboradores.find(c => c.uid === uid)) { setErrorColab('Ya es colaborador.'); setAgregandoColab(false); return; }
+            const nuevos = [...colaboradores, { uid, email: ud.email, nombre: ud.displayName || ud.email }];
             await updateDoc(doc(db, 'trivial_recursos', recursoId), { colaboradores: nuevos });
-            setColaboradores(nuevos);
-            setEmailNuevo('');
-        } catch (e) {
-            console.error(e);
-            setErrorColab('Error al agregar colaborador.');
-        }
+            setColaboradores(nuevos); setEmailNuevo('');
+        } catch (e) { console.error(e); setErrorColab('Error al agregar colaborador.'); }
         setAgregandoColab(false);
     };
 
@@ -244,144 +307,71 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
     };
 
     const copiar = (texto, key) => {
-        navigator.clipboard.writeText(texto).then(() => {
-            setCopiado(key);
-            setTimeout(() => setCopiado(''), 2000);
-        });
+        navigator.clipboard.writeText(texto).then(() => { setCopiado(key); setTimeout(() => setCopiado(''), 2000); });
     };
 
-    const cat = CATS[tabActiva];
-    const pregsCat = preguntas[tabActiva];
+    // ── Derived ────────────────────────────────────────────────────────────────
+    const catData       = categorias[tabActiva];
+    const catHex        = CAT_HEX[tabActiva];
+    const pregsCat      = preguntas[tabActiva];
+    const pendientesCat = pendientes[tabActiva] || [];
     const totalPreguntas = Object.values(preguntas).reduce((s, arr) => s + arr.length, 0);
+    const totalPendientes = Object.values(pendientes).reduce((s, arr) => s + arr.length, 0);
 
+    // ─────────────────────────────────────────────────────────────────────────
     return (
-        <div style={{
-            position: 'fixed', inset: 0,
-            background: '#0f172a', zIndex: 2000,
-            display: 'flex', flexDirection: 'column',
-            fontFamily: "'Segoe UI', sans-serif",
-        }}>
+        <div style={{ position: 'fixed', inset: 0, background: '#0f172a', zIndex: 2000, display: 'flex', flexDirection: 'column', fontFamily: "'Segoe UI', sans-serif" }}>
+
             {/* ─── HEADER ─── */}
-            <div style={{
-                background: '#1e293b',
-                borderBottom: '1px solid #334155',
-                padding: '10px 16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                flexShrink: 0,
-            }}>
-                <button
-                    onClick={onClose}
-                    title="Volver"
-                    style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1.3rem', padding: '2px 8px', lineHeight: 1, borderRadius: 6 }}
-                >
-                    ←
-                </button>
+            <div style={{ background: '#1e293b', borderBottom: '1px solid #334155', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1.3rem', padding: '2px 8px', lineHeight: 1, borderRadius: 6 }}>←</button>
                 <span style={{ fontSize: '1.4rem' }}>🎯</span>
                 <input
-                    value={titulo}
-                    onChange={e => setTitulo(e.target.value)}
-                    placeholder="Título del Trivial…"
-                    disabled={!esCreador}
-                    style={{
-                        flex: 1, background: 'transparent', border: 'none',
-                        color: '#f1f5f9', fontSize: '1.1rem', fontWeight: 700,
-                        outline: 'none', minWidth: 0,
-                    }}
+                    value={titulo} onChange={e => setTitulo(e.target.value)}
+                    placeholder="Título del Trivial…" disabled={!esCreador}
+                    style={{ flex: 1, background: 'transparent', border: 'none', color: '#f1f5f9', fontSize: '1.1rem', fontWeight: 700, outline: 'none', minWidth: 0 }}
                 />
-                {totalPreguntas > 0 && (
-                    <span style={{ color: '#64748b', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
-                        {totalPreguntas} preguntas
+                {totalPreguntas > 0 && <span style={{ color: '#64748b', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>{totalPreguntas} preguntas</span>}
+                {totalPendientes > 0 && (
+                    <span style={{ background: '#f59e0b', color: '#0f172a', borderRadius: 10, padding: '2px 10px', fontSize: '0.78rem', fontWeight: 800, whiteSpace: 'nowrap' }}>
+                        🕐 {totalPendientes} pendiente{totalPendientes !== 1 ? 's' : ''}
                     </span>
                 )}
                 <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                     {esCreador && (
-                        <button
-                            onClick={() => setPublica(p => !p)}
-                            style={{
-                                background: publica ? '#0f4c2a' : '#3b1f0a',
-                                border: `1px solid ${publica ? '#2ecc71' : '#e67e22'}`,
-                                color: publica ? '#2ecc71' : '#e67e22',
-                                padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
-                                fontSize: '0.8rem', fontWeight: 600,
-                            }}
-                        >
+                        <button onClick={() => setPublica(p => !p)} style={{ background: publica ? '#0f4c2a' : '#3b1f0a', border: `1px solid ${publica ? '#2ecc71' : '#e67e22'}`, color: publica ? '#2ecc71' : '#e67e22', padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
                             {publica ? '🌐 Pública' : '🔒 Privada'}
                         </button>
                     )}
-                    <button
-                        onClick={() => setPanelColab(p => !p)}
-                        style={{
-                            background: panelColab ? '#1e3a8a' : '#1e293b',
-                            border: '1px solid #3b82f6',
-                            color: '#60a5fa',
-                            padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
-                            fontSize: '0.8rem', fontWeight: 600,
-                        }}
-                    >
+                    <button onClick={() => setPanelColab(p => !p)} style={{ background: panelColab ? '#1e3a8a' : '#1e293b', border: '1px solid #3b82f6', color: '#60a5fa', padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
                         👥 Colaborar
                     </button>
                     {esCreador && (
-                        <button
-                            onClick={guardarRecurso}
-                            disabled={guardando}
-                            style={{
-                                background: '#1d4ed8', border: 'none', color: 'white',
-                                padding: '8px 18px', borderRadius: 8, cursor: guardando ? 'default' : 'pointer',
-                                fontSize: '0.9rem', fontWeight: 700,
-                                opacity: guardando ? 0.7 : 1,
-                            }}
-                        >
+                        <button onClick={guardarRecurso} disabled={guardando} style={{ background: '#1d4ed8', border: 'none', color: 'white', padding: '8px 18px', borderRadius: 8, cursor: guardando ? 'default' : 'pointer', fontSize: '0.9rem', fontWeight: 700, opacity: guardando ? 0.7 : 1 }}>
                             {guardando ? '…' : esNuevo ? '✓ Crear' : '✓ Guardar'}
                         </button>
                     )}
                 </div>
             </div>
 
-            {errorGuardar && (
-                <div style={{ background: '#7f1d1d', color: '#fca5a5', padding: '8px 20px', fontSize: '0.85rem', flexShrink: 0 }}>
-                    ⚠ {errorGuardar}
-                </div>
-            )}
+            {errorGuardar && <div style={{ background: '#7f1d1d', color: '#fca5a5', padding: '8px 20px', fontSize: '0.85rem', flexShrink: 0 }}>⚠ {errorGuardar}</div>}
 
             {/* ─── CATEGORY TABS ─── */}
-            <div style={{
-                display: 'flex',
-                background: '#1e293b',
-                borderBottom: '1px solid #334155',
-                flexShrink: 0,
-                overflowX: 'auto',
-            }}>
-                {Object.entries(CATS).map(([id, c]) => {
-                    const count = preguntas[id]?.length ?? 0;
+            <div style={{ display: 'flex', background: '#1e293b', borderBottom: '1px solid #334155', flexShrink: 0, overflowX: 'auto' }}>
+                {CAT_IDS.map(id => {
+                    const c      = categorias[id];
+                    const count  = preguntas[id]?.length ?? 0;
+                    const pend   = pendientes[id]?.length ?? 0;
                     const active = id === tabActiva;
+                    const hex    = CAT_HEX[id];
                     return (
-                        <button
-                            key={id}
-                            onClick={() => setTabActiva(id)}
-                            style={{
-                                flex: 1, minWidth: 88, padding: '10px 6px',
-                                border: 'none',
-                                borderBottom: active ? `3px solid ${c.hex}` : '3px solid transparent',
-                                background: active ? c.hex + '18' : 'transparent',
-                                color: active ? c.hex : '#64748b',
-                                cursor: 'pointer',
-                                fontSize: '0.78rem',
-                                fontWeight: active ? 700 : 500,
-                                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-                                transition: 'all 0.15s',
-                            }}
-                        >
+                        <button key={id} onClick={() => setTabActiva(id)} style={{ flex: 1, minWidth: 88, padding: '10px 6px', border: 'none', borderBottom: active ? `3px solid ${hex}` : '3px solid transparent', background: active ? hex + '18' : 'transparent', color: active ? hex : '#64748b', cursor: 'pointer', fontSize: '0.78rem', fontWeight: active ? 700 : 500, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, transition: 'all 0.15s' }}>
                             <span style={{ fontSize: '1.15rem' }}>{c.emoji}</span>
-                            <span>{c.name}</span>
-                            <span style={{
-                                background: active ? c.hex : '#334155',
-                                color: active ? 'white' : '#94a3b8',
-                                borderRadius: 10, padding: '1px 7px', fontSize: '0.72rem',
-                            }}>
-                                {count}
-                            </span>
+                            <span style={{ maxWidth: 84, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.nombre}</span>
+                            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                                <span style={{ background: active ? hex : '#334155', color: active ? 'white' : '#94a3b8', borderRadius: 10, padding: '1px 7px', fontSize: '0.72rem' }}>{count}</span>
+                                {pend > 0 && <span style={{ background: '#f59e0b', color: '#0f172a', borderRadius: 10, padding: '1px 6px', fontSize: '0.66rem', fontWeight: 800 }}>{pend}</span>}
+                            </div>
                         </button>
                     );
                 })}
@@ -390,107 +380,115 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
             {/* ─── MAIN AREA ─── */}
             <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
-                {/* Questions column */}
+                {/* ── Questions column ── */}
                 <div style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-                    {/* "Save first" hint when brand new */}
                     {esNuevo && !recursoId && (
-                        <div style={{
-                            background: '#1e3a8a22', border: '1px solid #3b82f660',
-                            borderRadius: 12, padding: '14px 18px',
-                            color: '#93c5fd', fontSize: '0.9rem',
-                        }}>
+                        <div style={{ background: '#1e3a8a22', border: '1px solid #3b82f660', borderRadius: 12, padding: '14px 18px', color: '#93c5fd', fontSize: '0.9rem' }}>
                             Pon un título y pulsa <strong>✓ Crear</strong> para empezar a añadir preguntas.
                         </div>
                     )}
 
-                    {/* Add question form */}
-                    {recursoId && (
-                        <div style={{
-                            background: '#1e293b',
-                            borderRadius: 14,
-                            border: `1px solid ${cat.hex}50`,
-                            overflow: 'hidden',
-                        }}>
-                            <button
-                                onClick={() => { setFormAbierto(p => !p); setErrorForm(''); }}
-                                style={{
-                                    width: '100%', padding: '13px 18px',
-                                    background: 'none', border: 'none',
-                                    color: cat.hex, cursor: 'pointer',
-                                    display: 'flex', alignItems: 'center', gap: 10,
-                                    fontSize: '0.92rem', fontWeight: 700,
-                                }}
-                            >
-                                <span style={{ fontSize: '1.1rem', transition: 'transform 0.2s', transform: formAbierto ? 'rotate(45deg)' : 'none', display: 'inline-block' }}>＋</span>
-                                Añadir pregunta de {cat.name}
-                            </button>
+                    {/* ── PENDING QUESTIONS for this category ── */}
+                    {esCreador && pendientesCat.length > 0 && (
+                        <div style={{ background: '#1c1a07', border: '1.5px solid #f59e0b60', borderRadius: 14, overflow: 'hidden' }}>
+                            <div style={{ background: '#f59e0b18', borderBottom: '1px solid #f59e0b30', padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontSize: '1rem' }}>🕐</span>
+                                <span style={{ color: '#f59e0b', fontWeight: 700, fontSize: '0.88rem' }}>
+                                    Pendientes de revisión — {pendientesCat.length} pregunta{pendientesCat.length !== 1 ? 's' : ''}
+                                </span>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '14px 18px' }}>
+                                {pendientesCat.map(pend => (
+                                    <div key={pend.id} style={{ background: '#0f172a', borderRadius: 10, padding: '13px 16px', border: '1px solid #f59e0b30' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <div style={{ color: '#94a3b8', fontSize: '0.72rem', marginBottom: 5 }}>
+                                                    ✉ <strong style={{ color: '#f59e0b' }}>{pend.enviadoPor?.nombre}</strong>
+                                                    {pend.enviadoPor?.curso && <span> · {pend.enviadoPor.curso}</span>}
+                                                </div>
+                                                <div style={{ color: '#f1f5f9', fontSize: '0.92rem', fontWeight: 600, marginBottom: 8, lineHeight: 1.4 }}>{pend.q}</div>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                                    <span style={{ color: '#4ade80', fontSize: '0.82rem' }}>✓ {pend.a}</span>
+                                                    {pend.w?.map((w, i) => <span key={i} style={{ color: '#64748b', fontSize: '0.82rem' }}>✗ {w}</span>)}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                                            <button
+                                                onClick={() => rechazarPendiente(pend)}
+                                                style={{ background: '#7f1d1d30', border: '1px solid #ef444430', color: '#f87171', padding: '6px 14px', borderRadius: 7, cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}
+                                            >
+                                                ✕ Rechazar
+                                            </button>
+                                            <button
+                                                onClick={() => aceptarPendiente(pend)}
+                                                style={{ background: '#14532d', border: '1px solid #4ade8060', color: '#4ade80', padding: '6px 18px', borderRadius: 7, cursor: 'pointer', fontSize: '0.82rem', fontWeight: 700 }}
+                                            >
+                                                ✓ Aceptar
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
+                    {/* ── CATEGORY CONFIG PANEL ── */}
+                    {esCreador && recursoId && (
+                        <div style={{ background: '#1e293b', borderRadius: 14, border: `1px solid ${catHex}50`, overflow: 'hidden' }}>
+                            <button onClick={() => setCatConfigAbierto(p => !p)} style={{ width: '100%', padding: '12px 18px', background: 'none', border: 'none', color: catHex, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.88rem', fontWeight: 700 }}>
+                                <span style={{ fontSize: '0.8rem', transition: 'transform 0.2s', transform: catConfigAbierto ? 'rotate(90deg)' : 'none', display: 'inline-block' }}>▶</span>
+                                ⚙ Configurar categoría · {catData.emoji} {catData.nombre}
+                            </button>
+                            {catConfigAbierto && (
+                                <div style={{ padding: '0 18px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                    <div style={{ display: 'flex', gap: 10 }}>
+                                        <div style={{ flex: '0 0 64px' }}>
+                                            <div style={labelStyle}>Emoji</div>
+                                            <input value={catData.emoji} onChange={e => updateCat('emoji', e.target.value.slice(0, 4))} style={{ width: '100%', background: '#0f172a', border: `1px solid ${catHex}60`, borderRadius: 8, color: '#f1f5f9', padding: '7px 4px', fontSize: '1.5rem', textAlign: 'center', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
+                                        </div>
+                                        <div style={{ flex: 1 }}>
+                                            <div style={labelStyle}>Nombre</div>
+                                            <input value={catData.nombre} onChange={e => updateCat('nombre', e.target.value)} placeholder="Ej: Historia de España" style={{ width: '100%', background: '#0f172a', border: `1px solid ${catHex}60`, borderRadius: 8, color: '#f1f5f9', padding: '9px 13px', fontSize: '0.9rem', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div style={labelStyle}>Descripción</div>
+                                        <textarea value={catData.desc} onChange={e => updateCat('desc', e.target.value)} placeholder="Describe el contenido de esta categoría…" rows={2} style={{ width: '100%', boxSizing: 'border-box', background: '#0f172a', border: `1px solid ${catHex}60`, borderRadius: 8, color: '#f1f5f9', padding: '9px 13px', fontSize: '0.88rem', resize: 'vertical', fontFamily: 'inherit', outline: 'none' }} />
+                                    </div>
+                                    <div>
+                                        <div style={labelStyle}>Imagen de portada</div>
+                                        <ImageSearchPanel currentUrl={catData.imagen} onSelect={url => updateCat('imagen', url)} accentColor={catHex} />
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                        <button onClick={guardarCategoria} disabled={guardandoCat} style={{ background: savedCat ? '#166534' : catHex, border: 'none', color: 'white', padding: '8px 22px', borderRadius: 8, cursor: guardandoCat ? 'default' : 'pointer', fontWeight: 700, fontSize: '0.88rem', opacity: guardandoCat ? 0.7 : 1, transition: 'background 0.3s' }}>
+                                            {guardandoCat ? 'Guardando…' : savedCat ? '✓ Guardado' : '✓ Guardar categoría'}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* ── Add question form ── */}
+                    {recursoId && (
+                        <div style={{ background: '#1e293b', borderRadius: 14, border: `1px solid ${catHex}50`, overflow: 'hidden' }}>
+                            <button onClick={() => { setFormAbierto(p => !p); setErrorForm(''); }} style={{ width: '100%', padding: '13px 18px', background: 'none', border: 'none', color: catHex, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.92rem', fontWeight: 700 }}>
+                                <span style={{ fontSize: '1.1rem', transition: 'transform 0.2s', transform: formAbierto ? 'rotate(45deg)' : 'none', display: 'inline-block' }}>＋</span>
+                                Añadir pregunta de {catData.nombre}
+                            </button>
                             {formAbierto && (
                                 <div style={{ padding: '0 18px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                                    <textarea
-                                        value={formQ}
-                                        onChange={e => setFormQ(e.target.value)}
-                                        placeholder="¿Cuál es la pregunta?"
-                                        rows={2}
-                                        style={{
-                                            width: '100%', boxSizing: 'border-box',
-                                            background: '#0f172a', border: '1px solid #334155',
-                                            borderRadius: 8, color: '#f1f5f9',
-                                            padding: '10px 13px', fontSize: '0.9rem',
-                                            resize: 'vertical', fontFamily: 'inherit', outline: 'none',
-                                        }}
-                                    />
-                                    <input
-                                        value={formA}
-                                        onChange={e => setFormA(e.target.value)}
-                                        placeholder="✓ Respuesta correcta"
-                                        style={{
-                                            background: '#0d2b1b', border: '2px solid #2ecc71',
-                                            borderRadius: 8, color: '#4ade80',
-                                            padding: '9px 13px', fontSize: '0.88rem',
-                                            fontFamily: 'inherit', outline: 'none',
-                                        }}
-                                    />
+                                    <textarea value={formQ} onChange={e => setFormQ(e.target.value)} placeholder="¿Cuál es la pregunta?" rows={2} style={{ width: '100%', boxSizing: 'border-box', background: '#0f172a', border: '1px solid #334155', borderRadius: 8, color: '#f1f5f9', padding: '10px 13px', fontSize: '0.9rem', resize: 'vertical', fontFamily: 'inherit', outline: 'none' }} />
+                                    <input value={formA} onChange={e => setFormA(e.target.value)} placeholder="✓ Respuesta correcta" style={{ background: '#0d2b1b', border: '2px solid #2ecc71', borderRadius: 8, color: '#4ade80', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
                                     {formW.map((w, i) => (
-                                        <input
-                                            key={i}
-                                            value={w}
-                                            onChange={e => {
-                                                const nw = [...formW];
-                                                nw[i] = e.target.value;
-                                                setFormW(nw);
-                                            }}
-                                            placeholder={`✗ Respuesta incorrecta ${i + 1}`}
-                                            style={{
-                                                background: '#2a0d0d', border: '2px solid #e74c3c',
-                                                borderRadius: 8, color: '#fca5a5',
-                                                padding: '9px 13px', fontSize: '0.88rem',
-                                                fontFamily: 'inherit', outline: 'none',
-                                            }}
-                                        />
+                                        <input key={i} value={w} onChange={e => { const nw = [...formW]; nw[i] = e.target.value; setFormW(nw); }} placeholder={`✗ Respuesta incorrecta ${i + 1}`} style={{ background: '#2a0d0d', border: '2px solid #e74c3c', borderRadius: 8, color: '#fca5a5', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
                                     ))}
-                                    {errorForm && (
-                                        <div style={{ color: '#fca5a5', fontSize: '0.82rem' }}>⚠ {errorForm}</div>
-                                    )}
+                                    {errorForm && <div style={{ color: '#fca5a5', fontSize: '0.82rem' }}>⚠ {errorForm}</div>}
                                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                                        <button
-                                            onClick={() => { setFormAbierto(false); setFormQ(''); setFormA(''); setFormW(['', '', '']); setErrorForm(''); }}
-                                            style={{ background: '#334155', border: 'none', color: '#94a3b8', padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontSize: '0.85rem' }}
-                                        >
-                                            Cancelar
-                                        </button>
-                                        <button
-                                            onClick={agregarPregunta}
-                                            disabled={guardandoPregunta}
-                                            style={{
-                                                background: cat.hex, border: 'none', color: 'white',
-                                                padding: '8px 22px', borderRadius: 8,
-                                                cursor: guardandoPregunta ? 'default' : 'pointer',
-                                                fontWeight: 700, fontSize: '0.88rem',
-                                                opacity: guardandoPregunta ? 0.6 : 1,
-                                            }}
-                                        >
+                                        <button onClick={() => { setFormAbierto(false); setFormQ(''); setFormA(''); setFormW(['', '', '']); setErrorForm(''); }} style={{ background: '#334155', border: 'none', color: '#94a3b8', padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontSize: '0.85rem' }}>Cancelar</button>
+                                        <button onClick={agregarPregunta} disabled={guardandoPregunta} style={{ background: catHex, border: 'none', color: 'white', padding: '8px 22px', borderRadius: 8, cursor: guardandoPregunta ? 'default' : 'pointer', fontWeight: 700, fontSize: '0.88rem', opacity: guardandoPregunta ? 0.6 : 1 }}>
                                             {guardandoPregunta ? 'Guardando…' : '+ Añadir'}
                                         </button>
                                     </div>
@@ -499,46 +497,24 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                         </div>
                     )}
 
-                    {/* Loading */}
-                    {cargandoPreguntas && (
-                        <p style={{ color: '#64748b', textAlign: 'center', padding: 20 }}>Cargando preguntas…</p>
-                    )}
+                    {cargandoPreguntas && <p style={{ color: '#64748b', textAlign: 'center', padding: 20 }}>Cargando preguntas…</p>}
 
-                    {/* Empty state */}
-                    {!cargandoPreguntas && recursoId && pregsCat.length === 0 && (
-                        <div style={{
-                            textAlign: 'center', padding: '36px 20px',
-                            background: '#1e293b', borderRadius: 14,
-                            border: '2px dashed #334155',
-                        }}>
-                            <div style={{ fontSize: '2.2rem', marginBottom: 8 }}>{cat.emoji}</div>
-                            <p style={{ color: '#64748b', margin: 0, fontSize: '0.95rem' }}>
-                                No hay preguntas de {cat.name} todavía.
-                            </p>
+                    {!cargandoPreguntas && recursoId && pregsCat.length === 0 && pendientesCat.length === 0 && (
+                        <div style={{ textAlign: 'center', padding: '36px 20px', background: '#1e293b', borderRadius: 14, border: '2px dashed #334155' }}>
+                            <div style={{ fontSize: '2.2rem', marginBottom: 8 }}>{catData.emoji}</div>
+                            <p style={{ color: '#64748b', margin: 0, fontSize: '0.95rem' }}>No hay preguntas de {catData.nombre} todavía.</p>
                         </div>
                     )}
 
-                    {/* Questions list */}
+                    {/* ── Accepted question cards ── */}
                     {pregsCat.map((p, idx) => {
                         const puedeEliminar = esCreador || p.autorUid === usuario?.uid;
                         return (
-                            <div
-                                key={p.id}
-                                style={{
-                                    background: '#1e293b',
-                                    borderRadius: 12,
-                                    padding: '14px 18px',
-                                    border: `1px solid ${cat.hex}28`,
-                                }}
-                            >
+                            <div key={p.id} style={{ background: '#1e293b', borderRadius: 12, padding: '14px 18px', border: `1px solid ${catHex}28` }}>
                                 <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                                     <div style={{ flex: 1, minWidth: 0 }}>
-                                        <div style={{ color: '#475569', fontSize: '0.72rem', marginBottom: 6 }}>
-                                            #{idx + 1} · {p.autorNombre}
-                                        </div>
-                                        <div style={{ color: '#f1f5f9', fontSize: '0.92rem', fontWeight: 600, marginBottom: 10, lineHeight: 1.45 }}>
-                                            {p.q}
-                                        </div>
+                                        <div style={{ color: '#475569', fontSize: '0.72rem', marginBottom: 6 }}>#{idx + 1} · {p.autorNombre}</div>
+                                        <div style={{ color: '#f1f5f9', fontSize: '0.92rem', fontWeight: 600, marginBottom: 10, lineHeight: 1.45 }}>{p.q}</div>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                                             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                                                 <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#2ecc71', flexShrink: 0 }} />
@@ -552,64 +528,94 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                                             ))}
                                         </div>
                                     </div>
-                                    {puedeEliminar && (
-                                        <button
-                                            onClick={() => eliminarPregunta(p.id, p.autorUid)}
-                                            title="Eliminar pregunta"
-                                            style={{
-                                                background: '#7f1d1d30', border: '1px solid #ef444430',
-                                                color: '#f87171', padding: '5px 9px',
-                                                borderRadius: 7, cursor: 'pointer', fontSize: '0.8rem', flexShrink: 0,
-                                            }}
-                                        >
-                                            🗑
-                                        </button>
-                                    )}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
+                                        {esCreador && (
+                                            <select value="" onChange={e => cambiarCategoriaPregunta(p.id, e.target.value)} title="Mover a otra categoría" style={{ background: '#0f172a', border: '1px solid #334155', color: '#94a3b8', borderRadius: 7, padding: '5px 7px', fontSize: '0.75rem', cursor: 'pointer', outline: 'none', maxWidth: 110 }}>
+                                                <option value="">Mover a…</option>
+                                                {CAT_IDS.filter(id => id !== tabActiva).map(id => (
+                                                    <option key={id} value={id}>{categorias[id].emoji} {categorias[id].nombre}</option>
+                                                ))}
+                                            </select>
+                                        )}
+                                        {puedeEliminar && (
+                                            <button onClick={() => eliminarPregunta(p.id, p.autorUid)} style={{ background: '#7f1d1d30', border: '1px solid #ef444430', color: '#f87171', padding: '5px 9px', borderRadius: 7, cursor: 'pointer', fontSize: '0.8rem' }}>🗑</button>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         );
                     })}
                 </div>
 
-                {/* ─── COLLABORATION PANEL ─── */}
+                {/* ── COLLABORATION PANEL ── */}
                 {panelColab && (
-                    <div style={{
-                        width: 300, background: '#1e293b',
-                        borderLeft: '1px solid #334155',
-                        overflowY: 'auto', padding: 18,
-                        flexShrink: 0,
-                        display: 'flex', flexDirection: 'column', gap: 20,
-                    }}>
+                    <div style={{ width: 300, background: '#1e293b', borderLeft: '1px solid #334155', overflowY: 'auto', padding: 18, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-                        {/* Game code */}
+                        {/* ── RECEIVE QUESTIONS (Question Sender) ── */}
+                        {esCreador && recursoId && (
+                            <div>
+                                <div style={labelStyle}>📬 Recibir preguntas</div>
+                                {!codigoEnvio ? (
+                                    <>
+                                        <p style={{ color: '#475569', fontSize: '0.75rem', margin: '0 0 10px', lineHeight: 1.5 }}>
+                                            Genera un enlace para que alumnos o colaboradores envíen preguntas. Tú las revisas antes de añadirlas al Trivial.
+                                        </p>
+                                        <button
+                                            onClick={generarCodigoEnvio}
+                                            disabled={generandoCodigo}
+                                            style={{ background: '#0a2a18', border: '1px solid #2ecc71', color: '#2ecc71', padding: '9px 14px', borderRadius: 8, cursor: generandoCodigo ? 'default' : 'pointer', fontWeight: 600, fontSize: '0.82rem', width: '100%', opacity: generandoCodigo ? 0.6 : 1 }}
+                                        >
+                                            {generandoCodigo ? '…' : '⚡ Activar recepción de preguntas'}
+                                        </button>
+                                    </>
+                                ) : (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                        <div style={codeBox}>
+                                            <span style={{ color: '#f59e0b', fontWeight: 900, fontSize: '1.1rem', letterSpacing: 3 }}>{codigoEnvio}</span>
+                                            <CopyBtn texto={codigoEnvio} id="envio" copiado={copiado} copiar={copiar} />
+                                        </div>
+                                        <button
+                                            onClick={() => copiar(`${window.location.origin}${window.location.pathname}?trivial_envio=${codigoEnvio}`, 'link_envio')}
+                                            style={{ background: copiado === 'link_envio' ? '#0a2a18' : '#0f172a', border: '1px solid #f59e0b40', color: copiado === 'link_envio' ? '#4ade80' : '#f59e0b', padding: '8px 12px', borderRadius: 7, cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600, textAlign: 'left', transition: '0.2s' }}
+                                        >
+                                            {copiado === 'link_envio' ? '✓ ¡Enlace copiado!' : '🔗 Copiar enlace directo'}
+                                        </button>
+                                        {totalPendientes > 0 && (
+                                            <div style={{ background: '#f59e0b18', border: '1px solid #f59e0b40', borderRadius: 8, padding: '8px 12px', color: '#f59e0b', fontSize: '0.82rem', fontWeight: 600 }}>
+                                                🕐 {totalPendientes} pregunta{totalPendientes !== 1 ? 's' : ''} pendiente{totalPendientes !== 1 ? 's' : ''} de revisión
+                                            </div>
+                                        )}
+                                        <p style={{ color: '#475569', fontSize: '0.73rem', margin: 0, lineHeight: 1.5 }}>
+                                            Comparte el código o el enlace. Las preguntas enviadas aparecerán en cada categoría con el cartel «PENDIENTE» para que las revises.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* ── Game code ── */}
                         {codigoJuego && (
                             <div>
                                 <div style={labelStyle}>Código para alumnos</div>
                                 <div style={codeBox}>
-                                    <span style={{ color: '#38bdf8', fontWeight: 900, fontSize: '1.25rem', letterSpacing: 4 }}>
-                                        {codigoJuego}
-                                    </span>
+                                    <span style={{ color: '#38bdf8', fontWeight: 900, fontSize: '1.25rem', letterSpacing: 4 }}>{codigoJuego}</span>
                                     <CopyBtn texto={codigoJuego} id="juego" copiado={copiado} copiar={copiar} />
                                 </div>
-                                <p style={{ color: '#475569', fontSize: '0.75rem', margin: '6px 0 0' }}>
-                                    Los alumnos usan este código en el buscador del juego.
-                                </p>
+                                <p style={{ color: '#475569', fontSize: '0.75rem', margin: '6px 0 0' }}>Los alumnos usan este código en el buscador del juego.</p>
                             </div>
                         )}
 
-                        {/* Invitation codes */}
+                        {/* ── Invitation codes ── */}
                         {codigosCategoria && (
                             <div>
                                 <div style={labelStyle}>Códigos de invitación por categoría</div>
-                                <p style={{ color: '#475569', fontSize: '0.75rem', margin: '0 0 10px' }}>
-                                    Comparte el código de una categoría para que otro profesor pueda añadir preguntas en ella.
-                                </p>
+                                <p style={{ color: '#475569', fontSize: '0.75rem', margin: '0 0 10px' }}>Comparte el código de una categoría para que otro profesor añada preguntas en ella.</p>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                                    {Object.entries(CATS).map(([id, c]) => (
+                                    {CAT_IDS.map(id => (
                                         <div key={id} style={{ background: '#0f172a', borderRadius: 8, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                                            <span>{c.emoji}</span>
+                                            <span>{categorias[id].emoji}</span>
                                             <div style={{ flex: 1, minWidth: 0 }}>
-                                                <div style={{ color: c.hex, fontSize: '0.73rem', fontWeight: 600 }}>{c.name}</div>
+                                                <div style={{ color: CAT_HEX[id], fontSize: '0.73rem', fontWeight: 600 }}>{categorias[id].nombre}</div>
                                                 <div style={{ color: '#64748b', fontSize: '0.78rem', fontFamily: 'monospace', letterSpacing: 1 }}>{codigosCategoria[id]}</div>
                                             </div>
                                             <CopyBtn texto={codigosCategoria[id]} id={id} copiado={copiado} copiar={copiar} />
@@ -619,38 +625,16 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                             </div>
                         )}
 
-                        {/* Email sharing — creator only */}
+                        {/* ── Email sharing ── */}
                         {esCreador && recursoId && (
                             <div>
                                 <div style={labelStyle}>Compartir con profesor</div>
-                                <p style={{ color: '#475569', fontSize: '0.75rem', margin: '0 0 10px' }}>
-                                    El profesor añadido podrá añadir y borrar sus propias preguntas.
-                                </p>
+                                <p style={{ color: '#475569', fontSize: '0.75rem', margin: '0 0 10px' }}>El profesor añadido podrá añadir y borrar sus propias preguntas.</p>
                                 <div style={{ display: 'flex', gap: 6 }}>
-                                    <input
-                                        value={emailNuevo}
-                                        onChange={e => { setEmailNuevo(e.target.value); setErrorColab(''); }}
-                                        onKeyDown={e => e.key === 'Enter' && agregarColaboradorPorEmail()}
-                                        placeholder="email@profesor.com"
-                                        style={{
-                                            flex: 1, background: '#0f172a',
-                                            border: '1px solid #334155', borderRadius: 7,
-                                            color: '#f1f5f9', padding: '8px 10px',
-                                            fontSize: '0.82rem', fontFamily: 'inherit', outline: 'none',
-                                        }}
-                                    />
-                                    <button
-                                        onClick={agregarColaboradorPorEmail}
-                                        disabled={agregandoColab}
-                                        style={{ background: '#1d4ed8', border: 'none', color: 'white', padding: '8px 12px', borderRadius: 7, cursor: 'pointer', fontWeight: 600, fontSize: '0.82rem' }}
-                                    >
-                                        {agregandoColab ? '…' : 'Añadir'}
-                                    </button>
+                                    <input value={emailNuevo} onChange={e => { setEmailNuevo(e.target.value); setErrorColab(''); }} onKeyDown={e => e.key === 'Enter' && agregarColaboradorPorEmail()} placeholder="email@profesor.com" style={{ flex: 1, background: '#0f172a', border: '1px solid #334155', borderRadius: 7, color: '#f1f5f9', padding: '8px 10px', fontSize: '0.82rem', fontFamily: 'inherit', outline: 'none' }} />
+                                    <button onClick={agregarColaboradorPorEmail} disabled={agregandoColab} style={{ background: '#1d4ed8', border: 'none', color: 'white', padding: '8px 12px', borderRadius: 7, cursor: 'pointer', fontWeight: 600, fontSize: '0.82rem' }}>{agregandoColab ? '…' : 'Añadir'}</button>
                                 </div>
-                                {errorColab && (
-                                    <div style={{ color: '#fca5a5', fontSize: '0.78rem', marginTop: 6 }}>⚠ {errorColab}</div>
-                                )}
-
+                                {errorColab && <div style={{ color: '#fca5a5', fontSize: '0.78rem', marginTop: 6 }}>⚠ {errorColab}</div>}
                                 {colaboradores.length > 0 && (
                                     <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
                                         {colaboradores.map(c => (
@@ -659,13 +643,7 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                                                     <div style={{ color: '#e2e8f0', fontSize: '0.83rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.nombre}</div>
                                                     <div style={{ color: '#64748b', fontSize: '0.73rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.email}</div>
                                                 </div>
-                                                <button
-                                                    onClick={() => quitarColaborador(c.uid)}
-                                                    title="Quitar colaborador"
-                                                    style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.9rem', padding: 2 }}
-                                                >
-                                                    ✕
-                                                </button>
+                                                <button onClick={() => quitarColaborador(c.uid)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.9rem', padding: 2 }}>✕</button>
                                             </div>
                                         ))}
                                     </div>
@@ -679,22 +657,22 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                             </div>
                         )}
 
-                        {/* Stats per category */}
+                        {/* ── Stats ── */}
                         {recursoId && (
                             <div>
                                 <div style={labelStyle}>Preguntas por categoría</div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                    {Object.entries(CATS).map(([id, c]) => {
-                                        const n = preguntas[id]?.length ?? 0;
+                                    {CAT_IDS.map(id => {
+                                        const n   = preguntas[id]?.length ?? 0;
                                         const pct = Math.min(100, (n / 20) * 100);
                                         return (
                                             <div key={id}>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                                                    <span style={{ color: c.hex, fontSize: '0.76rem' }}>{c.emoji} {c.name}</span>
+                                                    <span style={{ color: CAT_HEX[id], fontSize: '0.76rem' }}>{categorias[id].emoji} {categorias[id].nombre}</span>
                                                     <span style={{ color: '#64748b', fontSize: '0.76rem' }}>{n}</span>
                                                 </div>
                                                 <div style={{ height: 4, background: '#334155', borderRadius: 2 }}>
-                                                    <div style={{ height: 4, background: c.hex, borderRadius: 2, width: `${pct}%`, transition: 'width 0.4s' }} />
+                                                    <div style={{ height: 4, background: CAT_HEX[id], borderRadius: 2, width: `${pct}%`, transition: 'width 0.4s' }} />
                                                 </div>
                                             </div>
                                         );
@@ -709,33 +687,78 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
     );
 }
 
-// ─── Helper sub-components ─────────────────────────────────────────────────
+// ─── Image search ──────────────────────────────────────────────────────────────
+function ImageSearchPanel({ currentUrl, onSelect, accentColor }) {
+    const [abierto,    setAbierto]    = useState(false);
+    const [query,      setQuery]      = useState('');
+    const [buscando,   setBuscando]   = useState(false);
+    const [resultados, setResultados] = useState([]);
+
+    const buscar = async () => {
+        if (!query.trim()) return;
+        setBuscando(true);
+        try {
+            const res  = await fetch(`https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrnamespace=6&gsrsearch=${encodeURIComponent(query)}&gsrlimit=24&prop=imageinfo&iiprop=url&iiurlwidth=400&format=json&origin=*`);
+            const data = await res.json();
+            const pages = data.query?.pages || {};
+            const urls  = Object.values(pages)
+                .map(p => { const info = p.imageinfo?.[0]; return info?.thumburl || info?.url; })
+                .filter(u => u && /\.(jpe?g|png|gif|webp|svg)(\?|$)/i.test(u));
+            setResultados(urls);
+        } catch { /* ignore */ }
+        setBuscando(false);
+    };
+
+    return (
+        <div>
+            {currentUrl && (
+                <div style={{ position: 'relative', marginBottom: 8 }}>
+                    <img src={currentUrl} alt="portada" style={{ width: '100%', maxHeight: 140, objectFit: 'cover', borderRadius: 8, display: 'block' }} />
+                    <button onClick={() => onSelect('')} style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(15,23,42,0.85)', border: '1px solid #475569', color: '#f87171', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', fontSize: '0.75rem' }}>✕ Quitar</button>
+                </div>
+            )}
+            <button onClick={() => setAbierto(p => !p)} style={{ background: abierto ? accentColor + '20' : '#0f172a', border: `1px dashed ${accentColor}80`, color: accentColor, borderRadius: 8, padding: '8px 14px', cursor: 'pointer', fontSize: '0.83rem', fontWeight: 600, width: '100%', textAlign: 'left' }}>
+                🔍 {abierto ? 'Cerrar buscador' : currentUrl ? 'Cambiar imagen' : 'Añadir imagen'}
+            </button>
+            {abierto && (
+                <div style={{ marginTop: 8, background: '#0a111e', borderRadius: 10, padding: 12, border: '1px solid #1e293b' }}>
+                    <p style={{ margin: '0 0 8px', fontSize: '0.73rem', color: '#64748b' }}>Wikimedia Commons — imágenes libres de derechos</p>
+                    <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                        <input value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && buscar()} placeholder="Ej: mapa Europa, célula vegetal…" style={{ flex: 1, background: '#1e293b', border: '1px solid #334155', borderRadius: 7, color: '#f1f5f9', padding: '8px 10px', fontSize: '0.83rem', fontFamily: 'inherit', outline: 'none' }} />
+                        <button onClick={buscar} disabled={buscando} style={{ background: accentColor, border: 'none', color: 'white', borderRadius: 7, padding: '0 14px', cursor: buscando ? 'default' : 'pointer', fontWeight: 700, fontSize: '0.83rem', opacity: buscando ? 0.6 : 1 }}>{buscando ? '…' : 'Buscar'}</button>
+                    </div>
+                    <input placeholder="O pega una URL directamente…" style={{ width: '100%', boxSizing: 'border-box', background: '#1e293b', border: '1px solid #334155', borderRadius: 7, color: '#94a3b8', padding: '7px 10px', fontSize: '0.78rem', fontFamily: 'inherit', outline: 'none', marginBottom: resultados.length ? 8 : 0 }}
+                        onBlur={e => { if (e.target.value.startsWith('http')) { onSelect(e.target.value); setAbierto(false); } }}
+                        onKeyDown={e => { if (e.key === 'Enter' && e.target.value.startsWith('http')) { onSelect(e.target.value); setAbierto(false); } }}
+                    />
+                    {resultados.length > 0 && (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 6, maxHeight: 200, overflowY: 'auto' }}>
+                            {resultados.map((url, i) => (
+                                <img key={i} src={url} alt="resultado"
+                                    onClick={() => { onSelect(url); setAbierto(false); setResultados([]); setQuery(''); }}
+                                    onError={e => { e.target.style.display = 'none'; }}
+                                    style={{ width: '100%', height: 70, objectFit: 'cover', borderRadius: 6, cursor: 'pointer', border: '2px solid transparent', transition: '0.15s' }}
+                                    onMouseEnter={e => { e.target.style.borderColor = accentColor; }}
+                                    onMouseLeave={e => { e.target.style.borderColor = 'transparent'; }}
+                                />
+                            ))}
+                        </div>
+                    )}
+                    {resultados.length === 0 && !buscando && query && <p style={{ textAlign: 'center', color: '#475569', fontSize: '0.8rem', margin: 0 }}>Sin resultados. Prueba otro término.</p>}
+                </div>
+            )}
+        </div>
+    );
+}
 
 function CopyBtn({ texto, id, copiado, copiar }) {
     const done = copiado === id;
     return (
-        <button
-            onClick={() => copiar(texto, id)}
-            style={{
-                background: done ? '#166534' : '#334155',
-                border: 'none', color: done ? '#4ade80' : '#94a3b8',
-                padding: '4px 10px', borderRadius: 6,
-                cursor: 'pointer', fontSize: '0.75rem', flexShrink: 0,
-                transition: 'background 0.2s',
-            }}
-        >
+        <button onClick={() => copiar(texto, id)} style={{ background: done ? '#166534' : '#334155', border: 'none', color: done ? '#4ade80' : '#94a3b8', padding: '4px 10px', borderRadius: 6, cursor: 'pointer', fontSize: '0.75rem', flexShrink: 0, transition: 'background 0.2s' }}>
             {done ? '✓' : 'Copiar'}
         </button>
     );
 }
 
-const labelStyle = {
-    color: '#94a3b8', fontSize: '0.72rem', fontWeight: 700,
-    textTransform: 'uppercase', letterSpacing: '0.08em',
-    marginBottom: 8,
-};
-
-const codeBox = {
-    background: '#0f172a', borderRadius: 10, padding: '10px 14px',
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-};
+const labelStyle = { color: '#94a3b8', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 };
+const codeBox    = { background: '#0f172a', borderRadius: 10, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' };

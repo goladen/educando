@@ -591,7 +591,7 @@ export const APPS = [
 
     { id: 'STORYCUBES', name: 'Story Cubes', desc: 'Crea historias en equipo usando dados con imágenes.', color: '#8e44ad', emoji: '🎲', shareable: true },
     { id: 'RETOS', name: 'Retos', desc: 'Conecta puntos y puzzles de lógica.', color: '#f39c12', emoji: '🧩', shareable: true },
-    { id: 'TRIVIAL', name: 'Trivial', desc: 'El clásico juego de preguntas por categorías para hasta 6 jugadores.', color: '#16213e', emoji: '🎯', shareable: false },
+    { id: 'TRIVIAL', name: 'Trivial', desc: 'El clásico juego de preguntas por categorías para hasta 6 jugadores.', color: '#16213e', emoji: '🎯', shareable: true },
 
 ];
 
@@ -998,6 +998,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
         }
 
         if (appId === 'TRIVIAL') {
+            window.history.pushState({}, '', '?juego=trivial');
             setJuegoActivo({ tipoJuego: 'TRIVIAL' });
             return;
         }
@@ -1190,11 +1191,15 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
         if (juegoActivo.tipoJuego === 'RACING3D') return <RacingGame3D usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'MANSION_PITAGORICA') return <MansionPitagoricaGame alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'TRIVIAL') {
+            const salirTrivial = () => {
+                window.history.pushState({}, '', window.location.pathname);
+                setJuegoActivo(null);
+            };
             if (juegoActivo.usarBuscador) {
-                return <GamePlayer recurso={{ tipoJuego: 'TRIVIAL', ...juegoActivo }} usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
+                return <GamePlayer recurso={{ tipoJuego: 'TRIVIAL', ...juegoActivo }} usuario={usuario} alTerminar={salirTrivial} />;
             }
             return <TrivialGame
-                onExit={() => setJuegoActivo(null)}
+                onExit={salirTrivial}
                 onBuscar={() => setJuegoActivo(prev => ({ ...prev, usarBuscador: true }))}
             />;
         }

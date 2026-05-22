@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Dices, Trophy, ArrowLeft, Timer, Users, Play } from 'lucide-react';
+import { Dices, Trophy, ArrowLeft, Timer, Users, Play, Maximize2, Minimize2 } from 'lucide-react';
 import { db } from './firebase';
 import { collection, getDocs, query, where, doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import PREGUNTAS_JSON from './preguntas_trivial.json';
@@ -8,8 +8,39 @@ import wrongSound from './assets/negative_beeps-6008.mp3';
 import Confetti from 'react-confetti';
 
 // ─── SONIDOS ──────────────────────────────────────────────────────────────────
-const playCorrectSound = () => { try { new Audio(correctSound).play(); } catch(e) {} };
-const playWrongSound   = () => { try { new Audio(wrongSound).play();   } catch(e) {} };
+// Preload so the browser doesn't block on first interaction
+const _correctAudio = new Audio(correctSound);
+const _wrongAudio   = new Audio(wrongSound);
+
+const playCorrectSound = () => {
+    try { _correctAudio.currentTime = 0; _correctAudio.play().catch(() => {}); } catch(e) {}
+};
+const playWrongSound = () => {
+    try { _wrongAudio.currentTime = 0; _wrongAudio.play().catch(() => {}); } catch(e) {}
+};
+
+// Dice roll: procedural noise bursts via Web Audio (no asset needed)
+const playDiceSound = () => {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        for (let i = 0; i < 7; i++) {
+            const delay = i * 0.09;
+            const bufSize = Math.floor(ctx.sampleRate * 0.045);
+            const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+            const data = buf.getChannelData(0);
+            for (let j = 0; j < bufSize; j++) {
+                data[j] = (Math.random() * 2 - 1) * Math.exp(-j / (bufSize * 0.35));
+            }
+            const src = ctx.createBufferSource();
+            src.buffer = buf;
+            const gain = ctx.createGain();
+            gain.gain.setValueAtTime(0.28 - i * 0.02, ctx.currentTime + delay);
+            src.connect(gain);
+            gain.connect(ctx.destination);
+            src.start(ctx.currentTime + delay);
+        }
+    } catch(e) {}
+};
 
 const playJumpSound = () => {
     try {
@@ -25,8 +56,181 @@ const playJumpSound = () => {
         gain.connect(ctx.destination);
         osc.start();
         osc.stop(ctx.currentTime + 0.1);
-    } catch(e) { console.log("Audio no soportado"); }
+    } catch(e) {}
 };
+
+// ─── DADO SVG ─────────────────────────────────────────────────────────────────
+const DICE_DOTS = {
+    1: [[50, 50]],
+    2: [[30, 30], [70, 70]],
+    3: [[30, 30], [50, 50], [70, 70]],
+    4: [[30, 30], [70, 30], [30, 70], [70, 70]],
+    5: [[30, 30], [70, 30], [50, 50], [30, 70], [70, 70]],
+    6: [[30, 25], [70, 25], [30, 50], [70, 50], [30, 75], [70, 75]],
+};
+
+function DiceFace({ value, rolling, size = 62 }) {
+    const positions = DICE_DOTS[value] || [];
+    return (
+        <svg
+            width={size} height={size} viewBox="0 0 100 100"
+            style={{
+                filter: rolling
+                    ? 'drop-shadow(0 0 10px #38bdf8) drop-shadow(0 0 4px #7dd3fc)'
+                    : value
+                        ? 'drop-shadow(0 3px 6px rgba(0,0,0,0.6))'
+                        : 'none',
+                animation: rolling ? 'diceSpin 0.12s linear infinite' : 'none',
+                display: 'block',
+            }}
+        >
+            <defs>
+                <linearGradient id="dg" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#f8fafc" />
+                    <stop offset="100%" stopColor="#cbd5e1" />
+                </linearGradient>
+            </defs>
+            <rect x="5" y="5" width="90" height="90" rx="18" ry="18"
+                fill={rolling ? '#0f172a' : 'url(#dg)'}
+                stroke={rolling ? '#38bdf8' : '#94a3b8'}
+                strokeWidth="2.5"
+            />
+            {positions.map(([cx, cy], i) => (
+                <circle key={i} cx={cx} cy={cy} r="9"
+                    fill={rolling ? '#38bdf8' : '#1e293b'}
+                />
+            ))}
+        </svg>
+    );
+}
+
+// Inject keyframe once
+if (typeof document !== 'undefined' && !document.getElementById('trivial-dice-css')) {
+    const s = document.createElement('style');
+    s.id = 'trivial-dice-css';
+    s.textContent = `
+        @keyframes diceSpin {
+            0%   { transform: rotate(-12deg) scale(1.08); }
+            50%  { transform: rotate(12deg)  scale(0.94); }
+            100% { transform: rotate(-12deg) scale(1.08); }
+        }
+        @keyframes diceLand {
+            0%   { transform: scale(1.35) rotate(-6deg); }
+            60%  { transform: scale(0.9)  rotate(3deg);  }
+            100% { transform: scale(1)    rotate(0deg);  }
+        }
+        @keyframes heartRise {
+            0%   { transform: translateY(0)      rotate(0deg)   scale(1);    opacity: 1; }
+            80%  { opacity: 0.7; }
+            100% { transform: translateY(-105vh) rotate(25deg)  scale(0.6);  opacity: 0; }
+        }
+        @keyframes heartSway {
+            0%,100% { margin-left: 0; }
+            33%     { margin-left: 18px; }
+            66%     { margin-left: -14px; }
+        }
+        @keyframes trophyDrop {
+            0%   { transform: translateY(-80px) scale(0.5); opacity: 0; }
+            60%  { transform: translateY(12px)  scale(1.15); opacity: 1; }
+            80%  { transform: translateY(-6px)  scale(0.97); }
+            100% { transform: translateY(0)     scale(1); opacity: 1; }
+        }
+        @keyframes winnerSlide {
+            0%   { transform: translateY(40px); opacity: 0; }
+            100% { transform: translateY(0);    opacity: 1; }
+        }
+        @keyframes starSpin {
+            from { transform: rotate(0deg) scale(1); }
+            to   { transform: rotate(360deg) scale(1.2); }
+        }
+        @keyframes cardIn {
+            0%   { transform: translateX(-30px); opacity: 0; }
+            100% { transform: translateX(0);     opacity: 1; }
+        }
+    `;
+    document.head.appendChild(s);
+}
+
+// ─── CORAZONES ────────────────────────────────────────────────────────────────
+const HEART_EMOJIS = ['❤️','💖','💕','💗','💓','🧡','💛','💚','💙','💜','🤍','💝'];
+const HEARTS_DATA = Array.from({ length: 36 }, (_, i) => ({
+    id: i,
+    emoji: HEART_EMOJIS[i % HEART_EMOJIS.length],
+    left: 2 + (i * 97 / 35),           // spread evenly across width
+    size: 18 + Math.sin(i * 1.7) * 14, // 18–32px varied sizes
+    delay: (i * 0.18) % 5,             // stagger delays
+    duration: 4 + Math.cos(i * 0.9) * 1.5, // 2.5–5.5s
+}));
+
+// ─── PANTALLA COMPLETA ────────────────────────────────────────────────────────
+function FullscreenBtn({ bottom = 20, right = 16 }) {
+    const [isFull, setIsFull] = useState(false);
+
+    useEffect(() => {
+        const onChange = () => setIsFull(!!document.fullscreenElement);
+        document.addEventListener('fullscreenchange', onChange);
+        return () => document.removeEventListener('fullscreenchange', onChange);
+    }, []);
+
+    const toggle = () => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(() => {});
+        } else {
+            document.exitFullscreen().catch(() => {});
+        }
+    };
+
+    return (
+        <button
+            onClick={toggle}
+            title={isFull ? 'Salir de pantalla completa' : 'Pantalla completa'}
+            style={{
+                position: 'fixed',
+                bottom,
+                right,
+                zIndex: 9998,
+                background: 'rgba(15,23,42,0.82)',
+                border: '1px solid #475569',
+                color: '#94a3b8',
+                width: 36, height: 36,
+                borderRadius: 9,
+                cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                backdropFilter: 'blur(6px)',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                transition: 'color 0.15s, border-color 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#f1f5f9'; e.currentTarget.style.borderColor = '#94a3b8'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#94a3b8'; e.currentTarget.style.borderColor = '#475569'; }}
+        >
+            {isFull ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+        </button>
+    );
+}
+
+function HeartsEffect() {
+    return (
+        <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 1, overflow: 'hidden' }}>
+            {HEARTS_DATA.map(h => (
+                <div
+                    key={h.id}
+                    style={{
+                        position: 'absolute',
+                        bottom: '-40px',
+                        left: `${h.left}%`,
+                        fontSize: `${h.size}px`,
+                        lineHeight: 1,
+                        animation: `heartRise ${h.duration}s ease-in ${h.delay}s infinite,
+                                    heartSway ${h.duration * 0.7}s ease-in-out ${h.delay}s infinite`,
+                        willChange: 'transform, opacity',
+                    }}
+                >
+                    {h.emoji}
+                </div>
+            ))}
+        </div>
+    );
+}
 
 // ─── 1. BASE DE DATOS Y CONFIGURACIÓN ──────────────────────────────────────────
 const COLORS = [
@@ -183,8 +387,16 @@ const GET_PLAYER_POS_STYLE = (index) => {
 
 // ─── 3. COMPONENTE REACT (UI + INTEGRACIÓN CANVAS) ───────────────────────────
 export default function TrivialGame({ onExit, onBuscar }) {
+    // ─── RESPONSIVE ───
+    const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 640);
+    useEffect(() => {
+        const fn = () => setIsMobile(window.innerWidth <= 640);
+        window.addEventListener('resize', fn);
+        return () => window.removeEventListener('resize', fn);
+    }, []);
+
     // ─── ESTADOS DE CONFIGURACIÓN ───
-    const [pantalla, setPantalla] = useState('INTRO'); // INTRO, SETUP, PLAYING
+    const [pantalla, setPantalla] = useState('INTRO'); // INTRO, SETUP, RULES, PLAYING
     const [numPlayers, setNumPlayers] = useState(4);
     const [nombres, setNombres] = useState(['Jugador 1', 'Jugador 2', 'Jugador 3', 'Jugador 4', 'Jugador 5', 'Jugador 6']);
     
@@ -193,7 +405,10 @@ export default function TrivialGame({ onExit, onBuscar }) {
     const [activePlayerIdx, setActivePlayerIdx] = useState(0);
     const [gameState, setGameState] = useState('WAITING_ROLL'); 
     const [diceVal, setDiceVal] = useState(null);
-    const [modalData, setModalData] = useState(null); 
+    const [diceDisplay, setDiceDisplay] = useState(null); // face shown during animation
+    const [diceLanding, setDiceLanding] = useState(false);
+    const diceAnimRef = useRef(null);
+    const [modalData, setModalData] = useState(null);
     const [timeLeft, setTimeLeft] = useState(15); 
 
     const [fuentePreguntas, setFuentePreguntas] = useState('JSON');
@@ -272,7 +487,7 @@ export default function TrivialGame({ onExit, onBuscar }) {
             });
         }
         setPlayers(nuevosJugadores);
-        setPantalla('PLAYING');
+        setPantalla('RULES');
         setCargando(false);
     };
 
@@ -621,14 +836,25 @@ export default function TrivialGame({ onExit, onBuscar }) {
     const tirarDado = () => {
         if (pausaActiva || gameState !== 'WAITING_ROLL') return;
         setGameState('ROLLING');
-        
+        setDiceLanding(false);
+        playDiceSound();
+
+        // Rapid visual cycling
+        diceAnimRef.current = setInterval(() => {
+            setDiceDisplay(Math.floor(Math.random() * 6) + 1);
+        }, 75);
+
         setTimeout(() => {
+            clearInterval(diceAnimRef.current);
             const roll = Math.floor(Math.random() * 6) + 1;
+            setDiceDisplay(roll);
             setDiceVal(roll);
+            setDiceLanding(true);
+            setTimeout(() => setDiceLanding(false), 400);
             setGameState('SELECTING');
-            
+
             const eng = engineRef.current;
-            const currentPos = eng.playersPos[activePlayerIdx].node;
+            const currentPos = eng.playersPos[activePlayerIdxRef.current].node;
             eng.destinations = eng.board.getValidDestinations(currentPos, roll);
         }, 800);
     };
@@ -695,25 +921,26 @@ export default function TrivialGame({ onExit, onBuscar }) {
     if (pantalla === 'INTRO') {
         const totalPreguntas = Object.values(PREGUNTAS_JSON).flat().length;
         return (
-            <div style={{ ...st.appContainer, flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', gap: 0 }}>
+            <div style={{ ...st.appContainer, height: 'auto', minHeight: '100dvh', overflowY: 'auto', flexDirection: 'column', alignItems: 'center', justifyContent: isMobile ? 'flex-start' : 'center', padding: isMobile ? '24px 16px 32px' : '20px', gap: 0 }}>
+                <FullscreenBtn />
 
                 {/* Cabecera de colores de categoría */}
-                <div style={{ display: 'flex', gap: 10, marginBottom: 24 }}>
+                <div style={{ display: 'flex', gap: 10, marginBottom: 20, marginTop: isMobile ? 8 : 0 }}>
                     {COLORS.map(c => (
                         <div key={c.id} style={{ width: 22, height: 22, borderRadius: '50%', background: c.hex, boxShadow: `0 0 16px ${c.hex}cc` }} />
                     ))}
                 </div>
 
                 <h1 style={{ color: 'white', fontSize: 'clamp(2.5rem, 8vw, 5rem)', margin: 0, fontWeight: 900, letterSpacing: 6, textShadow: '0 0 50px rgba(255,255,255,0.15)' }}>TRIVIAL</h1>
-                <p style={{ color: '#64748b', marginBottom: 50, fontSize: '1.1rem', letterSpacing: 2 }}>JUEGO DE PREGUNTAS</p>
+                <p style={{ color: '#64748b', marginBottom: isMobile ? 24 : 50, fontSize: '1.1rem', letterSpacing: 2 }}>JUEGO DE PREGUNTAS</p>
 
                 {/* Dos opciones */}
-                <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', justifyContent: 'center', width: '100%', maxWidth: 820 }}>
+                <div style={{ display: 'flex', gap: isMobile ? 14 : 20, flexWrap: 'wrap', justifyContent: 'center', width: '100%', maxWidth: 820, padding: isMobile ? '0 4px' : 0 }}>
 
                     {/* Opción 1: Preguntas integradas */}
                     <div
                         onClick={() => { setFuentePreguntas('JSON'); setPantalla('SETUP'); }}
-                        style={{ flex: 1, minWidth: 300, background: 'rgba(30,41,59,0.9)', border: '2px solid #334155', borderRadius: 24, padding: 36, cursor: 'pointer', textAlign: 'center', transition: 'border-color 0.2s, transform 0.2s', position: 'relative', overflow: 'hidden' }}
+                        style={{ flex: 1, minWidth: isMobile ? '100%' : 280, background: 'rgba(30,41,59,0.9)', border: '2px solid #334155', borderRadius: 20, padding: isMobile ? '24px 20px' : 36, cursor: 'pointer', textAlign: 'center', transition: 'border-color 0.2s, transform 0.2s', position: 'relative', overflow: 'hidden' }}
                         onMouseEnter={e => { e.currentTarget.style.borderColor = '#38bdf8'; e.currentTarget.style.transform = 'translateY(-4px)'; }}
                         onMouseLeave={e => { e.currentTarget.style.borderColor = '#334155'; e.currentTarget.style.transform = 'translateY(0)'; }}
                     >
@@ -738,7 +965,7 @@ export default function TrivialGame({ onExit, onBuscar }) {
 
                     {/* Opción 2: Buscar Trivial */}
                     <div
-                        style={{ flex: 1, minWidth: 300, background: 'rgba(30,41,59,0.9)', border: '2px solid #334155', borderRadius: 24, padding: 36, textAlign: 'center', position: 'relative', overflow: 'hidden' }}
+                        style={{ flex: 1, minWidth: isMobile ? '100%' : 280, background: 'rgba(30,41,59,0.9)', border: '2px solid #334155', borderRadius: 20, padding: isMobile ? '24px 20px' : 36, textAlign: 'center', position: 'relative', overflow: 'hidden' }}
                     >
                         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 6, background: 'linear-gradient(135deg, #a855f7, #7c3aed)' }} />
                         <div style={{ fontSize: '3.5rem', marginBottom: 14 }}>🔍</div>
@@ -772,7 +999,7 @@ export default function TrivialGame({ onExit, onBuscar }) {
                     </div>
 
                     {/* Opción 3: Continuar partida */}
-                    <div style={{ flex: 1, minWidth: 300, background: 'rgba(30,41,59,0.9)', border: '2px solid #334155', borderRadius: 24, padding: 36, textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+                    <div style={{ flex: 1, minWidth: isMobile ? '100%' : 280, background: 'rgba(30,41,59,0.9)', border: '2px solid #334155', borderRadius: 20, padding: isMobile ? '24px 20px' : 36, textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
                         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 6, background: 'linear-gradient(135deg, #f59e0b, #d97706)' }} />
                         <div style={{ fontSize: '3.5rem', marginBottom: 14 }}>🔄</div>
                         <h2 style={{ color: 'white', margin: '0 0 10px', fontSize: '1.6rem' }}>Continuar partida</h2>
@@ -807,10 +1034,209 @@ export default function TrivialGame({ onExit, onBuscar }) {
         );
     }
 
+    // ════════════════════════════════════════════════════════════════════════
+    // RENDER: PANTALLA DE REGLAS
+    // ════════════════════════════════════════════════════════════════════════
+    if (pantalla === 'RULES') {
+        const cats = [
+            { id: 'geo', hex: '#3498db', emoji: '🌍', name: 'Geografía',    desc: 'Capitales, ríos, montañas y países del mundo.' },
+            { id: 'esp', hex: '#e84393', emoji: '🎬', name: 'Espectáculos', desc: 'Cine, música, televisión y cultura popular.' },
+            { id: 'his', hex: '#f1c40f', emoji: '📜', name: 'Historia',     desc: 'Personajes, batallas, fechas y civilizaciones.' },
+            { id: 'art', hex: '#9b59b6', emoji: '🎨', name: 'Arte y Lit.',  desc: 'Pintores, escritores, obras y movimientos.' },
+            { id: 'cie', hex: '#2ecc71', emoji: '🔬', name: 'Ciencias',     desc: 'Física, biología, química y matemáticas.' },
+            { id: 'dep', hex: '#e67e22', emoji: '⚽', name: 'Deportes',     desc: 'Fútbol, olimpiadas, récords y deportistas.' },
+        ];
+        const pasos = [
+            { n: '1', titulo: 'Lanza el dado', texto: 'En tu turno pulsa el botón para tirar. El número indica cuántas casillas puedes avanzar.' },
+            { n: '2', titulo: 'Elige tu casilla', texto: 'Haz clic en cualquiera de los destinos resaltados para mover tu ficha.' },
+            { n: '3', titulo: 'Responde la pregunta', texto: 'Al caer en una casilla de color se muestra una pregunta de esa categoría. Tienes 15 segundos.' },
+            { n: '4', titulo: 'Consigue quesitos', texto: 'Si aciertas en una casilla especial (nodo grande) obtienes el quesito de ese color.' },
+            { n: '5', titulo: '¡Gana el primero!', texto: 'Llega al centro con todos los quesitos y responde la pregunta final para ganar.' },
+        ];
+
+        return (
+            <div style={{
+                minHeight: '100vh',
+                background: 'linear-gradient(135deg, #0f172a 0%, #1e2d4a 50%, #0f172a 100%)',
+                fontFamily: "'Segoe UI', sans-serif",
+                overflowY: 'auto',
+                padding: '0 0 40px',
+            }}>
+                <FullscreenBtn />
+                {/* Header */}
+                <div style={{
+                    background: 'rgba(15,23,42,0.9)',
+                    borderBottom: '1px solid #1e3a5f',
+                    padding: '20px 32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 16,
+                    position: 'sticky', top: 0, zIndex: 10,
+                    backdropFilter: 'blur(8px)',
+                }}>
+                    <button
+                        onClick={() => setPantalla('SETUP')}
+                        style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.9rem', fontWeight: 600 }}
+                    >
+                        <ArrowLeft size={16} /> Configuración
+                    </button>
+                    <div style={{ flex: 1, textAlign: 'center' }}>
+                        <span style={{ color: '#f1f5f9', fontWeight: 900, fontSize: '1.2rem', letterSpacing: 2 }}>🎯 TRIVIAL</span>
+                    </div>
+                    {/* Jugadores en cabecera */}
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        {players.map(p => (
+                            <div key={p.id} style={{ width: 32, height: 32, borderRadius: '50%', background: p.color, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '0.75rem', fontWeight: 900, boxShadow: `0 0 8px ${p.color}80` }}>
+                                {p.name[0].toUpperCase()}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div style={{ maxWidth: 920, margin: '0 auto', padding: '32px 20px 0' }}>
+
+                    {/* Hero */}
+                    <div style={{ textAlign: 'center', marginBottom: 48 }}>
+                        <div style={{ fontSize: '4rem', marginBottom: 12, filter: 'drop-shadow(0 4px 12px rgba(56,189,248,0.4))' }}>🎯</div>
+                        <h1 style={{ color: '#f1f5f9', fontSize: '2.4rem', fontWeight: 900, margin: '0 0 10px', letterSpacing: 1 }}>
+                            ¿Cómo se juega?
+                        </h1>
+                        <p style={{ color: '#64748b', fontSize: '1.05rem', margin: 0, maxWidth: 520, marginInline: 'auto' }}>
+                            El clásico juego de conocimiento para {players.length} jugador{players.length !== 1 ? 'es' : ''}.<br />
+                            Reúne los 6 quesitos y demuestra que lo sabes todo.
+                        </p>
+                    </div>
+
+                    {/* Pasos */}
+                    <div style={{ marginBottom: 52 }}>
+                        <h2 style={{ color: '#94a3b8', fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 20 }}>
+                            Cómo jugar
+                        </h2>
+                        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
+                            {pasos.map(p => (
+                                <div key={p.n} style={{
+                                    background: 'rgba(30,41,59,0.7)',
+                                    border: '1px solid #1e3a5f',
+                                    borderRadius: 16,
+                                    padding: '18px 22px',
+                                    display: 'flex',
+                                    gap: 16,
+                                    alignItems: 'flex-start',
+                                }}>
+                                    <div style={{
+                                        width: 38, height: 38, borderRadius: '50%',
+                                        background: 'linear-gradient(135deg, #1d4ed8, #7c3aed)',
+                                        color: 'white', fontWeight: 900, fontSize: '1rem',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        flexShrink: 0, boxShadow: '0 4px 12px rgba(29,78,216,0.4)',
+                                    }}>{p.n}</div>
+                                    <div>
+                                        <div style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.97rem', marginBottom: 4 }}>{p.titulo}</div>
+                                        <div style={{ color: '#64748b', fontSize: '0.85rem', lineHeight: 1.55 }}>{p.texto}</div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Categorías */}
+                    <div style={{ marginBottom: 52 }}>
+                        <h2 style={{ color: '#94a3b8', fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 20 }}>
+                            Las 6 categorías
+                        </h2>
+                        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10 }}>
+                            {cats.map(c => (
+                                <div key={c.id} style={{
+                                    background: `linear-gradient(135deg, ${c.hex}18, ${c.hex}08)`,
+                                    border: `1.5px solid ${c.hex}45`,
+                                    borderRadius: 14,
+                                    padding: isMobile ? '12px 14px' : '18px 20px',
+                                    display: 'flex',
+                                    flexDirection: isMobile ? 'column' : 'row',
+                                    gap: isMobile ? 8 : 14,
+                                    alignItems: isMobile ? 'flex-start' : 'center',
+                                    transition: 'transform 0.15s',
+                                }}>
+                                    {/* Quesito */}
+                                    <div style={{
+                                        width: isMobile ? 36 : 48, height: isMobile ? 36 : 48, borderRadius: '50%',
+                                        background: `radial-gradient(circle at 35% 35%, ${c.hex}ff, ${c.hex}99)`,
+                                        boxShadow: `0 4px 14px ${c.hex}55`,
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        fontSize: isMobile ? '1.1rem' : '1.5rem', flexShrink: 0,
+                                    }}>
+                                        {c.emoji}
+                                    </div>
+                                    <div>
+                                        <div style={{ color: c.hex, fontWeight: 800, fontSize: isMobile ? '0.88rem' : '1rem', marginBottom: 2 }}>{c.name}</div>
+                                        {!isMobile && <div style={{ color: '#64748b', fontSize: '0.82rem', lineHeight: 1.5 }}>{c.desc}</div>}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Consejos rápidos */}
+                    <div style={{
+                        background: 'rgba(30,41,59,0.5)',
+                        border: '1px solid #1e3a5f',
+                        borderRadius: 16,
+                        padding: '20px 28px',
+                        marginBottom: 48,
+                        display: 'flex',
+                        gap: 32,
+                        flexWrap: 'wrap',
+                        justifyContent: 'center',
+                    }}>
+                        {[
+                            { icon: '⏱', texto: '15 segundos por pregunta' },
+                            { icon: '🎲', texto: 'Turno pasa si fallas' },
+                            { icon: '🏆', texto: 'Necesitas los 6 quesitos para ir al centro' },
+                            { icon: '🎯', texto: 'Responde bien en el centro para ganar' },
+                        ].map((t, i) => (
+                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#94a3b8', fontSize: '0.9rem' }}>
+                                <span style={{ fontSize: '1.3rem' }}>{t.icon}</span>
+                                {t.texto}
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* CTA */}
+                    <div style={{ textAlign: 'center' }}>
+                        <button
+                            onClick={() => setPantalla('PLAYING')}
+                            style={{
+                                background: 'linear-gradient(135deg, #1d4ed8, #7c3aed)',
+                                border: 'none',
+                                color: 'white',
+                                padding: '20px 72px',
+                                borderRadius: 50,
+                                fontSize: '1.25rem',
+                                fontWeight: 900,
+                                cursor: 'pointer',
+                                letterSpacing: 1,
+                                boxShadow: '0 8px 32px rgba(29,78,216,0.5)',
+                                transition: 'transform 0.15s, box-shadow 0.15s',
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.05)'; e.currentTarget.style.boxShadow = '0 12px 40px rgba(29,78,216,0.65)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 8px 32px rgba(29,78,216,0.5)'; }}
+                        >
+                            ¡A jugar!
+                        </button>
+                        <p style={{ color: '#334155', fontSize: '0.82rem', marginTop: 14 }}>
+                            Jugadores: {players.map(p => p.name).join(', ')}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     if (pantalla === 'SETUP') {
         return (
-            <div style={{ ...st.appContainer, justifyContent: 'center', alignItems: 'center' }}>
-                <div style={{ background: 'rgba(30, 41, 59, 0.95)', padding: 40, borderRadius: 20, width: '100%', maxWidth: 500, boxShadow: '0 25px 50px rgba(0,0,0,0.5)', border: '2px solid #334155' }}>
+            <div style={{ ...st.appContainer, height: 'auto', minHeight: '100dvh', justifyContent: 'center', alignItems: isMobile ? 'flex-start' : 'center', overflowY: 'auto', padding: isMobile ? '16px' : 0 }}>
+                <FullscreenBtn />
+                <div style={{ background: 'rgba(30, 41, 59, 0.95)', padding: isMobile ? '20px 16px' : 40, borderRadius: 20, width: '100%', maxWidth: 500, margin: isMobile ? '16px' : 0, boxSizing: 'border-box', boxShadow: '0 25px 50px rgba(0,0,0,0.5)', border: '2px solid #334155' }}>
                     <button onClick={() => setPantalla('INTRO')} style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 20, fontWeight: 'bold', fontSize: '0.9rem' }}>
                         <ArrowLeft size={16} /> Volver
                     </button>
@@ -893,97 +1319,181 @@ export default function TrivialGame({ onExit, onBuscar }) {
     // ════════════════════════════════════════════════════════════════════════
     return (
         <div style={st.appContainer}>
-            {gameState === 'WON' && <Confetti recycle={false} numberOfPieces={800} />}
+            {gameState === 'WON' && <Confetti recycle={false} numberOfPieces={500} />}
+            <FullscreenBtn bottom={isMobile ? 100 : 20} />
 
-            {/* BOTÓN SALIR FLOTANTE ARRIBA AL CENTRO */}
-            {onExit && (
-                <button onClick={onExit} style={{ position: 'absolute', top: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 50, background: 'rgba(15, 23, 42, 0.8)', color: 'white', border: '1px solid #334155', padding: '10px 20px', borderRadius: 30, cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 8, backdropFilter: 'blur(5px)' }}>
-                    <ArrowLeft size={16}/> Salir
-                </button>
+            {/* ── TIRA DE JUGADORES (móvil: arriba fijo / escritorio: esquinas) ── */}
+            {isMobile ? (
+                <div style={{
+                    position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20,
+                    background: 'rgba(15,23,42,0.95)', borderBottom: '1px solid #334155',
+                    display: 'flex', gap: 6, padding: '7px 10px', overflowX: 'auto',
+                    backdropFilter: 'blur(6px)', alignItems: 'center',
+                }}>
+                    {onExit && (
+                        <button onClick={onExit} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '2px 6px', flexShrink: 0 }}>
+                            <ArrowLeft size={18} />
+                        </button>
+                    )}
+                    {players.map((p, i) => {
+                        const isAct = i === activePlayerIdx;
+                        return (
+                            <div key={p.id} style={{
+                                flexShrink: 0,
+                                background: isAct ? `${p.color}22` : 'rgba(30,41,59,0.8)',
+                                border: `1.5px solid ${isAct ? p.color : '#334155'}`,
+                                borderRadius: 10, padding: '5px 9px',
+                                display: 'flex', alignItems: 'center', gap: 6,
+                                boxShadow: isAct ? `0 0 10px ${p.color}55` : 'none',
+                                transition: 'all 0.2s',
+                            }}>
+                                <div style={{ width: 11, height: 11, borderRadius: '50%', background: p.color, flexShrink: 0 }} />
+                                <span style={{ color: 'white', fontSize: '0.78rem', fontWeight: isAct ? 700 : 400, maxWidth: 70, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
+                                <div style={{ display: 'flex', gap: 2 }}>
+                                    {COLORS.map(c => (
+                                        <div key={c.id} style={{ width: 7, height: 7, borderRadius: '50%', background: p.wedges.includes(c.id) ? c.hex : '#334155' }} />
+                                    ))}
+                                </div>
+                                {isAct && <span style={{ fontSize: '0.6rem', background: p.color, color: '#0f172a', padding: '1px 4px', borderRadius: 5, fontWeight: 900 }}>▶</span>}
+                            </div>
+                        );
+                    })}
+                </div>
+            ) : (
+                <>
+                    {onExit && (
+                        <button onClick={onExit} style={{ position: 'absolute', top: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 50, background: 'rgba(15, 23, 42, 0.8)', color: 'white', border: '1px solid #334155', padding: '10px 20px', borderRadius: 30, cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 8, backdropFilter: 'blur(5px)' }}>
+                            <ArrowLeft size={16}/> Salir
+                        </button>
+                    )}
+                    {players.map((p, i) => {
+                        const isAct = i === activePlayerIdx;
+                        return (
+                            <div key={p.id} style={{ ...st.playerCardFloating, ...GET_PLAYER_POS_STYLE(i), border: isAct ? `2px solid ${p.color}` : '2px solid #334155', transform: `${GET_PLAYER_POS_STYLE(i).transform || ''} ${isAct ? 'scale(1.1)' : 'scale(1)'}`, boxShadow: isAct ? `0 0 30px ${p.color}88` : '0 10px 20px rgba(0,0,0,0.5)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontWeight: 'bold', color: 'white', fontSize: '1.2rem' }}>
+                                    <div style={{ width: 28, height: 28, borderRadius: '50%', background: p.color, border: '2px solid white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', color: '#1e293b' }}>P{i+1}</div>
+                                    {p.name}
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 5, marginTop: 10 }}>
+                                    {COLORS.map(c => (
+                                        <div key={c.id} style={{ height: 8, borderRadius: 4, background: p.wedges.includes(c.id) ? c.hex : '#475569', boxShadow: p.wedges.includes(c.id) ? `0 0 5px ${c.hex}` : 'none' }} />
+                                    ))}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </>
             )}
 
-            {/* TARJETAS DE JUGADORES FLOTANTES (Esquinas y Lados) */}
-            {players.map((p, i) => {
-                const isAct = i === activePlayerIdx;
-                return (
-                    <div key={p.id} style={{ ...st.playerCardFloating, ...GET_PLAYER_POS_STYLE(i), border: isAct ? `2px solid ${p.color}` : '2px solid #334155', transform: `${GET_PLAYER_POS_STYLE(i).transform || ''} ${isAct ? 'scale(1.1)' : 'scale(1)'}`, boxShadow: isAct ? `0 0 30px ${p.color}88` : '0 10px 20px rgba(0,0,0,0.5)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontWeight: 'bold', color: 'white', fontSize: '1.2rem' }}>
-                            <div style={{ width: 28, height: 28, borderRadius: '50%', background: p.color, border: '2px solid white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', color: '#1e293b' }}>P{i+1}</div>
-                            {p.name}
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 5, marginTop: 10 }}>
-                            {COLORS.map(c => (
-                                <div key={c.id} style={{ height: 8, borderRadius: 4, background: p.wedges.includes(c.id) ? c.hex : '#475569', boxShadow: p.wedges.includes(c.id) ? `0 0 5px ${c.hex}` : 'none' }} />
-                            ))}
-                        </div>
-                    </div>
-                );
-            })}
-
             {/* ZONA CENTRAL DE JUEGO (CANVAS) */}
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>
-                <div style={{ width: '100%', maxWidth: 800, aspectRatio: '1/1', position: 'relative' }}>
-                    <canvas 
-                        ref={canvasRef} 
-                        width={1000} 
-                        height={1000} 
+            <div style={{
+                position: 'absolute',
+                top: isMobile ? 50 : 0,
+                bottom: isMobile ? 86 : 0,
+                left: 0, right: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                zIndex: 1,
+            }}>
+                <div style={{ width: '100%', maxWidth: isMobile ? '100vmin' : 800, aspectRatio: '1/1', position: 'relative' }}>
+                    <canvas
+                        ref={canvasRef}
+                        width={1000}
+                        height={1000}
                         onClick={handleCanvasClick}
                         style={{ width: '100%', height: '100%', filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.8))', cursor: gameState === 'SELECTING' ? 'pointer' : 'default' }}
                     />
                 </div>
             </div>
 
-            {/* PANEL DE CONTROLES FLOTANTE (Abajo al Centro) */}
-            <div style={st.controlsFloating}>
-                <div style={{ textAlign: 'left', minWidth: 200 }}>
-                    <div style={{ fontSize: '0.9rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1 }}>Turno Actual</div>
-                    <div style={{ fontSize: '1.4rem', color: players[activePlayerIdx]?.color || 'white', fontWeight: 'bold' }}>
+            {/* PANEL DE CONTROLES */}
+            <div style={isMobile ? {
+                position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 20,
+                background: 'rgba(15,23,42,0.97)', borderTop: '1px solid #334155',
+                padding: '8px 12px', display: 'flex', alignItems: 'center',
+                gap: 8, backdropFilter: 'blur(8px)',
+            } : st.controlsFloating}>
+                {/* Nombre + estado */}
+                <div style={{ flex: isMobile ? 1 : 'none', minWidth: isMobile ? 0 : 200, textAlign: 'left', overflow: 'hidden' }}>
+                    <div style={{ fontSize: isMobile ? '0.7rem' : '0.9rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1 }}>Turno</div>
+                    <div style={{ fontSize: isMobile ? '1rem' : '1.4rem', color: players[activePlayerIdx]?.color || 'white', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {players[activePlayerIdx]?.name}
                     </div>
-                    <div style={{ fontSize: '0.9rem', color: '#cbd5e1', marginTop: 5 }}>
-                        {gameState === 'WAITING_ROLL' ? '¡Lanza el dado!' :
-                         gameState === 'SELECTING' ? 'Elige una casilla destino' :
-                         gameState === 'MOVING' ? 'Saltando...' : 'Respondiendo...'}
-                    </div>
+                    {!isMobile && (
+                        <div style={{ fontSize: '0.9rem', color: '#cbd5e1', marginTop: 5 }}>
+                            {gameState === 'WAITING_ROLL' ? '¡Lanza el dado!' :
+                             gameState === 'SELECTING' ? 'Elige una casilla destino' :
+                             gameState === 'MOVING' ? 'Saltando...' : 'Respondiendo...'}
+                        </div>
+                    )}
                 </div>
 
-                <div style={{ fontSize: '3rem', width: 60, textAlign: 'center', textShadow: '0 5px 15px rgba(0,0,0,0.5)' }}>
-                    {gameState === 'ROLLING' ? <Dices className="animate-spin" size={50} color="#38bdf8"/> : diceVal ? <span style={{color: '#f1c40f'}}>{diceVal}</span> : <Dices size={50} color="#94a3b8"/>}
+                {/* Dado */}
+                <div style={{ width: isMobile ? 46 : 72, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    {(gameState === 'ROLLING' && diceDisplay) ? (
+                        <DiceFace value={diceDisplay} rolling size={isMobile ? 40 : 62} />
+                    ) : diceDisplay ? (
+                        <div style={{ animation: diceLanding ? 'diceLand 0.4s ease-out' : 'none' }}>
+                            <DiceFace value={diceDisplay} rolling={false} size={isMobile ? 40 : 62} />
+                        </div>
+                    ) : (
+                        <Dices size={isMobile ? 34 : 52} color="#334155" />
+                    )}
                 </div>
 
+                {/* Botón lanzar */}
                 <button
                     onClick={tirarDado}
                     disabled={gameState !== 'WAITING_ROLL'}
-                    style={{ ...st.btnRoll, width: 'auto', padding: '15px 30px', opacity: gameState !== 'WAITING_ROLL' ? 0.5 : 1, cursor: gameState !== 'WAITING_ROLL' ? 'not-allowed' : 'pointer', margin: 0 }}
+                    style={{
+                        ...st.btnRoll,
+                        width: 'auto',
+                        padding: isMobile ? '10px 18px' : '15px 30px',
+                        fontSize: isMobile ? '0.95rem' : '1.3rem',
+                        opacity: gameState !== 'WAITING_ROLL' ? 0.5 : 1,
+                        cursor: gameState !== 'WAITING_ROLL' ? 'not-allowed' : 'pointer',
+                        margin: 0, flexShrink: 0,
+                    }}
                 >
-                    Lanzar Dado
+                    {isMobile ? '🎲 Lanzar' : 'Lanzar Dado'}
                 </button>
 
-                <button onClick={() => setPausaActiva(true)} style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid #475569', color: '#94a3b8', width: 46, height: 46, borderRadius: 12, fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>⏸</button>
+                {/* Pausa */}
+                <button onClick={() => setPausaActiva(true)} style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid #475569', color: '#94a3b8', width: isMobile ? 38 : 46, height: isMobile ? 38 : 46, borderRadius: 10, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>⏸</button>
             </div>
 
             {/* MODAL DE PREGUNTAS */}
             {gameState === 'QUESTION' && modalData && (
                 <div style={st.modalOverlay}>
-                    <div style={{ ...st.modalCard, borderTop: `10px solid ${modalData.color.hex}` }}>
+                    <div style={{
+                        ...st.modalCard,
+                        borderTop: `8px solid ${modalData.color.hex}`,
+                        padding: isMobile ? '20px 16px' : 45,
+                        margin: isMobile ? '0 8px' : 0,
+                        maxWidth: isMobile ? '100%' : 550,
+                        boxSizing: 'border-box',
+                    }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div style={{ fontSize: '1.1rem', textTransform: 'uppercase', letterSpacing: 2, color: modalData.color.hex, fontWeight: 'bold' }}>
+                            <div style={{ fontSize: isMobile ? '0.95rem' : '1.1rem', textTransform: 'uppercase', letterSpacing: 2, color: modalData.color.hex, fontWeight: 'bold' }}>
                                 {modalData.color.name}
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: timeLeft > 5 ? '#94a3b8' : '#e74c3c', fontWeight: 'bold', fontSize: '1.2rem' }}>
-                                <Timer size={24}/> {timeLeft}s
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: timeLeft > 5 ? '#94a3b8' : '#e74c3c', fontWeight: 'bold', fontSize: isMobile ? '1rem' : '1.2rem' }}>
+                                <Timer size={isMobile ? 18 : 24}/> {timeLeft}s
                             </div>
                         </div>
-                        
-                        <div style={{ height: 8, background: '#334155', borderRadius: 4, margin: '15px 0', overflow: 'hidden' }}>
+
+                        <div style={{ height: 6, background: '#334155', borderRadius: 4, margin: '12px 0', overflow: 'hidden' }}>
                             <div style={{ height: '100%', width: `${(timeLeft / 15) * 100}%`, background: timeLeft > 5 ? '#2ecc71' : '#e74c3c', transition: 'width 1s linear, background 0.3s' }} />
                         </div>
 
-                        <h2 style={{ color: 'white', fontSize: '1.7rem', margin: '20px 0 30px', lineHeight: 1.4 }}>{modalData.question}</h2>
-                        
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        <h2 style={{ color: 'white', fontSize: isMobile ? '1.2rem' : '1.7rem', margin: isMobile ? '14px 0 18px' : '20px 0 30px', lineHeight: 1.4 }}>{modalData.question}</h2>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 8 : 12 }}>
                             {modalData.answers.map((ans, i) => (
-                                <button key={i} onClick={() => responderPregunta(ans === modalData.correct)} style={st.btnAnswer}>{ans}</button>
+                                <button key={i} onClick={() => responderPregunta(ans === modalData.correct)} style={{
+                                    ...st.btnAnswer,
+                                    padding: isMobile ? '13px 14px' : 20,
+                                    fontSize: isMobile ? '0.95rem' : '1.2rem',
+                                }}>{ans}</button>
                             ))}
                         </div>
                     </div>
@@ -991,16 +1501,168 @@ export default function TrivialGame({ onExit, onBuscar }) {
             )}
 
             {/* PANTALLA VICTORIA */}
-            {gameState === 'WON' && (
-                <div style={st.modalOverlay}>
-                    <div style={{ ...st.modalCard, textAlign: 'center', background: '#1e293b' }}>
-                        <Trophy size={90} color="#f1c40f" style={{ margin: '0 auto 20px', filter: 'drop-shadow(0 0 20px rgba(241,196,15,0.5))' }}/>
-                        <h1 style={{ color: 'white', fontSize: '2.8rem', margin: 0 }}>¡{players[activePlayerIdx].name} GANA!</h1>
-                        <p style={{ color: '#94a3b8', fontSize: '1.3rem' }}>Ha reunido los 6 quesitos y superado la prueba final.</p>
-                        <button onClick={() => window.location.reload()} style={{ ...st.btnRoll, marginTop: 40 }}>Jugar de nuevo</button>
+            {gameState === 'WON' && (() => {
+                const winner = players[activePlayerIdx];
+                const sorted = [...players].sort((a, b) => b.wedges.length - a.wedges.length);
+                return (
+                    <div style={{
+                        position: 'fixed', inset: 0, zIndex: 200,
+                        background: 'linear-gradient(160deg, #0f172a 0%, #1e1b4b 45%, #0f172a 100%)',
+                        display: 'flex', flexDirection: 'column',
+                        alignItems: 'center', justifyContent: 'center',
+                        overflowY: 'auto', overflowX: 'hidden',
+                        padding: isMobile ? '16px 12px' : '32px 20px',
+                        fontFamily: "'Segoe UI', sans-serif",
+                    }}>
+                        <HeartsEffect />
+
+                        {/* Trofeo */}
+                        <div style={{ animation: 'trophyDrop 0.9s cubic-bezier(0.34,1.56,0.64,1) forwards', fontSize: isMobile ? '4.5rem' : '6rem', lineHeight: 1, marginBottom: 8, position: 'relative', zIndex: 2 }}>
+                            🏆
+                        </div>
+
+                        {/* Nombre del ganador */}
+                        <div style={{ animation: 'winnerSlide 0.6s ease-out 0.5s both', textAlign: 'center', zIndex: 2, marginBottom: isMobile ? 6 : 10 }}>
+                            <div style={{ color: '#fbbf24', fontSize: isMobile ? '0.85rem' : '1rem', fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 6 }}>
+                                ¡Ganador!
+                            </div>
+                            <h1 style={{
+                                margin: 0,
+                                fontSize: isMobile ? '2.2rem' : '3.2rem',
+                                fontWeight: 900,
+                                color: winner.color,
+                                textShadow: `0 0 30px ${winner.color}99, 0 0 60px ${winner.color}55`,
+                                lineHeight: 1.1,
+                            }}>
+                                {winner.name}
+                            </h1>
+                            <p style={{ color: '#94a3b8', fontSize: isMobile ? '0.9rem' : '1.05rem', margin: '10px 0 0', lineHeight: 1.5 }}>
+                                Ha reunido los 6 quesitos y ha superado la prueba final.<br />
+                                <span style={{ color: '#cbd5e1' }}>¡Enhorabuena a todos los participantes!</span>
+                            </p>
+                        </div>
+
+                        {/* Quesitos del ganador */}
+                        <div style={{ display: 'flex', gap: isMobile ? 8 : 12, marginBottom: isMobile ? 20 : 28, zIndex: 2, animation: 'winnerSlide 0.6s ease-out 0.7s both' }}>
+                            {COLORS.map((c, ci) => (
+                                <div key={c.id} style={{
+                                    width: isMobile ? 28 : 38, height: isMobile ? 28 : 38,
+                                    borderRadius: '50%',
+                                    background: `radial-gradient(circle at 35% 35%, ${c.hex}, ${c.hex}99)`,
+                                    boxShadow: `0 0 14px ${c.hex}aa`,
+                                    animation: `starSpin 2s linear ${ci * 0.15}s infinite`,
+                                    border: '2px solid rgba(255,255,255,0.2)',
+                                }}/>
+                            ))}
+                        </div>
+
+                        {/* Clasificación de jugadores */}
+                        {players.length > 1 && (
+                            <div style={{
+                                zIndex: 2,
+                                width: '100%', maxWidth: 480,
+                                background: 'rgba(30,41,59,0.7)',
+                                borderRadius: 20,
+                                border: '1px solid rgba(255,255,255,0.08)',
+                                backdropFilter: 'blur(10px)',
+                                padding: isMobile ? '14px 16px' : '20px 28px',
+                                marginBottom: isMobile ? 20 : 28,
+                                animation: 'winnerSlide 0.6s ease-out 0.9s both',
+                            }}>
+                                <div style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>
+                                    Clasificación final
+                                </div>
+                                {sorted.map((p, rank) => {
+                                    const isWinner = p.id === winner.id;
+                                    return (
+                                        <div
+                                            key={p.id}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', gap: 12,
+                                                padding: isMobile ? '8px 10px' : '10px 14px',
+                                                borderRadius: 12,
+                                                background: isWinner ? `${p.color}18` : 'transparent',
+                                                border: isWinner ? `1px solid ${p.color}55` : '1px solid transparent',
+                                                marginBottom: rank < sorted.length - 1 ? 6 : 0,
+                                                animation: `cardIn 0.4s ease-out ${1.0 + rank * 0.1}s both`,
+                                            }}
+                                        >
+                                            {/* Posición */}
+                                            <div style={{
+                                                width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+                                                background: rank === 0 ? 'linear-gradient(135deg,#fbbf24,#d97706)' : rank === 1 ? 'linear-gradient(135deg,#e2e8f0,#94a3b8)' : rank === 2 ? 'linear-gradient(135deg,#f97316,#c2410c)' : '#334155',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                fontSize: '0.8rem', fontWeight: 900, color: rank < 3 ? '#0f172a' : '#94a3b8',
+                                            }}>
+                                                {rank === 0 ? '👑' : rank + 1}
+                                            </div>
+
+                                            {/* Punto de color */}
+                                            <div style={{ width: 12, height: 12, borderRadius: '50%', background: p.color, flexShrink: 0, boxShadow: `0 0 8px ${p.color}` }} />
+
+                                            {/* Nombre */}
+                                            <span style={{ flex: 1, color: isWinner ? p.color : '#e2e8f0', fontWeight: isWinner ? 800 : 500, fontSize: isMobile ? '0.9rem' : '1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                {p.name}
+                                            </span>
+
+                                            {/* Quesitos */}
+                                            <div style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
+                                                {COLORS.map(c => (
+                                                    <div key={c.id} style={{
+                                                        width: isMobile ? 9 : 11, height: isMobile ? 9 : 11,
+                                                        borderRadius: '50%',
+                                                        background: p.wedges.includes(c.id) ? c.hex : '#1e293b',
+                                                        border: `1px solid ${p.wedges.includes(c.id) ? c.hex : '#334155'}`,
+                                                        boxShadow: p.wedges.includes(c.id) ? `0 0 5px ${c.hex}` : 'none',
+                                                    }}/>
+                                                ))}
+                                            </div>
+
+                                            {/* Cuenta */}
+                                            <span style={{ color: '#64748b', fontSize: '0.8rem', flexShrink: 0, minWidth: 28, textAlign: 'right' }}>
+                                                {p.wedges.length}/6
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {/* Botones */}
+                        <div style={{ display: 'flex', gap: 12, zIndex: 2, animation: 'winnerSlide 0.5s ease-out 1.2s both', flexWrap: 'wrap', justifyContent: 'center' }}>
+                            <button
+                                onClick={() => window.location.reload()}
+                                style={{
+                                    background: 'linear-gradient(135deg, #1d4ed8, #7c3aed)',
+                                    border: 'none', color: 'white',
+                                    padding: isMobile ? '14px 32px' : '16px 48px',
+                                    borderRadius: 50, cursor: 'pointer',
+                                    fontSize: isMobile ? '1rem' : '1.15rem', fontWeight: 900,
+                                    boxShadow: '0 8px 28px rgba(29,78,216,0.5)',
+                                    letterSpacing: '0.03em',
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'}
+                                onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                            >
+                                🎮 ¡Otra partida!
+                            </button>
+                            {onExit && (
+                                <button
+                                    onClick={onExit}
+                                    style={{
+                                        background: 'rgba(255,255,255,0.07)', border: '1px solid #334155',
+                                        color: '#94a3b8', padding: isMobile ? '14px 24px' : '16px 32px',
+                                        borderRadius: 50, cursor: 'pointer',
+                                        fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: 600,
+                                    }}
+                                >
+                                    Salir al menú
+                                </button>
+                            )}
+                        </div>
                     </div>
-                </div>
-            )}
+                );
+            })()}
 
             {/* ── MENÚ DE PAUSA ─────────────────────────────────────────────── */}
             {pausaActiva && (

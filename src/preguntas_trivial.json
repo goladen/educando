@@ -1,0 +1,1094 @@
+{
+    "geo": [
+        {
+            "q": "¿Cuál es el río más largo del mundo?",
+            "a": "Amazonas",
+            "w": [
+                "Nilo",
+                "Yangtsé",
+                "Misisipi"
+            ]
+        },
+        {
+            "q": "¿Cuál es la capital de Australia?",
+            "a": "Canberra",
+            "w": [
+                "Sídney",
+                "Melbourne",
+                "Perth"
+            ]
+        },
+        {
+            "q": "¿Qué país es el más grande del mundo por superficie?",
+            "a": "Rusia",
+            "w": [
+                "Canadá",
+                "China",
+                "Estados Unidos"
+            ]
+        },
+        {
+            "q": "¿Cuál es el océano más grande?",
+            "a": "Pacífico",
+            "w": [
+                "Atlántico",
+                "Índico",
+                "Ártico"
+            ]
+        },
+        {
+            "q": "¿En qué cordillera se encuentra el monte Everest?",
+            "a": "Himalaya",
+            "w": [
+                "Andes",
+                "Alpes",
+                "Montañas Rocosas"
+            ]
+        },
+        {
+            "q": "¿Cuál es la capital de Canadá?",
+            "a": "Ottawa",
+            "w": [
+                "Toronto",
+                "Montreal",
+                "Vancouver"
+            ]
+        },
+        {
+            "q": "¿Qué país europeo tiene forma de bota?",
+            "a": "Italia",
+            "w": [
+                "Grecia",
+                "España",
+                "Croacia"
+            ]
+        },
+        {
+            "q": "¿Cuál es el desierto cálido más grande del mundo?",
+            "a": "Sáhara",
+            "w": [
+                "Gobi",
+                "Kalahari",
+                "Atacama"
+            ]
+        },
+        {
+            "q": "¿Qué río pasa por la ciudad de París?",
+            "a": "Sena",
+            "w": [
+                "Támesis",
+                "Danubio",
+                "Rin"
+            ]
+        },
+        {
+            "q": "¿Qué estrecho separa Europa de África?",
+            "a": "Estrecho de Gibraltar",
+            "w": [
+                "Bósforo",
+                "Estrecho de Bering",
+                "Estrecho de Magallanes"
+            ]
+        },
+        {
+            "q": "¿Cuál es la capital de Brasil?",
+            "a": "Brasilia",
+            "w": [
+                "Río de Janeiro",
+                "São Paulo",
+                "Buenos Aires"
+            ]
+        },
+        {
+            "q": "¿Cuál es la montaña más alta de África?",
+            "a": "Kilimanjaro",
+            "w": [
+                "Monte Kenia",
+                "Elbrus",
+                "Mont Blanc"
+            ]
+        },
+        {
+            "q": "¿Qué país es famoso por sus fiordos?",
+            "a": "Noruega",
+            "w": [
+                "Suecia",
+                "Finlandia",
+                "Dinamarca"
+            ]
+        },
+        {
+            "q": "¿Qué ciudad europea es famosa por sus canales y góndolas?",
+            "a": "Venecia",
+            "w": [
+                "Ámsterdam",
+                "Brujas",
+                "San Petersburgo"
+            ]
+        },
+        {
+            "q": "¿Cuál es la capital de Argentina?",
+            "a": "Buenos Aires",
+            "w": [
+                "Santiago",
+                "Lima",
+                "Bogotá"
+            ]
+        },
+        {
+            "q": "¿Cuál es el lago más profundo del mundo?",
+            "a": "Lago Baikal",
+            "w": [
+                "Lago Victoria",
+                "Lago Titicaca",
+                "Lago Superior"
+            ]
+        },
+        {
+            "q": "¿Cuál es el continente más pequeño?",
+            "a": "Oceanía",
+            "w": [
+                "Europa",
+                "Antártida",
+                "América del Sur"
+            ]
+        },
+        {
+            "q": "¿Cuál es la isla más grande del mundo?",
+            "a": "Groenlandia",
+            "w": [
+                "Madagascar",
+                "Nueva Guinea",
+                "Borneo"
+            ]
+        },
+        {
+            "q": "¿Cuál es el estado independiente más pequeño del mundo?",
+            "a": "Ciudad del Vaticano",
+            "w": [
+                "Mónaco",
+                "San Marino",
+                "Andorra"
+            ]
+        },
+        {
+            "q": "¿En qué país se encuentra Machu Picchu?",
+            "a": "Perú",
+            "w": [
+                "Bolivia",
+                "Chile",
+                "Ecuador"
+            ]
+        }
+    ],
+    "esp": [
+        {
+            "q": "¿Qué superhéroe es conocido como el Hombre Murciélago?",
+            "a": "Batman",
+            "w": [
+                "Spiderman",
+                "Iron Man",
+                "Superman"
+            ]
+        },
+        {
+            "q": "¿Quién dirigió la película 'Parque Jurásico'?",
+            "a": "Steven Spielberg",
+            "w": [
+                "George Lucas",
+                "James Cameron",
+                "Ridley Scott"
+            ]
+        },
+        {
+            "q": "¿Quién es conocido como el Rey del Pop?",
+            "a": "Michael Jackson",
+            "w": [
+                "Elvis Presley",
+                "Prince",
+                "Freddie Mercury"
+            ]
+        },
+        {
+            "q": "¿Cuál es la película más taquillera de la historia?",
+            "a": "Avatar",
+            "w": [
+                "Vengadores: Endgame",
+                "Titanic",
+                "Star Wars"
+            ]
+        },
+        {
+            "q": "¿En qué serie aparecen familias como los Stark, Lannister y Targaryen?",
+            "a": "Juego de Tronos",
+            "w": [
+                "El Señor de los Anillos",
+                "The Witcher",
+                "Vikingos"
+            ]
+        },
+        {
+            "q": "¿Qué famosa banda británica cantaba 'Let it be'?",
+            "a": "The Beatles",
+            "w": [
+                "The Rolling Stones",
+                "Queen",
+                "The Who"
+            ]
+        },
+        {
+            "q": "¿Qué actor interpretó a Jack en 'Titanic'?",
+            "a": "Leonardo DiCaprio",
+            "w": [
+                "Brad Pitt",
+                "Johnny Depp",
+                "Tom Cruise"
+            ]
+        },
+        {
+            "q": "¿Qué película de animación fue la primera en ser nominada al Óscar a Mejor Película?",
+            "a": "La Bella y la Bestia",
+            "w": [
+                "Toy Story",
+                "El Rey León",
+                "Shrek"
+            ]
+        },
+        {
+            "q": "¿Quién interpreta al pirata Jack Sparrow?",
+            "a": "Johnny Depp",
+            "w": [
+                "Orlando Bloom",
+                "Brad Pitt",
+                "Tom Hardy"
+            ]
+        },
+        {
+            "q": "¿Qué cantante colombiana popularizó la canción 'Hips Don't Lie'?",
+            "a": "Shakira",
+            "w": [
+                "Beyoncé",
+                "Jennifer Lopez",
+                "Rihanna"
+            ]
+        },
+        {
+            "q": "¿Quién fue el creador de Mickey Mouse?",
+            "a": "Walt Disney",
+            "w": [
+                "Stan Lee",
+                "Matt Groening",
+                "Hayao Miyazaki"
+            ]
+        },
+        {
+            "q": "¿Quién es el villano principal de la trilogía original de Star Wars?",
+            "a": "Darth Vader",
+            "w": [
+                "El Joker",
+                "Voldemort",
+                "Sauron"
+            ]
+        },
+        {
+            "q": "¿Qué tipo de animal es Simba en 'El Rey León'?",
+            "a": "Un león",
+            "w": [
+                "Un tigre",
+                "Un leopardo",
+                "Un oso"
+            ]
+        },
+        {
+            "q": "¿Qué actriz protagonizó 'Los Juegos del Hambre' como Katniss Everdeen?",
+            "a": "Jennifer Lawrence",
+            "w": [
+                "Emma Stone",
+                "Scarlett Johansson",
+                "Shailene Woodley"
+            ]
+        },
+        {
+            "q": "¿En qué ciudad vive la familia Simpson?",
+            "a": "Springfield",
+            "w": [
+                "Quahog",
+                "South Park",
+                "Gotham"
+            ]
+        },
+        {
+            "q": "¿Qué cantante es conocida mundialmente como 'La Reina del Pop'?",
+            "a": "Madonna",
+            "w": [
+                "Britney Spears",
+                "Lady Gaga",
+                "Cher"
+            ]
+        },
+        {
+            "q": "¿Qué superhéroe inició el Universo Cinematográfico de Marvel en 2008?",
+            "a": "Iron Man",
+            "w": [
+                "Capitán América",
+                "Thor",
+                "Hulk"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama el joven mago con una cicatriz en forma de rayo?",
+            "a": "Harry Potter",
+            "w": [
+                "Ron Weasley",
+                "Newt Scamander",
+                "Percy Jackson"
+            ]
+        },
+        {
+            "q": "¿Cómo se llaman los premios de la Academia de Cine en España?",
+            "a": "Premios Goya",
+            "w": [
+                "Premios Óscar",
+                "Premios BAFTA",
+                "Premios César"
+            ]
+        },
+        {
+            "q": "¿De qué famosa banda de rock fue vocalista Freddie Mercury?",
+            "a": "Queen",
+            "w": [
+                "AC/DC",
+                "Nirvana",
+                "Aerosmith"
+            ]
+        }
+    ],
+    "his": [
+        {
+            "q": "¿En qué año llegó Cristóbal Colón a América?",
+            "a": "1492",
+            "w": [
+                "1402",
+                "1512",
+                "1482"
+            ]
+        },
+        {
+            "q": "¿Quién fue el primer emperador del Imperio Romano?",
+            "a": "Augusto",
+            "w": [
+                "Julio César",
+                "Nerón",
+                "Calígula"
+            ]
+        },
+        {
+            "q": "¿En qué año cayó el Muro de Berlín?",
+            "a": "1989",
+            "w": [
+                "1991",
+                "1985",
+                "1990"
+            ]
+        },
+        {
+            "q": "¿En qué año comenzó la Segunda Guerra Mundial?",
+            "a": "1939",
+            "w": [
+                "1914",
+                "1945",
+                "1936"
+            ]
+        },
+        {
+            "q": "¿Qué famosa reina egipcia tuvo romances con Julio César y Marco Antonio?",
+            "a": "Cleopatra",
+            "w": [
+                "Nefertiti",
+                "Hatshepsut",
+                "Ramsés"
+            ]
+        },
+        {
+            "q": "¿En qué año tuvo lugar la Revolución Francesa?",
+            "a": "1789",
+            "w": [
+                "1776",
+                "1804",
+                "1812"
+            ]
+        },
+        {
+            "q": "¿Qué antigua civilización construyó las pirámides de Giza?",
+            "a": "La civilización egipcia",
+            "w": [
+                "La civilización maya",
+                "La civilización azteca",
+                "El Imperio romano"
+            ]
+        },
+        {
+            "q": "¿Quién lideró la Unión Soviética durante la Segunda Guerra Mundial?",
+            "a": "Iósif Stalin",
+            "w": [
+                "Vladimir Lenin",
+                "León Trotsky",
+                "Mijaíl Gorbachov"
+            ]
+        },
+        {
+            "q": "¿Qué imperio precolombino construyó la ciudad de Machu Picchu?",
+            "a": "El Imperio Inca",
+            "w": [
+                "El Imperio Azteca",
+                "La civilización Maya",
+                "Los Olmecas"
+            ]
+        },
+        {
+            "q": "¿Quién fue el primer presidente de los Estados Unidos?",
+            "a": "George Washington",
+            "w": [
+                "Abraham Lincoln",
+                "Thomas Jefferson",
+                "John Adams"
+            ]
+        },
+        {
+            "q": "¿A quién se le atribuye la invención de la imprenta moderna?",
+            "a": "Johannes Gutenberg",
+            "w": [
+                "Leonardo da Vinci",
+                "Galileo Galilei",
+                "Thomas Edison"
+            ]
+        },
+        {
+            "q": "¿En qué país se originó la Revolución Industrial?",
+            "a": "Reino Unido",
+            "w": [
+                "Francia",
+                "Alemania",
+                "Estados Unidos"
+            ]
+        },
+        {
+            "q": "¿En qué batalla fue derrotado definitivamente Napoleón Bonaparte?",
+            "a": "Batalla de Waterloo",
+            "w": [
+                "Batalla de Austerlitz",
+                "Batalla de Trafalgar",
+                "Batalla de Leipzig"
+            ]
+        },
+        {
+            "q": "¿Qué imperio conquistó el español Hernán Cortés?",
+            "a": "El Imperio Azteca",
+            "w": [
+                "El Imperio Inca",
+                "La civilización Maya",
+                "Los Guaraníes"
+            ]
+        },
+        {
+            "q": "¿Qué monarca inglés tuvo seis esposas y rompió con la Iglesia Católica?",
+            "a": "Enrique VIII",
+            "w": [
+                "Carlos I",
+                "Jorge III",
+                "Ricardo Corazón de León"
+            ]
+        },
+        {
+            "q": "¿Qué civilización se desarrolló entre los ríos Tigris y Éufrates?",
+            "a": "Mesopotamia",
+            "w": [
+                "Egipto",
+                "Persia",
+                "Fenicia"
+            ]
+        },
+        {
+            "q": "¿Qué tratado puso fin oficialmente a la Primera Guerra Mundial?",
+            "a": "Tratado de Versalles",
+            "w": [
+                "Tratado de Tordesillas",
+                "Tratado de Utrecht",
+                "Paz de París"
+            ]
+        },
+        {
+            "q": "¿Entre qué años se desarrolló la Guerra Civil Española?",
+            "a": "1936-1939",
+            "w": [
+                "1931-1934",
+                "1939-1945",
+                "1920-1923"
+            ]
+        },
+        {
+            "q": "¿Quién descubrió la penicilina?",
+            "a": "Alexander Fleming",
+            "w": [
+                "Louis Pasteur",
+                "Marie Curie",
+                "Albert Einstein"
+            ]
+        },
+        {
+            "q": "¿Qué joven rey macedonio conquistó el inmenso Imperio Persa?",
+            "a": "Alejandro Magno",
+            "w": [
+                "Filipo II",
+                "Leónidas",
+                "Pericles"
+            ]
+        }
+    ],
+    "art": [
+        {
+            "q": "¿Quién escribió 'Don Quijote de la Mancha'?",
+            "a": "Miguel de Cervantes",
+            "w": [
+                "Lope de Vega",
+                "Luis de Góngora",
+                "Francisco de Quevedo"
+            ]
+        },
+        {
+            "q": "¿Quién pintó 'La Gioconda' (Mona Lisa)?",
+            "a": "Leonardo da Vinci",
+            "w": [
+                "Pablo Picasso",
+                "Vincent van Gogh",
+                "Salvador Dalí"
+            ]
+        },
+        {
+            "q": "¿Quién escribió la tragedia 'Romeo y Julieta'?",
+            "a": "William Shakespeare",
+            "w": [
+                "Charles Dickens",
+                "Oscar Wilde",
+                "Victor Hugo"
+            ]
+        },
+        {
+            "q": "¿Qué pintor español creó el cuadro 'El Guernica'?",
+            "a": "Pablo Picasso",
+            "w": [
+                "Salvador Dalí",
+                "Joan Miró",
+                "Francisco de Goya"
+            ]
+        },
+        {
+            "q": "¿Quién escribió la novela 'Cien años de soledad'?",
+            "a": "Gabriel García Márquez",
+            "w": [
+                "Mario Vargas Llosa",
+                "Julio Cortázar",
+                "Jorge Luis Borges"
+            ]
+        },
+        {
+            "q": "¿Qué pintor postimpresionista creó 'La noche estrellada'?",
+            "a": "Vincent van Gogh",
+            "w": [
+                "Claude Monet",
+                "Rembrandt",
+                "Paul Cézanne"
+            ]
+        },
+        {
+            "q": "¿Quién esculpió la famosa estatua del 'David' en el Renacimiento?",
+            "a": "Miguel Ángel",
+            "w": [
+                "Donatello",
+                "Gian Lorenzo Bernini",
+                "Auguste Rodin"
+            ]
+        },
+        {
+            "q": "¿Qué poema épico griego narra los eventos de la guerra de Troya?",
+            "a": "La Ilíada",
+            "w": [
+                "La Odisea",
+                "La Eneida",
+                "Edipo Rey"
+            ]
+        },
+        {
+            "q": "¿A qué corriente artística pertenecía principalmente Salvador Dalí?",
+            "a": "Surrealismo",
+            "w": [
+                "Impresionismo",
+                "Cubismo",
+                "Expresionismo"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama el escudero de Don Quijote?",
+            "a": "Sancho Panza",
+            "w": [
+                "Rocinante",
+                "Dulcinea del Toboso",
+                "Cardenio"
+            ]
+        },
+        {
+            "q": "¿Quién es el autor del libro 'El Principito'?",
+            "a": "Antoine de Saint-Exupéry",
+            "w": [
+                "Jules Verne",
+                "Victor Hugo",
+                "Marcel Proust"
+            ]
+        },
+        {
+            "q": "¿En qué museo se encuentra expuesta 'La Gioconda'?",
+            "a": "Museo del Louvre",
+            "w": [
+                "Museo del Prado",
+                "British Museum",
+                "Galería Uffizi"
+            ]
+        },
+        {
+            "q": "¿Quién es el pintor de la obra maestra 'Las Meninas'?",
+            "a": "Diego Velázquez",
+            "w": [
+                "Bartolomé Esteban Murillo",
+                "El Greco",
+                "Francisco de Zurbarán"
+            ]
+        },
+        {
+            "q": "¿En qué ciudad vive el jorobado Quasimodo en la famosa novela de Victor Hugo?",
+            "a": "París",
+            "w": [
+                "Londres",
+                "Roma",
+                "Madrid"
+            ]
+        },
+        {
+            "q": "¿Qué movimiento pictórico se centra en captar la luz con pinceladas rápidas?",
+            "a": "Impresionismo",
+            "w": [
+                "Barroco",
+                "Realismo",
+                "Romanticismo"
+            ]
+        },
+        {
+            "q": "¿Qué escritor británico creó el mundo de 'El Señor de los Anillos'?",
+            "a": "J.R.R. Tolkien",
+            "w": [
+                "C.S. Lewis",
+                "George R.R. Martin",
+                "J.K. Rowling"
+            ]
+        },
+        {
+            "q": "¿Quién fue la primera escritora latinoamericana en ganar el Premio Nobel de Literatura?",
+            "a": "Gabriela Mistral",
+            "w": [
+                "Isabel Allende",
+                "Frida Kahlo",
+                "Alfonsina Storni"
+            ]
+        },
+        {
+            "q": "¿A qué famoso pintor holandés le faltaba parte de una oreja?",
+            "a": "Vincent van Gogh",
+            "w": [
+                "Paul Gauguin",
+                "Henri Matisse",
+                "Edvard Munch"
+            ]
+        },
+        {
+            "q": "¿Qué famoso arquitecto y escultor diseñó el baldaquino de San Pedro en el Vaticano?",
+            "a": "Gian Lorenzo Bernini",
+            "w": [
+                "Filippo Brunelleschi",
+                "Francesco Borromini",
+                "Miguel Ángel"
+            ]
+        },
+        {
+            "q": "¿Qué detective de ficción fue creado por el escritor Arthur Conan Doyle?",
+            "a": "Sherlock Holmes",
+            "w": [
+                "Hércules Poirot",
+                "Philip Marlowe",
+                "Auguste Dupin"
+            ]
+        }
+    ],
+    "cie": [
+        {
+            "q": "¿A qué planeta se le conoce como el 'planeta rojo'?",
+            "a": "Marte",
+            "w": [
+                "Júpiter",
+                "Venus",
+                "Saturno"
+            ]
+        },
+        {
+            "q": "¿Cuál es la fórmula química del agua?",
+            "a": "H2O",
+            "w": [
+                "CO2",
+                "O2",
+                "NaCl"
+            ]
+        },
+        {
+            "q": "¿Qué órgano del cuerpo humano es el encargado de bombear la sangre?",
+            "a": "El corazón",
+            "w": [
+                "El pulmón",
+                "El cerebro",
+                "El hígado"
+            ]
+        },
+        {
+            "q": "¿Qué gas indispensable para la vida humana producen las plantas?",
+            "a": "Oxígeno",
+            "w": [
+                "Nitrógeno",
+                "Dióxido de Carbono",
+                "Hidrógeno"
+            ]
+        },
+        {
+            "q": "¿Qué astro se encuentra en el centro de nuestro sistema solar?",
+            "a": "El Sol",
+            "w": [
+                "La Tierra",
+                "Júpiter",
+                "La Luna"
+            ]
+        },
+        {
+            "q": "¿Cuál es el elemento químico más abundante en el universo?",
+            "a": "Hidrógeno",
+            "w": [
+                "Oxígeno",
+                "Carbono",
+                "Helio"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama la partícula subatómica con carga eléctrica negativa?",
+            "a": "Electrón",
+            "w": [
+                "Protón",
+                "Neutrón",
+                "Quark"
+            ]
+        },
+        {
+            "q": "¿Qué físico teórico desarrolló la Teoría de la Relatividad?",
+            "a": "Albert Einstein",
+            "w": [
+                "Isaac Newton",
+                "Nikola Tesla",
+                "Galileo Galilei"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama el proceso por el cual las plantas obtienen energía del sol?",
+            "a": "Fotosíntesis",
+            "w": [
+                "Respiración",
+                "Mitosis",
+                "Ósmosis"
+            ]
+        },
+        {
+            "q": "¿Cuál es el órgano más grande del cuerpo humano?",
+            "a": "La piel",
+            "w": [
+                "El hígado",
+                "Los intestinos",
+                "El cerebro"
+            ]
+        },
+        {
+            "q": "¿Cuál es el hueso más largo del cuerpo humano?",
+            "a": "El fémur",
+            "w": [
+                "La tibia",
+                "El peroné",
+                "El húmero"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama la fuerza que atrae a los objetos hacia el centro de la Tierra?",
+            "a": "Gravedad",
+            "w": [
+                "Magnetismo",
+                "Fricción",
+                "Tensión"
+            ]
+        },
+        {
+            "q": "¿Cuál es el planeta más grande del Sistema Solar?",
+            "a": "Júpiter",
+            "w": [
+                "Saturno",
+                "Urano",
+                "Neptuno"
+            ]
+        },
+        {
+            "q": "¿Cuál es el animal terrestre más rápido del mundo?",
+            "a": "El guepardo",
+            "w": [
+                "El león",
+                "La gacela",
+                "El avestruz"
+            ]
+        },
+        {
+            "q": "¿Qué metal es líquido a temperatura ambiente?",
+            "a": "Mercurio",
+            "w": [
+                "Plomo",
+                "Hierro",
+                "Plata"
+            ]
+        },
+        {
+            "q": "¿Cuál es la unidad básica, estructural y funcional de los seres vivos?",
+            "a": "La célula",
+            "w": [
+                "El átomo",
+                "La molécula",
+                "El tejido"
+            ]
+        },
+        {
+            "q": "¿A quién se le atribuye la invención de la bombilla incandescente práctica?",
+            "a": "Thomas Edison",
+            "w": [
+                "Nikola Tesla",
+                "Alexander Graham Bell",
+                "Benjamin Franklin"
+            ]
+        },
+        {
+            "q": "¿Qué tipo de grupo sanguíneo se considera el 'donante universal'?",
+            "a": "O negativo",
+            "w": [
+                "A positivo",
+                "B negativo",
+                "AB positivo"
+            ]
+        },
+        {
+            "q": "¿Cuál es la estrella más cercana a la Tierra?",
+            "a": "El Sol",
+            "w": [
+                "Próxima Centauri",
+                "Sirio",
+                "Betelgeuse"
+            ]
+        },
+        {
+            "q": "¿Cuál es el único mamífero capaz de volar activamente?",
+            "a": "El murciélago",
+            "w": [
+                "La ardilla voladora",
+                "El pingüino",
+                "El búho"
+            ]
+        }
+    ],
+    "dep": [
+        {
+            "q": "¿Cuántos jugadores hay en un equipo de baloncesto en la cancha?",
+            "a": "5",
+            "w": [
+                "6",
+                "7",
+                "4"
+            ]
+        },
+        {
+            "q": "¿Cada cuántos años se celebran los Juegos Olímpicos de verano?",
+            "a": "4 años",
+            "w": [
+                "2 años",
+                "3 años",
+                "5 años"
+            ]
+        },
+        {
+            "q": "¿Cuánto dura el tiempo reglamentario de un partido de fútbol?",
+            "a": "90 minutos",
+            "w": [
+                "80 minutos",
+                "100 minutos",
+                "120 minutos"
+            ]
+        },
+        {
+            "q": "¿En qué deporte se pueden ganar los torneos del 'Grand Slam'?",
+            "a": "Tenis",
+            "w": [
+                "Golf",
+                "Bádminton",
+                "Squash"
+            ]
+        },
+        {
+            "q": "¿Qué país ganó la primera Copa Mundial de Fútbol en 1930?",
+            "a": "Uruguay",
+            "w": [
+                "Brasil",
+                "Argentina",
+                "Italia"
+            ]
+        },
+        {
+            "q": "¿En qué deporte destacó históricamente Michael Jordan?",
+            "a": "Baloncesto",
+            "w": [
+                "Béisbol",
+                "Atletismo",
+                "Fútbol americano"
+            ]
+        },
+        {
+            "q": "¿Qué deporte utiliza un disco llamado 'puck' en lugar de una pelota?",
+            "a": "Hockey sobre hielo",
+            "w": [
+                "Waterpolo",
+                "Lacrosse",
+                "Críquet"
+            ]
+        },
+        {
+            "q": "¿Qué significan las siglas FIFA?",
+            "a": "Fédération Internationale de Football Association",
+            "w": [
+                "Federación Independiente de Fútbol Amateur",
+                "Fundación Internacional de Fútbol Asociado",
+                "Fondo Internacional de Fútbol y Atletismo"
+            ]
+        },
+        {
+            "q": "¿Cuál es el estilo de natación considerado más rápido?",
+            "a": "Crol o estilo libre",
+            "w": [
+                "Braza",
+                "Mariposa",
+                "Espalda"
+            ]
+        },
+        {
+            "q": "¿De qué color es el maillot que viste el líder del Tour de Francia?",
+            "a": "Amarillo",
+            "w": [
+                "Rojo",
+                "Verde",
+                "Blanco"
+            ]
+        },
+        {
+            "q": "¿Quién es el máximo goleador histórico de la selección de fútbol de Argentina?",
+            "a": "Lionel Messi",
+            "w": [
+                "Diego Maradona",
+                "Gabriel Batistuta",
+                "Sergio Agüero"
+            ]
+        },
+        {
+            "q": "¿Cuántos puntos vale un tiro libre encestado en baloncesto?",
+            "a": "1 punto",
+            "w": [
+                "2 puntos",
+                "3 puntos",
+                "Depende de la falta"
+            ]
+        },
+        {
+            "q": "¿En qué deporte se anota mediante un 'Touchdown'?",
+            "a": "Fútbol americano",
+            "w": [
+                "Rugby",
+                "Béisbol",
+                "Voleibol"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama la zona de césped muy corto donde se encuentra el hoyo en golf?",
+            "a": "Green",
+            "w": [
+                "Fairway",
+                "Bunker",
+                "Tee"
+            ]
+        },
+        {
+            "q": "¿Qué pieza es el objetivo principal a capturar en una partida de ajedrez?",
+            "a": "El Rey",
+            "w": [
+                "La Reina",
+                "El Peón",
+                "La Torre"
+            ]
+        },
+        {
+            "q": "¿Qué atleta jamaicano batió el récord mundial de los 100 metros lisos en 2009?",
+            "a": "Usain Bolt",
+            "w": [
+                "Asafa Powell",
+                "Yohan Blake",
+                "Carl Lewis"
+            ]
+        },
+        {
+            "q": "¿Cuál es la medalla que se otorga al primer clasificado en las Olimpiadas?",
+            "a": "Oro",
+            "w": [
+                "Plata",
+                "Bronce",
+                "Platino"
+            ]
+        },
+        {
+            "q": "¿Qué famoso artista marcial y actor creó el sistema Jeet Kune Do?",
+            "a": "Bruce Lee",
+            "w": [
+                "Jackie Chan",
+                "Chuck Norris",
+                "Jet Li"
+            ]
+        },
+        {
+            "q": "¿De qué país es originario el arte marcial del judo?",
+            "a": "Japón",
+            "w": [
+                "China",
+                "Corea",
+                "Tailandia"
+            ]
+        },
+        {
+            "q": "¿Sobre qué superficie se juega el torneo de tenis de Roland Garros?",
+            "a": "Tierra batida",
+            "w": [
+                "Hierba",
+                "Cemento",
+                "Pista dura"
+            ]
+        }
+    ]
+}

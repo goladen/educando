@@ -27,6 +27,8 @@ import SintaxisGame from './SintaxisGamen2';
 
 import { MousePointer2, Rocket, Search as SearchIcon, Car } from 'lucide-react';
 import InformesJuegos from './components/InformesJuegos2';
+import TrivialPartidasView from './components/TrivialPartidasView';
+import TrivialRecursosManager from './components/TrivialRecursosManager';
 import PiTutorial from './components/PiTutorial';
 
 const TUTORIAL_PROFESOR = [
@@ -1021,6 +1023,8 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                     <li style={styles.menuItem} onClick={() => navegar('HERRAMIENTAS')}>Herramientas del Profesor</li>
                     <li style={styles.menuItem} onClick={() => { setPresentacionEditar(null); navegar('PRESENTACIONES'); }}>📊 Presentaciones</li>
                     <li style={styles.menuItem} onClick={() => navegar('MI_PAGINA')}>🌐 Mi Página</li>
+                    <li style={styles.menuItem} onClick={() => navegar('TRIVIAL_PARTIDAS')}>🎯 Trivial Partidas</li>
+                    <li style={styles.menuItem} onClick={() => navegar('TRIVIAL_RECURSOS')}>🎯 Editor Trivial</li>
 
                     {/* --- CAMBIA ESTAS DOS LÍNEAS PARA LOS ENLACES EXTERNOS --- */}
                     <li style={styles.menuItem} onClick={() => {
@@ -1096,6 +1100,8 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                 />
             )}
             {modoDashboard === 'INFORMES' && <InformesJuegos usuario={usuario} googleToken={googleToken} />}
+            {modoDashboard === 'TRIVIAL_PARTIDAS' && <TrivialPartidasView usuario={usuario} />}
+            {modoDashboard === 'TRIVIAL_RECURSOS' && <TrivialRecursosManager usuario={usuario} />}
 
             {/* MI PÁGINA */}
             {modoDashboard === 'MI_PAGINA' && !paginaProfesorPreview && (

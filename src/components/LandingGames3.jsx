@@ -42,6 +42,7 @@ import AlgebraApp from '../Algebra';
 import VistasDidricas from '../VistasDidricas';
 import EstadisticaApp from '../Estadistica';
 import RetosApp from '../Retos';
+import TrivialGame from '../Trivial';
 import imgPasapalabra from '../assets/icono_pasapal.png'; // Revisa si es .png o .jpg
 import imgBurbujas from '../assets/icono_burbujas.png';
 import imgPikatron from '../assets/icono_pikatron.png';
@@ -590,6 +591,7 @@ export const APPS = [
 
     { id: 'STORYCUBES', name: 'Story Cubes', desc: 'Crea historias en equipo usando dados con imágenes.', color: '#8e44ad', emoji: '🎲', shareable: true },
     { id: 'RETOS', name: 'Retos', desc: 'Conecta puntos y puzzles de lógica.', color: '#f39c12', emoji: '🧩', shareable: true },
+    { id: 'TRIVIAL', name: 'Trivial', desc: 'El clásico juego de preguntas por categorías para hasta 6 jugadores.', color: '#16213e', emoji: '🎯', shareable: false },
 
 ];
 
@@ -995,6 +997,11 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
             return;
         }
 
+        if (appId === 'TRIVIAL') {
+            setJuegoActivo({ tipoJuego: 'TRIVIAL' });
+            return;
+        }
+
         const appInfo = APPS.find(a => a.id === appId);
         if (appInfo) {
             window.history.pushState({}, '', `/${appInfo.name.toLowerCase()}`);
@@ -1182,6 +1189,15 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
         if (juegoActivo.tipoJuego === 'KARTINGED_MULTI') return <KartingedMultiGame alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'RACING3D') return <RacingGame3D usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'MANSION_PITAGORICA') return <MansionPitagoricaGame alTerminar={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'TRIVIAL') {
+            if (juegoActivo.usarBuscador) {
+                return <GamePlayer recurso={{ tipoJuego: 'TRIVIAL', ...juegoActivo }} usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
+            }
+            return <TrivialGame
+                onExit={() => setJuegoActivo(null)}
+                onBuscar={() => setJuegoActivo(prev => ({ ...prev, usarBuscador: true }))}
+            />;
+        }
         if (juegoActivo.modoEspecial === 'PIKATRON') return <PikatronRun recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.modoEspecial === 'PLATAFORMAS') return <Plataformas onExit={() => setJuegoActivo(null)} recursoInicial={juegoActivo} />;
         if (juegoActivo.tipoJuego === 'RULETA') return <RuletaGame recurso={juegoActivo} usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;

@@ -35,6 +35,20 @@ REGLAS ESTRICTAS:
 Descripción de la aplicación que quiero:
 [ESCRIBE TU DESCRIPCIÓN AQUÍ]`;
 
+const CONVERT_PROMPT = `Tengo el siguiente programa escrito en [ESPECIFICA EL LENGUAJE/FRAMEWORK: Python, Vue, JavaScript vanilla, p5.js, etc.] y quiero convertirlo a un componente React llamado App para usarlo en una pizarra digital de aula.
+
+REGLAS ESTRICTAS para la conversión:
+- NO uses ningún import ni export
+- NO uses librerías externas (solo React puro)
+- Las variables de hook ya están disponibles: useState, useEffect, useRef, useCallback, useMemo, useReducer
+- Usa únicamente estilos inline (style={{}}) — no className, no Tailwind, no CSS externo
+- Adapta la lógica al entorno del navegador (sin sistema de archivos, sin servidor, sin base de datos)
+- Si el original usa canvas o animaciones, conviértelos usando useRef y useEffect con requestAnimationFrame
+- Devuelve SOLO el bloque de código del componente App, listo para pegar, sin ningún texto adicional
+
+Aquí está el código a convertir:
+[PEGA AQUÍ TU CÓDIGO]`;
+
 const MATERIAS = [
   'General', 'Matemáticas', 'Lengua', 'Inglés', 'Ciencias Naturales',
   'Historia', 'Geografía', 'Música', 'Plástica', 'Educación Física',
@@ -242,7 +256,8 @@ export default function MiniAppCreator({ onAbrirViewer }) {
   const [runCode, setRunCode]       = useState(DEFAULT_CODE);
   const [iframeKey, setIframeKey]   = useState(0);
   const [runtimeError, setRuntimeError] = useState('');
-  const [copied, setCopied]         = useState(false);
+  const [copied, setCopied]           = useState(false);
+  const [copiedConvert, setCopiedConvert] = useState(false);
   const [previewH, setPreviewH]     = useState(380);
   const [currentUser, setCurrentUser] = useState(auth.currentUser);
 
@@ -275,6 +290,13 @@ export default function MiniAppCreator({ onAbrirViewer }) {
     navigator.clipboard.writeText(AI_PROMPT).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const copyConvertPrompt = () => {
+    navigator.clipboard.writeText(CONVERT_PROMPT).then(() => {
+      setCopiedConvert(true);
+      setTimeout(() => setCopiedConvert(false), 2000);
     });
   };
 
@@ -320,18 +342,64 @@ export default function MiniAppCreator({ onAbrirViewer }) {
   return (
     <div style={{ fontFamily: 'system-ui' }}>
 
-      {/* ── Prompt helper ─────────────────────────────────────────────────── */}
-      <div style={{ background:'#f0f9ff', border:'1px solid #bae6fd', borderRadius:10, padding:'10px 14px', marginBottom:14, display:'flex', gap:10, alignItems:'flex-start', flexWrap:'wrap' }}>
-        <div style={{ flex:1, minWidth:200 }}>
-          <p style={{ margin:'0 0 4px', fontWeight:700, fontSize:'0.85rem', color:'#0369a1' }}>💡 Cómo crear tu app con IA (Claude / Gemini)</p>
-          <p style={{ margin:0, fontSize:'0.78rem', color:'#475569', lineHeight:1.5 }}>
-            Copia el prompt, pégalo en Claude o Gemini, describe tu aplicación al final, y pega el código en el editor. Luego pulsa <strong>▶ Ejecutar</strong>.
-          </p>
+      {/* ── Cabecera con instrucciones ────────────────────────────────────── */}
+      <div style={{ background:'linear-gradient(135deg, #6c63ff18, #3b82f610)', border:'1px solid #c4b5fd', borderRadius:12, padding:'14px 16px', marginBottom:16 }}>
+        <p style={{ margin:'0 0 12px', fontWeight:900, fontSize:'0.9rem', color:'#4c1d95' }}>
+          ⚡ Cómo usar el creador de mini-apps
+        </p>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(180px,1fr))', gap:10, marginBottom:12 }}>
+          {[
+            { n:'1', icon:'🤖', titulo:'Genera o convierte', desc:'Copia el prompt de abajo, pégalo en Claude o Gemini con tu descripción (o tu código) y obtén el componente React.' },
+            { n:'2', icon:'▶', titulo:'Prueba en el editor', desc:'Pega el código generado en el editor y pulsa Ejecutar para ver la app en la previsualización segura.' },
+            { n:'3', icon:'📤', titulo:'Comparte o publica', desc:'Si quieres que esté disponible en pikt.es, envíala para revisión. Tras la aprobación recibirás un enlace público.' },
+          ].map(s => (
+            <div key={s.n} style={{ display:'flex', gap:10, alignItems:'flex-start' }}>
+              <div style={{ width:26, height:26, borderRadius:'50%', background:'#6c63ff', color:'#fff', fontWeight:900, fontSize:'0.8rem', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                {s.n}
+              </div>
+              <div>
+                <p style={{ margin:'0 0 2px', fontWeight:800, fontSize:'0.8rem', color:'#4c1d95' }}>{s.icon} {s.titulo}</p>
+                <p style={{ margin:0, fontSize:'0.73rem', color:'#5b21b6', lineHeight:1.4 }}>{s.desc}</p>
+              </div>
+            </div>
+          ))}
         </div>
-        <button onClick={copyPrompt}
-          style={{ padding:'8px 14px', background: copied ? '#16a34a' : '#0284c7', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700, fontSize:'0.8rem', whiteSpace:'nowrap', flexShrink:0 }}>
-          {copied ? '✅ ¡Copiado!' : '📋 Copiar prompt para IA'}
-        </button>
+        <div style={{ background:'#ede9fe', borderRadius:8, padding:'8px 12px', fontSize:'0.75rem', color:'#5b21b6', lineHeight:1.5 }}>
+          <strong>🌐 Para alojar en pikt.es:</strong> usa el botón <em>«Enviar como herramienta pública»</em> que aparece debajo del editor. El administrador revisará el código y, si lo aprueba, tu app quedará disponible en un enlace único tipo <code style={{ background:'#ddd6fe', padding:'1px 5px', borderRadius:4 }}>pikt.es/?miniapp=ID</code> que podrás compartir con tus alumnos sin que nadie necesite cuenta.
+        </div>
+      </div>
+
+      {/* ── Prompts para IA ───────────────────────────────────────────────── */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(min(100%,300px),1fr))', gap:10, marginBottom:14 }}>
+
+        {/* Prompt crear desde cero */}
+        <div style={{ background:'#f0f9ff', border:'1px solid #bae6fd', borderRadius:10, padding:'10px 14px', display:'flex', flexDirection:'column', gap:8 }}>
+          <div>
+            <p style={{ margin:'0 0 3px', fontWeight:700, fontSize:'0.82rem', color:'#0369a1' }}>💡 Crear app nueva con IA</p>
+            <p style={{ margin:0, fontSize:'0.75rem', color:'#475569', lineHeight:1.4 }}>
+              Copia este prompt, pégalo en <strong>Claude o Gemini</strong>, describe tu aplicación al final y pega el código resultante en el editor.
+            </p>
+          </div>
+          <button onClick={copyPrompt}
+            style={{ padding:'7px 14px', background: copied ? '#16a34a' : '#0284c7', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700, fontSize:'0.78rem', alignSelf:'flex-start' }}>
+            {copied ? '✅ ¡Copiado!' : '📋 Copiar prompt de creación'}
+          </button>
+        </div>
+
+        {/* Prompt convertir código existente */}
+        <div style={{ background:'#fdf4ff', border:'1px solid #e9d5ff', borderRadius:10, padding:'10px 14px', display:'flex', flexDirection:'column', gap:8 }}>
+          <div>
+            <p style={{ margin:'0 0 3px', fontWeight:700, fontSize:'0.82rem', color:'#7e22ce' }}>🔄 Convertir código existente a React</p>
+            <p style={{ margin:0, fontSize:'0.75rem', color:'#475569', lineHeight:1.4 }}>
+              ¿Tienes un programa en <strong>Python, Vue, JS vanilla, p5.js…</strong>? Copia este prompt, pégalo en Claude o Gemini junto con tu código y obtendrás la versión React compatible.
+            </p>
+          </div>
+          <button onClick={copyConvertPrompt}
+            style={{ padding:'7px 14px', background: copiedConvert ? '#16a34a' : '#7e22ce', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700, fontSize:'0.78rem', alignSelf:'flex-start' }}>
+            {copiedConvert ? '✅ ¡Copiado!' : '📋 Copiar prompt de conversión'}
+          </button>
+        </div>
+
       </div>
 
       {/* ── Editor ────────────────────────────────────────────────────────── */}

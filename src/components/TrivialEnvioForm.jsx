@@ -13,25 +13,38 @@ const CAT_DEF  = {
     dep: { nombre: 'Deportes',     emoji: '⚽' },
 };
 
-function emptyQ(defaultCat) {
-    return { q: '', a: '', w: ['', '', ''], cat: defaultCat || 'geo' };
-}
+const TIPOS = [
+    { id: 'SELECCION', label: 'Selección múltiple', icon: '🔘' },
+    { id: 'CORTA',     label: 'Respuesta corta',    icon: '✏️' },
+    { id: 'RELLENAR',  label: 'Rellenar el hueco',  icon: '🔲' },
+    { id: 'ORDENAR',   label: 'Ordenar elementos',  icon: '🔀' },
+];
 
-// Returns the display info for a category id, using custom categorias if available
 function catInfo(id, categorias) {
     if (categorias?.[id]) return { nombre: categorias[id].nombre, emoji: categorias[id].emoji, hex: CAT_HEX[id] };
     return { ...CAT_DEF[id], hex: CAT_HEX[id] };
 }
 
+const IDIOMAS = [
+    { value: 'es-ES', label: '🇪🇸 Español' },
+    { value: 'fr-FR', label: '🇫🇷 Francés' },
+    { value: 'en-US', label: '🇬🇧 Inglés' },
+    { value: 'ca-ES', label: '🏴 Catalán' },
+];
+
+function emptyQ(defaultCat) {
+    return { tipo: 'SELECCION', q: '', a: '', w: ['', '', ''], bloques: ['', ''], lectura: '', lecturaIdioma: 'es-ES', cat: defaultCat || 'geo' };
+}
+
 export default function TrivialEnvioForm({ codigoInicial, onBack }) {
-    const [fase,     setFase]     = useState(codigoInicial ? 'CARGANDO' : 'CODIGO');
-    const [codigo,   setCodigo]   = useState(codigoInicial || '');
-    const [info,     setInfo]     = useState(null);   // { recursoId, titulo, categorias, creadorNombre }
-    const [preguntas,setPreguntas]= useState([]);
-    const [nombre,   setNombre]   = useState('');
-    const [curso,    setCurso]    = useState('');
-    const [error,    setError]    = useState('');
-    const [enviando, setEnviando] = useState(false);
+    const [fase,      setFase]      = useState(codigoInicial ? 'CARGANDO' : 'CODIGO');
+    const [codigo,    setCodigo]    = useState(codigoInicial || '');
+    const [info,      setInfo]      = useState(null);
+    const [preguntas, setPreguntas] = useState([]);
+    const [nombre,    setNombre]    = useState('');
+    const [curso,     setCurso]     = useState('');
+    const [error,     setError]     = useState('');
+    const [enviando,  setEnviando]  = useState(false);
 
     useEffect(() => {
         if (codigoInicial) buscar(codigoInicial);
@@ -65,6 +78,14 @@ export default function TrivialEnvioForm({ codigoInicial, onBack }) {
         });
     };
 
+    const updateTipo = (idx, tipo) => {
+        setPreguntas(prev => {
+            const next = [...prev];
+            next[idx] = { ...next[idx], tipo, q: '', a: '', w: ['', '', ''], bloques: tipo === 'ORDENAR' ? ['', ''] : ['', ''] };
+            return next;
+        });
+    };
+
     const updateW = (idx, wi, value) => {
         setPreguntas(prev => {
             const next = [...prev];
@@ -75,11 +96,37 @@ export default function TrivialEnvioForm({ codigoInicial, onBack }) {
         });
     };
 
+    const updateBloque = (idx, bi, value) => {
+        setPreguntas(prev => {
+            const next = [...prev];
+            const bloques = [...next[idx].bloques];
+            bloques[bi] = value;
+            next[idx] = { ...next[idx], bloques };
+            return next;
+        });
+    };
+
+    const addBloque = (idx) => {
+        setPreguntas(prev => {
+            const next = [...prev];
+            next[idx] = { ...next[idx], bloques: [...next[idx].bloques, ''] };
+            return next;
+        });
+    };
+
+    const removeBloque = (idx, bi) => {
+        setPreguntas(prev => {
+            const next = [...prev];
+            const bloques = next[idx].bloques.filter((_, i) => i !== bi);
+            next[idx] = { ...next[idx], bloques };
+            return next;
+        });
+    };
+
     const addQ = () => {
         const cats = CAT_IDS.filter(id => info?.categorias?.[id] !== undefined);
         const defaultCat = cats[0] || 'geo';
         setPreguntas(prev => [...prev, emptyQ(defaultCat)]);
-        // Scroll to bottom after adding
         setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 50);
     };
 
@@ -93,23 +140,41 @@ export default function TrivialEnvioForm({ codigoInicial, onBack }) {
         if (!nombre.trim()) { setError('Escribe tu nombre antes de enviar.'); return; }
         for (let i = 0; i < preguntas.length; i++) {
             const p = preguntas[i];
-            if (!p.q.trim())           { setError(`Falta el texto de la pregunta ${i + 1}.`); return; }
-            if (!p.a.trim())           { setError(`Falta la respuesta correcta en la pregunta ${i + 1}.`); return; }
-            if (p.w.some(w => !w.trim())) { setError(`Completa las 3 respuestas incorrectas en la pregunta ${i + 1}.`); return; }
-            if (!p.cat)                { setError(`Selecciona categoría en la pregunta ${i + 1}.`); return; }
+            const n = i + 1;
+            if (!p.q.trim() && p.tipo !== 'RELLENAR') { setError(`Falta el texto de la pregunta ${n}.`); return; }
+            if (p.tipo === 'SELECCION') {
+                if (!p.a.trim()) { setError(`Falta la respuesta correcta en la pregunta ${n}.`); return; }
+                if (p.w.some(w => !w.trim())) { setError(`Completa las 3 respuestas incorrectas en la pregunta ${n}.`); return; }
+            } else if (p.tipo === 'CORTA') {
+                if (!p.a.trim()) { setError(`Falta la respuesta en la pregunta ${n}.`); return; }
+            } else if (p.tipo === 'RELLENAR') {
+                if (!p.bloques[0].trim()) { setError(`Escribe la frase con el hueco en la pregunta ${n}.`); return; }
+                if (!p.bloques[1].trim()) { setError(`Escribe la respuesta del hueco en la pregunta ${n}.`); return; }
+            } else if (p.tipo === 'ORDENAR') {
+                const items = p.bloques.filter(b => b.trim());
+                if (items.length < 2) { setError(`Añade al menos 2 elementos para ordenar en la pregunta ${n}.`); return; }
+            }
+            if (!p.cat) { setError(`Selecciona categoría en la pregunta ${n}.`); return; }
         }
         setEnviando(true);
         try {
             const col = collection(db, 'trivial_recursos', info.recursoId, 'preguntas_pendientes');
-            await Promise.all(preguntas.map(p =>
-                addDoc(col, {
-                    q: p.q.trim(), a: p.a.trim(), w: p.w.map(s => s.trim()),
+            await Promise.all(preguntas.map(p => {
+                const lecturaData = p.lectura.trim() ? { lectura: p.lectura.trim(), lecturaIdioma: p.lecturaIdioma } : {};
+                const base = {
+                    tipo: p.tipo,
                     categoria: p.cat,
                     enviadoPor: { nombre: nombre.trim(), curso: curso.trim() },
                     fechaCreacion: serverTimestamp(),
                     estado: 'PENDIENTE',
-                })
-            ));
+                    ...lecturaData,
+                };
+                if (p.tipo === 'SELECCION') return addDoc(col, { ...base, q: p.q.trim(), a: p.a.trim(), w: p.w.map(s => s.trim()) });
+                if (p.tipo === 'CORTA')     return addDoc(col, { ...base, q: p.q.trim(), a: p.a.trim() });
+                if (p.tipo === 'RELLENAR')  return addDoc(col, { ...base, q: p.bloques[0].trim(), bloques: [p.bloques[0].trim(), p.bloques[1].trim()] });
+                if (p.tipo === 'ORDENAR')   return addDoc(col, { ...base, q: p.q.trim(), bloques: p.bloques.filter(b => b.trim()) });
+                return Promise.resolve();
+            }));
             setFase('EXITO');
         } catch (e) {
             console.error(e);
@@ -164,8 +229,6 @@ export default function TrivialEnvioForm({ codigoInicial, onBack }) {
     );
 
     // ─── RENDER: FORMULARIO ───────────────────────────────────────────────────
-    const cats = CAT_IDS.filter(id => info?.categorias ? true : true); // always show all
-
     return (
         <div style={{ ...wrap, justifyContent: 'flex-start', paddingTop: 20, paddingBottom: 40 }}>
             {onBack && <button onClick={onBack} style={{ ...btnVolver, position: 'static', marginBottom: 12 }}>← Volver</button>}
@@ -190,61 +253,133 @@ export default function TrivialEnvioForm({ codigoInicial, onBack }) {
                     const ci = catInfo(p.cat, info?.categorias);
                     return (
                         <div key={idx} style={{ background: 'white', borderRadius: 16, padding: '20px', boxShadow: '0 4px 16px rgba(0,0,0,0.1)', border: `2px solid ${ci.hex}40` }}>
-                            {/* Card header */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
-                                <span style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.95rem', minWidth: 80 }}>Pregunta {idx + 1}</span>
-                                {/* Category selector */}
+                            {/* Card header: category + type + delete */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+                                <span style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.92rem', flexShrink: 0 }}>Pregunta {idx + 1}</span>
+
+                                {/* Category */}
                                 <select
                                     value={p.cat}
                                     onChange={e => updateQ(idx, 'cat', e.target.value)}
-                                    style={{ background: ci.hex + '18', border: `1.5px solid ${ci.hex}`, color: ci.hex, borderRadius: 8, padding: '5px 10px', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', outline: 'none', flex: 1, minWidth: 140 }}
+                                    style={{ background: ci.hex + '18', border: `1.5px solid ${ci.hex}`, color: ci.hex, borderRadius: 8, padding: '5px 9px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', outline: 'none', flex: 1, minWidth: 130 }}
                                 >
                                     {CAT_IDS.map(id => {
                                         const c = catInfo(id, info?.categorias);
                                         return <option key={id} value={id}>{c.emoji} {c.nombre}</option>;
                                     })}
                                 </select>
+
+                                {/* Type */}
+                                <select
+                                    value={p.tipo}
+                                    onChange={e => updateTipo(idx, e.target.value)}
+                                    style={{ background: '#f8fafc', border: '1.5px solid #cbd5e1', color: '#475569', borderRadius: 8, padding: '5px 9px', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer', outline: 'none', flex: 1, minWidth: 150 }}
+                                >
+                                    {TIPOS.map(t => (
+                                        <option key={t.id} value={t.id}>{t.icon} {t.label}</option>
+                                    ))}
+                                </select>
+
                                 {preguntas.length > 1 && (
                                     <button onClick={() => removeQ(idx)} style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#ef4444', borderRadius: 7, padding: '5px 10px', cursor: 'pointer', fontSize: '0.8rem', flexShrink: 0 }}>✕</button>
                                 )}
                             </div>
 
-                            {/* Question */}
-                            <div style={{ marginBottom: 12 }}>
-                                <label style={lbl}>Pregunta</label>
+                            {/* ── SELECCION ── */}
+                            {p.tipo === 'SELECCION' && (<>
+                                <div style={{ marginBottom: 12 }}>
+                                    <label style={lbl}>Pregunta</label>
+                                    <textarea value={p.q} onChange={e => updateQ(idx, 'q', e.target.value)} placeholder="Escribe aquí la pregunta…" rows={2} style={{ ...inputBase, resize: 'vertical', fontFamily: 'inherit' }} />
+                                </div>
+                                <div style={{ marginBottom: 10 }}>
+                                    <label style={{ ...lbl, color: '#16a34a' }}>✓ Respuesta correcta</label>
+                                    <input value={p.a} onChange={e => updateQ(idx, 'a', e.target.value)} placeholder="La respuesta correcta" style={{ ...inputBase, borderColor: '#86efac', background: '#f0fdf4', color: '#166534' }} />
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 10px' }}>
+                                    {p.w.map((w, wi) => (
+                                        <div key={wi}>
+                                            <label style={{ ...lbl, color: '#dc2626' }}>✗ Incorrecta {wi + 1}</label>
+                                            <input value={w} onChange={e => updateW(idx, wi, e.target.value)} placeholder={`Opción falsa ${wi + 1}`} style={{ ...inputBase, borderColor: '#fca5a5', background: '#fff5f5', color: '#991b1b' }} />
+                                        </div>
+                                    ))}
+                                </div>
+                            </>)}
+
+                            {/* ── CORTA ── */}
+                            {p.tipo === 'CORTA' && (<>
+                                <div style={{ marginBottom: 12 }}>
+                                    <label style={lbl}>Pregunta</label>
+                                    <textarea value={p.q} onChange={e => updateQ(idx, 'q', e.target.value)} placeholder="Escribe aquí la pregunta…" rows={2} style={{ ...inputBase, resize: 'vertical', fontFamily: 'inherit' }} />
+                                </div>
+                                <div>
+                                    <label style={{ ...lbl, color: '#16a34a' }}>✓ Respuesta correcta</label>
+                                    <input value={p.a} onChange={e => updateQ(idx, 'a', e.target.value)} placeholder="Respuesta exacta (el jugador deberá escribirla)" style={{ ...inputBase, borderColor: '#86efac', background: '#f0fdf4', color: '#166534' }} />
+                                </div>
+                                <p style={{ color: '#94a3b8', fontSize: '0.75rem', margin: '8px 0 0' }}>El jugador escribe la respuesta. Acentos y mayúsculas se ignoran al comparar.</p>
+                            </>)}
+
+                            {/* ── RELLENAR ── */}
+                            {p.tipo === 'RELLENAR' && (<>
+                                <div style={{ marginBottom: 12 }}>
+                                    <label style={lbl}>Frase con el hueco <span style={{ color: '#94a3b8', fontWeight: 400 }}>(escribe ___ donde va el hueco)</span></label>
+                                    <textarea value={p.bloques[0]} onChange={e => updateBloque(idx, 0, e.target.value)} placeholder="Ej: La capital de España es ___" rows={2} style={{ ...inputBase, resize: 'vertical', fontFamily: 'inherit' }} />
+                                </div>
+                                <div>
+                                    <label style={{ ...lbl, color: '#16a34a' }}>✓ Palabra que rellena el hueco</label>
+                                    <input value={p.bloques[1]} onChange={e => updateBloque(idx, 1, e.target.value)} placeholder="Ej: Madrid" style={{ ...inputBase, borderColor: '#86efac', background: '#f0fdf4', color: '#166534' }} />
+                                </div>
+                            </>)}
+
+                            {/* ── ORDENAR ── */}
+                            {p.tipo === 'ORDENAR' && (<>
+                                <div style={{ marginBottom: 12 }}>
+                                    <label style={lbl}>Instrucción</label>
+                                    <textarea value={p.q} onChange={e => updateQ(idx, 'q', e.target.value)} placeholder="Ej: Ordena estos presidentes de mayor a menor antigüedad" rows={2} style={{ ...inputBase, resize: 'vertical', fontFamily: 'inherit' }} />
+                                </div>
+                                <label style={lbl}>Elementos en el orden correcto</label>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                                    {p.bloques.map((b, bi) => (
+                                        <div key={bi} style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
+                                            <span style={{ color: '#94a3b8', fontSize: '0.8rem', fontWeight: 700, width: 22, flexShrink: 0, textAlign: 'center' }}>{bi + 1}</span>
+                                            <input
+                                                value={b}
+                                                onChange={e => updateBloque(idx, bi, e.target.value)}
+                                                placeholder={`Elemento ${bi + 1}`}
+                                                style={{ ...inputBase, flex: 1 }}
+                                            />
+                                            {p.bloques.length > 2 && (
+                                                <button onClick={() => removeBloque(idx, bi)} style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#ef4444', borderRadius: 6, padding: '6px 8px', cursor: 'pointer', fontSize: '0.75rem', flexShrink: 0 }}>✕</button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                                <button
+                                    onClick={() => addBloque(idx)}
+                                    style={{ marginTop: 8, background: '#f8fafc', border: '1.5px dashed #cbd5e1', color: '#64748b', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600, width: '100%' }}
+                                >
+                                    ＋ Añadir elemento
+                                </button>
+                                <p style={{ color: '#94a3b8', fontSize: '0.75rem', margin: '8px 0 0' }}>El jugador verá los elementos desordenados y deberá ponerlos en este orden.</p>
+                            </>)}
+
+                            {/* ── TTS (todos los tipos) ── */}
+                            <div style={{ marginTop: 14, background: '#f0f9ff', borderRadius: 10, padding: '12px 14px', border: '1px solid #bae6fd' }}>
+                                <label style={{ ...lbl, color: '#0369a1', marginBottom: 7 }}>🔊 Texto para leer en voz alta <span style={{ fontWeight: 400, color: '#94a3b8' }}>(opcional)</span></label>
                                 <textarea
-                                    value={p.q}
-                                    onChange={e => updateQ(idx, 'q', e.target.value)}
-                                    placeholder="Escribe aquí la pregunta…"
+                                    value={p.lectura}
+                                    onChange={e => updateQ(idx, 'lectura', e.target.value)}
+                                    placeholder="Si rellenas este campo, el navegador leerá este texto al jugador cuando aparezca la pregunta."
                                     rows={2}
-                                    style={{ ...inputBase, resize: 'vertical', fontFamily: 'inherit' }}
+                                    style={{ ...inputBase, resize: 'vertical', fontFamily: 'inherit', background: 'white', borderColor: p.lectura.trim() ? '#38bdf8' : '#e2e8f0', marginBottom: 8 }}
                                 />
-                            </div>
-
-                            {/* Correct */}
-                            <div style={{ marginBottom: 8 }}>
-                                <label style={{ ...lbl, color: '#16a34a' }}>✓ Respuesta correcta</label>
-                                <input
-                                    value={p.a}
-                                    onChange={e => updateQ(idx, 'a', e.target.value)}
-                                    placeholder="La respuesta correcta"
-                                    style={{ ...inputBase, borderColor: '#86efac', background: '#f0fdf4', color: '#166534' }}
-                                />
-                            </div>
-
-                            {/* Wrong answers */}
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 10px' }}>
-                                {p.w.map((w, wi) => (
-                                    <div key={wi}>
-                                        <label style={{ ...lbl, color: '#dc2626' }}>✗ Incorrecta {wi + 1}</label>
-                                        <input
-                                            value={w}
-                                            onChange={e => updateW(idx, wi, e.target.value)}
-                                            placeholder={`Opción falsa ${wi + 1}`}
-                                            style={{ ...inputBase, borderColor: '#fca5a5', background: '#fff5f5', color: '#991b1b' }}
-                                        />
-                                    </div>
-                                ))}
+                                <select
+                                    value={p.lecturaIdioma}
+                                    onChange={e => updateQ(idx, 'lecturaIdioma', e.target.value)}
+                                    disabled={!p.lectura.trim()}
+                                    style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: 7, padding: '5px 10px', fontSize: '0.82rem', fontWeight: 600, cursor: p.lectura.trim() ? 'pointer' : 'default', outline: 'none', opacity: p.lectura.trim() ? 1 : 0.4 }}
+                                >
+                                    {IDIOMAS.map(i => <option key={i.value} value={i.value}>{i.label}</option>)}
+                                </select>
                             </div>
                         </div>
                     );
@@ -266,21 +401,11 @@ export default function TrivialEnvioForm({ codigoInicial, onBack }) {
                     <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                         <div style={{ flex: 1, minWidth: 160 }}>
                             <label style={lbl}>Nombre y apellidos *</label>
-                            <input
-                                value={nombre}
-                                onChange={e => { setNombre(e.target.value); setError(''); }}
-                                placeholder="Tu nombre completo"
-                                style={{ ...inputBase, borderColor: nombre.trim() ? '#86efac' : '#e2e8f0' }}
-                            />
+                            <input value={nombre} onChange={e => { setNombre(e.target.value); setError(''); }} placeholder="Tu nombre completo" style={{ ...inputBase, borderColor: nombre.trim() ? '#86efac' : '#e2e8f0' }} />
                         </div>
                         <div style={{ flex: 1, minWidth: 120 }}>
                             <label style={lbl}>Curso / Clase</label>
-                            <input
-                                value={curso}
-                                onChange={e => setCurso(e.target.value)}
-                                placeholder="Ej: 3ºA"
-                                style={inputBase}
-                            />
+                            <input value={curso} onChange={e => setCurso(e.target.value)} placeholder="Ej: 3ºA" style={inputBase} />
                         </div>
                     </div>
                 </div>
@@ -291,11 +416,7 @@ export default function TrivialEnvioForm({ codigoInicial, onBack }) {
                         ⚠ {error}
                     </div>
                 )}
-                <button
-                    onClick={enviar}
-                    disabled={enviando}
-                    style={{ ...btnPrimary, padding: '16px', fontSize: '1.05rem', opacity: enviando ? 0.6 : 1 }}
-                >
+                <button onClick={enviar} disabled={enviando} style={{ ...btnPrimary, padding: '16px', fontSize: '1.05rem', opacity: enviando ? 0.6 : 1 }}>
                     {enviando ? 'Enviando…' : `Enviar ${preguntas.length} pregunta${preguntas.length !== 1 ? 's' : ''} →`}
                 </button>
             </div>

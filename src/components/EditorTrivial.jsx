@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
 import {
     collection, doc, addDoc, setDoc, getDocs, updateDoc, deleteDoc,
@@ -6,6 +6,18 @@ import {
 } from 'firebase/firestore';
 
 const CAT_HEX = { geo: '#3498db', esp: '#e84393', his: '#f1c40f', art: '#9b59b6', cie: '#2ecc71', dep: '#e67e22' };
+
+const EMOJI_GRUPOS = [
+    { label: 'Geografía', emojis: ['🌍','🌎','🌏','🗺️','🏔️','⛰️','🌋','🏝️','🌊','🏜️','❄️','☀️','🌙','⭐','🌈','🌪️','🗼','🏛️','🗽','🌐','⛩️','🏯','🗿','🌴','🌵','🐚'] },
+    { label: 'Ciencias',  emojis: ['🔬','🧬','🧪','⚗️','🔭','💡','⚡','🧲','🔋','🌡️','🦠','🧫','💻','🤖','🛸','🧩','🔮','🧿','🩺','💊','⚛️','🧮','📡','🌌'] },
+    { label: 'Historia',  emojis: ['📜','⚔️','🛡️','👑','🏺','🗡️','🪖','⚓','🚢','🪙','💰','🔑','🕌','⛪','🏰','⛵','🧭','🪬','📯','🏇'] },
+    { label: 'Arte',      emojis: ['🎨','🖌️','✏️','📝','🎭','🎬','🎵','🎶','🎸','🎹','🎺','🎻','🥁','🎤','📷','📸','🎪','🖼️','🎼','🎧','📻','📺','🎞️'] },
+    { label: 'Deportes',  emojis: ['⚽','🏀','🏈','⚾','🎾','🏐','🏉','🎱','🏊','🚴','⛷️','🏋️','🥊','🏆','🥇','🎿','🏄','🤸','🏌️','🎯','🏹','🛹','🥋','🏇'] },
+    { label: 'Naturaleza',emojis: ['🌿','🌸','🌺','🌻','🍀','🌱','🍁','🍃','🦁','🐯','🐘','🦒','🐬','🦅','🦋','🐝','🦊','🐺','🦋','🐙','🦈','🐲','🌾','🍄'] },
+    { label: 'Varios',    emojis: ['📚','🎓','💎','🌟','💫','✨','🎲','🎮','🧠','🔑','🎁','🏅','🥚','🧸','🎠','🎡','🎢','🛕','🔔','🕯️','🪄','💈','🧿'] },
+];
+
+const cleanPrev = s => s ? String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim() : '';
 const CAT_IDS = ['geo', 'esp', 'his', 'art', 'cie', 'dep'];
 const CAT_DEFAULTS = {
     geo: { nombre: 'Geografía',    emoji: '🌍', desc: '' },
@@ -65,6 +77,15 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
     const [catConfigAbierto, setCatConfigAbierto] = useState(false);
     const [guardandoCat,     setGuardandoCat]     = useState(false);
     const [savedCat,         setSavedCat]         = useState(false);
+    const [emojiPickerAbierto, setEmojiPickerAbierto] = useState(false);
+    const emojiPickerRef = useRef(null);
+
+    // ── Question preview ───────────────────────────────────────────────────────
+    const [previewPregunta,  setPreviewPregunta]  = useState(null);
+    const [previewRevelado,  setPreviewRevelado]  = useState(false);
+    const [previewOrden,     setPreviewOrden]     = useState([]);
+    const [previewInput,     setPreviewInput]     = useState('');
+    const [previewHablando,  setPreviewHablando]  = useState(false);
 
     // ── Add-question form ──────────────────────────────────────────────────────
     const [formAbierto,        setFormAbierto]      = useState(false);
@@ -73,6 +94,8 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
     const [formA,              setFormA]            = useState('');
     const [formW,              setFormW]            = useState(['', '', '']);
     const [formBloques,        setFormBloques]      = useState(['', '']);
+    const [formLectura,        setFormLectura]      = useState('');
+    const [formLecturaIdioma,  setFormLecturaIdioma]= useState('es-ES');
     const [guardandoPregunta,  setGuardandoPregunta]= useState(false);
     const [errorForm,          setErrorForm]        = useState('');
 
@@ -94,10 +117,18 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
 
     // ── Effects ────────────────────────────────────────────────────────────────
     useEffect(() => {
+        if (!emojiPickerAbierto) return;
+        const handler = (e) => { if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target)) setEmojiPickerAbierto(false); };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [emojiPickerAbierto]);
+
+    useEffect(() => {
         if (recursoId && !preguntasCargadas[tabActiva]) cargarPreguntas(tabActiva);
         // Clear question form when switching tabs
         setFormAbierto(false);
-        setFormTipo('SELECCION'); setFormQ(''); setFormA(''); setFormW(['', '', '']); setFormBloques(['', '']); setErrorForm('');
+        setFormTipo('SELECCION'); setFormQ(''); setFormA(''); setFormW(['', '', '']); setFormBloques(['', '']);
+        setFormLectura(''); setFormLecturaIdioma('es-ES'); setErrorForm('');
     }, [recursoId, tabActiva]);
 
     useEffect(() => {
@@ -239,7 +270,8 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
         setErrorForm('');
         if (!recursoId) { setErrorGuardar('Guarda el recurso primero (botón "Crear" arriba).'); return; }
 
-        let data = { categoria: tabActiva, tipo: formTipo, autorUid: usuario.uid, autorNombre: usuario.displayName || usuario.email, fechaCreacion: serverTimestamp(), orden: Date.now() };
+        const lecturaData = formLectura.trim() ? { lectura: formLectura.trim(), lecturaIdioma: formLecturaIdioma } : {};
+        let data = { categoria: tabActiva, tipo: formTipo, autorUid: usuario.uid, autorNombre: usuario.displayName || usuario.email, fechaCreacion: serverTimestamp(), orden: Date.now(), ...lecturaData };
 
         if (formTipo === 'SELECCION') {
             if (!formQ.trim()) { setErrorForm('Escribe la pregunta.'); return; }
@@ -264,7 +296,8 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
         try {
             const ref = await addDoc(collection(db, 'trivial_recursos', recursoId, 'preguntas'), data);
             setPreguntas(prev => ({ ...prev, [tabActiva]: [...prev[tabActiva], { id: ref.id, ...data }] }));
-            setFormQ(''); setFormA(''); setFormW(['', '', '']); setFormBloques(['', '']); setFormAbierto(false);
+            setFormQ(''); setFormA(''); setFormW(['', '', '']); setFormBloques(['', '']);
+            setFormLectura(''); setFormLecturaIdioma('es-ES'); setFormAbierto(false);
         } catch (e) { console.error(e); setErrorForm('Error al guardar la pregunta.'); }
         setGuardandoPregunta(false);
     };
@@ -301,13 +334,16 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
 
     const abrirEdicion = (p) => {
         setEditandoPregId(p.id);
-        setEditForm({ tipo: p.tipo || 'SELECCION', q: p.q || '', a: p.a || '', w: [...(p.w || ['', '', ''])], bloques: [...(p.bloques || ['', ''])], autorNombre: p.autorNombre || '' });
+        setEditForm({ tipo: p.tipo || 'SELECCION', q: p.q || '', a: p.a || '', w: [...(p.w || ['', '', ''])], bloques: [...(p.bloques || ['', ''])], autorNombre: p.autorNombre || '', lectura: p.lectura || '', lecturaIdioma: p.lecturaIdioma || 'es-ES' });
     };
 
     const guardarEdicion = async () => {
         setGuardandoEdicion(true);
         try {
-            let upd = { tipo: editForm.tipo, autorNombre: editForm.autorNombre.trim() };
+            const lecturaUpd = editForm.lectura.trim()
+                ? { lectura: editForm.lectura.trim(), lecturaIdioma: editForm.lecturaIdioma }
+                : { lectura: '', lecturaIdioma: editForm.lecturaIdioma };
+            let upd = { tipo: editForm.tipo, autorNombre: editForm.autorNombre.trim(), ...lecturaUpd };
             if (editForm.tipo === 'SELECCION') {
                 upd = { ...upd, q: editForm.q.trim(), a: editForm.a.trim(), w: editForm.w.map(s => s.trim()) };
             } else if (editForm.tipo === 'CORTA') {
@@ -330,6 +366,38 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
 
     const cancelarEdicion = () => { setEditandoPregId(null); setEditForm(null); };
 
+    const abrirPreview = (p) => {
+        const tipo = p.tipo || 'SELECCION';
+        let shuffledAnswers = [];
+        let shuffledOrden = [];
+        if (tipo === 'SELECCION' && p.a && p.w) {
+            shuffledAnswers = [p.a, ...(p.w || [])].sort(() => Math.random() - 0.5);
+        }
+        if (tipo === 'ORDENAR' && p.bloques) {
+            shuffledOrden = [...p.bloques].sort(() => Math.random() - 0.5).map(t => ({ texto: t, enSlot: false }));
+        }
+        setPreviewPregunta({ ...p, shuffledAnswers });
+        setPreviewOrden(shuffledOrden);
+        setPreviewInput('');
+        setPreviewRevelado(false);
+        setPreviewHablando(false);
+        if (p.lectura && window.speechSynthesis) {
+            const utt = new SpeechSynthesisUtterance(p.lectura);
+            utt.lang = p.lecturaIdioma || 'es-ES';
+            utt.onstart = () => setPreviewHablando(true);
+            utt.onend   = () => setPreviewHablando(false);
+            utt.onerror = () => setPreviewHablando(false);
+            window.speechSynthesis.cancel();
+            window.speechSynthesis.speak(utt);
+        }
+    };
+
+    const cerrarPreview = () => {
+        if (window.speechSynthesis) window.speechSynthesis.cancel();
+        setPreviewPregunta(null);
+        setPreviewHablando(false);
+    };
+
     const cambiarCategoriaPregunta = async (pregId, nuevaCat) => {
         if (!nuevaCat || nuevaCat === tabActiva) return;
         const pregData = preguntas[tabActiva].find(p => p.id === pregId);
@@ -348,18 +416,20 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
     const aceptarPendiente = async (pend) => {
         try {
             const autorNombre = pend.enviadoPor.nombre + (pend.enviadoPor.curso ? ` (${pend.enviadoPor.curso})` : '');
-            const ref = await addDoc(collection(db, 'trivial_recursos', recursoId, 'preguntas'), {
-                q: pend.q, a: pend.a, w: pend.w, categoria: pend.categoria,
-                autorUid: 'externo', autorNombre,
-                fechaCreacion: serverTimestamp(),
-            });
+            const tipo = pend.tipo || 'SELECCION';
+            const lecturaData = pend.lectura ? { lectura: pend.lectura, lecturaIdioma: pend.lecturaIdioma || 'es-ES' } : {};
+            const base = { tipo, categoria: pend.categoria, autorUid: 'externo', autorNombre, fechaCreacion: serverTimestamp(), orden: Date.now(), ...lecturaData };
+            let data = base;
+            if (tipo === 'SELECCION') data = { ...base, q: pend.q, a: pend.a, w: pend.w };
+            else if (tipo === 'CORTA') data = { ...base, q: pend.q, a: pend.a };
+            else if (tipo === 'RELLENAR') data = { ...base, q: pend.bloques?.[0] || pend.q || '', bloques: pend.bloques };
+            else if (tipo === 'ORDENAR') data = { ...base, q: pend.q, bloques: pend.bloques };
+            const ref = await addDoc(collection(db, 'trivial_recursos', recursoId, 'preguntas'), data);
             await deleteDoc(doc(db, 'trivial_recursos', recursoId, 'preguntas_pendientes', pend.id));
             const cat = pend.categoria;
             setPreguntas(prev => ({
                 ...prev,
-                [cat]: preguntasCargadas[cat]
-                    ? [...prev[cat], { id: ref.id, q: pend.q, a: pend.a, w: pend.w, categoria: cat, autorUid: 'externo', autorNombre }]
-                    : prev[cat]
+                [cat]: preguntasCargadas[cat] ? [...prev[cat], { id: ref.id, ...data }] : prev[cat]
             }));
             setPendientes(prev => ({ ...prev, [cat]: prev[cat].filter(p => p.id !== pend.id) }));
         } catch (e) { console.error(e); }
@@ -410,6 +480,135 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
     // ─────────────────────────────────────────────────────────────────────────
     return (
         <div style={{ position: 'fixed', inset: 0, background: '#0f172a', zIndex: 2000, display: 'flex', flexDirection: 'column', fontFamily: "'Segoe UI', sans-serif" }}>
+
+        {/* ── MODAL PREVIEW ── */}
+        {previewPregunta && (() => {
+            const p    = previewPregunta;
+            const tipo = p.tipo || 'SELECCION';
+            const hex  = CAT_HEX[tabActiva];
+            const elegidos    = previewOrden.filter(s => s.enSlot);
+            const disponibles = previewOrden.filter(s => !s.enSlot);
+            const ordenCompleto = elegidos.length === (p.bloques?.length || 0);
+            return (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+                    onClick={e => { if (e.target === e.currentTarget) cerrarPreview(); }}>
+                    <div style={{ background: '#1e293b', borderRadius: 20, padding: 32, maxWidth: 520, width: '100%', borderTop: `8px solid ${hex}`, boxShadow: '0 24px 80px rgba(0,0,0,0.7)', position: 'relative' }}>
+                        {/* Header */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <div style={{ color: hex, fontWeight: 800, fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: 2 }}>
+                                    {categorias[tabActiva]?.emoji} {categorias[tabActiva]?.nombre}
+                                </div>
+                                {p.lectura && (
+                                    <button onClick={() => {
+                                        if (!window.speechSynthesis) return;
+                                        const utt = new SpeechSynthesisUtterance(p.lectura);
+                                        utt.lang = p.lecturaIdioma || 'es-ES';
+                                        utt.onstart = () => setPreviewHablando(true);
+                                        utt.onend   = () => setPreviewHablando(false);
+                                        utt.onerror = () => setPreviewHablando(false);
+                                        window.speechSynthesis.cancel();
+                                        window.speechSynthesis.speak(utt);
+                                    }} style={{ background: previewHablando ? '#1d4ed820' : 'transparent', border: `1px solid ${previewHablando ? '#38bdf8' : '#334155'}`, borderRadius: 20, padding: '3px 10px', cursor: 'pointer', color: previewHablando ? '#38bdf8' : '#64748b', fontSize: '0.75rem', fontWeight: 600 }}>
+                                        {previewHablando ? '🔊 Escuchando…' : '🔊 Escuchar'}
+                                    </button>
+                                )}
+                            </div>
+                            <button onClick={cerrarPreview} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1.2rem', lineHeight: 1 }}>✕</button>
+                        </div>
+
+                        {/* Barra de tiempo decorativa */}
+                        <div style={{ height: 5, background: '#334155', borderRadius: 4, marginBottom: 20 }}>
+                            <div style={{ height: '100%', width: '60%', background: hex, borderRadius: 4 }} />
+                        </div>
+
+                        {/* Contenido por tipo */}
+                        {tipo === 'SELECCION' && (<>
+                            <h2 style={{ color: 'white', fontSize: '1.4rem', margin: '0 0 24px', lineHeight: 1.4 }}>{p.q}</h2>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                {p.shuffledAnswers.map((ans, i) => {
+                                    const esCor = ans === p.a;
+                                    const bg = previewRevelado ? (esCor ? '#166534' : '#2a0d0d') : '#0f172a';
+                                    const border = previewRevelado ? (esCor ? '#4ade80' : '#ef444450') : '#334155';
+                                    return (
+                                        <div key={i} style={{ background: bg, border: `2px solid ${border}`, borderRadius: 12, padding: '14px 18px', color: previewRevelado ? (esCor ? '#4ade80' : '#64748b') : 'white', fontSize: '1rem', fontWeight: 600, transition: '0.2s', display: 'flex', alignItems: 'center', gap: 10 }}>
+                                            {previewRevelado && <span>{esCor ? '✓' : '✗'}</span>}
+                                            {ans}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </>)}
+
+                        {tipo === 'CORTA' && (<>
+                            <h2 style={{ color: 'white', fontSize: '1.4rem', margin: '0 0 20px', lineHeight: 1.4 }}>{p.q}</h2>
+                            {!previewRevelado
+                                ? <input value={previewInput} onChange={e => setPreviewInput(e.target.value)} placeholder="Escribe tu respuesta…" style={{ width: '100%', boxSizing: 'border-box', background: '#0f172a', border: '2px solid #475569', borderRadius: 10, color: 'white', padding: '14px 16px', fontSize: '1rem', fontFamily: 'inherit', outline: 'none' }} />
+                                : <div style={{ background: '#0d2b1b', border: '2px solid #4ade80', borderRadius: 10, padding: '14px 18px', color: '#4ade80', fontSize: '1.1rem', fontWeight: 700 }}>✓ {p.a}</div>
+                            }
+                            {!previewRevelado && previewInput.trim() && (
+                                <div style={{ marginTop: 10, color: cleanPrev(previewInput) === cleanPrev(p.a) ? '#4ade80' : '#f87171', fontSize: '0.85rem', fontWeight: 700 }}>
+                                    {cleanPrev(previewInput) === cleanPrev(p.a) ? '✓ Correcto' : '✗ Incorrecto'}
+                                </div>
+                            )}
+                        </>)}
+
+                        {tipo === 'RELLENAR' && (<>
+                            <div style={{ color: 'white', fontSize: '1.3rem', margin: '0 0 20px', lineHeight: 1.6 }}>
+                                <span>{p.bloques?.[0]} </span>
+                                <span style={{ borderBottom: `3px solid ${hex}`, padding: '0 12px', color: previewRevelado ? '#4ade80' : hex, fontWeight: 700 }}>
+                                    {previewRevelado ? p.bloques?.[1] : '___'}
+                                </span>
+                            </div>
+                            {!previewRevelado && (
+                                <input value={previewInput} onChange={e => setPreviewInput(e.target.value)} placeholder="Completa el hueco…" style={{ width: '100%', boxSizing: 'border-box', background: '#0f172a', border: `2px solid ${hex}`, borderRadius: 10, color: hex, padding: '14px 16px', fontSize: '1rem', fontFamily: 'inherit', outline: 'none' }} />
+                            )}
+                            {!previewRevelado && previewInput.trim() && (
+                                <div style={{ marginTop: 10, color: cleanPrev(previewInput) === cleanPrev(p.bloques?.[1]) ? '#4ade80' : '#f87171', fontSize: '0.85rem', fontWeight: 700 }}>
+                                    {cleanPrev(previewInput) === cleanPrev(p.bloques?.[1]) ? '✓ Correcto' : '✗ Incorrecto'}
+                                </div>
+                            )}
+                        </>)}
+
+                        {tipo === 'ORDENAR' && (<>
+                            {p.q && <h2 style={{ color: 'white', fontSize: '1.1rem', margin: '0 0 16px', lineHeight: 1.4 }}>{p.q}</h2>}
+                            <div style={{ minHeight: 44, background: '#0f172a', borderRadius: 10, padding: '8px 10px', marginBottom: 10, border: '2px dashed #334155', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                {elegidos.length === 0 && <span style={{ color: '#475569', fontSize: '0.85rem', alignSelf: 'center' }}>Toca los elementos en el orden correcto</span>}
+                                {elegidos.map((s, i) => (
+                                    <button key={i} onClick={() => setPreviewOrden(prev => prev.map(x => x.texto === s.texto ? { ...x, enSlot: false } : x))}
+                                        style={{ background: previewRevelado ? (p.bloques?.[i] === s.texto ? '#166534' : '#7f1d1d') : '#1d4ed8', border: 'none', color: 'white', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontSize: '0.95rem', fontWeight: 600 }}>
+                                        {i + 1}. {s.texto}
+                                    </button>
+                                ))}
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+                                {disponibles.map((s, i) => (
+                                    <button key={i} onClick={() => setPreviewOrden(prev => prev.map(x => x.texto === s.texto ? { ...x, enSlot: true } : x))}
+                                        style={{ background: '#334155', border: '1px solid #475569', color: '#e2e8f0', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontSize: '0.95rem' }}>
+                                        {s.texto}
+                                    </button>
+                                ))}
+                            </div>
+                            {previewRevelado && <div style={{ color: '#4ade80', fontSize: '0.85rem', fontWeight: 700, marginBottom: 8 }}>Orden correcto: {p.bloques?.join(' → ')}</div>}
+                        </>)}
+
+                        {/* Botón revelar / cerrar */}
+                        <div style={{ marginTop: 20, display: 'flex', gap: 10 }}>
+                            {!previewRevelado && (
+                                <button onClick={() => setPreviewRevelado(true)}
+                                    style={{ flex: 1, background: hex, border: 'none', color: 'white', padding: '13px', borderRadius: 10, cursor: 'pointer', fontWeight: 800, fontSize: '0.95rem' }}>
+                                    Ver respuesta correcta
+                                </button>
+                            )}
+                            <button onClick={cerrarPreview}
+                                style={{ flex: previewRevelado ? 1 : 0, background: '#334155', border: 'none', color: '#94a3b8', padding: '13px 20px', borderRadius: 10, cursor: 'pointer', fontWeight: 700, fontSize: '0.95rem' }}>
+                                Cerrar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        })()}
 
             {/* ─── HEADER ─── */}
             <div style={{ background: '#1e293b', borderBottom: '1px solid #334155', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
@@ -496,11 +695,29 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                                                     ✉ <strong style={{ color: '#f59e0b' }}>{pend.enviadoPor?.nombre}</strong>
                                                     {pend.enviadoPor?.curso && <span> · {pend.enviadoPor.curso}</span>}
                                                 </div>
-                                                <div style={{ color: '#f1f5f9', fontSize: '0.92rem', fontWeight: 600, marginBottom: 8, lineHeight: 1.4 }}>{pend.q}</div>
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                                                    <span style={{ color: '#4ade80', fontSize: '0.82rem' }}>✓ {pend.a}</span>
-                                                    {pend.w?.map((w, i) => <span key={i} style={{ color: '#64748b', fontSize: '0.82rem' }}>✗ {w}</span>)}
-                                                </div>
+                                                {(() => {
+                                                    const tipo = pend.tipo || 'SELECCION';
+                                                    const tipoBadge = { SELECCION: '🔘 Selección', CORTA: '✏️ Corta', RELLENAR: '🔲 Rellenar', ORDENAR: '🔀 Ordenar' }[tipo] || tipo;
+                                                    return (<>
+                                                        <div style={{ color: '#f59e0b', fontSize: '0.7rem', fontWeight: 700, marginBottom: 4 }}>{tipoBadge}</div>
+                                                        <div style={{ color: '#f1f5f9', fontSize: '0.92rem', fontWeight: 600, marginBottom: 8, lineHeight: 1.4 }}>{pend.q}</div>
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                                            {tipo === 'SELECCION' && (<>
+                                                                <span style={{ color: '#4ade80', fontSize: '0.82rem' }}>✓ {pend.a}</span>
+                                                                {pend.w?.map((w, i) => <span key={i} style={{ color: '#64748b', fontSize: '0.82rem' }}>✗ {w}</span>)}
+                                                            </>)}
+                                                            {tipo === 'CORTA' && <span style={{ color: '#4ade80', fontSize: '0.82rem' }}>✓ {pend.a}</span>}
+                                                            {tipo === 'RELLENAR' && pend.bloques?.map((b, i) => (
+                                                                <span key={i} style={{ color: i === 1 ? '#4ade80' : '#94a3b8', fontSize: '0.82rem' }}>
+                                                                    {i === 0 ? '📝 ' : '✓ '}{b}
+                                                                </span>
+                                                            ))}
+                                                            {tipo === 'ORDENAR' && pend.bloques?.map((b, i) => (
+                                                                <span key={i} style={{ color: '#94a3b8', fontSize: '0.82rem' }}>{i + 1}. {b}</span>
+                                                            ))}
+                                                        </div>
+                                                    </>);
+                                                })()}
                                             </div>
                                         </div>
                                         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
@@ -533,9 +750,30 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                             {catConfigAbierto && (
                                 <div style={{ padding: '0 18px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
                                     <div style={{ display: 'flex', gap: 10 }}>
-                                        <div style={{ flex: '0 0 64px' }}>
+                                        <div style={{ flex: '0 0 64px', position: 'relative' }} ref={emojiPickerRef}>
                                             <div style={labelStyle}>Emoji</div>
-                                            <input value={catData.emoji} onChange={e => updateCat('emoji', e.target.value.slice(0, 4))} style={{ width: '100%', background: '#0f172a', border: `1px solid ${catHex}60`, borderRadius: 8, color: '#f1f5f9', padding: '7px 4px', fontSize: '1.5rem', textAlign: 'center', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
+                                            <button
+                                                onClick={() => setEmojiPickerAbierto(p => !p)}
+                                                style={{ width: '100%', background: '#0f172a', border: `1px solid ${catHex}60`, borderRadius: 8, color: '#f1f5f9', padding: '7px 4px', fontSize: '1.5rem', textAlign: 'center', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                            >{catData.emoji}</button>
+                                            {emojiPickerAbierto && (
+                                                <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 100, background: '#1e293b', border: '1px solid #334155', borderRadius: 14, boxShadow: '0 12px 40px rgba(0,0,0,0.6)', width: 320, maxHeight: 380, overflowY: 'auto', padding: 14 }}>
+                                                    {EMOJI_GRUPOS.map(grupo => (
+                                                        <div key={grupo.label} style={{ marginBottom: 12 }}>
+                                                            <div style={{ color: '#64748b', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>{grupo.label}</div>
+                                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                                                {grupo.emojis.map(em => (
+                                                                    <button key={em} onClick={() => { updateCat('emoji', em); setEmojiPickerAbierto(false); }}
+                                                                        style={{ background: catData.emoji === em ? `${catHex}30` : 'transparent', border: catData.emoji === em ? `1px solid ${catHex}` : '1px solid transparent', borderRadius: 7, padding: '5px 6px', fontSize: '1.3rem', cursor: 'pointer', lineHeight: 1, transition: '0.1s' }}
+                                                                        onMouseEnter={e => e.currentTarget.style.background = '#334155'}
+                                                                        onMouseLeave={e => e.currentTarget.style.background = catData.emoji === em ? `${catHex}30` : 'transparent'}
+                                                                    >{em}</button>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                         <div style={{ flex: 1 }}>
                                             <div style={labelStyle}>Nombre</div>
@@ -618,6 +856,18 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                                         <button onClick={() => setFormBloques(prev => [...prev, ''])} style={{ background: '#0f172a', border: '1px dashed #475569', color: '#64748b', borderRadius: 8, padding: '7px', cursor: 'pointer', fontSize: '0.82rem' }}>+ Añadir elemento</button>
                                     </>)}
 
+                                    {/* TTS */}
+                                    <div style={{ background: '#0a1628', borderRadius: 10, padding: '10px 14px', border: '1px solid #1e3a5f' }}>
+                                        <div style={{ color: '#38bdf8', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 7 }}>🔊 Texto para leer en voz alta (opcional)</div>
+                                        <textarea value={formLectura} onChange={e => setFormLectura(e.target.value)} placeholder="Si rellenas este campo, el navegador leerá este texto al alumno al mostrar la pregunta." rows={2} style={{ width: '100%', boxSizing: 'border-box', background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 7, color: '#f1f5f9', padding: '8px 12px', fontSize: '0.85rem', resize: 'vertical', fontFamily: 'inherit', outline: 'none', marginBottom: 8 }} />
+                                        <select value={formLecturaIdioma} onChange={e => setFormLecturaIdioma(e.target.value)} style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 7, color: '#94a3b8', padding: '6px 10px', fontSize: '0.82rem', fontFamily: 'inherit', outline: 'none', cursor: 'pointer' }}>
+                                            <option value="es-ES">🇪🇸 Español</option>
+                                            <option value="fr-FR">🇫🇷 Francés</option>
+                                            <option value="en-US">🇬🇧 Inglés</option>
+                                            <option value="ca-ES">🏴 Catalán</option>
+                                        </select>
+                                    </div>
+
                                     {errorForm && <div style={{ color: '#fca5a5', fontSize: '0.82rem' }}>⚠ {errorForm}</div>}
                                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                                         <button onClick={() => { setFormAbierto(false); setFormQ(''); setFormA(''); setFormW(['', '', '']); setFormBloques(['', '']); setErrorForm(''); }} style={{ background: '#334155', border: 'none', color: '#94a3b8', padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontSize: '0.85rem' }}>Cancelar</button>
@@ -687,6 +937,17 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                                                 <button onClick={() => setEditForm(f => ({...f, bloques: [...(f.bloques||[]), '']}))} style={{ background: '#0f172a', border: '1px dashed #475569', color: '#64748b', borderRadius: 7, padding: '6px', cursor: 'pointer', fontSize: '0.78rem' }}>+ Añadir elemento</button>
                                             </div>
                                         )}
+                                        {/* TTS */}
+                                        <div style={{ background: '#0f172a', borderRadius: 10, padding: '10px 14px', border: '1px solid #1e3a5f' }}>
+                                            <div style={{ color: '#38bdf8', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 7 }}>🔊 Texto para leer en voz alta (opcional)</div>
+                                            <textarea value={editForm.lectura} onChange={e => setEditForm(f => ({ ...f, lectura: e.target.value }))} placeholder="Si rellenas este campo, el navegador leerá este texto al alumno al mostrar la pregunta." rows={2} style={{ width: '100%', boxSizing: 'border-box', background: '#0a1628', border: '1px solid #1e3a5f', borderRadius: 7, color: '#f1f5f9', padding: '8px 12px', fontSize: '0.85rem', resize: 'vertical', fontFamily: 'inherit', outline: 'none', marginBottom: 8 }} />
+                                            <select value={editForm.lecturaIdioma} onChange={e => setEditForm(f => ({ ...f, lecturaIdioma: e.target.value }))} style={{ background: '#0a1628', border: '1px solid #1e3a5f', borderRadius: 7, color: '#94a3b8', padding: '6px 10px', fontSize: '0.82rem', fontFamily: 'inherit', outline: 'none', cursor: 'pointer' }}>
+                                                <option value="es-ES">🇪🇸 Español</option>
+                                                <option value="fr-FR">🇫🇷 Francés</option>
+                                                <option value="en-US">🇬🇧 Inglés</option>
+                                                <option value="ca-ES">🏴 Catalán</option>
+                                            </select>
+                                        </div>
                                         <div>
                                             <div style={{ color: '#94a3b8', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>Creado por</div>
                                             <input value={editForm.autorNombre} onChange={e => setEditForm(f => ({ ...f, autorNombre: e.target.value }))} placeholder="Nombre del autor…" style={{ width: '100%', boxSizing: 'border-box', background: '#0f172a', border: '1px solid #334155', borderRadius: 8, color: '#94a3b8', padding: '8px 13px', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none' }} />
@@ -702,9 +963,10 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                                     /* ── VIEW MODE ── */
                                     <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                                         <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div style={{ color: '#475569', fontSize: '0.72rem', marginBottom: 6, display: 'flex', gap: 6, alignItems: 'center' }}>
+                                            <div style={{ color: '#475569', fontSize: '0.72rem', marginBottom: 6, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                                                 <span>{tipoLabel}</span>
                                                 <span>#{idx + 1} · {p.autorNombre}</span>
+                                                {p.lectura && <span style={{ color: '#38bdf8', fontSize: '0.68rem', background: '#0c2a4a', borderRadius: 4, padding: '1px 5px' }}>🔊 {({ 'es-ES': 'ES', 'fr-FR': 'FR', 'en-US': 'EN', 'ca-ES': 'CA' }[p.lecturaIdioma] || 'ES')}</span>}
                                             </div>
                                             {/* Pregunta */}
                                             {tipo !== 'RELLENAR' && p.q && (
@@ -751,6 +1013,7 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                                                 <button onClick={() => moverPregunta(idx, -1)} disabled={idx === 0} style={{ background: '#0f172a', border: '1px solid #334155', color: idx === 0 ? '#334155' : '#94a3b8', padding: '4px 7px', borderRadius: 6, cursor: idx === 0 ? 'default' : 'pointer', fontSize: '0.75rem', lineHeight: 1 }}>↑</button>
                                                 <button onClick={() => moverPregunta(idx, 1)} disabled={idx === pregsCat.length - 1} style={{ background: '#0f172a', border: '1px solid #334155', color: idx === pregsCat.length - 1 ? '#334155' : '#94a3b8', padding: '4px 7px', borderRadius: 6, cursor: idx === pregsCat.length - 1 ? 'default' : 'pointer', fontSize: '0.75rem', lineHeight: 1 }}>↓</button>
                                             </>)}
+                                            <button onClick={() => abrirPreview(p)} title="Previsualizar" style={{ background: '#1a1f2e', border: '1px solid #334155', color: '#94a3b8', padding: '5px 9px', borderRadius: 7, cursor: 'pointer', fontSize: '0.8rem' }}>👁</button>
                                             {esCreador && (
                                                 <button onClick={() => abrirEdicion(p)} style={{ background: '#1e3a5f', border: '1px solid #3b82f660', color: '#60a5fa', padding: '5px 9px', borderRadius: 7, cursor: 'pointer', fontSize: '0.8rem' }}>✏️</button>
                                             )}

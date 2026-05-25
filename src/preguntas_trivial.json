@@ -179,6 +179,276 @@
                 "Chile",
                 "Ecuador"
             ]
+        },
+        {
+            "q": "¿Cuál es el pico más alto de los Pirineos?",
+            "a": "Aneto",
+            "w": [
+                "Monte Perdido",
+                "Posets",
+                "Vignemale"
+            ]
+        },
+        {
+            "q": "¿Qué Parque Nacional se encuentra en la provincia de Huesca?",
+            "a": "Ordesa y Monte Perdido",
+            "w": [
+                "Picos de Europa",
+                "Doñana",
+                "Teide"
+            ]
+        },
+        {
+            "q": "¿Cuál es el río más caudaloso de España?",
+            "a": "Ebro",
+            "w": [
+                "Tajo",
+                "Guadalquivir",
+                "Duero"
+            ]
+        },
+        {
+            "q": "¿Cuál es la capital de Japón?",
+            "a": "Tokio",
+            "w": [
+                "Kioto",
+                "Pekín",
+                "Seúl"
+            ]
+        },
+        {
+            "q": "¿En qué continente se encuentra el desierto de Gobi?",
+            "a": "Asia",
+            "w": [
+                "África",
+                "América",
+                "Oceanía"
+            ]
+        },
+        {
+            "q": "¿Qué país tiene la mayor población del mundo (a fecha 2024)?",
+            "a": "India",
+            "w": [
+                "China",
+                "Estados Unidos",
+                "Rusia"
+            ]
+        },
+        {
+            "q": "¿Cuál es el país más pequeño de Centroamérica?",
+            "a": "El Salvador",
+            "w": [
+                "Costa Rica",
+                "Panamá",
+                "Belice"
+            ]
+        },
+        {
+            "q": "¿Cuál es la capital de Egipto?",
+            "a": "El Cairo",
+            "w": [
+                "Alejandría",
+                "Luxor",
+                "Túnez"
+            ]
+        },
+        {
+            "q": "¿Qué río atraviesa la ciudad de Londres?",
+            "a": "Támesis",
+            "w": [
+                "Sena",
+                "Danubio",
+                "Rin"
+            ]
+        },
+        {
+            "q": "¿Cuál es la cascada más alta del mundo?",
+            "a": "Salto Ángel",
+            "w": [
+                "Cataratas del Niágara",
+                "Cataratas Victoria",
+                "Cataratas de Iguazú"
+            ]
+        },
+        {
+            "q": "¿A qué país pertenece la isla de Pascua?",
+            "a": "Chile",
+            "w": [
+                "Argentina",
+                "Ecuador",
+                "Perú"
+            ]
+        },
+        {
+            "q": "¿Qué mar baña las costas de la Comunidad Valenciana?",
+            "a": "Mar Mediterráneo",
+            "w": [
+                "Mar Cantábrico",
+                "Océano Atlántico",
+                "Mar Menor"
+            ]
+        },
+        {
+            "q": "¿Cuál es la ciudad más poblada de Estados Unidos?",
+            "a": "Nueva York",
+            "w": [
+                "Los Ángeles",
+                "Chicago",
+                "Washington D.C."
+            ]
+        },
+        {
+            "q": "¿En qué país se encuentra la región de la Toscana?",
+            "a": "Italia",
+            "w": [
+                "Francia",
+                "España",
+                "Grecia"
+            ]
+        },
+        {
+            "q": "¿Cuál es el monte más alto de España?",
+            "a": "El Teide",
+            "w": [
+                "Mulhacén",
+                "Aneto",
+                "Naranjo de Bulnes"
+            ]
+        },
+        {
+            "q": "¿Qué cordillera separa Europa de Asia?",
+            "a": "Montes Urales",
+            "w": [
+                "Cáucaso",
+                "Alpes",
+                "Cárpatos"
+            ]
+        },
+        {
+            "q": "¿Cuál es la capital de Alemania?",
+            "a": "Berlín",
+            "w": [
+                "Múnich",
+                "Fráncfort",
+                "Hamburgo"
+            ]
+        },
+        {
+            "q": "¿En qué continente está Nueva Zelanda?",
+            "a": "Oceanía",
+            "w": [
+                "Asia",
+                "Europa",
+                "América"
+            ]
+        },
+        {
+            "q": "¿Cuál es la moneda oficial del Reino Unido?",
+            "a": "Libra esterlina",
+            "w": [
+                "Euro",
+                "Dólar",
+                "Franco"
+            ]
+        },
+        {
+            "q": "¿Qué río forma el Gran Cañón en Estados Unidos?",
+            "a": "Río Colorado",
+            "w": [
+                "Río Misisipi",
+                "Río Bravo",
+                "Río Missouri"
+            ]
+        },
+        {
+            "q": "¿En qué comunidad autónoma se encuentra Zaragoza?",
+            "a": "Aragón",
+            "w": [
+                "Cataluña",
+                "Navarra",
+                "La Rioja"
+            ]
+        },
+        {
+            "q": "¿Cuál es la capital de Rusia?",
+            "a": "Moscú",
+            "w": [
+                "San Petersburgo",
+                "Kiev",
+                "Minsk"
+            ]
+        },
+        {
+            "q": "¿En qué país sudamericano se habla portugués?",
+            "a": "Brasil",
+            "w": [
+                "Argentina",
+                "Colombia",
+                "Uruguay"
+            ]
+        },
+        {
+            "q": "¿Cuál es la montaña más alta de América del Norte?",
+            "a": "Monte Denali",
+            "w": [
+                "Monte Elbert",
+                "Monte Whitney",
+                "Monte Logan"
+            ]
+        },
+        {
+            "q": "¿Qué canal conecta el Océano Atlántico con el Pacífico?",
+            "a": "Canal de Panamá",
+            "w": [
+                "Canal de Suez",
+                "Canal de Corinto",
+                "Canal de Kiel"
+            ]
+        },
+        {
+            "q": "¿Cuál es la capital de Grecia?",
+            "a": "Atenas",
+            "w": [
+                "Esparta",
+                "Salónica",
+                "Roma"
+            ]
+        },
+        {
+            "q": "¿Qué isla está al sur de la península de la India?",
+            "a": "Sri Lanka",
+            "w": [
+                "Madagascar",
+                "Sumatra",
+                "Java"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama el paralelo 0° que divide la Tierra en dos hemisferios?",
+            "a": "Ecuador",
+            "w": [
+                "Trópico de Cáncer",
+                "Trópico de Capricornio",
+                "Meridiano de Greenwich"
+            ]
+        },
+        {
+            "q": "¿Cuál es la capital de Turquía?",
+            "a": "Ankara",
+            "w": [
+                "Estambul",
+                "Izmir",
+                "Bursa"
+            ]
+        },
+        {
+            "q": "¿En qué país se ubica el monumento Taj Mahal?",
+            "a": "India",
+            "w": [
+                "Pakistán",
+                "Bangladés",
+                "Irán"
+            ]
         }
     ],
     "esp": [
@@ -360,6 +630,276 @@
                 "AC/DC",
                 "Nirvana",
                 "Aerosmith"
+            ]
+        },
+        {
+            "q": "¿Qué compañía de videojuegos creó a Mario Bros?",
+            "a": "Nintendo",
+            "w": [
+                "Sega",
+                "Sony",
+                "Microsoft"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama el ogro verde de la película de animación de DreamWorks?",
+            "a": "Shrek",
+            "w": [
+                "Fiona",
+                "Asno",
+                "Gru"
+            ]
+        },
+        {
+            "q": "¿En qué plataforma se hizo mundialmente famoso el creador MrBeast?",
+            "a": "YouTube",
+            "w": [
+                "Twitch",
+                "TikTok",
+                "Instagram"
+            ]
+        },
+        {
+            "q": "¿Qué cantante española triunfó mundialmente con el álbum 'El Mal Querer'?",
+            "a": "Rosalía",
+            "w": [
+                "Aitana",
+                "Lola Índigo",
+                "Bad Gyal"
+            ]
+        },
+        {
+            "q": "¿Qué casa de Hogwarts tiene a un tejón como emblema en Harry Potter?",
+            "a": "Hufflepuff",
+            "w": [
+                "Gryffindor",
+                "Slytherin",
+                "Ravenclaw"
+            ]
+        },
+        {
+            "q": "¿Quién interpreta a Neo en la saga 'Matrix'?",
+            "a": "Keanu Reeves",
+            "w": [
+                "Will Smith",
+                "Tom Cruise",
+                "Brad Pitt"
+            ]
+        },
+        {
+            "q": "¿En qué ciudad española se celebra la gala principal de los Premios Feroz últimamente?",
+            "a": "Zaragoza",
+            "w": [
+                "Madrid",
+                "Barcelona",
+                "Sevilla"
+            ]
+        },
+        {
+            "q": "¿Cuál es el nombre del muñeco vaquero protagonista de Toy Story?",
+            "a": "Woody",
+            "w": [
+                "Buzz",
+                "Andy",
+                "Rex"
+            ]
+        },
+        {
+            "q": "¿Qué serie de Netflix está ambientada en el pueblo de Hawkins?",
+            "a": "Stranger Things",
+            "w": [
+                "Dark",
+                "Riverdale",
+                "Black Mirror"
+            ]
+        },
+        {
+            "q": "¿Qué superhéroe de Marvel es el rey de Wakanda?",
+            "a": "Black Panther",
+            "w": [
+                "Thor",
+                "Falcon",
+                "Vision"
+            ]
+        },
+        {
+            "q": "¿En qué red social los vídeos suelen durar entre 15 y 60 segundos por defecto (formato original)?",
+            "a": "TikTok",
+            "w": [
+                "Twitter",
+                "Facebook",
+                "LinkedIn"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama la princesa guerrera de Disney que salva a China?",
+            "a": "Mulán",
+            "w": [
+                "Pocahontas",
+                "Jasmine",
+                "Ariel"
+            ]
+        },
+        {
+            "q": "¿A qué grupo musical pertenecía Harry Styles?",
+            "a": "One Direction",
+            "w": [
+                "Backstreet Boys",
+                "BTS",
+                "Coldplay"
+            ]
+        },
+        {
+            "q": "¿Qué actriz interpreta a Miércoles Addams en la serie de Netflix?",
+            "a": "Jenna Ortega",
+            "w": [
+                "Millie Bobby Brown",
+                "Zendaya",
+                "Anya Taylor-Joy"
+            ]
+        },
+        {
+            "q": "¿Qué pez pierde a su hijo Nemo en la película de Pixar?",
+            "a": "Marlin",
+            "w": [
+                "Dory",
+                "Gill",
+                "Bruce"
+            ]
+        },
+        {
+            "q": "¿Qué monstruo gigante ataca Tokio en las películas clásicas japonesas?",
+            "a": "Godzilla",
+            "w": [
+                "King Kong",
+                "Mothra",
+                "Gamera"
+            ]
+        },
+        {
+            "q": "¿Cuál es el videojuego más vendido de la historia hasta la fecha?",
+            "a": "Minecraft",
+            "w": [
+                "Tetris",
+                "GTA V",
+                "Super Mario Bros"
+            ]
+        },
+        {
+            "q": "¿En qué anime el protagonista busca las Bolas del Dragón?",
+            "a": "Dragon Ball",
+            "w": [
+                "Naruto",
+                "One Piece",
+                "Attack on Titan"
+            ]
+        },
+        {
+            "q": "¿Quién es el artista detrás de la canción 'Blinding Lights'?",
+            "a": "The Weeknd",
+            "w": [
+                "Bruno Mars",
+                "Ed Sheeran",
+                "Justin Bieber"
+            ]
+        },
+        {
+            "q": "¿Qué animal es 'Peppa' en la famosa serie de dibujos animados?",
+            "a": "Una cerdita",
+            "w": [
+                "Una vaca",
+                "Una oveja",
+                "Una cabra"
+            ]
+        },
+        {
+            "q": "¿Qué actor da vida a Spider-Man en el Universo Marvel actual?",
+            "a": "Tom Holland",
+            "w": [
+                "Tobey Maguire",
+                "Andrew Garfield",
+                "Chris Evans"
+            ]
+        },
+        {
+            "q": "¿De qué color es la piel de la familia Simpson?",
+            "a": "Amarilla",
+            "w": [
+                "Blanca",
+                "Verde",
+                "Rosa"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama la escuela a la que asiste Harry Potter?",
+            "a": "Hogwarts",
+            "w": [
+                "Beauxbatons",
+                "Durmstrang",
+                "Ilvermorny"
+            ]
+        },
+        {
+            "q": "¿Qué personaje de videojuego es conocido por comer fantasmas?",
+            "a": "Pac-Man",
+            "w": [
+                "Sonic",
+                "Donkey Kong",
+                "Crash Bandicoot"
+            ]
+        },
+        {
+            "q": "¿Qué cantante estadounidense es famosa por sus 'Eras Tour'?",
+            "a": "Taylor Swift",
+            "w": [
+                "Ariana Grande",
+                "Katy Perry",
+                "Selena Gomez"
+            ]
+        },
+        {
+            "q": "¿Quién es el archienemigo de Batman?",
+            "a": "El Joker",
+            "w": [
+                "El Duende Verde",
+                "Lex Luthor",
+                "Thanos"
+            ]
+        },
+        {
+            "q": "¿En qué país nació el K-Pop?",
+            "a": "Corea del Sur",
+            "w": [
+                "Japón",
+                "China",
+                "Taiwán"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama el perro detective de la máquina del misterio?",
+            "a": "Scooby-Doo",
+            "w": [
+                "Snoopy",
+                "Pluto",
+                "Goofy"
+            ]
+        },
+        {
+            "q": "¿En qué película aparecen los personajes Elsa, Anna y Olaf?",
+            "a": "Frozen",
+            "w": [
+                "Enredados",
+                "Vaiana",
+                "Brave"
+            ]
+        },
+        {
+            "q": "¿Qué plataforma de streaming produce la serie 'La Casa de Papel'?",
+            "a": "Netflix",
+            "w": [
+                "HBO Max",
+                "Amazon Prime",
+                "Disney+"
             ]
         }
     ],
@@ -543,6 +1083,276 @@
                 "Leónidas",
                 "Pericles"
             ]
+        },
+        {
+            "q": "¿Qué corona se unió a la de Castilla por el matrimonio de los Reyes Católicos?",
+            "a": "Corona de Aragón",
+            "w": [
+                "Corona de Navarra",
+                "Corona de Portugal",
+                "Corona de León"
+            ]
+        },
+        {
+            "q": "¿Cómo se llamaba el último rey visigodo de la Península Ibérica?",
+            "a": "Rodrigo",
+            "w": [
+                "Pelayo",
+                "Recaredo",
+                "Alarico"
+            ]
+        },
+        {
+            "q": "¿Qué ciudad española fue la capital del califato omeya en la Península?",
+            "a": "Córdoba",
+            "w": [
+                "Granada",
+                "Sevilla",
+                "Toledo"
+            ]
+        },
+        {
+            "q": "¿En qué año se firmó la actual Constitución Española?",
+            "a": "1978",
+            "w": [
+                "1975",
+                "1981",
+                "1931"
+            ]
+        },
+        {
+            "q": "¿Cómo se llamaba el barco en el que viajaron los primeros colonos ingleses a Norteamérica?",
+            "a": "Mayflower",
+            "w": [
+                "Santa María",
+                "Victoria",
+                "Endeavour"
+            ]
+        },
+        {
+            "q": "¿Qué líder sudafricano pasó 27 años en prisión antes de ser presidente?",
+            "a": "Nelson Mandela",
+            "w": [
+                "Desmond Tutu",
+                "Steve Biko",
+                "Kofi Annan"
+            ]
+        },
+        {
+            "q": "¿Cómo se llamaba la ciudad de Estambul en la época bizantina?",
+            "a": "Constantinopla",
+            "w": [
+                "Bizancio",
+                "Atenas",
+                "Cartago"
+            ]
+        },
+        {
+            "q": "¿Quién fue la heroína francesa que lideró el ejército durante la Guerra de los Cien Años?",
+            "a": "Juana de Arco",
+            "w": [
+                "María Antonieta",
+                "Catalina de Médici",
+                "Leonor de Aquitania"
+            ]
+        },
+        {
+            "q": "¿En qué año ocurrió el accidente nuclear de Chernóbil?",
+            "a": "1986",
+            "w": [
+                "1979",
+                "1991",
+                "1982"
+            ]
+        },
+        {
+            "q": "¿Qué famoso líder romano fue asesinado en los idus de marzo?",
+            "a": "Julio César",
+            "w": [
+                "Cicerón",
+                "Marco Antonio",
+                "Pompeyo"
+            ]
+        },
+        {
+            "q": "¿Qué zar ruso fue ejecutado junto con su familia durante la Revolución Bolchevique?",
+            "a": "Nicolás II",
+            "w": [
+                "Pedro el Grande",
+                "Iván el Terrible",
+                "Alejandro III"
+            ]
+        },
+        {
+            "q": "¿Qué civilización prehispánica se asentó en la Península de Yucatán?",
+            "a": "Civilización Maya",
+            "w": [
+                "Civilización Azteca",
+                "Civilización Olmeca",
+                "Imperio Inca"
+            ]
+        },
+        {
+            "q": "¿Quién era el presidente de Estados Unidos durante la Guerra de Secesión?",
+            "a": "Abraham Lincoln",
+            "w": [
+                "George Washington",
+                "Thomas Jefferson",
+                "Ulysses S. Grant"
+            ]
+        },
+        {
+            "q": "¿Qué rey español fue conocido como 'El Hechizado'?",
+            "a": "Carlos II",
+            "w": [
+                "Felipe IV",
+                "Felipe V",
+                "Fernando VII"
+            ]
+        },
+        {
+            "q": "¿A qué filósofo griego se le obligó a beber cicuta?",
+            "a": "Sócrates",
+            "w": [
+                "Platón",
+                "Aristóteles",
+                "Epicuro"
+            ]
+        },
+        {
+            "q": "¿Qué importante vía romana cruzaba la Península Ibérica de norte a sur?",
+            "a": "Vía de la Plata",
+            "w": [
+                "Vía Augusta",
+                "Vía Apia",
+                "Vía Domitia"
+            ]
+        },
+        {
+            "q": "¿Quién fue el dictador de Italia durante la Segunda Guerra Mundial?",
+            "a": "Benito Mussolini",
+            "w": [
+                "Adolf Hitler",
+                "Francisco Franco",
+                "Joseph Stalin"
+            ]
+        },
+        {
+            "q": "¿En qué ciudad japonesa se lanzó la primera bomba atómica?",
+            "a": "Hiroshima",
+            "w": [
+                "Nagasaki",
+                "Tokio",
+                "Kioto"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama el conflicto no armado que enfrentó a EE.UU. y la URSS?",
+            "a": "Guerra Fría",
+            "w": [
+                "Guerra de Corea",
+                "Guerra de Vietnam",
+                "Guerra de los Cien Años"
+            ]
+        },
+        {
+            "q": "¿Quién fue el navegante portugués que completó la primera vuelta al mundo iniciada por Magallanes?",
+            "a": "Juan Sebastián Elcano",
+            "w": [
+                "Vasco da Gama",
+                "Cristóbal Colón",
+                "Américo Vespucio"
+            ]
+        },
+        {
+            "q": "¿Qué papa convocó la Primera Cruzada?",
+            "a": "Urbano II",
+            "w": [
+                "Inocencio III",
+                "Juan Pablo II",
+                "Pío XII"
+            ]
+        },
+        {
+            "q": "¿Cómo se conoce a la guerra entre Atenas y Esparta?",
+            "a": "Guerra del Peloponeso",
+            "w": [
+                "Guerras Médicas",
+                "Guerras Púnicas",
+                "Guerra de Troya"
+            ]
+        },
+        {
+            "q": "¿Qué ciudad fue destruida por la erupción del Vesubio en el año 79 d.C.?",
+            "a": "Pompeya",
+            "w": [
+                "Roma",
+                "Atenas",
+                "Cartago"
+            ]
+        },
+        {
+            "q": "¿Qué nombre recibía el líder religioso y político del mundo islámico tras la muerte de Mahoma?",
+            "a": "Califa",
+            "w": [
+                "Sultán",
+                "Emir",
+                "Visir"
+            ]
+        },
+        {
+            "q": "¿Qué país fue liderado por Fidel Castro desde 1959?",
+            "a": "Cuba",
+            "w": [
+                "Venezuela",
+                "México",
+                "Nicaragua"
+            ]
+        },
+        {
+            "q": "¿En qué año se fundó la Organización de las Naciones Unidas (ONU)?",
+            "a": "1945",
+            "w": [
+                "1919",
+                "1939",
+                "1950"
+            ]
+        },
+        {
+            "q": "¿Quién escribió el 'Manifiesto Comunista' junto a Friedrich Engels?",
+            "a": "Karl Marx",
+            "w": [
+                "Vladimir Lenin",
+                "Joseph Stalin",
+                "Mao Zedong"
+            ]
+        },
+        {
+            "q": "¿Qué nombre recibían los soldados romanos agrupados en unidades de unos 5.000 hombres?",
+            "a": "Legionarios",
+            "w": [
+                "Hoplitas",
+                "Jenízaros",
+                "Centuriones"
+            ]
+        },
+        {
+            "q": "¿Cómo se llamaba el último rey nazarí de Granada?",
+            "a": "Boabdil",
+            "w": [
+                "Almanzor",
+                "Abderramán III",
+                "Tariq"
+            ]
+        },
+        {
+            "q": "¿Qué faraón egipcio es famoso porque su tumba se encontró intacta?",
+            "a": "Tutankamón",
+            "w": [
+                "Ramsés II",
+                "Keops",
+                "Akenatón"
+            ]
         }
     ],
     "art": [
@@ -724,6 +1534,276 @@
                 "Hércules Poirot",
                 "Philip Marlowe",
                 "Auguste Dupin"
+            ]
+        },
+        {
+            "q": "¿Qué pintor aragonés es el autor de 'Los fusilamientos del 3 de mayo'?",
+            "a": "Francisco de Goya",
+            "w": [
+                "Diego Velázquez",
+                "Pablo Picasso",
+                "Joaquín Sorolla"
+            ]
+        },
+        {
+            "q": "¿Cuál es la función sintáctica del grupo nominal en 'El profesor explica la lección'?",
+            "a": "Sujeto",
+            "w": [
+                "Complemento Directo",
+                "Complemento Indirecto",
+                "Atributo"
+            ]
+        },
+        {
+            "q": "¿Quién pintó el fresco de 'La creación de Adán' en la Capilla Sixtina?",
+            "a": "Miguel Ángel",
+            "w": [
+                "Rafael",
+                "Leonardo da Vinci",
+                "Tiziano"
+            ]
+        },
+        {
+            "q": "¿Qué poeta español escribió 'Volverán las oscuras golondrinas'?",
+            "a": "Gustavo Adolfo Bécquer",
+            "w": [
+                "Antonio Machado",
+                "Federico García Lorca",
+                "Juan Ramón Jiménez"
+            ]
+        },
+        {
+            "q": "¿Qué famoso arquitecto modernista diseñó la Sagrada Familia?",
+            "a": "Antoni Gaudí",
+            "w": [
+                "Santiago Calatrava",
+                "Norman Foster",
+                "Frank Gehry"
+            ]
+        },
+        {
+            "q": "¿A qué movimiento literario pertenece Federico García Lorca?",
+            "a": "Generación del 27",
+            "w": [
+                "Generación del 98",
+                "Romanticismo",
+                "Realismo"
+            ]
+        },
+        {
+            "q": "¿Quién compuso 'La Flauta Mágica'?",
+            "a": "Wolfgang Amadeus Mozart",
+            "w": [
+                "Ludwig van Beethoven",
+                "Johann Sebastian Bach",
+                "Frédéric Chopin"
+            ]
+        },
+        {
+            "q": "¿Qué instrumento musical tocaba el célebre músico Pablo Casals?",
+            "a": "Violonchelo",
+            "w": [
+                "Violín",
+                "Piano",
+                "Guitarra"
+            ]
+        },
+        {
+            "q": "¿En análisis sintáctico, qué complemento siempre lleva preposición (a menudo 'a' o 'para') y recibe el daño o provecho de la acción?",
+            "a": "Complemento Indirecto",
+            "w": [
+                "Complemento Directo",
+                "Complemento Circunstancial",
+                "Complemento Agente"
+            ]
+        },
+        {
+            "q": "¿Qué tipo de palabra es 'árbol' según su acentuación?",
+            "a": "Llana",
+            "w": [
+                "Aguda",
+                "Esdrújula",
+                "Sobresdrújula"
+            ]
+        },
+        {
+            "q": "¿Quién es el autor de 'El perro del hortelano'?",
+            "a": "Lope de Vega",
+            "w": [
+                "Tirso de Molina",
+                "Pedro Calderón de la Barca",
+                "Cervantes"
+            ]
+        },
+        {
+            "q": "¿Qué género literario agrupa las obras escritas para ser representadas en un escenario?",
+            "a": "Teatro o Dramática",
+            "w": [
+                "Lírica",
+                "Épica",
+                "Ensayo"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama la figura literaria que consiste en atribuir cualidades humanas a animales u objetos?",
+            "a": "Personificación",
+            "w": [
+                "Metáfora",
+                "Hipérbole",
+                "Comparación"
+            ]
+        },
+        {
+            "q": "¿Qué cuadro de Salvador Dalí muestra relojes derritiéndose?",
+            "a": "La persistencia de la memoria",
+            "w": [
+                "El gran masturbador",
+                "Cristo de San Juan de la Cruz",
+                "Galatea de las esferas"
+            ]
+        },
+        {
+            "q": "¿A qué famoso pintor pertenece la 'Etapa Azul' y la 'Etapa Rosa'?",
+            "a": "Pablo Picasso",
+            "w": [
+                "Vincent van Gogh",
+                "Claude Monet",
+                "Paul Gauguin"
+            ]
+        },
+        {
+            "q": "¿Quién compuso las cuatro estaciones?",
+            "a": "Antonio Vivaldi",
+            "w": [
+                "Beethoven",
+                "Mozart",
+                "Bach"
+            ]
+        },
+        {
+            "q": "¿Qué famosa escritora británica creó a la detective Miss Marple?",
+            "a": "Agatha Christie",
+            "w": [
+                "J.K. Rowling",
+                "Jane Austen",
+                "Mary Shelley"
+            ]
+        },
+        {
+            "q": "¿Qué verbo es el núcleo del predicado en 'Ellos comieron manzanas'?",
+            "a": "Comieron",
+            "w": [
+                "Ellos",
+                "Manzanas",
+                "No hay verbo"
+            ]
+        },
+        {
+            "q": "¿Qué nombre recibe el texto escrito en verso que expresa emociones o sentimientos?",
+            "a": "Poesía",
+            "w": [
+                "Novela",
+                "Teatro",
+                "Cuento"
+            ]
+        },
+        {
+            "q": "¿Qué estilo arquitectónico se caracteriza por el uso del arco apuntado y las vidrieras?",
+            "a": "Gótico",
+            "w": [
+                "Románico",
+                "Renacentista",
+                "Barroco"
+            ]
+        },
+        {
+            "q": "¿Qué pintor impresionista francés es famoso por sus series de nenúfares?",
+            "a": "Claude Monet",
+            "w": [
+                "Édouard Manet",
+                "Pierre-Auguste Renoir",
+                "Edgar Degas"
+            ]
+        },
+        {
+            "q": "¿De qué famoso autor es la obra teatral 'La casa de Bernarda Alba'?",
+            "a": "Federico García Lorca",
+            "w": [
+                "Ramón del Valle-Inclán",
+                "Miguel de Unamuno",
+                "Antonio Machado"
+            ]
+        },
+        {
+            "q": "¿Qué nombre recibe un estrofa de cuatro versos de arte menor con rima consonante abba?",
+            "a": "Redondilla",
+            "w": [
+                "Cuarteto",
+                "Serventesio",
+                "Terceto"
+            ]
+        },
+        {
+            "q": "¿A qué familia de instrumentos pertenece la flauta travesera?",
+            "a": "Viento madera",
+            "w": [
+                "Viento metal",
+                "Cuerda frotada",
+                "Percusión"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama el estilo musical que fusiona el cante, toque y baile en Andalucía?",
+            "a": "Flamenco",
+            "w": [
+                "Jota",
+                "Sardana",
+                "Muiñeira"
+            ]
+        },
+        {
+            "q": "¿Qué dios romano es el equivalente a Poseidón en la mitología griega?",
+            "a": "Neptuno",
+            "w": [
+                "Júpiter",
+                "Marte",
+                "Plutón"
+            ]
+        },
+        {
+            "q": "¿Qué tipo de predicado tiene una oración con los verbos ser, estar o parecer?",
+            "a": "Predicado nominal",
+            "w": [
+                "Predicado verbal",
+                "Predicado activo",
+                "Predicado pasivo"
+            ]
+        },
+        {
+            "q": "¿Quién es el autor de la novela de terror 'Drácula'?",
+            "a": "Bram Stoker",
+            "w": [
+                "Mary Shelley",
+                "Edgar Allan Poe",
+                "H.P. Lovecraft"
+            ]
+        },
+        {
+            "q": "¿Qué famoso escultor francés creó la obra 'El Pensador'?",
+            "a": "Auguste Rodin",
+            "w": [
+                "Camille Claudel",
+                "Constantin Brancusi",
+                "Giacometti"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama la figura retórica que consiste en la exageración de un hecho?",
+            "a": "Hipérbole",
+            "w": [
+                "Metonimia",
+                "Metáfora",
+                "Anáfora"
             ]
         }
     ],
@@ -907,6 +1987,276 @@
                 "El pingüino",
                 "El búho"
             ]
+        },
+        {
+            "q": "¿Cómo se llama el teorema geométrico aplicable a los triángulos rectángulos?",
+            "a": "Teorema de Pitágoras",
+            "w": [
+                "Teorema de Tales",
+                "Teorema de Euler",
+                "Teorema de Fermat"
+            ]
+        },
+        {
+            "q": "¿Cuánto suman los ángulos interiores de un triángulo?",
+            "a": "180 grados",
+            "w": [
+                "90 grados",
+                "360 grados",
+                "270 grados"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama el polígono de cinco lados?",
+            "a": "Pentágono",
+            "w": [
+                "Hexágono",
+                "Heptágono",
+                "Octógono"
+            ]
+        },
+        {
+            "q": "¿Qué número irracional relaciona la longitud de una circunferencia con su diámetro?",
+            "a": "Pi (π)",
+            "w": [
+                "Número e",
+                "Número áureo (Phi)",
+                "Raíz de 2"
+            ]
+        },
+        {
+            "q": "¿Qué rama de las matemáticas estudia las propiedades de las figuras en el espacio?",
+            "a": "Geometría",
+            "w": [
+                "Álgebra",
+                "Aritmética",
+                "Estadística"
+            ]
+        },
+        {
+            "q": "¿Qué fuerza física es crucial tener en cuenta al asegurar en escalada?",
+            "a": "Gravedad",
+            "w": [
+                "Magnetismo",
+                "Fuerza Nuclear",
+                "Electromagnetismo"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama la parte de una fracción que está debajo de la línea?",
+            "a": "Denominador",
+            "w": [
+                "Numerador",
+                "Cociente",
+                "Resto"
+            ]
+        },
+        {
+            "q": "¿A cuántos grados Celsius hierve el agua a nivel del mar?",
+            "a": "100",
+            "w": [
+                "90",
+                "120",
+                "80"
+            ]
+        },
+        {
+            "q": "¿Qué instrumento se utiliza para medir los ángulos en geometría?",
+            "a": "Transportador",
+            "w": [
+                "Compás",
+                "Regla",
+                "Escuadra"
+            ]
+        },
+        {
+            "q": "¿Qué gas respiramos principalmente en la atmósfera terrestre?",
+            "a": "Nitrógeno",
+            "w": [
+                "Oxígeno",
+                "Dióxido de carbono",
+                "Hidrógeno"
+            ]
+        },
+        {
+            "q": "¿Cuál es el resultado de 8 multiplicado por 7?",
+            "a": "56",
+            "w": [
+                "54",
+                "64",
+                "48"
+            ]
+        },
+        {
+            "q": "¿Qué tipo de energía se obtiene del viento?",
+            "a": "Eólica",
+            "w": [
+                "Solar",
+                "Geotérmica",
+                "Hidráulica"
+            ]
+        },
+        {
+            "q": "¿Cuál es el primer elemento de la tabla periódica?",
+            "a": "Hidrógeno",
+            "w": [
+                "Oxígeno",
+                "Carbono",
+                "Helio"
+            ]
+        },
+        {
+            "q": "¿Cómo se llaman las rocas que se forman a partir del enfriamiento del magma?",
+            "a": "Rocas ígneas",
+            "w": [
+                "Rocas sedimentarias",
+                "Rocas metamórficas",
+                "Rocas calizas"
+            ]
+        },
+        {
+            "q": "¿Qué nombre recibe el centro de un átomo?",
+            "a": "Núcleo",
+            "w": [
+                "Electrón",
+                "Orbital",
+                "Corteza"
+            ]
+        },
+        {
+            "q": "¿Qué número se considera neutro en la suma?",
+            "a": "El cero",
+            "w": [
+                "El uno",
+                "El infinito",
+                "Ninguno"
+            ]
+        },
+        {
+            "q": "¿Qué biólogo propuso la teoría de la evolución por selección natural?",
+            "a": "Charles Darwin",
+            "w": [
+                "Gregor Mendel",
+                "Louis Pasteur",
+                "Alexander Fleming"
+            ]
+        },
+        {
+            "q": "¿Qué nombre geométrico recibe la línea recta que une el centro del círculo con cualquier punto del borde?",
+            "a": "Radio",
+            "w": [
+                "Diámetro",
+                "Cuerda",
+                "Secante"
+            ]
+        },
+        {
+            "q": "¿Qué nombre reciben los animales que comen plantas y carne?",
+            "a": "Omnívoros",
+            "w": [
+                "Carnívoros",
+                "Herbívoros",
+                "Insectívoros"
+            ]
+        },
+        {
+            "q": "¿A qué se debe el color azul del cielo durante el día?",
+            "a": "Dispersión de la luz solar (Dispersión de Rayleigh)",
+            "w": [
+                "Reflejo del océano",
+                "Gases de la estratosfera",
+                "Polvo espacial"
+            ]
+        },
+        {
+            "q": "¿Cuál es el símbolo del elemento químico Oro?",
+            "a": "Au",
+            "w": [
+                "Ag",
+                "Or",
+                "Fe"
+            ]
+        },
+        {
+            "q": "¿Cuál es el resultado de calcular 5 al cuadrado?",
+            "a": "25",
+            "w": [
+                "10",
+                "15",
+                "125"
+            ]
+        },
+        {
+            "q": "¿Qué figura geométrica tridimensional tiene forma de dado perfecto?",
+            "a": "Cubo (o Hexaedro)",
+            "w": [
+                "Cilindro",
+                "Prisma",
+                "Esfera"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama el estado de la materia que no tiene forma ni volumen propio?",
+            "a": "Gaseoso",
+            "w": [
+                "Sólido",
+                "Líquido",
+                "Plasma"
+            ]
+        },
+        {
+            "q": "¿Quién propuso el modelo heliocéntrico, donde la Tierra gira alrededor del Sol?",
+            "a": "Nicolás Copérnico",
+            "w": [
+                "Galileo Galilei",
+                "Johannes Kepler",
+                "Ptolomeo"
+            ]
+        },
+        {
+            "q": "¿Qué instrumento óptico se usa para ver bacterias y células?",
+            "a": "Microscopio",
+            "w": [
+                "Telescopio",
+                "Periscopio",
+                "Prismáticos"
+            ]
+        },
+        {
+            "q": "¿En matemáticas, qué nombre recibe una ecuación de segundo grado?",
+            "a": "Ecuación cuadrática",
+            "w": [
+                "Ecuación lineal",
+                "Ecuación cúbica",
+                "Ecuación diferencial"
+            ]
+        },
+        {
+            "q": "¿Cuál es el continente más frío, seco y ventoso de la Tierra?",
+            "a": "La Antártida",
+            "w": [
+                "Groenlandia",
+                "Ártico",
+                "Siberia"
+            ]
+        },
+        {
+            "q": "¿Cómo se denomina al poliedro formado por 4 caras que son triángulos?",
+            "a": "Tetraedro",
+            "w": [
+                "Cubo",
+                "Octaedro",
+                "Prisma"
+            ]
+        },
+        {
+            "q": "¿Qué término matemático se usa para indicar el punto donde se cortan dos rectas?",
+            "a": "Intersección",
+            "w": [
+                "Paralelismo",
+                "Bisectriz",
+                "Mediatriz"
+            ]
         }
     ],
     "dep": [
@@ -1088,6 +2438,276 @@
                 "Hierba",
                 "Cemento",
                 "Pista dura"
+            ]
+        },
+        {
+            "q": "¿Qué modalidad de escalada se practica en bloques de roca pequeños sin necesidad de cuerda?",
+            "a": "Búlder",
+            "w": [
+                "Escalada clásica",
+                "Alpinismo",
+                "Vía ferrata"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama el anillo metálico con cierre usado frecuentemente en escalada?",
+            "a": "Mosquetón",
+            "w": [
+                "Ocho",
+                "Fisurero",
+                "Cinta exprés"
+            ]
+        },
+        {
+            "q": "¿Qué deportista español ha ganado más torneos de Roland Garros en tenis?",
+            "a": "Rafael Nadal",
+            "w": [
+                "Carlos Alcaraz",
+                "Manolo Santana",
+                "David Ferrer"
+            ]
+        },
+        {
+            "q": "¿Qué piloto español ha ganado mundiales de Fórmula 1?",
+            "a": "Fernando Alonso",
+            "w": [
+                "Carlos Sainz",
+                "Marc Márquez",
+                "Jorge Lorenzo"
+            ]
+        },
+        {
+            "q": "¿Cuántos jugadores por equipo hay en un partido de voleibol?",
+            "a": "6",
+            "w": [
+                "5",
+                "7",
+                "4"
+            ]
+        },
+        {
+            "q": "¿En qué deporte se emplea un 'volante' (plumilla) en lugar de una pelota?",
+            "a": "Bádminton",
+            "w": [
+                "Squash",
+                "Pádel",
+                "Tenis de mesa"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama la prueba de atletismo que combina 10 disciplinas diferentes?",
+            "a": "Decatlón",
+            "w": [
+                "Heptatlón",
+                "Triatlón",
+                "Pentatlón"
+            ]
+        },
+        {
+            "q": "¿En qué deporte destaca el español Alberto Ginés, oro en Tokio 2020?",
+            "a": "Escalada deportiva",
+            "w": [
+                "Skateboarding",
+                "Gimnasia",
+                "Natación"
+            ]
+        },
+        {
+            "q": "¿Qué pieza del equipamiento de escalada se coloca alrededor de la cintura y muslos para asegurarse?",
+            "a": "Arnés",
+            "w": [
+                "Pies de gato",
+                "Asegurador",
+                "Cuerda dinámica"
+            ]
+        },
+        {
+            "q": "¿En qué país se inventó el tenis de mesa o ping-pong?",
+            "a": "Inglaterra",
+            "w": [
+                "China",
+                "Japón",
+                "Estados Unidos"
+            ]
+        },
+        {
+            "q": "¿De qué arte marcial es un cinturón negro ('dan') una muestra de grado avanzado?",
+            "a": "Karate (o Judo/Taekwondo)",
+            "w": [
+                "Boxeo",
+                "Lucha libre",
+                "Capoeira"
+            ]
+        },
+        {
+            "q": "¿Qué país ha ganado más Mundiales de Fútbol masculino?",
+            "a": "Brasil",
+            "w": [
+                "Alemania",
+                "Italia",
+                "Argentina"
+            ]
+        },
+        {
+            "q": "¿Qué instrumento se usa para golpear las bolas en el billar?",
+            "a": "Taco",
+            "w": [
+                "Palo",
+                "Mazo",
+                "Bate"
+            ]
+        },
+        {
+            "q": "¿En qué deporte se utiliza una bola muy pesada y unos pinos (bolos)?",
+            "a": "Bowling (Bolos)",
+            "w": [
+                "Petanca",
+                "Curling",
+                "Boccia"
+            ]
+        },
+        {
+            "q": "¿En qué prueba de gimnasia se utilizan aros, mazas o cinta?",
+            "a": "Gimnasia rítmica",
+            "w": [
+                "Gimnasia artística",
+                "Trampolín",
+                "Acrobática"
+            ]
+        },
+        {
+            "q": "¿Cuántas bases hay en un campo de béisbol, sin contar el 'home'?",
+            "a": "3",
+            "w": [
+                "4",
+                "2",
+                "5"
+            ]
+        },
+        {
+            "q": "¿En qué deporte de invierno se barren unas piedras sobre el hielo?",
+            "a": "Curling",
+            "w": [
+                "Patinaje artístico",
+                "Hockey",
+                "Bobsleigh"
+            ]
+        },
+        {
+            "q": "¿Cuál es la distancia aproximada de una carrera de maratón?",
+            "a": "42 km",
+            "w": [
+                "21 km",
+                "50 km",
+                "30 km"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama el polvo blanco que usan los escaladores y gimnastas para no resbalar?",
+            "a": "Magnesio",
+            "w": [
+                "Tiza",
+                "Talco",
+                "Yeso"
+            ]
+        },
+        {
+            "q": "¿En qué deporte sobresale Simone Biles?",
+            "a": "Gimnasia artística",
+            "w": [
+                "Natación",
+                "Atletismo",
+                "Tenis"
+            ]
+        },
+        {
+            "q": "¿Qué nadador tiene el récord de más medallas olímpicas de la historia?",
+            "a": "Michael Phelps",
+            "w": [
+                "Mark Spitz",
+                "Ian Thorpe",
+                "Ryan Lochte"
+            ]
+        },
+        {
+            "q": "¿En qué ciudad se celebraron los Juegos Olímpicos del año 1992?",
+            "a": "Barcelona",
+            "w": [
+                "Atlanta",
+                "Sídney",
+                "Seúl"
+            ]
+        },
+        {
+            "q": "¿Cuál es el equipo de fútbol con más Copas de Europa (Champions League)?",
+            "a": "Real Madrid",
+            "w": [
+                "AC Milan",
+                "FC Barcelona",
+                "Bayern Múnich"
+            ]
+        },
+        {
+            "q": "¿Qué deporte se juega en el torneo 'Seis Naciones'?",
+            "a": "Rugby",
+            "w": [
+                "Polo",
+                "Fútbol",
+                "Balonmano"
+            ]
+        },
+        {
+            "q": "¿En el tenis, qué significa la puntuación 'Deuce'?",
+            "a": "Empate a 40",
+            "w": [
+                "Ventaja",
+                "Falta doble",
+                "Punto de partido"
+            ]
+        },
+        {
+            "q": "¿Qué tipo de nudo en forma de ocho es el más común para atar la cuerda al arnés en escalada?",
+            "a": "Nudo de ocho doble",
+            "w": [
+                "Nudo ballestrinque",
+                "Nudo dinámico",
+                "As de guía"
+            ]
+        },
+        {
+            "q": "¿En qué deporte se hace un 'Hoyo en uno'?",
+            "a": "Golf",
+            "w": [
+                "Snooker",
+                "Croquet",
+                "Polo"
+            ]
+        },
+        {
+            "q": "¿Cómo se denomina al calzado ajustado específico que se usa en escalada?",
+            "a": "Pies de gato",
+            "w": [
+                "Crampones",
+                "Botas de travesía",
+                "Zapatillas de agarre"
+            ]
+        },
+        {
+            "q": "¿Qué piloto italiano es una leyenda del motociclismo con el número 46?",
+            "a": "Valentino Rossi",
+            "w": [
+                "Giacomo Agostini",
+                "Max Biaggi",
+                "Loris Capirossi"
+            ]
+        },
+        {
+            "q": "¿Cuál es el último evento del triatlón olímpico?",
+            "a": "Carrera a pie",
+            "w": [
+                "Ciclismo",
+                "Natación",
+                "Salto"
             ]
         }
     ]

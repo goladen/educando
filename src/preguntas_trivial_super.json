@@ -1,0 +1,776 @@
+{
+"geo": [
+{
+"tipo": "SELECCION",
+"q": "¿Cuál es el río más largo de Europa?",
+"a": "Volga",
+"w": [
+"Danubio",
+"Ural",
+"Rin"
+]
+},
+{
+"tipo": "SELECCION",
+"q": "¿Cuál es la capital de Mongolia?",
+"a": "Ulán Bator",
+"w": [
+"Astaná",
+"Dusambé",
+"Taskent"
+]
+},
+{
+"tipo": "SELECCION",
+"q": "¿Cuál es la montaña más alta de África?",
+"a": "Kilimanjaro",
+"w": [
+"Monte Kenia",
+"Elbrus",
+"Tubkal"
+]
+},
+{
+"tipo": "SELECCION",
+"q": "¿Qué país tiene el mayor número de islas en el mundo?",
+"a": "Suecia",
+"w": [
+"Finlandia",
+"Indonesia",
+"Canadá"
+]
+},
+{
+"tipo": "SELECCION",
+"q": "¿En qué país se encuentra principalmente el desierto de Atacama?",
+"a": "Chile",
+"w": [
+"Perú",
+"Argentina",
+"Bolivia"
+]
+},
+{
+"tipo": "SELECCION",
+"q": "¿Qué estrecho separa el continente asiático de Norteamérica?",
+"a": "Estrecho de Bering",
+"w": [
+"Bósforo",
+"Estrecho de Magallanes",
+"Estrecho de Ormuz"
+]
+},
+{
+"tipo": "CORTA",
+"q": "¿Cuál es el lago navegable más alto del mundo?",
+"a": "Titicaca"
+},
+{
+"tipo": "CORTA",
+"q": "¿En qué país africano se encuentra la histórica ciudad de Tombuctú?",
+"a": "Mali"
+},
+{
+"tipo": "CORTA",
+"q": "¿Cómo se llama la moneda oficial de Japón?",
+"a": "Yen"
+},
+{
+"tipo": "RELLENAR",
+"bloques": [
+"El país del continente africano con mayor población es",
+"Nigeria"
+]
+},
+{
+"tipo": "RELLENAR",
+"bloques": [
+"La capital de Nueva Zelanda es",
+"Wellington"
+]
+},
+{
+"tipo": "RELLENAR",
+"bloques": [
+"El monte Elbrus, considerado el más alto de Europa, se encuentra en",
+"Rusia"
+]
+},
+{
+"tipo": "ORDENAR",
+"q": "Ordena estos países por superficie, de mayor a menor:",
+"bloques": [
+"Rusia",
+"Canadá",
+"China",
+"Brasil",
+"Australia"
+]
+},
+{
+"tipo": "ORDENAR",
+"q": "Ordena estas ciudades europeas según su latitud, de norte a sur:",
+"bloques": [
+"Oslo",
+"Berlín",
+"Madrid",
+"La Valeta"
+]
+},
+{
+"tipo": "ORDENAR",
+"q": "Ordena las capas de la Tierra desde la superficie hacia el centro:",
+"bloques": [
+"Corteza",
+"Manto superior",
+"Manto inferior",
+"Núcleo externo",
+"Núcleo interno"
+]
+}
+],
+"esp": [
+{
+"tipo": "SELECCION",
+"q": "¿Quién dirigió la galardonada película 'El Padrino' (1972)?",
+"a": "Francis Ford Coppola",
+"w": [
+"Martin Scorsese",
+"Steven Spielberg",
+"Stanley Kubrick"
+]
+},
+{
+"tipo": "SELECCION",
+"q": "¿Cuál fue el primer largometraje de animación de la historia del cine?",
+"a": "Blancanieves y los siete enanitos",
+"w": [
+"Pinocho",
+"Fantasía",
+"Dumbo"
+]
+},
+{
+"tipo": "SELECCION",
+"q": "¿Cuál fue el álbum debut de la banda británica The Beatles?",
+"a": "Please Please Me",
+"w": [
+"Help!",
+"Abbey Road",
+"Let It Be"
+]
+},
+{
+"tipo": "SELECCION",
+"q": "¿Cómo se llama el personaje principal de la aclamada serie 'Mad Men'?",
+"a": "Don Draper",
+"w": [
+"Walter White",
+"Tony Soprano",
+"Dexter Morgan"
+]
+},
+{
+"tipo": "SELECCION",
+"q": "¿En qué ciudad estadounidense transcurre la trama principal de la serie 'The Wire'?",
+"a": "Baltimore",
+"w": [
+"Nueva York",
+"Chicago",
+"Los Ángeles"
+]
+},
+{
+"tipo": "SELECCION",
+"q": "¿Qué actriz interpreta el papel de la Bruja Escarlata (Wanda Maximoff) en el UCM?",
+"a": "Elizabeth Olsen",
+"w": [
+"Scarlett Johansson",
+"Brie Larson",
+"Florence Pugh"
+]
+},
+{
+"tipo": "CORTA",
+"q": "¿Cómo se llama el villano principal de la saga de libros y películas de Harry Potter?",
+"a": "Voldemort"
+},
+{
+"tipo": "CORTA",
+"q": "¿Qué famosa banda británica compuso la canción 'Bohemian Rhapsody'?",
+"a": "Queen"
+},
+{
+"tipo": "CORTA",
+"q": "¿Qué actor protagoniza la exitosa saga de películas de acción 'John Wick'?",
+"a": "Keanu Reeves"
+},
+{
+"tipo": "RELLENAR",
+"bloques": [
+"El verdadero nombre de nacimiento de la actriz Marilyn Monroe era",
+"Norma Jeane"
+]
+},
+{
+"tipo": "RELLENAR",
+"bloques": [
+"La famosa serie de televisión 'Juego de Tronos' está basada en los libros del escritor",
+"George R. R. Martin"
+]
+},
+{
+"tipo": "RELLENAR",
+"bloques": [
+"El premio más prestigioso de la industria del teatro en Broadway se llama Premio",
+"Tony"
+]
+},
+{
+"tipo": "ORDENAR",
+"q": "Ordena estas películas dirigidas por Quentin Tarantino según su año de estreno, de más antigua a más reciente:",
+"bloques": [
+"Reservoir Dogs",
+"Pulp Fiction",
+"Kill Bill",
+"Django Unchained"
+]
+},
+{
+"tipo": "ORDENAR",
+"q": "Ordena estos exitosos álbumes de Michael Jackson por su año de lanzamiento original:",
+"bloques": [
+"Off the Wall",
+"Thriller",
+"Bad",
+"Dangerous"
+]
+},
+{
+"tipo": "ORDENAR",
+"q": "Ordena estas películas del Universo Cinematográfico de Marvel por su fecha de estreno en cines:",
+"bloques": [
+"Iron Man",
+"The Avengers",
+"Black Panther",
+"Eternals"
+]
+}
+],
+"his": [
+{
+"tipo": "SELECCION",
+"q": "¿A qué faraón se le atribuye la construcción de la Gran Pirámide de Guiza?",
+"a": "Keops",
+"w": [
+"Kefrén",
+"Micerino",
+"Ramsés II"
+]
+},
+{
+"tipo": "SELECCION",
+"q": "¿En qué año se produjo la histórica caída de la ciudad de Constantinopla?",
+"a": "1453",
+"w": [
+"1492",
+"1415",
+"1476"
+]
+},
+{
+"tipo": "SELECCION",
+"q": "¿En qué famosa batalla fue derrotado definitivamente Napoleón Bonaparte en 1815?",
+"a": "Batalla de Waterloo",
+"w": [
+"Batalla de Austerlitz",
+"Batalla de Trafalgar",
+"Batalla de Leipzig"
+]
+},
+{
+"tipo": "SELECCION",
+"q": "¿Quién es considerado tradicionalmente como el primer emperador de Roma?",
+"a": "Augusto",
+"w": [
+"Julio César",
+"Nerón",
+"Trajano"
+]
+},
+{
+"tipo": "SELECCION",
+"q": "¿Qué reino peninsular patrocinó principalmente la expedición de Cristóbal Colón en 1492?",
+"a": "Reino de Castilla",
+"w": [
+"Corona de Aragón",
+"Reino de Portugal",
+"Reino de Navarra"
+]
+},
+{
+"tipo": "SELECCION",
+"q": "¿Qué tratado de paz supuso el fin oficial de la Primera Guerra Mundial?",
+"a": "Tratado de Versalles",
+"w": [
+"Tratado de Tordesillas",
+"Paz de Westfalia",
+"Tratado de Viena"
+]
+},
+{
+"tipo": "CORTA",
+"q": "¿Quién sucedió a Lenin y gobernó la Unión Soviética hasta 1953?",
+"a": "Stalin"
+},
+{
+"tipo": "CORTA",
+"q": "¿En qué ciudad fue asesinado el archiduque Francisco Fernando, detonando la Primera Guerra Mundial?",
+"a": "Sarajevo"
+},
+{
+"tipo": "CORTA",
+"q": "¿Cuál era el apellido de la dinastía que reinaba en Rusia antes de la Revolución de 1917?",
+"a": "Romanov"
+},
+{
+"tipo": "RELLENAR",
+"bloques": [
+"El primer presidente de los Estados Unidos de América fue",
+"George Washington"
+]
+},
+{
+"tipo": "RELLENAR",
+"bloques": [
+"El líder militar cartaginés que cruzó los Alpes con elefantes para atacar Roma fue",
+"Aníbal"
+]
+},
+{
+"tipo": "RELLENAR",
+"bloques": [
+"La antigua civilización precolombina que fundó la ciudad de Tenochtitlán fue la",
+"Azteca"
+]
+},
+{
+"tipo": "ORDENAR",
+"q": "Ordena cronológicamente el apogeo de estas antiguas civilizaciones, de más antigua a más reciente:",
+"bloques": [
+"Sumeria",
+"Egipto Faraónico",
+"Grecia Clásica",
+"Imperio Romano"
+]
+},
+{
+"tipo": "ORDENAR",
+"q": "Ordena cronológicamente estos importantes eventos de la Segunda Guerra Mundial:",
+"bloques": [
+"Invasión de Polonia",
+"Ataque a Pearl Harbor",
+"Desembarco de Normandía",
+"Bombardeos atómicos sobre Japón"
+]
+},
+{
+"tipo": "ORDENAR",
+"q": "Ordena cronológicamente los reinados de los siguientes monarcas de España:",
+"bloques": [
+"Carlos I",
+"Felipe II",
+"Carlos III",
+"Alfonso XIII",
+"Juan Carlos I"
+]
+}
+],
+"art": [
+{
+"tipo": "SELECCION",
+"q": "¿Qué famoso escritor es el autor de la novela 'Cien años de soledad'?",
+"a": "Gabriel García Márquez",
+"w": [
+"Mario Vargas Llosa",
+"Julio Cortázar",
+"Jorge Luis Borges"
+]
+},
+{
+"tipo": "SELECCION",
+"q": "¿A qué destacado movimiento artístico perteneció el pintor Salvador Dalí?",
+"a": "Surrealismo",
+"w": [
+"Cubismo",
+"Impresionismo",
+"Expresionismo Abstracto"
+]
+},
+{
+"tipo": "SELECCION",
+"q": "¿Quién es el autor de la obra literaria 'El retrato de Dorian Gray'?",
+"a": "Oscar Wilde",
+"w": [
+"Edgar Allan Poe",
+"Bram Stoker",
+"Mary Shelley"
+]
+},
+{
+"tipo": "SELECCION",
+"q": "¿Qué innovadora técnica utilizaba Georges Seurat en sus cuadros pictóricos?",
+"a": "Puntillismo",
+"w": [
+"Tenebrismo",
+"Sfumato",
+"Collage"
+]
+},
+{
+"tipo": "SELECCION",
+"q": "¿Qué destacado escultor francés es el autor de la obra 'El Pensador'?",
+"a": "Auguste Rodin",
+"w": [
+"Miguel Ángel",
+"Gian Lorenzo Bernini",
+"Donatello"
+]
+},
+{
+"tipo": "SELECCION",
+"q": "¿Qué visionario escritor británico es el autor de la novela distópica '1984'?",
+"a": "George Orwell",
+"w": [
+"Aldous Huxley",
+"Ray Bradbury",
+"H.G. Wells"
+]
+},
+{
+"tipo": "CORTA",
+"q": "¿Qué célebre pintor flamenco es el creador del tríptico 'El jardín de las delicias'?",
+"a": "El Bosco"
+},
+{
+"tipo": "CORTA",
+"q": "¿Qué famoso autor ruso escribió la novela psicológica 'Crimen y castigo'?",
+"a": "Dostoievski"
+},
+{
+"tipo": "CORTA",
+"q": "¿A qué genial arquitecto modernista le debemos el diseño de la Casa Batlló?",
+"a": "Antoni Gaudí"
+},
+{
+"tipo": "RELLENAR",
+"bloques": [
+"La obra cumbre de la literatura española escrita por Miguel de Cervantes es",
+"Don Quijote"
+]
+},
+{
+"tipo": "RELLENAR",
+"bloques": [
+"El museo nacional ubicado en Madrid que alberga el cuadro 'Las Meninas' es el",
+"Museo del Prado"
+]
+},
+{
+"tipo": "RELLENAR",
+"bloques": [
+"El famoso pintor impresionista francés conocido por sus cuadros de nenúfares fue",
+"Claude Monet"
+]
+},
+{
+"tipo": "ORDENAR",
+"q": "Ordena cronológicamente estos periodos de la historia del arte y la arquitectura europea:",
+"bloques": [
+"Románico",
+"Gótico",
+"Renacimiento",
+"Barroco"
+]
+},
+{
+"tipo": "ORDENAR",
+"q": "Ordena estas famosas obras de la literatura mundial según su fecha original de publicación:",
+"bloques": [
+"Don Quijote de la Mancha",
+"Frankenstein",
+"Drácula",
+"Harry Potter y la piedra filosofal"
+]
+},
+{
+"tipo": "ORDENAR",
+"q": "Ordena cronológicamente a estos maestros de la pintura según su fecha de nacimiento:",
+"bloques": [
+"Leonardo da Vinci",
+"Diego Velázquez",
+"Francisco de Goya",
+"Pablo Picasso"
+]
+}
+],
+"cie": [
+{
+"tipo": "SELECCION",
+"q": "¿Qué nombre recibe la partícula subatómica que carece de carga eléctrica?",
+"a": "Neutrón",
+"w": [
+"Protón",
+"Electrón",
+"Positrón"
+]
+},
+{
+"tipo": "SELECCION",
+"q": "¿A qué grupo pertenecen las plantas que poseen flores y semillas envueltas en un fruto?",
+"a": "Angiospermas",
+"w": [
+"Gimnospermas",
+"Briófitas",
+"Pteridófitas"
+]
+},
+{
+"tipo": "SELECCION",
+"q": "¿Qué planeta de nuestro sistema solar tiene el día más corto, rotando en apenas unas 10 horas?",
+"a": "Júpiter",
+"w": [
+"Mercurio",
+"Tierra",
+"Saturno"
+]
+},
+{
+"tipo": "SELECCION",
+"q": "¿Cuál es el símbolo químico con el que se representa el elemento Oro en la tabla periódica?",
+"a": "Au",
+"w": [
+"Ag",
+"Or",
+"Go"
+]
+},
+{
+"tipo": "SELECCION",
+"q": "¿Cuál es la unidad de medida estándar de la fuerza en el Sistema Internacional?",
+"a": "Newton",
+"w": [
+"Julio",
+"Pascal",
+"Watio"
+]
+},
+{
+"tipo": "SELECCION",
+"q": "¿Cuál de los siguientes elementos químicos es el gas noble más ligero?",
+"a": "Helio",
+"w": [
+"Neón",
+"Argón",
+"Criptón"
+]
+},
+{
+"tipo": "CORTA",
+"q": "¿Cómo se denomina el proceso biológico por el cual las plantas fabrican su propio alimento usando luz solar?",
+"a": "Fotosíntesis"
+},
+{
+"tipo": "CORTA",
+"q": "¿Cómo se llama el hueso más pequeño del cuerpo humano, situado en el oído medio?",
+"a": "Estribo"
+},
+{
+"tipo": "CORTA",
+"q": "¿Qué científico inglés formuló las famosas tres leyes del movimiento y la ley de gravitación universal?",
+"a": "Isaac Newton"
+},
+{
+"tipo": "RELLENAR",
+"bloques": [
+"La rama de las matemáticas clásicas que se encarga de estudiar las propiedades del espacio y las figuras es la",
+"Geometría"
+]
+},
+{
+"tipo": "RELLENAR",
+"bloques": [
+"El brillante físico teórico que desarrolló la famosa teoría de la relatividad fue",
+"Albert Einstein"
+]
+},
+{
+"tipo": "RELLENAR",
+"bloques": [
+"La compleja molécula en forma de doble hélice que contiene la información genética se abrevia como",
+"ADN"
+]
+},
+{
+"tipo": "ORDENAR",
+"q": "Ordena correctamente las fases principales del proceso de mitosis celular, de la primera a la última:",
+"bloques": [
+"Profase",
+"Metafase",
+"Anafase",
+"Telofase"
+]
+},
+{
+"tipo": "ORDENAR",
+"q": "Ordena estos planetas rocosos y gigantes gaseosos según su tamaño, de menor a mayor diámetro:",
+"bloques": [
+"Mercurio",
+"Marte",
+"Tierra",
+"Júpiter"
+]
+},
+{
+"tipo": "ORDENAR",
+"q": "Ordena las principales capas de la atmósfera terrestre comenzando desde la superficie hacia el espacio exterior:",
+"bloques": [
+"Troposfera",
+"Estratosfera",
+"Mesosfera",
+"Termosfera"
+]
+}
+],
+"dep": [
+{
+"tipo": "SELECCION",
+"q": "¿En qué popular deporte de equipo juegan tradicionalmente 15 jugadores a la vez por cada bando?",
+"a": "Rugby",
+"w": [
+"Fútbol",
+"Cricket",
+"Balonmano"
+]
+},
+{
+"tipo": "SELECCION",
+"q": "¿En qué país asiático se originó e inventó el arte marcial del Judo?",
+"a": "Japón",
+"w": [
+"China",
+"Corea del Sur",
+"Tailandia"
+]
+},
+{
+"tipo": "SELECCION",
+"q": "¿Qué famoso nadador estadounidense ostenta el récord de la mayor cantidad de medallas de oro olímpicas?",
+"a": "Michael Phelps",
+"w": [
+"Mark Spitz",
+"Ian Thorpe",
+"Ryan Lochte"
+]
+},
+{
+"tipo": "SELECCION",
+"q": "¿En qué importante ciudad europea se celebraron los Juegos Olímpicos de verano del año 2012?",
+"a": "Londres",
+"w": [
+"Pekín",
+"Río de Janeiro",
+"Atenas"
+]
+},
+{
+"tipo": "SELECCION",
+"q": "¿Qué mítico torneo de tenis de Grand Slam se disputa tradicionalmente sobre superficie de hierba?",
+"a": "Wimbledon",
+"w": [
+"Roland Garros",
+"US Open",
+"Abierto de Australia"
+]
+},
+{
+"tipo": "SELECCION",
+"q": "¿Cuál es la duración del tiempo reglamentario en un partido oficial de baloncesto según las reglas FIBA?",
+"a": "40 minutos",
+"w": [
+"48 minutos",
+"60 minutos",
+"45 minutos"
+]
+},
+{
+"tipo": "CORTA",
+"q": "¿En qué deporte de invierno se golpea un pequeño disco de caucho vulcanizado conocido como 'puck'?",
+"a": "Hockey"
+},
+{
+"tipo": "CORTA",
+"q": "¿Qué legendario velocista jamaicano mantiene el récord mundial absoluto de los 100 metros lisos?",
+"a": "Usain Bolt"
+},
+{
+"tipo": "CORTA",
+"q": "¿Qué estilo oficial de la natación de competición está considerado generalmente como el más lento?",
+"a": "Braza"
+},
+{
+"tipo": "RELLENAR",
+"bloques": [
+"En la particular puntuación del tenis en inglés, para decir que un jugador tiene cero puntos se usa la palabra",
+"Love"
+]
+},
+{
+"tipo": "RELLENAR",
+"bloques": [
+"El prestigioso trofeo que se entrega anualmente al equipo ganador de la Super Bowl de la NFL se llama Trofeo",
+"Lombardi"
+]
+},
+{
+"tipo": "RELLENAR",
+"bloques": [
+"La carrera o vuelta ciclista por etapas más antigua y famosa que se celebra en Europa es el",
+"Tour de Francia"
+]
+},
+{
+"tipo": "ORDENAR",
+"q": "Ordena estos colores de los cinturones básicos o grados Kyu en el Judo, de menor a mayor nivel de habilidad:",
+"bloques": [
+"Blanco",
+"Amarillo",
+"Naranja",
+"Verde",
+"Azul",
+"Marrón"
+]
+},
+{
+"tipo": "ORDENAR",
+"q": "Ordena cronológicamente estas importantes ciudades según acogieron los Juegos Olímpicos de verano, desde el más antiguo al más reciente:",
+"bloques": [
+"Sídney",
+"Atenas",
+"Pekín",
+"Londres",
+"Tokio"
+]
+},
+{
+"tipo": "ORDENAR",
+"q": "Ordena los cuatro grandes torneos de tenis del circuito Grand Slam según el orden cronológico en el que se disputan cada año:",
+"bloques": [
+"Abierto de Australia",
+"Roland Garros",
+"Wimbledon",
+"US Open"
+]
+}
+]
+}

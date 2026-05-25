@@ -3,6 +3,8 @@ import { Dices, Trophy, ArrowLeft, Timer, Users, Play, Maximize2, Minimize2 } fr
 import { db } from './firebase';
 import { collection, getDocs, query, where, orderBy, limit, doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import PREGUNTAS_JSON from './preguntas_trivial.json';
+import PREGUNTAS_PRIMARIA from './preguntas_trivial_primaria.json';
+import PREGUNTAS_SUPER from './preguntas_trivial_super.json';
 import correctSound from './assets/correct-choice-43861.mp3';
 import wrongSound from './assets/negative_beeps-6008.mp3';
 import Confetti from 'react-confetti';
@@ -234,12 +236,12 @@ function HeartsEffect() {
 
 // ─── 1. BASE DE DATOS Y CONFIGURACIÓN ──────────────────────────────────────────
 const COLORS = [
-    { id: 'geo', hex: '#3498db', name: 'Geografía' },
-    { id: 'esp', hex: '#e84393', name: 'Espectáculos' },
-    { id: 'his', hex: '#f1c40f', name: 'Historia' },
-    { id: 'art', hex: '#9b59b6', name: 'Arte y Lit.' },
-    { id: 'cie', hex: '#2ecc71', name: 'Ciencias' },
-    { id: 'dep', hex: '#e67e22', name: 'Deportes' }
+    { id: 'geo', hex: '#3498db', name: 'Geografía',    emoji: '🌍' },
+    { id: 'esp', hex: '#e84393', name: 'Espectáculos', emoji: '🎬' },
+    { id: 'his', hex: '#f1c40f', name: 'Historia',     emoji: '📜' },
+    { id: 'art', hex: '#9b59b6', name: 'Arte y Lit.',  emoji: '🎨' },
+    { id: 'cie', hex: '#2ecc71', name: 'Ciencias',     emoji: '🔬' },
+    { id: 'dep', hex: '#e67e22', name: 'Deportes',     emoji: '⚽' },
 ];
 
 const PREGUNTAS = {
@@ -449,6 +451,8 @@ export default function TrivialGame({ onExit, onBuscar }) {
     });
     const animFrameRef = useRef(null);
     const handleArrivalRef = useRef(null);
+    const categoriasRecursoRef = useRef(null);
+    const imgCacheRef = useRef({});
     
     // ─── BUSCADOR DE RECURSOS ───
     const buscarRecursosTrivial = async (texto) => {
@@ -496,6 +500,10 @@ export default function TrivialGame({ onExit, onBuscar }) {
 
         if (fuentePreguntas === 'JSON') {
             pregsFinales = PREGUNTAS_JSON;
+        } else if (fuentePreguntas === 'JSON_PRIMARIA') {
+            pregsFinales = PREGUNTAS_PRIMARIA;
+        } else if (fuentePreguntas === 'JSON_SUPER') {
+            pregsFinales = PREGUNTAS_SUPER;
         } else if (fuentePreguntas === 'FIREBASE') {
             try {
                 // Usar ID directo si viene del buscador; si no, buscar por codigoJuego
@@ -534,7 +542,7 @@ export default function TrivialGame({ onExit, onBuscar }) {
                     const cortas = CAT_IDS_TV.filter(c => (fbPregs[c]?.length || 0) < 5);
                     if (cortas.length > 0) {
                         const CAT_NAMES = { geo: 'Geografía', esp: 'Espectáculos', his: 'Historia', art: 'Arte y Lit.', cie: 'Ciencias', dep: 'Deportes' };
-                        setErrorPreguntas(`El recurso no tiene suficientes preguntas en: ${cortas.map(c => CAT_NAMES[c]).join(', ')}. Se necesitan al menos 5 por categoría.`);
+                        setErrorPreguntas(`El recurso no tiene suficientes preguntas. Se necesitan al menos 5 por categoría.`);
                         setCargando(false);
                         return;
                     }
@@ -592,6 +600,8 @@ export default function TrivialGame({ onExit, onBuscar }) {
                 jugadores: players.map(p => ({ nombre: p.name, color: p.color, quesitos: p.wedges })),
                 posiciones,
                 turnoActivo: activePlayerIdxRef.current,
+                fuentePreguntas,
+                recursoIdFB: recursoIdFB || null,
             });
 
             setCodigoPartidaGenerado(codigo);
@@ -630,7 +640,46 @@ export default function TrivialGame({ onExit, onBuscar }) {
 
             await updateDoc(doc(db, 'trivial_partidas', cod), { fechaUltimaActividad: serverTimestamp() });
 
-            preguntasRef.current = PREGUNTAS_JSON;
+            // Restaurar fuente de preguntas
+            const fuente = data.fuentePreguntas || 'JSON';
+            setFuentePreguntas(fuente);
+
+            if (fuente === 'JSON_PRIMARIA') {
+                preguntasRef.current = PREGUNTAS_PRIMARIA;
+            } else if (fuente === 'JSON_SUPER') {
+                preguntasRef.current = PREGUNTAS_SUPER;
+            } else if (fuente === 'FIREBASE' && data.recursoIdFB) {
+                try {
+                    const [pregSnap, recursoDoc] = await Promise.all([
+                        getDocs(collection(db, 'trivial_recursos', data.recursoIdFB, 'preguntas')),
+                        getDoc(doc(db, 'trivial_recursos', data.recursoIdFB)),
+                    ]);
+                    const fbPregs = {};
+                    pregSnap.forEach(d => {
+                        const q = d.data();
+                        const tipo = q.tipo || 'SELECCION';
+                        const valida = q.categoria && (
+                            (tipo === 'SELECCION' && q.q && q.a) ||
+                            (tipo === 'CORTA'     && q.q && q.a) ||
+                            (tipo === 'RELLENAR'  && q.bloques?.length >= 2) ||
+                            (tipo === 'ORDENAR'   && q.bloques?.length >= 2)
+                        );
+                        if (valida) {
+                            if (!fbPregs[q.categoria]) fbPregs[q.categoria] = [];
+                            fbPregs[q.categoria].push({ ...q, id: d.id });
+                        }
+                    });
+                    preguntasRef.current = Object.keys(fbPregs).length > 0 ? fbPregs : PREGUNTAS_JSON;
+                    setRecursoIdFB(data.recursoIdFB);
+                    if (recursoDoc.exists()) setCategoriasRecurso(recursoDoc.data().categorias || null);
+                } catch (e) {
+                    console.warn('No se pudieron recargar las preguntas del recurso, usando clásico.', e);
+                    preguntasRef.current = PREGUNTAS_JSON;
+                }
+            } else {
+                preguntasRef.current = PREGUNTAS_JSON;
+            }
+
             setPlayers(jugadoresRestaurados);
             setActivePlayerIdx(data.turnoActivo || 0);
             setPantalla('PLAYING');
@@ -645,9 +694,9 @@ export default function TrivialGame({ onExit, onBuscar }) {
     // ─── LÓGICA DEL TEMPORIZADOR ───
     useEffect(() => {
         let timer;
-        if (gameState === 'QUESTION' && timeLeft > 0) {
+        if (gameState === 'QUESTION' && timeLeft > 0 && !mostrandoRespuesta) {
             timer = setTimeout(() => setTimeLeft(t => t - 1), 1000);
-        } else if (gameState === 'QUESTION' && timeLeft === 0) {
+        } else if (gameState === 'QUESTION' && timeLeft === 0 && !mostrandoRespuesta) {
             responderPregunta(false);
         }
         return () => clearTimeout(timer);
@@ -790,6 +839,41 @@ export default function TrivialGame({ onExit, onBuscar }) {
                     drawRoundRect(ctx, -tw / 2 + 3, -th / 2 + 3, tw - 6, th * 0.38, 3); ctx.fill();
 
                     ctx.shadowBlur = 0;
+
+                    // Emoji / imagen en la 3ª casilla de cada radio (s_*_2)
+                    if (node.id.match(/^s_\d+_2$/)) {
+                        const catId = node.color.id;
+                        const cachedImg = imgCacheRef.current[catId];
+                        const custom = categoriasRecursoRef.current?.[catId];
+                        const emoji = custom?.emoji || node.color.emoji;
+                        // Cancelar la rotación acumulada: la casilla tiene rotate(angleFromCenter + π/2)
+                        const cancelRot = -(angleFromCenter + Math.PI / 2);
+                        ctx.save();
+                        ctx.rotate(cancelRot);
+                        ctx.globalAlpha = 1;
+                        // Disco blanco de fondo para contraste
+                        const R = 16;
+                        ctx.beginPath();
+                        ctx.arc(0, 0, R, 0, Math.PI * 2);
+                        ctx.fillStyle = 'rgba(255,255,255,0.92)';
+                        ctx.fill();
+                        ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+                        ctx.lineWidth = 1;
+                        ctx.stroke();
+                        if (cachedImg) {
+                            // Imagen recortada en círculo
+                            ctx.beginPath();
+                            ctx.arc(0, 0, R, 0, Math.PI * 2);
+                            ctx.clip();
+                            ctx.drawImage(cachedImg, -R, -R, R * 2, R * 2);
+                        } else if (emoji) {
+                            ctx.font = '22px "Apple Color Emoji","Segoe UI Emoji",serif';
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            ctx.fillText(emoji, 0, 1);
+                        }
+                        ctx.restore();
+                    }
                 }
                 ctx.restore();
             }
@@ -884,6 +968,36 @@ export default function TrivialGame({ onExit, onBuscar }) {
     }, [pantalla]); // eslint-disable-line
 
     useEffect(() => { window.currentPlayersState = players; }, [players]);
+    useEffect(() => {
+        categoriasRecursoRef.current = categoriasRecurso;
+        if (!categoriasRecurso) { imgCacheRef.current = {}; return; }
+        COLORS.forEach(c => {
+            const url = categoriasRecurso[c.id]?.imagen;
+            if (url && !imgCacheRef.current[c.id]) {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => { imgCacheRef.current[c.id] = img; };
+                img.src = url;
+            } else if (!url) {
+                delete imgCacheRef.current[c.id];
+            }
+        });
+    }, [categoriasRecurso]);
+
+    // ─── TTS ───
+    const [isSpeaking, setIsSpeaking] = useState(false);
+    useEffect(() => {
+        const texto = modalData?.qData?.lectura;
+        if (!texto || !window.speechSynthesis) return;
+        const utt = new SpeechSynthesisUtterance(texto);
+        utt.lang = modalData.qData.lecturaIdioma || 'es-ES';
+        utt.onstart = () => setIsSpeaking(true);
+        utt.onend   = () => setIsSpeaking(false);
+        utt.onerror = () => setIsSpeaking(false);
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utt);
+        return () => { window.speechSynthesis.cancel(); setIsSpeaking(false); };
+    }, [modalData]);
 
     // ─── MANEJADOR DE LLEGADA (PREGUNTAS) ───
     handleArrivalRef.current = useCallback((node) => {
@@ -907,6 +1021,7 @@ export default function TrivialGame({ onExit, onBuscar }) {
             setOrdenSlots([]);
         }
 
+        setMostrandoRespuesta(false);
         setTimeLeft(15);
         setGameState('QUESTION');
         setModalData({
@@ -975,7 +1090,19 @@ export default function TrivialGame({ onExit, onBuscar }) {
         }
     };
 
+    const [mostrandoRespuesta, setMostrandoRespuesta] = useState(false);
+
+    const cerrarModal = () => {
+        setMostrandoRespuesta(false);
+        setActivePlayerIdx(prev => (prev + 1) % players.length);
+        setGameState('WAITING_ROLL');
+        setModalData(null);
+        setDiceVal(null);
+    };
+
     const responderPregunta = (isCorrect) => {
+        if (window.speechSynthesis) window.speechSynthesis.cancel();
+        setIsSpeaking(false);
         isCorrect ? playCorrectSound() : playWrongSound();
         const eng = engineRef.current;
         if (isCorrect) {
@@ -994,13 +1121,12 @@ export default function TrivialGame({ onExit, onBuscar }) {
                     return np;
                 });
             }
-            setGameState('WAITING_ROLL'); 
-        } else {
-            setActivePlayerIdx(prev => (prev + 1) % players.length); 
             setGameState('WAITING_ROLL');
+            setModalData(null);
+            setDiceVal(null);
+        } else {
+            setMostrandoRespuesta(true);
         }
-        setModalData(null);
-        setDiceVal(null);
     };
 
     // ════════════════════════════════════════════════════════════════════════
@@ -1011,6 +1137,8 @@ export default function TrivialGame({ onExit, onBuscar }) {
     // ════════════════════════════════════════════════════════════════════════
     if (pantalla === 'INTRO') {
         const totalPreguntas = Object.values(PREGUNTAS_JSON).flat().length;
+        const totalPrimaria  = Object.values(PREGUNTAS_PRIMARIA).flat().length;
+        const totalSuper     = Object.values(PREGUNTAS_SUPER).flat().length;
         return (
             <div style={{ ...st.appContainer, height: 'auto', minHeight: '100dvh', overflow: 'auto', flexDirection: 'column', alignItems: 'center', justifyContent: isMobile ? 'flex-start' : 'center', padding: isMobile ? '24px 16px 32px' : '20px', gap: 0 }}>
                 <FullscreenBtn />
@@ -1054,7 +1182,53 @@ export default function TrivialGame({ onExit, onBuscar }) {
                         </button>
                     </div>
 
-                    {/* Opción 2: Buscar Trivial */}
+                    {/* Opción 2: Trivial Primaria */}
+                    <div
+                        onClick={() => { setFuentePreguntas('JSON_PRIMARIA'); setPantalla('SETUP'); }}
+                        style={{ flex: 1, minWidth: isMobile ? '100%' : 280, background: 'rgba(30,41,59,0.9)', border: '2px solid #334155', borderRadius: 20, padding: isMobile ? '24px 20px' : 36, cursor: 'pointer', textAlign: 'center', transition: 'border-color 0.2s, transform 0.2s', position: 'relative', overflow: 'hidden' }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = '#34d399'; e.currentTarget.style.transform = 'translateY(-4px)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = '#334155'; e.currentTarget.style.transform = 'translateY(0)'; }}
+                    >
+                        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 6, background: 'linear-gradient(135deg, #34d399, #059669)' }} />
+                        <div style={{ fontSize: '3.5rem', marginBottom: 14 }}>🌟</div>
+                        <h2 style={{ color: 'white', margin: '0 0 10px', fontSize: '1.6rem' }}>Trivial Primaria</h2>
+                        <p style={{ color: '#94a3b8', margin: '0 0 20px', lineHeight: 1.6 }}>
+                            {totalPrimaria} preguntas adaptadas para alumnos de primaria. Categorías más sencillas y amenas.
+                        </p>
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 24 }}>
+                            {COLORS.map(c => (
+                                <span key={c.id} style={{ background: c.hex, color: 'white', padding: '4px 12px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 'bold', textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>{c.name}</span>
+                            ))}
+                        </div>
+                        <button style={{ background: 'linear-gradient(135deg, #34d399, #059669)', color: 'white', border: 'none', padding: '14px 0', borderRadius: 30, fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', width: '100%', boxShadow: '0 8px 25px rgba(5,150,105,0.4)' }}>
+                            Jugar a primaria →
+                        </button>
+                    </div>
+
+                    {/* Opción 3: Super Trivial */}
+                    <div
+                        onClick={() => { setFuentePreguntas('JSON_SUPER'); setPantalla('SETUP'); }}
+                        style={{ flex: 1, minWidth: isMobile ? '100%' : 280, background: 'rgba(30,41,59,0.9)', border: '2px solid #334155', borderRadius: 20, padding: isMobile ? '24px 20px' : 36, cursor: 'pointer', textAlign: 'center', transition: 'border-color 0.2s, transform 0.2s', position: 'relative', overflow: 'hidden' }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = '#f59e0b'; e.currentTarget.style.transform = 'translateY(-4px)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = '#334155'; e.currentTarget.style.transform = 'translateY(0)'; }}
+                    >
+                        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 6, background: 'linear-gradient(135deg, #f59e0b, #d97706)' }} />
+                        <div style={{ fontSize: '3.5rem', marginBottom: 14 }}>⚡</div>
+                        <h2 style={{ color: 'white', margin: '0 0 10px', fontSize: '1.6rem' }}>Super Trivial</h2>
+                        <p style={{ color: '#94a3b8', margin: '0 0 20px', lineHeight: 1.6 }}>
+                            {totalSuper} preguntas con todos los tipos: selección, respuesta corta, rellenar el hueco y ordenar.
+                        </p>
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 24 }}>
+                            {['🔘 Selección', '✏️ Corta', '🔲 Rellenar', '🔀 Ordenar'].map(t => (
+                                <span key={t} style={{ background: 'rgba(245,158,11,0.2)', color: '#fbbf24', border: '1px solid #f59e0b50', padding: '4px 10px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 'bold' }}>{t}</span>
+                            ))}
+                        </div>
+                        <button style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', border: 'none', padding: '14px 0', borderRadius: 30, fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', width: '100%', boxShadow: '0 8px 25px rgba(245,158,11,0.4)' }}>
+                            Jugar al Super Trivial →
+                        </button>
+                    </div>
+
+                    {/* Opción 4: Buscar Trivial */}
                     <div
                         onClick={() => { setBusquedaTexto(''); setResultadosBusq([]); setBusqIniciada(false); setPantalla('BUSCADOR'); buscarRecursosTrivial(''); }}
                         style={{ flex: 1, minWidth: isMobile ? '100%' : 280, background: 'rgba(30,41,59,0.9)', border: '2px solid #334155', borderRadius: 20, padding: isMobile ? '24px 20px' : 36, cursor: 'pointer', textAlign: 'center', position: 'relative', overflow: 'hidden', transition: 'border-color 0.2s, transform 0.2s' }}
@@ -1641,8 +1815,28 @@ export default function TrivialGame({ onExit, onBuscar }) {
                         boxSizing: 'border-box',
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div style={{ fontSize: isMobile ? '0.95rem' : '1.1rem', textTransform: 'uppercase', letterSpacing: 2, color: modalData.color.hex, fontWeight: 'bold' }}>
-                                {modalData.color.name}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <div style={{ fontSize: isMobile ? '0.95rem' : '1.1rem', textTransform: 'uppercase', letterSpacing: 2, color: modalData.color.hex, fontWeight: 'bold' }}>
+                                    {modalData.color.name}
+                                </div>
+                                {modalData.qData?.lectura && (
+                                    <button
+                                        onClick={() => {
+                                            if (!window.speechSynthesis) return;
+                                            const utt = new SpeechSynthesisUtterance(modalData.qData.lectura);
+                                            utt.lang = modalData.qData.lecturaIdioma || 'es-ES';
+                                            utt.onstart = () => setIsSpeaking(true);
+                                            utt.onend   = () => setIsSpeaking(false);
+                                            utt.onerror = () => setIsSpeaking(false);
+                                            window.speechSynthesis.cancel();
+                                            window.speechSynthesis.speak(utt);
+                                        }}
+                                        title="Volver a escuchar"
+                                        style={{ background: isSpeaking ? '#1d4ed820' : 'transparent', border: `1px solid ${isSpeaking ? '#38bdf8' : '#334155'}`, borderRadius: 20, padding: '3px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, color: isSpeaking ? '#38bdf8' : '#64748b', fontSize: '0.78rem', fontWeight: 600, transition: '0.15s' }}
+                                    >
+                                        {isSpeaking ? '🔊 Escuchando…' : '🔊 Escuchar'}
+                                    </button>
+                                )}
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: timeLeft > 5 ? '#94a3b8' : '#e74c3c', fontWeight: 'bold', fontSize: isMobile ? '1rem' : '1.2rem' }}>
                                 <Timer size={isMobile ? 18 : 24}/> {timeLeft}s
@@ -1658,7 +1852,7 @@ export default function TrivialGame({ onExit, onBuscar }) {
                             const qData = modalData.qData || {};
                             const tipo  = qData.tipo || 'SELECCION';
 
-                            // Normalize helper (ignore accents + case)
+                            // Normalize helper (ignore accents + case + trailing spaces)
                             const clean = s => s ? String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim() : '';
 
                             // SELECCION — opción múltiple (por defecto)
@@ -1749,6 +1943,33 @@ export default function TrivialGame({ onExit, onBuscar }) {
                             }
 
                             return null;
+                        })()}
+
+                        {/* Panel de respuesta correcta al fallar */}
+                        {mostrandoRespuesta && (() => {
+                            const qData = modalData.qData || {};
+                            const tipo  = qData.tipo || 'SELECCION';
+                            let respuesta = '';
+                            if (tipo === 'SELECCION' || tipo === 'CORTA') respuesta = qData.a;
+                            else if (tipo === 'RELLENAR') respuesta = qData.bloques?.[1];
+                            else if (tipo === 'ORDENAR') respuesta = qData.bloques?.join(' → ');
+                            return (
+                                <div style={{ marginTop: 16, background: 'rgba(239,68,68,0.12)', border: '2px solid #ef4444', borderRadius: 14, padding: isMobile ? '14px 16px' : '20px 24px' }}>
+                                    <div style={{ color: '#f87171', fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>
+                                        ✗ Respuesta incorrecta
+                                    </div>
+                                    <div style={{ color: '#94a3b8', fontSize: '0.82rem', marginBottom: 6 }}>La respuesta correcta era:</div>
+                                    <div style={{ color: '#4ade80', fontSize: isMobile ? '1.1rem' : '1.35rem', fontWeight: 800, lineHeight: 1.4, marginBottom: 16 }}>
+                                        {respuesta}
+                                    </div>
+                                    <button
+                                        onClick={cerrarModal}
+                                        style={{ background: '#1e293b', border: '1px solid #475569', color: '#e2e8f0', padding: '11px 28px', borderRadius: 10, cursor: 'pointer', fontSize: '0.95rem', fontWeight: 700, width: '100%' }}
+                                    >
+                                        Entendido → siguiente jugador
+                                    </button>
+                                </div>
+                            );
                         })()}
                     </div>
                 </div>

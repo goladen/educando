@@ -1,0 +1,2714 @@
+{
+    "geo": [
+        {
+            "q": "¿En qué planeta vivimos?",
+            "a": "La Tierra",
+            "w": [
+                "Marte",
+                "Júpiter",
+                "Venus"
+            ]
+        },
+        {
+            "q": "¿Cuál es la capital de España?",
+            "a": "Madrid",
+            "w": [
+                "Barcelona",
+                "Sevilla",
+                "Valencia"
+            ]
+        },
+        {
+            "q": "¿Cuántos continentes hay?",
+            "a": "6 (o 7 según el modelo)",
+            "w": [
+                "4",
+                "5",
+                "8"
+            ]
+        },
+        {
+            "q": "¿Por dónde sale el Sol?",
+            "a": "Por el Este",
+            "w": [
+                "Por el Oeste",
+                "Por el Norte",
+                "Por el Sur"
+            ]
+        },
+        {
+            "q": "¿Cuál es el océano más grande?",
+            "a": "El Océano Pacífico",
+            "w": [
+                "El Océano Atlántico",
+                "El Océano Índico",
+                "El Mar Mediterráneo"
+            ]
+        },
+        {
+            "q": "¿Qué instrumento nos ayuda a saber dónde está el Norte?",
+            "a": "La brújula",
+            "w": [
+                "El termómetro",
+                "El reloj",
+                "El telescopio"
+            ]
+        },
+        {
+            "q": "¿Qué país tiene forma de bota?",
+            "a": "Italia",
+            "w": [
+                "Francia",
+                "España",
+                "Grecia"
+            ]
+        },
+        {
+            "q": "¿Qué río pasa por Sevilla?",
+            "a": "El Guadalquivir",
+            "w": [
+                "El Ebro",
+                "El Tajo",
+                "El Duero"
+            ]
+        },
+        {
+            "q": "¿Cuál es el animal que vive en el Polo Sur?",
+            "a": "El pingüino",
+            "w": [
+                "El oso polar",
+                "El león",
+                "El camello"
+            ]
+        },
+        {
+            "q": "¿Qué hay en el centro de la Tierra?",
+            "a": "El núcleo",
+            "w": [
+                "La corteza",
+                "El manto",
+                "El cielo"
+            ]
+        },
+        {
+            "q": "¿Qué cordillera separa España de Francia?",
+            "a": "Los Pirineos",
+            "w": [
+                "Los Alpes",
+                "Los Andes",
+                "El Himalaya"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama el modelo de la Tierra en forma de bola?",
+            "a": "Globo terráqueo",
+            "w": [
+                "Mapa",
+                "Plano",
+                "Croquis"
+            ]
+        },
+        {
+            "q": "¿Cuál es el continente más frío?",
+            "a": "La Antártida",
+            "w": [
+                "Europa",
+                "África",
+                "Asia"
+            ]
+        },
+        {
+            "q": "¿Qué país está encima de Estados Unidos?",
+            "a": "Canadá",
+            "w": [
+                "México",
+                "Brasil",
+                "Perú"
+            ]
+        },
+        {
+            "q": "¿De qué colores es la bandera de España?",
+            "a": "Rojo y amarillo",
+            "w": [
+                "Verde y blanco",
+                "Azul y rojo",
+                "Blanco y azul"
+            ]
+        },
+        {
+            "q": "¿Dónde están las pirámides muy famosas?",
+            "a": "En Egipto",
+            "w": [
+                "En China",
+                "En Japón",
+                "En Canadá"
+            ]
+        },
+        {
+            "q": "¿Cuál es el continente donde vivimos?",
+            "a": "Europa",
+            "w": [
+                "América",
+                "África",
+                "Asia"
+            ]
+        },
+        {
+            "q": "¿Qué idioma se habla en Reino Unido?",
+            "a": "Inglés",
+            "w": [
+                "Español",
+                "Francés",
+                "Alemán"
+            ]
+        },
+        {
+            "q": "¿Qué mar baña las playas de Valencia?",
+            "a": "Mar Mediterráneo",
+            "w": [
+                "Mar Cantábrico",
+                "Océano Atlántico",
+                "Mar Rojo"
+            ]
+        },
+        {
+            "q": "¿Qué son el Teide y el Vesubio?",
+            "a": "Volcanes",
+            "w": [
+                "Ríos",
+                "Lagos",
+                "Mares"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama la línea imaginaria que divide la Tierra por la mitad?",
+            "a": "El Ecuador",
+            "w": [
+                "El Meridiano",
+                "El Trópico",
+                "El Polo"
+            ]
+        },
+        {
+            "q": "¿Cuál es la capital de Francia?",
+            "a": "París",
+            "w": [
+                "Roma",
+                "Berlín",
+                "Londres"
+            ]
+        },
+        {
+            "q": "¿Qué gran río atraviesa Egipto?",
+            "a": "El Nilo",
+            "w": [
+                "El Amazonas",
+                "El Támesis",
+                "El Sena"
+            ]
+        },
+        {
+            "q": "¿En qué país viven los canguros salvajes?",
+            "a": "Australia",
+            "w": [
+                "Sudáfrica",
+                "Brasil",
+                "China"
+            ]
+        },
+        {
+            "q": "¿Qué es más grande, una ciudad o un país?",
+            "a": "Un país",
+            "w": [
+                "Una ciudad",
+                "Un pueblo",
+                "Un barrio"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama el libro que tiene muchos mapas?",
+            "a": "Un atlas",
+            "w": [
+                "Un diccionario",
+                "Una enciclopedia",
+                "Un cuento"
+            ]
+        },
+        {
+            "q": "¿De qué color se pintan los ríos y mares en los mapas?",
+            "a": "Azul",
+            "w": [
+                "Verde",
+                "Marrón",
+                "Amarillo"
+            ]
+        },
+        {
+            "q": "¿Cuál es el río más largo de España?",
+            "a": "El Ebro",
+            "w": [
+                "El Tajo",
+                "El Guadiana",
+                "El Miño"
+            ]
+        },
+        {
+            "q": "¿Qué monumento famoso hay en París?",
+            "a": "La Torre Eiffel",
+            "w": [
+                "El Coliseo",
+                "El Big Ben",
+                "La Estatua de la Libertad"
+            ]
+        },
+        {
+            "q": "¿Qué son las Canarias y las Baleares?",
+            "a": "Islas",
+            "w": [
+                "Penínsulas",
+                "Ríos",
+                "Montañas"
+            ]
+        },
+        {
+            "q": "¿En qué continente está China?",
+            "a": "Asia",
+            "w": [
+                "Europa",
+                "África",
+                "América"
+            ]
+        },
+        {
+            "q": "¿Qué océano hay entre España y América?",
+            "a": "El Atlántico",
+            "w": [
+                "El Pacífico",
+                "El Índico",
+                "El Glacial Ártico"
+            ]
+        },
+        {
+            "q": "¿Qué estado de EE. UU. está formado por islas?",
+            "a": "Hawái",
+            "w": [
+                "Texas",
+                "Florida",
+                "California"
+            ]
+        },
+        {
+            "q": "¿Qué es la selva amazónica?",
+            "a": "Un bosque muy grande",
+            "w": [
+                "Un desierto",
+                "Una montaña",
+                "Un río"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama la capital de Italia?",
+            "a": "Roma",
+            "w": [
+                "Venecia",
+                "Milán",
+                "Nápoles"
+            ]
+        },
+        {
+            "q": "¿Dónde hace más frío?",
+            "a": "En los Polos",
+            "w": [
+                "En el Ecuador",
+                "En el desierto",
+                "En la playa"
+            ]
+        },
+        {
+            "q": "¿Qué animal gigante vive en la sabana de África?",
+            "a": "El elefante",
+            "w": [
+                "El oso polar",
+                "El pingüino",
+                "El tigre"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama nuestro país?",
+            "a": "España",
+            "w": [
+                "Francia",
+                "Portugal",
+                "Italia"
+            ]
+        },
+        {
+            "q": "¿Qué país está a la izquierda de España en el mapa?",
+            "a": "Portugal",
+            "w": [
+                "Francia",
+                "Andorra",
+                "Italia"
+            ]
+        },
+        {
+            "q": "¿Qué idioma se habla en Argentina?",
+            "a": "Español",
+            "w": [
+                "Portugués",
+                "Inglés",
+                "Italiano"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama la ciudad donde vive el Papa?",
+            "a": "El Vaticano",
+            "w": [
+                "Madrid",
+                "Londres",
+                "Berlín"
+            ]
+        },
+        {
+            "q": "¿En qué país está la ciudad de Nueva York?",
+            "a": "Estados Unidos",
+            "w": [
+                "Inglaterra",
+                "Australia",
+                "Canadá"
+            ]
+        },
+        {
+            "q": "¿Qué lugar está lleno de arena y casi no llueve?",
+            "a": "El desierto",
+            "w": [
+                "La selva",
+                "El bosque",
+                "El océano"
+            ]
+        },
+        {
+            "q": "¿Cómo se llaman las montañas muy altas que echan fuego?",
+            "a": "Volcanes",
+            "w": [
+                "Colinas",
+                "Cordilleras",
+                "Valles"
+            ]
+        },
+        {
+            "q": "¿Qué animal de cuello largo vive en África?",
+            "a": "La jirafa",
+            "w": [
+                "El caballo",
+                "El oso",
+                "El ciervo"
+            ]
+        },
+        {
+            "q": "¿De qué color se suele pintar la tierra o llanuras en los mapas físicos?",
+            "a": "Verde",
+            "w": [
+                "Azul",
+                "Blanco",
+                "Negro"
+            ]
+        },
+        {
+            "q": "¿Cuál es la isla más grande de las Baleares?",
+            "a": "Mallorca",
+            "w": [
+                "Ibiza",
+                "Menorca",
+                "Formentera"
+            ]
+        },
+        {
+            "q": "¿En qué continente hay leones y cebras en libertad?",
+            "a": "África",
+            "w": [
+                "Europa",
+                "América",
+                "Oceanía"
+            ]
+        },
+        {
+            "q": "¿Qué es el agua dulce?",
+            "a": "La de los ríos y lagos",
+            "w": [
+                "La de los mares",
+                "La que tiene azúcar",
+                "La de los océanos"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama la unión de muchas montañas?",
+            "a": "Una cordillera",
+            "w": [
+                "Un valle",
+                "Una llanura",
+                "Una meseta"
+            ]
+        }
+    ],
+    "esp": [
+        {
+            "q": "¿Cómo se llama el muñeco de nieve de Frozen?",
+            "a": "Olaf",
+            "w": [
+                "Sven",
+                "Kristoff",
+                "Hans"
+            ]
+        },
+        {
+            "q": "¿De qué color son los Minions?",
+            "a": "Amarillos",
+            "w": [
+                "Azules",
+                "Verdes",
+                "Rojos"
+            ]
+        },
+        {
+            "q": "¿Qué animal es Peppa Pig?",
+            "a": "Una cerdita",
+            "w": [
+                "Una ovejita",
+                "Una perrita",
+                "Una vaca"
+            ]
+        },
+        {
+            "q": "¿Qué superhéroe lanza telarañas?",
+            "a": "Spiderman",
+            "w": [
+                "Batman",
+                "Superman",
+                "Hulk"
+            ]
+        },
+        {
+            "q": "¿De qué videojuego son los bloques y los 'creepers'?",
+            "a": "Minecraft",
+            "w": [
+                "Roblox",
+                "Fortnite",
+                "Mario Kart"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama el hermano de Mario Bros?",
+            "a": "Luigi",
+            "w": [
+                "Bowser",
+                "Toad",
+                "Yoshi"
+            ]
+        },
+        {
+            "q": "¿Qué vehículo conducen Ryder y la Patrulla Canina?",
+            "a": "Un Centro de Mando móvil",
+            "w": [
+                "Un avión",
+                "Un submarino",
+                "Un tren"
+            ]
+        },
+        {
+            "q": "¿Quién vive en una piña debajo del mar?",
+            "a": "Bob Esponja",
+            "w": [
+                "Patricio",
+                "Calamardo",
+                "Señor Cangrejo"
+            ]
+        },
+        {
+            "q": "¿De qué color es Sonic, el erizo rápido?",
+            "a": "Azul",
+            "w": [
+                "Rojo",
+                "Verde",
+                "Amarillo"
+            ]
+        },
+        {
+            "q": "¿En qué película salen emociones como Alegría, Tristeza e Ira?",
+            "a": "Del Revés (Inside Out)",
+            "w": [
+                "Toy Story",
+                "Up",
+                "Coco"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama el vaquero de Toy Story?",
+            "a": "Woody",
+            "w": [
+                "Buzz",
+                "Andy",
+                "Rex"
+            ]
+        },
+        {
+            "q": "¿Qué pokémon eléctrico acompaña a Ash Ketchum?",
+            "a": "Pikachu",
+            "w": [
+                "Charmander",
+                "Squirtle",
+                "Bulbasaur"
+            ]
+        },
+        {
+            "q": "¿En qué familia de perritos sale Bluey?",
+            "a": "En la familia Heeler",
+            "w": [
+                "En la familia Pig",
+                "En la familia Simpson",
+                "En la familia Griffin"
+            ]
+        },
+        {
+            "q": "¿Quién tiene una varita mágica y una cicatriz en la frente?",
+            "a": "Harry Potter",
+            "w": [
+                "Ron Weasley",
+                "Mickey Mouse",
+                "Peter Pan"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama la princesa que pierde un zapato de cristal?",
+            "a": "Cenicienta",
+            "w": [
+                "Blancanieves",
+                "Ariel",
+                "Bella"
+            ]
+        },
+        {
+            "q": "¿De qué color es la ropa de Papá Noel?",
+            "a": "Roja y blanca",
+            "w": [
+                "Azul y blanca",
+                "Verde y roja",
+                "Amarilla y negra"
+            ]
+        },
+        {
+            "q": "¿Qué animal es Simba?",
+            "a": "Un león",
+            "w": [
+                "Un tigre",
+                "Un oso",
+                "Un lobo"
+            ]
+        },
+        {
+            "q": "¿Quién es el villano principal de Mario Bros?",
+            "a": "Bowser",
+            "w": [
+                "Wario",
+                "Waluigi",
+                "Donkey Kong"
+            ]
+        },
+        {
+            "q": "¿Qué palabra mágica dice Mary Poppins?",
+            "a": "Supercalifragilisticoespialidoso",
+            "w": [
+                "Abracadabra",
+                "Ábrete Sésamo",
+                "Bibidi Babidi Bu"
+            ]
+        },
+        {
+            "q": "¿Cómo se llaman las mascotas de Ladybug en Miraculous?",
+            "a": "Kwamis",
+            "w": [
+                "Pokémons",
+                "Digimons",
+                "Hadas"
+            ]
+        },
+        {
+            "q": "¿Qué personaje de Disney tiene las orejas muy grandes y vuela?",
+            "a": "Dumbo",
+            "w": [
+                "Bambi",
+                "Pinocho",
+                "Simba"
+            ]
+        },
+        {
+            "q": "¿Qué niña aventurera viaja por el océano con Maui?",
+            "a": "Vaiana (Moana)",
+            "w": [
+                "Mulan",
+                "Pocahontas",
+                "Tiana"
+            ]
+        },
+        {
+            "q": "¿En qué juego de móvil hay que expulsar a los impostores?",
+            "a": "Among Us",
+            "w": [
+                "Brawl Stars",
+                "Clash Royale",
+                "Minecraft"
+            ]
+        },
+        {
+            "q": "¿De qué color es el vestido de Blancanieves?",
+            "a": "Azul y amarillo",
+            "w": [
+                "Rojo y negro",
+                "Rosa y morado",
+                "Verde y blanco"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama la novia de Mickey Mouse?",
+            "a": "Minnie",
+            "w": [
+                "Daisy",
+                "Pluto",
+                "Goofy"
+            ]
+        },
+        {
+            "q": "¿Qué comen principalmente las Tortugas Ninja?",
+            "a": "Pizza",
+            "w": [
+                "Hamburguesas",
+                "Helado",
+                "Pasta"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama la princesa que tiene el pelo muy largo y rubio?",
+            "a": "Rapunzel",
+            "w": [
+                "Aurora",
+                "Mérida",
+                "Jasmine"
+            ]
+        },
+        {
+            "q": "¿En qué película sale un panda rojo gigante?",
+            "a": "Red (Turning Red)",
+            "w": [
+                "Kung Fu Panda",
+                "Zootrópolis",
+                "Bichos"
+            ]
+        },
+        {
+            "q": "¿Qué animal es Doraemon?",
+            "a": "Un gato cósmico",
+            "w": [
+                "Un perro azul",
+                "Un ratón mágico",
+                "Un oso robot"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama el mejor amigo de Bob Esponja?",
+            "a": "Patricio Estrella",
+            "w": [
+                "Calamardo",
+                "Arenita",
+                "Plankton"
+            ]
+        },
+        {
+            "q": "¿Qué superhéroe lleva un escudo con una estrella?",
+            "a": "El Capitán América",
+            "w": [
+                "Iron Man",
+                "Thor",
+                "Hulk"
+            ]
+        },
+        {
+            "q": "¿Qué animal es el Maestro Shifu en Kung Fu Panda?",
+            "a": "Un panda rojo",
+            "w": [
+                "Una tortuga",
+                "Un tigre",
+                "Un oso panda"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama la ratoncita amiga de Peppa Pig?",
+            "a": "Rebecca Liebre",
+            "w": [
+                "Suzy Oveja",
+                "Zoe Cebra",
+                "Mandy Ratón"
+            ]
+        },
+        {
+            "q": "¿De qué están hechos los bloques de Lego básicos?",
+            "a": "De plástico",
+            "w": [
+                "De madera",
+                "De metal",
+                "De cartón"
+            ]
+        },
+        {
+            "q": "¿Quién es el gigante verde amable de las películas de ogros?",
+            "a": "Shrek",
+            "w": [
+                "Fiona",
+                "Hulk",
+                "Frankenstein"
+            ]
+        },
+        {
+            "q": "¿Qué princesa de Disney vive bajo el mar?",
+            "a": "Ariel",
+            "w": [
+                "Bella",
+                "Cenicienta",
+                "Tiana"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama el perrito policía de la Patrulla Canina?",
+            "a": "Chase",
+            "w": [
+                "Marshall",
+                "Rubble",
+                "Zuma"
+            ]
+        },
+        {
+            "q": "¿A qué fruta es alérgico Pac-Man? (Broma: ¿Qué come?)",
+            "a": "Come puntos y frutas",
+            "w": [
+                "Come fantasmas solo",
+                "Come queso",
+                "Come pizzas"
+            ]
+        },
+        {
+            "q": "¿En qué juego atrapas monstruos con 'Pokéballs'?",
+            "a": "Pokémon",
+            "w": [
+                "Digimon",
+                "Yu-Gi-Oh!",
+                "Bakugan"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama el coche rojo protagonista de la película Cars?",
+            "a": "Rayo McQueen",
+            "w": [
+                "Mate",
+                "Doc Hudson",
+                "Sally"
+            ]
+        },
+        {
+            "q": "¿Qué superheroína viste de rojo con puntos negros?",
+            "a": "Ladybug",
+            "w": [
+                "Cat Noir",
+                "Rena Rouge",
+                "Queen Bee"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama el monstruo azul de Monstruos S.A.?",
+            "a": "Sulley",
+            "w": [
+                "Mike Wazowski",
+                "Randall",
+                "Boo"
+            ]
+        },
+        {
+            "q": "¿Cuál es la comida favorita de Garfield?",
+            "a": "La lasaña",
+            "w": [
+                "Los ratones",
+                "El pescado",
+                "Las pizzas"
+            ]
+        },
+        {
+            "q": "¿Qué deporte juega Oliver Atom en 'Campeones'?",
+            "a": "Fútbol",
+            "w": [
+                "Baloncesto",
+                "Tenis",
+                "Béisbol"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama el dragón negro de la película 'Cómo entrenar a tu dragón'?",
+            "a": "Desdentao",
+            "w": [
+                "Furia",
+                "Tormenta",
+                "Hipo"
+            ]
+        },
+        {
+            "q": "¿Qué fruta come Blancanieves y se queda dormida?",
+            "a": "Una manzana",
+            "w": [
+                "Una pera",
+                "Un plátano",
+                "Una fresa"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama el compañero de Buzz Lightyear?",
+            "a": "Woody",
+            "w": [
+                "Señor Patata",
+                "Rex",
+                "Andy"
+            ]
+        },
+        {
+            "q": "¿De qué color es la ropa de Mario Bros?",
+            "a": "Roja y azul",
+            "w": [
+                "Verde y azul",
+                "Amarilla y azul",
+                "Blanca y roja"
+            ]
+        },
+        {
+            "q": "¿En la peli 'Encanto', en qué país vive la familia Madrigal?",
+            "a": "Colombia",
+            "w": [
+                "México",
+                "España",
+                "Brasil"
+            ]
+        },
+        {
+            "q": "¿Quién intenta comerse a los Tres Cerditos?",
+            "a": "El Lobo Feroz",
+            "w": [
+                "El León Feroz",
+                "El Oso Feroz",
+                "El Zorro Feroz"
+            ]
+        }
+    ],
+    "his": [
+        {
+            "q": "¿En qué época vivían los dinosaurios?",
+            "a": "En la Prehistoria",
+            "w": [
+                "En la Edad Media",
+                "En el futuro",
+                "Ayer"
+            ]
+        },
+        {
+            "q": "¿Con qué hacían fuego los primeros humanos?",
+            "a": "Frotando palos o piedras",
+            "w": [
+                "Con mecheros",
+                "Con cerillas",
+                "Con enchufes"
+            ]
+        },
+        {
+            "q": "¿Qué edificios gigantes construían en el Antiguo Egipto?",
+            "a": "Las Pirámides",
+            "w": [
+                "Los castillos",
+                "Los rascacielos",
+                "Las catedrales"
+            ]
+        },
+        {
+            "q": "¿Quién descubrió América?",
+            "a": "Cristóbal Colón",
+            "w": [
+                "Julio César",
+                "Don Quijote",
+                "Napoleón"
+            ]
+        },
+        {
+            "q": "¿En qué viajaban los caballeros de la Edad Media?",
+            "a": "En caballo",
+            "w": [
+                "En coche",
+                "En tren",
+                "En avión"
+            ]
+        },
+        {
+            "q": "¿De dónde eran los gladiadores y los emperadores?",
+            "a": "De Roma",
+            "w": [
+                "De París",
+                "De Egipto",
+                "De América"
+            ]
+        },
+        {
+            "q": "¿Con qué escribían antiguamente?",
+            "a": "Con una pluma y tinta",
+            "w": [
+                "Con bolígrafo",
+                "Con tablet",
+                "Con rotuladores"
+            ]
+        },
+        {
+            "q": "¿Cómo se llamaba la tela en la que escribían los egipcios?",
+            "a": "Papiro",
+            "w": [
+                "Folio",
+                "Cartulina",
+                "Papel de plata"
+            ]
+        },
+        {
+            "q": "¿Dónde vivían los reyes y las reinas en la Edad Media?",
+            "a": "En castillos",
+            "w": [
+                "En cuevas",
+                "En pirámides",
+                "En iglús"
+            ]
+        },
+        {
+            "q": "¿Qué animales prehistóricos tenían grandes colmillos (como Manny)?",
+            "a": "Los mamuts",
+            "w": [
+                "Los elefantes",
+                "Los hipopótamos",
+                "Las cebras"
+            ]
+        },
+        {
+            "q": "¿Qué gran invento es redondo y sirve para que los carros se muevan?",
+            "a": "La rueda",
+            "w": [
+                "El motor",
+                "El freno",
+                "El espejo"
+            ]
+        },
+        {
+            "q": "¿Cómo se llamaba la época de los hombres de las cavernas?",
+            "a": "La Edad de Piedra",
+            "w": [
+                "La Edad de Oro",
+                "La Edad de Plástico",
+                "El Futuro"
+            ]
+        },
+        {
+            "q": "¿En qué barco viajó Cristóbal Colón?",
+            "a": "En las carabelas",
+            "w": [
+                "En un submarino",
+                "En un transatlántico",
+                "En un velero deportivo"
+            ]
+        },
+        {
+            "q": "¿Qué construían los romanos para llevar agua a las ciudades?",
+            "a": "Acueductos",
+            "w": [
+                "Puentes de tren",
+                "Rascacielos",
+                "Túneles de coche"
+            ]
+        },
+        {
+            "q": "¿Cómo se vestían los caballeros medievales para protegerse?",
+            "a": "Con armaduras de metal",
+            "w": [
+                "Con chalecos de lana",
+                "Con trajes espaciales",
+                "Con chaquetas y corbatas"
+            ]
+        },
+        {
+            "q": "¿Qué ave usaban antiguamente para llevar mensajes de un castillo a otro?",
+            "a": "La paloma mensajera",
+            "w": [
+                "El águila",
+                "El loro",
+                "El pingüino"
+            ]
+        },
+        {
+            "q": "¿Dónde enterraban a los faraones?",
+            "a": "En sarcófagos dentro de pirámides",
+            "w": [
+                "En cuevas oscuras",
+                "En el fondo del mar",
+                "En el bosque"
+            ]
+        },
+        {
+            "q": "¿Cómo se llamaba la civilización que construyó Chichén Itzá?",
+            "a": "Los mayas",
+            "w": [
+                "Los romanos",
+                "Los egipcios",
+                "Los griegos"
+            ]
+        },
+        {
+            "q": "¿Qué personaje histórico era un gran inventor y pintor del Renacimiento?",
+            "a": "Leonardo da Vinci",
+            "w": [
+                "Julio César",
+                "Pablo Picasso",
+                "Mozart"
+            ]
+        },
+        {
+            "q": "¿Con qué iluminaban las casas antes de inventarse la luz eléctrica?",
+            "a": "Con velas y antorchas",
+            "w": [
+                "Con linternas a pilas",
+                "Con bombillas led",
+                "Con farolas solares"
+            ]
+        },
+        {
+            "q": "¿Qué civilización inventó los Juegos Olímpicos?",
+            "a": "Los antiguos griegos",
+            "w": [
+                "Los egipcios",
+                "Los romanos",
+                "Los vikingos"
+            ]
+        },
+        {
+            "q": "¿Cómo viajaban los vikingos por el mar?",
+            "a": "En barcos llamados drakkar",
+            "w": [
+                "En canoas de goma",
+                "En barcos a vapor",
+                "En veleros voladores"
+            ]
+        },
+        {
+            "q": "¿Quién fue la reina católica de España que ayudó a Colón?",
+            "a": "Isabel la Católica",
+            "w": [
+                "Reina Letizia",
+                "Cleopatra",
+                "Reina Victoria"
+            ]
+        },
+        {
+            "q": "¿Qué hacían los piratas en el mar?",
+            "a": "Robar tesoros a otros barcos",
+            "w": [
+                "Pescar ballenas amables",
+                "Repartir comida",
+                "Enseñar a nadar"
+            ]
+        },
+        {
+            "q": "¿Dónde se hacían las peleas de gladiadores en Roma?",
+            "a": "En el Coliseo",
+            "w": [
+                "En el estadio de fútbol",
+                "En el circo de payasos",
+                "En el museo"
+            ]
+        },
+        {
+            "q": "¿Con qué animal cruzó Aníbal las montañas para atacar a Roma?",
+            "a": "Con elefantes",
+            "w": [
+                "Con leones",
+                "Con jirafas",
+                "Con rinocerontes"
+            ]
+        },
+        {
+            "q": "¿Qué invento sirvió para imprimir muchos libros rápidos?",
+            "a": "La imprenta",
+            "w": [
+                "El ordenador",
+                "La máquina de escribir",
+                "El teléfono"
+            ]
+        },
+        {
+            "q": "¿Cómo se llamaba el tren antiguo que echaba mucho humo?",
+            "a": "Tren de vapor",
+            "w": [
+                "Tren bala",
+                "Metro",
+                "Tranvía"
+            ]
+        },
+        {
+            "q": "¿Qué gran muro construyeron en Asia para proteger su imperio?",
+            "a": "La Gran Muralla China",
+            "w": [
+                "El Muro de Berlín",
+                "El Muro de Hielo",
+                "El Muro Romano"
+            ]
+        },
+        {
+            "q": "¿Quiénes construyeron grandes ciudades en México y Perú?",
+            "a": "Los aztecas y los incas",
+            "w": [
+                "Los romanos y los griegos",
+                "Los egipcios y los persas",
+                "Los celtas y los vikingos"
+            ]
+        },
+        {
+            "q": "¿Qué llevaban en la cabeza los reyes?",
+            "a": "Una corona",
+            "w": [
+                "Un casco de moto",
+                "Un gorro de lana",
+                "Una gorra con visera"
+            ]
+        },
+        {
+            "q": "¿Qué gran científico descubrió la gravedad cuando le cayó una manzana?",
+            "a": "Isaac Newton",
+            "w": [
+                "Albert Einstein",
+                "Galileo",
+                "Pasteur"
+            ]
+        },
+        {
+            "q": "¿Qué usaban en la Prehistoria para cazar?",
+            "a": "Lanzas y piedras",
+            "w": [
+                "Pistolas de agua",
+                "Arcos mágicos",
+                "Láseres"
+            ]
+        },
+        {
+            "q": "¿A qué continente llegó Colón en 1492?",
+            "a": "A América",
+            "w": [
+                "A Asia",
+                "A Europa",
+                "A África"
+            ]
+        },
+        {
+            "q": "¿Qué bebían los dioses griegos según las leyendas?",
+            "a": "Néctar y ambrosía",
+            "w": [
+                "Cola Cao y Fanta",
+                "Zumo de naranja",
+                "Batidos de fresa"
+            ]
+        },
+        {
+            "q": "¿En qué año el hombre pisó la Luna por primera vez?",
+            "a": "1969",
+            "w": [
+                "2000",
+                "1990",
+                "1850"
+            ]
+        },
+        {
+            "q": "¿Quiénes hacían dibujos en las paredes de las cuevas?",
+            "a": "Los hombres prehistóricos",
+            "w": [
+                "Los romanos",
+                "Los faraones",
+                "Los reyes magos"
+            ]
+        },
+        {
+            "q": "¿Qué imperio dominó toda la zona del Mediterráneo?",
+            "a": "El Imperio Romano",
+            "w": [
+                "El Imperio Chino",
+                "El Imperio Inca",
+                "El Imperio Maya"
+            ]
+        },
+        {
+            "q": "¿Qué era un faraón?",
+            "a": "El rey del Antiguo Egipto",
+            "w": [
+                "El jefe de los vikingos",
+                "El líder de los romanos",
+                "Un caballero medieval"
+            ]
+        },
+        {
+            "q": "¿Con qué construían los egipcios las pirámides?",
+            "a": "Con enormes bloques de piedra",
+            "w": [
+                "Con ladrillos de plástico",
+                "Con madera de árbol",
+                "Con arena del mar"
+            ]
+        },
+        {
+            "q": "¿Qué guerreros del norte llevaban escudos redondos y hachas?",
+            "a": "Los vikingos",
+            "w": [
+                "Los romanos",
+                "Los ninjas",
+                "Los samuráis"
+            ]
+        },
+        {
+            "q": "¿Qué construían los romanos para conectar todas sus ciudades?",
+            "a": "Calzadas (carreteras empedradas)",
+            "w": [
+                "Autopistas",
+                "Vías de tren",
+                "Rutas de vuelo"
+            ]
+        },
+        {
+            "q": "¿Cómo se comunicaban antes los indios americanos a larga distancia?",
+            "a": "Con señales de humo",
+            "w": [
+                "Por teléfono",
+                "Mandando correos electrónicos",
+                "Con palomas mensajeras"
+            ]
+        },
+        {
+            "q": "¿Qué época vino después de la Prehistoria?",
+            "a": "La Edad Antigua",
+            "w": [
+                "La Edad Contemporánea",
+                "El Futuro",
+                "La Edad Moderna"
+            ]
+        },
+        {
+            "q": "¿Quién tocaba el arpa mágica en los cuentos griegos?",
+            "a": "Apolo (u Orfeo)",
+            "w": [
+                "Zeus",
+                "Hércules",
+                "Poseidón"
+            ]
+        },
+        {
+            "q": "¿En qué país empezó la Revolución Industrial?",
+            "a": "En Inglaterra",
+            "w": [
+                "En España",
+                "En Francia",
+                "En China"
+            ]
+        },
+        {
+            "q": "¿De qué material eran las primeras herramientas humanas?",
+            "a": "De piedra",
+            "w": [
+                "De hierro",
+                "De bronce",
+                "De plástico"
+            ]
+        },
+        {
+            "q": "¿Qué importante descubrimiento cambió la vida en la prehistoria y daba calor?",
+            "a": "El fuego",
+            "w": [
+                "La rueda",
+                "El agua",
+                "La ropa"
+            ]
+        },
+        {
+            "q": "¿Qué forma tienen las tumbas de los faraones más famosos?",
+            "a": "Piramidal",
+            "w": [
+                "Circular",
+                "Cuadrada",
+                "Esférica"
+            ]
+        },
+        {
+            "q": "¿Quién vivía en el Olimpo?",
+            "a": "Los dioses griegos",
+            "w": [
+                "Los faraones",
+                "Los reyes romanos",
+                "Los caballeros"
+            ]
+        }
+    ],
+    "art": [
+        {
+            "q": "¿De qué color es la mezcla de azul y amarillo?",
+            "a": "Verde",
+            "w": [
+                "Morado",
+                "Naranja",
+                "Marrón"
+            ]
+        },
+        {
+            "q": "¿Cuál de estos es un instrumento de cuerda?",
+            "a": "La guitarra",
+            "w": [
+                "El tambor",
+                "La flauta",
+                "La trompeta"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama el cuento donde una niña lleva una capa roja?",
+            "a": "Caperucita Roja",
+            "w": [
+                "Blancanieves",
+                "La Cenicienta",
+                "Rapunzel"
+            ]
+        },
+        {
+            "q": "¿Con qué objeto se pinta sobre un lienzo?",
+            "a": "Con un pincel",
+            "w": [
+                "Con un martillo",
+                "Con una cuchara",
+                "Con un zapato"
+            ]
+        },
+        {
+            "q": "¿Quién pintó cuadros muy raros y divertidos donde las caras tenían los ojos torcidos?",
+            "a": "Pablo Picasso",
+            "w": [
+                "Leonardo da Vinci",
+                "Velázquez",
+                "Goya"
+            ]
+        },
+        {
+            "q": "¿Qué animal se come a la abuelita de Caperucita?",
+            "a": "El lobo",
+            "w": [
+                "El oso",
+                "El león",
+                "El tigre"
+            ]
+        },
+        {
+            "q": "¿De qué color es la mezcla de rojo y amarillo?",
+            "a": "Naranja",
+            "w": [
+                "Verde",
+                "Morado",
+                "Azul"
+            ]
+        },
+        {
+            "q": "¿Qué instrumento se toca soplando y tiene teclas blancas y negras?",
+            "a": "La melódica (o piano de viento)",
+            "w": [
+                "El piano",
+                "La guitarra",
+                "El violín"
+            ]
+        },
+        {
+            "q": "¿En qué cuento sale un niño de madera al que le crece la nariz?",
+            "a": "Pinocho",
+            "w": [
+                "Peter Pan",
+                "Aladino",
+                "Tarzán"
+            ]
+        },
+        {
+            "q": "¿Qué instrumento se golpea con palillos?",
+            "a": "El tambor",
+            "w": [
+                "La flauta",
+                "El piano",
+                "El arpa"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama la casa donde hay muchos cuadros para que la gente los vea?",
+            "a": "Museo",
+            "w": [
+                "Cine",
+                "Teatro",
+                "Biblioteca"
+            ]
+        },
+        {
+            "q": "¿Qué usamos para sacar punta a los lápices de colores?",
+            "a": "El sacapuntas",
+            "w": [
+                "La goma",
+                "La regla",
+                "El compás"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama el cuento de tres hermanitos que hacen casas de paja, madera y ladrillo?",
+            "a": "Los tres cerditos",
+            "w": [
+                "Los tres osos",
+                "Las tres cabritillas",
+                "Los tres ratones"
+            ]
+        },
+        {
+            "q": "¿Qué colores mezclamos para hacer morado?",
+            "a": "Rojo y azul",
+            "w": [
+                "Rojo y verde",
+                "Azul y amarillo",
+                "Amarillo y verde"
+            ]
+        },
+        {
+            "q": "¿Qué es la plastilina?",
+            "a": "Una masa para modelar",
+            "w": [
+                "Una pintura para papel",
+                "Un instrumento musical",
+                "Un tipo de papel"
+            ]
+        },
+        {
+            "q": "¿Quién duerme en una cama de cristal en el bosque junto a 7 enanitos?",
+            "a": "Blancanieves",
+            "w": [
+                "La Sirenita",
+                "Cenicienta",
+                "Mulan"
+            ]
+        },
+        {
+            "q": "¿A qué instrumento le damos a teclas blancas y negras con los dedos?",
+            "a": "El piano",
+            "w": [
+                "La guitarra",
+                "La batería",
+                "La trompeta"
+            ]
+        },
+        {
+            "q": "¿Qué poeta escribía poemas para niños sobre animales y naturaleza en España?",
+            "a": "Gloria Fuertes",
+            "w": [
+                "Cervantes",
+                "Lorca",
+                "Machado"
+            ]
+        },
+        {
+            "q": "¿Qué animal usa botas y espada en un famoso cuento?",
+            "a": "El gato con botas",
+            "w": [
+                "El perro con sombrero",
+                "El ratón con capa",
+                "El lobo con gafas"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama la persona que escribe libros?",
+            "a": "Escritor/a",
+            "w": [
+                "Pintor/a",
+                "Músico",
+                "Actor/actriz"
+            ]
+        },
+        {
+            "q": "¿Qué figura musical dura un pulso o golpe?",
+            "a": "La negra",
+            "w": [
+                "La blanca",
+                "La corchea",
+                "La redonda"
+            ]
+        },
+        {
+            "q": "¿Qué figura musical dura dos pulsos?",
+            "a": "La blanca",
+            "w": [
+                "La negra",
+                "El silencio",
+                "La fusa"
+            ]
+        },
+        {
+            "q": "¿Qué lugar está lleno de libros que te puedes llevar prestados?",
+            "a": "La biblioteca",
+            "w": [
+                "La librería",
+                "El museo",
+                "El hospital"
+            ]
+        },
+        {
+            "q": "¿De qué color pinto si mezclo blanco y rojo?",
+            "a": "Rosa",
+            "w": [
+                "Naranja",
+                "Morado",
+                "Marrón"
+            ]
+        },
+        {
+            "q": "¿Qué princesa duerme 100 años al pincharse con una rueca?",
+            "a": "La Bella Durmiente",
+            "w": [
+                "Blancanieves",
+                "Cenicienta",
+                "Pocahontas"
+            ]
+        },
+        {
+            "q": "¿Qué instrumento de percusión suena al chocarlos y son muy flamencos?",
+            "a": "Las castañuelas",
+            "w": [
+                "Los platillos",
+                "La pandereta",
+                "El triángulo"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama el arte de doblar papel para hacer figuras como barcos o pajaritas?",
+            "a": "Papiroflexia u Origami",
+            "w": [
+                "Escultura",
+                "Pintura",
+                "Costura"
+            ]
+        },
+        {
+            "q": "¿A quién se le cae el zapato en el baile?",
+            "a": "A Cenicienta",
+            "w": [
+                "A Bella",
+                "A Blancanieves",
+                "A Ariel"
+            ]
+        },
+        {
+            "q": "¿Qué usamos para pegar dos trozos de papel?",
+            "a": "El pegamento",
+            "w": [
+                "Las tijeras",
+                "El rotulador",
+                "La goma"
+            ]
+        },
+        {
+            "q": "¿Qué instrumento se pone en el hombro y se toca con un arco?",
+            "a": "El violín",
+            "w": [
+                "La guitarra",
+                "La flauta",
+                "El piano"
+            ]
+        },
+        {
+            "q": "¿Quién pinta con una paleta y pinceles?",
+            "a": "El pintor/a",
+            "w": [
+                "El músico",
+                "El escritor/a",
+                "El arquitecto"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama el texto que rima y tiene música al leerlo?",
+            "a": "Un poema",
+            "w": [
+                "Una noticia",
+                "Un diccionario",
+                "Un manual"
+            ]
+        },
+        {
+            "q": "¿Qué cuento tiene a una niña con osos que prueban su sopa?",
+            "a": "Ricitos de Oro",
+            "w": [
+                "Garbancito",
+                "Pulgarcito",
+                "Aladino"
+            ]
+        },
+        {
+            "q": "¿Qué fruta es en realidad la casa de Bob Esponja?",
+            "a": "Una piña",
+            "w": [
+                "Una manzana",
+                "Un melón",
+                "Una sandía"
+            ]
+        },
+        {
+            "q": "¿Qué hacen los actores?",
+            "a": "Interpretar papeles en el teatro o cine",
+            "w": [
+                "Tocar instrumentos",
+                "Pintar cuadros",
+                "Vender entradas"
+            ]
+        },
+        {
+            "q": "¿Cuál es un color primario?",
+            "a": "El azul",
+            "w": [
+                "El verde",
+                "El naranja",
+                "El morado"
+            ]
+        },
+        {
+            "q": "¿Qué tipo de dibujo anima tus personajes favoritos de la tele?",
+            "a": "Dibujos animados o animación",
+            "w": [
+                "Cuadros al óleo",
+                "Esculturas",
+                "Bocetos"
+            ]
+        },
+        {
+            "q": "¿En qué cuento un patito es diferente a sus hermanos y luego se vuelve un cisne?",
+            "a": "El patito feo",
+            "w": [
+                "La gallina de los huevos de oro",
+                "El pollito Lito",
+                "Los músicos de Bremen"
+            ]
+        },
+        {
+            "q": "¿Qué cosa larga y de madera tocamos soplando en el cole?",
+            "a": "La flauta dulce",
+            "w": [
+                "El clarinete",
+                "El trombón",
+                "El saxofón"
+            ]
+        },
+        {
+            "q": "¿Qué son el rojo, azul y amarillo?",
+            "a": "Colores primarios",
+            "w": [
+                "Colores secundarios",
+                "Colores aburridos",
+                "Colores mágicos"
+            ]
+        },
+        {
+            "q": "¿Qué libro de aventuras narra las locuras de un señor y su caballo Rocinante?",
+            "a": "Don Quijote de la Mancha",
+            "w": [
+                "El Principito",
+                "Peter Pan",
+                "Alicia en el país de las maravillas"
+            ]
+        },
+        {
+            "q": "¿Qué pintura se usa con agua?",
+            "a": "La acuarela",
+            "w": [
+                "La cera",
+                "El rotulador",
+                "El bolígrafo"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama el grupo de personas que tocan instrumentos juntos dirigidos por un director?",
+            "a": "La orquesta",
+            "w": [
+                "El coro",
+                "La banda de rock",
+                "El ballet"
+            ]
+        },
+        {
+            "q": "¿En qué cuento un niño nunca crece y vive en Nunca Jamás?",
+            "a": "Peter Pan",
+            "w": [
+                "Hansel y Gretel",
+                "Aladino",
+                "El flautista de Hamelín"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama el cuento donde un flautista se lleva a las ratas (y luego a los niños)?",
+            "a": "El flautista de Hamelín",
+            "w": [
+                "El músico mágico",
+                "El flautista de Bremen",
+                "El gato flautista"
+            ]
+        },
+        {
+            "q": "¿Quién es el autor de las Meninas (el pintor)?",
+            "a": "Velázquez",
+            "w": [
+                "Picasso",
+                "Van Gogh",
+                "Goya"
+            ]
+        },
+        {
+            "q": "¿Qué nombre recibe una canción que cantan muchas voces a la vez?",
+            "a": "Un coro",
+            "w": [
+                "Un solo",
+                "Un rap",
+                "Un susurro"
+            ]
+        },
+        {
+            "q": "¿Con qué material se hacen las estatuas o vasijas moldeando barro?",
+            "a": "Con arcilla",
+            "w": [
+                "Con arena seca",
+                "Con plastilina de papel",
+                "Con tiza"
+            ]
+        },
+        {
+            "q": "¿Qué princesa de Disney es de Arabia y vuela en alfombra?",
+            "a": "Jasmine",
+            "w": [
+                "Pocahontas",
+                "Tiana",
+                "Mulan"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama la línea donde dibujamos las notas musicales?",
+            "a": "El pentagrama",
+            "w": [
+                "La pauta",
+                "El cuadro",
+                "El margen"
+            ]
+        }
+    ],
+    "cie": [
+        {
+            "q": "¿Cuál es la estrella que nos da luz y calor?",
+            "a": "El Sol",
+            "w": [
+                "La Luna",
+                "Marte",
+                "Las estrellas fugaces"
+            ]
+        },
+        {
+            "q": "¿Cuántos sentidos tenemos?",
+            "a": "Cinco",
+            "w": [
+                "Cuatro",
+                "Tres",
+                "Seis"
+            ]
+        },
+        {
+            "q": "¿Con qué sentido olemos una flor?",
+            "a": "Con el olfato",
+            "w": [
+                "Con la vista",
+                "Con el gusto",
+                "Con el oído"
+            ]
+        },
+        {
+            "q": "¿Qué beben todos los seres vivos para sobrevivir?",
+            "a": "Agua",
+            "w": [
+                "Zumo",
+                "Leche",
+                "Refresco"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama el gas que respiramos y necesitamos para vivir?",
+            "a": "Oxígeno",
+            "w": [
+                "Humo",
+                "Viento",
+                "Dióxido de carbono"
+            ]
+        },
+        {
+            "q": "¿Qué animal de la granja nos da leche?",
+            "a": "La vaca",
+            "w": [
+                "La gallina",
+                "El cerdo",
+                "El caballo"
+            ]
+        },
+        {
+            "q": "¿Qué cubren el cuerpo de los peces?",
+            "a": "Escamas",
+            "w": [
+                "Plumas",
+                "Pelo",
+                "Lana"
+            ]
+        },
+        {
+            "q": "¿Qué parte de la planta está escondida bajo la tierra?",
+            "a": "La raíz",
+            "w": [
+                "El tallo",
+                "Las hojas",
+                "Las flores"
+            ]
+        },
+        {
+            "q": "¿Qué órgano de nuestro cuerpo sirve para pensar?",
+            "a": "El cerebro",
+            "w": [
+                "El corazón",
+                "El estómago",
+                "Los pulmones"
+            ]
+        },
+        {
+            "q": "¿Qué son el hielo y la nieve?",
+            "a": "Agua congelada (sólida)",
+            "w": [
+                "Nubes caídas",
+                "Agua hirviendo",
+                "Viento frío"
+            ]
+        },
+        {
+            "q": "¿Qué comen los animales carnívoros?",
+            "a": "Carne",
+            "w": [
+                "Plantas",
+                "Fruta",
+                "Solo agua"
+            ]
+        },
+        {
+            "q": "¿Qué animal dice 'muuu'?",
+            "a": "La vaca",
+            "w": [
+                "La oveja",
+                "El pato",
+                "El gato"
+            ]
+        },
+        {
+            "q": "¿Cuál es el planeta donde vivimos?",
+            "a": "La Tierra",
+            "w": [
+                "Marte",
+                "La Luna",
+                "Venus"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama nuestro satélite natural que brilla de noche?",
+            "a": "La Luna",
+            "w": [
+                "El Sol",
+                "La estrella fugaz",
+                "Plutón"
+            ]
+        },
+        {
+            "q": "¿Con qué órgano respiramos el aire?",
+            "a": "Con los pulmones",
+            "w": [
+                "Con el estómago",
+                "Con los huesos",
+                "Con el corazón"
+            ]
+        },
+        {
+            "q": "¿Qué tienen los pájaros en el cuerpo para volar?",
+            "a": "Plumas y alas",
+            "w": [
+                "Escamas y aletas",
+                "Pelo y patas",
+                "Pico y dientes"
+            ]
+        },
+        {
+            "q": "¿Qué insecto hace la miel?",
+            "a": "La abeja",
+            "w": [
+                "La hormiga",
+                "La mosca",
+                "La araña"
+            ]
+        },
+        {
+            "q": "¿Qué forma tiene la Tierra?",
+            "a": "De esfera (como una pelota)",
+            "w": [
+                "Plana",
+                "Cuadrada",
+                "De triángulo"
+            ]
+        },
+        {
+            "q": "¿Qué estación del año hace mucho calor y no hay colegio?",
+            "a": "El verano",
+            "w": [
+                "El invierno",
+                "La primavera",
+                "El otoño"
+            ]
+        },
+        {
+            "q": "¿En qué estación se caen las hojas de muchos árboles?",
+            "a": "En otoño",
+            "w": [
+                "En primavera",
+                "En verano",
+                "En invierno"
+            ]
+        },
+        {
+            "q": "¿Cómo se llaman los animales que nacen del vientre de su madre?",
+            "a": "Mamíferos (y vivíparos)",
+            "w": [
+                "Oviparos",
+                "Aves",
+                "Peces"
+            ]
+        },
+        {
+            "q": "¿Cómo se llaman los animales que nacen de un huevo?",
+            "a": "Ovíparos",
+            "w": [
+                "Vivíparos",
+                "Mamíferos",
+                "Dinosaurios"
+            ]
+        },
+        {
+            "q": "¿Qué hace el corazón?",
+            "a": "Bombear la sangre",
+            "w": [
+                "Respirar aire",
+                "Digerir la comida",
+                "Mover los huesos"
+            ]
+        },
+        {
+            "q": "¿Qué color tienen la mayoría de las hojas de las plantas?",
+            "a": "Verde",
+            "w": [
+                "Marrón",
+                "Amarillo",
+                "Rojo"
+            ]
+        },
+        {
+            "q": "¿Qué comen los animales herbívoros?",
+            "a": "Plantas y hierba",
+            "w": [
+                "Carne",
+                "Solo insectos",
+                "Tierra"
+            ]
+        },
+        {
+            "q": "¿De dónde sale la mariposa?",
+            "a": "De una oruga (crisálida)",
+            "w": [
+                "De un gusano de tierra",
+                "De un renacuajo",
+                "De una mosca"
+            ]
+        },
+        {
+            "q": "¿Cuál es el sentido que usa los ojos?",
+            "a": "La vista",
+            "w": [
+                "El tacto",
+                "El gusto",
+                "El olfato"
+            ]
+        },
+        {
+            "q": "¿Qué cubre el cuerpo de los mamíferos, como los perros o gatos?",
+            "a": "Pelo",
+            "w": [
+                "Plumas",
+                "Escamas",
+                "Espinas"
+            ]
+        },
+        {
+            "q": "¿Qué animal anfibio es primero un renacuajo?",
+            "a": "La rana (o sapo)",
+            "w": [
+                "El pez",
+                "El cocodrilo",
+                "El pato"
+            ]
+        },
+        {
+            "q": "¿Qué parte de nuestro cuerpo sujeta y da forma a todo nuestro interior?",
+            "a": "El esqueleto (los huesos)",
+            "w": [
+                "La piel",
+                "Los músculos",
+                "La sangre"
+            ]
+        },
+        {
+            "q": "¿En qué se convierte el agua si la calentamos mucho al fuego?",
+            "a": "En vapor de agua (gas)",
+            "w": [
+                "En hielo",
+                "En zumo",
+                "En nieve"
+            ]
+        },
+        {
+            "q": "¿Qué necesita una planta para crecer fuerte?",
+            "a": "Agua y luz del sol",
+            "w": [
+                "Leche y galletas",
+                "Zumo y oscuridad",
+                "Viento frío"
+            ]
+        },
+        {
+            "q": "¿Qué animal marino es un mamífero muy inteligente que hace sonidos agudos?",
+            "a": "El delfín",
+            "w": [
+                "El tiburón",
+                "El pez payaso",
+                "La medusa"
+            ]
+        },
+        {
+            "q": "¿Con qué saboreamos la comida dulce o salada?",
+            "a": "Con la lengua (el gusto)",
+            "w": [
+                "Con los dientes",
+                "Con la nariz",
+                "Con los labios"
+            ]
+        },
+        {
+            "q": "¿Qué animal teje telas para atrapar insectos?",
+            "a": "La araña",
+            "w": [
+                "La hormiga",
+                "El saltamontes",
+                "La mosca"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama el movimiento de la Tierra dando vueltas alrededor del Sol?",
+            "a": "Traslación",
+            "w": [
+                "Rotación",
+                "Salto",
+                "Vuelo"
+            ]
+        },
+        {
+            "q": "¿Qué nos da luz por la noche gracias a la tecnología?",
+            "a": "La bombilla o lámpara",
+            "w": [
+                "La vela gigante",
+                "El espejo",
+                "La lupa"
+            ]
+        },
+        {
+            "q": "¿De qué están hechas las nubes?",
+            "a": "De gotitas de agua",
+            "w": [
+                "De algodón",
+                "De humo",
+                "De espuma"
+            ]
+        },
+        {
+            "q": "¿Qué hacen las plantas en la fotosíntesis?",
+            "a": "Fabrican su propio alimento",
+            "w": [
+                "Duermen",
+                "Respiran rápido",
+                "Se mueven de sitio"
+            ]
+        },
+        {
+            "q": "¿Cuál es el planeta con unos anillos muy grandes y famosos?",
+            "a": "Saturno",
+            "w": [
+                "Júpiter",
+                "La Tierra",
+                "Urano"
+            ]
+        },
+        {
+            "q": "¿Qué animal lleva su casa a cuestas?",
+            "a": "El caracol (o la tortuga)",
+            "w": [
+                "El conejo",
+                "El pájaro",
+                "La hormiga"
+            ]
+        },
+        {
+            "q": "¿Qué nos abriga en invierno dentro de nuestro cuerpo para no morir de frío?",
+            "a": "La grasa y la piel",
+            "w": [
+                "El pelo de las uñas",
+                "El sudor",
+                "La respiración"
+            ]
+        },
+        {
+            "q": "¿Cómo se llaman los dientes grandes de atrás para masticar la comida?",
+            "a": "Muelas",
+            "w": [
+                "Colmillos",
+                "Incisivos",
+                "Caninos"
+            ]
+        },
+        {
+            "q": "¿Qué tienen los árboles por donde les entra el alimento del suelo?",
+            "a": "Raíces",
+            "w": [
+                "Ramas",
+                "Hojas",
+                "Frutos"
+            ]
+        },
+        {
+            "q": "¿Qué animal reptil no tiene patas y se arrastra?",
+            "a": "La serpiente",
+            "w": [
+                "La lagartija",
+                "El cocodrilo",
+                "El sapo"
+            ]
+        },
+        {
+            "q": "¿Qué son los pingüinos?",
+            "a": "Aves",
+            "w": [
+                "Mamíferos",
+                "Peces",
+                "Reptiles"
+            ]
+        },
+        {
+            "q": "¿A qué sabe un limón o vinagre?",
+            "a": "Ácido",
+            "w": [
+                "Dulce",
+                "Salado",
+                "Picante"
+            ]
+        },
+        {
+            "q": "¿Qué parte de la cara usamos para escuchar?",
+            "a": "Las orejas (los oídos)",
+            "w": [
+                "Los ojos",
+                "La boca",
+                "La nariz"
+            ]
+        },
+        {
+            "q": "¿Cuál de estos objetos se pega a la puerta del frigorífico?",
+            "a": "Un imán",
+            "w": [
+                "Un papel",
+                "Un trozo de madera",
+                "Un plástico"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama la parte del brazo que se dobla en medio?",
+            "a": "El codo",
+            "w": [
+                "La rodilla",
+                "El tobillo",
+                "La muñeca"
+            ]
+        }
+    ],
+    "dep": [
+        {
+            "q": "¿De qué deporte es Messi o Cristiano Ronaldo?",
+            "a": "Fútbol",
+            "w": [
+                "Baloncesto",
+                "Tenis",
+                "Natación"
+            ]
+        },
+        {
+            "q": "¿Qué objeto se usa para jugar al fútbol?",
+            "a": "Un balón",
+            "w": [
+                "Una raqueta",
+                "Un bate",
+                "Unas gafas"
+            ]
+        },
+        {
+            "q": "¿Dónde se tiene que meter el balón en baloncesto?",
+            "a": "En una canasta",
+            "w": [
+                "En una portería",
+                "En un agujero",
+                "Sobre una red"
+            ]
+        },
+        {
+            "q": "¿Cuántos puntos vale un gol en el fútbol?",
+            "a": "Uno",
+            "w": [
+                "Dos",
+                "Tres",
+                "Diez"
+            ]
+        },
+        {
+            "q": "¿En qué deporte se usan raquetas?",
+            "a": "En tenis (o pádel)",
+            "w": [
+                "En natación",
+                "En fútbol",
+                "En ciclismo"
+            ]
+        },
+        {
+            "q": "¿Con qué parte del cuerpo está prohibido tocar el balón en el fútbol (salvo el portero)?",
+            "a": "Con las manos o brazos",
+            "w": [
+                "Con la cabeza",
+                "Con el pecho",
+                "Con los pies"
+            ]
+        },
+        {
+            "q": "¿En qué deporte hay que correr por el agua?",
+            "a": "Natación",
+            "w": [
+                "Atletismo",
+                "Gimnasia",
+                "Patinaje"
+            ]
+        },
+        {
+            "q": "¿Qué animal monta una persona que hace hípica?",
+            "a": "Un caballo",
+            "w": [
+                "Un toro",
+                "Un camello",
+                "Un burro"
+            ]
+        },
+        {
+            "q": "¿En qué deporte hay que dar pedales para avanzar?",
+            "a": "Ciclismo",
+            "w": [
+                "Patinaje",
+                "Surf",
+                "Esquí"
+            ]
+        },
+        {
+            "q": "¿Qué ropa llevamos para bañarnos en la piscina?",
+            "a": "Bañador",
+            "w": [
+                "Pijama",
+                "Abrigo",
+                "Chándal"
+            ]
+        },
+        {
+            "q": "¿Qué persona pita las faltas en un partido de fútbol?",
+            "a": "El árbitro",
+            "w": [
+                "El entrenador",
+                "El portero",
+                "El delantero"
+            ]
+        },
+        {
+            "q": "¿Qué medalla gana el que llega en primer lugar?",
+            "a": "La medalla de oro",
+            "w": [
+                "La de plata",
+                "La de bronce",
+                "La de plástico"
+            ]
+        },
+        {
+            "q": "¿Cuántos jugadores hay en un equipo de baloncesto jugando a la vez?",
+            "a": "5",
+            "w": [
+                "11",
+                "7",
+                "2"
+            ]
+        },
+        {
+            "q": "¿Qué nos ponemos en los pies para correr muy deprisa sobre el hielo?",
+            "a": "Patines de hielo",
+            "w": [
+                "Aletas",
+                "Botas de agua",
+                "Chanclas"
+            ]
+        },
+        {
+            "q": "¿En qué deporte hay que pasar la pelota por encima de una red usando solo las manos sin que caiga al suelo?",
+            "a": "Voleibol",
+            "w": [
+                "Tenis",
+                "Baloncesto",
+                "Balonmano"
+            ]
+        },
+        {
+            "q": "¿En qué deporte llevamos kimono y cinturones de colores?",
+            "a": "Karate (o Judo)",
+            "w": [
+                "Boxeo",
+                "Gimnasia",
+                "Natación"
+            ]
+        },
+        {
+            "q": "¿Qué se usa en la nieve para deslizarse por la montaña sobre dos tablas largas?",
+            "a": "Los esquís",
+            "w": [
+                "El trineo",
+                "La tabla de snowboard",
+                "Los patines"
+            ]
+        },
+        {
+            "q": "¿Dónde se hacen las carreras de atletismo?",
+            "a": "En una pista de atletismo",
+            "w": [
+                "En una piscina",
+                "En un ring",
+                "En una cancha de arena"
+            ]
+        },
+        {
+            "q": "¿Qué protecciones usamos para andar en monopatín o patines?",
+            "a": "Casco, rodilleras y coderas",
+            "w": [
+                "Gafas de sol",
+                "Bufanda y guantes",
+                "Paraguas"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama cuando en baloncesto lanzas desde muy lejos y entra?",
+            "a": "Triple",
+            "w": [
+                "Gol",
+                "Hoyo",
+                "Mate"
+            ]
+        },
+        {
+            "q": "¿Qué deporte consiste en pegar saltos y hacer volteretas en una colchoneta?",
+            "a": "Gimnasia",
+            "w": [
+                "Baloncesto",
+                "Hípica",
+                "Béisbol"
+            ]
+        },
+        {
+            "q": "¿Qué instrumento usan los equipos de fútbol para meter el balón dentro?",
+            "a": "La portería",
+            "w": [
+                "El agujero",
+                "El aro",
+                "La red"
+            ]
+        },
+        {
+            "q": "¿Qué palo usamos para batear la bola en el béisbol?",
+            "a": "Un bate",
+            "w": [
+                "Una raqueta",
+                "Una maza",
+                "Una escoba"
+            ]
+        },
+        {
+            "q": "¿En qué deporte se usan guantes grandes y se golpea un saco o al rival?",
+            "a": "Boxeo",
+            "w": [
+                "Judo",
+                "Voleibol",
+                "Tenis"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama la competición más famosa donde van todos los países cada 4 años?",
+            "a": "Juegos Olímpicos",
+            "w": [
+                "Mundial de fútbol",
+                "Liga de Campeones",
+                "Vuelta Ciclista"
+            ]
+        },
+        {
+            "q": "¿En qué deporte levantas pesas muy pesadas por encima de la cabeza?",
+            "a": "Halterofilia",
+            "w": [
+                "Atletismo",
+                "Natación",
+                "Lucha"
+            ]
+        },
+        {
+            "q": "¿Qué forma tiene el balón de rugby o fútbol americano?",
+            "a": "De óvalo (como un melón)",
+            "w": [
+                "Redonda",
+                "Cuadrada",
+                "Triangular"
+            ]
+        },
+        {
+            "q": "¿Qué gafas nos ponemos para bucear en la piscina?",
+            "a": "Gafas de natación o buceo",
+            "w": [
+                "Gafas de sol",
+                "Gafas de lectura",
+                "Gafas 3D"
+            ]
+        },
+        {
+            "q": "¿De qué color es la tarjeta si el árbitro te expulsa del campo de fútbol?",
+            "a": "Roja",
+            "w": [
+                "Amarilla",
+                "Verde",
+                "Negra"
+            ]
+        },
+        {
+            "q": "¿Qué significa hacer un 'hoyo en uno'?",
+            "a": "Meter la bola de golf al primer golpe",
+            "w": [
+                "Meter un gol",
+                "Hacer una canasta",
+                "Saltar muy alto"
+            ]
+        },
+        {
+            "q": "¿A qué se juega sobre una mesa verde con palos y bolas de colores?",
+            "a": "Al billar",
+            "w": [
+                "Al ping pong",
+                "Al futbolín",
+                "A las cartas"
+            ]
+        },
+        {
+            "q": "¿Qué deporte hace Fernando Alonso o Carlos Sainz?",
+            "a": "Fórmula 1 (coches)",
+            "w": [
+                "Motociclismo",
+                "Ciclismo",
+                "Karts"
+            ]
+        },
+        {
+            "q": "¿En qué deporte compite Rafa Nadal o Carlos Alcaraz?",
+            "a": "Tenis",
+            "w": [
+                "Pádel",
+                "Fútbol",
+                "Bádminton"
+            ]
+        },
+        {
+            "q": "¿Cuántos jugadores forman un equipo de fútbol entero en el campo?",
+            "a": "11",
+            "w": [
+                "5",
+                "8",
+                "15"
+            ]
+        },
+        {
+            "q": "¿Qué nos enseñan en el cole en la clase de Educación Física?",
+            "a": "Hacer deporte y estar sanos",
+            "w": [
+                "A sumar",
+                "A leer libros",
+                "A pintar con acuarelas"
+            ]
+        },
+        {
+            "q": "¿Qué se usa en ping pong para devolver la pelota?",
+            "a": "Una pala pequeña",
+            "w": [
+                "Una raqueta gigante",
+                "Un guante",
+                "Un zapato"
+            ]
+        },
+        {
+            "q": "¿Qué necesitamos para jugar a los bolos?",
+            "a": "Una bola pesada y tirar los bolos",
+            "w": [
+                "Una raqueta y una red",
+                "Un balón y porterías",
+                "Una piscina"
+            ]
+        },
+        {
+            "q": "¿Qué premio gana el tercer clasificado en una carrera olímpica?",
+            "a": "Medalla de bronce",
+            "w": [
+                "Medalla de oro",
+                "Medalla de plata",
+                "Un diploma de cartón"
+            ]
+        },
+        {
+            "q": "¿Qué nos ponemos debajo del bañador para nadar como peces y avanzar más rápido?",
+            "a": "Aletas",
+            "w": [
+                "Zapatos",
+                "Calcetines",
+                "Manguitos"
+            ]
+        },
+        {
+            "q": "¿En qué deporte saltas desde un avión con una tela grande que te frena al caer?",
+            "a": "Paracaidismo",
+            "w": [
+                "Salto de altura",
+                "Puenting",
+                "Escalada"
+            ]
+        },
+        {
+            "q": "¿Qué jugador del fútbol tiene permiso para coger el balón con las manos?",
+            "a": "El portero",
+            "w": [
+                "El defensa",
+                "El árbitro",
+                "El entrenador"
+            ]
+        },
+        {
+            "q": "¿Qué tienes que saltar en una carrera de obstáculos de atletismo?",
+            "a": "Vallas",
+            "w": [
+                "Sillas",
+                "Personas",
+                "Muros de piedra"
+            ]
+        },
+        {
+            "q": "¿Cómo se llama cuando dos equipos de fútbol empatan a cero?",
+            "a": "Empate a cero",
+            "w": [
+                "Victoria",
+                "Derrota",
+                "Penalti"
+            ]
+        },
+        {
+            "q": "¿Qué deporte acuático se practica subido en una tabla sobre las olas del mar?",
+            "a": "Surf",
+            "w": [
+                "Piragüismo",
+                "Natación",
+                "Waterpolo"
+            ]
+        },
+        {
+            "q": "¿Con qué se juega al bádminton en vez de con una pelota redonda?",
+            "a": "Con un volante (o plumilla)",
+            "w": [
+                "Con un disco",
+                "Con un globo",
+                "Con una naranja"
+            ]
+        },
+        {
+            "q": "¿En qué consiste el tiro con arco?",
+            "a": "Disparar flechas a una diana",
+            "w": [
+                "Disparar pelotas a un cesto",
+                "Tirar lanzas de madera",
+                "Tirar piedras al agua"
+            ]
+        },
+        {
+            "q": "¿Qué tipo de barco fino y largo se usa para hacer carreras en el río a remo?",
+            "a": "Piragua o canoa",
+            "w": [
+                "Submarino",
+                "Yate",
+                "Bote salvavidas"
+            ]
+        },
+        {
+            "q": "¿En el béisbol, quién es la persona que lanza la bola al bateador?",
+            "a": "El lanzador (Pitcher)",
+            "w": [
+                "El receptor",
+                "El árbitro",
+                "El portero"
+            ]
+        },
+        {
+            "q": "¿Qué deporte se juega en la playa golpeando un balón sobre una red alta y la arena?",
+            "a": "Vóley playa",
+            "w": [
+                "Balonmano",
+                "Fútbol sala",
+                "Petanca"
+            ]
+        },
+        {
+            "q": "¿Qué gritan los aficionados cuando su equipo mete el balón en la portería?",
+            "a": "¡Gol!",
+            "w": [
+                "¡Canasta!",
+                "¡Falta!",
+                "¡Punto!"
+            ]
+        }
+    ]
+}

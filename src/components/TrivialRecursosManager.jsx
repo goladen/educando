@@ -48,16 +48,7 @@ export default function TrivialRecursosManager({ usuario }) {
             );
             setPropios(snapPropios.docs.map(d => ({ id: d.id, ...d.data() })));
 
-            // Shared (colaborador)
-            const snapComp = await getDocs(
-                query(
-                    collection(db, 'trivial_recursos'),
-                    where('colaboradores', 'array-contains', { uid: usuario.uid, email: usuario.email, nombre: usuario.displayName || usuario.email })
-                )
-            );
-            // array-contains on object can miss partial matches; fallback: filter client-side
-            // Use a simpler approach: query by uid field in colaboradores array is not directly supported,
-            // so we'll rely on the data already loaded or use a secondary query by email
+            // Shared (colaborador) — query by uid only
             const snapComp2 = await getDocs(
                 query(collection(db, 'trivial_recursos'), where('colaboradoresUids', 'array-contains', usuario.uid))
             );

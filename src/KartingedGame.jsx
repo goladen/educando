@@ -113,8 +113,40 @@ function PantallaResultados({ resultado, recurso, usuario, onSalir }) {
     const [guardado, setGuardado] = useState(false);
     const [miPosicion, setMiPosicion] = useState(null);
     const [modalProfe, setModalProfe] = useState(false);
+    const [autoGuardado, setAutoGuardado] = useState(false);
 
-    useEffect(() => { cargarRanking(); }, []);
+    useEffect(() => {
+        cargarRanking();
+        autoGuardarInforme();
+    }, []);
+
+    const autoGuardarInforme = async () => {
+        try {
+            if (!recurso.profesorUid) return;
+            const profSnap = await getDoc(doc(db, 'users', recurso.profesorUid));
+            if (!profSnap.exists()) return;
+            const codigoProfesor = profSnap.data().codigoProfesor;
+            if (!codigoProfesor) return;
+
+            const nombre = usuario?.displayName || 'Anónimo';
+            const email  = usuario?.email || 'invitado';
+            const acertadas = resultado.acertadas ?? 0;
+            const falladas  = resultado.falladas  ?? 0;
+            const total     = acertadas + falladas;
+            const pct       = total > 0 ? Math.round(acertadas / total * 100) : 0;
+
+            await addDoc(collection(db, 'informes_juegos'), {
+                tipo: 'KARTINGED', modalidad: 'Individual', fecha: new Date(),
+                recursoId: recurso.id, recursoTitulo: recurso.titulo,
+                hoja: resultado.hoja, codigoProfesor,
+                jugadores: [{ nombre, email, hoja: resultado.hoja,
+                    tiempo: resultado.tiempo, tiempoFormateado: resultado.tiempoFormateado,
+                    puntos: resultado.puntos, posicion: resultado.posicion,
+                    intentos: total, aciertos: acertadas, fallos: falladas, porcentaje: pct }],
+            });
+            setAutoGuardado(true);
+        } catch (e) { console.error('Auto-save informe:', e); }
+    };
 
     const cargarRanking = async () => {
         try {
@@ -190,8 +222,23 @@ function PantallaResultados({ resultado, recurso, usuario, onSalir }) {
                 <div style={st.stat}><span>⏱ Tiempo</span><b>{resultado.tiempoFormateado}</b></div>
                 <div style={st.stat}><span>🏆 Puntos</span><b>{resultado.puntos}</b></div>
                 <div style={st.stat}><span>🚦 Posición</span><b>{resultado.posicion}º</b></div>
+                {resultado.acertadas != null && (
+                    <div style={st.stat}><span>✅ Acertadas</span><b style={{ color: '#2ecc71' }}>{resultado.acertadas}</b></div>
+                )}
+                {resultado.falladas != null && (
+                    <div style={st.stat}><span>❌ Falladas</span><b style={{ color: '#e74c3c' }}>{resultado.falladas}</b></div>
+                )}
+                {resultado.acertadas != null && resultado.falladas != null && resultado.acertadas + resultado.falladas > 0 && (
+                    <div style={st.stat}><span>📊 Acierto</span><b>{Math.round(resultado.acertadas / (resultado.acertadas + resultado.falladas) * 100)}%</b></div>
+                )}
                 <div style={{ ...st.stat, borderBottom: 'none' }}><span>📚 Recurso</span><b style={{ maxWidth: 200, textAlign: 'right', fontSize: '0.9rem' }}>{recurso.titulo} — {resultado.hoja}</b></div>
             </div>
+
+            {autoGuardado && (
+                <div style={{ color: '#2ecc71', fontSize: '0.82rem', marginBottom: 8 }}>
+                    ✅ Informe enviado al profesor automáticamente
+                </div>
+            )}
 
             <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap', justifyContent: 'center' }}>
                 {!guardado
@@ -238,11 +285,18 @@ function ModalEnviarProfe({ resultado, recurso, onClose }) {
         try {
             const codigoDoc = await getDoc(doc(db, 'codigos_profesor', code));
             if (!codigoDoc.exists()) { setError('Código no encontrado.'); setEnviando(false); return; }
+            const acertadas = resultado.acertadas ?? 0;
+            const falladas  = resultado.falladas  ?? 0;
+            const total     = acertadas + falladas;
+            const pct       = total > 0 ? Math.round(acertadas / total * 100) : 0;
             await addDoc(collection(db, 'informes_juegos'), {
                 tipo: 'KARTINGED', modalidad: 'Individual', fecha: new Date(),
                 recursoId: recurso.id, recursoTitulo: recurso.titulo,
                 hoja: resultado.hoja, codigoProfesor: code,
-                jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), tiempo: resultado.tiempo, tiempoFormateado: resultado.tiempoFormateado, puntos: resultado.puntos, posicion: resultado.posicion, hoja: resultado.hoja }],
+                jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), hoja: resultado.hoja,
+                    tiempo: resultado.tiempo, tiempoFormateado: resultado.tiempoFormateado,
+                    puntos: resultado.puntos, posicion: resultado.posicion,
+                    intentos: total, aciertos: acertadas, fallos: falladas, porcentaje: pct }],
             });
             setEnviado(true);
         } catch (e) { setError('Error: ' + e.message); }

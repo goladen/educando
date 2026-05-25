@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import Confetti from 'react-confetti';
 import { db } from '../firebase';
-import { collection, addDoc, doc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, getDoc, setDoc, onSnapshot, updateDoc, increment } from 'firebase/firestore';
 import correctSoundFile from '../assets/correct-choice-43861.mp3';
 import wrongSoundFile   from '../assets/negative_beeps-6008.mp3';
 
@@ -255,7 +256,7 @@ const SvgShape = ({ s, fill, stroke = '#555', strokeWidth = 1, opacity = 1, filt
 const inp = { width:'100%', padding:'9px 12px', borderRadius:9, border:'1.5px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.08)', color:'#f1f5f9', fontSize:'0.92rem', outline:'none', boxSizing:'border-box' };
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function BiologiaApp({ onBack }) {
+function BiologiaAppInner({ onBack, onCreateLive, onJoinLive }) {
   const [pantalla,    setPantalla]    = useState('intro');
   const [modoJuego,   setModoJuego]   = useState('cuerpo');
   const [nivel,       setNivel]       = useState('basico');
@@ -274,6 +275,8 @@ export default function BiologiaApp({ onBack }) {
   const [mCurso,      setMCurso]      = useState('');
   const [mCodigo,     setMCodigo]     = useState('');
   const [enviando,    setEnviando]    = useState(false);
+  const [joinCode,    setJoinCode]    = useState('');
+  const [joinName,    setJoinName]    = useState('');
 
   const timerRef = useRef(null);
   const inputRef = useRef(null);
@@ -359,6 +362,13 @@ export default function BiologiaApp({ onBack }) {
       setModalEnviar(false); setMNombre(''); setMCurso(''); setMCodigo('');
     } catch (e) { alert('Error: ' + e.message); }
     setEnviando(false);
+  };
+
+  const handleUnirse = () => {
+    const code = joinCode.trim().toUpperCase();
+    if (code.length !== 6) return alert('El código debe tener 6 caracteres.');
+    if (!joinName.trim()) return alert('Introduce tu nombre.');
+    onJoinLive?.(code, { displayName: joinName.trim(), uid: 'guest_' + Math.random().toString(36).substr(2, 8) });
   };
 
   // ── SVG render ──────────────────────────────────────────────────────────────
@@ -489,6 +499,23 @@ export default function BiologiaApp({ onBack }) {
         }}>
           ▶ Empezar Test — {pool.length} elementos
         </button>
+
+        {/* ── Live mode ──────────────────────────────────────────────────── */}
+        <div style={{ ...card, marginTop:14, borderColor:'rgba(220,38,38,0.25)', background:'rgba(220,38,38,0.04)' }}>
+          <div style={{ fontSize:'0.78rem', color:'#94a3b8', marginBottom:10, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em' }}>🔴 Juego en Vivo</div>
+          {onCreateLive && (
+            <button onClick={onCreateLive} style={{ width:'100%', padding:'11px', background:'linear-gradient(135deg,#dc2626,#b91c1c)', color:'white', border:'none', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:'0.88rem', marginBottom:10 }}>
+              🔴 Crear Partida en Vivo
+            </button>
+          )}
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            <input value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} placeholder="CÓDIGO DE SALA" style={{ ...inp, textTransform:'uppercase', letterSpacing:3, textAlign:'center' }} maxLength={6} />
+            <input value={joinName} onChange={e => setJoinName(e.target.value)} placeholder="Tu nombre" style={inp} />
+            <button onClick={handleUnirse} disabled={!joinCode || !joinName} style={{ width:'100%', padding:'10px', background:(!joinCode||!joinName)?'rgba(59,130,246,0.3)':'rgba(59,130,246,0.8)', color:'white', border:'none', borderRadius:9, cursor:(!joinCode||!joinName)?'not-allowed':'pointer', fontWeight:600, fontSize:'0.85rem' }}>
+              🎮 Unirse a Partida
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -669,4 +696,559 @@ export default function BiologiaApp({ onBack }) {
   }
 
   return null;
+}
+
+// ── Live mode helpers ─────────────────────────────────────────────────────────
+function genCodeBio() {
+  return Math.random().toString(36).substr(2, 6).toUpperCase();
+}
+
+const SECCIONES_BIO = [
+  { id:'cuerpo',          label:'Partes del Cuerpo',           emoji:'🧍', color:'#d97706' },
+  { id:'musculos_basico', label:'Músculos (básico)',            emoji:'💪', color:'#dc2626' },
+  { id:'musculos_medio',  label:'Músculos (medio)',             emoji:'💪', color:'#b91c1c' },
+  { id:'musculos_avanzado',label:'Músculos (avanzado)',         emoji:'💪', color:'#991b1b' },
+  { id:'huesos_basico',   label:'Huesos (básico)',              emoji:'🦴', color:'#64748b' },
+  { id:'huesos_medio',    label:'Huesos (medio)',               emoji:'🦴', color:'#475569' },
+  { id:'huesos_avanzado', label:'Huesos (avanzado)',            emoji:'🦴', color:'#334155' },
+  { id:'circulatorio',    label:'Sistema Circulatorio',         emoji:'🫀', color:'#b91c1c' },
+  { id:'digestivo',       label:'Sistema Digestivo',            emoji:'🍽️', color:'#b45309' },
+  { id:'respiratorio',    label:'Sistema Respiratorio',         emoji:'🫁', color:'#0284c7' },
+];
+
+function getPoolBio(seccionId) {
+  if (seccionId === 'cuerpo')           return CUERPO_PARTES;
+  if (seccionId === 'musculos_basico')  return MUSCULOS_BASE;
+  if (seccionId === 'musculos_medio')   return [...MUSCULOS_BASE, ...MUSCULOS_EXTRA_MEDIO];
+  if (seccionId === 'musculos_avanzado')return [...MUSCULOS_BASE, ...MUSCULOS_EXTRA_MEDIO, ...MUSCULOS_EXTRA_PRO];
+  if (seccionId === 'huesos_basico')    return HUESOS_BASE;
+  if (seccionId === 'huesos_medio')     return [...HUESOS_BASE, ...HUESOS_EXTRA_MEDIO];
+  if (seccionId === 'huesos_avanzado')  return [...HUESOS_BASE, ...HUESOS_EXTRA_MEDIO, ...HUESOS_EXTRA_PRO];
+  if (seccionId === 'circulatorio')     return CIRCULATORIO;
+  if (seccionId === 'digestivo')        return DIGESTIVO;
+  if (seccionId === 'respiratorio')     return RESPIRATORIO;
+  return [];
+}
+
+function getModoNivelBio(seccionId) {
+  if (seccionId === 'cuerpo')           return { modo:'cuerpo',       nivel:'basico' };
+  if (seccionId === 'musculos_basico')  return { modo:'musculos',     nivel:'basico' };
+  if (seccionId === 'musculos_medio')   return { modo:'musculos',     nivel:'medio'  };
+  if (seccionId === 'musculos_avanzado')return { modo:'musculos',     nivel:'avanzado'};
+  if (seccionId === 'huesos_basico')    return { modo:'huesos',       nivel:'basico' };
+  if (seccionId === 'huesos_medio')     return { modo:'huesos',       nivel:'medio'  };
+  if (seccionId === 'huesos_avanzado')  return { modo:'huesos',       nivel:'avanzado'};
+  if (seccionId === 'circulatorio')     return { modo:'circulatorio', nivel:'basico' };
+  if (seccionId === 'digestivo')        return { modo:'digestivo',    nivel:'basico' };
+  if (seccionId === 'respiratorio')     return { modo:'respiratorio', nivel:'basico' };
+  return { modo:'cuerpo', nivel:'basico' };
+}
+
+function generarPreguntasBio(config) {
+  const preguntas = [];
+  config.forEach(({ seccionId, cantidad, tipo }) => {
+    const pool = getPoolBio(seccionId);
+    const { modo, nivel } = getModoNivelBio(seccionId);
+    const shuffled = shuffle([...pool]).slice(0, cantidad);
+    shuffled.forEach(elem => {
+      const opciones = tipo === 'seleccionar'
+        ? shuffle([elem, ...shuffle(pool.filter(p => p.id !== elem.id)).slice(0, 3)]).map(o => o.nombre)
+        : null;
+      preguntas.push({ seccionId, modo, nivel, elementoId: elem.id, elementoNombre: elem.nombre, shape: elem.shape, tipo, opciones });
+    });
+  });
+  return shuffle(preguntas);
+}
+
+// ── Live SVG body (standalone) ────────────────────────────────────────────────
+function BodySVGLive({ modo, nivel, highlightId, feedbackOk }) {
+  const pool = getPool(modo, nivel);
+  const color = SYSTEM_COLOR[modo] || '#64748b';
+  const highlightElem = pool.find(e => e.id === highlightId);
+  return (
+    <svg viewBox="0 0 280 500" style={{ width:'100%', maxWidth:220, display:'block', margin:'0 auto' }}>
+      {BG_SHAPES.map((s, i) => <SvgShape key={i} s={s} fill="rgba(100,116,139,0.18)" stroke="#334155" />)}
+      {pool.map(e => {
+        const isHL = e.id === highlightId;
+        return (
+          <SvgShape key={e.id} s={e.shape}
+            fill={isHL ? (feedbackOk === true ? '#22c55e' : feedbackOk === false ? '#ef4444' : color) : 'rgba(100,116,139,0.22)'}
+            stroke={isHL ? '#fff' : '#475569'}
+            strokeWidth={isHL ? 2.5 : 1}
+            opacity={isHL ? 1 : 0.5}
+          />
+        );
+      })}
+      {highlightElem && (
+        <text x="140" y="498" textAnchor="middle" fill="#f1f5f9" fontSize="11" fontWeight="600">{highlightElem.nombre}</text>
+      )}
+    </svg>
+  );
+}
+
+// ── Config Modal ──────────────────────────────────────────────────────────────
+function ModalLiveBioConfig({ onClose, onCrear }) {
+  const [config, setConfig] = useState(
+    SECCIONES_BIO.map(s => ({ seccionId: s.id, cantidad: 0, tipo: 'seleccionar' }))
+  );
+  const [tiempo, setTiempo] = useState(20);
+  const [creando, setCreando] = useState(false);
+
+  const total = config.reduce((s, c) => s + c.cantidad, 0);
+
+  const setCantidad = (idx, val) => {
+    setConfig(prev => prev.map((c, i) => i === idx ? { ...c, cantidad: Math.max(0, val) } : c));
+  };
+  const setTipo = (idx, val) => {
+    setConfig(prev => prev.map((c, i) => i === idx ? { ...c, tipo: val } : c));
+  };
+
+  const handleCrear = async () => {
+    if (total === 0) return alert('Añade al menos una pregunta.');
+    setCreando(true);
+    try {
+      const codigo = genCodeBio();
+      const preguntas = generarPreguntasBio(config.filter(c => c.cantidad > 0));
+      await setDoc(doc(db, 'live_games', codigo), {
+        tipoJuego: 'biologia',
+        estado: 'LOBBY',
+        fasePregunta: null,
+        jugadores: {},
+        preguntas,
+        respuestasRonda: {},
+        indicePregunta: 0,
+        questionStartTime: null,
+        tiempo,
+        creadoEn: Date.now(),
+      });
+      onCrear(codigo);
+    } catch (e) {
+      alert('Error creando partida: ' + e.message);
+    }
+    setCreando(false);
+  };
+
+  const overlay = { position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:16 };
+  const modal   = { background:'#1e293b', borderRadius:16, padding:24, width:'100%', maxWidth:480, maxHeight:'90vh', overflowY:'auto', border:'1px solid rgba(255,255,255,0.1)' };
+  const row     = { display:'flex', alignItems:'center', gap:8, padding:'8px 0', borderBottom:'1px solid rgba(255,255,255,0.06)' };
+  const numBtn  = { width:28, height:28, borderRadius:6, border:'none', background:'rgba(255,255,255,0.1)', color:'#f1f5f9', cursor:'pointer', fontSize:'1rem', fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center' };
+  const selBtn  = (active) => ({ padding:'3px 8px', borderRadius:6, border:'none', fontSize:'0.72rem', fontWeight:600, cursor:'pointer', background: active ? 'rgba(99,102,241,0.7)' : 'rgba(255,255,255,0.08)', color: active ? '#fff' : '#94a3b8' });
+
+  return (
+    <div style={overlay} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={modal}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+          <h3 style={{ margin:0, color:'#f1f5f9', fontSize:'1.05rem' }}>🔴 Configurar Partida en Vivo</h3>
+          <button onClick={onClose} style={{ background:'none', border:'none', color:'#94a3b8', fontSize:'1.4rem', cursor:'pointer', lineHeight:1 }}>×</button>
+        </div>
+
+        <div style={{ marginBottom:16 }}>
+          {SECCIONES_BIO.map((sec, idx) => (
+            <div key={sec.id} style={row}>
+              <span style={{ flex:1, fontSize:'0.82rem', color:'#e2e8f0' }}>{sec.emoji} {sec.label}</span>
+              <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                <button style={numBtn} onClick={() => setCantidad(idx, config[idx].cantidad - 1)}>−</button>
+                <span style={{ width:20, textAlign:'center', color:'#f1f5f9', fontWeight:700, fontSize:'0.9rem' }}>{config[idx].cantidad}</span>
+                <button style={numBtn} onClick={() => setCantidad(idx, config[idx].cantidad + 1)}>+</button>
+              </div>
+              {config[idx].cantidad > 0 && (
+                <div style={{ display:'flex', gap:3 }}>
+                  <button style={selBtn(config[idx].tipo === 'seleccionar')} onClick={() => setTipo(idx, 'seleccionar')}>SEL</button>
+                  <button style={selBtn(config[idx].tipo === 'escribir')} onClick={() => setTipo(idx, 'escribir')}>ESC</button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:18 }}>
+          <span style={{ color:'#94a3b8', fontSize:'0.82rem' }}>⏱ Tiempo por pregunta:</span>
+          {[10,15,20,30,45].map(t => (
+            <button key={t} onClick={() => setTiempo(t)} style={{ padding:'4px 10px', borderRadius:7, border:'none', background: tiempo===t ? '#6366f1' : 'rgba(255,255,255,0.1)', color:'#f1f5f9', cursor:'pointer', fontWeight: tiempo===t?700:400, fontSize:'0.82rem' }}>{t}s</button>
+          ))}
+        </div>
+
+        <div style={{ display:'flex', gap:10 }}>
+          <button onClick={handleCrear} disabled={creando || total === 0} style={{ flex:1, padding:'12px', background: total===0?'rgba(220,38,38,0.3)':'linear-gradient(135deg,#dc2626,#b91c1c)', color:'#fff', border:'none', borderRadius:10, cursor: total===0?'not-allowed':'pointer', fontWeight:700, fontSize:'0.9rem' }}>
+            {creando ? 'Creando...' : `Crear Partida (${total} preg.)`}
+          </button>
+          <button onClick={onClose} style={{ padding:'12px 18px', background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.12)', color:'#94a3b8', borderRadius:10, cursor:'pointer' }}>Cancelar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Host component ────────────────────────────────────────────────────────────
+function BiologiaLiveHost({ codigo, onSalir }) {
+  const [gameState, setGameState] = useState(null);
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'live_games', codigo), snap => {
+      if (snap.exists()) setGameState(snap.data());
+    });
+    return () => { unsub(); clearInterval(timerRef.current); };
+  }, [codigo]);
+
+  const gameRef = doc(db, 'live_games', codigo);
+
+  const empezar = async () => {
+    await updateDoc(gameRef, { estado: 'COUNTDOWN' });
+    let c = 3;
+    const iv = setInterval(async () => {
+      c--;
+      if (c <= 0) {
+        clearInterval(iv);
+        await updateDoc(gameRef, { estado: 'JUEGO', fasePregunta: 'RESPONDING', indicePregunta: 0, questionStartTime: Date.now(), respuestasRonda: {} });
+      }
+    }, 1000);
+  };
+
+  const revelar = async () => {
+    if (!gameState) return;
+    clearInterval(timerRef.current);
+    const { preguntas, indicePregunta, respuestasRonda, jugadores, tiempo } = gameState;
+    const pregunta = preguntas[indicePregunta];
+    const updates = {};
+    const totalTiempo = (tiempo || 20) * 1000;
+    const now = Date.now();
+    Object.entries(respuestasRonda || {}).forEach(([uid, resp]) => {
+      if (resp.processed) return;
+      const elapsed = Math.min(now - (gameState.questionStartTime || now), totalTiempo);
+      const ratio = Math.max(0, 1 - elapsed / totalTiempo);
+      const correct = norm(resp.respuesta) === norm(pregunta.elementoNombre);
+      const puntosGanados = correct ? Math.round(500 + 500 * ratio) : 0;
+      updates[`respuestasRonda.${uid}.correct`] = correct;
+      updates[`respuestasRonda.${uid}.ratio`] = ratio;
+      updates[`respuestasRonda.${uid}.puntosGanados`] = puntosGanados;
+      updates[`respuestasRonda.${uid}.processed`] = true;
+      if (puntosGanados > 0) updates[`jugadores.${uid}.puntos`] = increment(puntosGanados);
+    });
+    updates.fasePregunta = 'REVEAL';
+    await updateDoc(gameRef, updates);
+  };
+
+  const siguiente = async () => {
+    if (!gameState) return;
+    const { preguntas, indicePregunta } = gameState;
+    const next = indicePregunta + 1;
+    if (next >= preguntas.length) {
+      await updateDoc(gameRef, { estado: 'FIN', fasePregunta: null });
+    } else {
+      await updateDoc(gameRef, { fasePregunta: 'RESPONDING', indicePregunta: next, questionStartTime: Date.now(), respuestasRonda: {} });
+    }
+  };
+
+  useEffect(() => {
+    if (!gameState || gameState.fasePregunta !== 'RESPONDING') { clearInterval(timerRef.current); return; }
+    const tiempo = (gameState.tiempo || 20) * 1000;
+    clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      const elapsed = Date.now() - (gameState.questionStartTime || Date.now());
+      if (elapsed >= tiempo) revelar();
+    }, 500);
+    return () => clearInterval(timerRef.current);
+  }, [gameState?.fasePregunta, gameState?.indicePregunta]);
+
+  if (!gameState) return <div style={{ color:'#94a3b8', textAlign:'center', padding:40 }}>Cargando...</div>;
+
+  const { estado, fasePregunta, jugadores = {}, preguntas = [], indicePregunta = 0, respuestasRonda = {}, tiempo: tSeg = 20 } = gameState;
+  const jugadoresArr = Object.entries(jugadores).sort((a, b) => b[1].puntos - a[1].puntos);
+  const preguntaActual = preguntas[indicePregunta];
+  const respondidos = Object.values(respuestasRonda).filter(r => r.processed !== undefined || r.respuesta).length;
+  const totalJugadores = Object.keys(jugadores).length;
+
+  const sH = {
+    wrap: { minHeight:'100vh', background:'linear-gradient(135deg,#0f172a,#1e1b4b)', padding:16, color:'#f1f5f9', fontFamily:'system-ui,sans-serif' },
+    card: { background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:14, padding:16, marginBottom:12 },
+    btn:  { padding:'12px 20px', border:'none', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:'0.9rem' },
+    h2:   { margin:'0 0 12px', fontSize:'1.1rem', color:'#e2e8f0' },
+  };
+
+  return (
+    <div style={sH.wrap}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+        <div>
+          <h2 style={{ margin:0, fontSize:'1.2rem' }}>🔴 Biología en Vivo</h2>
+          <div style={{ fontSize:'0.75rem', color:'#94a3b8' }}>Código: <span style={{ fontWeight:700, letterSpacing:3, color:'#f1f5f9' }}>{codigo}</span></div>
+        </div>
+        <button onClick={onSalir} style={{ ...sH.btn, background:'rgba(255,255,255,0.08)', color:'#94a3b8', padding:'8px 14px' }}>Salir</button>
+      </div>
+
+      {estado === 'LOBBY' && (
+        <div style={sH.card}>
+          <h3 style={sH.h2}>Sala de espera</h3>
+          <p style={{ color:'#94a3b8', fontSize:'0.85rem' }}>Jugadores conectados: {totalJugadores}</p>
+          {jugadoresArr.map(([uid, j]) => (
+            <div key={uid} style={{ padding:'6px 10px', background:'rgba(255,255,255,0.06)', borderRadius:8, marginBottom:4, fontSize:'0.85rem' }}>{j.nombre}</div>
+          ))}
+          <button onClick={empezar} disabled={totalJugadores === 0} style={{ ...sH.btn, marginTop:12, background: totalJugadores===0?'rgba(220,38,38,0.3)':'linear-gradient(135deg,#dc2626,#b91c1c)', color:'#fff', width:'100%' }}>
+            {totalJugadores === 0 ? 'Esperando jugadores...' : `Empezar (${totalJugadores} jugadores)`}
+          </button>
+        </div>
+      )}
+
+      {estado === 'COUNTDOWN' && (
+        <div style={{ ...sH.card, textAlign:'center', padding:40 }}>
+          <div style={{ fontSize:'3rem', fontWeight:900, color:'#dc2626' }}>3...</div>
+          <div style={{ color:'#94a3b8' }}>Preparaos</div>
+        </div>
+      )}
+
+      {estado === 'JUEGO' && preguntaActual && (
+        <div style={sH.card}>
+          <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
+            <span style={{ fontSize:'0.8rem', color:'#94a3b8' }}>Pregunta {indicePregunta + 1} / {preguntas.length}</span>
+            <span style={{ fontSize:'0.8rem', color:'#94a3b8' }}>Respondidos: {respondidos}/{totalJugadores}</span>
+          </div>
+          <BodySVGLive modo={preguntaActual.modo} nivel={preguntaActual.nivel} highlightId={preguntaActual.elementoId} feedbackOk={fasePregunta === 'REVEAL' ? true : null} />
+          <p style={{ textAlign:'center', fontWeight:700, marginTop:8, color:'#e2e8f0' }}>¿Qué parte es esta?</p>
+          {fasePregunta === 'RESPONDING' && (
+            <button onClick={revelar} style={{ ...sH.btn, width:'100%', marginTop:8, background:'rgba(220,38,38,0.7)', color:'#fff' }}>
+              Revelar respuesta
+            </button>
+          )}
+          {fasePregunta === 'REVEAL' && (
+            <>
+              <div style={{ textAlign:'center', background:'rgba(34,197,94,0.15)', borderRadius:10, padding:10, marginTop:8, fontWeight:700, color:'#4ade80' }}>
+                ✓ {preguntaActual.elementoNombre}
+              </div>
+              <div style={{ marginTop:10 }}>
+                {jugadoresArr.map(([uid, j]) => {
+                  const r = respuestasRonda[uid];
+                  return (
+                    <div key={uid} style={{ display:'flex', justifyContent:'space-between', padding:'5px 8px', background:'rgba(255,255,255,0.04)', borderRadius:7, marginBottom:3, fontSize:'0.82rem' }}>
+                      <span>{j.nombre}</span>
+                      <span style={{ color: r?.correct ? '#4ade80' : '#f87171', fontWeight:600 }}>
+                        {r ? (r.correct ? `+${r.puntosGanados}` : 'Incorrecto') : 'Sin resp.'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              <button onClick={siguiente} style={{ ...sH.btn, width:'100%', marginTop:12, background:'linear-gradient(135deg,#6366f1,#4f46e5)', color:'#fff' }}>
+                {indicePregunta + 1 < preguntas.length ? 'Siguiente pregunta →' : 'Ver resultados finales'}
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {estado === 'FIN' && (
+        <div style={sH.card}>
+          <h3 style={{ ...sH.h2, textAlign:'center' }}>🏆 Resultados finales</h3>
+          {jugadoresArr.map(([uid, j], i) => (
+            <div key={uid} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 12px', background:'rgba(255,255,255,0.05)', borderRadius:10, marginBottom:6 }}>
+              <span style={{ fontSize:'1.2rem' }}>{['🥇','🥈','🥉'][i] || `${i+1}.`}</span>
+              <span style={{ flex:1 }}>{j.nombre}</span>
+              <span style={{ fontWeight:700, color:'#fbbf24' }}>{j.puntos} pts</span>
+            </div>
+          ))}
+          <button onClick={onSalir} style={{ ...sH.btn, width:'100%', marginTop:14, background:'rgba(255,255,255,0.1)', color:'#f1f5f9' }}>Volver</button>
+        </div>
+      )}
+
+      {(estado === 'JUEGO' || estado === 'FIN') && (
+        <div style={sH.card}>
+          <h4 style={{ margin:'0 0 8px', fontSize:'0.85rem', color:'#94a3b8' }}>Clasificación</h4>
+          {jugadoresArr.map(([uid, j], i) => (
+            <div key={uid} style={{ display:'flex', justifyContent:'space-between', padding:'4px 8px', fontSize:'0.82rem' }}>
+              <span>{i+1}. {j.nombre}</span>
+              <span style={{ fontWeight:700, color:'#fbbf24' }}>{j.puntos} pts</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Client question ───────────────────────────────────────────────────────────
+function BioClientPregunta({ pregunta, tiempo, questionStartTime, uid, gameRef, respuestasRonda }) {
+  const [respuesta, setRespuesta] = useState('');
+  const [enviada, setEnviada] = useState(false);
+  const [tiempoLeft, setTiempoLeft] = useState(tiempo);
+
+  useEffect(() => {
+    setRespuesta(''); setEnviada(false); setTiempoLeft(tiempo);
+  }, [pregunta?.elementoId]);
+
+  useEffect(() => {
+    const iv = setInterval(() => {
+      const elapsed = (Date.now() - (questionStartTime || Date.now())) / 1000;
+      setTiempoLeft(Math.max(0, tiempo - elapsed));
+    }, 200);
+    return () => clearInterval(iv);
+  }, [questionStartTime, tiempo]);
+
+  const yaRespondio = enviada || !!respuestasRonda?.[uid]?.respuesta;
+
+  const enviar = async (resp) => {
+    if (yaRespondio) return;
+    setEnviada(true);
+    await updateDoc(gameRef, { [`respuestasRonda.${uid}.respuesta`]: resp, [`respuestasRonda.${uid}.timestamp`]: Date.now() });
+  };
+
+  const ratio = tiempoLeft / tiempo;
+  const barColor = ratio > 0.5 ? '#22c55e' : ratio > 0.25 ? '#f59e0b' : '#ef4444';
+
+  const sec = SECCIONES_BIO.find(s => s.id === pregunta.seccionId);
+  const color = sec?.color || '#dc2626';
+
+  return (
+    <div style={{ padding:16 }}>
+      <div style={{ height:6, borderRadius:3, background:'rgba(255,255,255,0.1)', marginBottom:12, overflow:'hidden' }}>
+        <div style={{ height:'100%', width:`${ratio*100}%`, background:barColor, borderRadius:3, transition:'width 0.2s' }} />
+      </div>
+      <div style={{ textAlign:'center', color:'#94a3b8', fontSize:'0.78rem', marginBottom:8 }}>{sec?.emoji} {sec?.label}</div>
+      <BodySVGLive modo={pregunta.modo} nivel={pregunta.nivel} highlightId={pregunta.elementoId} feedbackOk={null} />
+      <p style={{ textAlign:'center', fontWeight:700, color:'#e2e8f0', margin:'12px 0' }}>¿Qué parte del cuerpo es esta?</p>
+
+      {yaRespondio ? (
+        <div style={{ textAlign:'center', padding:16, color:'#4ade80', fontWeight:700 }}>✓ Respuesta enviada</div>
+      ) : pregunta.tipo === 'seleccionar' ? (
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+          {(pregunta.opciones || []).map(op => (
+            <button key={op} onClick={() => enviar(op)} style={{ padding:'12px 8px', background:' rgba(255,255,255,0.08)', border:`2px solid ${color}40`, borderRadius:10, color:'#f1f5f9', cursor:'pointer', fontWeight:600, fontSize:'0.82rem' }}>
+              {op}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div style={{ display:'flex', gap:8 }}>
+          <input
+            value={respuesta}
+            onChange={e => setRespuesta(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && respuesta.trim() && enviar(respuesta.trim())}
+            placeholder="Escribe el nombre..."
+            style={{ ...inp, flex:1 }}
+            autoFocus
+          />
+          <button onClick={() => enviar(respuesta.trim())} disabled={!respuesta.trim()} style={{ padding:'10px 16px', background: respuesta.trim()?color:'rgba(255,255,255,0.1)', border:'none', borderRadius:9, color:'#fff', cursor: respuesta.trim()?'pointer':'not-allowed', fontWeight:700 }}>
+            OK
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Client component ──────────────────────────────────────────────────────────
+function BiologiaLiveClient({ codigo, player, onSalir }) {
+  const [gameState, setGameState] = useState(null);
+  const joinedRef = useRef(false);
+  const uid = player.uid;
+  const gameRef = doc(db, 'live_games', codigo);
+
+  useEffect(() => {
+    const unsub = onSnapshot(gameRef, async snap => {
+      if (!snap.exists()) return;
+      const data = snap.data();
+      if (!joinedRef.current) {
+        joinedRef.current = true;
+        await updateDoc(gameRef, { [`jugadores.${uid}`]: { nombre: player.displayName, puntos: 0 } });
+      }
+      setGameState(data);
+    });
+    return unsub;
+  }, [codigo]);
+
+  if (!gameState) return <div style={{ color:'#94a3b8', textAlign:'center', padding:60, fontFamily:'system-ui,sans-serif' }}>Conectando...</div>;
+
+  const { estado, fasePregunta, jugadores = {}, preguntas = [], indicePregunta = 0, respuestasRonda = {}, questionStartTime, tiempo = 20 } = gameState;
+  const jugadoresArr = Object.entries(jugadores).sort((a, b) => b[1].puntos - a[1].puntos);
+  const preguntaActual = preguntas[indicePregunta];
+
+  const sH = {
+    wrap: { minHeight:'100vh', background:'linear-gradient(135deg,#0f172a,#1e1b4b)', color:'#f1f5f9', fontFamily:'system-ui,sans-serif' },
+    card: { background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:14, padding:16, margin:16 },
+  };
+
+  return (
+    <div style={sH.wrap}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 16px', borderBottom:'1px solid rgba(255,255,255,0.08)' }}>
+        <div style={{ fontSize:'0.85rem' }}>🔴 Biología en Vivo · <span style={{ color:'#94a3b8' }}>{player.displayName}</span></div>
+        <button onClick={onSalir} style={{ background:'none', border:'none', color:'#94a3b8', cursor:'pointer', fontSize:'0.8rem' }}>Salir</button>
+      </div>
+
+      {estado === 'LOBBY' && (
+        <div style={{ ...sH.card, textAlign:'center', padding:40 }}>
+          <div style={{ fontSize:'2rem', marginBottom:8 }}>⏳</div>
+          <p style={{ color:'#94a3b8' }}>Esperando a que el profesor inicie la partida...</p>
+          <p style={{ fontSize:'0.8rem', color:'#64748b' }}>Sala: <strong style={{ color:'#f1f5f9', letterSpacing:3 }}>{codigo}</strong></p>
+        </div>
+      )}
+
+      {estado === 'COUNTDOWN' && (
+        <div style={{ ...sH.card, textAlign:'center', padding:40 }}>
+          <div style={{ fontSize:'3rem', fontWeight:900, color:'#dc2626' }}>¡Preparados!</div>
+        </div>
+      )}
+
+      {estado === 'JUEGO' && preguntaActual && fasePregunta === 'RESPONDING' && (
+        <BioClientPregunta
+          pregunta={preguntaActual}
+          tiempo={tiempo}
+          questionStartTime={questionStartTime}
+          uid={uid}
+          gameRef={gameRef}
+          respuestasRonda={respuestasRonda}
+        />
+      )}
+
+      {estado === 'JUEGO' && fasePregunta === 'REVEAL' && preguntaActual && (
+        <div style={{ ...sH.card, textAlign:'center' }}>
+          <div style={{ fontSize:'0.8rem', color:'#94a3b8', marginBottom:8 }}>Respuesta correcta:</div>
+          <div style={{ fontSize:'1.3rem', fontWeight:700, color:'#4ade80', marginBottom:12 }}>✓ {preguntaActual.elementoNombre}</div>
+          {respuestasRonda[uid] && (
+            <div style={{ fontSize:'0.85rem', color: respuestasRonda[uid].correct ? '#4ade80' : '#f87171', fontWeight:600 }}>
+              {respuestasRonda[uid].correct ? `+${respuestasRonda[uid].puntosGanados} puntos` : 'Incorrecto'}
+            </div>
+          )}
+          <div style={{ marginTop:16, fontSize:'0.78rem', color:'#64748b' }}>Esperando siguiente pregunta...</div>
+        </div>
+      )}
+
+      {estado === 'FIN' && (
+        <div style={sH.card}>
+          <h3 style={{ textAlign:'center', margin:'0 0 14px', color:'#fbbf24' }}>🏆 ¡Partida terminada!</h3>
+          {jugadoresArr.map(([id, j], i) => (
+            <div key={id} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 12px', background: id===uid?'rgba(99,102,241,0.2)':'rgba(255,255,255,0.04)', borderRadius:10, marginBottom:6, border: id===uid?'1px solid rgba(99,102,241,0.4)':'1px solid transparent' }}>
+              <span>{['🥇','🥈','🥉'][i] || `${i+1}.`}</span>
+              <span style={{ flex:1 }}>{j.nombre} {id===uid?'(tú)':''}</span>
+              <span style={{ fontWeight:700, color:'#fbbf24' }}>{j.puntos} pts</span>
+            </div>
+          ))}
+          <button onClick={onSalir} style={{ width:'100%', marginTop:14, padding:'12px', background:'rgba(255,255,255,0.1)', border:'none', borderRadius:10, color:'#f1f5f9', cursor:'pointer', fontWeight:700 }}>Volver al inicio</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Export wrapper ────────────────────────────────────────────────────────────
+export default function BiologiaApp({ onBack }) {
+  const [liveConfig, setLiveConfig] = useState(false);
+  const [liveHost, setLiveHost]   = useState(null);
+  const [liveClient, setLiveClient] = useState(null);
+
+  if (liveHost)   return <BiologiaLiveHost   codigo={liveHost}          onSalir={() => setLiveHost(null)}   />;
+  if (liveClient) return <BiologiaLiveClient codigo={liveClient.codigo} player={liveClient.player} onSalir={() => setLiveClient(null)} />;
+
+  return (
+    <>
+      {liveConfig && (
+        <ModalLiveBioConfig
+          onClose={() => setLiveConfig(false)}
+          onCrear={codigo => { setLiveConfig(false); setLiveHost(codigo); }}
+        />
+      )}
+      <BiologiaAppInner
+        onBack={onBack}
+        onCreateLive={() => setLiveConfig(true)}
+        onJoinLive={(code, player) => setLiveClient({ codigo: code, player })}
+      />
+    </>
+  );
 }

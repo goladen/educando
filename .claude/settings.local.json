@@ -2,7 +2,15 @@
   "permissions": {
     "allow": [
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Asus  6\\\\educando\\\\src\" -Recurse -Name)",
-      "Bash(Select-Object -First 80)"
+      "Bash(Select-Object -First 80)",
+      "Bash(node --input-type=module)",
+      "Bash(npx --yes acorn --ecma2020 --module src/components/BiologiaApp.jsx)",
+      "Bash(npx acorn *)",
+      "Bash(node -e \"const fs = require\\('fs'\\); const content = fs.readFileSync\\('src/components/BiologiaApp.jsx', 'utf8'\\); const matches = [...content.matchAll\\(/export default/g\\)]; console.log\\('export default count:', matches.length\\); matches.forEach\\(\\(m, i\\) => { const line = content.substring\\(0, m.index\\).split\\('\\\\n'\\).length; console.log\\('  match', i+1, 'at line', line\\); }\\);\")",
+      "Bash(node -e \"const fs = require\\('fs'\\); const content = fs.readFileSync\\('src/components/GeografiaApp.jsx', 'utf8'\\); const matches = [...content.matchAll\\(/export default/g\\)]; console.log\\('export default count:', matches.length\\); matches.forEach\\(\\(m, i\\) => { const line = content.substring\\(0, m.index\\).split\\('\\\\n'\\).length; console.log\\('  match', i+1, 'at line', line\\); }\\);\")",
+      "Bash(node -e ' *)",
+      "Bash(curl -s http://localhost:5173/src/components/BiologiaApp.jsx)",
+      "Bash(kill %1)"
     ]
   }
 }

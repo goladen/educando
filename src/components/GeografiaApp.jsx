@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { db } from '../firebase';
-import { collection, addDoc, doc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, getDoc, setDoc, onSnapshot, updateDoc, increment } from 'firebase/firestore';
 import correctSoundFile from '../assets/correct-choice-43861.mp3';
 import wrongSoundFile   from '../assets/negative_beeps-6008.mp3';
 
@@ -559,7 +559,7 @@ const drawRio = (ctx, x1, y1, x2, y2) => {
 const inp = { width:'100%', padding:'9px 12px', borderRadius:9, border:'1.5px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.08)', color:'#f1f5f9', fontSize:'0.92rem', outline:'none', boxSizing:'border-box' };
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function GeografiaApp({ onBack }) {
+function GeografiaAppInner({ onBack, onCreateLive, onJoinLive }) {
   const [pantalla,          setPantalla]          = useState('intro');
   const [modoJuego,         setModoJuego]         = useState('mundo');
   const [continente,        setContinente]        = useState('Europa');
@@ -584,6 +584,8 @@ export default function GeografiaApp({ onBack }) {
   const [mCurso,            setMCurso]            = useState('');
   const [mCodigo,           setMCodigo]           = useState('');
   const [enviando,          setEnviando]          = useState(false);
+  const [joinCode,          setJoinCode]          = useState('');
+  const [joinName,          setJoinName]          = useState('');
 
   const canvasRef         = useRef(null);
   const timerRef          = useRef(null);
@@ -805,6 +807,13 @@ export default function GeografiaApp({ onBack }) {
       setMNombre(''); setMCurso(''); setMCodigo('');
     } catch (e) { alert('Error al enviar: ' + e.message); }
     setEnviando(false);
+  };
+
+  const handleUnirse = () => {
+    const code = joinCode.trim().toUpperCase();
+    if (code.length !== 6) return alert('El código debe tener 6 caracteres.');
+    if (!joinName.trim()) return alert('Introduce tu nombre.');
+    onJoinLive?.(code, { displayName: joinName.trim(), uid: 'guest_' + Math.random().toString(36).substr(2, 8) });
   };
 
   // ── Zoom + Pan ──────────────────────────────────────────────────────────────
@@ -1037,6 +1046,23 @@ export default function GeografiaApp({ onBack }) {
             style={{ width:'100%', padding:'14px 0', borderRadius:14, border:'none', background:'#3b82f6', color:'white', fontSize:'1.1rem', fontWeight:900, cursor: canStart ? 'pointer' : 'not-allowed', opacity: canStart ? 1 : 0.5 }}>
             {cargando ? '⏳ Cargando mapas…' : '¡Empezar!'}
           </button>
+
+          {/* Live mode */}
+          <div style={{ marginTop:16, borderTop:'1px solid rgba(255,255,255,0.1)', paddingTop:16 }}>
+            <div style={{ fontSize:'0.72rem', color:'rgba(255,255,255,0.45)', marginBottom:10, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em' }}>🔴 Juego en Vivo</div>
+            {onCreateLive && (
+              <button onClick={onCreateLive} style={{ width:'100%', padding:'11px', background:'linear-gradient(135deg,#dc2626,#b91c1c)', color:'white', border:'none', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:'0.88rem', marginBottom:10 }}>
+                🔴 Crear Partida en Vivo
+              </button>
+            )}
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              <input value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} placeholder="CÓDIGO DE SALA" style={{ width:'100%', padding:'9px 12px', borderRadius:9, border:'1.5px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.08)', color:'#f1f5f9', fontSize:'0.9rem', outline:'none', boxSizing:'border-box', textTransform:'uppercase', letterSpacing:3, textAlign:'center' }} maxLength={6} />
+              <input value={joinName} onChange={e => setJoinName(e.target.value)} placeholder="Tu nombre" style={{ width:'100%', padding:'9px 12px', borderRadius:9, border:'1.5px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.08)', color:'#f1f5f9', fontSize:'0.9rem', outline:'none', boxSizing:'border-box' }} />
+              <button onClick={handleUnirse} disabled={!joinCode || !joinName} style={{ width:'100%', padding:'10px', background:(!joinCode||!joinName)?'rgba(59,130,246,0.3)':'rgba(59,130,246,0.8)', color:'white', border:'none', borderRadius:9, cursor:(!joinCode||!joinName)?'not-allowed':'pointer', fontWeight:600, fontSize:'0.85rem' }}>
+                🎮 Unirse a Partida
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -1295,5 +1321,572 @@ export default function GeografiaApp({ onBack }) {
         </div>
       )}
     </div>
+  );
+}
+
+// ── Live mode helpers ─────────────────────────────────────────────────────────
+function genCodeGeo() {
+  return Math.random().toString(36).substr(2, 6).toUpperCase();
+}
+
+const SECCIONES_GEO = [
+  { id:'mundo_Europa',    label:'Países de Europa',       emoji:'🌍', pool: () => PAISES.filter(p => p.continente === 'Europa') },
+  { id:'mundo_América',   label:'Países de América',      emoji:'🌎', pool: () => PAISES.filter(p => p.continente === 'América') },
+  { id:'mundo_África',    label:'Países de África',       emoji:'🌍', pool: () => PAISES.filter(p => p.continente === 'África') },
+  { id:'mundo_Asia',      label:'Países de Asia',         emoji:'🌏', pool: () => PAISES.filter(p => p.continente === 'Asia') },
+  { id:'mundo_Oceanía',   label:'Países de Oceanía',      emoji:'🌏', pool: () => PAISES.filter(p => p.continente === 'Oceanía') },
+  { id:'provincias',      label:'Provincias de España',   emoji:'🗺️', pool: () => PROVINCIAS },
+  { id:'fisico_rios_España', label:'Ríos de España',       emoji:'🌊', pool: () => ELEMENTOS_GEO.filter(e => e.tipo === 'rio' && e.ambito === 'España') },
+  { id:'fisico_cord_España', label:'Cordilleras de España', emoji:'⛰️', pool: () => ELEMENTOS_GEO.filter(e => e.tipo === 'cordillera' && e.ambito === 'España') },
+  { id:'fisico_rios_Europa', label:'Ríos de Europa',       emoji:'🌊', pool: () => ELEMENTOS_GEO.filter(e => e.tipo === 'rio' && e.ambito === 'Europa') },
+  { id:'fisico_cord_Europa', label:'Cordilleras de Europa', emoji:'⛰️', pool: () => ELEMENTOS_GEO.filter(e => e.tipo === 'cordillera' && e.ambito === 'Europa') },
+  { id:'fisico_rios_América','label':'Ríos de América',    emoji:'🌊', pool: () => ELEMENTOS_GEO.filter(e => e.tipo === 'rio' && e.ambito === 'América') },
+  { id:'fisico_rios_África', label:'Ríos de África',       emoji:'🌊', pool: () => ELEMENTOS_GEO.filter(e => e.tipo === 'rio' && e.ambito === 'África') },
+  { id:'fisico_rios_Asia',   label:'Ríos de Asia',         emoji:'🌊', pool: () => ELEMENTOS_GEO.filter(e => e.tipo === 'rio' && e.ambito === 'Asia') },
+];
+
+function getSeccionGeo(id) { return SECCIONES_GEO.find(s => s.id === id); }
+
+function categoriaPorId(id) {
+  if (id.startsWith('mundo_'))    return 'mundo';
+  if (id === 'provincias')        return 'provincias';
+  if (id.startsWith('fisico_'))   return 'fisico';
+  return 'mundo';
+}
+
+function ambitoPorId(id) {
+  const parts = id.split('_');
+  if (id.startsWith('fisico_')) return parts[parts.length - 1];
+  if (id.startsWith('mundo_'))  return parts[1];
+  return 'España';
+}
+
+function tipoPorId(id) {
+  if (id.includes('_rios_'))  return 'rio';
+  if (id.includes('_cord_'))  return 'cordillera';
+  return null;
+}
+
+function generarPreguntasGeo(config) {
+  const preguntas = [];
+  config.forEach(({ seccionId, cantidad, tipo }) => {
+    const sec = getSeccionGeo(seccionId);
+    if (!sec) return;
+    const pool = sec.pool();
+    const shuffled = shuffle([...pool]).slice(0, cantidad);
+    shuffled.forEach(elem => {
+      const opciones = tipo === 'seleccionar'
+        ? shuffle([elem, ...shuffle(pool.filter(p => p.nombre !== elem.nombre)).slice(0, 3)]).map(o => o.nombre)
+        : null;
+      preguntas.push({
+        seccionId,
+        categoria: categoriaPorId(seccionId),
+        ambito: ambitoPorId(seccionId),
+        tipoElem: tipoPorId(seccionId),
+        nombre: elem.nombre,
+        nameEn: elem.nameEn,
+        nameAlt: elem.nameAlt,
+        lon: elem.lon, lat: elem.lat,
+        lon_inicio: elem.lon_inicio, lat_inicio: elem.lat_inicio,
+        lon_fin: elem.lon_fin, lat_fin: elem.lat_fin,
+        tipo,
+        opciones,
+      });
+    });
+  });
+  return shuffle(preguntas);
+}
+
+// ── Mini map canvas for live mode ─────────────────────────────────────────────
+function GeoLiveMapCanvas({ pregunta, worldFeats, espFeats, feedbackOk }) {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const { categoria, ambito, nombre, nameEn, nameAlt, tipoElem, lon, lat, lon_inicio, lat_inicio, lon_fin, lat_fin } = pregunta;
+
+    if (categoria === 'mundo' || categoria === 'provincias') {
+      const feats = categoria === 'provincias' ? espFeats : worldFeats;
+      if (!feats) { const ctx = canvas.getContext('2d'); ctx.fillStyle = '#1e3a5f'; ctx.fillRect(0, 0, canvas.width, canvas.height); return; }
+      const dummy = { nombre, nameEn, nameAlt };
+      const target = findFeature(feats, dummy);
+      let view;
+      if (target) {
+        view = categoria === 'provincias' ? provAutoView(target) : worldAutoView(target);
+      } else {
+        view = FISICO_VIEWS[ambito] || FISICO_VIEWS['Todo el mundo'];
+      }
+      renderMap(canvas, feats, target, view, categoria === 'provincias' ? '#d4e8f5' : '#bfdbfe', categoria === 'provincias' ? '#b8cdd8' : '#c5d4e0');
+      if (feedbackOk === false && target) {
+        const ctx = canvas.getContext('2d');
+        const { fwd } = makeProjFromView(view.lonC, view.latC, view.lonSpan, view.latSpan, canvas.width, canvas.height);
+        const bounds = getBoundsMain(target.geometry);
+        const cx = (bounds.minLon + bounds.maxLon) / 2;
+        const cy = (bounds.minLat + bounds.maxLat) / 2;
+        const { x, y } = fwd(cx, cy);
+        ctx.font = 'bold 22px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('❌', x, y);
+      }
+    } else {
+      // fisico
+      if (!worldFeats) return;
+      const view = FISICO_VIEWS[ambito] || FISICO_VIEWS['Todo el mundo'];
+      renderMap(canvas, worldFeats, null, view, '#bfdbfe', '#c5d4e0');
+      const { fwd } = makeProjFromView(view.lonC, view.latC, view.lonSpan, view.latSpan, canvas.width, canvas.height);
+      const ctx = canvas.getContext('2d');
+      if (tipoElem === 'rio' && lon_inicio != null) {
+        const { x: x1, y: y1 } = fwd(lon_inicio, lat_inicio);
+        const { x: x2, y: y2 } = fwd(lon_fin, lat_fin);
+        drawRio(ctx, x1, y1, x2, y2);
+      } else {
+        const { x, y } = fwd(lon, lat);
+        drawMarker(ctx, x, y, tipoElem || 'cordillera');
+      }
+    }
+  }, [pregunta, worldFeats, espFeats, feedbackOk]);
+
+  return <canvas ref={canvasRef} width={340} height={240} style={{ width:'100%', borderRadius:10, display:'block' }} />;
+}
+
+// ── Config Modal ──────────────────────────────────────────────────────────────
+function ModalLiveGeoConfig({ onClose, onCrear }) {
+  const [config, setConfig] = useState(
+    SECCIONES_GEO.map(s => ({ seccionId: s.id, cantidad: 0, tipo: 'seleccionar' }))
+  );
+  const [tiempo, setTiempo] = useState(20);
+  const [creando, setCreando] = useState(false);
+  const total = config.reduce((s, c) => s + c.cantidad, 0);
+
+  const setCantidad = (idx, val) => setConfig(prev => prev.map((c, i) => i === idx ? { ...c, cantidad: Math.max(0, val) } : c));
+  const setTipo     = (idx, val) => setConfig(prev => prev.map((c, i) => i === idx ? { ...c, tipo: val } : c));
+
+  const handleCrear = async () => {
+    if (total === 0) return alert('Añade al menos una pregunta.');
+    setCreando(true);
+    try {
+      const codigo = genCodeGeo();
+      const preguntas = generarPreguntasGeo(config.filter(c => c.cantidad > 0));
+      await setDoc(doc(db, 'live_games', codigo), {
+        tipoJuego: 'geografia',
+        estado: 'LOBBY',
+        fasePregunta: null,
+        jugadores: {},
+        preguntas,
+        respuestasRonda: {},
+        indicePregunta: 0,
+        questionStartTime: null,
+        tiempo,
+        creadoEn: Date.now(),
+      });
+      onCrear(codigo);
+    } catch (e) { alert('Error creando partida: ' + e.message); }
+    setCreando(false);
+  };
+
+  const overlay = { position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:16 };
+  const modal   = { background:'#0f172a', borderRadius:16, padding:24, width:'100%', maxWidth:480, maxHeight:'90vh', overflowY:'auto', border:'1px solid rgba(255,255,255,0.1)' };
+  const row     = { display:'flex', alignItems:'center', gap:8, padding:'7px 0', borderBottom:'1px solid rgba(255,255,255,0.06)' };
+  const numBtn  = { width:28, height:28, borderRadius:6, border:'none', background:'rgba(255,255,255,0.1)', color:'#f1f5f9', cursor:'pointer', fontSize:'1rem', fontWeight:700 };
+  const selBtn  = (active) => ({ padding:'3px 8px', borderRadius:6, border:'none', fontSize:'0.72rem', fontWeight:600, cursor:'pointer', background: active ? 'rgba(59,130,246,0.7)' : 'rgba(255,255,255,0.08)', color: active ? '#fff' : '#94a3b8' });
+
+  return (
+    <div style={overlay} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={modal}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+          <h3 style={{ margin:0, color:'#f1f5f9', fontSize:'1.05rem' }}>🔴 Configurar Partida de Geografía</h3>
+          <button onClick={onClose} style={{ background:'none', border:'none', color:'#94a3b8', fontSize:'1.4rem', cursor:'pointer' }}>×</button>
+        </div>
+        {SECCIONES_GEO.map((sec, idx) => (
+          <div key={sec.id} style={row}>
+            <span style={{ flex:1, fontSize:'0.8rem', color:'#e2e8f0' }}>{sec.emoji} {sec.label}</span>
+            <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+              <button style={numBtn} onClick={() => setCantidad(idx, config[idx].cantidad - 1)}>−</button>
+              <span style={{ width:20, textAlign:'center', color:'#f1f5f9', fontWeight:700, fontSize:'0.9rem' }}>{config[idx].cantidad}</span>
+              <button style={numBtn} onClick={() => setCantidad(idx, config[idx].cantidad + 1)}>+</button>
+            </div>
+            {config[idx].cantidad > 0 && (
+              <div style={{ display:'flex', gap:3 }}>
+                <button style={selBtn(config[idx].tipo === 'seleccionar')} onClick={() => setTipo(idx, 'seleccionar')}>SEL</button>
+                <button style={selBtn(config[idx].tipo === 'escribir')} onClick={() => setTipo(idx, 'escribir')}>ESC</button>
+              </div>
+            )}
+          </div>
+        ))}
+        <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:16, marginBottom:18, flexWrap:'wrap' }}>
+          <span style={{ color:'#94a3b8', fontSize:'0.82rem' }}>⏱ Tiempo:</span>
+          {[10,15,20,30,45].map(t => (
+            <button key={t} onClick={() => setTiempo(t)} style={{ padding:'4px 10px', borderRadius:7, border:'none', background: tiempo===t?'#3b82f6':'rgba(255,255,255,0.1)', color:'#f1f5f9', cursor:'pointer', fontWeight: tiempo===t?700:400, fontSize:'0.82rem' }}>{t}s</button>
+          ))}
+        </div>
+        <div style={{ display:'flex', gap:10 }}>
+          <button onClick={handleCrear} disabled={creando || total === 0} style={{ flex:1, padding:'12px', background: total===0?'rgba(59,130,246,0.3)':'linear-gradient(135deg,#1d4ed8,#1e40af)', color:'#fff', border:'none', borderRadius:10, cursor: total===0?'not-allowed':'pointer', fontWeight:700, fontSize:'0.9rem' }}>
+            {creando ? 'Creando...' : `Crear Partida (${total} preg.)`}
+          </button>
+          <button onClick={onClose} style={{ padding:'12px 18px', background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.12)', color:'#94a3b8', borderRadius:10, cursor:'pointer' }}>Cancelar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Host component ────────────────────────────────────────────────────────────
+function GeografiaLiveHost({ codigo, onSalir }) {
+  const [gameState, setGameState] = useState(null);
+  const [worldFeats, setWorldFeats] = useState(_worldCache);
+  const [espFeats,   setEspFeats]   = useState(_espCache);
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'live_games', codigo), snap => {
+      if (snap.exists()) setGameState(snap.data());
+    });
+    return () => { unsub(); clearInterval(timerRef.current); };
+  }, [codigo]);
+
+  useEffect(() => {
+    if (!_worldCache) fetch(WORLD_URL).then(r => r.json()).then(d => { _worldCache = d.features; setWorldFeats(d.features); });
+    else setWorldFeats(_worldCache);
+    if (!_espCache) fetch(ESP_PROV_URL).then(r => r.json()).then(d => { _espCache = d.features; setEspFeats(d.features); });
+    else setEspFeats(_espCache);
+  }, []);
+
+  const gameRef = doc(db, 'live_games', codigo);
+
+  const empezar = async () => {
+    await updateDoc(gameRef, { estado: 'COUNTDOWN' });
+    let c = 3;
+    const iv = setInterval(async () => {
+      c--;
+      if (c <= 0) {
+        clearInterval(iv);
+        await updateDoc(gameRef, { estado: 'JUEGO', fasePregunta: 'RESPONDING', indicePregunta: 0, questionStartTime: Date.now(), respuestasRonda: {} });
+      }
+    }, 1000);
+  };
+
+  const revelar = async () => {
+    if (!gameState) return;
+    clearInterval(timerRef.current);
+    const { preguntas, indicePregunta, respuestasRonda, tiempo: tSeg = 20 } = gameState;
+    const pregunta = preguntas[indicePregunta];
+    const updates = {};
+    const totalTiempo = tSeg * 1000;
+    const now = Date.now();
+    Object.entries(respuestasRonda || {}).forEach(([uid, resp]) => {
+      if (resp.processed) return;
+      const elapsed = Math.min(now - (gameState.questionStartTime || now), totalTiempo);
+      const ratio = Math.max(0, 1 - elapsed / totalTiempo);
+      const correct = norm(resp.respuesta) === norm(pregunta.nombre);
+      const puntosGanados = correct ? Math.round(500 + 500 * ratio) : 0;
+      updates[`respuestasRonda.${uid}.correct`] = correct;
+      updates[`respuestasRonda.${uid}.ratio`] = ratio;
+      updates[`respuestasRonda.${uid}.puntosGanados`] = puntosGanados;
+      updates[`respuestasRonda.${uid}.processed`] = true;
+      if (puntosGanados > 0) updates[`jugadores.${uid}.puntos`] = increment(puntosGanados);
+    });
+    updates.fasePregunta = 'REVEAL';
+    await updateDoc(gameRef, updates);
+  };
+
+  const siguiente = async () => {
+    if (!gameState) return;
+    const next = gameState.indicePregunta + 1;
+    if (next >= gameState.preguntas.length) {
+      await updateDoc(gameRef, { estado: 'FIN', fasePregunta: null });
+    } else {
+      await updateDoc(gameRef, { fasePregunta: 'RESPONDING', indicePregunta: next, questionStartTime: Date.now(), respuestasRonda: {} });
+    }
+  };
+
+  useEffect(() => {
+    if (!gameState || gameState.fasePregunta !== 'RESPONDING') { clearInterval(timerRef.current); return; }
+    const tSeg = gameState.tiempo || 20;
+    clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      if (Date.now() - (gameState.questionStartTime || Date.now()) >= tSeg * 1000) revelar();
+    }, 500);
+    return () => clearInterval(timerRef.current);
+  }, [gameState?.fasePregunta, gameState?.indicePregunta]);
+
+  if (!gameState) return <div style={{ color:'#94a3b8', textAlign:'center', padding:40, fontFamily:'system-ui,sans-serif' }}>Cargando...</div>;
+
+  const { estado, fasePregunta, jugadores = {}, preguntas = [], indicePregunta = 0, respuestasRonda = {} } = gameState;
+  const jugadoresArr = Object.entries(jugadores).sort((a, b) => b[1].puntos - a[1].puntos);
+  const preguntaActual = preguntas[indicePregunta];
+  const respondidos = Object.values(respuestasRonda).filter(r => r.respuesta).length;
+  const totalJugadores = Object.keys(jugadores).length;
+
+  const sH = {
+    wrap: { minHeight:'100vh', background:'linear-gradient(135deg,#0f172a,#1e3a5f)', padding:16, color:'#f1f5f9', fontFamily:'system-ui,sans-serif' },
+    card: { background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:14, padding:16, marginBottom:12 },
+    btn:  { padding:'12px 20px', border:'none', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:'0.9rem' },
+  };
+
+  return (
+    <div style={sH.wrap}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+        <div>
+          <h2 style={{ margin:0, fontSize:'1.1rem' }}>🔴 Geografía en Vivo</h2>
+          <div style={{ fontSize:'0.75rem', color:'#94a3b8' }}>Código: <span style={{ fontWeight:700, letterSpacing:3, color:'#f1f5f9' }}>{codigo}</span></div>
+        </div>
+        <button onClick={onSalir} style={{ ...sH.btn, background:'rgba(255,255,255,0.08)', color:'#94a3b8', padding:'8px 14px' }}>Salir</button>
+      </div>
+
+      {estado === 'LOBBY' && (
+        <div style={sH.card}>
+          <h3 style={{ margin:'0 0 10px', color:'#e2e8f0', fontSize:'1rem' }}>Sala de espera</h3>
+          <p style={{ color:'#94a3b8', fontSize:'0.85rem' }}>Jugadores: {totalJugadores}</p>
+          {jugadoresArr.map(([uid, j]) => (
+            <div key={uid} style={{ padding:'6px 10px', background:'rgba(255,255,255,0.06)', borderRadius:8, marginBottom:4, fontSize:'0.85rem' }}>{j.nombre}</div>
+          ))}
+          <button onClick={empezar} disabled={totalJugadores === 0} style={{ ...sH.btn, marginTop:12, background: totalJugadores===0?'rgba(59,130,246,0.3)':'linear-gradient(135deg,#1d4ed8,#1e40af)', color:'#fff', width:'100%' }}>
+            {totalJugadores === 0 ? 'Esperando jugadores...' : `Empezar (${totalJugadores} jugadores)`}
+          </button>
+        </div>
+      )}
+
+      {estado === 'COUNTDOWN' && (
+        <div style={{ ...sH.card, textAlign:'center', padding:40 }}>
+          <div style={{ fontSize:'3rem', fontWeight:900, color:'#3b82f6' }}>3...</div>
+        </div>
+      )}
+
+      {estado === 'JUEGO' && preguntaActual && (
+        <div style={sH.card}>
+          <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
+            <span style={{ fontSize:'0.8rem', color:'#94a3b8' }}>Pregunta {indicePregunta + 1}/{preguntas.length}</span>
+            <span style={{ fontSize:'0.8rem', color:'#94a3b8' }}>Respondidos: {respondidos}/{totalJugadores}</span>
+          </div>
+          <GeoLiveMapCanvas pregunta={preguntaActual} worldFeats={worldFeats} espFeats={espFeats} feedbackOk={fasePregunta === 'REVEAL' ? true : null} />
+          <p style={{ textAlign:'center', fontWeight:700, marginTop:8, color:'#e2e8f0' }}>
+            {preguntaActual.categoria === 'fisico' ? `¿Cómo se llama este ${preguntaActual.tipoElem === 'rio' ? 'río' : 'sistema montañoso'}?` : '¿Qué país/provincia es este?'}
+          </p>
+          {fasePregunta === 'RESPONDING' && (
+            <button onClick={revelar} style={{ ...sH.btn, width:'100%', marginTop:8, background:'rgba(59,130,246,0.7)', color:'#fff' }}>Revelar respuesta</button>
+          )}
+          {fasePregunta === 'REVEAL' && (
+            <>
+              <div style={{ textAlign:'center', background:'rgba(34,197,94,0.15)', borderRadius:10, padding:10, marginTop:8, fontWeight:700, color:'#4ade80' }}>✓ {preguntaActual.nombre}</div>
+              <div style={{ marginTop:10 }}>
+                {jugadoresArr.map(([uid, j]) => {
+                  const r = respuestasRonda[uid];
+                  return (
+                    <div key={uid} style={{ display:'flex', justifyContent:'space-between', padding:'5px 8px', background:'rgba(255,255,255,0.04)', borderRadius:7, marginBottom:3, fontSize:'0.82rem' }}>
+                      <span>{j.nombre}</span>
+                      <span style={{ color: r?.correct ? '#4ade80' : '#f87171', fontWeight:600 }}>
+                        {r ? (r.correct ? `+${r.puntosGanados}` : 'Incorrecto') : 'Sin resp.'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              <button onClick={siguiente} style={{ ...sH.btn, width:'100%', marginTop:12, background:'linear-gradient(135deg,#1d4ed8,#1e40af)', color:'#fff' }}>
+                {indicePregunta + 1 < preguntas.length ? 'Siguiente →' : 'Ver resultados'}
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {estado === 'FIN' && (
+        <div style={sH.card}>
+          <h3 style={{ textAlign:'center', margin:'0 0 14px' }}>🏆 Resultados</h3>
+          {jugadoresArr.map(([uid, j], i) => (
+            <div key={uid} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 12px', background:'rgba(255,255,255,0.05)', borderRadius:10, marginBottom:6 }}>
+              <span>{['🥇','🥈','🥉'][i] || `${i+1}.`}</span>
+              <span style={{ flex:1 }}>{j.nombre}</span>
+              <span style={{ fontWeight:700, color:'#fbbf24' }}>{j.puntos} pts</span>
+            </div>
+          ))}
+          <button onClick={onSalir} style={{ ...sH.btn, width:'100%', marginTop:14, background:'rgba(255,255,255,0.1)', color:'#f1f5f9' }}>Volver</button>
+        </div>
+      )}
+
+      {(estado === 'JUEGO' || estado === 'FIN') && (
+        <div style={sH.card}>
+          <h4 style={{ margin:'0 0 8px', fontSize:'0.85rem', color:'#94a3b8' }}>Clasificación</h4>
+          {jugadoresArr.map(([uid, j], i) => (
+            <div key={uid} style={{ display:'flex', justifyContent:'space-between', padding:'4px 8px', fontSize:'0.82rem' }}>
+              <span>{i+1}. {j.nombre}</span>
+              <span style={{ fontWeight:700, color:'#fbbf24' }}>{j.puntos} pts</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Client question ───────────────────────────────────────────────────────────
+function GeoClientPregunta({ pregunta, tiempo, questionStartTime, uid, gameRef, respuestasRonda, worldFeats, espFeats }) {
+  const [respuesta, setRespuesta] = useState('');
+  const [enviada, setEnviada] = useState(false);
+  const [tiempoLeft, setTiempoLeft] = useState(tiempo);
+
+  useEffect(() => { setRespuesta(''); setEnviada(false); setTiempoLeft(tiempo); }, [pregunta?.nombre]);
+
+  useEffect(() => {
+    const iv = setInterval(() => {
+      setTiempoLeft(Math.max(0, tiempo - (Date.now() - (questionStartTime || Date.now())) / 1000));
+    }, 200);
+    return () => clearInterval(iv);
+  }, [questionStartTime, tiempo]);
+
+  const yaRespondio = enviada || !!respuestasRonda?.[uid]?.respuesta;
+  const enviar = async (resp) => {
+    if (yaRespondio) return;
+    setEnviada(true);
+    await updateDoc(gameRef, { [`respuestasRonda.${uid}.respuesta`]: resp, [`respuestasRonda.${uid}.timestamp`]: Date.now() });
+  };
+
+  const ratio = tiempoLeft / tiempo;
+  const barColor = ratio > 0.5 ? '#22c55e' : ratio > 0.25 ? '#f59e0b' : '#ef4444';
+  const sec = getSeccionGeo(pregunta.seccionId);
+
+  return (
+    <div style={{ padding:16 }}>
+      <div style={{ height:6, borderRadius:3, background:'rgba(255,255,255,0.1)', marginBottom:12, overflow:'hidden' }}>
+        <div style={{ height:'100%', width:`${ratio*100}%`, background:barColor, borderRadius:3, transition:'width 0.2s' }} />
+      </div>
+      <div style={{ textAlign:'center', color:'#94a3b8', fontSize:'0.78rem', marginBottom:8 }}>{sec?.emoji} {sec?.label}</div>
+      <GeoLiveMapCanvas pregunta={pregunta} worldFeats={worldFeats} espFeats={espFeats} feedbackOk={null} />
+      <p style={{ textAlign:'center', fontWeight:700, color:'#e2e8f0', margin:'10px 0' }}>
+        {pregunta.categoria === 'fisico' ? `¿Cómo se llama este ${pregunta.tipoElem === 'rio' ? 'río' : 'sistema montañoso'}?` : '¿Qué lugar es este?'}
+      </p>
+      {yaRespondio ? (
+        <div style={{ textAlign:'center', padding:14, color:'#4ade80', fontWeight:700 }}>✓ Respuesta enviada</div>
+      ) : pregunta.tipo === 'seleccionar' ? (
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+          {(pregunta.opciones || []).map(op => (
+            <button key={op} onClick={() => enviar(op)} style={{ padding:'11px 8px', background:'rgba(255,255,255,0.08)', border:'2px solid rgba(59,130,246,0.3)', borderRadius:10, color:'#f1f5f9', cursor:'pointer', fontWeight:600, fontSize:'0.82rem' }}>{op}</button>
+          ))}
+        </div>
+      ) : (
+        <div style={{ display:'flex', gap:8 }}>
+          <input value={respuesta} onChange={e => setRespuesta(e.target.value)} onKeyDown={e => e.key === 'Enter' && respuesta.trim() && enviar(respuesta.trim())} placeholder="Escribe el nombre..." style={{ ...inp, flex:1 }} autoFocus />
+          <button onClick={() => enviar(respuesta.trim())} disabled={!respuesta.trim()} style={{ padding:'10px 16px', background: respuesta.trim()?'#3b82f6':'rgba(255,255,255,0.1)', border:'none', borderRadius:9, color:'#fff', cursor: respuesta.trim()?'pointer':'not-allowed', fontWeight:700 }}>OK</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Client component ──────────────────────────────────────────────────────────
+function GeografiaLiveClient({ codigo, player, onSalir }) {
+  const [gameState, setGameState] = useState(null);
+  const [worldFeats, setWorldFeats] = useState(_worldCache);
+  const [espFeats,   setEspFeats]   = useState(_espCache);
+  const joinedRef = useRef(false);
+  const uid = player.uid;
+  const gameRef = doc(db, 'live_games', codigo);
+
+  useEffect(() => {
+    if (!_worldCache) fetch(WORLD_URL).then(r => r.json()).then(d => { _worldCache = d.features; setWorldFeats(d.features); });
+    if (!_espCache)   fetch(ESP_PROV_URL).then(r => r.json()).then(d => { _espCache = d.features; setEspFeats(d.features); });
+  }, []);
+
+  useEffect(() => {
+    const unsub = onSnapshot(gameRef, async snap => {
+      if (!snap.exists()) return;
+      const data = snap.data();
+      if (!joinedRef.current) {
+        joinedRef.current = true;
+        await updateDoc(gameRef, { [`jugadores.${uid}`]: { nombre: player.displayName, puntos: 0 } });
+      }
+      setGameState(data);
+    });
+    return unsub;
+  }, [codigo]);
+
+  if (!gameState) return <div style={{ color:'#94a3b8', textAlign:'center', padding:60, fontFamily:'system-ui,sans-serif' }}>Conectando...</div>;
+
+  const { estado, fasePregunta, jugadores = {}, preguntas = [], indicePregunta = 0, respuestasRonda = {}, questionStartTime, tiempo = 20 } = gameState;
+  const jugadoresArr = Object.entries(jugadores).sort((a, b) => b[1].puntos - a[1].puntos);
+  const preguntaActual = preguntas[indicePregunta];
+
+  const sH = {
+    wrap: { minHeight:'100vh', background:'linear-gradient(135deg,#0f172a,#1e3a5f)', color:'#f1f5f9', fontFamily:'system-ui,sans-serif' },
+    card: { background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:14, padding:16, margin:16 },
+  };
+
+  return (
+    <div style={sH.wrap}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 16px', borderBottom:'1px solid rgba(255,255,255,0.08)' }}>
+        <div style={{ fontSize:'0.85rem' }}>🔴 Geografía en Vivo · <span style={{ color:'#94a3b8' }}>{player.displayName}</span></div>
+        <button onClick={onSalir} style={{ background:'none', border:'none', color:'#94a3b8', cursor:'pointer', fontSize:'0.8rem' }}>Salir</button>
+      </div>
+
+      {estado === 'LOBBY' && (
+        <div style={{ ...sH.card, textAlign:'center', padding:40 }}>
+          <div style={{ fontSize:'2rem', marginBottom:8 }}>⏳</div>
+          <p style={{ color:'#94a3b8' }}>Esperando a que el profesor inicie la partida...</p>
+          <p style={{ fontSize:'0.8rem', color:'#64748b' }}>Sala: <strong style={{ color:'#f1f5f9', letterSpacing:3 }}>{codigo}</strong></p>
+        </div>
+      )}
+
+      {estado === 'COUNTDOWN' && (
+        <div style={{ ...sH.card, textAlign:'center', padding:40 }}>
+          <div style={{ fontSize:'3rem', fontWeight:900, color:'#3b82f6' }}>¡Preparados!</div>
+        </div>
+      )}
+
+      {estado === 'JUEGO' && preguntaActual && fasePregunta === 'RESPONDING' && (
+        <GeoClientPregunta pregunta={preguntaActual} tiempo={tiempo} questionStartTime={questionStartTime} uid={uid} gameRef={gameRef} respuestasRonda={respuestasRonda} worldFeats={worldFeats} espFeats={espFeats} />
+      )}
+
+      {estado === 'JUEGO' && fasePregunta === 'REVEAL' && preguntaActual && (
+        <div style={{ ...sH.card, textAlign:'center' }}>
+          <div style={{ fontSize:'0.8rem', color:'#94a3b8', marginBottom:8 }}>Respuesta correcta:</div>
+          <div style={{ fontSize:'1.3rem', fontWeight:700, color:'#4ade80', marginBottom:12 }}>✓ {preguntaActual.nombre}</div>
+          {respuestasRonda[uid] && (
+            <div style={{ fontSize:'0.85rem', color: respuestasRonda[uid].correct ? '#4ade80' : '#f87171', fontWeight:600 }}>
+              {respuestasRonda[uid].correct ? `+${respuestasRonda[uid].puntosGanados} puntos` : 'Incorrecto'}
+            </div>
+          )}
+          <div style={{ marginTop:16, fontSize:'0.78rem', color:'#64748b' }}>Esperando siguiente pregunta...</div>
+        </div>
+      )}
+
+      {estado === 'FIN' && (
+        <div style={sH.card}>
+          <h3 style={{ textAlign:'center', margin:'0 0 14px', color:'#fbbf24' }}>🏆 ¡Partida terminada!</h3>
+          {jugadoresArr.map(([id, j], i) => (
+            <div key={id} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 12px', background: id===uid?'rgba(59,130,246,0.2)':'rgba(255,255,255,0.04)', borderRadius:10, marginBottom:6, border: id===uid?'1px solid rgba(59,130,246,0.4)':'1px solid transparent' }}>
+              <span>{['🥇','🥈','🥉'][i] || `${i+1}.`}</span>
+              <span style={{ flex:1 }}>{j.nombre} {id===uid?'(tú)':''}</span>
+              <span style={{ fontWeight:700, color:'#fbbf24' }}>{j.puntos} pts</span>
+            </div>
+          ))}
+          <button onClick={onSalir} style={{ width:'100%', marginTop:14, padding:'12px', background:'rgba(255,255,255,0.1)', border:'none', borderRadius:10, color:'#f1f5f9', cursor:'pointer', fontWeight:700 }}>Volver al inicio</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Export wrapper ────────────────────────────────────────────────────────────
+export default function GeografiaApp({ onBack }) {
+  const [liveConfig, setLiveConfig] = useState(false);
+  const [liveHost,   setLiveHost]   = useState(null);
+  const [liveClient, setLiveClient] = useState(null);
+
+  if (liveHost)   return <GeografiaLiveHost   codigo={liveHost}          onSalir={() => setLiveHost(null)}   />;
+  if (liveClient) return <GeografiaLiveClient codigo={liveClient.codigo} player={liveClient.player} onSalir={() => setLiveClient(null)} />;
+
+  return (
+    <>
+      {liveConfig && (
+        <ModalLiveGeoConfig
+          onClose={() => setLiveConfig(false)}
+          onCrear={codigo => { setLiveConfig(false); setLiveHost(codigo); }}
+        />
+      )}
+      <GeografiaAppInner
+        onBack={onBack}
+        onCreateLive={() => setLiveConfig(true)}
+        onJoinLive={(code, player) => setLiveClient({ codigo: code, player })}
+      />
+    </>
   );
 }

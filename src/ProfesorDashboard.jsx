@@ -1023,8 +1023,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                     <li style={styles.menuItem} onClick={() => navegar('HERRAMIENTAS')}>Herramientas del Profesor</li>
                     <li style={styles.menuItem} onClick={() => { setPresentacionEditar(null); navegar('PRESENTACIONES'); }}>📊 Presentaciones</li>
                     <li style={styles.menuItem} onClick={() => navegar('MI_PAGINA')}>🌐 Mi Página</li>
-                    <li style={styles.menuItem} onClick={() => navegar('TRIVIAL_PARTIDAS')}>🎯 Trivial Partidas</li>
-                    <li style={styles.menuItem} onClick={() => navegar('TRIVIAL_RECURSOS')}>🎯 Editor Trivial</li>
+                    <li style={styles.menuItem} onClick={() => navegar('TRIVIAL')}>🎯 Trivial</li>
 
                     {/* --- CAMBIA ESTAS DOS LÍNEAS PARA LOS ENLACES EXTERNOS --- */}
                     <li style={styles.menuItem} onClick={() => {
@@ -1100,6 +1099,29 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                 />
             )}
             {modoDashboard === 'INFORMES' && <InformesJuegos usuario={usuario} googleToken={googleToken} />}
+            {modoDashboard === 'TRIVIAL' && (
+                <div style={{ maxWidth: 600, margin: '0 auto', padding: '20px 0' }}>
+                    <h2 style={{ fontWeight: 800, fontSize: 28, marginBottom: 32, color: '#2c3e50' }}>🎯 Trivial</h2>
+                    <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+                        <button
+                            onClick={() => navegar('TRIVIAL_PARTIDAS')}
+                            style={{ flex: 1, minWidth: 200, padding: '28px 20px', borderRadius: 16, border: '2px solid #e67e22', background: 'white', cursor: 'pointer', textAlign: 'left', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
+                        >
+                            <div style={{ fontSize: 36, marginBottom: 10 }}>🏆</div>
+                            <div style={{ fontWeight: 700, fontSize: 18, color: '#2c3e50', marginBottom: 6 }}>Gestionar partidas</div>
+                            <div style={{ fontSize: 13, color: '#7f8c8d' }}>Lanza y controla partidas en vivo con tus alumnos</div>
+                        </button>
+                        <button
+                            onClick={() => navegar('TRIVIAL_RECURSOS')}
+                            style={{ flex: 1, minWidth: 200, padding: '28px 20px', borderRadius: 16, border: '2px solid #9b59b6', background: 'white', cursor: 'pointer', textAlign: 'left', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
+                        >
+                            <div style={{ fontSize: 36, marginBottom: 10 }}>📝</div>
+                            <div style={{ fontWeight: 700, fontSize: 18, color: '#2c3e50', marginBottom: 6 }}>Crear un trivial</div>
+                            <div style={{ fontSize: 13, color: '#7f8c8d' }}>Crea y edita tus propios juegos de trivial con preguntas</div>
+                        </button>
+                    </div>
+                </div>
+            )}
             {modoDashboard === 'TRIVIAL_PARTIDAS' && <TrivialPartidasView usuario={usuario} />}
             {modoDashboard === 'TRIVIAL_RECURSOS' && <TrivialRecursosManager usuario={usuario} />}
 

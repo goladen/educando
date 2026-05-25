@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Dices, Trophy, ArrowLeft, Timer, Users, Play, Maximize2, Minimize2 } from 'lucide-react';
 import { db } from './firebase';
-import { collection, getDocs, query, where, doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, limit, doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import PREGUNTAS_JSON from './preguntas_trivial.json';
 import correctSound from './assets/correct-choice-43861.mp3';
 import wrongSound from './assets/negative_beeps-6008.mp3';
@@ -400,6 +400,16 @@ export default function TrivialGame({ onExit, onBuscar }) {
     const [numPlayers, setNumPlayers] = useState(4);
     const [nombres, setNombres] = useState(['Jugador 1', 'Jugador 2', 'Jugador 3', 'Jugador 4', 'Jugador 5', 'Jugador 6']);
     
+    // ─── ESTADOS BUSCADOR ───
+    const [busquedaTexto,   setBusquedaTexto]   = useState('');
+    const [resultadosBusq,  setResultadosBusq]  = useState([]);
+    const [cargandoBusq,    setCargandoBusq]    = useState(false);
+    const [busqError,       setBusqError]       = useState('');
+    const [busqIniciada,    setBusqIniciada]    = useState(false);
+    const [recursoIdFB,       setRecursoIdFB]       = useState(null);
+    const [categoriasRecurso, setCategoriasRecurso] = useState(null); // categorias del recurso cargado
+    const [errorPreguntas,    setErrorPreguntas]    = useState('');
+
     // ─── ESTADOS DEL JUEGO ───
     const [players, setPlayers] = useState([]);
     const [activePlayerIdx, setActivePlayerIdx] = useState(0);
@@ -409,7 +419,9 @@ export default function TrivialGame({ onExit, onBuscar }) {
     const [diceLanding, setDiceLanding] = useState(false);
     const diceAnimRef = useRef(null);
     const [modalData, setModalData] = useState(null);
-    const [timeLeft, setTimeLeft] = useState(15); 
+    const [timeLeft, setTimeLeft] = useState(15);
+    const [inputCorta, setInputCorta] = useState('');
+    const [ordenSlots, setOrdenSlots] = useState([]); // for ORDENAR type
 
     const [fuentePreguntas, setFuentePreguntas] = useState('JSON');
     const [codigoFirebase, setCodigoFirebase] = useState('');
@@ -438,6 +450,45 @@ export default function TrivialGame({ onExit, onBuscar }) {
     const animFrameRef = useRef(null);
     const handleArrivalRef = useRef(null);
     
+    // ─── BUSCADOR DE RECURSOS ───
+    const buscarRecursosTrivial = async (texto) => {
+        setCargandoBusq(true);
+        setBusqError('');
+        setBusqIniciada(true);
+        try {
+            const snap = await getDocs(
+                query(
+                    collection(db, 'trivial_recursos'),
+                    where('publica', '==', true),
+                    where('tipoJuego', '==', 'TRIVIAL'),
+                    orderBy('fechaModificacion', 'desc'),
+                    limit(60)
+                )
+            );
+            let docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            if (texto.trim()) {
+                const t = texto.trim().toLowerCase();
+                docs = docs.filter(d =>
+                    (d.titulo || '').toLowerCase().includes(t) ||
+                    (d.creadorNombre || '').toLowerCase().includes(t) ||
+                    (d.descripcion || '').toLowerCase().includes(t)
+                );
+            }
+            setResultadosBusq(docs);
+        } catch (e) {
+            console.error(e);
+            setBusqError('Error al buscar. Inténtalo de nuevo.');
+        }
+        setCargandoBusq(false);
+    };
+
+    const seleccionarRecurso = (recurso) => {
+        setCodigoFirebase(recurso.codigoJuego || '');
+        setRecursoIdFB(recurso.id);
+        setFuentePreguntas('FIREBASE');
+        setPantalla('SETUP');
+    };
+
     // ─── INICIAR JUEGO ───
     const iniciarJuego = async () => {
         setCargando(true);
@@ -445,26 +496,51 @@ export default function TrivialGame({ onExit, onBuscar }) {
 
         if (fuentePreguntas === 'JSON') {
             pregsFinales = PREGUNTAS_JSON;
-        } else if (fuentePreguntas === 'FIREBASE' && codigoFirebase.trim()) {
+        } else if (fuentePreguntas === 'FIREBASE') {
             try {
-                // Buscar el recurso por codigoJuego en trivial_recursos
-                const recursoSnap = await getDocs(query(
-                    collection(db, 'trivial_recursos'),
-                    where('codigoJuego', '==', codigoFirebase.trim().toUpperCase())
-                ));
-                if (!recursoSnap.empty) {
-                    const recursoId = recursoSnap.docs[0].id;
-                    const pregSnap = await getDocs(
-                        collection(db, 'trivial_recursos', recursoId, 'preguntas')
-                    );
+                // Usar ID directo si viene del buscador; si no, buscar por codigoJuego
+                let recursoId = recursoIdFB;
+                if (!recursoId && codigoFirebase.trim()) {
+                    const recursoSnap = await getDocs(query(
+                        collection(db, 'trivial_recursos'),
+                        where('codigoJuego', '==', codigoFirebase.trim().toUpperCase()),
+                        where('publica', '==', true)
+                    ));
+                    if (!recursoSnap.empty) recursoId = recursoSnap.docs[0].id;
+                }
+                if (recursoId) {
+                    const [pregSnap, recursoDoc] = await Promise.all([
+                        getDocs(collection(db, 'trivial_recursos', recursoId, 'preguntas')),
+                        getDoc(doc(db, 'trivial_recursos', recursoId)),
+                    ]);
                     const fbPregs = {};
                     pregSnap.forEach(d => {
                         const data = d.data();
-                        if (data.categoria && data.q && data.a) {
+                        const tipo = data.tipo || 'SELECCION';
+                        const valida =
+                            data.categoria && (
+                                (tipo === 'SELECCION' && data.q && data.a) ||
+                                (tipo === 'CORTA'     && data.q && data.a) ||
+                                (tipo === 'RELLENAR'  && data.bloques?.length >= 2) ||
+                                (tipo === 'ORDENAR'   && data.bloques?.length >= 2)
+                            );
+                        if (valida) {
                             if (!fbPregs[data.categoria]) fbPregs[data.categoria] = [];
-                            fbPregs[data.categoria].push({ q: data.q, a: data.a, w: data.w || [] });
+                            fbPregs[data.categoria].push({ ...data, id: d.id });
                         }
                     });
+                    // Validate minimum 5 questions per category
+                    const CAT_IDS_TV = ['geo', 'esp', 'his', 'art', 'cie', 'dep'];
+                    const cortas = CAT_IDS_TV.filter(c => (fbPregs[c]?.length || 0) < 5);
+                    if (cortas.length > 0) {
+                        const CAT_NAMES = { geo: 'Geografía', esp: 'Espectáculos', his: 'Historia', art: 'Arte y Lit.', cie: 'Ciencias', dep: 'Deportes' };
+                        setErrorPreguntas(`El recurso no tiene suficientes preguntas en: ${cortas.map(c => CAT_NAMES[c]).join(', ')}. Se necesitan al menos 5 por categoría.`);
+                        setCargando(false);
+                        return;
+                    }
+                    if (recursoDoc.exists()) {
+                        setCategoriasRecurso(recursoDoc.data().categorias || null);
+                    }
                     if (Object.keys(fbPregs).length > 0) pregsFinales = fbPregs;
                     else console.warn('El recurso existe pero no tiene preguntas, usando internas.');
                 } else {
@@ -819,15 +895,30 @@ export default function TrivialGame({ onExit, onBuscar }) {
         let qCat = isCenter ? COLORS[Math.floor(Math.random() * COLORS.length)].id : catId;
         const qList = preguntasRef.current[qCat] || preguntasRef.current['geo'] || PREGUNTAS['geo'];
         const qData = qList[Math.floor(Math.random() * qList.length)];
+        const tipo = qData.tipo || 'SELECCION';
+
+        // Prepare type-specific state
+        setInputCorta('');
+        if (tipo === 'ORDENAR' && qData.bloques) {
+            // Shuffle for the player to sort
+            const mezclado = [...qData.bloques].sort(() => Math.random() - 0.5);
+            setOrdenSlots(mezclado.map(b => ({ texto: b, enSlot: false })));
+        } else {
+            setOrdenSlots([]);
+        }
 
         setTimeLeft(15);
         setGameState('QUESTION');
         setModalData({
             node, isFinal,
             color: isCenter ? { hex: '#3498db', name: 'Centro Final' } : node.color,
-            question: qData.q,
-            correct: qData.a,
-            answers: [qData.a, ...qData.w].sort(() => Math.random() - 0.5)
+            qData,
+            // legacy fields for SELECCION compatibility
+            question: tipo === 'RELLENAR' ? (qData.bloques?.[0] || '') : (qData.q || ''),
+            correct: tipo === 'RELLENAR' ? qData.bloques?.[1] : qData.a,
+            answers: (tipo === 'SELECCION' && qData.a && qData.w)
+                ? [qData.a, ...qData.w].sort(() => Math.random() - 0.5)
+                : [],
         });
     }, [activePlayerIdx, players]);
 
@@ -921,7 +1012,7 @@ export default function TrivialGame({ onExit, onBuscar }) {
     if (pantalla === 'INTRO') {
         const totalPreguntas = Object.values(PREGUNTAS_JSON).flat().length;
         return (
-            <div style={{ ...st.appContainer, height: 'auto', minHeight: '100dvh', overflowY: 'auto', flexDirection: 'column', alignItems: 'center', justifyContent: isMobile ? 'flex-start' : 'center', padding: isMobile ? '24px 16px 32px' : '20px', gap: 0 }}>
+            <div style={{ ...st.appContainer, height: 'auto', minHeight: '100dvh', overflow: 'auto', flexDirection: 'column', alignItems: 'center', justifyContent: isMobile ? 'flex-start' : 'center', padding: isMobile ? '24px 16px 32px' : '20px', gap: 0 }}>
                 <FullscreenBtn />
 
                 {/* Cabecera de colores de categoría */}
@@ -949,9 +1040,9 @@ export default function TrivialGame({ onExit, onBuscar }) {
                             {COLORS.map(c => <div key={c.id} style={{ flex: 1, background: c.hex }} />)}
                         </div>
                         <div style={{ fontSize: '3.5rem', marginBottom: 14 }}>🎮</div>
-                        <h2 style={{ color: 'white', margin: '0 0 10px', fontSize: '1.6rem' }}>Jugar ahora</h2>
+                        <h2 style={{ color: 'white', margin: '0 0 10px', fontSize: '1.6rem' }}>Trivial Clásico</h2>
                         <p style={{ color: '#94a3b8', margin: '0 0 20px', lineHeight: 1.6 }}>
-                            {totalPreguntas} preguntas integradas repartidas en las 6 categorías clásicas. Listo para jugar sin ningún código.
+                            {totalPreguntas} preguntas en las 6 categorías clásicas. Empieza a jugar directamente.
                         </p>
                         <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 24 }}>
                             {COLORS.map(c => (
@@ -959,43 +1050,26 @@ export default function TrivialGame({ onExit, onBuscar }) {
                             ))}
                         </div>
                         <button style={{ background: 'linear-gradient(135deg, #38bdf8, #2563eb)', color: 'white', border: 'none', padding: '14px 0', borderRadius: 30, fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', width: '100%', boxShadow: '0 8px 25px rgba(37,99,235,0.4)' }}>
-                            Jugar con preguntas integradas →
+                            Jugar al clásico →
                         </button>
                     </div>
 
                     {/* Opción 2: Buscar Trivial */}
                     <div
-                        style={{ flex: 1, minWidth: isMobile ? '100%' : 280, background: 'rgba(30,41,59,0.9)', border: '2px solid #334155', borderRadius: 20, padding: isMobile ? '24px 20px' : 36, textAlign: 'center', position: 'relative', overflow: 'hidden' }}
+                        onClick={() => { setBusquedaTexto(''); setResultadosBusq([]); setBusqIniciada(false); setPantalla('BUSCADOR'); buscarRecursosTrivial(''); }}
+                        style={{ flex: 1, minWidth: isMobile ? '100%' : 280, background: 'rgba(30,41,59,0.9)', border: '2px solid #334155', borderRadius: 20, padding: isMobile ? '24px 20px' : 36, cursor: 'pointer', textAlign: 'center', position: 'relative', overflow: 'hidden', transition: 'border-color 0.2s, transform 0.2s' }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = '#a855f7'; e.currentTarget.style.transform = 'translateY(-4px)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = '#334155'; e.currentTarget.style.transform = 'translateY(0)'; }}
                     >
                         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 6, background: 'linear-gradient(135deg, #a855f7, #7c3aed)' }} />
                         <div style={{ fontSize: '3.5rem', marginBottom: 14 }}>🔍</div>
                         <h2 style={{ color: 'white', margin: '0 0 10px', fontSize: '1.6rem' }}>Buscar Trivial</h2>
                         <p style={{ color: '#94a3b8', margin: '0 0 20px', lineHeight: 1.6 }}>
-                            Introduce el código que te ha dado tu profesor para cargar sus preguntas personalizadas.
+                            Explora todos los triviales públicos. Filtra por título, autor o ve todos los disponibles.
                         </p>
-                        <input
-                            type="text"
-                            placeholder="Código del juego (ej: AB3K7F)…"
-                            value={codigoFirebase}
-                            onChange={e => setCodigoFirebase(e.target.value.toUpperCase())}
-                            onKeyDown={e => { if (e.key === 'Enter' && codigoFirebase.trim()) { setFuentePreguntas('FIREBASE'); setPantalla('SETUP'); } }}
-                            style={{ width: '100%', padding: '13px 16px', borderRadius: 12, background: '#0f172a', color: 'white', border: '2px solid #475569', outline: 'none', fontSize: '1rem', boxSizing: 'border-box', marginBottom: 14, textTransform: 'uppercase', letterSpacing: 2, fontFamily: 'monospace' }}
-                        />
-                        <button
-                            onClick={() => { if (codigoFirebase.trim()) { setFuentePreguntas('FIREBASE'); setPantalla('SETUP'); } }}
-                            disabled={!codigoFirebase.trim()}
-                            style={{ background: codigoFirebase.trim() ? 'linear-gradient(135deg, #a855f7, #7c3aed)' : '#1e293b', color: codigoFirebase.trim() ? 'white' : '#475569', border: '2px solid', borderColor: codigoFirebase.trim() ? 'transparent' : '#334155', padding: '14px 0', borderRadius: 30, fontSize: '1rem', fontWeight: 'bold', cursor: codigoFirebase.trim() ? 'pointer' : 'not-allowed', width: '100%', transition: '0.2s', boxShadow: codigoFirebase.trim() ? '0 8px 25px rgba(168,85,247,0.4)' : 'none' }}
-                        >
-                            Cargar preguntas y jugar →
+                        <button style={{ background: 'linear-gradient(135deg, #a855f7, #7c3aed)', color: 'white', border: 'none', padding: '14px 0', borderRadius: 30, fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', width: '100%', boxShadow: '0 8px 25px rgba(168,85,247,0.4)' }}>
+                            Explorar triviales →
                         </button>
-                        {onBuscar && (
-                            <button
-                                onClick={onBuscar}
-                                style={{ marginTop: 12, background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '0.85rem', textDecoration: 'underline' }}
-                            >
-                                Buscar en el catálogo de juegos
-                            </button>
-                        )}
                     </div>
 
                     {/* Opción 3: Continuar partida */}
@@ -1035,17 +1109,119 @@ export default function TrivialGame({ onExit, onBuscar }) {
     }
 
     // ════════════════════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════════════════════
+    // RENDER: BUSCADOR DE TRIVIALES
+    // ════════════════════════════════════════════════════════════════════════
+    if (pantalla === 'BUSCADOR') {
+        const CAT_COLORS = { geo: '#3498db', esp: '#e84393', his: '#f1c40f', art: '#9b59b6', cie: '#2ecc71', dep: '#e67e22' };
+        return (
+            <div style={{ minHeight: '100dvh', background: '#0f172a', display: 'flex', flexDirection: 'column', fontFamily: "'Segoe UI', sans-serif" }}>
+                {/* Header */}
+                <div style={{ background: '#1e293b', borderBottom: '1px solid #334155', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
+                    <button onClick={() => setPantalla('INTRO')} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1.3rem', padding: '2px 6px', borderRadius: 6 }}>←</button>
+                    <span style={{ fontSize: '1.3rem' }}>🔍</span>
+                    <h2 style={{ color: 'white', margin: 0, fontSize: '1.1rem', fontWeight: 800 }}>Explorar Triviales</h2>
+                </div>
+
+                {/* Search bar */}
+                <div style={{ padding: '20px 20px 0', maxWidth: 800, width: '100%', margin: '0 auto', boxSizing: 'border-box' }}>
+                    <div style={{ display: 'flex', gap: 10 }}>
+                        <input
+                            value={busquedaTexto}
+                            onChange={e => setBusquedaTexto(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && buscarRecursosTrivial(busquedaTexto)}
+                            placeholder="Buscar por título, autor o descripción…"
+                            autoFocus
+                            style={{ flex: 1, background: '#1e293b', border: '2px solid #334155', borderRadius: 12, color: 'white', padding: '12px 16px', fontSize: '1rem', fontFamily: 'inherit', outline: 'none' }}
+                        />
+                        <button
+                            onClick={() => buscarRecursosTrivial(busquedaTexto)}
+                            disabled={cargandoBusq}
+                            style={{ background: 'linear-gradient(135deg, #a855f7, #7c3aed)', border: 'none', color: 'white', padding: '12px 22px', borderRadius: 12, cursor: cargandoBusq ? 'default' : 'pointer', fontWeight: 700, fontSize: '0.95rem', opacity: cargandoBusq ? 0.6 : 1, whiteSpace: 'nowrap' }}
+                        >
+                            {cargandoBusq ? '…' : 'Buscar'}
+                        </button>
+                    </div>
+                    {busqError && <p style={{ color: '#f87171', fontSize: '0.85rem', marginTop: 8 }}>{busqError}</p>}
+                </div>
+
+                {/* Results */}
+                <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px 32px', maxWidth: 800, width: '100%', margin: '0 auto', boxSizing: 'border-box' }}>
+                    {cargandoBusq && (
+                        <p style={{ color: '#64748b', textAlign: 'center', padding: 40 }}>Buscando…</p>
+                    )}
+                    {!cargandoBusq && busqIniciada && resultadosBusq.length === 0 && (
+                        <p style={{ color: '#64748b', textAlign: 'center', padding: 40 }}>No se encontraron triviales públicos{busquedaTexto ? ` con "${busquedaTexto}"` : ''}.</p>
+                    )}
+                    {!cargandoBusq && resultadosBusq.length > 0 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 8 }}>
+                            <p style={{ color: '#64748b', fontSize: '0.82rem', margin: 0 }}>{resultadosBusq.length} resultado{resultadosBusq.length !== 1 ? 's' : ''}</p>
+                            {resultadosBusq.map(r => {
+                                const cats = r.categorias || {};
+                                const catIds = ['geo', 'esp', 'his', 'art', 'cie', 'dep'];
+                                return (
+                                    <div
+                                        key={r.id}
+                                        onClick={() => seleccionarRecurso(r)}
+                                        style={{ background: '#1e293b', border: '2px solid #334155', borderRadius: 16, padding: '18px 20px', cursor: 'pointer', transition: 'border-color 0.15s, transform 0.15s' }}
+                                        onMouseEnter={e => { e.currentTarget.style.borderColor = '#a855f7'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                                        onMouseLeave={e => { e.currentTarget.style.borderColor = '#334155'; e.currentTarget.style.transform = 'translateY(0)'; }}
+                                    >
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 10 }}>
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <div style={{ color: 'white', fontWeight: 800, fontSize: '1.05rem', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>🎯 {r.titulo}</div>
+                                                <div style={{ color: '#64748b', fontSize: '0.82rem' }}>por {r.creadorNombre || 'Anónimo'}</div>
+                                                {r.descripcion && <div style={{ color: '#94a3b8', fontSize: '0.83rem', marginTop: 5, lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{r.descripcion}</div>}
+                                            </div>
+                                            <button style={{ background: 'linear-gradient(135deg, #a855f7, #7c3aed)', border: 'none', color: 'white', padding: '8px 16px', borderRadius: 10, cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem', flexShrink: 0 }}>
+                                                Jugar →
+                                            </button>
+                                        </div>
+                                        {/* Category pills */}
+                                        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                                            {catIds.map(id => {
+                                                const c = cats[id];
+                                                const hex = CAT_COLORS[id];
+                                                return (
+                                                    <span key={id} style={{ background: hex + '22', border: `1px solid ${hex}50`, color: hex, borderRadius: 8, padding: '2px 9px', fontSize: '0.74rem', fontWeight: 600 }}>
+                                                        {c?.emoji || ''} {c?.nombre || id}
+                                                    </span>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
     // RENDER: PANTALLA DE REGLAS
     // ════════════════════════════════════════════════════════════════════════
     if (pantalla === 'RULES') {
-        const cats = [
-            { id: 'geo', hex: '#3498db', emoji: '🌍', name: 'Geografía',    desc: 'Capitales, ríos, montañas y países del mundo.' },
-            { id: 'esp', hex: '#e84393', emoji: '🎬', name: 'Espectáculos', desc: 'Cine, música, televisión y cultura popular.' },
-            { id: 'his', hex: '#f1c40f', emoji: '📜', name: 'Historia',     desc: 'Personajes, batallas, fechas y civilizaciones.' },
-            { id: 'art', hex: '#9b59b6', emoji: '🎨', name: 'Arte y Lit.',  desc: 'Pintores, escritores, obras y movimientos.' },
-            { id: 'cie', hex: '#2ecc71', emoji: '🔬', name: 'Ciencias',     desc: 'Física, biología, química y matemáticas.' },
-            { id: 'dep', hex: '#e67e22', emoji: '⚽', name: 'Deportes',     desc: 'Fútbol, olimpiadas, récords y deportistas.' },
-        ];
+        const CAT_DEFAULTS_RULES = {
+            geo: { hex: '#3498db', emoji: '🌍', name: 'Geografía',    desc: 'Capitales, ríos, montañas y países del mundo.' },
+            esp: { hex: '#e84393', emoji: '🎬', name: 'Espectáculos', desc: 'Cine, música, televisión y cultura popular.' },
+            his: { hex: '#f1c40f', emoji: '📜', name: 'Historia',     desc: 'Personajes, batallas, fechas y civilizaciones.' },
+            art: { hex: '#9b59b6', emoji: '🎨', name: 'Arte y Lit.',  desc: 'Pintores, escritores, obras y movimientos.' },
+            cie: { hex: '#2ecc71', emoji: '🔬', name: 'Ciencias',     desc: 'Física, biología, química y matemáticas.' },
+            dep: { hex: '#e67e22', emoji: '⚽', name: 'Deportes',     desc: 'Fútbol, olimpiadas, récords y deportistas.' },
+        };
+        const cats = ['geo', 'esp', 'his', 'art', 'cie', 'dep'].map(id => {
+            const def = CAT_DEFAULTS_RULES[id];
+            const custom = categoriasRecurso?.[id];
+            return {
+                id,
+                hex: def.hex,
+                emoji: custom?.emoji || def.emoji,
+                name: custom?.nombre || def.name,
+                desc: custom?.desc  || def.desc,
+                imagen: custom?.imagen || '',
+            };
+        });
         const pasos = [
             { n: '1', titulo: 'Lanza el dado', texto: 'En tu turno pulsa el botón para tirar. El número indica cuántas casillas puedes avanzar.' },
             { n: '2', titulo: 'Elige tu casilla', texto: 'Haz clic en cualquiera de los destinos resaltados para mover tu ficha.' },
@@ -1157,15 +1333,18 @@ export default function TrivialGame({ onExit, onBuscar }) {
                                     alignItems: isMobile ? 'flex-start' : 'center',
                                     transition: 'transform 0.15s',
                                 }}>
-                                    {/* Quesito */}
+                                    {/* Quesito / imagen */}
                                     <div style={{
                                         width: isMobile ? 36 : 48, height: isMobile ? 36 : 48, borderRadius: '50%',
-                                        background: `radial-gradient(circle at 35% 35%, ${c.hex}ff, ${c.hex}99)`,
+                                        background: c.imagen ? 'transparent' : `radial-gradient(circle at 35% 35%, ${c.hex}ff, ${c.hex}99)`,
                                         boxShadow: `0 4px 14px ${c.hex}55`,
                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                                         fontSize: isMobile ? '1.1rem' : '1.5rem', flexShrink: 0,
+                                        overflow: 'hidden',
                                     }}>
-                                        {c.emoji}
+                                        {c.imagen
+                                            ? <img src={c.imagen} alt={c.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                                            : c.emoji}
                                     </div>
                                     <div>
                                         <div style={{ color: c.hex, fontWeight: 800, fontSize: isMobile ? '0.88rem' : '1rem', marginBottom: 2 }}>{c.name}</div>
@@ -1234,7 +1413,7 @@ export default function TrivialGame({ onExit, onBuscar }) {
 
     if (pantalla === 'SETUP') {
         return (
-            <div style={{ ...st.appContainer, height: 'auto', minHeight: '100dvh', justifyContent: 'center', alignItems: isMobile ? 'flex-start' : 'center', overflowY: 'auto', padding: isMobile ? '16px' : 0 }}>
+            <div style={{ ...st.appContainer, height: 'auto', minHeight: '100dvh', justifyContent: 'center', alignItems: isMobile ? 'flex-start' : 'center', overflow: 'auto', padding: isMobile ? '16px' : 0 }}>
                 <FullscreenBtn />
                 <div style={{ background: 'rgba(30, 41, 59, 0.95)', padding: isMobile ? '20px 16px' : 40, borderRadius: 20, width: '100%', maxWidth: 500, margin: isMobile ? '16px' : 0, boxSizing: 'border-box', boxShadow: '0 25px 50px rgba(0,0,0,0.5)', border: '2px solid #334155' }}>
                     <button onClick={() => setPantalla('INTRO')} style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 20, fontWeight: 'bold', fontSize: '0.9rem' }}>
@@ -1257,37 +1436,21 @@ export default function TrivialGame({ onExit, onBuscar }) {
                         </select>
                     </div>
 
-                    <div style={{ marginBottom: 20 }}>
-                        <label style={{ color: 'white', fontWeight: 'bold', display: 'block', marginBottom: 10 }}>Fuente de Preguntas:</label>
-                        <div style={{ display: 'flex', gap: 8 }}>
-                            {[
-                                { id: 'INTERNO', label: '🎮 Internas' },
-                                { id: 'JSON',    label: '📄 Archivo JSON' },
-                                { id: 'FIREBASE', label: '🔥 Firebase' }
-                            ].map(f => (
-                                <button key={f.id} onClick={() => setFuentePreguntas(f.id)} style={{
-                                    flex: 1, padding: '10px 5px', borderRadius: 10, border: '2px solid',
-                                    borderColor: fuentePreguntas === f.id ? '#38bdf8' : '#334155',
-                                    background: fuentePreguntas === f.id ? 'rgba(56,189,248,0.15)' : 'transparent',
-                                    color: fuentePreguntas === f.id ? '#38bdf8' : '#94a3b8',
-                                    cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem'
-                                }}>{f.label}</button>
-                            ))}
-                        </div>
-                        {fuentePreguntas === 'JSON' && (
-                            <p style={{ color: '#94a3b8', fontSize: '0.82rem', marginTop: 8, lineHeight: 1.5 }}>
-                                Usando <code style={{ color: '#38bdf8' }}>preguntas_trivial.json</code> — {Object.values(PREGUNTAS_JSON).flat().length} preguntas en {Object.keys(PREGUNTAS_JSON).length} categorías.
-                            </p>
-                        )}
-                        {fuentePreguntas === 'FIREBASE' && (
-                            <input
-                                type="text"
-                                value={codigoFirebase}
-                                onChange={e => setCodigoFirebase(e.target.value.toUpperCase())}
-                                placeholder="Código del juego (ej: AB3K7F)"
-                                style={{ width: '100%', marginTop: 10, padding: '10px 15px', borderRadius: 10, background: '#0f172a', color: 'white', border: '2px solid #38bdf8', outline: 'none', fontSize: '1rem', boxSizing: 'border-box', textTransform: 'uppercase', letterSpacing: 2, fontFamily: 'monospace' }}
-                            />
-                        )}
+                    {/* Info sobre la fuente de preguntas (read-only) */}
+                    <div style={{ marginBottom: 20, background: '#0f172a', borderRadius: 12, padding: '12px 16px', border: '1px solid #334155', display: 'flex', alignItems: 'center', gap: 10 }}>
+                        {fuentePreguntas === 'JSON' ? (<>
+                            <span style={{ fontSize: '1.2rem' }}>📄</span>
+                            <div>
+                                <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: '0.88rem' }}>Trivial Clásico</div>
+                                <div style={{ color: '#64748b', fontSize: '0.78rem' }}>{Object.values(PREGUNTAS_JSON).flat().length} preguntas en {Object.keys(PREGUNTAS_JSON).length} categorías</div>
+                            </div>
+                        </>) : (<>
+                            <span style={{ fontSize: '1.2rem' }}>🎯</span>
+                            <div>
+                                <div style={{ color: '#a855f7', fontWeight: 700, fontSize: '0.88rem' }}>Trivial personalizado</div>
+                                <div style={{ color: '#64748b', fontSize: '0.78rem', fontFamily: 'monospace', letterSpacing: 1 }}>{codigoFirebase}</div>
+                            </div>
+                        </>)}
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 30 }}>
@@ -1305,10 +1468,15 @@ export default function TrivialGame({ onExit, onBuscar }) {
                         ))}
                     </div>
 
-                    <button onClick={iniciarJuego} disabled={cargando} style={{ ...st.btnRoll, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, opacity: cargando ? 0.7 : 1, cursor: cargando ? 'wait' : 'pointer' }}>
+                    {errorPreguntas && (
+                        <div style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid #ef4444', borderRadius: 12, padding: '12px 16px', color: '#fca5a5', fontSize: '0.87rem', lineHeight: 1.5, marginBottom: 4 }}>
+                            ⚠️ {errorPreguntas}
+                        </div>
+                    )}
+                    <button onClick={() => { setErrorPreguntas(''); iniciarJuego(); }} disabled={cargando} style={{ ...st.btnRoll, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, opacity: cargando ? 0.7 : 1, cursor: cargando ? 'wait' : 'pointer' }}>
                         <Play size={20}/> {cargando ? 'Cargando preguntas...' : 'Empezar Juego'}
                     </button>
-                    <button onClick={() => setPantalla('INTRO')} style={{ width: '100%', background: 'transparent', border: 'none', color: '#64748b', padding: 12, marginTop: 5, cursor: 'pointer', fontWeight: 'bold' }}>← Volver al inicio</button>
+                    <button onClick={() => { setPantalla('INTRO'); setCategoriasRecurso(null); setErrorPreguntas(''); }} style={{ width: '100%', background: 'transparent', border: 'none', color: '#64748b', padding: 12, marginTop: 5, cursor: 'pointer', fontWeight: 'bold' }}>← Volver al inicio</button>
                 </div>
             </div>
         );
@@ -1485,17 +1653,103 @@ export default function TrivialGame({ onExit, onBuscar }) {
                             <div style={{ height: '100%', width: `${(timeLeft / 15) * 100}%`, background: timeLeft > 5 ? '#2ecc71' : '#e74c3c', transition: 'width 1s linear, background 0.3s' }} />
                         </div>
 
-                        <h2 style={{ color: 'white', fontSize: isMobile ? '1.2rem' : '1.7rem', margin: isMobile ? '14px 0 18px' : '20px 0 30px', lineHeight: 1.4 }}>{modalData.question}</h2>
+                        {/* Pregunta */}
+                        {(() => {
+                            const qData = modalData.qData || {};
+                            const tipo  = qData.tipo || 'SELECCION';
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 8 : 12 }}>
-                            {modalData.answers.map((ans, i) => (
-                                <button key={i} onClick={() => responderPregunta(ans === modalData.correct)} style={{
-                                    ...st.btnAnswer,
-                                    padding: isMobile ? '13px 14px' : 20,
-                                    fontSize: isMobile ? '0.95rem' : '1.2rem',
-                                }}>{ans}</button>
-                            ))}
-                        </div>
+                            // Normalize helper (ignore accents + case)
+                            const clean = s => s ? String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim() : '';
+
+                            // SELECCION — opción múltiple (por defecto)
+                            if (tipo === 'SELECCION' || !tipo) return (<>
+                                <h2 style={{ color: 'white', fontSize: isMobile ? '1.2rem' : '1.7rem', margin: isMobile ? '14px 0 18px' : '20px 0 30px', lineHeight: 1.4 }}>{qData.q}</h2>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 8 : 12 }}>
+                                    {modalData.answers.map((ans, i) => (
+                                        <button key={i} onClick={() => responderPregunta(ans === modalData.correct)} style={{ ...st.btnAnswer, padding: isMobile ? '13px 14px' : 20, fontSize: isMobile ? '0.95rem' : '1.2rem' }}>{ans}</button>
+                                    ))}
+                                </div>
+                            </>);
+
+                            // CORTA — respuesta libre
+                            if (tipo === 'CORTA') return (<>
+                                <h2 style={{ color: 'white', fontSize: isMobile ? '1.2rem' : '1.7rem', margin: isMobile ? '14px 0 18px' : '20px 0 24px', lineHeight: 1.4 }}>{qData.q}</h2>
+                                <input
+                                    value={inputCorta}
+                                    onChange={e => setInputCorta(e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Enter' && inputCorta.trim()) responderPregunta(clean(inputCorta) === clean(qData.a)); }}
+                                    placeholder="Escribe tu respuesta…"
+                                    autoFocus
+                                    style={{ width: '100%', boxSizing: 'border-box', background: '#0f172a', border: '2px solid #475569', borderRadius: 10, color: 'white', padding: '14px 16px', fontSize: isMobile ? '1rem' : '1.15rem', fontFamily: 'inherit', outline: 'none', marginBottom: 12 }}
+                                />
+                                <button
+                                    onClick={() => { if (inputCorta.trim()) responderPregunta(clean(inputCorta) === clean(qData.a)); }}
+                                    disabled={!inputCorta.trim()}
+                                    style={{ ...st.btnAnswer, background: '#1d4ed8', border: 'none', fontWeight: 800, opacity: inputCorta.trim() ? 1 : 0.4 }}
+                                >Responder</button>
+                            </>);
+
+                            // RELLENAR — texto con hueco
+                            if (tipo === 'RELLENAR') return (<>
+                                <div style={{ color: 'white', fontSize: isMobile ? '1.15rem' : '1.5rem', margin: isMobile ? '14px 0 18px' : '20px 0 24px', lineHeight: 1.6 }}>
+                                    <span>{qData.bloques?.[0]} </span>
+                                    <span style={{ borderBottom: '3px solid #38bdf8', padding: '0 12px', color: '#38bdf8', fontWeight: 700 }}>___</span>
+                                </div>
+                                <input
+                                    value={inputCorta}
+                                    onChange={e => setInputCorta(e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Enter' && inputCorta.trim()) responderPregunta(clean(inputCorta) === clean(qData.bloques?.[1])); }}
+                                    placeholder="Completa el hueco…"
+                                    autoFocus
+                                    style={{ width: '100%', boxSizing: 'border-box', background: '#0f172a', border: '2px solid #38bdf8', borderRadius: 10, color: '#38bdf8', padding: '14px 16px', fontSize: isMobile ? '1rem' : '1.15rem', fontFamily: 'inherit', outline: 'none', marginBottom: 12 }}
+                                />
+                                <button
+                                    onClick={() => { if (inputCorta.trim()) responderPregunta(clean(inputCorta) === clean(qData.bloques?.[1])); }}
+                                    disabled={!inputCorta.trim()}
+                                    style={{ ...st.btnAnswer, background: '#0e7490', border: 'none', fontWeight: 800, opacity: inputCorta.trim() ? 1 : 0.4 }}
+                                >Responder</button>
+                            </>);
+
+                            // ORDENAR — poner en orden
+                            if (tipo === 'ORDENAR') {
+                                const elegidos = ordenSlots.filter(s => s.enSlot);
+                                const disponibles = ordenSlots.filter(s => !s.enSlot);
+                                const completo = elegidos.length === qData.bloques?.length;
+                                const confirmarOrden = () => {
+                                    if (!completo) return;
+                                    const correcto = JSON.stringify(elegidos.map(s => s.texto)) === JSON.stringify(qData.bloques);
+                                    responderPregunta(correcto);
+                                };
+                                return (<>
+                                    {qData.q && <h2 style={{ color: 'white', fontSize: isMobile ? '1rem' : '1.3rem', margin: isMobile ? '10px 0 14px' : '14px 0 20px', lineHeight: 1.4 }}>{qData.q}</h2>}
+                                    {/* Slots elegidos */}
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, minHeight: 44, background: '#0f172a', borderRadius: 10, padding: '8px 10px', marginBottom: 10, border: '2px dashed #334155' }}>
+                                        {elegidos.length === 0 && <span style={{ color: '#475569', fontSize: '0.85rem', alignSelf: 'center' }}>Toca los elementos en el orden correcto</span>}
+                                        {elegidos.map((s, i) => (
+                                            <button key={i} onClick={() => setOrdenSlots(prev => prev.map(x => x.texto === s.texto ? { ...x, enSlot: false } : x))}
+                                                style={{ background: '#1d4ed8', border: 'none', color: 'white', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: 600 }}>
+                                                {i + 1}. {s.texto}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    {/* Disponibles */}
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+                                        {disponibles.map((s, i) => (
+                                            <button key={i} onClick={() => setOrdenSlots(prev => prev.map(x => x.texto === s.texto ? { ...x, enSlot: true } : x))}
+                                                style={{ background: '#334155', border: '1px solid #475569', color: '#e2e8f0', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontSize: isMobile ? '0.9rem' : '1rem' }}>
+                                                {s.texto}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <button onClick={confirmarOrden} disabled={!completo}
+                                        style={{ ...st.btnAnswer, background: '#166534', border: 'none', fontWeight: 800, opacity: completo ? 1 : 0.4 }}>
+                                        Confirmar orden
+                                    </button>
+                                </>);
+                            }
+
+                            return null;
+                        })()}
                     </div>
                 </div>
             )}

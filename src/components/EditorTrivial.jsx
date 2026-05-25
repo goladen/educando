@@ -68,11 +68,18 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
 
     // ── Add-question form ──────────────────────────────────────────────────────
     const [formAbierto,        setFormAbierto]      = useState(false);
+    const [formTipo,           setFormTipo]         = useState('SELECCION');
     const [formQ,              setFormQ]            = useState('');
     const [formA,              setFormA]            = useState('');
     const [formW,              setFormW]            = useState(['', '', '']);
+    const [formBloques,        setFormBloques]      = useState(['', '']);
     const [guardandoPregunta,  setGuardandoPregunta]= useState(false);
     const [errorForm,          setErrorForm]        = useState('');
+
+    // ── Edit-question form ─────────────────────────────────────────────────────
+    const [editandoPregId,  setEditandoPregId]  = useState(null);
+    const [editForm,        setEditForm]        = useState(null);
+    const [guardandoEdicion,setGuardandoEdicion]= useState(false);
 
     // ── Collaboration ──────────────────────────────────────────────────────────
     const [panelColab,    setPanelColab]    = useState(false);
@@ -88,6 +95,9 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
     // ── Effects ────────────────────────────────────────────────────────────────
     useEffect(() => {
         if (recursoId && !preguntasCargadas[tabActiva]) cargarPreguntas(tabActiva);
+        // Clear question form when switching tabs
+        setFormAbierto(false);
+        setFormTipo('SELECCION'); setFormQ(''); setFormA(''); setFormW(['', '', '']); setFormBloques(['', '']); setErrorForm('');
     }, [recursoId, tabActiva]);
 
     useEffect(() => {
@@ -102,7 +112,14 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                 query(collection(db, 'trivial_recursos', recursoId, 'preguntas'),
                     where('categoria', '==', cat), orderBy('fechaCreacion', 'asc'))
             );
-            setPreguntas(prev => ({ ...prev, [cat]: snap.docs.map(d => ({ id: d.id, ...d.data() })) }));
+            const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            // Sort by explicit orden if present, else preserve load order
+            docs.sort((a, b) => {
+                const oa = a.orden ?? a.fechaCreacion?.seconds ?? 0;
+                const ob = b.orden ?? b.fechaCreacion?.seconds ?? 0;
+                return oa - ob;
+            });
+            setPreguntas(prev => ({ ...prev, [cat]: docs }));
             setPreguntasCargadas(prev => ({ ...prev, [cat]: true }));
         } catch (e) { console.error(e); }
         setCargandoPreguntas(false);
@@ -165,6 +182,19 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
     // ── Save resource ──────────────────────────────────────────────────────────
     const guardarRecurso = async () => {
         if (!titulo.trim()) { setErrorGuardar('El título es obligatorio.'); return; }
+
+        // If question form is open, handle it before saving resource
+        if (formAbierto) {
+            const completa = formQ.trim() && formA.trim() && formW.every(w => w.trim());
+            const parcial  = formQ.trim() || formA.trim() || formW.some(w => w.trim());
+            if (completa) {
+                await agregarPregunta(); // saves question and closes form
+            } else if (parcial) {
+                setErrorGuardar('Completa o cancela la pregunta antes de guardar.');
+                return;
+            }
+        }
+
         setGuardando(true);
         setErrorGuardar('');
         try {
@@ -207,27 +237,34 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
     // ── Questions CRUD ─────────────────────────────────────────────────────────
     const agregarPregunta = async () => {
         setErrorForm('');
-        if (!formQ.trim()) { setErrorForm('Escribe la pregunta.'); return; }
-        if (!formA.trim()) { setErrorForm('Escribe la respuesta correcta.'); return; }
-        if (formW.some(w => !w.trim())) { setErrorForm('Completa las tres respuestas incorrectas.'); return; }
         if (!recursoId) { setErrorGuardar('Guarda el recurso primero (botón "Crear" arriba).'); return; }
+
+        let data = { categoria: tabActiva, tipo: formTipo, autorUid: usuario.uid, autorNombre: usuario.displayName || usuario.email, fechaCreacion: serverTimestamp(), orden: Date.now() };
+
+        if (formTipo === 'SELECCION') {
+            if (!formQ.trim()) { setErrorForm('Escribe la pregunta.'); return; }
+            if (!formA.trim()) { setErrorForm('Escribe la respuesta correcta.'); return; }
+            if (formW.some(w => !w.trim())) { setErrorForm('Completa las tres respuestas incorrectas.'); return; }
+            data = { ...data, q: formQ.trim(), a: formA.trim(), w: formW.map(s => s.trim()) };
+        } else if (formTipo === 'CORTA') {
+            if (!formQ.trim()) { setErrorForm('Escribe la pregunta.'); return; }
+            if (!formA.trim()) { setErrorForm('Escribe la respuesta.'); return; }
+            data = { ...data, q: formQ.trim(), a: formA.trim() };
+        } else if (formTipo === 'RELLENAR') {
+            if (!formBloques[0].trim()) { setErrorForm('Escribe el texto antes del hueco.'); return; }
+            if (!formBloques[1].trim()) { setErrorForm('Escribe la respuesta correcta.'); return; }
+            data = { ...data, q: formQ.trim(), bloques: [formBloques[0].trim(), formBloques[1].trim()] };
+        } else if (formTipo === 'ORDENAR') {
+            const items = formBloques.filter(b => b.trim());
+            if (items.length < 2) { setErrorForm('Añade al menos 2 elementos para ordenar.'); return; }
+            data = { ...data, q: formQ.trim(), bloques: items };
+        }
+
         setGuardandoPregunta(true);
         try {
-            const ref = await addDoc(collection(db, 'trivial_recursos', recursoId, 'preguntas'), {
-                categoria: tabActiva,
-                q: formQ.trim(), a: formA.trim(), w: formW.map(s => s.trim()),
-                autorUid: usuario.uid, autorNombre: usuario.displayName || usuario.email,
-                fechaCreacion: serverTimestamp(),
-            });
-            setPreguntas(prev => ({
-                ...prev,
-                [tabActiva]: [...prev[tabActiva], {
-                    id: ref.id, categoria: tabActiva,
-                    q: formQ.trim(), a: formA.trim(), w: formW.map(s => s.trim()),
-                    autorUid: usuario.uid, autorNombre: usuario.displayName || usuario.email,
-                }]
-            }));
-            setFormQ(''); setFormA(''); setFormW(['', '', '']); setFormAbierto(false);
+            const ref = await addDoc(collection(db, 'trivial_recursos', recursoId, 'preguntas'), data);
+            setPreguntas(prev => ({ ...prev, [tabActiva]: [...prev[tabActiva], { id: ref.id, ...data }] }));
+            setFormQ(''); setFormA(''); setFormW(['', '', '']); setFormBloques(['', '']); setFormAbierto(false);
         } catch (e) { console.error(e); setErrorForm('Error al guardar la pregunta.'); }
         setGuardandoPregunta(false);
     };
@@ -240,6 +277,58 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
             setPreguntas(prev => ({ ...prev, [tabActiva]: prev[tabActiva].filter(p => p.id !== pregId) }));
         } catch (e) { console.error(e); }
     };
+
+    const moverPregunta = async (idx, dir) => {
+        const lista = [...pregsCat];
+        const otroIdx = idx + dir;
+        if (otroIdx < 0 || otroIdx >= lista.length) return;
+        const a = lista[idx];
+        const b = lista[otroIdx];
+        const ordenA = a.orden ?? idx * 1000;
+        const ordenB = b.orden ?? otroIdx * 1000;
+        try {
+            await Promise.all([
+                updateDoc(doc(db, 'trivial_recursos', recursoId, 'preguntas', a.id), { orden: ordenB }),
+                updateDoc(doc(db, 'trivial_recursos', recursoId, 'preguntas', b.id), { orden: ordenA }),
+            ]);
+            const nueva = [...lista];
+            nueva[idx]      = { ...a, orden: ordenB };
+            nueva[otroIdx]  = { ...b, orden: ordenA };
+            nueva.sort((x, y) => (x.orden ?? 0) - (y.orden ?? 0));
+            setPreguntas(prev => ({ ...prev, [tabActiva]: nueva }));
+        } catch (e) { console.error(e); }
+    };
+
+    const abrirEdicion = (p) => {
+        setEditandoPregId(p.id);
+        setEditForm({ tipo: p.tipo || 'SELECCION', q: p.q || '', a: p.a || '', w: [...(p.w || ['', '', ''])], bloques: [...(p.bloques || ['', ''])], autorNombre: p.autorNombre || '' });
+    };
+
+    const guardarEdicion = async () => {
+        setGuardandoEdicion(true);
+        try {
+            let upd = { tipo: editForm.tipo, autorNombre: editForm.autorNombre.trim() };
+            if (editForm.tipo === 'SELECCION') {
+                upd = { ...upd, q: editForm.q.trim(), a: editForm.a.trim(), w: editForm.w.map(s => s.trim()) };
+            } else if (editForm.tipo === 'CORTA') {
+                upd = { ...upd, q: editForm.q.trim(), a: editForm.a.trim() };
+            } else if (editForm.tipo === 'RELLENAR') {
+                upd = { ...upd, q: editForm.q.trim(), bloques: editForm.bloques.map(s => s.trim()) };
+            } else if (editForm.tipo === 'ORDENAR') {
+                upd = { ...upd, q: editForm.q.trim(), bloques: editForm.bloques.filter(s => s.trim()) };
+            }
+            await updateDoc(doc(db, 'trivial_recursos', recursoId, 'preguntas', editandoPregId), upd);
+            setPreguntas(prev => ({
+                ...prev,
+                [tabActiva]: prev[tabActiva].map(p => p.id === editandoPregId ? { ...p, ...upd } : p)
+            }));
+            setEditandoPregId(null);
+            setEditForm(null);
+        } catch (e) { console.error(e); }
+        setGuardandoEdicion(false);
+    };
+
+    const cancelarEdicion = () => { setEditandoPregId(null); setEditForm(null); };
 
     const cambiarCategoriaPregunta = async (pregId, nuevaCat) => {
         if (!nuevaCat || nuevaCat === tabActiva) return;
@@ -480,16 +569,60 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                             </button>
                             {formAbierto && (
                                 <div style={{ padding: '0 18px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                                    <textarea value={formQ} onChange={e => setFormQ(e.target.value)} placeholder="¿Cuál es la pregunta?" rows={2} style={{ width: '100%', boxSizing: 'border-box', background: '#0f172a', border: '1px solid #334155', borderRadius: 8, color: '#f1f5f9', padding: '10px 13px', fontSize: '0.9rem', resize: 'vertical', fontFamily: 'inherit', outline: 'none' }} />
-                                    <input value={formA} onChange={e => setFormA(e.target.value)} placeholder="✓ Respuesta correcta" style={{ background: '#0d2b1b', border: '2px solid #2ecc71', borderRadius: 8, color: '#4ade80', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
-                                    {formW.map((w, i) => (
-                                        <input key={i} value={w} onChange={e => { const nw = [...formW]; nw[i] = e.target.value; setFormW(nw); }} placeholder={`✗ Respuesta incorrecta ${i + 1}`} style={{ background: '#2a0d0d', border: '2px solid #e74c3c', borderRadius: 8, color: '#fca5a5', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
-                                    ))}
+                                    {/* Tipo de pregunta */}
+                                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                        <span style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>Tipo:</span>
+                                        <select value={formTipo} onChange={e => { setFormTipo(e.target.value); setFormBloques(['', '']); }} style={{ background: '#0f172a', border: `1px solid ${catHex}60`, borderRadius: 8, color: '#f1f5f9', padding: '7px 10px', fontSize: '0.84rem', fontFamily: 'inherit', outline: 'none', cursor: 'pointer', flex: 1 }}>
+                                            <option value="SELECCION">🔘 Selección múltiple</option>
+                                            <option value="CORTA">✏️ Respuesta corta</option>
+                                            <option value="RELLENAR">📝 Rellenar el hueco</option>
+                                            <option value="ORDENAR">🔢 Ordenar elementos</option>
+                                        </select>
+                                    </div>
+
+                                    {/* Campos comunes: pregunta principal */}
+                                    {(formTipo === 'SELECCION' || formTipo === 'CORTA' || formTipo === 'ORDENAR') && (
+                                        <textarea value={formQ} onChange={e => setFormQ(e.target.value)} placeholder={formTipo === 'ORDENAR' ? 'Instrucción (opcional): ej. "Ordena de mayor a menor…"' : '¿Cuál es la pregunta?'} rows={2} style={{ width: '100%', boxSizing: 'border-box', background: '#0f172a', border: '1px solid #334155', borderRadius: 8, color: '#f1f5f9', padding: '10px 13px', fontSize: '0.9rem', resize: 'vertical', fontFamily: 'inherit', outline: 'none' }} />
+                                    )}
+
+                                    {/* SELECCION: correcta + 3 incorrectas */}
+                                    {formTipo === 'SELECCION' && (<>
+                                        <input value={formA} onChange={e => setFormA(e.target.value)} placeholder="✓ Respuesta correcta" style={{ background: '#0d2b1b', border: '2px solid #2ecc71', borderRadius: 8, color: '#4ade80', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
+                                        {formW.map((w, i) => (
+                                            <input key={i} value={w} onChange={e => { const nw = [...formW]; nw[i] = e.target.value; setFormW(nw); }} placeholder={`✗ Respuesta incorrecta ${i + 1}`} style={{ background: '#2a0d0d', border: '2px solid #e74c3c', borderRadius: 8, color: '#fca5a5', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
+                                        ))}
+                                    </>)}
+
+                                    {/* CORTA: solo respuesta */}
+                                    {formTipo === 'CORTA' && (
+                                        <input value={formA} onChange={e => setFormA(e.target.value)} placeholder="✓ Respuesta (se compara ignorando acentos y mayúsculas)" style={{ background: '#0d2b1b', border: '2px solid #2ecc71', borderRadius: 8, color: '#4ade80', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
+                                    )}
+
+                                    {/* RELLENAR: texto + hueco + respuesta */}
+                                    {formTipo === 'RELLENAR' && (<>
+                                        <div style={{ color: '#64748b', fontSize: '0.78rem' }}>Escribe el texto dividido en dos partes. El hueco irá entre medias.</div>
+                                        <input value={formBloques[0]} onChange={e => setFormBloques(b => [e.target.value, b[1]])} placeholder="Texto antes del hueco: ej. «La capital de Francia es»" style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 8, color: '#f1f5f9', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
+                                        <input value={formBloques[1]} onChange={e => setFormBloques(b => [b[0], e.target.value])} placeholder="✓ Respuesta correcta (lo que va en el hueco): ej. «París»" style={{ background: '#0d2b1b', border: '2px solid #2ecc71', borderRadius: 8, color: '#4ade80', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
+                                    </>)}
+
+                                    {/* ORDENAR: lista dinámica de ítems */}
+                                    {formTipo === 'ORDENAR' && (<>
+                                        <div style={{ color: '#64748b', fontSize: '0.78rem' }}>Añade los elementos en el orden correcto. Los alumnos los recibirán mezclados.</div>
+                                        {formBloques.map((b, i) => (
+                                            <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                                <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700, minWidth: 18 }}>{i + 1}.</span>
+                                                <input value={b} onChange={e => setFormBloques(prev => { const n = [...prev]; n[i] = e.target.value; return n; })} placeholder={`Elemento ${i + 1}`} style={{ flex: 1, background: '#0f172a', border: '1px solid #475569', borderRadius: 8, color: '#f1f5f9', padding: '8px 12px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
+                                                {formBloques.length > 2 && <button onClick={() => setFormBloques(prev => prev.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '1rem', padding: '0 4px' }}>✕</button>}
+                                            </div>
+                                        ))}
+                                        <button onClick={() => setFormBloques(prev => [...prev, ''])} style={{ background: '#0f172a', border: '1px dashed #475569', color: '#64748b', borderRadius: 8, padding: '7px', cursor: 'pointer', fontSize: '0.82rem' }}>+ Añadir elemento</button>
+                                    </>)}
+
                                     {errorForm && <div style={{ color: '#fca5a5', fontSize: '0.82rem' }}>⚠ {errorForm}</div>}
                                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                                        <button onClick={() => { setFormAbierto(false); setFormQ(''); setFormA(''); setFormW(['', '', '']); setErrorForm(''); }} style={{ background: '#334155', border: 'none', color: '#94a3b8', padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontSize: '0.85rem' }}>Cancelar</button>
+                                        <button onClick={() => { setFormAbierto(false); setFormQ(''); setFormA(''); setFormW(['', '', '']); setFormBloques(['', '']); setErrorForm(''); }} style={{ background: '#334155', border: 'none', color: '#94a3b8', padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontSize: '0.85rem' }}>Cancelar</button>
                                         <button onClick={agregarPregunta} disabled={guardandoPregunta} style={{ background: catHex, border: 'none', color: 'white', padding: '8px 22px', borderRadius: 8, cursor: guardandoPregunta ? 'default' : 'pointer', fontWeight: 700, fontSize: '0.88rem', opacity: guardandoPregunta ? 0.6 : 1 }}>
-                                            {guardandoPregunta ? 'Guardando…' : '+ Añadir'}
+                                            {guardandoPregunta ? 'Guardando…' : '✓ Añadir pregunta'}
                                         </button>
                                     </div>
                                 </div>
@@ -509,39 +642,132 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                     {/* ── Accepted question cards ── */}
                     {pregsCat.map((p, idx) => {
                         const puedeEliminar = esCreador || p.autorUid === usuario?.uid;
+                        const editando      = esCreador && editandoPregId === p.id;
+                        const tipo          = p.tipo || 'SELECCION';
+                        const tipoLabel     = { SELECCION: '🔘', CORTA: '✏️', RELLENAR: '📝', ORDENAR: '🔢' }[tipo] || '🔘';
                         return (
-                            <div key={p.id} style={{ background: '#1e293b', borderRadius: 12, padding: '14px 18px', border: `1px solid ${catHex}28` }}>
-                                <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                        <div style={{ color: '#475569', fontSize: '0.72rem', marginBottom: 6 }}>#{idx + 1} · {p.autorNombre}</div>
-                                        <div style={{ color: '#f1f5f9', fontSize: '0.92rem', fontWeight: 600, marginBottom: 10, lineHeight: 1.45 }}>{p.q}</div>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                                <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#2ecc71', flexShrink: 0 }} />
-                                                <span style={{ color: '#4ade80', fontSize: '0.85rem' }}>{p.a}</span>
-                                            </div>
-                                            {p.w?.map((wr, wi) => (
-                                                <div key={wi} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#e74c3c', flexShrink: 0 }} />
-                                                    <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>{wr}</span>
-                                                </div>
+                            <div key={p.id} style={{ background: '#1e293b', borderRadius: 12, padding: '14px 18px', border: `1px solid ${editando ? catHex + '80' : catHex + '28'}` }}>
+                                {editando ? (
+                                    /* ── EDIT MODE ── */
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                            <span style={{ color: '#94a3b8', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase' }}>Editando #{idx + 1}</span>
+                                            <select value={editForm.tipo} onChange={e => setEditForm(f => ({ ...f, tipo: e.target.value, bloques: f.bloques?.length ? f.bloques : ['', ''] }))} style={{ marginLeft: 'auto', background: '#0f172a', border: `1px solid ${catHex}60`, borderRadius: 7, color: '#f1f5f9', padding: '5px 8px', fontSize: '0.8rem', fontFamily: 'inherit', outline: 'none', cursor: 'pointer' }}>
+                                                <option value="SELECCION">🔘 Selección múltiple</option>
+                                                <option value="CORTA">✏️ Respuesta corta</option>
+                                                <option value="RELLENAR">📝 Rellenar el hueco</option>
+                                                <option value="ORDENAR">🔢 Ordenar elementos</option>
+                                            </select>
+                                        </div>
+                                        {(editForm.tipo === 'SELECCION' || editForm.tipo === 'CORTA' || editForm.tipo === 'ORDENAR') && (
+                                            <textarea value={editForm.q} onChange={e => setEditForm(f => ({ ...f, q: e.target.value }))} placeholder="Pregunta…" rows={2} style={{ width: '100%', boxSizing: 'border-box', background: '#0f172a', border: '1px solid #334155', borderRadius: 8, color: '#f1f5f9', padding: '9px 13px', fontSize: '0.9rem', resize: 'vertical', fontFamily: 'inherit', outline: 'none' }} />
+                                        )}
+                                        {editForm.tipo === 'SELECCION' && (<>
+                                            <input value={editForm.a} onChange={e => setEditForm(f => ({ ...f, a: e.target.value }))} placeholder="✓ Respuesta correcta" style={{ background: '#0d2b1b', border: '2px solid #2ecc71', borderRadius: 8, color: '#4ade80', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
+                                            {(editForm.w || ['', '', '']).map((w, i) => (
+                                                <input key={i} value={w} onChange={e => { const nw = [...(editForm.w || ['','',''])]; nw[i] = e.target.value; setEditForm(f => ({ ...f, w: nw })); }} placeholder={`✗ Incorrecta ${i + 1}`} style={{ background: '#2a0d0d', border: '2px solid #e74c3c', borderRadius: 8, color: '#fca5a5', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
                                             ))}
+                                        </>)}
+                                        {editForm.tipo === 'CORTA' && (
+                                            <input value={editForm.a} onChange={e => setEditForm(f => ({ ...f, a: e.target.value }))} placeholder="✓ Respuesta" style={{ background: '#0d2b1b', border: '2px solid #2ecc71', borderRadius: 8, color: '#4ade80', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
+                                        )}
+                                        {editForm.tipo === 'RELLENAR' && (<>
+                                            <input value={editForm.bloques?.[0] || ''} onChange={e => setEditForm(f => { const b = [...(f.bloques||['',''])]; b[0]=e.target.value; return {...f,bloques:b}; })} placeholder="Texto antes del hueco" style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 8, color: '#f1f5f9', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
+                                            <input value={editForm.bloques?.[1] || ''} onChange={e => setEditForm(f => { const b = [...(f.bloques||['',''])]; b[1]=e.target.value; return {...f,bloques:b}; })} placeholder="✓ Respuesta correcta" style={{ background: '#0d2b1b', border: '2px solid #2ecc71', borderRadius: 8, color: '#4ade80', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
+                                        </>)}
+                                        {editForm.tipo === 'ORDENAR' && (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                                {(editForm.bloques || []).map((b, i) => (
+                                                    <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                                        <span style={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 700, minWidth: 18 }}>{i + 1}.</span>
+                                                        <input value={b} onChange={e => setEditForm(f => { const n=[...f.bloques]; n[i]=e.target.value; return {...f,bloques:n}; })} style={{ flex: 1, background: '#0f172a', border: '1px solid #475569', borderRadius: 7, color: '#f1f5f9', padding: '7px 10px', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none' }} />
+                                                        {(editForm.bloques||[]).length > 2 && <button onClick={() => setEditForm(f => ({...f, bloques: f.bloques.filter((_,j)=>j!==i)}))} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '1rem' }}>✕</button>}
+                                                    </div>
+                                                ))}
+                                                <button onClick={() => setEditForm(f => ({...f, bloques: [...(f.bloques||[]), '']}))} style={{ background: '#0f172a', border: '1px dashed #475569', color: '#64748b', borderRadius: 7, padding: '6px', cursor: 'pointer', fontSize: '0.78rem' }}>+ Añadir elemento</button>
+                                            </div>
+                                        )}
+                                        <div>
+                                            <div style={{ color: '#94a3b8', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>Creado por</div>
+                                            <input value={editForm.autorNombre} onChange={e => setEditForm(f => ({ ...f, autorNombre: e.target.value }))} placeholder="Nombre del autor…" style={{ width: '100%', boxSizing: 'border-box', background: '#0f172a', border: '1px solid #334155', borderRadius: 8, color: '#94a3b8', padding: '8px 13px', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none' }} />
+                                        </div>
+                                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                                            <button onClick={cancelarEdicion} style={{ background: '#334155', border: 'none', color: '#94a3b8', padding: '7px 16px', borderRadius: 8, cursor: 'pointer', fontSize: '0.85rem' }}>Cancelar</button>
+                                            <button onClick={guardarEdicion} disabled={guardandoEdicion} style={{ background: catHex, border: 'none', color: 'white', padding: '7px 22px', borderRadius: 8, cursor: guardandoEdicion ? 'default' : 'pointer', fontWeight: 700, fontSize: '0.88rem', opacity: guardandoEdicion ? 0.6 : 1 }}>
+                                                {guardandoEdicion ? 'Guardando…' : '✓ Guardar'}
+                                            </button>
                                         </div>
                                     </div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
-                                        {esCreador && (
-                                            <select value="" onChange={e => cambiarCategoriaPregunta(p.id, e.target.value)} title="Mover a otra categoría" style={{ background: '#0f172a', border: '1px solid #334155', color: '#94a3b8', borderRadius: 7, padding: '5px 7px', fontSize: '0.75rem', cursor: 'pointer', outline: 'none', maxWidth: 110 }}>
-                                                <option value="">Mover a…</option>
-                                                {CAT_IDS.filter(id => id !== tabActiva).map(id => (
-                                                    <option key={id} value={id}>{categorias[id].emoji} {categorias[id].nombre}</option>
-                                                ))}
-                                            </select>
-                                        )}
-                                        {puedeEliminar && (
-                                            <button onClick={() => eliminarPregunta(p.id, p.autorUid)} style={{ background: '#7f1d1d30', border: '1px solid #ef444430', color: '#f87171', padding: '5px 9px', borderRadius: 7, cursor: 'pointer', fontSize: '0.8rem' }}>🗑</button>
-                                        )}
+                                ) : (
+                                    /* ── VIEW MODE ── */
+                                    <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ color: '#475569', fontSize: '0.72rem', marginBottom: 6, display: 'flex', gap: 6, alignItems: 'center' }}>
+                                                <span>{tipoLabel}</span>
+                                                <span>#{idx + 1} · {p.autorNombre}</span>
+                                            </div>
+                                            {/* Pregunta */}
+                                            {tipo !== 'RELLENAR' && p.q && (
+                                                <div style={{ color: '#f1f5f9', fontSize: '0.92rem', fontWeight: 600, marginBottom: 8, lineHeight: 1.45 }}>{p.q}</div>
+                                            )}
+                                            {/* Respuestas según tipo */}
+                                            {tipo === 'SELECCION' && (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#2ecc71', flexShrink: 0 }} />
+                                                        <span style={{ color: '#4ade80', fontSize: '0.85rem' }}>{p.a}</span>
+                                                    </div>
+                                                    {p.w?.map((wr, wi) => (
+                                                        <div key={wi} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#e74c3c', flexShrink: 0 }} />
+                                                            <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>{wr}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            {tipo === 'CORTA' && (
+                                                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#2ecc71', flexShrink: 0 }} />
+                                                    <span style={{ color: '#4ade80', fontSize: '0.85rem' }}>{p.a}</span>
+                                                </div>
+                                            )}
+                                            {tipo === 'RELLENAR' && (
+                                                <div style={{ color: '#f1f5f9', fontSize: '0.9rem', lineHeight: 1.5 }}>
+                                                    <span>{p.bloques?.[0]} </span>
+                                                    <span style={{ background: '#0d2b1b', border: '1px solid #2ecc71', color: '#4ade80', borderRadius: 5, padding: '1px 8px', fontWeight: 700 }}>{p.bloques?.[1]}</span>
+                                                </div>
+                                            )}
+                                            {tipo === 'ORDENAR' && (
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 4 }}>
+                                                    {p.bloques?.map((b, bi) => (
+                                                        <span key={bi} style={{ background: '#1e3a5f', border: '1px solid #3b82f640', color: '#93c5fd', borderRadius: 6, padding: '3px 9px', fontSize: '0.82rem' }}>{bi + 1}. {b}</span>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 5, flexShrink: 0 }}>
+                                            {/* Reorder */}
+                                            {esCreador && (<>
+                                                <button onClick={() => moverPregunta(idx, -1)} disabled={idx === 0} style={{ background: '#0f172a', border: '1px solid #334155', color: idx === 0 ? '#334155' : '#94a3b8', padding: '4px 7px', borderRadius: 6, cursor: idx === 0 ? 'default' : 'pointer', fontSize: '0.75rem', lineHeight: 1 }}>↑</button>
+                                                <button onClick={() => moverPregunta(idx, 1)} disabled={idx === pregsCat.length - 1} style={{ background: '#0f172a', border: '1px solid #334155', color: idx === pregsCat.length - 1 ? '#334155' : '#94a3b8', padding: '4px 7px', borderRadius: 6, cursor: idx === pregsCat.length - 1 ? 'default' : 'pointer', fontSize: '0.75rem', lineHeight: 1 }}>↓</button>
+                                            </>)}
+                                            {esCreador && (
+                                                <button onClick={() => abrirEdicion(p)} style={{ background: '#1e3a5f', border: '1px solid #3b82f660', color: '#60a5fa', padding: '5px 9px', borderRadius: 7, cursor: 'pointer', fontSize: '0.8rem' }}>✏️</button>
+                                            )}
+                                            {esCreador && (
+                                                <select value="" onChange={e => cambiarCategoriaPregunta(p.id, e.target.value)} title="Mover a otra categoría" style={{ background: '#0f172a', border: '1px solid #334155', color: '#94a3b8', borderRadius: 7, padding: '5px 7px', fontSize: '0.75rem', cursor: 'pointer', outline: 'none', maxWidth: 110 }}>
+                                                    <option value="">Mover a…</option>
+                                                    {CAT_IDS.filter(id => id !== tabActiva).map(id => (
+                                                        <option key={id} value={id}>{categorias[id].emoji} {categorias[id].nombre}</option>
+                                                    ))}
+                                                </select>
+                                            )}
+                                            {puedeEliminar && (
+                                                <button onClick={() => eliminarPregunta(p.id, p.autorUid)} style={{ background: '#7f1d1d30', border: '1px solid #ef444430', color: '#f87171', padding: '5px 9px', borderRadius: 7, cursor: 'pointer', fontSize: '0.8rem' }}>🗑</button>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
+                                )}
                             </div>
                         );
                     })}

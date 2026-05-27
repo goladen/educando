@@ -33,7 +33,7 @@ const IDIOMAS = [
 ];
 
 function emptyQ(defaultCat) {
-    return { tipo: 'SELECCION', q: '', a: '', w: ['', '', ''], bloques: ['', ''], lectura: '', lecturaIdioma: 'es-ES', cat: defaultCat || 'geo' };
+    return { tipo: 'SELECCION', q: '', a: '', w: ['', '', ''], bloques: ['', '', ''], alternativas: [], lectura: '', lecturaIdioma: 'es-ES', cat: defaultCat || 'geo' };
 }
 
 export default function TrivialEnvioForm({ codigoInicial, onBack }) {
@@ -81,7 +81,7 @@ export default function TrivialEnvioForm({ codigoInicial, onBack }) {
     const updateTipo = (idx, tipo) => {
         setPreguntas(prev => {
             const next = [...prev];
-            next[idx] = { ...next[idx], tipo, q: '', a: '', w: ['', '', ''], bloques: tipo === 'ORDENAR' ? ['', ''] : ['', ''] };
+            next[idx] = { ...next[idx], tipo, q: '', a: '', w: ['', '', ''], bloques: tipo === 'RELLENAR' ? ['', '', ''] : ['', ''], alternativas: [] };
             return next;
         });
     };
@@ -148,8 +148,8 @@ export default function TrivialEnvioForm({ codigoInicial, onBack }) {
             } else if (p.tipo === 'CORTA') {
                 if (!p.a.trim()) { setError(`Falta la respuesta en la pregunta ${n}.`); return; }
             } else if (p.tipo === 'RELLENAR') {
-                if (!p.bloques[0].trim()) { setError(`Escribe la frase con el hueco en la pregunta ${n}.`); return; }
-                if (!p.bloques[1].trim()) { setError(`Escribe la respuesta del hueco en la pregunta ${n}.`); return; }
+                if (!p.bloques[0].trim()) { setError(`Escribe el texto antes del hueco en la pregunta ${n}.`); return; }
+                if (!p.bloques[1].trim()) { setError(`Escribe la respuesta correcta en la pregunta ${n}.`); return; }
             } else if (p.tipo === 'ORDENAR') {
                 const items = p.bloques.filter(b => b.trim());
                 if (items.length < 2) { setError(`Añade al menos 2 elementos para ordenar en la pregunta ${n}.`); return; }
@@ -171,7 +171,12 @@ export default function TrivialEnvioForm({ codigoInicial, onBack }) {
                 };
                 if (p.tipo === 'SELECCION') return addDoc(col, { ...base, q: p.q.trim(), a: p.a.trim(), w: p.w.map(s => s.trim()) });
                 if (p.tipo === 'CORTA')     return addDoc(col, { ...base, q: p.q.trim(), a: p.a.trim() });
-                if (p.tipo === 'RELLENAR')  return addDoc(col, { ...base, q: p.bloques[0].trim(), bloques: [p.bloques[0].trim(), p.bloques[1].trim()] });
+                if (p.tipo === 'RELLENAR') {
+                    const alts = (p.alternativas || []).map(s => s.trim()).filter(Boolean);
+                    const rData = { ...base, bloques: [p.bloques[0].trim(), p.bloques[1].trim(), p.bloques[2]?.trim() || ''] };
+                    if (alts.length) rData.alternativas = alts;
+                    return addDoc(col, rData);
+                }
                 if (p.tipo === 'ORDENAR')   return addDoc(col, { ...base, q: p.q.trim(), bloques: p.bloques.filter(b => b.trim()) });
                 return Promise.resolve();
             }));
@@ -320,13 +325,27 @@ export default function TrivialEnvioForm({ codigoInicial, onBack }) {
 
                             {/* ── RELLENAR ── */}
                             {p.tipo === 'RELLENAR' && (<>
-                                <div style={{ marginBottom: 12 }}>
-                                    <label style={lbl}>Frase con el hueco <span style={{ color: '#94a3b8', fontWeight: 400 }}>(escribe ___ donde va el hueco)</span></label>
-                                    <textarea value={p.bloques[0]} onChange={e => updateBloque(idx, 0, e.target.value)} placeholder="Ej: La capital de España es ___" rows={2} style={{ ...inputBase, resize: 'vertical', fontFamily: 'inherit' }} />
+                                <div style={{ marginBottom: 10 }}>
+                                    <label style={lbl}>Texto antes del hueco</label>
+                                    <input value={p.bloques[0]} onChange={e => updateBloque(idx, 0, e.target.value)} placeholder="Ej: La capital de España es" style={inputBase} />
+                                </div>
+                                <div style={{ marginBottom: 10 }}>
+                                    <label style={{ ...lbl, color: '#16a34a' }}>✓ Respuesta correcta (lo que va en el hueco)</label>
+                                    <input value={p.bloques[1]} onChange={e => updateBloque(idx, 1, e.target.value)} placeholder="Ej: Madrid" style={{ ...inputBase, borderColor: '#86efac', background: '#f0fdf4', color: '#166534' }} />
+                                </div>
+                                <div style={{ marginBottom: 10 }}>
+                                    <label style={lbl}>Texto después del hueco <span style={{ color: '#94a3b8', fontWeight: 400 }}>(opcional)</span></label>
+                                    <input value={p.bloques[2] || ''} onChange={e => updateBloque(idx, 2, e.target.value)} placeholder="Ej: , la ciudad más grande de España" style={inputBase} />
                                 </div>
                                 <div>
-                                    <label style={{ ...lbl, color: '#16a34a' }}>✓ Palabra que rellena el hueco</label>
-                                    <input value={p.bloques[1]} onChange={e => updateBloque(idx, 1, e.target.value)} placeholder="Ej: Madrid" style={{ ...inputBase, borderColor: '#86efac', background: '#f0fdf4', color: '#166534' }} />
+                                    <label style={lbl}>Respuestas alternativas válidas <span style={{ color: '#94a3b8', fontWeight: 400 }}>(opcional)</span></label>
+                                    {(p.alternativas || []).map((alt, ai) => (
+                                        <div key={ai} style={{ display: 'flex', gap: 7, marginBottom: 6, alignItems: 'center' }}>
+                                            <input value={alt} onChange={e => { setPreguntas(prev => { const next=[...prev]; const alts=[...(next[idx].alternativas||[])]; alts[ai]=e.target.value; next[idx]={...next[idx],alternativas:alts}; return next; }); }} placeholder={`Alternativa ${ai+1}`} style={{ ...inputBase, flex: 1, marginBottom: 0 }} />
+                                            <button onClick={() => setPreguntas(prev => { const next=[...prev]; next[idx]={...next[idx],alternativas:(next[idx].alternativas||[]).filter((_,j)=>j!==ai)}; return next; })} style={{ background:'#fef2f2', border:'1px solid #fecaca', color:'#ef4444', borderRadius:6, padding:'6px 8px', cursor:'pointer', fontSize:'0.75rem', flexShrink:0 }}>✕</button>
+                                        </div>
+                                    ))}
+                                    <button onClick={() => setPreguntas(prev => { const next=[...prev]; next[idx]={...next[idx],alternativas:[...(next[idx].alternativas||[]),'']};return next; })} style={{ background:'#f0fdf4', border:'1px dashed #86efac', color:'#16a34a', borderRadius:6, padding:'6px 12px', cursor:'pointer', fontSize:'0.78rem' }}>+ Añadir alternativa</button>
                                 </div>
                             </>)}
 

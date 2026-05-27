@@ -42,6 +42,7 @@ import AlgebraApp from '../Algebra';
 import VistasDidricas from '../VistasDidricas';
 import EstadisticaApp from '../Estadistica';
 import RetosApp from '../Retos';
+import SimuladorDados from '../Probabilidad';
 import TrivialGame from '../Trivial';
 import imgPasapalabra from '../assets/icono_pasapal.png'; // Revisa si es .png o .jpg
 import imgBurbujas from '../assets/icono_burbujas.png';
@@ -588,6 +589,7 @@ export const APPS = [
 
     { id: 'POLINOMIOS',   name: 'Álgebra',      desc: 'Operaciones con polinomios.',              color: '#FF9800', emoji: '✖️', isMath: true, shareable: true },
     { id: 'ESTADISTICA',  name: 'Estadística',  desc: 'Tablas, parámetros y representación gráfica.', color: '#9C27B0', emoji: '📊', isMath: true, shareable: true },
+    { id: 'PROBABILIDAD', name: 'Probabilidad', desc: 'Simulador de dados: tipos, múltiples dados y análisis de frecuencias.', color: '#f59e0b', emoji: '🎲', isMath: true, shareable: true },
 
     { id: 'STORYCUBES', name: 'Story Cubes', desc: 'Crea historias en equipo usando dados con imágenes.', color: '#8e44ad', emoji: '🎲', shareable: true },
     { id: 'RETOS', name: 'Retos', desc: 'Conecta puntos y puzzles de lógica.', color: '#f39c12', emoji: '🧩', shareable: true },
@@ -997,6 +999,11 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
             return;
         }
 
+        if (appId === 'PROBABILIDAD') {
+            setJuegoActivo({ tipoJuego: 'PROBABILIDAD' });
+            return;
+        }
+
         if (appId === 'TRIVIAL') {
             window.history.pushState({}, '', '?juego=trivial');
             setJuegoActivo({ tipoJuego: 'TRIVIAL' });
@@ -1174,6 +1181,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
         if (juegoActivo.tipoJuego === 'GEOMETRÍA_ANALÍTICA') return <GeometriaAnalitica onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'POLINOMIOS')  return <AlgebraApp      usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'ESTADISTICA') return <EstadisticaApp  usuario={usuario} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'PROBABILIDAD') return <SimuladorDados onExit={() => setJuegoActivo(null)} />;
 
         if (juegoActivo.tipoJuego === 'SINTAXIS')    return <SintaxisGame  usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'LISTENING')   return <Listening     usuario={usuario} onExit={() => setJuegoActivo(null)} />;
@@ -1767,8 +1775,9 @@ const [entrando, setEntrando] = useState(false);
         if (appData.id === 'FUNCIONES' || juegoActivo.tipoJuego === 'FUNCIONES') return <Funciones usuario={null} onExit={handleExitGame} />;
         if (appData.id === 'GEOMETRÍA_ANALÍTICA' || juegoActivo.tipoJuego === 'GEOMETRÍA_ANALÍTICA') return <GeometriaAnalitica usuario={null} onExit={handleExitGame} />;
         if (appData.id === 'POLINOMIOS'  || juegoActivo.tipoJuego === 'POLINOMIOS')  return <AlgebraApp     usuario={null} onExit={handleExitGame} />;
-        if (appData.id === 'ESTADISTICA' || juegoActivo.tipoJuego === 'ESTADISTICA') return <EstadisticaApp usuario={null} onExit={handleExitGame} />;
-        if (appData.id === 'RETOS'       || juegoActivo.tipoJuego === 'RETOS')       return <RetosApp                             onExit={handleExitGame} />;
+        if (appData.id === 'ESTADISTICA'  || juegoActivo.tipoJuego === 'ESTADISTICA')  return <EstadisticaApp  usuario={null} onExit={handleExitGame} />;
+        if (appData.id === 'PROBABILIDAD' || juegoActivo.tipoJuego === 'PROBABILIDAD') return <SimuladorDados                    onExit={handleExitGame} />;
+        if (appData.id === 'RETOS'        || juegoActivo.tipoJuego === 'RETOS')        return <RetosApp                          onExit={handleExitGame} />;
 
     }
     // --- NUEVO: ATAJO PARA JUEGOS CON MENÚ PROPIO ---

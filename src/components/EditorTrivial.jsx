@@ -83,7 +83,7 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
     // ── Question preview ───────────────────────────────────────────────────────
     const [previewPregunta,  setPreviewPregunta]  = useState(null);
     const [previewRevelado,  setPreviewRevelado]  = useState(false);
-    const [previewOrden,     setPreviewOrden]     = useState([]);
+    const [previewOrden,     setPreviewOrden]     = useState({ available: [], slots: [] });
     const [previewInput,     setPreviewInput]     = useState('');
     const [previewHablando,  setPreviewHablando]  = useState(false);
 
@@ -94,6 +94,7 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
     const [formA,              setFormA]            = useState('');
     const [formW,              setFormW]            = useState(['', '', '']);
     const [formBloques,        setFormBloques]      = useState(['', '']);
+    const [formAlternativas,   setFormAlternativas] = useState([]);
     const [formLectura,        setFormLectura]      = useState('');
     const [formLecturaIdioma,  setFormLecturaIdioma]= useState('es-ES');
     const [guardandoPregunta,  setGuardandoPregunta]= useState(false);
@@ -124,10 +125,14 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
     }, [emojiPickerAbierto]);
 
     useEffect(() => {
+        if (recursoId) cargarTodasLasPreguntas();
+    }, [recursoId]);
+
+    useEffect(() => {
         if (recursoId && !preguntasCargadas[tabActiva]) cargarPreguntas(tabActiva);
         // Clear question form when switching tabs
         setFormAbierto(false);
-        setFormTipo('SELECCION'); setFormQ(''); setFormA(''); setFormW(['', '', '']); setFormBloques(['', '']);
+        setFormTipo('SELECCION'); setFormQ(''); setFormA(''); setFormW(['', '', '']); setFormBloques(['', '']); setFormAlternativas([]);
         setFormLectura(''); setFormLecturaIdioma('es-ES'); setErrorForm('');
     }, [recursoId, tabActiva]);
 
@@ -136,6 +141,28 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
     }, [recursoId]);
 
     // ── Loaders ────────────────────────────────────────────────────────────────
+    const cargarTodasLasPreguntas = async () => {
+        setCargandoPreguntas(true);
+        try {
+            const snap = await getDocs(
+                query(collection(db, 'trivial_recursos', recursoId, 'preguntas'), orderBy('fechaCreacion', 'asc'))
+            );
+            const por_cat = { geo: [], esp: [], his: [], art: [], cie: [], dep: [] };
+            for (const d of snap.docs) {
+                const data = { id: d.id, ...d.data() };
+                if (por_cat[data.categoria]) por_cat[data.categoria].push(data);
+            }
+            const cargadas = {};
+            for (const cat of CAT_IDS) {
+                por_cat[cat].sort((a, b) => (a.orden ?? a.fechaCreacion?.seconds ?? 0) - (b.orden ?? b.fechaCreacion?.seconds ?? 0));
+                cargadas[cat] = true;
+            }
+            setPreguntas(por_cat);
+            setPreguntasCargadas(cargadas);
+        } catch (e) { console.error(e); }
+        setCargandoPreguntas(false);
+    };
+
     const cargarPreguntas = async (cat) => {
         setCargandoPreguntas(true);
         try {
@@ -285,7 +312,9 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
         } else if (formTipo === 'RELLENAR') {
             if (!formBloques[0].trim()) { setErrorForm('Escribe el texto antes del hueco.'); return; }
             if (!formBloques[1].trim()) { setErrorForm('Escribe la respuesta correcta.'); return; }
-            data = { ...data, q: formQ.trim(), bloques: [formBloques[0].trim(), formBloques[1].trim()] };
+            const alts = formAlternativas.map(s => s.trim()).filter(Boolean);
+            data = { ...data, bloques: [formBloques[0].trim(), formBloques[1].trim(), formBloques[2]?.trim() || ''] };
+            if (alts.length) data = { ...data, alternativas: alts };
         } else if (formTipo === 'ORDENAR') {
             const items = formBloques.filter(b => b.trim());
             if (items.length < 2) { setErrorForm('Añade al menos 2 elementos para ordenar.'); return; }
@@ -296,7 +325,7 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
         try {
             const ref = await addDoc(collection(db, 'trivial_recursos', recursoId, 'preguntas'), data);
             setPreguntas(prev => ({ ...prev, [tabActiva]: [...prev[tabActiva], { id: ref.id, ...data }] }));
-            setFormQ(''); setFormA(''); setFormW(['', '', '']); setFormBloques(['', '']);
+            setFormQ(''); setFormA(''); setFormW(['', '', '']); setFormBloques(['', '']); setFormAlternativas([]);
             setFormLectura(''); setFormLecturaIdioma('es-ES'); setFormAbierto(false);
         } catch (e) { console.error(e); setErrorForm('Error al guardar la pregunta.'); }
         setGuardandoPregunta(false);
@@ -334,7 +363,9 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
 
     const abrirEdicion = (p) => {
         setEditandoPregId(p.id);
-        setEditForm({ tipo: p.tipo || 'SELECCION', q: p.q || '', a: p.a || '', w: [...(p.w || ['', '', ''])], bloques: [...(p.bloques || ['', ''])], autorNombre: p.autorNombre || '', lectura: p.lectura || '', lecturaIdioma: p.lecturaIdioma || 'es-ES' });
+        const bloques = [...(p.bloques || ['', ''])];
+        while (bloques.length < 3) bloques.push('');
+        setEditForm({ tipo: p.tipo || 'SELECCION', q: p.q || '', a: p.a || '', w: [...(p.w || ['', '', ''])], bloques, alternativas: [...(p.alternativas || [])], autorNombre: p.autorNombre || '', lectura: p.lectura || '', lecturaIdioma: p.lecturaIdioma || 'es-ES' });
     };
 
     const guardarEdicion = async () => {
@@ -349,7 +380,10 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
             } else if (editForm.tipo === 'CORTA') {
                 upd = { ...upd, q: editForm.q.trim(), a: editForm.a.trim() };
             } else if (editForm.tipo === 'RELLENAR') {
-                upd = { ...upd, q: editForm.q.trim(), bloques: editForm.bloques.map(s => s.trim()) };
+                const b = (editForm.bloques || ['', '', '']).map(s => s.trim());
+                while (b.length < 3) b.push('');
+                const alts = (editForm.alternativas || []).map(s => s.trim()).filter(Boolean);
+                upd = { ...upd, bloques: b, alternativas: alts };
             } else if (editForm.tipo === 'ORDENAR') {
                 upd = { ...upd, q: editForm.q.trim(), bloques: editForm.bloques.filter(s => s.trim()) };
             }
@@ -374,10 +408,10 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
             shuffledAnswers = [p.a, ...(p.w || [])].sort(() => Math.random() - 0.5);
         }
         if (tipo === 'ORDENAR' && p.bloques) {
-            shuffledOrden = [...p.bloques].sort(() => Math.random() - 0.5).map(t => ({ texto: t, enSlot: false }));
+            shuffledOrden = [...p.bloques].sort(() => Math.random() - 0.5);
         }
         setPreviewPregunta({ ...p, shuffledAnswers });
-        setPreviewOrden(shuffledOrden);
+        setPreviewOrden(tipo === 'ORDENAR' ? { available: shuffledOrden, slots: [] } : { available: [], slots: [] });
         setPreviewInput('');
         setPreviewRevelado(false);
         setPreviewHablando(false);
@@ -422,7 +456,7 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
             let data = base;
             if (tipo === 'SELECCION') data = { ...base, q: pend.q, a: pend.a, w: pend.w };
             else if (tipo === 'CORTA') data = { ...base, q: pend.q, a: pend.a };
-            else if (tipo === 'RELLENAR') data = { ...base, q: pend.bloques?.[0] || pend.q || '', bloques: pend.bloques };
+            else if (tipo === 'RELLENAR') { const alts = pend.alternativas?.length ? { alternativas: pend.alternativas } : {}; data = { ...base, bloques: pend.bloques, ...alts }; }
             else if (tipo === 'ORDENAR') data = { ...base, q: pend.q, bloques: pend.bloques };
             const ref = await addDoc(collection(db, 'trivial_recursos', recursoId, 'preguntas'), data);
             await deleteDoc(doc(db, 'trivial_recursos', recursoId, 'preguntas_pendientes', pend.id));
@@ -486,8 +520,8 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
             const p    = previewPregunta;
             const tipo = p.tipo || 'SELECCION';
             const hex  = CAT_HEX[tabActiva];
-            const elegidos    = previewOrden.filter(s => s.enSlot);
-            const disponibles = previewOrden.filter(s => !s.enSlot);
+            const elegidos    = previewOrden.slots || [];
+            const disponibles = previewOrden.available || [];
             const ordenCompleto = elegidos.length === (p.bloques?.length || 0);
             return (
                 <div style={{ position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
@@ -559,15 +593,16 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                                 <span style={{ borderBottom: `3px solid ${hex}`, padding: '0 12px', color: previewRevelado ? '#4ade80' : hex, fontWeight: 700 }}>
                                     {previewRevelado ? p.bloques?.[1] : '___'}
                                 </span>
+                                {p.bloques?.[2] && <span> {p.bloques[2]}</span>}
                             </div>
                             {!previewRevelado && (
                                 <input value={previewInput} onChange={e => setPreviewInput(e.target.value)} placeholder="Completa el hueco…" style={{ width: '100%', boxSizing: 'border-box', background: '#0f172a', border: `2px solid ${hex}`, borderRadius: 10, color: hex, padding: '14px 16px', fontSize: '1rem', fontFamily: 'inherit', outline: 'none' }} />
                             )}
-                            {!previewRevelado && previewInput.trim() && (
-                                <div style={{ marginTop: 10, color: cleanPrev(previewInput) === cleanPrev(p.bloques?.[1]) ? '#4ade80' : '#f87171', fontSize: '0.85rem', fontWeight: 700 }}>
-                                    {cleanPrev(previewInput) === cleanPrev(p.bloques?.[1]) ? '✓ Correcto' : '✗ Incorrecto'}
-                                </div>
-                            )}
+                            {!previewRevelado && previewInput.trim() && (() => {
+                                const alts = p.alternativas || [];
+                                const ok = cleanPrev(previewInput) === cleanPrev(p.bloques?.[1]) || alts.some(a => cleanPrev(previewInput) === cleanPrev(a));
+                                return <div style={{ marginTop: 10, color: ok ? '#4ade80' : '#f87171', fontSize: '0.85rem', fontWeight: 700 }}>{ok ? '✓ Correcto' : '✗ Incorrecto'}</div>;
+                            })()}
                         </>)}
 
                         {tipo === 'ORDENAR' && (<>
@@ -575,17 +610,17 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                             <div style={{ minHeight: 44, background: '#0f172a', borderRadius: 10, padding: '8px 10px', marginBottom: 10, border: '2px dashed #334155', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                                 {elegidos.length === 0 && <span style={{ color: '#475569', fontSize: '0.85rem', alignSelf: 'center' }}>Toca los elementos en el orden correcto</span>}
                                 {elegidos.map((s, i) => (
-                                    <button key={i} onClick={() => setPreviewOrden(prev => prev.map(x => x.texto === s.texto ? { ...x, enSlot: false } : x))}
-                                        style={{ background: previewRevelado ? (p.bloques?.[i] === s.texto ? '#166534' : '#7f1d1d') : '#1d4ed8', border: 'none', color: 'white', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontSize: '0.95rem', fontWeight: 600 }}>
-                                        {i + 1}. {s.texto}
+                                    <button key={i} onClick={() => setPreviewOrden(prev => ({ slots: prev.slots.filter(t => t !== s), available: [...prev.available, s] }))}
+                                        style={{ background: previewRevelado ? (p.bloques?.[i] === s ? '#166534' : '#7f1d1d') : '#1d4ed8', border: 'none', color: 'white', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontSize: '0.95rem', fontWeight: 600 }}>
+                                        {i + 1}. {s}
                                     </button>
                                 ))}
                             </div>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
                                 {disponibles.map((s, i) => (
-                                    <button key={i} onClick={() => setPreviewOrden(prev => prev.map(x => x.texto === s.texto ? { ...x, enSlot: true } : x))}
+                                    <button key={i} onClick={() => setPreviewOrden(prev => ({ available: prev.available.filter(t => t !== s), slots: [...prev.slots, s] }))}
                                         style={{ background: '#334155', border: '1px solid #475569', color: '#e2e8f0', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontSize: '0.95rem' }}>
-                                        {s.texto}
+                                        {s}
                                     </button>
                                 ))}
                             </div>
@@ -707,11 +742,10 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                                                                 {pend.w?.map((w, i) => <span key={i} style={{ color: '#64748b', fontSize: '0.82rem' }}>✗ {w}</span>)}
                                                             </>)}
                                                             {tipo === 'CORTA' && <span style={{ color: '#4ade80', fontSize: '0.82rem' }}>✓ {pend.a}</span>}
-                                                            {tipo === 'RELLENAR' && pend.bloques?.map((b, i) => (
-                                                                <span key={i} style={{ color: i === 1 ? '#4ade80' : '#94a3b8', fontSize: '0.82rem' }}>
-                                                                    {i === 0 ? '📝 ' : '✓ '}{b}
-                                                                </span>
-                                                            ))}
+                                                            {tipo === 'RELLENAR' && (<>
+                                                                {pend.bloques?.[0] && <span style={{ color: '#94a3b8', fontSize: '0.82rem' }}>📝 {pend.bloques[0]} <span style={{ color: '#4ade80', background: '#0d2b1b', borderRadius: 3, padding: '0 5px' }}>{pend.bloques[1]}</span>{pend.bloques[2] ? ' ' + pend.bloques[2] : ''}</span>}
+                                                                {pend.alternativas?.length > 0 && <span style={{ color: '#64748b', fontSize: '0.78rem' }}>alt: {pend.alternativas.join(', ')}</span>}
+                                                            </>)}
                                                             {tipo === 'ORDENAR' && pend.bloques?.map((b, i) => (
                                                                 <span key={i} style={{ color: '#94a3b8', fontSize: '0.82rem' }}>{i + 1}. {b}</span>
                                                             ))}
@@ -800,13 +834,13 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
 
                     {/* ── Add question form ── */}
                     {recursoId && (
-                        <div style={{ background: '#1e293b', borderRadius: 14, border: `1px solid ${catHex}50`, overflow: 'hidden' }}>
-                            <button onClick={() => { setFormAbierto(p => !p); setErrorForm(''); }} style={{ width: '100%', padding: '13px 18px', background: 'none', border: 'none', color: catHex, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.92rem', fontWeight: 700 }}>
+                        <div style={{ background: '#1e293b', borderRadius: 14, border: `1px solid ${catHex}50` }}>
+                            <button onClick={() => { setFormAbierto(p => !p); setErrorForm(''); }} style={{ width: '100%', padding: '13px 18px', background: 'none', border: 'none', color: catHex, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.92rem', fontWeight: 700, borderRadius: formAbierto ? '14px 14px 0 0' : 14 }}>
                                 <span style={{ fontSize: '1.1rem', transition: 'transform 0.2s', transform: formAbierto ? 'rotate(45deg)' : 'none', display: 'inline-block' }}>＋</span>
                                 Añadir pregunta de {catData.nombre}
                             </button>
                             {formAbierto && (
-                                <div style={{ padding: '0 18px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                <div style={{ padding: '0 18px 18px', display: 'flex', flexDirection: 'column', gap: 10, borderTop: `1px solid ${catHex}30` }}>
                                     {/* Tipo de pregunta */}
                                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                                         <span style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>Tipo:</span>
@@ -825,22 +859,32 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
 
                                     {/* SELECCION: correcta + 3 incorrectas */}
                                     {formTipo === 'SELECCION' && (<>
-                                        <input value={formA} onChange={e => setFormA(e.target.value)} placeholder="✓ Respuesta correcta" style={{ background: '#0d2b1b', border: '2px solid #2ecc71', borderRadius: 8, color: '#4ade80', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
+                                        <input value={formA} onChange={e => setFormA(e.target.value)} placeholder="✓ Respuesta correcta" style={{ width: '100%', boxSizing: 'border-box', background: '#0d2b1b', border: '2px solid #2ecc71', borderRadius: 8, color: '#4ade80', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
                                         {formW.map((w, i) => (
-                                            <input key={i} value={w} onChange={e => { const nw = [...formW]; nw[i] = e.target.value; setFormW(nw); }} placeholder={`✗ Respuesta incorrecta ${i + 1}`} style={{ background: '#2a0d0d', border: '2px solid #e74c3c', borderRadius: 8, color: '#fca5a5', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
+                                            <input key={i} value={w} onChange={e => { const nw = [...formW]; nw[i] = e.target.value; setFormW(nw); }} placeholder={`✗ Respuesta incorrecta ${i + 1}`} style={{ width: '100%', boxSizing: 'border-box', background: '#2a0d0d', border: '2px solid #e74c3c', borderRadius: 8, color: '#fca5a5', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
                                         ))}
                                     </>)}
 
                                     {/* CORTA: solo respuesta */}
                                     {formTipo === 'CORTA' && (
-                                        <input value={formA} onChange={e => setFormA(e.target.value)} placeholder="✓ Respuesta (se compara ignorando acentos y mayúsculas)" style={{ background: '#0d2b1b', border: '2px solid #2ecc71', borderRadius: 8, color: '#4ade80', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
+                                        <input value={formA} onChange={e => setFormA(e.target.value)} placeholder="✓ Respuesta (se compara ignorando acentos y mayúsculas)" style={{ width: '100%', boxSizing: 'border-box', background: '#0d2b1b', border: '2px solid #2ecc71', borderRadius: 8, color: '#4ade80', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
                                     )}
 
                                     {/* RELLENAR: texto + hueco + respuesta */}
                                     {formTipo === 'RELLENAR' && (<>
-                                        <div style={{ color: '#64748b', fontSize: '0.78rem' }}>Escribe el texto dividido en dos partes. El hueco irá entre medias.</div>
-                                        <input value={formBloques[0]} onChange={e => setFormBloques(b => [e.target.value, b[1]])} placeholder="Texto antes del hueco: ej. «La capital de Francia es»" style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 8, color: '#f1f5f9', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
-                                        <input value={formBloques[1]} onChange={e => setFormBloques(b => [b[0], e.target.value])} placeholder="✓ Respuesta correcta (lo que va en el hueco): ej. «París»" style={{ background: '#0d2b1b', border: '2px solid #2ecc71', borderRadius: 8, color: '#4ade80', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
+                                        <div style={{ color: '#64748b', fontSize: '0.78rem' }}>El jugador verá el texto antes y después del hueco, y debe escribir la respuesta.</div>
+                                        <input value={formBloques[0]} onChange={e => setFormBloques(b => [e.target.value, b[1] || '', b[2] || ''])} placeholder="Texto antes del hueco: ej. «La capital de Francia es»" style={{ width: '100%', boxSizing: 'border-box', background: '#0f172a', border: '1px solid #334155', borderRadius: 8, color: '#f1f5f9', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
+                                        <input value={formBloques[1] || ''} onChange={e => setFormBloques(b => [b[0] || '', e.target.value, b[2] || ''])} placeholder="✓ Respuesta correcta: ej. «París»" style={{ width: '100%', boxSizing: 'border-box', background: '#0d2b1b', border: '2px solid #2ecc71', borderRadius: 8, color: '#4ade80', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
+                                        <input value={formBloques[2] || ''} onChange={e => setFormBloques(b => [b[0] || '', b[1] || '', e.target.value])} placeholder="Texto después del hueco (opcional): ej. «, ciudad de la luz»" style={{ width: '100%', boxSizing: 'border-box', background: '#0f172a', border: '1px solid #334155', borderRadius: 8, color: '#f1f5f9', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
+                                        {/* Alternativas */}
+                                        <div style={{ color: '#64748b', fontSize: '0.76rem', marginTop: 4 }}>Respuestas alternativas válidas (opcional — se ignoran acentos y mayúsculas):</div>
+                                        {formAlternativas.map((alt, i) => (
+                                            <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                                <input value={alt} onChange={e => setFormAlternativas(prev => { const n = [...prev]; n[i] = e.target.value; return n; })} placeholder={`Alternativa ${i + 1}`} style={{ flex: 1, background: '#0d2b1b', border: '1px solid #2ecc7160', borderRadius: 7, color: '#4ade80', padding: '7px 11px', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none' }} />
+                                                <button onClick={() => setFormAlternativas(prev => prev.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '1rem', padding: '0 4px' }}>✕</button>
+                                            </div>
+                                        ))}
+                                        <button onClick={() => setFormAlternativas(prev => [...prev, ''])} style={{ background: '#0f172a', border: '1px dashed #2ecc7140', color: '#4ade80', borderRadius: 7, padding: '6px 10px', cursor: 'pointer', fontSize: '0.78rem', alignSelf: 'flex-start' }}>+ Añadir alternativa</button>
                                     </>)}
 
                                     {/* ORDENAR: lista dinámica de ítems */}
@@ -870,7 +914,7 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
 
                                     {errorForm && <div style={{ color: '#fca5a5', fontSize: '0.82rem' }}>⚠ {errorForm}</div>}
                                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                                        <button onClick={() => { setFormAbierto(false); setFormQ(''); setFormA(''); setFormW(['', '', '']); setFormBloques(['', '']); setErrorForm(''); }} style={{ background: '#334155', border: 'none', color: '#94a3b8', padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontSize: '0.85rem' }}>Cancelar</button>
+                                        <button onClick={() => { setFormAbierto(false); setFormQ(''); setFormA(''); setFormW(['', '', '']); setFormBloques(['', '']); setFormAlternativas([]); setErrorForm(''); }} style={{ background: '#334155', border: 'none', color: '#94a3b8', padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontSize: '0.85rem' }}>Cancelar</button>
                                         <button onClick={agregarPregunta} disabled={guardandoPregunta} style={{ background: catHex, border: 'none', color: 'white', padding: '8px 22px', borderRadius: 8, cursor: guardandoPregunta ? 'default' : 'pointer', fontWeight: 700, fontSize: '0.88rem', opacity: guardandoPregunta ? 0.6 : 1 }}>
                                             {guardandoPregunta ? 'Guardando…' : '✓ Añadir pregunta'}
                                         </button>
@@ -922,8 +966,17 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                                             <input value={editForm.a} onChange={e => setEditForm(f => ({ ...f, a: e.target.value }))} placeholder="✓ Respuesta" style={{ background: '#0d2b1b', border: '2px solid #2ecc71', borderRadius: 8, color: '#4ade80', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
                                         )}
                                         {editForm.tipo === 'RELLENAR' && (<>
-                                            <input value={editForm.bloques?.[0] || ''} onChange={e => setEditForm(f => { const b = [...(f.bloques||['',''])]; b[0]=e.target.value; return {...f,bloques:b}; })} placeholder="Texto antes del hueco" style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 8, color: '#f1f5f9', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
-                                            <input value={editForm.bloques?.[1] || ''} onChange={e => setEditForm(f => { const b = [...(f.bloques||['',''])]; b[1]=e.target.value; return {...f,bloques:b}; })} placeholder="✓ Respuesta correcta" style={{ background: '#0d2b1b', border: '2px solid #2ecc71', borderRadius: 8, color: '#4ade80', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
+                                            <input value={editForm.bloques?.[0] || ''} onChange={e => setEditForm(f => { const b = [...(f.bloques||['','',''])]; b[0]=e.target.value; return {...f,bloques:b}; })} placeholder="Texto antes del hueco" style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 8, color: '#f1f5f9', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
+                                            <input value={editForm.bloques?.[1] || ''} onChange={e => setEditForm(f => { const b = [...(f.bloques||['','',''])]; b[1]=e.target.value; return {...f,bloques:b}; })} placeholder="✓ Respuesta correcta" style={{ background: '#0d2b1b', border: '2px solid #2ecc71', borderRadius: 8, color: '#4ade80', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
+                                            <input value={editForm.bloques?.[2] || ''} onChange={e => setEditForm(f => { const b = [...(f.bloques||['','',''])]; b[2]=e.target.value; return {...f,bloques:b}; })} placeholder="Texto después del hueco (opcional)" style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 8, color: '#f1f5f9', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
+                                            <div style={{ color: '#64748b', fontSize: '0.76rem' }}>Alternativas válidas (opcional):</div>
+                                            {(editForm.alternativas || []).map((alt, i) => (
+                                                <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                                    <input value={alt} onChange={e => setEditForm(f => { const n=[...(f.alternativas||[])]; n[i]=e.target.value; return {...f,alternativas:n}; })} placeholder={`Alternativa ${i+1}`} style={{ flex:1, background:'#0d2b1b', border:'1px solid #2ecc7160', borderRadius:7, color:'#4ade80', padding:'7px 11px', fontSize:'0.85rem', fontFamily:'inherit', outline:'none' }} />
+                                                    <button onClick={() => setEditForm(f => ({...f, alternativas: (f.alternativas||[]).filter((_,j)=>j!==i)}))} style={{ background:'none', border:'none', color:'#ef4444', cursor:'pointer', fontSize:'1rem', padding:'0 4px' }}>✕</button>
+                                                </div>
+                                            ))}
+                                            <button onClick={() => setEditForm(f => ({...f, alternativas: [...(f.alternativas||[]), '']}))} style={{ background:'#0f172a', border:'1px dashed #2ecc7140', color:'#4ade80', borderRadius:7, padding:'6px 10px', cursor:'pointer', fontSize:'0.78rem', alignSelf:'flex-start' }}>+ Añadir alternativa</button>
                                         </>)}
                                         {editForm.tipo === 'ORDENAR' && (
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -997,6 +1050,8 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                                                 <div style={{ color: '#f1f5f9', fontSize: '0.9rem', lineHeight: 1.5 }}>
                                                     <span>{p.bloques?.[0]} </span>
                                                     <span style={{ background: '#0d2b1b', border: '1px solid #2ecc71', color: '#4ade80', borderRadius: 5, padding: '1px 8px', fontWeight: 700 }}>{p.bloques?.[1]}</span>
+                                                    {p.bloques?.[2] && <span> {p.bloques[2]}</span>}
+                                                    {p.alternativas?.length > 0 && <span style={{ color: '#64748b', fontSize: '0.78rem' }}> · alt: {p.alternativas.join(', ')}</span>}
                                                 </div>
                                             )}
                                             {tipo === 'ORDENAR' && (

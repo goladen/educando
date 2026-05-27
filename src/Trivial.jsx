@@ -423,7 +423,7 @@ export default function TrivialGame({ onExit, onBuscar }) {
     const [modalData, setModalData] = useState(null);
     const [timeLeft, setTimeLeft] = useState(15);
     const [inputCorta, setInputCorta] = useState('');
-    const [ordenSlots, setOrdenSlots] = useState([]); // for ORDENAR type
+    const [ordenSlots, setOrdenSlots] = useState({ available: [], slots: [] }); // for ORDENAR type
 
     const [fuentePreguntas, setFuentePreguntas] = useState('JSON');
     const [codigoFirebase, setCodigoFirebase] = useState('');
@@ -1014,11 +1014,10 @@ export default function TrivialGame({ onExit, onBuscar }) {
         // Prepare type-specific state
         setInputCorta('');
         if (tipo === 'ORDENAR' && qData.bloques) {
-            // Shuffle for the player to sort
             const mezclado = [...qData.bloques].sort(() => Math.random() - 0.5);
-            setOrdenSlots(mezclado.map(b => ({ texto: b, enSlot: false })));
+            setOrdenSlots({ available: mezclado, slots: [] });
         } else {
-            setOrdenSlots([]);
+            setOrdenSlots({ available: [], slots: [] });
         }
 
         setMostrandoRespuesta(false);
@@ -1884,54 +1883,62 @@ export default function TrivialGame({ onExit, onBuscar }) {
                             </>);
 
                             // RELLENAR — texto con hueco
-                            if (tipo === 'RELLENAR') return (<>
-                                <div style={{ color: 'white', fontSize: isMobile ? '1.15rem' : '1.5rem', margin: isMobile ? '14px 0 18px' : '20px 0 24px', lineHeight: 1.6 }}>
-                                    <span>{qData.bloques?.[0]} </span>
-                                    <span style={{ borderBottom: '3px solid #38bdf8', padding: '0 12px', color: '#38bdf8', fontWeight: 700 }}>___</span>
-                                </div>
-                                <input
-                                    value={inputCorta}
-                                    onChange={e => setInputCorta(e.target.value)}
-                                    onKeyDown={e => { if (e.key === 'Enter' && inputCorta.trim()) responderPregunta(clean(inputCorta) === clean(qData.bloques?.[1])); }}
-                                    placeholder="Completa el hueco…"
-                                    autoFocus
-                                    style={{ width: '100%', boxSizing: 'border-box', background: '#0f172a', border: '2px solid #38bdf8', borderRadius: 10, color: '#38bdf8', padding: '14px 16px', fontSize: isMobile ? '1rem' : '1.15rem', fontFamily: 'inherit', outline: 'none', marginBottom: 12 }}
-                                />
-                                <button
-                                    onClick={() => { if (inputCorta.trim()) responderPregunta(clean(inputCorta) === clean(qData.bloques?.[1])); }}
-                                    disabled={!inputCorta.trim()}
-                                    style={{ ...st.btnAnswer, background: '#0e7490', border: 'none', fontWeight: 800, opacity: inputCorta.trim() ? 1 : 0.4 }}
-                                >Responder</button>
-                            </>);
-
-                            // ORDENAR — poner en orden
-                            if (tipo === 'ORDENAR') {
-                                const elegidos = ordenSlots.filter(s => s.enSlot);
-                                const disponibles = ordenSlots.filter(s => !s.enSlot);
-                                const completo = elegidos.length === qData.bloques?.length;
-                                const confirmarOrden = () => {
-                                    if (!completo) return;
-                                    const correcto = JSON.stringify(elegidos.map(s => s.texto)) === JSON.stringify(qData.bloques);
+                            if (tipo === 'RELLENAR') {
+                                const checkRellenar = () => {
+                                    if (!inputCorta.trim()) return;
+                                    const ans = qData.bloques?.[1];
+                                    const alts = qData.alternativas || [];
+                                    const correcto = clean(inputCorta) === clean(ans) || alts.some(a => clean(inputCorta) === clean(a));
                                     responderPregunta(correcto);
                                 };
                                 return (<>
+                                    <div style={{ color: 'white', fontSize: isMobile ? '1.15rem' : '1.5rem', margin: isMobile ? '14px 0 18px' : '20px 0 24px', lineHeight: 1.6 }}>
+                                        <span>{qData.bloques?.[0]} </span>
+                                        <span style={{ borderBottom: '3px solid #38bdf8', padding: '0 12px', color: '#38bdf8', fontWeight: 700 }}>___</span>
+                                        {qData.bloques?.[2] && <span> {qData.bloques[2]}</span>}
+                                    </div>
+                                    <input
+                                        value={inputCorta}
+                                        onChange={e => setInputCorta(e.target.value)}
+                                        onKeyDown={e => { if (e.key === 'Enter') checkRellenar(); }}
+                                        placeholder="Completa el hueco…"
+                                        autoFocus
+                                        style={{ width: '100%', boxSizing: 'border-box', background: '#0f172a', border: '2px solid #38bdf8', borderRadius: 10, color: '#38bdf8', padding: '14px 16px', fontSize: isMobile ? '1rem' : '1.15rem', fontFamily: 'inherit', outline: 'none', marginBottom: 12 }}
+                                    />
+                                    <button
+                                        onClick={checkRellenar}
+                                        disabled={!inputCorta.trim()}
+                                        style={{ ...st.btnAnswer, background: '#0e7490', border: 'none', fontWeight: 800, opacity: inputCorta.trim() ? 1 : 0.4 }}
+                                    >Responder</button>
+                                </>);
+                            }
+
+                            // ORDENAR — poner en orden
+                            if (tipo === 'ORDENAR') {
+                                const { slots: elegidos, available: disponibles } = ordenSlots;
+                                const completo = elegidos.length === qData.bloques?.length;
+                                const confirmarOrden = () => {
+                                    if (!completo) return;
+                                    responderPregunta(JSON.stringify(elegidos) === JSON.stringify(qData.bloques));
+                                };
+                                return (<>
                                     {qData.q && <h2 style={{ color: 'white', fontSize: isMobile ? '1rem' : '1.3rem', margin: isMobile ? '10px 0 14px' : '14px 0 20px', lineHeight: 1.4 }}>{qData.q}</h2>}
-                                    {/* Slots elegidos */}
+                                    {/* Slots elegidos — orden de click */}
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, minHeight: 44, background: '#0f172a', borderRadius: 10, padding: '8px 10px', marginBottom: 10, border: '2px dashed #334155' }}>
                                         {elegidos.length === 0 && <span style={{ color: '#475569', fontSize: '0.85rem', alignSelf: 'center' }}>Toca los elementos en el orden correcto</span>}
                                         {elegidos.map((s, i) => (
-                                            <button key={i} onClick={() => setOrdenSlots(prev => prev.map(x => x.texto === s.texto ? { ...x, enSlot: false } : x))}
+                                            <button key={i} onClick={() => setOrdenSlots(prev => ({ slots: prev.slots.filter(t => t !== s), available: [...prev.available, s] }))}
                                                 style={{ background: '#1d4ed8', border: 'none', color: 'white', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: 600 }}>
-                                                {i + 1}. {s.texto}
+                                                {i + 1}. {s}
                                             </button>
                                         ))}
                                     </div>
                                     {/* Disponibles */}
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
                                         {disponibles.map((s, i) => (
-                                            <button key={i} onClick={() => setOrdenSlots(prev => prev.map(x => x.texto === s.texto ? { ...x, enSlot: true } : x))}
+                                            <button key={i} onClick={() => setOrdenSlots(prev => ({ available: prev.available.filter(t => t !== s), slots: [...prev.slots, s] }))}
                                                 style={{ background: '#334155', border: '1px solid #475569', color: '#e2e8f0', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontSize: isMobile ? '0.9rem' : '1rem' }}>
-                                                {s.texto}
+                                                {s}
                                             </button>
                                         ))}
                                     </div>

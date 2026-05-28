@@ -1077,14 +1077,270 @@ function TresPuertas({ onBack }) {
   );
 }
 
+// ─── UrnasProbabilidad ───────────────────────────────────────────────────────
+
+function UrnasProbabilidad({ onBack }) {
+  const [urns, setUrns] = useState([
+    { id: 1, name: 'Urna 1', balls: { '🔴 Rojo': 5, '🔵 Azul': 5 } },
+    { id: 2, name: 'Urna 2', balls: { '🔴 Rojo': 10 } },
+    { id: 3, name: 'Urna 3', balls: { '🔵 Azul': 10 } },
+  ]);
+  const [selectedUrnId,  setSelectedUrnId]  = useState(1);
+  const [colorInput,     setColorInput]     = useState('🔴 Rojo');
+  const [quantityInput,  setQuantityInput]  = useState(5);
+  const [stagesCount,    setStagesCount]    = useState(1);
+  const [experimentTree, setExperimentTree] = useState({ S1: 1 });
+  const [singleResult,   setSingleResult]   = useState(null);
+  const [bulkResults,    setBulkResults]    = useState(null);
+
+  const handleCreateUrn = () => {
+    const newId = urns.length > 0 ? Math.max(...urns.map(u => u.id)) + 1 : 1;
+    setUrns(prev => [...prev, { id: newId, name: `Urna ${newId}`, balls: {} }]);
+    setSelectedUrnId(newId);
+  };
+
+  const handleAddBalls = () => {
+    if (quantityInput <= 0) return;
+    setUrns(prev => prev.map(u => {
+      if (u.id !== selectedUrnId) return u;
+      return { ...u, balls: { ...u.balls, [colorInput]: (u.balls[colorInput] || 0) + quantityInput } };
+    }));
+  };
+
+  const handleClearUrn = (id) => {
+    setUrns(prev => prev.map(u => u.id === id ? { ...u, balls: {} } : u));
+    setSingleResult(null);
+    setBulkResults(null);
+  };
+
+  const drawBall = (urnId) => {
+    const urn = urns.find(u => u.id === urnId);
+    if (!urn || !Object.keys(urn.balls).length) return 'Vacía';
+    const pool = Object.entries(urn.balls).flatMap(([c, n]) => Array(n).fill(c));
+    return pool.length ? pool[Math.floor(Math.random() * pool.length)] : 'Vacía';
+  };
+
+  const getUrnForStep = (stage, path) => {
+    const key = stage === 1 ? 'S1' : `S${stage}-${path.join('-')}`;
+    return experimentTree[key] || urns[0]?.id || 1;
+  };
+
+  const runOnce = () => {
+    const steps = [];
+    const path  = [];
+    for (let i = 1; i <= stagesCount; i++) {
+      const uId  = getUrnForStep(i, path);
+      const ball = drawBall(uId);
+      steps.push({ stage: i, urnName: urns.find(u => u.id === uId)?.name || `Urna ${uId}`, ball });
+      if (ball === 'Vacía') break;
+      path.push(ball);
+    }
+    setSingleResult(steps);
+  };
+
+  const run1000 = () => {
+    const agg = {};
+    for (let s = 0; s < 1000; s++) {
+      const path = [];
+      for (let i = 1; i <= stagesCount; i++) {
+        const ball = drawBall(getUrnForStep(i, path));
+        path.push(ball);
+        if (ball === 'Vacía') break;
+      }
+      const key = path.join(' ➔ ');
+      agg[key] = (agg[key] || 0) + 1;
+    }
+    setBulkResults(agg);
+  };
+
+  const renderTreeLevel = (stage, path) => {
+    if (stage > stagesCount) return null;
+    const key      = stage === 1 ? 'S1' : `S${stage}-${path.join('-')}`;
+    const nodeUrnId = experimentTree[key] || urns[0]?.id || 1;
+    const nodeUrn   = urns.find(u => u.id === nodeUrnId);
+    const colors    = nodeUrn ? Object.keys(nodeUrn.balls).filter(c => nodeUrn.balls[c] > 0) : [];
+
+    return (
+      <div key={key} style={{ marginLeft: stage === 1 ? 0 : 32, borderLeft: stage === 1 ? 'none' : '3px solid #cbd5e1', paddingLeft: stage === 1 ? 0 : 18, marginTop: 12, position: 'relative' }}>
+        {stage > 1 && <div style={{ position: 'absolute', left: 0, top: 20, width: 14, borderTop: '3px solid #cbd5e1' }} />}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: stage === 1 ? '#eff6ff' : '#fff', padding: '10px 18px', borderRadius: 8, border: stage === 1 ? '2px solid #93c5fd' : '1px solid #e2e8f0' }}>
+          {stage === 1
+            ? <span style={{ fontWeight: 700, color: '#1d4ed8', fontSize: 16 }}>🚀 Etapa 1 (Inicio) ➔</span>
+            : <span style={{ fontWeight: 700, color: '#475569', fontSize: 15 }}>Si sale {path[path.length - 1]} ➔</span>}
+          <select
+            value={nodeUrnId}
+            onChange={e => { setExperimentTree(prev => ({ ...prev, [key]: Number(e.target.value) })); setSingleResult(null); setBulkResults(null); }}
+            style={{ padding: '6px 12px', fontSize: 14, borderRadius: 6, border: '1px solid #94a3b8', background: '#f8fafc', fontWeight: 600, cursor: 'pointer' }}
+          >
+            {urns.map(u => {
+              const total = Object.values(u.balls).reduce((a, b) => a + b, 0);
+              return <option key={u.id} value={u.id}>{u.name} ({total} bolas)</option>;
+            })}
+          </select>
+        </div>
+        {stage < stagesCount && colors.length > 0 && (
+          <div style={{ marginTop: 4 }}>
+            {colors.map(c => renderTreeLevel(stage + 1, [...path, c]))}
+          </div>
+        )}
+        {stage < stagesCount && colors.length === 0 && (
+          <div style={{ marginLeft: 32, color: '#ef4444', fontSize: 13, marginTop: 8, fontWeight: 700 }}>⚠️ Urna vacía — árbol cortado aquí.</div>
+        )}
+      </div>
+    );
+  };
+
+  const panelSt = { background: '#fff', padding: 20, borderRadius: 14, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0', marginBottom: 20 };
+  const secTitle = { margin: '0 0 14px', color: '#1d4ed8', fontWeight: 700, fontSize: 16, borderBottom: '2px solid #eff6ff', paddingBottom: 8 };
+
+  return (
+    <div style={{ fontFamily: 'Segoe UI, Roboto, sans-serif', padding: 24, maxWidth: 1000, margin: '0 auto', background: '#f8fafc', borderRadius: 16, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', color: '#1e293b' }}>
+      <button onClick={onBack} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b', marginBottom: 12, fontWeight: 700, fontSize: '0.9rem' }}>
+        ← Volver al menú
+      </button>
+      <h1 style={{ textAlign: 'center', fontSize: 28, fontWeight: 800, margin: '0 0 24px' }}>🔮 Urnas y Árbol de Probabilidad</h1>
+
+      {/* Bloque 1: Crear urnas */}
+      <div style={panelSt}>
+        <h3 style={secTitle}>1. Crear y llenar urnas</h3>
+        <button onClick={handleCreateUrn} style={{ padding: '8px 16px', fontSize: 14, fontWeight: 700, background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', marginBottom: 14 }}>
+          ➕ Nueva Urna
+        </button>
+
+        {/* Selector de urna activa */}
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
+          {urns.map(u => {
+            const total = Object.values(u.balls).reduce((a, b) => a + b, 0);
+            return (
+              <button key={u.id}
+                onClick={() => { setSelectedUrnId(u.id); setSingleResult(null); setBulkResults(null); }}
+                style={{ padding: '10px 16px', fontSize: 14, fontWeight: 700, borderRadius: 8, cursor: 'pointer', border: u.id === selectedUrnId ? '3px solid #2563eb' : '1px solid #cbd5e1', background: u.id === selectedUrnId ? '#eff6ff' : '#fff', color: u.id === selectedUrnId ? '#1d4ed8' : '#475569' }}>
+                🏺 {u.name} ({total})
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Editor de bolas */}
+        <div style={{ background: '#f8fafc', padding: 14, borderRadius: 10, border: '1px solid #e2e8f0', display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
+          <span style={{ fontWeight: 700, fontSize: 14 }}>Editando {urns.find(u => u.id === selectedUrnId)?.name}:</span>
+          <select value={colorInput} onChange={e => setColorInput(e.target.value)} style={{ ...inputSt, width: 'auto' }}>
+            {['🔴 Rojo', '🔵 Azul', '🟢 Verde', '🟡 Amarillo', '⚫ Negro'].map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <button onClick={() => setQuantityInput(q => Math.max(1, q - 1))} style={{ width: 32, height: 32, fontWeight: 800, fontSize: 16, border: '1px solid #cbd5e1', borderRadius: 6, cursor: 'pointer', background: '#fff' }}>−</button>
+            <span style={{ minWidth: 30, textAlign: 'center', fontWeight: 700, fontSize: 16 }}>{quantityInput}</span>
+            <button onClick={() => setQuantityInput(q => q + 1)} style={{ width: 32, height: 32, fontWeight: 800, fontSize: 16, border: '1px solid #cbd5e1', borderRadius: 6, cursor: 'pointer', background: '#fff' }}>+</button>
+          </div>
+          <button onClick={handleAddBalls} style={{ padding: '8px 16px', fontSize: 14, fontWeight: 700, background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer' }}>📥 Añadir</button>
+          <button onClick={() => handleClearUrn(selectedUrnId)} style={{ padding: '8px 16px', fontSize: 14, fontWeight: 700, background: '#ef4444', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer' }}>🗑️ Vaciar</button>
+        </div>
+
+        {/* Vista de urnas */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+          {urns.map(u => (
+            <div key={u.id} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 12, background: '#fff' }}>
+              <strong style={{ color: '#334155', fontSize: 14 }}>{u.name}</strong>
+              <div style={{ fontSize: 13, marginTop: 6, color: '#64748b' }}>
+                {Object.keys(u.balls).length === 0 ? <em>Vacía</em> : Object.entries(u.balls).map(([c, q]) => q > 0 && <div key={c}>{c}: {q}</div>)}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, marginTop: 8 }}>
+                {Object.entries(u.balls).map(([color, count]) =>
+                  Array.from({ length: Math.min(count, 20) }).map((_, i) => (
+                    <span key={i} style={{ fontSize: 15 }}>{color.split(' ')[0]}</span>
+                  ))
+                )}
+                {Object.values(u.balls).reduce((a, b) => a + b, 0) > 20 && <span style={{ fontSize: 12, color: '#94a3b8' }}>…</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Bloque 2: Árbol condicional */}
+      <div style={panelSt}>
+        <h3 style={secTitle}>2. Diagrama de Árbol Condicional</h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, background: '#fffbeb', padding: '12px 16px', borderRadius: 10, border: '1px solid #fcd34d', flexWrap: 'wrap' }}>
+          <span style={{ fontWeight: 700, color: '#92400e', fontSize: 15 }}>Profundidad (etapas):</span>
+          {[1, 2, 3].map(n => (
+            <button key={n}
+              onClick={() => { setStagesCount(n); setSingleResult(null); setBulkResults(null); }}
+              style={{ padding: '8px 22px', fontSize: 16, fontWeight: 700, borderRadius: 8, cursor: 'pointer', background: stagesCount === n ? '#f59e0b' : '#fff', color: stagesCount === n ? '#fff' : '#92400e', border: '2px solid #f59e0b' }}>
+              {n}
+            </button>
+          ))}
+        </div>
+        <div style={{ background: '#faf5ff', padding: 18, borderRadius: 12, border: '1px solid #e9d8fd', overflowX: 'auto' }}>
+          {renderTreeLevel(1, [])}
+        </div>
+      </div>
+
+      {/* Bloque 3: Simulaciones */}
+      <div style={panelSt}>
+        <h3 style={secTitle}>3. Experimento</h3>
+        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 20 }}>
+          <button onClick={runOnce} style={{ padding: '12px 22px', fontSize: 15, fontWeight: 700, background: '#10b981', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', boxShadow: '0 4px 10px rgba(16,185,129,0.25)' }}>
+            🎲 Extraer 1 camino
+          </button>
+          <button onClick={run1000} style={{ padding: '12px 22px', fontSize: 15, fontWeight: 700, background: '#2563eb', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', boxShadow: '0 4px 10px rgba(37,99,235,0.25)' }}>
+            📊 Simular 1 000 veces
+          </button>
+        </div>
+
+        {singleResult && (
+          <div style={{ background: '#f0fdf4', border: '2px solid #86efac', padding: 18, borderRadius: 10, marginBottom: 16 }}>
+            <strong style={{ color: '#166534', fontSize: 15, display: 'block', marginBottom: 14 }}>Camino extraído:</strong>
+            <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+              {singleResult.map((res, i) => (
+                <React.Fragment key={i}>
+                  <div style={{ padding: '12px 18px', background: '#fff', borderRadius: 10, border: '2px solid #86efac', minWidth: 140, textAlign: 'center' }}>
+                    <span style={{ fontSize: 12, color: '#64748b', display: 'block', fontWeight: 600 }}>Etapa {res.stage} · {res.urnName}</span>
+                    <strong style={{ fontSize: 22, display: 'block', marginTop: 6 }}>{res.ball}</strong>
+                  </div>
+                  {i < singleResult.length - 1 && <span style={{ fontSize: 22, color: '#86efac' }}>➔</span>}
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {bulkResults && (
+          <div style={{ background: '#eff6ff', border: '2px solid #93c5fd', padding: 20, borderRadius: 10 }}>
+            <strong style={{ color: '#1e3a8a', fontSize: 16, display: 'block', marginBottom: 4 }}>📈 Distribución empírica (N = 1 000)</strong>
+            <p style={{ margin: '0 0 16px', fontSize: 13, color: '#2563eb' }}>Frecuencia de cada camino en el árbol.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
+              {Object.entries(bulkResults).sort((a, b) => b[1] - a[1]).map(([path, count]) => {
+                const pct = ((count / 1000) * 100).toFixed(1);
+                return (
+                  <div key={path} style={{ background: '#fff', padding: 14, borderRadius: 10, border: '1px solid #bfdbfe' }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', display: 'block', marginBottom: 8 }}>{path}</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 16, color: '#2563eb', fontWeight: 700 }}>{count} veces</span>
+                      <span style={{ padding: '3px 10px', background: '#eff6ff', border: '1px solid #93c5fd', borderRadius: 6, color: '#1d4ed8', fontWeight: 700, fontSize: 15 }}>{pct}%</span>
+                    </div>
+                    <div style={{ width: '100%', background: '#dbeafe', height: 8, borderRadius: 4, marginTop: 10, overflow: 'hidden' }}>
+                      <div style={{ width: `${pct}%`, background: '#2563eb', height: '100%', transition: 'width 0.5s' }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main menu selector ───────────────────────────────────────────────────────
 
 export default function SimuladorProbabilidad({ onExit }) {
-  const [modo, setModo] = useState(null); // null | 'DADOS' | 'CARRERA' | 'PUERTAS'
+  const [modo, setModo] = useState(null); // null | 'DADOS' | 'CARRERA' | 'PUERTAS' | 'URNAS'
 
-  if (modo === 'DADOS')   return <SimuladorDados   onBack={() => setModo(null)} />;
-  if (modo === 'CARRERA') return <CarreraCamellos  onBack={() => setModo(null)} />;
-  if (modo === 'PUERTAS') return <TresPuertas      onBack={() => setModo(null)} />;
+  if (modo === 'DADOS')   return <SimuladorDados      onBack={() => setModo(null)} />;
+  if (modo === 'CARRERA') return <CarreraCamellos     onBack={() => setModo(null)} />;
+  if (modo === 'PUERTAS') return <TresPuertas         onBack={() => setModo(null)} />;
+  if (modo === 'URNAS')   return <UrnasProbabilidad   onBack={() => setModo(null)} />;
 
   return (
     <div style={{
@@ -1101,7 +1357,7 @@ export default function SimuladorProbabilidad({ onExit }) {
       <h1 style={{ textAlign: 'center', fontSize: 34, fontWeight: 800, margin: '0 0 8px' }}>🎲 Probabilidad</h1>
       <p style={{ textAlign: 'center', color: '#64748b', marginBottom: 44, fontSize: 16 }}>Elige una actividad</p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 24, maxWidth: 860, margin: '0 auto' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 22, maxWidth: 1100, margin: '0 auto' }}>
 
         {/* Card: Simulador de Dados */}
         <div
@@ -1142,6 +1398,20 @@ export default function SimuladorProbabilidad({ onExit }) {
           <h2 style={{ color: '#fbbf24', fontSize: 21, fontWeight: 800, margin: '0 0 10px' }}>Las Tres Puertas</h2>
           <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: 13, margin: 0, lineHeight: 1.5 }}>
             El Problema de Monty Hall<br />¿Cambias de puerta o te mantienes? 🚗🐐
+          </p>
+        </div>
+
+        {/* Card: Urnas y Árbol */}
+        <div
+          onClick={() => setModo('URNAS')}
+          style={{ background: '#fdf4ff', border: '3px solid #a855f7', borderRadius: 22, padding: '36px 24px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 24px rgba(168,85,247,0.12)', transition: 'transform 0.2s, box-shadow 0.2s' }}
+          onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 16px 32px rgba(168,85,247,0.25)'; }}
+          onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)';   e.currentTarget.style.boxShadow = '0 8px 24px rgba(168,85,247,0.12)'; }}
+        >
+          <div style={{ fontSize: 64, marginBottom: 16 }}>🔮</div>
+          <h2 style={{ color: '#7e22ce', fontSize: 21, fontWeight: 800, margin: '0 0 10px' }}>Urnas y Árbol</h2>
+          <p style={{ color: '#64748b', fontSize: 13, margin: 0, lineHeight: 1.5 }}>
+            Configura urnas con bolas de colores<br />Árbol condicional · Simulación de 1 000 caminos
           </p>
         </div>
 

@@ -46,6 +46,7 @@ import SimuladorDados from '../Probabilidad';
 import TrivialGame from '../Trivial';
 import SimuladorOAOA from '../MatesOAOA';
 import JuegoFeriaOAOA from '../FeriaMates';
+import JuegoDivisibilidad from '../Divisibilidad';
 import imgPasapalabra from '../assets/icono_pasapal.png'; // Revisa si es .png o .jpg
 import imgBurbujas from '../assets/icono_burbujas.png';
 import imgPikatron from '../assets/icono_pikatron.png';
@@ -1198,6 +1199,12 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                 <JuegoFeriaOAOA />
             </div>
         );
+        if (juegoActivo.tipoJuego === 'DIVISIBILIDAD') return (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#F3E5F5', overflowY: 'auto' }}>
+                <button onClick={() => setJuegoActivo(null)} style={{ position: 'fixed', top: 14, left: 14, zIndex: 10000, background: '#7B1FA2', color: 'white', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>← Volver</button>
+                <JuegoDivisibilidad />
+            </div>
+        );
 
         if (juegoActivo.tipoJuego === 'SINTAXIS')    return <SintaxisGame  usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'LISTENING')   return <Listening     usuario={usuario} onExit={() => setJuegoActivo(null)} />;
@@ -1252,7 +1259,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                         <h1 style={{ color: '#009688', fontSize: '3rem', margin: 0, textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>Primaria</h1>
                         <p style={{ color: '#666', fontSize: '1.2rem', marginTop: '10px' }}>Juegos de cálculo para primaria</p>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '25px', maxWidth: '600px', margin: '0 auto', paddingBottom: '40px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '25px', maxWidth: '860px', margin: '0 auto', paddingBottom: '40px' }}>
                         <div
                             onClick={() => setJuegoActivo({ tipoJuego: 'MATES_OAOA' })}
                             style={{ background: '#E0F2F1', borderRadius: '20px', padding: '30px 20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s', border: '3px solid #009688' }}
@@ -1272,6 +1279,16 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                             <div style={{ fontSize: '50px', marginBottom: '15px' }}>🎡</div>
                             <h3 style={{ margin: '0 0 10px 0', color: '#e67e22', fontSize: '1.4rem' }}>Feria del Cálculo</h3>
                             <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>¡Supera operaciones al estilo OAOA antes de que se acabe el tiempo!</p>
+                        </div>
+                        <div
+                            onClick={() => setJuegoActivo({ tipoJuego: 'DIVISIBILIDAD' })}
+                            style={{ background: '#F3E5F5', borderRadius: '20px', padding: '30px 20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s', border: '3px solid #7B1FA2' }}
+                            onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
+                            onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                        >
+                            <div style={{ fontSize: '50px', marginBottom: '15px' }}>🔢</div>
+                            <h3 style={{ margin: '0 0 10px 0', color: '#7B1FA2', fontSize: '1.4rem' }}>Divisibilidad</h3>
+                            <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>Primos, múltiplos, divisores y la criba de Eratóstenes.</p>
                         </div>
                     </div>
                 </div>

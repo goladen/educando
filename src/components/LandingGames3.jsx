@@ -501,7 +501,7 @@ export const APPS = [
     { id: 'WORDLE', name: 'WordLe', desc: 'Adivina la palabra en 6 intentos.', color: '#2e7d32', img: imgWordle, shareable: true },
     { id: 'MATHLE', name: 'MathLe', desc: 'Adivina la ecuación matemática oculta.', color: '#1565C0', img: imgMathle, shareable: true },
     { id: 'THINKHOOT', name: 'PiLive', desc: 'Diviértete en vivo con tus compañeros.', color: '#9C27B0', img: imgPilive, isLive: true, shareable: true },
-    { id: 'EAE', name: 'PictoTabú', desc: 'Dibuja o describe sin usar palabras tabú.', color: '#e67e22', emoji: '🎨✍️', isLive: true, shareable: false },
+    { id: 'EAE', name: 'PictoTabú', desc: 'Dibuja o describe sin usar palabras tabú.', color: '#e67e22', emoji: '🎨✍️', img: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEg80nlTKknMfTBotTp1CGlbyfxwhJALm8EsZoOrxi3qKUZ5z8dgiezpsnVAh9UoCSvtA7FJ_0XifE0lN9_t8mAAQiH_nebCwjN5IwpvhjAi4JF-NcSEP0M972qoXd3HPtyjfzRWj-dZM9s/s1600/Captura+de+pantalla+2020-03-30+a+las+10.29.34.png', isLive: true, shareable: false },
     { id: 'MATHLIVE', name: 'MathLive', desc: 'Juega con las mates en tiempo real.', color: '#009688', img: imgMathlive, isLive: true, shareable: true },
     { id: 'OLYMPICLIVE', name: 'Olympic_Live', desc: 'Compite en minijuegos y cálculo.', color: '#D32F2F', img: imgOlympic, isLive: true, shareable: true },
     { id: 'SOPA', name: 'Sopa_letras', desc: 'Encuentra las palabras ocultas.', color: '#e67e22', img: imgSopa, shareable: true },
@@ -954,7 +954,12 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                     }
                     // ----------------------------------------
 
-                    if (filtros.ciclo && cleanText(r.ciclo) !== cleanText(filtros.ciclo) && cleanText(r.config?.ciclo) !== cleanText(filtros.ciclo)) return false;
+                    if (filtros.ciclo) {
+                        const fc = cleanText(filtros.ciclo);
+                        const matchC = Array.isArray(r.ciclo) ? r.ciclo.some(c => cleanText(c) === fc) : cleanText(r.ciclo) === fc;
+                        const matchCfg = Array.isArray(r.config?.ciclo) ? r.config.ciclo.some(c => cleanText(c) === fc) : cleanText(r.config?.ciclo) === fc;
+                        if (!matchC && !matchCfg) return false;
+                    }
                     if (filtros.pais && !cleanText(r.pais).includes(cleanText(filtros.pais))) return false;
                     if (filtros.region && !cleanText(r.region).includes(cleanText(filtros.region))) return false;
                     if (filtros.poblacion && !cleanText(r.poblacion).includes(cleanText(filtros.poblacion))) return false;
@@ -1567,8 +1572,11 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '40px', maxWidth: '700px', margin: '0 auto 40px auto' }}>
                 {APPS.filter(app => app.isLive).map(app => (
                     <div key={app.id} onClick={() => abrirJuego(app.id)} style={{ background: '#fff', borderRadius: '20px', padding: '20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.3)', border: `4px solid ${app.color}`, transition: 'transform 0.2s', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                        <div style={{ width: '80px', height: '80px', marginBottom: '15px' }}>
-                            <img src={app.img} alt={app.name} style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '15px' }} onError={(e) => e.target.style.display = 'none'} />
+                        <div style={{ width: '80px', height: '80px', marginBottom: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {app.img
+                                ? <img src={app.img} alt={app.name} style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '15px' }} />
+                                : <span style={{ fontSize: '52px', lineHeight: 1 }}>{app.emoji}</span>
+                            }
                         </div>
                         <h3 style={{ margin: 0, color: app.color, fontSize: '1.4rem', fontWeight: 'bold' }}>{app.name}</h3>
                         <p style={{ margin: '10px 0 0 0', fontSize: '0.9rem', color: '#555', lineHeight: '1.3' }}>{app.desc}</p>
@@ -1975,7 +1983,11 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={null} onExit={onHo
                     if (r.isFinished !== true && r.config?.isFinished !== true) return false;
 
                     if (filtros.tema && !cleanText(r.temas).includes(cleanText(filtros.tema)) && !cleanText(r.titulo).includes(cleanText(filtros.tema))) return false;
-                    if (filtros.ciclo && cleanText(r.ciclo) !== cleanText(filtros.ciclo)) return false;
+                    if (filtros.ciclo) {
+                        const fc = cleanText(filtros.ciclo);
+                        const matchC = Array.isArray(r.ciclo) ? r.ciclo.some(c => cleanText(c) === fc) : cleanText(r.ciclo) === fc;
+                        if (!matchC) return false;
+                    }
 
                     if (filtros.pais && !cleanText(r.pais).includes(cleanText(filtros.pais))) return false;
                     if (filtros.region && !cleanText(r.region).includes(cleanText(filtros.region))) return false;

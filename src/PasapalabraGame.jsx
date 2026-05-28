@@ -324,7 +324,7 @@ export default function PasapalabraGame({ recurso, usuario, alTerminar, modoOlim
         return { rosco1, rosco2 };
     };
 
-    const iniciar = (duelo, hoja) => {
+    const iniciar = async (duelo, hoja) => {
         setModoDuelo(duelo);
         setHojaSeleccionada(hoja);
 
@@ -349,8 +349,8 @@ export default function PasapalabraGame({ recurso, usuario, alTerminar, modoOlim
 
         try {
             const refR = doc(db, 'resources', recurso.id);
-           updateDoc(refR, { playCount: increment(1) });
-        } catch (e) { console.error("Error sumando partida:", e); }
+            await updateDoc(refR, { playCount: increment(1) });
+        } catch (e) { /* sin permisos si es invitado, ignorar */ }
 
 
         setFase('COUNTDOWN');
@@ -532,11 +532,12 @@ const PantallaCuentaAtras = ({ hoja, profesor, instrucciones, playSound, onFinis
 };
 
 // --- MOTOR DEL JUEGO (Tablero) ---
-const Tablero = ({ jugadores, setJugadores, turno, setTurno, modoDuelo, playSound, onFinish }) => {
+const Tablero = ({ jugadores, setJugadores, turno, setTurno, modoDuelo, playSound, onFinish, modoOlimpico = false, onOlimpicoFinish = null }) => {
     const [input, setInput] = useState('');
     const [pausado, setPausado] = useState(false);
     const [datosError, setDatosError] = useState(null);
     const inputRef = useRef(null);
+    const timerEndedRef = useRef(false);
 
     const jugador = jugadores[turno];
     const preguntaActual = jugador.rosco[jugador.indice];
@@ -562,7 +563,7 @@ const Tablero = ({ jugadores, setJugadores, turno, setTurno, modoDuelo, playSoun
                     } else {
                         jActivo.terminado = true;
                         playSound('WRONG');
-                        gestionarCambioTurno(copy, true);
+                        timerEndedRef.current = true;
                     }
                 }
                 return copy;
@@ -570,6 +571,14 @@ const Tablero = ({ jugadores, setJugadores, turno, setTurno, modoDuelo, playSoun
         }, 1000);
         return () => clearInterval(interval);
     }, [turno, jugador.terminado, pausado]);
+
+    useEffect(() => {
+        if (jugador.terminado && timerEndedRef.current) {
+            timerEndedRef.current = false;
+            gestionarCambioTurno(jugadores, true);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [jugador.terminado]);
 
     const gestionarCambioTurno = (copyJugadores, forzarCambio = false) => {
         if (!modoDuelo) {

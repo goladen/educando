@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Wrench, Table, FileQuestion, RefreshCw, Camera, BarChart2, BookOpen, Tv2, Shield } from 'lucide-react';
+import { useState, lazy, Suspense } from 'react';
+import { Wrench, Table, FileQuestion, RefreshCw, Camera, BarChart2, BookOpen, Tv2, Shield, Code2 } from 'lucide-react';
 
 import ToolExportarGoogleSheets from './ToolExportarGoogleSheets';
 import ToolGeneradorGoogleForms from './ToolGeneradorGoogleForms';
@@ -9,6 +9,7 @@ import FotoAOmni from './FotoAOmni';
 import VideoAPre from './VideoAPresentacion';
 import InformesJuegos from './InformesJuegos2';
 import AdminRecursosUploader from './AdminRecursosUploader';
+const MiniAppCreator = lazy(() => import('./MiniAppCreator'));
 
 const ADMIN_EMAIL = 'goladen@gmail.com';
 
@@ -23,6 +24,17 @@ export default function TeacherTools({ usuario, googleToken, perfilProfesor, onO
     if (herramientaActiva === 'INFORMES')       return <InformesJuegos usuario={usuario} />;
     if (herramientaActiva === 'VIDEO')          return <VideoAPre onBack={() => setHerramientaActiva(null)} usuario={usuario} />;
     if (herramientaActiva === 'ADMIN_UPLOADER') return <AdminRecursosUploader usuario={usuario} onBack={() => setHerramientaActiva(null)} />;
+    if (herramientaActiva === 'MINIAPP') return (
+        <div style={{ padding: '20px 16px' }}>
+            <button onClick={() => setHerramientaActiva(null)}
+                style={{ marginBottom: 20, padding: '7px 14px', borderRadius: 8, border: '1px solid #dde', background: 'white', cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 5, color: '#555' }}>
+                ← Volver a herramientas
+            </button>
+            <Suspense fallback={<div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>Cargando editor…</div>}>
+                <MiniAppCreator onAbrirViewer={id => window.open(`/?miniapp=${id}`, '_blank')} />
+            </Suspense>
+        </div>
+    );
 
     if (herramientaActiva === 'FOTO') {
         return (
@@ -133,6 +145,17 @@ export default function TeacherTools({ usuario, googleToken, perfilProfesor, onO
                     <h3 style={{ margin: '0 0 10px 0', color: '#2c3e50' }}>Informes de Juegos</h3>
                     <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>
                         Consulta los resultados que tus alumnos han enviado desde los juegos.
+                    </p>
+                </div>
+
+                {/* ── Mini-App Creator ── */}
+                <div onClick={() => setHerramientaActiva('MINIAPP')} style={{ ...cardStyle, borderLeft: '4px solid #6c63ff' }}>
+                    <div style={{ background: '#ede9fe', padding: '15px', borderRadius: '50%', marginBottom: '15px' }}>
+                        <Code2 size={32} color="#6c63ff" />
+                    </div>
+                    <h3 style={{ margin: '0 0 10px 0', color: '#6c63ff' }}>Crear Mini-App</h3>
+                    <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>
+                        Diseña una aplicación interactiva con IA o código React y compártela con tus alumnos.
                     </p>
                 </div>
 

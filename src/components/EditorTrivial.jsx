@@ -111,6 +111,20 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
     const [agregandoColab,setAgregandoColab]= useState(false);
     const [errorColab,    setErrorColab]    = useState('');
 
+    // ── Import modal ──────────────────────────────────────────────────────────
+    const [importModal,    setImportModal]    = useState(false);
+    const [importStep,     setImportStep]     = useState(1);
+    const [importTipo,     setImportTipo]     = useState('');
+    const [importRecursos, setImportRecursos] = useState([]);
+    const [importRecurso,  setImportRecurso]  = useState(null);
+    const [importHojaIdx,  setImportHojaIdx]  = useState(-1);
+    const [importPregs,    setImportPregs]    = useState([]);
+    const [importSel,      setImportSel]      = useState(new Set());
+    const [importCat,      setImportCat]      = useState('geo');
+    const [importCargando, setImportCargando] = useState(false);
+    const [importGuardando,setImportGuardando]= useState(false);
+    const [importError,    setImportError]    = useState('');
+
     // ── Save ───────────────────────────────────────────────────────────────────
     const [guardando,    setGuardando]    = useState(false);
     const [errorGuardar, setErrorGuardar] = useState('');
@@ -196,6 +210,74 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
             setPendientes(por_cat);
             setPendientesCargados(true);
         } catch (e) { console.error(e); }
+    };
+
+    // ── Import helpers ─────────────────────────────────────────────────────────
+    const abrirImport = () => {
+        setImportStep(1); setImportTipo(''); setImportRecursos([]); setImportRecurso(null);
+        setImportHojaIdx(-1); setImportPregs([]); setImportSel(new Set());
+        setImportCat(tabActiva); setImportError(''); setImportModal(true);
+    };
+
+    const cargarRecursosImport = async (tipoJuego) => {
+        setImportCargando(true); setImportError('');
+        try {
+            const snap = await getDocs(
+                query(collection(db, 'resources'),
+                    where('profesorUid', '==', usuario.uid),
+                    where('tipoJuego', '==', tipoJuego))
+            );
+            setImportRecursos(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        } catch (e) { setImportError('Error al cargar recursos.'); }
+        setImportCargando(false);
+    };
+
+    const calcImportPregs = (recurso, hojaIdx) => {
+        const hojas = recurso?.hojas || [];
+        const srcs = hojaIdx === -1 ? hojas.map((h, i) => ({ h, i })) : [{ h: hojas[hojaIdx], i: hojaIdx }];
+        return srcs.flatMap(({ h, i }) =>
+            (h?.preguntas || []).map((q, qi) => ({ hoja: h.nombreHoja || `Hoja ${i + 1}`, hojaIdx: i, qi, q }))
+        );
+    };
+
+    const isImportable = (tipo, q) => {
+        if (tipo === 'PASAPALABRA') return !!(q.pregunta && q.respuesta);
+        if (tipo === 'CAZABURBUJAS') return !!(q.pregunta && (q.correcta || q.respuesta) && q.incorrectas?.length);
+        if (tipo === 'APAREJADOS') return !!(q.terminoA && q.terminoB);
+        return false;
+    };
+
+    const confirmarImport = async () => {
+        if (!recursoId || importSel.size === 0) return;
+        setImportGuardando(true); setImportError('');
+        try {
+            const base = {
+                categoria: importCat, creadorUid: usuario.uid, autorUid: usuario.uid,
+                autorNombre: usuario.displayName || usuario.email, fechaCreacion: serverTimestamp(),
+            };
+            const nuevas = [];
+            for (const idx of importSel) {
+                const item = importPregs[idx]; if (!item) continue;
+                const q = item.q; let datos;
+                if (importTipo === 'PASAPALABRA') {
+                    datos = { ...base, tipo: 'CORTA', q: q.pregunta, a: q.respuesta };
+                } else if (importTipo === 'CAZABURBUJAS') {
+                    const correcta = q.correcta || q.respuesta || '';
+                    const incs = [...(q.incorrectas || [])].slice(0, 3);
+                    while (incs.length < 3) incs.push('');
+                    datos = { ...base, tipo: 'SELECCION', q: q.pregunta, a: correcta, w: incs };
+                } else if (importTipo === 'APAREJADOS') {
+                    datos = { ...base, tipo: 'CORTA', q: q.terminoA, a: q.terminoB };
+                }
+                if (datos) {
+                    const ref = await addDoc(collection(db, 'trivial_recursos', recursoId, 'preguntas'), datos);
+                    nuevas.push({ id: ref.id, ...datos });
+                }
+            }
+            setPreguntas(prev => ({ ...prev, [importCat]: [...prev[importCat], ...nuevas] }));
+            setImportModal(false);
+        } catch (e) { setImportError('Error al importar.'); }
+        setImportGuardando(false);
     };
 
     // ── Category helpers ───────────────────────────────────────────────────────
@@ -514,6 +596,208 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
     // ─────────────────────────────────────────────────────────────────────────
     return (
         <div style={{ position: 'fixed', inset: 0, background: '#0f172a', zIndex: 2000, display: 'flex', flexDirection: 'column', fontFamily: "'Segoe UI', sans-serif" }}>
+
+        {/* ── IMPORT MODAL ── */}
+        {importModal && (() => {
+            const TIPOS = [
+                { id: 'PASAPALABRA', label: 'Pasapalabra', icon: '📝', desc: 'Pregunta + respuesta  →  Respuesta corta' },
+                { id: 'CAZABURBUJAS', label: 'Caza Burbujas', icon: '🫧', desc: 'Pregunta + opciones  →  Selección múltiple' },
+                { id: 'APAREJADOS', label: 'Aparejados', icon: '🔗', desc: 'Término A + B  →  Respuesta corta' },
+            ];
+            const selPregs = importPregs.filter((_, i) => importSel.has(i));
+            const allSel = importPregs.length > 0 && importPregs.every((_, i) => importSel.has(i));
+
+            const toggleAll = () => {
+                if (allSel) setImportSel(new Set());
+                else setImportSel(new Set(importPregs.map((_, i) => i)));
+            };
+
+            return (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 4000, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+                    onClick={e => { if (e.target === e.currentTarget) setImportModal(false); }}>
+                    <div style={{ background: '#1e293b', borderRadius: 20, width: '100%', maxWidth: 560, maxHeight: '92vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 80px rgba(0,0,0,0.8)', overflow: 'hidden' }}>
+                        {/* Header */}
+                        <div style={{ background: '#0f172a', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid #334155', flexShrink: 0 }}>
+                            {importStep > 1 && (
+                                <button onClick={() => { setImportStep(s => s - 1); setImportError(''); }} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1.2rem', padding: '2px 6px', lineHeight: 1 }}>←</button>
+                            )}
+                            <span style={{ fontSize: '1.2rem' }}>📥</span>
+                            <div style={{ flex: 1 }}>
+                                <div style={{ color: '#f1f5f9', fontWeight: 700, fontSize: '0.95rem' }}>
+                                    {importStep === 1 ? 'Importar preguntas' : importStep === 2 ? `${TIPOS.find(t => t.id === importTipo)?.icon} ${TIPOS.find(t => t.id === importTipo)?.label}` : importRecurso?.titulo || 'Seleccionar preguntas'}
+                                </div>
+                                <div style={{ color: '#64748b', fontSize: '0.72rem' }}>
+                                    {importStep === 1 ? 'Elige el tipo de recurso fuente' : importStep === 2 ? 'Elige el recurso' : 'Marca las preguntas a importar'}
+                                </div>
+                            </div>
+                            {/* Step dots */}
+                            <div style={{ display: 'flex', gap: 5 }}>
+                                {[1, 2, 3].map(s => (
+                                    <div key={s} style={{ width: 8, height: 8, borderRadius: '50%', background: s === importStep ? '#38bdf8' : s < importStep ? '#4ade80' : '#334155' }} />
+                                ))}
+                            </div>
+                            <button onClick={() => setImportModal(false)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1.2rem', padding: '2px 6px', lineHeight: 1, marginLeft: 4 }}>✕</button>
+                        </div>
+
+                        {/* Body */}
+                        <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
+                            {importError && <div style={{ background: '#7f1d1d', color: '#fca5a5', borderRadius: 8, padding: '8px 14px', fontSize: '0.82rem', marginBottom: 14 }}>⚠ {importError}</div>}
+
+                            {/* ── Step 1: choose source type ── */}
+                            {importStep === 1 && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                    {TIPOS.map(t => (
+                                        <button key={t.id} onClick={async () => {
+                                            setImportTipo(t.id); setImportRecursos([]); setImportStep(2);
+                                            await cargarRecursosImport(t.id);
+                                        }} style={{ background: '#0f172a', border: '2px solid #334155', borderRadius: 14, padding: '16px 20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 16, textAlign: 'left', transition: '0.15s' }}
+                                            onMouseEnter={e => e.currentTarget.style.borderColor = '#38bdf8'}
+                                            onMouseLeave={e => e.currentTarget.style.borderColor = '#334155'}>
+                                            <span style={{ fontSize: '2rem' }}>{t.icon}</span>
+                                            <div>
+                                                <div style={{ color: '#f1f5f9', fontWeight: 700, fontSize: '1rem' }}>{t.label}</div>
+                                                <div style={{ color: '#64748b', fontSize: '0.78rem', marginTop: 3 }}>{t.desc}</div>
+                                            </div>
+                                            <span style={{ marginLeft: 'auto', color: '#475569' }}>›</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* ── Step 2: choose resource ── */}
+                            {importStep === 2 && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                    {importCargando && <div style={{ color: '#64748b', textAlign: 'center', padding: 24 }}>Cargando recursos…</div>}
+                                    {!importCargando && importRecursos.length === 0 && (
+                                        <div style={{ background: '#0f172a', borderRadius: 12, padding: '28px 20px', textAlign: 'center', border: '2px dashed #334155' }}>
+                                            <div style={{ fontSize: '2rem', marginBottom: 8 }}>📭</div>
+                                            <div style={{ color: '#64748b', fontSize: '0.9rem' }}>No tienes recursos de este tipo.</div>
+                                        </div>
+                                    )}
+                                    {importRecursos.map(r => (
+                                        <button key={r.id} onClick={() => {
+                                            setImportRecurso(r);
+                                            setImportHojaIdx(-1);
+                                            const pregs = calcImportPregs(r, -1).filter(item => isImportable(importTipo, item.q));
+                                            setImportPregs(pregs);
+                                            setImportSel(new Set(pregs.map((_, i) => i)));
+                                            setImportStep(3);
+                                        }} style={{ background: '#0f172a', border: '2px solid #334155', borderRadius: 12, padding: '14px 18px', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 14, transition: '0.15s' }}
+                                            onMouseEnter={e => e.currentTarget.style.borderColor = '#38bdf8'}
+                                            onMouseLeave={e => e.currentTarget.style.borderColor = '#334155'}>
+                                            <span style={{ fontSize: '1.5rem' }}>{TIPOS.find(t => t.id === importTipo)?.icon}</span>
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <div style={{ color: '#f1f5f9', fontWeight: 600, fontSize: '0.92rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.titulo}</div>
+                                                <div style={{ color: '#64748b', fontSize: '0.75rem', marginTop: 2 }}>
+                                                    {r.hojas?.length || 0} hoja{r.hojas?.length !== 1 ? 's' : ''} · {(r.hojas || []).reduce((s, h) => s + (h.preguntas?.length || 0), 0)} preguntas
+                                                </div>
+                                            </div>
+                                            <span style={{ color: '#475569' }}>›</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* ── Step 3: hoja + question selection ── */}
+                            {importStep === 3 && importRecurso && (() => {
+                                const hojas = importRecurso.hojas || [];
+                                return (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                                        {/* Hoja selector */}
+                                        {hojas.length > 1 && (
+                                            <div>
+                                                <div style={{ color: '#94a3b8', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Hoja</div>
+                                                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                                    <button onClick={() => {
+                                                        setImportHojaIdx(-1);
+                                                        const pregs = calcImportPregs(importRecurso, -1).filter(item => isImportable(importTipo, item.q));
+                                                        setImportPregs(pregs); setImportSel(new Set(pregs.map((_, i) => i)));
+                                                    }} style={{ background: importHojaIdx === -1 ? '#1d4ed8' : '#0f172a', border: `1px solid ${importHojaIdx === -1 ? '#3b82f6' : '#334155'}`, color: importHojaIdx === -1 ? 'white' : '#94a3b8', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: importHojaIdx === -1 ? 700 : 400 }}>Todas</button>
+                                                    {hojas.map((h, hi) => (
+                                                        <button key={hi} onClick={() => {
+                                                            setImportHojaIdx(hi);
+                                                            const pregs = calcImportPregs(importRecurso, hi).filter(item => isImportable(importTipo, item.q));
+                                                            setImportPregs(pregs); setImportSel(new Set(pregs.map((_, i) => i)));
+                                                        }} style={{ background: importHojaIdx === hi ? '#1d4ed8' : '#0f172a', border: `1px solid ${importHojaIdx === hi ? '#3b82f6' : '#334155'}`, color: importHojaIdx === hi ? 'white' : '#94a3b8', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: importHojaIdx === hi ? 700 : 400 }}>
+                                                            {h.nombreHoja || `Hoja ${hi + 1}`}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Select all toggle + count */}
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                                            <button onClick={toggleAll} style={{ background: allSel ? '#14532d' : '#0f172a', border: `1px solid ${allSel ? '#4ade80' : '#475569'}`, color: allSel ? '#4ade80' : '#94a3b8', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
+                                                {allSel ? '✓ Todas seleccionadas' : 'Seleccionar todas'}
+                                            </button>
+                                            <span style={{ color: '#64748b', fontSize: '0.8rem' }}>{importSel.size} / {importPregs.length} seleccionadas</span>
+                                        </div>
+
+                                        {/* Question list */}
+                                        {importPregs.length === 0 && (
+                                            <div style={{ background: '#0f172a', borderRadius: 10, padding: '20px', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>
+                                                No hay preguntas importables en esta selección.
+                                            </div>
+                                        )}
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 300, overflowY: 'auto' }}>
+                                            {importPregs.map((item, i) => {
+                                                const sel = importSel.has(i);
+                                                const q = item.q;
+                                                let preview;
+                                                if (importTipo === 'PASAPALABRA') preview = <><span style={{ color: '#f1f5f9' }}>{q.pregunta}</span><span style={{ color: '#4ade80', marginLeft: 8 }}>→ {q.respuesta}</span></>;
+                                                else if (importTipo === 'CAZABURBUJAS') preview = <><span style={{ color: '#f1f5f9' }}>{q.pregunta}</span><span style={{ color: '#4ade80', marginLeft: 8 }}>✓ {q.correcta || q.respuesta}</span></>;
+                                                else if (importTipo === 'APAREJADOS') preview = <><span style={{ color: '#f1f5f9' }}>{q.terminoA}</span><span style={{ color: '#38bdf8', margin: '0 6px' }}>↔</span><span style={{ color: '#4ade80' }}>{q.terminoB}</span></>;
+                                                return (
+                                                    <button key={i} onClick={() => {
+                                                        setImportSel(prev => {
+                                                            const next = new Set(prev);
+                                                            if (next.has(i)) next.delete(i); else next.add(i);
+                                                            return next;
+                                                        });
+                                                    }} style={{ background: sel ? '#0d2b1b' : '#0f172a', border: `1px solid ${sel ? '#4ade80' : '#334155'}`, borderRadius: 9, padding: '10px 14px', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'flex-start', gap: 10, transition: '0.1s' }}>
+                                                        <span style={{ fontSize: '1rem', flexShrink: 0, marginTop: 1 }}>{sel ? '☑' : '☐'}</span>
+                                                        <div style={{ fontSize: '0.83rem', lineHeight: 1.4, flex: 1, minWidth: 0 }}>
+                                                            {hojas.length > 1 && importHojaIdx === -1 && (
+                                                                <div style={{ color: '#475569', fontSize: '0.7rem', marginBottom: 2 }}>{item.hoja}</div>
+                                                            )}
+                                                            {preview}
+                                                        </div>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+
+                                        {/* Destination category */}
+                                        <div>
+                                            <div style={{ color: '#94a3b8', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Categoría destino</div>
+                                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                                {CAT_IDS.map(id => (
+                                                    <button key={id} onClick={() => setImportCat(id)} style={{ background: importCat === id ? CAT_HEX[id] + '30' : '#0f172a', border: `2px solid ${importCat === id ? CAT_HEX[id] : '#334155'}`, color: importCat === id ? CAT_HEX[id] : '#64748b', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: importCat === id ? 700 : 400, display: 'flex', alignItems: 'center', gap: 5 }}>
+                                                        <span>{categorias[id].emoji}</span>
+                                                        <span>{categorias[id].nombre}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+                        </div>
+
+                        {/* Footer */}
+                        {importStep === 3 && (
+                            <div style={{ borderTop: '1px solid #334155', padding: '14px 20px', display: 'flex', gap: 10, justifyContent: 'flex-end', background: '#0f172a', flexShrink: 0 }}>
+                                <button onClick={() => setImportModal(false)} style={{ background: '#334155', border: 'none', color: '#94a3b8', padding: '10px 18px', borderRadius: 9, cursor: 'pointer', fontSize: '0.88rem' }}>Cancelar</button>
+                                <button onClick={confirmarImport} disabled={importGuardando || importSel.size === 0} style={{ background: importSel.size === 0 ? '#334155' : '#1d4ed8', border: 'none', color: 'white', padding: '10px 22px', borderRadius: 9, cursor: importSel.size === 0 || importGuardando ? 'default' : 'pointer', fontWeight: 700, fontSize: '0.88rem', opacity: importGuardando ? 0.6 : 1 }}>
+                                    {importGuardando ? 'Importando…' : `📥 Importar ${importSel.size} pregunta${importSel.size !== 1 ? 's' : ''}`}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        })()}
 
         {/* ── MODAL PREVIEW ── */}
         {previewPregunta && (() => {
@@ -922,6 +1206,14 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                                 </div>
                             )}
                         </div>
+                    )}
+
+                    {/* ── Import button ── */}
+                    {recursoId && (
+                        <button onClick={abrirImport} style={{ background: '#0f172a', border: `1px dashed ${catHex}60`, borderRadius: 14, padding: '12px 18px', cursor: 'pointer', color: catHex, fontWeight: 600, fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left' }}>
+                            <span style={{ fontSize: '1.1rem' }}>📥</span>
+                            Importar preguntas de otro recurso
+                        </button>
                     )}
 
                     {cargandoPreguntas && <p style={{ color: '#64748b', textAlign: 'center', padding: 20 }}>Cargando preguntas…</p>}

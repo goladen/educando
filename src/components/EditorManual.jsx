@@ -710,17 +710,33 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
                                     />
                                 </div>
                                 <div style={{ marginBottom: '15px' }}>
-                                    <label style={styles.label}>Ciclo Educativo</label>
-                                    <select value={datos.ciclo || 'Secundaria'} onChange={e => setDatos({ ...datos, ciclo: e.target.value })} style={styles.input}>
-                                        <option value="Infantil">Infantil</option>
-                                        <option value="Primaria">Primaria</option>
-                                        <option value="Secundaria">Secundaria</option>
-                                        <option value="Bachillerato">Bachillerato</option>
-                                        <option value="FP">Formación Profesional</option>
-                                        <option value="Universidad">Universidad</option>
-                                        <option value="Otros">Otros</option>
-                                    </select>
+                                    <label style={styles.label}>Enseñanzas (puedes elegir varias)</label>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+                                        {['Infantil','Primaria','Secundaria','Bachillerato','FP','Universidad','Otros'].map(c => {
+                                            const activos = Array.isArray(datos.ciclo) ? datos.ciclo : datos.ciclo ? [datos.ciclo] : ['Secundaria'];
+                                            const activo = activos.includes(c);
+                                            return (
+                                                <button key={c} type="button" onClick={() => {
+                                                    let nuevo = activo ? activos.filter(x => x !== c) : [...activos, c];
+                                                    if (nuevo.length === 0) nuevo = [c];
+                                                    setDatos({ ...datos, ciclo: nuevo });
+                                                }} style={{
+                                                    padding: '5px 12px', borderRadius: 20, border: '1.5px solid',
+                                                    borderColor: activo ? '#3F51B5' : '#ddd',
+                                                    background: activo ? '#3F51B5' : 'white',
+                                                    color: activo ? 'white' : '#555',
+                                                    fontWeight: activo ? 700 : 400,
+                                                    fontSize: '0.8rem', cursor: 'pointer',
+                                                }}>{c}</button>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
+                                <InputConfig
+                                    label="Autor (nombre que aparece al iniciar el juego)"
+                                    val={datos.profesorNombre}
+                                    set={v => setDatos({ ...datos, profesorNombre: v })}
+                                />
                                 <h4 style={styles.sectionTitle}>Ajustes de Juego</h4>
                                 {configJuego.camposConfig.map(campo => (
                                     <div key={campo.key} style={{ marginBottom: '10px' }}>

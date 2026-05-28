@@ -170,10 +170,10 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender }) {
                     const matchTema = !f.tema || cleanText(r.titulo).includes(cleanText(f.tema)) || (r.temas && cleanText(r.temas).includes(cleanText(f.tema)));
                     if (!matchTema) return false;
                     if (f.ciclo) {
-                        const cicloBusqueda = cleanText(f.ciclo);
-                        const enCampo = r.ciclo && cleanText(r.ciclo) === cicloBusqueda;
-                        const enConfig = r.config?.ciclo && cleanText(r.config.ciclo) === cicloBusqueda;
-                        const enTemas = r.temas && cleanText(r.temas).includes(cicloBusqueda);
+                        const cb = cleanText(f.ciclo);
+                        const enCampo = Array.isArray(r.ciclo) ? r.ciclo.some(c => cleanText(c) === cb) : r.ciclo && cleanText(r.ciclo) === cb;
+                        const enConfig = Array.isArray(r.config?.ciclo) ? r.config.ciclo.some(c => cleanText(c) === cb) : r.config?.ciclo && cleanText(r.config.ciclo) === cb;
+                        const enTemas = r.temas && cleanText(r.temas).includes(cb);
                         if (!enCampo && !enConfig && !enTemas) return false;
                     }
                     return true;

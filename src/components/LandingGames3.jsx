@@ -44,6 +44,7 @@ import EstadisticaApp from '../Estadistica';
 import RetosApp from '../Retos';
 import SimuladorDados from '../Probabilidad';
 import TrivialGame from '../Trivial';
+import ExpresionArtEscri from '../ExpresionArtEscri';
 import SimuladorOAOA from '../MatesOAOA';
 import JuegoFeriaOAOA from '../FeriaMates';
 import JuegoDivisibilidad from '../Divisibilidad';
@@ -500,6 +501,7 @@ export const APPS = [
     { id: 'WORDLE', name: 'WordLe', desc: 'Adivina la palabra en 6 intentos.', color: '#2e7d32', img: imgWordle, shareable: true },
     { id: 'MATHLE', name: 'MathLe', desc: 'Adivina la ecuación matemática oculta.', color: '#1565C0', img: imgMathle, shareable: true },
     { id: 'THINKHOOT', name: 'PiLive', desc: 'Diviértete en vivo con tus compañeros.', color: '#9C27B0', img: imgPilive, isLive: true, shareable: true },
+    { id: 'EAE', name: 'PictoTabú', desc: 'Dibuja o describe sin usar palabras tabú.', color: '#e67e22', emoji: '🎨✍️', isLive: true, shareable: false },
     { id: 'MATHLIVE', name: 'MathLive', desc: 'Juega con las mates en tiempo real.', color: '#009688', img: imgMathlive, isLive: true, shareable: true },
     { id: 'OLYMPICLIVE', name: 'Olympic_Live', desc: 'Compite en minijuegos y cálculo.', color: '#D32F2F', img: imgOlympic, isLive: true, shareable: true },
     { id: 'SOPA', name: 'Sopa_letras', desc: 'Encuentra las palabras ocultas.', color: '#e67e22', img: imgSopa, shareable: true },
@@ -777,6 +779,13 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                 setJuegoActivo({ tipoJuego: juegoParam.toUpperCase(), tourConfig, verbInitialConfig });
                 return;
             }
+            const salaParam = params.get('sala');
+            if (salaParam && /^\d{6}$/.test(salaParam)) {
+                setPictoTabuInitCode(salaParam);
+                setPictoTabuModal(true);
+                return;
+            }
+
             if (path === 'math_world') {
                 setZonaActiva('MATH');
             } else if (path === '' || path === 'inicio') {
@@ -840,6 +849,9 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
     const [isMathLiveAlumno, setIsMathLiveAlumno] = useState(false);
     const [joinLiveTipoJuego, setJoinLiveTipoJuego] = useState('');
     const [hostTipoJuego, setHostTipoJuego] = useState('');
+    const [pictoTabuModal, setPictoTabuModal] = useState(false);
+    const [pictoTabuInitCode, setPictoTabuInitCode] = useState('');
+    const [joinLiveHostId, setJoinLiveHostId] = useState(null);
     // Estados Live Host (Presentador)
     const [liveModeHost, setLiveModeHost] = useState(false);
     const [hostRoomCode, setHostRoomCode] = useState('');
@@ -1009,6 +1021,11 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
             return;
         }
 
+        if (appId === 'EAE') {
+            setPictoTabuModal(true);
+            return;
+        }
+
         if (appId === 'TRIVIAL') {
             window.history.pushState({}, '', '?juego=trivial');
             setJuegoActivo({ tipoJuego: 'TRIVIAL' });
@@ -1095,6 +1112,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
         // ------------------------------------
 
         if (isMathLiveHost) return <MathLive isHost={true} codigoSala={hostRoomCode} usuario={tempUser} onExit={() => setLiveModeHost(false)} />;
+        if (hostTipoJuego === 'EAE') return <ExpresionArtEscri isHost={true} codigoSala={hostRoomCode} usuario={tempUser} onExit={() => setLiveModeHost(false)} />;
         return <ThinkHootGame isHost={true} codigoSala={hostRoomCode} usuario={tempUser} onExit={() => setLiveModeHost(false)} />;
     }
     if (liveModeAlumno) {
@@ -1103,6 +1121,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
 
         if (tipoFinal === 'OLYMPICLIVE') return <OlympicLive isHost={false} codigoSala={typeof joinCode !== 'undefined' ? joinCode : joinLiveCode} usuario={{ displayName: typeof joinName !== 'undefined' ? joinName : joinLiveName, email: null }} onExit={() => setLiveModeAlumno(false)} />;
         if (tipoFinal === 'MATHLIVE' || isMathLiveAlumno) return <MathLive isHost={false} codigoSala={typeof joinCode !== 'undefined' ? joinCode : joinLiveCode} usuario={{ displayName: typeof joinName !== 'undefined' ? joinName : joinLiveName, email: null }} onExit={() => setLiveModeAlumno(false)} />;
+        if (tipoFinal === 'EAE') return <ExpresionArtEscri isHost={false} codigoSala={joinLiveCode} usuario={{ uid: joinLiveHostId || null, displayName: joinLiveName, email: null }} onExit={() => { setLiveModeAlumno(false); setJoinLiveHostId(null); }} />;
 
         return <ThinkHootGame isHost={false} codigoSala={typeof joinCode !== 'undefined' ? joinCode : joinLiveCode} usuario={{ displayName: typeof joinName !== 'undefined' ? joinName : joinLiveName, email: null }} onExit={() => setLiveModeAlumno(false)} />;
     }
@@ -1432,6 +1451,20 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
 
             {shareModal && <ShareModal url={shareModal.url} titulo={shareModal.titulo} onClose={() => setShareModal(null)} />}
             {showPerfil && usuario && <UserProfile usuario={usuario} onClose={() => setShowPerfil(false)} showSupport={false} />}
+            {pictoTabuModal && <PictoTabuModal
+                usuario={usuario}
+                initialCode={pictoTabuInitCode}
+                onClose={() => { setPictoTabuModal(false); setPictoTabuInitCode(''); }}
+                onEnterRoom={(code, name, hostId) => {
+                    setJoinLiveCode(code);
+                    setJoinLiveName(name);
+                    setJoinLiveHostId(hostId || null);
+                    setJoinLiveTipoJuego('EAE');
+                    setLiveModeAlumno(true);
+                    setPictoTabuModal(false);
+                    setPictoTabuInitCode('');
+                }}
+            />}
 
             {/* BARRA DE USUARIO LOGUEADO */}
             {usuario && (
@@ -2264,6 +2297,175 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={null} onExit={onHo
 
 
 
+}
+
+// ─── PictoTabú Modal (crear/unirse) ─────────────────────────────────────────
+function PictoTabuModal({ usuario, onClose, onEnterRoom, initialCode = '' }) {
+    const [tab, setTab] = useState(initialCode ? 'UNIRSE' : 'CREAR');
+    const [nombre, setNombre] = useState(usuario?.displayName || '');
+    const [modo, setModo] = useState('MIXTO');
+    const [tiempo, setTiempo] = useState(60);
+    const [sinProfesor, setSinProfesor] = useState(true);
+    const [creando, setCreando] = useState(false);
+    const [salaCreada, setSalaCreada] = useState(null);
+    const [joinCode, setJoinCode] = useState(initialCode);
+    const [joinName, setJoinName] = useState(usuario?.displayName || '');
+    const [joining, setJoining] = useState(false);
+    // hostId fijo para esta sesión — se usará para identificar al creador como admin
+    const [hostId] = useState(() => usuario?.uid || ('h_' + Math.random().toString(36).substring(2, 11)));
+
+    const crearSala = async () => {
+        if (sinProfesor && !nombre.trim()) return alert('Introduce tu nombre.');
+        setCreando(true);
+        try {
+            const sala = Math.floor(100000 + Math.random() * 900000).toString();
+            await setDoc(doc(db, 'live_games', sala), {
+                hostId,
+                estado: 'LOBBY',
+                jugadores: {},
+                mensajes: {},
+                config: { tiempoRonda: tiempo },
+                tipoJuego: 'EAE',
+                modoJuego: modo,
+                sinProfesor,
+                anfitrionesUsados: [],
+                palabrasUsadas: [],
+                rondaActual: 0,
+                timestamp: new Date(),
+            });
+            setSalaCreada(sala);
+        } catch (e) { alert('Error: ' + e.message); }
+        setCreando(false);
+    };
+
+    const entrarASalaCreada = () => {
+        onEnterRoom(salaCreada, nombre.trim() || (usuario?.displayName || 'Anfitrión'), hostId);
+    };
+
+    const unirseSala = async () => {
+        const code = joinCode.trim().toUpperCase();
+        if (!code || !joinName.trim()) return alert('Introduce código y nombre.');
+        setJoining(true);
+        try {
+            const snap = await getDoc(doc(db, 'live_games', code));
+            if (!snap.exists()) { alert('Sala no encontrada.'); setJoining(false); return; }
+            onEnterRoom(code, joinName.trim());
+        } catch (e) { alert('Error: ' + e.message); }
+        setJoining(false);
+    };
+
+    const roomUrl = salaCreada ? `${window.location.origin}?sala=${salaCreada}` : '';
+    const qrUrl   = salaCreada
+        ? `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(roomUrl)}&bgcolor=ffffff&color=1a1a2e&margin=6`
+        : '';
+
+    const overlay = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 9998, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 };
+    const box     = { background: '#1a1a2e', borderRadius: 20, padding: 28, width: '100%', maxWidth: 440, color: 'white', boxShadow: '0 20px 60px rgba(0,0,0,0.6)', position: 'relative', maxHeight: '90vh', overflowY: 'auto' };
+    const tabBtn  = (t) => ({ flex: 1, padding: '10px', border: 'none', borderRadius: 10, cursor: 'pointer', fontWeight: 700, fontSize: '1rem', background: tab === t ? '#e67e22' : 'rgba(255,255,255,0.1)', color: 'white', transition: 'all 0.2s' });
+    const inp     = { width: '100%', padding: '12px 14px', borderRadius: 10, border: '2px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: 'white', fontSize: '1rem', boxSizing: 'border-box', outline: 'none' };
+    const label   = { color: '#bdc3c7', fontSize: '0.82rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6, display: 'block' };
+    const btn     = (bg) => ({ width: '100%', padding: '13px', border: 'none', borderRadius: 12, background: bg, color: 'white', fontWeight: 700, fontSize: '1.05rem', cursor: 'pointer', marginTop: 12 });
+
+    return (
+        <div style={overlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+            <div style={box}>
+                <button onClick={onClose} style={{ position: 'absolute', top: 14, right: 14, background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', width: 32, height: 32, borderRadius: '50%', cursor: 'pointer', fontWeight: 700, fontSize: '1rem' }}>✕</button>
+
+                <div style={{ textAlign: 'center', marginBottom: 20 }}>
+                    <div style={{ fontSize: '2.5rem' }}>🎨✍️</div>
+                    <h2 style={{ margin: '8px 0 4px', fontFamily: 'Righteous, sans-serif', color: '#e67e22', fontSize: '1.6rem' }}>PictoTabú</h2>
+                    <p style={{ color: '#95a5a6', margin: 0, fontSize: '0.88rem' }}>Pictionary + Tabú Multijugador</p>
+                </div>
+
+                <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+                    <button style={tabBtn('CREAR')} onClick={() => setTab('CREAR')}>➕ Crear Sala</button>
+                    <button style={tabBtn('UNIRSE')} onClick={() => setTab('UNIRSE')}>🚪 Unirse</button>
+                </div>
+
+                {/* ── TAB CREAR ── */}
+                {tab === 'CREAR' && !salaCreada && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                        <div>
+                            <label style={label}>Tu nombre</label>
+                            <input style={inp} value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Nombre (aparecerá en el juego)" />
+                        </div>
+                        <div>
+                            <label style={label}>Modo de juego</label>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                                {[['MIXTO','🎲 Mixto'],['DIBUJAR','🎨 Solo Dibujo'],['DESCRIBIR','✍️ Solo Tabú']].map(([v,lbl]) => (
+                                    <button key={v} onClick={() => setModo(v)} style={{ flex: 1, padding: '9px 4px', border: `2px solid ${modo === v ? '#e67e22' : 'rgba(255,255,255,0.15)'}`, borderRadius: 10, background: modo === v ? 'rgba(230,126,34,0.2)' : 'rgba(255,255,255,0.05)', color: modo === v ? '#e67e22' : '#ccc', cursor: 'pointer', fontWeight: 700, fontSize: '0.78rem' }}>{lbl}</button>
+                                ))}
+                            </div>
+                        </div>
+                        <div>
+                            <label style={label}>Tiempo por turno</label>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                                {[45,60,90,120].map(t => (
+                                    <button key={t} onClick={() => setTiempo(t)} style={{ flex: 1, padding: '9px 4px', border: `2px solid ${tiempo === t ? '#3498db' : 'rgba(255,255,255,0.15)'}`, borderRadius: 10, background: tiempo === t ? 'rgba(52,152,219,0.2)' : 'rgba(255,255,255,0.05)', color: tiempo === t ? '#3498db' : '#ccc', cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem' }}>{t}s</button>
+                                ))}
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(255,255,255,0.06)', borderRadius: 12, padding: '12px 14px' }}>
+                            <input type="checkbox" id="sinProf" checked={sinProfesor} onChange={e => setSinProfesor(e.target.checked)} style={{ width: 18, height: 18, cursor: 'pointer' }} />
+                            <label htmlFor="sinProf" style={{ cursor: 'pointer', color: 'white' }}>
+                                <strong>Modo sin profesor</strong>
+                                <div style={{ color: '#95a5a6', fontSize: '0.78rem', marginTop: 2 }}>El creador gestiona las rondas</div>
+                            </label>
+                        </div>
+                        <button style={btn('#e67e22')} onClick={crearSala} disabled={creando}>
+                            {creando ? '⏳ Creando...' : '🚀 Crear Sala'}
+                        </button>
+                    </div>
+                )}
+
+                {/* ── SALA CREADA ── */}
+                {tab === 'CREAR' && salaCreada && (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+                        <div style={{ background: 'rgba(230,126,34,0.15)', border: '2px solid #e67e22', borderRadius: 16, padding: '16px 24px', textAlign: 'center', width: '100%' }}>
+                            <div style={{ color: '#95a5a6', fontSize: '0.78rem', letterSpacing: 2, marginBottom: 4 }}>CÓDIGO DE SALA</div>
+                            <div style={{ fontFamily: 'Righteous, sans-serif', fontSize: '3.5rem', color: '#e67e22', letterSpacing: 6 }}>{salaCreada}</div>
+                        </div>
+                        <div style={{ background: 'white', padding: 8, borderRadius: 12 }}>
+                            <img src={qrUrl} alt="QR" style={{ width: 160, height: 160, display: 'block' }} />
+                        </div>
+                        <p style={{ color: '#bdc3c7', fontSize: '0.83rem', textAlign: 'center', margin: 0 }}>
+                            Comparte el código o QR con los jugadores.<br />URL: <code style={{ color: '#f1c40f', fontSize: '0.75rem' }}>{roomUrl}</code>
+                        </p>
+                        {sinProfesor && (
+                            <button style={btn('#2ecc71')} onClick={entrarASalaCreada}>
+                                🎮 Entrar a jugar
+                            </button>
+                        )}
+                        {!sinProfesor && (
+                            <p style={{ color: '#95a5a6', fontSize: '0.82rem', textAlign: 'center', marginTop: 4 }}>
+                                Muestra este código desde el dashboard de profesor para gestionar la partida.
+                            </p>
+                        )}
+                        <button style={{ ...btn('rgba(255,255,255,0.1)'), marginTop: 0, border: '1px solid rgba(255,255,255,0.2)' }} onClick={() => setSalaCreada(null)}>
+                            ← Crear otra sala
+                        </button>
+                    </div>
+                )}
+
+                {/* ── TAB UNIRSE ── */}
+                {tab === 'UNIRSE' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                        <div>
+                            <label style={label}>Tu nombre</label>
+                            <input style={inp} value={joinName} onChange={e => setJoinName(e.target.value)} placeholder="Tu nombre en el juego" />
+                        </div>
+                        <div>
+                            <label style={label}>Código de sala (6 dígitos)</label>
+                            <input style={{ ...inp, textAlign: 'center', fontSize: '1.8rem', letterSpacing: 6, fontFamily: 'Righteous, sans-serif' }} value={joinCode} onChange={e => setJoinCode(e.target.value.replace(/\D/g,'').substring(0,6))} placeholder="000000" maxLength={6} />
+                        </div>
+                        <button style={btn('#3498db')} onClick={unirseSala} disabled={joining || joinCode.length < 6 || !joinName.trim()}>
+                            {joining ? '⏳ Conectando...' : '🚪 Entrar a la Sala'}
+                        </button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
 }
 
 const styles = {

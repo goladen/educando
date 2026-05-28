@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Wrench, Table, FileQuestion, RefreshCw, Camera, BarChart2, BookOpen, Tv2 } from 'lucide-react';
+import { Wrench, Table, FileQuestion, RefreshCw, Camera, BarChart2, BookOpen, Tv2, Shield } from 'lucide-react';
 
 import ToolExportarGoogleSheets from './ToolExportarGoogleSheets';
 import ToolGeneradorGoogleForms from './ToolGeneradorGoogleForms';
@@ -8,16 +8,21 @@ import FotoARecurso from './FotoARecurso';
 import FotoAOmni from './FotoAOmni';
 import VideoAPre from './VideoAPresentacion';
 import InformesJuegos from './InformesJuegos2';
+import AdminRecursosUploader from './AdminRecursosUploader';
+
+const ADMIN_EMAIL = 'goladen@gmail.com';
 
 export default function TeacherTools({ usuario, googleToken, perfilProfesor, onOpenEditorOmni }) {
     const [herramientaActiva, setHerramientaActiva] = useState(null);
     const [showFotoOmni, setShowFotoOmni] = useState(false);
+    const isAdmin = usuario?.email === ADMIN_EMAIL;
 
-    if (herramientaActiva === 'SHEETS')      return <ToolExportarGoogleSheets usuario={usuario} googleToken={googleToken} onBack={() => setHerramientaActiva(null)} />;
-    if (herramientaActiva === 'FORMS')       return <ToolGeneradorGoogleForms  usuario={usuario} googleToken={googleToken} onBack={() => setHerramientaActiva(null)} />;
-    if (herramientaActiva === 'CONVERSOR')   return <ToolConversorRecursos     usuario={usuario} onBack={() => setHerramientaActiva(null)} />;
-    if (herramientaActiva === 'INFORMES')    return <InformesJuegos usuario={usuario} />;
-    if (herramientaActiva === 'VIDEO')       return <VideoAPre onBack={() => setHerramientaActiva(null)} usuario={usuario} />;
+    if (herramientaActiva === 'SHEETS')         return <ToolExportarGoogleSheets usuario={usuario} googleToken={googleToken} onBack={() => setHerramientaActiva(null)} />;
+    if (herramientaActiva === 'FORMS')          return <ToolGeneradorGoogleForms  usuario={usuario} googleToken={googleToken} onBack={() => setHerramientaActiva(null)} />;
+    if (herramientaActiva === 'CONVERSOR')      return <ToolConversorRecursos     usuario={usuario} onBack={() => setHerramientaActiva(null)} />;
+    if (herramientaActiva === 'INFORMES')       return <InformesJuegos usuario={usuario} />;
+    if (herramientaActiva === 'VIDEO')          return <VideoAPre onBack={() => setHerramientaActiva(null)} usuario={usuario} />;
+    if (herramientaActiva === 'ADMIN_UPLOADER') return <AdminRecursosUploader usuario={usuario} onBack={() => setHerramientaActiva(null)} />;
 
     if (herramientaActiva === 'FOTO') {
         return (
@@ -130,6 +135,20 @@ export default function TeacherTools({ usuario, googleToken, perfilProfesor, onO
                         Consulta los resultados que tus alumnos han enviado desde los juegos.
                     </p>
                 </div>
+
+                {/* ── Admin: Cargador de recursos con IA (solo goladen@gmail.com) ── */}
+                {isAdmin && (
+                    <div onClick={() => setHerramientaActiva('ADMIN_UPLOADER')}
+                        style={{ ...cardStyle, borderLeft: '4px solid #6D28D9', background: 'linear-gradient(135deg,#faf5ff,#ede9fe)' }}>
+                        <div style={{ background: '#EDE9FE', padding: '15px', borderRadius: '50%', marginBottom: '15px' }}>
+                            <Shield size={32} color="#6D28D9" />
+                        </div>
+                        <h3 style={{ margin: '0 0 10px 0', color: '#6D28D9' }}>Cargador IA (Admin)</h3>
+                        <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>
+                            Genera preguntas con Gemini y súbelas directamente a Firebase como recursos listos para usar.
+                        </p>
+                    </div>
+                )}
 
             </div>
         </div>

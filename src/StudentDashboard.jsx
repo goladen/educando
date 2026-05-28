@@ -4,6 +4,7 @@ import { collection, query, where, getDocs, orderBy, getCountFromServer, doc, ge
 import { Search, MapPin, User, Globe, ArrowLeft, Play, Users, UserCircle, Share2, Copy } from 'lucide-react'; // AÑADIDO: Share2, Copy
 import GamePlayer from './GamePlayer';
 import ThinkHootGame from './ThinkHootGame';
+import ExpresionArtEscri from './ExpresionArtEscri';
 import RuletaGame from './RuletaGame';
 import QuestionSenderClient from './QuestionSenderClient';
 import UserProfile from './components/UserProfile';
@@ -53,6 +54,19 @@ const getNombreJuego = (tipo) => {
     if (t === 'QUESTION_SENDER') return 'Question Sender';
     return t;
 };
+
+// Detecta el tipoJuego de la sala y renderiza el componente adecuado
+function LiveGameRouter({ codigoSala, usuario, onExit }) {
+    const [tipoJuego, setTipoJuego] = useState(null);
+    useEffect(() => {
+        getDoc(doc(db, 'live_games', codigoSala)).then(snap => {
+            setTipoJuego(snap.exists() ? (snap.data().tipoJuego || 'THINKHOOT') : 'THINKHOOT');
+        }).catch(() => setTipoJuego('THINKHOOT'));
+    }, [codigoSala]);
+    if (!tipoJuego) return <div style={{ color: 'white', padding: 40, textAlign: 'center' }}>Conectando...</div>;
+    if (tipoJuego === 'EAE') return <ExpresionArtEscri isHost={false} codigoSala={codigoSala} usuario={usuario} onExit={onExit} />;
+    return <ThinkHootGame isHost={false} codigoSala={codigoSala} usuario={usuario} onExit={onExit} />;
+}
 
 export default function StudentDashboard({ usuario }) {
     const [vistaActual, setVistaActual] = useState('JUEGOS');
@@ -175,7 +189,7 @@ export default function StudentDashboard({ usuario }) {
     };
 
     if (senderMode) return <QuestionSenderClient usuario={usuario} onBack={() => setSenderMode(false)} />;
-    if (fase === 'EN_VIVO') return <ThinkHootGame isHost={false} codigoSala={joinData.codigo} usuario={{ ...usuario, displayName: joinData.alias || usuario.displayName }} onExit={() => setFase('SELECCION')} />;
+    if (fase === 'EN_VIVO') return <LiveGameRouter codigoSala={joinData.codigo} usuario={{ ...usuario, displayName: joinData.alias || usuario.displayName }} onExit={() => setFase('SELECCION')} />;
     if (fase === 'JUGANDO') {
         if (juegoElegido === 'RULETA' || recursoActivo.tipoJuego === 'RULETA') return <RuletaGame recurso={recursoActivo} usuario={usuario} alTerminar={() => setFase('BUSQUEDA')} />;
         return <GamePlayer recurso={recursoActivo} usuario={usuario} alTerminar={() => setFase('BUSQUEDA')} />;

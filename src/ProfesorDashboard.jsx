@@ -7,6 +7,7 @@ import { procesarArchivoExcel } from './ExcelParser';
 import { generarPreguntasGemini } from './GeminiGenerator';
 import GamePlayer from './GamePlayer';
 import ThinkHootGame from './ThinkHootGame';
+import ExpresionArtEscri from './ExpresionArtEscri';
 import EditorManual from './components/EditorManual';
 import EditorPro from './components/EditorPro';
 import RuletaGame from './RuletaGame';
@@ -858,6 +859,21 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             }
         }
 
+        // EAE no necesita preguntas — el juego las genera internamente
+        if (r.tipoJuego === 'EAE') {
+            const myHostId  = usuario?.uid || "host_invitado_" + Date.now();
+            await setDoc(doc(db, "live_games", sala), {
+                hostId: myHostId, recursoId: r.id || 'temp_id',
+                recursoTitulo: r.titulo || 'ExpresionArt&Escri',
+                estado: 'LOBBY', jugadores: {}, mensajes: {},
+                config: { tiempoRonda: parseInt(r.config?.tiempoRonda) || 60 },
+                tipoJuego: 'EAE', anfitrionesUsados: [], palabrasUsadas: [], rondaActual: 0,
+                timestamp: new Date(),
+            });
+            setHostGameData({ ...hostGameData, codigoSala: sala, fase: 'LIVE' });
+            return;
+        }
+
         if (!pool || pool.length === 0) return alert("No hay preguntas disponibles con esa configuración.");
 
         // 2. RECORTAR Y ADAPTAR FORMATO
@@ -912,7 +928,12 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             return <MathLive isHost={true} codigoSala={hostGameData.codigoSala} usuario={usuario} onExit={() => setHostGameData(null)} />;
         }
 
-        // 3. Si no es ninguno de los anteriores, cargamos el ThinkHoot normal
+        // 3. ExpresionArt&Escri (Pictionary + Tabú)
+        if (hostGameData.recurso?.tipoJuego === 'EAE') {
+            return <ExpresionArtEscri isHost={true} codigoSala={hostGameData.codigoSala} usuario={usuario} onExit={() => setHostGameData(null)} />;
+        }
+
+        // 4. Si no es ninguno de los anteriores, cargamos el ThinkHoot normal
         return <ThinkHootGame isHost={true} codigoSala={hostGameData.codigoSala} usuario={usuario} onExit={() => setHostGameData(null)} />;
     }
 

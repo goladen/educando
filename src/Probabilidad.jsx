@@ -1090,8 +1090,9 @@ function UrnasProbabilidad({ onBack }) {
   const [quantityInput,  setQuantityInput]  = useState(5);
   const [stagesCount,    setStagesCount]    = useState(1);
   const [experimentTree, setExperimentTree] = useState({ S1: 1 });
-  const [singleResult,   setSingleResult]   = useState(null);
-  const [bulkResults,    setBulkResults]    = useState(null);
+  const [singleResult,     setSingleResult]     = useState(null);
+  const [bulkResults,      setBulkResults]      = useState(null);
+  const [withReplacement,  setWithReplacement]  = useState(true);
 
   const handleCreateUrn = () => {
     const newId = urns.length > 0 ? Math.max(...urns.map(u => u.id)) + 1 : 1;
@@ -1113,12 +1114,15 @@ function UrnasProbabilidad({ onBack }) {
     setBulkResults(null);
   };
 
-  const drawBall = (urnId) => {
-    const urn = urns.find(u => u.id === urnId);
-    if (!urn || !Object.keys(urn.balls).length) return 'Vacía';
-    const pool = Object.entries(urn.balls).flatMap(([c, n]) => Array(n).fill(c));
-    return pool.length ? pool[Math.floor(Math.random() * pool.length)] : 'Vacía';
+  // Extrae una bola de un mapa de bolas (puede ser la urna original o una copia temporal)
+  const drawFromMap = (ballsMap) => {
+    const pool = Object.entries(ballsMap).flatMap(([c, n]) => Array(n).fill(c));
+    return pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
   };
+
+  // Construye copias frescas de las urnas para experimentos sin reemplazamiento
+  const freshTempBalls = () =>
+    Object.fromEntries(urns.map(u => [u.id, { ...u.balls }]));
 
   const getUrnForStep = (stage, path) => {
     const key = stage === 1 ? 'S1' : `S${stage}-${path.join('-')}`;
@@ -1126,14 +1130,30 @@ function UrnasProbabilidad({ onBack }) {
   };
 
   const runOnce = () => {
-    const steps = [];
-    const path  = [];
+    const steps    = [];
+    const path     = [];
+    const tempBalls = withReplacement ? null : freshTempBalls();
+
     for (let i = 1; i <= stagesCount; i++) {
-      const uId  = getUrnForStep(i, path);
-      const ball = drawBall(uId);
-      steps.push({ stage: i, urnName: urns.find(u => u.id === uId)?.name || `Urna ${uId}`, ball });
-      if (ball === 'Vacía') break;
-      path.push(ball);
+      const uId    = getUrnForStep(i, path);
+      const source = withReplacement
+        ? urns.find(u => u.id === uId)?.balls || {}
+        : tempBalls[uId] || {};
+      const drawn  = drawFromMap(source);
+
+      if (drawn === null) {
+        steps.push({ stage: i, urnName: urns.find(u => u.id === uId)?.name || `Urna ${uId}`, ball: 'Vacía' });
+        break;
+      }
+      steps.push({ stage: i, urnName: urns.find(u => u.id === uId)?.name || `Urna ${uId}`, ball: drawn });
+      path.push(drawn);
+
+      // Sin reemplazamiento: retirar la bola extraída de la copia temporal
+      if (!withReplacement && tempBalls[uId]) {
+        const cnt = (tempBalls[uId][drawn] || 1) - 1;
+        if (cnt <= 0) delete tempBalls[uId][drawn];
+        else tempBalls[uId][drawn] = cnt;
+      }
     }
     setSingleResult(steps);
   };
@@ -1141,11 +1161,24 @@ function UrnasProbabilidad({ onBack }) {
   const run1000 = () => {
     const agg = {};
     for (let s = 0; s < 1000; s++) {
-      const path = [];
+      const path      = [];
+      const tempBalls = withReplacement ? null : freshTempBalls();
+
       for (let i = 1; i <= stagesCount; i++) {
-        const ball = drawBall(getUrnForStep(i, path));
-        path.push(ball);
-        if (ball === 'Vacía') break;
+        const uId    = getUrnForStep(i, path);
+        const source = withReplacement
+          ? urns.find(u => u.id === uId)?.balls || {}
+          : tempBalls[uId] || {};
+        const drawn  = drawFromMap(source);
+
+        if (drawn === null) { path.push('Vacía'); break; }
+        path.push(drawn);
+
+        if (!withReplacement && tempBalls[uId]) {
+          const cnt = (tempBalls[uId][drawn] || 1) - 1;
+          if (cnt <= 0) delete tempBalls[uId][drawn];
+          else tempBalls[uId][drawn] = cnt;
+        }
       }
       const key = path.join(' ➔ ');
       agg[key] = (agg[key] || 0) + 1;
@@ -1278,6 +1311,35 @@ function UrnasProbabilidad({ onBack }) {
       {/* Bloque 3: Simulaciones */}
       <div style={panelSt}>
         <h3 style={secTitle}>3. Experimento</h3>
+
+        {/* Toggle: con / sin reemplazamiento */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, background: '#f8fafc', padding: '12px 16px', borderRadius: 10, border: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
+          <span style={{ fontWeight: 700, fontSize: 14, color: '#334155' }}>Tipo de extracción:</span>
+          <button
+            onClick={() => { setWithReplacement(true);  setSingleResult(null); setBulkResults(null); }}
+            style={{ padding: '8px 18px', fontSize: 14, fontWeight: 700, borderRadius: 8, border: '2px solid', cursor: 'pointer', transition: 'all 0.15s',
+              borderColor:  withReplacement ? '#2563eb' : '#cbd5e1',
+              background:   withReplacement ? '#eff6ff' : '#fff',
+              color:        withReplacement ? '#1d4ed8' : '#64748b' }}
+          >
+            ♻️ Con reemplazamiento
+          </button>
+          <button
+            onClick={() => { setWithReplacement(false); setSingleResult(null); setBulkResults(null); }}
+            style={{ padding: '8px 18px', fontSize: 14, fontWeight: 700, borderRadius: 8, border: '2px solid', cursor: 'pointer', transition: 'all 0.15s',
+              borderColor: !withReplacement ? '#dc2626' : '#cbd5e1',
+              background:  !withReplacement ? '#fef2f2' : '#fff',
+              color:       !withReplacement ? '#dc2626' : '#64748b' }}
+          >
+            🚫 Sin reemplazamiento
+          </button>
+          <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 4 }}>
+            {withReplacement
+              ? 'La bola vuelve a la urna tras cada extracción'
+              : 'La bola extraída no vuelve — la urna cambia en cada etapa'}
+          </span>
+        </div>
+
         <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 20 }}>
           <button onClick={runOnce} style={{ padding: '12px 22px', fontSize: 15, fontWeight: 700, background: '#10b981', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', boxShadow: '0 4px 10px rgba(16,185,129,0.25)' }}>
             🎲 Extraer 1 camino

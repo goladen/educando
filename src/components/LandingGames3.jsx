@@ -44,6 +44,8 @@ import EstadisticaApp from '../Estadistica';
 import RetosApp from '../Retos';
 import SimuladorDados from '../Probabilidad';
 import TrivialGame from '../Trivial';
+import SimuladorOAOA from '../MatesOAOA';
+import JuegoFeriaOAOA from '../FeriaMates';
 import imgPasapalabra from '../assets/icono_pasapal.png'; // Revisa si es .png o .jpg
 import imgBurbujas from '../assets/icono_burbujas.png';
 import imgPikatron from '../assets/icono_pikatron.png';
@@ -828,6 +830,8 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
         if (vistaAlumno === 'RECORDS') cargarRecords();
     }, [vistaAlumno]);
 
+    const [subzonaMath, setSubzonaMath] = useState(null);
+
     // Estados Live Alumno
     const [liveModeAlumno, setLiveModeAlumno] = useState(false);
     const [joinLiveCode, setJoinLiveCode] = useState('');
@@ -1182,6 +1186,18 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
         if (juegoActivo.tipoJuego === 'POLINOMIOS')  return <AlgebraApp      usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'ESTADISTICA') return <EstadisticaApp  usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'PROBABILIDAD') return <SimuladorDados onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'MATES_OAOA') return (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#f0faf9', overflowY: 'auto' }}>
+                <button onClick={() => setJuegoActivo(null)} style={{ position: 'fixed', top: 14, left: 14, zIndex: 10000, background: '#009688', color: 'white', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>← Volver</button>
+                <SimuladorOAOA />
+            </div>
+        );
+        if (juegoActivo.tipoJuego === 'FERIA_MATES') return (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#fff8f0', overflowY: 'auto' }}>
+                <button onClick={() => setJuegoActivo(null)} style={{ position: 'fixed', top: 14, left: 14, zIndex: 10000, background: '#e67e22', color: 'white', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>← Volver</button>
+                <JuegoFeriaOAOA />
+            </div>
+        );
 
         if (juegoActivo.tipoJuego === 'SINTAXIS')    return <SintaxisGame  usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'LISTENING')   return <Listening     usuario={usuario} onExit={() => setJuegoActivo(null)} />;
@@ -1224,11 +1240,50 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
 
     // --- PANTALLA EXCLUSIVA MATH WORLD ---
     if (zonaActiva === 'MATH') {
+        // Subvista: Primaria
+        if (subzonaMath === 'PRIMARIA') {
+            return (
+                <div style={{ width: '100%', marginTop: '20px' }}>
+                    <button onClick={() => setSubzonaMath(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#333', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '20px', fontWeight: 'bold' }}>
+                        <Home size={20} /> Volver a Math World
+                    </button>
+                    <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+                        <div style={{ fontSize: '70px', marginBottom: '10px' }}>🏫</div>
+                        <h1 style={{ color: '#009688', fontSize: '3rem', margin: 0, textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>Primaria</h1>
+                        <p style={{ color: '#666', fontSize: '1.2rem', marginTop: '10px' }}>Juegos de cálculo para primaria</p>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '25px', maxWidth: '600px', margin: '0 auto', paddingBottom: '40px' }}>
+                        <div
+                            onClick={() => setJuegoActivo({ tipoJuego: 'MATES_OAOA' })}
+                            style={{ background: '#E0F2F1', borderRadius: '20px', padding: '30px 20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s', border: '3px solid #009688' }}
+                            onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
+                            onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                        >
+                            <div style={{ fontSize: '50px', marginBottom: '15px' }}>🧮</div>
+                            <h3 style={{ margin: '0 0 10px 0', color: '#009688', fontSize: '1.4rem' }}>Método OAOA</h3>
+                            <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>Aprende las 4 operaciones básicas paso a paso con algoritmos abiertos.</p>
+                        </div>
+                        <div
+                            onClick={() => setJuegoActivo({ tipoJuego: 'FERIA_MATES' })}
+                            style={{ background: '#FFF3E0', borderRadius: '20px', padding: '30px 20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s', border: '3px solid #e67e22' }}
+                            onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
+                            onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                        >
+                            <div style={{ fontSize: '50px', marginBottom: '15px' }}>🎡</div>
+                            <h3 style={{ margin: '0 0 10px 0', color: '#e67e22', fontSize: '1.4rem' }}>Feria del Cálculo</h3>
+                            <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>¡Supera operaciones al estilo OAOA antes de que se acabe el tiempo!</p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
         return (
             <div style={{ width: '100%', marginTop: '20px' }}>
                 {/* Botón Volver Modificado */}
                 <button onClick={() => {
                     setZonaActiva('MAIN');
+                    setSubzonaMath(null);
                     window.history.pushState({}, '', '/');
                     window.dispatchEvent(new Event('popstate'));
                 }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#333', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '20px', fontWeight: 'bold' }}>
@@ -1242,6 +1297,18 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '25px', maxWidth: '900px', margin: '0 auto', paddingBottom: '40px' }}>
+                    {/* Tarjeta Primaria */}
+                    <div
+                        onClick={() => setSubzonaMath('PRIMARIA')}
+                        style={{ background: '#E8F5E9', borderRadius: '20px', padding: '30px 20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s', border: '3px solid #4CAF50' }}
+                        onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
+                        onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                    >
+                        <div style={{ fontSize: '50px', marginBottom: '15px' }}>🏫</div>
+                        <h3 style={{ margin: '0 0 10px 0', color: '#4CAF50', fontSize: '1.4rem' }}>Primaria</h3>
+                        <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>Juegos de cálculo: Método OAOA y Feria del Cálculo.</p>
+                    </div>
+
                     {APPS.filter(app => app.isMath).map(app => (
                         <div
                             key={app.id}

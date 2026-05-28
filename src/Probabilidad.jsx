@@ -32,6 +32,68 @@ function playHoofSound() {
   } catch (_) {}
 }
 
+// ─── Audio: fanfare (game show ascending jingle) ──────────────────────────────
+
+function playFanfare() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    // C4→E4→G4 then C5+E5+G5 chord
+    const notes = [
+      [0,    262, 0.18],
+      [0.20, 330, 0.18],
+      [0.40, 392, 0.18],
+      [0.60, 523, 0.55],
+      [0.60, 659, 0.55],
+      [0.60, 784, 0.55],
+    ];
+    notes.forEach(([t, freq, dur]) => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'triangle';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.28, ctx.currentTime + t);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + dur);
+      osc.start(ctx.currentTime + t);
+      osc.stop(ctx.currentTime + t + dur + 0.05);
+    });
+    setTimeout(() => ctx.close(), 2000);
+  } catch (_) {}
+}
+
+// ─── Audio: wrong answer (sad trombone) ───────────────────────────────────────
+
+function playWrong() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    // Descending Bb3→A3→Ab3→G3
+    const notes = [
+      [0,    233, 0.22],
+      [0.26, 220, 0.22],
+      [0.52, 208, 0.22],
+      [0.78, 196, 0.55],
+    ];
+    notes.forEach(([t, freq, dur]) => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sawtooth';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.22, ctx.currentTime + t);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + dur);
+      osc.start(ctx.currentTime + t);
+      osc.stop(ctx.currentTime + t + dur + 0.05);
+    });
+    setTimeout(() => ctx.close(), 2500);
+  } catch (_) {}
+}
+
 // ─── Race helpers ─────────────────────────────────────────────────────────────
 
 function calcResult(d1, d2, op) {
@@ -698,13 +760,331 @@ function CarreraCamellos({ onBack }) {
   );
 }
 
+// ─── TresPuertas (Monty Hall) ─────────────────────────────────────────────────
+
+function TresPuertas({ onBack }) {
+  const [showPhase, setShowPhase] = useState('INTRO'); // 'INTRO' | 'OPENING' | 'PLAYING'
+  const [curtainOpen, setCurtainOpen] = useState(false);
+  const curtainRef = useRef(null);
+  const playRef    = useRef(null);
+
+  const [carPosition,    setCarPosition]    = useState(() => Math.floor(Math.random() * 3) + 1);
+  const [selectedDoor,   setSelectedDoor]   = useState(null);
+  const [revealedDoor,   setRevealedDoor]   = useState(null);
+  const [gameState,      setGameState]      = useState('CHOOSE'); // CHOOSE | DECIDE | REVEAL
+  const [playerDecision, setPlayerDecision] = useState(null);
+  const [lastResult,     setLastResult]     = useState(null);
+  const [stats, setStats] = useState({ switchWins: 0, switchLosses: 0, stayWins: 0, stayLosses: 0 });
+
+  useEffect(() => () => { clearTimeout(curtainRef.current); clearTimeout(playRef.current); }, []);
+
+  const startShow = () => {
+    setShowPhase('OPENING');
+    playFanfare();
+    curtainRef.current = setTimeout(() => setCurtainOpen(true), 50);
+    playRef.current    = setTimeout(() => setShowPhase('PLAYING'), 2100);
+  };
+
+  const startNewRound = () => {
+    setCarPosition(Math.floor(Math.random() * 3) + 1);
+    setSelectedDoor(null);
+    setRevealedDoor(null);
+    setGameState('CHOOSE');
+    setPlayerDecision(null);
+    setLastResult(null);
+  };
+
+  const resetAll = () => {
+    startNewRound();
+    setStats({ switchWins: 0, switchLosses: 0, stayWins: 0, stayLosses: 0 });
+  };
+
+  const handleDoorClick = (doorNum) => {
+    if (gameState !== 'CHOOSE') return;
+    setSelectedDoor(doorNum);
+    const avail = [1, 2, 3].filter(d => d !== doorNum && d !== carPosition);
+    setRevealedDoor(avail[Math.floor(Math.random() * avail.length)]);
+    setGameState('DECIDE');
+  };
+
+  const handleDecision = (decision) => {
+    if (gameState !== 'DECIDE') return;
+    setPlayerDecision(decision);
+    let finalDoor = selectedDoor;
+    if (decision === 'SWITCH') {
+      finalDoor = [1, 2, 3].find(d => d !== selectedDoor && d !== revealedDoor);
+      setSelectedDoor(finalDoor);
+    }
+    const isWin = finalDoor === carPosition;
+    setLastResult(isWin ? 'WIN' : 'LOSS');
+    setStats(prev => {
+      const ns = { ...prev };
+      if (decision === 'SWITCH') { if (isWin) ns.switchWins++; else ns.switchLosses++; }
+      else                       { if (isWin) ns.stayWins++;   else ns.stayLosses++;   }
+      return ns;
+    });
+    setGameState('REVEAL');
+    if (isWin) playApplause(); else playWrong();
+  };
+
+  const runBulkSimulation = (strategy, count) => {
+    let sW = 0, sL = 0, stW = 0, stL = 0;
+    for (let i = 0; i < count; i++) {
+      const car    = Math.floor(Math.random() * 3) + 1;
+      const choice = Math.floor(Math.random() * 3) + 1;
+      const avail  = [1, 2, 3].filter(d => d !== choice && d !== car);
+      const reveal = avail[Math.floor(Math.random() * avail.length)];
+      if (strategy === 'SWITCH') {
+        const final = [1, 2, 3].find(d => d !== choice && d !== reveal);
+        if (final === car) sW++; else sL++;
+      } else {
+        if (choice === car) stW++; else stL++;
+      }
+    }
+    setStats(prev => ({
+      switchWins:   prev.switchWins   + sW,
+      switchLosses: prev.switchLosses + sL,
+      stayWins:     prev.stayWins     + stW,
+      stayLosses:   prev.stayLosses   + stL,
+    }));
+  };
+
+  const totalSwitch = stats.switchWins + stats.switchLosses;
+  const totalStay   = stats.stayWins   + stats.stayLosses;
+  const pctSwitch   = totalSwitch > 0 ? ((stats.switchWins / totalSwitch) * 100).toFixed(1) : '—';
+  const pctStay     = totalStay   > 0 ? ((stats.stayWins   / totalStay)   * 100).toFixed(1) : '—';
+
+  const presenterText = () => {
+    if (gameState === 'CHOOSE') return '🎤 ¡Bienvenidos a Las Tres Puertas! Detrás de una de estas puertas hay un coche increíble... ¡Elige una puerta!';
+    if (gameState === 'DECIDE') return `🎤 ¡Interesante! He abierto la puerta ${revealedDoor}... ¡y hay una cabra! 🐐 ¿Mantienes la puerta ${selectedDoor} o cambias a la otra?`;
+    if (gameState === 'REVEAL' && lastResult === 'WIN' && playerDecision === 'SWITCH') return '🎤 ¡¡¡ENHORABUENA!!! ¡Cambiaste de puerta y ganaste el coche! 🚗🎉 La probabilidad te sonrió — cambiando ganas 2 de cada 3 veces.';
+    if (gameState === 'REVEAL' && lastResult === 'WIN' && playerDecision === 'STAY')   return '🎤 ¡¡ENHORABUENA!! ¡Mantuviste tu puerta y ganaste el coche! 🚗✨ ¡Eres de los afortunados — solo ganas 1 de cada 3 veces así!';
+    if (gameState === 'REVEAL' && lastResult === 'LOSS' && playerDecision === 'SWITCH') return '🎤 ¡Ay, mala suerte! Cambiaste pero era una cabra esta vez. 🐐 Estadísticamente, cambiando ganarías el 66.7% de las veces.';
+    if (gameState === 'REVEAL' && lastResult === 'LOSS' && playerDecision === 'STAY')  return '🎤 ¡Mantuviste y había cabra! 🐐 Si hubieras cambiado, tenías un 66.7% de posibilidades de ganar el coche. ¡Inténtalo de nuevo!';
+    return '';
+  };
+
+  // ── INTRO ──
+  if (showPhase === 'INTRO') {
+    return (
+      <div style={{ fontFamily: 'Segoe UI, Roboto, sans-serif', minHeight: 480, background: 'linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)', borderRadius: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 40, color: '#fff', textAlign: 'center', position: 'relative' }}>
+        <button onClick={onBack} style={{ position: 'absolute', top: 16, left: 16, background: 'transparent', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.55)', fontWeight: 700, fontSize: '0.9rem' }}>
+          ← Volver al menú
+        </button>
+        <div style={{ fontSize: 80, marginBottom: 20, filter: 'drop-shadow(0 0 20px rgba(251,191,36,0.5))' }}>🚪🎰🚪</div>
+        <h1 style={{ fontSize: 44, fontWeight: 900, color: '#fbbf24', margin: '0 0 14px', textShadow: '0 0 30px rgba(251,191,36,0.5)', letterSpacing: '-0.5px' }}>
+          Las Tres Puertas
+        </h1>
+        <p style={{ fontSize: 19, color: 'rgba(255,255,255,0.75)', marginBottom: 10, maxWidth: 480, lineHeight: 1.5 }}>
+          El famoso Problema de Monty Hall
+        </p>
+        <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.45)', marginBottom: 44, maxWidth: 420, lineHeight: 1.5 }}>
+          Detrás de una puerta hay un 🚗 coche. Detrás de las otras dos, una 🐐 cabra. ¡El concurso de TV que desafía tu intuición matemática!
+        </p>
+        <button
+          onClick={startShow}
+          style={{ padding: '20px 52px', fontSize: 24, fontWeight: 900, color: '#1e1b4b', background: 'linear-gradient(135deg, #fbbf24, #f59e0b)', border: 'none', borderRadius: 18, cursor: 'pointer', boxShadow: '0 8px 32px rgba(251,191,36,0.5)', letterSpacing: '0.5px', transition: 'transform 0.15s, box-shadow 0.15s' }}
+          onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.06)'; e.currentTarget.style.boxShadow = '0 12px 44px rgba(251,191,36,0.7)'; }}
+          onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)';   e.currentTarget.style.boxShadow = '0 8px 32px rgba(251,191,36,0.5)'; }}
+        >
+          🎬 ¡COMENZAR EL SHOW!
+        </button>
+      </div>
+    );
+  }
+
+  // ── CURTAIN OPENING ──
+  if (showPhase === 'OPENING') {
+    return (
+      <div style={{ fontFamily: 'Segoe UI, Roboto, sans-serif', background: 'linear-gradient(135deg, #0f0c29, #302b63)', borderRadius: 20, minHeight: 480, position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {/* Top valance */}
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 52, background: 'linear-gradient(135deg, #7c2d12, #b45309)', zIndex: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.5)' }}>
+          <span style={{ color: '#fbbf24', fontWeight: 900, fontSize: 18, letterSpacing: 4 }}>🌟  LAS TRES PUERTAS  🌟</span>
+        </div>
+        {/* Door preview behind curtains */}
+        <div style={{ display: 'flex', gap: 24, marginTop: 52 }}>
+          {[1, 2, 3].map(n => (
+            <div key={n} style={{ width: 140, height: 220, background: '#1e1b4b', borderRadius: 16, border: '4px solid rgba(251,191,36,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 72 }}>🚪</div>
+          ))}
+        </div>
+        {/* Left curtain */}
+        <div style={{
+          position: 'absolute', top: 0, left: 0, width: '50%', height: '100%',
+          background: 'repeating-linear-gradient(90deg, rgba(0,0,0,0.12) 0px, rgba(0,0,0,0.12) 3px, transparent 3px, transparent 18px), linear-gradient(180deg, #991b1b 0%, #7f1d1d 100%)',
+          transform: curtainOpen ? 'translateX(-100%)' : 'translateX(0)',
+          transition: 'transform 1.8s cubic-bezier(0.4, 0, 0.2, 1)',
+          borderRight: '8px solid #92400e',
+          zIndex: 10,
+        }} />
+        {/* Right curtain */}
+        <div style={{
+          position: 'absolute', top: 0, right: 0, width: '50%', height: '100%',
+          background: 'repeating-linear-gradient(90deg, rgba(0,0,0,0.12) 0px, rgba(0,0,0,0.12) 3px, transparent 3px, transparent 18px), linear-gradient(180deg, #991b1b 0%, #7f1d1d 100%)',
+          transform: curtainOpen ? 'translateX(100%)' : 'translateX(0)',
+          transition: 'transform 1.8s cubic-bezier(0.4, 0, 0.2, 1)',
+          borderLeft: '8px solid #92400e',
+          zIndex: 10,
+        }} />
+        {/* Center seam */}
+        {!curtainOpen && (
+          <div style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: 10, height: '100%', background: '#7c2d12', zIndex: 11 }} />
+        )}
+      </div>
+    );
+  }
+
+  // ── PLAYING ──
+  return (
+    <div style={{ fontFamily: 'Segoe UI, Roboto, sans-serif', background: 'linear-gradient(160deg, #0f0c29 0%, #1a1740 100%)', borderRadius: 20, color: '#fff', overflow: 'hidden' }}>
+      {/* Header bar */}
+      <div style={{ background: 'linear-gradient(135deg, #7c2d12, #b45309)', padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <button onClick={onBack} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.75)', fontWeight: 700, fontSize: '0.9rem' }}>
+          ← Volver al menú
+        </button>
+        <span style={{ color: '#fbbf24', fontWeight: 900, fontSize: 17, letterSpacing: 3 }}>🌟 LAS TRES PUERTAS 🌟</span>
+        <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>{totalSwitch + totalStay} partidas</span>
+      </div>
+
+      <div style={{ padding: '20px 24px 28px' }}>
+        {/* Presenter speech bubble */}
+        <div style={{ background: 'rgba(255,255,255,0.09)', border: '1.5px solid rgba(251,191,36,0.35)', borderRadius: 16, padding: '14px 22px', marginBottom: 22, fontSize: 16, fontWeight: 600, color: '#fef3c7', lineHeight: 1.55 }}>
+          {presenterText()}
+        </div>
+
+        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+
+          {/* Game area */}
+          <div style={{ flex: '2', minWidth: 300 }}>
+            <div style={{ display: 'flex', gap: 14, marginBottom: 20, justifyContent: 'center' }}>
+              {[1, 2, 3].map(doorNum => {
+                const isSel   = selectedDoor === doorNum;
+                const isRev   = revealedDoor  === doorNum;
+                const isOpen  = gameState === 'REVEAL' || isRev;
+                const hasCar  = carPosition === doorNum;
+
+                let bg = 'rgba(255,255,255,0.07)';
+                let border = '3px solid rgba(255,255,255,0.18)';
+                let labelCol = 'rgba(255,255,255,0.5)';
+                let shadow = 'none';
+                if (isSel && gameState !== 'REVEAL') {
+                  bg = 'rgba(251,191,36,0.18)'; border = '3px solid #fbbf24';
+                  labelCol = '#fbbf24'; shadow = '0 0 24px rgba(251,191,36,0.35)';
+                }
+                if (isRev && gameState === 'DECIDE') {
+                  bg = 'rgba(255,255,255,0.03)'; border = '3px solid rgba(255,255,255,0.1)';
+                }
+                if (gameState === 'REVEAL') {
+                  if (hasCar) { bg = 'rgba(34,197,94,0.18)'; border = '3px solid #22c55e'; labelCol = '#86efac'; shadow = '0 0 28px rgba(34,197,94,0.35)'; }
+                  else        { bg = 'rgba(239,68,68,0.12)';  border = '3px solid #ef4444'; labelCol = '#fca5a5'; }
+                }
+
+                return (
+                  <div key={doorNum} onClick={() => handleDoorClick(doorNum)}
+                    style={{ flex: 1, minWidth: 110, maxWidth: 175, height: 248, borderRadius: 18, border, background: bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: gameState === 'CHOOSE' ? 'pointer' : 'default', transform: isSel && gameState !== 'REVEAL' ? 'scale(1.05)' : 'scale(1)', opacity: isRev && gameState === 'DECIDE' ? 0.45 : 1, transition: 'all 0.2s ease', boxShadow: shadow, position: 'relative' }}>
+                    <div style={{ position: 'absolute', top: 12, left: 12, width: 30, height: 30, borderRadius: '50%', background: 'rgba(0,0,0,0.5)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 700 }}>
+                      {doorNum}
+                    </div>
+                    <div style={{ fontSize: 72, lineHeight: 1 }}>
+                      {!isOpen ? '🚪' : (hasCar ? '🚗' : '🐐')}
+                    </div>
+                    <div style={{ marginTop: 12, fontSize: 13, fontWeight: 700, color: labelCol }}>
+                      {isSel && gameState !== 'REVEAL' && '⭐ Elegida'}
+                      {isRev && gameState === 'DECIDE' && '🗑️ Cabra'}
+                      {gameState === 'REVEAL' && (hasCar ? '🏆 ¡Coche!' : '🐐 Cabra')}
+                      {!isSel && !isRev && gameState !== 'REVEAL' && '🚪 Cerrada'}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {gameState === 'DECIDE' && (
+              <div style={{ display: 'flex', gap: 14, justifyContent: 'center', marginBottom: 16 }}>
+                <button onClick={() => handleDecision('STAY')}
+                  style={{ padding: '14px 26px', fontSize: 18, fontWeight: 800, color: '#fff', background: '#dc2626', border: 'none', borderRadius: 12, cursor: 'pointer', boxShadow: '0 4px 16px rgba(220,38,38,0.45)' }}>
+                  ✋ Mantener
+                </button>
+                <button onClick={() => handleDecision('SWITCH')}
+                  style={{ padding: '14px 26px', fontSize: 18, fontWeight: 800, color: '#fff', background: '#2563eb', border: 'none', borderRadius: 12, cursor: 'pointer', boxShadow: '0 4px 16px rgba(37,99,235,0.45)' }}>
+                  🔄 Cambiar
+                </button>
+              </div>
+            )}
+
+            {gameState === 'REVEAL' && (
+              <div style={{ textAlign: 'center' }}>
+                <button onClick={startNewRound}
+                  style={{ padding: '14px 36px', fontSize: 17, fontWeight: 800, color: '#fff', background: '#10b981', border: 'none', borderRadius: 12, cursor: 'pointer', boxShadow: '0 4px 16px rgba(16,185,129,0.45)' }}>
+                  🚪 Siguiente Ronda
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Stats sidebar */}
+          <div style={{ flex: '1', minWidth: 260 }}>
+            <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 16, padding: 18, marginBottom: 14, border: '1px solid rgba(255,255,255,0.1)' }}>
+              <h3 style={{ margin: '0 0 14px', color: '#fbbf24', fontSize: 15, fontWeight: 700 }}>📊 Estadísticas</h3>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr>
+                    {['Estrategia', '🏆', '❌', '%'].map((h, i) => (
+                      <th key={i} style={{ padding: '7px 5px', color: 'rgba(255,255,255,0.45)', fontWeight: 600, textAlign: i === 0 ? 'left' : 'center', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td style={{ padding: '10px 5px', fontWeight: 700, color: '#60a5fa' }}>🔄 Cambiar</td>
+                    <td style={{ padding: '10px 5px', textAlign: 'center', color: '#86efac' }}>{stats.switchWins}</td>
+                    <td style={{ padding: '10px 5px', textAlign: 'center', color: '#fca5a5' }}>{stats.switchLosses}</td>
+                    <td style={{ padding: '10px 5px', textAlign: 'center', fontWeight: 700, color: '#86efac' }}>{pctSwitch}%</td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: '10px 5px', fontWeight: 700, color: '#f87171' }}>✋ Mantener</td>
+                    <td style={{ padding: '10px 5px', textAlign: 'center', color: '#86efac' }}>{stats.stayWins}</td>
+                    <td style={{ padding: '10px 5px', textAlign: 'center', color: '#fca5a5' }}>{stats.stayLosses}</td>
+                    <td style={{ padding: '10px 5px', textAlign: 'center', fontWeight: 700, color: '#86efac' }}>{pctStay}%</td>
+                  </tr>
+                </tbody>
+              </table>
+              <p style={{ margin: '10px 0 0', fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>Total: {totalSwitch + totalStay} partidas</p>
+            </div>
+
+            <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 16, padding: 18, border: '1px solid rgba(255,255,255,0.07)' }}>
+              <h3 style={{ margin: '0 0 10px', color: '#fbbf24', fontSize: 14, fontWeight: 700 }}>🤖 Simulación masiva</h3>
+              <p style={{ margin: '0 0 12px', fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5 }}>Genera 100 partidas automáticas para demostrar la paradoja:</p>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                <button onClick={() => runBulkSimulation('SWITCH', 100)}
+                  style={{ flex: 1, padding: '9px 6px', fontSize: 12, fontWeight: 700, color: '#fff', background: '#2563eb', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
+                  🔄 Cambiar (100)
+                </button>
+                <button onClick={() => runBulkSimulation('STAY', 100)}
+                  style={{ flex: 1, padding: '9px 6px', fontSize: 12, fontWeight: 700, color: '#fff', background: '#dc2626', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
+                  ✋ Mantener (100)
+                </button>
+              </div>
+              <button onClick={resetAll}
+                style={{ width: '100%', padding: '9px', fontSize: 12, fontWeight: 700, color: '#fff', background: '#374151', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
+                🗑️ Limpiar estadísticas
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main menu selector ───────────────────────────────────────────────────────
 
 export default function SimuladorProbabilidad({ onExit }) {
-  const [modo, setModo] = useState(null); // null | 'DADOS' | 'CARRERA'
+  const [modo, setModo] = useState(null); // null | 'DADOS' | 'CARRERA' | 'PUERTAS'
 
   if (modo === 'DADOS')   return <SimuladorDados   onBack={() => setModo(null)} />;
   if (modo === 'CARRERA') return <CarreraCamellos  onBack={() => setModo(null)} />;
+  if (modo === 'PUERTAS') return <TresPuertas      onBack={() => setModo(null)} />;
 
   return (
     <div style={{
@@ -721,18 +1101,18 @@ export default function SimuladorProbabilidad({ onExit }) {
       <h1 style={{ textAlign: 'center', fontSize: 34, fontWeight: 800, margin: '0 0 8px' }}>🎲 Probabilidad</h1>
       <p style={{ textAlign: 'center', color: '#64748b', marginBottom: 44, fontSize: 16 }}>Elige una actividad</p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 28, maxWidth: 620, margin: '0 auto' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 24, maxWidth: 860, margin: '0 auto' }}>
 
         {/* Card: Simulador de Dados */}
         <div
           onClick={() => setModo('DADOS')}
-          style={{ background: '#eff6ff', border: '3px solid #2563eb', borderRadius: 22, padding: '40px 28px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 24px rgba(37,99,235,0.12)', transition: 'transform 0.2s, box-shadow 0.2s' }}
+          style={{ background: '#eff6ff', border: '3px solid #2563eb', borderRadius: 22, padding: '36px 24px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 24px rgba(37,99,235,0.12)', transition: 'transform 0.2s, box-shadow 0.2s' }}
           onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 16px 32px rgba(37,99,235,0.2)'; }}
           onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)';   e.currentTarget.style.boxShadow = '0 8px 24px rgba(37,99,235,0.12)'; }}
         >
-          <div style={{ fontSize: 68, marginBottom: 18 }}>🎲</div>
-          <h2 style={{ color: '#1d4ed8', fontSize: 22, fontWeight: 800, margin: '0 0 10px' }}>Simulador de Dados</h2>
-          <p style={{ color: '#475569', fontSize: 14, margin: 0, lineHeight: 1.5 }}>
+          <div style={{ fontSize: 64, marginBottom: 16 }}>🎲</div>
+          <h2 style={{ color: '#1d4ed8', fontSize: 21, fontWeight: 800, margin: '0 0 10px' }}>Simulador de Dados</h2>
+          <p style={{ color: '#475569', fontSize: 13, margin: 0, lineHeight: 1.5 }}>
             D4–D100 · 1–3 dados · hasta 1 000 000 tiradas<br />Suma, Resta, Multiplicación o División
           </p>
         </div>
@@ -740,14 +1120,28 @@ export default function SimuladorProbabilidad({ onExit }) {
         {/* Card: Carrera de Camellos */}
         <div
           onClick={() => setModo('CARRERA')}
-          style={{ background: '#fefce8', border: '3px solid #ca8a04', borderRadius: 22, padding: '40px 28px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 24px rgba(202,138,4,0.12)', transition: 'transform 0.2s, box-shadow 0.2s' }}
+          style={{ background: '#fefce8', border: '3px solid #ca8a04', borderRadius: 22, padding: '36px 24px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 24px rgba(202,138,4,0.12)', transition: 'transform 0.2s, box-shadow 0.2s' }}
           onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 16px 32px rgba(202,138,4,0.2)'; }}
           onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)';   e.currentTarget.style.boxShadow = '0 8px 24px rgba(202,138,4,0.12)'; }}
         >
-          <div style={{ fontSize: 68, marginBottom: 18 }}>🐪</div>
-          <h2 style={{ color: '#92400e', fontSize: 22, fontWeight: 800, margin: '0 0 10px' }}>Carrera de Camellos</h2>
-          <p style={{ color: '#475569', fontSize: 14, margin: 0, lineHeight: 1.5 }}>
+          <div style={{ fontSize: 64, marginBottom: 16 }}>🐪</div>
+          <h2 style={{ color: '#92400e', fontSize: 21, fontWeight: 800, margin: '0 0 10px' }}>Carrera de Camellos</h2>
+          <p style={{ color: '#475569', fontSize: 13, margin: 0, lineHeight: 1.5 }}>
             2 dados D6 · Suma, |Resta| o Multiplicación<br />Asigna camellos a filas · ¡Que gane la probabilidad!
+          </p>
+        </div>
+
+        {/* Card: Las Tres Puertas */}
+        <div
+          onClick={() => setModo('PUERTAS')}
+          style={{ background: 'linear-gradient(135deg, #1e1b4b, #312e81)', border: '3px solid #7c3aed', borderRadius: 22, padding: '36px 24px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 24px rgba(124,58,237,0.2)', transition: 'transform 0.2s, box-shadow 0.2s' }}
+          onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 16px 32px rgba(124,58,237,0.35)'; }}
+          onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)';   e.currentTarget.style.boxShadow = '0 8px 24px rgba(124,58,237,0.2)'; }}
+        >
+          <div style={{ fontSize: 64, marginBottom: 16 }}>🚪</div>
+          <h2 style={{ color: '#fbbf24', fontSize: 21, fontWeight: 800, margin: '0 0 10px' }}>Las Tres Puertas</h2>
+          <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: 13, margin: 0, lineHeight: 1.5 }}>
+            El Problema de Monty Hall<br />¿Cambias de puerta o te mantienes? 🚗🐐
           </p>
         </div>
 

@@ -130,6 +130,7 @@ export default function EstadisticaApp({ onExit, usuario }) {
     const [enviado,setEnviado]=useState(false);
     const [errorEnv,setErrorEnv]=useState('');
     const [isFullscreen,setIsFullscreen]=useState(false);
+    const [modoClase,setModoClase]=useState(false);
     const appRef=useRef(null);
 
     useEffect(()=>{ const fn=()=>setIsFullscreen(!!document.fullscreenElement); document.addEventListener('fullscreenchange',fn); return()=>document.removeEventListener('fullscreenchange',fn); },[]);
@@ -205,6 +206,12 @@ export default function EstadisticaApp({ onExit, usuario }) {
                                 </button>
                             ))}
                         </div>
+                        <div style={{marginTop:20,textAlign:'center'}}>
+                            <button onClick={()=>setModoClase(true)} style={{...BTN(D.gold,'#111'),fontSize:'1rem',padding:'13px 28px',borderRadius:12,boxShadow:'0 4px 18px rgba(243,156,18,0.25)'}}>
+                                🖊 Modo Pizarra — crea tu propio estudio
+                            </button>
+                            <div style={{fontSize:'0.75rem',color:D.muted,marginTop:6}}>Introduce los datos en clase y comprueba fi, %, xᵢ·nᵢ y (xᵢ−x̄)²·nᵢ</div>
+                        </div>
                     </div>
                 )}
 
@@ -257,6 +264,8 @@ export default function EstadisticaApp({ onExit, usuario }) {
                     </div>
                 )}
             </div>
+
+            {modoClase&&<ModoClase onClose={()=>setModoClase(false)}/>}
 
             {/* Send modal */}
             {showEnviar&&(
@@ -480,14 +489,12 @@ function GraficoSVG({ filas, isCont, titulo }) {
         <div style={{...CARD,background:'#0d1117',overflowX:'auto'}}>
             <div style={{fontSize:'0.78rem',color:D.muted,marginBottom:8,fontWeight:700}}>{titulo}</div>
             <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',maxWidth:W,display:'block'}}>
-                {/* Grid lines */}
                 {yTicks.map((v,i)=>(
                     <g key={i}>
                         <line x1={padL} y1={padT+scaleY(v)} x2={W-padR} y2={padT+scaleY(v)} stroke="#30363d" strokeWidth={1}/>
                         <text x={padL-4} y={padT+scaleY(v)+4} textAnchor="end" fontSize={10} fill={D.muted}>{v}</text>
                     </g>
                 ))}
-                {/* Bars */}
                 {filas.map((f,i)=>{
                     const x=padL+i*barW+gap/2;
                     const bw=barW-gap;
@@ -504,10 +511,8 @@ function GraficoSVG({ filas, isCont, titulo }) {
                         </g>
                     );
                 })}
-                {/* Axes */}
                 <line x1={padL} y1={padT} x2={padL} y2={padT+chartH} stroke={D.muted} strokeWidth={1.5}/>
                 <line x1={padL} y1={padT+chartH} x2={W-padR} y2={padT+chartH} stroke={D.muted} strokeWidth={1.5}/>
-                {/* Axis labels */}
                 <text x={padL/2-4} y={H/2} textAnchor="middle" fontSize={10} fill={D.muted} transform={`rotate(-90,${padL/2-4},${H/2})`}>Frecuencia (nᵢ)</text>
                 <text x={padL+(W-padL-padR)/2} y={H-2} textAnchor="middle" fontSize={10} fill={D.muted}>{isCont?'Intervalos':'Valores'}</text>
             </svg>
@@ -580,7 +585,6 @@ function FaseGrafico({ estudio, correct, onPasar }) {
                 </div>
             ))}
 
-            {/* Gráfico real debajo de las preguntas */}
             <GraficoSVG filas={correct.filas} isCont={isCont}
                 titulo={isCont?`Histograma — ${estudio.titulo}`:`Diagrama de barras — ${estudio.titulo}`}/>
 
@@ -592,6 +596,597 @@ function FaseGrafico({ estudio, correct, onPasar }) {
                     Ver resultados <ArrowRight size={14}/>
                   </button>
             }
+        </div>
+    );
+}
+
+// ─── MODO PIZARRA ─────────────────────────────────────────────────────────────
+function ModoClase({ onClose }) {
+    const [paso, setPaso]           = useState(1);
+    const [cfg,  setCfg]            = useState({ variable:'', poblacion:'', tipo:'cuant_cont' });
+    const [tabla, setTabla]         = useState(null);
+    const [totales, setTotales]     = useState({ ni:'', fi:'', pct:'', xini:'', dev2ni:'' });
+    const [active, setActive]       = useState(null); // {row: i | -1 para totales, col}
+    const [checked, setChecked]     = useState(false);
+    const [valRes,  setValRes]      = useState(null);
+    const [totValRes, setTotValRes] = useState(null);
+    const [showCalc, setShowCalc]   = useState(false);
+    const [calcExpr, setCalcExpr]   = useState('');
+    const [calcRes,  setCalcRes]    = useState(null);
+    const [colChecked, setColChecked] = useState({});
+    const [params, setParams]         = useState({ media:'', mediana:'', moda:'', rango:'', dt:'' });
+    const [paramsRes, setParamsRes]   = useState(null);
+
+    const TIPO_COLS = {
+        cuant_cont:  ['intervalo','xi','ni','fi','pct','xini','dev2ni'],
+        cuant_disc:  ['xi','ni','fi','pct','xini','dev2ni'],
+        cualitativa: ['categoria','ni','fi','pct'],
+    };
+    // Columnas de totales por tipo (sin las de texto/marca)
+    const TOT_COLS = {
+        cuant_cont:  ['ni','fi','pct','xini','dev2ni'],
+        cuant_disc:  ['ni','fi','pct','xini','dev2ni'],
+        cualitativa: ['ni','fi','pct'],
+    };
+    // Cuántas columnas ocupa el label "TOTALES Σ →" (colspan)
+    const TOT_SPAN = { cuant_cont:2, cuant_disc:1, cualitativa:1 };
+    const HEADS = {
+        intervalo:'Intervalo', xi:'Marca xᵢ', ni:'Frec. nᵢ',
+        fi:'fᵢ (nᵢ/N)', pct:'%', xini:'xᵢ·nᵢ', dev2ni:'(xᵢ−x̄)²·nᵢ', categoria:'Categoría',
+    };
+    const NUM_COLS  = new Set(['xi','ni','fi','pct','xini','dev2ni']);
+    const COMP_COLS = new Set(['fi','pct','xini','dev2ni']);
+    const KB_COLS   = new Set(['xi','ni','fi','pct','xini','dev2ni','intervalo']);
+    const PARAM_LABELS = { media:'Media x̄', mediana:'Mediana Me', moda:'Moda Mo', rango:'Rango', dt:'Desv. típica σ' };
+
+    const parseDec = s => parseFloat(String(s||'').replace(',','.'));
+    const checkVal = (s, c) => {
+        const v = parseDec(s);
+        if (isNaN(v)||isNaN(c)) return false;
+        if (Math.abs(c) < 0.0001) return Math.abs(v) < 0.05;
+        return Math.abs(v-c)/Math.abs(c)*100 <= 2;
+    };
+    const emptyRow  = (t) => Object.fromEntries(TIPO_COLS[t].map(c=>[c,'']));
+    const fmt = (v, dec=3) => v != null ? String(+v.toFixed(dec)).replace('.',',') : '—';
+
+    // Estadísticos en vivo a partir de lo que el alumno ha introducido
+    const getStats = () => {
+        if (!tabla) return null;
+        const tipo = cfg.tipo;
+        const rows = tabla.map(f => ({
+            xi:   parseDec(f.xi),
+            ni:   parseDec(f.ni) || 0,
+            intv: tipo === 'cuant_cont' ? parseIntervalNums(f.intervalo || '') : null,
+        })).filter(r => !isNaN(r.xi) && r.ni > 0);
+        if (!rows.length) return null;
+        const Nv  = rows.reduce((s,r)=>s+r.ni, 0);
+        const sXN = rows.reduce((s,r)=>s+r.xi*r.ni, 0);
+        const mv  = sXN / Nv;
+        const sD2 = rows.reduce((s,r)=>s+Math.pow(r.xi-mv,2)*r.ni, 0);
+        const dtv = Math.sqrt(sD2 / Nv);
+        const mxNi = Math.max(...rows.map(r=>r.ni));
+        const mods  = rows.filter(r=>r.ni===mxNi).map(r=>r.xi);
+        const rang  = Math.max(...rows.map(r=>r.xi)) - Math.min(...rows.map(r=>r.xi));
+        // Mediana
+        let med = null;
+        let ac = 0;
+        const pos = Nv / 2;
+        for (const r of rows) {
+            if (ac + r.ni >= pos) {
+                med = (tipo === 'cuant_cont' && r.intv)
+                    ? r.intv.lo + (pos - ac) / r.ni * (r.intv.hi - r.intv.lo)
+                    : r.xi;
+                break;
+            }
+            ac += r.ni;
+        }
+        return { N:Nv, mean:mv, mediana:med, modas:mods, rango:rang, dt:dtv, sumXN:sXN, sumD2:sD2 };
+    };
+
+    const st   = getStats();
+    const N    = st?.N    || 0;
+    const mean = st?.mean || 0;
+
+    const continuar = () => {
+        setTabla(Array(4).fill(null).map(()=>emptyRow(cfg.tipo)));
+        setTotales({ ni:'', fi:'', pct:'', xini:'', dev2ni:'' });
+        setParams({ media:'', mediana:'', moda:'', rango:'', dt:'' });
+        setActive(null); setChecked(false); setValRes(null); setTotValRes(null); setColChecked({}); setParamsRes(null);
+        setPaso(2);
+    };
+
+    const handleKey = (k) => {
+        if (!active) return;
+        const { row, col } = active;
+        const up = (cur) => {
+            const c = String(cur || '');
+            if (k === 'back') return c.slice(0, -1);
+            if (col !== 'intervalo') {
+                if (k === ',' && c.includes(',')) return c;
+                if (k === ',' && c === '') return '0,';
+            }
+            return c + k;
+        };
+        if (row === -2) {
+            setParams(p => ({ ...p, [col]: up(p[col]) }));
+        } else if (row === -1) {
+            setTotales(p => ({ ...p, [col]: up(p[col]) }));
+        } else {
+            setTabla(p => {
+                const t = p.map(r=>({...r}));
+                t[row] = { ...t[row], [col]: up(t[row][col]) };
+                return t;
+            });
+        }
+    };
+
+    const comprobar = () => {
+        if (!st || !N) return;
+        const tipo = cfg.tipo;
+        const res = tabla.map(f => {
+            const ni_v = parseDec(f.ni) || 0;
+            const xi_v = parseDec(f.xi) || 0;
+            const fi_c = ni_v / N;
+            const r = { fi: checkVal(f.fi, fi_c), pct: checkVal(f.pct, fi_c * 100) };
+            if (tipo !== 'cualitativa') {
+                r.xini   = checkVal(f.xini,   xi_v * ni_v);
+                r.dev2ni = checkVal(f.dev2ni,  Math.pow(xi_v - mean, 2) * ni_v);
+            }
+            return r;
+        });
+        const totRes = {
+            ni:  checkVal(totales.ni,  N),
+            fi:  checkVal(totales.fi,  1),
+            pct: checkVal(totales.pct, 100),
+        };
+        if (tipo !== 'cualitativa') {
+            totRes.xini   = checkVal(totales.xini,   st.sumXN);
+            totRes.dev2ni = checkVal(totales.dev2ni,  st.sumD2);
+        }
+        let pRes = null;
+        if (st && cfg.tipo !== 'cualitativa') {
+            pRes = {
+                media:   checkVal(params.media,   st.mean),
+                mediana: checkVal(params.mediana, st.mediana),
+                moda:    st.modas?.some(m => checkVal(params.moda, m)) ?? false,
+                rango:   checkVal(params.rango,   st.rango),
+                dt:      checkVal(params.dt,      st.dt),
+            };
+        }
+        setValRes(res); setTotValRes(totRes); setParamsRes(pRes); setChecked(true); setActive(null);
+    };
+
+    const resetTabla = () => {
+        setTabla(Array(tabla.length).fill(null).map(()=>emptyRow(cfg.tipo)));
+        setTotales({ ni:'', fi:'', pct:'', xini:'', dev2ni:'' });
+        setParams({ media:'', mediana:'', moda:'', rango:'', dt:'' });
+        setChecked(false); setValRes(null); setTotValRes(null); setParamsRes(null); setActive(null); setColChecked({});
+    };
+
+    const checkCol = (col) => {
+        if (!st || !N) return;
+        const tipo = cfg.tipo;
+        const rows = tabla.map(f => {
+            const ni_v = parseDec(f.ni) || 0;
+            const xi_v = parseDec(f.xi) || 0;
+            const fi_c = ni_v / N;
+            if (col === 'fi')     return checkVal(f.fi, fi_c);
+            if (col === 'pct')    return checkVal(f.pct, fi_c * 100);
+            if (col === 'xini')   return checkVal(f.xini, xi_v * ni_v);
+            if (col === 'dev2ni') return checkVal(f.dev2ni, Math.pow(xi_v - mean, 2) * ni_v);
+            return null;
+        });
+        let total = null;
+        if (TOT_COLS[tipo].includes(col)) {
+            if (col === 'fi')     total = checkVal(totales.fi,  1);
+            if (col === 'pct')    total = checkVal(totales.pct, 100);
+            if (col === 'xini')   total = checkVal(totales.xini,   st.sumXN);
+            if (col === 'dev2ni') total = checkVal(totales.dev2ni, st.sumD2);
+        }
+        setColChecked(prev => ({ ...prev, [col]: { rows, total } }));
+    };
+
+    // Calculadora
+    const evalCalc = () => {
+        if (!calcExpr) return;
+        try {
+            const expr = calcExpr
+                .replace(/,/g, '.').replace(/×/g, '*').replace(/÷/g, '/')
+                .replace(/√\(/g, 'Math.sqrt(').replace(/\^2/g, '**2');
+            // eslint-disable-next-line no-new-func
+            const r = Function('return (' + expr + ')')();
+            setCalcRes(typeof r === 'number' && Number.isFinite(r)
+                ? String(+r.toFixed(10).replace(/\.?0+$/, '')).replace('.', ',')
+                : 'Error');
+        } catch { setCalcRes('Error'); }
+    };
+
+    // ── Paso 1: configuración ──────────────────────────────────────────────────
+    if (paso === 1) return (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.93)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+            <div style={{...CARD,maxWidth:500,width:'100%',boxShadow:'0 24px 64px rgba(0,0,0,0.7)'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:22}}>
+                    <div style={{fontWeight:700,fontSize:'1.15rem',color:D.gold}}>🖊 Modo Pizarra</div>
+                    <button onClick={onClose} style={{background:'transparent',border:'none',color:D.muted,fontSize:'1.5rem',cursor:'pointer',lineHeight:1,padding:'0 4px'}}>×</button>
+                </div>
+                <div style={{display:'flex',flexDirection:'column',gap:14}}>
+                    <div>
+                        <div style={{fontSize:'0.72rem',color:D.muted,fontWeight:700,marginBottom:5,letterSpacing:.5}}>VARIABLE ESTADÍSTICA</div>
+                        <input value={cfg.variable} onChange={e=>setCfg(c=>({...c,variable:e.target.value}))}
+                            placeholder="Ej: Altura en cm, Número de hermanos…"
+                            style={{width:'100%',boxSizing:'border-box',padding:'10px 12px',borderRadius:9,border:`1.5px solid ${D.border}`,background:D.bg,color:D.text,fontSize:'0.9rem',outline:'none'}}/>
+                    </div>
+                    <div>
+                        <div style={{fontSize:'0.72rem',color:D.muted,fontWeight:700,marginBottom:5,letterSpacing:.5}}>POBLACIÓN</div>
+                        <input value={cfg.poblacion} onChange={e=>setCfg(c=>({...c,poblacion:e.target.value}))}
+                            placeholder="Ej: Todos los alumnos del centro…"
+                            style={{width:'100%',boxSizing:'border-box',padding:'10px 12px',borderRadius:9,border:`1.5px solid ${D.border}`,background:D.bg,color:D.text,fontSize:'0.9rem',outline:'none'}}/>
+                    </div>
+                    <div>
+                        <div style={{fontSize:'0.72rem',color:D.muted,fontWeight:700,marginBottom:8,letterSpacing:.5}}>TIPO DE VARIABLE</div>
+                        <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                            {[
+                                {v:'cuant_cont',  lbl:'Cuantitativa continua',  sub:'Con intervalos · Histograma'},
+                                {v:'cuant_disc',  lbl:'Cuantitativa discreta',  sub:'Sin intervalos · Diagrama de barras'},
+                                {v:'cualitativa', lbl:'Cualitativa',            sub:'Nominal u ordinal'},
+                            ].map(({v,lbl,sub})=>(
+                                <button key={v} onClick={()=>setCfg(c=>({...c,tipo:v}))}
+                                    style={{padding:'11px 14px',borderRadius:9,cursor:'pointer',textAlign:'left',
+                                        border:`2px solid ${cfg.tipo===v?D.accent:D.border}`,
+                                        background:cfg.tipo===v?'#1a2a3a':D.bg,color:D.text}}>
+                                    <span style={{fontWeight:700}}>{lbl}</span>
+                                    <span style={{fontSize:'0.75rem',color:D.muted,marginLeft:10}}>{sub}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <button onClick={continuar} disabled={!cfg.variable.trim()}
+                        style={{...BTN(D.accent),justifyContent:'center',marginTop:4,padding:'12px 20px',fontSize:'1rem',opacity:cfg.variable.trim()?1:0.45}}>
+                        Continuar →
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+
+    // ── Paso 2: tabla + estadísticos + calculadora ─────────────────────────────
+    const cols     = TIPO_COLS[cfg.tipo];
+    const totCols  = TOT_COLS[cfg.tipo];
+    const totSpan  = TOT_SPAN[cfg.tipo];
+    const KEYS     = ['7','8','9','4','5','6','1','2','3',',','0','back'];
+    const CALC_BTNS = [
+        {lbl:'AC',  act:()=>{setCalcExpr('');setCalcRes(null);}, bg:'#7b1010'},
+        {lbl:'←',   act:()=>setCalcExpr(e=>e.slice(0,-1)),      bg:'#30363d'},
+        {lbl:'(',   act:()=>setCalcExpr(e=>e+'('),               bg:'#30363d'},
+        {lbl:')',   act:()=>setCalcExpr(e=>e+')'),               bg:'#30363d'},
+        {lbl:'√(',  act:()=>setCalcExpr(e=>e+'√('),             bg:D.accent},
+        {lbl:'x²',  act:()=>setCalcExpr(e=>e+'^2'),              bg:D.accent},
+        {lbl:'÷',   act:()=>setCalcExpr(e=>e+'/'),               bg:'#6e3a1a'},
+        {lbl:'×',   act:()=>setCalcExpr(e=>e+'×'),               bg:'#6e3a1a'},
+        {lbl:'7',   act:()=>setCalcExpr(e=>e+'7')},
+        {lbl:'8',   act:()=>setCalcExpr(e=>e+'8')},
+        {lbl:'9',   act:()=>setCalcExpr(e=>e+'9')},
+        {lbl:'-',   act:()=>setCalcExpr(e=>e+'-'),               bg:'#6e3a1a'},
+        {lbl:'4',   act:()=>setCalcExpr(e=>e+'4')},
+        {lbl:'5',   act:()=>setCalcExpr(e=>e+'5')},
+        {lbl:'6',   act:()=>setCalcExpr(e=>e+'6')},
+        {lbl:'+',   act:()=>setCalcExpr(e=>e+'+'),               bg:'#6e3a1a'},
+        {lbl:'1',   act:()=>setCalcExpr(e=>e+'1')},
+        {lbl:'2',   act:()=>setCalcExpr(e=>e+'2')},
+        {lbl:'3',   act:()=>setCalcExpr(e=>e+'3')},
+        {lbl:'=',   act:evalCalc,                                 bg:D.green},
+        {lbl:',',   act:()=>setCalcExpr(e=>e+',')},
+        {lbl:'0',   act:()=>setCalcExpr(e=>e+'0')},
+        {lbl:'.',   act:()=>setCalcExpr(e=>e+'.')},
+        {lbl:'',    act:()=>{},                                   bg:'transparent'},
+    ];
+
+    const cellCss = (col, row) => {
+        const isAct = active?.row === row && active?.col === col;
+        let border = isAct ? D.accent : D.border;
+        let bg = D.bg, color = D.text;
+        // Check por columna individual
+        if (COMP_COLS.has(col) && colChecked[col]) {
+            const ok = row === -1 ? colChecked[col].total : colChecked[col].rows?.[row];
+            if (ok !== null && ok !== undefined) {
+                border = ok ? D.green : D.red;
+                bg     = ok ? '#0d3321' : '#2c0d0d';
+                color  = ok ? D.green2 : D.red;
+            }
+        }
+        // Comprobar global sobreescribe
+        if (checked) {
+            const ok = row === -1
+                ? totValRes?.[col]
+                : COMP_COLS.has(col) ? valRes?.[row]?.[col] : undefined;
+            if (ok !== undefined && ok !== null) {
+                border = ok ? D.green : D.red;
+                bg     = ok ? '#0d3321' : '#2c0d0d';
+                color  = ok ? D.green2  : D.red;
+            }
+        }
+        return {
+            width:'100%', minWidth:50, padding:'7px 4px', textAlign:'center',
+            boxSizing:'border-box', borderRadius:5, fontSize:'0.82rem',
+            border:`1.5px solid ${border}`, background:bg, color,
+            cursor: checked ? 'default' : 'pointer', userSelect:'none', display:'block',
+        };
+    };
+
+    const activeVal = active
+        ? (active.row === -2 ? params[active.col]
+           : active.row === -1 ? totales[active.col]
+           : tabla?.[active.row]?.[active.col])
+        : '';
+
+    return (
+        <div style={{position:'fixed',inset:0,background:D.bg,zIndex:9999,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+
+            {/* Header */}
+            <div style={{padding:'10px 16px',background:D.card,borderBottom:`1px solid ${D.border}`,display:'flex',justifyContent:'space-between',alignItems:'center',flexShrink:0,gap:8}}>
+                <div style={{minWidth:0}}>
+                    <span style={{fontWeight:700,color:D.gold,fontSize:'1rem'}}>🖊 Modo Pizarra</span>
+                    <span style={{fontSize:'0.75rem',color:D.muted,marginLeft:10}}>{cfg.variable}</span>
+                </div>
+                <div style={{display:'flex',gap:6,flexShrink:0}}>
+                    <button onClick={()=>setPaso(1)} style={{...BTN('#30363d'),padding:'6px 12px',fontSize:'0.78rem'}}>← Config</button>
+                    <button onClick={onClose}        style={{...BTN('#30363d'),padding:'6px 12px',fontSize:'0.78rem'}}>Salir</button>
+                </div>
+            </div>
+
+            {/* Info strip */}
+            <div style={{padding:'6px 16px',background:'#1a2a3a',borderBottom:`1px solid ${D.border}`,fontSize:'0.75rem',color:D.muted,flexShrink:0,display:'flex',flexWrap:'wrap',gap:12}}>
+                <span><b style={{color:D.text}}>Variable:</b> {cfg.variable}</span>
+                {cfg.poblacion && <span><b style={{color:D.text}}>Población:</b> {cfg.poblacion}</span>}
+                {N > 0 && <span style={{color:D.gold}}>N = {N}</span>}
+            </div>
+
+            {/* Scrollable area */}
+            <div style={{flex:1, overflowY:'auto', padding:'12px 16px'}}>
+
+                {/* ── Tabla ── */}
+                <div style={{overflowX:'auto', marginBottom:16}}>
+                    <table style={{borderCollapse:'collapse', fontSize:'0.8rem', width:'100%'}}>
+                        <thead>
+                            <tr style={{background:D.accent, color:'white'}}>
+                                {cols.map(c=>{
+                                    const cd = colChecked[c];
+                                    const allOk = cd && cd.rows.every(v=>v===true) && (cd.total===null||cd.total===true);
+                                    const hasBad = cd && (cd.rows.some(v=>v===false) || cd.total===false);
+                                    return (
+                                        <th key={c} style={{padding:'6px 6px 4px',border:`1px solid ${D.border}`,whiteSpace:'nowrap',fontSize:'0.75rem',verticalAlign:'top'}}>
+                                            <div style={{marginBottom:COMP_COLS.has(c)?4:0}}>{HEADS[c]}</div>
+                                            {COMP_COLS.has(c) && (
+                                                <button onClick={()=>checkCol(c)}
+                                                    style={{padding:'2px 0',width:'100%',borderRadius:5,border:`1px solid ${!cd?'rgba(255,255,255,0.25)':allOk?D.green:D.red}`,
+                                                        background:!cd?'rgba(255,255,255,0.12)':allOk?'#0d3321':'#2c0d0d',
+                                                        color:!cd?'white':allOk?D.green2:D.red,
+                                                        fontWeight:700,fontSize:'0.75rem',cursor:'pointer'}}>
+                                                    ✓
+                                                </button>
+                                            )}
+                                        </th>
+                                    );
+                                })}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {tabla.map((fila, i) => (
+                                <tr key={i} style={{borderBottom:`1px solid ${D.border}`}}>
+                                    {cols.map(col => {
+                                        const isKb = KB_COLS.has(col);
+                                        const isAct = active?.row === i && active?.col === col;
+                                        if (isKb) return (
+                                            <td key={col} style={{padding:3,border:`1px solid ${D.border}`}}>
+                                                <div onClick={()=>{ if(!checked) setActive(isAct?null:{row:i,col}); }}
+                                                    style={cellCss(col, i)}>
+                                                    {fila[col] || ''}
+                                                    {isAct && <span style={{borderRight:'2px solid #58a6ff',marginLeft:1}}>&nbsp;</span>}
+                                                    {!fila[col] && !isAct && <span style={{color:D.border}}>—</span>}
+                                                </div>
+                                            </td>
+                                        );
+                                        return (
+                                            <td key={col} style={{padding:3,border:`1px solid ${D.border}`}}>
+                                                <input value={fila[col]} disabled={checked}
+                                                    onFocus={()=>setActive(null)}
+                                                    onChange={e=>{ setTabla(t=>{ const a=t.map(r=>({...r})); a[i]={...a[i],[col]:e.target.value}; return a; }); }}
+                                                    style={{width:'100%',minWidth:70,padding:'6px 4px',textAlign:'center',boxSizing:'border-box',outline:'none',borderRadius:5,fontSize:'0.8rem',border:`1.5px solid ${D.border}`,background:D.bg,color:D.text}}/>
+                                            </td>
+                                        );
+                                    })}
+                                </tr>
+                            ))}
+
+                            {/* Fila totales */}
+                            <tr style={{background:'#1a1a2e', fontWeight:700}}>
+                                <td colSpan={totSpan} style={{padding:'7px 8px',textAlign:'right',color:D.gold,border:`1px solid ${D.border}`,fontSize:'0.78rem',whiteSpace:'nowrap'}}>
+                                    TOTALES Σ →
+                                </td>
+                                {totCols.map(col => {
+                                    const isAct = active?.row === -1 && active?.col === col;
+                                    return (
+                                        <td key={col} style={{padding:3,border:`1px solid ${D.border}`}}>
+                                            <div onClick={()=>{ if(!checked) setActive(isAct?null:{row:-1,col}); }}
+                                                style={cellCss(col, -1)}>
+                                                {totales[col] || ''}
+                                                {isAct && <span style={{borderRight:'2px solid #58a6ff',marginLeft:1}}>&nbsp;</span>}
+                                                {!totales[col] && !isAct && <span style={{color:D.border}}>—</span>}
+                                            </div>
+                                        </td>
+                                    );
+                                })}
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* ── Parámetros estadísticos (manual) ── */}
+                {cfg.tipo !== 'cualitativa' && (
+                    <div style={{...CARD,background:'#0b1520',border:`1px solid ${D.accent}`,marginBottom:14,padding:14}}>
+                        <div style={{fontSize:'0.68rem',color:D.accent,fontWeight:700,marginBottom:10,letterSpacing:.6}}>
+                            PARÁMETROS — rellena con el teclado y comprueba
+                        </div>
+                        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(110px,1fr))',gap:8}}>
+                            {[
+                                {key:'media',   lbl:'Media x̄'},
+                                {key:'mediana', lbl:'Mediana Me'},
+                                {key:'moda',    lbl:'Moda Mo'},
+                                {key:'rango',   lbl:'Rango'},
+                                {key:'dt',      lbl:'Desv. típica σ'},
+                            ].map(({key, lbl}) => {
+                                const isAct = active?.row === -2 && active?.col === key;
+                                const ok = paramsRes?.[key];
+                                const correctVal = st ? (
+                                    key === 'media'   ? st.mean :
+                                    key === 'mediana' ? st.mediana :
+                                    key === 'moda'    ? st.modas?.[0] :
+                                    key === 'rango'   ? st.rango :
+                                    key === 'dt'      ? st.dt : null
+                                ) : null;
+                                let bdr = isAct ? D.accent : D.border;
+                                let pbg = D.bg, tc = D.text;
+                                if (paramsRes) {
+                                    bdr = ok ? D.green : D.red;
+                                    pbg = ok ? '#0d3321' : '#2c0d0d';
+                                    tc  = ok ? D.green2 : D.red;
+                                }
+                                return (
+                                    <div key={key}>
+                                        <div style={{fontSize:'0.62rem',color:D.muted,marginBottom:3,fontWeight:700}}>{lbl}</div>
+                                        <div onClick={()=>{ if(!checked) setActive(isAct?null:{row:-2,col:key}); }}
+                                            style={{background:pbg,borderRadius:8,padding:'8px 10px',border:`1.5px solid ${bdr}`,
+                                                color:tc,fontSize:'1rem',fontWeight:700,textAlign:'center',
+                                                cursor:checked?'default':'pointer',userSelect:'none',minHeight:38,
+                                                display:'flex',alignItems:'center',justifyContent:'center',gap:2}}>
+                                            {params[key] || ''}
+                                            {isAct && <span style={{borderRight:'2px solid #58a6ff',marginLeft:1}}>&nbsp;</span>}
+                                            {!params[key] && !isAct && <span style={{color:D.border,fontWeight:400}}>—</span>}
+                                        </div>
+                                        {paramsRes && !ok && correctVal !== null && (
+                                            <div style={{fontSize:'0.68rem',color:D.red,marginTop:2}}>→ {fmt(correctVal,3)}</div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
+                {/* ── Calculadora ── */}
+                <div style={{marginBottom:14}}>
+                    <button onClick={()=>setShowCalc(s=>!s)}
+                        style={{...BTN('#30363d'),fontSize:'0.8rem',padding:'7px 14px',marginBottom: showCalc?8:0}}>
+                        🧮 Calculadora {showCalc ? '▲' : '▼'}
+                    </button>
+                    {showCalc && (
+                        <div style={{...CARD,background:'#0d1117',maxWidth:310,padding:14}}>
+                            {/* Display */}
+                            <div style={{background:D.bg,borderRadius:8,padding:'10px 12px',marginBottom:10,border:`1px solid ${D.border}`,minHeight:56}}>
+                                <div style={{fontSize:'0.8rem',color:D.muted,wordBreak:'break-all',minHeight:18,fontFamily:'monospace'}}>
+                                    {calcExpr || <span style={{opacity:.4}}>0</span>}
+                                </div>
+                                {calcRes !== null && (
+                                    <div style={{fontSize:'1.4rem',fontWeight:700,color:D.gold,textAlign:'right',marginTop:4,fontFamily:'monospace'}}>
+                                        = {calcRes}
+                                    </div>
+                                )}
+                            </div>
+                            {/* Botones 4×6 */}
+                            <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:5}}>
+                                {CALC_BTNS.map(({lbl,act,bg},idx)=>(
+                                    lbl === ''
+                                    ? <div key={idx}/>
+                                    : <button key={idx} onClick={act}
+                                        style={{padding:'11px 0',borderRadius:8,border:`1px solid ${D.border}`,
+                                            background: bg || D.dark2,
+                                            color: D.text, fontWeight:700, fontSize:'0.9rem', cursor:'pointer'}}>
+                                        {lbl}
+                                      </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* ── Botones de acción ── */}
+                <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+                    {!checked ? (
+                        <>
+                            <button onClick={()=>setTabla(t=>[...t,emptyRow(cfg.tipo)])}
+                                style={{...BTN('#30363d'),padding:'7px 12px',fontSize:'0.8rem'}}>+ Fila</button>
+                            {tabla.length > 1 && (
+                                <button onClick={()=>setTabla(t=>t.slice(0,-1))}
+                                    style={{...BTN('#30363d'),padding:'7px 12px',fontSize:'0.8rem'}}>− Fila</button>
+                            )}
+                            <button onClick={comprobar} disabled={N === 0}
+                                style={{...BTN(D.gold,'#111'),padding:'8px 18px',fontSize:'0.9rem',opacity:N===0?0.45:1}}>
+                                ✓ Comprobar
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <div style={{...CARD,padding:'8px 14px',background:'#0d1a0d',border:`1px solid ${D.green}`,fontSize:'0.82rem'}}>
+                                <span style={{color:D.green2}}>
+                                    {valRes && totValRes && (()=>{
+                                        const cOk  = valRes.flatMap(r=>Object.values(r)).filter(Boolean).length;
+                                        const cTot = valRes.flatMap(r=>Object.values(r)).length;
+                                        const tOk  = Object.values(totValRes).filter(Boolean).length;
+                                        const tTot = Object.values(totValRes).length;
+                                        const pOk  = paramsRes ? Object.values(paramsRes).filter(Boolean).length : 0;
+                                        const pTot = paramsRes ? Object.values(paramsRes).length : 0;
+                                        return `${cOk+tOk+pOk} / ${cTot+tTot+pTot} celdas correctas`;
+                                    })()}
+                                </span>
+                            </div>
+                            <button onClick={()=>{setChecked(false);setValRes(null);setTotValRes(null);setParamsRes(null);}}
+                                style={{...BTN('#30363d'),padding:'7px 12px',fontSize:'0.8rem'}}>Editar</button>
+                            <button onClick={resetTabla}
+                                style={{...BTN(D.red),padding:'7px 12px',fontSize:'0.8rem'}}>Limpiar todo</button>
+                        </>
+                    )}
+                </div>
+            </div>
+
+            {/* ── Teclado numérico (fijo abajo) ── */}
+            {active && !checked && (
+                <div style={{background:D.card,borderTop:`2px solid ${D.accent}`,padding:'10px 16px',flexShrink:0}}>
+                    <div style={{fontSize:'0.7rem',color:D.muted,marginBottom:8,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                        <span>
+                            Celda: <b style={{color:D.accent}}>{HEADS[active.col] || PARAM_LABELS[active.col] || active.col}</b>
+                            {active.row === -2 ? ' (PARÁMETRO)' : active.row === -1 ? ' (TOTALES)' : `  fila ${active.row + 1}`}
+                            {activeVal ? <b style={{color:D.text,fontFamily:'monospace',marginLeft:8,fontSize:'0.88rem'}}>{activeVal}</b> : null}
+                        </span>
+                        <button onClick={()=>setActive(null)} style={{background:'transparent',border:'none',color:D.muted,cursor:'pointer',fontSize:'0.9rem',padding:'0 4px'}}>✕</button>
+                    </div>
+                    {active.col === 'intervalo' ? (
+                        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:7,maxWidth:300}}>
+                            {['7','8','9','back','4','5','6','[','1','2','3',']',',','0','(',')'].map((k,idx)=>(
+                                <button key={idx} onClick={()=>handleKey(k)}
+                                    style={{padding:'14px 0',borderRadius:9,
+                                        border:`1px solid ${k==='back'?D.red:['[',']','(',')'].includes(k)?D.accent:D.border}`,
+                                        background:k==='back'?'#2c0d0d':['[',']','(',')'].includes(k)?'#1a2a3a':D.dark2,
+                                        color:k==='back'?D.red:['[',']','(',')'].includes(k)?D.accent:D.text,
+                                        fontWeight:700,fontSize:'1.1rem',cursor:'pointer'}}>
+                                    {k === 'back' ? '←' : k}
+                                </button>
+                            ))}
+                        </div>
+                    ) : (
+                        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:7,maxWidth:240}}>
+                            {KEYS.map((k,idx)=>(
+                                <button key={idx} onClick={()=>handleKey(k)}
+                                    style={{padding:'14px 0',borderRadius:9,
+                                        border:`1px solid ${k==='back'?D.red:D.border}`,
+                                        background:k==='back'?'#2c0d0d':D.dark2,
+                                        color:k==='back'?D.red:D.text,fontWeight:700,fontSize:'1.1rem',cursor:'pointer'}}>
+                                    {k === 'back' ? '←' : k}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 }

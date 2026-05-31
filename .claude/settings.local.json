@@ -18,7 +18,8 @@
       "Bash(Get-Content \"C:\\\\Users\\\\ASUS6~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-Asus--6-educando\\\\a0f0db03-257f-42d6-8829-ccd1c32bb995\\\\tasks\\\\b6fpuxmxf.output\")",
       "Bash(Select-String -Pattern \"error|Error|warn|compiled|Failed\")",
       "Bash(npx --yes tsc --noEmit --allowJs --jsx react --target es2020 --moduleResolution node --esModuleInterop src/ExpresionArtEscri.jsx)",
-      "Bash(node -e \"const fs=require\\('fs'\\); const code=fs.readFileSync\\('src/ExpresionArtEscri.jsx','utf8'\\); const acorn=require\\('acorn'\\); \")"
+      "Bash(node -e \"const fs=require\\('fs'\\); const code=fs.readFileSync\\('src/ExpresionArtEscri.jsx','utf8'\\); const acorn=require\\('acorn'\\); \")",
+      "Bash(python -c ' *)"
     ]
   }
 }

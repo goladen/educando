@@ -41,6 +41,12 @@ import HerramientasClase from '../GestionAula';
 import AlgebraApp from '../Algebra';
 import VistasDidricas from '../VistasDidricas';
 import EstadisticaApp from '../Estadistica';
+import SimuladorColisiones from '../Simuladores física/SimuladorColisiones';
+import SimuladorPlanoInclinado from '../Simuladores física/SimuladorPlanoInclinado';
+import SimuladorTiroParabolico from '../Simuladores física/SimuladorTiroParabolico';
+import SimuladorCaidaLibre from '../Simuladores física/SimuladorCaidaLibre';
+import SimuladorPendulo from '../Simuladores física/SimuladorPendulo';
+import SimuladorLeyDeOhm from '../Simuladores física/SimuladorLeyDeOhm';
 import RetosApp from '../Retos';
 import SimuladorDados from '../Probabilidad';
 import TrivialGame from '../Trivial';
@@ -762,10 +768,22 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                 setGestionAula(true);
                 return;
             }
+            // Física: rutas /fisica y /fisica/<slug>
+            if (path === 'fisica') { setSimuladoresFisica(true); return; }
+            if (path.startsWith('fisica/')) {
+                const SLUG_MAP = { colisiones:'COLISIONES', planoinclinado:'PLANO_INCLINADO', tiroparabolico:'TIRO_PARABOLICO', caidalibre:'CAIDA_LIBRE', pendulo:'PENDULO', leydeohm:'LEY_OHM' };
+                const key = SLUG_MAP[path.slice(7)];
+                setSimuladoresFisica(true);
+                if (key) setSimuladorFisicaActivo(key);
+                return;
+            }
+
             const juegoParam = params.get('juego');
             if (juegoParam) {
-                if (juegoParam.toLowerCase() === 'geografia') { setGeografiaApp(true); return; }
-                if (juegoParam.toLowerCase() === 'biologia')  { setBiologiaApp(true);  return; }
+                if (juegoParam.toLowerCase() === 'fisica')         { setSimuladoresFisica(true); return; }
+                if (juegoParam.toLowerCase() === 'geografia')      { setGeografiaApp(true);   return; }
+                if (juegoParam.toLowerCase() === 'biologia')       { setBiologiaApp(true);    return; }
+                if (juegoParam.toLowerCase() === 'vistas_didricas') { setVistasDidricas(true); return; }
                 let tourConfig = null;
                 const tcParam = params.get('tourconfig');
                 if (tcParam) {
@@ -818,6 +836,8 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
     const [biologiaApp,         setBiologiaApp]         = useState(false);
     const [gestionAula,         setGestionAula]         = useState(() => { const p = new URLSearchParams(window.location.search); return !!(p.get('gestion') || p.get('pizarra')); });
     const [vistasDidricas,      setVistasDidricas]      = useState(false);
+    const [simuladoresFisica,   setSimuladoresFisica]   = useState(false);
+    const [simuladorFisicaActivo, setSimuladorFisicaActivo] = useState(null);
 
     // Estados alumno logueado
     const [vistaAlumno,    setVistaAlumno]    = useState('MAIN'); // 'MAIN' | 'RECORDS'
@@ -1180,6 +1200,84 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
             <VistasDidricas onBack={() => setVistasDidricas(false)} />
         </div>
     );
+
+    if (simuladoresFisica) {
+        const SIMS = [
+            { key: 'COLISIONES',      slug: 'colisiones',      label: 'Colisiones',       emoji: '💥', color: '#e74c3c', desc: 'Colisiones elásticas e inelásticas',  comp: SimuladorColisiones },
+            { key: 'PLANO_INCLINADO', slug: 'planoinclinado',  label: 'Plano Inclinado',  emoji: '📐', color: '#3498db', desc: 'Fuerzas en planos inclinados',          comp: SimuladorPlanoInclinado },
+            { key: 'TIRO_PARABOLICO', slug: 'tiroparabolico',  label: 'Tiro Parabólico',  emoji: '🏹', color: '#27ae60', desc: 'Movimiento parabólico de proyectiles', comp: SimuladorTiroParabolico },
+            { key: 'CAIDA_LIBRE',     slug: 'caidalibre',      label: 'Caída Libre',      emoji: '⬇️', color: '#9b59b6', desc: 'Caída libre y gravedad',               comp: SimuladorCaidaLibre },
+            { key: 'PENDULO',         slug: 'pendulo',         label: 'Péndulo',          emoji: '⏱️', color: '#f39c12', desc: 'Oscilaciones del péndulo simple',      comp: SimuladorPendulo },
+            { key: 'LEY_OHM',         slug: 'leydeohm',        label: 'Ley de Ohm',       emoji: '⚡', color: '#1abc9c', desc: 'Circuitos y ley de Ohm',              comp: SimuladorLeyDeOhm },
+        ];
+
+        const volverAlMenu = () => { setSimuladorFisicaActivo(null); window.history.pushState({}, '', '/fisica'); };
+        const volverAlInicio = () => { setSimuladoresFisica(false); window.history.pushState({}, '', '/'); };
+        const abrirSim = (sim) => { setSimuladorFisicaActivo(sim.key); window.history.pushState({}, '', `/fisica/${sim.slug}`); };
+
+        if (simuladorFisicaActivo) {
+            const sim = SIMS.find(s => s.key === simuladorFisicaActivo);
+            const Comp = sim?.comp;
+            const simUrl = `${window.location.origin}/fisica/${sim?.slug}`;
+            return (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 9999, overflowY: 'auto', background: '#0f0f1a' }}>
+                    <div style={{ position: 'fixed', top: 12, left: 12, zIndex: 10001, display: 'flex', gap: 8 }}>
+                        <button onClick={volverAlMenu} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: 10, padding: '8px 16px', color: 'white', cursor: 'pointer', fontWeight: 700, backdropFilter: 'blur(6px)' }}>
+                            ← Volver
+                        </button>
+                        <button onClick={() => setShareModal({ url: simUrl, titulo: sim?.label })} title={simUrl} style={{ background: 'rgba(255,255,255,0.12)', border: 'none', borderRadius: 10, padding: '8px 12px', color: 'white', cursor: 'pointer', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.85rem' }}>
+                            <Share2 size={14}/> Compartir
+                        </button>
+                    </div>
+                    {Comp && <Comp />}
+                    {shareModal && <ShareModal url={shareModal.url} titulo={shareModal.titulo} onClose={() => setShareModal(null)} />}
+                </div>
+            );
+        }
+
+        return (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 9999, overflowY: 'auto', background: 'linear-gradient(135deg,#0f0f1a,#1a1a3e)', padding: '40px 20px' }}>
+                <div style={{ maxWidth: 700, margin: '0 auto' }}>
+                    <button onClick={volverAlInicio} style={{ background: 'rgba(255,255,255,0.12)', border: 'none', borderRadius: 10, padding: '8px 18px', color: 'white', cursor: 'pointer', fontWeight: 700, marginBottom: 30 }}>
+                        ← Volver
+                    </button>
+                    <div style={{ textAlign: 'center', marginBottom: 36 }}>
+                        <div style={{ fontSize: 64 }}>🔭</div>
+                        <h1 style={{ color: 'white', fontSize: '2.2rem', margin: '8px 0 6px' }}>Simuladores de Física</h1>
+                        <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '1rem' }}>Selecciona un simulador para empezar</p>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 20 }}>
+                        {SIMS.map(sim => {
+                            const simUrl = `${window.location.origin}/fisica/${sim.slug}`;
+                            return (
+                                <div key={sim.key} style={{ position: 'relative' }}>
+                                    <button
+                                        onClick={e => { e.stopPropagation(); setShareModal({ url: simUrl, titulo: sim.label }); }}
+                                        title={simUrl}
+                                        style={{ position: 'absolute', top: 8, right: 8, zIndex: 2, background: 'rgba(255,255,255,0.12)', border: 'none', borderRadius: 7, padding: '4px 7px', cursor: 'pointer', color: sim.color, display: 'flex', alignItems: 'center' }}
+                                    >
+                                        <Share2 size={13}/>
+                                    </button>
+                                    <div
+                                        onClick={() => abrirSim(sim)}
+                                        style={{ background: 'rgba(255,255,255,0.07)', border: `2px solid ${sim.color}55`, borderRadius: 16, padding: '28px 16px', textAlign: 'center', cursor: 'pointer', transition: 'transform 0.2s, background 0.2s', height: '100%', boxSizing: 'border-box' }}
+                                        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.background = `${sim.color}22`; }}
+                                        onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; }}
+                                    >
+                                        <div style={{ fontSize: 44, marginBottom: 10 }}>{sim.emoji}</div>
+                                        <h3 style={{ color: sim.color, margin: '0 0 6px', fontSize: '1rem', fontWeight: 800 }}>{sim.label}</h3>
+                                        <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.8rem', margin: 0 }}>{sim.desc}</p>
+                                        <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.7rem', margin: '8px 0 0', fontFamily: 'monospace' }}>pikt.es/fisica/{sim.slug}</p>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+                {shareModal && <ShareModal url={shareModal.url} titulo={shareModal.titulo} onClose={() => setShareModal(null)} />}
+            </div>
+        );
+    }
 
     if (omninteractivo) return (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#F8FAFC', overflowY: 'auto' }}>
@@ -1628,7 +1726,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '15px', marginBottom: '40px', maxWidth: '900px', margin: '0 auto 40px auto' }}>
                 {[
                     { id: 'SINTAXIS',        label: 'Sintaxis',        emoji: '🖍️',  color: '#3498db', action: () => setJuegoActivo({ tipoJuego: 'SINTAXIS' }), shareable: true },
-                    { id: 'MATH_WORLD',      label: 'Math World',      emoji: '🌍',  color: '#009688', action: () => abrirJuego('MATH_WORLD_PORTAL'), shareable: true },
+                    { id: 'MATH_WORLD',      label: 'Math World',      emoji: '🌍',  color: '#009688', action: () => abrirJuego('MATH_WORLD_PORTAL'), shareable: true, shareUrl: `${window.location.origin}/math_world` },
                     { id: 'LISTENING',       label: 'Listening',       emoji: '🙉',  color: '#8E44AD', action: () => setJuegoActivo({ tipoJuego: 'LISTENING' }), shareable: true },
                     { id: 'ETIQUETAS',       label: 'EtiquetaMe',      img: imgEtiquetas, color: '#e74c3c', action: () => abrirJuego('ETIQUETAS'), shareable: true },
                     { id: 'QUESTION_SENDER', label: 'Q-Sender',        emoji: '📮',  color: '#2c3e50', action: () => setJuegoActivo({ tipoJuego: 'QUESTION_SENDER' }), shareable: true },
@@ -1641,7 +1739,8 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                     { id: 'GEOGRAFIA',           label: 'Geografía',            emoji: '🌍', color: '#0d9488', action: () => setGeografiaApp(true), shareable: true },
                     { id: 'BIOLOGIA',            label: 'Biología',             emoji: '🔬', color: '#16a34a', action: () => setBiologiaApp(true),  shareable: true },
                     { id: 'GESTION_AULA', label: 'Gestión Aula', emoji: '🏫', color: '#e67e22', action: () => setGestionAula(true), shareable: true, shareUrl: `${window.location.origin}${window.location.pathname}?gestion=menu` },
-                    { id: 'VISTAS_DIDRICAS', label: 'Vistas Diédricas', emoji: '📐', color: '#7c3aed', action: () => setVistasDidricas(true), shareable: false },
+                    { id: 'VISTAS_DIDRICAS', label: 'Vistas Diédricas', emoji: '📐', color: '#7c3aed', action: () => setVistasDidricas(true), shareable: true },
+                    { id: 'SIMULADORES_FISICA', label: 'Física', emoji: '🔭', color: '#e74c3c', action: () => { setSimuladoresFisica(true); window.history.pushState({}, '', '/fisica'); }, shareable: true, shareUrl: `${window.location.origin}/fisica` },
                 ].map(tool => (
                     <div key={tool.id} onClick={tool.action} style={{ background: '#ffffbf', borderRadius: '15px', padding: '15px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transition: 'transform 0.2s', border: `2px solid ${tool.color}20`, position: 'relative' }}
                         onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-3px)'}

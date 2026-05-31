@@ -100,8 +100,9 @@ function App() {
         'api','admin','login','app',
         'irregular_verbs','sistema_solar',
         'retos','conectapuntos','sudoku',
+        'fisica',
       ]);
-      if (slug && !RUTAS_RESERVADAS.has(slug)) {
+      if (slug && !RUTAS_RESERVADAS.has(slug) && !slug.startsWith('fisica/')) {
         // Check if it's a professor page slug
         getDocs(query(collection(db,'paginas_profesores'), where('slug','==',slug), where('publicada','==',true)))
           .then(snap => { if (!snap.empty) setPaginaTarget({ slug, uid: snap.docs[0].id }); })

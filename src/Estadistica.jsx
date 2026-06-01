@@ -616,6 +616,13 @@ function ModoClase({ onClose }) {
     const [colChecked, setColChecked] = useState({});
     const [params, setParams]         = useState({ media:'', mediana:'', moda:'', rango:'', dt:'' });
     const [paramsRes, setParamsRes]   = useState(null);
+    const [showGrafico, setShowGrafico] = useState(false);
+    const [grafStep,    setGrafStep]    = useState(1);
+    const [grafCfg,     setGrafCfg]     = useState({ barType:null, ejeX:null, ejeY:null });
+    const [barHeights,  setBarHeights]  = useState([]);
+    const [grafChecked, setGrafChecked] = useState(false);
+    const [grafDrag,    setGrafDrag]    = useState(null);
+    const svgRef = useRef(null);
 
     const TIPO_COLS = {
         cuant_cont:  ['intervalo','xi','ni','fi','pct','xini','dev2ni'],
@@ -638,6 +645,7 @@ function ModoClase({ onClose }) {
     const COMP_COLS = new Set(['fi','pct','xini','dev2ni']);
     const KB_COLS   = new Set(['xi','ni','fi','pct','xini','dev2ni','intervalo']);
     const PARAM_LABELS = { media:'Media x̄', mediana:'Mediana Me', moda:'Moda Mo', rango:'Rango', dt:'Desv. típica σ' };
+    const COL_W = { intervalo:84, xi:46, ni:44, fi:50, pct:44, xini:58, dev2ni:66, categoria:68 };
 
     const parseDec = s => parseFloat(String(s||'').replace(',','.'));
     const checkVal = (s, c) => {
@@ -692,6 +700,7 @@ function ModoClase({ onClose }) {
         setTotales({ ni:'', fi:'', pct:'', xini:'', dev2ni:'' });
         setParams({ media:'', mediana:'', moda:'', rango:'', dt:'' });
         setActive(null); setChecked(false); setValRes(null); setTotValRes(null); setColChecked({}); setParamsRes(null);
+        setShowGrafico(false); setBarHeights([]); setGrafChecked(false); setGrafDrag(null);
         setPaso(2);
     };
 
@@ -801,6 +810,36 @@ function ModoClase({ onClose }) {
         } catch { setCalcRes('Error'); }
     };
 
+    // ── Gráfico helpers ───────────────────────────────────────────────────────
+    const openGrafico = () => {
+        if (!showGrafico) {
+            const rows = tabla ? tabla.filter(f => {
+                const ni = parseDec(f.ni);
+                const lbl = cfg.tipo==='cualitativa'?f.categoria:cfg.tipo==='cuant_cont'?f.intervalo:f.xi;
+                return ni > 0 && lbl;
+            }) : [];
+            setBarHeights(rows.map(()=>0));
+            setGrafStep(1); setGrafCfg({barType:null,ejeX:null,ejeY:null}); setGrafChecked(false); setGrafDrag(null);
+        }
+        setShowGrafico(s=>!s);
+    };
+    const stopDrag = () => setGrafDrag(null);
+    const startBarDrag = (idx, clientY) => {
+        setGrafDrag(idx);
+        if (!svgRef.current) return;
+        const rect = svgRef.current.getBoundingClientRect();
+        const svgY = (clientY - rect.top) * (260 / rect.height);
+        const h = Math.max(0, Math.min(200, 218 - svgY));
+        setBarHeights(prev => { const a=[...prev]; a[idx]=h; return a; });
+    };
+    const onSvgMove = (clientY) => {
+        if (grafDrag === null || !svgRef.current) return;
+        const rect = svgRef.current.getBoundingClientRect();
+        const svgY = (clientY - rect.top) * (260 / rect.height);
+        const h = Math.max(0, Math.min(200, 218 - svgY));
+        setBarHeights(prev => { const a=[...prev]; a[grafDrag]=h; return a; });
+    };
+
     // ── Paso 1: configuración ──────────────────────────────────────────────────
     if (paso === 1) return (
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.93)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
@@ -854,6 +893,32 @@ function ModoClase({ onClose }) {
     const totCols  = TOT_COLS[cfg.tipo];
     const totSpan  = TOT_SPAN[cfg.tipo];
     const KEYS     = ['7','8','9','4','5','6','1','2','3',',','0','back'];
+
+    const nextCell = () => {
+        if (!active) return;
+        const { row, col } = active;
+        const kbCols = cols.filter(c => KB_COLS.has(c));
+        const totColsSet = new Set(totCols);
+        if (row === -2) {
+            const paramKeys = ['media','mediana','moda','rango','dt'];
+            const pIdx = paramKeys.indexOf(col);
+            if (pIdx < paramKeys.length - 1) setActive({ row:-2, col:paramKeys[pIdx+1] });
+            else setActive(null);
+        } else if (row === -1) {
+            const colIdx = kbCols.indexOf(col);
+            setActive({ row:0, col:kbCols[(colIdx+1) % kbCols.length] });
+        } else {
+            if (row < tabla.length - 1) {
+                setActive({ row:row+1, col });
+            } else if (totColsSet.has(col)) {
+                setActive({ row:-1, col });
+            } else {
+                const colIdx = kbCols.indexOf(col);
+                setActive({ row:0, col:kbCols[(colIdx+1) % kbCols.length] });
+            }
+        }
+    };
+
     const CALC_BTNS = [
         {lbl:'AC',  act:()=>{setCalcExpr('');setCalcRes(null);}, bg:'#7b1010'},
         {lbl:'←',   act:()=>setCalcExpr(e=>e.slice(0,-1)),      bg:'#30363d'},
@@ -906,8 +971,8 @@ function ModoClase({ onClose }) {
             }
         }
         return {
-            width:'100%', minWidth:50, padding:'7px 4px', textAlign:'center',
-            boxSizing:'border-box', borderRadius:5, fontSize:'0.82rem',
+            width:'100%', padding:'5px 2px', textAlign:'center',
+            boxSizing:'border-box', borderRadius:5, fontSize:'1.1rem', fontWeight:600,
             border:`1.5px solid ${border}`, background:bg, color,
             cursor: checked ? 'default' : 'pointer', userSelect:'none', display:'block',
         };
@@ -918,6 +983,35 @@ function ModoClase({ onClose }) {
            : active.row === -1 ? totales[active.col]
            : tabla?.[active.row]?.[active.col])
         : '';
+
+    // — Gráfico computed ——
+    const grafRows = tabla ? tabla.filter(f => {
+        const ni = parseDec(f.ni);
+        const lbl = cfg.tipo==='cualitativa'?f.categoria:cfg.tipo==='cuant_cont'?f.intervalo:f.xi;
+        return ni > 0 && lbl;
+    }) : [];
+    const GW=540,GH=260,GPL=44,GPB=42,GPT=18,GPR=10,GCW=GW-GPL-GPR,GCH=GH-GPT-GPB;
+    const gmaxNi = Math.max(...grafRows.map(f=>parseDec(f.ni)||0), 1);
+    const gSlotW = grafRows.length ? GCW/grafRows.length : GCW;
+    const gJuntas = grafCfg.barType==='juntas';
+    const gBW = gSlotW*(gJuntas?1:0.82), gBOff = gSlotW*(gJuntas?0:0.09);
+    const GCOLS=['#3498db','#e74c3c','#27ae60','#f39c12','#9b59b6','#1abc9c','#e67e22','#fd79a8'];
+    const gYStep=Math.max(1,Math.ceil(gmaxNi/4));
+    const gYTicks=[];
+    for(let v=0;v<=gmaxNi;v+=gYStep) gYTicks.push(v);
+    if(gYTicks[gYTicks.length-1]<gmaxNi) gYTicks.push(gmaxNi);
+    const EJEX_CORRECT=cfg.tipo==='cuant_cont'?'intervalos':cfg.tipo==='cuant_disc'?'valores':'categorias';
+    const EJEX_OPTS=cfg.tipo==='cuant_cont'
+        ?[{v:'intervalos',lbl:'Los intervalos de clase'},{v:'ni',lbl:'Las frecuencias nᵢ'},{v:'xi',lbl:'Las marcas xᵢ'}]
+        :cfg.tipo==='cuant_disc'
+        ?[{v:'valores',lbl:'Los valores xᵢ'},{v:'ni',lbl:'Las frecuencias nᵢ'},{v:'intervalos',lbl:'Los intervalos'}]
+        :[{v:'categorias',lbl:'Las categorías'},{v:'ni',lbl:'Las frecuencias nᵢ'},{v:'xi',lbl:'Valores numéricos'}];
+    const EJEY_OPTS=[{v:'ni',lbl:'Frecuencias absolutas nᵢ'},{v:'xi',lbl:'Valores / Intervalos'},{v:'pct',lbl:'Porcentajes %'}];
+    const grafAllQ = grafCfg.barType && grafCfg.ejeX && grafCfg.ejeY;
+    const gmaxDrawn = Math.max(...barHeights,1);
+    const gBarOk = grafRows.map((f,i)=>Math.abs((barHeights[i]||0)/gmaxDrawn-(parseDec(f.ni)||0)/gmaxNi)<=0.2);
+    const gCorrQ1=(cfg.tipo==='cuant_cont'?'juntas':'separadas')===grafCfg.barType;
+    const gCorrQ2=EJEX_CORRECT===grafCfg.ejeX, gCorrQ3='ni'===grafCfg.ejeY;
 
     return (
         <div style={{position:'fixed',inset:0,background:D.bg,zIndex:9999,display:'flex',flexDirection:'column',overflow:'hidden'}}>
@@ -946,7 +1040,7 @@ function ModoClase({ onClose }) {
 
                 {/* ── Tabla ── */}
                 <div style={{overflowX:'auto', marginBottom:16}}>
-                    <table style={{borderCollapse:'collapse', fontSize:'0.8rem', width:'100%'}}>
+                    <table style={{borderCollapse:'collapse', fontSize:'0.8rem', width:'auto', tableLayout:'fixed'}}>
                         <thead>
                             <tr style={{background:D.accent, color:'white'}}>
                                 {cols.map(c=>{
@@ -954,7 +1048,7 @@ function ModoClase({ onClose }) {
                                     const allOk = cd && cd.rows.every(v=>v===true) && (cd.total===null||cd.total===true);
                                     const hasBad = cd && (cd.rows.some(v=>v===false) || cd.total===false);
                                     return (
-                                        <th key={c} style={{padding:'6px 6px 4px',border:`1px solid ${D.border}`,whiteSpace:'nowrap',fontSize:'0.75rem',verticalAlign:'top'}}>
+                                        <th key={c} style={{width:COL_W[c]||50,padding:'4px 3px 3px',border:`1px solid ${D.border}`,whiteSpace:'normal',lineHeight:1.2,fontSize:'0.72rem',verticalAlign:'top',textAlign:'center'}}>
                                             <div style={{marginBottom:COMP_COLS.has(c)?4:0}}>{HEADS[c]}</div>
                                             {COMP_COLS.has(c) && (
                                                 <button onClick={()=>checkCol(c)}
@@ -1146,6 +1240,186 @@ function ModoClase({ onClose }) {
                         </>
                     )}
                 </div>
+
+                {/* ── Gráfico interactivo ── */}
+                <div style={{marginTop:12}}>
+                    <button onClick={openGrafico}
+                        style={{...BTN('#30363d'),fontSize:'0.8rem',padding:'7px 14px',marginBottom:showGrafico?8:0}}>
+                        📊 Gráfico {showGrafico ? '▲' : '▼'}
+                    </button>
+
+                    {showGrafico && (
+                        <div style={{...CARD,padding:14}}>
+
+                            {/* PASO 1: preguntas */}
+                            {grafStep===1 && (
+                                <div style={{display:'flex',flexDirection:'column',gap:14}}>
+                                    <div style={{fontWeight:700,color:D.gold,fontSize:'0.9rem'}}>Preguntas del gráfico</div>
+
+                                    {/* Q1 barras */}
+                                    <div>
+                                        <div style={{fontSize:'0.72rem',color:D.muted,fontWeight:700,marginBottom:6,letterSpacing:.4}}>¿CÓMO SE DIBUJAN LAS BARRAS?</div>
+                                        <div style={{display:'flex',gap:8}}>
+                                            {[{v:'juntas',lbl:'Barras JUNTAS',sub:'Histograma'},{v:'separadas',lbl:'Barras SEPARADAS',sub:'Diagrama de barras'}].map(({v,lbl,sub})=>(
+                                                <button key={v} onClick={()=>setGrafCfg(g=>({...g,barType:v}))}
+                                                    style={{flex:1,padding:'10px 8px',borderRadius:9,cursor:'pointer',textAlign:'center',
+                                                        border:`2px solid ${grafCfg.barType===v?D.accent:D.border}`,
+                                                        background:grafCfg.barType===v?'#1a2a3a':D.bg,color:D.text}}>
+                                                    <div style={{fontWeight:700,fontSize:'0.85rem'}}>{lbl}</div>
+                                                    <div style={{fontSize:'0.7rem',color:D.muted,marginTop:3}}>{sub}</div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Q2 eje X */}
+                                    <div>
+                                        <div style={{fontSize:'0.72rem',color:D.muted,fontWeight:700,marginBottom:6,letterSpacing:.4}}>¿QUÉ SE PONE EN EL EJE X (HORIZONTAL)?</div>
+                                        <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                                            {EJEX_OPTS.map(({v,lbl})=>(
+                                                <button key={v} onClick={()=>setGrafCfg(g=>({...g,ejeX:v}))}
+                                                    style={{padding:'9px 12px',borderRadius:9,cursor:'pointer',textAlign:'left',fontSize:'0.85rem',
+                                                        border:`2px solid ${grafCfg.ejeX===v?D.accent:D.border}`,
+                                                        background:grafCfg.ejeX===v?'#1a2a3a':D.bg,color:D.text,fontWeight:grafCfg.ejeX===v?700:400}}>
+                                                    {lbl}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Q3 eje Y */}
+                                    <div>
+                                        <div style={{fontSize:'0.72rem',color:D.muted,fontWeight:700,marginBottom:6,letterSpacing:.4}}>¿QUÉ SE PONE EN EL EJE Y (VERTICAL)?</div>
+                                        <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                                            {EJEY_OPTS.map(({v,lbl})=>(
+                                                <button key={v} onClick={()=>setGrafCfg(g=>({...g,ejeY:v}))}
+                                                    style={{padding:'9px 12px',borderRadius:9,cursor:'pointer',textAlign:'left',fontSize:'0.85rem',
+                                                        border:`2px solid ${grafCfg.ejeY===v?D.accent:D.border}`,
+                                                        background:grafCfg.ejeY===v?'#1a2a3a':D.bg,color:D.text,fontWeight:grafCfg.ejeY===v?700:400}}>
+                                                    {lbl}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <button onClick={()=>setGrafStep(2)} disabled={!grafAllQ}
+                                        style={{...BTN(D.accent),justifyContent:'center',opacity:grafAllQ?1:0.4,padding:'11px 20px'}}>
+                                        Dibujar el gráfico →
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* PASO 2: dibujar */}
+                            {grafStep===2 && (
+                                <div>
+                                    <div style={{display:'flex',gap:8,marginBottom:8,alignItems:'center',flexWrap:'wrap'}}>
+                                        <button onClick={()=>{setGrafStep(1);setGrafChecked(false);}}
+                                            style={{...BTN('#30363d'),padding:'6px 12px',fontSize:'0.78rem'}}>← Preguntas</button>
+                                        <span style={{fontSize:'0.72rem',color:D.muted}}>
+                                            Haz clic y arrastra hacia arriba para levantar cada barra
+                                        </span>
+                                    </div>
+
+                                    <div style={{overflowX:'auto'}}>
+                                        <svg ref={svgRef}
+                                            viewBox={`0 0 ${GW} ${GH}`}
+                                            style={{width:'100%',maxWidth:GW,display:'block',touchAction:'none',cursor:grafDrag!==null?'ns-resize':'default'}}
+                                            onMouseMove={e=>onSvgMove(e.clientY)}
+                                            onMouseUp={stopDrag}
+                                            onMouseLeave={stopDrag}
+                                            onTouchMove={e=>{e.preventDefault();onSvgMove(e.touches[0].clientY);}}
+                                            onTouchEnd={stopDrag}>
+
+                                            {/* Fondo */}
+                                            <rect x={0} y={0} width={GW} height={GH} fill={D.bg} rx={8}/>
+
+                                            {/* Grid + Y ticks */}
+                                            {gYTicks.map((v,i)=>{
+                                                const y=GPT+GCH-(v/gmaxNi*GCH);
+                                                return (<g key={i}>
+                                                    <line x1={GPL} y1={y} x2={GW-GPR} y2={y} stroke="#30363d" strokeWidth={1}/>
+                                                    <text x={GPL-4} y={y+4} textAnchor="end" fontSize={10} fill={D.muted}>{v}</text>
+                                                </g>);
+                                            })}
+
+                                            {/* Barras */}
+                                            {grafRows.map((f,i)=>{
+                                                const x=GPL+i*gSlotW+gBOff;
+                                                const h=barHeights[i]||0;
+                                                const yBar=GPT+GCH-h;
+                                                const col=grafChecked?(gBarOk[i]?D.green:D.red):GCOLS[i%GCOLS.length];
+                                                const lbl=cfg.tipo==='cualitativa'?f.categoria:cfg.tipo==='cuant_cont'?f.intervalo:f.xi;
+                                                const lblShort=lbl&&lbl.length>10?lbl.replace(/\s/g,''):lbl;
+                                                return (<g key={i}>
+                                                    {/* Barra coloreada */}
+                                                    {h>0&&<rect x={x} y={yBar} width={gBW} height={h}
+                                                        fill={col} opacity={0.88} rx={gJuntas?0:3}/>}
+                                                    {/* Zona de interacción */}
+                                                    <rect x={GPL+i*gSlotW} y={GPT} width={gSlotW} height={GCH}
+                                                        fill="transparent" style={{cursor:'ns-resize'}}
+                                                        onMouseDown={e=>{e.preventDefault();startBarDrag(i,e.clientY);}}
+                                                        onTouchStart={e=>startBarDrag(i,e.touches[0].clientY)}/>
+                                                    {/* Valor encima */}
+                                                    {h>8&&<text x={x+gBW/2} y={yBar-3} textAnchor="middle"
+                                                        fontSize={11} fill={col} fontWeight="700">
+                                                        {Math.round(h/GCH*gmaxNi*10)/10}
+                                                    </text>}
+                                                    {/* Etiqueta X */}
+                                                    <text x={GPL+i*gSlotW+gSlotW/2} y={GH-GPB+14}
+                                                        textAnchor="middle" fontSize={9} fill={D.muted}
+                                                        transform={grafRows.length>5?`rotate(-35,${GPL+i*gSlotW+gSlotW/2},${GH-GPB+14})`:undefined}>
+                                                        {lblShort}
+                                                    </text>
+                                                </g>);
+                                            })}
+
+                                            {/* Ejes */}
+                                            <line x1={GPL} y1={GPT} x2={GPL} y2={GPT+GCH} stroke={D.muted} strokeWidth={2}/>
+                                            <line x1={GPL} y1={GPT+GCH} x2={GW-GPR} y2={GPT+GCH} stroke={D.muted} strokeWidth={2}/>
+                                            <text x={GPL/2-2} y={GPT+GCH/2} textAnchor="middle" fontSize={10} fill={D.muted}
+                                                transform={`rotate(-90,${GPL/2-2},${GPT+GCH/2})`}>nᵢ</text>
+                                        </svg>
+                                    </div>
+
+                                    {!grafChecked ? (
+                                        <div style={{marginTop:10,display:'flex',gap:8,flexWrap:'wrap'}}>
+                                            <button onClick={()=>setGrafChecked(true)}
+                                                disabled={barHeights.every(h=>h===0)}
+                                                style={{...BTN(D.gold,'#111'),opacity:barHeights.every(h=>h===0)?0.4:1}}>
+                                                ✓ Comprobar gráfico
+                                            </button>
+                                            <button onClick={()=>setBarHeights(grafRows.map(()=>0))}
+                                                style={{...BTN('#30363d'),padding:'8px 12px',fontSize:'0.8rem'}}>
+                                                Borrar barras
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div style={{...CARD,background:'#0b1520',border:`1px solid ${D.border}`,padding:12,marginTop:10,fontSize:'0.82rem'}}>
+                                            <div style={{fontWeight:700,color:D.accent,marginBottom:8}}>Resultados</div>
+                                            {[
+                                                {lbl:'Tipo de gráfico', ok:gCorrQ1, msg:gCorrQ1?'✓':`✗ → ${(cfg.tipo==='cuant_cont'?'juntas':'separadas')==='juntas'?'Barras juntas':'Barras separadas'}`},
+                                                {lbl:'Eje X', ok:gCorrQ2, msg:gCorrQ2?'✓':`✗ → ${EJEX_OPTS.find(o=>o.v===EJEX_CORRECT)?.lbl}`},
+                                                {lbl:'Eje Y', ok:gCorrQ3, msg:gCorrQ3?'✓':'✗ → Frecuencias absolutas nᵢ'},
+                                            ].map(({lbl,ok,msg})=>(
+                                                <div key={lbl} style={{display:'flex',justifyContent:'space-between',padding:'4px 0',borderBottom:`1px solid ${D.border}`,gap:8}}>
+                                                    <span style={{color:D.muted}}>{lbl}</span>
+                                                    <span style={{color:ok?D.green2:D.red,fontWeight:700}}>{msg}</span>
+                                                </div>
+                                            ))}
+                                            <div style={{marginTop:8,color:D.muted}}>
+                                                Barras: <b style={{color:D.text}}>{gBarOk.filter(Boolean).length}/{gBarOk.length}</b> proporciones correctas (±20%)
+                                            </div>
+                                            <button onClick={()=>{setGrafChecked(false);setBarHeights(grafRows.map(()=>0));}}
+                                                style={{...BTN('#30363d'),padding:'6px 12px',fontSize:'0.78rem',marginTop:10}}>
+                                                Volver a dibujar
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* ── Teclado numérico (fijo abajo) ── */}
@@ -1155,7 +1429,7 @@ function ModoClase({ onClose }) {
                         <span>
                             Celda: <b style={{color:D.accent}}>{HEADS[active.col] || PARAM_LABELS[active.col] || active.col}</b>
                             {active.row === -2 ? ' (PARÁMETRO)' : active.row === -1 ? ' (TOTALES)' : `  fila ${active.row + 1}`}
-                            {activeVal ? <b style={{color:D.text,fontFamily:'monospace',marginLeft:8,fontSize:'0.88rem'}}>{activeVal}</b> : null}
+                            {activeVal ? <b style={{color:D.text,fontFamily:'monospace',marginLeft:8,fontSize:'0.78rem'}}>{activeVal}</b> : null}
                         </span>
                         <button onClick={()=>setActive(null)} style={{background:'transparent',border:'none',color:D.muted,cursor:'pointer',fontSize:'0.9rem',padding:'0 4px'}}>✕</button>
                     </div>
@@ -1185,6 +1459,12 @@ function ModoClase({ onClose }) {
                             ))}
                         </div>
                     )}
+                    <button onClick={nextCell}
+                        style={{marginTop:6,width:'100%',maxWidth:active.col==='intervalo'?300:240,
+                            padding:'10px 0',borderRadius:9,border:`1px solid ${D.accent}`,
+                            background:'#1a2a3a',color:D.accent,fontWeight:700,fontSize:'0.9rem',cursor:'pointer'}}>
+                        ↓ Sig. celda
+                    </button>
                 </div>
             )}
         </div>

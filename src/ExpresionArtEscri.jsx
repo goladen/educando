@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { db } from './firebase';
-import { doc, getDoc, addDoc, updateDoc, onSnapshot, increment, collection, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, addDoc, updateDoc, onSnapshot, increment, collection, writeBatch, deleteField } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
 import { Users, Play, Send, Save, CheckCircle, XCircle, Medal, Trophy, Loader, ArrowUp, X } from 'lucide-react';
 
@@ -85,6 +85,128 @@ const calcPuntosGuesser = (timestamp, startTime, tiempoTotal) => {
 };
 
 // ============================================================================
+// HELPER: Prepara los datos de la próxima ronda (ganador, palabra, modo)
+// ============================================================================
+const COLORES_RULETA_EAE = ['#e74c3c','#3498db','#2ecc71','#f1c40f','#9b59b6','#e67e22','#1abc9c','#e91e63'];
+
+function prepararDatosRonda(data) {
+    const lista       = Object.values(data.jugadores || {});
+    const usados      = data.anfitrionesUsados || [];
+    const disponibles = lista.filter(j => !usados.includes(j.uid));
+    if (disponibles.length === 0) return null;
+
+    const anfitrion  = disponibles[Math.floor(Math.random() * disponibles.length)];
+    const usadas     = data.palabrasUsadas || [];
+    const pool       = PALABRAS_EAE.filter(pw => !usadas.includes(pw.p));
+    const banco      = pool.length > 0 ? pool : PALABRAS_EAE;
+    const entrada    = banco[Math.floor(Math.random() * banco.length)];
+    const modoConf   = data.modoJuego;
+    // MIXTO: alterna estrictamente en vez de aleatorio
+    const modo       = modoConf === 'DIBUJAR'  ? 'DIBUJAR'
+                     : modoConf === 'DESCRIBIR' ? 'DESCRIBIR'
+                     : (data.ultimoModo === 'DIBUJAR' ? 'DESCRIBIR' : 'DIBUJAR');
+
+    return {
+        disponiblesNombres: disponibles.map(j => j.nombre),
+        ganadorIndex:       disponibles.findIndex(j => j.uid === anfitrion.uid),
+        rondaData: {
+            anfitrionUid:      anfitrion.uid,
+            anfitrionNombre:   anfitrion.nombre,
+            modoRonda:         modo,
+            palabraSecreta:    entrada.p,
+            palabrasTabu:      modo === 'DESCRIBIR' ? entrada.t : [],
+            anfitrionesUsados: [...usados, anfitrion.uid],
+            palabrasUsadas:    [...usadas, entrada.p],
+            rondaActual:       (data.rondaActual || 0) + 1,
+            ultimoModo:        modo,
+        },
+    };
+}
+
+// ============================================================================
+// RULETA: Overlay animado que gira y aterriza en el ganador preelegido
+// ============================================================================
+function RuletaEAE({ disponibles, ganadorIndex }) {
+    const canvasRef = useRef(null);
+    const [rotacion, setRotacion] = useState(0);
+    const [mostrarGanador, setMostrarGanador] = useState(false);
+
+    const dibujar = () => {
+        const canvas = canvasRef.current;
+        if (!canvas || !disponibles.length) return;
+        const ctx  = canvas.getContext('2d');
+        const S    = canvas.width;
+        const c    = S / 2;
+        const r    = c - 8;
+        const n    = disponibles.length;
+        const ang  = (2 * Math.PI) / n;
+        ctx.clearRect(0, 0, S, S);
+        for (let i = 0; i < n; i++) {
+            const a0 = i * ang, a1 = a0 + ang;
+            ctx.beginPath();
+            ctx.moveTo(c, c);
+            ctx.arc(c, c, r, a0, a1);
+            ctx.fillStyle = COLORES_RULETA_EAE[i % COLORES_RULETA_EAE.length];
+            ctx.fill();
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+            ctx.save();
+            ctx.translate(c, c);
+            ctx.rotate(a0 + ang / 2);
+            ctx.textAlign = 'right';
+            ctx.fillStyle = '#fff';
+            const fs = Math.max(9, Math.min(18, 110 / n));
+            ctx.font = `bold ${fs}px Arial`;
+            ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 3;
+            const txt = disponibles[i].length > 11 ? disponibles[i].slice(0, 10) + '…' : disponibles[i];
+            ctx.fillText(txt, r - 12, fs * 0.38);
+            ctx.restore();
+        }
+    };
+
+    useEffect(() => { dibujar(); }, [disponibles]);
+
+    useEffect(() => {
+        const t = setTimeout(() => {
+            const n   = disponibles.length;
+            const ang = 360 / n;
+            // Queremos que la sección de ganadorIndex quede en el puntero (derecha = 0°)
+            const centerOfSection = (ganadorIndex + 0.5) * ang;
+            const target = (360 - centerOfSection % 360 + 360) % 360;
+            const cur    = rotacion % 360;
+            let delta    = target - cur;
+            if (delta < 0) delta += 360;
+            const newRot = rotacion + 5 * 360 + delta;
+            setRotacion(newRot);
+            setTimeout(() => setMostrarGanador(true), 4300);
+        }, 600);
+        return () => clearTimeout(t);
+    }, []); // solo al montar
+
+    const SZ = Math.min(300, (typeof window !== 'undefined' ? window.innerWidth : 400) - 60);
+
+    return (
+        <div style={{ position:'fixed', inset:0, zIndex:300, background:'rgba(0,0,0,0.93)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center' }}>
+            <h2 style={{ color:'#f1c40f', fontFamily:"'Righteous',sans-serif", marginBottom:20, fontSize:'1.6rem', textAlign:'center' }}>
+                🎡 ¿Quién es el siguiente?
+            </h2>
+            <div style={{ position:'relative', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                {/* Puntero derecha */}
+                <div style={{ position:'absolute', right:-22, top:'50%', transform:'translateY(-50%)', width:0, height:0, borderTop:'16px solid transparent', borderBottom:'16px solid transparent', borderRight:'32px solid #f1c40f', zIndex:10 }} />
+                <div style={{ width:SZ, height:SZ, borderRadius:'50%', overflow:'hidden', border:'5px solid #f1c40f', boxShadow:'0 0 30px rgba(241,196,15,0.5)' }}>
+                    <canvas ref={canvasRef} width={SZ} height={SZ}
+                        style={{ transform:`rotate(${rotacion}deg)`, transition:'transform 4s cubic-bezier(0.2,0.8,0.2,1)', display:'block' }} />
+                </div>
+            </div>
+            {mostrarGanador && disponibles[ganadorIndex] && (
+                <div style={{ marginTop:24, background:'#f1c40f', padding:'16px 40px', borderRadius:16, color:'#1a1a2e', fontSize:'2rem', fontWeight:'bold', animation:'pop 0.4s', textAlign:'center', border:'4px solid #e67e22', boxShadow:'0 8px 25px rgba(241,196,15,0.4)' }}>
+                    🎭 {disponibles[ganadorIndex]}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ============================================================================
 // MAIN EXPORT — DISPATCHER
 // ============================================================================
 export default function ExpresionArtEscri(props) {
@@ -112,9 +234,13 @@ function EAEHost({ codigoSala, onExit, usuario }) {
     const [enviandoInforme, setEnviandoInforme] = useState(false);
     const [informeEnviado, setInformeEnviado]   = useState(false);
 
-    const timerRef          = useRef(null);
-    const gameDataRef       = useRef(null);
+    const timerRef           = useRef(null);
+    const gameDataRef        = useRef(null);
     const terminarInProgress = useRef(false);
+    const pingIdRef          = useRef(null);
+    const [pingState,   setPingState]   = useState(null); // null | 'PINGING' | 'RESULT'
+    const [pingResult,  setPingResult]  = useState(null); // { respondidos, noRespondidos }
+    const [pingCountdown, setPingCountdown] = useState(0);
 
     useEffect(() => { gameDataRef.current = gameData; }, [gameData]);
 
@@ -192,57 +318,130 @@ function EAEHost({ codigoSala, onExit, usuario }) {
         return () => clearInterval(timerRef.current);
     }, [faseHost, faseRonda, gameData?.roundStartTime]);
 
+    // ─── Ping: comprobar conexiones ──────────────────────────────────────────
+    const enviarPing = async () => {
+        if (pingState === 'PINGING') return;
+        const pingId = Date.now().toString();
+        pingIdRef.current = pingId;
+        setPingState('PINGING');
+        setPingCountdown(8);
+        setPingResult(null);
+        await updateDoc(doc(db, 'live_games', codigoSala), {
+            pingRequest: { id: pingId, respondedBy: {} }
+        });
+        const intervalo = setInterval(() => {
+            setPingCountdown(prev => {
+                if (prev <= 1) { clearInterval(intervalo); return 0; }
+                return prev - 1;
+            });
+        }, 1000);
+        setTimeout(() => {
+            clearInterval(intervalo);
+            const data = gameDataRef.current;
+            if (!data || pingIdRef.current !== pingId) return;
+            const respondidos    = Object.keys(data.pingRequest?.respondedBy || {});
+            const todosUids      = Object.keys(data.jugadores || {});
+            const noRespondidos  = todosUids.filter(uid => !respondidos.includes(uid));
+            const nombrarUid = uid => data.jugadores?.[uid]?.nombre || uid;
+            setPingResult({
+                respondidos:   respondidos.map(nombrarUid),
+                noRespondidos: noRespondidos.map(uid => ({ uid, nombre: nombrarUid(uid) })),
+            });
+            setPingState('RESULT');
+        }, 8000);
+    };
+
+    const kickJugador = async (uid) => {
+        await updateDoc(doc(db, 'live_games', codigoSala), {
+            [`jugadores.${uid}`]: deleteField()
+        });
+        setPingResult(prev => prev ? {
+            ...prev,
+            noRespondidos: prev.noRespondidos.filter(j => j.uid !== uid)
+        } : prev);
+    };
+
+    // ─── Pasar palabra (nueva palabra, mismo anfitrión) ──────────────────────
+    const pasarPalabra = async () => {
+        const data = gameDataRef.current;
+        if (!data || data.faseRonda !== 'JUGANDO') return;
+        terminarInProgress.current = false;
+        const usadas  = [...(data.palabrasUsadas || [])];
+        const pool    = PALABRAS_EAE.filter(pw => !usadas.includes(pw.p));
+        const banco   = pool.length > 0 ? pool : PALABRAS_EAE;
+        const entrada = banco[Math.floor(Math.random() * banco.length)];
+        const modoConf = data.modoJuego;
+        const modo = modoConf === 'DIBUJAR'  ? 'DIBUJAR'
+                   : modoConf === 'DESCRIBIR' ? 'DESCRIBIR'
+                   : (data.ultimoModo === 'DIBUJAR' ? 'DESCRIBIR' : 'DIBUJAR');
+        await updateDoc(doc(db, 'live_games', codigoSala), {
+            palabraSecreta:    entrada.p,
+            palabrasTabu:      modo === 'DESCRIBIR' ? entrada.t : [],
+            modoRonda:         modo,
+            textoDescripcion:  '',
+            imagenDibujo:      '',
+            respuestasRonda:   {},
+            roundStartTime:    Date.now(),
+            palabrasUsadas:    [...usadas, entrada.p],
+        });
+        playSound('START');
+    };
+
     // ─── Funciones de flujo ───────────────────────────────────────────────────
     const empezarPartida = async () => {
         await updateDoc(doc(db, 'live_games', codigoSala), { estado: 'COUNTDOWN' });
     };
 
-    const finCuentaAtras = () => iniciarRonda(gameDataRef.current);
+    const finCuentaAtras = () => mostrarRuleta(gameDataRef.current);
 
-    const iniciarRonda = async (data) => {
+    const mostrarRuleta = async (data) => {
         if (!data) return;
         setCargando(false);
         terminarInProgress.current = false;
-
-        const lista       = Object.values(data.jugadores || {});
-        const usados      = data.anfitrionesUsados || [];
-        const disponibles = lista.filter(j => !usados.includes(j.uid));
-
-        if (disponibles.length === 0) {
+        const prepared = prepararDatosRonda(data);
+        if (!prepared) {
             await updateDoc(doc(db, 'live_games', codigoSala), { estado: 'FIN' });
             playSound('WIN');
             return;
         }
+        await updateDoc(doc(db, 'live_games', codigoSala), {
+            faseRonda:          'RULETA',
+            ruletaDisponibles:  prepared.disponiblesNombres,
+            ruletaGanadorIndex: prepared.ganadorIndex,
+            ruletaRondaData:    prepared.rondaData,
+        });
+    };
 
-        const anfitrion  = disponibles[Math.floor(Math.random() * disponibles.length)];
-        const usadas     = data.palabrasUsadas || [];
-        const pool       = PALABRAS_EAE.filter(pw => !usadas.includes(pw.p));
-        const banco      = pool.length > 0 ? pool : PALABRAS_EAE;
-        const entrada    = banco[Math.floor(Math.random() * banco.length)];
-        const modoConf   = data.modoJuego;
-        const modo       = modoConf === 'DIBUJAR' ? 'DIBUJAR'
-                         : modoConf === 'DESCRIBIR' ? 'DESCRIBIR'
-                         : (Math.random() < 0.5 ? 'DIBUJAR' : 'DESCRIBIR');
-
+    const iniciarRondaDesdeRuleta = async (data) => {
+        if (!data?.ruletaRondaData) return;
+        const r = data.ruletaRondaData;
         await updateDoc(doc(db, 'live_games', codigoSala), {
             estado:            'JUEGO',
             faseRonda:         'JUGANDO',
-            anfitrionUid:      anfitrion.uid,
-            anfitrionNombre:   anfitrion.nombre,
-            modoRonda:         modo,
-            palabraSecreta:    entrada.p,
-            palabrasTabu:      modo === 'DESCRIBIR' ? entrada.t : [],
+            anfitrionUid:      r.anfitrionUid,
+            anfitrionNombre:   r.anfitrionNombre,
+            modoRonda:         r.modoRonda,
+            palabraSecreta:    r.palabraSecreta,
+            palabrasTabu:      r.palabrasTabu,
             textoDescripcion:  '',
             imagenDibujo:      '',
             respuestasRonda:   {},
             roundStartTime:    Date.now(),
             puntuacionAnfitrion: 0,
-            anfitrionesUsados: [...usados, anfitrion.uid],
-            palabrasUsadas:    [...usadas, entrada.p],
-            rondaActual:       (data.rondaActual || 0) + 1,
+            anfitrionesUsados: r.anfitrionesUsados,
+            palabrasUsadas:    r.palabrasUsadas,
+            rondaActual:       r.rondaActual,
+            ultimoModo:        r.modoRonda,
         });
         playSound('START');
     };
+
+    // Auto-transición RULETA → JUGANDO (6s = 0.6s delay + 4s spin + 1.4s mostrar ganador)
+    useEffect(() => {
+        if (faseRonda !== 'RULETA' || !gameData) return;
+        const t = setTimeout(() => iniciarRondaDesdeRuleta(gameDataRef.current), 6000);
+        return () => clearTimeout(t);
+    }, [faseRonda, gameData?.ruletaGanadorIndex]);
 
     const terminarRonda = async (data) => {
         if (data.faseRonda !== 'JUGANDO') return;
@@ -279,17 +478,7 @@ function EAEHost({ codigoSala, onExit, usuario }) {
     const siguienteRonda = async () => {
         if (cargando) return;
         setCargando(true);
-        const data      = gameDataRef.current;
-        const lista     = Object.values(data.jugadores || {});
-        const usados    = data.anfitrionesUsados || [];
-        const quedan    = lista.filter(j => !usados.includes(j.uid));
-
-        if (quedan.length === 0) {
-            await updateDoc(doc(db, 'live_games', codigoSala), { estado: 'FIN' });
-            playSound('WIN');
-        } else {
-            await iniciarRonda(data);
-        }
+        await mostrarRuleta(gameDataRef.current);
     };
 
     const guardarResultados = async () => {
@@ -377,6 +566,14 @@ function EAEHost({ codigoSala, onExit, usuario }) {
                 {/* COUNTDOWN */}
                 {faseHost === 'COUNTDOWN' && <PantallaCuentaAtras playSound={playSound} onFinished={finCuentaAtras} />}
 
+                {/* RULETA */}
+                {faseHost === 'JUEGO' && faseRonda === 'RULETA' && gameData.ruletaDisponibles && (
+                    <RuletaEAE
+                        disponibles={gameData.ruletaDisponibles}
+                        ganadorIndex={gameData.ruletaGanadorIndex ?? 0}
+                    />
+                )}
+
                 {/* JUEGO */}
                 {faseHost === 'JUEGO' && (
                     <>
@@ -405,9 +602,48 @@ function EAEHost({ codigoSala, onExit, usuario }) {
                                         )}
                                     </div>
 
-                                    <button className="btn-force-timeout" onClick={() => terminarRonda(gameData)}>
-                                        ⏹ Forzar Final
-                                    </button>
+                                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center', marginTop: 10 }}>
+                                        <button className="btn-force-timeout" onClick={() => terminarRonda(gameData)}>
+                                            ⏹ Forzar Final
+                                        </button>
+                                        <button className="btn-force-timeout" style={{ background: '#8e44ad' }} onClick={pasarPalabra}>
+                                            ⏭ Pasar Palabra
+                                        </button>
+                                        <button className="btn-force-timeout"
+                                            style={{ background: pingState === 'PINGING' ? '#555' : '#2980b9' }}
+                                            onClick={enviarPing}
+                                            disabled={pingState === 'PINGING'}>
+                                            {pingState === 'PINGING' ? `📡 Comprobando… (${pingCountdown}s)` : '📡 Comprobar Conexión'}
+                                        </button>
+                                    </div>
+
+                                    {pingState === 'RESULT' && pingResult && (
+                                        <div style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid #444', borderRadius: 10, padding: 12, marginTop: 10, fontSize: '0.88rem' }}>
+                                            <div style={{ color: '#2ecc71', marginBottom: 6 }}>
+                                                ✅ Conectados: {pingResult.respondidos.join(', ') || 'ninguno'}
+                                            </div>
+                                            {pingResult.noRespondidos.length > 0 && (
+                                                <div>
+                                                    <div style={{ color: '#e74c3c', marginBottom: 6 }}>
+                                                        ❌ Sin respuesta: {pingResult.noRespondidos.map(j => j.nombre).join(', ')}
+                                                    </div>
+                                                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                                        {pingResult.noRespondidos.map(j => (
+                                                            <button key={j.uid}
+                                                                onClick={() => kickJugador(j.uid)}
+                                                                style={{ background: '#e74c3c', color: 'white', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: '0.8rem' }}>
+                                                                Eliminar {j.nombre}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            <button onClick={() => setPingState(null)}
+                                                style={{ marginTop: 8, background: 'transparent', border: '1px solid #666', color: '#aaa', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontSize: '0.8rem' }}>
+                                                Cerrar
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Sidebar ranking en tiempo real */}
@@ -524,6 +760,11 @@ function EAEClient({ codigoSala, usuario, onExit }) {
     const timerRef           = useRef(null);
     const gameDataRef        = useRef(null);
     const terminarInProgress = useRef(false);
+    const lastPingIdRef      = useRef(null);
+    const pingIdRef          = useRef(null);
+    const [pingState,    setPingState]    = useState(null);
+    const [pingResult,   setPingResult]   = useState(null);
+    const [pingCountdown, setPingCountdown] = useState(0);
 
     useEffect(() => { gameDataRef.current = gameData; }, [gameData]);
 
@@ -543,6 +784,17 @@ function EAEClient({ codigoSala, usuario, onExit }) {
             setFase(data.estado || 'LOBBY');
             setFaseRonda(data.faseRonda || 'JUGANDO');
             setJugadores(data.jugadores ? Object.values(data.jugadores) : []);
+
+            // Auto-responder al ping del host/admin
+            const pingId = data.pingRequest?.id;
+            if (pingId && pingId !== lastPingIdRef.current) {
+                lastPingIdRef.current = pingId;
+                if (!data.pingRequest?.respondedBy?.[myUid]) {
+                    updateDoc(doc(db, 'live_games', codigoSala), {
+                        [`pingRequest.respondedBy.${myUid}`]: true
+                    }).catch(() => {});
+                }
+            }
 
             const jMap = data.jugadores || {};
             if (jMap[myUid]) {
@@ -612,49 +864,126 @@ function EAEClient({ codigoSala, usuario, onExit }) {
         return () => clearInterval(timerRef.current);
     }, [isAdmin, fase, faseRonda, gameData?.roundStartTime]);
 
+    // ─── Admin: ping + pasar palabra ─────────────────────────────────────────
+    const enviarPingAdmin = async () => {
+        if (pingState === 'PINGING') return;
+        const pingId = Date.now().toString();
+        pingIdRef.current = pingId;
+        setPingState('PINGING');
+        setPingCountdown(8);
+        setPingResult(null);
+        await updateDoc(doc(db, 'live_games', codigoSala), {
+            pingRequest: { id: pingId, respondedBy: {} }
+        });
+        const intervalo = setInterval(() => {
+            setPingCountdown(prev => {
+                if (prev <= 1) { clearInterval(intervalo); return 0; }
+                return prev - 1;
+            });
+        }, 1000);
+        setTimeout(() => {
+            clearInterval(intervalo);
+            const data = gameDataRef.current;
+            if (!data || pingIdRef.current !== pingId) return;
+            const respondidos   = Object.keys(data.pingRequest?.respondedBy || {});
+            const todosUids     = Object.keys(data.jugadores || {});
+            const noRespondidos = todosUids.filter(uid => !respondidos.includes(uid));
+            const nombrarUid    = uid => data.jugadores?.[uid]?.nombre || uid;
+            setPingResult({
+                respondidos:   respondidos.map(nombrarUid),
+                noRespondidos: noRespondidos.map(uid => ({ uid, nombre: nombrarUid(uid) })),
+            });
+            setPingState('RESULT');
+        }, 8000);
+    };
+
+    const kickJugadorAdmin = async (uid) => {
+        await updateDoc(doc(db, 'live_games', codigoSala), {
+            [`jugadores.${uid}`]: deleteField()
+        });
+        setPingResult(prev => prev ? {
+            ...prev,
+            noRespondidos: prev.noRespondidos.filter(j => j.uid !== uid)
+        } : prev);
+    };
+
+    const pasarPalabraAdmin = async () => {
+        const data = gameDataRef.current;
+        if (!data || data.faseRonda !== 'JUGANDO') return;
+        terminarInProgress.current = false;
+        const usadas  = [...(data.palabrasUsadas || [])];
+        const pool    = PALABRAS_EAE.filter(pw => !usadas.includes(pw.p));
+        const banco   = pool.length > 0 ? pool : PALABRAS_EAE;
+        const entrada = banco[Math.floor(Math.random() * banco.length)];
+        const modoConf = data.modoJuego;
+        const modo = modoConf === 'DIBUJAR'  ? 'DIBUJAR'
+                   : modoConf === 'DESCRIBIR' ? 'DESCRIBIR'
+                   : (data.ultimoModo === 'DIBUJAR' ? 'DESCRIBIR' : 'DIBUJAR');
+        await updateDoc(doc(db, 'live_games', codigoSala), {
+            palabraSecreta:   entrada.p,
+            palabrasTabu:     modo === 'DESCRIBIR' ? entrada.t : [],
+            modoRonda:        modo,
+            textoDescripcion: '',
+            imagenDibujo:     '',
+            respuestasRonda:  {},
+            roundStartTime:   Date.now(),
+            palabrasUsadas:   [...usadas, entrada.p],
+        });
+        safePlay(audioStart);
+    };
+
     // ─── Admin funciones de flujo ─────────────────────────────────────────────
     const empezarPartidaAdmin = () =>
         updateDoc(doc(db, 'live_games', codigoSala), { estado: 'COUNTDOWN' });
 
-    const iniciarRondaAdmin = async (data) => {
+    const mostrarRuletaAdmin = async (data) => {
         if (!data) return;
         setCargandoRonda(false);
         terminarInProgress.current = false;
-
-        const lista       = Object.values(data.jugadores || {});
-        const usados      = data.anfitrionesUsados || [];
-        const disponibles = lista.filter(j => !usados.includes(j.uid));
-
-        if (disponibles.length === 0) {
+        const prepared = prepararDatosRonda(data);
+        if (!prepared) {
             await updateDoc(doc(db, 'live_games', codigoSala), { estado: 'FIN' });
             safePlay(audioWin);
             return;
         }
-
-        const anfitrion = disponibles[Math.floor(Math.random() * disponibles.length)];
-        const usadas    = data.palabrasUsadas || [];
-        const pool      = PALABRAS_EAE.filter(pw => !usadas.includes(pw.p));
-        const banco     = pool.length > 0 ? pool : PALABRAS_EAE;
-        const entrada   = banco[Math.floor(Math.random() * banco.length)];
-        const modoConf  = data.modoJuego;
-        const modo      = modoConf === 'DIBUJAR' ? 'DIBUJAR'
-                        : modoConf === 'DESCRIBIR' ? 'DESCRIBIR'
-                        : (Math.random() < 0.5 ? 'DIBUJAR' : 'DESCRIBIR');
-
         await updateDoc(doc(db, 'live_games', codigoSala), {
-            estado: 'JUEGO', faseRonda: 'JUGANDO',
-            anfitrionUid: anfitrion.uid, anfitrionNombre: anfitrion.nombre,
-            modoRonda: modo, palabraSecreta: entrada.p,
-            palabrasTabu: modo === 'DESCRIBIR' ? entrada.t : [],
-            textoDescripcion: '', imagenDibujo: '',
-            respuestasRonda: {}, roundStartTime: Date.now(),
+            faseRonda:          'RULETA',
+            ruletaDisponibles:  prepared.disponiblesNombres,
+            ruletaGanadorIndex: prepared.ganadorIndex,
+            ruletaRondaData:    prepared.rondaData,
+        });
+    };
+
+    const iniciarRondaDesdeRuletaAdmin = async (data) => {
+        if (!data?.ruletaRondaData) return;
+        const r = data.ruletaRondaData;
+        await updateDoc(doc(db, 'live_games', codigoSala), {
+            estado:            'JUEGO',
+            faseRonda:         'JUGANDO',
+            anfitrionUid:      r.anfitrionUid,
+            anfitrionNombre:   r.anfitrionNombre,
+            modoRonda:         r.modoRonda,
+            palabraSecreta:    r.palabraSecreta,
+            palabrasTabu:      r.palabrasTabu,
+            textoDescripcion:  '',
+            imagenDibujo:      '',
+            respuestasRonda:   {},
+            roundStartTime:    Date.now(),
             puntuacionAnfitrion: 0,
-            anfitrionesUsados: [...usados, anfitrion.uid],
-            palabrasUsadas:    [...usadas, entrada.p],
-            rondaActual: (data.rondaActual || 0) + 1,
+            anfitrionesUsados: r.anfitrionesUsados,
+            palabrasUsadas:    r.palabrasUsadas,
+            rondaActual:       r.rondaActual,
+            ultimoModo:        r.modoRonda,
         });
         safePlay(audioStart);
     };
+
+    // Auto-transición RULETA → JUGANDO (admin)
+    useEffect(() => {
+        if (!isAdmin || faseRonda !== 'RULETA' || !gameData) return;
+        const t = setTimeout(() => iniciarRondaDesdeRuletaAdmin(gameDataRef.current), 6000);
+        return () => clearTimeout(t);
+    }, [isAdmin, faseRonda, gameData?.ruletaGanadorIndex]);
 
     const terminarRondaAdmin = async (data) => {
         if (data.faseRonda !== 'JUGANDO') return;
@@ -686,17 +1015,7 @@ function EAEClient({ codigoSala, usuario, onExit }) {
     const siguienteRondaAdmin = async () => {
         if (cargandoRonda) return;
         setCargandoRonda(true);
-        const data   = gameDataRef.current;
-        const lista  = Object.values(data.jugadores || {});
-        const usados = data.anfitrionesUsados || [];
-        const quedan = lista.filter(j => !usados.includes(j.uid));
-
-        if (quedan.length === 0) {
-            await updateDoc(doc(db, 'live_games', codigoSala), { estado: 'FIN' });
-            safePlay(audioWin);
-        } else {
-            await iniciarRondaAdmin(data);
-        }
+        await mostrarRuletaAdmin(gameDataRef.current);
     };
 
     // ─── Acciones del adivinador ──────────────────────────────────────────────
@@ -769,7 +1088,7 @@ function EAEClient({ codigoSala, usuario, onExit }) {
             {/* COUNTDOWN */}
             {fase === 'COUNTDOWN' && (
                 isAdmin
-                    ? <PantallaCuentaAtras playSound={() => safePlay(audioStart)} onFinished={() => iniciarRondaAdmin(gameDataRef.current)} />
+                    ? <PantallaCuentaAtras playSound={() => safePlay(audioStart)} onFinished={() => mostrarRuletaAdmin(gameDataRef.current)} />
                     : <div className="lobby-wait">
                         <h1 style={{ fontSize: '4rem', color: '#f1c40f', fontFamily: "'Righteous', sans-serif" }}>¡ATENTOS!</h1>
                     </div>
@@ -778,6 +1097,14 @@ function EAEClient({ codigoSala, usuario, onExit }) {
             {/* JUEGO */}
             {fase === 'JUEGO' && (
                 <>
+                    {/* RULETA: todos los jugadores la ven */}
+                    {faseRonda === 'RULETA' && gameData.ruletaDisponibles && (
+                        <RuletaEAE
+                            disponibles={gameData.ruletaDisponibles}
+                            ganadorIndex={gameData.ruletaGanadorIndex ?? 0}
+                        />
+                    )}
+
                     {/* sinProfesor: REVEAL compartido */}
                     {sinProfesor && faseRonda === 'REVEAL' && (
                         <EAERevealCompartido
@@ -812,36 +1139,76 @@ function EAEClient({ codigoSala, usuario, onExit }) {
 
                     {/* Flujo normal: JUGANDO (o REVEAL/LEADERBOARD cuando conProfesor) */}
                     {(!sinProfesor || faseRonda === 'JUGANDO') && (
-                        soyAnfitrion ? (
-                            <AnfitrionView
-                                key={gameData.rondaActual}
-                                modoRonda={gameData.modoRonda}
-                                palabraSecreta={gameData.palabraSecreta}
-                                palabrasTabu={gameData.palabrasTabu || []}
-                                codigoSala={codigoSala}
-                                myUid={myUid}
-                                faseRonda={faseRonda}
-                                roundStartTime={gameData.roundStartTime}
-                                tiempoRonda={tiempoRonda}
-                                puntuacionAnfitrion={gameData.puntuacionAnfitrion}
-                                myPuntos={puntuacion}
-                            />
-                        ) : (
-                            <AdivinadorView
-                                key={gameData.rondaActual}
-                                modoRonda={gameData.modoRonda}
-                                imagenDibujo={gameData.imagenDibujo}
-                                textoDescripcion={gameData.textoDescripcion}
-                                palabraSecreta={gameData.palabraSecreta}
-                                anfitrionNombre={gameData.anfitrionNombre}
-                                faseRonda={faseRonda}
-                                miRespuesta={miRespuesta}
-                                roundStartTime={gameData.roundStartTime}
-                                tiempoRonda={tiempoRonda}
-                                onResponder={enviarRespuesta}
-                                puntuacion={puntuacion}
-                            />
-                        )
+                        <>
+                            {/* Barra de control para el admin en sinProfesor */}
+                            {isAdmin && faseRonda === 'JUGANDO' && (
+                                <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 200, background: 'rgba(0,0,0,0.85)', borderTop: '2px solid #e67e22', padding: '8px 12px' }}>
+                                    <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap', marginBottom: pingState === 'RESULT' && pingResult ? 6 : 0 }}>
+                                        <button onClick={pasarPalabraAdmin}
+                                            style={{ background: '#8e44ad', color: 'white', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem' }}>
+                                            ⏭ Pasar Palabra
+                                        </button>
+                                        <button onClick={() => terminarRondaAdmin(gameDataRef.current)}
+                                            style={{ background: '#c0392b', color: 'white', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem' }}>
+                                            ⏹ Forzar Final
+                                        </button>
+                                        <button onClick={enviarPingAdmin}
+                                            disabled={pingState === 'PINGING'}
+                                            style={{ background: pingState === 'PINGING' ? '#555' : '#2980b9', color: 'white', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: pingState === 'PINGING' ? 'wait' : 'pointer', fontWeight: 700, fontSize: '0.85rem' }}>
+                                            {pingState === 'PINGING' ? `📡 Comprobando… (${pingCountdown}s)` : '📡 Comprobar Conexión'}
+                                        </button>
+                                    </div>
+                                    {pingState === 'RESULT' && pingResult && (
+                                        <div style={{ fontSize: '0.82rem', textAlign: 'center' }}>
+                                            <span style={{ color: '#2ecc71' }}>✅ {pingResult.respondidos.join(', ') || 'ninguno'}</span>
+                                            {pingResult.noRespondidos.length > 0 && (
+                                                <>
+                                                    <span style={{ color: '#e74c3c', marginLeft: 10 }}>❌ Sin respuesta: </span>
+                                                    {pingResult.noRespondidos.map(j => (
+                                                        <button key={j.uid} onClick={() => kickJugadorAdmin(j.uid)}
+                                                            style={{ background: '#e74c3c', color: 'white', border: 'none', borderRadius: 5, padding: '2px 8px', cursor: 'pointer', fontSize: '0.78rem', marginLeft: 4 }}>
+                                                            Eliminar {j.nombre}
+                                                        </button>
+                                                    ))}
+                                                </>
+                                            )}
+                                            <button onClick={() => setPingState(null)}
+                                                style={{ marginLeft: 10, background: 'transparent', border: '1px solid #666', color: '#aaa', borderRadius: 5, padding: '2px 8px', cursor: 'pointer', fontSize: '0.78rem' }}>✕</button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                            {soyAnfitrion ? (
+                                <AnfitrionView
+                                    key={gameData.rondaActual}
+                                    modoRonda={gameData.modoRonda}
+                                    palabraSecreta={gameData.palabraSecreta}
+                                    palabrasTabu={gameData.palabrasTabu || []}
+                                    codigoSala={codigoSala}
+                                    myUid={myUid}
+                                    faseRonda={faseRonda}
+                                    roundStartTime={gameData.roundStartTime}
+                                    tiempoRonda={tiempoRonda}
+                                    puntuacionAnfitrion={gameData.puntuacionAnfitrion}
+                                    myPuntos={puntuacion}
+                                />
+                            ) : (
+                                <AdivinadorView
+                                    key={gameData.rondaActual}
+                                    modoRonda={gameData.modoRonda}
+                                    imagenDibujo={gameData.imagenDibujo}
+                                    textoDescripcion={gameData.textoDescripcion}
+                                    palabraSecreta={gameData.palabraSecreta}
+                                    anfitrionNombre={gameData.anfitrionNombre}
+                                    faseRonda={faseRonda}
+                                    miRespuesta={miRespuesta}
+                                    roundStartTime={gameData.roundStartTime}
+                                    tiempoRonda={tiempoRonda}
+                                    onResponder={enviarRespuesta}
+                                    puntuacion={puntuacion}
+                                />
+                            )}
+                        </>
                     )}
                 </>
             )}

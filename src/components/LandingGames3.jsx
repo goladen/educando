@@ -804,10 +804,40 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                 return;
             }
 
-            if (path === 'math_world') {
-                setZonaActiva('MATH');
+            if (path === 'primaria') {
+                setZonaActiva('MATH'); setSubzonaMath('PRIMARIA'); setJuegoActivo(null);
+            } else if (path === 'primaria/oaoa') {
+                setZonaActiva('MATH'); setSubzonaMath('PRIMARIA'); setJuegoActivo({ tipoJuego: 'MATES_OAOA' });
+            } else if (path === 'primaria/feria') {
+                setZonaActiva('MATH'); setSubzonaMath('PRIMARIA'); setJuegoActivo({ tipoJuego: 'FERIA_MATES', primaria: true });
+            } else if (path === 'primaria/divisibilidad') {
+                setZonaActiva('MATH'); setSubzonaMath('PRIMARIA'); setJuegoActivo({ tipoJuego: 'DIVISIBILIDAD' });
+            } else if (path === 'feria') {
+                setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'FERIA_MATES' });
+            } else if (path === 'calculo') {
+                setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'CALCULO' });
+            } else if (path === 'geometrix') {
+                setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'GEOMETRIX' });
+            } else if (path === 'ecuaciones') {
+                setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'ECUACIONES' });
+            } else if (path === 'funciones') {
+                setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'FUNCIONES' });
+            } else if (path.includes('anal') && path.includes('tica')) {
+                setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'GEOMETRÍA_ANALÍTICA' });
+            } else if (path === 'álgebra' || path === 'algebra') {
+                setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'POLINOMIOS' });
+            } else if (path === 'estadística' || path === 'estadistica') {
+                setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'ESTADISTICA' });
+            } else if (path === 'probabilidad') {
+                setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'PROBABILIDAD' });
+            } else if (path === 'oca') {
+                setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'OCA' });
+            } else if (path === 'domino') {
+                setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'DOMINO' });
+            } else if (path === 'math_world') {
+                setZonaActiva('MATH'); setSubzonaMath(null); setJuegoActivo(null);
             } else if (path === '' || path === 'inicio') {
-                setZonaActiva('MAIN');
+                setZonaActiva('MAIN'); setJuegoActivo(null); setSubzonaMath(null);
             }
         };
         checkURL();
@@ -1299,31 +1329,31 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
 
         if (juegoActivo.tipoJuego === 'ETIQUETAS') return <EtiquetaMe recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
 
-        if (juegoActivo.tipoJuego === 'GEOMETRIX') return <Geometrix usuario={usuario} onExit={() => setJuegoActivo(null)} />;
-        if (juegoActivo.tipoJuego === 'CALCULO') return <CalculoMental usuario={usuario} onExit={() => setJuegoActivo(null)} />;
-        if (juegoActivo.tipoJuego === 'OCA') return <OcaMatematicaDirect onExit={() => setJuegoActivo(null)} />;
-        if (juegoActivo.tipoJuego === 'DOMINO') return <DominoMatematicoDirect onExit={() => setJuegoActivo(null)} />;
-        if (juegoActivo.tipoJuego === 'ECUACIONES') return <Ecuaciones usuario={usuario} onExit={() => setJuegoActivo(null)} />;
-        if (juegoActivo.tipoJuego === 'FUNCIONES') return <Funciones onExit={() => setJuegoActivo(null)} />;
-        if (juegoActivo.tipoJuego === 'GEOMETRÍA_ANALÍTICA') return <GeometriaAnalitica onExit={() => setJuegoActivo(null)} />;
-        if (juegoActivo.tipoJuego === 'POLINOMIOS')  return <AlgebraApp      usuario={usuario} onExit={() => setJuegoActivo(null)} />;
-        if (juegoActivo.tipoJuego === 'ESTADISTICA') return <EstadisticaApp  usuario={usuario} onExit={() => setJuegoActivo(null)} />;
-        if (juegoActivo.tipoJuego === 'PROBABILIDAD') return <SimuladorDados onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'GEOMETRIX') return <Geometrix usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
+        if (juegoActivo.tipoJuego === 'CALCULO') return <CalculoMental usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
+        if (juegoActivo.tipoJuego === 'OCA') return <OcaMatematicaDirect onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
+        if (juegoActivo.tipoJuego === 'DOMINO') return <DominoMatematicoDirect onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
+        if (juegoActivo.tipoJuego === 'ECUACIONES') return <Ecuaciones usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
+        if (juegoActivo.tipoJuego === 'FUNCIONES') return <Funciones onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
+        if (juegoActivo.tipoJuego === 'GEOMETRÍA_ANALÍTICA') return <GeometriaAnalitica onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
+        if (juegoActivo.tipoJuego === 'POLINOMIOS')  return <AlgebraApp      usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
+        if (juegoActivo.tipoJuego === 'ESTADISTICA') return <EstadisticaApp  usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
+        if (juegoActivo.tipoJuego === 'PROBABILIDAD') return <SimuladorDados onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'MATES_OAOA') return (
             <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#f0faf9', overflowY: 'auto' }}>
-                <button onClick={() => setJuegoActivo(null)} style={{ position: 'fixed', top: 14, left: 14, zIndex: 10000, background: '#009688', color: 'white', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>← Volver</button>
+                <button onClick={() => { window.history.pushState({}, '', '/primaria'); setJuegoActivo(null); }} style={{ position: 'fixed', top: 14, left: 14, zIndex: 10000, background: '#009688', color: 'white', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>← Volver</button>
                 <SimuladorOAOA />
             </div>
         );
         if (juegoActivo.tipoJuego === 'FERIA_MATES') return (
             <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#fff8f0', overflowY: 'auto' }}>
-                <button onClick={() => setJuegoActivo(null)} style={{ position: 'fixed', top: 14, left: 14, zIndex: 10000, background: '#e67e22', color: 'white', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>← Volver</button>
+                <button onClick={() => { window.history.pushState({}, '', juegoActivo.primaria ? '/primaria' : '/math_world'); setJuegoActivo(null); }} style={{ position: 'fixed', top: 14, left: 14, zIndex: 10000, background: '#e67e22', color: 'white', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>← Volver</button>
                 <JuegoFeriaOAOA primaria={!!juegoActivo.primaria} />
             </div>
         );
         if (juegoActivo.tipoJuego === 'DIVISIBILIDAD') return (
             <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#F3E5F5', overflowY: 'auto' }}>
-                <button onClick={() => setJuegoActivo(null)} style={{ position: 'fixed', top: 14, left: 14, zIndex: 10000, background: '#7B1FA2', color: 'white', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>← Volver</button>
+                <button onClick={() => { window.history.pushState({}, '', '/primaria'); setJuegoActivo(null); }} style={{ position: 'fixed', top: 14, left: 14, zIndex: 10000, background: '#7B1FA2', color: 'white', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>← Volver</button>
                 <JuegoDivisibilidad />
             </div>
         );
@@ -1373,7 +1403,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
         if (subzonaMath === 'PRIMARIA') {
             return (
                 <div style={{ width: '100%', marginTop: '20px' }}>
-                    <button onClick={() => setSubzonaMath(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#333', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '20px', fontWeight: 'bold' }}>
+                    <button onClick={() => { setSubzonaMath(null); window.history.pushState({}, '', '/math_world'); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#333', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '20px', fontWeight: 'bold' }}>
                         <Home size={20} /> Volver a Math World
                     </button>
                     <div style={{ textAlign: 'center', marginBottom: '40px' }}>
@@ -1383,7 +1413,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '25px', maxWidth: '860px', margin: '0 auto', paddingBottom: '40px' }}>
                         <div
-                            onClick={() => setJuegoActivo({ tipoJuego: 'MATES_OAOA' })}
+                            onClick={() => { window.history.pushState({}, '', '/primaria/oaoa'); setJuegoActivo({ tipoJuego: 'MATES_OAOA' }); }}
                             style={{ background: '#E0F2F1', borderRadius: '20px', padding: '30px 20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s', border: '3px solid #009688' }}
                             onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
                             onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
@@ -1393,7 +1423,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                             <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>Aprende las 4 operaciones básicas paso a paso con algoritmos abiertos.</p>
                         </div>
                         <div
-                            onClick={() => setJuegoActivo({ tipoJuego: 'FERIA_MATES', primaria: true })}
+                            onClick={() => { window.history.pushState({}, '', '/primaria/feria'); setJuegoActivo({ tipoJuego: 'FERIA_MATES', primaria: true }); }}
                             style={{ background: '#FFF3E0', borderRadius: '20px', padding: '30px 20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s', border: '3px solid #e67e22' }}
                             onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
                             onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
@@ -1403,7 +1433,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                             <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>¡Supera operaciones al estilo OAOA antes de que se acabe el tiempo!</p>
                         </div>
                         <div
-                            onClick={() => setJuegoActivo({ tipoJuego: 'DIVISIBILIDAD' })}
+                            onClick={() => { window.history.pushState({}, '', '/primaria/divisibilidad'); setJuegoActivo({ tipoJuego: 'DIVISIBILIDAD' }); }}
                             style={{ background: '#F3E5F5', borderRadius: '20px', padding: '30px 20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s', border: '3px solid #7B1FA2' }}
                             onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
                             onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
@@ -1438,7 +1468,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '25px', maxWidth: '900px', margin: '0 auto', paddingBottom: '40px' }}>
                     {/* Tarjeta Primaria */}
                     <div
-                        onClick={() => setSubzonaMath('PRIMARIA')}
+                        onClick={() => { setSubzonaMath('PRIMARIA'); window.history.pushState({}, '', '/primaria'); }}
                         style={{ background: '#E8F5E9', borderRadius: '20px', padding: '30px 20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s', border: '3px solid #4CAF50' }}
                         onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
                         onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
@@ -1468,7 +1498,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                                     🧠 Cálculo Mental
                                 </button>
                                 <button
-                                    onClick={() => setJuegoActivo({ tipoJuego: 'FERIA_MATES' })}
+                                    onClick={() => { window.history.pushState({}, '', '/feria'); setJuegoActivo({ tipoJuego: 'FERIA_MATES' }); }}
                                     onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.03)'}
                                     onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
                                     style={{ border: 'none', borderRadius: 12, padding: '11px 0', cursor: 'pointer', fontWeight: 800, fontSize: '0.95rem', background: '#e67e22', color: 'white', transition: 'transform 0.15s', boxShadow: '0 4px 12px rgba(230,126,34,0.45)' }}>

@@ -96,13 +96,14 @@ function App() {
         'etiquetas','etiquetame',
         'geometrix','calculo','funciones','funciones2','geometria_analitica','geometriaanalitica',
         'ecuaciones','oca','domino','musica',
-        'algebra','polinomios','estadistica',
+        'algebra','polinomios','estadistica','probabilidad',
         'api','admin','login','app',
         'irregular_verbs','sistema_solar',
         'retos','conectapuntos','sudoku',
         'fisica',
+        'math_world','primaria','feria',
       ]);
-      if (slug && !RUTAS_RESERVADAS.has(slug) && !slug.startsWith('fisica/')) {
+      if (slug && !RUTAS_RESERVADAS.has(slug) && !slug.startsWith('fisica/') && !slug.startsWith('primaria/')) {
         // Check if it's a professor page slug
         getDocs(query(collection(db,'paginas_profesores'), where('slug','==',slug), where('publicada','==',true)))
           .then(snap => { if (!snap.empty) setPaginaTarget({ slug, uid: snap.docs[0].id }); })

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import sonidoCorrecto from './assets/correct-choice-43861.mp3';
 import sonidoFallo    from './assets/negative_beeps-6008.mp3';
-import fondoImg       from './assets/pantalla1.jpeg';
+import fondoImg       from './assets/pantalla5.jpeg';
 import TironCuerdaJuego from './TironCuerda';
 
 const COLORS = [

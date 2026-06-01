@@ -1318,7 +1318,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
         if (juegoActivo.tipoJuego === 'FERIA_MATES') return (
             <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#fff8f0', overflowY: 'auto' }}>
                 <button onClick={() => setJuegoActivo(null)} style={{ position: 'fixed', top: 14, left: 14, zIndex: 10000, background: '#e67e22', color: 'white', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>← Volver</button>
-                <JuegoFeriaOAOA />
+                <JuegoFeriaOAOA primaria={!!juegoActivo.primaria} />
             </div>
         );
         if (juegoActivo.tipoJuego === 'DIVISIBILIDAD') return (
@@ -1393,7 +1393,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                             <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>Aprende las 4 operaciones básicas paso a paso con algoritmos abiertos.</p>
                         </div>
                         <div
-                            onClick={() => setJuegoActivo({ tipoJuego: 'FERIA_MATES' })}
+                            onClick={() => setJuegoActivo({ tipoJuego: 'FERIA_MATES', primaria: true })}
                             style={{ background: '#FFF3E0', borderRadius: '20px', padding: '30px 20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s', border: '3px solid #e67e22' }}
                             onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
                             onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
@@ -1448,27 +1448,56 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                         <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>Juegos de cálculo: Método OAOA y Feria del Cálculo.</p>
                     </div>
 
-                    {APPS.filter(app => app.isMath).map(app => (
-                        <div
-                            key={app.id}
-                            onClick={() => {
-                                if (app.comingSoon) alert(`¡${app.name} está en desarrollo y llegará muy pronto! 🚀`);
-                                else abrirJuego(app.id);
-                            }}
-                            style={{
-                                background: app.comingSoon ? '#f8f9fa' : '#E0F2F1',
-                                borderRadius: '20px', padding: '30px 20px', textAlign: 'center',
-                                cursor: app.comingSoon ? 'not-allowed' : 'pointer',
-                                boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s',
-                                opacity: app.comingSoon ? 0.7 : 1, border: `3px solid ${app.comingSoon ? '#ddd' : app.color}`
-                            }}
-                        >
-                            <div style={{ fontSize: '50px', marginBottom: '15px', filter: app.comingSoon ? 'grayscale(100%)' : 'none' }}>{app.emoji}</div>
-                            <h3 style={{ margin: '0 0 10px 0', color: app.comingSoon ? '#7f8c8d' : app.color, fontSize: '1.4rem' }}>{app.name}</h3>
-                            <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>{app.desc}</p>
-                            {app.comingSoon && <span style={{ display: 'inline-block', marginTop: '15px', background: '#e0e0e0', color: '#555', padding: '5px 12px', borderRadius: '15px', fontSize: '0.8rem', fontWeight: 'bold' }}>Próximamente</span>}
-                        </div>
-                    ))}
+                    {APPS.filter(app => app.isMath).map(app => {
+                        if (app.id === 'CALCULO') return (
+                            <div key={app.id} style={{
+                                background: '#E0F2F1', borderRadius: '20px', padding: '22px 18px',
+                                boxShadow: '0 8px 20px rgba(0,0,0,0.1)', border: `3px solid ${app.color}`,
+                                display: 'flex', flexDirection: 'column', gap: 10,
+                            }}>
+                                <div style={{ textAlign: 'center', marginBottom: 4 }}>
+                                    <div style={{ fontSize: '44px', marginBottom: '8px' }}>🧠</div>
+                                    <h3 style={{ margin: '0 0 6px 0', color: app.color, fontSize: '1.3rem' }}>Cálculo</h3>
+                                    <p style={{ margin: 0, color: '#666', fontSize: '0.88rem' }}>{app.desc}</p>
+                                </div>
+                                <button
+                                    onClick={() => abrirJuego('CALCULO')}
+                                    onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.03)'}
+                                    onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                                    style={{ border: 'none', borderRadius: 12, padding: '11px 0', cursor: 'pointer', fontWeight: 800, fontSize: '0.95rem', background: app.color, color: 'white', transition: 'transform 0.15s', boxShadow: `0 4px 12px ${app.color}55` }}>
+                                    🧠 Cálculo Mental
+                                </button>
+                                <button
+                                    onClick={() => setJuegoActivo({ tipoJuego: 'FERIA_MATES' })}
+                                    onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.03)'}
+                                    onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                                    style={{ border: 'none', borderRadius: 12, padding: '11px 0', cursor: 'pointer', fontWeight: 800, fontSize: '0.95rem', background: '#e67e22', color: 'white', transition: 'transform 0.15s', boxShadow: '0 4px 12px rgba(230,126,34,0.45)' }}>
+                                    🎡 Feria del Cálculo
+                                </button>
+                            </div>
+                        );
+                        return (
+                            <div
+                                key={app.id}
+                                onClick={() => {
+                                    if (app.comingSoon) alert(`¡${app.name} está en desarrollo y llegará muy pronto! 🚀`);
+                                    else abrirJuego(app.id);
+                                }}
+                                style={{
+                                    background: app.comingSoon ? '#f8f9fa' : '#E0F2F1',
+                                    borderRadius: '20px', padding: '30px 20px', textAlign: 'center',
+                                    cursor: app.comingSoon ? 'not-allowed' : 'pointer',
+                                    boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s',
+                                    opacity: app.comingSoon ? 0.7 : 1, border: `3px solid ${app.comingSoon ? '#ddd' : app.color}`
+                                }}
+                            >
+                                <div style={{ fontSize: '50px', marginBottom: '15px', filter: app.comingSoon ? 'grayscale(100%)' : 'none' }}>{app.emoji}</div>
+                                <h3 style={{ margin: '0 0 10px 0', color: app.comingSoon ? '#7f8c8d' : app.color, fontSize: '1.4rem' }}>{app.name}</h3>
+                                <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>{app.desc}</p>
+                                {app.comingSoon && <span style={{ display: 'inline-block', marginTop: '15px', background: '#e0e0e0', color: '#555', padding: '5px 12px', borderRadius: '15px', fontSize: '0.8rem', fontWeight: 'bold' }}>Próximamente</span>}
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
         );

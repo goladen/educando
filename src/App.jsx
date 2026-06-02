@@ -16,6 +16,8 @@ import AnnotationOverlay from './components/AnnotationOverlay';
 import HerramientasClase from './GestionAula';
 import MiniAppViewer from './components/MiniAppViewer';
 import TrivialEnvioForm from './components/TrivialEnvioForm';
+import PartesPlantaGame from './PartesPlanta';
+import EtiquetaMe from './EtiquetaMe';
 
 const TUTORIAL_ALUMNO = [
     {
@@ -80,11 +82,13 @@ function App() {
       if (uid) { setPaginaTarget({ uid }); return; }
       const slug = window.location.pathname.replace(/^\//, '').replace(/\/$/, '').trim().toLowerCase();
       if (slug === 'funcionesejecutivas' || slug === 'irregular_verbs' || slug === 'sistema_solar'
-          || slug === 'retos' || slug === 'conectapuntos' || slug === 'sudoku') {
+          || slug === 'retos' || slug === 'conectapuntos' || slug === 'sudoku'
+          || slug === 'partes_planta' || slug === 'etiquetame') {
         setRutaPublica(slug);
         return;
       }
       const RUTAS_RESERVADAS = new Set([
+        'partes_planta',
         'populares','inicio',
         'pasapalabra','cazaburbujas','burbujas',
         'pikatron','pikatron_2','plataformas',
@@ -227,6 +231,8 @@ function App() {
         </>
     );
 
+    if (rutaPublica === 'partes_planta') return <PartesPlantaGame onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
+    if (rutaPublica === 'etiquetame') return <EtiquetaMe onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
     if (rutaPublica === 'funcionesejecutivas') return <><FuncionesEjecutivas onBack={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'irregular_verbs') return <><IrregularVerbsTest />{anotadorUI}</>;
     if (rutaPublica === 'sistema_solar') return <><SolarSystemViewer onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;

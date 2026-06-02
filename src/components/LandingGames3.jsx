@@ -1087,6 +1087,11 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
             return;
         }
 
+        if (appId === 'ETIQUETAS') {
+            setJuegoActivo({ tipoJuego: 'ETIQUETAS' });
+            return;
+        }
+
         const appInfo = APPS.find(a => a.id === appId);
         if (appInfo) {
             window.history.pushState({}, '', `/${appInfo.name.toLowerCase()}`);

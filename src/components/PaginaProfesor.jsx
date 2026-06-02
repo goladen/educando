@@ -101,15 +101,18 @@ function JuegoCard({ juegoId, color }) {
 // ─── Convierte cualquier URL de presentación en URL embebible ────────────────
 function getPresentacionEmbed(url) {
   if (!url) return null;
-  // Google Slides: /pub?… → ya es embebible; /edit o /present → convertir
-  const gsMatch = url.match(/docs\.google\.com\/presentation\/d\/([^/]+)/);
-  if (gsMatch) {
-    // Si ya es /pub devolvemos tal cual (puede tener ?start=false&loop=false&delayms=…)
-    if (url.includes('/pub')) return url.includes('output=embed') ? url : url + (url.includes('?') ? '&' : '?') + 'output=embed';
-    return `https://docs.google.com/presentation/d/${gsMatch[1]}/embed?start=false&loop=false&delayms=3000`;
+  if (!url.includes('docs.google.com/presentation')) {
+    // PPTX directo o OneDrive → Office Online viewer
+    return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`;
   }
-  // PPTX directo o OneDrive → Office Online viewer
-  return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`;
+  // URLs ya listas para embed (pubembed o embed directo)
+  if (url.includes('/pubembed') || url.includes('/embed')) return url;
+  // URLs /pub → añadir output=embed si falta
+  if (url.includes('/pub')) return url.includes('output=embed') ? url : url + (url.includes('?') ? '&' : '?') + 'output=embed';
+  // URLs /edit o /present → construir URL embed con el ID correcto
+  const idMatch = url.match(/\/presentation\/d\/([^/?#]+)/);
+  if (idMatch) return `https://docs.google.com/presentation/d/${idMatch[1]}/embed?start=false&loop=false&delayms=3000`;
+  return null;
 }
 
 // ─── Tarjeta de tarea ─────────────────────────────────────────────────────────
@@ -198,7 +201,7 @@ function TareaCard({ tarea, color }) {
           </div>
           <iframe src={pptxEmbed} title="Presentación"
             style={{ flex:1, width:'100%', border:'none', display:'block' }}
-            allow="fullscreen" allowFullScreen/>
+            allow="fullscreen"/>
         </div>
       )}
 

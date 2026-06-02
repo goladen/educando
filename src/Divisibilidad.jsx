@@ -4,6 +4,7 @@ import sonidoFallo    from './assets/negative_beeps-6008.mp3';
 import sonidoInicio   from './assets/inicio-juego.mp3';
 import { db } from './firebase';
 import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
+import DescubreMates from './DescubreMates';
 
 // ── Modal Enviar al Profesor ──────────────────────────────────────────────────
 function ModalEnviarProfe({ datos, onClose }) {
@@ -144,6 +145,16 @@ function App() {
   const [intentosDiv,    setIntDiv]    = useState(0);
   const [mostrarEnvio,   setMostrarEnvio] = useState(false);
 
+  // --- ESTADOS: TABLA DE DIVISORES (era_div) ---
+  const [eraDivTargets,   setEraDivTargets]   = useState([]);
+  const [eraDivRound,     setEraDivRound]     = useState(0);
+  const [eraDivMarked,    setEraDivMarked]    = useState(new Set());
+  const [eraDivPar,       setEraDivPar]       = useState(null);   // 'par'|'impar'
+  const [eraDivPrimo,     setEraDivPrimo]     = useState(null);   // 'primo'|'compuesto'
+  const [eraDivCuadrado,  setEraDivCuadrado]  = useState(null);   // true|false
+  const [eraDivChecked,   setEraDivChecked]   = useState(false);
+  const [eraDivResults,   setEraDivResults]   = useState([]);
+
   // --- EFECTO: CUENTA ATRÁS GLOBAL ---
   useEffect(() => {
     if (countdown === null) return;
@@ -179,6 +190,13 @@ function App() {
 
   // --- AUXILIAR: MEZCLAR ARRAYS ---
   const shuffleArray = (arr) => [...arr].sort(() => Math.random() - 0.5);
+
+  // --- AUXILIARES: TABLA DE DIVISORES ---
+  const getDivisors = (n) => Array.from({ length: n }, (_, i) => i + 1).filter(i => n % i === 0);
+  const esPrimo = (n) => { if (n < 2) return false; for (let i = 2; i <= Math.sqrt(n); i++) if (n % i === 0) return false; return true; };
+  const esCuadradoPerfecto = (n) => Number.isInteger(Math.sqrt(n));
+
+  const ERA_DIV_POOL = [12, 15, 16, 18, 20, 21, 24, 25, 28, 30, 35, 36, 40, 42, 45, 48, 49, 50, 60, 72];
 
   // --- INICIALIZADORES DE JUEGOS ---
   const startCriba = () => {
@@ -303,6 +321,60 @@ function App() {
     audioStart.current.currentTime = 0; audioStart.current.play();
     setCountdown(3);
     setView('divisors');
+  };
+
+  const startEraDivisores = () => {
+    const pool = shuffleArray(ERA_DIV_POOL).slice(0, 5);
+    setEraDivTargets(pool);
+    setEraDivRound(0);
+    setEraDivMarked(new Set());
+    setEraDivPar(null); setEraDivPrimo(null); setEraDivCuadrado(null);
+    setEraDivChecked(false); setEraDivResults([]);
+    setView('era_div');
+  };
+
+  const handleEraDivCellClick = (num) => {
+    if (eraDivChecked) return;
+    const target = eraDivTargets[eraDivRound];
+    if (num === target) return; // always auto-counted, just highlighted
+    setEraDivMarked(prev => {
+      const next = new Set(prev);
+      if (next.has(num)) next.delete(num); else next.add(num);
+      return next;
+    });
+  };
+
+  const handleEraDivComprobar = () => {
+    const target = eraDivTargets[eraDivRound];
+    const correctDivSet = new Set(getDivisors(target));
+    // target cell is auto-included: player only needs to mark divisors 1..target-1
+    const correctOtros = new Set([...correctDivSet].filter(d => d !== target));
+    const extraMarcados = [...eraDivMarked].filter(n => !correctDivSet.has(n)).length;
+    const faltan = [...correctOtros].filter(n => !eraDivMarked.has(n)).length;
+
+    const parCorr = target % 2 === 0 ? eraDivPar === 'par' : eraDivPar === 'impar';
+    const primoCorr = esPrimo(target) ? eraDivPrimo === 'primo' : eraDivPrimo === 'compuesto';
+    const cuadradoCorr = esCuadradoPerfecto(target) ? eraDivCuadrado === true : eraDivCuadrado === false;
+    const divisoresPerf = extraMarcados === 0 && faltan === 0;
+
+    setEraDivResults(prev => [...prev, {
+      target, correctDivs: [...correctDivSet], marked: [...eraDivMarked],
+      extraMarcados, faltan, parCorr, primoCorr, cuadradoCorr, divisoresPerf,
+      parAns: eraDivPar, primoAns: eraDivPrimo, cuadradoAns: eraDivCuadrado
+    }]);
+    setEraDivChecked(true);
+    const todo = divisoresPerf && parCorr && primoCorr && cuadradoCorr;
+    if (todo) { audioOk.current.currentTime = 0; audioOk.current.play(); }
+    else { audioFail.current.currentTime = 0; audioFail.current.play(); }
+  };
+
+  const handleEraDivSiguiente = () => {
+    const next = eraDivRound + 1;
+    if (next >= 5) { setView('era_div_resumen'); return; }
+    setEraDivRound(next);
+    setEraDivMarked(new Set());
+    setEraDivPar(null); setEraDivPrimo(null); setEraDivCuadrado(null);
+    setEraDivChecked(false);
   };
 
   // --- MANEJADORES DE CLICKS ---
@@ -547,6 +619,20 @@ function App() {
               <span style={{ fontSize: '14px', marginTop: '10px', fontWeight: 'normal' }}>Divisores de grandes números aleatorios</span>
             </button>
           </div>
+          <button
+            style={{ ...mainButtonStyle, backgroundColor: '#c05621', marginTop: 25, width: '100%', maxWidth: 800, flexDirection: 'row', gap: 16 }}
+            onClick={startEraDivisores}
+          >
+            <span>🗂️ Tabla de los 100: Divisores</span>
+            <span style={{ fontSize: '14px', fontWeight: 'normal' }}>Marca los divisores en la tabla del 1 al 100 · 5 rondas</span>
+          </button>
+          <button
+            style={{ ...mainButtonStyle, backgroundColor: '#2d6a4f', marginTop: 14, width: '100%', maxWidth: 800, flexDirection: 'row', gap: 16 }}
+            onClick={() => setView('descubre')}
+          >
+            <span>🔍 Descubre Primos, Cuadrados y Pares</span>
+            <span style={{ fontSize: '14px', fontWeight: 'normal' }}>Fichas arrastrables + lazo · 5 rondas cada juego</span>
+          </button>
         </>
       )}
 
@@ -737,6 +823,197 @@ function App() {
           </div>
         </div>
       )}
+      {/* --- DESCUBRE PRIMOS, CUADRADOS Y PARES --- */}
+      {view === 'descubre' && (
+        <DescubreMates onBack={() => setView('menu')} />
+      )}
+
+      {/* --- TABLA DE DIVISORES (era_div) --- */}
+      {(view === 'era_div' || view === 'era_div_resumen') && (() => {
+        const target = eraDivTargets[eraDivRound] || 0;
+        const correctDivSet = new Set(getDivisors(target));
+        const correctOtros = new Set([...correctDivSet].filter(d => d !== target));
+
+        const btnQ = (activo, onClick, label, color) => (
+          <button onClick={onClick} style={{
+            padding: '10px 20px', borderRadius: 10, border: `2px solid ${color}`,
+            background: activo ? color : 'white', color: activo ? 'white' : color,
+            fontWeight: 700, fontSize: '1rem', cursor: 'pointer', transition: 'all 0.15s',
+          }}>{label}</button>
+        );
+
+        const canComprobar = eraDivPar && eraDivPrimo && eraDivCuadrado !== null;
+
+        const getCellStyle = (num) => {
+          const isTarget = num === target;
+          const isMarked = eraDivMarked.has(num);
+          const isDiv = correctDivSet.has(num);
+
+          if (isTarget) return {
+            ...cellStyle, height: 40, fontSize: '16px',
+            background: 'linear-gradient(135deg,#744210,#c05621)',
+            color: 'white', border: '3px solid #c05621',
+            boxShadow: '0 0 0 3px rgba(192,86,33,0.35)', transform: 'scale(1.05)', zIndex: 1,
+          };
+          if (!eraDivChecked) {
+            if (isMarked) return { ...cellStyle, height: 40, fontSize: '16px', background: '#c6f6d5', border: '2px solid #48bb78', color: '#22543d', fontWeight: 900 };
+            return { ...cellStyle, height: 40, fontSize: '15px' };
+          }
+          // After comprobar
+          if (isMarked && isDiv) return { ...cellStyle, height: 40, fontSize: '16px', background: '#c6f6d5', border: '2px solid #48bb78', color: '#22543d', fontWeight: 900 };
+          if (isMarked && !isDiv) return { ...cellStyle, height: 40, fontSize: '16px', background: '#fed7d7', border: '2px solid #f56565', color: '#742a2a', fontWeight: 900 };
+          if (!isMarked && correctOtros.has(num)) return { ...cellStyle, height: 40, fontSize: '16px', background: '#fefcbf', border: '2px solid #d69e2e', color: '#744210', fontWeight: 900 };
+          return { ...cellStyle, height: 40, fontSize: '15px' };
+        };
+
+        if (view === 'era_div_resumen') {
+          const total = eraDivResults.reduce((s, r) => s + (r.divisoresPerf ? 1 : 0) + (r.parCorr ? 1 : 0) + (r.primoCorr ? 1 : 0) + (r.cuadradoCorr ? 1 : 0), 0);
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+              <h2 style={{ ...headerStyle, fontSize: '28px' }}>📊 Resumen de la partida</h2>
+              <div style={{ background: 'white', borderRadius: 16, padding: '24px 30px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', maxWidth: 760, width: '100%', marginBottom: 24 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr 1fr 1fr', gap: '10px 16px', alignItems: 'center' }}>
+                  <div style={{ fontWeight: 800, color: '#4a5568', fontSize: '0.85rem' }}>NÚMERO</div>
+                  <div style={{ fontWeight: 800, color: '#4a5568', fontSize: '0.85rem', textAlign: 'center' }}>DIVISORES</div>
+                  <div style={{ fontWeight: 800, color: '#4a5568', fontSize: '0.85rem', textAlign: 'center' }}>PAR/IMPAR</div>
+                  <div style={{ fontWeight: 800, color: '#4a5568', fontSize: '0.85rem', textAlign: 'center' }}>PRIMO/COMP.</div>
+                  <div style={{ fontWeight: 800, color: '#4a5568', fontSize: '0.85rem', textAlign: 'center' }}>CUADRADO</div>
+                  {eraDivResults.map((r, i) => {
+                    const isPar = r.target % 2 === 0;
+                    const isPrime = esPrimo(r.target);
+                    const isCuad = esCuadradoPerfecto(r.target);
+                    return (<React.Fragment key={i}>
+                      <div style={{ fontWeight: 900, fontSize: '1.5rem', color: '#c05621' }}>{r.target}</div>
+                      <div style={{ textAlign: 'center' }}>
+                        {r.divisoresPerf ? <span style={{ color: '#38a169', fontSize: '1.4rem' }}>✓</span> : <span style={{ color: '#e53e3e', fontSize: '1.4rem' }}>✗</span>}
+                        {!r.divisoresPerf && <div style={{ fontSize: '0.7rem', color: '#718096' }}>Faltan: {r.correctDivs.filter(d => d !== r.target && !r.marked.includes(d)).join(', ') || '—'} {r.extraMarcados > 0 ? `· Extra: ${r.marked.filter(n => !r.correctDivs.includes(n)).join(', ')}` : ''}</div>}
+                        {r.divisoresPerf && <div style={{ fontSize: '0.7rem', color: '#718096' }}>{r.correctDivs.join(', ')}</div>}
+                      </div>
+                      <div style={{ textAlign: 'center' }}>
+                        {r.parCorr ? <span style={{ color: '#38a169', fontSize: '1.4rem' }}>✓</span> : <span style={{ color: '#e53e3e', fontSize: '1.4rem' }}>✗</span>}
+                        <div style={{ fontSize: '0.75rem', color: '#718096' }}>{isPar ? 'Par' : 'Impar'}</div>
+                      </div>
+                      <div style={{ textAlign: 'center' }}>
+                        {r.primoCorr ? <span style={{ color: '#38a169', fontSize: '1.4rem' }}>✓</span> : <span style={{ color: '#e53e3e', fontSize: '1.4rem' }}>✗</span>}
+                        <div style={{ fontSize: '0.75rem', color: '#718096' }}>{isPrime ? 'Primo' : 'Compuesto'}</div>
+                      </div>
+                      <div style={{ textAlign: 'center' }}>
+                        {r.cuadradoCorr ? <span style={{ color: '#38a169', fontSize: '1.4rem' }}>✓</span> : <span style={{ color: '#e53e3e', fontSize: '1.4rem' }}>✗</span>}
+                        <div style={{ fontSize: '0.75rem', color: '#718096' }}>{isCuad ? 'Sí' : 'No'}</div>
+                      </div>
+                    </React.Fragment>);
+                  })}
+                </div>
+                <div style={{ marginTop: 20, textAlign: 'center', fontSize: '1.3rem', fontWeight: 800, color: '#2d3748' }}>
+                  Puntuación total: <span style={{ color: total >= 16 ? '#38a169' : total >= 10 ? '#d69e2e' : '#e53e3e', fontSize: '1.8rem' }}>{total}</span> / 20
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', justifyContent: 'center' }}>
+                <button style={{ ...backButtonStyle, backgroundColor: '#c05621', marginBottom: 0 }} onClick={startEraDivisores}>🔄 Jugar de nuevo</button>
+                <button style={{ ...backButtonStyle, marginBottom: 0 }} onClick={() => setView('menu')}>⬅️ Menú</button>
+              </div>
+            </div>
+          );
+        }
+
+        // Playing view
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+            <style>{`@keyframes pulseTarget { 0%,100%{box-shadow:0 0 0 4px rgba(192,86,33,0.4)} 50%{box-shadow:0 0 0 8px rgba(192,86,33,0.15)} }`}</style>
+            <button style={backButtonStyle} onClick={() => setView('menu')}>⬅️ Volver al Menú</button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 30, marginBottom: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
+              <div style={{ fontSize: '1.1rem', color: '#718096', fontWeight: 700 }}>Ronda {eraDivRound + 1} / 5</div>
+              <div style={{ background: '#fffaf0', border: '3px solid #c05621', borderRadius: 14, padding: '10px 26px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ color: '#744210', fontSize: '1.05rem', fontWeight: 700 }}>Marca los divisores de:</span>
+                <span style={{ color: '#c05621', fontSize: '2.2rem', fontWeight: 900, lineHeight: 1 }}>{target}</span>
+              </div>
+              <div style={{ fontSize: '0.9rem', color: '#a0aec0' }}>({[...eraDivMarked].length} marcados)</div>
+            </div>
+
+            {/* 10×10 grid */}
+            <div style={{ position: 'relative', maxWidth: 600, width: '100%', marginBottom: 18 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: 5, background: 'white', padding: 14, borderRadius: 14, boxShadow: '0 10px 25px rgba(0,0,0,0.08)' }}>
+                {Array.from({ length: 100 }, (_, i) => i + 1).map(num => (
+                  <div key={num} onClick={() => handleEraDivCellClick(num)} style={{ ...getCellStyle(num), position: 'relative', animation: num === target ? 'pulseTarget 1.8s ease-in-out infinite' : 'none' }}>
+                    {num}
+                    {eraDivChecked && eraDivMarked.has(num) && correctDivSet.has(num) && <span style={{ position: 'absolute', top: 1, right: 2, fontSize: 9, lineHeight: 1 }}>✓</span>}
+                    {eraDivChecked && eraDivMarked.has(num) && !correctDivSet.has(num) && <span style={{ position: 'absolute', top: 1, right: 2, fontSize: 9, lineHeight: 1 }}>✗</span>}
+                    {eraDivChecked && !eraDivMarked.has(num) && correctOtros.has(num) && <span style={{ position: 'absolute', top: 1, right: 2, fontSize: 9, lineHeight: 1 }}>!</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Leyenda */}
+            {eraDivChecked && (
+              <div style={{ display: 'flex', gap: 16, marginBottom: 12, flexWrap: 'wrap', justifyContent: 'center', fontSize: '0.82rem' }}>
+                <span style={{ color: '#22543d' }}>🟩 Correcto</span>
+                <span style={{ color: '#742a2a' }}>🟥 No es divisor</span>
+                <span style={{ color: '#744210' }}>🟨 Te faltó marcar</span>
+                <span style={{ color: '#c05621' }}>🟫 Número objetivo (siempre divisor de sí mismo)</span>
+              </div>
+            )}
+
+            {/* Preguntas */}
+            <div style={{ background: 'white', borderRadius: 14, padding: '18px 24px', boxShadow: '0 4px 14px rgba(0,0,0,0.07)', maxWidth: 600, width: '100%', display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <span style={{ fontWeight: 700, color: '#2d3748', minWidth: 180 }}>¿Es par o impar?</span>
+                {btnQ(eraDivPar === 'par', () => !eraDivChecked && setEraDivPar('par'), 'Par', '#3182ce')}
+                {btnQ(eraDivPar === 'impar', () => !eraDivChecked && setEraDivPar('impar'), 'Impar', '#718096')}
+                {eraDivChecked && <span style={{ fontSize: '1.2rem' }}>{eraDivResults[eraDivResults.length-1]?.parCorr ? '✅' : `❌ Es ${target % 2 === 0 ? 'par' : 'impar'}`}</span>}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <span style={{ fontWeight: 700, color: '#2d3748', minWidth: 180 }}>¿Es primo o compuesto?</span>
+                {btnQ(eraDivPrimo === 'primo', () => !eraDivChecked && setEraDivPrimo('primo'), 'Primo', '#38a169')}
+                {btnQ(eraDivPrimo === 'compuesto', () => !eraDivChecked && setEraDivPrimo('compuesto'), 'Compuesto', '#805ad5')}
+                {eraDivChecked && <span style={{ fontSize: '1.2rem' }}>{eraDivResults[eraDivResults.length-1]?.primoCorr ? '✅' : `❌ Es ${esPrimo(target) ? 'primo' : 'compuesto'}`}</span>}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <span style={{ fontWeight: 700, color: '#2d3748', minWidth: 180 }}>¿Es cuadrado perfecto?</span>
+                {btnQ(eraDivCuadrado === true, () => !eraDivChecked && setEraDivCuadrado(true), 'Sí', '#d69e2e')}
+                {btnQ(eraDivCuadrado === false, () => !eraDivChecked && setEraDivCuadrado(false), 'No', '#718096')}
+                {eraDivChecked && <span style={{ fontSize: '1.2rem' }}>{eraDivResults[eraDivResults.length-1]?.cuadradoCorr ? '✅' : `❌ ${esCuadradoPerfecto(target) ? `Sí (${Math.round(Math.sqrt(target))}²)` : 'No'}`}</span>}
+              </div>
+            </div>
+
+            {/* Feedback tras comprobar */}
+            {eraDivChecked && (() => {
+              const res = eraDivResults[eraDivResults.length - 1];
+              const score = (res.divisoresPerf ? 1 : 0) + (res.parCorr ? 1 : 0) + (res.primoCorr ? 1 : 0) + (res.cuadradoCorr ? 1 : 0);
+              const todo = score === 4;
+              return (
+                <div style={{ background: todo ? '#f0fff4' : '#fffaf0', border: `2px solid ${todo ? '#48bb78' : '#d69e2e'}`, borderRadius: 12, padding: '14px 22px', textAlign: 'center', maxWidth: 600, width: '100%', marginBottom: 14 }}>
+                  <div style={{ fontSize: '1.3rem', fontWeight: 800, color: todo ? '#22543d' : '#744210' }}>
+                    {todo ? '🌟 ¡Perfecto! 4/4' : `${score}/4 puntos`}
+                  </div>
+                  {!res.divisoresPerf && (
+                    <div style={{ fontSize: '0.88rem', color: '#718096', marginTop: 6 }}>
+                      Divisores de {res.target}: {res.correctDivs.join(', ')}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {!eraDivChecked ? (
+              <button
+                disabled={!canComprobar}
+                onClick={handleEraDivComprobar}
+                style={{ padding: '14px 40px', borderRadius: 12, border: 'none', background: canComprobar ? '#c05621' : '#e2e8f0', color: canComprobar ? 'white' : '#a0aec0', fontWeight: 800, fontSize: '1.1rem', cursor: canComprobar ? 'pointer' : 'default', transition: 'all 0.2s' }}>
+                ✔ Comprobar
+              </button>
+            ) : (
+              <button
+                onClick={handleEraDivSiguiente}
+                style={{ padding: '14px 40px', borderRadius: 12, border: 'none', background: '#c05621', color: 'white', fontWeight: 800, fontSize: '1.1rem', cursor: 'pointer' }}>
+                {eraDivRound < 4 ? '▶ Siguiente ronda' : '📊 Ver resumen'}
+              </button>
+            )}
+          </div>
+        );
+      })()}
+
       {mostrarEnvio && (
         <ModalEnviarProfe
           datos={{ aciertosPrimos, intentosPrimos, aciertosMult, intentosMult, aciertosDiv, intentosDiv }}

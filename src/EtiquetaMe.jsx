@@ -4,9 +4,10 @@ import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, addDoc 
 import {
     Search, Key, ChevronDown, ChevronUp, Filter,
     CheckCircle, XCircle, RotateCcw, ArrowLeft, Play,
-    Image as ImageIcon, Trophy, Shuffle
+    Image as ImageIcon, Trophy, Shuffle, Settings
 } from 'lucide-react';
 import Confetti from 'react-confetti';
+import PartesPlantaGame from './PartesPlanta';
 
 // ─────────────────────────────────────────────
 // HELPERS (mismos que LandingGames3)
@@ -84,19 +85,23 @@ function PantallaPresentacionEtiqueta({ presentacion, onEmpezar, onExit }) {
 export default function EtiquetaMe({ onExit, recurso: recursoInicial = null }) {
     // Si llega recurso desde LandingGames, saltamos la busqueda
     const [pantalla, setPantalla]           = useState(() => {
-        if (!recursoInicial) return 'BUSQUEDA';
+        if (!recursoInicial || !(recursoInicial.hojas?.length)) return 'BUSQUEDA';
         if (recursoInicial.presentacion?.titulo) return 'PRESENTACION';
-        return (recursoInicial.hojas?.length || 0) <= 1 ? 'JUGANDO' : 'ELECCION';
+        return recursoInicial.hojas.length <= 1 ? 'JUGANDO' : 'ELECCION';
     });
-    const [recursoActivo, setRecursoActivo] = useState(recursoInicial);
+    const [recursoActivo, setRecursoActivo] = useState(recursoInicial?.hojas?.length ? recursoInicial : null);
     const [hojaActiva, setHojaActiva]       = useState(() => {
-        if (!recursoInicial) return null;
-        if ((recursoInicial.hojas?.length || 0) === 1) return recursoInicial.hojas[0];
+        if (!recursoInicial?.hojas?.length) return null;
+        if (recursoInicial.hojas.length === 1) return recursoInicial.hojas[0];
         return null;
     });
 
     const volverBusqueda = () => { setPantalla('BUSQUEDA'); setRecursoActivo(null); setHojaActiva(null); };
     const volverEleccion = () => { setPantalla('ELECCION'); setHojaActiva(null); };
+
+    if (pantalla === 'PARTESPLANTA') {
+        return <PartesPlantaGame onExit={volverBusqueda} />;
+    }
 
     const elegirRecurso = (r) => {
         setRecursoActivo(r);
@@ -162,19 +167,28 @@ export default function EtiquetaMe({ onExit, recurso: recursoInicial = null }) {
         );
     }
 
-    return <PantallaBusqueda onElegir={elegirRecurso} onExit={onExit} />;
+    return <PantallaBusqueda onElegir={elegirRecurso} onExit={onExit} onPartesPlanta={() => setPantalla('PARTESPLANTA')} />;
 }
 
 // ─────────────────────────────────────────────
 // PANTALLA 1 — BUSCADOR
 // ─────────────────────────────────────────────
-function PantallaBusqueda({ onElegir, onExit }) {
+function PantallaBusqueda({ onElegir, onExit, onPartesPlanta }) {
     const [modoBusqueda, setModoBusqueda]       = useState('FILTROS');
     const [codigo, setCodigo]                   = useState('');
     const [filtros, setFiltros]                 = useState({ tema: '', ciclo: '', pais: '', region: '', poblacion: '', autor: '' });
     const [mostrarMas, setMostrarMas]           = useState(false);
     const [buscando, setBuscando]               = useState(false);
     const [resultados, setResultados]           = useState([]);
+    const [linkCopiado, setLinkCopiado]         = useState(false);
+
+    const copiarLink = () => {
+        const url = `${window.location.origin}/etiquetame`;
+        navigator.clipboard.writeText(url).then(() => {
+            setLinkCopiado(true);
+            setTimeout(() => setLinkCopiado(false), 2500);
+        }).catch(() => {});
+    };
 
     const buscar = async () => {
         setBuscando(true);
@@ -224,15 +238,56 @@ function PantallaBusqueda({ onElegir, onExit }) {
                         <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.7)' }}>Aprende etiquetando imágenes</div>
                     </div>
                 </div>
-                {onExit && (
-                    <button onClick={onExit} style={st.btnSalir}>
-                        <ArrowLeft size={16} /> Salir
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <button onClick={copiarLink} style={{ ...st.btnSalir, background: linkCopiado ? 'rgba(74,222,128,0.25)' : 'rgba(255,255,255,0.15)', borderColor: linkCopiado ? '#4ade80' : 'rgba(255,255,255,0.3)', minWidth: 44 }}>
+                        {linkCopiado ? <><CheckCircle size={15} /> ¡Copiado!</> : <><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg> Compartir</>}
                     </button>
-                )}
+                    {onExit && (
+                        <button onClick={onExit} style={st.btnSalir}>
+                            <ArrowLeft size={16} /> Salir
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {/* Tarjeta modelo — Partes de la Planta */}
+            <div style={{ maxWidth: 860, margin: '20px auto 0', width: 'calc(100% - 32px)' }}>
+                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 8 }}>
+                    ✨ Juego de ejemplo
+                </div>
+                <div
+                    onClick={onPartesPlanta}
+                    style={{
+                        background: 'linear-gradient(135deg,#166534 0%,#16a34a 60%,#4ade80 100%)',
+                        borderRadius: 16, padding: '18px 22px', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: 18,
+                        boxShadow: '0 8px 28px rgba(0,0,0,0.35)',
+                        border: '2px solid rgba(255,255,255,0.15)',
+                        transition: 'transform 0.15s',
+                    }}
+                >
+                    <div style={{ fontSize: '3.5rem', flexShrink: 0, lineHeight: 1 }}>🌱</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 900, fontSize: '1.15rem', color: 'white', marginBottom: 3 }}>
+                            Partes de la Planta
+                        </div>
+                        <div style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.8)', marginBottom: 8 }}>
+                            Arrastra las etiquetas a su lugar · 3 niveles · 3 idiomas
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            {['Primaria','Arrastrar etiquetas','Ejemplo del juego'].map(tag => (
+                                <span key={tag} style={{ background: 'rgba(255,255,255,0.2)', color: 'white', borderRadius: 20, padding: '2px 10px', fontSize: '0.72rem', fontWeight: 700 }}>{tag}</span>
+                            ))}
+                        </div>
+                    </div>
+                    <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 12, padding: '8px 16px', color: 'white', fontWeight: 800, fontSize: '0.9rem', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                        ▶ Jugar
+                    </div>
+                </div>
             </div>
 
             {/* Buscador */}
-            <div style={st.buscadorCard}>
+            <div style={{ ...st.buscadorCard, marginTop: 16 }}>
                 <h3 style={{ margin: '0 0 18px', color: '#2c3e50', display: 'flex', alignItems: 'center', gap: 8 }}>
                     <Search size={18} /> Encuentra un Diagrama
                 </h3>
@@ -471,13 +526,30 @@ function ModalEnviarProfe({ datos, onClose }) {
     );
 }
 
-function PantallaJuego({ recurso, hoja, onJugarDeNuevo, onCambiarDiagrama }) {
+function PantallaJuego({ recurso, hoja, onJugarDeNuevo, onCambiarDiagrama, onSalir }) {
     const markers  = hoja?.markers || [];
     const imageUrl = hoja?.imageUrl || '';
 
-    const [respuestas, setRespuestas] = useState({});
-    const [evaluacion, setEvaluacion] = useState(null);
+    const [modoJuego, setModoJuego]       = useState('ARRASTRAR');
+    const [showSettings, setShowSettings] = useState(false);
+    const [respuestas, setRespuestas]     = useState({});
+    const [evaluacion, setEvaluacion]     = useState(null);
     const [mostrarEnvio, setMostrarEnvio] = useState(false);
+    const [arrastrando, setArrastrando]   = useState(null);
+    const [etiquetasPool, setEtiquetasPool] = useState(() =>
+        [...markers].map(m => m.text).sort(() => Math.random() - 0.5)
+    );
+
+    const shufflePool = () =>
+        setEtiquetasPool([...markers].map(m => m.text).sort(() => Math.random() - 0.5));
+
+    const cambiarModo = (modo) => {
+        setModoJuego(modo);
+        setRespuestas({});
+        setEvaluacion(null);
+        setShowSettings(false);
+        shufflePool();
+    };
 
     const comprobar = () => {
         let aciertos = 0;
@@ -498,8 +570,21 @@ function PantallaJuego({ recurso, hoja, onJugarDeNuevo, onCambiarDiagrama }) {
     const reiniciar = () => {
         setRespuestas({});
         setEvaluacion(null);
+        shufflePool();
         onJugarDeNuevo();
     };
+
+    const handleDrop = (markerId) => {
+        if (!arrastrando || evaluacion) return;
+        const updated = { ...respuestas };
+        Object.keys(updated).forEach(k => { if (updated[k] === arrastrando) delete updated[k]; });
+        updated[markerId] = arrastrando;
+        setRespuestas(updated);
+        setArrastrando(null);
+    };
+
+    const etiquetasDisponibles = etiquetasPool.filter(t => !Object.values(respuestas).includes(t));
+    const todasColocadas = markers.every(m => respuestas[m.id]);
 
     if (!imageUrl || markers.length === 0) {
         return (
@@ -517,6 +602,7 @@ function PantallaJuego({ recurso, hoja, onJugarDeNuevo, onCambiarDiagrama }) {
         <div style={st.pagina}>
             {perfecto && <Confetti recycle={false} numberOfPieces={300} />}
 
+            {/* Header */}
             <div style={st.headerJuego}>
                 <button onClick={onCambiarDiagrama} style={st.btnVolver}>
                     <ArrowLeft size={15} /> Diagramas
@@ -525,17 +611,62 @@ function PantallaJuego({ recurso, hoja, onJugarDeNuevo, onCambiarDiagrama }) {
                     <div style={{ fontWeight: 900, fontSize: '1rem', color: 'white' }}>{recurso.titulo}</div>
                     <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.7)' }}>{hoja.nombreHoja}</div>
                 </div>
-                {evaluacion ? (
-                    <div style={st.notaHeader(evaluacion.nota)}>{evaluacion.nota.toFixed(2)}%</div>
-                ) : (
-                    <div style={{ width: 80 }} />
-                )}
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    {evaluacion && (
+                        <div style={st.notaHeader(evaluacion.nota)}>{evaluacion.nota.toFixed(2)}%</div>
+                    )}
+                    <button
+                        onClick={() => setShowSettings(s => !s)}
+                        title="Ajustes"
+                        style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: 36, height: 36, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}
+                    >
+                        <Settings size={18} />
+                    </button>
+                </div>
             </div>
+
+            {/* Settings modal */}
+            {showSettings && (
+                <div
+                    style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    onClick={() => setShowSettings(false)}
+                >
+                    <div
+                        style={{ background: 'white', borderRadius: 18, padding: '24px 28px', maxWidth: 340, width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <h3 style={{ margin: '0 0 16px', color: '#2c3e50', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: 7 }}>
+                            <Settings size={16} /> Modo de juego
+                        </h3>
+                        {[
+                            { key: 'ARRASTRAR', icon: '🖱️', label: 'Arrastrar etiquetas', desc: 'Arrastra las etiquetas a su lugar en la imagen' },
+                            { key: 'ESCRIBIR',  icon: '✏️', label: 'Escribir respuestas',  desc: 'Escribe el nombre en cada casilla' },
+                        ].map(opt => (
+                            <div key={opt.key}
+                                onClick={() => cambiarModo(opt.key)}
+                                style={{
+                                    padding: '12px 14px', borderRadius: 10, marginBottom: 8, cursor: 'pointer',
+                                    background: modoJuego === opt.key ? '#eaf4fd' : '#f8f9fa',
+                                    border: `2px solid ${modoJuego === opt.key ? '#3498db' : '#e0e0e0'}`,
+                                    transition: 'all 0.15s',
+                                }}
+                            >
+                                <div style={{ fontWeight: 'bold', color: '#2c3e50', marginBottom: 2 }}>{opt.icon} {opt.label}</div>
+                                <div style={{ fontSize: '0.78rem', color: '#888' }}>{opt.desc}</div>
+                            </div>
+                        ))}
+                        <button onClick={() => setShowSettings(false)}
+                            style={{ width: '100%', marginTop: 8, padding: '10px', borderRadius: 10, border: 'none', background: '#f0f0f0', cursor: 'pointer', fontWeight: 'bold', color: '#555' }}>
+                            Cerrar
+                        </button>
+                    </div>
+                </div>
+            )}
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px' }}>
                 <div style={{ maxWidth: 1000, margin: '0 auto' }}>
 
-                    {/* Wrapper con padding igual que el editor para que las etiquetas no se corten */}
+                    {/* Image wrapper */}
                     <div style={{
                         position: 'relative', display: 'inline-block', width: '100%',
                         background: 'white', borderRadius: 14,
@@ -548,23 +679,21 @@ function PantallaJuego({ recurso, hoja, onJugarDeNuevo, onCambiarDiagrama }) {
                             draggable="false"
                         />
 
-                        {/* Lienzo del profesor — base64 PNG superpuesto sobre la imagen */}
+                        {/* Paint overlay: mismo área que la imagen (dentro del padding de 60px) */}
                         {hoja.paintData && (
                             <img
                                 src={hoja.paintData}
                                 alt=""
                                 style={{
-                                    position: 'absolute', top: 0, left: 0,
-                                    width: '100%', height: '100%',
-                                    zIndex: 1,
-                                    pointerEvents: 'none',
-                                    borderRadius: 14,
+                                    position: 'absolute', top: 60, left: 60,
+                                    width: 'calc(100% - 120px)', height: 'auto',
+                                    zIndex: 1, pointerEvents: 'none',
                                 }}
                                 draggable="false"
                             />
                         )}
 
-                        {/* Lineas SVG con overflow visible */}
+                        {/* SVG lines */}
                         <svg style={{
                             position: 'absolute', top: 0, left: 0,
                             width: '100%', height: '100%',
@@ -589,7 +718,7 @@ function PantallaJuego({ recurso, hoja, onJugarDeNuevo, onCambiarDiagrama }) {
                             })}
                         </svg>
 
-                        {/* Puntos de anclaje */}
+                        {/* Anchor dots */}
                         {markers.map(m => {
                             const estado = evaluacion ? evaluacion.resultados[m.id] : null;
                             const color  = estado === true ? '#27ae60' : estado === false ? '#e74c3c' : '#e67e22';
@@ -606,71 +735,143 @@ function PantallaJuego({ recurso, hoja, onJugarDeNuevo, onCambiarDiagrama }) {
                             );
                         })}
 
-                        {/* Inputs en la posicion exacta labelX/labelY del profesor */}
+                        {/* Etiquetas: drop-zones (ARRASTRAR) o inputs (ESCRIBIR) */}
                         {markers.map((m, i) => {
-                            const estado      = evaluacion ? evaluacion.resultados[m.id] : null;
-                            const borderColor = estado === true ? '#27ae60' : estado === false ? '#e74c3c' : '#aaa';
-                            const bgColor     = estado === true ? '#e8f8f0' : estado === false ? '#fef0ef' : 'white';
-                            const displayVal  = (evaluacion && estado === false) ? m.text : (respuestas[m.id] || '');
-                            return (
-                                <div key={`label-${m.id}`} style={{
-                                    position: 'absolute',
-                                    left: `${m.labelX}%`, top: `${m.labelY}%`,
-                                    transform: 'translate(-50%, -50%)',
-                                    zIndex: 10,
-                                    display: 'flex', alignItems: 'center', gap: 4,
-                                    background: bgColor,
-                                    border: `2px solid ${borderColor}`,
-                                    borderRadius: 8,
-                                    boxShadow: '0 3px 10px rgba(0,0,0,0.2)',
-                                    padding: '3px 6px 3px 4px',
-                                    whiteSpace: 'nowrap',
-                                    transition: 'border-color 0.3s, background 0.3s',
-                                }}>
-                                    <div style={{
-                                        width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
-                                        background: borderColor, color: 'white',
-                                        fontWeight: 'bold', fontSize: 11,
-                                        display: 'flex', justifyContent: 'center', alignItems: 'center',
+                            const estado = evaluacion ? evaluacion.resultados[m.id] : null;
+
+                            if (modoJuego === 'ESCRIBIR') {
+                                const borderColor = estado === true ? '#27ae60' : estado === false ? '#e74c3c' : '#aaa';
+                                const bgColor     = estado === true ? '#e8f8f0' : estado === false ? '#fef0ef' : 'white';
+                                const displayVal  = (evaluacion && estado === false) ? m.text : (respuestas[m.id] || '');
+                                return (
+                                    <div key={`label-${m.id}`} style={{
+                                        position: 'absolute',
+                                        left: `${m.labelX}%`, top: `${m.labelY}%`,
+                                        transform: 'translate(-50%, -50%)',
+                                        zIndex: 10,
+                                        display: 'flex', alignItems: 'center', gap: 4,
+                                        background: bgColor, border: `2px solid ${borderColor}`,
+                                        borderRadius: 8, boxShadow: '0 3px 10px rgba(0,0,0,0.2)',
+                                        padding: '3px 6px 3px 4px', whiteSpace: 'nowrap',
+                                        transition: 'border-color 0.3s, background 0.3s',
                                     }}>
-                                        {i + 1}
+                                        <div style={{ width: 22, height: 22, borderRadius: '50%', flexShrink: 0, background: borderColor, color: 'white', fontWeight: 'bold', fontSize: 11, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                                            {i + 1}
+                                        </div>
+                                        {!evaluacion ? (
+                                            <input
+                                                type="text" placeholder="..."
+                                                value={respuestas[m.id] || ''}
+                                                onChange={e => setRespuestas({ ...respuestas, [m.id]: e.target.value })}
+                                                onKeyDown={e => e.key === 'Enter' && comprobar()}
+                                                style={{ border: 'none', outline: 'none', fontSize: 13, fontWeight: 'bold', background: 'transparent', color: '#2c3e50', width: `${Math.max(6, (respuestas[m.id]?.length || 0) + 3)}ch`, minWidth: 55, maxWidth: 160 }}
+                                            />
+                                        ) : (
+                                            <span style={{ fontSize: 13, fontWeight: 'bold', color: estado === true ? '#1a7a4a' : '#c0392b', padding: '1px 2px', minWidth: 40 }}>
+                                                {displayVal}
+                                            </span>
+                                        )}
+                                        {estado === true  && <CheckCircle size={14} color="#27ae60" />}
+                                        {estado === false && <XCircle     size={14} color="#e74c3c" />}
                                     </div>
-                                    {!evaluacion ? (
-                                        <input
-                                            type="text" placeholder="..."
-                                            value={respuestas[m.id] || ''}
-                                            onChange={e => setRespuestas({ ...respuestas, [m.id]: e.target.value })}
-                                            onKeyDown={e => e.key === 'Enter' && comprobar()}
-                                            style={{
-                                                border: 'none', outline: 'none',
-                                                fontSize: 13, fontWeight: 'bold',
-                                                background: 'transparent', color: '#2c3e50',
-                                                width: `${Math.max(6, (respuestas[m.id]?.length || 0) + 3)}ch`,
-                                                minWidth: 55, maxWidth: 160,
-                                            }}
-                                        />
+                                );
+                            }
+
+                            // ARRASTRAR — drop zone
+                            const texto    = respuestas[m.id] || null;
+                            const isFilled = Boolean(texto);
+                            const borderColor = estado === true ? '#27ae60' : estado === false ? '#e74c3c' : isFilled ? '#3498db' : '#bbb';
+                            const bgColor     = estado === true ? '#e8f8f0' : estado === false ? '#fef0ef' : isFilled ? '#eaf4fd' : 'rgba(255,255,255,0.92)';
+                            return (
+                                <div key={`zone-${m.id}`}
+                                    style={{
+                                        position: 'absolute',
+                                        left: `${m.labelX}%`, top: `${m.labelY}%`,
+                                        transform: 'translate(-50%, -50%)',
+                                        zIndex: 10,
+                                        minWidth: 80, padding: '5px 10px',
+                                        background: bgColor,
+                                        border: `2px ${isFilled ? 'solid' : 'dashed'} ${borderColor}`,
+                                        borderRadius: 8, boxShadow: '0 3px 10px rgba(0,0,0,0.15)',
+                                        display: 'flex', alignItems: 'center', gap: 4,
+                                        whiteSpace: 'nowrap', userSelect: 'none',
+                                        cursor: !evaluacion && isFilled ? 'pointer' : 'default',
+                                        transition: 'all 0.2s',
+                                    }}
+                                    onDragOver={e => e.preventDefault()}
+                                    onDrop={() => handleDrop(m.id)}
+                                    onClick={() => {
+                                        if (!evaluacion && isFilled) {
+                                            const updated = { ...respuestas };
+                                            delete updated[m.id];
+                                            setRespuestas(updated);
+                                        }
+                                    }}
+                                >
+                                    {isFilled ? (
+                                        <>
+                                            <span style={{ fontSize: 13, fontWeight: 'bold', color: estado === false ? '#c0392b' : '#2c3e50' }}>
+                                                {estado === false ? m.text : texto}
+                                            </span>
+                                            {estado === true  && <CheckCircle size={13} color="#27ae60" />}
+                                            {estado === false && <XCircle     size={13} color="#e74c3c" />}
+                                        </>
                                     ) : (
-                                        <span style={{
-                                            fontSize: 13, fontWeight: 'bold',
-                                            color: estado === true ? '#1a7a4a' : '#c0392b',
-                                            padding: '1px 2px', minWidth: 40,
-                                        }}>
-                                            {displayVal}
-                                        </span>
+                                        <span style={{ fontSize: 12, color: '#ccc', letterSpacing: 2 }}>···</span>
                                     )}
-                                    {estado === true  && <CheckCircle size={14} color="#27ae60" />}
-                                    {estado === false && <XCircle     size={14} color="#e74c3c" />}
                                 </div>
                             );
                         })}
                     </div>
 
-                    {/* Acciones debajo de la imagen */}
+                    {/* Banco de etiquetas (solo modo ARRASTRAR, antes de evaluar) */}
+                    {modoJuego === 'ARRASTRAR' && !evaluacion && (
+                        <div style={{
+                            marginTop: 16,
+                            background: 'rgba(255,255,255,0.08)',
+                            borderRadius: 14, padding: '14px 18px',
+                            border: '2px dashed rgba(255,255,255,0.25)',
+                        }}>
+                            <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
+                                Arrastra cada etiqueta a su casilla
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                                {etiquetasDisponibles.map((text, idx) => (
+                                    <div
+                                        key={idx}
+                                        draggable
+                                        onDragStart={() => setArrastrando(text)}
+                                        onDragEnd={() => setArrastrando(null)}
+                                        style={{
+                                            background: 'white', border: '3px solid #e2e8f0', borderBottomWidth: 5,
+                                            padding: '6px 16px', borderRadius: 12,
+                                            fontWeight: 800, fontSize: '0.95rem', color: '#475569',
+                                            cursor: 'grab', userSelect: 'none',
+                                            boxShadow: '0 3px 6px rgba(0,0,0,0.1)',
+                                            opacity: arrastrando === text ? 0.45 : 1,
+                                            transition: 'opacity 0.1s',
+                                        }}
+                                    >
+                                        {text}
+                                    </div>
+                                ))}
+                                {etiquetasDisponibles.length === 0 && (
+                                    <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.85rem', fontStyle: 'italic' }}>
+                                        ¡Todas colocadas! Pulsa Comprobar.
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Acciones */}
                     <div style={{ marginTop: 18, maxWidth: 460, margin: '18px auto 0' }}>
                         {!evaluacion ? (
-                            <button onClick={comprobar} style={st.btnComprobar}>
-                                <CheckCircle size={18} /> Comprobar
-                            </button>
+                            (modoJuego === 'ESCRIBIR' || todasColocadas) && (
+                                <button onClick={comprobar} style={st.btnComprobar}>
+                                    <CheckCircle size={18} /> Comprobar
+                                </button>
+                            )
                         ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                                 <div style={st.resultadoBox(evaluacion.nota)}>

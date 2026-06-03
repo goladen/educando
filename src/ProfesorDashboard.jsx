@@ -467,7 +467,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
     const generarCodigoAcceso = () => { const c = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let r = ''; for (let i = 0; i < 5; i++) r += c.charAt(Math.floor(Math.random() * c.length)); return r; };
     const mostrarCodigo = async (r) => { if (r.accessCode) return alert(`🔑 ${r.accessCode}`); const c = generarCodigoAcceso(); await updateDoc(doc(db, "resources", r.id), { accessCode: c }); alert(`Nuevo: ${c}`); cargarRecursosPropios(); };
 
-    const guardarRecursoFinal = async () => {
+    const guardarRecursoFinal = async (extraData = {}) => {
         if (!datosEditor.titulo) return alert("Falta Título");
         if (datosEditor.hojas.length === 0 && datosEditor.tipoJuego !== 'SOLAR_SYSTEM') return alert("Falta Hoja");
 
@@ -512,6 +512,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
         try {
             const dataToSave = {
                 ...datosEditor,
+                ...extraData,           // sobrescribe campos concretos (ej: isFinished: true)
                 profesorUid: usuario.uid,
                 tipoJuego: juegoSeleccionado, // Aseguramos el tipo seleccionado
                 fechaCreacion: new Date()
@@ -519,9 +520,9 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
 
             delete dataToSave.id;
 
-            // Ajustes específicos al guardar
+            // hojasCodes siempre: permite "Recibir preguntas" en cualquier juego
+            dataToSave.hojasCodes = datosEditor.hojas.map(h => h.accessCode).filter(c => c);
             if (juegoSeleccionado === 'QUESTION_SENDER') {
-                dataToSave.hojasCodes = datosEditor.hojas.map(h => h.accessCode).filter(c => c);
                 dataToSave.targetGame = datosEditor.targetGame || 'PASAPALABRA';
             }
 

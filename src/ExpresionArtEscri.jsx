@@ -23,52 +23,19 @@ const audioWin     = _mkAudio(winSoundFile);
 const audioStart   = _mkAudio(startSoundFile);
 const safePlay = (ao) => { ao.currentTime = 0; ao.play().catch(() => {}); };
 
-// --- BANCO DE PALABRAS ---
-const PALABRAS_EAE = [
-    { p: 'MARIPOSA',   t: ['insecto', 'volar', 'alas', 'oruga', 'flor'] },
-    { p: 'SUBMARINO',  t: ['barco', 'agua', 'mar', 'nadar', 'hundirse'] },
-    { p: 'VOLCÁN',     t: ['lava', 'erupción', 'fuego', 'montaña', 'humo'] },
-    { p: 'ASTRONAUTA', t: ['espacio', 'cohete', 'luna', 'traje', 'gravedad'] },
-    { p: 'BIBLIOTECA', t: ['libro', 'leer', 'silencio', 'estante', 'estudiar'] },
-    { p: 'DINOSAURIO', t: ['prehistórico', 'extinto', 'grande', 'reptil', 'fósil'] },
-    { p: 'ARCOÍRIS',   t: ['color', 'lluvia', 'sol', 'cielo', 'arco'] },
-    { p: 'PIRÁMIDE',   t: ['Egipto', 'faraón', 'triángulo', 'momia', 'arena'] },
-    { p: 'SOMBRERO',   t: ['cabeza', 'llevar', 'ponerse', 'hat', 'ropa'] },
-    { p: 'TELÉFONO',   t: ['llamar', 'hablar', 'móvil', 'marcar', 'ring'] },
-    { p: 'ELEFANTE',   t: ['trompa', 'grande', 'gris', 'África', 'animal'] },
-    { p: 'BICICLETA',  t: ['rueda', 'pedalear', 'montar', 'velocidad', 'transporte'] },
-    { p: 'GUITARRA',   t: ['música', 'instrumento', 'cuerda', 'tocar', 'cantar'] },
-    { p: 'PINGÜINO',   t: ['polo', 'frío', 'nieve', 'ave', 'nadar'] },
-    { p: 'CASTILLO',   t: ['rey', 'piedra', 'medieval', 'princesa', 'torre'] },
-    { p: 'SEMÁFORO',   t: ['tráfico', 'rojo', 'verde', 'calle', 'luz'] },
-    { p: 'PARAGUAS',   t: ['lluvia', 'mojarse', 'abrirse', 'agua', 'proteger'] },
-    { p: 'RELOJ',      t: ['tiempo', 'hora', 'minuto', 'segundero', 'manecilla'] },
-    { p: 'GLOBO',      t: ['inflar', 'redondo', 'volar', 'fiesta', 'helio'] },
-    { p: 'LABERINTO',  t: ['camino', 'perderse', 'salida', 'ruta', 'girar'] },
-    { p: 'CARACOL',    t: ['concha', 'lento', 'babosa', 'animal', 'molusco'] },
-    { p: 'COHETE',     t: ['espacio', 'lanzar', 'velocidad', 'astronauta', 'nave'] },
-    { p: 'TORMENTA',   t: ['lluvia', 'trueno', 'rayo', 'viento', 'nube'] },
-    { p: 'ESPEJO',     t: ['reflejo', 'mirar', 'cristal', 'imagen', 'verse'] },
-    { p: 'TORTUGA',    t: ['lento', 'concha', 'animal', 'reptil', 'caparazón'] },
-    { p: 'DRAGÓN',     t: ['fuego', 'volar', 'escamas', 'mito', 'fantástico'] },
-    { p: 'FARO',       t: ['luz', 'barco', 'costa', 'noche', 'señal'] },
-    { p: 'ESCALERA',   t: ['subir', 'peldaño', 'bajar', 'arriba', 'piso'] },
-    { p: 'CARNAVAL',   t: ['fiesta', 'disfraz', 'máscara', 'desfile', 'bailar'] },
-    { p: 'BRÚJULA',    t: ['norte', 'orientar', 'dirección', 'navegar', 'perder'] },
-    { p: 'CUEVA',      t: ['oscuro', 'piedra', 'murciélago', 'entrar', 'profundo'] },
-    { p: 'TIBURÓN',    t: ['mar', 'pez', 'nadar', 'dientes', 'agua'] },
-    { p: 'PARACAÍDAS', t: ['saltar', 'avión', 'volar', 'caer', 'paracaidista'] },
-    { p: 'MICROSCOPIO',t: ['ver', 'pequeño', 'ciencia', 'laboratorio', 'lente'] },
-];
+// --- BANCO DE PALABRAS (importado de bibliotecaEAE.js) ---
+import { getPalabrasEAE } from './bibliotecaEAE';
 
 // --- UTILIDADES ---
 const clean = (s) => s ? String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim() : "";
 
-const detectarTabu = (texto, tabues) => {
-    if (!texto || !tabues?.length) return null;
+// palabraSecreta se pasa como primer tabú para que también quede prohibida
+const detectarTabu = (texto, tabues, palabraSecreta = '') => {
+    const lista = palabraSecreta ? [palabraSecreta, ...(tabues || [])] : (tabues || []);
+    if (!texto || !lista.length) return null;
     const palabras = clean(texto).split(/\s+/).filter(w => w.length >= 3);
     for (const w of palabras) {
-        for (const t of tabues) {
+        for (const t of lista) {
             const root = clean(t).substring(0, Math.min(4, clean(t).length));
             if (root.length >= 3 && w.length >= root.length && w.substring(0, root.length) === root) {
                 return t;
@@ -97,8 +64,9 @@ function prepararDatosRonda(data) {
 
     const anfitrion  = disponibles[Math.floor(Math.random() * disponibles.length)];
     const usadas     = data.palabrasUsadas || [];
-    const pool       = PALABRAS_EAE.filter(pw => !usadas.includes(pw.p));
-    const banco      = pool.length > 0 ? pool : PALABRAS_EAE;
+    const _banco     = getPalabrasEAE(data.config?.categoria);
+    const pool       = _banco.filter(pw => !usadas.includes(pw.p));
+    const banco      = pool.length > 0 ? pool : _banco;
     const entrada    = banco[Math.floor(Math.random() * banco.length)];
     const modoConf   = data.modoJuego;
     // MIXTO: alterna estrictamente en vez de aleatorio
@@ -1361,7 +1329,7 @@ function AnfitrionView({ modoRonda, palabraSecreta, palabrasTabu, codigoSala, my
             {/* Modo: dibujo o tabú */}
             {modoRonda === 'DIBUJAR'
                 ? <AnfitrionDibujo codigoSala={codigoSala} />
-                : <AnfitrionTabu palabrasTabu={palabrasTabu} codigoSala={codigoSala} myUid={myUid} />
+                : <AnfitrionTabu palabrasTabu={palabrasTabu} palabraSecreta={palabraSecreta} codigoSala={codigoSala} myUid={myUid} />
             }
         </div>
     );
@@ -1460,7 +1428,7 @@ function AnfitrionDibujo({ codigoSala }) {
 // ============================================================================
 // 5. TABÚ DEL ANFITRIÓN (modo Describir)
 // ============================================================================
-function AnfitrionTabu({ palabrasTabu, codigoSala, myUid }) {
+function AnfitrionTabu({ palabrasTabu, palabraSecreta, codigoSala, myUid }) {
     const [texto, setTexto]             = useState('');
     const [tabooFlash, setTabooFlash]   = useState(null);
     const [penaltyAnim, setPenaltyAnim] = useState(false);
@@ -1469,7 +1437,7 @@ function AnfitrionTabu({ palabrasTabu, codigoSala, myUid }) {
 
     const handleChange = async (e) => {
         const val       = e.target.value;
-        const violation = detectarTabu(val, palabrasTabu);
+        const violation = detectarTabu(val, palabrasTabu, palabraSecreta);
 
         if (violation) {
             // Eliminar la última palabra escrita (la infractora)
@@ -1510,6 +1478,11 @@ function AnfitrionTabu({ palabrasTabu, codigoSala, myUid }) {
             <div className="tabu-taboo-box">
                 <div className="tabu-header-label">⛔ Palabras Prohibidas</div>
                 <div className="tabu-chips-row">
+                    {palabraSecreta && (
+                        <span className="tabu-chip" style={{ background: '#c0392b', fontWeight: 900, fontSize: '1rem', letterSpacing: 1 }}>
+                            {palabraSecreta}
+                        </span>
+                    )}
                     {palabrasTabu.map((t, i) => <span key={i} className="tabu-chip">{t}</span>)}
                 </div>
             </div>

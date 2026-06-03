@@ -73,7 +73,7 @@ export default function QuestionSenderClient({ usuario, onBack, codigoInicial}) 
                 hojaIndex,
                 nombreHoja: hoja.nombreHoja,
                 profesor: docData.profesorNombre,
-                targetGame: docData.targetGame || 'PASAPALABRA',
+                targetGame: docData.targetGame || docData.tipoJuego || 'PASAPALABRA',
                 numPreguntas
             });
             setFase('FORMULARIO');
@@ -228,7 +228,9 @@ export default function QuestionSenderClient({ usuario, onBack, codigoInicial}) 
     return (
         <div style={{ ...estiloContenedor, justifyContent: 'flex-start', paddingTop: '20px' }}>
             <div style={{ ...cardStyle, maxWidth: '800px', width: '95%' }}>
-                <h2 style={{ color: '#3498db', margin: '0' }}>{datosHoja.targetGame}</h2>
+                <h2 style={{ color: '#3498db', margin: '0' }}>
+                    {{ PASAPALABRA: '📝 Pasapalabra', CAZABURBUJAS: '🫧 Caza Burbujas', THINKHOOT: '🎯 PiLive', RULETA: '🎡 La Ruleta', APAREJADOS: '🔗 Aparejados', PIKATRON: '🫧 Pikatron' }[datosHoja.targetGame] || datosHoja.targetGame}
+                </h2>
 
                 {/* AQUI MOSTRAMOS CUANTAS PREGUNTAS SE PIDEN */}
                 <div style={{ background: '#e3f2fd', padding: '15px', borderRadius: '10px', margin: '20px 0', borderLeft: '5px solid #2196F3', textAlign: 'left' }}>

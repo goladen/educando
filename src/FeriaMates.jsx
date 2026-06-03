@@ -3,6 +3,7 @@ import sonidoCorrecto from './assets/correct-choice-43861.mp3';
 import sonidoFallo    from './assets/negative_beeps-6008.mp3';
 import fondoImg       from './assets/pantalla5.jpeg';
 import TironCuerdaJuego from './TironCuerda';
+import DueloPiratas from './DueloPiratas';
 
 const COLORS = [
   '#FF6B6B','#4ECDC4','#45B7D1','#96CEB4','#FFEAA7',
@@ -248,6 +249,7 @@ export default function JuegoFeriaOAOA({ primaria = false }) {
   const [mostrarCfg, setMostrarCfg] = useState(false);
   const [config,     setConfig]     = useState({ tipoNum:'naturales', tiempoPregunta:14, tiposOp: OPS_NATURALES });
   const [gearHover,  setGearHover]  = useState(false);
+  const [verDuelo,   setVerDuelo]   = useState(false);
 
   // Velocidad adaptativa
   const [tiempoActualG,  setTiempoActualG]  = useState(14);
@@ -689,9 +691,24 @@ export default function JuegoFeriaOAOA({ primaria = false }) {
                 <div>Tirón de Cuerda</div>
                 <div style={{ fontSize:'0.78rem', fontWeight:400, opacity:0.85, marginTop:4 }}>2 jugadores · sin límite</div>
               </button>
+              <button onClick={()=>setVerDuelo(true)}
+                onMouseDown={e=>e.currentTarget.style.transform='scale(0.95)'}
+                onMouseUp={e=>e.currentTarget.style.transform='scale(1)'}
+                style={{ ...btnBase, padding:'26px 36px',
+                  background:'linear-gradient(135deg,#0a1628,#1a4a7a)',
+                  boxShadow:'0 8px 24px rgba(10,22,40,0.55)',
+                  color:'white', fontSize:'1.15rem', flex:'1 1 200px', maxWidth:250,
+                  border:'2px solid rgba(249,199,79,0.5)' }}>
+                <div style={{ fontSize:'2.5rem', marginBottom:8 }}>🏴‍☠️</div>
+                <div style={{ color:'#f9c74f', fontFamily:'Georgia,serif' }}>Duelo de Piratas</div>
+                <div style={{ fontSize:'0.78rem', fontWeight:400, opacity:0.85, marginTop:4, color:'#94d2bd' }}>2 jugadores · cañonazos</div>
+              </button>
             </div>
           </div>
         )}
+
+        {/* ── DUELO DE PIRATAS ─────────────────────────────────────── */}
+        {verDuelo && <DueloPiratas onExit={() => setVerDuelo(false)} />}
 
         {/* ── TIRÓN DE CUERDA ──────────────────────────────────────── */}
         {pantalla === 'tiron' && (

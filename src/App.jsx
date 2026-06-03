@@ -16,6 +16,7 @@ import AnnotationOverlay from './components/AnnotationOverlay';
 import HerramientasClase from './GestionAula';
 import MiniAppViewer from './components/MiniAppViewer';
 import TrivialEnvioForm from './components/TrivialEnvioForm';
+import QuestionSenderClient from './QuestionSenderClient';
 import PartesPlantaGame from './PartesPlanta';
 import EtiquetaMe from './EtiquetaMe';
 
@@ -45,8 +46,9 @@ function App() {
     const [temas, setTemas] = useState("");
     // DETECTAR PÁGINA PÚBLICA DE PROFESOR — por slug (/nombre) o por ?p=uid
     const [paginaTarget,    setPaginaTarget]    = useState(null); // { uid } | { slug }
-    const [miniappId,       setMiniappId]       = useState(null);
-    const [trivialEnvioCode,setTrivialEnvioCode]= useState(null);
+    const [miniappId,         setMiniappId]         = useState(null);
+    const [trivialEnvioCode,  setTrivialEnvioCode]  = useState(null);
+    const [questionSenderCode,setQuestionSenderCode]= useState(null);
 
     // ANNOTATION OVERLAY + PIZARRA DESDE CAPTURA
     const [annotationOpen,   setAnnotationOpen]   = useState(false);
@@ -78,6 +80,8 @@ function App() {
       if (mid) { setMiniappId(mid); return; }
       const trivialEnvio = params.get('trivial_envio');
       if (trivialEnvio) { setTrivialEnvioCode(trivialEnvio.toUpperCase()); return; }
+      const qsc = params.get('c');
+      if (qsc) { setQuestionSenderCode(qsc.toUpperCase()); return; }
       const uid = params.get('p');
       if (uid) { setPaginaTarget({ uid }); return; }
       const slug = window.location.pathname.replace(/^\//, '').replace(/\/$/, '').trim().toLowerCase();
@@ -245,6 +249,9 @@ function App() {
 
     // Formulario público de envío de preguntas al Trivial (no requiere login)
     if (trivialEnvioCode) return <TrivialEnvioForm codigoInicial={trivialEnvioCode} onBack={() => { setTrivialEnvioCode(null); window.history.pushState({}, '', '/'); }} />;
+
+    // Formulario público de envío de preguntas a cualquier recurso vía código ?c=CODE (no requiere login)
+    if (questionSenderCode) return <QuestionSenderClient codigoInicial={questionSenderCode} usuario={usuario} onBack={() => { setQuestionSenderCode(null); window.history.pushState({}, '', '/'); }} />;
 
     // PÁGINA PÚBLICA DEL PROFESOR (no requiere login)
     if (paginaTarget) return <><PaginaProfesor uid={paginaTarget.uid} onBack={() => { setPaginaTarget(null); window.history.back(); }} />{anotadorUI}</>;

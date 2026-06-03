@@ -40,6 +40,7 @@ import BiologiaApp  from './BiologiaApp';
 import HerramientasClase from '../GestionAula';
 import AlgebraApp from '../Algebra';
 import VistasDidricas from '../VistasDidricas';
+import MiniAppCreator from './MiniAppCreator';
 import EstadisticaApp from '../Estadistica';
 import SimuladorColisiones from '../Simuladores física/SimuladorColisiones';
 import SimuladorPlanoInclinado from '../Simuladores física/SimuladorPlanoInclinado';
@@ -54,6 +55,8 @@ import ExpresionArtEscri from '../ExpresionArtEscri';
 import SimuladorOAOA from '../MatesOAOA';
 import JuegoFeriaOAOA from '../FeriaMates';
 import JuegoDivisibilidad from '../Divisibilidad';
+import DueloPiratas from '../DueloPiratas';
+import DueloPiratasRecurso from '../DueloPiratasRecurso';
 import imgPasapalabra from '../assets/icono_pasapal.png'; // Revisa si es .png o .jpg
 import imgBurbujas from '../assets/icono_burbujas.png';
 import imgPikatron from '../assets/icono_pikatron.png';
@@ -605,8 +608,472 @@ export const APPS = [
     { id: 'STORYCUBES', name: 'Story Cubes', desc: 'Crea historias en equipo usando dados con imágenes.', color: '#8e44ad', emoji: '🎲', shareable: true },
     { id: 'RETOS', name: 'Retos', desc: 'Conecta puntos y puzzles de lógica.', color: '#f39c12', emoji: '🧩', shareable: true },
     { id: 'TRIVIAL', name: 'Trivial', desc: 'El clásico juego de preguntas por categorías para hasta 6 jugadores.', color: '#16213e', emoji: '🎯', shareable: true },
+    { id: 'DUELO_PIRATAS_RECURSO', name: 'Duelo Piratas', desc: '2 jugadores · cañonazos con tu recurso · múltiple opción, aparejados o pasapalabra.', color: '#0a1628', emoji: '🏴‍☠️', shareable: true },
 
 ];
+
+// --- CATÁLOGO DE INFORMACIÓN POR JUEGO/HERRAMIENTA ---
+export const GAME_INFO = {
+    PASAPALABRA: {
+        descripcion: 'Juego de vocabulario tipo concurso televisivo. El alumno debe adivinar una palabra por cada letra del abecedario usando la pista dada. Ideal para repasar vocabulario de cualquier materia.',
+        tipoPreguntas: 'Definiciones o pistas que llevan a una palabra (una por cada letra del abecedario). El profesor crea las preguntas desde el Panel Docente.',
+        biblioteca: 'No incluye biblioteca propia. El profesor debe crear un recurso con las preguntas y palabras.',
+        multiplayer: 'Individual. Se puede jugar por turnos en clase para hacerlo más dinámico.',
+        materias: ['Universal', 'Lengua y Literatura', 'Inglés', 'Ciencias Sociales', 'Historia'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
+    CAZABURBUJAS: {
+        descripcion: 'Burbujas flotantes aparecen en pantalla con posibles respuestas. El alumno debe explotar la burbuja correcta antes de que desaparezca. Ritmo rápido y muy motivador.',
+        tipoPreguntas: 'Preguntas de opción múltiple de cualquier materia y nivel. El profesor crea el recurso.',
+        biblioteca: 'No incluye biblioteca propia. Requiere recurso del profesor.',
+        multiplayer: 'Individual (modo competición por puntuación).',
+        materias: ['Universal'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
+    PIKATRON: {
+        descripcion: 'Juego tipo endless runner: el personaje corre automáticamente y el alumno responde preguntas para saltar obstáculos y seguir avanzando. Gran motivación.',
+        tipoPreguntas: 'Opción múltiple de cualquier materia. Recurso creado por el profesor.',
+        biblioteca: 'No incluye biblioteca propia. Requiere recurso del profesor.',
+        multiplayer: 'Individual.',
+        materias: ['Universal'],
+        etapas: ['Primaria', 'ESO'],
+    },
+    PIKATRON_2: {
+        descripcion: 'Variante del Pikatron con mecánica de plataformas. El personaje salta entre plataformas y el alumno responde preguntas para progresar por distintos escenarios.',
+        tipoPreguntas: 'Opción múltiple de cualquier materia. Recurso creado por el profesor.',
+        biblioteca: 'No incluye biblioteca propia. Requiere recurso del profesor.',
+        multiplayer: 'Individual.',
+        materias: ['Universal'],
+        etapas: ['Primaria', 'ESO'],
+    },
+    KARTINGED: {
+        descripcion: 'Carrera de karts en 3D. Los alumnos compiten respondiendo preguntas en los checkpoints para acelerar. Se puede jugar en red local con varios dispositivos simultáneamente.',
+        tipoPreguntas: 'Opción múltiple de cualquier materia. Recurso creado por el profesor.',
+        biblioteca: 'No incluye biblioteca propia. Requiere recurso del profesor.',
+        multiplayer: 'Sí, multijugador en red local (hasta 4 jugadores en tiempo real).',
+        materias: ['Universal'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
+    RACING3D: {
+        descripcion: 'Carrera de coches en 3D contra IA. El alumno compite en 4 vueltas contra 3 vehículos con IA respondiendo preguntas en los checkpoints para ganar velocidad.',
+        tipoPreguntas: 'Opción múltiple de cualquier materia. Recurso creado por el profesor.',
+        biblioteca: 'No incluye biblioteca propia. Requiere recurso del profesor.',
+        multiplayer: 'Individual contra IA (3 coches de inteligencia artificial).',
+        materias: ['Universal'],
+        etapas: ['ESO', 'Bachillerato'],
+    },
+    MANSION_PITAGORICA: {
+        descripcion: 'Aventura de exploración por una mansión misteriosa. El alumno responde preguntas de opción múltiple para desbloquear habitaciones y avanzar por la historia.',
+        tipoPreguntas: 'Opción múltiple de cualquier materia. Recurso creado por el profesor.',
+        biblioteca: 'No incluye biblioteca propia. Requiere recurso del profesor.',
+        multiplayer: 'Individual.',
+        materias: ['Universal', 'Matemáticas'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
+    APAREJADOS: {
+        descripcion: 'Juego de memoria y parejas: el alumno voltea tarjetas para emparejar conceptos relacionados (término-definición, imagen-palabra, pregunta-respuesta, etc.).',
+        tipoPreguntas: 'Pares de conceptos relacionados (cualquier materia). Recurso creado por el profesor.',
+        biblioteca: 'No incluye biblioteca propia. Requiere recurso del profesor.',
+        multiplayer: 'Individual o por turnos.',
+        materias: ['Universal'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
+    RULETA: {
+        descripcion: 'Inspirado en "La Ruleta de la Suerte". Un panel oculta una frase o palabra que los alumnos deben descubrir letra a letra. Perfecto para vocabulario y expresiones.',
+        tipoPreguntas: 'Frases, palabras o expresiones a descubrir. Recurso creado por el profesor.',
+        biblioteca: 'No incluye biblioteca propia. Requiere recurso del profesor.',
+        multiplayer: 'Sí, por turnos. Varios alumnos pueden jugar a la vez.',
+        materias: ['Lengua y Literatura', 'Inglés', 'Universal'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
+    WORDLE: {
+        descripcion: 'Adivina la palabra oculta en 6 intentos. Cada intento te indica qué letras están en posición correcta (verde), en la palabra pero mal posición (amarillo) o no aparecen (gris).',
+        tipoPreguntas: 'Palabras de vocabulario de cualquier materia. Recurso creado por el profesor.',
+        biblioteca: 'No incluye biblioteca propia. Requiere recurso con lista de palabras.',
+        multiplayer: 'Individual.',
+        materias: ['Lengua y Literatura', 'Inglés', 'Ciencias Sociales', 'Universal'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
+    MATHLE: {
+        descripcion: 'Versión matemática del Wordle. Adivina la ecuación matemática oculta en 6 intentos usando operaciones aritméticas y los colores como pista.',
+        tipoPreguntas: 'Ecuaciones numéricas (solo números y operadores aritméticos).',
+        biblioteca: 'Sí, incluye un desafío diario incorporado (código MATH) y soporte para recursos del profesor.',
+        multiplayer: 'Individual.',
+        materias: ['Matemáticas'],
+        etapas: ['ESO', 'Bachillerato'],
+    },
+    THINKHOOT: {
+        descripcion: 'Juego en vivo tipo Kahoot/Quizz: todos los alumnos compiten simultáneamente desde sus dispositivos respondiendo preguntas en tiempo real. Ranking en pantalla del profesor.',
+        tipoPreguntas: 'Opción múltiple en tiempo real. Recurso creado por el profesor.',
+        biblioteca: 'No incluye biblioteca propia. Requiere recurso del profesor.',
+        multiplayer: 'Sí, toda la clase a la vez (multijugador en tiempo real).',
+        materias: ['Universal'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
+    EAE: {
+        descripcion: 'PictoTabú en vivo: un alumno dibuja o describe un concepto sin usar las palabras prohibidas, y el resto de la clase adivina. Gran dinamismo grupal.',
+        tipoPreguntas: 'Conceptos o palabras para dibujar o describir. Recurso creado por el profesor.',
+        biblioteca: 'No incluye biblioteca propia. Requiere recurso del profesor.',
+        multiplayer: 'Sí, toda la clase participa en vivo (multijugador).',
+        materias: ['Arte', 'Lengua y Literatura', 'Inglés', 'Universal'],
+        etapas: ['ESO', 'Bachillerato'],
+    },
+    MATHLIVE: {
+        descripcion: 'Competición matemática en tiempo real. Los alumnos resuelven operaciones contrarreloj compitiendo contra sus compañeros. El profesor controla la partida.',
+        tipoPreguntas: 'Operaciones matemáticas (suma, resta, multiplicación, división, potencias, fracciones). Configurable por el profesor.',
+        biblioteca: 'Sí, genera operaciones automáticamente según la configuración del profesor (tipo y rango de números).',
+        multiplayer: 'Sí, toda la clase a la vez (multijugador en tiempo real).',
+        materias: ['Matemáticas'],
+        etapas: ['Primaria', 'ESO'],
+    },
+    OLYMPICLIVE: {
+        descripcion: 'Olimpiadas matemáticas en vivo: los alumnos compiten en minijuegos de cálculo mental para ganar medallas. Muy dinámico y motivador para la clase.',
+        tipoPreguntas: 'Operaciones de cálculo mental y aritmética básica.',
+        biblioteca: 'Sí, genera las operaciones automáticamente según nivel.',
+        multiplayer: 'Sí, toda la clase a la vez (multijugador en tiempo real).',
+        materias: ['Matemáticas'],
+        etapas: ['Primaria', 'ESO'],
+    },
+    SOPA: {
+        descripcion: 'Sopa de letras interactiva digital. Los alumnos localizan palabras relacionadas con un tema en una cuadrícula de letras. Clásico con formato digital.',
+        tipoPreguntas: 'Lista de palabras a encontrar (vocabulario de cualquier tema). Recurso creado por el profesor.',
+        biblioteca: 'No incluye biblioteca propia. Requiere recurso del profesor.',
+        multiplayer: 'Individual.',
+        materias: ['Universal', 'Lengua y Literatura', 'Inglés', 'Ciencias Sociales'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
+    STORYCUBES: {
+        descripcion: 'Dados de imágenes para estimular la creatividad narrativa. El alumno lanza los dados virtuales y debe construir una historia usando las imágenes obtenidas.',
+        tipoPreguntas: 'No hay preguntas. Es una actividad de expresión oral y escritura creativa libre.',
+        biblioteca: 'Sí, incluye biblioteca propia de imágenes en los dados. Sin necesidad de recurso del profesor.',
+        multiplayer: 'Sí, se puede usar en equipo o por turnos en clase.',
+        materias: ['Lengua y Literatura', 'Inglés', 'Arte'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
+    RETOS: {
+        descripcion: 'Colección de puzzles y retos de pensamiento lógico: conectar puntos, laberintos, puzzles visuales y desafíos de razonamiento.',
+        tipoPreguntas: 'Puzzles lógicos y visuales. No son preguntas de contenido curricular.',
+        biblioteca: 'Sí, incluye biblioteca propia de retos y puzzles. Sin necesidad de recurso del profesor.',
+        multiplayer: 'Individual.',
+        materias: ['Matemáticas', 'Tecnología'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
+    TRIVIAL: {
+        descripcion: 'El clásico trivial adaptado al aula. Preguntas por categorías, tablero de juego y hasta 6 jugadores simultáneos. Perfecto para repasos temáticos.',
+        tipoPreguntas: 'Opción múltiple organizada por categorías. Recurso creado por el profesor.',
+        biblioteca: 'No incluye biblioteca propia. Requiere recurso del profesor.',
+        multiplayer: 'Sí, hasta 6 jugadores simultáneos (en el mismo dispositivo o en red).',
+        materias: ['Universal'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
+    DUELO_PIRATAS_RECURSO: {
+        descripcion: 'Duelo de barcos piratas para 2 jugadores usando cualquier recurso del aula. Cada jugada correcta dispara un cañonazo al barco rival. Admite respuesta múltiple, aparejados y pasapalabra.',
+        tipoPreguntas: 'Cualquier recurso con código de acceso: opción múltiple, aparejados (genera opciones automáticamente) o pasapalabra (se escribe la respuesta). Los jugadores se turnan con preguntas distintas del mismo recurso.',
+        biblioteca: 'No incluye biblioteca propia. Se carga un recurso con el código de acceso del profesor.',
+        multiplayer: 'Sí, 2 jugadores en el mismo dispositivo.',
+        materias: ['Universal'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
+    // Herramientas
+    SINTAXIS: {
+        descripcion: 'Analizador sintáctico interactivo de Lengua. El alumno puede marcar el sujeto, predicado, núcleos y complementos de frases seleccionadas, con corrección automática.',
+        tipoPreguntas: 'Análisis sintáctico de frases. Incluye frases propias y permite al profesor añadir las suyas.',
+        biblioteca: 'Sí, incluye biblioteca de frases clasificadas por dificultad y nivel educativo.',
+        multiplayer: 'Individual.',
+        materias: ['Lengua y Literatura'],
+        etapas: ['ESO', 'Bachillerato'],
+    },
+    MATH_WORLD_PORTAL: {
+        descripcion: 'Portal de acceso a todas las herramientas matemáticas avanzadas: Geometrix, Ecuaciones, Funciones, Geometría Analítica, Álgebra, Estadística y Probabilidad.',
+        tipoPreguntas: 'Varía según la herramienta seleccionada dentro del portal.',
+        biblioteca: 'Sí, cada herramienta genera ejercicios y ejemplos automáticamente.',
+        multiplayer: 'Individual (herramientas de trabajo personal).',
+        materias: ['Matemáticas'],
+        etapas: ['ESO', 'Bachillerato'],
+    },
+    LISTENING: {
+        descripcion: 'Actividad de comprensión oral en inglés. El alumno escucha un audio y responde preguntas o completa huecos. Mejora la comprensión auditiva.',
+        tipoPreguntas: 'Comprensión oral: huecos, opción múltiple. Recurso creado por el profesor con audio y preguntas.',
+        biblioteca: 'No incluye biblioteca propia. El profesor sube el audio y crea las preguntas.',
+        multiplayer: 'Individual.',
+        materias: ['Inglés', 'Lengua Extranjera'],
+        etapas: ['ESO', 'Bachillerato'],
+    },
+    ETIQUETAS: {
+        descripcion: 'El alumno arrastra etiquetas y las coloca en la posición correcta sobre una imagen o diagrama. Ideal para anatomía, mapas, circuitos, células y mucho más.',
+        tipoPreguntas: 'Identificación de partes o estructuras en imágenes. El profesor sube la imagen y define las etiquetas.',
+        biblioteca: 'No incluye biblioteca propia. El profesor crea el recurso con imagen y etiquetas.',
+        multiplayer: 'Individual.',
+        materias: ['Ciencias Naturales', 'Biología', 'Geografía', 'Tecnología', 'Universal'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
+    QUESTION_SENDER: {
+        descripcion: 'Herramienta de comunicación inversa: los alumnos envían preguntas al profesor directamente. El profesor puede convertirlas en un juego o recurso en tiempo real.',
+        tipoPreguntas: 'Cualquier tipo de pregunta que el alumno quiera formular al profesor.',
+        biblioteca: 'No aplica.',
+        multiplayer: 'Toda la clase puede enviar preguntas simultáneamente.',
+        materias: ['Universal'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
+    OMNINTERACTIVE: {
+        descripcion: 'Visor de contenido educativo enriquecido e interactivo. Permite explorar documentos, libros digitales y contenidos didácticos con elementos multimedia integrados.',
+        tipoPreguntas: 'No hay preguntas tradicionales. Es un recurso de presentación y exploración de contenido.',
+        biblioteca: 'Sí, incluye acceso a contenidos educativos propios.',
+        multiplayer: 'Individual (o proyección para toda la clase).',
+        materias: ['Universal'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
+    VIDEOQUIZZ: {
+        descripcion: 'Reproduce vídeos de YouTube con preguntas intercaladas en momentos específicos. Los alumnos deben responder para que el vídeo continúe, asegurando la atención.',
+        tipoPreguntas: 'Opción múltiple sincronizada con puntos del vídeo. Configurado por el profesor.',
+        biblioteca: 'No incluye biblioteca propia. El profesor configura el vídeo y las preguntas.',
+        multiplayer: 'Individual (o proyección colectiva).',
+        materias: ['Universal'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato', 'FP'],
+    },
+    FUNCIONES_EJECUTIVAS: {
+        descripcion: 'Ejercicios digitales para trabajar las funciones ejecutivas: atención sostenida, memoria de trabajo, inhibición y planificación. Pensado para atención a la diversidad.',
+        tipoPreguntas: 'Ejercicios cognitivos, no preguntas curriculares. Secuencias, patrones, memoria visual.',
+        biblioteca: 'Sí, incluye biblioteca propia de ejercicios graduados por dificultad.',
+        multiplayer: 'Individual.',
+        materias: ['Orientación', 'Atención a la Diversidad'],
+        etapas: ['Primaria', 'ESO'],
+    },
+    IRREGULAR_VERBS: {
+        descripcion: 'Test interactivo de verbos irregulares en inglés. El alumno practica las tres formas (infinitivo, pasado simple, participio) con retroalimentación inmediata y puntuación.',
+        tipoPreguntas: 'Verbos irregulares inglés: dado el infinitivo, completar pasado y participio (o viceversa).',
+        biblioteca: 'Sí, incluye la lista completa de verbos irregulares del inglés clasificados por frecuencia y dificultad.',
+        multiplayer: 'Individual.',
+        materias: ['Inglés', 'Lengua Extranjera'],
+        etapas: ['ESO', 'Bachillerato'],
+    },
+    SOLAR_SYSTEM: {
+        descripcion: 'Tour 3D guiado por el sistema solar con narración por voz, música de fondo personalizable y escena comparativa de tamaños planetarios. El profesor puede personalizar cada planeta.',
+        tipoPreguntas: 'No hay preguntas. Es un recurso audiovisual de presentación y exploración espacial.',
+        biblioteca: 'Sí, incluye información de todos los planetas del sistema solar, personalizable por el profesor.',
+        multiplayer: 'Individual o proyección para toda la clase.',
+        materias: ['Ciencias Naturales', 'Física'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
+    MUSICA: {
+        descripcion: 'Herramienta interactiva de música para el aula: teoría musical, lectura de notas, instrumentos, escucha activa y actividades de expresión musical.',
+        tipoPreguntas: 'Actividades musicales variadas: identificar notas, ritmos, instrumentos.',
+        biblioteca: 'Sí, incluye biblioteca propia de teoría musical y ejercicios auditivos.',
+        multiplayer: 'Individual (o proyección para toda la clase).',
+        materias: ['Música'],
+        etapas: ['Primaria', 'ESO'],
+    },
+    GEOGRAFIA: {
+        descripcion: 'Herramienta interactiva de geografía con mapas mundiales y de España. Incluye países, capitales, ríos, mares, montañas, comunidades autónomas y modo quiz.',
+        tipoPreguntas: 'Identificación de elementos en mapas, capitales, geografía física y política, con modo quiz integrado.',
+        biblioteca: 'Sí, base de datos completa de geografía mundial y española.',
+        multiplayer: 'Individual.',
+        materias: ['Geografía', 'Ciencias Sociales'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
+    BIOLOGIA: {
+        descripcion: 'Herramienta interactiva de biología: anatomía humana, célula, ecosistemas, reino animal y vegetal, genética y clasificación de seres vivos.',
+        tipoPreguntas: 'Identificación de estructuras, completar etiquetas, quiz de conceptos biológicos.',
+        biblioteca: 'Sí, biblioteca propia de contenidos de biología organizados por temas.',
+        multiplayer: 'Individual.',
+        materias: ['Biología', 'Ciencias Naturales'],
+        etapas: ['ESO', 'Bachillerato'],
+    },
+    GESTION_AULA: {
+        descripcion: 'Suite de herramientas de gestión del aula: temporizador, ruleta de nombres aleatoria, creador de grupos, semáforo de comportamiento, pizarra y más.',
+        tipoPreguntas: 'No hay preguntas. Es una herramienta de gestión y organización docente.',
+        biblioteca: 'No aplica.',
+        multiplayer: 'Herramienta docente para toda la clase.',
+        materias: ['Universal'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
+    VISTAS_DIDRICAS: {
+        descripcion: 'Visualizador interactivo de vistas diédricas (planta, alzado, perfil). El alumno practica la lectura y el dibujo de vistas ortogonales de objetos 3D.',
+        tipoPreguntas: 'Identificación de vistas diédricas de sólidos 3D y ejercicios de representación.',
+        biblioteca: 'Sí, incluye biblioteca de modelos 3D y ejercicios de vistas.',
+        multiplayer: 'Individual.',
+        materias: ['Tecnología', 'Dibujo Técnico', 'Matemáticas'],
+        etapas: ['ESO', 'Bachillerato'],
+    },
+    SIMULADORES_FISICA: {
+        descripcion: 'Colección de 6 simuladores de Física interactivos: colisiones, plano inclinado, tiro parabólico, caída libre, péndulo y Ley de Ohm. Permite experimentar con parámetros.',
+        tipoPreguntas: 'No hay preguntas. Son simuladores visuales para experimentar con leyes físicas modificando variables.',
+        biblioteca: 'Sí, 6 simuladores incorporados listos para usar sin configuración.',
+        multiplayer: 'Individual (o proyección para toda la clase).',
+        materias: ['Física', 'Ciencias Naturales'],
+        etapas: ['ESO', 'Bachillerato'],
+    },
+    MINIAPP_CREATOR: {
+        descripcion: 'Editor de mini-aplicaciones interactivas con asistencia de IA. El alumno o el docente describe una idea y la IA genera el código HTML/JS; se puede probar, guardar y compartir como URL.',
+        tipoPreguntas: 'No hay preguntas. Es una herramienta de creación y experimentación con IA generativa.',
+        biblioteca: 'Sí, incluye plantillas y generación asistida por IA.',
+        multiplayer: 'Individual. Las apps creadas se pueden compartir con toda la clase.',
+        materias: ['Tecnología', 'Informática'],
+        etapas: ['ESO', 'Bachillerato'],
+    },
+    // Math games
+    GEOMETRIX: {
+        descripcion: 'Calculadora interactiva de geometría: áreas, perímetros de figuras planas, volúmenes de sólidos 3D y regla virtual con animaciones y fórmulas visualizadas.',
+        tipoPreguntas: 'No hay preguntas. Es una herramienta de cálculo y visualización geométrica.',
+        biblioteca: 'Sí, incluye todas las figuras geométricas planas y sólidos con sus fórmulas.',
+        multiplayer: 'Individual.',
+        materias: ['Matemáticas'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
+    CALCULO: {
+        descripcion: 'Ejercicios de cálculo mental con tiempo. Configura el tipo de operaciones (suma, resta, multiplicación, división), rango de números y tiempo límite. Ideal para agilidad aritmética.',
+        tipoPreguntas: 'Operaciones aritméticas generadas automáticamente según la configuración elegida.',
+        biblioteca: 'Sí, genera ejercicios automáticamente. Sin necesidad de recurso del profesor.',
+        multiplayer: 'Individual.',
+        materias: ['Matemáticas'],
+        etapas: ['Primaria', 'ESO'],
+    },
+    ECUACIONES: {
+        descripcion: 'Herramienta para resolver ecuaciones de primer y segundo grado paso a paso. Muestra el proceso completo de despeje con visualización de cada operación.',
+        tipoPreguntas: 'Ecuaciones de primer y segundo grado. Genera ejemplos automáticamente.',
+        biblioteca: 'Sí, genera ecuaciones automáticamente con distintos niveles de dificultad.',
+        multiplayer: 'Individual.',
+        materias: ['Matemáticas'],
+        etapas: ['ESO', 'Bachillerato'],
+    },
+    FUNCIONES: {
+        descripcion: 'Explorador interactivo de funciones matemáticas: representación gráfica en el plano cartesiano, análisis de dominio, recorrido, crecimiento, extremos y simetrías.',
+        tipoPreguntas: 'Análisis y representación de funciones. La herramienta genera ejemplos automáticamente.',
+        biblioteca: 'Sí, incluye tipos de funciones con ejemplos y ejercicios de análisis.',
+        multiplayer: 'Individual.',
+        materias: ['Matemáticas'],
+        etapas: ['ESO', 'Bachillerato'],
+    },
+    'GEOMETRÍA_ANALÍTICA': {
+        descripcion: 'Herramienta de geometría analítica: ecuaciones de rectas, parábolas, hipérbolas y elipses en el plano cartesiano. Representación gráfica interactiva.',
+        tipoPreguntas: 'Ecuaciones de rectas y cónicas, análisis gráfico de figuras en el plano.',
+        biblioteca: 'Sí, genera ejemplos automáticamente de rectas y cónicas.',
+        multiplayer: 'Individual.',
+        materias: ['Matemáticas'],
+        etapas: ['ESO', 'Bachillerato'],
+    },
+    POLINOMIOS: {
+        descripcion: 'Herramienta de álgebra para trabajar con polinomios: suma, resta, multiplicación, división polinómica, factorización y regla de Ruffini con pasos detallados.',
+        tipoPreguntas: 'Operaciones con polinomios generadas automáticamente.',
+        biblioteca: 'Sí, genera ejercicios de cada tipo de operación automáticamente.',
+        multiplayer: 'Individual.',
+        materias: ['Matemáticas'],
+        etapas: ['ESO', 'Bachillerato'],
+    },
+    ESTADISTICA: {
+        descripcion: 'Herramienta de estadística descriptiva: tablas de frecuencias absolutas y relativas, media, mediana, moda, varianza, desviación típica y representaciones gráficas.',
+        tipoPreguntas: 'Análisis estadístico de conjuntos de datos. El alumno introduce datos o usa los ejemplos.',
+        biblioteca: 'Sí, incluye conjuntos de datos de ejemplo y genera automáticamente.',
+        multiplayer: 'Individual.',
+        materias: ['Matemáticas'],
+        etapas: ['ESO', 'Bachillerato'],
+    },
+    PROBABILIDAD: {
+        descripcion: 'Simulador de dados interactivo para el estudio de la probabilidad. Permite elegir tipo de dado, número de dados, realizar experimentos y analizar frecuencias relativas.',
+        tipoPreguntas: 'Experimentos aleatorios con dados. No son preguntas sino simulaciones probabilísticas.',
+        biblioteca: 'Sí, simulador propio con dados estándar y personalizados.',
+        multiplayer: 'Individual.',
+        materias: ['Matemáticas'],
+        etapas: ['ESO', 'Bachillerato'],
+    },
+};
+
+const MATERIA_COLORS = {
+    'Universal': '#78909C',
+    'Matemáticas': '#009688',
+    'Lengua y Literatura': '#7B1FA2',
+    'Inglés': '#0288D1',
+    'Ciencias Naturales': '#388E3C',
+    'Ciencias Sociales': '#F57C00',
+    'Física': '#C62828',
+    'Geografía': '#00796B',
+    'Historia': '#6D4C41',
+    'Arte': '#AD1457',
+    'Música': '#5E35B1',
+    'Tecnología': '#546E7A',
+    'Biología': '#2E7D32',
+    'Química': '#E65100',
+    'Orientación': '#00838F',
+    'Atención a la Diversidad': '#00838F',
+    'Dibujo Técnico': '#546E7A',
+    'Lengua Extranjera': '#1565C0',
+    'FP': '#4E342E',
+};
+
+const ETAPA_COLORS = {
+    'Infantil': '#F06292',
+    'Primaria': '#66BB6A',
+    'ESO': '#42A5F5',
+    'Bachillerato': '#EF5350',
+    'FP': '#FFA726',
+    'Formación Continua': '#8D6E63',
+};
+
+// --- CONFIGURACIÓN POR MATERIA ---
+export const MATERIAS_CONFIG = [
+    {
+        id: 'MATEMATICAS', label: 'Matemáticas', emoji: '🔢', color: '#009688',
+        keywords: ['matemáticas', 'mates', 'math', 'calculo', 'algebra', 'geometria', 'estadistica', 'probabilidad', 'fraccion', 'ecuacion', 'funcion', 'numero', 'operacion'],
+        specificIds: ['MATH_WORLD_PORTAL', 'GEOMETRIX', 'CALCULO', 'ECUACIONES', 'FUNCIONES', 'GEOMETRÍA_ANALÍTICA', 'POLINOMIOS', 'ESTADISTICA', 'PROBABILIDAD', 'MATHLE', 'MATHLIVE', 'OLYMPICLIVE'],
+    },
+    {
+        id: 'LENGUA', label: 'Lengua', emoji: '📖', color: '#7B1FA2',
+        keywords: ['lengua', 'castellano', 'español', 'literatura', 'gramatica', 'sintaxis', 'vocabulario', 'comprension', 'escritura', 'lectura', 'texto', 'ortografia'],
+        specificIds: ['SINTAXIS', 'STORYCUBES'],
+    },
+    {
+        id: 'GEO_HISTORIA', label: 'Geo e Historia', emoji: '🌍', color: '#F57C00',
+        keywords: ['geografia', 'historia', 'sociales', 'ciencias sociales', 'mapa', 'comunidades', 'europa', 'mundo', 'continente', 'pais', 'capital', 'civilizacion', 'cultura', 'prehistoria'],
+        specificIds: ['GEOGRAFIA', 'ETIQUETAS'],
+    },
+    {
+        id: 'FISICA_QUIMICA', label: 'Física y Química', emoji: '⚗️', color: '#C62828',
+        keywords: ['fisica', 'quimica', 'ciencias', 'energia', 'fuerza', 'reaccion', 'elemento', 'atomo', 'molecula', 'electricidad', 'movimiento', 'calor', 'luz', 'ondas'],
+        specificIds: ['SIMULADORES_FISICA', 'ETIQUETAS'],
+    },
+    {
+        id: 'BIOLOGIA', label: 'Biología', emoji: '🔬', color: '#2E7D32',
+        keywords: ['biologia', 'ciencias naturales', 'naturaleza', 'animal', 'planta', 'celula', 'ecosistema', 'anatomia', 'cuerpo', 'organismo', 'evolucion', 'genetica'],
+        specificIds: ['BIOLOGIA', 'SOLAR_SYSTEM', 'ETIQUETAS'],
+    },
+    {
+        id: 'MUSICA', label: 'Música', emoji: '🎵', color: '#5E35B1',
+        keywords: ['musica', 'music', 'notas', 'instrumento', 'ritmo', 'melodia', 'armonia', 'partitura', 'solfeo', 'cancion'],
+        specificIds: ['MUSICA'],
+    },
+    {
+        id: 'TECNOLOGIA', label: 'Tecnología', emoji: '⚙️', color: '#546E7A',
+        keywords: ['tecnologia', 'tecno', 'informatica', 'robotica', 'circuito', 'maquina', 'programacion', 'dibujo tecnico', 'diseño', 'vistas', 'mecanismo'],
+        specificIds: ['VISTAS_DIDRICAS', 'MINIAPP_CREATOR'],
+    },
+    {
+        id: 'PLASTICA', label: 'Plástica', emoji: '🎨', color: '#AD1457',
+        keywords: ['plastica', 'arte', 'dibujo', 'visual', 'pintura', 'artistica', 'escultura', 'color', 'forma', 'volumen', 'perspectiva'],
+        specificIds: ['STORYCUBES'],
+    },
+    {
+        id: 'IDIOMAS', label: 'Idiomas', emoji: '🌐', color: '#1565C0',
+        keywords: ['ingles', 'english', 'frances', 'french', 'aleman', 'german', 'idioma', 'lengua extranjera', 'irregular', 'verbo', 'listening', 'speaking', 'grammar'],
+        specificIds: ['IRREGULAR_VERBS', 'LISTENING', 'SINTAXIS'],
+    },
+];
+
+const MATH_ONLY_IDS = new Set(['MATHLIVE']);
+const GESTION_IDS = ['GESTION_AULA', 'QUESTION_SENDER', 'OMNINTERACTIVE', 'VIDEOQUIZZ'];
+
+const EXTRA_TOOLS = {
+    OMNINTERACTIVE:     { id: 'OMNINTERACTIVE',     name: 'Omninteractive',   emoji: '📚', color: '#6D28D9' },
+    VIDEOQUIZZ:         { id: 'VIDEOQUIZZ',         name: 'VideoQuizz',       emoji: '🎬', color: '#DC2626' },
+    FUNCIONES_EJECUTIVAS:{ id: 'FUNCIONES_EJECUTIVAS',name: 'Func. Ejecutivas',emoji: '🧠', color: '#FF5722' },
+    SOLAR_SYSTEM:       { id: 'SOLAR_SYSTEM',       name: 'Sistema Solar',    emoji: '🪐', color: '#3B82F6' },
+    MUSICA:             { id: 'MUSICA',             name: 'Música',           emoji: '🎵', color: '#8b5cf6' },
+    GEOGRAFIA:          { id: 'GEOGRAFIA',          name: 'Geografía',        emoji: '🌍', color: '#0d9488' },
+    BIOLOGIA:           { id: 'BIOLOGIA',           name: 'Biología',         emoji: '🔬', color: '#16a34a' },
+    GESTION_AULA:       { id: 'GESTION_AULA',       name: 'Gestión Aula',     emoji: '🏫', color: '#e67e22' },
+    VISTAS_DIDRICAS:    { id: 'VISTAS_DIDRICAS',    name: 'Vistas Diédricas', emoji: '📐', color: '#7c3aed' },
+    SIMULADORES_FISICA: { id: 'SIMULADORES_FISICA', name: 'Física',           emoji: '🔭', color: '#e74c3c' },
+    MINIAPP_CREATOR:    { id: 'MINIAPP_CREATOR',    name: 'Creación App con IA', emoji: '🤖', color: '#0ea5e9' },
+};
 
 // --- FUNCIONES DE AYUDA PARA BÚSQUEDA INTELIGENTE ---
 
@@ -856,6 +1323,14 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
 
     const [juegoActivo, setJuegoActivo] = useState(null);
     const [shareModal, setShareModal] = useState(null); // { url, titulo }
+    const [infoModal, setInfoModal] = useState(null); // { info, name, color, emoji, img }
+    const [tabPrincipal, setTabPrincipal] = useState('TODAS'); // 'TODAS' | 'MATERIA'
+    const [materiaActiva, setMateriaActiva] = useState('MATEMATICAS');
+    const [buscadorVisible, setBuscadorVisible] = useState(false);
+    const [dueloPiratasSelector, setDueloPiratasSelector] = useState(false);
+    const [dueloBuscarRecurso, setDueloBuscarRecurso] = useState(false);
+    const [recursosPorMateria, setRecursosPorMateria] = useState({});
+    const [cargandoRecursosMat, setCargandoRecursosMat] = useState(false);
     const [recursoParaElegir, setRecursoParaElegir] = useState(null);
     const [omninteractivo, setOmninteractivo] = useState(false);
     const [videoQuizz,     setVideoQuizz]     = useState(false);
@@ -866,6 +1341,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
     const [biologiaApp,         setBiologiaApp]         = useState(false);
     const [gestionAula,         setGestionAula]         = useState(() => { const p = new URLSearchParams(window.location.search); return !!(p.get('gestion') || p.get('pizarra')); });
     const [vistasDidricas,      setVistasDidricas]      = useState(false);
+    const [miniAppCreator,      setMiniAppCreator]      = useState(false);
     const [simuladoresFisica,   setSimuladoresFisica]   = useState(false);
     const [simuladorFisicaActivo, setSimuladorFisicaActivo] = useState(null);
 
@@ -1087,6 +1563,11 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
             return;
         }
 
+        if (appId === 'DUELO_PIRATAS_RECURSO') {
+            setDueloPiratasSelector(true);
+            return;
+        }
+
         if (appId === 'ETIQUETAS') {
             setJuegoActivo({ tipoJuego: 'ETIQUETAS' });
             return;
@@ -1104,6 +1585,56 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
             return;
         }
     };
+
+    // Abre cualquier herramienta o juego por su ID (usado en vista por materia)
+    const openById = (id) => {
+        const TOOL_ACTIONS = {
+            SINTAXIS:           () => setJuegoActivo({ tipoJuego: 'SINTAXIS' }),
+            LISTENING:          () => setJuegoActivo({ tipoJuego: 'LISTENING' }),
+            OMNINTERACTIVE:     () => setOmninteractivo(true),
+            VIDEOQUIZZ:         () => setVideoQuizz(true),
+            FUNCIONES_EJECUTIVAS: () => setFuncionesEjecutivas(true),
+            IRREGULAR_VERBS:    () => setIrregularVerbs(true),
+            SOLAR_SYSTEM:       () => setJuegoActivo({ tipoJuego: 'SOLAR_SYSTEM' }),
+            MUSICA:             () => setMusicApp(true),
+            GEOGRAFIA:          () => setGeografiaApp(true),
+            BIOLOGIA:           () => setBiologiaApp(true),
+            GESTION_AULA:       () => setGestionAula(true),
+            VISTAS_DIDRICAS:    () => setVistasDidricas(true),
+            MINIAPP_CREATOR:    () => setMiniAppCreator(true),
+            SIMULADORES_FISICA: () => { setSimuladoresFisica(true); window.history.pushState({}, '', '/fisica'); },
+            QUESTION_SENDER:    () => setJuegoActivo({ tipoJuego: 'QUESTION_SENDER' }),
+        };
+        if (TOOL_ACTIONS[id]) TOOL_ACTIONS[id]();
+        else abrirJuego(id);
+    };
+
+    const cargarRecursosPorMateria = async (materiaId) => {
+        if (recursosPorMateria[materiaId] !== undefined) return;
+        const materia = MATERIAS_CONFIG.find(m => m.id === materiaId);
+        if (!materia) return;
+        setCargandoRecursosMat(true);
+        try {
+            const ref = collection(db, 'resources');
+            const q = query(ref, orderBy('fechaCreacion', 'desc'), limit(150));
+            const snap = await getDocs(q);
+            const todos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            const filtrados = todos.filter(r => {
+                const temas = cleanText(r.temas || '') + ' ' + cleanText(r.titulo || '');
+                return materia.keywords.some(kw => temas.includes(cleanText(kw)));
+            });
+            if (materiaId === 'MATEMATICAS' && !filtrados.find(r => r.id === 'fake-mathle')) {
+                filtrados.unshift(FAKE_MATHLE);
+            }
+            setRecursosPorMateria(prev => ({ ...prev, [materiaId]: filtrados }));
+        } catch (e) {
+            console.error(e);
+            setRecursosPorMateria(prev => ({ ...prev, [materiaId]: [] }));
+        }
+        setCargandoRecursosMat(false);
+    };
+
+    const getToolData = (id) => APPS.find(a => a.id === id) || EXTRA_TOOLS[id] || null;
 
     const lanzarComoGestor = async (r, hojaForzada = null) => {
         if (!window.confirm("¿Quieres iniciar una sesión en vivo como presentador de este juego?")) return;
@@ -1236,6 +1767,13 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
         </div>
     );
 
+    if (miniAppCreator) return (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#0f172a', overflowY: 'auto' }}>
+            <button onClick={() => setMiniAppCreator(false)} style={{ position: 'fixed', top: 12, left: 12, zIndex: 10000, background: '#1e293b', color: '#fff', border: '1px solid #334155', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 14 }}>← Volver</button>
+            <MiniAppCreator onAbrirViewer={(id) => window.open(`/?miniapp=${id}`, '_blank')} />
+        </div>
+    );
+
     if (simuladoresFisica) {
         const SIMS = [
             { key: 'COLISIONES',      slug: 'colisiones',      label: 'Colisiones',       emoji: '💥', color: '#e74c3c', desc: 'Colisiones elásticas e inelásticas',  comp: SimuladorColisiones },
@@ -1362,6 +1900,12 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                 <JuegoDivisibilidad />
             </div>
         );
+        if (juegoActivo.tipoJuego === 'DUELO_PIRATAS') return (
+            <DueloPiratas onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />
+        );
+        if (juegoActivo.tipoJuego === 'DUELO_PIRATAS_RECURSO') return (
+            <DueloPiratasRecurso recursoInicial={juegoActivo.recurso || null} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />
+        );
 
         if (juegoActivo.tipoJuego === 'SINTAXIS')    return <SintaxisGame  usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'LISTENING')   return <Listening     usuario={usuario} onExit={() => setJuegoActivo(null)} />;
@@ -1485,11 +2029,18 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
 
                     {APPS.filter(app => app.isMath).map(app => {
                         if (app.id === 'CALCULO') return (
-                            <div key={app.id} style={{
+                            <div key={app.id} style={{ position: 'relative',
                                 background: '#E0F2F1', borderRadius: '20px', padding: '22px 18px',
                                 boxShadow: '0 8px 20px rgba(0,0,0,0.1)', border: `3px solid ${app.color}`,
                                 display: 'flex', flexDirection: 'column', gap: 10,
                             }}>
+                                {GAME_INFO[app.id] && (
+                                    <button
+                                        onClick={() => setInfoModal({ info: GAME_INFO[app.id], name: app.name, color: app.color, emoji: '🧠' })}
+                                        title="Información"
+                                        style={{ position:'absolute', top:8, left:8, background:'rgba(255,255,255,0.8)', border:'none', borderRadius:6, padding:'3px 7px', cursor:'pointer', color: app.color, fontWeight:700, fontSize:'0.78rem', lineHeight:1 }}
+                                    >ℹ</button>
+                                )}
                                 <div style={{ textAlign: 'center', marginBottom: 4 }}>
                                     <div style={{ fontSize: '44px', marginBottom: '8px' }}>🧠</div>
                                     <h3 style={{ margin: '0 0 6px 0', color: app.color, fontSize: '1.3rem' }}>Cálculo</h3>
@@ -1519,6 +2070,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                                     else abrirJuego(app.id);
                                 }}
                                 style={{
+                                    position: 'relative',
                                     background: app.comingSoon ? '#f8f9fa' : '#E0F2F1',
                                     borderRadius: '20px', padding: '30px 20px', textAlign: 'center',
                                     cursor: app.comingSoon ? 'not-allowed' : 'pointer',
@@ -1526,6 +2078,13 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                                     opacity: app.comingSoon ? 0.7 : 1, border: `3px solid ${app.comingSoon ? '#ddd' : app.color}`
                                 }}
                             >
+                                {GAME_INFO[app.id] && (
+                                    <button
+                                        onClick={e => { e.stopPropagation(); setInfoModal({ info: GAME_INFO[app.id], name: app.name, color: app.color, emoji: app.emoji }); }}
+                                        title="Información"
+                                        style={{ position:'absolute', top:8, left:8, background:'rgba(255,255,255,0.8)', border:'none', borderRadius:6, padding:'3px 7px', cursor:'pointer', color: app.color, fontWeight:700, fontSize:'0.78rem', lineHeight:1 }}
+                                    >ℹ</button>
+                                )}
                                 <div style={{ fontSize: '50px', marginBottom: '15px', filter: app.comingSoon ? 'grayscale(100%)' : 'none' }}>{app.emoji}</div>
                                 <h3 style={{ margin: '0 0 10px 0', color: app.comingSoon ? '#7f8c8d' : app.color, fontSize: '1.4rem' }}>{app.name}</h3>
                                 <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>{app.desc}</p>
@@ -1533,6 +2092,29 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                             </div>
                         );
                     })}
+
+                    {/* ── Duelo de Piratas ── */}
+                    <div
+                        onClick={() => { window.history.pushState({}, '', '/duelo-piratas'); setJuegoActivo({ tipoJuego: 'DUELO_PIRATAS' }); }}
+                        style={{
+                            background: 'linear-gradient(135deg,#0a1628 0%,#1a3a5c 100%)',
+                            borderRadius: '20px', padding: '28px 18px', textAlign: 'center',
+                            cursor: 'pointer', boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
+                            transition: 'transform 0.2s, box-shadow 0.2s',
+                            border: '3px solid #f9c74f66',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 14px 32px rgba(0,0,0,0.35)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.25)'; }}
+                    >
+                        <div style={{ fontSize: '48px', marginBottom: '12px' }}>🏴‍☠️</div>
+                        <h3 style={{ margin: '0 0 8px', color: '#f9c74f', fontSize: '1.35rem', fontFamily: 'Georgia,serif' }}>Duelo de Piratas</h3>
+                        <p style={{ margin: 0, color: '#94d2bd', fontSize: '0.88rem' }}>
+                            Dispara cañonazos respondiendo operaciones. ¡Sincroniza el ángulo y acaba con el barco enemigo!
+                        </p>
+                        <span style={{ display: 'inline-block', marginTop: '14px', background: 'rgba(249,199,79,0.15)', color: '#f9c74f', padding: '4px 14px', borderRadius: '20px', fontSize: '0.78rem', fontWeight: 700, border: '1px solid #f9c74f55' }}>
+                            ⚓ 2 Jugadores · Local
+                        </span>
+                    </div>
                 </div>
             </div>
         );
@@ -1617,6 +2199,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
             )}
 
             {shareModal && <ShareModal url={shareModal.url} titulo={shareModal.titulo} onClose={() => setShareModal(null)} />}
+            {infoModal && <InfoModal info={infoModal.info} name={infoModal.name} color={infoModal.color} emoji={infoModal.emoji} img={infoModal.img} onClose={() => setInfoModal(null)} />}
             {showPerfil && usuario && <UserProfile usuario={usuario} onClose={() => setShowPerfil(false)} showSupport={false} />}
             {pictoTabuModal && <PictoTabuModal
                 usuario={usuario}
@@ -1649,82 +2232,287 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                 </div>
             )}
 
-            {/* BUSCADOR PRINCIPAL (MÁS ANCHO) */}
-            <div style={{ background: 'rgba(255,255,255,0.95)', padding: '30px', borderRadius: '20px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', marginBottom: '30px', maxWidth: '900px', margin: '0 auto 30px auto' }}>
-                <h3 style={{ margin: '0 0 20px 0', color: '#333', textAlign: 'center' }}><Search size={20} style={{ verticalAlign: 'middle' }} /> Encuentra un Recurso</h3>
-
-                <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginBottom: '20px' }}>
-                    <button onClick={() => setModoBusqueda('FILTROS')} style={{ padding: '10px 20px', borderRadius: '20px', border: 'none', background: modoBusqueda === 'FILTROS' ? '#f1c40f' : '#eee', fontWeight: 'bold', cursor: 'pointer' }}><Filter size={16} /> Filtros</button>
-                    <button onClick={() => setModoBusqueda('CODIGO')} style={{ padding: '10px 20px', borderRadius: '20px', border: 'none', background: modoBusqueda === 'CODIGO' ? '#f1c40f' : '#eee', fontWeight: 'bold', cursor: 'pointer' }}><Key size={16} /> Código</button>
+            {/* ── TABS PRINCIPALES + BOTÓN LUPA ── */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 10 }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button
+                        onClick={() => setTabPrincipal('TODAS')}
+                        style={{ padding: '10px 18px', borderRadius: 20, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '0.92rem', transition: 'all 0.2s',
+                            background: tabPrincipal === 'TODAS' ? '#f1c40f' : 'rgba(255,255,255,0.2)',
+                            color: tabPrincipal === 'TODAS' ? '#333' : 'white',
+                            boxShadow: tabPrincipal === 'TODAS' ? '0 2px 10px rgba(241,196,15,0.5)' : 'none' }}
+                    >🎮 Todas</button>
+                    <button
+                        onClick={() => { setTabPrincipal('MATERIA'); cargarRecursosPorMateria(materiaActiva); }}
+                        style={{ padding: '10px 18px', borderRadius: 20, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '0.92rem', transition: 'all 0.2s',
+                            background: tabPrincipal === 'MATERIA' ? '#f1c40f' : 'rgba(255,255,255,0.2)',
+                            color: tabPrincipal === 'MATERIA' ? '#333' : 'white',
+                            boxShadow: tabPrincipal === 'MATERIA' ? '0 2px 10px rgba(241,196,15,0.5)' : 'none' }}
+                    >📚 Por Materia</button>
                 </div>
-
-                {modoBusqueda === 'CODIGO' ? (
-                    <div style={{ textAlign: 'center' }}>
-                        <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '15px' }}>Si tienes un código de 6 números es una sesión en vivo. Si tiene 4 o 5 letras, es un juego.</p>
-                        <input placeholder="Ej: A1B2C o 123456" value={codigo} onChange={e => setCodigo(e.target.value)} style={{ padding: '15px', fontSize: '1.5rem', textAlign: 'center', borderRadius: '10px', border: '2px solid #ddd', width: '100%', maxwidth:'250px', textTransform: 'uppercase', letterSpacing: '3px' }} maxLength={6} />
-                    </div>
-                ) : (
-                        <div>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px' }}>
-                                <select style={styles.input} value={filtros.tipoJuego} onChange={e => setFiltros({ ...filtros, tipoJuego: e.target.value })}>
-                                    <option value="">📂 Todos los Juegos</option>
-                                    <option value="PASAPALABRA">Pasapalabra</option>
-                                    <option value="CAZABURBUJAS">Burbujas/Pikatron</option>
-                                    <option value="APAREJADOS">Aparejados</option>
-                                    <option value="RULETA">La Ruleta</option>
-                                    <option value="SOPA">Sopa de Letras</option>
-
-                                    <option value="WORDLE">WordLe</option>
-                                    <option value="THINKHOOT">📡 Live (En Vivo)</option>
-                                </select>
-                                <select style={styles.input} value={filtros.ciclo} onChange={e => setFiltros({ ...filtros, ciclo: e.target.value })}>
-                                    <option value="">🎓 Cualquier Ciclo</option>
-                                    <option value="Infantil">Infantil</option>
-                                    <option value="Primaria">Primaria</option>
-                                    <option value="Secundaria">Secundaria</option>
-                                    <option value="Bachillerato">Bachillerato</option>
-                                    <option value="FP">FP</option>
-                                    <option value="Otros">Otros</option>
-                                </select>
-                                <input style={styles.input} placeholder="Tema (Ej: Mates...)" value={filtros.tema} onChange={e => setFiltros({ ...filtros, tema: e.target.value })} />
-                            </div>
-
-                            {/* BOTÓN MÁS FILTROS */}
-                            <div style={{ textAlign: 'right', marginTop: '10px' }}>
-                                <button onClick={() => setMostrarMasFiltros(!mostrarMasFiltros)} style={{ background: 'none', border: 'none', color: '#2196F3', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '5px', width: '100%' }}>
-                                    {mostrarMasFiltros ? <ChevronUp size={16} /> : <ChevronDown size={16} />} {mostrarMasFiltros ? 'Menos filtros' : 'Más filtros (País, Autor...)'}
-                                </button>
-                            </div>
-
-                            {mostrarMasFiltros && (
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px', marginTop: '10px', padding: '15px', background: '#f5f5f5', borderRadius: '10px' }}>
-                                    <input style={styles.input} placeholder="País" value={filtros.pais} onChange={e => setFiltros({ ...filtros, pais: e.target.value })} />
-                                    <input style={styles.input} placeholder="Región/Provincia" value={filtros.region} onChange={e => setFiltros({ ...filtros, region: e.target.value })} />
-                                    <input style={styles.input} placeholder="Localidad" value={filtros.poblacion} onChange={e => setFiltros({ ...filtros, poblacion: e.target.value })} />
-                                    <input style={styles.input} placeholder="Nombre del Profesor" value={filtros.autor} onChange={e => setFiltros({ ...filtros, autor: e.target.value })} />
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                <button onClick={buscar} disabled={buscando} style={{ background: '#2196F3', color: 'white', padding: '12px', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', width: '100%', marginTop: '15px', fontSize: '1.1rem' }}>
-                    {buscando ? 'Buscando...' : 'Buscar'}
+                <button
+                    onClick={() => setBuscadorVisible(true)}
+                    title="Buscar recurso"
+                    style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.35)', color: 'white', borderRadius: 12, padding: '10px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: '0.9rem', flexShrink: 0 }}
+                >
+                    <Search size={18} /> Buscar
                 </button>
+            </div>
 
-                {/* RESULTADOS (2 COLUMNAS, SCROLL VERTICAL) */}
-                {resultados.length > 0 && (
-                    <div style={{ marginTop: '25px', borderTop: '2px dashed #eee', paddingTop: '20px' }}>
-                        <h4 style={{ color: '#666', marginBottom: '15px' }}>Resultados ({resultados.length}):</h4>
-                        <div style={{ maxHeight: '400px', overflowY: 'auto', paddingRight: '10px' }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '15px' }}>
-                                {resultados.map(r => (
+            {/* ── SELECTOR DUELO DE PIRATAS ── */}
+            {dueloPiratasSelector && (
+                <div onClick={() => setDueloPiratasSelector(false)} style={{ position:'fixed', inset:0, zIndex:9999, background:'rgba(0,0,0,0.78)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+                    <div onClick={e => e.stopPropagation()} style={{ background:'linear-gradient(180deg,#07111f 0%,#0e2a44 100%)', borderRadius:20, padding:28, width:'100%', maxWidth:420, boxShadow:'0 20px 60px rgba(0,0,0,0.6)', border:'2px solid rgba(249,199,79,0.3)' }}>
+                        <div style={{ textAlign:'center', marginBottom:24 }}>
+                            <div style={{ fontSize:'2.2rem', marginBottom:6 }}>🏴‍☠️</div>
+                            <h3 style={{ margin:0, color:'#f9c74f', fontFamily:'Georgia,serif', fontSize:'1.6rem' }}>Duelo de Piratas</h3>
+                            <p style={{ color:'#94d2bd', margin:'6px 0 0', fontSize:'0.87rem' }}>Elige el tipo de partida</p>
+                        </div>
+                        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+                            <button
+                                onClick={() => { setDueloPiratasSelector(false); window.history.pushState({}, '', '?juego=duelo_piratas'); setJuegoActivo({ tipoJuego:'DUELO_PIRATAS' }); }}
+                                style={{ background:'linear-gradient(135deg,#1a4a7a,#0a1628)', border:'2px solid rgba(249,199,79,0.45)', borderRadius:14, padding:'20px 24px', cursor:'pointer', textAlign:'left', color:'white', width:'100%' }}>
+                                <div style={{ fontSize:'1.5rem', marginBottom:6 }}>🧮</div>
+                                <div style={{ fontWeight:800, fontSize:'1.05rem', color:'#f9c74f', marginBottom:4 }}>Matemáticas</div>
+                                <div style={{ fontSize:'0.82rem', color:'#94d2bd' }}>Conteo, sumas, restas, multiplicaciones, divisiones y raíces</div>
+                            </button>
+                            <button
+                                onClick={() => { setDueloPiratasSelector(false); setResultados([]); setDueloBuscarRecurso(true); }}
+                                style={{ background:'linear-gradient(135deg,#1a4a2a,#0a2814)', border:'2px solid rgba(100,220,120,0.35)', borderRadius:14, padding:'20px 24px', cursor:'pointer', textAlign:'left', color:'white', width:'100%' }}>
+                                <div style={{ fontSize:'1.5rem', marginBottom:6 }}>📚</div>
+                                <div style={{ fontWeight:800, fontSize:'1.05rem', color:'#80e89a', marginBottom:4 }}>Con un recurso</div>
+                                <div style={{ fontSize:'0.82rem', color:'#94d2bd' }}>Busca por materia, tema, ciclo o pega el código de acceso</div>
+                            </button>
+                        </div>
+                        <button onClick={() => setDueloPiratasSelector(false)} style={{ display:'block', margin:'20px auto 0', background:'transparent', border:'1px solid rgba(255,255,255,0.2)', color:'#888', borderRadius:8, padding:'8px 24px', cursor:'pointer', fontSize:'0.9rem' }}>Cancelar</button>
+                    </div>
+                </div>
+            )}
+
+            {/* ── BUSCAR RECURSO PARA DUELO DE PIRATAS ── */}
+            {dueloBuscarRecurso && (
+                <div onClick={() => setDueloBuscarRecurso(false)} style={{ position:'fixed', inset:0, zIndex:9999, background:'rgba(0,0,0,0.75)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+                    <div onClick={e => e.stopPropagation()} style={{ background:'white', borderRadius:20, padding:28, width:'100%', maxWidth:620, maxHeight:'90vh', overflowY:'auto', boxShadow:'0 20px 60px rgba(0,0,0,0.5)' }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+                            <h3 style={{ margin:0, color:'#0a1628', display:'flex', alignItems:'center', gap:8 }}>🏴‍☠️ Elige un recurso para el Duelo</h3>
+                            <button onClick={() => setDueloBuscarRecurso(false)} style={{ background:'#f1f5f9', border:'none', borderRadius:8, padding:'6px 10px', cursor:'pointer', fontWeight:700 }}>✕</button>
+                        </div>
+                        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:10, marginBottom:10 }}>
+                            <select style={styles.input} value={filtros.tipoJuego} onChange={e => setFiltros({ ...filtros, tipoJuego: e.target.value })}>
+                                <option value="">📂 Todos los tipos</option>
+                                <option value="PASAPALABRA">Pasapalabra</option>
+                                <option value="CAZABURBUJAS">Burbujas</option>
+                                <option value="APAREJADOS">Aparejados</option>
+                                <option value="RULETA">Ruleta</option>
+                                <option value="SOPA">Sopa de Letras</option>
+                                <option value="WORDLE">WordLe</option>
+                            </select>
+                            <select style={styles.input} value={filtros.ciclo} onChange={e => setFiltros({ ...filtros, ciclo: e.target.value })}>
+                                <option value="">🎓 Cualquier ciclo</option>
+                                <option value="Infantil">Infantil</option>
+                                <option value="Primaria">Primaria</option>
+                                <option value="Secundaria">Secundaria</option>
+                                <option value="Bachillerato">Bachillerato</option>
+                                <option value="FP">FP</option>
+                            </select>
+                            <input style={styles.input} placeholder="Tema (Ej: Historia...)" value={filtros.tema} onChange={e => setFiltros({ ...filtros, tema: e.target.value })} />
+                        </div>
+                        <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+                            <input placeholder="Código de acceso (4-5 letras)" value={codigo} onChange={e => setCodigo(e.target.value.toUpperCase())} onKeyDown={e => e.key === 'Enter' && buscar()} style={{ ...styles.input, flex:1, letterSpacing:2, fontWeight:700 }} maxLength={5} />
+                            <button onClick={buscar} disabled={buscando} style={{ background:'#0a1628', color:'white', border:'none', borderRadius:10, padding:'10px 18px', cursor:'pointer', fontWeight:700, whiteSpace:'nowrap' }}>
+                                {buscando ? '⏳' : '🔍 Buscar'}
+                            </button>
+                        </div>
+                        {resultados.length > 0 && (
+                            <div>
+                                <p style={{ color:'#555', fontSize:'0.85rem', marginBottom:10 }}>{resultados.length} resultado{resultados.length !== 1 ? 's' : ''} — elige uno para el duelo:</p>
+                                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(260px, 1fr))', gap:12, maxHeight:340, overflowY:'auto', paddingRight:4 }}>
+                                    {resultados.map(r => (
+                                        <ResourceCard key={r.id} r={r} onClick={() => { setDueloBuscarRecurso(false); setJuegoActivo({ tipoJuego:'DUELO_PIRATAS_RECURSO', recurso: r }); }} />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* ── MODAL BUSCADOR ── */}
+            {buscadorVisible && (
+                <div onClick={() => setBuscadorVisible(false)} style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                    <div onClick={e => e.stopPropagation()} style={{ background: 'white', borderRadius: 20, padding: 28, width: '100%', maxWidth: 600, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                            <h3 style={{ margin: 0, color: '#333', display: 'flex', alignItems: 'center', gap: 8 }}><Search size={20} /> Encuentra un Recurso</h3>
+                            <button onClick={() => setBuscadorVisible(false)} style={{ background: '#f1f5f9', border: 'none', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontWeight: 700 }}>✕</button>
+                        </div>
+                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginBottom: '20px' }}>
+                            <button onClick={() => setModoBusqueda('FILTROS')} style={{ padding: '10px 20px', borderRadius: '20px', border: 'none', background: modoBusqueda === 'FILTROS' ? '#f1c40f' : '#eee', fontWeight: 'bold', cursor: 'pointer' }}><Filter size={16} /> Filtros</button>
+                            <button onClick={() => setModoBusqueda('CODIGO')} style={{ padding: '10px 20px', borderRadius: '20px', border: 'none', background: modoBusqueda === 'CODIGO' ? '#f1c40f' : '#eee', fontWeight: 'bold', cursor: 'pointer' }}><Key size={16} /> Código</button>
+                        </div>
+                        {modoBusqueda === 'CODIGO' ? (
+                            <div style={{ textAlign: 'center' }}>
+                                <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '15px' }}>Si tienes un código de 6 números es una sesión en vivo. Si tiene 4 o 5 letras, es un juego.</p>
+                                <input placeholder="Ej: A1B2C o 123456" value={codigo} onChange={e => setCodigo(e.target.value)} style={{ padding: '15px', fontSize: '1.5rem', textAlign: 'center', borderRadius: '10px', border: '2px solid #ddd', width: '100%', textTransform: 'uppercase', letterSpacing: '3px', boxSizing: 'border-box' }} maxLength={6} />
+                            </div>
+                        ) : (
+                            <div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px' }}>
+                                    <select style={styles.input} value={filtros.tipoJuego} onChange={e => setFiltros({ ...filtros, tipoJuego: e.target.value })}>
+                                        <option value="">📂 Todos los Juegos</option>
+                                        <option value="PASAPALABRA">Pasapalabra</option>
+                                        <option value="CAZABURBUJAS">Burbujas/Pikatron</option>
+                                        <option value="APAREJADOS">Aparejados</option>
+                                        <option value="RULETA">La Ruleta</option>
+                                        <option value="SOPA">Sopa de Letras</option>
+                                        <option value="WORDLE">WordLe</option>
+                                        <option value="THINKHOOT">📡 Live (En Vivo)</option>
+                                    </select>
+                                    <select style={styles.input} value={filtros.ciclo} onChange={e => setFiltros({ ...filtros, ciclo: e.target.value })}>
+                                        <option value="">🎓 Cualquier Ciclo</option>
+                                        <option value="Infantil">Infantil</option>
+                                        <option value="Primaria">Primaria</option>
+                                        <option value="Secundaria">Secundaria</option>
+                                        <option value="Bachillerato">Bachillerato</option>
+                                        <option value="FP">FP</option>
+                                        <option value="Otros">Otros</option>
+                                    </select>
+                                    <input style={styles.input} placeholder="Tema (Ej: Mates...)" value={filtros.tema} onChange={e => setFiltros({ ...filtros, tema: e.target.value })} />
+                                </div>
+                                <div style={{ textAlign: 'right', marginTop: '10px' }}>
+                                    <button onClick={() => setMostrarMasFiltros(!mostrarMasFiltros)} style={{ background: 'none', border: 'none', color: '#2196F3', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '5px', width: '100%' }}>
+                                        {mostrarMasFiltros ? <ChevronUp size={16} /> : <ChevronDown size={16} />} {mostrarMasFiltros ? 'Menos filtros' : 'Más filtros (País, Autor...)'}
+                                    </button>
+                                </div>
+                                {mostrarMasFiltros && (
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px', marginTop: '10px', padding: '15px', background: '#f5f5f5', borderRadius: '10px' }}>
+                                        <input style={styles.input} placeholder="País" value={filtros.pais} onChange={e => setFiltros({ ...filtros, pais: e.target.value })} />
+                                        <input style={styles.input} placeholder="Región/Provincia" value={filtros.region} onChange={e => setFiltros({ ...filtros, region: e.target.value })} />
+                                        <input style={styles.input} placeholder="Localidad" value={filtros.poblacion} onChange={e => setFiltros({ ...filtros, poblacion: e.target.value })} />
+                                        <input style={styles.input} placeholder="Nombre del Profesor" value={filtros.autor} onChange={e => setFiltros({ ...filtros, autor: e.target.value })} />
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        <button onClick={buscar} disabled={buscando} style={{ background: '#2196F3', color: 'white', padding: '12px', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', width: '100%', marginTop: '15px', fontSize: '1.1rem' }}>
+                            {buscando ? 'Buscando...' : 'Buscar'}
+                        </button>
+                        {resultados.length > 0 && (
+                            <div style={{ marginTop: '25px', borderTop: '2px dashed #eee', paddingTop: '20px' }}>
+                                <h4 style={{ color: '#666', marginBottom: '15px' }}>Resultados ({resultados.length}):</h4>
+                                <div style={{ maxHeight: '340px', overflowY: 'auto', paddingRight: '8px' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '12px' }}>
+                                        {resultados.map(r => (
+                                            <ResourceCard key={r.id} r={r} onClick={() => { procesarClickTarjeta(r); setBuscadorVisible(false); }} />
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* ── VISTA POR MATERIA ── */}
+            {tabPrincipal === 'MATERIA' && (() => {
+                const materia = MATERIAS_CONFIG.find(m => m.id === materiaActiva) || MATERIAS_CONFIG[0];
+                const specificApps = materia.specificIds.map(id => getToolData(id)).filter(Boolean);
+                const universalApps = APPS.filter(a =>
+                    !GESTION_IDS.includes(a.id) &&
+                    !materia.specificIds.includes(a.id) &&
+                    !a.isMath &&
+                    !a.isHerramienta &&
+                    (!MATH_ONLY_IDS.has(a.id) || materiaActiva === 'MATEMATICAS')
+                );
+                const gestionApps = GESTION_IDS.map(id => getToolData(id)).filter(Boolean);
+                const recursos = recursosPorMateria[materiaActiva];
+
+                const miniCard = (app, onClick) => (
+                    <div key={app.id} onClick={onClick}
+                        style={{ position: 'relative', background: '#ffffbf', borderRadius: 15, padding: '12px 10px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.15)', border: `2px solid ${app.color || '#ddd'}30`, transition: 'transform 0.15s' }}
+                        onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+                        onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
+                        {GAME_INFO[app.id] && (
+                            <button onClick={e => { e.stopPropagation(); setInfoModal({ info: GAME_INFO[app.id], name: app.name || app.label, color: app.color, emoji: app.emoji, img: app.img }); }}
+                                title="Info"
+                                style={{ position:'absolute', top:5, left:5, background:'rgba(255,255,255,0.85)', border:'none', borderRadius:5, padding:'2px 5px', cursor:'pointer', color: app.color, fontWeight:700, fontSize:'0.7rem', lineHeight:1 }}>ℹ</button>
+                        )}
+                        <div style={{ width: 46, height: 46, margin: '0 auto 8px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${app.color || '#999'}18`, borderRadius: 12 }}>
+                            {app.img
+                                ? <img src={app.img} alt={app.name} style={{ width: 36, height: 36, objectFit: 'contain', borderRadius: 8 }} />
+                                : <span style={{ fontSize: 26 }}>{app.emoji}</span>}
+                        </div>
+                        <h4 style={{ margin: 0, color: app.color || '#333', fontSize: '0.8rem', fontWeight: 700, lineHeight: 1.2 }}>{app.name || app.label}</h4>
+                    </div>
+                );
+
+                return (
+                    <div>
+                        {/* Sub-tabs materias */}
+                        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 6, marginBottom: 24, scrollbarWidth: 'none' }}>
+                            {MATERIAS_CONFIG.map(m => (
+                                <button key={m.id}
+                                    onClick={() => { setMateriaActiva(m.id); cargarRecursosPorMateria(m.id); }}
+                                    style={{ flexShrink: 0, padding: '8px 16px', borderRadius: 20, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem', transition: 'all 0.2s', whiteSpace: 'nowrap',
+                                        background: materiaActiva === m.id ? m.color : 'rgba(255,255,255,0.18)',
+                                        color: materiaActiva === m.id ? 'white' : 'rgba(255,255,255,0.8)',
+                                        boxShadow: materiaActiva === m.id ? `0 3px 12px ${m.color}66` : 'none' }}
+                                >{m.emoji} {m.label}</button>
+                            ))}
+                        </div>
+
+                        {/* Herramientas específicas */}
+                        {specificApps.length > 0 && (<>
+                            <h3 style={{ color: materia.color, textShadow: '0 1px 3px rgba(0,0,0,0.4)', marginBottom: 14, marginTop: 0, fontSize: '1.1rem' }}>
+                                {materia.emoji} Herramientas de {materia.label}
+                            </h3>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 14, marginBottom: 28 }}>
+                                {specificApps.map(app => miniCard(app, () => openById(app.id)))}
+                            </div>
+                        </>)}
+
+                        {/* Juegos universales */}
+                        <h3 style={{ color: '#f1c40f', textShadow: '0 1px 3px rgba(0,0,0,0.5)', marginBottom: 14, fontSize: '1.05rem' }}>
+                            🎮 Juegos para tu clase
+                        </h3>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 12, marginBottom: 28 }}>
+                            {universalApps.map(app => miniCard(app, () => abrirJuego(app.id)))}
+                        </div>
+
+                        {/* Gestión aula */}
+                        <h3 style={{ color: 'rgba(255,255,255,0.85)', textShadow: '0 1px 3px rgba(0,0,0,0.4)', marginBottom: 14, fontSize: '1.05rem' }}>
+                            🏫 Siempre disponibles
+                        </h3>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 12, marginBottom: 28 }}>
+                            {gestionApps.map(app => miniCard(app, () => openById(app.id)))}
+                        </div>
+
+                        {/* Recursos de la comunidad */}
+                        <h3 style={{ color: materia.color, textShadow: '0 1px 3px rgba(0,0,0,0.4)', marginBottom: 14, fontSize: '1.05rem' }}>
+                            📚 Recursos de la comunidad
+                        </h3>
+                        {!recursos && !cargandoRecursosMat && (
+                            <button onClick={() => cargarRecursosPorMateria(materiaActiva)}
+                                style={{ background: materia.color, color: 'white', border: 'none', borderRadius: 12, padding: '12px 24px', cursor: 'pointer', fontWeight: 700, fontSize: '0.95rem' }}>
+                                Cargar recursos de {materia.label}
+                            </button>
+                        )}
+                        {cargandoRecursosMat && <p style={{ color: 'rgba(255,255,255,0.7)' }}>⏳ Cargando recursos...</p>}
+                        {recursos && recursos.length === 0 && (
+                            <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem' }}>No se encontraron recursos de la comunidad para esta materia aún.</p>
+                        )}
+                        {recursos && recursos.length > 0 && (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14, marginBottom: 20 }}>
+                                {recursos.map(r => (
                                     <ResourceCard key={r.id} r={r} onClick={() => procesarClickTarjeta(r)} />
                                 ))}
                             </div>
-                        </div>
+                        )}
                     </div>
-                )}
-            </div>
+                );
+            })()}
+
+            {/* ── VISTA TODAS LAS APLICACIONES ── */}
+            {tabPrincipal === 'TODAS' && <>
 
             {/* --- SECCIÓN 1: JUEGOS EN VIVO (TODA LA CLASE) --- */}
             <h2 style={{ color: '#f1c40f', textShadow: '0 2px 4px rgba(0,0,0,0.8)', textAlign: 'center', marginBottom: '20px', marginTop: '30px' }}>
@@ -1733,7 +2521,14 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '40px', maxWidth: '700px', margin: '0 auto 40px auto' }}>
                 {APPS.filter(app => app.isLive).map(app => (
-                    <div key={app.id} onClick={() => abrirJuego(app.id)} style={{ background: '#fff', borderRadius: '20px', padding: '20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.3)', border: `4px solid ${app.color}`, transition: 'transform 0.2s', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <div key={app.id} onClick={() => abrirJuego(app.id)} style={{ position: 'relative', background: '#fff', borderRadius: '20px', padding: '20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.3)', border: `4px solid ${app.color}`, transition: 'transform 0.2s', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        {GAME_INFO[app.id] && (
+                            <button
+                                onClick={e => { e.stopPropagation(); setInfoModal({ info: GAME_INFO[app.id], name: app.name, color: app.color, emoji: app.emoji, img: app.img }); }}
+                                title="Información"
+                                style={{ position:'absolute', top:8, left:8, background: `${app.color}22`, border:`1px solid ${app.color}44`, borderRadius:8, padding:'3px 7px', cursor:'pointer', color: app.color, fontWeight:700, fontSize:'0.78rem', lineHeight:1 }}
+                            >ℹ</button>
+                        )}
                         <div style={{ width: '80px', height: '80px', marginBottom: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             {app.img
                                 ? <img src={app.img} alt={app.name} style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '15px' }} />
@@ -1772,6 +2567,13 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                                 <Share2 size={13}/>
                             </button>
                         )}
+                        {GAME_INFO[app.id] && (
+                            <button
+                                onClick={e => { e.stopPropagation(); setInfoModal({ info: GAME_INFO[app.id], name: app.name, color: app.color, emoji: app.emoji, img: app.img }); }}
+                                title="Información"
+                                style={{ position:'absolute', top:6, left:6, background:'rgba(255,255,255,0.8)', border:'none', borderRadius:6, padding:'3px 6px', cursor:'pointer', color: app.color, fontWeight:700, fontSize:'0.75rem', lineHeight:1 }}
+                            >ℹ</button>
+                        )}
                         <div style={{ width: '60px', height: '60px', margin: '0 auto 10px auto', background: 'transparent', borderRadius: '15px', display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'white' }}>
                             {app.img ? (
                             <img src={app.img} alt={app.name} style={{ width: '60px', height: '60px', objectFit: 'contain', borderRadius: '15px' }} onError={(e) => e.target.style.display = 'none'} />
@@ -1790,7 +2592,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '15px', marginBottom: '40px', maxWidth: '900px', margin: '0 auto 40px auto' }}>
                 {[
                     { id: 'SINTAXIS',        label: 'Sintaxis',        emoji: '🖍️',  color: '#3498db', action: () => setJuegoActivo({ tipoJuego: 'SINTAXIS' }), shareable: true },
-                    { id: 'MATH_WORLD',      label: 'Math World',      emoji: '🌍',  color: '#009688', action: () => abrirJuego('MATH_WORLD_PORTAL'), shareable: true, shareUrl: `${window.location.origin}/math_world` },
+                    { id: 'MATH_WORLD_PORTAL', label: 'Math World',    emoji: '🌍',  color: '#009688', action: () => abrirJuego('MATH_WORLD_PORTAL'), shareable: true, shareUrl: `${window.location.origin}/math_world` },
                     { id: 'LISTENING',       label: 'Listening',       emoji: '🙉',  color: '#8E44AD', action: () => setJuegoActivo({ tipoJuego: 'LISTENING' }), shareable: true },
                     { id: 'ETIQUETAS',       label: 'EtiquetaMe',      img: imgEtiquetas, color: '#e74c3c', action: () => abrirJuego('ETIQUETAS'), shareable: true },
                     { id: 'QUESTION_SENDER', label: 'Q-Sender',        emoji: '📮',  color: '#2c3e50', action: () => setJuegoActivo({ tipoJuego: 'QUESTION_SENDER' }), shareable: true },
@@ -1822,6 +2624,13 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                                 <Share2 size={13}/>
                             </button>
                         )}
+                        {GAME_INFO[tool.id] && (
+                            <button
+                                onClick={e => { e.stopPropagation(); setInfoModal({ info: GAME_INFO[tool.id], name: tool.label, color: tool.color, emoji: tool.emoji, img: tool.img }); }}
+                                title="Información"
+                                style={{ position:'absolute', top:6, left:6, background:'rgba(255,255,255,0.8)', border:'none', borderRadius:6, padding:'3px 6px', cursor:'pointer', color: tool.color, fontWeight:700, fontSize:'0.75rem', lineHeight:1 }}
+                            >ℹ</button>
+                        )}
                         <div style={{ width: '52px', height: '52px', margin: '0 auto 10px auto', display: 'flex', justifyContent: 'center', alignItems: 'center', background: `${tool.color}18`, borderRadius: '12px' }}>
                             {tool.img
                                 ? <img src={tool.img} alt={tool.label} style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
@@ -1832,6 +2641,8 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                     </div>
                 ))}
             </div>
+
+            </>}
 
             {/* ========================================= */}
             {/* FOOTER DE LICENCIA (PANTALLA PRINCIPAL) */}
@@ -1853,6 +2664,68 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
 
        
     
+        </div>
+    );
+}
+
+// MODAL DE INFORMACIÓN DE JUEGO/HERRAMIENTA
+function InfoModal({ info, name, color, emoji, img, onClose }) {
+    if (!info) return null;
+    return (
+        <div
+            onClick={onClose}
+            style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
+        >
+            <div
+                onClick={e => e.stopPropagation()}
+                style={{ background: '#fff', borderRadius: 20, maxWidth: 520, width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}
+            >
+                {/* Header */}
+                <div style={{ background: color, borderRadius: '20px 20px 0 0', padding: '20px 20px 16px', display: 'flex', alignItems: 'center', gap: 14 }}>
+                    <div style={{ width: 56, height: 56, borderRadius: 14, background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        {img
+                            ? <img src={img} alt={name} style={{ width: 44, height: 44, objectFit: 'contain', borderRadius: 10 }} />
+                            : <span style={{ fontSize: 32 }}>{emoji}</span>
+                        }
+                    </div>
+                    <div style={{ flex: 1 }}>
+                        <h2 style={{ margin: 0, color: 'white', fontSize: '1.3rem', fontWeight: 800 }}>{name}</h2>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 6 }}>
+                            {info.etapas?.map(e => (
+                                <span key={e} style={{ background: 'rgba(255,255,255,0.25)', color: 'white', borderRadius: 20, padding: '2px 10px', fontSize: '0.72rem', fontWeight: 700 }}>{e}</span>
+                            ))}
+                        </div>
+                    </div>
+                    <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', borderRadius: 10, width: 32, height: 32, cursor: 'pointer', fontWeight: 700, fontSize: '1rem', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+                </div>
+
+                {/* Body */}
+                <div style={{ padding: '18px 20px 20px' }}>
+                    {/* Materias */}
+                    <div style={{ marginBottom: 14 }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>Materias</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                            {info.materias?.map(m => (
+                                <span key={m} style={{ background: (MATERIA_COLORS[m] || '#607D8B') + '20', color: MATERIA_COLORS[m] || '#607D8B', border: `1px solid ${MATERIA_COLORS[m] || '#607D8B'}50`, borderRadius: 20, padding: '3px 12px', fontSize: '0.78rem', fontWeight: 700 }}>{m}</span>
+                            ))}
+                        </div>
+                    </div>
+
+                    <InfoRow icon="📖" label="Descripción" text={info.descripcion} />
+                    <InfoRow icon="❓" label="Tipo de preguntas" text={info.tipoPreguntas} />
+                    <InfoRow icon="📚" label="Biblioteca incorporada" text={info.biblioteca} />
+                    <InfoRow icon="👥" label="Multijugador" text={info.multiplayer} />
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function InfoRow({ icon, label, text }) {
+    return (
+        <div style={{ marginBottom: 12, padding: '10px 14px', background: '#F8FAFC', borderRadius: 12, borderLeft: '3px solid #E2E8F0' }}>
+            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 3 }}>{icon} {label}</div>
+            <div style={{ fontSize: '0.88rem', color: '#334155', lineHeight: 1.5 }}>{text}</div>
         </div>
     );
 }
@@ -2487,7 +3360,20 @@ function PictoTabuModal({ usuario, onClose, onEnterRoom, initialCode = '' }) {
     const [joinName, setJoinName] = useState(usuario?.displayName || '');
     const [joining, setJoining] = useState(false);
     // hostId fijo para esta sesión — se usará para identificar al creador como admin
+    const [categoria, setCategoria] = useState('TODAS');
     const [hostId] = useState(() => usuario?.uid || ('h_' + Math.random().toString(36).substring(2, 11)));
+
+    const CATS = [
+        { id: 'TODAS',       label: '🌐 Todas' },
+        { id: 'GENERAL',     label: '🎯 General' },
+        { id: 'MATEMATICAS', label: '📐 Mates' },
+        { id: 'LENGUA',      label: '📝 Lengua' },
+        { id: 'HISTORIA',    label: '🏛️ Historia' },
+        { id: 'DEPORTE',     label: '⚽ Deporte' },
+        { id: 'ARTE_MUSICA', label: '🎨 Arte' },
+        { id: 'GEOGRAFIA',   label: '🌍 Geografía' },
+        { id: 'TECNOLOGIA',  label: '💻 Tecnología' },
+    ];
 
     const crearSala = async () => {
         if (sinProfesor && !nombre.trim()) return alert('Introduce tu nombre.');
@@ -2499,7 +3385,7 @@ function PictoTabuModal({ usuario, onClose, onEnterRoom, initialCode = '' }) {
                 estado: 'LOBBY',
                 jugadores: {},
                 mensajes: {},
-                config: { tiempoRonda: tiempo },
+                config: { tiempoRonda: tiempo, categoria },
                 tipoJuego: 'EAE',
                 modoJuego: modo,
                 sinProfesor,
@@ -2577,6 +3463,17 @@ function PictoTabuModal({ usuario, onClose, onEnterRoom, initialCode = '' }) {
                             <div style={{ display: 'flex', gap: 8 }}>
                                 {[45,60,90,120].map(t => (
                                     <button key={t} onClick={() => setTiempo(t)} style={{ flex: 1, padding: '9px 4px', border: `2px solid ${tiempo === t ? '#3498db' : 'rgba(255,255,255,0.15)'}`, borderRadius: 10, background: tiempo === t ? 'rgba(52,152,219,0.2)' : 'rgba(255,255,255,0.05)', color: tiempo === t ? '#3498db' : '#ccc', cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem' }}>{t}s</button>
+                                ))}
+                            </div>
+                        </div>
+                        <div>
+                            <label style={label}>Categoría de palabras</label>
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                {CATS.map(c => (
+                                    <button key={c.id} onClick={() => setCategoria(c.id)}
+                                        style={{ padding: '7px 10px', border: `2px solid ${categoria === c.id ? '#2ecc71' : 'rgba(255,255,255,0.15)'}`, borderRadius: 10, background: categoria === c.id ? 'rgba(46,204,113,0.2)' : 'rgba(255,255,255,0.05)', color: categoria === c.id ? '#2ecc71' : '#ccc', cursor: 'pointer', fontWeight: 700, fontSize: '0.72rem' }}>
+                                        {c.label}
+                                    </button>
                                 ))}
                             </div>
                         </div>

@@ -98,6 +98,27 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
     const [searchResultsPres, setSearchResultsPres] = useState([]);
     const [isSearchingPres, setIsSearchingPres] = useState(false);
     const [mostrandoPreviewPres, setMostrandoPreviewPres] = useState(false);
+
+    // ── Submission link panel ─────────────────────────────────────────────────
+    const [panelEnvio,    setPanelEnvio]    = useState(false);
+    const [linkCopiado,   setLinkCopiado]   = useState('');
+    const copiarTexto = (texto, clave) => {
+        navigator.clipboard.writeText(texto).then(() => { setLinkCopiado(clave); setTimeout(() => setLinkCopiado(''), 2000); });
+    };
+
+    // ── Import modal ──────────────────────────────────────────────────────────
+    const [importModal,    setImportModal]    = useState(false);
+    const [importStep,     setImportStep]     = useState(1);
+    const [importRecursos, setImportRecursos] = useState([]);
+    const [importRecurso,  setImportRecurso]  = useState(null);
+    const [importBusqueda, setImportBusqueda] = useState('');
+    const [importHojaIdx,  setImportHojaIdx]  = useState(-1);
+    const [importPregs,    setImportPregs]    = useState([]);
+    const [importSel,      setImportSel]      = useState(new Set());
+    const [importCargando, setImportCargando] = useState(false);
+    const [importGuardando,setImportGuardando]= useState(false);
+    const [importError,    setImportError]    = useState('');
+
     useEffect(() => {
         // Inicializar hojas si no existen
         if (!datos.hojas || datos.hojas.length === 0) {
@@ -334,6 +355,83 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
         return url;
     };
 
+    // ── Import helpers ────────────────────────────────────────────────────────
+    const abrirImport = async () => {
+        setImportStep(1); setImportRecurso(null); setImportBusqueda('');
+        setImportHojaIdx(-1); setImportPregs([]); setImportSel(new Set()); setImportError('');
+        setImportCargando(true); setImportModal(true);
+        try {
+            const snap = await getDocs(query(collection(db, 'resources'), where('profesorUid', '==', usuario.uid)));
+            const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+                .filter(r => !['WORDLE', 'SOPA', 'QUESTION_SENDER'].includes(r.tipoJuego))
+                .sort((a, b) => (b.updatedAt?.toMillis?.() ?? 0) - (a.updatedAt?.toMillis?.() ?? 0));
+            setImportRecursos(docs);
+        } catch { setImportError('Error al cargar recursos.'); }
+        setImportCargando(false);
+    };
+
+    const calcImportPregs = (recurso, hojaIdx) => {
+        const hojas = recurso?.hojas || [];
+        const srcs = hojaIdx === -1 ? hojas.map((h, i) => ({ h, i })) : [{ h: hojas[hojaIdx], i: hojaIdx }];
+        return srcs.flatMap(({ h, i }) =>
+            (h?.preguntas || []).map((q, qi) => ({ hoja: h.nombreHoja || `Hoja ${i + 1}`, hojaIdx: i, qi, q }))
+        ).filter(item => {
+            const q = item.q;
+            return !!((q.pregunta || q.terminoA || '').trim() || (q.respuesta || q.correcta || q.terminoB || '').trim());
+        });
+    };
+
+    const convertirPreguntas = (selItems) => {
+        const abc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        const existingCount = (datos.hojas[indiceHojaActiva]?.preguntas || []).length;
+        const target = configJuego.id;
+        const poolRespuestas = selItems.map(item =>
+            (item.q.respuesta || item.q.correcta || item.q.terminoB || '').trim()
+        ).filter(Boolean);
+
+        return selItems.map((item, idx) => {
+            const q = item.q;
+            const pregStr = (q.pregunta || q.terminoA || '').trim();
+            const respStr = (q.respuesta || q.correcta || q.terminoB || '').trim();
+            if (!pregStr && !respStr) return null;
+
+            if (target === 'PASAPALABRA') {
+                const letra = q.letra || (respStr && /^[A-Za-zÑñÁÉÍÓÚáéíóú]/.test(respStr)
+                    ? respStr.charAt(0).toUpperCase()
+                    : abc[(existingCount + idx) % 26]);
+                return { letra, pregunta: pregStr, respuesta: respStr, correcta: '', incorrectas: ['', '', ''] };
+            }
+            if (target === 'APAREJADOS') {
+                return { terminoA: pregStr, terminoB: respStr, pregunta: '', respuesta: '', correcta: '', incorrectas: ['', '', ''] };
+            }
+            // CAZABURBUJAS, THINKHOOT, RULETA — need incorrectas
+            let incs = (q.incorrectas || []).filter(Boolean).slice(0, 3);
+            if (incs.length < 3) {
+                const otros = poolRespuestas.filter(r => r !== respStr && !incs.includes(r)).sort(() => Math.random() - 0.5);
+                while (incs.length < 3 && otros.length > 0) incs.push(otros.shift());
+                while (incs.length < 3) incs.push(`Opción ${incs.length + 1}`);
+            }
+            return { pregunta: pregStr, respuesta: respStr, correcta: respStr, incorrectas: incs };
+        }).filter(Boolean);
+    };
+
+    const confirmarImport = () => {
+        if (importSel.size === 0) return;
+        setImportGuardando(true);
+        try {
+            const selItems = importPregs.filter((_, i) => importSel.has(i));
+            const convertidas = convertirPreguntas(selItems);
+            const nuevasHojas = [...datos.hojas];
+            nuevasHojas[indiceHojaActiva] = {
+                ...nuevasHojas[indiceHojaActiva],
+                preguntas: [...(nuevasHojas[indiceHojaActiva].preguntas || []), ...convertidas],
+            };
+            setDatos({ ...datos, hojas: nuevasHojas });
+            setImportModal(false);
+        } catch { setImportError('Error al importar.'); }
+        setImportGuardando(false);
+    };
+
     const hojaActual = datos.hojas[indiceHojaActiva] || { preguntas: [] };
     const esQuestionSender = configJuego.id === 'QUESTION_SENDER';
 
@@ -481,6 +579,54 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
                         )}
                     </div>
 
+                    {/* 🔗 RECIBIR PREGUNTAS — visible en todos los juegos salvo QUESTION_SENDER */}
+                    {!esQuestionSender && (
+                        <div style={{ background: 'white', borderRadius: 10, border: '1px solid #ddd', marginBottom: 15, overflow: 'hidden' }}>
+                            <button onClick={() => setPanelEnvio(p => !p)} style={{ width: '100%', background: panelEnvio ? '#E8EAF6' : 'white', border: 'none', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', textAlign: 'left' }}>
+                                <span style={{ fontSize: 16 }}>{panelEnvio ? '▾' : '▸'}</span>
+                                <span style={{ fontWeight: 700, color: '#3F51B5', fontSize: 14 }}>🔗 Recibir preguntas de alumnos</span>
+                                {hojaActual.accessCode && <span style={{ marginLeft: 'auto', background: '#E8EAF6', color: '#3F51B5', borderRadius: 20, padding: '2px 10px', fontSize: 12, fontWeight: 700 }}>Activo</span>}
+                            </button>
+                            {panelEnvio && (
+                                <div style={{ padding: '14px 16px', borderTop: '1px solid #eee', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                    {!datos.id && (
+                                        <div style={{ background: '#FFF8E1', border: '1px solid #FFD54F', borderRadius: 8, padding: '10px 14px', color: '#E65100', fontSize: 13 }}>
+                                            💾 Guarda el recurso primero para que el enlace funcione.
+                                        </div>
+                                    )}
+                                    <p style={{ margin: 0, fontSize: 13, color: '#555', lineHeight: 1.5 }}>
+                                        Genera un código y comparte el enlace. Cualquier alumno podrá enviarte preguntas en el formato de <strong>{configJuego.label}</strong> sin necesidad de cuenta.
+                                    </p>
+                                    {!hojaActual.accessCode ? (
+                                        <button onClick={generarCodigoHoja} style={{ background: '#3F51B5', color: 'white', border: 'none', padding: '10px 18px', borderRadius: 8, cursor: 'pointer', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, alignSelf: 'flex-start' }}>
+                                            <RotateCcw size={15} /> Activar enlace para esta hoja
+                                        </button>
+                                    ) : (
+                                        <>
+                                            {/* Código */}
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#F5F7FF', border: '2px solid #3F51B5', borderRadius: 10, padding: '10px 16px' }}>
+                                                <span style={{ fontSize: 26, letterSpacing: 5, fontWeight: 900, color: '#3F51B5', flex: 1 }}>{hojaActual.accessCode}</span>
+                                                <button onClick={() => copiarTexto(hojaActual.accessCode, 'codigo')} style={{ background: linkCopiado === 'codigo' ? '#4CAF50' : '#3F51B5', color: 'white', border: 'none', borderRadius: 7, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+                                                    {linkCopiado === 'codigo' ? '✓ Copiado' : 'Copiar código'}
+                                                </button>
+                                            </div>
+                                            {/* Enlace completo */}
+                                            <div style={{ display: 'flex', gap: 8 }}>
+                                                <input readOnly value={`${window.location.origin}${window.location.pathname}?c=${hojaActual.accessCode}`} style={{ ...styles.input, fontSize: 12, color: '#555', flex: 1 }} />
+                                                <button onClick={() => copiarTexto(`${window.location.origin}${window.location.pathname}?c=${hojaActual.accessCode}`, 'link')} style={{ background: linkCopiado === 'link' ? '#4CAF50' : '#607D8B', color: 'white', border: 'none', borderRadius: 7, padding: '0 14px', cursor: 'pointer', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+                                                    {linkCopiado === 'link' ? '✓ ¡Copiado!' : '🔗 Copiar enlace'}
+                                                </button>
+                                            </div>
+                                            <button onClick={generarCodigoHoja} style={{ background: 'none', border: 'none', color: '#999', cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', gap: 5, alignSelf: 'flex-start', textDecoration: 'underline' }}>
+                                                <RotateCcw size={12} /> Regenerar código
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {/* 1. PANEL DE CONFIGURACIÓN (SOLO SI ES QUESTION SENDER) */}
                     {esQuestionSender && (
                         <div style={{ padding: '10px', background: '#e3f2fd', borderRadius: '10px', border: '1px solid #2196F3', marginBottom: '20px' }}>
@@ -517,7 +663,10 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
                         <h3 style={{ margin: 0, color: '#333' }}>
                             {esQuestionSender ? 'Buzón de Respuestas' : 'Preguntas'} ({hojaActual.preguntas.length})
                         </h3>
-                        <button onClick={agregarPregunta} style={styles.addQuestionBtn}><Plus size={18} /> Añadir Pregunta</button>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                            <button onClick={agregarPregunta} style={styles.addQuestionBtn}><Plus size={18} /> Añadir Pregunta</button>
+                            <button onClick={abrirImport} style={{ background: '#FF9800', color: 'white', border: 'none', padding: '8px 14px', borderRadius: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px', fontWeight: 'bold' }}>📥 Importar</button>
+                        </div>
                     </div>
 
                     <div style={styles.questionsList}>
@@ -618,8 +767,8 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
                     <PublicarModal
                         modo={modalPublicar}
                         onGuardarPublicar={async () => {
+                            await onSave({ isFinished: true });
                             setDatos(prev => ({ ...prev, isFinished: true }));
-                            await onSave();
                             setModalPublicar(null);
                         }}
                         onGuardarSolo={async () => { await onSave(); setModalPublicar(null); }}
@@ -642,8 +791,8 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
                                     {!datos.isFinished && (
                                         <button
                                             onClick={async () => {
+                                                await onSave({ isFinished: true });
                                                 setDatos(prev => ({ ...prev, isFinished: true }));
-                                                await onSave();
                                                 onClose();
                                             }}
                                             style={{ width: '100%', padding: '12px', background: '#6366f1', color: 'white', border: 'none', borderRadius: '5px', fontSize: '1.1rem', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }}
@@ -1029,6 +1178,184 @@ export default function EditorManual({ datos, setDatos, configJuego, onClose, on
             </div>
             <style>{`.hide-mobile { display: inline; } @media (max-width: 600px) { .hide-mobile { display: none; } }`}</style>
 
+            {/* ── IMPORT MODAL ── */}
+            {importModal && (() => {
+                const TIPO_INFO = {
+                    PASAPALABRA: { icon: '📝', label: 'Pasapalabra' },
+                    CAZABURBUJAS: { icon: '🫧', label: 'Caza Burbujas' },
+                    THINKHOOT:   { icon: '🎯', label: 'PiLive' },
+                    APAREJADOS:  { icon: '🔗', label: 'Aparejados' },
+                    RULETA:      { icon: '🎡', label: 'La Ruleta' },
+                    SINTAXIS:    { icon: '📊', label: 'Sintaxis' },
+                    ETIQUETAS:   { icon: '🏷️', label: 'Etiquetas' },
+                };
+                const needsWrong = ['CAZABURBUJAS', 'THINKHOOT', 'RULETA'].includes(configJuego.id);
+                const allSel = importPregs.length > 0 && importPregs.every((_, i) => importSel.has(i));
+                const toggleAll = () => setImportSel(allSel ? new Set() : new Set(importPregs.map((_, i) => i)));
+
+                const recursosFiltrados = importRecursos.filter(r => {
+                    const q = importBusqueda.toLowerCase();
+                    return !q || (r.titulo || '').toLowerCase().includes(q) || (r.tipoJuego || '').toLowerCase().includes(q);
+                });
+
+                const hojas = importRecurso?.hojas || [];
+
+                return (
+                    <div style={{ ...styles.configOverlay, zIndex: 5000 }} onClick={e => { if (e.target === e.currentTarget) setImportModal(false); }}>
+                        <div style={{ ...styles.configModal, maxWidth: 580, width: '96%', maxHeight: '90vh' }}>
+
+                            {/* Header */}
+                            <div style={{ ...styles.configHeader, gap: 8 }}>
+                                {importStep === 2 && (
+                                    <button onClick={() => { setImportStep(1); setImportRecurso(null); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: '#555', padding: '0 4px' }}>←</button>
+                                )}
+                                <h3 style={{ margin: 0, flex: 1, fontSize: 15, color: '#1E293B' }}>
+                                    📥 {importStep === 1 ? 'Importar desde otro recurso' : importRecurso?.titulo || 'Seleccionar preguntas'}
+                                </h3>
+                                <div style={{ display: 'flex', gap: 4 }}>
+                                    {[1, 2].map(s => <div key={s} style={{ width: 8, height: 8, borderRadius: '50%', background: s === importStep ? '#3F51B5' : s < importStep ? '#4CAF50' : '#ddd' }} />)}
+                                </div>
+                                <button onClick={() => setImportModal(false)} style={styles.iconBtnBlack}><X size={20} /></button>
+                            </div>
+
+                            {/* Body */}
+                            <div style={{ ...styles.configBody, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                {importError && (
+                                    <div style={{ background: '#FFEBEE', border: '1px solid #FFCDD2', borderRadius: 8, padding: '8px 12px', color: '#C62828', fontSize: 13 }}>⚠ {importError}</div>
+                                )}
+
+                                {/* ── Step 1: resource list ── */}
+                                {importStep === 1 && (<>
+                                    <input
+                                        value={importBusqueda} onChange={e => setImportBusqueda(e.target.value)}
+                                        placeholder="🔍 Buscar por título o tipo…"
+                                        style={{ ...styles.input, marginBottom: 4 }}
+                                    />
+                                    {importCargando && <div style={{ textAlign: 'center', padding: 30, color: '#999' }}>⏳ Cargando recursos…</div>}
+                                    {!importCargando && recursosFiltrados.length === 0 && (
+                                        <div style={{ textAlign: 'center', padding: 30, color: '#999', border: '2px dashed #ddd', borderRadius: 10 }}>
+                                            📭 No tienes recursos para importar.
+                                        </div>
+                                    )}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 400, overflowY: 'auto' }}>
+                                        {recursosFiltrados.map(r => {
+                                            const info = TIPO_INFO[r.tipoJuego] || { icon: '📋', label: r.tipoJuego || 'Recurso' };
+                                            const totalPregs = (r.hojas || []).reduce((s, h) => s + (h.preguntas?.length || 0), 0);
+                                            return (
+                                                <button key={r.id} onClick={() => {
+                                                    setImportRecurso(r);
+                                                    setImportHojaIdx(-1);
+                                                    const ps = calcImportPregs(r, -1);
+                                                    setImportPregs(ps);
+                                                    setImportSel(new Set(ps.map((_, i) => i)));
+                                                    setImportStep(2);
+                                                }} style={{ background: 'white', border: '1.5px solid #E2E8F0', borderRadius: 10, padding: '11px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', transition: '0.15s' }}
+                                                    onMouseEnter={e => { e.currentTarget.style.borderColor = '#3F51B5'; e.currentTarget.style.background = '#F5F7FF'; }}
+                                                    onMouseLeave={e => { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.background = 'white'; }}>
+                                                    <span style={{ fontSize: '1.6rem', flexShrink: 0 }}>{info.icon}</span>
+                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                        <div style={{ fontWeight: 700, fontSize: 14, color: '#0F172A', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{r.titulo || 'Sin título'}</div>
+                                                        <div style={{ fontSize: 12, color: '#94A3B8', marginTop: 2 }}>
+                                                            {info.label} · {r.hojas?.length || 0} hoja{r.hojas?.length !== 1 ? 's' : ''} · {totalPregs} preguntas
+                                                        </div>
+                                                    </div>
+                                                    <span style={{ color: '#94A3B8', fontSize: 18 }}>›</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </>)}
+
+                                {/* ── Step 2: hoja + questions ── */}
+                                {importStep === 2 && importRecurso && (<>
+                                    {/* Hoja tabs */}
+                                    {hojas.length > 1 && (
+                                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                            <button onClick={() => {
+                                                setImportHojaIdx(-1);
+                                                const ps = calcImportPregs(importRecurso, -1);
+                                                setImportPregs(ps); setImportSel(new Set(ps.map((_, i) => i)));
+                                            }} style={{ padding: '5px 12px', borderRadius: 20, border: `1.5px solid ${importHojaIdx === -1 ? '#3F51B5' : '#ddd'}`, background: importHojaIdx === -1 ? '#E8EAF6' : 'white', color: importHojaIdx === -1 ? '#3F51B5' : '#555', fontSize: 13, cursor: 'pointer', fontWeight: importHojaIdx === -1 ? 700 : 400 }}>Todas</button>
+                                            {hojas.map((h, hi) => (
+                                                <button key={hi} onClick={() => {
+                                                    setImportHojaIdx(hi);
+                                                    const ps = calcImportPregs(importRecurso, hi);
+                                                    setImportPregs(ps); setImportSel(new Set(ps.map((_, i) => i)));
+                                                }} style={{ padding: '5px 12px', borderRadius: 20, border: `1.5px solid ${importHojaIdx === hi ? '#3F51B5' : '#ddd'}`, background: importHojaIdx === hi ? '#E8EAF6' : 'white', color: importHojaIdx === hi ? '#3F51B5' : '#555', fontSize: 13, cursor: 'pointer', fontWeight: importHojaIdx === hi ? 700 : 400 }}>
+                                                    {h.nombreHoja || `Hoja ${hi + 1}`}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {needsWrong && (
+                                        <div style={{ background: '#FFF3E0', border: '1px solid #FFB74D', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#E65100' }}>
+                                            💡 Las preguntas sin opciones incorrectas las generará automáticamente mezclando las respuestas del resto de preguntas importadas, igual que el Conversor Mágico.
+                                        </div>
+                                    )}
+                                    {configJuego.id === 'RULETA' && (
+                                        <div style={{ background: '#FCE4EC', border: '1px solid #F48FB1', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#880E4F' }}>
+                                            🎡 Recuerda: la Frase Oculta de cada hoja debes rellenarla manualmente después de importar.
+                                        </div>
+                                    )}
+
+                                    {/* Select all + count */}
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                                        <button onClick={toggleAll} style={{ background: allSel ? '#E8F5E9' : '#f5f5f5', border: `1px solid ${allSel ? '#4CAF50' : '#ddd'}`, color: allSel ? '#2E7D32' : '#555', borderRadius: 8, padding: '5px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                                            {allSel ? '✓ Todas seleccionadas' : 'Seleccionar todas'}
+                                        </button>
+                                        <span style={{ color: '#94A3B8', fontSize: 12 }}>{importSel.size} / {importPregs.length}</span>
+                                    </div>
+
+                                    {/* Question list */}
+                                    {importPregs.length === 0 && (
+                                        <div style={{ textAlign: 'center', padding: 20, color: '#999', border: '2px dashed #eee', borderRadius: 10 }}>No hay preguntas importables en esta selección.</div>
+                                    )}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 340, overflowY: 'auto' }}>
+                                        {importPregs.map((item, i) => {
+                                            const sel = importSel.has(i);
+                                            const q = item.q;
+                                            const pregStr = (q.pregunta || q.terminoA || '').trim();
+                                            const respStr = (q.respuesta || q.correcta || q.terminoB || '').trim();
+                                            const tieneIncs = q.incorrectas?.some(Boolean);
+                                            return (
+                                                <button key={i} onClick={() => setImportSel(prev => {
+                                                    const next = new Set(prev);
+                                                    if (next.has(i)) next.delete(i); else next.add(i);
+                                                    return next;
+                                                })} style={{ background: sel ? '#F0FFF4' : 'white', border: `1.5px solid ${sel ? '#4CAF50' : '#E2E8F0'}`, borderRadius: 8, padding: '9px 12px', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'flex-start', gap: 10, transition: '0.1s' }}>
+                                                    <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>{sel ? '☑' : '☐'}</span>
+                                                    <div style={{ flex: 1, minWidth: 0, fontSize: 13 }}>
+                                                        {hojas.length > 1 && importHojaIdx === -1 && (
+                                                            <div style={{ color: '#94A3B8', fontSize: 11, marginBottom: 2 }}>{item.hoja}</div>
+                                                        )}
+                                                        <span style={{ color: '#1E293B' }}>{pregStr}</span>
+                                                        {respStr && <span style={{ color: '#4CAF50', marginLeft: 8, fontWeight: 600 }}>→ {respStr}</span>}
+                                                        {needsWrong && !tieneIncs && (
+                                                            <span style={{ color: '#FF9800', fontSize: 11, marginLeft: 8 }}>⚡ incs. auto</span>
+                                                        )}
+                                                    </div>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </>)}
+                            </div>
+
+                            {/* Footer */}
+                            {importStep === 2 && (
+                                <div style={{ padding: '12px 20px', borderTop: '1px solid #eee', display: 'flex', gap: 10, justifyContent: 'flex-end', background: '#FAFAFA', borderBottomLeftRadius: 15, borderBottomRightRadius: 15 }}>
+                                    <button onClick={() => setImportModal(false)} style={{ background: '#f5f5f5', border: '1px solid #ddd', color: '#555', padding: '10px 18px', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>Cancelar</button>
+                                    <button onClick={confirmarImport} disabled={importGuardando || importSel.size === 0} style={{ background: importSel.size === 0 ? '#ccc' : '#FF9800', border: 'none', color: 'white', padding: '10px 22px', borderRadius: 8, cursor: importSel.size === 0 ? 'default' : 'pointer', fontWeight: 700, fontSize: 13, opacity: importGuardando ? 0.7 : 1 }}>
+                                        {importGuardando ? 'Importando…' : `📥 Importar ${importSel.size} pregunta${importSel.size !== 1 ? 's' : ''}`}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            })()}
+
             {presPickerAbiertoManual && (
                 <PiKTPresentacionPicker
                     usuario={usuario}
@@ -1065,6 +1392,7 @@ const styles = {
     letraInput: { width: '40px', textAlign: 'center', fontSize: '16px', fontWeight: 'bold', border: '2px solid #3F51B5', borderRadius: '5px', color: '#3F51B5' },
     deleteBtn: { background: '#ffebee', color: '#c62828', border: 'none', padding: '5px', borderRadius: '4px', cursor: 'pointer' },
     inputsGrid: { display: 'flex', flexDirection: 'column', gap: '10px' },
+    grid2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' },
     miniLabel: { fontSize: '11px', color: '#777', marginBottom: '2px', display: 'block', textTransform: 'uppercase' },
     configOverlay: { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 4000 },
     configModal: { background: 'white', width: '90%', maxWidth: '400px', borderRadius: '15px', maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' },

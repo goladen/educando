@@ -42,10 +42,13 @@ async function cargarRecurso(codigo) {
 
 // ─── NORMALIZE QUESTIONS ─────────────────────────────────────────────────────
 // Returns [{display, respuesta, opciones: string[]|null}]
-function normalizarPreguntas(recurso) {
-  let raw = [];
-  if (Array.isArray(recurso.preguntas)) raw = recurso.preguntas;
-  else if (Array.isArray(recurso.hojas) && recurso.hojas[0]?.preguntas) raw = recurso.hojas[0].preguntas;
+function normalizarPreguntas(recurso, rawOverride = null) {
+  let raw = rawOverride;
+  if (!raw) {
+    if (Array.isArray(recurso.preguntas)) raw = recurso.preguntas;
+    else if (Array.isArray(recurso.hojas) && recurso.hojas[0]?.preguntas) raw = recurso.hojas[0].preguntas;
+    else raw = [];
+  }
 
   const items = raw.map(p => {
     if (!p) return null;
@@ -119,13 +122,86 @@ function ShipColumn({ playerId, side, vidas, shipRef, cañonRef, muzzleRef }) {
   );
 }
 
+// ─── TECLADO VIRTUAL ─────────────────────────────────────────────────────────
+function TecladoVirtual({ onKey, color, disabled }) {
+  const [numeros, setNumeros] = useState(false);
+
+  const btn = (label, key, extra = {}) => (
+    <button
+      key={label}
+      onPointerDown={e => { e.preventDefault(); e.currentTarget.style.transform='scale(0.82)'; if (!disabled) onKey(key ?? label); }}
+      onPointerUp={e => { e.currentTarget.style.transform='scale(1)'; }}
+      onPointerLeave={e => { e.currentTarget.style.transform='scale(1)'; }}
+      style={{
+        padding:'5px 2px', borderRadius:5,
+        border:`1px solid ${color}44`,
+        background: disabled ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.12)',
+        color: disabled ? '#555' : 'white',
+        fontSize:'0.6rem', fontWeight:800,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        userSelect:'none', lineHeight:1,
+        minWidth:22, transition:'transform 0.08s',
+        ...extra,
+      }}
+    >{label}</button>
+  );
+
+  const toggleBtn = (label, onClick) => (
+    <button
+      onPointerDown={e => { e.preventDefault(); e.currentTarget.style.transform='scale(0.82)'; onClick(); }}
+      onPointerUp={e => { e.currentTarget.style.transform='scale(1)'; }}
+      onPointerLeave={e => { e.currentTarget.style.transform='scale(1)'; }}
+      style={{
+        padding:'5px 4px', borderRadius:5,
+        border:`1px solid ${color}66`,
+        background: `${color}55`,
+        color:'white', fontSize:'0.58rem', fontWeight:800,
+        cursor:'pointer', userSelect:'none', lineHeight:1,
+        minWidth:34, transition:'transform 0.08s',
+      }}
+    >{label}</button>
+  );
+
+  const wrap = { display:'flex', flexDirection:'column', gap:3, alignItems:'center', marginTop:6, paddingTop:6, borderTop:`1px solid ${color}25` };
+
+  if (numeros) return (
+    <div style={wrap}>
+      <div style={{display:'flex',gap:2}}>
+        {['1','2','3','4','5','6','7','8','9','0'].map(k => btn(k, k))}
+      </div>
+      <div style={{display:'flex',gap:2}}>
+        {toggleBtn('ABC', () => setNumeros(false))}
+        {btn('⌫','⌫',{minWidth:34})}
+        {btn('␣','ESPACIO',{minWidth:60})}
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={wrap}>
+      <div style={{display:'flex',gap:2}}>
+        {['Q','W','E','R','T','Y','U','I','O','P'].map(k => btn(k, k))}
+      </div>
+      <div style={{display:'flex',gap:2}}>
+        {['A','S','D','F','G','H','J','K','L','Ñ'].map(k => btn(k, k))}
+      </div>
+      <div style={{display:'flex',gap:2}}>
+        {toggleBtn('123', () => setNumeros(true))}
+        {['Z','X','C','V','B','N','M'].map(k => btn(k, k))}
+        {btn('⌫','⌫',{minWidth:34})}
+        {btn('␣','ESPACIO',{minWidth:52})}
+      </div>
+    </div>
+  );
+}
+
 // ─── CONTROL PANEL ───────────────────────────────────────────────────────────
 function ControlPanel({ playerId, pregunta, cooldown, aimRef, onRespuesta, hitStart, hitWidth }) {
   const color = COLORES[playerId];
   const [texto, setTexto] = useState('');
   const tieneOpciones = Array.isArray(pregunta?.opciones) && pregunta.opciones.length > 0;
+  const pantallaGrande = window.innerWidth >= 900;
 
-  // Clear text when question changes
   useEffect(() => { setTexto(''); }, [pregunta?.display]);
 
   const handleSubmit = (e) => {
@@ -133,6 +209,14 @@ function ControlPanel({ playerId, pregunta, cooldown, aimRef, onRespuesta, hitSt
     if (!texto.trim() || cooldown) return;
     onRespuesta(texto.trim());
     setTexto('');
+  };
+
+  const handleTecla = (k) => {
+    if (cooldown) return;
+    if (k === '⌫')      setTexto(t => t.slice(0, -1));
+    else if (k === '↵')  { setTexto(t => { if (t.trim()) { onRespuesta(t.trim()); return ''; } return t; }); }
+    else if (k === 'ESPACIO') setTexto(t => t + ' ');
+    else                 setTexto(t => t + k);
   };
 
   return (
@@ -181,51 +265,72 @@ function ControlPanel({ playerId, pregunta, cooldown, aimRef, onRespuesta, hitSt
           ))}
         </div>
       ) : (
-        <form onSubmit={handleSubmit} style={{display:'flex',gap:6}}>
-          <input
-            value={texto}
-            onChange={e => setTexto(e.target.value)}
-            disabled={!!cooldown}
-            placeholder="Escribe tu respuesta…"
-            style={{
-              flex:1, padding:'8px 10px', borderRadius:8,
-              border:`2px solid ${color}88`, background:'rgba(255,255,255,.92)',
-              fontSize:'clamp(0.78rem,1.1vw,0.95rem)', outline:'none',
-              color:'#1a1a2e', fontWeight:600,
-            }}
-          />
-          <button type="submit" disabled={!!cooldown || !texto.trim()}
-            style={{
-              padding:'8px 13px', borderRadius:8, border:'none',
-              background:cooldown?'rgba(255,255,255,0.15)':color,
-              color:'white', fontWeight:900, fontSize:'1.1rem',
-              cursor:cooldown?'not-allowed':'pointer', transition:'background 0.2s',
-            }}>⚡</button>
-        </form>
+        <>
+          <form onSubmit={handleSubmit} style={{display:'flex',gap:6}}>
+            <input
+              value={texto}
+              onChange={e => setTexto(e.target.value)}
+              disabled={!!cooldown}
+              placeholder="Escribe tu respuesta…"
+              style={{
+                flex:1, padding:'8px 10px', borderRadius:8,
+                border:`2px solid ${color}88`, background:'rgba(255,255,255,.92)',
+                fontSize:'clamp(0.78rem,1.1vw,0.95rem)', outline:'none',
+                color:'#1a1a2e', fontWeight:600,
+              }}
+            />
+            <button type="submit" disabled={!!cooldown || !texto.trim()}
+              style={{
+                padding:'8px 13px', borderRadius:8, border:'none',
+                background:cooldown?'rgba(255,255,255,0.15)':color,
+                color:'white', fontWeight:900, fontSize:'1.1rem',
+                cursor:cooldown?'not-allowed':'pointer', transition:'background 0.2s',
+              }}>⚡</button>
+          </form>
+          {pantallaGrande && (
+            <TecladoVirtual onKey={handleTecla} color={color} disabled={!!cooldown} />
+          )}
+        </>
       )}
     </div>
   );
 }
 
 // ─── MENU SCREEN ─────────────────────────────────────────────────────────────
-function MenuPantalla({ onStart, onExit }) {
-  const [codigo,   setCodigo]   = useState('');
-  const [buscando, setBuscando] = useState(false);
-  const [recurso,  setRecurso]  = useState(null);
-  const [error,    setError]    = useState('');
+function MenuPantalla({ onStart, onExit, recursoInicial = null }) {
+  const [codigo,        setCodigo]        = useState('');
+  const [buscando,      setBuscando]      = useState(false);
+  const [recurso,       setRecurso]       = useState(recursoInicial);
+  const [error,         setError]         = useState('');
+  const [hojasChecked,  setHojasChecked]  = useState(
+    recursoInicial?.hojas?.length > 1 ? recursoInicial.hojas.map((_, i) => i) : []
+  );
 
   const buscar = async () => {
     if (!codigo.trim()) return;
     setBuscando(true); setError(''); setRecurso(null);
-    try { setRecurso(await cargarRecurso(codigo)); }
-    catch(e) { setError(e.message || 'Error al cargar el recurso'); }
+    try {
+      const r = await cargarRecurso(codigo);
+      setRecurso(r);
+      setHojasChecked(r?.hojas?.length > 1 ? r.hojas.map((_, i) => i) : []);
+    } catch(e) { setError(e.message || 'Error al cargar el recurso'); }
     setBuscando(false);
   };
 
-  const pregsCount = recurso
-    ? Array.isArray(recurso.preguntas) ? recurso.preguntas.length
-    : (Array.isArray(recurso.hojas) && recurso.hojas[0]?.preguntas ? recurso.hojas[0].preguntas.length : 0)
-    : 0;
+  // Build raw questions from selected hojas (or flat preguntas)
+  const hojas = recurso?.hojas || [];
+  const tieneHojas = hojas.length > 1;
+  const preguntasRaw = tieneHojas
+    ? hojas.filter((_, i) => hojasChecked.includes(i)).flatMap(h => h.preguntas || [])
+    : Array.isArray(recurso?.preguntas)
+      ? recurso.preguntas
+      : (hojas[0]?.preguntas || []);
+  const pregsCount = preguntasRaw.length;
+
+  const toggleHoja = (i) => setHojasChecked(prev =>
+    prev.includes(i) ? prev.filter(x => x !== i) : [...prev, i]
+  );
+  const todasActivas = tieneHojas && hojasChecked.length === hojas.length;
 
   return (
     <div style={{position:'fixed',inset:0,zIndex:9999,background:'linear-gradient(180deg,#07111f 0%,#0e2a44 45%,#0a4060 100%)',display:'flex',flexDirection:'column',alignItems:'center',overflowY:'auto',padding:'24px 16px 32px'}}>
@@ -269,22 +374,61 @@ function MenuPantalla({ onStart, onExit }) {
         {error && <div style={{color:'#ff5252',fontSize:'0.82rem',marginTop:8}}>⚠️ {error}</div>}
       </div>
 
-      {/* Resource info */}
+      {/* Hoja selector — solo si hay varias hojas */}
+      {recurso && tieneHojas && (
+        <div style={{background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.14)',borderRadius:14,padding:'14px 16px',marginBottom:14,maxWidth:420,width:'100%'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+            <div style={{color:'#f9c74f',fontSize:'0.82rem',fontWeight:700}}>📋 Hojas a incluir (aleatorio)</div>
+            <button
+              onClick={() => setHojasChecked(todasActivas ? [] : hojas.map((_,i) => i))}
+              style={{background:'rgba(249,199,79,0.15)',border:'1px solid rgba(249,199,79,0.3)',color:'#f9c74f',borderRadius:6,padding:'3px 10px',cursor:'pointer',fontSize:'0.75rem',fontWeight:700}}>
+              {todasActivas ? 'Ninguna' : 'Todas'}
+            </button>
+          </div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+            {hojas.map((h, i) => {
+              const nombre = h.nombre || h.nombreHoja || `Hoja ${i+1}`;
+              const count  = h.preguntas?.length || 0;
+              const activa = hojasChecked.includes(i);
+              return (
+                <button key={i} onClick={() => toggleHoja(i)}
+                  style={{
+                    padding:'6px 12px', borderRadius:8, cursor:'pointer',
+                    border: activa ? '2px solid #f9c74f' : '2px solid rgba(255,255,255,0.18)',
+                    background: activa ? 'rgba(249,199,79,0.18)' : 'rgba(255,255,255,0.05)',
+                    color: activa ? '#f9c74f' : 'rgba(255,255,255,0.55)',
+                    fontSize:'0.78rem', fontWeight:700, transition:'all 0.15s',
+                  }}>
+                  {nombre} <span style={{opacity:0.6,fontWeight:400}}>({count})</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Resource info + start */}
       {recurso && (
         <div style={{background:'rgba(249,199,79,0.1)',border:'2px solid rgba(249,199,79,0.4)',borderRadius:14,padding:'16px 20px',marginBottom:18,maxWidth:420,width:'100%',textAlign:'center'}}>
           <div style={{fontSize:'1.4rem',marginBottom:5}}>📚</div>
           <div style={{color:'#f9c74f',fontWeight:800,fontSize:'1rem',marginBottom:3}}>{recurso.titulo||recurso.nombre||'Recurso'}</div>
-          <div style={{color:'#94d2bd',fontSize:'0.82rem',marginBottom:3}}>{recurso.tipoJuego} · {pregsCount} preguntas</div>
+          <div style={{color:'#94d2bd',fontSize:'0.82rem',marginBottom:3}}>
+            {recurso.tipoJuego} · {pregsCount} pregunta{pregsCount !== 1 ? 's' : ''}
+            {tieneHojas && hojasChecked.length > 0 && hojasChecked.length < hojas.length &&
+              <span style={{opacity:0.7}}> · {hojasChecked.length}/{hojas.length} hojas</span>}
+          </div>
           {recurso.tipoJuego === 'PASAPALABRA'
             ? <div style={{color:'rgba(255,255,255,0.5)',fontSize:'0.75rem',marginBottom:10}}>🖊️ Modo escritura — cada jugador escribe su respuesta</div>
             : <div style={{color:'rgba(255,255,255,0.5)',fontSize:'0.75rem',marginBottom:10}}>🔘 Modo botones — opciones de respuesta generadas automáticamente</div>
           }
-          {pregsCount < 3
-            ? <div style={{color:'#ff5252',fontSize:'0.8rem'}}>⚠️ Se necesitan al menos 3 preguntas</div>
-            : <button onClick={() => onStart(recurso)}
-                style={{background:'linear-gradient(135deg,#f9c74f,#f4a261)',color:'#1a1a1a',border:'none',borderRadius:10,padding:'11px 28px',fontWeight:900,fontSize:'0.95rem',cursor:'pointer',boxShadow:'0 4px 14px rgba(249,199,79,0.4)'}}>
-                ⚓ ¡Comenzar Duelo!
-              </button>
+          {tieneHojas && hojasChecked.length === 0
+            ? <div style={{color:'#ff5252',fontSize:'0.8rem'}}>⚠️ Selecciona al menos una hoja</div>
+            : pregsCount < 3
+              ? <div style={{color:'#ff5252',fontSize:'0.8rem'}}>⚠️ Se necesitan al menos 3 preguntas</div>
+              : <button onClick={() => onStart(recurso, preguntasRaw)}
+                  style={{background:'linear-gradient(135deg,#f9c74f,#f4a261)',color:'#1a1a1a',border:'none',borderRadius:10,padding:'11px 28px',fontWeight:900,fontSize:'0.95rem',cursor:'pointer',boxShadow:'0 4px 14px rgba(249,199,79,0.4)'}}>
+                  ⚓ ¡Comenzar Duelo!
+                </button>
           }
         </div>
       )}
@@ -338,7 +482,7 @@ function GameOverPantalla({ ganador, stats, tituloRecurso, onReintentar, onMenu,
 }
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
-export default function DueloPiratasRecurso({ onExit }) {
+export default function DueloPiratasRecurso({ onExit, recursoInicial = null }) {
   const [fase,          setFase]        = useState('menu');
   const [recursoActual, setRecurso]     = useState(null);
   const [tituloRecurso, setTitulo]      = useState('');
@@ -376,7 +520,8 @@ export default function DueloPiratasRecurso({ onExit }) {
   const shipEls   = useRef([null, null]);
   const sfxRef    = useRef(null);
   const musicRef  = useRef(null);
-  const poolRef   = useRef([]);     // normalised question array
+  const poolRef        = useRef([]);
+  const preguntasRawRef = useRef(null); // raw questions for rematch
   const poolIdxRef = useRef([0,0]); // per-player index
 
   useEffect(() => { preguntasRef.current = preguntas; }, [preguntas]);
@@ -595,8 +740,9 @@ export default function DueloPiratasRecurso({ onExit }) {
   };
 
   // ── Start game ─────────────────────────────────────────────────────────────
-  const iniciarJuego = (recurso) => {
-    const pool = normalizarPreguntas(recurso).sort(() => Math.random() - 0.5);
+  const iniciarJuego = (recurso, preguntasRaw = null) => {
+    preguntasRawRef.current = preguntasRaw;
+    const pool = normalizarPreguntas(recurso, preguntasRaw).sort(() => Math.random() - 0.5);
     if (!pool.length) { alert('No se encontraron preguntas válidas en este recurso'); return; }
     poolRef.current  = pool;
     poolIdxRef.current = [0, Math.floor(pool.length / 2)]; // offset so players start on different Qs
@@ -616,10 +762,10 @@ export default function DueloPiratasRecurso({ onExit }) {
   };
 
   // ── RENDER ─────────────────────────────────────────────────────────────────
-  if (fase==='menu') return <MenuPantalla onStart={iniciarJuego} onExit={onExit}/>;
+  if (fase==='menu') return <MenuPantalla onStart={iniciarJuego} onExit={onExit} recursoInicial={recursoInicial}/>;
   if (fase==='gameover') return (
     <GameOverPantalla ganador={ganador} stats={stats} tituloRecurso={tituloRecurso}
-      onReintentar={() => iniciarJuego(recursoActual)}
+      onReintentar={() => iniciarJuego(recursoActual, preguntasRawRef.current)}
       onMenu={() => setFase('menu')} onExit={onExit}
     />
   );

@@ -19,6 +19,7 @@ import TrivialEnvioForm from './components/TrivialEnvioForm';
 import QuestionSenderClient from './QuestionSenderClient';
 import PartesPlantaGame from './PartesPlanta';
 import EtiquetaMe from './EtiquetaMe';
+import KartingTrack from './KartingTrack';
 
 const TUTORIAL_ALUMNO = [
     {
@@ -87,7 +88,7 @@ function App() {
       const slug = window.location.pathname.replace(/^\//, '').replace(/\/$/, '').trim().toLowerCase();
       if (slug === 'funcionesejecutivas' || slug === 'irregular_verbs' || slug === 'sistema_solar'
           || slug === 'retos' || slug === 'conectapuntos' || slug === 'sudoku'
-          || slug === 'partes_planta' || slug === 'etiquetame') {
+          || slug === 'partes_planta' || slug === 'etiquetame' || slug === 'karting_track') {
         setRutaPublica(slug);
         return;
       }
@@ -235,6 +236,7 @@ function App() {
         </>
     );
 
+    if (rutaPublica === 'karting_track') return <KartingTrack />;
     if (rutaPublica === 'partes_planta') return <PartesPlantaGame onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
     if (rutaPublica === 'etiquetame') return <EtiquetaMe onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
     if (rutaPublica === 'funcionesejecutivas') return <><FuncionesEjecutivas onBack={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;

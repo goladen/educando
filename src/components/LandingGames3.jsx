@@ -1,9 +1,9 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, setDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, setDoc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { Search, Key, Filter, Zap, Play, Home, ChevronDown, ChevronUp, Mail, Link2, Share2 } from 'lucide-react';
 import GamePlayer from '../GamePlayer';
-import KartingedGame from '../KartingedGame';
+import KartingTrack from '../KartingTrack';
 import KartingedMultiGame from '../KartingedMultiGame';
 import RacingGame3D from '../RacingGame3D';
 import ThinkHootGame from '../ThinkHootGame';
@@ -26,6 +26,7 @@ import Plataformas from '../Plataformas2';
 import StoryCubes from '../StoryCubes';
 import UserProfile from './UserProfile';
 import MansionPitagoricaGame from '../MansionPitagoricaGame';
+import ArkadeHub from '../MiniArcade/ArkadeHub';
 
 import EtiquetaMe from '../EtiquetaMe';
 import OmninteractiveApp from '../OmninteractiveApp';
@@ -609,6 +610,14 @@ export const APPS = [
     { id: 'RETOS', name: 'Retos', desc: 'Conecta puntos y puzzles de lógica.', color: '#f39c12', emoji: '🧩', shareable: true },
     { id: 'TRIVIAL', name: 'Trivial', desc: 'El clásico juego de preguntas por categorías para hasta 6 jugadores.', color: '#16213e', emoji: '🎯', shareable: true },
     { id: 'DUELO_PIRATAS_RECURSO', name: 'Duelo Piratas', desc: '2 jugadores · cañonazos con tu recurso · múltiple opción, aparejados o pasapalabra.', color: '#0a1628', emoji: '🏴‍☠️', shareable: true },
+    {
+        id: 'ARKADE',
+        name: 'Arkade',
+        desc: 'Mini juegos clásicos: Tetris y más.',
+        color: '#bf5af2',
+        emoji: '🕹️',
+        shareable: false,
+    },
 
 ];
 
@@ -1351,6 +1360,34 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
     const [loadingRecords, setLoadingRecords] = useState(false);
     const [showPerfil,     setShowPerfil]     = useState(false);
 
+    // Notificaciones del sistema (aprobación/rechazo mini-apps, etc.)
+    const [notifs,       setNotifs]       = useState([]);
+    const [showNotifs,   setShowNotifs]   = useState(false);
+
+    useEffect(() => {
+        if (!usuario?.uid) return;
+        const q = query(
+            collection(db, 'notificaciones'),
+            where('uid', '==', usuario.uid)
+        );
+        const unsub = onSnapshot(q, snap => {
+            const todas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            const noLeidas = todas
+                .filter(n => !n.leida)
+                .sort((a, b) => (b.creadoEn?.seconds || 0) - (a.creadoEn?.seconds || 0));
+            setNotifs(noLeidas);
+        });
+        return unsub;
+    }, [usuario?.uid]);
+
+    const marcarLeida = async (notifId) => {
+        await updateDoc(doc(db, 'notificaciones', notifId), { leida: true });
+    };
+
+    const marcarTodasLeidas = () => {
+        notifs.forEach(n => marcarLeida(n.id));
+    };
+
     const cargarRecords = async () => {
         if (!usuario?.email) return;
         setLoadingRecords(true);
@@ -1539,6 +1576,11 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
 
         if (appId === 'STORYCUBES') {
             setJuegoActivo({ tipoJuego: 'STORYCUBES' });
+            return;
+        }
+
+        if (appId === 'ARKADE') {
+            setJuegoActivo({ tipoJuego: 'ARKADE' });
             return;
         }
 
@@ -1910,6 +1952,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
         if (juegoActivo.tipoJuego === 'SINTAXIS')    return <SintaxisGame  usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'LISTENING')   return <Listening     usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'STORYCUBES')  return <StoryCubes    usuario={usuario} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'ARKADE')      return <ArkadeHub onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'RETOS')        return <RetosApp                        onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'SOLAR_SYSTEM') return <SolarSystemViewer recursoConfig={juegoActivo.tourConfig || null} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'IRREGULAR_VERBS') return (
@@ -1918,7 +1961,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                 <IrregularVerbsTest initialConfig={juegoActivo.verbInitialConfig || null} />
             </div>
         );
-        if (juegoActivo.tipoJuego === 'KARTINGED') return <KartingedGame usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'KARTINGED') return <KartingTrack alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'KARTINGED_MULTI') return <KartingedMultiGame alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'RACING3D') return <RacingGame3D usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'MANSION_PITAGORICA') return <MansionPitagoricaGame alTerminar={() => setJuegoActivo(null)} />;
@@ -2218,9 +2261,64 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
 
             {/* BARRA DE USUARIO LOGUEADO */}
             {usuario && (
-                <div style={{ display:'flex', alignItems:'center', gap:10, background:'rgba(255,255,255,0.15)', backdropFilter:'blur(8px)', borderRadius:14, padding:'8px 16px', marginBottom:16, flexWrap:'wrap' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:10, background:'rgba(255,255,255,0.15)', backdropFilter:'blur(8px)', borderRadius:14, padding:'8px 16px', marginBottom:16, flexWrap:'wrap', position:'relative' }}>
                     {usuario.photoURL && <img src={usuario.photoURL} alt="avatar" style={{ width:34, height:34, borderRadius:'50%', border:'2px solid rgba(255,255,255,0.6)' }} />}
                     <span style={{ color:'white', fontWeight:700, fontSize:'0.9rem', flex:1 }}>{usuario.displayName}</span>
+                    {/* Campana de notificaciones */}
+                    <div style={{ position:'relative' }}>
+                        <button onClick={() => setShowNotifs(v => !v)}
+                            style={{ background:'rgba(255,255,255,0.2)', border:'1px solid rgba(255,255,255,0.35)', color:'white', borderRadius:10, padding:'6px 14px', cursor:'pointer', fontWeight:600, fontSize:'0.82rem', display:'flex', alignItems:'center', gap:5, position:'relative' }}>
+                            🔔
+                            {notifs.length > 0 && (
+                                <span style={{ position:'absolute', top:-6, right:-6, background:'#ef4444', color:'white', borderRadius:'50%', width:18, height:18, fontSize:'0.65rem', fontWeight:900, display:'flex', alignItems:'center', justifyContent:'center', border:'2px solid rgba(255,255,255,0.3)' }}>
+                                    {notifs.length}
+                                </span>
+                            )}
+                        </button>
+                        {/* Panel de notificaciones */}
+                        {showNotifs && (
+                            <div style={{ position:'absolute', top:'calc(100% + 8px)', right:0, background:'white', borderRadius:14, boxShadow:'0 8px 32px rgba(0,0,0,0.18)', width:320, zIndex:9000, overflow:'hidden', border:'1px solid #e2e8f0' }}>
+                                <div style={{ padding:'12px 16px', borderBottom:'1px solid #f1f5f9', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                                    <span style={{ fontWeight:800, color:'#1e293b', fontSize:'0.9rem' }}>🔔 Notificaciones</span>
+                                    <div style={{ display:'flex', gap:6 }}>
+                                        {notifs.length > 0 && (
+                                            <button onClick={marcarTodasLeidas} style={{ background:'none', border:'none', cursor:'pointer', color:'#6c63ff', fontWeight:700, fontSize:'0.75rem' }}>Marcar todas leídas</button>
+                                        )}
+                                        <button onClick={() => setShowNotifs(false)} style={{ background:'none', border:'none', cursor:'pointer', color:'#94a3b8', fontSize:'1rem', lineHeight:1 }}>✕</button>
+                                    </div>
+                                </div>
+                                {notifs.length === 0 ? (
+                                    <div style={{ padding:'24px 16px', textAlign:'center', color:'#94a3b8', fontSize:'0.85rem' }}>Sin notificaciones nuevas</div>
+                                ) : (
+                                    <div style={{ maxHeight:320, overflowY:'auto' }}>
+                                        {notifs.map(n => (
+                                            <div key={n.id} style={{ padding:'12px 16px', borderBottom:'1px solid #f8fafc', display:'flex', gap:10, alignItems:'flex-start' }}>
+                                                <span style={{ fontSize:'1.4rem', lineHeight:1, flexShrink:0 }}>
+                                                    {n.tipo === 'miniapp_aprobada' ? '✅' : '❌'}
+                                                </span>
+                                                <div style={{ flex:1 }}>
+                                                    <p style={{ margin:'0 0 2px', fontWeight:700, fontSize:'0.83rem', color:'#1e293b' }}>
+                                                        {n.tipo === 'miniapp_aprobada' ? 'Tu app ha sido aprobada' : 'Tu app ha sido rechazada'}
+                                                    </p>
+                                                    <p style={{ margin:'0 0 4px', fontSize:'0.78rem', color:'#475569' }}>
+                                                        «{n.titulo}»
+                                                    </p>
+                                                    {n.motivo && (
+                                                        <p style={{ margin:'0 0 4px', fontSize:'0.75rem', color:'#ef4444', background:'#fef2f2', padding:'3px 8px', borderRadius:6 }}>
+                                                            Motivo: {n.motivo}
+                                                        </p>
+                                                    )}
+                                                    <button onClick={() => marcarLeida(n.id)} style={{ background:'none', border:'none', cursor:'pointer', color:'#6c63ff', fontWeight:700, fontSize:'0.72rem', padding:0 }}>
+                                                        Marcar como leída
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
                     <button onClick={() => setVistaAlumno('RECORDS')}
                         style={{ background:'rgba(255,255,255,0.2)', border:'1px solid rgba(255,255,255,0.35)', color:'white', borderRadius:10, padding:'6px 14px', cursor:'pointer', fontWeight:600, fontSize:'0.82rem', display:'flex', alignItems:'center', gap:5 }}>
                         📊 Mis Récords
@@ -2644,10 +2742,10 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
 
             </>}
 
-            {/* ========================================= */}
+
             {/* FOOTER DE LICENCIA (PANTALLA PRINCIPAL) */}
             {/* ========================================= */}
-            <div style={{ textAlign: 'center', padding: '20px', marginTop: '40px', fontSize: '0.85rem', color: '#fff', borderTop: '1px solid rgba(255,255,255,0.2)' }}>
+            <div style={{ textAlign: 'center', padding: '20px', marginTop: '16px', fontSize: '0.85rem', color: '#fff', borderTop: '1px solid rgba(255,255,255,0.2)' }}>
                 <a href="https://github.com/goladen/educando" target="_blank" rel="noopener noreferrer" style={{ color: '#f1c40f', fontWeight: 'bold', textDecoration: 'none' }}>Pikt.es</a>
                 {' '}© 2025 by{' '}
                 <a href="https://pikt.es" target="_blank" rel="noopener noreferrer" style={{ color: '#fff', textDecoration: 'none' }}>Pikt</a>

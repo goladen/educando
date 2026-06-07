@@ -1,20 +1,33 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, getDocs, doc, updateDoc, orderBy, query, serverTimestamp } from 'firebase/firestore';
+import {
+  collection, getDocs, doc, updateDoc, deleteDoc,
+  orderBy, query, serverTimestamp, addDoc,
+} from 'firebase/firestore';
 import { buildSrcdoc } from '../utils/miniAppSrcdoc';
 
 const ESTADOS = { pendiente:'🕐 Pendiente', aprobada:'✅ Aprobada', rechazada:'❌ Rechazada' };
 const COLORES  = { pendiente:'#f59e0b', aprobada:'#10b981', rechazada:'#ef4444' };
 
+const MATERIAS = [
+  'Matemáticas','Lengua','Ciencias','Historia','Geografía','Inglés',
+  'Física','Química','Biología','Tecnología','Arte','Música','Educación Física','Otra',
+];
+
 export default function MiniAppAdmin({ usuario }) {
-  const [apps, setApps]               = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [filtro, setFiltro]           = useState('pendiente');
-  const [preview, setPreview]         = useState(null); // { app, iframeKey }
+  const [apps, setApps]                 = useState([]);
+  const [loading, setLoading]           = useState(true);
+  const [filtro, setFiltro]             = useState('pendiente');
+  const [preview, setPreview]           = useState(null);
   const [motivoRechazo, setMotivoRechazo] = useState('');
-  const [accionando, setAccionando]   = useState(null); // id being acted on
+  const [accionando, setAccionando]     = useState(null);
   const [runtimeError, setRuntimeError] = useState('');
-  const [copiado, setCopiado]         = useState(null); // id copiado
+  const [copiado, setCopiado]           = useState(null);
+  // Edición inline
+  const [editando, setEditando]         = useState(null); // { id, titulo, descripcion, materia }
+  const [guardandoEdit, setGuardandoEdit] = useState(false);
+  // Borrado
+  const [eliminando, setEliminando]     = useState(null); // id confirmando
 
   const cargar = () => {
     setLoading(true);
@@ -32,9 +45,27 @@ export default function MiniAppAdmin({ usuario }) {
     return () => window.removeEventListener('message', h);
   }, []);
 
+  const enviarNotificacion = async (app, tipo, motivo = '') => {
+    if (!app.autorId) return;
+    try {
+      await addDoc(collection(db, 'notificaciones'), {
+        uid:      app.autorId,
+        tipo,
+        titulo:   app.titulo || '(sin título)',
+        motivo,
+        miniappId: app.id,
+        leida:    false,
+        creadoEn: serverTimestamp(),
+      });
+    } catch (e) {
+      console.error('Error enviando notificación:', e);
+    }
+  };
+
   const aprobar = async (app) => {
     setAccionando(app.id);
     await updateDoc(doc(db, 'miniapps', app.id), { estado:'aprobada', aprobadoEn: serverTimestamp(), motivoRechazo: '' });
+    await enviarNotificacion(app, 'miniapp_aprobada');
     setApps(prev => prev.map(a => a.id === app.id ? { ...a, estado:'aprobada' } : a));
     setAccionando(null);
   };
@@ -42,10 +73,37 @@ export default function MiniAppAdmin({ usuario }) {
   const rechazar = async (app) => {
     if (!motivoRechazo.trim()) { alert('Añade un motivo de rechazo.'); return; }
     setAccionando(app.id);
-    await updateDoc(doc(db, 'miniapps', app.id), { estado:'rechazada', motivoRechazo: motivoRechazo.trim() });
-    setApps(prev => prev.map(a => a.id === app.id ? { ...a, estado:'rechazada', motivoRechazo: motivoRechazo.trim() } : a));
+    const motivo = motivoRechazo.trim();
+    await updateDoc(doc(db, 'miniapps', app.id), { estado:'rechazada', motivoRechazo: motivo });
+    await enviarNotificacion(app, 'miniapp_rechazada', motivo);
+    setApps(prev => prev.map(a => a.id === app.id ? { ...a, estado:'rechazada', motivoRechazo: motivo } : a));
     setMotivoRechazo('');
     setAccionando(null);
+  };
+
+  const eliminar = async (id) => {
+    setAccionando(id);
+    await deleteDoc(doc(db, 'miniapps', id));
+    setApps(prev => prev.filter(a => a.id !== id));
+    setEliminando(null);
+    setAccionando(null);
+  };
+
+  const guardarEdit = async () => {
+    if (!editando) return;
+    setGuardandoEdit(true);
+    await updateDoc(doc(db, 'miniapps', editando.id), {
+      titulo:      editando.titulo.trim(),
+      descripcion: editando.descripcion.trim(),
+      materia:     editando.materia,
+    });
+    setApps(prev => prev.map(a =>
+      a.id === editando.id
+        ? { ...a, titulo: editando.titulo.trim(), descripcion: editando.descripcion.trim(), materia: editando.materia }
+        : a
+    ));
+    setEditando(null);
+    setGuardandoEdit(false);
   };
 
   const copiarLink = (id) => {
@@ -83,6 +141,7 @@ export default function MiniAppAdmin({ usuario }) {
       ) : (
         filtradas.map(app => (
           <div key={app.id} style={{ border:'1px solid #e2e8f0', borderRadius:12, marginBottom:16, overflow:'hidden', background:'#fff', boxShadow:'0 2px 8px rgba(0,0,0,0.04)' }}>
+
             {/* App header */}
             <div style={{ padding:'12px 16px', borderBottom:'1px solid #f1f5f9', display:'flex', alignItems:'flex-start', gap:12, flexWrap:'wrap' }}>
               <div style={{ flex:1, minWidth:200 }}>
@@ -101,6 +160,12 @@ export default function MiniAppAdmin({ usuario }) {
                     {copiado===app.id ? '✅ Copiado' : '🔗 Copiar enlace'}
                   </button>
                 )}
+                {/* Botón editar */}
+                <button
+                  onClick={() => setEditando(editando?.id === app.id ? null : { id:app.id, titulo:app.titulo||'', descripcion:app.descripcion||'', materia:app.materia||'' })}
+                  style={{ padding:'5px 12px', background: editando?.id===app.id ? '#1e293b' : '#f1f5f9', color: editando?.id===app.id ? '#fff' : '#374151', border:'none', borderRadius:8, cursor:'pointer', fontSize:'0.78rem', fontWeight:700 }}>
+                  ✏️ {editando?.id===app.id ? 'Cancelar edición' : 'Editar'}
+                </button>
                 <button onClick={() => { setRuntimeError(''); setPreview(preview?.app.id === app.id ? null : { app, iframeKey: Date.now() }); }}
                   style={{ padding:'5px 12px', background: preview?.app.id===app.id ? '#1e293b' : '#f1f5f9', color: preview?.app.id===app.id ? '#fff' : '#374151', border:'none', borderRadius:8, cursor:'pointer', fontSize:'0.78rem', fontWeight:700 }}>
                   {preview?.app.id === app.id ? '⬆ Ocultar preview' : '👁 Ver preview'}
@@ -117,10 +182,76 @@ export default function MiniAppAdmin({ usuario }) {
                     ❌ Rechazar
                   </button>
                 )}
+                {/* Eliminar definitivamente (solo rechazadas) */}
+                {app.estado === 'rechazada' && (
+                  eliminando === app.id ? (
+                    <span style={{ display:'flex', gap:4, alignItems:'center' }}>
+                      <span style={{ fontSize:'0.75rem', color:'#ef4444', fontWeight:700 }}>¿Seguro?</span>
+                      <button onClick={() => eliminar(app.id)} disabled={!!accionando}
+                        style={{ padding:'4px 10px', background:'#ef4444', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontSize:'0.75rem', fontWeight:700 }}>
+                        Sí, borrar
+                      </button>
+                      <button onClick={() => setEliminando(null)}
+                        style={{ padding:'4px 10px', background:'#f1f5f9', color:'#374151', border:'none', borderRadius:6, cursor:'pointer', fontSize:'0.75rem' }}>
+                        No
+                      </button>
+                    </span>
+                  ) : (
+                    <button onClick={() => setEliminando(app.id)} disabled={!!accionando}
+                      style={{ padding:'5px 12px', background:'#fff', color:'#ef4444', border:'1px solid #ef4444', borderRadius:8, cursor:'pointer', fontSize:'0.78rem', fontWeight:700 }}>
+                      🗑 Eliminar
+                    </button>
+                  )
+                )}
               </div>
             </div>
 
-            {/* Motivo rechazo input (solo visible si el botón de rechazar está disponible) */}
+            {/* Formulario de edición inline */}
+            {editando?.id === app.id && (
+              <div style={{ padding:'12px 16px', background:'#f8fafc', borderBottom:'1px solid #e2e8f0', display:'flex', flexDirection:'column', gap:8 }}>
+                <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                  <div style={{ flex:2, minWidth:180 }}>
+                    <label style={{ fontSize:'0.72rem', fontWeight:700, color:'#475569', display:'block', marginBottom:3 }}>Título</label>
+                    <input
+                      value={editando.titulo}
+                      onChange={e => setEditando(p => ({ ...p, titulo: e.target.value }))}
+                      style={{ width:'100%', padding:'6px 10px', borderRadius:6, border:'1px solid #e2e8f0', fontSize:'0.85rem', outline:'none', boxSizing:'border-box' }}
+                    />
+                  </div>
+                  <div style={{ flex:1, minWidth:130 }}>
+                    <label style={{ fontSize:'0.72rem', fontWeight:700, color:'#475569', display:'block', marginBottom:3 }}>Materia</label>
+                    <select
+                      value={editando.materia}
+                      onChange={e => setEditando(p => ({ ...p, materia: e.target.value }))}
+                      style={{ width:'100%', padding:'6px 8px', borderRadius:6, border:'1px solid #e2e8f0', fontSize:'0.82rem', outline:'none', boxSizing:'border-box' }}>
+                      <option value=''>— Sin materia —</option>
+                      {MATERIAS.map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label style={{ fontSize:'0.72rem', fontWeight:700, color:'#475569', display:'block', marginBottom:3 }}>Descripción</label>
+                  <textarea
+                    value={editando.descripcion}
+                    onChange={e => setEditando(p => ({ ...p, descripcion: e.target.value }))}
+                    rows={2}
+                    style={{ width:'100%', padding:'6px 10px', borderRadius:6, border:'1px solid #e2e8f0', fontSize:'0.82rem', outline:'none', resize:'vertical', boxSizing:'border-box' }}
+                  />
+                </div>
+                <div style={{ display:'flex', gap:8 }}>
+                  <button onClick={guardarEdit} disabled={guardandoEdit}
+                    style={{ padding:'6px 18px', background:'#6c63ff', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontSize:'0.82rem', fontWeight:700, opacity: guardandoEdit ? 0.6 : 1 }}>
+                    {guardandoEdit ? 'Guardando…' : '💾 Guardar cambios'}
+                  </button>
+                  <button onClick={() => setEditando(null)}
+                    style={{ padding:'6px 14px', background:'#f1f5f9', color:'#374151', border:'none', borderRadius:8, cursor:'pointer', fontSize:'0.82rem' }}>
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Motivo rechazo input */}
             {app.estado !== 'rechazada' && (
               <div style={{ padding:'8px 16px', background:'#fef9f9', borderBottom:'1px solid #f1f5f9', display:'flex', gap:8, alignItems:'center' }}>
                 <input
@@ -152,7 +283,6 @@ export default function MiniAppAdmin({ usuario }) {
                   title={`Preview: ${app.titulo}`}
                   style={{ width:'100%', height:340, border:'none', display:'block', borderTop:'2px dashed #e2e8f0' }}
                 />
-                {/* Code viewer */}
                 <details style={{ borderTop:'1px solid #f1f5f9' }}>
                   <summary style={{ padding:'8px 16px', cursor:'pointer', fontWeight:700, fontSize:'0.8rem', color:'#475569', userSelect:'none', background:'#f8fafc' }}>
                     {'{ }'} Ver código fuente

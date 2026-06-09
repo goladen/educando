@@ -24,7 +24,7 @@ function initBricks() {
     return bricks;
 }
 
-export default function Arkanoid({ onExit }) {
+export default function Arkanoid({ onExit, contained = false, panelId = null }) {
     const containerRef = useRef(null);
     const requestRef = useRef(null);
     const moveDir = useRef(0);
@@ -125,11 +125,15 @@ export default function Arkanoid({ onExit }) {
             moveDir.current = keys.has('ArrowLeft') ? -1 : (keys.has('ArrowRight') ? 1 : 0);
         };
         const down = (e) => {
+            if (panelId && window.__arkadePanel !== panelId) return;
             if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') e.preventDefault();
             if ((e.key === ' ' || e.key === 'Enter') && stateRef.current.status === 'served') { e.preventDefault(); launchBall(); }
             keys.add(e.key); sync();
         };
-        const up = (e) => { keys.delete(e.key); sync(); };
+        const up = (e) => {
+            if (panelId && window.__arkadePanel !== panelId) return;
+            keys.delete(e.key); sync();
+        };
         window.addEventListener('keydown', down);
         window.addEventListener('keyup', up);
         return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };
@@ -184,7 +188,7 @@ export default function Arkanoid({ onExit }) {
 
     return (
         <div style={{
-            position: 'fixed', inset: 0, zIndex: 9999,
+            position: contained ? 'absolute' : 'fixed', inset: 0, zIndex: 9999,
             background: '#050510', display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center',
             fontFamily: '"Segoe UI", sans-serif', color: '#fff', padding: 10, boxSizing: 'border-box',

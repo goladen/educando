@@ -35,6 +35,7 @@ import DominoMatematicoDirect from '../dominofracciones';
 import VideoQuizzApp from '../VideoQuizzApp';
 import FuncionesEjecutivas from '../FuncionesEjecutivas';
 import IrregularVerbsTest from '../IrregularVerbsTest';
+import LenguaSignos from '../LenguaSignos';
 import MusicApp from '../MusicApp';
 import GeografiaApp from './GeografiaApp';
 import BiologiaApp  from './BiologiaApp';
@@ -527,6 +528,16 @@ export const APPS = [
         shareable: true
     },
     {
+        id: 'LENGUA_SIGNOS',
+        name: 'Lengua_Signos',
+        desc: 'Transcribe y aprende el alfabeto manual español.',
+        color: '#2563EB',
+        emoji: '🤟',
+        isSpecial: false,
+        isHerramienta: true,
+        shareable: true
+    },
+    {
         id: 'SINTAXIS',
         name: 'Sintaxis',
         desc: 'Analiza frases de distintos niveles.',
@@ -616,7 +627,8 @@ export const APPS = [
         desc: 'Mini juegos clásicos: Tetris y más.',
         color: '#bf5af2',
         emoji: '🕹️',
-        shareable: false,
+        shareable: true,
+        shareUrl: `${window.location.origin}/arkade`,
     },
 
 ];
@@ -1312,6 +1324,8 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                 setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'DOMINO' });
             } else if (path === 'math_world') {
                 setZonaActiva('MATH'); setSubzonaMath(null); setJuegoActivo(null);
+            } else if (path === 'arkade') {
+                setJuegoActivo({ tipoJuego: 'ARKADE' });
             } else if (path === '' || path === 'inicio') {
                 setZonaActiva('MAIN'); setJuegoActivo(null); setSubzonaMath(null);
             }
@@ -1580,6 +1594,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
         }
 
         if (appId === 'ARKADE') {
+            window.history.pushState({}, '', '/arkade');
             setJuegoActivo({ tipoJuego: 'ARKADE' });
             return;
         }
@@ -1631,6 +1646,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
     // Abre cualquier herramienta o juego por su ID (usado en vista por materia)
     const openById = (id) => {
         const TOOL_ACTIONS = {
+            LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
             SINTAXIS:           () => setJuegoActivo({ tipoJuego: 'SINTAXIS' }),
             LISTENING:          () => setJuegoActivo({ tipoJuego: 'LISTENING' }),
             OMNINTERACTIVE:     () => setOmninteractivo(true),
@@ -1949,6 +1965,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
             <DueloPiratasRecurso recursoInicial={juegoActivo.recurso || null} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />
         );
 
+        if (juegoActivo.tipoJuego === 'LENGUA_SIGNOS') return <LenguaSignos onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'SINTAXIS')    return <SintaxisGame  usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'LISTENING')   return <Listening     usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'STORYCUBES')  return <StoryCubes    usuario={usuario} onExit={() => setJuegoActivo(null)} />;
@@ -2656,7 +2673,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                             <button
                                 onClick={e => {
                                     e.stopPropagation();
-                                    const url = `${window.location.origin}${window.location.pathname}?juego=${app.id.toLowerCase()}`;
+                                    const url = app.shareUrl || `${window.location.origin}${window.location.pathname}?juego=${app.id.toLowerCase()}`;
                                     setShareModal({ url, titulo: app.name });
                                 }}
                                 title="Compartir"
@@ -2689,6 +2706,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
             </h2>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '15px', marginBottom: '40px', maxWidth: '900px', margin: '0 auto 40px auto' }}>
                 {[
+                    { id: 'LENGUA_SIGNOS',   label: 'Lengua Signos',   emoji: '🤟',  color: '#2563EB', action: () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }), shareable: true },
                     { id: 'SINTAXIS',        label: 'Sintaxis',        emoji: '🖍️',  color: '#3498db', action: () => setJuegoActivo({ tipoJuego: 'SINTAXIS' }), shareable: true },
                     { id: 'MATH_WORLD_PORTAL', label: 'Math World',    emoji: '🌍',  color: '#009688', action: () => abrirJuego('MATH_WORLD_PORTAL'), shareable: true, shareUrl: `${window.location.origin}/math_world` },
                     { id: 'LISTENING',       label: 'Listening',       emoji: '🙉',  color: '#8E44AD', action: () => setJuegoActivo({ tipoJuego: 'LISTENING' }), shareable: true },

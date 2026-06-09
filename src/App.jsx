@@ -20,6 +20,7 @@ import QuestionSenderClient from './QuestionSenderClient';
 import PartesPlantaGame from './PartesPlanta';
 import EtiquetaMe from './EtiquetaMe';
 import KartingTrack from './KartingTrack';
+import ArkadeHub from './MiniArcade/ArkadeHub';
 
 const TUTORIAL_ALUMNO = [
     {
@@ -88,7 +89,8 @@ function App() {
       const slug = window.location.pathname.replace(/^\//, '').replace(/\/$/, '').trim().toLowerCase();
       if (slug === 'funcionesejecutivas' || slug === 'irregular_verbs' || slug === 'sistema_solar'
           || slug === 'retos' || slug === 'conectapuntos' || slug === 'sudoku'
-          || slug === 'partes_planta' || slug === 'etiquetame' || slug === 'karting_track') {
+          || slug === 'partes_planta' || slug === 'etiquetame' || slug === 'karting_track'
+          || slug === 'arkade') {
         setRutaPublica(slug);
         return;
       }
@@ -111,6 +113,7 @@ function App() {
         'retos','conectapuntos','sudoku',
         'fisica',
         'math_world','primaria','feria',
+        'arkade',
       ]);
       if (slug && !RUTAS_RESERVADAS.has(slug) && !slug.startsWith('fisica/') && !slug.startsWith('primaria/')) {
         // Check if it's a professor page slug
@@ -237,6 +240,7 @@ function App() {
     );
 
     if (rutaPublica === 'karting_track') return <KartingTrack />;
+    if (rutaPublica === 'arkade') return <ArkadeHub onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
     if (rutaPublica === 'partes_planta') return <PartesPlantaGame onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
     if (rutaPublica === 'etiquetame') return <EtiquetaMe onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
     if (rutaPublica === 'funcionesejecutivas') return <><FuncionesEjecutivas onBack={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;

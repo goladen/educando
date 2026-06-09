@@ -52,7 +52,7 @@ function floodFill(board, rows, cols, r, c) {
     }
 }
 
-export default function Buscaminas({ onExit }) {
+export default function Buscaminas({ onExit, contained = false, containerWidth }) {
     const [levelKey, setLevelKey] = useState('Fácil');
     const { rows, cols, mines } = LEVELS[levelKey];
 
@@ -131,11 +131,11 @@ export default function Buscaminas({ onExit }) {
         setShowSave(false);
     }
 
-    const CELL = Math.min(36, Math.floor((Math.min(window.innerWidth - 40, 600)) / cols));
+    const CELL = Math.min(36, Math.floor((Math.min((containerWidth ?? window.innerWidth) - 40, 600)) / cols));
 
     return (
         <div style={{
-            position: 'fixed', inset: 0, zIndex: 9999,
+            position: contained ? 'absolute' : 'fixed', inset: 0, zIndex: 9999,
             background: 'linear-gradient(135deg, #0a0a1a 0%, #0d1b2a 100%)',
             display: 'flex', flexDirection: 'column', alignItems: 'center',
             overflowY: 'auto', padding: '16px 12px',

@@ -9,15 +9,20 @@ import { saveScore, getLastName, fmtScore } from './ranking';
  *   onDone    – callback when dismissed (saved or skipped)
  */
 export default function SaveForm({ gameKey, score, accentColor = '#00f5ff', onDone }) {
-    const [name, setName] = useState(getLastName);
-    const [result, setResult] = useState(null); // null | { monthly, allTime }
-
-    function handleSave() {
-        const r = saveScore(gameKey, score, name);
-        setResult(r);
-    }
-
+    const [name, setName]     = useState(getLastName);
+    const [result, setResult] = useState(null);   // null | 'saving' | { monthly, allTime }
     const isBusca = gameKey.startsWith('BUSCAMINAS');
+
+    async function handleSave() {
+        if (result === 'saving') return;
+        setResult('saving');
+        try {
+            const r = await saveScore(gameKey, score, name);
+            setResult(r);
+        } catch {
+            setResult({ monthly: null, allTime: null });
+        }
+    }
 
     return (
         <div style={{ textAlign: 'center', marginTop: 8 }}>
@@ -47,7 +52,7 @@ export default function SaveForm({ gameKey, score, accentColor = '#00f5ff', onDo
                         <button onClick={handleSave} style={{
                             background: accentColor, color: '#000', border: 'none',
                             borderRadius: 7, padding: '7px 18px', cursor: 'pointer',
-                            fontWeight: 700, fontSize: '0.82rem',
+                            fontWeight: 700, fontSize: '0.82rem', opacity: 1,
                         }}>Guardar 💾</button>
                         <button onClick={onDone} style={{
                             background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.45)',
@@ -56,6 +61,8 @@ export default function SaveForm({ gameKey, score, accentColor = '#00f5ff', onDo
                         }}>Saltar</button>
                     </div>
                 </>
+            ) : result === 'saving' ? (
+                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem', margin: 0 }}>Guardando…</p>
             ) : (
                 <>
                     <p style={{ color: accentColor, fontSize: '0.8rem', fontWeight: 700, margin: '0 0 6px' }}>✓ ¡Guardado!</p>
@@ -71,7 +78,7 @@ export default function SaveForm({ gameKey, score, accentColor = '#00f5ff', onDo
                     )}
                     {!result.monthly && !result.allTime && (
                         <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.75rem', margin: '0 0 3px' }}>
-                            Fuera del top 10 — se borrará en 30 días
+                            Guardado — fuera del top 10
                         </p>
                     )}
                     <button onClick={onDone} style={{

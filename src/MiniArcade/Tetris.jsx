@@ -74,7 +74,7 @@ function calcScore(cleared, level) {
     return (SCORE_TABLE[cleared] || 0) * (level + 1);
 }
 
-export default function Tetris({ onExit }) {
+export default function Tetris({ onExit, contained = false, panelId = null, containerWidth }) {
     const [board, setBoard] = useState(emptyBoard());
     const [piece, setPiece] = useState(() => randomPiece());
     const [next, setNext] = useState(() => randomPiece());
@@ -149,6 +149,7 @@ export default function Tetris({ onExit }) {
     // Keyboard
     useEffect(() => {
         const handler = (e) => {
+            if (panelId && window.__arkadePanel !== panelId) return;
             if (!started || gameOverRef.current) return;
             if (e.key === 'Escape') { setPaused(p => !p); return; }
             if (pausedRef.current) return;
@@ -217,8 +218,14 @@ export default function Tetris({ onExit }) {
         });
     }
 
-    const CELL = 28;
-    const boardPx = BOARD_WIDTH * CELL;
+    const PANEL_W = 90;
+    const availW = containerWidth ?? window.innerWidth;
+    const CELL = Math.min(
+        28,
+        Math.floor((availW - PANEL_W - 12 - 32) / BOARD_WIDTH),
+        Math.floor((window.innerHeight - 150) / BOARD_HEIGHT),
+    );
+    const boardPx  = BOARD_WIDTH  * CELL;
     const boardHPx = BOARD_HEIGHT * CELL;
 
     function NextPreview() {
@@ -240,10 +247,10 @@ export default function Tetris({ onExit }) {
 
     return (
         <div style={{
-            position: 'fixed', inset: 0, zIndex: 9999,
+            position: contained ? 'absolute' : 'fixed', inset: 0, zIndex: 9999,
             background: 'linear-gradient(135deg, #0a0a1a 0%, #0d1b2a 100%)',
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            fontFamily: "'Courier New', monospace",
+            fontFamily: "'Courier New', monospace", overflowY: 'auto',
         }}>
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 12 }}>
@@ -332,7 +339,7 @@ export default function Tetris({ onExit }) {
                 </div>
 
                 {/* Side panel */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14, width: 110 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: PANEL_W }}>
                     <div style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(0,245,255,0.2)', borderRadius: 10, padding: '10px 12px' }}>
                         <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.65rem', letterSpacing: 2, marginBottom: 4 }}>PUNTOS</div>
                         <div style={{ color: '#ffd700', fontSize: '1.1rem', fontWeight: 700 }}>{score}</div>

@@ -10,7 +10,7 @@ const BALL_R = 10;
 const PADDLE_OFFSET = 30;
 const WIN_SCORE = 7;
 
-export default function Pong({ onExit }) {
+export default function Pong({ onExit, contained = false, panelId = null, containerWidth }) {
     const containerRef = useRef(null);
     const requestRef = useRef(null);
     const p1Move = useRef(0);
@@ -118,6 +118,7 @@ export default function Pong({ onExit }) {
             p2Move.current = keys.has('ArrowUp') ? -1 : (keys.has('ArrowDown') ? 1 : 0);
         };
         const down = (e) => {
+            if (panelId && window.__arkadePanel !== panelId) return;
             const st = stateRef.current;
             if (e.key === ' ' || e.key === 'Enter') {
                 e.preventDefault();
@@ -126,7 +127,10 @@ export default function Pong({ onExit }) {
             keys.add(e.key);
             sync();
         };
-        const up = (e) => { keys.delete(e.key); sync(); };
+        const up = (e) => {
+            if (panelId && window.__arkadePanel !== panelId) return;
+            keys.delete(e.key); sync();
+        };
         window.addEventListener('keydown', down);
         window.addEventListener('keyup', up);
         return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };
@@ -169,6 +173,15 @@ export default function Pong({ onExit }) {
     };
 
     const st = stateRef.current;
+
+    // Dimensiones responsivas: ajusta al viewport sin desbordar
+    const pongScale = Math.min(1,
+        ((containerWidth ?? window.innerWidth) - 160) / WIDTH,
+        (window.innerHeight - (contained ? 160 : 120)) / HEIGHT,
+    );
+    const pongW = Math.floor(WIDTH  * pongScale);
+    const pongH = Math.floor(HEIGHT * pongScale);
+
     const btnStyle = (color) => ({
         flex: 1, padding: '18px 0', fontSize: '1.8rem', fontWeight: 700,
         background: '#1a1a3a', color, border: `2px solid ${color}`,
@@ -179,7 +192,7 @@ export default function Pong({ onExit }) {
 
     return (
         <div style={{
-            position: 'fixed', inset: 0, zIndex: 9999,
+            position: contained ? 'absolute' : 'fixed', inset: 0, zIndex: 9999,
             background: '#050510', display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center',
             fontFamily: '"Segoe UI", sans-serif', color: '#fff', padding: 10, boxSizing: 'border-box',
@@ -205,10 +218,10 @@ export default function Pong({ onExit }) {
                 </div>
             )}
 
-            <div style={{ display: 'flex', alignItems: 'stretch', justifyContent: 'center', width: '100%', maxWidth: 1000, gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', width: '100%', maxWidth: 1000, gap: 12 }}>
                 {/* P1 mobile buttons */}
                 {st.status !== 'menu' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', width: 70 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', width: 70, height: pongH }}>
                         <button onPointerDown={e=>{e.preventDefault();p1Move.current=-1}} onPointerUp={()=>p1Move.current=0} onPointerLeave={()=>p1Move.current=0} style={btnStyle('#00aaff')}>▲</button>
                         <button onPointerDown={e=>{e.preventDefault();p1Move.current=1}} onPointerUp={()=>p1Move.current=0} onPointerLeave={()=>p1Move.current=0} style={btnStyle('#00aaff')}>▼</button>
                     </div>
@@ -217,7 +230,7 @@ export default function Pong({ onExit }) {
                 {/* Canvas */}
                 <div ref={containerRef} onPointerMove={handlePointerMove}
                     style={{
-                        flex: 1, maxWidth: WIDTH, aspectRatio: `${WIDTH}/${HEIGHT}`,
+                        width: pongW, height: pongH, flexShrink: 0,
                         background: '#0a0a1a', position: 'relative', overflow: 'hidden',
                         borderRadius: 12, border: '2px solid #1a1a3a',
                         boxShadow: '0 0 30px rgba(0,255,170,0.2)', touchAction: 'none',
@@ -263,7 +276,7 @@ export default function Pong({ onExit }) {
 
                 {/* P2 mobile buttons */}
                 {st.status !== 'menu' && (
-                    <div style={{ display:'flex', flexDirection:'column', width:70, visibility: st.mode==='pvp'?'visible':'hidden' }}>
+                    <div style={{ display:'flex', flexDirection:'column', width:70, height: pongH, visibility: st.mode==='pvp'?'visible':'hidden' }}>
                         <button onPointerDown={e=>{e.preventDefault();p2Move.current=-1}} onPointerUp={()=>p2Move.current=0} onPointerLeave={()=>p2Move.current=0} style={btnStyle('#aa00ff')}>▲</button>
                         <button onPointerDown={e=>{e.preventDefault();p2Move.current=1}} onPointerUp={()=>p2Move.current=0} onPointerLeave={()=>p2Move.current=0} style={btnStyle('#aa00ff')}>▼</button>
                     </div>

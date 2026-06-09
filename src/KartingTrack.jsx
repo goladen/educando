@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import TrackEditor from './TrackEditor';
+import TrackEditor         from './TrackEditor';
+import TrackTest           from './TrackTest';
+import AlmacenCircuitos    from './AlmacenCircuitos';
 import { db } from './firebase';
 import { collection, query, where, getDocs, addDoc, doc, getDoc } from 'firebase/firestore';
 
@@ -108,23 +110,25 @@ const TILE_ROTATIONS2 = {
 const TILE_SRCS2 = { 1:dirtTile01, 2:dirtTile02, 3:dirtTile03, 5:dirtTile05, 6:dirtTile06, 7:dirtTile07 };
 
 const wp2 = (col, row) => [(col+0.5)*TW, (row+0.5)*TW];
+
+// Arc midpoints: guide the AI along the actual road curve at each corner.
+// Each corner arc midpoint sits exactly at TW/2 radius (on-road center) from the arc center,
+// at the 45° diagonal into the tile — preventing the AI from cutting through off-road interior.
+const ARC_D = TW / 2 * Math.SQRT1_2; // ≈ 2.12
+const arcWpA = (col,row) => [(col+1)*TW - ARC_D, (row+1)*TW - ARC_D];
+const arcWpB = (col,row) => [col*TW     + ARC_D, (row+1)*TW - ARC_D];
+const arcWpC = (col,row) => [(col+1)*TW - ARC_D, row*TW     + ARC_D];
+const arcWpD = (col,row) => [col*TW     + ARC_D, row*TW     + ARC_D];
+
 const WAYPOINTS2 = [
-  // top straight (after A corner at col1,row1)
-  wp2(2,1), wp2(5,1), wp2(8,1), wp2(11,1), wp2(14,1), wp2(15,1),
-  // right outer (after B corner at col16,row1)
-  wp2(16,2), wp2(16,3),
-  // inner top (after D corner at col16,row4)
-  wp2(15,4), wp2(13,4), wp2(11,4), wp2(9,4), wp2(8,4),
-  // inner left (after A corner at col7,row4)
-  wp2(7,5), wp2(7,6), wp2(7,7),
-  // inner bottom (after C corner at col7,row8)
-  wp2(8,8), wp2(10,8), wp2(12,8), wp2(14,8), wp2(15,8),
-  // right outer cont (after B corner at col16,row8)
-  wp2(16,9), wp2(16,10), wp2(16,11),
-  // bottom straight (after D corner at col16,row12)
-  wp2(15,12), wp2(12,12), wp2(9,12), wp2(6,12), wp2(3,12), wp2(2,12),
-  // left outer (after C corner at col1,row12)
-  wp2(1,11), wp2(1,9), wp2(1,7), wp2(1,5), wp2(1,3), wp2(1,2),
+  wp2(2,1), wp2(5,1), wp2(8,1), wp2(11,1), wp2(14,1), wp2(15,1), arcWpB(16,1),
+  wp2(16,2), wp2(16,3), arcWpD(16,4),
+  wp2(15,4), wp2(13,4), wp2(11,4), wp2(9,4), wp2(8,4), arcWpA(7,4),
+  wp2(7,5), wp2(7,6), wp2(7,7), arcWpC(7,8),
+  wp2(8,8), wp2(10,8), wp2(12,8), wp2(14,8), wp2(15,8), arcWpB(16,8),
+  wp2(16,9), wp2(16,10), wp2(16,11), arcWpD(16,12),
+  wp2(15,12), wp2(12,12), wp2(9,12), wp2(6,12), wp2(3,12), wp2(2,12), arcWpC(1,12),
+  wp2(1,11), wp2(1,9), wp2(1,7), wp2(1,5), wp2(1,3), wp2(1,2), arcWpA(1,1),
 ];
 const CHECKPOINT_POS2 = [
   [10.5*TW, 1.5*TW],
@@ -134,22 +138,14 @@ const CHECKPOINT_POS2 = [
 
 const wp = (col, row) => [(col+0.5)*TW, (row+0.5)*TW];
 const WAYPOINTS = [
-  // top straight (after A corner at col1)
-  wp(2,1), wp(4,1), wp(7,1), wp(9,1), wp(11,1),
-  // right outer (after B corner at col12,row1)
-  wp(12,2), wp(12,3),
-  // inner top (after D corner at col12,row4)
-  wp(11,4), wp(9,4), wp(8,4),
-  // inner left (after A corner at col7,row4)
-  wp(7,5),
-  // inner bottom (after C corner at col7,row6)
-  wp(8,6), wp(10,6), wp(11,6),
-  // right outer cont (after B corner at col12,row6)
-  wp(12,7), wp(12,8),
-  // bottom straight (after D corner at col12,row9)
-  wp(11,9), wp(8,9), wp(5,9), wp(2,9),
-  // left outer (after C corner at col1,row9)
-  wp(1,8), wp(1,6), wp(1,4), wp(1,2),
+  wp(2,1), wp(4,1), wp(7,1), wp(9,1), wp(11,1), arcWpB(12,1),
+  wp(12,2), wp(12,3), arcWpD(12,4),
+  wp(11,4), wp(9,4), wp(8,4), arcWpA(7,4),
+  wp(7,5), arcWpC(7,6),
+  wp(8,6), wp(10,6), wp(11,6), arcWpB(12,6),
+  wp(12,7), wp(12,8), arcWpD(12,9),
+  wp(11,9), wp(8,9), wp(5,9), wp(2,9), arcWpC(1,9),
+  wp(1,8), wp(1,6), wp(1,4), wp(1,2), arcWpA(1,1),
 ];
 
 // ── Carrera ───────────────────────────────────────────────────────────────────
@@ -220,7 +216,7 @@ function buildCar(scene, mainColor=0xe74c3c, darkColor=0xc0392b) {
 // ════════════════════════════════════════════════════════════════════════════
 // PANTALLA PREVIA – selección de recurso con multi-hoja (estilo Duelo Piratas)
 // ════════════════════════════════════════════════════════════════════════════
-function PantallaPrevia({ onIniciar, onConstruir }) {
+function PantallaPrevia({ onIniciar, onConstruir, onAlmacen }) {
   const [circuito,     setCircuito]     = useState(1);
   const [recursos,     setRecursos]     = useState([]);
   const [cargando,     setCargando]     = useState(true);
@@ -312,16 +308,27 @@ function PantallaPrevia({ onIniciar, onConstruir }) {
         })}
       </div>
 
-      {/* Botón constructor */}
-      <button onClick={onConstruir} style={{
-        marginBottom:24, padding:'10px 24px', borderRadius:12, cursor:'pointer',
-        border:'1px solid rgba(255,215,0,0.35)',
-        background:'rgba(255,215,0,0.08)', color:'#FFD700',
-        fontSize:'0.85rem', fontWeight:700, letterSpacing:0.5,
-        transition:'background .15s',
-      }}>
-        ✏️ Construir circuito
-      </button>
+      {/* Botones de circuito propio */}
+      <div style={{display:'flex',gap:10,marginBottom:24,flexWrap:'wrap',justifyContent:'center'}}>
+        <button onClick={onConstruir} style={{
+          padding:'10px 24px', borderRadius:12, cursor:'pointer',
+          border:'1px solid rgba(255,215,0,0.35)',
+          background:'rgba(255,215,0,0.08)', color:'#FFD700',
+          fontSize:'0.85rem', fontWeight:700, letterSpacing:0.5,
+          transition:'background .15s',
+        }}>
+          ✏️ Construir circuito
+        </button>
+        <button onClick={onAlmacen} style={{
+          padding:'10px 24px', borderRadius:12, cursor:'pointer',
+          border:'1px solid rgba(100,180,255,0.35)',
+          background:'rgba(100,180,255,0.08)', color:'#64b4ff',
+          fontSize:'0.85rem', fontWeight:700, letterSpacing:0.5,
+          transition:'background .15s',
+        }}>
+          🗂️ Almacén de circuitos
+        </button>
+      </div>
 
       {cargando ? <p style={{color:'#aaa'}}>Cargando recursos...</p> : (
         <>
@@ -565,6 +572,148 @@ function ModalPregunta({ datos, onRespuesta }) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// CONFIG PREVIA AL TEST DEL CIRCUITO LIBRE
+// ════════════════════════════════════════════════════════════════════════════
+function TrackTestSetup({ onIniciar, onVolver }) {
+  const [recursos,     setRecursos]     = useState([]);
+  const [cargando,     setCargando]     = useState(true);
+  const [recursoSel,   setRecursoSel]   = useState(null);
+  const [hojasChecked, setHojasChecked] = useState([]);
+  const [numVueltas,   setNumVueltas]   = useState(2);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [s1, s2] = await Promise.all([
+          getDocs(query(collection(db,'resources'), where('tipoJuego','==','CAZABURBUJAS'), where('isPrivate','==',false))),
+          getDocs(query(collection(db,'resources'), where('tipoJuego','==','KARTINGED'),   where('isPrivate','==',false))),
+        ]);
+        setRecursos([...s1.docs,...s2.docs].map(d=>({id:d.id,...d.data()})));
+      } catch(e) { console.error(e); }
+      setCargando(false);
+    })();
+  }, []);
+
+  const seleccionar = (r) => {
+    setRecursoSel(r);
+    const hs = r.hojas || [];
+    setHojasChecked(hs.length > 1 ? hs.map((_,i)=>i) : []);
+  };
+
+  const hojas      = recursoSel?.hojas || [];
+  const tieneHojas = hojas.length > 1;
+  const toggleHoja = (i) => setHojasChecked(prev => prev.includes(i) ? prev.filter(x=>x!==i) : [...prev, i]);
+
+  const pregsCount = tieneHojas
+    ? hojasChecked.reduce((acc,i) => acc + (hojas[i]?.preguntas?.length || 0), 0)
+    : (recursoSel?.hojas?.[0]?.preguntas?.length || recursoSel?.preguntas?.length || 0);
+
+  const iniciar = (sinRecurso = false) => {
+    if (sinRecurso) { onIniciar(null, [], numVueltas); return; }
+    if (!recursoSel) return;
+    const sel = !tieneHojas ? ['General'] : hojasChecked.map(i=>hojas[i]?.nombreHoja).filter(Boolean);
+    if (!sel.length) return;
+    onIniciar(recursoSel, sel, numVueltas);
+  };
+
+  const st = {
+    page:  { minHeight:'100vh', background:'linear-gradient(135deg,#1a1a2e,#16213e,#0f3460)', display:'flex', flexDirection:'column', alignItems:'center', padding:'30px 20px', color:'white', fontFamily:"'Segoe UI',sans-serif" },
+    title: { fontSize:'2rem', fontWeight:900, margin:'0 0 6px', background:'linear-gradient(90deg,#FF6B00,#FFD700)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' },
+    grid:  { display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))', gap:12, width:'100%', maxWidth:800 },
+    card:  (sel) => ({ background:sel?'rgba(255,107,0,0.22)':'rgba(255,255,255,0.07)', border:`2px solid ${sel?'#FF6B00':'rgba(255,255,255,0.12)'}`, borderRadius:12, padding:'14px 16px', cursor:'pointer', transition:'all .2s' }),
+  };
+
+  return (
+    <div style={st.page}>
+      <div style={{fontSize:'2.4rem',marginBottom:4}}>🏗️</div>
+      <h2 style={st.title}>Configurar Prueba</h2>
+
+      {/* Vueltas */}
+      <div style={{marginBottom:18,textAlign:'center'}}>
+        <div style={{color:'#FFD700',fontWeight:700,fontSize:'0.9rem',marginBottom:8}}>🔁 Número de vueltas</div>
+        <div style={{display:'flex',gap:10,justifyContent:'center'}}>
+          {[1,2,3,4,5].map(n=>(
+            <button key={n} onClick={()=>setNumVueltas(n)} style={{
+              width:44,height:44,borderRadius:10,border:`2px solid ${numVueltas===n?'#FF6B00':'rgba(255,255,255,0.2)'}`,
+              background:numVueltas===n?'rgba(255,107,0,0.3)':'rgba(255,255,255,0.06)',
+              color:'white',fontWeight:800,fontSize:'1rem',cursor:'pointer',transition:'all .15s',
+            }}>{n}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Solo conducir */}
+      <button onClick={()=>iniciar(true)} style={{
+        marginBottom:20,padding:'10px 28px',borderRadius:12,cursor:'pointer',
+        border:'1px solid rgba(255,255,255,0.22)',background:'rgba(255,255,255,0.08)',
+        color:'white',fontSize:'0.88rem',fontWeight:700,
+      }}>🚗 Solo conducir (sin preguntas)</button>
+
+      {/* Recursos */}
+      <p style={{color:'#aaa',fontSize:'0.82rem',marginBottom:12}}>O elige un recurso con preguntas:</p>
+      {cargando ? <p style={{color:'#aaa'}}>Cargando recursos...</p> : (
+        <>
+          <div style={st.grid}>
+            {recursos.map(r=>(
+              <div key={r.id} style={st.card(recursoSel?.id===r.id)} onClick={()=>seleccionar(r)}>
+                <div style={{fontWeight:700,fontSize:'0.95rem',marginBottom:3}}>🚗 {r.titulo}</div>
+                <div style={{color:'#aaa',fontSize:'0.75rem'}}>{r.temas||'Sin tema'} · {r.hojas?.length||1} hoja(s)</div>
+              </div>
+            ))}
+            {!recursos.length && <p style={{color:'#aaa'}}>No hay recursos disponibles.</p>}
+          </div>
+
+          {recursoSel && (
+            <div style={{marginTop:20,width:'100%',maxWidth:800}}>
+              {tieneHojas && (
+                <div style={{background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.14)',borderRadius:12,padding:'12px 14px',marginBottom:12}}>
+                  <div style={{color:'#FFD700',fontSize:'0.84rem',fontWeight:700,marginBottom:8}}>📋 Hojas</div>
+                  <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+                    {hojas.map((h,i)=>{
+                      const nombre=h.nombreHoja||`Hoja ${i+1}`, count=h.preguntas?.length||0, activa=hojasChecked.includes(i);
+                      return(
+                        <button key={i} onClick={()=>toggleHoja(i)} style={{
+                          padding:'6px 12px',borderRadius:8,cursor:'pointer',
+                          border:activa?'2px solid #FF6B00':'2px solid rgba(255,255,255,0.18)',
+                          background:activa?'rgba(255,107,0,0.2)':'rgba(255,255,255,0.05)',
+                          color:activa?'#FF6B00':'rgba(255,255,255,0.55)',
+                          fontSize:'0.8rem',fontWeight:700,transition:'all .15s',
+                        }}>{nombre} <span style={{opacity:.6,fontWeight:400}}>({count})</span></button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              <div style={{background:'rgba(255,107,0,0.1)',border:'2px solid rgba(255,107,0,0.3)',borderRadius:12,padding:'10px 16px',marginBottom:12,textAlign:'center'}}>
+                <div style={{color:'#FFD700',fontWeight:800,marginBottom:2}}>{recursoSel.titulo}</div>
+                <div style={{color:'#aaa',fontSize:'0.8rem'}}>{pregsCount} pregunta{pregsCount!==1?'s':''} · máx. 4 por vuelta</div>
+              </div>
+              {tieneHojas&&hojasChecked.length===0
+                ? <p style={{color:'#ff5252',textAlign:'center',fontSize:'0.88rem'}}>⚠️ Selecciona al menos una hoja</p>
+                : (
+                  <div style={{textAlign:'center'}}>
+                    <button onClick={()=>iniciar(false)} style={{
+                      padding:'12px 36px',borderRadius:12,border:'none',cursor:'pointer',
+                      fontWeight:800,fontSize:'1rem',color:'white',
+                      background:'linear-gradient(135deg,#FF6B00,#CC4400)',
+                      boxShadow:'0 4px 20px rgba(255,107,0,0.4)',
+                    }}>🏁 ¡Probar circuito!</button>
+                  </div>
+                )
+              }
+            </div>
+          )}
+        </>
+      )}
+
+      <button onClick={onVolver} style={{marginTop:20,padding:'9px 20px',borderRadius:10,
+        border:'1px solid rgba(255,255,255,0.18)',background:'rgba(255,255,255,0.07)',
+        color:'white',cursor:'pointer',fontSize:'0.85rem'}}>← Volver al editor</button>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // PANTALLA DE RESULTADOS
 // ════════════════════════════════════════════════════════════════════════════
 function PantallaResultados({ resultado, recurso, hojas, onReintentar, onSalir }) {
@@ -585,18 +734,20 @@ function PantallaResultados({ resultado, recurso, hojas, onReintentar, onSalir }
         <div style={st.row}><span>✅ Aciertos</span><b style={{color:'#2ecc71'}}>{resultado.acertadas}</b></div>
         <div style={st.row}><span>❌ Fallos</span><b style={{color:'#e74c3c'}}>{resultado.falladas}</b></div>
         <div style={st.row}><span>⏳ Penalización</span><b style={{color:'#e67e22'}}>{resultado.penaltySecs>0?`+${resultado.penaltySecs}s`:'—'}</b></div>
-        <div style={st.row}><span>📚 Recurso</span><b style={{fontSize:'0.88rem',maxWidth:200,textAlign:'right'}}>{recurso.titulo}</b></div>
-        <div style={{...st.row,borderBottom:'none',flexWrap:'wrap',gap:4,alignItems:'flex-start'}}>
-          <span>📋 Hojas</span>
-          <b style={{fontSize:'0.85rem',maxWidth:220,textAlign:'right'}}>{hojas.join(', ')}</b>
-        </div>
+        {recurso && <>
+          <div style={st.row}><span>📚 Recurso</span><b style={{fontSize:'0.88rem',maxWidth:200,textAlign:'right'}}>{recurso.titulo}</b></div>
+          <div style={{...st.row,borderBottom:'none',flexWrap:'wrap',gap:4,alignItems:'flex-start'}}>
+            <span>📋 Hojas</span>
+            <b style={{fontSize:'0.85rem',maxWidth:220,textAlign:'right'}}>{hojas.join(', ')}</b>
+          </div>
+        </>}
       </div>
       <div style={{display:'flex',gap:10,flexWrap:'wrap',justifyContent:'center'}}>
-        <button style={st.btn('linear-gradient(135deg,#27ae60,#1e8449)')} onClick={()=>setModalProfe(true)}>📤 Enviar al profesor</button>
+        {recurso && <button style={st.btn('linear-gradient(135deg,#27ae60,#1e8449)')} onClick={()=>setModalProfe(true)}>📤 Enviar al profesor</button>}
         <button style={st.btn('linear-gradient(135deg,#FF6B00,#CC4400)')} onClick={onReintentar}>🔄 Volver a jugar</button>
         <button style={st.btn('rgba(255,255,255,0.1)')} onClick={onSalir}>🏠 Salir</button>
       </div>
-      {modalProfe && <ModalEnviarProfe resultado={resultado} recurso={recurso} hojas={hojas} onClose={()=>setModalProfe(false)}/>}
+      {modalProfe && recurso && <ModalEnviarProfe resultado={resultado} recurso={recurso} hojas={hojas} onClose={()=>setModalProfe(false)}/>}
     </div>
   );
 }
@@ -918,10 +1069,10 @@ function KartingGame({ recurso, hojas, circuito=1, onTerminar, onSalir }) {
     if (isC2) {
       const orig = textures[V];
       const vTex = orig.clone();
-      vTex.rotation = Math.PI / 2; vTex.center.set(0.5, 0.5); vTex.needsUpdate = true;
+      vTex.rotation = Math.PI / 2; vTex.center.set(0.5, 0.5);
       textures[V] = vTex;
       const hTex = orig.clone();
-      hTex.rotation = Math.PI; hTex.center.set(0.5, 0.5); hTex.needsUpdate = true;
+      hTex.rotation = Math.PI; hTex.center.set(0.5, 0.5);
       textures[H] = hTex;
       // road_dirt04 horario (−PI/2) para curvas 4 y 8
       dirt04Tex = loader.load(dirtTile04);
@@ -1020,7 +1171,7 @@ function KartingGame({ recurso, hojas, circuito=1, onTerminar, onSalir }) {
     let speed=0;
     const MAX_SPEED=0.30, ACCEL=0.007, FRICTION=0.965, BRAKE_F=0.90, TURN=0.022, SLIDE_FACTOR=0.88;
     let aiSpeed=0, aiWpIdx=cfg.startWp, aiStuckFrames=0, aiReverseFrames=0;
-    const AI_MAX=0.22, AI_ACCEL=0.006, AI_TURN=0.08, AI_STUCK_LIMIT=55;
+    const AI_MAX=0.20, AI_ACCEL=0.006, AI_TURN=0.10, AI_STUCK_LIMIT=45;
 
     let phaseLocal='countdown', countdownStart=Date.now();
     let playerLapLocal=0, aiLapLocal=0, lapStart=0;
@@ -1045,40 +1196,13 @@ function KartingGame({ recurso, hojas, circuito=1, onTerminar, onSalir }) {
     const onResize=()=>{ camera.aspect=mount.clientWidth/mount.clientHeight; camera.updateProjectionMatrix(); renderer.setSize(mount.clientWidth,mount.clientHeight); };
     window.addEventListener('resize',onResize);
 
-    // Cámara inicial
-    const trackCx = cfg.cols*TW/2, trackCz = cfg.rows*TW/2;
-    if (isC2) {
-      // Vista cenital para revisar el circuito de tierra
-      scene.fog = null;                              // sin niebla en vista cenital
-      camera.position.set(trackCx, 78, trackCz);
-      camera.lookAt(new THREE.Vector3(trackCx, 0, trackCz));
-      camera.fov = 70; camera.updateProjectionMatrix();
-
-      // Números en cada curva para identificarlas
-      const corners2 = [
-        {n:1, col:1,  row:1 }, {n:2, col:16, row:1 },
-        {n:3, col:7,  row:4 }, {n:4, col:16, row:4 },
-        {n:5, col:7,  row:8 }, {n:6, col:16, row:8 },
-        {n:7, col:1,  row:12}, {n:8, col:16, row:12},
-      ];
-      corners2.forEach(({n, col, row}) => {
-        const nc=document.createElement('canvas'); nc.width=96; nc.height=96;
-        const nctx=nc.getContext('2d');
-        nctx.fillStyle='rgba(220,50,50,0.92)';
-        nctx.beginPath(); nctx.arc(48,48,44,0,Math.PI*2); nctx.fill();
-        nctx.strokeStyle='white'; nctx.lineWidth=3;
-        nctx.beginPath(); nctx.arc(48,48,44,0,Math.PI*2); nctx.stroke();
-        nctx.fillStyle='white'; nctx.font='bold 52px Arial';
-        nctx.textAlign='center'; nctx.textBaseline='middle';
-        nctx.fillText(n,48,50);
-        const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(nc),transparent:true}));
-        sp.position.set((col+0.5)*TW, 5, (row+0.5)*TW);
-        sp.scale.set(7,7,1); scene.add(sp);
-      });
-    } else {
-      camera.position.set(car.position.x+Math.sin(car.rotation.y)*12, car.position.y+5.5, car.position.z+Math.cos(car.rotation.y)*12);
-    }
-    const camTarget=new THREE.Vector3().copy(isC2 ? new THREE.Vector3(trackCx,0,trackCz) : car.position);
+    // Cámara inicial — detrás del coche (igual en ambos circuitos)
+    camera.position.set(
+      car.position.x + Math.sin(car.rotation.y)*12,
+      car.position.y + 5.5,
+      car.position.z + Math.cos(car.rotation.y)*12
+    );
+    const camTarget = new THREE.Vector3().copy(car.position);
 
     let animId;
     const animate=()=>{
@@ -1189,7 +1313,7 @@ function KartingGame({ recurso, hojas, circuito=1, onTerminar, onSalir }) {
           while(angleDiff<-Math.PI) angleDiff+=2*Math.PI;
           ai.rotation.y+=Math.sign(angleDiff)*Math.min(Math.abs(angleDiff)*0.55,AI_TURN);
 
-          const curveFactor=1-Math.min(Math.abs(angleDiff)/Math.PI,1)*0.70;
+          const curveFactor=1-Math.min(Math.abs(angleDiff)/Math.PI,1)*0.80;
 
           // player avoidance: if player is close and ahead, steer away and slow down
           const pDx=car.position.x-ai.position.x, pDz=car.position.z-ai.position.z;
@@ -1209,10 +1333,29 @@ function KartingGame({ recurso, hojas, circuito=1, onTerminar, onSalir }) {
 
         const aiDx=-Math.sin(ai.rotation.y)*aiSpeed, aiDz=-Math.cos(ai.rotation.y)*aiSpeed;
         const aiNx=ai.position.x+aiDx, aiNz=ai.position.z+aiDz;
-        if      (isCarOnRoad(aiNx,aiNz))           { ai.position.x=aiNx; ai.position.z=aiNz; }
-        else if (isCarOnRoad(aiNx,ai.position.z))  { ai.position.x=aiNx; aiSpeed*=0.5; }
-        else if (isCarOnRoad(ai.position.x,aiNz))  { ai.position.z=aiNz; aiSpeed*=0.5; }
-        else                                        { aiSpeed*=0.35; }
+        if (isCarOnRoad(aiNx,aiNz)) {
+          ai.position.x=aiNx; ai.position.z=aiNz;
+        } else {
+          // Sweep steering angles (±PI/8 steps) to find one that is on-road
+          // AND moves closer to the look-ahead target — like a player would steer.
+          const tgtDistNow=Math.hypot(tgX-ai.position.x, tgZ-ai.position.z);
+          const sweepSpd=Math.max(Math.abs(aiSpeed), 0.08);
+          let moved=false;
+          for (let s=1; s<=8 && !moved; s++) {
+            for (const sign of [-1,1]) {
+              const ta=ai.rotation.y + sign*s*(Math.PI/8);
+              const tx=ai.position.x - Math.sin(ta)*sweepSpd;
+              const tz=ai.position.z - Math.cos(ta)*sweepSpd;
+              if (isCarOnRoad(tx,tz) && Math.hypot(tgX-tx,tgZ-tz)<tgtDistNow) {
+                ai.rotation.y=ta;
+                ai.position.x=tx; ai.position.z=tz;
+                aiSpeed=Math.max(aiSpeed*0.75, 0.05);
+                moved=true; break;
+              }
+            }
+          }
+          if (!moved) aiSpeed*=0.25;
+        }
 
         // stuck detection → trigger reverse recovery (inspired by AICarAvoidanceBehaviour)
         if (aiReverseFrames===0) {
@@ -1269,8 +1412,8 @@ function KartingGame({ recurso, hojas, circuito=1, onTerminar, onSalir }) {
         if (now-lastTimerUpdate>100) { setCurrentMs(now-lapStart-totalPausedRef.current+penaltyRef.current); lastTimerUpdate=now; }
       }
 
-      // Cámara
-      if (!isC2) {
+      // Cámara — sigue al jugador en ambos circuitos
+      {
         const bX=Math.sin(car.rotation.y)*11, bZ=Math.cos(car.rotation.y)*11;
         camera.position.x+=(car.position.x+bX-camera.position.x)*0.08;
         camera.position.y+=(car.position.y+5.2-camera.position.y)*0.08;
@@ -1403,21 +1546,66 @@ function KartingGame({ recurso, hojas, circuito=1, onTerminar, onSalir }) {
 // WRAPPER PRINCIPAL
 // ════════════════════════════════════════════════════════════════════════════
 export default function KartingTrack({ alTerminar } = {}) {
-  const [fase,      setFase]     = useState('PREVIO');
-  const [recurso,   setRecurso]  = useState(null);
-  const [hojas,     setHojas]    = useState(['General']);
-  const [circuito,  setCircuito] = useState(1);
-  const [resultado, setResultado]= useState(null);
+  const [fase,         setFase]        = useState('PREVIO');
+  const [recurso,      setRecurso]     = useState(null);
+  const [hojas,        setHojas]       = useState(['General']);
+  const [circuito,     setCircuito]    = useState(1);
+  const [resultado,    setResultado]   = useState(null);
+  const [customPaths,  setCustomPaths]  = useState(null);
+  const [customObjects,setCustomObjects]= useState([]);
+  const [testConfig,   setTestConfig]   = useState(null); // {recurso, hojas, numVueltas}
+  const [testResultado,setTestResultado]= useState(null);
+  const [loadedCircuit,setLoadedCircuit]= useState(null); // {paths, objects} from warehouse
+  const [editorSource, setEditorSource] = useState('PREVIO'); // where "Volver" goes from editor
 
   const salir = () => { if (alTerminar) alTerminar(); else window.history.back(); };
 
   if (fase==='EDITOR')
-    return <TrackEditor onVolver={() => setFase('PREVIO')} />;
+    return <TrackEditor
+      onVolver={() => { setLoadedCircuit(null); setFase(editorSource); }}
+      onProbar={(p, objs) => { setCustomPaths(p); setCustomObjects(objs); setFase('TESTING_SETUP'); }}
+      initialPaths={loadedCircuit?.paths  || []}
+      initialObjects={loadedCircuit?.objects || []}
+    />;
+
+  if (fase==='ALMACEN')
+    return <AlmacenCircuitos
+      onJugar={(paths,objects)=>{ setCustomPaths(paths); setCustomObjects(objects); setFase('TESTING_SETUP'); }}
+      onEditar={(paths,objects)=>{ setLoadedCircuit({paths,objects}); setEditorSource('ALMACEN'); setFase('EDITOR'); }}
+      onVolver={()=>setFase('PREVIO')}
+    />;
+
+  if (fase==='TESTING_SETUP')
+    return <TrackTestSetup
+      onIniciar={(r,h,n) => { setTestConfig({recurso:r,hojas:h,numVueltas:n}); setFase('TESTING'); }}
+      onVolver={() => setFase('EDITOR')}
+    />;
+
+  if (fase==='TESTING' && customPaths)
+    return <TrackTest
+      paths={customPaths}
+      objects={customObjects}
+      recurso={testConfig?.recurso ?? null}
+      hojas={testConfig?.hojas ?? []}
+      numVueltas={testConfig?.numVueltas ?? 2}
+      onVolver={() => setFase('TESTING_SETUP')}
+      onTerminar={(res) => { setTestResultado(res); setFase('TESTING_RESULT'); }}
+    />;
+
+  if (fase==='TESTING_RESULT' && testResultado)
+    return <PantallaResultados
+      resultado={testResultado}
+      recurso={testConfig?.recurso ?? null}
+      hojas={testConfig?.hojas ?? []}
+      onReintentar={() => { setTestResultado(null); setFase('TESTING'); }}
+      onSalir={() => setFase('EDITOR')}
+    />;
 
   if (fase==='PREVIO')
     return <PantallaPrevia
       onIniciar={(r,h,c)=>{ setRecurso(r); setHojas(h); setCircuito(c); setFase('JUGANDO'); }}
-      onConstruir={() => setFase('EDITOR')}
+      onConstruir={() => { setLoadedCircuit(null); setEditorSource('PREVIO'); setFase('EDITOR'); }}
+      onAlmacen={() => setFase('ALMACEN')}
     />;
 
   if (fase==='RESULTADO' && resultado)

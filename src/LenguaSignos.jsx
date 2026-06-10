@@ -1,5 +1,105 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import lenguadesignoImg from './assets/lenguadesigno.jpg';
+import { FRASES_PIC } from './BibliotecaLenguaSignos';
+
+// ─── Utilidades ARASAAC ───────────────────────────────────────────────────────
+const PIC_API = 'https://api.arasaac.org/v1/pictograms/es/search';
+const picImg  = id => `https://static.arasaac.org/pictograms/${id}/${id}_2500.png`;
+const _picCache = new Map();
+
+function stripAccents(w) {
+  return w.normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+// Verbos irregulares con diptongo: forma conjugada → infinitivo
+const IRREG = {
+  juega:'jugar', juegan:'jugar', juegas:'jugar',
+  duerme:'dormir', duermen:'dormir', duermo:'dormir',
+  vuela:'volar', vuelan:'volar', vuelas:'volar', vuelo:'volar',
+  fluye:'fluir', fluyen:'fluir', fluyo:'fluir',
+  puede:'poder', pueden:'poder', puedo:'poder',
+  tiene:'tener', tienen:'tener', tengo:'tener',
+  viene:'venir', vienen:'venir', vengo:'venir',
+  quiere:'querer', quieren:'querer', quiero:'querer',
+  sigue:'seguir', siguen:'seguir', sigo:'seguir',
+  pide:'pedir', piden:'pedir', pido:'pedir',
+  sirve:'servir', sirven:'servir',
+  calienta:'calentar', calientan:'calentar',
+  enciende:'encender', encienden:'encender',
+  pierde:'perder', pierden:'perder',
+  cierra:'cerrar', cierran:'cerrar',
+  empieza:'empezar', empiezan:'empezar',
+  elige:'elegir', eligen:'elegir',
+  mueve:'mover', mueven:'mover',
+  siente:'sentir', sienten:'sentir',
+  miente:'mentir', mienten:'mentir',
+};
+
+function verbVariants(w) {
+  // Primero: irregulares con diptongo
+  if (IRREG[w]) return [IRREG[w]];
+
+  const v = [];
+  // Gerundios
+  if (/ando$/.test(w)) return [w.slice(0,-4)+'ar'];
+  if (/iendo$/.test(w)) return [w.slice(0,-5)+'er', w.slice(0,-5)+'ir'];
+
+  // Plural → singular (intenta quitando -s, -n)
+  if (/[^aeiou]an$/.test(w) && w.length > 4) v.push(w.slice(0,-2));  // cazan→caza
+  else if (/[^aeiou]en$/.test(w) && w.length > 4) v.push(w.slice(0,-2)); // comen→come
+  else if (/[^aeiou]n$/.test(w) && w.length > 4) v.push(w.slice(0,-1));
+  else if (/s$/.test(w) && w.length > 3) v.push(w.slice(0,-1));
+
+  // Forma base + r → infinitivo regular (dibuja→dibujar, escribe→escribir, navega→navegar)
+  if (/[^aeiou][ae]$/.test(w) && w.length > 3) v.push(w + 'r');
+  // Para las formas plurales ya reducidas, también añadir +r
+  v.forEach(s => { if (/[^aeiou][ae]$/.test(s) && s.length > 3) v.push(s + 'r'); });
+
+  return [...new Set(v)];
+}
+
+async function tryFetch(candidate) {
+  if (_picCache.has(candidate)) return _picCache.get(candidate);
+  try {
+    const r = await fetch(`${PIC_API}/${encodeURIComponent(candidate)}`);
+    if (!r.ok) return undefined; // undefined = not tried yet / not found, don't cache
+    const d = await r.json();
+    const id = Array.isArray(d) && d.length > 0 ? d[0]._id : null;
+    _picCache.set(candidate, id);
+    return id;
+  } catch { return undefined; }
+}
+
+async function fetchPicId(word) {
+  const base = stripAccents(word.toLowerCase().trim());
+  if (_picCache.has(base)) return _picCache.get(base);
+
+  // Intentar: palabra normalizada, luego variantes de infinitivo
+  const candidates = [base, ...verbVariants(base)];
+  for (const c of candidates) {
+    const id = await tryFetch(c);
+    if (id !== undefined) { // found (even if null = "no pictogram")
+      _picCache.set(base, id);
+      return id;
+    }
+  }
+  _picCache.set(base, null);
+  return null;
+}
+
+function fraseTexto(f) { return f.texto; }
+function contentWords(f, max = 6) {
+  return f.tokens.slice(0, max);
+}
+function pickRandom(arr, n, exclude = []) {
+  const pool = arr.filter(x => !exclude.includes(x));
+  const out = [];
+  while (out.length < n && pool.length > 0) {
+    const i = Math.floor(Math.random() * pool.length);
+    out.push(pool.splice(i, 1)[0]);
+  }
+  return out;
+}
 
 // Carga la imagen una vez y cachea sus dimensiones naturales
 let _naturalW = null;
@@ -133,9 +233,62 @@ function SignLabeled({ char, size = 70 }) {
 }
 
 // ─── MODO TRANSCRIPCIÓN ──────────────────────────────────────────────────────
+const HEART_CONFIG = [
+  { left:'38%', delay:0,    size:'2rem'  },
+  { left:'50%', delay:80,   size:'2.6rem'},
+  { left:'62%', delay:160,  size:'1.8rem'},
+  { left:'44%', delay:240,  size:'2.2rem'},
+  { left:'56%', delay:320,  size:'1.6rem'},
+  { left:'34%', delay:400,  size:'2rem'  },
+  { left:'66%', delay:480,  size:'1.9rem'},
+];
+
+function HeartsEffect({ show }) {
+  if (!show) return null;
+  return (
+    <div style={{ position:'fixed', inset:0, pointerEvents:'none', zIndex:99999 }}>
+      {HEART_CONFIG.map((h, i) => (
+        <div key={i} style={{
+          position:'absolute', bottom:'40%', left: h.left,
+          fontSize: h.size, lineHeight:1,
+          animation:`floatHeart 1.1s ease-out ${h.delay}ms forwards`,
+        }}>❤️</div>
+      ))}
+    </div>
+  );
+}
+
 function ModoTranscripcion() {
   const [texto, setTexto] = useState('');
+  const [hablando, setHablando] = useState(false);
+  const [escuchando, setEscuchando] = useState(false);
+  const recRef = React.useRef(null);
   const chars = texto.toUpperCase().split('').filter(c => c !== '\n');
+
+  const escucharTTS = () => {
+    if (!window.speechSynthesis || !texto.trim()) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(texto);
+    u.lang = 'es-ES'; u.rate = 0.85;
+    u.onstart = () => setHablando(true);
+    u.onend = () => setHablando(false);
+    u.onerror = () => setHablando(false);
+    window.speechSynthesis.speak(u);
+  };
+
+  const iniciarMicrofono = () => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { alert('Tu navegador no soporta reconocimiento de voz.'); return; }
+    if (recRef.current) { recRef.current.stop(); return; }
+    const rec = new SR();
+    rec.lang = 'es-ES'; rec.interimResults = false; rec.maxAlternatives = 1;
+    recRef.current = rec;
+    setEscuchando(true);
+    rec.onresult = (e) => { setTexto(e.results[0][0].transcript); };
+    rec.onerror = () => { setEscuchando(false); recRef.current = null; };
+    rec.onend   = () => { setEscuchando(false); recRef.current = null; };
+    rec.start();
+  };
 
   return (
     <div>
@@ -143,7 +296,7 @@ function ModoTranscripcion() {
         <textarea
           value={texto}
           onChange={e => setTexto(e.target.value)}
-          placeholder="Escribe una palabra o frase..."
+          placeholder="Escribe una palabra o frase... o usa el micrófono 🎤"
           rows={2}
           style={{
             width: '100%', boxSizing: 'border-box',
@@ -156,6 +309,30 @@ function ModoTranscripcion() {
           onFocus={e => e.target.style.borderColor = '#2563EB'}
           onBlur={e => e.target.style.borderColor = '#93C5FD'}
         />
+        <div style={{ display:'flex', gap:10, marginTop:10 }}>
+          <button onClick={escucharTTS} disabled={!texto.trim()}
+            style={{ padding:'8px 18px', fontWeight:700, fontSize:'0.88rem',
+              background: hablando ? '#DBEAFE' : 'white',
+              color: hablando ? '#1D4ED8' : '#64748B',
+              border:`2px solid ${hablando ? '#93C5FD' : '#E2E8F0'}`,
+              borderRadius:10, cursor: texto.trim() ? 'pointer':'default',
+              opacity: texto.trim() ? 1 : 0.45,
+              transition:'all 0.2s', display:'inline-flex', alignItems:'center', gap:6 }}>
+            <span>{hablando ? '🔊' : '🔈'}</span>
+            {hablando ? 'Reproduciendo...' : 'Escuchar'}
+          </button>
+          <button onClick={iniciarMicrofono}
+            style={{ padding:'8px 18px', fontWeight:700, fontSize:'0.88rem',
+              background: escuchando ? '#FEE2E2' : 'white',
+              color: escuchando ? '#DC2626' : '#64748B',
+              border:`2px solid ${escuchando ? '#FCA5A5' : '#E2E8F0'}`,
+              borderRadius:10, cursor:'pointer',
+              transition:'all 0.2s', display:'inline-flex', alignItems:'center', gap:6,
+              animation: escuchando ? 'pulse 1s infinite' : 'none' }}>
+            <span>{escuchando ? '⏺️' : '🎤'}</span>
+            {escuchando ? 'Escuchando...' : 'Dictar'}
+          </button>
+        </div>
       </div>
 
       {chars.length === 0 && (
@@ -191,10 +368,40 @@ function ModoDeletrear() {
   const [mostrarPista, setMostrarPista] = useState(false);
   const [puntos, setPuntos] = useState(0);
   const [intentos, setIntentos] = useState(0);
+  const [showHearts, setShowHearts] = useState(false);
+  const [hablando, setHablando] = useState(false);
+  const [escuchando, setEscuchando] = useState(false);
+  const [transcripcion, setTranscripcion] = useState('');
+  const recRef = React.useRef(null);
 
   const palabra = PALABRAS[palabraIdx];
 
   const teclado = useMemo(() => shuffle(LETTERS), [palabraIdx]);
+
+  const escucharTTS = () => {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(palabra.toLowerCase());
+    u.lang = 'es-ES'; u.rate = 0.8;
+    u.onstart = () => setHablando(true);
+    u.onend = () => setHablando(false);
+    u.onerror = () => setHablando(false);
+    window.speechSynthesis.speak(u);
+  };
+
+  const iniciarMicrofono = () => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { alert('Tu navegador no soporta reconocimiento de voz.'); return; }
+    if (recRef.current) { recRef.current.stop(); return; }
+    const rec = new SR();
+    rec.lang = 'es-ES'; rec.interimResults = false; rec.maxAlternatives = 1;
+    recRef.current = rec;
+    setEscuchando(true); setTranscripcion('');
+    rec.onresult = (e) => { setTranscripcion(e.results[0][0].transcript); };
+    rec.onerror = () => { setEscuchando(false); recRef.current = null; };
+    rec.onend   = () => { setEscuchando(false); recRef.current = null; };
+    rec.start();
+  };
 
   const clickLetra = (letra) => {
     if (estado !== 'jugando') return;
@@ -205,7 +412,11 @@ function ModoDeletrear() {
       const correcto = nueva.join('') === palabra;
       setEstado(correcto ? 'ok' : 'error');
       setIntentos(i => i + 1);
-      if (correcto) setPuntos(p => p + 1);
+      if (correcto) {
+        setPuntos(p => p + 1);
+        setShowHearts(true);
+        setTimeout(() => setShowHearts(false), 1600);
+      }
     }
   };
 
@@ -231,6 +442,7 @@ function ModoDeletrear() {
 
   return (
     <div>
+      <HeartsEffect show={showHearts} />
       {/* Marcador */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
         <div style={{ background:'#EFF6FF', borderRadius:12, padding:'6px 16px', fontSize:'0.9rem', fontWeight:700, color:'#1D4ED8' }}>
@@ -251,9 +463,37 @@ function ModoDeletrear() {
         <p style={{ color:'#64748B', fontSize:'0.85rem', margin:'0 0 8px' }}>Deletrea esta palabra con los signos:</p>
         <div style={{ fontSize:'2.5rem', fontWeight:900, letterSpacing:6, color:'#1E293B',
           background:'white', display:'inline-block', padding:'12px 32px',
-          borderRadius:16, boxShadow:'0 4px 12px rgba(0,0,0,0.08)' }}>
+          borderRadius:16, boxShadow:'0 4px 12px rgba(0,0,0,0.08)', marginBottom:12 }}>
           {palabra}
         </div>
+        <div style={{ display:'flex', gap:10, justifyContent:'center' }}>
+          <button onClick={escucharTTS}
+            style={{ padding:'8px 18px', fontWeight:700, fontSize:'0.88rem',
+              background: hablando ? '#DBEAFE' : 'white',
+              color: hablando ? '#1D4ED8' : '#64748B',
+              border:`2px solid ${hablando ? '#93C5FD' : '#E2E8F0'}`,
+              borderRadius:10, cursor:'pointer',
+              transition:'all 0.2s', display:'inline-flex', alignItems:'center', gap:6 }}>
+            <span>{hablando ? '🔊' : '🔈'}</span>
+            {hablando ? 'Reproduciendo...' : 'Escuchar'}
+          </button>
+          <button onClick={iniciarMicrofono}
+            style={{ padding:'8px 18px', fontWeight:700, fontSize:'0.88rem',
+              background: escuchando ? '#FEE2E2' : 'white',
+              color: escuchando ? '#DC2626' : '#64748B',
+              border:`2px solid ${escuchando ? '#FCA5A5' : '#E2E8F0'}`,
+              borderRadius:10, cursor:'pointer',
+              transition:'all 0.2s', display:'inline-flex', alignItems:'center', gap:6,
+              animation: escuchando ? 'pulse 1s infinite' : 'none' }}>
+            <span>{escuchando ? '⏺️' : '🎤'}</span>
+            {escuchando ? 'Escuchando...' : 'Decir palabra'}
+          </button>
+        </div>
+        {transcripcion && (
+          <p style={{ margin:'10px 0 0', fontSize:'0.82rem', color:'#64748B', fontStyle:'italic' }}>
+            Reconocido: "<strong>{transcripcion}</strong>"
+          </p>
+        )}
       </div>
 
       {/* Zona de escritura */}
@@ -399,14 +639,328 @@ function ModoReferencia() {
   );
 }
 
+// ─── MODO PICTOGRAMAS (traductor) ─────────────────────────────────────────────
+function PicCell({ id, word, size = 90 }) {
+  const [err, setErr] = useState(false);
+  return (
+    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+      <div style={{ width:size, height:size, borderRadius:10, overflow:'hidden',
+        background: id && !err ? '#F0FDF4' : '#F8FAFC',
+        border:'1.5px solid ' + (id && !err ? '#A7F3D0' : '#E2E8F0'),
+        display:'flex', alignItems:'center', justifyContent:'center' }}>
+        {id && !err
+          ? <img src={picImg(id)} alt={word} onError={() => setErr(true)}
+              style={{ width:size, height:size, objectFit:'contain' }} />
+          : <span style={{ fontSize:'1.4rem', color:'#CBD5E1' }}>🔤</span>}
+      </div>
+      <span style={{ fontSize:'0.7rem', fontWeight:700, color: id && !err ? '#065F46':'#94A3B8',
+        maxWidth:size, textAlign:'center', wordBreak:'break-word' }}>{word}</span>
+    </div>
+  );
+}
+
+function ModoPictogramas() {
+  const [texto, setTexto] = useState('');
+  const [resultados, setResultados] = useState([]);
+  const [cargando, setCargando] = useState(false);
+  const [escuchando, setEscuchando] = useState(false);
+  const recRef = React.useRef(null);
+
+  const traducir = useCallback(async () => {
+    const tokens = texto.trim().split(/\s+/)
+      .map(w => w.replace(/[.,;:!?¿¡"'()]/g, '').trim()).filter(Boolean);
+    if (!tokens.length) return;
+    setCargando(true);
+    setResultados(tokens.map(w => ({ word: w, id: null, loading: true })));
+    await Promise.all(tokens.map((w, i) =>
+      fetchPicId(w).then(id => setResultados(p => {
+        const n = [...p]; n[i] = { word: w, id, loading: false }; return n;
+      }))
+    ));
+    setCargando(false);
+  }, [texto]);
+
+  const iniciarMicrofono = () => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { alert('Tu navegador no soporta reconocimiento de voz.'); return; }
+    if (recRef.current) { recRef.current.stop(); return; }
+    const rec = new SR();
+    rec.lang = 'es-ES'; rec.interimResults = false; rec.maxAlternatives = 1;
+    recRef.current = rec;
+    setEscuchando(true);
+    rec.onresult = (e) => { setTexto(e.results[0][0].transcript); };
+    rec.onerror = () => { setEscuchando(false); recRef.current = null; };
+    rec.onend   = () => { setEscuchando(false); recRef.current = null; };
+    rec.start();
+  };
+
+  return (
+    <div>
+      <div style={{ marginBottom:16 }}>
+        <textarea value={texto} onChange={e => setTexto(e.target.value)}
+          onKeyDown={e => { if (e.key==='Enter' && (e.ctrlKey||e.metaKey)) traducir(); }}
+          placeholder="Escribe una frase... o usa el micrófono 🎤"
+          rows={2}
+          style={{ width:'100%', boxSizing:'border-box', padding:'12px 14px',
+            fontSize:'1rem', border:'2px solid #A7F3D0', borderRadius:12,
+            outline:'none', resize:'vertical', fontFamily:'inherit', background:'#F0FDF4' }} />
+        <div style={{ display:'flex', gap:10, marginTop:10, flexWrap:'wrap' }}>
+          <button onClick={traducir} disabled={!texto.trim() || cargando}
+            style={{ padding:'10px 24px', fontWeight:700,
+              background: !texto.trim()||cargando ? '#D1FAE5' : 'linear-gradient(135deg,#059669,#047857)',
+              color: !texto.trim()||cargando ? '#6EE7B7' : 'white',
+              border:'none', borderRadius:10, cursor: !texto.trim()||cargando ? 'default':'pointer',
+              boxShadow: texto.trim()&&!cargando ? '0 3px 10px rgba(5,150,105,0.3)':'none' }}>
+            {cargando ? '⏳ Buscando...' : '🔍 Traducir'}
+          </button>
+          <button onClick={iniciarMicrofono}
+            style={{ padding:'10px 18px', fontWeight:700, fontSize:'0.88rem',
+              background: escuchando ? '#FEE2E2' : 'white',
+              color: escuchando ? '#DC2626' : '#64748B',
+              border:`2px solid ${escuchando ? '#FCA5A5' : '#E2E8F0'}`,
+              borderRadius:10, cursor:'pointer',
+              transition:'all 0.2s', display:'inline-flex', alignItems:'center', gap:6,
+              animation: escuchando ? 'pulse 1s infinite' : 'none' }}>
+            <span>{escuchando ? '⏺️' : '🎤'}</span>
+            {escuchando ? 'Escuchando...' : 'Dictar'}
+          </button>
+        </div>
+      </div>
+      {resultados.length > 0 && (
+        <div style={{ display:'flex', flexWrap:'wrap', gap:'12px 10px',
+          justifyContent:'center', padding:'16px 8px',
+          background:'#F8FAFC', borderRadius:14, border:'1.5px solid #E2E8F0' }}>
+          {resultados.map((r, i) => (
+            r.word === ' ' ? <div key={i} style={{ width:16 }} />
+              : <PicCell key={i} id={r.id} word={r.word} size={80} />
+          ))}
+        </div>
+      )}
+      {!resultados.length && (
+        <div style={{ textAlign:'center', color:'#94A3B8', padding:'30px 0' }}>
+          <div style={{ fontSize:'3rem', marginBottom:8 }}>🖼️</div>
+          <p style={{ margin:0 }}>Los pictogramas aparecerán aquí</p>
+          <p style={{ margin:'4px 0 0', fontSize:'0.8rem' }}>Powered by ARASAAC</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── MODO QUIZ PICTOGRAMAS ────────────────────────────────────────────────────
+function OptionCard({ frase, pics, selected, estado, isCorrect, onClick, label }) {
+  const words = contentWords(frase);
+  const border = selected
+    ? isCorrect ? '3px solid #16A34A' : '3px solid #DC2626'
+    : '2px solid #E2E8F0';
+  const bg = selected
+    ? isCorrect ? '#F0FDF4' : '#FEF2F2'
+    : '#FAFAFA';
+
+  return (
+    <button onClick={onClick} disabled={estado !== 'jugando'}
+      style={{ background:bg, border, borderRadius:16, padding:'12px 10px',
+        cursor: estado==='jugando' ? 'pointer':'default', textAlign:'center',
+        display:'flex', flexDirection:'column', alignItems:'center', gap:8,
+        transition:'all 0.2s', flex:'1 1 200px', minWidth:0,
+        boxShadow: selected ? '0 4px 16px rgba(0,0,0,0.12)' : '0 2px 8px rgba(0,0,0,0.06)',
+      }}
+      onMouseEnter={e => { if(estado==='jugando') e.currentTarget.style.transform='translateY(-2px)'; }}
+      onMouseLeave={e => { e.currentTarget.style.transform=''; }}>
+      <span style={{ fontSize:'0.7rem', fontWeight:700, color:'#94A3B8', letterSpacing:1 }}>{label}</span>
+      <div style={{ display:'flex', flexWrap:'wrap', gap:6, justifyContent:'center' }}>
+        {words.map((w, i) => {
+          const id = pics[w];
+          return (
+            <div key={i} style={{ width:56, height:56, borderRadius:8, overflow:'hidden',
+              background: id ? '#EFF6FF':'#F1F5F9', border:'1px solid #E2E8F0',
+              display:'flex', alignItems:'center', justifyContent:'center' }}>
+              {id
+                ? <img src={picImg(id)} alt={w} style={{ width:56, height:56, objectFit:'contain' }} />
+                : <span style={{ fontSize:'0.65rem', color:'#94A3B8', padding:2, textAlign:'center' }}>{w}</span>}
+            </div>
+          );
+        })}
+      </div>
+      {selected && (
+        <span style={{ fontSize:'1.2rem' }}>{isCorrect ? '✅' : '❌'}</span>
+      )}
+    </button>
+  );
+}
+
+function ModoQuizPictogramas() {
+  const [puntos, setPuntos] = useState(0);
+  const [intentos, setIntentos] = useState(0);
+  const [pregunta, setPregunta] = useState(null);
+  const [seleccion, setSeleccion] = useState(null);
+  const [estado, setEstado] = useState('cargando');
+  const [hablando, setHablando] = useState(false);
+  const [escuchando, setEscuchando] = useState(false);
+  const [transcripcion, setTranscripcion] = useState('');
+  const [showHearts, setShowHearts] = useState(false);
+  const recRef = React.useRef(null);
+
+  const escuchar = useCallback((texto) => {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(texto);
+    u.lang = 'es-ES'; u.rate = 0.85;
+    u.onstart = () => setHablando(true);
+    u.onend = () => setHablando(false);
+    u.onerror = () => setHablando(false);
+    window.speechSynthesis.speak(u);
+  }, []);
+
+
+  const iniciarMicrofono = useCallback(() => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { alert('Tu navegador no soporta reconocimiento de voz.'); return; }
+    if (recRef.current) { recRef.current.stop(); return; }
+    const rec = new SR();
+    rec.lang = 'es-ES'; rec.interimResults = false; rec.maxAlternatives = 1;
+    recRef.current = rec;
+    setEscuchando(true); setTranscripcion('');
+    rec.onresult = (e) => { setTranscripcion(e.results[0][0].transcript); };
+    rec.onerror = () => { setEscuchando(false); recRef.current = null; };
+    rec.onend  = () => { setEscuchando(false); recRef.current = null; };
+    rec.start();
+  }, []);
+
+  const generarPregunta = useCallback(async () => {
+    setEstado('cargando');
+    setSeleccion(null);
+    const [correcta, ...distractores] = pickRandom(FRASES_PIC, 4);
+    const options = [correcta, ...distractores];
+    // Mezclar opciones
+    for (let i = options.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [options[i], options[j]] = [options[j], options[i]];
+    }
+    const correctIdx = options.indexOf(correcta);
+    // Recopilar todas las palabras de contenido únicas
+    const allWords = [...new Set(options.flatMap(f => contentWords(f)))];
+    // Fetch en paralelo
+    const entries = await Promise.all(allWords.map(w => fetchPicId(w).then(id => [w, id])));
+    const pics = Object.fromEntries(entries);
+    setPregunta({ correcta, options, correctIdx, pics });
+    setEstado('jugando');
+  }, []);
+
+  useEffect(() => { generarPregunta(); }, [generarPregunta]);
+
+  const dispararCorazones = () => {
+    setShowHearts(true);
+    setTimeout(() => setShowHearts(false), 1600);
+  };
+
+  const seleccionar = (idx) => {
+    if (estado !== 'jugando') return;
+    setSeleccion(idx);
+    setEstado('resuelto');
+    setIntentos(i => i + 1);
+    if (idx === pregunta.correctIdx) { setPuntos(p => p + 1); dispararCorazones(); }
+  };
+
+  if (estado === 'cargando' || !pregunta) return (
+    <div style={{ textAlign:'center', padding:'40px 0', color:'#64748B' }}>
+      <div style={{ fontSize:'2.5rem', marginBottom:12 }}>⏳</div>
+      <p style={{ margin:0, fontWeight:600 }}>Buscando pictogramas...</p>
+    </div>
+  );
+
+  return (
+    <div>
+      <HeartsEffect show={showHearts} />
+      {/* Marcador */}
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+        <div style={{ background:'#EFF6FF', borderRadius:12, padding:'6px 16px',
+          fontSize:'0.9rem', fontWeight:700, color:'#1D4ED8' }}>✅ {puntos} / {intentos}</div>
+        <span style={{ fontSize:'0.8rem', color:'#94A3B8', fontWeight:600 }}>
+          ¿Qué pictogramas corresponden a esta frase?
+        </span>
+      </div>
+
+      {/* Frase objetivo */}
+      <div style={{ textAlign:'center', marginBottom:20,
+        background:'linear-gradient(135deg,#EFF6FF,#F0F9FF)', borderRadius:16,
+        padding:'18px 24px', border:'2px solid #BFDBFE' }}>
+        <p style={{ margin:'0 0 12px', fontSize:'1.25rem', fontWeight:800, color:'#1E293B', lineHeight:1.4 }}>
+          "{fraseTexto(pregunta.correcta)}"
+        </p>
+        <div style={{ display:'flex', gap:10, justifyContent:'center', flexWrap:'wrap' }}>
+          <button onClick={() => escuchar(fraseTexto(pregunta.correcta))}
+            style={{ padding:'8px 18px', fontWeight:700, fontSize:'0.88rem',
+              background: hablando ? '#DBEAFE' : 'white',
+              color: hablando ? '#1D4ED8' : '#64748B',
+              border:`2px solid ${hablando ? '#93C5FD' : '#E2E8F0'}`,
+              borderRadius:10, cursor:'pointer', transition:'all 0.2s',
+              display:'inline-flex', alignItems:'center', gap:6 }}>
+            <span>{hablando ? '🔊' : '🔈'}</span>
+            {hablando ? 'Reproduciendo...' : 'Escuchar'}
+          </button>
+
+          <button onClick={iniciarMicrofono}
+            style={{ padding:'8px 18px', fontWeight:700, fontSize:'0.88rem',
+              background: escuchando ? '#FEE2E2' : 'white',
+              color: escuchando ? '#DC2626' : '#64748B',
+              border:`2px solid ${escuchando ? '#FCA5A5' : '#E2E8F0'}`,
+              borderRadius:10, cursor:'pointer',
+              transition:'all 0.2s', display:'inline-flex', alignItems:'center', gap:6,
+              animation: escuchando ? 'pulse 1s infinite' : 'none' }}>
+            <span>{escuchando ? '⏺️' : '🎤'}</span>
+            {escuchando ? 'Escuchando...' : 'Decir frase'}
+          </button>
+        </div>
+
+        {transcripcion && (
+          <p style={{ margin:'10px 0 0', fontSize:'0.82rem', color:'#64748B', fontStyle:'italic' }}>
+            Reconocido: "<strong>{transcripcion}</strong>"
+          </p>
+        )}
+      </div>
+
+      {/* Opciones 2×2 */}
+      <div style={{ display:'flex', flexWrap:'wrap', gap:12, marginBottom:16 }}>
+        {pregunta.options.map((f, i) => (
+          <OptionCard key={f.id} frase={f} pics={pregunta.pics}
+            selected={seleccion === i} estado={estado}
+            isCorrect={i === pregunta.correctIdx}
+            onClick={() => seleccionar(i)}
+            label={`Opción ${i + 1}`} />
+        ))}
+      </div>
+
+      {/* Feedback */}
+      {estado === 'resuelto' && (
+        <div style={{ textAlign:'center' }}>
+          {seleccion === pregunta.correctIdx
+            ? <p style={{ color:'#16A34A', fontWeight:700, fontSize:'1.05rem', margin:'0 0 12px' }}>¡Correcto! 🎉</p>
+            : <p style={{ color:'#DC2626', fontWeight:700, fontSize:'0.95rem', margin:'0 0 12px' }}>
+                Incorrecto — la respuesta correcta era la opción {pregunta.correctIdx + 1}
+              </p>}
+          <button onClick={generarPregunta}
+            style={{ padding:'12px 32px', background:'linear-gradient(135deg,#059669,#047857)',
+              border:'none', borderRadius:12, cursor:'pointer', fontWeight:700, color:'white',
+              boxShadow:'0 4px 12px rgba(5,150,105,0.35)', fontSize:'1rem' }}>
+            Siguiente →
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── COMPONENTE PRINCIPAL ─────────────────────────────────────────────────────
 export default function LenguaSignos({ onExit }) {
   const [modo, setModo] = useState('transcripcion');
 
   const tabs = [
-    { id:'transcripcion', label:'✍️ Transcribir', desc:'Texto → signos' },
-    { id:'deletrear',     label:'🖐️ Deletrear',   desc:'Quiz de signos' },
+    { id:'transcripcion', label:'✍️ Signos',      desc:'Texto → signos' },
+    { id:'deletrear',     label:'🖐️ Deletrear',   desc:'Quiz signos' },
     { id:'referencia',    label:'📖 Referencia',  desc:'Abecedario' },
+    { id:'pictogramas',   label:'🖼️ Pictogramas', desc:'Texto → pics' },
+    { id:'quizpic',       label:'🎯 Quiz Pics',   desc:'Adivina la frase' },
   ];
 
   return (
@@ -415,6 +969,11 @@ export default function LenguaSignos({ onExit }) {
       background:'linear-gradient(135deg,#EFF6FF 0%,#F0F9FF 50%,#F8FAFC 100%)',
       overflowY:'auto', fontFamily:'system-ui, sans-serif',
     }}>
+      <style>{`
+        @keyframes spin{to{transform:rotate(360deg)}}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.45}}
+        @keyframes floatHeart{0%{transform:translateY(0) scale(1);opacity:1}100%{transform:translateY(-160px) scale(1.4);opacity:0}}
+      `}</style>
       {/* Header */}
       <div style={{
         background:'linear-gradient(135deg,#2563EB,#1D4ED8)',
@@ -438,30 +997,34 @@ export default function LenguaSignos({ onExit }) {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div style={{
-        display:'flex', gap:8, padding:'16px 20px 0',
-        maxWidth:700, margin:'0 auto',
-      }}>
-        {tabs.map(t => (
-          <button key={t.id} onClick={() => setModo(t.id)}
-            style={{
-              flex:1, padding:'10px 8px', border:'2px solid',
-              borderColor: modo === t.id ? '#2563EB' : '#E2E8F0',
-              borderRadius:12, cursor:'pointer', fontWeight:700,
-              background: modo === t.id ? '#EFF6FF' : 'white',
-              color: modo === t.id ? '#1D4ED8' : '#94A3B8',
-              fontSize:'0.8rem', transition:'all 0.2s',
-              display:'flex', flexDirection:'column', alignItems:'center', gap:2,
-            }}>
-            <span>{t.label}</span>
-            <span style={{ fontWeight:400, fontSize:'0.7rem', opacity:0.7 }}>{t.desc}</span>
-          </button>
-        ))}
+      {/* Tabs — scrollable en móvil */}
+      <div style={{ overflowX:'auto', padding:'14px 20px 0',
+        maxWidth:740, margin:'0 auto', WebkitOverflowScrolling:'touch' }}>
+        <div style={{ display:'flex', gap:6, minWidth:'max-content' }}>
+          {tabs.map(t => (
+            <button key={t.id} onClick={() => setModo(t.id)}
+              style={{
+                padding:'8px 14px', border:'2px solid',
+                borderColor: modo === t.id
+                  ? (t.id === 'pictogramas'||t.id === 'quizpic' ? '#059669' : '#2563EB')
+                  : '#E2E8F0',
+                borderRadius:12, cursor:'pointer', fontWeight:700, whiteSpace:'nowrap',
+                background: modo === t.id
+                  ? (t.id === 'pictogramas'||t.id === 'quizpic' ? '#ECFDF5' : '#EFF6FF')
+                  : 'white',
+                color: modo === t.id
+                  ? (t.id === 'pictogramas'||t.id === 'quizpic' ? '#065F46' : '#1D4ED8')
+                  : '#94A3B8',
+                fontSize:'0.82rem', transition:'all 0.2s',
+              }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Contenido */}
-      <div style={{ maxWidth:700, margin:'0 auto', padding:'20px 20px 40px' }}>
+      <div style={{ maxWidth:740, margin:'0 auto', padding:'16px 20px 40px' }}>
         <div style={{
           background:'white', borderRadius:20, padding:'24px 20px',
           boxShadow:'0 4px 20px rgba(0,0,0,0.07)', border:'1.5px solid #E2E8F0',
@@ -469,6 +1032,8 @@ export default function LenguaSignos({ onExit }) {
           {modo === 'transcripcion' && <ModoTranscripcion />}
           {modo === 'deletrear'     && <ModoDeletrear />}
           {modo === 'referencia'    && <ModoReferencia />}
+          {modo === 'pictogramas'   && <ModoPictogramas />}
+          {modo === 'quizpic'       && <ModoQuizPictogramas />}
         </div>
       </div>
     </div>

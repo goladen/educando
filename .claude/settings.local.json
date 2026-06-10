@@ -25,7 +25,8 @@
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Asus  6\\\\educando\\\\src\\\\kenney_racing-pack\" -Recurse -Directory)",
       "Bash(Select-Object FullName)",
       "Bash(npx --yes tsc --noEmit --jsx react)",
-      "Bash(npx --no react-scripts build --no-emit)"
+      "Bash(npx --no react-scripts build --no-emit)",
+      "WebFetch(domain:api.arasaac.org)"
     ]
   }
 }

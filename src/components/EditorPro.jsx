@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+﻿import { useState, useEffect, useRef } from 'react';
 import { Save, X, Trash2, FolderPlus, ArrowUp, ArrowDown, Clock, Trophy, GripVertical, Image as ImageIcon, Type, List, AlignCenter, MoreHorizontal, Settings } from 'lucide-react';
 import PublicarModal from './PublicarModal';
 
@@ -125,6 +125,7 @@ export default function EditorPro({ datos, setDatos, onClose, onSave, usuario })
                         <option value="RELLENAR">Rellenar Hueco</option>
                         <option value="PRESENTATION">Presentación</option>
                         <option value="DIBUJO">Dibujo en Pizarra</option>
+                        <option value="MUSICAL">Pregunta Musical 🎵</option>
                     </select>
 
                     {tipo !== 'PRESENTATION' && (
@@ -213,6 +214,10 @@ export default function EditorPro({ datos, setDatos, onClose, onSave, usuario })
                         <input placeholder="URL de la Imagen (https://...)" value={p.bloques?.[1] || ''} onChange={e => updatePreguntaArray(i, 'bloques', 1, e.target.value)} className="inp" style={{ marginBottom: '5px' }} />
                         <input placeholder="Enunciado Inferior" value={p.bloques?.[2] || ''} onChange={e => updatePreguntaArray(i, 'bloques', 2, e.target.value)} className="inp" />
                     </div>
+                )}
+
+                {tipo === 'MUSICAL' && (
+                    <MusicalEditorFields p={p} idx={i} updatePregunta={updatePregunta} />
                 )}
 
                 {/* --- NUEVO BLOQUE PARA DIBUJO --- */}
@@ -304,7 +309,7 @@ export default function EditorPro({ datos, setDatos, onClose, onSave, usuario })
                     ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', maxWidth: '800px', margin: '0 auto' }}>
                                 {datos.hojas[hojaActiva]?.preguntas.map((p, i) => (
-                                    <div key={i} style={{ background: 'white', padding: '15px', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'flex-start', gap: '10px', borderLeft: `5px solid ${p.tipo === 'PRESENTATION' ? '#95a5a6' : '#3498db'}` }}>
+                                    <div key={i} style={{ background: 'white', padding: '15px', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'flex-start', gap: '10px', borderLeft: `5px solid ${p.tipo === 'PRESENTATION' ? '#95a5a6' : p.tipo === 'MUSICAL' ? '#9b59b6' : '#3498db'}` }}>
 
                                         {/* Controles Izquierda */}
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', alignItems: 'center', paddingTop: '5px' }}>
@@ -403,6 +408,259 @@ export default function EditorPro({ datos, setDatos, onClose, onSave, usuario })
 
             </div>
             <style>{`.hide-mobile { display: inline; } .hide-mobile-xs { display: inline; } @media (max-width: 600px) { .hide-mobile { display: none; } .hide-mobile-xs { display: none; } }`}</style>
+        </div>
+    );
+}
+
+function MusicalEditorFields({ p, idx, updatePregunta }) {
+    const [videoUrl, setVideoUrl] = useState(p.videoUrl || '');
+    const [videoId, setVideoId] = useState(p.videoId || '');
+    const [letra, setLetra] = useState(p.letra || '');
+    const [blancos, setBlancos] = useState(p.blancos || []);
+    const [fetchingLetra, setFetchingLetra] = useState(false);
+    const [fetchError, setFetchError] = useState('');
+    const [currentTime, setCurrentTime] = useState(0);
+    const [playerReady, setPlayerReady] = useState(false);
+    const playerRef = useRef(null);
+    const timeIntervalRef = useRef(null);
+    const playerDivId = `yt-editor-player-${idx}`;
+
+    const extractVideoId = (url) => {
+        if (!url) return null;
+        const patterns = [/[?&]v=([^&]+)/, /youtu\.be\/([^?&]+)/, /embed\/([^?&]+)/];
+        for (const pat of patterns) { const m = url.match(pat); if (m) return m[1]; }
+        return null;
+    };
+
+    const handleUrlChange = (url) => {
+        setVideoUrl(url);
+        const id = extractVideoId(url);
+        if (id) {
+            setVideoId(id);
+            updatePregunta(idx, 'videoId', id);
+            updatePregunta(idx, 'videoUrl', url);
+        }
+    };
+
+    const initPlayer = () => {
+        if (!window.YT || !window.YT.Player) return;
+        if (playerRef.current) { try { playerRef.current.destroy(); } catch(e) {} }
+        if (timeIntervalRef.current) clearInterval(timeIntervalRef.current);
+        setPlayerReady(false);
+        const div = document.getElementById(playerDivId);
+        if (!div) return;
+        playerRef.current = new window.YT.Player(playerDivId, {
+            videoId,
+            height: '220',
+            width: '100%',
+            playerVars: { rel: 0, modestbranding: 1, origin: window.location.origin },
+            events: {
+                onReady: () => {
+                    setPlayerReady(true);
+                    timeIntervalRef.current = setInterval(() => {
+                        try { setCurrentTime(Math.floor(playerRef.current.getCurrentTime())); } catch(e) {}
+                    }, 500);
+                }
+            }
+        });
+    };
+
+    useEffect(() => {
+        if (!videoId) return;
+        const setup = () => setTimeout(initPlayer, 150);
+        if (window.YT && window.YT.Player) {
+            setup();
+        } else {
+            if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
+                const tag = document.createElement('script');
+                tag.src = 'https://www.youtube.com/iframe_api';
+                document.head.appendChild(tag);
+            }
+            const prev = window.onYouTubeIframeAPIReady;
+            window.onYouTubeIframeAPIReady = () => { if (prev) prev(); setup(); };
+        }
+        return () => { if (timeIntervalRef.current) clearInterval(timeIntervalRef.current); };
+    }, [videoId]);
+
+    const cleanTitle = (s) => s
+        .replace(/\|.*$/g, '')
+        .replace(/\(.*?\)/g, '')
+        .replace(/\[.*?\]/g, '')
+        .replace(/feat\..*$/i, '')
+        .replace(/ft\..*$/i, '')
+        .replace(/VEVO$/i, '')
+        .trim();
+
+    const tryLyrics = async (artist, song) => {
+        const r = await fetch(`https://api.lyrics.ovh/v1/${encodeURIComponent(artist)}/${encodeURIComponent(song)}`);
+        const d = await r.json();
+        return d.lyrics || null;
+    };
+
+    const fetchLetra = async () => {
+        if (!videoId) return;
+        setFetchingLetra(true); setFetchError('');
+        try {
+            const oRes = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
+            if (!oRes.ok) throw new Error('no_oembed');
+            const oData = await oRes.json();
+            const title = oData.title || '';
+            const sepIdx = title.indexOf(' - ');
+
+            if (sepIdx < 0) throw new Error('no_artist');
+
+            const rawArtist = title.substring(0, sepIdx);
+            const rawSong   = title.substring(sepIdx + 3);
+            const artist = cleanTitle(rawArtist);
+            const song   = cleanTitle(rawSong);
+
+            if (!artist || !song) throw new Error('no_artist');
+
+            // Intento 1: Artista - Canción (orden normal)
+            let lyrics = await tryLyrics(artist, song);
+
+            // Intento 2: Canción - Artista (orden invertido, común en canales oficiales)
+            if (!lyrics) lyrics = await tryLyrics(song, artist);
+
+            if (lyrics) {
+                setLetra(lyrics.trim());
+                updatePregunta(idx, 'letra', lyrics.trim());
+            } else {
+                throw new Error('no_lyrics');
+            }
+        } catch(e) {
+            setFetchError(
+                e.message === 'no_artist'
+                    ? 'Título sin formato "Artista - Canción". Pega la letra manualmente.'
+                    : 'No se encontró la letra automáticamente. Pégala manualmente.'
+            );
+        }
+        setFetchingLetra(false);
+    };
+
+    const marcarTimestamp = (bi) => {
+        const t = playerReady && playerRef.current ? Math.floor(playerRef.current.getCurrentTime()) : currentTime;
+        const nb = blancos.map((b, i) => i === bi ? { ...b, timestamp: t } : b);
+        setBlancos(nb); updatePregunta(idx, 'blancos', nb);
+    };
+
+    const updateBlancoTimestamp = (bi, val) => {
+        const nb = blancos.map((b, i) => i === bi ? { ...b, timestamp: parseInt(val) || 0 } : b);
+        setBlancos(nb); updatePregunta(idx, 'blancos', nb);
+    };
+
+    const togglePalabra = (rawWord, letraIdx) => {
+        const palabra = rawWord.replace(/[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ']/g, '').trim();
+        if (!palabra) return;
+        const existingIdx = blancos.findIndex(b => b.letraIdx === letraIdx);
+        let nb;
+        if (existingIdx >= 0) {
+            nb = blancos.filter((_, i) => i !== existingIdx);
+        } else {
+            nb = [...blancos, { palabra, timestamp: 0, letraIdx }];
+            nb.sort((a, b) => a.letraIdx - b.letraIdx);
+        }
+        setBlancos(nb); updatePregunta(idx, 'blancos', nb);
+    };
+
+    const renderLetraInteractiva = () => {
+        if (!letra) return null;
+        const tokens = [];
+        let wordBuf = ''; let wordStart = 0;
+        for (let ci = 0; ci <= letra.length; ci++) {
+            const c = ci < letra.length ? letra[ci] : null;
+            if (c && /[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ']/.test(c)) {
+                if (!wordBuf) wordStart = ci;
+                wordBuf += c;
+            } else {
+                if (wordBuf) {
+                    const pos = wordStart;
+                    const word = wordBuf;
+                    const isBlanco = blancos.some(b => b.letraIdx === pos);
+                    const blancoNum = blancos.findIndex(b => b.letraIdx === pos) + 1;
+                    tokens.push(
+                        <span key={`w${pos}`} onClick={() => togglePalabra(word, pos)}
+                            style={{ cursor: 'pointer', background: isBlanco ? '#f1c40f' : 'transparent', color: isBlanco ? '#000' : '#ecf0f1', padding: isBlanco ? '1px 3px' : '0', borderRadius: '3px', fontWeight: isBlanco ? 'bold' : 'normal' }}
+                            title={isBlanco ? `Blanco #${blancoNum}: clic para quitar` : 'Clic para marcar como blanco'}>
+                            {isBlanco ? <><span style={{borderBottom:'2px solid #e67e22'}}>____</span><sup style={{fontSize:'9px',color:'#e67e22'}}>{blancoNum}</sup></> : word}
+                        </span>
+                    );
+                    wordBuf = '';
+                }
+                if (c === '\n') tokens.push(<br key={`br${ci}`} />);
+                else if (c) tokens.push(<span key={`c${ci}`}>{c}</span>);
+            }
+        }
+        return tokens;
+    };
+
+    const fmtTime = (s) => `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+
+    return (
+        <div style={{ border: '2px solid #9b59b6', borderRadius: '8px', padding: '12px', background: '#1a1a2e' }}>
+            <div style={{ textAlign: 'center', color: '#bb8fce', fontWeight: 'bold', marginBottom: '10px', fontSize: '13px' }}>🎵 Pregunta Musical</div>
+
+            <div style={{ marginBottom: '10px' }}>
+                <label style={{ color: '#bbb', fontSize: '12px', display: 'block', marginBottom: '4px' }}>URL de YouTube:</label>
+                <input placeholder="https://www.youtube.com/watch?v=..." value={videoUrl} onChange={e => handleUrlChange(e.target.value)} className="inp" style={{ borderColor: '#9b59b6', background: '#0d0d1a', color: 'white' }} />
+            </div>
+
+            {videoId && (
+                <div style={{ marginBottom: '10px' }}>
+                    <div id={playerDivId} style={{ width: '100%', minHeight: '220px', background: '#000' }} />
+                    <div style={{ textAlign: 'center', color: '#f1c40f', fontSize: '12px', padding: '4px 0', background: 'rgba(0,0,0,0.5)' }}>
+                        ⏱ {playerReady ? `Tiempo actual: ${fmtTime(currentTime)}` : 'Cargando reproductor...'}
+                    </div>
+                </div>
+            )}
+
+            <div style={{ marginBottom: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <label style={{ color: '#bbb', fontSize: '12px' }}>Letra de la canción:</label>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                        {videoId && <button onClick={fetchLetra} disabled={fetchingLetra} style={{ padding: '4px 10px', background: '#9b59b6', color: 'white', border: 'none', borderRadius: '12px', fontSize: '11px', cursor: 'pointer' }}>{fetchingLetra ? 'Buscando...' : '🔍 Obtener letra'}</button>}
+                        {letra && <button onClick={() => { setLetra(''); updatePregunta(idx, 'letra', ''); setBlancos([]); updatePregunta(idx, 'blancos', []); }} style={{ padding: '4px 8px', background: 'transparent', color: '#888', border: '1px solid #555', borderRadius: '10px', fontSize: '11px', cursor: 'pointer' }}>Cambiar letra</button>}
+                    </div>
+                </div>
+                {fetchError && <div style={{ color: '#e74c3c', fontSize: '11px', marginBottom: '5px' }}>{fetchError}</div>}
+                {letra ? (
+                    <>
+                        <div style={{ background: '#0d0d1a', border: '1px solid #9b59b6', borderRadius: '5px', padding: '10px', maxHeight: '200px', overflowY: 'auto', lineHeight: '2', fontSize: '13px', fontFamily: 'monospace', userSelect: 'none' }}>
+                            {renderLetraInteractiva()}
+                        </div>
+                        <div style={{ color: '#888', fontSize: '11px', marginTop: '4px' }}>💡 Haz clic en las palabras para marcarlas como blancos</div>
+                    </>
+                ) : (
+                    <textarea placeholder="Pega la letra de la canción aquí..." value={letra} onChange={e => { setLetra(e.target.value); updatePregunta(idx, 'letra', e.target.value); }} rows={6}
+                        style={{ width: '100%', padding: '8px', background: '#0d0d1a', color: '#ecf0f1', border: '1px solid #9b59b6', borderRadius: '5px', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'monospace', fontSize: '13px' }} />
+                )}
+            </div>
+
+            {blancos.length > 0 && (
+                <div style={{ background: '#0d0d1a', border: '1px solid #e67e22', borderRadius: '5px', padding: '10px' }}>
+                    <div style={{ color: '#e67e22', fontWeight: 'bold', fontSize: '12px', marginBottom: '8px' }}>Blancos configurados ({blancos.length}) — establece el momento de pausa:</div>
+                    {blancos.map((b, bi) => (
+                        <div key={bi} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
+                            <span style={{ color: '#f1c40f', fontWeight: 'bold', fontSize: '12px', minWidth: '22px' }}>#{bi+1}</span>
+                            <span style={{ color: '#ecf0f1', fontWeight: 'bold', fontSize: '13px', minWidth: '70px' }}>{b.palabra}</span>
+                            <input type="number" value={b.timestamp} onChange={e => updateBlancoTimestamp(bi, e.target.value)}
+                                style={{ width: '65px', padding: '3px 6px', background: '#1a1a2e', color: '#ecf0f1', border: '1px solid #555', borderRadius: '4px', fontSize: '12px' }} placeholder="seg" />
+                            <span style={{ color: '#888', fontSize: '11px' }}>{fmtTime(b.timestamp)}</span>
+                            {playerReady && (
+                                <button onClick={() => marcarTimestamp(bi)} style={{ padding: '3px 8px', background: '#e67e22', color: 'white', border: 'none', borderRadius: '10px', fontSize: '11px', cursor: 'pointer' }}>
+                                    📍 Marcar ahora
+                                </button>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {blancos.length === 0 && letra && (
+                <div style={{ color: '#777', fontSize: '12px', textAlign: 'center', padding: '8px', border: '1px dashed #555', borderRadius: '5px' }}>
+                    Sin blancos aún. Haz clic en palabras de la letra para añadirlos.
+                </div>
+            )}
         </div>
     );
 }

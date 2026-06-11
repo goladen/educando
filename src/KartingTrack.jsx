@@ -3,6 +3,8 @@ import * as THREE from 'three';
 import TrackEditor         from './TrackEditor';
 import TrackTest           from './TrackTest';
 import AlmacenCircuitos    from './AlmacenCircuitos';
+import KartingCreateRace   from './KartingOnline/KartingCreateRace';
+import KartingJoinRace     from './KartingOnline/KartingJoinRace';
 import { db } from './firebase';
 import { collection, query, where, getDocs, addDoc, doc, getDoc } from 'firebase/firestore';
 
@@ -216,7 +218,7 @@ function buildCar(scene, mainColor=0xe74c3c, darkColor=0xc0392b) {
 // ════════════════════════════════════════════════════════════════════════════
 // PANTALLA PREVIA – selección de recurso con multi-hoja (estilo Duelo Piratas)
 // ════════════════════════════════════════════════════════════════════════════
-function PantallaPrevia({ onIniciar, onConstruir, onAlmacen }) {
+function PantallaPrevia({ onIniciar, onConstruir, onAlmacen, onOnline }) {
   const [circuito,     setCircuito]     = useState(1);
   const [recursos,     setRecursos]     = useState([]);
   const [cargando,     setCargando]     = useState(true);
@@ -327,6 +329,15 @@ function PantallaPrevia({ onIniciar, onConstruir, onAlmacen }) {
           transition:'background .15s',
         }}>
           🗂️ Almacén de circuitos
+        </button>
+        <button onClick={onOnline} style={{
+          padding:'10px 24px', borderRadius:12, cursor:'pointer',
+          border:'1px solid rgba(46,204,113,0.35)',
+          background:'rgba(46,204,113,0.08)', color:'#2ecc71',
+          fontSize:'0.85rem', fontWeight:700, letterSpacing:0.5,
+          transition:'background .15s',
+        }}>
+          🌐 Juego Online
         </button>
       </div>
 
@@ -801,7 +812,7 @@ function Joystick({ joyRef }) {
       onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
       onMouseDown={onMouseDown}
       style={{
-        position:'absolute', bottom:32, right:32,   /* ← derecha */
+        position:'fixed', bottom:32, right:32,   /* fixed → visible en fullscreen landscape */
         width:JOY_R*2, height:JOY_R*2, borderRadius:'50%',
         background:'rgba(255,255,255,0.10)',
         border:'2px solid rgba(255,255,255,0.28)',
@@ -915,7 +926,9 @@ function FloatingToast({ type, seconds }) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-function KartingGame({ recurso, hojas, circuito=1, onTerminar, onSalir }) {
+export function KartingGame({ recurso, hojas, circuito=1, onTerminar, onSalir,
+  skipCountdown=false, timerBase=null, onCheckpoint=null, onLapComplete=null, maxLaps=MAX_LAPS,
+}) {
   const isC2 = circuito === 2;
   const cfg = {
     track:    isC2 ? TRACK2        : TRACK,
@@ -946,13 +959,18 @@ function KartingGame({ recurso, hojas, circuito=1, onTerminar, onSalir }) {
   const [toasts,      setToasts]      = useState([]);
   const toastIdRef = useRef(0);
 
-  const questionActiveRef = useRef(false);
-  const answeredCpsRef    = useRef(new Set());
-  const cpMeshRef         = useRef([]);
-  const penaltyRef        = useRef(0);
-  const aciertasRef       = useRef(0);
-  const falladasRef       = useRef(0);
-  const pauseStartRef     = useRef(0);
+  const questionActiveRef  = useRef(false);
+  const answeredCpsRef     = useRef(new Set());
+  const cpMeshRef          = useRef([]);
+  const penaltyRef         = useRef(0);
+  const aciertasRef        = useRef(0);
+  const falladasRef        = useRef(0);
+  const pauseStartRef      = useRef(0);
+  const onCheckpointRef    = useRef(onCheckpoint);
+  const onLapCompleteRef   = useRef(onLapComplete);
+  const pendingCpRef       = useRef(null);
+  useEffect(()=>{ onCheckpointRef.current=onCheckpoint; },[onCheckpoint]);
+  useEffect(()=>{ onLapCompleteRef.current=onLapComplete; },[onLapComplete]);
   const totalPausedRef    = useRef(0);
   const questionPoolRef   = useRef([]);
   const qIdxRef           = useRef(0);
@@ -974,6 +992,7 @@ function KartingGame({ recurso, hojas, circuito=1, onTerminar, onSalir }) {
 
   // ── Pool de preguntas ────────────────────────────────────────────────────
   useEffect(() => {
+    if (!recurso) { questionPoolRef.current = []; return; }
     let pool = [];
     if (!hojas || hojas.includes('General') || !recurso.hojas?.length) {
       pool = recurso.hojas?.flatMap(h => h.preguntas || []) || recurso.preguntas || [];
@@ -1009,13 +1028,17 @@ function KartingGame({ recurso, hojas, circuito=1, onTerminar, onSalir }) {
     if (isCorrect) {
       aciertasRef.current++;
       setAciertos(a => a+1);
-      penaltyRef.current -= 3000;          // bonus: ganas 3 segundos
+      penaltyRef.current -= 3000;
       addToast('ok', 3);
     } else {
       falladasRef.current++;
       setFalladas(f => f+1);
-      penaltyRef.current += 5000;          // penalización: pierdes 5 segundos
+      penaltyRef.current += 5000;
       addToast('fail', 5);
+    }
+    if (pendingCpRef.current) {
+      onCheckpointRef.current?.({ ...pendingCpRef.current, ok: isCorrect });
+      pendingCpRef.current = null;
     }
     questionActiveRef.current = false;
     setActiveQuestion(null);
@@ -1173,8 +1196,10 @@ function KartingGame({ recurso, hojas, circuito=1, onTerminar, onSalir }) {
     let aiSpeed=0, aiWpIdx=cfg.startWp, aiStuckFrames=0, aiReverseFrames=0;
     const AI_MAX=0.20, AI_ACCEL=0.006, AI_TURN=0.10, AI_STUCK_LIMIT=45;
 
-    let phaseLocal='countdown', countdownStart=Date.now();
-    let playerLapLocal=0, aiLapLocal=0, lapStart=0;
+    const effectiveBase = skipCountdown ? (timerBase || Date.now()) : 0;
+    let phaseLocal = skipCountdown ? 'racing' : 'countdown', countdownStart=Date.now();
+    let raceStart = effectiveBase;
+    let playerLapLocal=0, aiLapLocal=0, lapStart = skipCountdown ? effectiveBase : 0;
     let lapTimesLocal=[], prevCarX=car.position.x, prevAiX=ai.position.x;
     let lastTimerUpdate=0, playerWpIdx=cfg.startWp, goPlayed=false, startPlayed=false;
 
@@ -1217,8 +1242,11 @@ function KartingGame({ recurso, hojas, circuito=1, onTerminar, onSalir }) {
         else if (elapsed<2) setCountdown(2);
         else if (elapsed<3) setCountdown(1);
         else if (elapsed<4) { setCountdown(0); if(!goPlayed){goPlayed=true; musicEl.play().catch(()=>{});} }
-        else { phaseLocal='racing'; lapStart=now; setPhase('racing'); setPlayerLap(1); }
+        else { phaseLocal='racing'; lapStart=now; raceStart=now; setPhase('racing'); setPlayerLap(1); }
         speed=0; aiSpeed=0;
+      }
+      if (phaseLocal==='racing' && skipCountdown && !goPlayed) {
+        goPlayed=true; musicEl.play().catch(()=>{}); setPhase('racing'); setPlayerLap(1);
       }
 
       const questionActive=questionActiveRef.current;
@@ -1246,11 +1274,29 @@ function KartingGame({ recurso, hojas, circuito=1, onTerminar, onSalir }) {
 
         if (speed!==0) {
           const dir=speed>0?1:-1;
-          const joyL = joy.active && joy.x < -0.12;
-          const joyR = joy.active && joy.x >  0.12;
-          const steerMag = joy.active ? Math.min(Math.abs(joy.x),1) : 1;
-          if (leftKey  || joyL) car.rotation.y += TURN*dir*(joyL ? steerMag : 1);
-          if (rightKey || joyR) car.rotation.y -= TURN*dir*(joyR ? steerMag : 1);
+          // Keyboard steering
+          if (leftKey)  car.rotation.y += TURN*dir;
+          if (rightKey) car.rotation.y -= TURN*dir;
+          // Joystick: waypoint-biased assist when going forward, direct when reversing
+          if (joy.active) {
+            if (dir>0) {
+              const [pwX,pwZ]=cfg.waypoints[playerWpIdx];
+              const wpAngle=Math.atan2(-(pwX-car.position.x),-(pwZ-car.position.z));
+              let diff=wpAngle-car.rotation.y;
+              while(diff> Math.PI) diff-=2*Math.PI;
+              while(diff<-Math.PI) diff+=2*Math.PI;
+              // autoSteer: proportional correction [-1,1], same convention as AI
+              const autoSteer=Math.sign(diff)*Math.min(Math.abs(diff)*0.45,1.0);
+              // blend: assist 45% + player input (joy.x<0=left=positive rotation)
+              const combined=Math.max(-1,Math.min(1,autoSteer*0.45+(-joy.x)));
+              car.rotation.y+=TURN*combined;
+            } else {
+              // reversing: direct steering (inverted like a real car)
+              const steerMag=Math.min(Math.abs(joy.x),1);
+              if(joy.x<-0.12) car.rotation.y-=TURN*steerMag;
+              if(joy.x> 0.12) car.rotation.y+=TURN*steerMag;
+            }
+          }
         }
 
         const dx=-Math.sin(car.rotation.y)*speed, dz=-Math.cos(car.rotation.y)*speed;
@@ -1280,6 +1326,7 @@ function KartingGame({ recurso, hojas, circuito=1, onTerminar, onSalir }) {
                 speed=0;
                 questionActiveRef.current=true;
                 pauseStartRef.current=now;
+                pendingCpRef.current = { cpIdx: i, lap: playerLapLocal, tMs: now - raceStart };
                 setActiveQuestion({...q, cpIdx:i});
                 if (cpMeshRef.current[i]) cpMeshRef.current[i].color.set(0xffff00);
               }
@@ -1387,11 +1434,12 @@ function KartingGame({ recurso, hojas, circuito=1, onTerminar, onSalir }) {
           setLapTimes([...lapTimesLocal]);
           lapStart=now; totalPausedRef.current=0; setCurrentMs(0);
           cpMeshRef.current.forEach(m=>{ if(m) m.color.set(0xFF6B00); });
-          if (playerLapLocal>=MAX_LAPS) {
+          onLapCompleteRef.current?.(playerLapLocal);
+          if (playerLapLocal>=maxLaps) {
             phaseLocal='finished';
             const totalMs=lapTimesLocal.reduce((a,b)=>a+b,0);
             onTerminar({
-              posicion: aiLapLocal>=MAX_LAPS?2:1,
+              posicion: aiLapLocal>=maxLaps?2:1,
               tiempo: totalMs,
               tiempoFormateado: fmt(totalMs),
               acertadas: aciertasRef.current,
@@ -1489,7 +1537,7 @@ function KartingGame({ recurso, hojas, circuito=1, onTerminar, onSalir }) {
         <>
           {/* Vuelta + tiempo — izquierda */}
           <div style={{position:'absolute',top:12,left:12,...hud,padding:'8px 14px',minWidth:130}}>
-            <div style={{fontSize:11,opacity:0.7,marginBottom:3}}>VUELTA {playerLap} / {MAX_LAPS}</div>
+            <div style={{fontSize:11,opacity:0.7,marginBottom:3}}>VUELTA {playerLap} / {maxLaps}</div>
             <div style={{fontSize:18,fontWeight:'bold',fontVariantNumeric:'tabular-nums'}}>{fmt(currentMs)}</div>
             {lapTimes.length>0 && (
               <div style={{marginTop:4,fontSize:11,opacity:0.85}}>
@@ -1575,6 +1623,12 @@ export default function KartingTrack({ alTerminar } = {}) {
       onVolver={()=>setFase('PREVIO')}
     />;
 
+  if (fase==='ONLINE_CREATE')
+    return <KartingCreateRace onVolver={()=>setFase('PREVIO')} />;
+
+  if (fase==='ONLINE_JOIN')
+    return <KartingJoinRace initialCode={null} onVolver={()=>setFase('PREVIO')} />;
+
   if (fase==='TESTING_SETUP')
     return <TrackTestSetup
       onIniciar={(r,h,n) => { setTestConfig({recurso:r,hojas:h,numVueltas:n}); setFase('TESTING'); }}
@@ -1601,11 +1655,29 @@ export default function KartingTrack({ alTerminar } = {}) {
       onSalir={() => setFase('EDITOR')}
     />;
 
+  if (fase==='ONLINE_MENU') return (
+    <div style={{minHeight:'100vh',background:'linear-gradient(135deg,#0a0f2e,#0f1a3e)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',color:'white',fontFamily:"'Segoe UI',sans-serif",gap:20}}>
+      <div style={{fontSize:'3rem'}}>🌐</div>
+      <h2 style={{fontSize:'1.8rem',fontWeight:900,margin:0,background:'linear-gradient(90deg,#FF6B00,#FFD700)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>Juego Online</h2>
+      <p style={{color:'rgba(255,255,255,0.4)',fontSize:'0.88rem',margin:0}}>¿Eres el profesor o un alumno?</p>
+      <div style={{display:'flex',gap:16,marginTop:8}}>
+        <button onClick={()=>setFase('ONLINE_CREATE')} style={{padding:'16px 32px',borderRadius:14,border:'1.5px solid rgba(255,107,0,0.4)',background:'rgba(255,107,0,0.12)',color:'#FF6B00',fontWeight:700,fontSize:'1rem',cursor:'pointer'}}>
+          👨‍🏫 Crear partida<br/><span style={{fontSize:'0.75rem',fontWeight:400,opacity:0.7}}>Soy el profesor</span>
+        </button>
+        <button onClick={()=>setFase('ONLINE_JOIN')} style={{padding:'16px 32px',borderRadius:14,border:'1.5px solid rgba(46,204,113,0.4)',background:'rgba(46,204,113,0.10)',color:'#2ecc71',fontWeight:700,fontSize:'1rem',cursor:'pointer'}}>
+          🎮 Unirse<br/><span style={{fontSize:'0.75rem',fontWeight:400,opacity:0.7}}>Tengo un código</span>
+        </button>
+      </div>
+      <button onClick={()=>setFase('PREVIO')} style={{marginTop:8,padding:'7px 20px',borderRadius:9,border:'1px solid rgba(255,255,255,0.18)',background:'rgba(255,255,255,0.07)',color:'rgba(255,255,255,0.55)',cursor:'pointer',fontSize:'0.82rem'}}>← Volver</button>
+    </div>
+  );
+
   if (fase==='PREVIO')
     return <PantallaPrevia
       onIniciar={(r,h,c)=>{ setRecurso(r); setHojas(h); setCircuito(c); setFase('JUGANDO'); }}
       onConstruir={() => { setLoadedCircuit(null); setEditorSource('PREVIO'); setFase('EDITOR'); }}
       onAlmacen={() => setFase('ALMACEN')}
+      onOnline={() => setFase('ONLINE_MENU')}
     />;
 
   if (fase==='RESULTADO' && resultado)

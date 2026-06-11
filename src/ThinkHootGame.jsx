@@ -81,6 +81,10 @@ function ThinkHootHost({ codigoSala, onExit, usuario }) {
     const [avatarMood, setAvatarMood] = useState('neutral');
 
     const timerRef = useRef(null);
+    const ytPlayerRef = useRef(null);
+    const ytPlayerReadyRef = useRef(false);
+    const watchingIntervalRef = useRef(null);
+    const revealTimeoutRef = useRef(null);
 
     const gameDataRef = useRef(gameData);
     useEffect(() => {
@@ -124,8 +128,10 @@ function ThinkHootHost({ codigoSala, onExit, usuario }) {
                             // --- CORRECCIÓN: Ignoramos si es presentación o dibujo ---
                             if (resp.correct && !isPresentation && !isDibujo) {
                                 const p = data.preguntas[data.indicePregunta];
-                                const max = parseInt(p.puntosMax || data.config?.puntosMax || 100);
-                                const min = parseInt(p.puntosMin || data.config?.puntosMin || 50);
+                                const esMusical = p.tipo === 'MUSICAL';
+                                const numBlancos = esMusical ? Math.max(1, p.blancos?.length || 1) : 1;
+                                const max = Math.round(parseInt(p.puntosMax || data.config?.puntosMax || 100) / numBlancos);
+                                const min = Math.round(parseInt(p.puntosMin || data.config?.puntosMin || 50) / numBlancos);
                                 const tiempoTotal = parseInt(p.tiempo || data.config?.tiempoPregunta || 20);
 
                                 const ahora = Date.now();
@@ -153,9 +159,14 @@ function ThinkHootHost({ codigoSala, onExit, usuario }) {
                     // Auto-avance
                     const numRespuestas = Object.keys(respuestas).length;
                     const numJugadores = listaJugadores.length;
-                    const esPresentacion = data.preguntas?.[data.indicePregunta]?.tipo === 'PRESENTATION';
+                    const tipoPregunta = data.preguntas?.[data.indicePregunta]?.tipo;
+                    const esPresentacion = tipoPregunta === 'PRESENTATION';
+                    const esMusical = tipoPregunta === 'MUSICAL';
 
-                    if (!esPresentacion && numJugadores > 0 && numRespuestas >= numJugadores) {
+                    if (!esPresentacion && !esMusical && numJugadores > 0 && numRespuestas >= numJugadores) {
+                        revelarRespuestas(data);
+                    }
+                    if (esMusical && numJugadores > 0 && numRespuestas >= numJugadores) {
                         revelarRespuestas(data);
                     }
                 }
@@ -201,6 +212,78 @@ function ThinkHootHost({ codigoSala, onExit, usuario }) {
         return () => clearInterval(timerRef.current);
     }, [faseHost, subFase, gameData?.indicePregunta, gameData?.questionStartTime]);
 
+    // Inicializar YouTube player cuando la pregunta es MUSICAL
+    useEffect(() => {
+        const p = gameData?.preguntas?.[gameData?.indicePregunta];
+        if (!p || p.tipo !== 'MUSICAL' || faseHost !== 'JUEGO') return;
+        const videoId = p.videoId;
+        if (!videoId) return;
+
+        const createPlayer = () => {
+            if (ytPlayerRef.current) { try { ytPlayerRef.current.destroy(); } catch(e) {} ytPlayerRef.current = null; }
+            ytPlayerReadyRef.current = false;
+            const div = document.getElementById('yt-host-player');
+            if (!div) return;
+            ytPlayerRef.current = new window.YT.Player('yt-host-player', {
+                videoId,
+                height: '100%',
+                width: '100%',
+                playerVars: { autoplay: 1, rel: 0, modestbranding: 1 },
+                events: {
+                    onReady: (e) => { ytPlayerReadyRef.current = true; e.target.playVideo(); },
+                    onStateChange: (e) => {
+                        if (e.data === window.YT?.PlayerState?.ENDED) revelarRespuestas(gameDataRef.current);
+                    }
+                }
+            });
+        };
+
+        if (window.YT && window.YT.Player) {
+            setTimeout(createPlayer, 100);
+        } else {
+            if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
+                const tag = document.createElement('script'); tag.src = 'https://www.youtube.com/iframe_api'; document.head.appendChild(tag);
+            }
+            const prev = window.onYouTubeIframeAPIReady;
+            window.onYouTubeIframeAPIReady = () => { if (prev) prev(); setTimeout(createPlayer, 100); };
+        }
+        return () => {
+            if (ytPlayerRef.current) { try { ytPlayerRef.current.destroy(); } catch(e) {} ytPlayerRef.current = null; }
+            ytPlayerReadyRef.current = false;
+        };
+    }, [faseHost, gameData?.indicePregunta]);
+
+    // Auto-pausa en timestamp del blanco actual
+    useEffect(() => {
+        if (faseHost !== 'JUEGO' || subFase !== 'WATCHING') {
+            if (watchingIntervalRef.current) clearInterval(watchingIntervalRef.current);
+            return;
+        }
+        const p = gameData?.preguntas?.[gameData?.indicePregunta];
+        if (p?.tipo !== 'MUSICAL') return;
+        const blancoActual = gameData.blancoActual || 0;
+        const blanco = p.blancos?.[blancoActual];
+        if (!blanco || blanco.timestamp <= 0) return;
+
+        if (watchingIntervalRef.current) clearInterval(watchingIntervalRef.current);
+        watchingIntervalRef.current = setInterval(async () => {
+            if (!ytPlayerRef.current || !ytPlayerReadyRef.current) return;
+            try {
+                const t = ytPlayerRef.current.getCurrentTime();
+                if (t >= blanco.timestamp) {
+                    clearInterval(watchingIntervalRef.current);
+                    ytPlayerRef.current.pauseVideo();
+                    await updateDoc(doc(db, "live_games", codigoSala), {
+                        fasePregunta: 'RESPONDING',
+                        questionStartTime: Date.now(),
+                        respuestasRonda: {}
+                    });
+                }
+            } catch(e) {}
+        }, 300);
+        return () => { if (watchingIntervalRef.current) clearInterval(watchingIntervalRef.current); };
+    }, [faseHost, subFase, gameData?.blancoActual]);
+
     const playSound = (type) => {
         if (type === 'START') safePlay(audioStart);
         else if (type === 'WIN') safePlay(audioWin);
@@ -213,13 +296,33 @@ function ThinkHootHost({ codigoSala, onExit, usuario }) {
     };
 
     const finCuentaAtras = async () => {
+        const firstQ = gameData?.preguntas?.[0];
+        const firstFase = firstQ?.tipo === 'MUSICAL' ? 'WATCHING' : 'RESPONDING';
         await updateDoc(doc(db, "live_games", codigoSala), {
             estado: 'JUEGO',
             indicePregunta: 0,
             respuestasRonda: {},
-            fasePregunta: 'RESPONDING',
+            fasePregunta: firstFase,
+            blancoActual: 0,
             questionStartTime: Date.now()
         });
+    };
+
+    const siguienteBlanco = async () => {
+        const data = gameDataRef.current;
+        if (!data) return;
+        const p = data.preguntas[data.indicePregunta];
+        const nextBlancoIdx = (data.blancoActual || 0) + 1;
+        if (nextBlancoIdx < (p.blancos?.length || 0)) {
+            if (ytPlayerRef.current) { try { ytPlayerRef.current.playVideo(); } catch(e) {} }
+            await updateDoc(doc(db, "live_games", codigoSala), {
+                fasePregunta: 'WATCHING',
+                blancoActual: nextBlancoIdx,
+                respuestasRonda: {}
+            });
+        } else {
+            await updateDoc(doc(db, "live_games", codigoSala), { fasePregunta: 'LEADERBOARD' });
+        }
     };
 
     const revelarRespuestas = async (dataActual) => {
@@ -238,23 +341,31 @@ function ThinkHootHost({ codigoSala, onExit, usuario }) {
         }
         setAvatarMood(newMood);
 
-        await updateDoc(doc(db, "live_games", codigoSala), { fasePregunta: 'REVEAL' });
+        const tipoActual = dataActual.preguntas[dataActual.indicePregunta]?.tipo;
+        const esDibujo = tipoActual === 'DIBUJO';
+        const esMusical = tipoActual === 'MUSICAL';
 
-        // --- ESTA ES LA LÍNEA QUE FALTABA ---
-        const esDibujo = dataActual.preguntas[dataActual.indicePregunta]?.tipo === 'DIBUJO';
-
-        if (!esDibujo) {
-            setTimeout(async () => await updateDoc(doc(db, "live_games", codigoSala), { fasePregunta: 'LEADERBOARD' }), 5000);
+        if (esMusical) {
+            await updateDoc(doc(db, "live_games", codigoSala), { fasePregunta: 'BLANK_REVEAL' });
+            setTimeout(() => siguienteBlanco(), 3500);
+        } else if (!esDibujo) {
+            await updateDoc(doc(db, "live_games", codigoSala), { fasePregunta: 'REVEAL' });
+            if (revealTimeoutRef.current) clearTimeout(revealTimeoutRef.current);
+            revealTimeoutRef.current = setTimeout(async () => {
+                revealTimeoutRef.current = null;
+                await updateDoc(doc(db, "live_games", codigoSala), { fasePregunta: 'LEADERBOARD' });
+            }, 5000);
         }
-    
     };
 
-    const siguientePregunta = async (e) => { // <--- 1. Añadimos 'e' aquí
+    const siguientePregunta = async (e) => {
         if (cargandoSiguiente) return;
 
-        // 2. ESTO ES LO IMPORTANTE: Quita el foco del botón para que no se quede "pegado"
-        if (e && e.target) {
-            e.target.blur();
+        if (e && e.target) e.target.blur();
+
+        if (revealTimeoutRef.current) {
+            clearTimeout(revealTimeoutRef.current);
+            revealTimeoutRef.current = null;
         }
 
         setCargandoSiguiente(true);
@@ -268,10 +379,13 @@ function ThinkHootHost({ codigoSala, onExit, usuario }) {
             }
             // CASO 2: Si ya estamos en solución, ranking o es presentación, avanzamos
             else if (nextIdx < gameData.preguntas.length) {
+                const nextQ = gameData.preguntas[nextIdx];
+                const nextFase = nextQ?.tipo === 'MUSICAL' ? 'WATCHING' : 'RESPONDING';
                 await updateDoc(doc(db, "live_games", codigoSala), {
                     indicePregunta: nextIdx,
                     respuestasRonda: {},
-                    fasePregunta: 'RESPONDING',
+                    fasePregunta: nextFase,
+                    blancoActual: 0,
                     questionStartTime: Date.now()
                 });
                 setAvatarMood('neutral');
@@ -427,7 +541,7 @@ function ThinkHootHost({ codigoSala, onExit, usuario }) {
             </div>
 
             {/* AVATAR PI - HOST (FIJO IZQUIERDA) */}
-            {faseHost === 'JUEGO' && !isPresentation && (
+            {faseHost === 'JUEGO' && !isPresentation && subFase !== 'WATCHING' && (
                 <div className="pi-avatar-container-host">
                     <img src={avatarMood === 'happy' ? piHappy : (avatarMood === 'angry' ? piAngry : piNeutral)} className={`pi-avatar-img ${avatarMood}`} />
                     <div className="pi-stats-badge">{stats.pct}% Aciertos</div>
@@ -472,9 +586,58 @@ function ThinkHootHost({ codigoSala, onExit, usuario }) {
 
                 {faseHost === 'JUEGO' && (
                     <>
+                        {/* Player YouTube persistente — siempre en el DOM para preguntas MUSICAL */}
+                        {currentP?.tipo === 'MUSICAL' && (
+                            <div style={{
+                                position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                                display: subFase === 'WATCHING' ? 'flex' : 'none',
+                                flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                                padding: '70px 20px 20px', background: '#2c3e50', zIndex: 100
+                            }}>
+                                <div style={{ color: '#bb8fce', fontWeight: 'bold', fontSize: '1.1rem', marginBottom: '10px' }}>
+                                    🎵 Blanco #{(gameData.blancoActual || 0) + 1} de {currentP.blancos?.length || 0}
+                                </div>
+                                <div id="yt-host-player" style={{ width: '100%', maxWidth: '800px', aspectRatio: '16/9', background: '#000', borderRadius: '8px' }} />
+                                <div style={{ display: 'flex', gap: '15px', alignItems: 'center', marginTop: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                                    <button onClick={async () => {
+                                        if (ytPlayerRef.current) try { ytPlayerRef.current.pauseVideo(); } catch(e) {}
+                                        await updateDoc(doc(db, "live_games", codigoSala), { fasePregunta: 'RESPONDING', questionStartTime: Date.now(), respuestasRonda: {} });
+                                    }} style={{ padding: '9px 20px', background: '#e67e22', color: 'white', border: 'none', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem' }}>
+                                        ⏸ Pausar ahora
+                                    </button>
+                                    <span style={{ color: '#888', fontSize: '12px' }}>Pausará automáticamente al llegar al timestamp</span>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* BLANK_REVEAL: mostrar la palabra correcta del blanco */}
+                        {subFase === 'BLANK_REVEAL' && currentP?.tipo === 'MUSICAL' && (
+                            <div className="host-question-view centered">
+                                <div className="correct-answer-reveal" style={{ marginTop: '120px' }}>
+                                    <div className="reveal-label">🎵 Blanco #{(gameData.blancoActual || 0) + 1} — Respuesta:</div>
+                                    <div className="reveal-text">{currentP.blancos?.[gameData.blancoActual || 0]?.palabra}</div>
+                                    <div style={{ color: '#888', fontSize: '0.9rem', marginTop: '12px' }}>
+                                        {(gameData.blancoActual || 0) + 1 < (currentP.blancos?.length || 0) ? '⏳ Continuando la canción...' : '✅ Pregunta musical completada'}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {subFase === 'RESPONDING' && (
                             <div className="host-question-view centered">
-                                {isPresentation ? (
+                                {currentP?.tipo === 'MUSICAL' ? (
+                                    <div className="question-card">
+                                        <div style={{ textAlign: 'center', color: '#bb8fce', fontWeight: 'bold', fontSize: '1.2rem', marginBottom: '8px' }}>
+                                            🎵 Blanco #{(gameData.blancoActual || 0) + 1}: <span style={{ color: '#f1c40f', fontSize: '1.5rem', letterSpacing: '4px' }}>_ _ _ _</span>
+                                        </div>
+                                        <div className="host-waiting">
+                                            <Loader className="spin-icon" size={64} />
+                                            <p>Los alumnos completan la palabra...</p>
+                                            <div className="timer-big">{timerVisual}s</div>
+                                            <button className="btn-force-timeout" onClick={terminarTiempo}>⏹ Forzar Final</button>
+                                        </div>
+                                    </div>
+                                ) : isPresentation ? (
                                     <div className="question-card presentation-card">
                                         <h2 className="p-top">{parseText(currentP.bloques?.[0])}</h2>
                                         {currentP.bloques?.[1] && <img src={currentP.bloques[1]} className="presentation-img-large" />}
@@ -724,9 +887,11 @@ function ThinkHootClient({ codigoSala, usuario, onExit }) {
     }
 
     const preguntaActual = gameData.preguntas?.[gameData.indicePregunta];
+    const blancoActual = gameData.blancoActual || 0;
     let textoRespuestaCorrecta = "";
     if (preguntaActual) {
         if (preguntaActual.tipo === 'RELLENAR' && preguntaActual.bloques) textoRespuestaCorrecta = preguntaActual.bloques[1];
+        else if (preguntaActual.tipo === 'MUSICAL') textoRespuestaCorrecta = preguntaActual.blancos?.[blancoActual]?.palabra || '';
         else if (preguntaActual.tipo === 'ORDENAR') textoRespuestaCorrecta = "Orden Incorrecto";
         else textoRespuestaCorrecta = (preguntaActual.correcta || preguntaActual.respuesta || preguntaActual.a || "");
     }
@@ -770,7 +935,7 @@ function ThinkHootClient({ codigoSala, usuario, onExit }) {
     <div className="client-question-area">
         {preguntaActual ? (
             <ClientQuestionEngine
-                key={gameData.indicePregunta} // <--- ¡AÑADE ESTO OBLIGATORIAMENTE!
+                key={`${gameData.indicePregunta}-${blancoActual}`}
                 data={preguntaActual}
                 config={gameData.config}
                 startTime={gameData.questionStartTime}
@@ -778,6 +943,7 @@ function ThinkHootClient({ codigoSala, usuario, onExit }) {
                 myResult={myResult}
                 correctAnswerText={textoRespuestaCorrecta}
                 currentTotalScore={puntuacion}
+                blancoActual={blancoActual}
                 onResponded={notificarRespuesta}
             />
         ) : <div>Cargando...</div>}
@@ -838,7 +1004,7 @@ function ThinkHootClient({ codigoSala, usuario, onExit }) {
 }
 
 // --- ENGINE DEL ALUMNO ---
-function ClientQuestionEngine({ data, config, startTime, subFase, myResult, correctAnswerText, currentTotalScore, onResponded }) {
+function ClientQuestionEngine({ data, config, startTime, subFase, myResult, correctAnswerText, currentTotalScore, blancoActual, onResponded }) {
     const [answeredLocal, setAnsweredLocal] = useState(false);
     const [timeLeft, setTimeLeft] = useState(100);
     const [isLate, setIsLate] = useState(false);
@@ -875,6 +1041,43 @@ function ClientQuestionEngine({ data, config, startTime, subFase, myResult, corr
 
     if (data.tipo === 'PRESENTATION') {
         return <div className="waiting-others"><Monitor size={64} color="white" /><h2>¡Mira la pizarra!</h2></div>;
+    }
+
+    if (data.tipo === 'MUSICAL' && subFase === 'WATCHING') {
+        const totalBlancos = data.blancos?.length || 0;
+        return (
+            <div className="waiting-others" style={{ gap: '16px' }}>
+                <div style={{ fontSize: '3rem', animation: 'bounce 1s infinite' }}>🎵</div>
+                <h2 style={{ color: '#bb8fce' }}>¡Escucha la canción!</h2>
+                <p style={{ color: '#ccc', fontSize: '1rem' }}>Espera a que se pause para completar el hueco</p>
+                <div style={{ background: 'rgba(155,89,182,0.2)', border: '1px solid #9b59b6', borderRadius: '20px', padding: '6px 16px', color: '#bb8fce', fontSize: '0.9rem' }}>
+                    Blanco {(blancoActual || 0) + 1} de {totalBlancos}
+                </div>
+            </div>
+        );
+    }
+
+    if (data.tipo === 'MUSICAL' && subFase === 'BLANK_REVEAL') {
+        const fueCorrecta = myResult?.correct;
+        const puntosGanados = myResult?.puntosGanados || 0;
+        return (
+            <div className="feedback-container">
+                <div className="pi-feedback-wrapper">
+                    <img src={fueCorrecta ? piHappy : piAngry} className={`pi-feedback ${fueCorrecta ? 'happy' : 'angry'}`} />
+                </div>
+                <div className={`neon-card ${fueCorrecta ? 'success' : 'error'}`}>
+                    {fueCorrecta ? <CheckCircle size={50} color="#2ecc71" /> : <XCircle size={50} color="#ff003c" />}
+                    <div className="neon-title">{fueCorrecta ? '¡CORRECTO!' : (!myResult ? '¡TIEMPO!' : '¡INCORRECTO!')}</div>
+                    {fueCorrecta && <div className="points-added">+{puntosGanados} pts</div>}
+                    {!fueCorrecta && correctAnswerText && (
+                        <>
+                            <div className="neon-label">La palabra era:</div>
+                            <div className="neon-answer">{correctAnswerText}</div>
+                        </>
+                    )}
+                </div>
+            </div>
+        );
     }
 
     // --- MODO NEÓN RESTAURADO PARA EL FEEDBACK ---
@@ -943,14 +1146,14 @@ function ClientQuestionEngine({ data, config, startTime, subFase, myResult, corr
                     <p>Enviado. Espera...</p>
                 </div>
             ) : (
-                    <QuestionDisplay data={data} onAnswer={handleAnswer} disabled={false} isHostView={false} />
+                    <QuestionDisplay data={data} onAnswer={handleAnswer} disabled={false} isHostView={false} blancoActual={blancoActual} />
                 )}
         </div>
     );
 }
 
 // --- VISUALIZADOR DE PREGUNTA ---
-const QuestionDisplay = memo(function QuestionDisplay({ data, onAnswer, disabled, feedback, isHostView, showAnswer }) {
+const QuestionDisplay = memo(function QuestionDisplay({ data, onAnswer, disabled, feedback, isHostView, showAnswer, blancoActual }) {
     const [orden, setOrden] = useState([]);
     const [texto, setTexto] = useState('');
     const [slots, setSlots] = useState([]);
@@ -1021,7 +1224,56 @@ const QuestionDisplay = memo(function QuestionDisplay({ data, onAnswer, disabled
 
     const isMultiple = hasOptions && !isOrdenar && !isRellenar;
     // Si no es ninguno de los anteriores, FORZAMOS que sea Respuesta Corta
-    const isShortAnswer = !isMultiple && !isOrdenar && !isRellenar && !isPresentation && data.tipo !== 'DIBUJO'    ;
+    const isShortAnswer = !isMultiple && !isOrdenar && !isRellenar && !isPresentation && data.tipo !== 'DIBUJO' && data.tipo !== 'MUSICAL';
+
+    if (data.tipo === 'MUSICAL') {
+        const blanco = data.blancos?.[blancoActual || 0];
+        const contextLines = (() => {
+            if (!data.letra || !blanco) return [];
+            const lines = data.letra.split('\n');
+            let charPos = 0;
+            for (let i = 0; i < lines.length; i++) {
+                if (blanco.letraIdx >= charPos && blanco.letraIdx < charPos + lines[i].length + 1) {
+                    const blank = lines[i].substring(0, blanco.letraIdx - charPos) + '____' + lines[i].substring(blanco.letraIdx - charPos + blanco.palabra.length);
+                    return [i > 0 ? lines[i - 1] : null, blank, i < lines.length - 1 ? lines[i + 1] : null].filter(Boolean);
+                }
+                charPos += lines[i].length + 1;
+            }
+            return [];
+        })();
+
+        return (
+            <div className="question-card" style={{ textAlign: 'center' }}>
+                <div style={{ color: '#bb8fce', fontWeight: 'bold', fontSize: '1rem', marginBottom: '10px' }}>
+                    🎵 Completa la palabra
+                </div>
+                {contextLines.length > 0 && (
+                    <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '12px', marginBottom: '14px', lineHeight: '2', fontStyle: 'italic', fontSize: '1rem' }}>
+                        {contextLines.map((line, i) => (
+                            <div key={i} style={{ color: line === contextLines[Math.floor(contextLines.length / 2)] ? 'white' : '#aaa', fontWeight: line === contextLines[Math.floor(contextLines.length / 2)] ? 'bold' : 'normal' }}>
+                                {line}
+                            </div>
+                        ))}
+                    </div>
+                )}
+                {!isHostView && (
+                    <div className="completar-wrapper">
+                        <input
+                            value={texto}
+                            onChange={e => setTexto(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') onAnswer(clean(texto) === clean(blanco?.palabra || '')); }}
+                            className="input-hueco-amarillo"
+                            placeholder="Escribe la palabra..."
+                            disabled={disabled}
+                            autoFocus
+                        />
+                        <button className="btn-confirmar-amarillo" onClick={() => onAnswer(clean(texto) === clean(blanco?.palabra || ''))} disabled={disabled}>ENVIAR</button>
+                    </div>
+                )}
+                {isHostView && <div style={{ color: '#888', fontSize: '1rem' }}>Alumnos escribiendo la palabra...</div>}
+            </div>
+        );
+    }
 
     return (
         <div className="question-card">
@@ -1115,15 +1367,14 @@ const QuestionDisplay = memo(function QuestionDisplay({ data, onAnswer, disabled
     );
 
 }, (prevProps, nextProps) => {
-    // ESTA FUNCIÓN DECIDE SI SE REPINTA (Devuelve true si NO debe cambiar)
-    // Solo repintamos si cambia la pregunta, el feedback, o si se deshabilita
     return (
         prevProps.data.q === nextProps.data.q &&
         prevProps.data.pregunta === nextProps.data.pregunta &&
         prevProps.feedback === nextProps.feedback &&
         prevProps.disabled === nextProps.disabled &&
         prevProps.showAnswer === nextProps.showAnswer &&
-        prevProps.isHostView === nextProps.isHostView
+        prevProps.isHostView === nextProps.isHostView &&
+        prevProps.blancoActual === nextProps.blancoActual
     );
 });
 

@@ -221,15 +221,26 @@ function ModalPregunta({datos,cpTotal,onRespuesta}){
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-export default function TrackTest({ paths, objects=[], recurso, hojas, numVueltas=2, onVolver, onTerminar }) {
-  const mountRef       = useRef(null);
-  const keysRef        = useRef({});
-  const joyRef         = useRef({x:0,y:0,active:false});
-  const qActRef        = useRef(false);
-  const aciertasRef    = useRef(0);
-  const falladasRef    = useRef(0);
-  const onTerminarRef  = useRef(onTerminar);
+export default function TrackTest({
+  paths, objects=[], recurso, hojas=[], numVueltas=2, onVolver, onTerminar,
+  // Online mode props
+  skipCountdown=false, timerBase=null,
+  onCheckpoint=null,   // ({cpIdx, lap, tMs, ok}) => void
+  onLapComplete=null,  // (lapsCompleted) => void
+}) {
+  const mountRef          = useRef(null);
+  const keysRef           = useRef({});
+  const joyRef            = useRef({x:0,y:0,active:false});
+  const qActRef           = useRef(false);
+  const aciertasRef       = useRef(0);
+  const falladasRef       = useRef(0);
+  const onTerminarRef     = useRef(onTerminar);
+  const onCheckpointRef   = useRef(onCheckpoint);
+  const onLapCompleteRef  = useRef(onLapComplete);
+  const pendingCpRef      = useRef(null); // {cpIdx, lap, tMs} — filled by anim loop, ok added in handleAnswer
   useEffect(()=>{ onTerminarRef.current=onTerminar; },[onTerminar]);
+  useEffect(()=>{ onCheckpointRef.current=onCheckpoint; },[onCheckpoint]);
+  useEffect(()=>{ onLapCompleteRef.current=onLapComplete; },[onLapComplete]);
 
   const [phase,      setPhase]      = useState('countdown');
   const [countdown,  setCountdown]  = useState(3);
@@ -264,6 +275,10 @@ export default function TrackTest({ paths, objects=[], recurso, hojas, numVuelta
   const handleAnswer=(ok)=>{
     if(ok){aciertasRef.current++;setAciertos(v=>v+1);}
     else  {falladasRef.current++;setFalladas(v=>v+1);}
+    if(pendingCpRef.current){
+      onCheckpointRef.current?.({...pendingCpRef.current, ok});
+      pendingCpRef.current=null;
+    }
     qActRef.current=false;
     setActiveQ(null);
   };
@@ -401,7 +416,8 @@ export default function TrackTest({ paths, objects=[], recurso, hojas, numVuelta
     };
 
     // Race state
-    let speed=0,phaseLocal='countdown',timerStart=0,lastTU=0;
+    const effectiveTimerBase = timerBase || Date.now();
+    let speed=0,phaseLocal=skipCountdown?'racing':'countdown',timerStart=skipCountdown?effectiveTimerBase:0,lastTU=0;
     const cdStart=Date.now();
     let lapCount=0,lapAway=false,raceEnded=false;
     const answered=new Set();
@@ -438,6 +454,10 @@ export default function TrackTest({ paths, objects=[], recurso, hojas, numVuelta
         else{phaseLocal='racing';timerStart=now;setPhase('racing');}
         speed=0;
       }
+      if(phaseLocal==='racing'&&skipCountdown&&!goPlayed){
+        goPlayed=true; musicEl.play().catch(()=>{});
+        setPhase('racing');
+      }
 
       if(phaseLocal==='racing'&&!qActRef.current){
         const gas=k['ArrowUp']||k['w']||k['W'], brk=k['ArrowDown']||k['s']||k['S'];
@@ -473,6 +493,7 @@ export default function TrackTest({ paths, objects=[], recurso, hojas, numVuelta
         if(lapAway&&dist<FINISH_R&&!raceEnded){
           lapAway=false; lapCount++;
           answered.clear();
+          onLapCompleteRef.current?.(lapCount);
           if(lapCount>=numVueltas){
             raceEnded=true; phaseLocal='finished'; setPhase('finished');
             setResultado({
@@ -489,9 +510,16 @@ export default function TrackTest({ paths, objects=[], recurso, hojas, numVuelta
           if(answered.has(cpI)) return;
           if(Math.hypot(car.position.x-cp.x,car.position.z-cp.z)<CP_RADIUS){
             answered.add(cpI);
+            const tMs=now-timerStart;
             const q=pickQ();
-            if(q){speed=0;qActRef.current=true;setActiveQ({...q,cpIdx:cpI});}
-            else {setZoneToast({idx:cpI});setTimeout(()=>setZoneToast(null),1800);}
+            if(q){
+              pendingCpRef.current={cpIdx:cpI,lap:lapCount,tMs};
+              speed=0;qActRef.current=true;setActiveQ({...q,cpIdx:cpI});
+            } else {
+              // no question — report immediately as null
+              onCheckpointRef.current?.({cpIdx:cpI,lap:lapCount,tMs,ok:null});
+              setZoneToast({idx:cpI});setTimeout(()=>setZoneToast(null),1800);
+            }
           }
         });
 
@@ -529,7 +557,7 @@ export default function TrackTest({ paths, objects=[], recurso, hojas, numVuelta
     <div style={{width:'100vw',height:'100vh',position:'relative',background:'#87ceeb',overflow:'hidden'}}>
       <div ref={mountRef} style={{width:'100%',height:'100%'}}/>
 
-      {phase==='countdown'&&(
+      {phase==='countdown'&&!skipCountdown&&(
         <div style={{position:'absolute',top:'38%',left:'50%',transform:'translate(-50%,-50%)',
           display:'flex',flexDirection:'column',alignItems:'center',gap:12,...hud,padding:'22px 36px'}}>
           <div style={{display:'flex',gap:14}}>

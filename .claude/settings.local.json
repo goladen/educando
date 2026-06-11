@@ -26,7 +26,8 @@
       "Bash(Select-Object FullName)",
       "Bash(npx --yes tsc --noEmit --jsx react)",
       "Bash(npx --no react-scripts build --no-emit)",
-      "WebFetch(domain:api.arasaac.org)"
+      "WebFetch(domain:api.arasaac.org)",
+      "Bash(node -e \"const fs = require\\('fs'\\); const code = fs.readFileSync\\('src/ThinkHootGame.jsx','utf8'\\); const errors = []; if \\(!code.includes\\('siguienteBlanco'\\)\\) errors.push\\('Missing siguienteBlanco'\\); if \\(!code.includes\\('WATCHING'\\)\\) errors.push\\('Missing WATCHING state'\\); if \\(!code.includes\\('BLANK_REVEAL'\\)\\) errors.push\\('Missing BLANK_REVEAL state'\\); if \\(!code.includes\\('MUSICAL'\\)\\) errors.push\\('Missing MUSICAL handling'\\); if \\(!code.includes\\('ytPlayerRef'\\)\\) errors.push\\('Missing ytPlayerRef'\\); if \\(errors.length\\) console.log\\('ISSUES:', errors\\); else console.log\\('All checks passed'\\);\")"
     ]
   }
 }

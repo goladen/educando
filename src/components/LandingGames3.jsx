@@ -50,6 +50,8 @@ import SimuladorTiroParabolico from '../Simuladores física/SimuladorTiroParabol
 import SimuladorCaidaLibre from '../Simuladores física/SimuladorCaidaLibre';
 import SimuladorPendulo from '../Simuladores física/SimuladorPendulo';
 import SimuladorLeyDeOhm from '../Simuladores física/SimuladorLeyDeOhm';
+import EnlaceMoleculas from '../Simuladores física/EnlaceMoleculas';
+import AjustesReacciones from '../Simuladores física/AjustesReacciones';
 import RetosApp from '../Retos';
 import SimuladorDados from '../Probabilidad';
 import TrivialGame from '../Trivial';
@@ -1259,7 +1261,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
             // Física: rutas /fisica y /fisica/<slug>
             if (path === 'fisica') { setSimuladoresFisica(true); return; }
             if (path.startsWith('fisica/')) {
-                const SLUG_MAP = { colisiones:'COLISIONES', planoinclinado:'PLANO_INCLINADO', tiroparabolico:'TIRO_PARABOLICO', caidalibre:'CAIDA_LIBRE', pendulo:'PENDULO', leydeohm:'LEY_OHM' };
+                const SLUG_MAP = { colisiones:'COLISIONES', planoinclinado:'PLANO_INCLINADO', tiroparabolico:'TIRO_PARABOLICO', caidalibre:'CAIDA_LIBRE', pendulo:'PENDULO', leydeohm:'LEY_OHM', enlacemoleculas:'ENLACE_MOLECULAS', ajustesreaccion:'AJUSTES_REACCION' };
                 const key = SLUG_MAP[path.slice(7)];
                 setSimuladoresFisica(true);
                 if (key) setSimuladorFisicaActivo(key);
@@ -1834,12 +1836,14 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
 
     if (simuladoresFisica) {
         const SIMS = [
-            { key: 'COLISIONES',      slug: 'colisiones',      label: 'Colisiones',       emoji: '💥', color: '#e74c3c', desc: 'Colisiones elásticas e inelásticas',  comp: SimuladorColisiones },
-            { key: 'PLANO_INCLINADO', slug: 'planoinclinado',  label: 'Plano Inclinado',  emoji: '📐', color: '#3498db', desc: 'Fuerzas en planos inclinados',          comp: SimuladorPlanoInclinado },
-            { key: 'TIRO_PARABOLICO', slug: 'tiroparabolico',  label: 'Tiro Parabólico',  emoji: '🏹', color: '#27ae60', desc: 'Movimiento parabólico de proyectiles', comp: SimuladorTiroParabolico },
-            { key: 'CAIDA_LIBRE',     slug: 'caidalibre',      label: 'Caída Libre',      emoji: '⬇️', color: '#9b59b6', desc: 'Caída libre y gravedad',               comp: SimuladorCaidaLibre },
-            { key: 'PENDULO',         slug: 'pendulo',         label: 'Péndulo',          emoji: '⏱️', color: '#f39c12', desc: 'Oscilaciones del péndulo simple',      comp: SimuladorPendulo },
-            { key: 'LEY_OHM',         slug: 'leydeohm',        label: 'Ley de Ohm',       emoji: '⚡', color: '#1abc9c', desc: 'Circuitos y ley de Ohm',              comp: SimuladorLeyDeOhm },
+            { key: 'COLISIONES',        slug: 'colisiones',        label: 'Colisiones',         emoji: '💥', color: '#e74c3c', desc: 'Colisiones elásticas e inelásticas',   comp: SimuladorColisiones },
+            { key: 'PLANO_INCLINADO',   slug: 'planoinclinado',    label: 'Plano Inclinado',    emoji: '📐', color: '#3498db', desc: 'Fuerzas en planos inclinados',           comp: SimuladorPlanoInclinado },
+            { key: 'TIRO_PARABOLICO',   slug: 'tiroparabolico',    label: 'Tiro Parabólico',    emoji: '🏹', color: '#27ae60', desc: 'Movimiento parabólico de proyectiles',  comp: SimuladorTiroParabolico },
+            { key: 'CAIDA_LIBRE',       slug: 'caidalibre',        label: 'Caída Libre',        emoji: '⬇️', color: '#9b59b6', desc: 'Caída libre y gravedad',                comp: SimuladorCaidaLibre },
+            { key: 'PENDULO',           slug: 'pendulo',           label: 'Péndulo',            emoji: '⏱️', color: '#f39c12', desc: 'Oscilaciones del péndulo simple',       comp: SimuladorPendulo },
+            { key: 'LEY_OHM',           slug: 'leydeohm',          label: 'Ley de Ohm',         emoji: '⚡', color: '#1abc9c', desc: 'Circuitos y ley de Ohm',               comp: SimuladorLeyDeOhm },
+            { key: 'ENLACE_MOLECULAS',  slug: 'enlacemoleculas',   label: 'Enlace de Moléculas',emoji: '⚛️', color: '#8b5cf6', desc: 'Pizarra de enlace químico',             comp: EnlaceMoleculas },
+            { key: 'AJUSTES_REACCION',  slug: 'ajustesreaccion',   label: 'Ajuste de Reacción', emoji: '🧪', color: '#e67e22', desc: 'Ajusta coeficientes estequiométricos',  comp: AjustesReacciones },
         ];
 
         const volverAlMenu = () => { setSimuladorFisicaActivo(null); window.history.pushState({}, '', '/fisica'); };
@@ -1874,7 +1878,7 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
                     </button>
                     <div style={{ textAlign: 'center', marginBottom: 36 }}>
                         <div style={{ fontSize: 64 }}>🔭</div>
-                        <h1 style={{ color: 'white', fontSize: '2.2rem', margin: '8px 0 6px' }}>Simuladores de Física</h1>
+                        <h1 style={{ color: 'white', fontSize: '2.2rem', margin: '8px 0 6px' }}>Física y Química</h1>
                         <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '1rem' }}>Selecciona un simulador para empezar</p>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 20 }}>
@@ -2722,7 +2726,7 @@ if (juegoActivo.tipoJuego === 'LENGUA_SIGNOS') return <LenguaSignos onExit={() =
                     { id: 'BIOLOGIA',            label: 'Biología',             emoji: '🔬', color: '#16a34a', action: () => setBiologiaApp(true),  shareable: true },
                     { id: 'GESTION_AULA', label: 'Gestión Aula', emoji: '🏫', color: '#e67e22', action: () => setGestionAula(true), shareable: true, shareUrl: `${window.location.origin}${window.location.pathname}?gestion=menu` },
                     { id: 'VISTAS_DIDRICAS', label: 'Vistas Diédricas', emoji: '📐', color: '#7c3aed', action: () => setVistasDidricas(true), shareable: true },
-                    { id: 'SIMULADORES_FISICA', label: 'Física', emoji: '🔭', color: '#e74c3c', action: () => { setSimuladoresFisica(true); window.history.pushState({}, '', '/fisica'); }, shareable: true, shareUrl: `${window.location.origin}/fisica` },
+                    { id: 'SIMULADORES_FISICA', label: 'Física y Química', emoji: '🔭', color: '#e74c3c', action: () => { setSimuladoresFisica(true); window.history.pushState({}, '', '/fisica'); }, shareable: true, shareUrl: `${window.location.origin}/fisica` },
                 ].map(tool => (
                     <div key={tool.id} onClick={tool.action} style={{ background: '#ffffbf', borderRadius: '15px', padding: '15px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transition: 'transform 0.2s', border: `2px solid ${tool.color}20`, position: 'relative' }}
                         onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-3px)'}
@@ -3019,6 +3023,7 @@ const [entrando, setEntrando] = useState(false);
     const [joinName, setJoinName] = useState('');
     const [liveModeAlumno, setLiveModeAlumno] = useState(false);
     const [joinLiveTipoJuego, setJoinLiveTipoJuego] = useState('');
+    const [isMathLiveAlumno, setIsMathLiveAlumno] = useState(false);
     // Gestor/Single Player
     const [liveModeHost, setLiveModeHost] = useState(false);
     const [hostRoomCode, setHostRoomCode] = useState('');

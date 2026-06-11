@@ -87,6 +87,31 @@ async function fetchPicId(word) {
   return null;
 }
 
+// Caché de todos los IDs por palabra (para el selector de alternativas)
+const _picCacheAll = new Map();
+
+async function fetchAllPicIds(word) {
+  const base = stripAccents(word.toLowerCase().trim());
+  if (_picCacheAll.has(base)) return _picCacheAll.get(base);
+
+  const candidates = [base, ...verbVariants(base)];
+  for (const c of candidates) {
+    try {
+      const r = await fetch(`${PIC_API}/${encodeURIComponent(c)}`);
+      if (!r.ok) continue;
+      const d = await r.json();
+      if (Array.isArray(d) && d.length > 0) {
+        const ids = d.slice(0, 12).map(x => x._id).filter(Boolean);
+        _picCacheAll.set(base, ids);
+        if (!_picCache.has(base)) _picCache.set(base, ids[0]);
+        return ids;
+      }
+    } catch {}
+  }
+  _picCacheAll.set(base, []);
+  return [];
+}
+
 function fraseTexto(f) { return f.texto; }
 function contentWords(f, max = 6) {
   return f.tokens.slice(0, max);
@@ -640,21 +665,65 @@ function ModoReferencia() {
 }
 
 // ─── MODO PICTOGRAMAS (traductor) ─────────────────────────────────────────────
-function PicCell({ id, word, size = 90 }) {
+function PicCell({ id, word, size = 90, hasAlts, onClick }) {
   const [err, setErr] = useState(false);
+  const found = id && !err;
   return (
-    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+    <div onClick={hasAlts ? onClick : undefined}
+      style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4,
+        cursor: hasAlts ? 'pointer' : 'default', position:'relative' }}>
       <div style={{ width:size, height:size, borderRadius:10, overflow:'hidden',
-        background: id && !err ? '#F0FDF4' : '#F8FAFC',
-        border:'1.5px solid ' + (id && !err ? '#A7F3D0' : '#E2E8F0'),
-        display:'flex', alignItems:'center', justifyContent:'center' }}>
-        {id && !err
+        background: found ? '#F0FDF4' : '#F8FAFC',
+        border:'2px solid ' + (found ? '#A7F3D0' : '#E2E8F0'),
+        display:'flex', alignItems:'center', justifyContent:'center',
+        transition:'border-color 0.15s, box-shadow 0.15s',
+        boxShadow: hasAlts ? '0 2px 8px rgba(5,150,105,0.12)' : 'none' }}>
+        {found
           ? <img src={picImg(id)} alt={word} onError={() => setErr(true)}
               style={{ width:size, height:size, objectFit:'contain' }} />
           : <span style={{ fontSize:'1.4rem', color:'#CBD5E1' }}>🔤</span>}
       </div>
-      <span style={{ fontSize:'0.7rem', fontWeight:700, color: id && !err ? '#065F46':'#94A3B8',
+      {hasAlts && (
+        <div style={{ position:'absolute', top:4, right:4,
+          background:'#059669', borderRadius:'50%', width:16, height:16,
+          display:'flex', alignItems:'center', justifyContent:'center',
+          fontSize:'0.6rem', color:'white', fontWeight:900, lineHeight:1 }}>⊕</div>
+      )}
+      <span style={{ fontSize:'0.7rem', fontWeight:700, color: found ? '#065F46':'#94A3B8',
         maxWidth:size, textAlign:'center', wordBreak:'break-word' }}>{word}</span>
+    </div>
+  );
+}
+
+function AltsModal({ word, ids, selectedId, onSelect, onClose }) {
+  return (
+    <div onClick={onClose} style={{ position:'fixed', inset:0, zIndex:99999,
+      background:'rgba(0,0,0,0.45)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background:'white', borderRadius:20,
+        padding:'20px 24px', maxWidth:460, width:'90%',
+        boxShadow:'0 20px 60px rgba(0,0,0,0.25)', maxHeight:'80vh', overflowY:'auto' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+          <h3 style={{ margin:0, fontSize:'1.05rem', fontWeight:800, color:'#1E293B' }}>
+            Pictogramas para <em>"{word}"</em>
+          </h3>
+          <button onClick={onClose} style={{ background:'none', border:'none',
+            fontSize:'1.3rem', cursor:'pointer', color:'#94A3B8', lineHeight:1 }}>✕</button>
+        </div>
+        <div style={{ display:'flex', flexWrap:'wrap', gap:12, justifyContent:'center' }}>
+          {ids.map((id) => (
+            <button key={id} onClick={() => onSelect(id)} style={{
+              padding:6, border:`3px solid ${id === selectedId ? '#059669' : '#E2E8F0'}`,
+              borderRadius:14, cursor:'pointer',
+              background: id === selectedId ? '#F0FDF4' : 'white',
+              transition:'all 0.15s', boxShadow: id === selectedId ? '0 0 0 2px #A7F3D0' : 'none' }}>
+              <img src={picImg(id)} alt="" style={{ width:80, height:80, objectFit:'contain', display:'block' }} />
+            </button>
+          ))}
+        </div>
+        <p style={{ margin:'14px 0 0', fontSize:'0.75rem', color:'#94A3B8', textAlign:'center' }}>
+          Haz clic en un pictograma para seleccionarlo
+        </p>
+      </div>
     </div>
   );
 }
@@ -664,6 +733,7 @@ function ModoPictogramas() {
   const [resultados, setResultados] = useState([]);
   const [cargando, setCargando] = useState(false);
   const [escuchando, setEscuchando] = useState(false);
+  const [popup, setPopup] = useState(null); // { idx, word, ids, selectedId }
   const recRef = React.useRef(null);
 
   const traducir = useCallback(async () => {
@@ -671,10 +741,10 @@ function ModoPictogramas() {
       .map(w => w.replace(/[.,;:!?¿¡"'()]/g, '').trim()).filter(Boolean);
     if (!tokens.length) return;
     setCargando(true);
-    setResultados(tokens.map(w => ({ word: w, id: null, loading: true })));
+    setResultados(tokens.map(w => ({ word: w, ids: [], selectedId: null, loading: true })));
     await Promise.all(tokens.map((w, i) =>
-      fetchPicId(w).then(id => setResultados(p => {
-        const n = [...p]; n[i] = { word: w, id, loading: false }; return n;
+      fetchAllPicIds(w).then(ids => setResultados(p => {
+        const n = [...p]; n[i] = { word: w, ids, selectedId: ids[0] ?? null, loading: false }; return n;
       }))
     ));
     setCargando(false);
@@ -727,14 +797,33 @@ function ModoPictogramas() {
         </div>
       </div>
       {resultados.length > 0 && (
-        <div style={{ display:'flex', flexWrap:'wrap', gap:'12px 10px',
-          justifyContent:'center', padding:'16px 8px',
-          background:'#F8FAFC', borderRadius:14, border:'1.5px solid #E2E8F0' }}>
-          {resultados.map((r, i) => (
-            r.word === ' ' ? <div key={i} style={{ width:16 }} />
-              : <PicCell key={i} id={r.id} word={r.word} size={80} />
-          ))}
-        </div>
+        <>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:'12px 10px',
+            justifyContent:'center', padding:'16px 8px',
+            background:'#F8FAFC', borderRadius:14, border:'1.5px solid #E2E8F0' }}>
+            {resultados.map((r, i) => (
+              r.word === ' ' ? <div key={i} style={{ width:16 }} />
+                : <PicCell key={i} id={r.selectedId} word={r.word} size={80}
+                    hasAlts={r.ids.length > 1}
+                    onClick={() => setPopup({ idx: i, word: r.word, ids: r.ids, selectedId: r.selectedId })} />
+            ))}
+          </div>
+          <p style={{ margin:'8px 0 0', fontSize:'0.75rem', color:'#94A3B8', textAlign:'center' }}>
+            Los pictogramas con <strong style={{ color:'#059669' }}>⊕</strong> tienen alternativas — haz clic para cambiarlos
+          </p>
+        </>
+      )}
+      {popup && (
+        <AltsModal
+          word={popup.word}
+          ids={popup.ids}
+          selectedId={resultados[popup.idx]?.selectedId}
+          onSelect={(id) => {
+            setResultados(p => p.map((r, i) => i === popup.idx ? { ...r, selectedId: id } : r));
+            setPopup(null);
+          }}
+          onClose={() => setPopup(null)}
+        />
       )}
       {!resultados.length && (
         <div style={{ textAlign:'center', color:'#94A3B8', padding:'30px 0' }}>

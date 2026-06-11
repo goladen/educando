@@ -119,7 +119,7 @@ export default function AlmacenCircuitos({ onJugar, onEditar, onVolver }) {
       background:'linear-gradient(90deg,#FF6B00,#FFD700)',
       WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' },
     tab: (active) => ({
-      padding:'8px 20px', borderRadius:20, border:'none', cursor:'pointer',
+      padding:'8px 20px', borderRadius:20, cursor:'pointer',
       fontWeight:700, fontSize:'0.82rem', transition:'all .15s',
       background: active ? 'rgba(255,107,0,0.30)' : 'rgba(255,255,255,0.08)',
       color:      active ? '#FF6B00' : 'rgba(255,255,255,0.55)',

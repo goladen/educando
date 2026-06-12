@@ -1,5 +1,6 @@
 import { useState, lazy, Suspense } from 'react';
-import { Wrench, Table, FileQuestion, RefreshCw, Camera, BarChart2, BookOpen, Tv2, Shield, Code2 } from 'lucide-react';
+import { Wrench, Table, FileQuestion, RefreshCw, Camera, BarChart2, BookOpen, Tv2, Shield, Code2, Film } from 'lucide-react';
+import VideoTimelineEditor from '../VideoTimelineEditor';
 
 import ToolExportarGoogleSheets from './ToolExportarGoogleSheets';
 import ToolGeneradorGoogleForms from './ToolGeneradorGoogleForms';
@@ -34,6 +35,10 @@ export default function TeacherTools({ usuario, googleToken, perfilProfesor, onO
                 <MiniAppCreator onAbrirViewer={id => window.open(`/?miniapp=${id}`, '_blank')} />
             </Suspense>
         </div>
+    );
+
+    if (herramientaActiva === 'VIDEO_EDITOR') return (
+        <VideoTimelineEditor onBack={() => setHerramientaActiva(null)} />
     );
 
     if (herramientaActiva === 'FOTO') {
@@ -156,6 +161,17 @@ export default function TeacherTools({ usuario, googleToken, perfilProfesor, onO
                     <h3 style={{ margin: '0 0 10px 0', color: '#6c63ff' }}>Crear Mini-App</h3>
                     <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>
                         Diseña una aplicación interactiva con IA o código React y compártela con tus alumnos.
+                    </p>
+                </div>
+
+                {/* ── Editor de Vídeo Interactivo ── */}
+                <div onClick={() => setHerramientaActiva('VIDEO_EDITOR')} style={{ ...cardStyle, borderLeft: '4px solid #0891b2' }}>
+                    <div style={{ background: '#cffafe', padding: '15px', borderRadius: '50%', marginBottom: '15px' }}>
+                        <Film size={32} color="#0891b2" />
+                    </div>
+                    <h3 style={{ margin: '0 0 10px 0', color: '#0891b2' }}>Editor de Vídeo</h3>
+                    <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>
+                        Crea tramos de reproducción, añade preguntas y pausas en una línea de tiempo visual.
                     </p>
                 </div>
 

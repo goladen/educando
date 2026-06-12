@@ -7,18 +7,23 @@ import PREGUNTAS_PRIMARIA from './preguntas_trivial_primaria.json';
 import PREGUNTAS_SUPER from './preguntas_trivial_super.json';
 import correctSound from './assets/correct-choice-43861.mp3';
 import wrongSound from './assets/negative_beeps-6008.mp3';
+import wedgeSound from './assets/sonidorespcorrecta.mp3';
 import Confetti from 'react-confetti';
 
 // ─── SONIDOS ──────────────────────────────────────────────────────────────────
 // Preload so the browser doesn't block on first interaction
 const _correctAudio = new Audio(correctSound);
 const _wrongAudio   = new Audio(wrongSound);
+const _wedgeAudio   = new Audio(wedgeSound);
 
 const playCorrectSound = () => {
     try { _correctAudio.currentTime = 0; _correctAudio.play().catch(() => {}); } catch(e) {}
 };
 const playWrongSound = () => {
     try { _wrongAudio.currentTime = 0; _wrongAudio.play().catch(() => {}); } catch(e) {}
+};
+const playWedgeSound = () => {
+    try { _wedgeAudio.currentTime = 0; _wedgeAudio.play().catch(() => {}); } catch(e) {}
 };
 
 // Dice roll: procedural noise bursts via Web Audio (no asset needed)
@@ -357,12 +362,12 @@ class TrivialBoard {
 }
 
 class Particle {
-    constructor(x, y) {
+    constructor(x, y, color = null) {
         this.x = x; this.y = y;
-        this.vx = (Math.random() - 0.5) * 15;
-        this.vy = (Math.random() - 1) * 15 - 5;
-        this.color = COLORS[Math.floor(Math.random() * COLORS.length)].hex;
-        this.size = Math.random() * 8 + 4;
+        this.vx = (Math.random() - 0.5) * 18;
+        this.vy = (Math.random() - 1.2) * 18 - 5;
+        this.color = color || COLORS[Math.floor(Math.random() * COLORS.length)].hex;
+        this.size = Math.random() * 10 + 5;
         this.life = 100;
     }
     update() { this.x += this.vx; this.y += this.vy; this.vy += 0.4; this.life -= 2; }
@@ -428,6 +433,7 @@ export default function TrivialGame({ onExit, onBuscar }) {
     const [fuentePreguntas, setFuentePreguntas] = useState('JSON');
     const [codigoFirebase, setCodigoFirebase] = useState('');
     const [cargando, setCargando] = useState(false);
+    const [controlsOcultos, setControlsOcultos] = useState(false);
     const preguntasRef = useRef(PREGUNTAS);
 
     const activePlayerIdxRef = useRef(0);
@@ -1090,9 +1096,22 @@ export default function TrivialGame({ onExit, onBuscar }) {
     };
 
     const [mostrandoRespuesta, setMostrandoRespuesta] = useState(false);
+    const [wedgePerdido, setWedgePerdido] = useState(null); // { catId, catName, catHex }
+
+    // Auto-ocultar panel al seleccionar casilla (ver dado 1s, luego ocultar)
+    useEffect(() => {
+        let t;
+        if (gameState === 'SELECTING') {
+            t = setTimeout(() => setControlsOcultos(true), 1000);
+        } else {
+            setControlsOcultos(false);
+        }
+        return () => clearTimeout(t);
+    }, [gameState]);
 
     const cerrarModal = () => {
         setMostrandoRespuesta(false);
+        setWedgePerdido(null);
         setActivePlayerIdx(prev => (prev + 1) % players.length);
         setGameState('WAITING_ROLL');
         setModalData(null);
@@ -1102,20 +1121,22 @@ export default function TrivialGame({ onExit, onBuscar }) {
     const responderPregunta = (isCorrect) => {
         if (window.speechSynthesis) window.speechSynthesis.cancel();
         setIsSpeaking(false);
-        isCorrect ? playCorrectSound() : playWrongSound();
         const eng = engineRef.current;
         if (isCorrect) {
+            playCorrectSound();
             if (modalData.isFinal) {
                 setGameState('WON');
                 return;
             }
             if (modalData.node.type === 'wedge') {
                 const catId = modalData.node.color.id;
+                const catHex = modalData.node.color.hex;
                 setPlayers(prev => {
                     const np = [...prev];
                     if (!np[activePlayerIdx].wedges.includes(catId)) {
                         np[activePlayerIdx].wedges.push(catId);
-                        for(let i=0; i<40; i++) eng.particles.push(new Particle(modalData.node.x, modalData.node.y));
+                        playWedgeSound();
+                        for (let i = 0; i < 70; i++) eng.particles.push(new Particle(modalData.node.x, modalData.node.y, catHex));
                     }
                     return np;
                 });
@@ -1124,6 +1145,21 @@ export default function TrivialGame({ onExit, onBuscar }) {
             setModalData(null);
             setDiceVal(null);
         } else {
+            playWrongSound();
+            // Si fallas en una casilla de quesito que ya tenías, pierdes ese quesito
+            if (modalData.node.type === 'wedge') {
+                const catId  = modalData.node.color.id;
+                const catHex = modalData.node.color.hex;
+                const catName = modalData.node.color.name;
+                setPlayers(prev => {
+                    const np = [...prev];
+                    if (np[activePlayerIdx].wedges.includes(catId)) {
+                        np[activePlayerIdx] = { ...np[activePlayerIdx], wedges: np[activePlayerIdx].wedges.filter(w => w !== catId) };
+                        setWedgePerdido({ catId, catName, catHex });
+                    }
+                    return np;
+                });
+            }
             setMostrandoRespuesta(true);
         }
     };
@@ -1672,7 +1708,7 @@ export default function TrivialGame({ onExit, onBuscar }) {
                     backdropFilter: 'blur(6px)', alignItems: 'center',
                 }}>
                     {onExit && (
-                        <button onClick={onExit} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '2px 6px', flexShrink: 0 }}>
+                        <button onClick={() => setPausaActiva(true)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '2px 6px', flexShrink: 0 }}>
                             <ArrowLeft size={18} />
                         </button>
                     )}
@@ -1703,8 +1739,8 @@ export default function TrivialGame({ onExit, onBuscar }) {
             ) : (
                 <>
                     {onExit && (
-                        <button onClick={onExit} style={{ position: 'absolute', top: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 50, background: 'rgba(15, 23, 42, 0.8)', color: 'white', border: '1px solid #334155', padding: '10px 20px', borderRadius: 30, cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 8, backdropFilter: 'blur(5px)' }}>
-                            <ArrowLeft size={16}/> Salir
+                        <button onClick={() => setPausaActiva(true)} style={{ position: 'absolute', top: 16, left: 16, zIndex: 50, background: 'rgba(15,23,42,0.85)', color: '#94a3b8', border: '1px solid #334155', padding: '8px 14px', borderRadius: 20, cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6, backdropFilter: 'blur(6px)' }}>
+                            <ArrowLeft size={14}/> Salir
                         </button>
                     )}
                     {players.map((p, i) => {
@@ -1730,7 +1766,7 @@ export default function TrivialGame({ onExit, onBuscar }) {
             <div style={{
                 position: 'absolute',
                 top: isMobile ? 50 : 0,
-                bottom: isMobile ? 86 : 0,
+                bottom: isMobile ? (controlsOcultos ? 0 : 86) : 0,
                 left: 0, right: 0,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 zIndex: 1,
@@ -1747,60 +1783,62 @@ export default function TrivialGame({ onExit, onBuscar }) {
             </div>
 
             {/* PANEL DE CONTROLES */}
-            <div style={isMobile ? {
-                position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 20,
-                background: 'rgba(15,23,42,0.97)', borderTop: '1px solid #334155',
-                padding: '8px 12px', display: 'flex', alignItems: 'center',
-                gap: 8, backdropFilter: 'blur(8px)',
-            } : st.controlsFloating}>
-                {/* Nombre + estado */}
-                <div style={{ flex: isMobile ? 1 : 'none', minWidth: isMobile ? 0 : 200, textAlign: 'left', overflow: 'hidden' }}>
-                    <div style={{ fontSize: isMobile ? '0.7rem' : '0.9rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1 }}>Turno</div>
-                    <div style={{ fontSize: isMobile ? '1rem' : '1.4rem', color: players[activePlayerIdx]?.color || 'white', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {players[activePlayerIdx]?.name}
+            {!controlsOcultos && (
+                <div style={isMobile ? {
+                    position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 20,
+                    background: 'rgba(15,23,42,0.97)', borderTop: '1px solid #334155',
+                    padding: '8px 12px', display: 'flex', alignItems: 'center',
+                    gap: 8, backdropFilter: 'blur(8px)',
+                } : st.controlsFloating}>
+                    {/* Nombre + estado */}
+                    <div style={{ flex: isMobile ? 1 : 'none', minWidth: isMobile ? 0 : 200, textAlign: 'left', overflow: 'hidden' }}>
+                        <div style={{ fontSize: isMobile ? '0.7rem' : '0.9rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1 }}>Turno</div>
+                        <div style={{ fontSize: isMobile ? '1rem' : '1.4rem', color: players[activePlayerIdx]?.color || 'white', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {players[activePlayerIdx]?.name}
+                        </div>
+                        {!isMobile && (
+                            <div style={{ fontSize: '0.9rem', color: '#cbd5e1', marginTop: 5 }}>
+                                {gameState === 'WAITING_ROLL' ? '¡Lanza el dado!' :
+                                 gameState === 'SELECTING' ? 'Elige una casilla destino' :
+                                 gameState === 'MOVING' ? 'Saltando...' : 'Respondiendo...'}
+                            </div>
+                        )}
                     </div>
-                    {!isMobile && (
-                        <div style={{ fontSize: '0.9rem', color: '#cbd5e1', marginTop: 5 }}>
-                            {gameState === 'WAITING_ROLL' ? '¡Lanza el dado!' :
-                             gameState === 'SELECTING' ? 'Elige una casilla destino' :
-                             gameState === 'MOVING' ? 'Saltando...' : 'Respondiendo...'}
-                        </div>
-                    )}
+
+                    {/* Dado */}
+                    <div style={{ width: isMobile ? 46 : 72, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        {(gameState === 'ROLLING' && diceDisplay) ? (
+                            <DiceFace value={diceDisplay} rolling size={isMobile ? 40 : 62} />
+                        ) : diceDisplay ? (
+                            <div style={{ animation: diceLanding ? 'diceLand 0.4s ease-out' : 'none' }}>
+                                <DiceFace value={diceDisplay} rolling={false} size={isMobile ? 40 : 62} />
+                            </div>
+                        ) : (
+                            <Dices size={isMobile ? 34 : 52} color="#334155" />
+                        )}
+                    </div>
+
+                    {/* Botón lanzar */}
+                    <button
+                        onClick={tirarDado}
+                        disabled={gameState !== 'WAITING_ROLL'}
+                        style={{
+                            ...st.btnRoll,
+                            width: 'auto',
+                            padding: isMobile ? '10px 18px' : '15px 30px',
+                            fontSize: isMobile ? '0.95rem' : '1.3rem',
+                            opacity: gameState !== 'WAITING_ROLL' ? 0.5 : 1,
+                            cursor: gameState !== 'WAITING_ROLL' ? 'not-allowed' : 'pointer',
+                            margin: 0, flexShrink: 0,
+                        }}
+                    >
+                        {isMobile ? '🎲 Lanzar' : 'Lanzar Dado'}
+                    </button>
+
+                    {/* Pausa */}
+                    <button onClick={() => setPausaActiva(true)} style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid #475569', color: '#94a3b8', width: isMobile ? 38 : 46, height: isMobile ? 38 : 46, borderRadius: 10, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>⏸</button>
                 </div>
-
-                {/* Dado */}
-                <div style={{ width: isMobile ? 46 : 72, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    {(gameState === 'ROLLING' && diceDisplay) ? (
-                        <DiceFace value={diceDisplay} rolling size={isMobile ? 40 : 62} />
-                    ) : diceDisplay ? (
-                        <div style={{ animation: diceLanding ? 'diceLand 0.4s ease-out' : 'none' }}>
-                            <DiceFace value={diceDisplay} rolling={false} size={isMobile ? 40 : 62} />
-                        </div>
-                    ) : (
-                        <Dices size={isMobile ? 34 : 52} color="#334155" />
-                    )}
-                </div>
-
-                {/* Botón lanzar */}
-                <button
-                    onClick={tirarDado}
-                    disabled={gameState !== 'WAITING_ROLL'}
-                    style={{
-                        ...st.btnRoll,
-                        width: 'auto',
-                        padding: isMobile ? '10px 18px' : '15px 30px',
-                        fontSize: isMobile ? '0.95rem' : '1.3rem',
-                        opacity: gameState !== 'WAITING_ROLL' ? 0.5 : 1,
-                        cursor: gameState !== 'WAITING_ROLL' ? 'not-allowed' : 'pointer',
-                        margin: 0, flexShrink: 0,
-                    }}
-                >
-                    {isMobile ? '🎲 Lanzar' : 'Lanzar Dado'}
-                </button>
-
-                {/* Pausa */}
-                <button onClick={() => setPausaActiva(true)} style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid #475569', color: '#94a3b8', width: isMobile ? 38 : 46, height: isMobile ? 38 : 46, borderRadius: 10, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>⏸</button>
-            </div>
+            )}
 
             {/* MODAL DE PREGUNTAS */}
             {gameState === 'QUESTION' && modalData && (
@@ -1859,7 +1897,7 @@ export default function TrivialGame({ onExit, onBuscar }) {
                                 <h2 style={{ color: 'white', fontSize: isMobile ? '1.2rem' : '1.7rem', margin: isMobile ? '14px 0 18px' : '20px 0 30px', lineHeight: 1.4 }}>{qData.q}</h2>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 8 : 12 }}>
                                     {modalData.answers.map((ans, i) => (
-                                        <button key={i} onClick={() => responderPregunta(ans === modalData.correct)} style={{ ...st.btnAnswer, padding: isMobile ? '13px 14px' : 20, fontSize: isMobile ? '0.95rem' : '1.2rem' }}>{ans}</button>
+                                        <button key={i} onClick={() => !mostrandoRespuesta && responderPregunta(ans === modalData.correct)} disabled={mostrandoRespuesta} style={{ ...st.btnAnswer, padding: isMobile ? '13px 14px' : 20, fontSize: isMobile ? '0.95rem' : '1.2rem', opacity: mostrandoRespuesta ? 0.4 : 1, cursor: mostrandoRespuesta ? 'default' : 'pointer' }}>{ans}</button>
                                     ))}
                                 </div>
                             </>);
@@ -1870,22 +1908,23 @@ export default function TrivialGame({ onExit, onBuscar }) {
                                 <input
                                     value={inputCorta}
                                     onChange={e => setInputCorta(e.target.value)}
-                                    onKeyDown={e => { if (e.key === 'Enter' && inputCorta.trim()) responderPregunta(clean(inputCorta) === clean(qData.a)); }}
+                                    onKeyDown={e => { if (e.key === 'Enter' && inputCorta.trim() && !mostrandoRespuesta) responderPregunta(clean(inputCorta) === clean(qData.a)); }}
                                     placeholder="Escribe tu respuesta…"
                                     autoFocus
-                                    style={{ width: '100%', boxSizing: 'border-box', background: '#0f172a', border: '2px solid #475569', borderRadius: 10, color: 'white', padding: '14px 16px', fontSize: isMobile ? '1rem' : '1.15rem', fontFamily: 'inherit', outline: 'none', marginBottom: 12 }}
+                                    disabled={mostrandoRespuesta}
+                                    style={{ width: '100%', boxSizing: 'border-box', background: '#0f172a', border: '2px solid #475569', borderRadius: 10, color: 'white', padding: '14px 16px', fontSize: isMobile ? '1rem' : '1.15rem', fontFamily: 'inherit', outline: 'none', marginBottom: 12, opacity: mostrandoRespuesta ? 0.4 : 1 }}
                                 />
                                 <button
-                                    onClick={() => { if (inputCorta.trim()) responderPregunta(clean(inputCorta) === clean(qData.a)); }}
-                                    disabled={!inputCorta.trim()}
-                                    style={{ ...st.btnAnswer, background: '#1d4ed8', border: 'none', fontWeight: 800, opacity: inputCorta.trim() ? 1 : 0.4 }}
+                                    onClick={() => { if (inputCorta.trim() && !mostrandoRespuesta) responderPregunta(clean(inputCorta) === clean(qData.a)); }}
+                                    disabled={!inputCorta.trim() || mostrandoRespuesta}
+                                    style={{ ...st.btnAnswer, background: '#1d4ed8', border: 'none', fontWeight: 800, opacity: (inputCorta.trim() && !mostrandoRespuesta) ? 1 : 0.4 }}
                                 >Responder</button>
                             </>);
 
                             // RELLENAR — texto con hueco
                             if (tipo === 'RELLENAR') {
                                 const checkRellenar = () => {
-                                    if (!inputCorta.trim()) return;
+                                    if (!inputCorta.trim() || mostrandoRespuesta) return;
                                     const ans = qData.bloques?.[1];
                                     const alts = qData.alternativas || [];
                                     const correcto = clean(inputCorta) === clean(ans) || alts.some(a => clean(inputCorta) === clean(a));
@@ -1918,7 +1957,7 @@ export default function TrivialGame({ onExit, onBuscar }) {
                                 const { slots: elegidos, available: disponibles } = ordenSlots;
                                 const completo = elegidos.length === qData.bloques?.length;
                                 const confirmarOrden = () => {
-                                    if (!completo) return;
+                                    if (!completo || mostrandoRespuesta) return;
                                     responderPregunta(JSON.stringify(elegidos) === JSON.stringify(qData.bloques));
                                 };
                                 return (<>
@@ -1966,9 +2005,17 @@ export default function TrivialGame({ onExit, onBuscar }) {
                                         ✗ Respuesta incorrecta
                                     </div>
                                     <div style={{ color: '#94a3b8', fontSize: '0.82rem', marginBottom: 6 }}>La respuesta correcta era:</div>
-                                    <div style={{ color: '#4ade80', fontSize: isMobile ? '1.1rem' : '1.35rem', fontWeight: 800, lineHeight: 1.4, marginBottom: 16 }}>
+                                    <div style={{ color: '#4ade80', fontSize: isMobile ? '1.1rem' : '1.35rem', fontWeight: 800, lineHeight: 1.4, marginBottom: wedgePerdido ? 12 : 16 }}>
                                         {respuesta}
                                     </div>
+                                    {wedgePerdido && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: `${wedgePerdido.catHex}18`, border: `2px solid ${wedgePerdido.catHex}80`, borderRadius: 10, padding: '10px 14px', marginBottom: 14 }}>
+                                            <div style={{ width: 18, height: 18, borderRadius: '50%', background: wedgePerdido.catHex, flexShrink: 0 }} />
+                                            <span style={{ color: '#f1f5f9', fontSize: '0.88rem', fontWeight: 700 }}>
+                                                ¡Has perdido el quesito de <span style={{ color: wedgePerdido.catHex }}>{wedgePerdido.catName}</span>!
+                                            </span>
+                                        </div>
+                                    )}
                                     <button
                                         onClick={cerrarModal}
                                         style={{ background: '#1e293b', border: '1px solid #475569', color: '#e2e8f0', padding: '11px 28px', borderRadius: 10, cursor: 'pointer', fontSize: '0.95rem', fontWeight: 700, width: '100%' }}
@@ -2191,6 +2238,11 @@ export default function TrivialGame({ onExit, onBuscar }) {
                                     <p style={{ color: '#94a3b8', margin: '10px 0 20px' }}>Guardando partida…</p>
                                 )}
 
+                                {onExit && (
+                                    <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid #ef444440', borderRadius: 10, padding: '10px 14px', marginBottom: 10, color: '#fca5a5', fontSize: '0.82rem', lineHeight: 1.5 }}>
+                                        ⚠️ Si sales sin guardar, <strong>perderás el progreso</strong> de esta partida.
+                                    </div>
+                                )}
                                 <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
                                     <button onClick={() => { setPausaActiva(false); setEstadoGuardar(null); setErrorGuardar(''); setCodigoProfesorGuardar(''); }} style={{ flex: 1, background: 'rgba(56,189,248,0.1)', border: '1px solid #38bdf8', color: '#38bdf8', padding: '12px', borderRadius: 12, cursor: 'pointer', fontWeight: 'bold' }}>▶ Continuar</button>
                                     {onExit && <button onClick={onExit} style={{ flex: 1, background: 'rgba(239,68,68,0.1)', border: '1px solid #ef4444', color: '#ef4444', padding: '12px', borderRadius: 12, cursor: 'pointer', fontWeight: 'bold' }}>🚪 Salir</button>}

@@ -3,6 +3,7 @@
 // Uso: <VideoQuizzApp onBack={fn} recursoDirecto={null} />
 
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import VtePlayScreen from './VtePlayScreen';
 import { db } from './firebase';
 import { collection, query as fsQuery, where, getDocs, addDoc, getDoc, doc } from 'firebase/firestore';
 import { BIBLIOTECA_VQ } from './BibliotecaVideoQuizz';
@@ -779,9 +780,14 @@ function BrowseScreen({ onSelect, onBack }) {
         {loading&&<div style={{gridColumn:'1/-1',textAlign:'center',padding:60,color:'rgba(255,255,255,0.3)'}}>Cargando...</div>}
         {!loading&&filtered.length===0&&<div style={{gridColumn:'1/-1',textAlign:'center',padding:60,color:'rgba(255,255,255,0.3)'}}>No hay vídeos disponibles todavía.</div>}
         {filtered.map(r=>{
-          const vid   = extractVideoId(r.youtubeUrl);
-          const thumb = vid ? `https://img.youtube.com/vi/${vid}/mqdefault.jpg` : null;
-          const clr   = r.color || '#DC2626';
+          const isVTE  = r.format === 'VTE';
+          const vid    = extractVideoId(r.youtubeUrl);
+          const thumb  = vid ? `https://img.youtube.com/vi/${vid}/mqdefault.jpg` : null;
+          const clr    = isVTE ? '#7C3AED' : (r.color || '#DC2626');
+          const qCount = isVTE
+            ? (r.vteData?.questions||[]).filter(q => (q.preguntas||[]).length > 0).length
+            : (r.ejercicios||[]).length;
+          const srcCount = isVTE ? (r.vteData?.sources||[]).length : 0;
           return (
             <div key={r.id} onClick={()=>onSelect(r)}
               style={{background:'#1E293B',borderRadius:14,border:'1px solid #334155',overflow:'hidden',cursor:'pointer',transition:'transform 0.15s,box-shadow 0.15s',borderTop:`3px solid ${clr}`}}
@@ -796,14 +802,19 @@ function BrowseScreen({ onSelect, onBack }) {
                 <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,0.25)',display:'flex',alignItems:'center',justifyContent:'center'}}>
                   <div style={{width:44,height:44,borderRadius:'50%',background:'rgba(255,255,255,0.9)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,color:clr}}>▶</div>
                 </div>
+                {isVTE && (
+                  <div style={{position:'absolute',top:8,left:8,background:'rgba(124,58,237,0.9)',color:'white',fontSize:10,fontWeight:700,padding:'2px 7px',borderRadius:6}}>
+                    {srcCount > 1 ? `${srcCount} vídeos` : 'Multi-pista'}
+                  </div>
+                )}
                 <div style={{position:'absolute',bottom:8,right:8,background:'rgba(0,0,0,0.8)',color:'white',fontSize:11,fontWeight:700,padding:'2px 8px',borderRadius:6}}>
-                  {(r.ejercicios||[]).length} preguntas
+                  {isVTE ? `${qCount} test${qCount!==1?'s':''}` : `${qCount} preguntas`}
                 </div>
               </div>
               {/* Info */}
               <div style={{padding:'14px'}}>
                 <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
-                  <span style={{fontSize:11,fontWeight:700,color:clr,padding:'2px 8px',borderRadius:10,background:`${clr}20`}}>{r.nivel}</span>
+                  <span style={{fontSize:11,fontWeight:700,color:clr,padding:'2px 8px',borderRadius:10,background:`${clr}20`}}>{isVTE ? 'VideoQuiz' : r.nivel}</span>
                   <span style={{fontSize:11,color:'rgba(255,255,255,0.35)'}}>{r.asignatura}</span>
                 </div>
                 <h3 style={{margin:'0 0 4px',fontSize:15,fontWeight:700,color:'white',lineHeight:1.3}}>{r.titulo}</h3>
@@ -823,7 +834,9 @@ export default function VideoQuizzApp({ onBack = () => {}, recursoDirecto = null
   const [recurso, setRecurso] = useState(recursoDirecto);
 
   if (screen === 'play' && recurso) {
-    return <PlayScreen recurso={recurso} onBack={() => { if (recursoDirecto) onBack(); else setScreen('browse'); }}/>;
+    const backFn = () => { if (recursoDirecto) onBack(); else setScreen('browse'); };
+    if (recurso.format === 'VTE') return <VtePlayScreen recurso={recurso} onBack={backFn} />;
+    return <PlayScreen recurso={recurso} onBack={backFn}/>;
   }
   return <BrowseScreen onSelect={r => { setRecurso(r); setScreen('play'); }} onBack={onBack}/>;
 }

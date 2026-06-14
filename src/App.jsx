@@ -21,6 +21,7 @@ import PartesPlantaGame from './PartesPlanta';
 import EtiquetaMe from './EtiquetaMe';
 import KartingTrack from './KartingTrack';
 import ArkadeHub from './MiniArcade/ArkadeHub';
+import VideoQuizzApp from './VideoQuizzApp';
 
 const TUTORIAL_ALUMNO = [
     {
@@ -40,6 +41,7 @@ function App() {
     const [googleToken, setGoogleToken] = useState(null);
     const [deepLinkGame, setDeepLinkGame] = useState(null);
     const [rutaPublica, setRutaPublica] = useState(null);
+    const [vqRecurso, setVqRecurso] = useState(null); // ?vq=ID deep link for VTE VideoQuizz
 
     // ESTADOS PARA UBICACIÓN
     const [pais, setPais] = useState("");
@@ -84,6 +86,13 @@ function App() {
       if (trivialEnvio) { setTrivialEnvioCode(trivialEnvio.toUpperCase()); return; }
       const qsc = params.get('c');
       if (qsc) { setQuestionSenderCode(qsc.toUpperCase()); return; }
+      const vqId = params.get('vq');
+      if (vqId) {
+        getDoc(doc(db, 'resources', vqId)).then(snap => {
+          if (snap.exists()) setVqRecurso({ id: snap.id, ...snap.data() });
+        }).catch(() => {});
+        return;
+      }
       const uid = params.get('p');
       if (uid) { setPaginaTarget({ uid }); return; }
       const slug = window.location.pathname.replace(/^\//, '').replace(/\/$/, '').trim().toLowerCase();
@@ -261,6 +270,8 @@ function App() {
 
     // PÁGINA PÚBLICA DEL PROFESOR (no requiere login)
     if (paginaTarget) return <><PaginaProfesor uid={paginaTarget.uid} onBack={() => { setPaginaTarget(null); window.history.back(); }} />{anotadorUI}</>;
+
+    if (vqRecurso) return <VideoQuizzApp recursoDirecto={vqRecurso} onBack={() => { setVqRecurso(null); window.history.pushState({}, '', '/'); }} />;
 
     if (cargando && !deepLinkGame) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Cargando...</div>;
 

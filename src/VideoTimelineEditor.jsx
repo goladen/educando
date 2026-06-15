@@ -100,10 +100,11 @@ async function ytDuration(id, fallbackKey = '') {
 
 // ─── Multi-player YouTube hook ────────────────────────────────────────────────
 function useMultiYTPlayer({ onTime }) {
-  const playersRef  = useRef({});   // { id_yt: YT.Player }
-  const readyRef    = useRef({});   // { id_yt: true }
-  const timerRef    = useRef(null);
-  const primaryRef  = useRef(null); // id_yt of player driving onTime
+  const playersRef   = useRef({});   // { id_yt: YT.Player }
+  const readyRef     = useRef({});   // { id_yt: true }
+  const timerRef     = useRef(null);
+  const primaryRef   = useRef(null); // id_yt of player driving onTime
+  const clipStartRef = useRef(0);    // clip.start - clip.videoOffset for primary player → converts yt-time → timeline-time
   const [playing, setPlaying] = useState(false);
 
   const loadAPI = () => new Promise(res => {
@@ -132,7 +133,7 @@ function useMultiYTPlayer({ onTime }) {
           const isP = e.data === window.YT?.PlayerState?.PLAYING;
           setPlaying(isP); clearInterval(timerRef.current);
           if (isP) timerRef.current = setInterval(() => {
-            try { onTime(playersRef.current[id_yt].getCurrentTime()); } catch {}
+            try { onTime(playersRef.current[id_yt].getCurrentTime() + clipStartRef.current); } catch {}
           }, 150);
         },
       },
@@ -147,20 +148,23 @@ function useMultiYTPlayer({ onTime }) {
   }, []);
 
   const eachReady = fn => Object.entries(readyRef.current).forEach(([id, ok]) => { if (ok) fn(playersRef.current[id]); });
-  const seekAll  = useCallback(t  => eachReady(p => p.seekTo(t, true)), []);
-  const playAll  = useCallback(() => eachReady(p => p.playVideo()), []);
-  const pauseAll = useCallback(() => eachReady(p => p.pauseVideo()), []);
-  const toggle   = useCallback(() => playing ? pauseAll() : playAll(), [playing, pauseAll, playAll]);
+  const seekAll  = useCallback(t       => eachReady(p => p.seekTo(t, true)), []);
+  const seekOne  = useCallback((id, t) => { try { if (readyRef.current[id]) playersRef.current[id]?.seekTo(t, true); } catch {} }, []);
+  const playAll  = useCallback(()      => eachReady(p => p.playVideo()), []);
+  const playOne  = useCallback(id      => { try { if (readyRef.current[id]) playersRef.current[id]?.playVideo(); } catch {} }, []);
+  const pauseAll = useCallback(()      => eachReady(p => p.pauseVideo()), []);
+  const pauseOne = useCallback(id      => { try { if (readyRef.current[id]) playersRef.current[id]?.pauseVideo(); } catch {} }, []);
+  const toggle   = useCallback(()      => playing ? pauseAll() : playAll(), [playing, pauseAll, playAll]);
 
-  const setRate = useCallback((id_yt, rate) => {
+  const setRate  = useCallback((id_yt, rate) => {
     try { if (readyRef.current[id_yt]) playersRef.current[id_yt]?.setPlaybackRate(rate); } catch {}
   }, []);
-  const setVol = useCallback((id_yt, vol) => {
+  const setVol   = useCallback((id_yt, vol) => {
     try { if (readyRef.current[id_yt]) playersRef.current[id_yt]?.setVolume(vol); } catch {}
   }, []);
 
   useEffect(() => () => clearInterval(timerRef.current), []);
-  return { initPlayer, removePlayer, seekAll, playAll, pauseAll, toggle, playing, setRate, setVol };
+  return { initPlayer, removePlayer, seekAll, seekOne, playAll, playOne, pauseAll, pauseOne, toggle, playing, setRate, setVol, primaryRef, clipStartRef };
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -217,7 +221,7 @@ function R(st, a) {
     case 'ADD_CLIP': {
       const id = `c${st._nc}`; const src = st.sources.find(s => s.id === a.src); if (!src) return st;
       const dur = Math.min(src.dur, st.duration - a.start); if (dur < 1) return st;
-      return { ...st, tracks: st.tracks.map(t => t.id === a.track ? { ...t, clips: [...t.clips, { id, src: a.src, start: a.start, dur, speed: 1 }] } : t), selId: id, _nc: st._nc + 1 };
+      return { ...st, tracks: st.tracks.map(t => t.id === a.track ? { ...t, clips: [...t.clips, { id, src: a.src, start: a.start, dur, speed: 1, videoOffset: 0 }] } : t), selId: id, _nc: st._nc + 1 };
     }
     case 'UPD_CLIP':  return { ...st, tracks: st.tracks.map(t => ({ ...t, clips: t.clips.map(c => c.id === a.id ? { ...c, ...a.u } : c) })) };
     case 'UPD_TRACK': return { ...st, tracks: st.tracks.map(t => t.id === a.id ? { ...t, ...a.u } : t) };
@@ -228,7 +232,7 @@ function R(st, a) {
         const c = t.clips.find(x => (a.id ? x.id === a.id : true) && ph > x.start + .5 && ph < x.start + x.dur - .5);
         if (!c) return t;
         const ld = ph - c.start; const rid = `c${nc++}`;
-        return { ...t, clips: t.clips.map(x => x.id === c.id ? { ...x, dur: ld } : x).concat({ ...c, id: rid, start: ph, dur: c.dur - ld }) };
+        return { ...t, clips: t.clips.map(x => x.id === c.id ? { ...x, dur: ld } : x).concat({ ...c, id: rid, start: ph, dur: c.dur - ld, videoOffset: (c.videoOffset || 0) + ld }) };
       });
       return { ...st, tracks, _nc: nc };
     }
@@ -758,6 +762,22 @@ export default function VideoTimelineEditor({ onBack }) {
     prevSrcIds.current = current;
   }, [state.sources]);
 
+  // Seek all active YouTube players to the correct position for timeline time T
+  function seekYoutubeTo(T) {
+    for (const track of state.tracks) {
+      const clip = track.clips.find(c => T >= c.start && T < c.start + c.dur);
+      if (!clip) continue;
+      const src = state.sources.find(s => s.id === clip.src);
+      if (!src) continue;
+      const ytTime = (clip.videoOffset || 0) + (T - clip.start);
+      ytPlayer.seekOne(src.id_yt, ytTime);
+      // Keep clipStartRef in sync so the timer converts yt-time → timeline-time correctly
+      if (src.id_yt === ytPlayer.primaryRef.current) {
+        ytPlayer.clipStartRef.current = clip.start - (clip.videoOffset || 0);
+      }
+    }
+  }
+
   // playhead drag on ruler
   function rulerDown(e) { e.currentTarget.setPointerCapture(e.pointerId); phDrag.current = true; seekTo(e); }
   function rulerMove(e) { if (phDrag.current) seekTo(e); }
@@ -766,7 +786,7 @@ export default function VideoTimelineEditor({ onBack }) {
     if (!tlRef.current) return;
     const { left, width } = tlRef.current.getBoundingClientRect();
     const t = p2s(e.clientX - left, width, state.duration);
-    dispatch({ type: 'SEEK', t }); ytPlayer.seekAll(t);
+    dispatch({ type: 'SEEK', t }); seekYoutubeTo(t);
   }
 
   function onTrackClick(e, trackId) {
@@ -902,6 +922,8 @@ export default function VideoTimelineEditor({ onBack }) {
 
   const activeCount = activeBlocks.length;
 
+  const prevActiveRef = useRef(new Set());
+
   // Pause + show question when playhead crosses a question marker
   const prevPhRef = useRef(0);
   useEffect(() => {
@@ -912,18 +934,43 @@ export default function VideoTimelineEditor({ onBack }) {
     prevPhRef.current = state.playhead;
   }, [state.playhead]);
 
-  // Apply speed + volume whenever active clips or their properties change
+  // Pause inactive players; seek + play newly active ones; sync speed/vol
   const appliedRef = useRef({});
   useEffect(() => {
+    const currentActive = new Set(activeBlocks.map(b => b.src.id_yt));
+
+    // Pause players that just left the active set
+    prevActiveRef.current.forEach(id_yt => {
+      if (!currentActive.has(id_yt)) ytPlayer.pauseOne(id_yt);
+    });
+
     for (const { src, track } of activeBlocks) {
       const clip = track.clips.find(c => state.playhead >= c.start && state.playhead < c.start + c.dur);
-      const speed = clip?.speed || 1;
+      if (!clip) continue;
+
+      const isNew = !prevActiveRef.current.has(src.id_yt);
+      const ytTime = (clip.videoOffset || 0) + (state.playhead - clip.start);
+
+      if (isNew) {
+        // Seek to correct position within the YouTube video
+        ytPlayer.seekOne(src.id_yt, ytTime);
+        if (ytPlayer.playing) ytPlayer.playOne(src.id_yt);
+      }
+
+      // Keep clipStartRef updated for the primary player's timer
+      if (src.id_yt === ytPlayer.primaryRef.current) {
+        ytPlayer.clipStartRef.current = clip.start - (clip.videoOffset || 0);
+      }
+
+      const speed = clip.speed || 1;
       const vol   = track.volume ?? 100;
       const prev  = appliedRef.current[src.id_yt] || {};
       if (prev.speed !== speed) ytPlayer.setRate(src.id_yt, speed);
       if (prev.vol   !== vol)   ytPlayer.setVol(src.id_yt, vol);
       appliedRef.current[src.id_yt] = { speed, vol };
     }
+
+    prevActiveRef.current = currentActive;
   }, [activeBlocks]);
 
   const activeOverlays = useMemo(() =>
@@ -986,8 +1033,8 @@ export default function VideoTimelineEditor({ onBack }) {
                   const nq     = (p.vteData?.questions || []).filter(q => q.preguntas?.length > 0).length;
                   const isOpen = !!openingId && p.id === openingId;
                   return (
-                    <button key={p.id} onClick={() => openProject(p.id)} disabled={!!openingId}
-                      style={{ background:'#0f0f0f', border:'1px solid #1e1e1e', borderRadius:14, overflow:'hidden', cursor:openingId ? 'default' : 'pointer', textAlign:'left', padding:0, opacity: openingId && !isOpen ? 0.45 : 1, transition:'border-color .15s', display:'flex', flexDirection:'column' }}>
+                    <div key={p.id} onClick={() => !openingId && !confirmDeleteId && openProject(p.id)}
+                      style={{ background:'#0f0f0f', border:'1px solid #1e1e1e', borderRadius:14, overflow:'hidden', cursor: openingId || confirmDeleteId ? 'default' : 'pointer', textAlign:'left', opacity: openingId && !isOpen ? 0.45 : 1, transition:'border-color .15s', display:'flex', flexDirection:'column', userSelect:'none' }}>
                       {/* Thumbnail */}
                       <div style={{ position:'relative', aspectRatio:'16/9', background:'#0a0a0a' }}>
                         {thumb
@@ -997,7 +1044,7 @@ export default function VideoTimelineEditor({ onBack }) {
                         {isOpen && (
                           <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,.6)', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:13 }}>Abriendo…</div>
                         )}
-                        <span style={{ position:'absolute', top:7, right:7, fontSize:9, fontWeight:700, padding:'3px 8px', borderRadius:20, background: p.isFinished ? 'rgba(0,0,0,.75)' : 'rgba(0,0,0,.75)', color: p.isFinished ? '#4ade80' : '#a78bfa' }}>
+                        <span style={{ position:'absolute', top:7, right:7, fontSize:9, fontWeight:700, padding:'3px 8px', borderRadius:20, background:'rgba(0,0,0,.75)', color: p.isFinished ? '#4ade80' : '#a78bfa' }}>
                           {p.isFinished ? '● Publicado' : '○ Borrador'}
                         </span>
                       </div>
@@ -1011,7 +1058,7 @@ export default function VideoTimelineEditor({ onBack }) {
                               style={{ padding:'3px 10px', background:'#dc2626', color:'#fff', border:'none', borderRadius:6, fontSize:10, fontWeight:700, cursor:'pointer', opacity: deletingId===p.id ? 0.6 : 1 }}>
                               {deletingId === p.id ? '…' : 'Sí'}
                             </button>
-                            <button onClick={() => setConfirmDeleteId(null)}
+                            <button onClick={e => { e.stopPropagation(); setConfirmDeleteId(null); }}
                               style={{ padding:'3px 10px', background:'#1e1e1e', color:'#9ca3af', border:'1px solid #2a2a2a', borderRadius:6, fontSize:10, cursor:'pointer' }}>
                               No
                             </button>
@@ -1030,7 +1077,7 @@ export default function VideoTimelineEditor({ onBack }) {
                           </div>
                         )}
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -1268,9 +1315,9 @@ export default function VideoTimelineEditor({ onBack }) {
           </div>
 
           <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-            <button className="vte-btn" onClick={() => { const t = Math.max(0, state.playhead-10); dispatch({type:'SEEK',t}); ytPlayer.seekAll(t); }} style={{ color:'#9ca3af', fontSize:18, width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', borderRadius:'50%', background:'transparent', border:'none', cursor:'pointer' }}>⏮</button>
+            <button className="vte-btn" onClick={() => { const t = Math.max(0, state.playhead-10); dispatch({type:'SEEK',t}); seekYoutubeTo(t); }} style={{ color:'#9ca3af', fontSize:18, width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', borderRadius:'50%', background:'transparent', border:'none', cursor:'pointer' }}>⏮</button>
             <button onClick={ytPlayer.toggle} style={{ width:44, height:44, borderRadius:'50%', background:'#fff', color:'#000', fontSize:18, display:'flex', alignItems:'center', justifyContent:'center', border:'none', cursor:'pointer', boxShadow:'0 4px 16px rgba(255,255,255,.15)' }}>{ytPlayer.playing ? '⏸' : '▶'}</button>
-            <button className="vte-btn" onClick={() => { const t = Math.min(state.duration, state.playhead+10); dispatch({type:'SEEK',t}); ytPlayer.seekAll(t); }} style={{ color:'#9ca3af', fontSize:18, width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', borderRadius:'50%', background:'transparent', border:'none', cursor:'pointer' }}>⏭</button>
+            <button className="vte-btn" onClick={() => { const t = Math.min(state.duration, state.playhead+10); dispatch({type:'SEEK',t}); seekYoutubeTo(t); }} style={{ color:'#9ca3af', fontSize:18, width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', borderRadius:'50%', background:'transparent', border:'none', cursor:'pointer' }}>⏭</button>
             <span style={{ color:'#6b7280', fontSize:11, fontFamily:'monospace', marginLeft:8 }}>{fmt(state.playhead)} / {fmt(state.duration)}</span>
           </div>
         </div>
@@ -1411,7 +1458,7 @@ export default function VideoTimelineEditor({ onBack }) {
 
                   {/* preview button */}
                   {(selQ.preguntas||[]).length > 0 && (
-                    <button onClick={()=>{ ytPlayer.pauseAll(); dispatch({type:'SEEK',t:selQ.start}); ytPlayer.seekAll(selQ.start); setActiveQId(selQ.id); }}
+                    <button onClick={()=>{ ytPlayer.pauseAll(); dispatch({type:'SEEK',t:selQ.start}); seekYoutubeTo(selQ.start); setActiveQId(selQ.id); }}
                       style={{padding:'6px 0',background:'rgba(167,139,250,.15)',color:'#a78bfa',border:'1px solid rgba(167,139,250,.3)',borderRadius:8,fontSize:9,fontWeight:600,cursor:'pointer'}}>
                       ▶ Previsualizar test
                     </button>
@@ -1680,19 +1727,6 @@ export default function VideoTimelineEditor({ onBack }) {
                   })}
                 </div>
 
-                {/* Question markers track */}
-                <div style={{ position:'relative', height:TEXT_H, background:'#0a0010', borderBottom:'1px solid #1e1e1e', cursor:'crosshair', overflow:'visible' }}
-                  onClick={e => { if (e.target.closest?.('[data-question]') || !tlRef.current) return; const {left,width}=tlRef.current.getBoundingClientRect(); dispatch({type:'ADD_Q',start:Math.round(p2s(e.clientX-left,width,state.duration))}); }}>
-                  {(state.questions||[]).map(qcp => (
-                    <div key={qcp.id} data-question style={{ position:'absolute', top:'50%', left:`${s2p(qcp.start,state.duration)}%`, transform:'translate(-50%,-50%)', cursor:'pointer', zIndex:10 }}
-                      onClick={e => { e.stopPropagation(); dispatch({type:'SEL',id:qcp.id}); }}>
-                      <div style={{ width:12,height:12,background:'#a78bfa',borderRadius:2,transform:'rotate(45deg)',border:`2px solid ${state.selId===qcp.id?'#fff':'#6d28d9'}`,transition:'border .12s' }} />
-                      <div style={{ position:'absolute',top:'100%',left:'50%',transform:'translateX(-50%)',marginTop:4,color:'#a78bfa',fontSize:7,whiteSpace:'nowrap',fontWeight:600 }}>{qcp.label}</div>
-                    </div>
-                  ))}
-                  {(state.questions||[]).length===0 && <span style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:8,color:'rgba(167,139,250,.25)',pointerEvents:'none'}}>Clic para añadir test interactivo</span>}
-                </div>
-
                 {/* Text overlay track */}
                 <div style={{ position:'relative', height:TEXT_H, background:'#0f0e00', borderBottom:'1px solid #1e1e1e', cursor:'crosshair', overflow:'visible' }}
                   onClick={onOvlTrackClick}>
@@ -1705,6 +1739,19 @@ export default function VideoTimelineEditor({ onBack }) {
                     </div>
                   ))}
                   {state.overlays.length === 0 && <span style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', fontSize:8, color:'rgba(113,63,18,.3)', pointerEvents:'none' }}>Clic para añadir título superpuesto</span>}
+                </div>
+
+                {/* Question markers track */}
+                <div style={{ position:'relative', height:TEXT_H, background:'#0a0010', borderBottom:'1px solid #1e1e1e', cursor:'crosshair', overflow:'visible' }}
+                  onClick={e => { if (e.target.closest?.('[data-question]') || !tlRef.current) return; const {left,width}=tlRef.current.getBoundingClientRect(); dispatch({type:'ADD_Q',start:Math.round(p2s(e.clientX-left,width,state.duration))}); }}>
+                  {(state.questions||[]).map(qcp => (
+                    <div key={qcp.id} data-question style={{ position:'absolute', top:'50%', left:`${s2p(qcp.start,state.duration)}%`, transform:'translate(-50%,-50%)', cursor:'pointer', zIndex:10 }}
+                      onClick={e => { e.stopPropagation(); dispatch({type:'SEL',id:qcp.id}); }}>
+                      <div style={{ width:12,height:12,background:'#a78bfa',borderRadius:2,transform:'rotate(45deg)',border:`2px solid ${state.selId===qcp.id?'#fff':'#6d28d9'}`,transition:'border .12s' }} />
+                      <div style={{ position:'absolute',top:'100%',left:'50%',transform:'translateX(-50%)',marginTop:4,color:'#a78bfa',fontSize:7,whiteSpace:'nowrap',fontWeight:600 }}>{qcp.label}</div>
+                    </div>
+                  ))}
+                  {(state.questions||[]).length===0 && <span style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:8,color:'rgba(167,139,250,.25)',pointerEvents:'none'}}>Clic para añadir test interactivo</span>}
                 </div>
 
                 {/* Video tracks */}
@@ -1724,7 +1771,7 @@ export default function VideoTimelineEditor({ onBack }) {
                             onUpd={(id, u) => dispatch({ type:'UPD_CLIP', id, u })}
                             onDel={id => dispatch({ type:'DEL_CLIP', id })}
                             onSel={id => dispatch({ type:'SEL', id })}
-                            onSeek={t => ytPlayer.seekAll(t)} />
+                            onSeek={t => { dispatch({type:'SEEK',t}); seekYoutubeTo(t); }} />
                         </div>
                       ))}
                       {track.clips.length === 0 && state.hlSrc && <span style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', fontSize:8, color:'rgba(96,165,250,.3)', pointerEvents:'none' }}>Clic para colocar aquí</span>}

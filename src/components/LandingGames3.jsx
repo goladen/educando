@@ -52,6 +52,7 @@ import SimuladorPendulo from '../Simuladores física/SimuladorPendulo';
 import SimuladorLeyDeOhm from '../Simuladores física/SimuladorLeyDeOhm';
 import EnlaceMoleculas from '../Simuladores física/EnlaceMoleculas';
 import AjustesReacciones from '../Simuladores física/AjustesReacciones';
+import CaidaEscalada from '../Simuladores física/CaidaEscalada';
 import RetosApp from '../Retos';
 import SimuladorDados from '../Probabilidad';
 import TrivialGame from '../Trivial';
@@ -1261,7 +1262,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
             // Física: rutas /fisica y /fisica/<slug>
             if (path === 'fisica') { setSimuladoresFisica(true); return; }
             if (path.startsWith('fisica/')) {
-                const SLUG_MAP = { colisiones:'COLISIONES', planoinclinado:'PLANO_INCLINADO', tiroparabolico:'TIRO_PARABOLICO', caidalibre:'CAIDA_LIBRE', pendulo:'PENDULO', leydeohm:'LEY_OHM', enlacemoleculas:'ENLACE_MOLECULAS', ajustesreaccion:'AJUSTES_REACCION' };
+                const SLUG_MAP = { colisiones:'COLISIONES', planoinclinado:'PLANO_INCLINADO', tiroparabolico:'TIRO_PARABOLICO', caidalibre:'CAIDA_LIBRE', pendulo:'PENDULO', leydeohm:'LEY_OHM', enlacemoleculas:'ENLACE_MOLECULAS', ajustesreaccion:'AJUSTES_REACCION', caidaescalada:'CAIDA_ESCALADA' };
                 const key = SLUG_MAP[path.slice(7)];
                 setSimuladoresFisica(true);
                 if (key) setSimuladorFisicaActivo(key);
@@ -1844,6 +1845,7 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
             { key: 'LEY_OHM',           slug: 'leydeohm',          label: 'Ley de Ohm',         emoji: '⚡', color: '#1abc9c', desc: 'Circuitos y ley de Ohm',               comp: SimuladorLeyDeOhm },
             { key: 'ENLACE_MOLECULAS',  slug: 'enlacemoleculas',   label: 'Enlace de Moléculas',emoji: '⚛️', color: '#8b5cf6', desc: 'Pizarra de enlace químico',             comp: EnlaceMoleculas },
             { key: 'AJUSTES_REACCION',  slug: 'ajustesreaccion',   label: 'Ajuste de Reacción', emoji: '🧪', color: '#e67e22', desc: 'Ajusta coeficientes estequiométricos',  comp: AjustesReacciones },
+            { key: 'CAIDA_ESCALADA',    slug: 'caidaescalada',     label: 'Caída en Escalada',  emoji: '🧗', color: '#0ea5e9', desc: 'Simulación de caída en escalada deportiva', comp: CaidaEscalada },
         ];
 
         const volverAlMenu = () => { setSimuladorFisicaActivo(null); window.history.pushState({}, '', '/fisica'); };

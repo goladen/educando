@@ -14,6 +14,7 @@ const DEFAULT_CONFIG = {
     numEjercicios: null, // null = modo tiempo libre; número = modo ejercicios fijos
     tipos: { positivos: true, negativos: false, decimales: false, fracciones: false },
     operaciones: { suma: true, resta: true, multiplicacion: false, division: false },
+    dual: false,
 };
 
 // Configuraciones de los modos predefinidos
@@ -209,6 +210,7 @@ const ConfigModal = ({ config, onChange, onStart, onClose }) => {
         const finalCfg = {
             ...local,
             numEjercicios: modoConteo === 'ejercicios' ? (local.numEjercicios || 10) : null,
+            dual: local.dual ?? false,
         };
         onChange(finalCfg);
         onStart(finalCfg);
@@ -278,6 +280,13 @@ const ConfigModal = ({ config, onChange, onStart, onClose }) => {
                     </Section>
                 )}
 
+                {/* Modo Dual */}
+                <Section label="⚡ Modo especial">
+                    <Chip active={local.dual} onClick={() => setLocal(prev => ({ ...prev, dual: !prev.dual }))} color="#8e44ad">
+                        🪟 Dual (2 tableros)
+                    </Chip>
+                </Section>
+
                 <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 20 }}>
                     <button onClick={onClose} style={{ padding: '12px 24px', background: '#f0f0f0', color: '#555', border: 'none', borderRadius: 30, fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer' }}>Cancelar</button>
                     <button onClick={handleStart} style={{ padding: '12px 28px', background: '#9b59b6', color: 'white', border: 'none', borderRadius: 30, fontSize: '1.05rem', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 12px #9b59b655' }}>
@@ -306,10 +315,28 @@ function ModalEnviarProfe({ datos, onClose }) {
         try {
             const codigoDoc = await getDoc(doc(db, 'codigos_profesor', code));
             if (!codigoDoc.exists()) { setError('Código no encontrado.'); setEnviando(false); return; }
+            const intentos = datos.aciertos + datos.fallos;
             await addDoc(collection(db, 'informes_juegos'), {
                 tipo: 'CALCULO', modalidad: 'Individual', fecha: new Date(),
                 codigoProfesor: code,
-                jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), aciertos: datos.aciertos, puntos: datos.puntos }],
+                jugadores: [{
+                    nombre: nombre.trim(),
+                    curso: curso.trim(),
+                    aciertos: datos.aciertos,
+                    fallos: datos.fallos,
+                    intentos,
+                    puntos: datos.puntos,
+                    skips: datos.skips,
+                    porcentaje: Math.round((datos.aciertos / Math.max(1, intentos)) * 100),
+                    config: {
+                        operaciones: datos.config.operaciones,
+                        tipos: datos.config.tipos,
+                        minNum: datos.config.minNum,
+                        maxNum: datos.config.maxNum,
+                        tiempo: datos.config.tiempo,
+                        numEjercicios: datos.config.numEjercicios,
+                    },
+                }],
             });
             setEnviado(true);
         } catch(e) { setError('Error: ' + e.message); }
@@ -327,7 +354,7 @@ function ModalEnviarProfe({ datos, onClose }) {
                     <div style={{ textAlign: 'center', padding: '20px 0' }}>
                         <div style={{ fontSize: '3rem', marginBottom: 10 }}>✅</div>
                         <div style={{ color: '#2ecc71', fontWeight: 700, fontSize: '1.1rem' }}>¡Informe enviado!</div>
-                        <div style={{ marginTop: 8, color: '#aaa', fontSize: '0.9rem' }}>{datos.aciertos} aciertos · {datos.puntos} pts</div>
+                        <div style={{ marginTop: 8, color: '#aaa', fontSize: '0.9rem' }}>✅ {datos.aciertos} aciertos · ❌ {datos.fallos} fallos · {datos.puntos} pts</div>
                         <button onClick={onClose} style={{ marginTop: 16, padding: '9px 22px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer', color: 'white', fontFamily: 'inherit' }}>Cerrar</button>
                     </div>
                 ) : (
@@ -365,12 +392,30 @@ export default function CalculoMentalGame({ usuario, onExit }) {
     const [showConfig, setShowConfig] = useState(false);
     const [timeLeft, setTimeLeft] = useState(DEFAULT_CONFIG.tiempo);
     const [score, setScore] = useState(0);
+    const [score1, setScore1] = useState(0);
+    const [score2, setScore2] = useState(0);
     const [aciertos, setAciertos] = useState(0);
+    const [fallos, setFallos] = useState(0);
     const [skips, setSkips] = useState(0);
+    // por jugador en dual
+    const [aciertos1, setAciertos1] = useState(0);
+    const [fallos1,   setFallos1]   = useState(0);
+    const [aciertos2, setAciertos2] = useState(0);
+    const [fallos2,   setFallos2]   = useState(0);
     const [ejercicioActual, setEjercicioActual] = useState(0); // para modo ejercicios fijos
 
     const [currentProblem, setCurrentProblem] = useState(null);
     const [currentAnswer, setCurrentAnswer] = useState(0);
+    const [currentProblem2, setCurrentProblem2] = useState(null);
+    const [currentAnswer2, setCurrentAnswer2] = useState(0);
+    // status por tablero (dual): null | 'ok' | 'skip' | 'err'
+    const [status1, setStatus1] = useState(null);
+    const [status2, setStatus2] = useState(null);
+    // contadores independientes para modo ejercicios en dual
+    const [ejercicio1, setEjercicio1] = useState(1);
+    const [ejercicio2, setEjercicio2] = useState(1);
+    const [finished1, setFinished1] = useState(false);
+    const [finished2, setFinished2] = useState(false);
     const [feedback, setFeedback] = useState(null); // 'CORRECT' | 'INCORRECT' | 'SKIP'
     const [showSolution, setShowSolution] = useState(false);
 
@@ -392,17 +437,66 @@ export default function CalculoMentalGame({ usuario, onExit }) {
         return () => clearInterval(timerRef.current);
     }, [gameState, timeLeft, modoEjercicios]);
 
+    // Tablero 1 avanza de forma independiente
+    useEffect(() => {
+        if (!config.dual || gameState !== 'PLAYING' || finished1) return;
+        if (status1 !== 'ok' && status1 !== 'skip') return;
+        const t = setTimeout(() => {
+            setStatus1(null); setCurrentAnswer(0);
+            if (config.numEjercicios) {
+                if (ejercicio1 >= config.numEjercicios) { setFinished1(true); }
+                else { setEjercicio1(e => e + 1); setCurrentProblem(generarProblema(config)); }
+            } else {
+                setCurrentProblem(generarProblema(config));
+            }
+        }, 800);
+        return () => clearTimeout(t);
+    }, [status1]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Tablero 2 avanza de forma independiente
+    useEffect(() => {
+        if (!config.dual || gameState !== 'PLAYING' || finished2) return;
+        if (status2 !== 'ok' && status2 !== 'skip') return;
+        const t = setTimeout(() => {
+            setStatus2(null); setCurrentAnswer2(0);
+            if (config.numEjercicios) {
+                if (ejercicio2 >= config.numEjercicios) { setFinished2(true); }
+                else { setEjercicio2(e => e + 1); setCurrentProblem2(generarProblema(config)); }
+            } else {
+                setCurrentProblem2(generarProblema(config));
+            }
+        }, 800);
+        return () => clearTimeout(t);
+    }, [status2]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // En modo ejercicios dual: acaba cuando los dos terminan
+    useEffect(() => {
+        if (!config.dual || !config.numEjercicios || gameState !== 'PLAYING') return;
+        if (finished1 && finished2) setGameState('END');
+    }, [finished1, finished2]); // eslint-disable-line react-hooks/exhaustive-deps
+
     const startGame = (cfg = config) => {
         setConfig(cfg);
         setScore(0);
-        setAciertos(0);
-        setSkips(0);
+        setScore1(0); setScore2(0);
+        setAciertos(0); setFallos(0); setSkips(0);
+        setAciertos1(0); setFallos1(0);
+        setAciertos2(0); setFallos2(0);
         setEjercicioActual(1);
         setTimeLeft(cfg.tiempo);
         setCurrentProblem(generarProblema(cfg));
         setCurrentAnswer(0);
         setShowSolution(false);
         setFeedback(null);
+        setStatus1(null); setStatus2(null);
+        setEjercicio1(1); setEjercicio2(1);
+        setFinished1(false); setFinished2(false);
+        if (cfg.dual) {
+            setCurrentProblem2(generarProblema(cfg));
+            setCurrentAnswer2(0);
+        } else {
+            setCurrentProblem2(null);
+        }
         setGameState('PLAYING');
     };
 
@@ -424,31 +518,57 @@ export default function CalculoMentalGame({ usuario, onExit }) {
         }
     };
 
+    // ── Handlers por tablero (dual) ───────────────────────────────────────────
+    const check1 = () => {
+        if (status1 !== null || !currentProblem) return;
+        if (Math.abs(currentAnswer - currentProblem.answer) < 0.001) {
+            setScore1(s => s + 10); setAciertos(a => a + 1); setAciertos1(a => a + 1); setStatus1('ok');
+        } else {
+            setScore1(s => Math.max(0, s - 3)); setFallos(f => f + 1); setFallos1(f => f + 1); setStatus1('err');
+            setTimeout(() => setStatus1(p => p === 'err' ? null : p), 500);
+        }
+    };
+    const skip1 = () => {
+        if (status1 !== null) return;
+        setScore1(s => Math.max(0, s - 2)); setSkips(sk => sk + 1);
+        setFallos(f => f + 1); setFallos1(f => f + 1); setStatus1('skip');
+    };
+    const check2 = () => {
+        if (status2 !== null || !currentProblem2) return;
+        if (Math.abs(currentAnswer2 - currentProblem2.answer) < 0.001) {
+            setScore2(s => s + 10); setAciertos(a => a + 1); setAciertos2(a => a + 1); setStatus2('ok');
+        } else {
+            setScore2(s => Math.max(0, s - 3)); setFallos(f => f + 1); setFallos2(f => f + 1); setStatus2('err');
+            setTimeout(() => setStatus2(p => p === 'err' ? null : p), 500);
+        }
+    };
+    const skip2 = () => {
+        if (status2 !== null) return;
+        setScore2(s => Math.max(0, s - 2)); setSkips(sk => sk + 1);
+        setFallos(f => f + 1); setFallos2(f => f + 1); setStatus2('skip');
+    };
+
+    // ── Handler modo single ───────────────────────────────────────────────────
     const checkAnswer = () => {
         if (!currentProblem || showSolution) return;
         const isCorrect = Math.abs(currentAnswer - currentProblem.answer) < 0.001;
         if (isCorrect) {
-            setScore(s => s + 10);
-            setAciertos(a => a + 1);
-            setFeedback('CORRECT');
+            setScore(s => s + 10); setAciertos(a => a + 1); setFeedback('CORRECT');
             setTimeout(() => {
                 setFeedback(null);
                 if (modoEjercicios) avanzarEjercicio(config);
                 else { setCurrentAnswer(0); setCurrentProblem(generarProblema(config)); setShowSolution(false); }
             }, 600);
         } else {
-            setScore(s => Math.max(0, s - 3));
-            setFeedback('INCORRECT');
+            setScore(s => Math.max(0, s - 3)); setFallos(f => f + 1); setFeedback('INCORRECT');
             setTimeout(() => setFeedback(null), 600);
         }
     };
 
     const handleSkip = () => {
         if (!currentProblem || showSolution) return;
-        setSkips(s => s + 1);
-        setScore(s => Math.max(0, s - 2));
-        setShowSolution(true);
-        setFeedback('SKIP');
+        setSkips(s => s + 1); setFallos(f => f + 1); setScore(s => Math.max(0, s - 2));
+        setShowSolution(true); setFeedback('SKIP');
         setTimeout(() => {
             setFeedback(null);
             if (modoEjercicios) avanzarEjercicio(config);
@@ -479,7 +599,7 @@ export default function CalculoMentalGame({ usuario, onExit }) {
         }
     };
 
-    // Botones de ajuste dinámicos según tipo de problema
+    // Botones de ajuste dinámicos según tipo de problema (modo single)
     const getBotones = () => {
         const has = currentProblem?.hasDecimals;
         return has
@@ -517,7 +637,12 @@ export default function CalculoMentalGame({ usuario, onExit }) {
                 </button>
                 {gameState === 'PLAYING' && (
                     <div style={st.scoreFlex}>
-                        {modoEjercicios ? (
+                        {config.dual && config.numEjercicios ? (
+                            <>
+                                <div style={{ ...st.scoreBoard, color: '#3498db', fontSize: '0.85rem' }}>🔵 {finished1 ? '✓' : `${ejercicio1}/${config.numEjercicios}`}</div>
+                                <div style={{ ...st.scoreBoard, color: '#e74c3c', fontSize: '0.85rem' }}>🔴 {finished2 ? '✓' : `${ejercicio2}/${config.numEjercicios}`}</div>
+                            </>
+                        ) : modoEjercicios ? (
                             <div style={{ ...st.scoreBoard, color: '#009688' }}>
                                 🔢 {ejercicioActual}/{config.numEjercicios}
                             </div>
@@ -526,12 +651,20 @@ export default function CalculoMentalGame({ usuario, onExit }) {
                                 <Clock size={16} /> {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
                             </div>
                         )}
-                        <div style={{ ...st.scoreBoard, color: '#E91E63' }}>
-                            <Trophy size={16} /> {score}
-                        </div>
-                        <div style={{ ...st.scoreBoard, color: '#27ae60', fontSize: '0.9rem' }}>
-                            ✅ {aciertos}
-                        </div>
+                        {config.dual ? (
+                            <>
+                                <div style={{ ...st.scoreBoard, color: '#3498db', fontSize: '0.85rem' }}><Trophy size={14}/> {score1}</div>
+                                <div style={{ ...st.scoreBoard, color: '#e74c3c', fontSize: '0.85rem' }}><Trophy size={14}/> {score2}</div>
+                            </>
+                        ) : (
+                            <div style={{ ...st.scoreBoard, color: '#E91E63' }}>
+                                <Trophy size={16} /> {score}
+                            </div>
+                        )}
+                        {!config.dual && <>
+                            <div style={{ ...st.scoreBoard, color: '#27ae60', fontSize: '0.9rem' }}>✅ {aciertos}</div>
+                            <div style={{ ...st.scoreBoard, color: '#e74c3c', fontSize: '0.9rem' }}>❌ {fallos}</div>
+                        </>}
                     </div>
                 )}
             </div>
@@ -620,30 +753,111 @@ export default function CalculoMentalGame({ usuario, onExit }) {
 
             {/* JUEGO */}
             {gameState === 'PLAYING' && currentProblem && (
-                <div style={{ ...st.centerCard, border: `4px solid ${borderColor}`, transition: 'border-color 0.2s, transform 0.2s', transform: feedback === 'CORRECT' ? 'scale(1.03)' : 'none' }}>
+                <div style={{ ...st.centerCard, maxWidth: config.dual ? 780 : 520, border: `4px solid ${borderColor}`, transition: 'border-color 0.2s, transform 0.2s', transform: feedback === 'CORRECT' ? 'scale(1.03)' : 'none' }}>
 
-                    {/* Operación */}
-                    <div style={{ fontSize: isMobile ? '2rem' : '3rem', fontWeight: 'bold', color: '#2c3e50', marginBottom: 16, minHeight: 60, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {currentProblem.text} = ?
-                    </div>
-
-                    {/* Respuesta / Solución */}
-                    <div style={{ background: '#f8f9fa', borderRadius: 14, padding: '12px 16px', marginBottom: 16, border: '2px solid #e0e0e0', position: 'relative' }}>
-                        <span style={{ fontSize: '0.85rem', color: '#7f8c8d', display: 'block', marginBottom: 4 }}>
-                            {showSolution ? '✅ Solución:' : 'Tu respuesta:'}
-                        </span>
-                        <div style={{ fontSize: isMobile ? '2.5rem' : '3rem', fontWeight: 'bold', color: showSolution ? '#27ae60' : '#E91E63', textAlign: 'center' }}>
-                            {showSolution ? currentProblem.displayAnswer : currentAnswer}
+                    {config.dual ? (
+                        /* ── MODO DUAL: cada tablero totalmente independiente ── */
+                        <>
+                        <div style={{ display: 'flex', gap: 10, flexDirection: isMobile ? 'column' : 'row' }}>
+                            {[
+                                { problem: currentProblem,  answer: currentAnswer,  setAns: setCurrentAnswer,  status: status1, check: check1, skip: skip1, accent: '#3498db', finished: finished1, pts: score1, pac: aciertos1, pfa: fallos1 },
+                                { problem: currentProblem2, answer: currentAnswer2, setAns: setCurrentAnswer2, status: status2, check: check2, skip: skip2, accent: '#e74c3c', finished: finished2, pts: score2, pac: aciertos2, pfa: fallos2 },
+                            ].map(({ problem, answer, setAns, status, check, skip, accent, finished, pts, pac, pfa }, idx) => {
+                                const locked = status === 'ok' || status === 'skip' || finished;
+                                const isErr  = status === 'err';
+                                const borderCol = status === 'ok' ? '#27ae60' : status === 'err' ? '#e74c3c' : status === 'skip' ? '#f39c12' : `${accent}55`;
+                                const bgCol     = status === 'ok' ? '#f0fff4' : status === 'err' ? '#fff5f5' : status === 'skip' ? '#fffbf0' : `${accent}07`;
+                                const botones = problem?.hasDecimals
+                                    ? [{ vals: [10, 1, 0.1, 0.01], color: accent }, { vals: [-10, -1, -0.1, -0.01], color: accent }]
+                                    : [{ vals: [100, 10, 1], color: accent }, { vals: [-100, -10, -1], color: accent }];
+                                const makeAdd = v => () => { if (!locked) setAns(prev => parseFloat((prev + v).toFixed(4))); };
+                                const btnBase = { flex: 1, fontWeight: 'bold', color: 'white', border: 'none', borderRadius: 10, cursor: locked ? 'default' : 'pointer', minWidth: 0, touchAction: 'manipulation', transition: 'opacity 0.15s', opacity: locked ? 0.4 : 1 };
+                                return (
+                                    <div key={idx} style={{ flex: 1, borderRadius: 16, padding: '10px 8px', border: `3px solid ${borderCol}`, background: bgCol, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 8, transition: 'all 0.2s' }}>
+                                        {/* Marcador del jugador */}
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                            <span style={{ display:'flex', alignItems:'center', gap:3, fontWeight:800, color: accent, fontSize:'0.95rem' }}><Trophy size={13} color={accent}/>{pts} pts</span>
+                                            <span style={{ display:'flex', alignItems:'center', gap:3, fontWeight:700, color:'#27ae60', fontSize:'0.88rem' }}>✅ {pac}</span>
+                                            <span style={{ display:'flex', alignItems:'center', gap:3, fontWeight:700, color:'#e74c3c', fontSize:'0.88rem' }}>❌ {pfa}</span>
+                                        </div>
+                                        {/* Operación */}
+                                        <div style={{ fontSize: isMobile ? '1.3rem' : '1.7rem', fontWeight: 'bold', color: '#2c3e50', textAlign: 'center', minHeight: 40, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            {problem?.text} = ?
+                                        </div>
+                                        {/* Respuesta */}
+                                        <div style={{ background: 'white', borderRadius: 10, padding: '6px 8px', textAlign: 'center', position: 'relative', minHeight: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <div style={{ fontSize: isMobile ? '1.8rem' : '2.2rem', fontWeight: 'bold', color: status === 'ok' ? '#27ae60' : status === 'skip' ? '#f39c12' : isErr ? '#e74c3c' : accent }}>
+                                                {status === 'skip' ? problem?.displayAnswer : answer}
+                                            </div>
+                                            {!locked && (
+                                                <button onClick={() => setAns(0)} style={{ position: 'absolute', top: 4, right: 6, background: 'transparent', border: 'none', color: '#bbb', cursor: 'pointer', padding: 2 }}>
+                                                    <Delete size={15} />
+                                                </button>
+                                            )}
+                                        </div>
+                                        {/* Estado final */}
+                                        {status === 'ok'   && !finished && <div style={{ textAlign: 'center', color: '#27ae60', fontWeight: 700, fontSize: '1rem' }}>✅ ¡Correcto!</div>}
+                                        {status === 'skip' && !finished && <div style={{ textAlign: 'center', color: '#f39c12', fontWeight: 700, fontSize: '0.85rem' }}>👁 Solución: {problem?.displayAnswer}</div>}
+                                        {finished && <div style={{ textAlign: 'center', color: '#27ae60', fontWeight: 700, fontSize: '1rem', padding: '8px 0' }}>🎯 ¡Completado!</div>}
+                                        {/* Mando numérico propio */}
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                                            {botones.map((fila, fi) => (
+                                                <div key={fi} style={{ display: 'flex', gap: 5 }}>
+                                                    {fila.vals.map(v => (
+                                                        <button key={v} onClick={makeAdd(v)} disabled={locked}
+                                                            style={{ ...btnBase, padding: isMobile ? '12px 2px' : '14px 4px', fontSize: isMobile ? '0.88rem' : '1rem', background: fila.color, boxShadow: locked ? 'none' : `0 4px 0 rgba(0,0,0,0.18)` }}
+                                                            onMouseDown={e => { if (!locked) { e.currentTarget.style.transform='translateY(4px)'; e.currentTarget.style.boxShadow='none'; } }}
+                                                            onMouseUp={e => { e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow=locked?'none':`0 4px 0 rgba(0,0,0,0.18)`; }}
+                                                            onMouseLeave={e => { e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow=locked?'none':`0 4px 0 rgba(0,0,0,0.18)`; }}
+                                                            onTouchStart={e => { if (!locked) { e.currentTarget.style.transform='translateY(4px)'; e.currentTarget.style.boxShadow='none'; } }}
+                                                            onTouchEnd={e => { e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow=locked?'none':`0 4px 0 rgba(0,0,0,0.18)`; }}
+                                                        >
+                                                            {v > 0 ? `+${v}` : `${v}`}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            ))}
+                                        </div>
+                                        {/* Comprobar / Pasar propios */}
+                                        <div style={{ display: 'flex', gap: 6 }}>
+                                            <button onClick={skip} disabled={locked}
+                                                style={{ flex: 1, padding: isMobile ? '10px 4px' : '11px 6px', fontWeight: 700, fontSize: isMobile ? '0.8rem' : '0.88rem', background: locked ? '#eee' : '#f39c12', color: locked ? '#aaa' : 'white', border: 'none', borderRadius: 10, cursor: locked ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, boxShadow: locked ? 'none' : '0 3px 0 #d68910', touchAction: 'manipulation' }}>
+                                                <SkipForward size={14} /> Pasar
+                                            </button>
+                                            <button onClick={check} disabled={locked}
+                                                style={{ flex: 2, padding: isMobile ? '10px 4px' : '11px 6px', fontWeight: 700, fontSize: isMobile ? '0.8rem' : '0.88rem', background: locked ? '#eee' : '#27ae60', color: locked ? '#aaa' : 'white', border: 'none', borderRadius: 10, cursor: locked ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, boxShadow: locked ? 'none' : '0 3px 0 #1e8449', touchAction: 'manipulation' }}>
+                                                <CheckCircle size={14} /> Comprobar
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
-                        {!showSolution && (
-                            <button onClick={resetAnswer} style={{ position: 'absolute', top: 10, right: 12, background: 'transparent', border: 'none', color: '#95a5a6', cursor: 'pointer', padding: 4 }}>
-                                <Delete size={22} />
-                            </button>
-                        )}
-                    </div>
+                        </>
+                    ) : (
+                        /* ── MODO SINGLE: tablero único ── */
+                        <>
+                            <div style={{ fontSize: isMobile ? '2rem' : '3rem', fontWeight: 'bold', color: '#2c3e50', marginBottom: 16, minHeight: 60, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                {currentProblem.text} = ?
+                            </div>
+                            <div style={{ background: '#f8f9fa', borderRadius: 14, padding: '12px 16px', marginBottom: 16, border: '2px solid #e0e0e0', position: 'relative' }}>
+                                <span style={{ fontSize: '0.85rem', color: '#7f8c8d', display: 'block', marginBottom: 4 }}>
+                                    {showSolution ? '✅ Solución:' : 'Tu respuesta:'}
+                                </span>
+                                <div style={{ fontSize: isMobile ? '2.5rem' : '3rem', fontWeight: 'bold', color: showSolution ? '#27ae60' : '#E91E63', textAlign: 'center' }}>
+                                    {showSolution ? currentProblem.displayAnswer : currentAnswer}
+                                </div>
+                                {!showSolution && (
+                                    <button onClick={resetAnswer} style={{ position: 'absolute', top: 10, right: 12, background: 'transparent', border: 'none', color: '#95a5a6', cursor: 'pointer', padding: 4 }}>
+                                        <Delete size={22} />
+                                    </button>
+                                )}
+                            </div>
+                        </>
+                    )}
 
-                    {/* Botonera numérica */}
-                    {!showSolution && (
+                    {/* Botonera numérica — solo en modo single */}
+                    {!config.dual && !showSolution && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
                             {getBotones().map((fila, fi) => (
                                 <div key={fi} style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
@@ -655,8 +869,8 @@ export default function CalculoMentalGame({ usuario, onExit }) {
                         </div>
                     )}
 
-                    {/* Botones de acción */}
-                    {!showSolution && (
+                    {/* Pasar / Comprobar — solo en modo single */}
+                    {!config.dual && !showSolution && (
                         <div style={{ display: 'flex', gap: 10 }}>
                             <button onClick={handleSkip} style={st.btnSkip} title="Pasar (−2 pts, ver solución)">
                                 <SkipForward size={18} /> Pasar
@@ -702,7 +916,7 @@ export default function CalculoMentalGame({ usuario, onExit }) {
             )}
             {mostrarEnvio && (
                 <ModalEnviarProfe
-                    datos={{ aciertos, puntos: score }}
+                    datos={{ aciertos, fallos, puntos: config.dual ? score1 + score2 : score, skips, config }}
                     onClose={() => setMostrarEnvio(false)}
                 />
             )}

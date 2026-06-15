@@ -589,6 +589,18 @@ export default function InformesJuegos({ usuario, googleToken }) {
                                         onBuscarJugador={setBusquedaJugador}
                                     />
                                 );
+                                if (tipo === 'CALCULO') return (
+                                    <CalculoCard
+                                        key={inf.id} inf={inf}
+                                        onBorrar={()=>borrar(inf.id)}
+                                        borrando={borrando===inf.id}
+                                        borradoOk={borrandoOk===inf.id}
+                                        modoSeleccion={modoSeleccion}
+                                        seleccionado={selec}
+                                        onSeleccionar={()=>toggleSeleccion(inf.id)}
+                                        onBuscarJugador={setBusquedaJugador}
+                                    />
+                                );
                                 return (
                                     <InformeCard
                                         key={inf.id} inf={inf}
@@ -927,6 +939,104 @@ const OAOACard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccion
                     </button>
                 )}
             </div>
+            {confirmar && (
+                <div style={{ background:'#fdecea', borderTop:'1px solid #fdd', padding:'10px 15px', display:'flex', alignItems:'center', gap:10, fontSize:'0.83rem' }}>
+                    <AlertTriangle size={14} color="#e74c3c"/>
+                    <span style={{ flex:1, color:'#c0392b' }}>¿Eliminar este informe?</span>
+                    <button onClick={()=>{setConfirmar(false);onBorrar();}} disabled={borrando} style={{ padding:'4px 12px', borderRadius:7, border:'none', background:'#e74c3c', color:'white', cursor:'pointer', fontWeight:700, fontSize:'0.8rem' }}>{borrando?'Borrando…':'Eliminar'}</button>
+                    <button onClick={()=>setConfirmar(false)} style={{ padding:'4px 10px', borderRadius:7, border:'1px solid #ddd', background:'white', cursor:'pointer', fontSize:'0.8rem' }}>Cancelar</button>
+                </div>
+            )}
+            {borradoOk && <div style={{ background:'#e8f5e9', padding:'8px 15px', fontSize:'0.8rem', color:'#27ae60', display:'flex', alignItems:'center', gap:6 }}><CheckCircle size={13}/>Eliminado</div>}
+        </div>
+    );
+};
+
+// ─── Tarjeta especial para Cálculo Mental ────────────────────────────────────
+const CalculoCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccionado, onSeleccionar, onBuscarJugador }) => {
+    const [confirmar, setConfirmar] = useState(false);
+    const j = (inf.jugadores || [])[0] || {};
+    const aciertos = j.aciertos ?? 0;
+    const fallos   = j.fallos   ?? 0;
+    const intentos = j.intentos ?? (aciertos + fallos);
+    const puntos   = j.puntos   ?? 0;
+    const skips    = j.skips    ?? 0;
+    const pct      = j.porcentaje ?? (intentos > 0 ? Math.round((aciertos / intentos) * 100) : 0);
+    const pctColor = p => p >= 80 ? '#27ae60' : p >= 50 ? '#e67e22' : '#e74c3c';
+    const cfg      = j.config || {};
+
+    const opsActivas = cfg.operaciones
+        ? Object.entries(cfg.operaciones).filter(([,v]) => v).map(([k]) =>
+            ({ suma: '➕', resta: '➖', multiplicacion: '✖️', division: '➗' }[k] || k))
+        : [];
+    const tiposActivos = cfg.tipos
+        ? Object.entries(cfg.tipos).filter(([,v]) => v).map(([k]) =>
+            ({ positivos: 'Positivos', negativos: 'Negativos', decimales: 'Decimales', fracciones: 'Fracciones' }[k] || k))
+        : [];
+    const modoTexto = cfg.numEjercicios
+        ? `${cfg.numEjercicios} ejercicios`
+        : cfg.tiempo
+        ? `${cfg.tiempo < 60 ? cfg.tiempo + 's' : cfg.tiempo / 60 + ' min'}`
+        : null;
+
+    return (
+        <div style={{ background:'white', borderRadius:13, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', overflow:'hidden', border: seleccionado ? '2px solid #1565C0' : '1.5px solid #fce4ec', transition:'border 0.1s' }}>
+            {/* Cabecera */}
+            <div onClick={modoSeleccion ? onSeleccionar : undefined} style={{ padding:'11px 15px', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', cursor: modoSeleccion ? 'pointer' : 'default', background: seleccionado ? '#f0f4ff' : 'white' }}>
+                {modoSeleccion && (
+                    <input type="checkbox" checked={seleccionado} onChange={e=>{e.stopPropagation();onSeleccionar();}} onClick={e=>e.stopPropagation()} style={{ width:17, height:17, cursor:'pointer', accentColor:'#1565C0', flexShrink:0 }}/>
+                )}
+                <span style={{ fontSize:'1.4rem' }}>🧠</span>
+                <div style={{ flex:1, minWidth:100 }}>
+                    <div style={{ fontWeight:700, color:'#2c3e50', fontSize:'0.92rem' }}>
+                        Cálculo Mental
+                        {puntos > 0 && <span style={{ marginLeft:8, fontWeight:400, color:'#E91E63', fontSize:'0.8rem' }}>🏆 {puntos} pts</span>}
+                    </div>
+                    <div style={{ fontSize:'0.74rem', color:'#95a5a6', marginTop:1 }}>
+                        {fmtFecha(inf.fecha)}
+                        {j.nombre && <> · <span onClick={e=>{e.stopPropagation();onBuscarJugador?.(j.nombre);}} style={{ cursor:'pointer', borderBottom:'1px dotted #aaa', fontWeight:600, color:'#2c3e50' }}>{j.nombre}</span></>}
+                        {j.curso  && <span style={{ marginLeft:5, color:'#aaa' }}>({j.curso})</span>}
+                    </div>
+                </div>
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+                    <span style={{ padding:'2px 8px', borderRadius:20, background:'#e8f5e9', color:'#27ae60', fontWeight:700, fontSize:'0.78rem' }}>✅ {aciertos}</span>
+                    <span style={{ padding:'2px 8px', borderRadius:20, background:'#fdecea', color:'#e74c3c', fontWeight:700, fontSize:'0.78rem' }}>❌ {fallos}</span>
+                    {skips > 0 && <span style={{ padding:'2px 8px', borderRadius:20, background:'#fff8e1', color:'#f39c12', fontWeight:700, fontSize:'0.78rem' }}>⏭ {skips}</span>}
+                    <span style={{ padding:'2px 8px', borderRadius:20, background:'#f3f4f6', fontWeight:700, fontSize:'0.78rem', color: pctColor(pct) }}>{pct}%</span>
+                </div>
+                {!modoSeleccion && (
+                    <button onClick={e=>{e.stopPropagation();setConfirmar(true);}} style={{ padding:'4px 7px', borderRadius:7, border:'1px solid #fdd', background:'#fdecea', color:'#e74c3c', cursor:'pointer', flexShrink:0 }} title="Eliminar informe">
+                        <Trash2 size={13}/>
+                    </button>
+                )}
+            </div>
+            {/* Desglose configuración */}
+            {(opsActivas.length > 0 || tiposActivos.length > 0 || modoTexto) && (
+                <div style={{ padding:'8px 15px 10px', borderTop:'1px solid #fce4ec', background:'#fff9fb', display:'flex', gap:12, flexWrap:'wrap', alignItems:'center' }}>
+                    {opsActivas.length > 0 && (
+                        <div style={{ display:'flex', gap:4, alignItems:'center' }}>
+                            <span style={{ fontSize:'0.7rem', color:'#aaa', fontWeight:600 }}>OPS</span>
+                            {opsActivas.map(op => (
+                                <span key={op} style={{ padding:'1px 7px', borderRadius:10, background:'#fce4ec', color:'#E91E63', fontWeight:700, fontSize:'0.78rem' }}>{op}</span>
+                            ))}
+                        </div>
+                    )}
+                    {tiposActivos.length > 0 && (
+                        <div style={{ display:'flex', gap:4, alignItems:'center' }}>
+                            <span style={{ fontSize:'0.7rem', color:'#aaa', fontWeight:600 }}>TIPO</span>
+                            {tiposActivos.map(t => (
+                                <span key={t} style={{ padding:'1px 7px', borderRadius:10, background:'#f3f4f6', color:'#555', fontWeight:600, fontSize:'0.75rem' }}>{t}</span>
+                            ))}
+                        </div>
+                    )}
+                    {(cfg.minNum != null || cfg.maxNum != null) && (
+                        <span style={{ fontSize:'0.75rem', color:'#7f8c8d' }}>📏 {cfg.minNum}–{cfg.maxNum}</span>
+                    )}
+                    {modoTexto && (
+                        <span style={{ fontSize:'0.75rem', color:'#7f8c8d' }}>⏱ {modoTexto}</span>
+                    )}
+                </div>
+            )}
             {confirmar && (
                 <div style={{ background:'#fdecea', borderTop:'1px solid #fdd', padding:'10px 15px', display:'flex', alignItems:'center', gap:10, fontSize:'0.83rem' }}>
                     <AlertTriangle size={14} color="#e74c3c"/>

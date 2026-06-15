@@ -49,6 +49,7 @@ import EditorOmni from './components/EditorOmni';
 import EditorPaginaProfesor from './components/EditorPaginaProfesor';
 import PaginaProfesor from './components/PaginaProfesor';
 import EditorVideoQuizz from './components/EditorVideoQuizz';
+import VideoTimelineEditor from './VideoTimelineEditor';
 import EditorSolarSystem from './components/EditorSolarSystem';
 import OmninteractiveApp from './OmninteractiveApp';
 import VideoQuizzApp from './VideoQuizzApp';
@@ -132,6 +133,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
     const [recursoOmniInicial, setRecursoOmniInicial] = useState(null);
     const [mostrandoEditorVideoQuizz, setMostrandoEditorVideoQuizz] = useState(false);
     const [recursoVQInicial, setRecursoVQInicial] = useState(null);
+    const [mostrandoEditorVTE, setMostrandoEditorVTE] = useState(false);
     const [mostrandoEditorSolarSystem, setMostrandoEditorSolarSystem] = useState(false);
     const [paginaProfesorPreview, setPaginaProfesorPreview] = useState(null);
     // Añade este estado junto a los demás en ProfesorDashboard
@@ -175,7 +177,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             const s = await getDocs(q);
             const docs = s.docs.map(d => ({ ...d.data(), id: d.id })).filter(r => {
                 if (modoDashboard === 'PRO') {
-                    return r.tipo === 'PRO' || r.tipo === 'PRO-BURBUJAS' || r.tipo === 'OLYMPIC' || r.tipo === 'SINTAXIS' || r.tipo === 'ETIQUETAS' || r.tipo === 'OMNI' || r.tipo === 'VIDEOQUIZZ' || r.tipo === 'SOLAR_SYSTEM';
+                    return r.tipo === 'PRO' || r.tipo === 'PRO-BURBUJAS' || r.tipo === 'OLYMPIC' || r.tipo === 'SINTAXIS' || r.tipo === 'ETIQUETAS' || r.tipo === 'OMNI' || r.tipo === 'VIDEOQUIZZ' || r.tipo === 'SOLAR_SYSTEM' || r.format === 'VTE';
                 }
 
                 if (modoDashboard === 'LIVE') {
@@ -260,7 +262,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             if (juegoSeleccionado === 'SINTAXIS') return iniciarCreacionSintaxis();
             if (juegoSeleccionado === 'ETIQUETAS') return iniciarCreacionEtiquetas();
             if (juegoSeleccionado === 'OMNINTERACTIVE') { setRecursoOmniInicial(null); return setMostrandoEditorOmni(true); }
-            if (juegoSeleccionado === 'VIDEOQUIZZ') { setRecursoVQInicial(null); return setMostrandoEditorVideoQuizz(true); }
+            if (juegoSeleccionado === 'VIDEOQUIZZ') { return setMostrandoEditorVTE(true); }
             if (juegoSeleccionado === 'SOLAR_SYSTEM') {
                 setDatosEditor({ id: null, titulo: '', temas: '', profesorNombre: (perfilProfesor?.nombre) || usuario.displayName, pais: perfilProfesor?.pais || '', region: perfilProfesor?.region || '', poblacion: perfilProfesor?.poblacion || '', config: {}, hojas: [], tourConfig: null });
                 return setMostrandoEditorSolarSystem(true);
@@ -437,8 +439,12 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                 setMostrandoEditorOmni(true);
             }
             else if (dataFresca.tipoJuego === 'VIDEOQUIZZ' || dataFresca.tipo === 'VIDEOQUIZZ' || dataFresca.youtubeUrl) {
-                setRecursoVQInicial(dataFresca);
-                setMostrandoEditorVideoQuizz(true);
+                if (dataFresca.format === 'VTE') {
+                    setMostrandoEditorVTE(true);
+                } else {
+                    setRecursoVQInicial(dataFresca);
+                    setMostrandoEditorVideoQuizz(true);
+                }
             }
             else if (dataFresca.tipoJuego === 'SOLAR_SYSTEM' || dataFresca.tipo === 'SOLAR_SYSTEM') {
                 setDatosEditor(dataFresca);
@@ -1537,6 +1543,10 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                     usuario={perfilProfesor || usuario}
                     onBack={() => { setMostrandoEditorVideoQuizz(false); setRecursoVQInicial(null); }}
                 />
+            )}
+
+            {mostrandoEditorVTE && (
+                <VideoTimelineEditor onBack={() => setMostrandoEditorVTE(false)} />
             )}
 
             {mostrandoEditorSolarSystem && (

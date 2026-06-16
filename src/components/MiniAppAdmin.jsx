@@ -24,7 +24,7 @@ export default function MiniAppAdmin({ usuario }) {
   const [runtimeError, setRuntimeError] = useState('');
   const [copiado, setCopiado]           = useState(null);
   // Edición inline
-  const [editando, setEditando]         = useState(null); // { id, titulo, descripcion, materia }
+  const [editando, setEditando]         = useState(null); // { id, titulo, descripcion, materia, autorNombre, autorEmail }
   const [guardandoEdit, setGuardandoEdit] = useState(false);
   // Borrado
   const [eliminando, setEliminando]     = useState(null); // id confirmando
@@ -96,10 +96,13 @@ export default function MiniAppAdmin({ usuario }) {
       titulo:      editando.titulo.trim(),
       descripcion: editando.descripcion.trim(),
       materia:     editando.materia,
+      autorNombre: editando.autorNombre.trim(),
+      autorEmail:  editando.autorEmail.trim(),
     });
     setApps(prev => prev.map(a =>
       a.id === editando.id
-        ? { ...a, titulo: editando.titulo.trim(), descripcion: editando.descripcion.trim(), materia: editando.materia }
+        ? { ...a, titulo: editando.titulo.trim(), descripcion: editando.descripcion.trim(), materia: editando.materia,
+            autorNombre: editando.autorNombre.trim(), autorEmail: editando.autorEmail.trim() }
         : a
     ));
     setEditando(null);
@@ -162,7 +165,7 @@ export default function MiniAppAdmin({ usuario }) {
                 )}
                 {/* Botón editar */}
                 <button
-                  onClick={() => setEditando(editando?.id === app.id ? null : { id:app.id, titulo:app.titulo||'', descripcion:app.descripcion||'', materia:app.materia||'' })}
+                  onClick={() => setEditando(editando?.id === app.id ? null : { id:app.id, titulo:app.titulo||'', descripcion:app.descripcion||'', materia:app.materia||'', autorNombre:app.autorNombre||'', autorEmail:app.autorEmail||'' })}
                   style={{ padding:'5px 12px', background: editando?.id===app.id ? '#1e293b' : '#f1f5f9', color: editando?.id===app.id ? '#fff' : '#374151', border:'none', borderRadius:8, cursor:'pointer', fontSize:'0.78rem', fontWeight:700 }}>
                   ✏️ {editando?.id===app.id ? 'Cancelar edición' : 'Editar'}
                 </button>
@@ -238,6 +241,29 @@ export default function MiniAppAdmin({ usuario }) {
                     style={{ width:'100%', padding:'6px 10px', borderRadius:6, border:'1px solid #e2e8f0', fontSize:'0.82rem', outline:'none', resize:'vertical', boxSizing:'border-box' }}
                   />
                 </div>
+                <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                  <div style={{ flex:1, minWidth:160 }}>
+                    <label style={{ fontSize:'0.72rem', fontWeight:700, color:'#475569', display:'block', marginBottom:3 }}>Nombre del autor</label>
+                    <input
+                      value={editando.autorNombre}
+                      onChange={e => setEditando(p => ({ ...p, autorNombre: e.target.value }))}
+                      placeholder="Ej: Lucía (4º ESO B)"
+                      style={{ width:'100%', padding:'6px 10px', borderRadius:6, border:'1px solid #e2e8f0', fontSize:'0.85rem', outline:'none', boxSizing:'border-box' }}
+                    />
+                  </div>
+                  <div style={{ flex:1, minWidth:160 }}>
+                    <label style={{ fontSize:'0.72rem', fontWeight:700, color:'#475569', display:'block', marginBottom:3 }}>Email del autor</label>
+                    <input
+                      value={editando.autorEmail}
+                      onChange={e => setEditando(p => ({ ...p, autorEmail: e.target.value }))}
+                      placeholder="email@ejemplo.com"
+                      style={{ width:'100%', padding:'6px 10px', borderRadius:6, border:'1px solid #e2e8f0', fontSize:'0.85rem', outline:'none', boxSizing:'border-box' }}
+                    />
+                  </div>
+                </div>
+                <p style={{ margin:0, fontSize:'0.7rem', color:'#94a3b8' }}>
+                  ⚠ Esto solo cambia el nombre/email que se muestra. Si la app fue enviada desde una cuenta registrada, las notificaciones de aprobación/rechazo seguirán llegando a esa cuenta, no a este email.
+                </p>
                 <div style={{ display:'flex', gap:8 }}>
                   <button onClick={guardarEdit} disabled={guardandoEdit}
                     style={{ padding:'6px 18px', background:'#6c63ff', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontSize:'0.82rem', fontWeight:700, opacity: guardandoEdit ? 0.6 : 1 }}>

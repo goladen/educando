@@ -260,6 +260,8 @@ export default function MiniAppCreator({ onAbrirViewer }) {
   const [copiedConvert, setCopiedConvert] = useState(false);
   const [previewH, setPreviewH]     = useState(380);
   const [currentUser, setCurrentUser] = useState(auth.currentUser);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const previewIframeRef = useRef(null);
 
   // Submission state
   const [showSubmit, setShowSubmit] = useState(false);
@@ -279,6 +281,20 @@ export default function MiniAppCreator({ onAbrirViewer }) {
     const unsub = onAuthStateChanged(auth, u => setCurrentUser(u));
     return unsub;
   }, []);
+
+  useEffect(() => {
+    const h = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', h);
+    return () => document.removeEventListener('fullscreenchange', h);
+  }, []);
+
+  const togglePreviewFullscreen = () => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else if (previewIframeRef.current) {
+      previewIframeRef.current.requestFullscreen();
+    }
+  };
 
   const handleRun = useCallback(() => {
     setRuntimeError('');
@@ -429,13 +445,19 @@ export default function MiniAppCreator({ onAbrirViewer }) {
 
       {/* ── Secure preview ────────────────────────────────────────────────── */}
       <div style={{ marginBottom:16 }}>
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6, gap:8, flexWrap:'wrap' }}>
           <span style={{ fontWeight:700, fontSize:'0.85rem', color:'#374151' }}>🔒 Previsualización segura</span>
-          <span style={{ fontSize:'0.72rem', color:'#6b7280', background:'#f3f4f6', padding:'2px 8px', borderRadius:20 }}>aislada · sin acceso a la app principal</span>
+          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <span style={{ fontSize:'0.72rem', color:'#6b7280', background:'#f3f4f6', padding:'2px 8px', borderRadius:20 }}>aislada · sin acceso a la app principal</span>
+            <button onClick={togglePreviewFullscreen}
+              style={{ padding:'4px 10px', background:'#f1f5f9', color:'#374151', border:'1px solid #e2e8f0', borderRadius:8, cursor:'pointer', fontSize:'0.75rem', fontWeight:700 }}>
+              {isFullscreen ? '⤡ Salir' : '⛶ Pantalla completa'}
+            </button>
+          </div>
         </div>
         <div style={{ border:'2px solid #e5e7eb', borderRadius:10, overflow:'hidden', background:'#fff' }}>
-          <iframe key={iframeKey} srcDoc={buildSrcdoc(runCode)} sandbox="allow-scripts"
-            title="Previsualización" style={{ width:'100%', height:previewH, border:'none', display:'block' }} />
+          <iframe ref={previewIframeRef} key={iframeKey} srcDoc={buildSrcdoc(runCode)} sandbox="allow-scripts"
+            title="Previsualización" style={{ width:'100%', height:previewH, border:'none', display:'block', background:'#fff' }} />
           <div onMouseDown={startDrag}
             style={{ height:8, cursor:'ns-resize', background:'#f9fafb', borderTop:'1px solid #e5e7eb', display:'flex', alignItems:'center', justifyContent:'center' }}>
             <div style={{ width:32, height:3, background:'#d1d5db', borderRadius:2 }} />

@@ -26,7 +26,7 @@ import TextWordleGame from './TextWordleGame';
 import SintaxisGame from './SintaxisGamen2';
 
 
-import { MousePointer2, Rocket, Search as SearchIcon, Car } from 'lucide-react';
+import { MousePointer2, Rocket, Search as SearchIcon, Car, Clock } from 'lucide-react';
 import InformesJuegos from './components/InformesJuegos2';
 import TrivialPartidasView from './components/TrivialPartidasView';
 import TrivialRecursosManager from './components/TrivialRecursosManager';
@@ -45,6 +45,7 @@ import EditorWordle from './components/EditorWordle';
 import EditorOlympic from './components/EditorOlympic';
 import EditorSintaxis from './components/EditorSintaxis';
 import EditorEtiquetas from './components/EditorEtiquetas';
+import EditorLineaTiempo from './components/EditorLineaTiempo';
 import EditorOmni from './components/EditorOmni';
 import EditorPaginaProfesor from './components/EditorPaginaProfesor';
 import PaginaProfesor from './components/PaginaProfesor';
@@ -87,6 +88,7 @@ const TIPOS_JUEGOS = {
     QUESTION_SENDER: { id: 'QUESTION_SENDER', label: 'Question Sender', color: '#2c3e50', camposConfig: [{ key: 'numPreguntas', label: 'Preguntas a pedir', type: 'number', default: 3 }] },
     // Añade dentro del objeto TIPOS_JUEGOS:
     ETIQUETAS: { id: 'ETIQUETAS', label: 'Etiquetas', color: '#e74c3c', camposConfig: [] },
+LINEA_TIEMPO: { id: 'LINEA_TIEMPO', label: 'Línea del Tiempo', color: '#2980b9', camposConfig: [] },
 SINTAXIS: { id: 'SINTAXIS', label: 'Sintaxis', color: '#3498db', camposConfig: [] },
 OMNINTERACTIVE: { id: 'OMNINTERACTIVE', label: 'Omninteractive', color: '#6D28D9', camposConfig: [] },
 VIDEOQUIZZ: { id: 'VIDEOQUIZZ', label: 'VideoQuizz', color: '#DC2626', camposConfig: [] },
@@ -129,6 +131,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
     // Añade junto a los otros useState de editores:
     const [mostrandoEditorSintaxis, setMostrandoEditorSintaxis] = useState(false);
     const [mostrandoEditorEtiquetas, setMostrandoEditorEtiquetas] = useState(false);
+    const [mostrandoEditorLineaTiempo, setMostrandoEditorLineaTiempo] = useState(false);
     const [mostrandoEditorOmni, setMostrandoEditorOmni] = useState(false);
     const [recursoOmniInicial, setRecursoOmniInicial] = useState(null);
     const [mostrandoEditorVideoQuizz, setMostrandoEditorVideoQuizz] = useState(false);
@@ -177,7 +180,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             const s = await getDocs(q);
             const docs = s.docs.map(d => ({ ...d.data(), id: d.id })).filter(r => {
                 if (modoDashboard === 'PRO') {
-                    return r.tipo === 'PRO' || r.tipo === 'PRO-BURBUJAS' || r.tipo === 'OLYMPIC' || r.tipo === 'SINTAXIS' || r.tipo === 'ETIQUETAS' || r.tipo === 'OMNI' || r.tipo === 'VIDEOQUIZZ' || r.tipo === 'SOLAR_SYSTEM' || r.format === 'VTE';
+                    return r.tipo === 'PRO' || r.tipo === 'PRO-BURBUJAS' || r.tipo === 'OLYMPIC' || r.tipo === 'SINTAXIS' || r.tipo === 'ETIQUETAS' || r.tipo === 'LINEA_TIEMPO' || r.tipo === 'OMNI' || r.tipo === 'VIDEOQUIZZ' || r.tipo === 'SOLAR_SYSTEM' || r.format === 'VTE';
                 }
 
                 if (modoDashboard === 'LIVE') {
@@ -187,7 +190,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
 
 
                 // En clásico mostramos los que NO sean de ningún tipo PRO
-                return !r.tipo || (r.tipo !== 'PRO' && r.tipo !== 'PRO-BURBUJAS' && r.tipo !== 'OLYMPIC' && r.tipo !== 'SINTAXIS' && r.tipo !== 'ETIQUETAS' && r.tipo !== 'OMNI' && r.tipo !== 'VIDEOQUIZZ' && r.tipo !== 'SOLAR_SYSTEM');
+                return !r.tipo || (r.tipo !== 'PRO' && r.tipo !== 'PRO-BURBUJAS' && r.tipo !== 'OLYMPIC' && r.tipo !== 'SINTAXIS' && r.tipo !== 'ETIQUETAS' && r.tipo !== 'LINEA_TIEMPO' && r.tipo !== 'OMNI' && r.tipo !== 'VIDEOQUIZZ' && r.tipo !== 'SOLAR_SYSTEM');
             });
             setRecursos(docs);
         } catch (e) { console.error(e) }
@@ -202,7 +205,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             const docs = s.docs.map(d => ({ ...d.data(), id: d.id })).filter(d => d.profesorUid !== usuario.uid).filter(r => {
                 if (modoDashboard === 'PRO') {
                     // CAMBIO AQUÍ TAMBIÉN
-                    return r.tipo === 'PRO' || r.tipo === 'PRO-BURBUJAS' || r.tipo === 'OLYMPIC' || r.tipo === 'SINTAXIS' || r.tipo === 'ETIQUETAS';
+                    return r.tipo === 'PRO' || r.tipo === 'PRO-BURBUJAS' || r.tipo === 'OLYMPIC' || r.tipo === 'SINTAXIS' || r.tipo === 'ETIQUETAS' || r.tipo === 'LINEA_TIEMPO';
                 }
 
                 if (modoDashboard === 'LIVE') {
@@ -261,6 +264,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             if (juegoSeleccionado === 'OLYMPICLIVE') return iniciarCreacionOlympic();
             if (juegoSeleccionado === 'SINTAXIS') return iniciarCreacionSintaxis();
             if (juegoSeleccionado === 'ETIQUETAS') return iniciarCreacionEtiquetas();
+            if (juegoSeleccionado === 'LINEA_TIEMPO') return iniciarCreacionLineaTiempo();
             if (juegoSeleccionado === 'OMNINTERACTIVE') { setRecursoOmniInicial(null); return setMostrandoEditorOmni(true); }
             if (juegoSeleccionado === 'VIDEOQUIZZ') { return setMostrandoEditorVTE(true); }
             if (juegoSeleccionado === 'SOLAR_SYSTEM') {
@@ -322,6 +326,20 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
         };
         setDatosEditor(nuevoRecurso);
         setMostrandoEditorEtiquetas(true);
+    };
+
+    const iniciarCreacionLineaTiempo = () => {
+        const nuevoRecurso = {
+            id: null, titulo: '', temas: '',
+            profesorNombre: perfilProfesor?.nombre || usuario.displayName,
+            pais: perfilProfesor?.pais || '',
+            region: perfilProfesor?.region || '',
+            poblacion: perfilProfesor?.poblacion || '',
+            tipo: 'LINEA_TIEMPO', tipoJuego: 'LINEA_TIEMPO',
+            hojas: [], isPrivate: false,
+        };
+        setDatosEditor(nuevoRecurso);
+        setMostrandoEditorLineaTiempo(true);
     };
 
     // 1. CREAR PILIVE (THINKHOOT PRO)
@@ -433,6 +451,9 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             }
             else if (dataFresca.tipoJuego === 'ETIQUETAS') {
                 setMostrandoEditorEtiquetas(true);
+            }
+            else if (dataFresca.tipoJuego === 'LINEA_TIEMPO') {
+                setMostrandoEditorLineaTiempo(true);
             }
             else if (dataFresca.tipoJuego === 'OMNINTERACTIVE' || dataFresca.tipo === 'OMNI') {
                 setRecursoOmniInicial(dataFresca);
@@ -1180,7 +1201,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                 <>{modoDashboard === 'CLASICO' && (
                     <div className="game-type-scroll" style={{ marginBottom: '20px' }}>
                         {Object.values(TIPOS_JUEGOS)
-                            .filter(j => j.id !== 'MATHLIVE' && j.id !== 'WORDLE' && j.id !== 'OLYMPICLIVE' && j.id !== 'SINTAXIS' && j.id !== 'ETIQUETAS' && j.id !== 'OMNINTERACTIVE' && j.id !== 'VIDEOQUIZZ' && j.id !== 'SOLAR_SYSTEM')
+                            .filter(j => j.id !== 'MATHLIVE' && j.id !== 'WORDLE' && j.id !== 'OLYMPICLIVE' && j.id !== 'SINTAXIS' && j.id !== 'ETIQUETAS' && j.id !== 'LINEA_TIEMPO' && j.id !== 'OMNINTERACTIVE' && j.id !== 'VIDEOQUIZZ' && j.id !== 'SOLAR_SYSTEM')
                             .map(j => (
                                 <button key={j.id} onClick={() => setJuegoSeleccionado(j.id)} style={{ padding: '8px 16px', borderRadius: '20px', border: 'none', background: juegoSeleccionado === j.id ? j.color : 'white', color: juegoSeleccionado === j.id ? 'white' : '#555', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
                                     {j.label}
@@ -1297,6 +1318,14 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                                             color: juegoSeleccionado === 'ETIQUETAS' ? 'white' : '#555'
                                         }}>
                                         <Crosshair size={16} /> <span className="btn-text">Etiquetas</span>
+                                    </button>
+                                    <button onClick={() => setJuegoSeleccionado('LINEA_TIEMPO')} className="header-btn"
+                                        style={{
+                                            padding: '8px 20px', borderRadius: '20px',
+                                            background: juegoSeleccionado === 'LINEA_TIEMPO' ? '#2980b9' : 'white',
+                                            color: juegoSeleccionado === 'LINEA_TIEMPO' ? 'white' : '#555'
+                                        }}>
+                                        <Clock size={16} /> <span className="btn-text">Línea Tiempo</span>
                                     </button>
                                     <button onClick={() => setJuegoSeleccionado('OMNINTERACTIVE')} className="header-btn"
                                         style={{
@@ -1515,6 +1544,15 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                     datos={datosEditor}
                     setDatos={setDatosEditor}
                     onClose={() => setMostrandoEditorEtiquetas(false)}
+                    usuario={perfilProfesor || usuario}
+                />
+            )}
+
+            {mostrandoEditorLineaTiempo && (
+                <EditorLineaTiempo
+                    datos={datosEditor}
+                    setDatos={setDatosEditor}
+                    onClose={() => setMostrandoEditorLineaTiempo(false)}
                     usuario={perfilProfesor || usuario}
                 />
             )}

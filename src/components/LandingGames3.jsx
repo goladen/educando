@@ -7,6 +7,7 @@ import KartingTrack from '../KartingTrack';
 import KartingedMultiGame from '../KartingedMultiGame';
 import RacingGame3D from '../RacingGame3D';
 import ThinkHootGame from '../ThinkHootGame';
+import PiLiveSolo from '../PiLiveSolo';
 import RuletaGame from '../RuletaGame';
 import MathLive from '../MathLive';
 import OlympicLive from '../OlympicLive';
@@ -29,6 +30,7 @@ import MansionPitagoricaGame from '../MansionPitagoricaGame';
 import ArkadeHub from '../MiniArcade/ArkadeHub';
 
 import EtiquetaMe from '../EtiquetaMe';
+import LineaTiempoGame from '../LineaTiempoGame';
 import OmninteractiveApp from '../OmninteractiveApp';
 import OcaMatematicaDirect from '../OcaMatematica';
 import DominoMatematicoDirect from '../dominofracciones';
@@ -1275,6 +1277,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                 if (juegoParam.toLowerCase() === 'geografia')      { setGeografiaApp(true);   return; }
                 if (juegoParam.toLowerCase() === 'biologia')       { setBiologiaApp(true);    return; }
                 if (juegoParam.toLowerCase() === 'vistas_didricas') { setVistasDidricas(true); return; }
+                if (juegoParam.toLowerCase() === 'linea_tiempo')    { setJuegoActivo({ tipoJuego: 'LINEA_TIEMPO' }); return; }
                 let tourConfig = null;
                 const tcParam = params.get('tourconfig');
                 if (tcParam) {
@@ -1358,6 +1361,8 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
     const [recursosPorMateria, setRecursosPorMateria] = useState({});
     const [cargandoRecursosMat, setCargandoRecursosMat] = useState(false);
     const [recursoParaElegir, setRecursoParaElegir] = useState(null);
+    const [eligiendoModoPiLive, setEligiendoModoPiLive] = useState(null);
+    const [configSoloPiLive, setConfigSoloPiLive] = useState(null);
     const [omninteractivo, setOmninteractivo] = useState(false);
     const [videoQuizz,     setVideoQuizz]     = useState(false);
     const [funcionesEjecutivas, setFuncionesEjecutivas] = useState(false);
@@ -1747,9 +1752,11 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
     };
 
     const procesarClickTarjeta = (r) => {
-        if (esJuegoEnVivo(r)) lanzarComoGestor(r);
+        if (r.tipoJuego === 'THINKHOOT' && esJuegoEnVivo(r)) setEligiendoModoPiLive(r);
+        else if (esJuegoEnVivo(r)) lanzarComoGestor(r);
         else if (r.tipoJuego === 'CAZABURBUJAS' || r.tipoJuego === 'PIKATRON' || r.tipoJuego === 'WORDLE' || r.tipoJuego === 'SOPA') setRecursoParaElegir(r);
         else if (r.tipoJuego === 'ETIQUETAS') setJuegoActivo(r);
+        else if (r.tipoJuego === 'LINEA_TIEMPO') setJuegoActivo(r);
         else if (r.tipoJuego === 'KARTINGED') setJuegoActivo(r);
         else setJuegoActivo(r);
     };
@@ -1935,6 +1942,7 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
         }
 
         if (juegoActivo.tipoJuego === 'ETIQUETAS') return <EtiquetaMe recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'LINEA_TIEMPO') return <LineaTiempoGame recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
 
         if (juegoActivo.tipoJuego === 'GEOMETRIX') return <Geometrix usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'CALCULO') return <CalculoMental usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
@@ -2008,6 +2016,7 @@ if (juegoActivo.tipoJuego === 'LENGUA_SIGNOS') return <LenguaSignos onExit={() =
         if (juegoActivo.tipoJuego === 'MATHLE') return <MathWordleGame usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.modoEspecial === 'WORDLE' || (juegoActivo.tipoJuego === 'WORDLE' && !juegoActivo.modoEspecial)) return <TextWordleGame recursoInicial={juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.modoEspecial === 'SOPA' || (juegoActivo.tipoJuego === 'SOPA' && !juegoActivo.modoEspecial)) return <SopaDeLetrasGame recurso={juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.modoEspecial === 'PILIVE_SOLO') return <PiLiveSolo recurso={juegoActivo} usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
 
         return <GamePlayer recurso={juegoActivo} usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
     }
@@ -2262,6 +2271,28 @@ if (juegoActivo.tipoJuego === 'LENGUA_SIGNOS') return <LenguaSignos onExit={() =
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* MODAL ELEGIR MODO PILIVE: PRESENTAR vs JUGAR SOLO */}
+            {eligiendoModoPiLive && (
+                <ModalEligeModoPiLive
+                    recurso={eligiendoModoPiLive}
+                    onPresentar={() => { const r = eligiendoModoPiLive; setEligiendoModoPiLive(null); lanzarComoGestor(r); }}
+                    onJugarSolo={() => { setConfigSoloPiLive(eligiendoModoPiLive); setEligiendoModoPiLive(null); }}
+                    onClose={() => setEligiendoModoPiLive(null)}
+                />
+            )}
+
+            {/* MODAL CONFIGURAR PARTIDA INDIVIDUAL PILIVE */}
+            {configSoloPiLive && (
+                <ModalConfigSoloPiLive
+                    recurso={configSoloPiLive}
+                    onStart={(pool, hojaNombreSeleccionada) => {
+                        setJuegoActivo({ ...configSoloPiLive, preguntas: pool, hojas: undefined, hojaNombreSeleccionada, modoEspecial: 'PILIVE_SOLO' });
+                        setConfigSoloPiLive(null);
+                    }}
+                    onClose={() => setConfigSoloPiLive(null)}
+                />
             )}
 
             {shareModal && <ShareModal url={shareModal.url} titulo={shareModal.titulo} onClose={() => setShareModal(null)} />}
@@ -2728,6 +2759,7 @@ if (juegoActivo.tipoJuego === 'LENGUA_SIGNOS') return <LenguaSignos onExit={() =
                     { id: 'BIOLOGIA',            label: 'Biología',             emoji: '🔬', color: '#16a34a', action: () => setBiologiaApp(true),  shareable: true },
                     { id: 'GESTION_AULA', label: 'Gestión Aula', emoji: '🏫', color: '#e67e22', action: () => setGestionAula(true), shareable: true, shareUrl: `${window.location.origin}${window.location.pathname}?gestion=menu` },
                     { id: 'VISTAS_DIDRICAS', label: 'Vistas Diédricas', emoji: '📐', color: '#7c3aed', action: () => setVistasDidricas(true), shareable: true },
+                    { id: 'LINEA_TIEMPO', label: 'Línea del Tiempo', emoji: '🕰️', color: '#2980b9', action: () => setJuegoActivo({ tipoJuego: 'LINEA_TIEMPO' }), shareable: true, shareUrl: `${window.location.origin}${window.location.pathname}?juego=linea_tiempo` },
                     { id: 'SIMULADORES_FISICA', label: 'Física y Química', emoji: '🔭', color: '#e74c3c', action: () => { setSimuladoresFisica(true); window.history.pushState({}, '', '/fisica'); }, shareable: true, shareUrl: `${window.location.origin}/fisica` },
                 ].map(tool => (
                     <div key={tool.id} onClick={tool.action} style={{ background: '#ffffbf', borderRadius: '15px', padding: '15px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transition: 'transform 0.2s', border: `2px solid ${tool.color}20`, position: 'relative' }}
@@ -2848,6 +2880,107 @@ function InfoRow({ icon, label, text }) {
         <div style={{ marginBottom: 12, padding: '10px 14px', background: '#F8FAFC', borderRadius: 12, borderLeft: '3px solid #E2E8F0' }}>
             <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 3 }}>{icon} {label}</div>
             <div style={{ fontSize: '0.88rem', color: '#334155', lineHeight: 1.5 }}>{text}</div>
+        </div>
+    );
+}
+
+// MODAL: elegir entre presentar en vivo o jugar en solitario (PiLive)
+function ModalEligeModoPiLive({ recurso, onPresentar, onJugarSolo, onClose }) {
+    return (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.8)', zIndex: 5000, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <div style={{ background: 'white', padding: '30px', borderRadius: '20px', textAlign: 'center', maxWidth: '420px', width: '90%' }}>
+                <h2 style={{ color: '#2c3e50', margin: '0 0 6px 0' }}>🎮 {recurso.titulo}</h2>
+                <p style={{ color: '#7f8c8d', fontSize: '0.9rem', margin: '0 0 20px 0' }}>¿Cómo quieres jugar?</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <button onClick={onPresentar} style={{ padding: '15px', background: '#9C27B0', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.05rem', cursor: 'pointer', fontWeight: 'bold' }}>🖥️ Presentar en vivo</button>
+                    <button onClick={onJugarSolo} style={{ padding: '15px', background: '#3498db', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.05rem', cursor: 'pointer', fontWeight: 'bold' }}>🙋 Jugar yo solo</button>
+                    <button onClick={onClose} style={{ marginTop: '6px', background: 'transparent', border: 'none', color: '#999', cursor: 'pointer' }}>Cancelar</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// MODAL: configurar partida individual de PiLive (hojas, cantidad, aleatorio)
+function ModalConfigSoloPiLive({ recurso, onStart, onClose }) {
+    const hojas = (recurso.hojas && recurso.hojas.length > 0) ? recurso.hojas : null;
+    const [seleccion, setSeleccion] = useState(() => hojas ? hojas.map((_, i) => i) : []);
+
+    const poolDisponible = React.useMemo(() => {
+        let pool = [];
+        if (hojas) {
+            seleccion.forEach(i => pool.push(...(hojas[i]?.preguntas || [])));
+        } else {
+            pool = recurso.preguntas || [];
+        }
+        // En modo solo no se pueden evaluar los dibujos → se descartan
+        return pool.filter(p => p && p.tipo !== 'DIBUJO');
+    }, [seleccion, hojas, recurso.preguntas]);
+
+    const [cantidad, setCantidad] = useState(() => Math.min(parseInt(recurso.config?.numPreguntas) || 10, Math.max(1, poolDisponible.length || 1)));
+    const [aleatorio, setAleatorio] = useState(recurso.config?.aleatorio !== false);
+
+    useEffect(() => {
+        setCantidad(c => Math.min(Math.max(1, c), Math.max(1, poolDisponible.length)));
+    }, [poolDisponible.length]);
+
+    const toggleHoja = (i) => {
+        setSeleccion(prev => prev.includes(i) ? prev.filter(x => x !== i) : [...prev, i].sort((a, b) => a - b));
+    };
+
+    const empezar = () => {
+        if (poolDisponible.length === 0) return alert("Selecciona al menos una hoja con preguntas.");
+        let pool = [...poolDisponible];
+        if (aleatorio) pool.sort(() => Math.random() - 0.5);
+        pool = pool.slice(0, cantidad);
+        const hojaNombreSeleccionada = hojas
+            ? seleccion.map(i => hojas[i]?.nombreHoja || hojas[i]?.nombre || `Hoja ${i + 1}`).join(', ')
+            : '';
+        onStart(pool, hojaNombreSeleccionada);
+    };
+
+    return (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.8)', zIndex: 5000, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <div style={{ background: 'white', padding: '30px', borderRadius: '20px', textAlign: 'left', maxWidth: '440px', width: '90%' }}>
+                <h2 style={{ color: '#2c3e50', margin: '0 0 6px 0', textAlign: 'center' }}>🙋 Configurar partida</h2>
+                <p style={{ color: '#7f8c8d', fontSize: '0.85rem', margin: '0 0 16px 0', textAlign: 'center' }}>{recurso.titulo}</p>
+
+                {hojas && hojas.length > 1 && (
+                    <div style={{ marginBottom: 16 }}>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#555', marginBottom: 8 }}>📋 Elige una o varias hojas:</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 180, overflowY: 'auto' }}>
+                            {hojas.map((h, i) => (
+                                <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#f8f9fa', borderRadius: 8, cursor: 'pointer', fontSize: '0.88rem' }}>
+                                    <input type="checkbox" checked={seleccion.includes(i)} onChange={() => toggleHoja(i)} />
+                                    <span style={{ flex: 1 }}>📄 {h.nombreHoja || h.nombre || `Hoja ${i + 1}`}</span>
+                                    <span style={{ color: '#999', fontSize: '0.78rem' }}>{h.preguntas?.length || 0} preg.</span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                <div style={{ marginBottom: 14 }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#555', display: 'block', marginBottom: 6 }}>❓ Número de preguntas</label>
+                    <input type="number" min={1} max={Math.max(1, poolDisponible.length)}
+                        value={cantidad}
+                        onChange={e => setCantidad(Math.min(Math.max(1, parseInt(e.target.value) || 1), Math.max(1, poolDisponible.length)))}
+                        style={{ padding: '8px 12px', borderRadius: 8, border: '1.5px solid #ddd', width: 100, fontSize: '0.95rem' }} />
+                    <span style={{ color: '#999', fontSize: '0.82rem', marginLeft: 8 }}>/ {poolDisponible.length} disponibles</span>
+                </div>
+
+                <div style={{ marginBottom: 20 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.88rem', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={aleatorio} onChange={e => setAleatorio(e.target.checked)} />
+                        🔀 Orden aleatorio
+                    </label>
+                </div>
+
+                <div style={{ display: 'flex', gap: 10 }}>
+                    <button onClick={empezar} disabled={poolDisponible.length === 0} style={{ flex: 1, padding: '12px', background: poolDisponible.length === 0 ? '#bbb' : '#27ae60', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: poolDisponible.length === 0 ? 'default' : 'pointer' }}>▶️ Empezar</button>
+                    <button onClick={onClose} style={{ padding: '12px 16px', background: '#eee', border: 'none', borderRadius: '10px', cursor: 'pointer', color: '#555' }}>Cancelar</button>
+                </div>
+            </div>
         </div>
     );
 }
@@ -3032,6 +3165,8 @@ const [entrando, setEntrando] = useState(false);
     const [juegoActivo, setJuegoActivo] = useState(null);
     const [recursoParaElegir, setRecursoParaElegir] = useState(null);
     const [selectorHojaRecurso, setSelectorHojaRecurso] = useState(null); // { recurso, hojas }
+    const [eligiendoModoPiLive, setEligiendoModoPiLive] = useState(null);
+    const [configSoloPiLive, setConfigSoloPiLive] = useState(null);
     // --- NUEVAS FUNCIONES DE SALIDA DIRECTA ---
     const handleExitGame = () => {
         if (appData.isMath) {
@@ -3205,8 +3340,11 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={null} onExit={onHo
 
     const procesarClickTarjeta = (r) => {
         if (appData.isLive) {
+            if (appData.id === 'THINKHOOT') {
+                setEligiendoModoPiLive(r);
+            }
             // Si el recurso tiene múltiples hojas, mostrar selector primero
-            if (r.hojas && r.hojas.length > 1) {
+            else if (r.hojas && r.hojas.length > 1) {
                 setSelectorHojaRecurso(r);
             } else {
                 lanzarComoGestor(r);
@@ -3240,11 +3378,39 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={null} onExit={onHo
         if (appData.id === 'WORDLE' || juegoActivo.modoEspecial === 'WORDLE' || (juegoActivo.tipoJuego === 'WORDLE' && !juegoActivo.modoEspecial)) return <TextWordleGame recursoInicial={juegoActivo} usuario={null} onExit={() => setJuegoActivo(null)} />;
         if (appData.id === 'SOPA' || juegoActivo.modoEspecial === 'SOPA' || (juegoActivo.tipoJuego === 'SOPA' && !juegoActivo.modoEspecial)) return <SopaDeLetrasGame recursoInicial={juegoActivo} usuario={null} onExit={() => setJuegoActivo(null)} />;
         if (appData.id === 'ETIQUETAS' || juegoActivo.tipoJuego === 'ETIQUETAS')     return <EtiquetaMe recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.modoEspecial === 'PILIVE_SOLO') return <PiLiveSolo recurso={juegoActivo} usuario={null} alTerminar={() => setJuegoActivo(null)} />;
         return <GamePlayer recurso={juegoActivo} usuario={null} alTerminar={() => setJuegoActivo(null)} />;
     }
 
     return (
         <div style={{ width: '100%', minHeight: '100vh', background: '#f0f2f5', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
+
+            {/* MODAL ELEGIR MODO PILIVE: PRESENTAR vs JUGAR SOLO */}
+            {eligiendoModoPiLive && (
+                <ModalEligeModoPiLive
+                    recurso={eligiendoModoPiLive}
+                    onPresentar={() => {
+                        const r = eligiendoModoPiLive;
+                        setEligiendoModoPiLive(null);
+                        if (r.hojas && r.hojas.length > 1) setSelectorHojaRecurso(r);
+                        else lanzarComoGestor(r);
+                    }}
+                    onJugarSolo={() => { setConfigSoloPiLive(eligiendoModoPiLive); setEligiendoModoPiLive(null); }}
+                    onClose={() => setEligiendoModoPiLive(null)}
+                />
+            )}
+
+            {/* MODAL CONFIGURAR PARTIDA INDIVIDUAL PILIVE */}
+            {configSoloPiLive && (
+                <ModalConfigSoloPiLive
+                    recurso={configSoloPiLive}
+                    onStart={(pool, hojaNombreSeleccionada) => {
+                        setJuegoActivo({ ...configSoloPiLive, preguntas: pool, hojas: undefined, hojaNombreSeleccionada, modoEspecial: 'PILIVE_SOLO' });
+                        setConfigSoloPiLive(null);
+                    }}
+                    onClose={() => setConfigSoloPiLive(null)}
+                />
+            )}
 
             {/* MODAL SELECTOR DE HOJA */}
             {selectorHojaRecurso && (

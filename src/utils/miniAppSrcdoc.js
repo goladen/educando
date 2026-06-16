@@ -1,7 +1,21 @@
+// Quita import/export sueltos que la IA añade a veces a pesar de las instrucciones.
+// Sin esto, el navegador rompe al insertar el <script> porque Babel standalone
+// no transforma módulos ES por defecto (solo JSX), y "import"/"export" no son
+// válidos en un script clásico.
+function stripModuleSyntax(code) {
+  return code
+    .replace(/^[ \t]*import\s[\s\S]*?from\s*['"][^'"]+['"]\s*;?/gm, '')
+    .replace(/^[ \t]*import\s*['"][^'"]+['"]\s*;?/gm, '')
+    .replace(/^[ \t]*export\s+default\s+(function|class)/gm, '$1')
+    .replace(/^[ \t]*export\s+default\s+\w+\s*;?\s*$/gm, '')
+    .replace(/^[ \t]*export\s+\{[^}]*\}\s*;?\s*$/gm, '')
+    .replace(/^[ \t]*export\s+(const|let|var|function|class)\s+/gm, '$1 ');
+}
+
 // Shared builder for the sandboxed iframe HTML used in MiniAppCreator and MiniAppViewer
 export function buildSrcdoc(code) {
   // Escape </script> inside user code to prevent HTML injection
-  const safe = code.replace(/<\/script>/gi, '<\\/script>');
+  const safe = stripModuleSyntax(code).replace(/<\/script>/gi, '<\\/script>');
   return `<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -9,7 +23,7 @@ export function buildSrcdoc(code) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.7/babel.min.js"></script>
   <script>
     window.onerror = function(msg, src, line) {
       window.parent.postMessage({ type:'miniapp-error', msg: msg + ' (línea '+line+')' }, '*');

@@ -601,6 +601,18 @@ export default function InformesJuegos({ usuario, googleToken }) {
                                         onBuscarJugador={setBusquedaJugador}
                                     />
                                 );
+                                if (tipo === 'LINEA_TIEMPO') return (
+                                    <LineaTiempoCard
+                                        key={inf.id} inf={inf}
+                                        onBorrar={()=>borrar(inf.id)}
+                                        borrando={borrando===inf.id}
+                                        borradoOk={borrandoOk===inf.id}
+                                        modoSeleccion={modoSeleccion}
+                                        seleccionado={selec}
+                                        onSeleccionar={()=>toggleSeleccion(inf.id)}
+                                        onBuscarJugador={setBusquedaJugador}
+                                    />
+                                );
                                 return (
                                     <InformeCard
                                         key={inf.id} inf={inf}
@@ -700,10 +712,12 @@ const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, 
                 <div style={{ flex:1, minWidth:100 }}>
                     <div style={{ fontWeight:700, color:'#2c3e50', fontSize:'0.92rem' }}>
                         {tipoLabel(tipo)}
+                        {(inf.recursoTitulo || inf.titulo) && <span style={{ marginLeft:6, fontWeight:600, color:'#34495e' }}>· {inf.recursoTitulo || inf.titulo}</span>}
                         {inf.modalidad && <span style={{ marginLeft:8, fontWeight:400, color:'#7f8c8d', fontSize:'0.8rem' }}>{inf.modalidad}</span>}
                     </div>
-                    <div style={{ fontSize:'0.74rem', color:'#95a5a6', marginTop:1, display:'flex', alignItems:'center', gap:4 }}>
-                        <Clock size={10}/>{fmtFecha(inf.fecha)}
+                    <div style={{ fontSize:'0.74rem', color:'#95a5a6', marginTop:1, display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                        <span style={{ display:'flex', alignItems:'center', gap:4 }}><Clock size={10}/>{fmtFecha(inf.fecha)}</span>
+                        {inf.hoja && <span>📄 {inf.hoja}</span>}
                     </div>
                 </div>
                 <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
@@ -931,6 +945,62 @@ const OAOACard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccion
                     )}
                     <span style={{ padding:'2px 8px', borderRadius:20, background:'#f3f4f6', fontWeight:700, fontSize:'0.78rem', color: pctColor(pctTotal) }}>
                         Total {pctTotal}%
+                    </span>
+                </div>
+                {!modoSeleccion && (
+                    <button onClick={e=>{e.stopPropagation();setConfirmar(true);}} style={{ padding:'4px 7px', borderRadius:7, border:'1px solid #fdd', background:'#fdecea', color:'#e74c3c', cursor:'pointer', flexShrink:0 }} title="Eliminar informe">
+                        <Trash2 size={13}/>
+                    </button>
+                )}
+            </div>
+            {confirmar && (
+                <div style={{ background:'#fdecea', borderTop:'1px solid #fdd', padding:'10px 15px', display:'flex', alignItems:'center', gap:10, fontSize:'0.83rem' }}>
+                    <AlertTriangle size={14} color="#e74c3c"/>
+                    <span style={{ flex:1, color:'#c0392b' }}>¿Eliminar este informe?</span>
+                    <button onClick={()=>{setConfirmar(false);onBorrar();}} disabled={borrando} style={{ padding:'4px 12px', borderRadius:7, border:'none', background:'#e74c3c', color:'white', cursor:'pointer', fontWeight:700, fontSize:'0.8rem' }}>{borrando?'Borrando…':'Eliminar'}</button>
+                    <button onClick={()=>setConfirmar(false)} style={{ padding:'4px 10px', borderRadius:7, border:'1px solid #ddd', background:'white', cursor:'pointer', fontSize:'0.8rem' }}>Cancelar</button>
+                </div>
+            )}
+            {borradoOk && <div style={{ background:'#e8f5e9', padding:'8px 15px', fontSize:'0.8rem', color:'#27ae60', display:'flex', alignItems:'center', gap:6 }}><CheckCircle size={13}/>Eliminado</div>}
+        </div>
+    );
+};
+
+// ─── Tarjeta especial para Línea del Tiempo ──────────────────────────────────
+const LineaTiempoCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccionado, onSeleccionar, onBuscarJugador }) => {
+    const [confirmar, setConfirmar] = useState(false);
+    const j = (inf.jugadores || [])[0] || {};
+    const intentos = j.intentos ?? 0;
+    const total = j.total ?? j.aciertos ?? 0;
+    // Menos intentos = mejor. Verde si lo clava (1 intento), naranja hasta 3, rojo si más.
+    const intColor = intentos <= 1 ? '#27ae60' : intentos <= 3 ? '#e67e22' : '#e74c3c';
+
+    return (
+        <div style={{ background:'white', borderRadius:13, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', overflow:'hidden', border: seleccionado ? '2px solid #1565C0' : '1.5px solid #e8e8e8', transition:'border 0.1s' }}>
+            <div onClick={modoSeleccion ? onSeleccionar : undefined} style={{ padding:'11px 15px', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', cursor: modoSeleccion ? 'pointer' : 'default', background: seleccionado ? '#f0f4ff' : 'white' }}>
+                {modoSeleccion && (
+                    <input type="checkbox" checked={seleccionado} onChange={e=>{e.stopPropagation();onSeleccionar();}} onClick={e=>e.stopPropagation()} style={{ width:17, height:17, cursor:'pointer', accentColor:'#1565C0', flexShrink:0 }}/>
+                )}
+                <span style={{ fontSize:'1.4rem' }}>🕰️</span>
+                <div style={{ flex:1, minWidth:100 }}>
+                    <div style={{ fontWeight:700, color:'#2c3e50', fontSize:'0.92rem' }}>
+                        {inf.recursoTitulo || 'Línea del Tiempo'}
+                        {inf.hoja && <span style={{ marginLeft:8, fontWeight:400, color:'#7f8c8d', fontSize:'0.8rem' }}>{inf.hoja}</span>}
+                    </div>
+                    <div style={{ fontSize:'0.74rem', color:'#95a5a6', marginTop:1 }}>
+                        {fmtFecha(inf.fecha)}
+                        {j.nombre && <> · <span onClick={e=>{e.stopPropagation();onBuscarJugador?.(j.nombre);}} style={{ cursor:'pointer', borderBottom:'1px dotted #aaa', fontWeight:600, color:'#2c3e50' }}>{j.nombre}</span></>}
+                        {j.curso && <span style={{ marginLeft:5, color:'#aaa' }}>({j.curso})</span>}
+                    </div>
+                </div>
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                    {total > 0 && (
+                        <span style={{ padding:'2px 8px', borderRadius:20, background:'#e8f1f8', color:'#1f5f86', fontWeight:700, fontSize:'0.78rem' }}>
+                            📅 {total} eventos
+                        </span>
+                    )}
+                    <span style={{ padding:'2px 8px', borderRadius:20, background:'#f3f4f6', fontWeight:700, fontSize:'0.78rem', color: intColor }}>
+                        🎯 {intentos} {intentos === 1 ? 'intento' : 'intentos'}
                     </span>
                 </div>
                 {!modoSeleccion && (

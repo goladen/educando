@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { buildSrcdoc } from '../utils/miniAppSrcdoc';
@@ -9,6 +9,22 @@ export default function MiniAppViewer({ miniappId, onBack }) {
   const [error, setError]         = useState('');
   const [runtimeError, setRuntimeError] = useState('');
   const [iframeKey, setIframeKey] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const iframeRef = useRef(null);
+
+  useEffect(() => {
+    const h = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', h);
+    return () => document.removeEventListener('fullscreenchange', h);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else if (iframeRef.current) {
+      iframeRef.current.requestFullscreen();
+    }
+  };
 
   useEffect(() => {
     getDoc(doc(db, 'miniapps', miniappId))
@@ -68,6 +84,10 @@ export default function MiniAppViewer({ miniappId, onBack }) {
           style={{ background:'rgba(108,99,255,0.3)', border:'none', color:'#c4b5fd', borderRadius:8, padding:'6px 12px', cursor:'pointer', fontSize:'0.8rem', fontWeight:700 }}>
           ↺ Recargar
         </button>
+        <button onClick={toggleFullscreen}
+          style={{ background:'rgba(108,99,255,0.3)', border:'none', color:'#c4b5fd', borderRadius:8, padding:'6px 12px', cursor:'pointer', fontSize:'0.8rem', fontWeight:700 }}>
+          {isFullscreen ? '⤡ Salir de pantalla completa' : '⛶ Pantalla completa'}
+        </button>
       </div>
 
       {runtimeError && (
@@ -79,11 +99,12 @@ export default function MiniAppViewer({ miniappId, onBack }) {
 
       {/* Sandboxed app */}
       <iframe
+        ref={iframeRef}
         key={iframeKey}
         srcDoc={buildSrcdoc(app.code)}
         sandbox="allow-scripts"
         title={app.titulo}
-        style={{ width:'100%', height:'calc(100vh - 58px)', border:'none', display:'block' }}
+        style={{ width:'100%', height:'calc(100vh - 58px)', border:'none', display:'block', background:'#fff' }}
       />
     </div>
   );

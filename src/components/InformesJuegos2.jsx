@@ -52,8 +52,8 @@ const ConfigBadge = ({ icon, label }) => (
         {icon} {label}
     </span>
 );
-const TIPO_LABEL  = { OCA:'🦆 Oca Matemática', CAZABURBUJAS:'🔵 Cazaburbujas', PIKATRON:'⚡ Pikatron', SOPA:'🔤 Sopa de Letras', WORDLE:'🟩 Wordle', MATHLE:'🔢 Mathle', PASAPALABRA:'🔠 Pasapalabra', FUNCIONES:'∫ Funciones', FUNCIONES_ANALISIS:'📈 Análisis de Funciones', APAREJADOS:'🃏 Aparejados', STORYCUBES:'🎲 Story Cubes', IRREGULAR_VERBS:'🇬🇧 Verbos Irregulares', THINKHOOT:'🦉 PiLive', MATHLIVE:'🧮 MathLive', OLYMPICLIVE:'🏅 OlympicLive', ALGEBRA:'✖️ Álgebra', DOMINO:'🁣 Dominó', ESTADISTICA:'📊 Estadística', MUSIC_COMPASS:'🎵 Entrenamiento Auditivo', MUSIC_GAMES:'🎼 Juegos Musicales', GEOGRAFIA:'🌍 Test de Geografía', BIOLOGIA:'🔬 Test de Biología' };
-const TIPO_ICON   = { OCA:'🦆', CAZABURBUJAS:'🔵', PIKATRON:'⚡', SOPA:'🔤', WORDLE:'🟩', MATHLE:'🔢', PASAPALABRA:'🔠', FUNCIONES:'∫', FUNCIONES_ANALISIS:'📈', APAREJADOS:'🃏', STORYCUBES:'🎲', IRREGULAR_VERBS:'🇬🇧', THINKHOOT:'🦉', MATHLIVE:'🧮', OLYMPICLIVE:'🏅', ALGEBRA:'✖️', DOMINO:'🁣', ESTADISTICA:'📊', MUSIC_COMPASS:'🎵', MUSIC_GAMES:'🎼', GEOGRAFIA:'🌍', BIOLOGIA:'🔬' };
+const TIPO_LABEL  = { OCA:'🦆 Oca Matemática', CAZABURBUJAS:'🔵 Cazaburbujas', PIKATRON:'⚡ Pikatron', SOPA:'🔤 Sopa de Letras', WORDLE:'🟩 Wordle', MATHLE:'🔢 Mathle', PASAPALABRA:'🔠 Pasapalabra', FUNCIONES:'∫ Funciones', FUNCIONES_ANALISIS:'📈 Análisis de Funciones', APAREJADOS:'🃏 Aparejados', STORYCUBES:'🎲 Story Cubes', IRREGULAR_VERBS:'🇬🇧 Verbos Irregulares', THINKHOOT:'🦉 PiLive', MATHLIVE:'🧮 MathLive', OLYMPICLIVE:'🏅 OlympicLive', ALGEBRA:'✖️ Álgebra', DOMINO:'🁣 Dominó', ESTADISTICA:'📊 Estadística', MUSIC_COMPASS:'🎵 Entrenamiento Auditivo', MUSIC_GAMES:'🎼 Juegos Musicales', GEOGRAFIA:'🌍 Test de Geografía', BIOLOGIA:'🔬 Test de Biología', FUTBOLQUIZZ:'⚽ Fútbol Quizz' };
+const TIPO_ICON   = { OCA:'🦆', CAZABURBUJAS:'🔵', PIKATRON:'⚡', SOPA:'🔤', WORDLE:'🟩', MATHLE:'🔢', PASAPALABRA:'🔠', FUNCIONES:'∫', FUNCIONES_ANALISIS:'📈', APAREJADOS:'🃏', STORYCUBES:'🎲', IRREGULAR_VERBS:'🇬🇧', THINKHOOT:'🦉', MATHLIVE:'🧮', OLYMPICLIVE:'🏅', ALGEBRA:'✖️', DOMINO:'🁣', ESTADISTICA:'📊', MUSIC_COMPASS:'🎵', MUSIC_GAMES:'🎼', GEOGRAFIA:'🌍', BIOLOGIA:'🔬', FUTBOLQUIZZ:'⚽' };
 const TIPO_LIVE = new Set(['THINKHOOT', 'MATHLIVE', 'OLYMPICLIVE']);
 const tipoLabel   = (t) => TIPO_LABEL[t] || ('🎮 ' + (t||'Juego'));
 const tipoIcon    = (t) => TIPO_ICON[t]  || '🎮';
@@ -613,6 +613,18 @@ export default function InformesJuegos({ usuario, googleToken }) {
                                         onBuscarJugador={setBusquedaJugador}
                                     />
                                 );
+                                if (tipo === 'FUTBOLQUIZZ') return (
+                                    <FutbolQuizzCard
+                                        key={inf.id} inf={inf}
+                                        onBorrar={()=>borrar(inf.id)}
+                                        borrando={borrando===inf.id}
+                                        borradoOk={borrandoOk===inf.id}
+                                        modoSeleccion={modoSeleccion}
+                                        seleccionado={selec}
+                                        onSeleccionar={()=>toggleSeleccion(inf.id)}
+                                        onBuscarJugador={setBusquedaJugador}
+                                    />
+                                );
                                 return (
                                     <InformeCard
                                         key={inf.id} inf={inf}
@@ -902,6 +914,84 @@ const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, 
 };
 
 // ─── Tarjeta especial para Bloques OAOA (Cálculo Primaria) ──────────────────
+// ─── Tarjeta especial para Fútbol Quizz (Rojo vs Azul) ───────────────────────
+const FutbolQuizzCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccionado, onSeleccionar, onBuscarJugador }) => {
+    const [confirmar, setConfirmar] = useState(false);
+    const jugadores = inf.jugadores || [];
+    const rojo = jugadores.find(j => j.equipo === 'Rojo') || jugadores[0] || {};
+    const azul = jugadores.find(j => j.equipo === 'Azul') || jugadores[1] || {};
+    const hojas = Array.isArray(inf.hojas) ? inf.hojas : (inf.hojas ? [inf.hojas] : []);
+
+    const Equipo = ({ j, color, bg }) => {
+        const esGana = j.ganador;
+        return (
+            <div style={{ flex:1, minWidth:120, background: esGana ? bg : '#f8f9fa', border:`1.5px solid ${esGana ? color : '#e8e8e8'}`, borderRadius:10, padding:'8px 10px' }}>
+                <div style={{ fontWeight:700, color, fontSize:'0.85rem', display:'flex', alignItems:'center', gap:4 }}>
+                    {esGana && '🏆'}
+                    <span onClick={e=>{e.stopPropagation();onBuscarJugador?.(j.nombre);}} style={{ cursor:'pointer', borderBottom:'1px dotted #aaa' }}>{j.nombre || '—'}</span>
+                </div>
+                <div style={{ display:'flex', gap:8, marginTop:4, fontSize:'0.78rem', fontWeight:700, flexWrap:'wrap' }}>
+                    <span style={{ color:'#2c3e50' }}>⚽ {j.goles ?? 0}</span>
+                    <span style={{ color:'#27ae60' }}>✓ {j.aciertos ?? 0}</span>
+                    <span style={{ color:'#e74c3c' }}>✗ {j.fallos ?? 0}</span>
+                    {(j.intentos > 0) && <span style={{ color:'#7f8c8d' }}>{j.porcentaje ?? 0}%</span>}
+                </div>
+            </div>
+        );
+    };
+
+    return (
+        <div style={{ background:'white', borderRadius:13, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', overflow:'hidden', border: seleccionado ? '2px solid #1565C0' : '1.5px solid #e8e8e8' }}>
+            <div onClick={modoSeleccion ? onSeleccionar : undefined} style={{ padding:'11px 15px', cursor: modoSeleccion ? 'pointer' : 'default', background: seleccionado ? '#f0f4ff' : 'white' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+                    {modoSeleccion && (
+                        <input type="checkbox" checked={seleccionado} onChange={e=>{e.stopPropagation();onSeleccionar();}} onClick={e=>e.stopPropagation()} style={{ width:17, height:17, cursor:'pointer', accentColor:'#1565C0', flexShrink:0 }}/>
+                    )}
+                    <span style={{ fontSize:'1.4rem' }}>⚽</span>
+                    <div style={{ flex:1, minWidth:120 }}>
+                        <div style={{ fontWeight:700, color:'#2c3e50', fontSize:'0.92rem' }}>
+                            Fútbol Quizz
+                            {inf.ganador && <span style={{ marginLeft:8, fontWeight:400, color:'#27ae60', fontSize:'0.8rem' }}>🏆 {inf.ganador}</span>}
+                        </div>
+                        <div style={{ fontSize:'0.74rem', color:'#95a5a6', marginTop:1, display:'flex', alignItems:'center', gap:4, flexWrap:'wrap' }}>
+                            <Clock size={10}/>{fmtFecha(inf.fecha)}
+                            {(rojo.curso || azul.curso) && <span style={{ color:'#aaa' }}>· {rojo.curso || azul.curso}</span>}
+                        </div>
+                    </div>
+                    {!modoSeleccion && (
+                        <button onClick={e=>{e.stopPropagation();setConfirmar(true);}} style={{ padding:'4px 7px', borderRadius:7, border:'1px solid #fdd', background:'#fdecea', color:'#e74c3c', cursor:'pointer', flexShrink:0 }} title="Eliminar informe">
+                            <Trash2 size={13}/>
+                        </button>
+                    )}
+                </div>
+
+                {/* Marcador por equipos */}
+                <div style={{ display:'flex', gap:8, marginTop:10 }}>
+                    <Equipo j={rojo} color="#e74c3c" bg="#fdecea" />
+                    <Equipo j={azul} color="#2980b9" bg="#eaf2fb" />
+                </div>
+
+                {/* Recurso y hojas */}
+                {(inf.recursoTitulo || hojas.length > 0) && (
+                    <div style={{ marginTop:8, fontSize:'0.74rem', color:'#7f8c8d', display:'flex', flexDirection:'column', gap:2 }}>
+                        {inf.recursoTitulo && <span>📚 {inf.recursoTitulo}</span>}
+                        {hojas.length > 0 && <span>📄 {hojas.join(', ')}</span>}
+                    </div>
+                )}
+            </div>
+            {confirmar && (
+                <div style={{ background:'#fdecea', borderTop:'1px solid #fdd', padding:'10px 15px', display:'flex', alignItems:'center', gap:10, fontSize:'0.83rem' }}>
+                    <AlertTriangle size={14} color="#e74c3c"/>
+                    <span style={{ flex:1, color:'#c0392b' }}>¿Eliminar este informe?</span>
+                    <button onClick={()=>{setConfirmar(false);onBorrar();}} disabled={borrando} style={{ padding:'4px 12px', borderRadius:7, border:'none', background:'#e74c3c', color:'white', cursor:'pointer', fontWeight:700, fontSize:'0.8rem' }}>{borrando?'Borrando…':'Eliminar'}</button>
+                    <button onClick={()=>setConfirmar(false)} style={{ padding:'4px 10px', borderRadius:7, border:'1px solid #ddd', background:'white', cursor:'pointer', fontSize:'0.8rem' }}>Cancelar</button>
+                </div>
+            )}
+            {borradoOk && <div style={{ background:'#e8f5e9', padding:'8px 15px', fontSize:'0.8rem', color:'#27ae60', display:'flex', alignItems:'center', gap:6 }}><CheckCircle size={13}/>Eliminado</div>}
+        </div>
+    );
+};
+
 const OAOACard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccionado, onSeleccionar, onBuscarJugador }) => {
     const [confirmar, setConfirmar] = useState(false);
     const j = (inf.jugadores || [])[0] || {};

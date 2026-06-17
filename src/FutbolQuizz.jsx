@@ -10,12 +10,18 @@ const CHAMPIONS_START = 37;
 import correctSoundFile from './assets/correct-choice-43861.mp3';
 import wrongSoundFile from './assets/negative_beeps-6008.mp3';
 import goalSoundFile from './assets/gol-cutmp3.mp3';
+import whistleSoundFile from './assets/piarbitro.mp3';
 
 const _mkAudio = src => { let a; return { play() { return (a ??= new Audio(src)).play(); }, reset() { if (a) a.currentTime = 0; } }; };
 const audioCorrect = _mkAudio(correctSoundFile);
 const audioWrong = _mkAudio(wrongSoundFile);
 const audioGoal = _mkAudio(goalSoundFile);
 const safePlay = (audioObj) => { audioObj.reset(); audioObj.play().catch(() => { }); };
+
+// Silbato del árbitro: una instancia nueva por pitido para poder solaparlos
+const playWhistle = () => { try { const a = new Audio(whistleSoundFile); a.play().catch(() => { }); } catch (e) { } };
+// Tres pitidos seguidos (inicio de partido)
+const playWhistleTriple = () => { [0, 600, 1200].forEach(d => setTimeout(playWhistle, d)); };
 
 // ============================================================================
 // Helpers de preguntas (compartidos con el motor PiLive)
@@ -36,12 +42,18 @@ const getCorrectAnswerText = (data) => {
     return data.respuesta || data.correcta || data.a || '';
 };
 
-// Construye y baraja el pool de preguntas de un recurso (THINKHOOT, CAZABURBUJAS o PASAPALABRA)
-function construirPool(recurso) {
+// Construye y baraja el pool de preguntas de un recurso (THINKHOOT, CAZABURBUJAS o PASAPALABRA).
+// Si se pasan hojasSeleccionadas, solo se incluyen esas hojas; al barajar se mezclan entre sí.
+function construirPool(recurso, hojasSeleccionadas) {
     if (!recurso) return [];
     let pool = [];
     if (Array.isArray(recurso.preguntas)) pool.push(...recurso.preguntas);
-    if (Array.isArray(recurso.hojas)) recurso.hojas.forEach(h => { if (Array.isArray(h.preguntas)) pool.push(...h.preguntas); });
+    if (Array.isArray(recurso.hojas)) {
+        const usar = (hojasSeleccionadas && hojasSeleccionadas.length)
+            ? recurso.hojas.filter(h => hojasSeleccionadas.includes(h.nombreHoja))
+            : recurso.hojas;
+        usar.forEach(h => { if (Array.isArray(h.preguntas)) pool.push(...h.preguntas); });
+    }
 
     pool = pool
         .filter(p => p && p.tipo !== 'DIBUJO' && p.tipo !== 'MUSICAL' && p.tipo !== 'PRESENTATION')
@@ -247,13 +259,38 @@ function PantallaInicio({ onJugar, onExit }) {
     const [nombreRojo, setNombreRojo] = useState('');
     const [nombreAzul, setNombreAzul] = useState('');
     const [golesParaGanar, setGolesParaGanar] = useState(3);
+    const [vsCPU, setVsCPU] = useState(false);
+    const [recursoElegido, setRecursoElegido] = useState(null); // recurso a la espera de elegir hojas
+    const [hojasSel, setHojasSel] = useState(new Set());
 
-    const lanzar = (recurso) => onJugar({
-        recurso,
-        nombreRojo: nombreRojo.trim() || 'Equipo Rojo',
-        nombreAzul: nombreAzul.trim() || 'Equipo Azul',
+    const lanzar = (recurso, hojas = null) => onJugar({
+        recurso, hojas, vsCPU,
+        nombreRojo: nombreRojo.trim() || (vsCPU ? 'Jugador' : 'Equipo Rojo'),
+        nombreAzul: vsCPU ? 'Ordenador' : (nombreAzul.trim() || 'Equipo Azul'),
         golesParaGanar
     });
+
+    // Hojas (con preguntas) de un recurso
+    const hojasDe = (r) => (r.hojas || []).filter(h => h.preguntas?.length > 0).map(h => h.nombreHoja);
+
+    // Tras elegir recurso: si tiene varias hojas, pedir cuáles; si no, lanzar directo
+    const seleccionarRecurso = (r) => {
+        const hojas = hojasDe(r);
+        if (hojas.length > 1) {
+            setRecursoElegido(r);
+            setHojasSel(new Set(hojas)); // todas marcadas por defecto
+        } else {
+            lanzar(r, hojas.length ? hojas : null);
+        }
+    };
+
+    const toggleHoja = (nombre) => {
+        setHojasSel(prev => {
+            const n = new Set(prev);
+            if (n.has(nombre)) n.delete(nombre); else n.add(nombre);
+            return n;
+        });
+    };
 
     const tipoLabel = (r) => {
         const tj = r.tipoJuego;
@@ -275,7 +312,7 @@ function PantallaInicio({ onJugar, onExit }) {
             if (snap.empty) { setError('Código no encontrado.'); setBuscando(false); return; }
             const r = { ...snap.docs[0].data(), id: snap.docs[0].id };
             if (!tienePreguntas(r)) { setError('Ese recurso no tiene preguntas jugables.'); setBuscando(false); return; }
-            lanzar(r);
+            seleccionarRecurso(r);
         } catch (e) { setError('Error: ' + e.message); }
         setBuscando(false);
     };
@@ -325,23 +362,40 @@ function PantallaInicio({ onJugar, onExit }) {
                 <div style={{ background: 'rgba(0,0,0,0.35)', borderRadius: 16, padding: '18px 20px', lineHeight: 1.6, fontSize: '0.95rem' }}>
                     <div style={{ fontWeight: 800, color: '#f1c40f', marginBottom: 8, fontSize: '1.05rem' }}>📋 Cómo se juega</div>
                     <ul style={{ margin: 0, paddingLeft: 20 }}>
-                        <li>Dos equipos (🔴 Rojo y 🔵 Azul) juegan por turnos.</li>
-                        <li>Antes de tirar, el equipo debe <b>responder una pregunta</b>.</li>
-                        <li>Si <b>acierta</b>, arrastra un jugador y suéltalo para chutar.</li>
-                        <li>Si <b>falla</b>, el turno pasa al otro equipo.</li>
-                        <li>Marca goles en la portería contraria. ¡Gana quien más meta!</li>
+                        <li>Antes de tirar hay que <b>responder una pregunta</b> (el primer tiro es libre).</li>
+                        <li>Si <b>aciertas</b>, arrastra un jugador y suéltalo para chutar a portería.</li>
+                        {vsCPU
+                            ? <li><b>1 jugador:</b> si fallas <b>más de 3 preguntas seguidas</b>, el Ordenador marca gol.</li>
+                            : <li><b>2 jugadores:</b> si fallas, el turno pasa al otro equipo.</li>}
+                        <li>Gana el primero en marcar los goles fijados.</li>
                     </ul>
                     <div style={{ marginTop: 8, color: '#cbd5e1', fontSize: '0.85rem' }}>Admite recursos de tipo <b>PiLive</b>, <b>Burbujas</b> y <b>Pasapalabra</b>.</div>
                 </div>
 
+                {/* Modo de juego */}
+                <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 16, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <div style={{ fontWeight: 700 }}>🎮 Modo de juego</div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        {[{ k: false, t: '👥 2 Jugadores', d: 'Rojo vs Azul' }, { k: true, t: '🤖 1 Jugador', d: 'vs Ordenador' }].map(o => (
+                            <button key={String(o.k)} onClick={() => setVsCPU(o.k)}
+                                style={{ flex: 1, padding: '12px', borderRadius: 12, border: vsCPU === o.k ? '2px solid #f1c40f' : '1.5px solid rgba(255,255,255,0.2)', background: vsCPU === o.k ? 'rgba(241,196,15,0.18)' : 'rgba(255,255,255,0.05)', color: 'white', cursor: 'pointer', fontWeight: 700 }}>
+                                <div>{o.t}</div>
+                                <div style={{ fontSize: '0.74rem', color: '#cbd5e1', fontWeight: 500 }}>{o.d}</div>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
                 {/* Equipos y goles para ganar */}
                 <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 16, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    <div style={{ fontWeight: 700 }}>👥 Jugadores</div>
+                    <div style={{ fontWeight: 700 }}>{vsCPU ? '🙋 Tu nombre' : '👥 Jugadores'}</div>
                     <div style={{ display: 'flex', gap: 8 }}>
-                        <input value={nombreRojo} onChange={e => setNombreRojo(e.target.value)} maxLength={20} placeholder="Nombre Equipo Rojo"
+                        <input value={nombreRojo} onChange={e => setNombreRojo(e.target.value)} maxLength={20} placeholder={vsCPU ? 'Tu nombre' : 'Nombre Equipo Rojo'}
                             style={{ ...inp, borderColor: '#ef4444', flex: 1 }} />
-                        <input value={nombreAzul} onChange={e => setNombreAzul(e.target.value)} maxLength={20} placeholder="Nombre Equipo Azul"
-                            style={{ ...inp, borderColor: '#3b82f6', flex: 1 }} />
+                        {!vsCPU && (
+                            <input value={nombreAzul} onChange={e => setNombreAzul(e.target.value)} maxLength={20} placeholder="Nombre Equipo Azul"
+                                style={{ ...inp, borderColor: '#3b82f6', flex: 1 }} />
+                        )}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                         <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>🏆 Gana el primero en marcar:</span>
@@ -376,7 +430,7 @@ function PantallaInicio({ onJugar, onExit }) {
                             {resultados.map(r => {
                                 const tl = tipoLabel(r);
                                 return (
-                                    <button key={r.id} onClick={() => lanzar(r)} style={{ display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, padding: '10px 12px', cursor: 'pointer', color: 'white' }}>
+                                    <button key={r.id} onClick={() => seleccionarRecurso(r)} style={{ display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, padding: '10px 12px', cursor: 'pointer', color: 'white' }}>
                                         <span style={{ ...{ padding: '3px 8px', borderRadius: 8, fontSize: '0.7rem', fontWeight: 700 }, background: tl.color }}>{tl.txt}</span>
                                         <span style={{ flex: 1, fontWeight: 600, fontSize: '0.9rem' }}>{r.titulo || 'Sin título'}</span>
                                         <span style={{ color: '#94a3b8', fontSize: '1.2rem' }}>▶</span>
@@ -392,6 +446,44 @@ function PantallaInicio({ onJugar, onExit }) {
                     ▶ Jugar sin recurso (libre)
                 </button>
             </div>
+
+            {/* Modal: elegir hoja(s) del recurso */}
+            {recursoElegido && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 10001, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
+                    <div style={{ background: '#1e272e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 18, width: '100%', maxWidth: 420, padding: '22px 24px', color: 'white', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                            <h3 style={{ margin: 0, fontSize: '1.05rem', color: '#f1c40f' }}>📄 Elige las hojas</h3>
+                            <button onClick={() => setRecursoElegido(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#aaa', fontSize: '1.2rem' }}>✕</button>
+                        </div>
+                        <div style={{ color: '#cbd5e1', fontSize: '0.85rem', marginBottom: 12 }}>{recursoElegido.titulo} — se mezclarán las preguntas de las hojas elegidas.</div>
+
+                        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                            <button onClick={() => setHojasSel(new Set(hojasDe(recursoElegido)))} style={{ flex: 1, padding: '7px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.06)', color: 'white', cursor: 'pointer', fontSize: '0.8rem' }}>Todas</button>
+                            <button onClick={() => setHojasSel(new Set())} style={{ flex: 1, padding: '7px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.06)', color: 'white', cursor: 'pointer', fontSize: '0.8rem' }}>Ninguna</button>
+                        </div>
+
+                        <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
+                            {hojasDe(recursoElegido).map(nombre => {
+                                const sel = hojasSel.has(nombre);
+                                const numP = recursoElegido.hojas.find(h => h.nombreHoja === nombre)?.preguntas?.length || 0;
+                                return (
+                                    <button key={nombre} onClick={() => toggleHoja(nombre)} style={{ display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', background: sel ? 'rgba(46,204,113,0.18)' : 'rgba(255,255,255,0.05)', border: `1.5px solid ${sel ? '#2ecc71' : 'rgba(255,255,255,0.12)'}`, borderRadius: 10, padding: '10px 12px', cursor: 'pointer', color: 'white' }}>
+                                        <span style={{ fontSize: '1.1rem' }}>{sel ? '☑' : '☐'}</span>
+                                        <span style={{ flex: 1, fontWeight: 600, fontSize: '0.9rem' }}>{nombre}</span>
+                                        <span style={{ color: '#94a3b8', fontSize: '0.78rem' }}>{numP} preg.</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        <button onClick={() => { if (hojasSel.size === 0) return; lanzar(recursoElegido, Array.from(hojasSel)); }}
+                            disabled={hojasSel.size === 0}
+                            style={{ marginTop: 14, padding: '13px', borderRadius: 12, border: 'none', background: hojasSel.size === 0 ? '#555' : 'linear-gradient(135deg,#16a34a,#15803d)', color: 'white', fontWeight: 800, fontSize: '1rem', cursor: hojasSel.size === 0 ? 'default' : 'pointer' }}>
+                            ▶ Empezar partido ({hojasSel.size} {hojasSel.size === 1 ? 'hoja' : 'hojas'})
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -401,13 +493,15 @@ function PantallaInicio({ onJugar, onExit }) {
 // ============================================================================
 function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
     const recurso = config?.recurso || null;
-    const nombres = { red: config?.nombreRojo || 'Equipo Rojo', blue: config?.nombreAzul || 'Equipo Azul' };
+    const vsCPU = !!config?.vsCPU;
+    const nombres = { red: config?.nombreRojo || 'Equipo Rojo', blue: config?.nombreAzul || (vsCPU ? 'Ordenador' : 'Equipo Azul') };
     const golesParaGanar = config?.golesParaGanar || 3;
 
     const width = 800;
     const height = 500;
-    const goalYTop = height / 2 - 60;
-    const goalYBottom = height / 2 + 60;
+    const goalHalf = 95; // semialtura de la portería (mayor = portería más grande)
+    const goalYTop = height / 2 - goalHalf;
+    const goalYBottom = height / 2 + goalHalf;
 
     const initialPlayers = [
         { id: 'r1', team: 'red', x: 100, y: 250, r: 18, angle: 0, vx: 0, vy: 0 },
@@ -420,8 +514,8 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
         { id: 'b4', team: 'blue', x: 420, y: 250, r: 18, angle: Math.PI, vx: 0, vy: 0 },
     ];
 
-    // Pool de preguntas
-    const poolRef = useRef(construirPool(recurso));
+    // Pool de preguntas (mezcla las hojas elegidas)
+    const poolRef = useRef(construirPool(recurso, config?.hojas));
     const idxRef = useRef(0);
     const modoConPreguntas = poolRef.current.length > 0;
 
@@ -431,6 +525,10 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
         activeTeam: 'red',
         isSimulating: false,
         score: { red: 0, blue: 0 },
+        shooterId: null,       // jugador lanzado en el tiro actual (para detectar penalti)
+        ballTouched: false,    // si el balón se ha tocado durante el tiro actual
+        penaltiActivo: false,  // estamos ejecutando un penalti (campo sin obstáculos)
+        pendingPenalti: null,  // equipo al que se le concede un penalti
         message: modoConPreguntas ? `¡${nombres.red}! Primer tiro libre: arrastra para tirar.` : `¡Turno de ${nombres.red}! Arrastra un jugador para apuntar.`
     });
 
@@ -450,6 +548,16 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
     const finalizadoRef = useRef(false);
     // El primer tiro de cada equipo es libre (sin pregunta); luego ya hay que responder.
     const primerTiroRef = useRef({ red: false, blue: false });
+    // vs Ordenador: racha de fallos seguidos del alumno (a los >3 marca el ordenador)
+    const streakRef = useRef(0);
+    const [rachaFallos, setRachaFallos] = useState(0);
+    // vs Ordenador: control del turno automático de la IA
+    const cpuTimeoutRef = useRef(null);
+    const cpuPensandoRef = useRef(false);
+    // Penalti
+    const prePenaltiRef = useRef(null); // posiciones congeladas "antes del penalti"
+    const penaltiTimeoutRef = useRef(null);
+    const [penaltiBanner, setPenaltiBanner] = useState(false);
 
     // Tamaño del campo: rellena todo el área disponible manteniendo proporción (clave en escritorio)
     const fieldAreaRef = useRef(null);
@@ -473,6 +581,9 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
 
     const playSound = (ok) => safePlay(ok ? audioCorrect : audioWrong);
     const playGoalSound = () => safePlay(audioGoal);
+
+    // Pitido triple del árbitro al comenzar el partido
+    useEffect(() => { playWhistleTriple(); }, []);
 
     const registrarRespuesta = (team, ok) => {
         setStats(prev => {
@@ -500,7 +611,7 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
                 const score = { ...game.score };
                 const s = statsRef.current;
                 setTimeout(() => onFin({
-                    ganador, nombres, golesParaGanar, score,
+                    ganador, nombres, golesParaGanar, score, vsCPU,
                     stats: {
                         red: { goles: score.red, aciertos: s.red.aciertos, fallos: s.red.fallos },
                         blue: { goles: score.blue, aciertos: s.blue.aciertos, fallos: s.blue.fallos },
@@ -523,10 +634,59 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
         setRevealInfo(null);
     };
 
+    // --- TURNO DEL ORDENADOR: apunta a portería y dispara (acierta a veces) ---
+    const dispararCPU = () => {
+        const ball = game.ball;
+        const blues = game.players.filter(p => p.team === 'blue');
+        if (!blues.length) return;
+        // Portería contraria del ordenador = izquierda (x≈8). Punto objetivo con variación → unos entran y otros no.
+        const goalY = height / 2 + (Math.random() * 240 - 120);
+        const G = { x: 6, y: goalY };
+        // Elegir el jugador azul mejor situado (detrás del balón respecto a la portería)
+        let best = blues[0], bestSc = -Infinity;
+        blues.forEach(p => {
+            const bx = ball.x - p.x, by = ball.y - p.y; const bl = Math.hypot(bx, by) || 1;
+            const gx = G.x - ball.x, gy = G.y - ball.y; const gl = Math.hypot(gx, gy) || 1;
+            const align = (bx / bl) * (gx / gl) + (by / bl) * (gy / gl); // alineación tiro→portería
+            const sc = align - bl / 700; // mejor si está alineado y cerca
+            if (sc > bestSc) { bestSc = sc; best = p; }
+        });
+        // Preview de apuntado (línea hacia el balón) para que se vea que "va a portería"
+        setAiming({ isActive: true, playerId: best.id, currentX: ball.x, currentY: ball.y });
+        setGame(prev => ({ ...prev, message: '🤖 El Ordenador apunta…' }));
+        clearTimeout(cpuTimeoutRef.current);
+        cpuTimeoutRef.current = setTimeout(() => {
+            if (finalizadoRef.current) return;
+            setAiming({ isActive: false, playerId: null, currentX: 0, currentY: 0 });
+            const dx = ball.x - best.x, dy = ball.y - best.y; const dl = Math.hypot(dx, dy) || 1;
+            const speed = 30 + Math.random() * 9; // fuerza del disparo
+            const vx = (dx / dl) * speed, vy = (dy / dl) * speed;
+            setGame(prev => {
+                if (prev.isSimulating) return prev;
+                const players = prev.players.map(p => p.id === best.id ? { ...p, vx, vy, angle: Math.atan2(vy, vx) } : p);
+                return { ...prev, players, isSimulating: true, shooterId: best.id, ballTouched: false, message: prev.penaltiActivo ? '🤖 ¡Penalti del Ordenador!' : '🤖 ¡El Ordenador dispara!' };
+            });
+            cpuPensandoRef.current = false; // listo para el siguiente turno azul
+        }, 850);
+    };
+
     useEffect(() => {
-        if (!modoConPreguntas) return;
-        if (finalizadoRef.current) return; // partido terminado, no cargar más preguntas
+        if (finalizadoRef.current) return; // partido terminado
         if (game.isSimulating) return;
+        if (game.pendingPenalti) return; // mostrando el cartel de penalti, esperar
+
+        // Turno automático del ordenador (azul), también para lanzar su penalti
+        if (vsCPU && game.activeTeam === 'blue') {
+            if (!cpuPensandoRef.current) { cpuPensandoRef.current = true; dispararCPU(); }
+            return;
+        }
+        cpuPensandoRef.current = false;
+
+        // Penalti del jugador humano: se tira sin pregunta
+        if (game.penaltiActivo) return;
+
+        // Turno del jugador
+        if (!modoConPreguntas) return; // sin recurso: puede tirar libremente
         if (faseTurno === 'TIRAR') return; // ya respondió (o tiro libre), esperando el tiro
         const team = game.activeTeam;
         // Primer tiro de cada equipo: sin pregunta
@@ -538,29 +698,92 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
         }
         cargarSiguientePregunta();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [game.activeTeam, game.isSimulating]);
+    }, [game.activeTeam, game.isSimulating, game.penaltiActivo]);
+
+    useEffect(() => () => clearTimeout(cpuTimeoutRef.current), []);
+
+    // --- PENALTI: muestra el cartel y monta el campo sin obstáculos ---
+    useEffect(() => {
+        if (!game.pendingPenalti) return;
+        if (finalizadoRef.current) return;
+        const team = game.pendingPenalti;
+        // Guardar las posiciones "antes del penalti" (para restaurarlas si falla)
+        prePenaltiRef.current = { ball: { ...game.ball, vx: 0, vy: 0 }, players: game.players.map(p => ({ ...p, vx: 0, vy: 0 })) };
+        playWhistle(); // pitido del árbitro señalando el penalti
+        setPenaltiBanner(true);
+        clearTimeout(penaltiTimeoutRef.current);
+        penaltiTimeoutRef.current = setTimeout(() => {
+            setPenaltiBanner(false);
+            // Un único jugador del equipo, balón en el centro, sin obstáculos
+            const base = initialPlayers.find(p => p.id === (team === 'red' ? 'r4' : 'b4')) || initialPlayers.find(p => p.team === team);
+            const taker = { ...base, x: team === 'red' ? width / 2 - 95 : width / 2 + 95, y: height / 2, vx: 0, vy: 0, angle: team === 'red' ? 0 : Math.PI };
+            setFaseTurno('TIRAR'); // se tira sin pregunta
+            setGame(prev => ({
+                ...prev,
+                pendingPenalti: null,
+                penaltiActivo: true,
+                ball: { x: width / 2, y: height / 2, vx: 0, vy: 0 },
+                players: [taker],
+                activeTeam: team,
+                isSimulating: false,
+                shooterId: null,
+                ballTouched: false,
+                message: `⚽ Penalti de ${nombres[team]}. ¡Tira a portería!`
+            }));
+        }, 1400);
+        return () => clearTimeout(penaltiTimeoutRef.current);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [game.pendingPenalti]);
 
     const responderPregunta = (ok) => {
         if (modalFase !== 'RESPONDER') return;
         const team = game.activeTeam;
         playSound(ok);
         registrarRespuesta(team, ok);
+        // Racha de fallos (solo relevante en modo vs Ordenador)
+        streakRef.current = ok ? 0 : streakRef.current + 1;
+        setRachaFallos(streakRef.current);
+        const cpuMarca = vsCPU && !ok && streakRef.current > 3;
+        const cpuGana = cpuMarca && (game.score.blue + 1) >= golesParaGanar;
+        if (cpuMarca) streakRef.current = 0;
         setRevealInfo({ ok, correctText: getCorrectAnswerText(preguntaActual) });
         setModalFase('REVEAL');
         clearTimeout(revealTimeoutRef.current);
         revealTimeoutRef.current = setTimeout(() => {
+            if (finalizadoRef.current) return;
             if (ok) {
                 setRevealInfo(null);
                 setModalFase('RESPONDER');
                 setFaseTurno('TIRAR');
                 setGame(prev => ({ ...prev, message: `¡Correcto! ${nombres[team]}, arrastra para tirar.` }));
-            } else {
-                // Falla → pasa el turno (el effect cargará la nueva pregunta)
-                setGame(prev => {
-                    const nt = prev.activeTeam === 'red' ? 'blue' : 'red';
-                    return { ...prev, activeTeam: nt, message: `¡Fallo! Turno de ${nombres[nt]}.` };
-                });
+                return;
             }
+            // FALLO
+            if (vsCPU) {
+                if (cpuMarca) {
+                    setRachaFallos(0);
+                    setGame(prev => ({
+                        ...prev,
+                        score: { ...prev.score, blue: prev.score.blue + 1 },
+                        ball: { x: width / 2, y: height / 2, vx: 0, vy: 0 },
+                        players: initialPlayers.map(p => ({ ...p })),
+                        isSimulating: false,
+                        message: '🤖 ¡Fallaste 4 seguidas! El Ordenador marca.'
+                    }));
+                } else {
+                    setGame(prev => ({ ...prev, message: `¡Fallo! (${streakRef.current} de 4 seguidos) Inténtalo otra vez.` }));
+                }
+                // El alumno mantiene el turno → nueva pregunta (salvo que el ordenador gane el partido)
+                setRevealInfo(null);
+                setModalFase('RESPONDER');
+                if (!cpuGana) cargarSiguientePregunta();
+                return;
+            }
+            // 2 jugadores: falla → pasa el turno (el effect cargará la nueva pregunta)
+            setGame(prev => {
+                const nt = prev.activeTeam === 'red' ? 'blue' : 'red';
+                return { ...prev, activeTeam: nt, message: `¡Fallo! Turno de ${nombres[nt]}.` };
+            });
         }, ok ? 1300 : 2700);
     };
 
@@ -588,11 +811,11 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
 
                 if (newBall.x <= 15 && newBall.y >= goalYTop && newBall.y <= goalYBottom) {
                     newScore.blue += 1;
-                    return { ...prev, score: newScore, activeTeam: 'red', message: `¡GOOOL de ${nombres.blue}! Turno de ${nombres.red}.`, ball: { x: width / 2, y: height / 2, vx: 0, vy: 0 }, players: initialPlayers.map(p => ({ ...p })), isSimulating: false };
+                    return { ...prev, score: newScore, activeTeam: 'red', message: vsCPU ? '🤖 ¡El Ordenador marca! Te toca.' : `¡GOOOL de ${nombres.blue}! Turno de ${nombres.red}.`, ball: { x: width / 2, y: height / 2, vx: 0, vy: 0 }, players: initialPlayers.map(p => ({ ...p })), isSimulating: false, shooterId: null, ballTouched: false, penaltiActivo: false, pendingPenalti: null };
                 }
                 if (newBall.x >= width - 15 && newBall.y >= goalYTop && newBall.y <= goalYBottom) {
                     newScore.red += 1;
-                    return { ...prev, score: newScore, activeTeam: 'blue', message: `¡GOOOL de ${nombres.red}! Turno de ${nombres.blue}.`, ball: { x: width / 2, y: height / 2, vx: 0, vy: 0 }, players: initialPlayers.map(p => ({ ...p })), isSimulating: false };
+                    return { ...prev, score: newScore, activeTeam: 'blue', message: vsCPU ? '⚽ ¡GOOOL! Ahora dispara el Ordenador.' : `¡GOOOL de ${nombres.red}! Turno de ${nombres.blue}.`, ball: { x: width / 2, y: height / 2, vx: 0, vy: 0 }, players: initialPlayers.map(p => ({ ...p })), isSimulating: false, shooterId: null, ballTouched: false, penaltiActivo: false, pendingPenalti: null };
                 }
 
                 if (newBall.x < 15) { newBall.x = 15; newBall.vx *= -0.7; }
@@ -610,11 +833,14 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
                     if (p.y > height - 25) { p.y = height - 25; p.vy *= -0.5; }
                 });
 
+                // Colisión jugador-balón (marca si el balón se ha tocado)
+                let ballHit = false;
                 newPlayers.forEach(p => {
                     const dx = newBall.x - p.x, dy = newBall.y - p.y;
                     const dist = Math.sqrt(dx * dx + dy * dy);
                     const minDist = p.r + 11;
                     if (dist < minDist) {
+                        ballHit = true;
                         const overlap = minDist - dist, ax = dx / dist, ay = dy / dist;
                         newBall.x += ax * overlap;
                         const rvx = newBall.vx - p.vx, rvy = newBall.vy - p.vy;
@@ -622,7 +848,10 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
                         if (dot < 0) { newBall.vx -= 1.5 * dot * ax; newBall.vy -= 1.5 * dot * ay; p.vx += 0.3 * dot * ax; p.vy += 0.3 * dot * ay; }
                     }
                 });
+                const ballTouchedNow = prev.ballTouched || ballHit;
 
+                // Colisión jugador-jugador (detecta penalti: el tirador toca a un rival sin haber tocado el balón)
+                let foulCommitted = false;
                 for (let i = 0; i < newPlayers.length; i++) {
                     for (let j = i + 1; j < newPlayers.length; j++) {
                         const p1 = newPlayers[i], p2 = newPlayers[j];
@@ -635,19 +864,52 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
                             const rvx = p2.vx - p1.vx, rvy = p2.vy - p1.vy;
                             const dot = rvx * ax + rvy * ay;
                             if (dot < 0) { p1.vx += dot * ax * 0.7; p1.vy += dot * ay * 0.7; p2.vx -= dot * ax * 0.7; p2.vy -= dot * ay * 0.7; }
+                            // ¿Falta? El jugador lanzado choca con un rival y aún no se ha tocado el balón
+                            if (!ballTouchedNow && prev.shooterId && !prev.penaltiActivo && p1.team !== p2.team
+                                && (p1.id === prev.shooterId || p2.id === prev.shooterId)) {
+                                foulCommitted = true;
+                            }
                         }
                     }
                 }
 
+                // PENALTI: se detiene la jugada y se concede al equipo contrario (el que sufre la falta)
+                if (foulCommitted) {
+                    return {
+                        ...prev,
+                        ball: { ...newBall, vx: 0, vy: 0 },
+                        players: newPlayers.map(p => ({ ...p, vx: 0, vy: 0 })),
+                        isSimulating: false,
+                        shooterId: null,
+                        ballTouched: false,
+                        pendingPenalti: prev.activeTeam === 'red' ? 'blue' : 'red',
+                        message: '⚠️ ¡PENALTI!'
+                    };
+                }
+
                 if (isSimulating && !isMoving) {
                     isSimulating = false;
+                    // Penalti fallado (un gol habría salido antes): se restaura "como estaba antes del penalti"
+                    if (prev.penaltiActivo) {
+                        const snap = prePenaltiRef.current;
+                        const restPlayers = snap ? snap.players.map(p => ({ ...p, vx: 0, vy: 0 })) : initialPlayers.map(p => ({ ...p }));
+                        const restBall = snap ? { ...snap.ball, vx: 0, vy: 0 } : { x: width / 2, y: height / 2, vx: 0, vy: 0 };
+                        return {
+                            ...prev, ball: restBall, players: restPlayers, isSimulating: false,
+                            penaltiActivo: false, shooterId: null, ballTouched: false, pendingPenalti: null,
+                            activeTeam: prev.activeTeam, // mantiene el turno del que tiró el penalti
+                            message: (vsCPU && prev.activeTeam === 'blue') ? '🤖 Penalti fallado.' : 'Penalti fallado. Sigue tu turno.'
+                        };
+                    }
                     newTeam = prev.activeTeam === 'red' ? 'blue' : 'red';
-                    newMessage = `¡Turno de ${nombres[newTeam]}!`;
+                    newMessage = vsCPU
+                        ? (newTeam === 'blue' ? '🤖 Turno del Ordenador' : `¡Tu turno, ${nombres.red}!`)
+                        : `¡Turno de ${nombres[newTeam]}!`;
                 }
 
                 if (!isMoving && prev.isSimulating === isSimulating && newTeam === prev.activeTeam) return prev;
 
-                return { ...prev, ball: newBall, players: newPlayers, isSimulating, activeTeam: newTeam, message: newMessage };
+                return { ...prev, ball: newBall, players: newPlayers, isSimulating, activeTeam: newTeam, message: newMessage, shooterId: isSimulating ? prev.shooterId : null, ballTouched: isSimulating ? ballTouchedNow : false };
             });
             animationFrameId = requestAnimationFrame(updatePhysics);
         };
@@ -667,6 +929,7 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
 
     const handleStartAim = (player, e) => {
         if (game.isSimulating || game.activeTeam !== player.team) return;
+        if (vsCPU && player.team === 'blue') return; // el ordenador controla el azul
         if (!puedeTirar) return;
         if (e.cancelable) e.preventDefault();
         const coords = getMouseCoords(e);
@@ -675,6 +938,7 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
 
     const handleMoveAim = (e) => {
         if (!aiming.isActive) return;
+        if (vsCPU && game.activeTeam === 'blue') return; // apuntando el ordenador, ignorar al humano
         if (e.cancelable) e.preventDefault();
         const coords = getMouseCoords(e);
         setAiming(prev => ({ ...prev, currentX: coords.x, currentY: coords.y }));
@@ -682,6 +946,7 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
 
     const handleEndAim = (e) => {
         if (!aiming.isActive) return;
+        if (vsCPU && game.activeTeam === 'blue') return; // disparo gestionado por la IA
         if (e.cancelable) e.preventDefault();
         setGame(prev => {
             const player = prev.players.find(p => p.id === aiming.playerId);
@@ -694,7 +959,7 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
             const ax = dist === 0 ? 0 : dx / dist, ay = dist === 0 ? 0 : dy / dist;
             const newVx = ax * dist * forceFactor, newVy = ay * dist * forceFactor;
             const newPlayers = prev.players.map(p => p.id === player.id ? { ...p, vx: newVx, vy: newVy, angle: Math.atan2(newVy, newVx) } : p);
-            return { ...prev, players: newPlayers, isSimulating: true, message: '¡Jugada en movimiento...!' };
+            return { ...prev, players: newPlayers, isSimulating: true, shooterId: player.id, ballTouched: false, message: prev.penaltiActivo ? '⚽ ¡Penalti lanzado!' : '¡Jugada en movimiento...!' };
         });
         // Este equipo ya ha gastado su tiro libre inicial
         primerTiroRef.current[game.activeTeam] = true;
@@ -708,6 +973,7 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
             ball: { x: width / 2, y: height / 2, vx: 0, vy: 0 },
             players: initialPlayers.map(p => ({ ...p })),
             activeTeam: 'red', isSimulating: false, score: { red: 0, blue: 0 },
+            shooterId: null, ballTouched: false, penaltiActivo: false, pendingPenalti: null,
             message: modoConPreguntas ? `¡${nombres.red}! Responde para poder tirar.` : `Reiniciado. Turno de ${nombres.red}.`
         });
         setAiming({ isActive: false, playerId: null, currentX: 0, currentY: 0 });
@@ -717,6 +983,9 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
         prevScoreRef.current = { red: 0, blue: 0 };
         finalizadoRef.current = false;
         primerTiroRef.current = { red: false, blue: false };
+        streakRef.current = 0; setRachaFallos(0);
+        cpuPensandoRef.current = false; clearTimeout(cpuTimeoutRef.current);
+        prePenaltiRef.current = null; setPenaltiBanner(false); clearTimeout(penaltiTimeoutRef.current);
         setPreguntaActual(null);
         setFaseTurno('TIRAR'); // el primer tiro vuelve a ser libre
     };
@@ -734,7 +1003,7 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
         aimTargetY = aimingPlayer.y + ay * finalDist;
     }
 
-    const mostrarModal = modoConPreguntas && faseTurno === 'PREGUNTA' && !game.isSimulating && preguntaActual;
+    const mostrarModal = modoConPreguntas && faseTurno === 'PREGUNTA' && !game.isSimulating && preguntaActual && (!vsCPU || game.activeTeam === 'red');
     const teamColor = (t) => t === 'red' ? '#ef4444' : '#3b82f6';
     const teamName = (t) => t === 'red' ? 'Rojo' : 'Azul';
 
@@ -754,7 +1023,9 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
                     <div style={{ textAlign: 'center', maxWidth: 110 }}>
                         <div style={{ fontSize: 'clamp(9px, 2.4vw, 12px)', color: '#93c5fd', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{nombres.blue}</div>
                         <div style={{ fontSize: 'clamp(24px, 6.5vw, 34px)', fontWeight: 'bold', color: '#3b82f6', lineHeight: 1 }}>{game.score.blue}</div>
-                        {modoConPreguntas && <div style={{ fontSize: 'clamp(8px, 2.2vw, 11px)', color: '#94a3b8', fontWeight: 700 }}>✓{stats.blue.aciertos} ✗{stats.blue.fallos}</div>}
+                        {modoConPreguntas && (vsCPU
+                            ? <div style={{ fontSize: 'clamp(8px, 2.2vw, 11px)', color: '#94a3b8', fontWeight: 700 }}>🤖 racha {rachaFallos}/4</div>
+                            : <div style={{ fontSize: 'clamp(8px, 2.2vw, 11px)', color: '#94a3b8', fontWeight: 700 }}>✓{stats.blue.aciertos} ✗{stats.blue.fallos}</div>)}
                     </div>
                 </div>
             </div>
@@ -775,8 +1046,8 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
                         <circle cx={width / 2} cy={height / 2} r="6" fill="#ffffff" />
                         <rect x="15" y={height / 2 - 130} width="90" height="260" fill="none" stroke="#ffffff" strokeWidth="4" opacity="0.5" />
                         <rect x={width - 105} y={height / 2 - 130} width="90" height="260" fill="none" stroke="#ffffff" strokeWidth="4" opacity="0.5" />
-                        <rect x="2" y={goalYTop} width="13" height={120} fill="#1e293b" stroke="#fff" strokeWidth="2" opacity="0.9" />
-                        <rect x={width - 15} y={goalYTop} width="13" height={120} fill="#1e293b" stroke="#fff" strokeWidth="2" opacity="0.9" />
+                        <rect x="2" y={goalYTop} width="13" height={goalYBottom - goalYTop} fill="#1e293b" stroke="#fff" strokeWidth="2" opacity="0.9" />
+                        <rect x={width - 15} y={goalYTop} width="13" height={goalYBottom - goalYTop} fill="#1e293b" stroke="#fff" strokeWidth="2" opacity="0.9" />
 
                         {aimingPlayer && (
                             <g style={{ pointerEvents: 'none' }}>
@@ -824,6 +1095,13 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
                             <div style={{ fontSize: 'clamp(2rem, 9vw, 5rem)', fontWeight: 900, color: teamColor(golFlash), textShadow: '0 4px 14px rgba(0,0,0,0.6)', animation: 'fqGol 0.5s ease' }}>⚽ ¡GOOOL!</div>
                         </div>
                     )}
+
+                    {/* Cartel de PENALTI */}
+                    {penaltiBanner && (
+                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(234,179,8,0.18)', pointerEvents: 'none' }}>
+                            <div style={{ fontSize: 'clamp(2rem, 9vw, 5rem)', fontWeight: 900, color: '#eab308', textShadow: '0 4px 14px rgba(0,0,0,0.7)', animation: 'fqGol 0.5s ease', letterSpacing: 2 }}>⚠️ ¡PENALTI!</div>
+                        </div>
+                    )}
                 </div>
 
                 {/* MODAL DE PREGUNTA */}
@@ -833,6 +1111,7 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
                         <div className="fq-modal-hud">
                             <span className="fq-team-chip" style={{ background: teamColor(game.activeTeam) }}>{nombres[game.activeTeam]}</span>
                             <span style={{ color: '#cbd5e1', fontSize: '0.9rem' }}>Responde para tirar</span>
+                            {vsCPU && <span style={{ color: rachaFallos >= 3 ? '#ef4444' : '#94a3b8', fontSize: '0.85rem', fontWeight: 700 }}>🤖 Fallos: {rachaFallos}/4</span>}
                         </div>
                         {modalFase === 'REVEAL' && revealInfo ? (
                             <div className="question-card" style={{ textAlign: 'center' }}>
@@ -864,7 +1143,7 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
 // ============================================================================
 // PANTALLA DE CAMPEONES — celebración final
 // ============================================================================
-function PantallaCampeones({ resultado, recurso, onJugarOtra, onExit }) {
+function PantallaCampeones({ resultado, recurso, hojas, onJugarOtra, onExit }) {
     const [mostrarEnvio, setMostrarEnvio] = useState(false);
     const { ganador, nombres, stats, golesParaGanar } = resultado;
     const colorGana = ganador === 'red' ? '#ef4444' : '#3b82f6';
@@ -955,7 +1234,7 @@ function PantallaCampeones({ resultado, recurso, onJugarOtra, onExit }) {
                 </div>
             </div>
 
-            {mostrarEnvio && <ModalEnviarProfeFutbol resultado={resultado} recurso={recurso} onClose={() => setMostrarEnvio(false)} />}
+            {mostrarEnvio && <ModalEnviarProfeFutbol resultado={resultado} recurso={recurso} hojas={hojas} onClose={() => setMostrarEnvio(false)} />}
 
             <style>{`
                 @keyframes fqCaer { 0% { transform: translateY(0) rotate(0deg); } 100% { transform: translateY(110vh) rotate(360deg); } }
@@ -966,13 +1245,16 @@ function PantallaCampeones({ resultado, recurso, onJugarOtra, onExit }) {
 }
 
 // Modal de envío al profesor (guarda en informes_juegos, tipo FUTBOLQUIZZ)
-function ModalEnviarProfeFutbol({ resultado, recurso, onClose }) {
+function ModalEnviarProfeFutbol({ resultado, recurso, hojas, onClose }) {
     const [codigo, setCodigo] = useState('');
     const [curso, setCurso] = useState('');
     const [enviando, setEnviando] = useState(false);
     const [enviado, setEnviado] = useState(false);
     const [error, setError] = useState('');
     const { nombres, stats, ganador } = resultado;
+
+    // Hojas jugadas: las seleccionadas, o todas las del recurso
+    const hojasUsadas = (hojas && hojas.length) ? hojas : (recurso?.hojas?.map(h => h.nombreHoja) || []);
 
     const enviar = async () => {
         const code = codigo.trim().toUpperCase();
@@ -992,8 +1274,9 @@ function ModalEnviarProfeFutbol({ resultado, recurso, onClose }) {
                 };
             };
             await addDoc(collection(db, 'informes_juegos'), {
-                tipo: 'FUTBOLQUIZZ', modalidad: 'Versus', fecha: new Date(),
+                tipo: 'FUTBOLQUIZZ', modalidad: resultado.vsCPU ? 'Individual (vs Ordenador)' : 'Versus', fecha: new Date(),
                 recursoId: recurso?.id || '', recursoTitulo: recurso?.titulo || 'Fútbol Quizz (libre)',
+                hojas: hojasUsadas,
                 codigoProfesor: code,
                 ganador: nombres[ganador],
                 jugadores: [mkJugador('red'), mkJugador('blue')],
@@ -1023,6 +1306,8 @@ function ModalEnviarProfeFutbol({ resultado, recurso, onClose }) {
                         <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: '10px 12px', fontSize: '0.82rem', color: '#ddd' }}>
                             <div><b style={{ color: '#ef4444' }}>{nombres.red}</b>: {stats.red.goles}⚽ · {stats.red.aciertos}✓ {stats.red.fallos}✗</div>
                             <div style={{ marginTop: 3 }}><b style={{ color: '#3b82f6' }}>{nombres.blue}</b>: {stats.blue.goles}⚽ · {stats.blue.aciertos}✓ {stats.blue.fallos}✗</div>
+                            {recurso?.titulo && <div style={{ marginTop: 5, color: '#aaa' }}>📚 {recurso.titulo}</div>}
+                            {hojasUsadas.length > 0 && <div style={{ color: '#aaa' }}>📄 {hojasUsadas.join(', ')}</div>}
                         </div>
                         <div><label style={{ fontSize: '0.78rem', color: '#aaa', fontWeight: 600, display: 'block', marginBottom: 4 }}>Curso (opcional)</label>
                             <input value={curso} onChange={e => setCurso(e.target.value)} placeholder="Ej: 3º Primaria A" style={inp} /></div>
@@ -1057,6 +1342,7 @@ export default function FutbolQuizz({ onExit }) {
         return <PantallaCampeones
             resultado={resultado}
             recurso={config?.recurso || null}
+            hojas={config?.hojas || null}
             onJugarOtra={() => { setResultado(null); setFase('INICIO'); }}
             onExit={onExit}
         />;

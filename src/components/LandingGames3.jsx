@@ -25,6 +25,7 @@ import Funciones from '../Funciones';
 import GeometriaAnalitica from '../Funciones2'
 import Plataformas from '../Plataformas2';
 import StoryCubes from '../StoryCubes';
+import FutbolQuizz from '../FutbolQuizz';
 import UserProfile from './UserProfile';
 import MansionPitagoricaGame from '../MansionPitagoricaGame';
 import ArkadeHub from '../MiniArcade/ArkadeHub';
@@ -623,6 +624,7 @@ export const APPS = [
     { id: 'PROBABILIDAD', name: 'Probabilidad', desc: 'Simulador de dados: tipos, múltiples dados y análisis de frecuencias.', color: '#f59e0b', emoji: '🎲', isMath: true, shareable: true },
 
     { id: 'STORYCUBES', name: 'Story Cubes', desc: 'Crea historias en equipo usando dados con imágenes.', color: '#8e44ad', emoji: '🎲', shareable: true },
+    { id: 'FUTBOLQUIZZ', name: 'Fútbol Quizz', desc: 'Pizarra de fútbol por turnos: arrastra y dispara para marcar gol.', color: '#15803d', emoji: '⚽', shareable: true },
     { id: 'RETOS', name: 'Retos', desc: 'Conecta puntos y puzzles de lógica.', color: '#f39c12', emoji: '🧩', shareable: true },
     { id: 'TRIVIAL', name: 'Trivial', desc: 'El clásico juego de preguntas por categorías para hasta 6 jugadores.', color: '#16213e', emoji: '🎯', shareable: true },
     { id: 'DUELO_PIRATAS_RECURSO', name: 'Duelo Piratas', desc: '2 jugadores · cañonazos con tu recurso · múltiple opción, aparejados o pasapalabra.', color: '#0a1628', emoji: '🏴‍☠️', shareable: true },
@@ -653,6 +655,14 @@ export const GAME_INFO = {
         tipoPreguntas: 'Preguntas de opción múltiple de cualquier materia y nivel. El profesor crea el recurso.',
         biblioteca: 'No incluye biblioteca propia. Requiere recurso del profesor.',
         multiplayer: 'Individual (modo competición por puntuación).',
+        materias: ['Universal'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
+    FUTBOLQUIZZ: {
+        descripcion: 'Pizarra de fútbol táctil por turnos. Antes de tirar, cada equipo debe responder una pregunta: si acierta arrastra y dispara un jugador para marcar gol; si falla, pasa el turno. Marcador de goles y de aciertos, con sonido de gol.',
+        tipoPreguntas: 'Respuesta corta, opción múltiple, ordenar y rellenar (aspecto PiLive). Admite recursos de tipo PiLive, Burbujas y Pasapalabra. También se puede jugar sin recurso (modo libre).',
+        biblioteca: 'No incluye biblioteca propia: reutiliza los recursos del profesor (PiLive / Burbujas / Pasapalabra) por código o búsqueda por tema.',
+        multiplayer: '2 jugadores por turnos en el mismo dispositivo (Equipo Rojo vs Equipo Azul).',
         materias: ['Universal'],
         etapas: ['Primaria', 'ESO', 'Bachillerato'],
     },
@@ -1601,6 +1611,11 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
             return;
         }
 
+        if (appId === 'FUTBOLQUIZZ') {
+            setJuegoActivo({ tipoJuego: 'FUTBOLQUIZZ' });
+            return;
+        }
+
         if (appId === 'ARKADE') {
             window.history.pushState({}, '', '/arkade');
             setJuegoActivo({ tipoJuego: 'ARKADE' });
@@ -1983,6 +1998,7 @@ if (juegoActivo.tipoJuego === 'LENGUA_SIGNOS') return <LenguaSignos onExit={() =
         if (juegoActivo.tipoJuego === 'SINTAXIS')    return <SintaxisGame  usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'LISTENING')   return <Listening     usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'STORYCUBES')  return <StoryCubes    usuario={usuario} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'FUTBOLQUIZZ') return <FutbolQuizz   onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'ARKADE')      return <ArkadeHub onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'RETOS')        return <RetosApp                        onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'SOLAR_SYSTEM') return <SolarSystemViewer recursoConfig={juegoActivo.tourConfig || null} onExit={() => setJuegoActivo(null)} />;

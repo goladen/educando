@@ -56,6 +56,7 @@ import SimuladorLeyDeOhm from '../Simuladores física/SimuladorLeyDeOhm';
 import EnlaceMoleculas from '../Simuladores física/EnlaceMoleculas';
 import AjustesReacciones from '../Simuladores física/AjustesReacciones';
 import CaidaEscalada from '../Simuladores física/CaidaEscalada';
+import SimuladorAtomos from '../Simuladores física/SimuladorAtomos';
 import RetosApp from '../Retos';
 import SimuladorDados from '../Probabilidad';
 import TrivialGame from '../Trivial';
@@ -1868,6 +1869,7 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
             { key: 'ENLACE_MOLECULAS',  slug: 'enlacemoleculas',   label: 'Enlace de Moléculas',emoji: '⚛️', color: '#8b5cf6', desc: 'Pizarra de enlace químico',             comp: EnlaceMoleculas },
             { key: 'AJUSTES_REACCION',  slug: 'ajustesreaccion',   label: 'Ajuste de Reacción', emoji: '🧪', color: '#e67e22', desc: 'Ajusta coeficientes estequiométricos',  comp: AjustesReacciones },
             { key: 'CAIDA_ESCALADA',    slug: 'caidaescalada',     label: 'Caída en Escalada',  emoji: '🧗', color: '#0ea5e9', desc: 'Simulación de caída en escalada deportiva', comp: CaidaEscalada },
+            { key: 'ATOMOS',            slug: 'atomos',            label: 'Átomos Interactivos',emoji: '⚛️', color: '#6366f1', desc: 'Modelo 3D del átomo + test de partículas',  comp: SimuladorAtomos },
         ];
 
         const volverAlMenu = () => { setSimuladorFisicaActivo(null); window.history.pushState({}, '', '/fisica'); };

@@ -529,6 +529,7 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
         ballTouched: false,    // si el balón se ha tocado durante el tiro actual
         penaltiActivo: false,  // estamos ejecutando un penalti (campo sin obstáculos)
         pendingPenalti: null,  // equipo al que se le concede un penalti
+        golPausa: false,       // acaba de marcarse un gol → transición antes de la pregunta
         message: modoConPreguntas ? `¡${nombres.red}! Primer tiro libre: arrastra para tirar.` : `¡Turno de ${nombres.red}! Arrastra un jugador para apuntar.`
     });
 
@@ -558,6 +559,8 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
     const prePenaltiRef = useRef(null); // posiciones congeladas "antes del penalti"
     const penaltiTimeoutRef = useRef(null);
     const [penaltiBanner, setPenaltiBanner] = useState(false);
+    // Transición tras gol (espera antes de mostrar la siguiente pregunta)
+    const golQTimeoutRef = useRef(null);
 
     // Tamaño del campo: rellena todo el área disponible manteniendo proporción (clave en escritorio)
     const fieldAreaRef = useRef(null);
@@ -675,6 +678,9 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
         if (game.isSimulating) return;
         if (game.pendingPenalti) return; // mostrando el cartel de penalti, esperar
 
+        const trasGol = game.golPausa;
+        if (trasGol) setGame(prev => ({ ...prev, golPausa: false }));
+
         // Turno automático del ordenador (azul), también para lanzar su penalti
         if (vsCPU && game.activeTeam === 'blue') {
             if (!cpuPensandoRef.current) { cpuPensandoRef.current = true; dispararCPU(); }
@@ -694,6 +700,13 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
             setFaseTurno('TIRAR');
             setPreguntaActual(null);
             setGame(prev => ({ ...prev, message: `¡${nombres[team]}! Primer tiro libre: arrastra para tirar.` }));
+            return;
+        }
+        // Tras un gol, dar una transición antes de mostrar la pregunta
+        if (trasGol) {
+            setPreguntaActual(null); // ocultar el modal durante la celebración
+            clearTimeout(golQTimeoutRef.current);
+            golQTimeoutRef.current = setTimeout(() => { if (!finalizadoRef.current) cargarSiguientePregunta(); }, 1800);
             return;
         }
         cargarSiguientePregunta();
@@ -811,11 +824,11 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
 
                 if (newBall.x <= 15 && newBall.y >= goalYTop && newBall.y <= goalYBottom) {
                     newScore.blue += 1;
-                    return { ...prev, score: newScore, activeTeam: 'red', message: vsCPU ? '🤖 ¡El Ordenador marca! Te toca.' : `¡GOOOL de ${nombres.blue}! Turno de ${nombres.red}.`, ball: { x: width / 2, y: height / 2, vx: 0, vy: 0 }, players: initialPlayers.map(p => ({ ...p })), isSimulating: false, shooterId: null, ballTouched: false, penaltiActivo: false, pendingPenalti: null };
+                    return { ...prev, score: newScore, activeTeam: 'red', message: vsCPU ? '🤖 ¡El Ordenador marca! Te toca.' : `¡GOOOL de ${nombres.blue}! Turno de ${nombres.red}.`, ball: { x: width / 2, y: height / 2, vx: 0, vy: 0 }, players: initialPlayers.map(p => ({ ...p })), isSimulating: false, shooterId: null, ballTouched: false, penaltiActivo: false, pendingPenalti: null, golPausa: true };
                 }
                 if (newBall.x >= width - 15 && newBall.y >= goalYTop && newBall.y <= goalYBottom) {
                     newScore.red += 1;
-                    return { ...prev, score: newScore, activeTeam: 'blue', message: vsCPU ? '⚽ ¡GOOOL! Ahora dispara el Ordenador.' : `¡GOOOL de ${nombres.red}! Turno de ${nombres.blue}.`, ball: { x: width / 2, y: height / 2, vx: 0, vy: 0 }, players: initialPlayers.map(p => ({ ...p })), isSimulating: false, shooterId: null, ballTouched: false, penaltiActivo: false, pendingPenalti: null };
+                    return { ...prev, score: newScore, activeTeam: 'blue', message: vsCPU ? '⚽ ¡GOOOL! Ahora dispara el Ordenador.' : `¡GOOOL de ${nombres.red}! Turno de ${nombres.blue}.`, ball: { x: width / 2, y: height / 2, vx: 0, vy: 0 }, players: initialPlayers.map(p => ({ ...p })), isSimulating: false, shooterId: null, ballTouched: false, penaltiActivo: false, pendingPenalti: null, golPausa: true };
                 }
 
                 if (newBall.x < 15) { newBall.x = 15; newBall.vx *= -0.7; }
@@ -837,12 +850,14 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
                 let ballHit = false;
                 newPlayers.forEach(p => {
                     const dx = newBall.x - p.x, dy = newBall.y - p.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    const minDist = p.r + 11;
+                    const dist = Math.sqrt(dx * dx + dy * dy) || 0.0001;
+                    const minDist = p.r + 17; // radio de choque mayor → evita atascos y "tunneling"
                     if (dist < minDist) {
                         ballHit = true;
                         const overlap = minDist - dist, ax = dx / dist, ay = dy / dist;
+                        // Separar el balón en ambos ejes (antes solo en X → se atascaba en esquinas)
                         newBall.x += ax * overlap;
+                        newBall.y += ay * overlap;
                         const rvx = newBall.vx - p.vx, rvy = newBall.vy - p.vy;
                         const dot = rvx * ax + rvy * ay;
                         if (dot < 0) { newBall.vx -= 1.5 * dot * ax; newBall.vy -= 1.5 * dot * ay; p.vx += 0.3 * dot * ax; p.vy += 0.3 * dot * ay; }
@@ -973,7 +988,7 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
             ball: { x: width / 2, y: height / 2, vx: 0, vy: 0 },
             players: initialPlayers.map(p => ({ ...p })),
             activeTeam: 'red', isSimulating: false, score: { red: 0, blue: 0 },
-            shooterId: null, ballTouched: false, penaltiActivo: false, pendingPenalti: null,
+            shooterId: null, ballTouched: false, penaltiActivo: false, pendingPenalti: null, golPausa: false,
             message: modoConPreguntas ? `¡${nombres.red}! Responde para poder tirar.` : `Reiniciado. Turno de ${nombres.red}.`
         });
         setAiming({ isActive: false, playerId: null, currentX: 0, currentY: 0 });
@@ -986,6 +1001,7 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
         streakRef.current = 0; setRachaFallos(0);
         cpuPensandoRef.current = false; clearTimeout(cpuTimeoutRef.current);
         prePenaltiRef.current = null; setPenaltiBanner(false); clearTimeout(penaltiTimeoutRef.current);
+        clearTimeout(golQTimeoutRef.current);
         setPreguntaActual(null);
         setFaseTurno('TIRAR'); // el primer tiro vuelve a ser libre
     };
@@ -1003,7 +1019,7 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
         aimTargetY = aimingPlayer.y + ay * finalDist;
     }
 
-    const mostrarModal = modoConPreguntas && faseTurno === 'PREGUNTA' && !game.isSimulating && preguntaActual && (!vsCPU || game.activeTeam === 'red');
+    const mostrarModal = modoConPreguntas && faseTurno === 'PREGUNTA' && !game.isSimulating && preguntaActual && !game.golPausa && (!vsCPU || game.activeTeam === 'red');
     const teamColor = (t) => t === 'red' ? '#ef4444' : '#3b82f6';
     const teamName = (t) => t === 'red' ? 'Rojo' : 'Azul';
 
@@ -1011,7 +1027,7 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', backgroundColor: '#1e293b', fontFamily: 'system-ui, sans-serif', padding: 'env(safe-area-inset-top, 8px) 8px env(safe-area-inset-bottom, 8px) 8px', boxSizing: 'border-box', userSelect: 'none', touchAction: 'none', overflow: 'hidden' }}>
 
             {/* Barra superior: volver + marcador con goles y aciertos */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', flexShrink: 0, position: 'relative', marginBottom: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', flexShrink: 0, position: 'relative', marginBottom: '4px' }}>
                 <button onClick={onVolverInicio} style={{ position: 'absolute', left: 4, top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.1)', color: 'white', border: 'none', borderRadius: 8, padding: '8px 12px', cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem' }}>← Menú</button>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(12px, 3.5vw, 30px)', backgroundColor: '#0f172a', padding: '6px clamp(14px, 4.5vw, 36px)', borderRadius: '40px', border: '3px solid #334155', boxShadow: '0 4px 20px rgba(0,0,0,0.6)' }}>
                     <div style={{ textAlign: 'center', maxWidth: 110 }}>
@@ -1028,15 +1044,15 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
                             : <div style={{ fontSize: 'clamp(8px, 2.2vw, 11px)', color: '#94a3b8', fontWeight: 700 }}>✓{stats.blue.aciertos} ✗{stats.blue.fallos}</div>)}
                     </div>
                 </div>
-            </div>
-
-            {/* Indicador de Turno */}
-            <div style={{ fontSize: 'clamp(11px, 3.2vw, 17px)', fontWeight: '600', color: '#fff', marginBottom: '8px', textAlign: 'center', backgroundColor: game.isSimulating ? '#475569' : (game.activeTeam === 'red' ? '#991b1b' : '#1e40af'), padding: '8px 18px', borderRadius: '30px', border: '1px solid rgba(255,255,255,0.2)', transition: 'background-color 0.3s', maxWidth: '94%', flexShrink: 0 }}>
-                {game.message}
+                <button onClick={reiniciar} title="Reiniciar partido" style={{ position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.1)', color: 'white', border: 'none', borderRadius: 8, padding: '8px 12px', cursor: 'pointer', fontWeight: 700, fontSize: '1rem' }}>↻</button>
             </div>
 
             {/* Campo */}
             <div ref={fieldAreaRef} style={{ flex: 1, minHeight: 0, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                {/* Indicador de turno (flotante sobre el campo) */}
+                <div style={{ position: 'absolute', top: 2, left: '50%', transform: 'translateX(-50%)', zIndex: 10, fontSize: 'clamp(10px, 2.8vw, 15px)', fontWeight: 600, color: '#fff', textAlign: 'center', backgroundColor: game.isSimulating ? 'rgba(71,85,105,0.92)' : (game.activeTeam === 'red' ? 'rgba(153,27,27,0.92)' : 'rgba(30,64,175,0.92)'), padding: '5px 14px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.2)', transition: 'background-color 0.3s', maxWidth: '92%', pointerEvents: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {game.message}
+                </div>
                 <div style={{ position: 'relative', boxShadow: '0 15px 35px rgba(0,0,0,0.8)', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#15803d', border: '4px solid #1e293b', width: fieldSize.w ? `${fieldSize.w}px` : '100%', height: fieldSize.h ? `${fieldSize.h}px` : 'auto', aspectRatio: fieldSize.w ? undefined : `${width} / ${height}`, boxSizing: 'border-box' }}>
                     <svg ref={svgRef} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet" style={{ display: 'block', width: '100%', height: '100%' }}
                         onMouseMove={handleMoveAim} onMouseUp={handleEndAim} onMouseLeave={handleEndAim} onTouchMove={handleMoveAim} onTouchEnd={handleEndAim}>
@@ -1130,10 +1146,6 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
                     </div>
                 )}
             </div>
-
-            <button onClick={reiniciar} style={{ marginTop: '10px', padding: '10px 28px', backgroundColor: '#475569', color: '#fff', border: 'none', borderRadius: '8px', fontSize: 'clamp(13px, 3.4vw, 16px)', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.3)', flexShrink: 0 }}>
-                Reiniciar Partido
-            </button>
 
             <style>{`@keyframes fqGol { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }`}</style>
         </div>

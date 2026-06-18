@@ -588,6 +588,26 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
     // Pitido triple del árbitro al comenzar el partido
     useEffect(() => { playWhistleTriple(); }, []);
 
+    // Pantalla completa
+    const [isFs, setIsFs] = useState(false);
+    useEffect(() => {
+        const onFs = () => setIsFs(!!(document.fullscreenElement || document.webkitFullscreenElement));
+        document.addEventListener('fullscreenchange', onFs);
+        document.addEventListener('webkitfullscreenchange', onFs);
+        return () => { document.removeEventListener('fullscreenchange', onFs); document.removeEventListener('webkitfullscreenchange', onFs); };
+    }, []);
+    const toggleFullscreen = () => {
+        try {
+            const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+            if (!fsEl) {
+                const el = document.documentElement;
+                (el.requestFullscreen || el.webkitRequestFullscreen || el.webkitRequestFullScreen)?.call(el);
+            } else {
+                (document.exitFullscreen || document.webkitExitFullscreen)?.call(document);
+            }
+        } catch (e) { }
+    };
+
     const registrarRespuesta = (team, ok) => {
         setStats(prev => {
             const n = { ...prev, [team]: { ...prev[team], [ok ? 'aciertos' : 'fallos']: prev[team][ok ? 'aciertos' : 'fallos'] + 1 } };
@@ -1044,7 +1064,10 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
                             : <div style={{ fontSize: 'clamp(8px, 2.2vw, 11px)', color: '#94a3b8', fontWeight: 700 }}>✓{stats.blue.aciertos} ✗{stats.blue.fallos}</div>)}
                     </div>
                 </div>
-                <button onClick={reiniciar} title="Reiniciar partido" style={{ position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.1)', color: 'white', border: 'none', borderRadius: 8, padding: '8px 12px', cursor: 'pointer', fontWeight: 700, fontSize: '1rem' }}>↻</button>
+                <div style={{ position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)', display: 'flex', gap: 6 }}>
+                    <button onClick={toggleFullscreen} title={isFs ? 'Salir de pantalla completa' : 'Pantalla completa'} style={{ background: 'rgba(255,255,255,0.1)', color: 'white', border: 'none', borderRadius: 8, padding: '8px 12px', cursor: 'pointer', fontWeight: 700, fontSize: '1rem' }}>{isFs ? '🗗' : '⛶'}</button>
+                    <button onClick={reiniciar} title="Reiniciar partido" style={{ background: 'rgba(255,255,255,0.1)', color: 'white', border: 'none', borderRadius: 8, padding: '8px 12px', cursor: 'pointer', fontWeight: 700, fontSize: '1rem' }}>↻</button>
+                </div>
             </div>
 
             {/* Campo */}

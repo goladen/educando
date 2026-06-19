@@ -781,7 +781,7 @@ const RIOS = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
-function PizarraApp() {
+export function PizarraApp({ initialModo = 'general' } = {}) {
     const canvasRef      = useRef(null);
     const contenedorRef  = useRef(null);
     const fileInputRef   = useRef(null);
@@ -814,7 +814,7 @@ function PizarraApp() {
     const [graficaConfig,  setGraficaConfig]  = useState(null);
     const [fullscreen,     setFullscreen]     = useState(false);
     const [redrawTick,     setRedrawTick]     = useState(0);
-    const [modoPizarra,    setModoPizarra]    = useState('general');
+    const [modoPizarra,    setModoPizarra]    = useState(initialModo);
 
     // Multi-page
     const [paginas,   setPaginas]   = useState([[]]);
@@ -959,6 +959,7 @@ function PizarraApp() {
         const data = {
             codigo,
             modo,
+            modoPizarra,
             createdAt: new Date(),
             updatedAt: new Date(),
             participantes: [{ id, nombre: 'Profesor', color }],
@@ -987,6 +988,7 @@ function PizarraApp() {
             if (!snap.exists()) { setErrorCompartir('Código no encontrado'); setJuntandose(false); return; }
             const datos = snap.data();
             const modo = datos.modo;
+            if (datos.modoPizarra) setModoPizarra(datos.modoPizarra);   // el alumno entra en el modo del profe (música, geo…)
             const usedColors = (datos.participantes || []).map(p => p.color);
             const color = COLORES_PARTICIPANTES.find(c => !usedColors.includes(c)) || COLORES_PARTICIPANTES[0];
             const id = 'user_' + Date.now();

@@ -1,7 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { PASOS, NOTAS, NOTAS_STAFF, INSTRUMENTOS_SEQ, playTone } from './musicUtils';
 import CreadorRitmosColab from './CreadorRitmosColab';
 import EarTrainingGame from './MusicCompass';
+import MusicaInstrumentos from './MusicaInstrumentos';
+const PizarraMusical = lazy(() => import('./GestionAula').then(m => ({ default: m.PizarraApp })));
 import { db } from './firebase';
 import { collection, addDoc, doc, getDoc } from 'firebase/firestore';
 
@@ -58,8 +60,19 @@ export default function MusicApp({ onBack, usuario = null }) {
     if (app === 'ritmos')  return <CreadorDeRitmos onBack={() => setApp(null)} usuario={usuario} />;
     if (app === 'colab')   return <CreadorRitmosColab onBack={() => setApp(null)} usuario={usuario} />;
     if (app === 'compass') return <EarTrainingGame onBack={() => setApp(null)} />;
+    if (app === 'instrumentos') return <MusicaInstrumentos onBack={() => setApp(null)} />;
+    if (app === 'pizarra') return (
+        <div style={{ minHeight: '100vh', background: '#fce4ec', padding: '14px 12px', boxSizing: 'border-box' }}>
+            <button onClick={() => setApp(null)} style={{ ...s.backBtn, marginBottom: 14, background: 'white', color: '#333', border: '1px solid #ccc' }}>← Volver</button>
+            <Suspense fallback={<div style={{ padding: 40, textAlign: 'center', color: '#7f8c8d' }}>Cargando pizarra…</div>}>
+                <PizarraMusical initialModo="musica" />
+            </Suspense>
+        </div>
+    );
 
     const APPS_MUSICA = [
+        { id: 'instrumentos', titulo: 'Instrumentos',          desc: 'Toca piano, xilófono, batería y guitarra realista. Multitáctil para móvil y pizarra.', emoji: '🎸', color: '#ef4444' },
+        { id: 'pizarra',  titulo: 'Pizarra musical',           desc: 'Pizarra interactiva con pentagramas, notas, silencios y alteraciones para escribir música.', emoji: '🎼', color: '#3b82f6' },
         { id: 'lluvia',   titulo: 'Lluvia de Notas',          desc: 'Lee la nota en el pentagrama y responde antes de que se acabe el tiempo.', emoji: '🎼', color: '#6366f1' },
         { id: 'simon',    titulo: 'Simón Dice Musical',       desc: 'Escucha y repite la secuencia musical. ¿Cuántos niveles puedes superar?',   emoji: '🎹', color: '#10b981' },
         { id: 'ritmos',   titulo: 'Creador de Ritmos',        desc: 'Programa tu propio beat con bombo, caja, hi-hat y melodía.',                emoji: '🥁', color: '#f59e0b' },

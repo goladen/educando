@@ -6,6 +6,8 @@ import Confetti from 'react-confetti';
 import { db } from './firebase';
 import { doc, setDoc, updateDoc, onSnapshot, increment, collection, writeBatch, addDoc, getDoc } from 'firebase/firestore';
 import { bibliotecaGeometria } from './BibliotecaGeometria';
+import PerimetroArea from './PerimetroArea';
+import Visor3dPoliedrosEuler from './Visor3dPoliedrosEuler';
 
 // --- AUDIOS Y AVATARES (Estética MathLive) ---
 import correctSoundFile from './assets/correct-choice-43861.mp3';
@@ -576,6 +578,7 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
     const [drawMode, setDrawMode] = useState(false);
     const [showCalc, setShowCalc] = useState(false);
     const [showFigurasCompuestas, setShowFigurasCompuestas] = useState(false);
+    const [herramienta, setHerramienta] = useState(null); // 'perimetro' | 'poliedros'
 
     // Modo 3 config
     const [showGameConfig, setShowGameConfig] = useState(false);
@@ -789,6 +792,16 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
         </>);
     };
 
+    if (herramienta) {
+        const esPerimetro = herramienta === 'perimetro';
+        return (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: esPerimetro ? '#ecf0f1' : '#EDE7F6', overflowY: 'auto' }}>
+                <button onClick={() => setHerramienta(null)} style={{ position: 'fixed', top: 14, right: 14, zIndex: 10000, background: esPerimetro ? '#2E7D32' : '#5E35B1', color: 'white', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>← Geometrix</button>
+                {esPerimetro ? <PerimetroArea /> : <Visor3dPoliedrosEuler />}
+            </div>
+        );
+    }
+
     return (
         <div style={sLocal.container}>
 
@@ -906,6 +919,16 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
                         {/* Figuras Compuestas */}
                         <button onClick={() => setShowFigurasCompuestas(true)} style={{ ...sLocal.btnPrimary, background: '#e74c3c' }}>
                             🏗️ Figuras Compuestas <span style={{ fontSize: '0.8rem', opacity: 0.85 }}>(área y volumen)</span>
+                        </button>
+
+                        <div style={{ width: '100%', maxWidth: 320, height: 2, background: '#eee', margin: '6px 0' }} />
+
+                        {/* Herramientas de exploración */}
+                        <button onClick={() => setHerramienta('perimetro')} style={{ ...sLocal.btnPrimary, background: '#2E7D32' }}>
+                            🟩 Perímetros y Áreas <span style={{ fontSize: '0.8rem', opacity: 0.85 }}>(construir y explorar)</span>
+                        </button>
+                        <button onClick={() => setHerramienta('poliedros')} style={{ ...sLocal.btnPrimary, background: '#5E35B1' }}>
+                            🔷 Poliedros 3D · Euler <span style={{ fontSize: '0.8rem', opacity: 0.85 }}>(girar y contar)</span>
                         </button>
 
                         <div style={{ width: '100%', maxWidth: 320, height: 2, background: '#eee', margin: '6px 0' }} />

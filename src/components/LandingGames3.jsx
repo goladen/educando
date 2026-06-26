@@ -23,6 +23,9 @@ import CalculoMental from '../CalculoMental';
 import Ecuaciones from '../Ecuaciones';
 import Funciones from '../Funciones';
 import GeometriaAnalitica from '../Funciones2'
+import PerimetroArea from '../PerimetroArea';
+import Visor3dPoliedrosEuler from '../Visor3dPoliedrosEuler';
+import GranjaInteractiva from '../GranjaInteractiva';
 import Plataformas from '../Plataformas2';
 import StoryCubes from '../StoryCubes';
 import FutbolQuizz from '../FutbolQuizz';
@@ -66,6 +69,8 @@ import JuegoFeriaOAOA from '../FeriaMates';
 import JuegoDivisibilidad from '../Divisibilidad';
 import DueloPiratas from '../DueloPiratas';
 import DueloPiratasRecurso from '../DueloPiratasRecurso';
+import BlocklyEditor from '../BlocklyEditor';
+import ProgramacionRobotica from '../ProgramacionRobotica';
 import imgPasapalabra from '../assets/icono_pasapal.png'; // Revisa si es .png o .jpg
 import imgBurbujas from '../assets/icono_burbujas.png';
 import imgPikatron from '../assets/icono_pikatron.png';
@@ -884,6 +889,14 @@ export const GAME_INFO = {
         materias: ['Inglés', 'Lengua Extranjera'],
         etapas: ['ESO', 'Bachillerato'],
     },
+    ROBOTICA_BLOQUES: {
+        descripcion: 'Entorno de programación por bloques unificado para tres placas educativas: BBC Micro:bit V2 (MicroPython), CyberPi/mBot2 (Python con la librería cyberpi) y Arduino Uno/Nano (C++). Genera el código en tiempo real, conecta la placa por USB (Web Serial) y envía el programa al REPL o intercambia datos por el puerto serie.',
+        tipoPreguntas: 'No hay preguntas. Es una herramienta de programación y robótica educativa.',
+        biblioteca: 'No aplica. Incluye bloques propios para cada placa (matriz LED, pantalla, pines digitales, esperas) más los bloques estándar de lógica, bucles, matemáticas y texto.',
+        multiplayer: 'Individual (cada alumno con su placa) o proyección para toda la clase.',
+        materias: ['Tecnología', 'Informática', 'Robótica'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
     SOLAR_SYSTEM: {
         descripcion: 'Tour 3D guiado por el sistema solar con narración por voz, música de fondo personalizable y escena comparativa de tamaños planetarios. El profesor puede personalizar cada planeta.',
         tipoPreguntas: 'No hay preguntas. Es un recurso audiovisual de presentación y exploración espacial.',
@@ -1288,6 +1301,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                 if (juegoParam.toLowerCase() === 'geografia')      { setGeografiaApp(true);   return; }
                 if (juegoParam.toLowerCase() === 'biologia')       { setBiologiaApp(true);    return; }
                 if (juegoParam.toLowerCase() === 'vistas_didricas') { setVistasDidricas(true); return; }
+                if (juegoParam.toLowerCase() === 'situaciones_aprendizaje') { setSituacionesAprendizaje(true); return; }
                 if (juegoParam.toLowerCase() === 'linea_tiempo')    { setJuegoActivo({ tipoJuego: 'LINEA_TIEMPO' }); return; }
                 let tourConfig = null;
                 const tcParam = params.get('tourconfig');
@@ -1299,7 +1313,11 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                 if (vcParam) {
                     try { verbInitialConfig = JSON.parse(decodeURIComponent(Array.from(atob(vcParam)).map(c=>('%'+('00'+c.charCodeAt(0).toString(16)).slice(-2))).join(''))); } catch {}
                 }
-                setJuegoActivo({ tipoJuego: juegoParam.toUpperCase(), tourConfig, verbInitialConfig });
+                const projParam = params.get('proj');
+                const sharedProject = projParam
+                    ? { id: projParam, role: params.get('role'), key: params.get('key') }
+                    : null;
+                setJuegoActivo({ tipoJuego: juegoParam.toUpperCase(), tourConfig, verbInitialConfig, sharedProject });
                 return;
             }
             const salaParam = params.get('sala');
@@ -1317,6 +1335,12 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                 setZonaActiva('MATH'); setSubzonaMath('PRIMARIA'); setJuegoActivo({ tipoJuego: 'FERIA_MATES', primaria: true });
             } else if (path === 'primaria/divisibilidad') {
                 setZonaActiva('MATH'); setSubzonaMath('PRIMARIA'); setJuegoActivo({ tipoJuego: 'DIVISIBILIDAD' });
+            } else if (path === 'primaria/geometria/perimetro-area') {
+                setZonaActiva('MATH'); setSubzonaMath('GEOMETRIA'); setJuegoActivo({ tipoJuego: 'GEO_PERIMETRO_AREA' });
+            } else if (path === 'primaria/geometria/poliedros') {
+                setZonaActiva('MATH'); setSubzonaMath('GEOMETRIA'); setJuegoActivo({ tipoJuego: 'GEO_VISOR_POLIEDROS' });
+            } else if (path === 'primaria/geometria') {
+                setZonaActiva('MATH'); setSubzonaMath('GEOMETRIA'); setJuegoActivo(null);
             } else if (path === 'feria') {
                 setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'FERIA_MATES' });
             } else if (path === 'calculo') {
@@ -1383,6 +1407,8 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
     const [biologiaApp,         setBiologiaApp]         = useState(false);
     const [gestionAula,         setGestionAula]         = useState(() => { const p = new URLSearchParams(window.location.search); return !!(p.get('gestion') || p.get('pizarra')); });
     const [vistasDidricas,      setVistasDidricas]      = useState(false);
+    const [situacionesAprendizaje, setSituacionesAprendizaje] = useState(false);
+    const [situacionActiva,        setSituacionActiva]        = useState(null); // 'GRANJA' | ...
     const [miniAppCreator,      setMiniAppCreator]      = useState(false);
     const [simuladoresFisica,   setSimuladoresFisica]   = useState(false);
     const [simuladorFisicaActivo, setSimuladorFisicaActivo] = useState(null);
@@ -1851,6 +1877,39 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
         </div>
     );
 
+    if (situacionesAprendizaje) {
+        if (situacionActiva === 'GRANJA') return (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#f4fbf4', overflowY: 'auto' }}>
+                <button onClick={() => setSituacionActiva(null)} style={{ position: 'fixed', top: 14, right: 14, zIndex: 10000, background: '#15803d', color: 'white', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>← Situaciones</button>
+                <GranjaInteractiva />
+            </div>
+        );
+        return (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#f4fbf4', overflowY: 'auto' }}>
+                <button onClick={() => setSituacionesAprendizaje(false)} style={{ position: 'fixed', top: 14, right: 14, zIndex: 10000, background: '#15803d', color: 'white', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>← Volver</button>
+                <div style={{ width: '100%', maxWidth: 900, margin: '0 auto', padding: '60px 20px 40px' }}>
+                    <div style={{ textAlign: 'center', marginBottom: 40 }}>
+                        <div style={{ fontSize: 70, marginBottom: 10 }}>🌱</div>
+                        <h1 style={{ color: '#15803d', fontSize: '3rem', margin: 0, textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>Situaciones de Aprendizaje</h1>
+                        <p style={{ color: '#666', fontSize: '1.2rem', marginTop: 10 }}>Contextos reales para aplicar lo aprendido</p>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 25, paddingBottom: 40 }}>
+                        <div
+                            onClick={() => setSituacionActiva('GRANJA')}
+                            style={{ background: '#E8F5E9', borderRadius: 20, padding: '30px 20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s', border: '3px solid #2E7D32' }}
+                            onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
+                            onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                        >
+                            <div style={{ fontSize: 50, marginBottom: 15 }}>🚜</div>
+                            <h3 style={{ margin: '0 0 10px 0', color: '#2E7D32', fontSize: '1.4rem' }}>Granja Interactiva</h3>
+                            <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>Resuelve retos de matemáticas, ciencias y proporcionalidad gestionando una granja.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     if (miniAppCreator) return (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#0f172a', overflowY: 'auto' }}>
             <button onClick={() => setMiniAppCreator(false)} style={{ position: 'fixed', top: 12, left: 12, zIndex: 10000, background: '#1e293b', color: '#fff', border: '1px solid #334155', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 14 }}>← Volver</button>
@@ -1989,6 +2048,18 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
                 <JuegoDivisibilidad />
             </div>
         );
+        if (juegoActivo.tipoJuego === 'GEO_PERIMETRO_AREA') return (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#ecf0f1', overflowY: 'auto' }}>
+                <button onClick={() => { window.history.pushState({}, '', '/primaria/geometria'); setSubzonaMath('GEOMETRIA'); setJuegoActivo(null); }} style={{ position: 'fixed', top: 14, right: 14, zIndex: 10000, background: '#2E7D32', color: 'white', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>← Volver</button>
+                <PerimetroArea />
+            </div>
+        );
+        if (juegoActivo.tipoJuego === 'GEO_VISOR_POLIEDROS') return (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#EDE7F6', overflowY: 'auto' }}>
+                <button onClick={() => { window.history.pushState({}, '', '/primaria/geometria'); setSubzonaMath('GEOMETRIA'); setJuegoActivo(null); }} style={{ position: 'fixed', top: 14, right: 14, zIndex: 10000, background: '#5E35B1', color: 'white', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>← Volver</button>
+                <Visor3dPoliedrosEuler />
+            </div>
+        );
         if (juegoActivo.tipoJuego === 'DUELO_PIRATAS') return (
             <DueloPiratas onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />
         );
@@ -1996,7 +2067,12 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
             <DueloPiratasRecurso recursoInicial={juegoActivo.recurso || null} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />
         );
 
-if (juegoActivo.tipoJuego === 'LENGUA_SIGNOS') return <LenguaSignos onExit={() => setJuegoActivo(null)} />;
+if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
+            // Enlace compartido → directo al editor de bloques; si no, al hub.
+            if (juegoActivo.sharedProject) return <BlocklyEditor usuario={usuario} onLoginRequest={onLoginRequest} sharedProject={juegoActivo.sharedProject} onExit={() => setJuegoActivo(null)} />;
+            return <ProgramacionRobotica usuario={usuario} onLoginRequest={onLoginRequest} onExit={() => setJuegoActivo(null)} />;
+        }
+        if (juegoActivo.tipoJuego === 'LENGUA_SIGNOS') return <LenguaSignos onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'SINTAXIS')    return <SintaxisGame  usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'LISTENING')   return <Listening     usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'STORYCUBES')  return <StoryCubes    usuario={usuario} onExit={() => setJuegoActivo(null)} />;
@@ -2083,6 +2159,53 @@ if (juegoActivo.tipoJuego === 'LENGUA_SIGNOS') return <LenguaSignos onExit={() =
                             <div style={{ fontSize: '50px', marginBottom: '15px' }}>🔢</div>
                             <h3 style={{ margin: '0 0 10px 0', color: '#7B1FA2', fontSize: '1.4rem' }}>Divisibilidad</h3>
                             <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>Primos, múltiplos, divisores y la criba de Eratóstenes.</p>
+                        </div>
+                        <div
+                            onClick={() => { window.history.pushState({}, '', '/primaria/geometria'); setSubzonaMath('GEOMETRIA'); setJuegoActivo(null); }}
+                            style={{ background: '#E3F2FD', borderRadius: '20px', padding: '30px 20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s', border: '3px solid #1976D2' }}
+                            onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
+                            onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                        >
+                            <div style={{ fontSize: '50px', marginBottom: '15px' }}>📐</div>
+                            <h3 style={{ margin: '0 0 10px 0', color: '#1976D2', fontSize: '1.4rem' }}>Geometría</h3>
+                            <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>Perímetros y áreas, y el visor 3D de poliedros con la fórmula de Euler.</p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        if (subzonaMath === 'GEOMETRIA') {
+            return (
+                <div style={{ width: '100%', marginTop: '20px' }}>
+                    <button onClick={() => { setSubzonaMath('PRIMARIA'); window.history.pushState({}, '', '/primaria'); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#333', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '20px', fontWeight: 'bold' }}>
+                        <Home size={20} /> Volver a Primaria
+                    </button>
+                    <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+                        <div style={{ fontSize: '70px', marginBottom: '10px' }}>📐</div>
+                        <h1 style={{ color: '#1976D2', fontSize: '3rem', margin: 0, textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>Geometría</h1>
+                        <p style={{ color: '#666', fontSize: '1.2rem', marginTop: '10px' }}>Explora el plano y el espacio</p>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '25px', maxWidth: '700px', margin: '0 auto', paddingBottom: '40px' }}>
+                        <div
+                            onClick={() => { window.history.pushState({}, '', '/primaria/geometria/perimetro-area'); setJuegoActivo({ tipoJuego: 'GEO_PERIMETRO_AREA' }); }}
+                            style={{ background: '#E8F5E9', borderRadius: '20px', padding: '30px 20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s', border: '3px solid #2E7D32' }}
+                            onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
+                            onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                        >
+                            <div style={{ fontSize: '50px', marginBottom: '15px' }}>🟩</div>
+                            <h3 style={{ margin: '0 0 10px 0', color: '#2E7D32', fontSize: '1.4rem' }}>Perímetros y Áreas</h3>
+                            <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>Construye figuras en la cuadrícula y descubre perímetro y área con retos.</p>
+                        </div>
+                        <div
+                            onClick={() => { window.history.pushState({}, '', '/primaria/geometria/poliedros'); setJuegoActivo({ tipoJuego: 'GEO_VISOR_POLIEDROS' }); }}
+                            style={{ background: '#EDE7F6', borderRadius: '20px', padding: '30px 20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s', border: '3px solid #5E35B1' }}
+                            onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
+                            onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                        >
+                            <div style={{ fontSize: '50px', marginBottom: '15px' }}>🔷</div>
+                            <h3 style={{ margin: '0 0 10px 0', color: '#5E35B1', fontSize: '1.4rem' }}>Poliedros 3D · Euler</h3>
+                            <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>Gira poliedros en 3D y comprueba la fórmula de Euler: V − A + C = 2.</p>
                         </div>
                     </div>
                 </div>
@@ -2779,6 +2902,8 @@ if (juegoActivo.tipoJuego === 'LENGUA_SIGNOS') return <LenguaSignos onExit={() =
                     { id: 'VISTAS_DIDRICAS', label: 'Vistas Diédricas', emoji: '📐', color: '#7c3aed', action: () => setVistasDidricas(true), shareable: true },
                     { id: 'LINEA_TIEMPO', label: 'Línea del Tiempo', emoji: '🕰️', color: '#2980b9', action: () => setJuegoActivo({ tipoJuego: 'LINEA_TIEMPO' }), shareable: true, shareUrl: `${window.location.origin}${window.location.pathname}?juego=linea_tiempo` },
                     { id: 'SIMULADORES_FISICA', label: 'Física y Química', emoji: '🔭', color: '#e74c3c', action: () => { setSimuladoresFisica(true); window.history.pushState({}, '', '/fisica'); }, shareable: true, shareUrl: `${window.location.origin}/fisica` },
+                    { id: 'ROBOTICA_BLOQUES', label: 'Programación y robótica', emoji: '🤖', color: '#0EA5E9', action: () => setJuegoActivo({ tipoJuego: 'ROBOTICA_BLOQUES' }), shareable: true, shareUrl: `${window.location.origin}${window.location.pathname}?juego=robotica_bloques` },
+                    { id: 'SITUACIONES_APRENDIZAJE', label: 'Situaciones de Aprendizaje', emoji: '🌱', color: '#15803d', action: () => setSituacionesAprendizaje(true), shareable: true, shareUrl: `${window.location.origin}${window.location.pathname}?juego=situaciones_aprendizaje` },
                 ].map(tool => (
                     <div key={tool.id} onClick={tool.action} style={{ background: '#ffffbf', borderRadius: '15px', padding: '15px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transition: 'transform 0.2s', border: `2px solid ${tool.color}20`, position: 'relative' }}
                         onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-3px)'}
@@ -3226,6 +3351,7 @@ const [entrando, setEntrando] = useState(false);
 
     if (appData.id === 'SINTAXIS') return <SintaxisGame usuario={null} onExit={onHome} />;
 if (appData.id === 'LISTENING') return <Listening usuario={null} onExit={onHome} />;
+    if (appData.id === 'ROBOTICA_BLOQUES') return <ProgramacionRobotica usuario={null} onLoginRequest={onLoginRequest} onExit={onHome} />;
 
 
 if (appData.id === 'PIKATRON_2') return <Plataformas usuario={null} onExit={onHome} />;

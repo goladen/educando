@@ -149,11 +149,11 @@ export default function ProgramacionRobotica({ usuario = null, onLoginRequest, o
       <div style={styles.scroll}>
         {/* Cabecera infografía */}
         <div style={styles.infoHead}>
-          <div style={styles.infoBadge}>📊 INFOGRAFÍA DIDÁCTICA</div>
+          <div style={styles.infoBadge}>📊 PiKT Robótica</div>
           <h3 style={styles.infoH3}>Kit de Robótica y Computación</h3>
           <p style={styles.infoSub}>
-            Recursos y proyectos para el Centro de Profesorado de Ejea de los Caballeros
-            (ESO y Bachillerato)
+            Recursos y proyectos
+           
           </p>
           <div style={styles.bloqueTag}>🤖 BLOQUE 1: ROBÓTICA MAKER Y MICROCONTROLADORES</div>
         </div>

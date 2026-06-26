@@ -77,6 +77,65 @@ const MB_PINS = [
   ['P0', '0'], ['P1', '1'], ['P2', '2'], ['P8', '8'],
   ['P12', '12'], ['P13', '13'], ['P14', '14'], ['P15', '15'], ['P16', '16'],
 ];
+// Pines con entrada ANALÓGICA fiable en el micro:bit (los tres pads grandes).
+const MB_APINS = [['P0', '0'], ['P1', '1'], ['P2', '2']];
+
+// «Micro:bit + Smart Home» es, a efectos de puerto/REPL/guardado, una micro:bit.
+const baseBoard = (b) => (b === 'microbit_smarthome' ? 'microbit' : b);
+
+// Driver MicroPython mínimo para la pantalla LCD 1602 por I²C (backpack PCF8574).
+// Usa i2c y sleep de «from microbit import *». SCL=P19, SDA=P20.
+const LCD_DRIVER_PY = `class _LCD:
+    def __init__(s, addr=0x27):
+        s.a = addr
+        s.bl = 0x08
+        for c in (0x33, 0x32, 0x28, 0x0C, 0x06, 0x01):
+            s._cmd(c)
+        sleep(5)
+    def _w(s, d):
+        i2c.write(s.a, bytes([d | s.bl]))
+        i2c.write(s.a, bytes([d | 0x04 | s.bl]))
+        i2c.write(s.a, bytes([(d & ~0x04) | s.bl]))
+    def _send(s, b, m):
+        s._w(m | (b & 0xF0))
+        s._w(m | ((b << 4) & 0xF0))
+    def _cmd(s, b):
+        s._send(b, 0)
+    def _chr(s, b):
+        s._send(b, 1)
+    def clear(s):
+        s._cmd(0x01)
+        sleep(2)
+    def show(s, t, col=0, row=0):
+        s._cmd(0x80 + 0x40 * row + col)
+        for ch in str(t):
+            s._chr(ord(ch))`;
+
+// ───────────────────────────────────────────────────────────────────────────
+// MAPA DE PINES DEL MONTAJE SMART HOME (Aragón).
+// Edita aquí UNA sola vez: cada componente del kit ya queda asignado a su pin,
+// así el alumnado no tiene que configurarlos. Los bloques muestran este pin por
+// defecto (se puede cambiar en el desplegable si el montaje varía).
+// ───────────────────────────────────────────────────────────────────────────
+const SMARTHOME_PINS = {
+  luz: '1',         // 🔆 sensor de luz (LDR / fotorresistencia) — analógico
+  gas: '2',         // 💨 sensor de gas / humo — analógico
+  vapor: '0',       // 💧 sensor de vapor / lluvia — analógico
+  suelo: '1',       // 🌱 humedad del suelo — analógico
+  pir: '8',         // 🚶 sensor de movimiento PIR — digital
+  led: '13',        // 💡 LED / iluminación — digital o PWM
+  ventilador: '14', // 🌀 ventilador / motor — PWM
+  servo: '15',      // 🚪 servo (puerta / ventana) — PWM
+  rele: '12',       // 🔌 relé — digital
+  zumbador: '16',   // 🔔 zumbador (buzzer) — tono / melodía
+};
+
+// Reordena la lista de pines para que el pin del montaje aparezca por defecto.
+const pinOpts = (def, base = MB_PINS) => {
+  const first = base.find((o) => o[1] === def);
+  const rest = base.filter((o) => o[1] !== def);
+  return first ? [first, ...rest] : base;
+};
 
 let DEFINED = false;
 
@@ -979,6 +1038,166 @@ function defineBlocksAndGenerators() {
       colour: '#64748b',
       tooltip: 'Bloque de código C++ con cuerpo (if, for, while…)',
     },
+
+    // ===== MICRO:BIT + SMART HOME (Keyestudio · montaje Aragón) =====
+    // — SENSORES (devuelven un valor) —
+    {
+      type: 'smarthome_luz',
+      message0: '🔆 nivel de luz (LDR) en pin %1',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: pinOpts(SMARTHOME_PINS.luz, MB_APINS) }],
+      output: 'Number', colour: '#0d9488',
+      tooltip: 'Sensor de luz: 0 (oscuro) … 1023 (mucha luz). read_analog().',
+    },
+    {
+      type: 'smarthome_gas',
+      message0: '💨 nivel de gas / humo en pin %1',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: pinOpts(SMARTHOME_PINS.gas, MB_APINS) }],
+      output: 'Number', colour: '#0d9488',
+      tooltip: 'Sensor de gas/humo (analógico): valor 0…1023.',
+    },
+    {
+      type: 'smarthome_vapor',
+      message0: '💧 nivel de vapor / lluvia en pin %1',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: pinOpts(SMARTHOME_PINS.vapor, MB_APINS) }],
+      output: 'Number', colour: '#0d9488',
+      tooltip: 'Sensor de vapor/lluvia (analógico): valor 0…1023.',
+    },
+    {
+      type: 'smarthome_suelo',
+      message0: '🌱 humedad del suelo en pin %1',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: pinOpts(SMARTHOME_PINS.suelo, MB_APINS) }],
+      output: 'Number', colour: '#0d9488',
+      tooltip: 'Sensor de humedad del suelo (analógico): valor 0…1023.',
+    },
+    {
+      type: 'smarthome_pir',
+      message0: '🚶 ¿hay movimiento? (PIR) en pin %1',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: pinOpts(SMARTHOME_PINS.pir) }],
+      output: 'Boolean', colour: '#0d9488',
+      tooltip: 'Sensor de movimiento PIR: verdadero si detecta movimiento.',
+    },
+    {
+      type: 'smarthome_analog_read',
+      message0: 'leer sensor analógico (0–1023) en pin %1',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: MB_APINS }],
+      output: 'Number', colour: '#0d9488',
+      tooltip: 'Lectura analógica genérica de cualquier sensor (read_analog).',
+    },
+    {
+      type: 'smarthome_digital_read',
+      message0: 'leer sensor digital en pin %1',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: MB_PINS }],
+      output: 'Number', colour: '#0d9488',
+      tooltip: 'Lectura digital genérica (0/1): botón, final de carrera, magnético…',
+    },
+
+    // — ACTUADORES (acciones) —
+    {
+      type: 'smarthome_led',
+      message0: '💡 LED en pin %1 %2',
+      args0: [
+        { type: 'field_dropdown', name: 'PIN', options: pinOpts(SMARTHOME_PINS.led) },
+        { type: 'field_dropdown', name: 'STATE', options: [['encender', '1'], ['apagar', '0']] },
+      ],
+      previousStatement: null, nextStatement: null, colour: '#f59e0b',
+      tooltip: 'Enciende o apaga el LED (escritura digital).',
+    },
+    {
+      type: 'smarthome_led_bright',
+      message0: '💡 LED en pin %1 brillo %2 %%',
+      args0: [
+        { type: 'field_dropdown', name: 'PIN', options: pinOpts(SMARTHOME_PINS.led) },
+        { type: 'field_number', name: 'VAL', value: 80, min: 0, max: 100 },
+      ],
+      previousStatement: null, nextStatement: null, colour: '#f59e0b',
+      tooltip: 'Regula el brillo del LED (PWM 0–100 %).',
+    },
+    {
+      type: 'smarthome_fan',
+      message0: '🌀 ventilador / motor en pin %1 velocidad %2 %%',
+      args0: [
+        { type: 'field_dropdown', name: 'PIN', options: pinOpts(SMARTHOME_PINS.ventilador) },
+        { type: 'field_number', name: 'VAL', value: 100, min: 0, max: 100 },
+      ],
+      previousStatement: null, nextStatement: null, colour: '#10b981',
+      tooltip: 'Controla la velocidad del ventilador/motor (PWM 0–100 %).',
+    },
+    {
+      type: 'smarthome_servo',
+      message0: '🚪 servo (puerta) en pin %1 ángulo %2 °',
+      args0: [
+        { type: 'field_dropdown', name: 'PIN', options: pinOpts(SMARTHOME_PINS.servo) },
+        { type: 'field_number', name: 'ANG', value: 90, min: 0, max: 180 },
+      ],
+      previousStatement: null, nextStatement: null, colour: '#10b981',
+      tooltip: 'Mueve el servo (puerta/ventana) al ángulo indicado (0–180°).',
+    },
+    {
+      type: 'smarthome_relay',
+      message0: '🔌 relé en pin %1 %2',
+      args0: [
+        { type: 'field_dropdown', name: 'PIN', options: pinOpts(SMARTHOME_PINS.rele) },
+        { type: 'field_dropdown', name: 'STATE', options: [['activar', '1'], ['desactivar', '0']] },
+      ],
+      previousStatement: null, nextStatement: null, colour: '#10b981',
+      tooltip: 'Activa o desactiva el relé (enchufe/bombilla 230 V del kit).',
+    },
+
+    // — SONIDO (zumbador) —
+    {
+      type: 'smarthome_buzzer_tone',
+      message0: '🔔 zumbador en pin %1 tono %2 Hz durante %3 ms',
+      args0: [
+        { type: 'field_dropdown', name: 'PIN', options: pinOpts(SMARTHOME_PINS.zumbador) },
+        { type: 'field_number', name: 'FREQ', value: 440, min: 50, max: 5000 },
+        { type: 'field_number', name: 'MS', value: 300, min: 10, max: 5000 },
+      ],
+      previousStatement: null, nextStatement: null, colour: '#a855f7',
+      tooltip: 'Reproduce un tono en el zumbador.',
+    },
+    {
+      type: 'smarthome_buzzer_melody',
+      message0: '🔔 zumbador en pin %1 melodía %2',
+      args0: [
+        { type: 'field_dropdown', name: 'PIN', options: pinOpts(SMARTHOME_PINS.zumbador) },
+        {
+          type: 'field_dropdown', name: 'MELODY',
+          options: [
+            ['cumpleaños', 'BIRTHDAY'], ['boda', 'WEDDING'], ['entretenedor', 'ENTERTAINER'],
+            ['nyan', 'NYAN'], ['subir nivel', 'POWER_UP'], ['bajar nivel', 'POWER_DOWN'],
+            ['alarma', 'BADDY'], ['redoble', 'DADADADUM'],
+          ],
+        },
+      ],
+      previousStatement: null, nextStatement: null, colour: '#a855f7',
+      tooltip: 'Reproduce una melodía predefinida en el zumbador.',
+    },
+
+    // — PANTALLA LCD 1602 I²C (SCL=P19, SDA=P20) —
+    {
+      type: 'smarthome_lcd_init',
+      message0: '🖥️ iniciar pantalla LCD I²C (dirección %1)',
+      args0: [{ type: 'field_dropdown', name: 'ADDR', options: [['0x27', '0x27'], ['0x3F', '0x3F']] }],
+      previousStatement: null, nextStatement: null, colour: '#3b82f6',
+      tooltip: 'Inicia la LCD 1602 por I²C (SCL=P19, SDA=P20). Ponlo «al empezar».',
+    },
+    {
+      type: 'smarthome_lcd_show',
+      message0: '🖥️ LCD escribir %1 en fila %2 columna %3',
+      args0: [
+        { type: 'field_input', name: 'TEXT', text: 'Hola' },
+        { type: 'field_dropdown', name: 'ROW', options: [['1', '0'], ['2', '1']] },
+        { type: 'field_number', name: 'COL', value: 0, min: 0, max: 15 },
+      ],
+      previousStatement: null, nextStatement: null, colour: '#3b82f6',
+      tooltip: 'Escribe texto en la pantalla LCD.',
+    },
+    {
+      type: 'smarthome_lcd_clear',
+      message0: '🖥️ LCD borrar pantalla',
+      previousStatement: null, nextStatement: null, colour: '#3b82f6',
+      tooltip: 'Borra la pantalla LCD.',
+    },
   ]);
 
   /* ───────── GENERADORES PYTHON (Micro:bit + CyberPi) ───────── */
@@ -1173,6 +1392,73 @@ function defineBlocksAndGenerators() {
   P.forBlock['microbit_speech_say'] = function (block, gen) {
     gen.definitions_['import_speech'] = 'import speech';
     return `speech.say(${gen.quote_(block.getFieldValue('TEXT'))})\n`;
+  };
+
+  /* ── MICRO:BIT + SMART HOME (Keyestudio · montaje Aragón) ── */
+  // Sensores (lecturas)
+  const shAnalog = (block, gen) => {
+    mbImport(gen);
+    return [`pin${block.getFieldValue('PIN')}.read_analog()`, Order.ATOMIC];
+  };
+  P.forBlock['smarthome_luz'] = shAnalog;
+  P.forBlock['smarthome_gas'] = shAnalog;
+  P.forBlock['smarthome_vapor'] = shAnalog;
+  P.forBlock['smarthome_suelo'] = shAnalog;
+  P.forBlock['smarthome_analog_read'] = shAnalog;
+  P.forBlock['smarthome_digital_read'] = function (block, gen) {
+    mbImport(gen);
+    return [`pin${block.getFieldValue('PIN')}.read_digital()`, Order.ATOMIC];
+  };
+  P.forBlock['smarthome_pir'] = function (block, gen) {
+    mbImport(gen);
+    return [`(pin${block.getFieldValue('PIN')}.read_digital() == 1)`, Order.ATOMIC];
+  };
+  // Actuadores
+  P.forBlock['smarthome_led'] = function (block, gen) {
+    mbImport(gen);
+    return `pin${block.getFieldValue('PIN')}.write_digital(${block.getFieldValue('STATE')})\n`;
+  };
+  P.forBlock['smarthome_relay'] = function (block, gen) {
+    mbImport(gen);
+    return `pin${block.getFieldValue('PIN')}.write_digital(${block.getFieldValue('STATE')})\n`;
+  };
+  const shPwm = (block, gen) => {
+    mbImport(gen);
+    const v = Math.round((Number(block.getFieldValue('VAL')) / 100) * 1023);
+    return `pin${block.getFieldValue('PIN')}.write_analog(${v})\n`;
+  };
+  P.forBlock['smarthome_led_bright'] = shPwm;
+  P.forBlock['smarthome_fan'] = shPwm;
+  P.forBlock['smarthome_servo'] = function (block, gen) {
+    mbImport(gen);
+    gen.definitions_['def_servo'] =
+      'def _servo(p, ang):\n' +
+      '    p.set_analog_period(20)\n' +
+      '    p.write_analog(round(26 + (128 - 26) * ang / 180))';
+    return `_servo(pin${block.getFieldValue('PIN')}, ${block.getFieldValue('ANG')})\n`;
+  };
+  // Sonido
+  P.forBlock['smarthome_buzzer_tone'] = function (block, gen) {
+    mbImport(gen);
+    gen.definitions_['import_music'] = 'import music';
+    return `music.pitch(${block.getFieldValue('FREQ')}, ${block.getFieldValue('MS')}, pin=pin${block.getFieldValue('PIN')})\n`;
+  };
+  P.forBlock['smarthome_buzzer_melody'] = function (block, gen) {
+    mbImport(gen);
+    gen.definitions_['import_music'] = 'import music';
+    return `music.play(music.${block.getFieldValue('MELODY')}, pin=pin${block.getFieldValue('PIN')})\n`;
+  };
+  // Pantalla LCD 1602 I²C
+  P.forBlock['smarthome_lcd_init'] = function (block, gen) {
+    mbImport(gen);
+    gen.definitions_['class_lcd'] = LCD_DRIVER_PY;
+    return `lcd = _LCD(${block.getFieldValue('ADDR')})\n`;
+  };
+  P.forBlock['smarthome_lcd_show'] = function (block, gen) {
+    return `lcd.show(${gen.quote_(block.getFieldValue('TEXT'))}, ${block.getFieldValue('COL')}, ${block.getFieldValue('ROW')})\n`;
+  };
+  P.forBlock['smarthome_lcd_clear'] = function () {
+    return 'lcd.clear()\n';
   };
   P.forBlock['microbit_radio_group'] = function (block, gen) {
     gen.definitions_['import_radio'] = 'import radio';
@@ -1638,6 +1924,61 @@ const TOOLBOXES = {
       CODE_PY,
     ],
   },
+  microbit_smarthome: {
+    kind: 'categoryToolbox',
+    contents: [
+      {
+        kind: 'category', name: 'Básico', colour: '230',
+        contents: [
+          blk('microbit_on_start'), blk('microbit_forever'),
+          blk('microbit_show_string'), blk('microbit_show_value'),
+          blk('microbit_show_leds'), blk('microbit_clear'), blk('microbit_pause'),
+        ],
+      },
+      {
+        kind: 'category', name: '🏠 Sensores', colour: '#0d9488',
+        contents: [
+          blk('smarthome_luz'), blk('smarthome_gas'), blk('smarthome_vapor'),
+          blk('smarthome_suelo'), blk('smarthome_pir'),
+          blk('microbit_temperature'),
+          blk('smarthome_analog_read'), blk('smarthome_digital_read'),
+        ],
+      },
+      {
+        kind: 'category', name: '🏠 Actuadores', colour: '#f59e0b',
+        contents: [
+          blk('smarthome_led'), blk('smarthome_led_bright'),
+          blk('smarthome_fan'), blk('smarthome_servo'), blk('smarthome_relay'),
+        ],
+      },
+      {
+        kind: 'category', name: '🏠 Sonido', colour: '#a855f7',
+        contents: [blk('smarthome_buzzer_tone'), blk('smarthome_buzzer_melody')],
+      },
+      {
+        kind: 'category', name: '🏠 Pantalla LCD', colour: '#3b82f6',
+        contents: [
+          blk('smarthome_lcd_init'), blk('smarthome_lcd_show'), blk('smarthome_lcd_clear'),
+        ],
+      },
+      {
+        kind: 'category', name: 'Entrada / Botones', colour: '20',
+        contents: [
+          blk('microbit_button_pressed'), blk('microbit_pin_touched'),
+          blk('microbit_gesture'),
+        ],
+      },
+      {
+        kind: 'category', name: 'Pines (avanzado)', colour: '180',
+        contents: [
+          blk('microbit_pin_digital_write'), blk('microbit_pin_digital_read'),
+          blk('microbit_pin_analog_write'), blk('microbit_pin_analog_read'),
+        ],
+      },
+      ...STD_CATEGORIES,
+      CODE_PY,
+    ],
+  },
   arduino: {
     kind: 'categoryToolbox',
     contents: [
@@ -1681,6 +2022,7 @@ const TOOLBOXES = {
 
 const BOARD_META = {
   microbit: { label: 'BBC Micro:bit V2', lang: 'MicroPython', repl: true },
+  microbit_smarthome: { label: 'Micro:bit + Smart Home', lang: 'MicroPython', repl: true },
   cyberpi: { label: 'CyberPi / mBot2', lang: 'Python (cyberpi)', repl: true },
   arduino: { label: 'Arduino Uno / Nano', lang: 'C++ (Arduino)', repl: false },
 };
@@ -1690,6 +2032,10 @@ const LANG_INFO = {
   microbit: {
     lang: 'MicroPython para la BBC micro:bit V2',
     notes: 'Usa la librería microbit (from microbit import *) y, si hacen falta, music, radio o speech.',
+  },
+  microbit_smarthome: {
+    lang: 'MicroPython para micro:bit V2 conectada al kit Smart Home (Keyestudio)',
+    notes: 'Usa from microbit import *; lee sensores con pinX.read_analog()/read_digital(), mueve actuadores con write_digital()/write_analog(), el zumbador con music y la LCD 1602 por i2c (SCL=P19, SDA=P20). Respeta los pines del montaje.',
   },
   cyberpi: {
     lang: 'Python con la librería cyberpi (y mbot2/mbuild para el robot mBot2)',
@@ -1707,6 +2053,12 @@ const CONNECT_HELP = {
     'micro:bit V2: normalmente NO necesita driver (plug-and-play en Windows 10/11).',
     'Prueba con otro cable USB (que sea de datos, no solo de carga) y otro puerto.',
     'Para EJECUTAR debe tener firmware MicroPython flasheado (no MakeCode).',
+  ],
+  microbit_smarthome: [
+    'Conecta el USB a la micro:bit montada sobre la placa Shield del kit Smart Home.',
+    'No necesita driver en Windows 10/11; usa un cable USB de datos.',
+    'Para EJECUTAR debe tener firmware MicroPython flasheado (no MakeCode).',
+    'Cada bloque ya trae el pin del montaje; la LCD usa I²C (SCL=P19, SDA=P20).',
   ],
   cyberpi: [
     'CyberPi/mBot2: si no aparece el puerto, instala el driver USB CH340 (el que usa mBlock de Makeblock).',
@@ -3065,7 +3417,7 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
       if (!detected || detected === detectedBoardRef.current) return;
       detectedBoardRef.current = detected;
       const sel = selectedBoardRef.current;
-      if (detected !== sel) {
+      if (baseBoard(detected) !== baseBoard(sel)) {
         log(
           `⚠️ La placa conectada parece ${BOARD_META[detected].label}, pero tienes seleccionada «${BOARD_META[sel].label}». ` +
             `Cambia el desplegable a «${BOARD_META[detected].label}» para generar el código correcto.`,
@@ -3621,7 +3973,7 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
 
           {/* En CyberPi el firmware siempre arranca a su menú: main.py no autoarranca,
               así que estos botones solo se ofrecen para micro:bit (donde sí funciona). */}
-          {selectedBoard === 'microbit' && (
+          {baseBoard(selectedBoard) === 'microbit' && (
             <button
               onClick={uploadToBoard}
               disabled={!isConnected}
@@ -3636,7 +3988,7 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
             </button>
           )}
 
-          {selectedBoard === 'microbit' && (
+          {baseBoard(selectedBoard) === 'microbit' && (
             <button
               onClick={deleteMainPy}
               disabled={!isConnected}

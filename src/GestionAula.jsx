@@ -12,6 +12,7 @@ import Confetti from 'react-confetti';
 import GeografiaPanel from './components/GeografiaPanel';
 import MusicStaffPanel from './components/MusicStaffPanel';
 const MiniAppCreator = lazy(() => import('./components/MiniAppCreator'));
+const RecortesExtrem = lazy(() => import('./components/RecortesExtrem'));
 import { db } from './firebase';
 import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 
@@ -3339,7 +3340,7 @@ export default function HerramientasClase({ onExit, initialTool }) {
         const params = new URLSearchParams(window.location.search);
         if (params.get('pizarra')) return 'pizarra';
         const g = params.get('gestion');
-        if (g === 'ruleta' || g === 'pizarra' || g === 'reloj' || g === 'grupos' || g === 'plano') return g;
+        if (['ruleta', 'pizarra', 'reloj', 'grupos', 'plano', 'miniapp', 'recortes'].includes(g)) return g;
         return null;
     });
     const [shareModal, setShareModal] = useState(null); // { url, titulo }
@@ -3353,6 +3354,7 @@ export default function HerramientasClase({ onExit, initialTool }) {
         { id: 'grupos',   icon: <Users size={40}/>,        titulo: 'Grupos de Clase',    desc: 'Crea subgrupos aleatorios a partir de una lista de alumnos.', color: '#9b59b6' },
         { id: 'plano',    icon: <LayoutGrid size={40}/>,   titulo: 'Plano de Clase',     desc: 'Organiza los asientos de tu aula con un plano visual.',    color: '#1565C0' },
         { id: 'miniapp',  icon: <span style={{fontSize:36}}>⚡</span>, titulo: 'App con IA', desc: 'Genera una mini-aplicación interactiva con Claude o Gemini y previsualízala al instante.', color: '#7c3aed' },
+        { id: 'recortes', icon: <span style={{fontSize:36}}>✂️</span>, titulo: 'Recortes Extrem', desc: 'Carga una imagen o PDF y haz varios recortes a la vez para crear una matriz de imágenes.', color: '#16a085' },
     ];
 
     return (
@@ -3423,6 +3425,7 @@ export default function HerramientasClase({ onExit, initialTool }) {
                     {activa === 'grupos'   && <GruposLibre />}
                     {activa === 'plano'    && <PlanoAulaLibre />}
                     {activa === 'miniapp'  && <Suspense fallback={<div style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Cargando…</div>}><MiniAppCreator onAbrirViewer={(id) => window.open(`/?miniapp=${id}`, '_blank')} /></Suspense>}
+                    {activa === 'recortes' && <Suspense fallback={<div style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Cargando…</div>}><RecortesExtrem /></Suspense>}
                 </div>
             )}
 

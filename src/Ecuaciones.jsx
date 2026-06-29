@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { RotateCcw, CheckCircle, XCircle, Trophy, Clock, Calculator, Settings, SkipForward, Monitor, Loader, Users, Send } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { db } from './firebase';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 import { doc, setDoc, updateDoc, onSnapshot, increment, collection, addDoc, getDoc } from 'firebase/firestore';
 import piHappy from './assets/Pi-contento.png';
 import piAngry from './assets/Pi-enfadado.png';
@@ -1054,6 +1055,12 @@ function ModalEnviarProfeEcu({ datos, onClose }) {
                 tipo: 'ECUACIONES', modalidad: esLive ? 'Online' : 'Individual',
                 fecha: new Date(), codigoProfesor: code, jugadores: jugadoresInforme,
             });
+            if (!esLive) {
+                guardarRegistroLocal('ECUACIONES', {
+                    titulo: 'Ecuaciones', aciertos: datos.puntos || 0,
+                    nombre: nombre.trim(), curso: curso.trim(), via: 'profesor',
+                });
+            }
             setEnviado(true);
         } catch(e) { console.error(e); setError('Error: ' + e.message); }
         setEnviando(false);

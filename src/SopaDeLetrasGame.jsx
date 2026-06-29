@@ -2,6 +2,7 @@
 import { db } from './firebase';
 import { collection, addDoc, query, where, orderBy, limit, getDocs, doc, getDoc } from 'firebase/firestore';
 import { X, Settings, Trophy, Search, BookOpen, Globe, ArrowLeft, Share2, Check } from 'lucide-react';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 
 import Confetti from 'react-confetti';
 import SopaDeLetras from './SopaDeLetras'; // <--- Importamos el motor de la sopa que ya creamos
@@ -39,6 +40,10 @@ function ModalEnviarProfe({ datos, onClose }) {
                 codigoProfesor: code,
                 config: { idioma: datos.idioma, numPalabras: datos.numPalabras },
                 jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), aciertos: datos.palabras, tiempo: datos.tiempo }],
+            });
+            guardarRegistroLocal('SOPA', {
+                titulo: datos.recursoTitulo, aciertos: datos.palabras,
+                nombre: nombre.trim(), curso: curso.trim(), via: 'profesor',
             });
             setEnviado(true);
         } catch(e) { setError('Error: ' + e.message); }
@@ -499,6 +504,10 @@ export default function SopaDeLetrasGame({ usuario, onExit, recurso, modoOlimpic
                     lang: config.lang
                 });
             }
+            guardarRegistroLocal('SOPA', {
+                titulo: (isCustomGame && recursoActual) ? (recursoActual.titulo || 'Sopa de Letras') : `Aleatoria (${config.lang}-${config.numWords})`,
+                nombre: playerName.trim(), via: 'ranking',
+            });
             alert("¡Resultado guardado!");
             cargarRanking();
         } catch (e) {

@@ -3,6 +3,7 @@ import { db } from './firebase';
 import { doc, getDoc, setDoc, addDoc, collection, query, where, getDocs, orderBy, limit, updateDoc, getCountFromServer, increment } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
 import ReactionAvatar from './components/ReactionAvatar';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 
 // --- IMPORTACIÓN DE AUDIOS ---
 import correctSoundFile from './assets/correct-choice-43861.mp3';
@@ -309,6 +310,10 @@ export default function CazaBurbujasGame({ recurso, usuario, alTerminar, modoOli
                     alert(`Puntuación Guardada. Posición #${rank} 🚀`);
                 }
             }
+            guardarRegistroLocal('CAZABURBUJAS', {
+                titulo: recurso.titulo, aciertos: puntuacion,
+                nombre: nombreFinal, via: 'ranking',
+            });
             alTerminar();
         } catch (e) {
             console.error(e);
@@ -393,6 +398,10 @@ function ModalEnviarProfe({ datos, onClose }) {
                 recursoId: datos.recursoId, recursoTitulo: datos.recursoTitulo,
                 hoja: datos.hoja, codigoProfesor: code,
                 jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), aciertos: datos.aciertos, fallos: 0, hoja: datos.hoja }],
+            });
+            guardarRegistroLocal('CAZABURBUJAS', {
+                titulo: datos.recursoTitulo, aciertos: datos.aciertos,
+                nombre: nombre.trim(), curso: curso.trim(), via: 'profesor',
             });
             setEnviado(true);
         } catch(e) { setError('Error: ' + e.message); }

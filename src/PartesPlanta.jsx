@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { db } from './firebase';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 import { collection, addDoc, doc, getDoc } from 'firebase/firestore';
 
 // ─── Modal enviar al profesor ────────────────────────────────────────────────
@@ -24,6 +25,10 @@ function ModalEnviarProfe({ datos, onClose }) {
                 recursoTitulo: 'Partes de la Planta',
                 codigoProfesor: code,
                 jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), aciertos: datos.niveles, total: datos.niveles, nota: 100 }],
+            });
+            guardarRegistroLocal('PARTES_PLANTA', {
+                titulo: 'Partes de la Planta', aciertos: datos.niveles, intentos: datos.niveles,
+                nombre: nombre.trim(), curso: curso.trim(), via: 'profesor',
             });
             setEnviado(true);
         } catch(e) { setError('Error: ' + e.message); }

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Dices, Trophy, Clock, RotateCcw, Play, AlertCircle, Send, CheckCircle, Share2 } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { db } from './firebase';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 import { collection, addDoc, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 // ─── Constantes ───────────────────────────────────────────────────────────────
 const TOTAL    = 63;
@@ -329,6 +330,11 @@ function PantallaFin({ ord, modo, stats, jugadores, baseStr, onSetup, onRepetir 
                     const pct = s.intentos > 0 ? Math.round(s.aciertos / s.intentos * 100) : 0;
                     return { nombre: j.nombre, aciertos: s.aciertos, intentos: s.intentos, porcentaje: pct };
                 }),
+            });
+            const s0 = stats[jugadores[0]?.id] || { intentos: 0, aciertos: 0 };
+            guardarRegistroLocal('OCA', {
+                titulo: 'Oca Matemática', aciertos: s0.aciertos, intentos: s0.intentos,
+                nombre: jugadores[0]?.nombre || '', via: 'profesor',
             });
             setEnviado(true);
         } catch (e) {

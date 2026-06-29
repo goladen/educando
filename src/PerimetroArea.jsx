@@ -1,4 +1,94 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { db } from './firebase';
+import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
+import { guardarRegistroLocal } from './utils/registrosLocales';
+
+const MISIONES_PA = [
+  { id: 1, title: '1. El Granjero' },
+  { id: 2, title: '2. El Albañil' },
+  { id: 3, title: '3. El Arquitecto' },
+  { id: 4, title: '4. El Perfeccionista' },
+  { id: 5, title: '5. El Maestro Geómetra' },
+];
+
+// Modal "Enviar al profesor" para Perímetro y Área.
+function ModalEnviarPA({ datos, onClose }) {
+  const [nombre, setNombre] = useState('');
+  const [curso,  setCurso]  = useState('');
+  const [codigo, setCodigo] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const [enviado,  setEnviado]  = useState(false);
+  const [error,    setError]    = useState('');
+
+  const enviar = async () => {
+    const code = codigo.trim().toUpperCase();
+    if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+    if (!code) { setError('Escribe el código del profesor.'); return; }
+    setEnviando(true); setError('');
+    try {
+      const snap = await getDoc(doc(db, 'codigos_profesor', code));
+      if (!snap.exists()) { setError('Código de profesor no encontrado.'); setEnviando(false); return; }
+      const pct = datos.total > 0 ? Math.round((datos.aciertos / datos.total) * 100) : 0;
+      await addDoc(collection(db, 'informes_juegos'), {
+        tipo: 'PERIMETRO_AREA', modalidad: 'Individual', fecha: new Date(),
+        codigoProfesor: code, profesorUid: snap.data().uid || null,
+        modoJuego: 'Desafíos', configuracion: datos.configDesc || null,
+        jugadores: [{
+          nombre: nombre.trim(), curso: curso.trim(),
+          aciertos: datos.aciertos, total: datos.total, intentos: datos.total,
+          porcentaje: pct, modo: 'Desafíos', configuracion: datos.configDesc || null,
+        }],
+      });
+      guardarRegistroLocal('PERIMETRO_AREA', {
+        titulo: 'Perímetro y Área', aciertos: datos.aciertos, intentos: datos.total, porcentaje: pct,
+        nombre: nombre.trim(), curso: curso.trim(), via: 'profesor',
+      });
+      setEnviado(true);
+    } catch (e) { setError('Error al enviar: ' + (e.message || '')); }
+    setEnviando(false);
+  };
+
+  const inp = { padding:'9px 12px', borderRadius:9, border:'1.5px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.08)', color:'white', fontSize:'0.9rem', outline:'none', width:'100%', boxSizing:'border-box', fontFamily:'inherit' };
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.78)', zIndex:10002, display:'flex', justifyContent:'center', alignItems:'center', padding:16 }}>
+      <div style={{ background:'#1e272e', border:'1px solid rgba(255,255,255,0.15)', borderRadius:20, width:'100%', maxWidth:380, padding:'26px 28px', color:'white', fontFamily:"'Segoe UI',sans-serif", boxShadow:'0 30px 80px rgba(0,0,0,0.7)' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+          <h3 style={{ margin:0, fontSize:'1.05rem', color:'#f1c40f' }}>📤 Enviar al profesor</h3>
+          <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', color:'#aaa', fontSize:'1.2rem' }}>✕</button>
+        </div>
+        {enviado ? (
+          <div style={{ textAlign:'center', padding:'18px 0' }}>
+            <div style={{ fontSize:'3rem' }}>✅</div>
+            <div style={{ color:'#2ecc71', fontWeight:700 }}>¡Informe enviado!</div>
+            <div style={{ color:'#aaa', fontSize:'0.88rem', marginTop:8 }}>{datos.aciertos}/{datos.total} misiones completadas</div>
+            <button onClick={onClose} style={{ marginTop:16, padding:'9px 22px', borderRadius:10, border:'none', background:'rgba(255,255,255,0.1)', cursor:'pointer', color:'white' }}>Cerrar</button>
+          </div>
+        ) : (
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            <div style={{ background:'rgba(255,255,255,0.06)', borderRadius:10, padding:'10px 12px', fontSize:'0.82rem', color:'#cfd6dc' }}>
+              ⭐ {datos.aciertos}/{datos.total} misiones completadas
+              {datos.configDesc && <div style={{ marginTop:3, color:'#9aa4ad' }}>{datos.configDesc}</div>}
+            </div>
+            <div><label style={{ fontSize:'0.78rem', color:'#aaa', fontWeight:600, display:'block', marginBottom:4 }}>Nombre y apellido</label>
+              <input value={nombre} onChange={e=>setNombre(e.target.value)} placeholder="Tu nombre completo" style={inp}/></div>
+            <div><label style={{ fontSize:'0.78rem', color:'#aaa', fontWeight:600, display:'block', marginBottom:4 }}>Curso</label>
+              <input value={curso} onChange={e=>setCurso(e.target.value)} placeholder="Ej: 1º ESO A" style={inp}/></div>
+            <div><label style={{ fontSize:'0.78rem', color:'#aaa', fontWeight:600, display:'block', marginBottom:4 }}>Código del profesor</label>
+              <input value={codigo} onChange={e=>setCodigo(e.target.value.toUpperCase())} placeholder="XXXXXX" maxLength={10} style={{ ...inp, letterSpacing:2, fontWeight:700 }}/></div>
+            {error && <div style={{ color:'#e74c3c', fontSize:'0.8rem' }}>⚠ {error}</div>}
+            <div style={{ display:'flex', gap:9, marginTop:4 }}>
+              <button onClick={onClose} style={{ flex:1, padding:'10px', borderRadius:10, border:'1px solid rgba(255,255,255,0.2)', background:'transparent', cursor:'pointer', color:'white' }}>Cancelar</button>
+              <button onClick={enviar} disabled={enviando} style={{ flex:2, padding:'10px', borderRadius:10, border:'none', background:enviando?'#555':'linear-gradient(135deg,#27ae60,#2ecc71)', color:'white', fontWeight:700, cursor:enviando?'default':'pointer' }}>
+                {enviando ? 'Enviando…' : '📤 Enviar'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 const PerimetroArea = () => {
   const [mission, setMission] = useState(0);
@@ -13,6 +103,7 @@ const PerimetroArea = () => {
   const [dFences, setDFences] = useState({});
   const [feedback, setFeedback] = useState(null);
   const [savedFigures, setSavedFigures] = useState([]);
+  const [mostrarEnvio, setMostrarEnvio] = useState(false);
 
   const [windowDimensions, setWindowDimensions] = useState({
     w: typeof window !== 'undefined' ? window.innerWidth : 1024,
@@ -293,6 +384,32 @@ const PerimetroArea = () => {
             </div>
           ))}
         </div>
+
+        <div style={{ textAlign: 'center', marginTop: 30 }}>
+          <button
+            onClick={() => setMostrarEnvio(true)}
+            disabled={completedMissions.length === 0}
+            style={{ padding: '12px 28px', fontSize: '1rem', fontWeight: 700, color: 'white', border: 'none', borderRadius: 30, cursor: completedMissions.length === 0 ? 'not-allowed' : 'pointer', opacity: completedMissions.length === 0 ? 0.5 : 1, background: 'linear-gradient(135deg,#27ae60,#2ecc71)', boxShadow: '0 4px 12px rgba(39,174,96,0.4)' }}
+          >
+            📤 Enviar al profesor {completedMissions.length > 0 && `(${completedMissions.length}/${MISIONES_PA.length} ⭐)`}
+          </button>
+          {completedMissions.length === 0 && (
+            <p style={{ color: '#95a5a6', fontSize: '0.85rem', marginTop: 8 }}>Completa al menos una misión para poder enviar tus resultados.</p>
+          )}
+        </div>
+
+        {mostrarEnvio && (
+          <ModalEnviarPA
+            datos={{
+              aciertos: completedMissions.length,
+              total: MISIONES_PA.length,
+              configDesc: completedMissions.length
+                ? 'Completadas: ' + MISIONES_PA.filter(m => completedMissions.includes(m.id)).map(m => m.title).join(', ')
+                : '',
+            }}
+            onClose={() => setMostrarEnvio(false)}
+          />
+        )}
       </div>
     );
   }

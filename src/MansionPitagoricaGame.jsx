@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { db } from './firebase';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 import { doc, getDoc, collection, query, where, getDocs, addDoc, orderBy, limit } from 'firebase/firestore';
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -256,6 +257,11 @@ function ModalEnviarProfe({ resultado, recurso, onClose }) {
                 tipo: 'MANSION_PITAGORICA', modalidad: 'Individual', fecha: new Date(),
                 recursoId: recurso.id, recursoTitulo: recurso.titulo, codigoProfesor: code,
                 jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), puntos: resultado.puntos ?? 0, aciertos: resultado.aciertos ?? 0, fallos: resultado.fallos ?? 0 }],
+            });
+            guardarRegistroLocal('MANSION_PITAGORICA', {
+                titulo: recurso.titulo, aciertos: resultado.aciertos ?? 0,
+                intentos: (resultado.aciertos ?? 0) + (resultado.fallos ?? 0),
+                nombre: nombre.trim(), curso: curso.trim(), via: 'profesor',
             });
             setEnviado(true);
         } catch (e) { setError('Error: ' + e.message); }

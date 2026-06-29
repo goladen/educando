@@ -1,6 +1,7 @@
 // Algebra.jsx — 7-module interactive algebra practice for ESO
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { db } from './firebase';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 import { addDoc, collection, doc, getDoc } from 'firebase/firestore';
 import { CheckCircle, XCircle, RefreshCw, Send, Share2, ChevronDown, ChevronUp, Maximize2, Minimize2 } from 'lucide-react';
 
@@ -839,6 +840,10 @@ export default function AlgebraApp({ onExit, usuario }) {
                         porcentaje: t.total>0 ? Math.round(t.ok/t.total*100) : 0,
                     })),
                 }],
+            });
+            guardarRegistroLocal('ALGEBRA', {
+                titulo: 'Álgebra', aciertos: totalOk, intentos: totalTotal,
+                nombre, via: 'profesor',
             });
             setEnviado(true);
         } catch(e) { setErrorEnv('Error al enviar: '+e.message); }

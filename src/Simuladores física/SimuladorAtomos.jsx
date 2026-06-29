@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { db } from '../firebase';
+import { guardarRegistroLocal } from '../utils/registrosLocales';
 import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
 
 // ─── SONIDOS (Web Audio API) ──────────────────────────────────────────────────
@@ -173,6 +174,10 @@ function ModalEnviarProfe({ datos, onClose }) {
         jugadores: [{ nombre: nombre.trim(), curso: curso.trim(),
           aciertos: datos.aciertos, intentos: 10,
           porcentaje: Math.round((datos.aciertos / 10) * 100) }],
+      });
+      guardarRegistroLocal('ATOMOS_TEST', {
+        titulo: 'Test de Átomos', aciertos: datos.aciertos, intentos: 10,
+        nombre: nombre.trim(), curso: curso.trim(), via: 'profesor',
       });
       setEnviado(true);
     } catch (e) { setError('Error: ' + e.message); }

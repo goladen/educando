@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import GameLauncher from './components/GameLauncher';
 import { db } from './firebase';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 import { doc, getDoc, collection, query, where, orderBy, limit, getDocs, addDoc, updateDoc, getCountFromServer } from 'firebase/firestore';
 
 // ─────────────────────────────────────────────
@@ -166,6 +167,10 @@ function ModalEnviarProfe({ resultado, recurso, onClose }) {
                 recursoId: recurso.id, recursoTitulo: recurso.titulo,
                 hoja: resultado.hoja, codigoProfesor: code,
                 jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), tiempo: resultado.tiempo, tiempoFormateado: resultado.tiempoFormateado, puntos: resultado.puntos, posicion: resultado.posicion, hoja: resultado.hoja }],
+            });
+            guardarRegistroLocal('KARTINGED', {
+                titulo: recurso.titulo, aciertos: resultado.puntos ?? 0,
+                nombre: nombre.trim(), curso: curso.trim(), via: 'profesor',
             });
             setEnviado(true);
         } catch (e) { setError('Error: ' + e.message); }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { db } from './firebase';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 import { collection, addDoc, getDoc, doc } from 'firebase/firestore';
 
 // ── SVG note primitives ────────────────────────────────────────────
@@ -147,6 +148,10 @@ function ModalEnviar({ historial, puntuacion, onClose }) {
                         sinPuntos: h.sinPuntos,
                     })),
                 }],
+            });
+            guardarRegistroLocal('MUSIC_COMPASS', {
+                titulo: 'Entrenamiento Auditivo (Ritmo)', aciertos: puntuacion,
+                nombre: nombre.trim(), curso: curso.trim(), via: 'profesor',
             });
             setEnviado(true);
         } catch (e) { setError('Error al enviar: ' + e.message); }

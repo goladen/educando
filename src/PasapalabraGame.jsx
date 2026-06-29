@@ -2,6 +2,7 @@
 import { db } from './firebase';
 import { doc, updateDoc, addDoc, getDoc, collection, query, where, getDocs, orderBy, limit, getCountFromServer,increment } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 
 // --- IMPORTACIÓN DE AUDIOS ---
 import correctSoundFile from './assets/correct-choice-43861.mp3';
@@ -179,6 +180,11 @@ function ModalEnviarProfe({ datos, onClose }) {
                 recursoId: datos.recursoId, recursoTitulo: datos.recursoTitulo,
                 hoja: datos.hoja, codigoProfesor: code,
                 jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), aciertos: datos.aciertos, fallos: datos.fallos, hoja: datos.hoja }],
+            });
+            guardarRegistroLocal('PASAPALABRA', {
+                titulo: datos.recursoTitulo, aciertos: datos.aciertos,
+                intentos: (datos.aciertos || 0) + (datos.fallos || 0),
+                nombre: nombre.trim(), curso: curso.trim(), via: 'profesor',
             });
             setEnviado(true);
         } catch(e) { setError('Error: ' + e.message); }
@@ -793,6 +799,11 @@ const PantallaFin = ({ jugadores, recurso, hoja, usuario, modoDuelo, modoOlimpic
                     alert(`Puntuación Guardada. Estás en la posición #${rank} 🚀`);
                 }
             }
+            guardarRegistroLocal('PASAPALABRA', {
+                titulo: recurso.titulo, aciertos: score,
+                intentos: score + (jugadores[0].fallos || 0),
+                nombre: nombreGuardar, via: 'ranking',
+            });
             onExit();
         } catch (e) { console.error(e); alert("Error guardando."); setGuardando(false); }
     };

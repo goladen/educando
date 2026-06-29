@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from './firebase';
 import { collection, addDoc, query, where, orderBy, limit, getDocs, doc, getDoc } from 'firebase/firestore';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 import { X, Settings, Trophy, Search, BookOpen, Globe, ArrowLeft, Zap, Clock } from 'lucide-react';
 import Confetti from 'react-confetti';
 
@@ -51,6 +52,10 @@ function ModalEnviarProfe({ datos, onClose }) {
                 codigoProfesor: code,
                 config: { idioma: datos.idioma, longitud: datos.longitud, modo: datos.modo },
                 jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), aciertos: datos.score, tiempo: datos.tiempo, intentos: datos.intentos }],
+            });
+            guardarRegistroLocal('WORDLE', {
+                titulo: datos.recursoTitulo, aciertos: datos.score,
+                nombre: nombre.trim(), curso: curso.trim(), via: 'profesor',
             });
             setEnviado(true);
         } catch(e) { setError('Error: ' + e.message); }

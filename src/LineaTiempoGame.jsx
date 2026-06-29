@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { db } from './firebase';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 import { collection, doc, getDoc, getDocs, addDoc, query, where, orderBy, limit } from 'firebase/firestore';
 import { Clock, ArrowLeft, Search, CheckCircle, RotateCcw, Info, X, Calendar } from 'lucide-react';
 import { BIBLIOTECA_LINEAS_TIEMPO } from './BibliotecaLineasTiempo';
@@ -561,6 +562,10 @@ function ModalEnviarProfe({ datos, onClose }) {
                 recursoId: datos.recursoId, recursoTitulo: datos.recursoTitulo, hoja: datos.hoja,
                 codigoProfesor: code,
                 jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), aciertos: datos.aciertos, total: datos.total, intentos: datos.intentos, porcentaje: 100 }],
+            });
+            guardarRegistroLocal('LINEA_TIEMPO', {
+                titulo: datos.recursoTitulo, aciertos: datos.aciertos, intentos: datos.intentos || datos.total,
+                nombre: nombre.trim(), curso: curso.trim(), via: 'profesor',
             });
             setEnviado(true);
         } catch (e) { setError('Error: ' + e.message); }

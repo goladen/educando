@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { db } from './firebase';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, addDoc } from 'firebase/firestore';
 import {
     Search, Key, ChevronDown, ChevronUp, Filter,
@@ -480,6 +481,10 @@ function ModalEnviarProfe({ datos, onClose }) {
                 recursoId: datos.recursoId, recursoTitulo: datos.recursoTitulo,
                 hoja: datos.hoja, codigoProfesor: code,
                 jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), aciertos: datos.aciertos, total: datos.total, nota: datos.nota }],
+            });
+            guardarRegistroLocal('ETIQUETAS', {
+                titulo: datos.recursoTitulo, aciertos: datos.aciertos, intentos: datos.total,
+                nombre: nombre.trim(), curso: curso.trim(), via: 'profesor',
             });
             setEnviado(true);
         } catch(e) { setError('Error: ' + e.message); }

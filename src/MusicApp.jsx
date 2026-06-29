@@ -5,6 +5,7 @@ import EarTrainingGame from './MusicCompass';
 import MusicaInstrumentos from './MusicaInstrumentos';
 const PizarraMusical = lazy(() => import('./GestionAula').then(m => ({ default: m.PizarraApp })));
 import { db } from './firebase';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 import { collection, addDoc, doc, getDoc } from 'firebase/firestore';
 
 // ─── Hub ─────────────────────────────────────────────────────────────────────
@@ -46,6 +47,10 @@ export default function MusicApp({ onBack, usuario = null }) {
                         ...(p.nivel !== undefined ? { nivel: p.nivel } : {}),
                     })),
                 }],
+            });
+            guardarRegistroLocal('MUSIC_GAMES', {
+                titulo: `Música · ${sesionMusical.length} partida(s)`, aciertos: totalPuntos,
+                nombre: mNombre.trim(), curso: mCurso.trim(), via: 'profesor',
             });
             alert(`✅ Sesión enviada al profesor. ${sesionMusical.length} partida(s) incluidas.`);
             setSesionMusical([]);

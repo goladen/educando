@@ -72,13 +72,17 @@ const ArdOrder = {
   NONE: 99,
 };
 
-// Pines GPIO habituales del Micro:bit para escritura/lectura digital y PWM.
+// Pines GPIO del Micro:bit para escritura/lectura digital y PWM
+// (incluye P3/P4/P10/P11, usados por el montaje Smart Home de Aragón).
 const MB_PINS = [
-  ['P0', '0'], ['P1', '1'], ['P2', '2'], ['P8', '8'],
-  ['P12', '12'], ['P13', '13'], ['P14', '14'], ['P15', '15'], ['P16', '16'],
+  ['P0', '0'], ['P1', '1'], ['P2', '2'], ['P3', '3'], ['P4', '4'],
+  ['P8', '8'], ['P10', '10'], ['P11', '11'], ['P12', '12'],
+  ['P13', '13'], ['P14', '14'], ['P15', '15'], ['P16', '16'],
 ];
-// Pines con entrada ANALÓGICA fiable en el micro:bit (los tres pads grandes).
-const MB_APINS = [['P0', '0'], ['P1', '1'], ['P2', '2']];
+// Pines con entrada ANALÓGICA en el micro:bit (canales ADC: P0–P4 y P10).
+const MB_APINS = [
+  ['P0', '0'], ['P1', '1'], ['P2', '2'], ['P3', '3'], ['P4', '4'], ['P10', '10'],
+];
 
 // «Micro:bit + Smart Home» es, a efectos de puerto/REPL/guardado, una micro:bit.
 const baseBoard = (b) => (b === 'microbit_smarthome' ? 'microbit' : b);
@@ -118,16 +122,19 @@ const LCD_DRIVER_PY = `class _LCD:
 // defecto (se puede cambiar en el desplegable si el montaje varía).
 // ───────────────────────────────────────────────────────────────────────────
 const SMARTHOME_PINS = {
-  luz: '1',         // 🔆 sensor de luz (LDR / fotorresistencia) — analógico
-  gas: '2',         // 💨 sensor de gas / humo — analógico
-  vapor: '0',       // 💧 sensor de vapor / lluvia — analógico
-  suelo: '1',       // 🌱 humedad del suelo — analógico
-  pir: '8',         // 🚶 sensor de movimiento PIR — digital
-  led: '13',        // 💡 LED / iluminación — digital o PWM
-  ventilador: '14', // 🌀 ventilador / motor — PWM
-  servo: '15',      // 🚪 servo (puerta / ventana) — PWM
-  rele: '12',       // 🔌 relé — digital
-  zumbador: '16',   // 🔔 zumbador (buzzer) — tono / melodía
+  // ── ENTRADAS (sensores) ──
+  pir: '1',         // 🚶 sensor de movimiento PIR (cúpula blanca) — digital
+  gas: '2',         // 💨 sensor de gas / humo MQ-2 — analógico
+  suelo: '3',       // 🌱 humedad del suelo (horquilla) — analógico
+  luz: '4',         // 🔆 sensor de luz / fotorresistencia (LDR) — analógico
+  vapor: '10',      // 💧 sensor de vapor / lluvia (tejado) — analógico
+  boton: '11',      // 🔘 botón / sensor de choque (timbre, final de carrera) — digital
+  // ── SALIDAS (actuadores) ──
+  zumbador: '0',    // 🔔 zumbador (pin nativo de audio) — tono / melodía
+  servo: '8',       // 🚪 servomotor puerta / ventana (azul) — 0–180°
+  ventilador: '12', // 🌀 motor del ventilador — digital/PWM
+  led: '13',        // 💡 LED amarillo (lámpara de habitación) — digital o PWM
+  rgb: '14',        // 🌈 LED RGB / NeoPixel direccionable
 };
 
 // Reordena la lista de pines para que el pin del montaje aparezca por defecto.
@@ -1077,6 +1084,13 @@ function defineBlocksAndGenerators() {
       tooltip: 'Sensor de movimiento PIR: verdadero si detecta movimiento.',
     },
     {
+      type: 'smarthome_boton',
+      message0: '🔘 ¿pulsado? (botón / choque) en pin %1',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: pinOpts(SMARTHOME_PINS.boton) }],
+      output: 'Boolean', colour: '#0d9488',
+      tooltip: 'Botón pulsador / sensor de choque: verdadero al pulsar (timbre, ventana).',
+    },
+    {
       type: 'smarthome_analog_read',
       message0: 'leer sensor analógico (0–1023) en pin %1',
       args0: [{ type: 'field_dropdown', name: 'PIN', options: MB_APINS }],
@@ -1114,13 +1128,13 @@ function defineBlocksAndGenerators() {
     },
     {
       type: 'smarthome_fan',
-      message0: '🌀 ventilador / motor en pin %1 velocidad %2 %%',
+      message0: '🌀 ventilador / motor en pin %1 %2',
       args0: [
         { type: 'field_dropdown', name: 'PIN', options: pinOpts(SMARTHOME_PINS.ventilador) },
-        { type: 'field_number', name: 'VAL', value: 100, min: 0, max: 100 },
+        { type: 'field_dropdown', name: 'STATE', options: [['encender', '1'], ['apagar', '0']] },
       ],
       previousStatement: null, nextStatement: null, colour: '#10b981',
-      tooltip: 'Controla la velocidad del ventilador/motor (PWM 0–100 %).',
+      tooltip: 'Enciende o apaga el ventilador/motor (señal digital, como el toggle de MakeCode).',
     },
     {
       type: 'smarthome_servo',
@@ -1133,14 +1147,21 @@ function defineBlocksAndGenerators() {
       tooltip: 'Mueve el servo (puerta/ventana) al ángulo indicado (0–180°).',
     },
     {
-      type: 'smarthome_relay',
-      message0: '🔌 relé en pin %1 %2',
+      type: 'smarthome_rgb',
+      message0: '🌈 LED RGB (pin %1) color %2',
       args0: [
-        { type: 'field_dropdown', name: 'PIN', options: pinOpts(SMARTHOME_PINS.rele) },
-        { type: 'field_dropdown', name: 'STATE', options: [['activar', '1'], ['desactivar', '0']] },
+        { type: 'field_dropdown', name: 'PIN', options: pinOpts(SMARTHOME_PINS.rgb) },
+        {
+          type: 'field_dropdown', name: 'COLOR',
+          options: [
+            ['rojo', '255,0,0'], ['verde', '0,255,0'], ['azul', '0,0,255'],
+            ['amarillo', '255,180,0'], ['cian', '0,255,255'], ['magenta', '255,0,255'],
+            ['blanco', '120,120,120'], ['apagado', '0,0,0'],
+          ],
+        },
       ],
       previousStatement: null, nextStatement: null, colour: '#10b981',
-      tooltip: 'Activa o desactiva el relé (enchufe/bombilla 230 V del kit).',
+      tooltip: 'Pone el LED RGB / NeoPixel del color elegido (rojo=alarma, verde=seguro…).',
     },
 
     // — SONIDO (zumbador) —
@@ -1409,18 +1430,27 @@ function defineBlocksAndGenerators() {
     mbImport(gen);
     return [`pin${block.getFieldValue('PIN')}.read_digital()`, Order.ATOMIC];
   };
-  P.forBlock['smarthome_pir'] = function (block, gen) {
+  const shDigitalBool = (block, gen) => {
     mbImport(gen);
     return [`(pin${block.getFieldValue('PIN')}.read_digital() == 1)`, Order.ATOMIC];
   };
+  P.forBlock['smarthome_pir'] = shDigitalBool;
+  P.forBlock['smarthome_boton'] = shDigitalBool;
   // Actuadores
   P.forBlock['smarthome_led'] = function (block, gen) {
     mbImport(gen);
     return `pin${block.getFieldValue('PIN')}.write_digital(${block.getFieldValue('STATE')})\n`;
   };
-  P.forBlock['smarthome_relay'] = function (block, gen) {
+  P.forBlock['smarthome_rgb'] = function (block, gen) {
     mbImport(gen);
-    return `pin${block.getFieldValue('PIN')}.write_digital(${block.getFieldValue('STATE')})\n`;
+    gen.definitions_['import_neopixel'] = 'import neopixel';
+    const pin = block.getFieldValue('PIN');
+    gen.definitions_['def_rgb'] =
+      'def _rgb(p, r, g, b):\n' +
+      '    np = neopixel.NeoPixel(p, 1)\n' +
+      '    np[0] = (r, g, b)\n' +
+      '    np.show()';
+    return `_rgb(pin${pin}, ${block.getFieldValue('COLOR')})\n`;
   };
   const shPwm = (block, gen) => {
     mbImport(gen);
@@ -1428,7 +1458,10 @@ function defineBlocksAndGenerators() {
     return `pin${block.getFieldValue('PIN')}.write_analog(${v})\n`;
   };
   P.forBlock['smarthome_led_bright'] = shPwm;
-  P.forBlock['smarthome_fan'] = shPwm;
+  P.forBlock['smarthome_fan'] = function (block, gen) {
+    mbImport(gen);
+    return `pin${block.getFieldValue('PIN')}.write_digital(${block.getFieldValue('STATE')})\n`;
+  };
   P.forBlock['smarthome_servo'] = function (block, gen) {
     mbImport(gen);
     gen.definitions_['def_servo'] =
@@ -1448,16 +1481,26 @@ function defineBlocksAndGenerators() {
     gen.definitions_['import_music'] = 'import music';
     return `music.play(music.${block.getFieldValue('MELODY')}, pin=pin${block.getFieldValue('PIN')})\n`;
   };
-  // Pantalla LCD 1602 I²C
-  P.forBlock['smarthome_lcd_init'] = function (block, gen) {
+  // Pantalla LCD 1602 I²C. La pantalla se crea automáticamente como variable
+  // global `lcd` (def. de nivel superior) la primera vez que se usa CUALQUIER
+  // bloque de LCD, así no hace falta acordarse del bloque «iniciar». El bloque
+  // «iniciar» solo sirve para fijar la dirección I²C (0x27 / 0x3F).
+  const lcdEnsure = (gen, addr) => {
     mbImport(gen);
     gen.definitions_['class_lcd'] = LCD_DRIVER_PY;
-    return `lcd = _LCD(${block.getFieldValue('ADDR')})\n`;
+    if (addr) gen.definitions_['zz_lcd_obj'] = `lcd = _LCD(${addr})`;
+    else if (!gen.definitions_['zz_lcd_obj']) gen.definitions_['zz_lcd_obj'] = 'lcd = _LCD(0x27)';
+  };
+  P.forBlock['smarthome_lcd_init'] = function (block, gen) {
+    lcdEnsure(gen, block.getFieldValue('ADDR'));
+    return '';
   };
   P.forBlock['smarthome_lcd_show'] = function (block, gen) {
+    lcdEnsure(gen);
     return `lcd.show(${gen.quote_(block.getFieldValue('TEXT'))}, ${block.getFieldValue('COL')}, ${block.getFieldValue('ROW')})\n`;
   };
-  P.forBlock['smarthome_lcd_clear'] = function () {
+  P.forBlock['smarthome_lcd_clear'] = function (block, gen) {
+    lcdEnsure(gen);
     return 'lcd.clear()\n';
   };
   P.forBlock['microbit_radio_group'] = function (block, gen) {
@@ -1938,8 +1981,9 @@ const TOOLBOXES = {
       {
         kind: 'category', name: '🏠 Sensores', colour: '#0d9488',
         contents: [
-          blk('smarthome_luz'), blk('smarthome_gas'), blk('smarthome_vapor'),
-          blk('smarthome_suelo'), blk('smarthome_pir'),
+          blk('smarthome_pir'), blk('smarthome_boton'),
+          blk('smarthome_gas'), blk('smarthome_suelo'),
+          blk('smarthome_luz'), blk('smarthome_vapor'),
           blk('microbit_temperature'),
           blk('smarthome_analog_read'), blk('smarthome_digital_read'),
         ],
@@ -1947,8 +1991,8 @@ const TOOLBOXES = {
       {
         kind: 'category', name: '🏠 Actuadores', colour: '#f59e0b',
         contents: [
-          blk('smarthome_led'), blk('smarthome_led_bright'),
-          blk('smarthome_fan'), blk('smarthome_servo'), blk('smarthome_relay'),
+          blk('smarthome_led'), blk('smarthome_led_bright'), blk('smarthome_rgb'),
+          blk('smarthome_fan'), blk('smarthome_servo'),
         ],
       },
       {
@@ -2762,7 +2806,7 @@ function codeToState(board, code) {
 /* ──────────────────────────────────────────────────────────────────────────
    3. COMPONENTE REACT
    ────────────────────────────────────────────────────────────────────────── */
-export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, sharedProject = null }) {
+export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, sharedProject = null, initialBoard = 'microbit' }) {
   const blocklyDiv = useRef(null); // contenedor del workspace
   const workspaceRef = useRef(null); // instancia del workspace
   const portRef = useRef(null); // puerto Web Serial
@@ -2778,7 +2822,7 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
   const selectedBoardRef = useRef('microbit'); // placa seleccionada (para el read loop)
   const detectedBoardRef = useRef(null); // placa detectada por el banner del REPL
 
-  const [selectedBoard, setSelectedBoard] = useState('microbit');
+  const [selectedBoard, setSelectedBoard] = useState(initialBoard);
   const [isConnected, setIsConnected] = useState(false);
   const [generatedCode, setGeneratedCode] = useState('');
   const [logs, setLogs] = useState([]);

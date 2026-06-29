@@ -3,6 +3,7 @@ import sonidoCorrecto from './assets/correct-choice-43861.mp3';
 import sonidoFallo    from './assets/negative_beeps-6008.mp3';
 import sonidoInicio   from './assets/inicio-juego.mp3';
 import { db } from './firebase';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
 import DescubreMates from './DescubreMates';
 
@@ -40,6 +41,10 @@ function ModalEnviarProfe({ datos, onClose }) {
           multiplos: { aciertos: datos.aciertosMult,   intentos: datos.intentosMult   },
           divisores: { aciertos: datos.aciertosDiv,    intentos: datos.intentosDiv    },
         }],
+      });
+      guardarRegistroLocal('DIVISIBILIDAD', {
+        titulo: 'Divisibilidad', aciertos: totalAc, intentos: totalIn,
+        nombre: nombre.trim(), curso: curso.trim(), via: 'profesor',
       });
       setEnviado(true);
     } catch (e) { setError('Error: ' + e.message); }

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { ArrowLeft, RefreshCw, CheckCircle, Activity, Edit3, List, Send, Search, AlertTriangle, Share2 } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { db } from './firebase';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from 'firebase/auth';
 import { collection, addDoc, getDoc, doc } from 'firebase/firestore';
 import { FUNCIONES_DB } from './BibliotecaFunciones';
@@ -355,6 +356,10 @@ function ModalEnviarProfe({ datos, onClose }) {
                 codigoProfesor: code,
                 config: { tipoFuncion: datos.tipoFuncion, idFuncion: datos.idFuncion },
                 jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), porcentaje: datos.porcentaje, tipoEjercicio: datos.tipoFuncion, idFuncion: datos.idFuncion, puntos: datos.porcentaje }],
+            });
+            guardarRegistroLocal('FUNCIONES_ANALISIS', {
+                titulo: 'Análisis de Funciones', aciertos: datos.porcentaje, intentos: 100, porcentaje: datos.porcentaje,
+                nombre: nombre.trim(), curso: curso.trim(), via: 'profesor',
             });
             setEnviado(true);
         } catch(e) { setError('Error al enviar: ' + e.message); }

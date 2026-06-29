@@ -3,6 +3,8 @@ import { db } from '../firebase';
 import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, setDoc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { Search, Key, Filter, Zap, Play, Home, ChevronDown, ChevronUp, Mail, Link2, Share2 } from 'lucide-react';
 import GamePlayer from '../GamePlayer';
+import MisRegistros from './MisRegistros';
+import { getResumenRegistros } from '../utils/registrosLocales';
 import KartingTrack from '../KartingTrack';
 import KartingedMultiGame from '../KartingedMultiGame';
 import RacingGame3D from '../RacingGame3D';
@@ -16,10 +18,12 @@ import PikatronRun from '../PikatronRun';
 import TextWordleGame from '../TextWordleGame';
 import MathWordleGame from '../MathWordleGame';
 import SopaDeLetrasGame from '../SopaDeLetrasGame';
+import Ahorcado from '../Ahorcado';
 import SintaxisGame from '../SintaxisGamen2';
 import Listening from '../ListeningGame'
 import Geometrix from '../Geometrix';
-import CalculoMental from '../CalculoMental'; 
+import CalculoMental from '../CalculoMental';
+import CalculoDinero from '../CalculoDinero';
 import Ecuaciones from '../Ecuaciones';
 import Funciones from '../Funciones';
 import GeometriaAnalitica from '../Funciones2'
@@ -44,6 +48,7 @@ import IrregularVerbsTest from '../IrregularVerbsTest';
 import LenguaSignos from '../LenguaSignos';
 import MusicApp from '../MusicApp';
 import GeografiaApp from './GeografiaApp';
+import ImperiosGame from './ImperiosGame';
 import BiologiaApp  from './BiologiaApp';
 import HerramientasClase from '../GestionAula';
 import AlgebraApp from '../Algebra';
@@ -60,6 +65,7 @@ import EnlaceMoleculas from '../Simuladores física/EnlaceMoleculas';
 import AjustesReacciones from '../Simuladores física/AjustesReacciones';
 import CaidaEscalada from '../Simuladores física/CaidaEscalada';
 import SimuladorAtomos from '../Simuladores física/SimuladorAtomos';
+import GayLusac from '../Simuladores física/GayLusac';
 import RetosApp from '../Retos';
 import SimuladorDados from '../Probabilidad';
 import TrivialGame from '../Trivial';
@@ -71,6 +77,7 @@ import DueloPiratas from '../DueloPiratas';
 import DueloPiratasRecurso from '../DueloPiratasRecurso';
 import BlocklyEditor from '../BlocklyEditor';
 import ProgramacionRobotica from '../ProgramacionRobotica';
+import imgPiContento from '../assets/Pi-contento.png';
 import imgPasapalabra from '../assets/icono_pasapal.png'; // Revisa si es .png o .jpg
 import imgBurbujas from '../assets/icono_burbujas.png';
 import imgPikatron from '../assets/icono_pikatron.png';
@@ -521,13 +528,14 @@ export const APPS = [
 
 { id: 'APAREJADOS', name: 'AparejaDOS', desc: 'Encuentra las parejas correctas.', color: '#FF9800', img: imgAparejados, shareable: true },
     { id: 'RULETA', name: 'Ruleta', desc: 'Resuelve el panel oculto.', color: '#f1c40f', img: imgRuleta, shareable: true },
-    { id: 'WORDLE', name: 'WordLe', desc: 'Adivina la palabra en 6 intentos.', color: '#2e7d32', img: imgWordle, shareable: true },
     { id: 'MATHLE', name: 'MathLe', desc: 'Adivina la ecuación matemática oculta.', color: '#1565C0', img: imgMathle, shareable: true },
     { id: 'THINKHOOT', name: 'PiLive', desc: 'Diviértete en vivo con tus compañeros.', color: '#9C27B0', img: imgPilive, isLive: true, shareable: true },
     { id: 'EAE', name: 'PictoTabú', desc: 'Dibuja o describe sin usar palabras tabú.', color: '#e67e22', emoji: '🎨✍️', img: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEg80nlTKknMfTBotTp1CGlbyfxwhJALm8EsZoOrxi3qKUZ5z8dgiezpsnVAh9UoCSvtA7FJ_0XifE0lN9_t8mAAQiH_nebCwjN5IwpvhjAi4JF-NcSEP0M972qoXd3HPtyjfzRWj-dZM9s/s1600/Captura+de+pantalla+2020-03-30+a+las+10.29.34.png', isLive: true, shareable: false },
     { id: 'MATHLIVE', name: 'MathLive', desc: 'Juega con las mates en tiempo real.', color: '#009688', img: imgMathlive, isLive: true, shareable: true },
     { id: 'OLYMPICLIVE', name: 'Olympic_Live', desc: 'Compite en minijuegos y cálculo.', color: '#D32F2F', img: imgOlympic, isLive: true, shareable: true },
+    { id: 'AHORCADO', name: 'Ahorcado', desc: 'Adivina la palabra letra a letra.', color: '#6d28d9', emoji: '🪢', shareable: true },
     { id: 'SOPA', name: 'Sopa_letras', desc: 'Encuentra las palabras ocultas.', color: '#e67e22', img: imgSopa, shareable: true },
+    { id: 'WORDLE', name: 'WordLe', desc: 'Adivina la palabra en 6 intentos.', color: '#2e7d32', img: imgWordle, shareable: true },
     {
         id: 'QUESTION_SENDER',
         name: 'Q-Sender',
@@ -597,6 +605,15 @@ export const APPS = [
         desc: 'Agilidad mental y operaciones con tiempo.',
         color: '#E91E63',
         emoji: '🧠',
+        isMath: true,
+        shareable: true
+    },
+    {
+        id: 'DINERO',
+        name: 'Dinero',
+        desc: 'Paga con billetes y monedas, vuelta, IVA y rebajas.',
+        color: '#16a085',
+        emoji: '💶',
         isMath: true,
         shareable: true
     },
@@ -784,6 +801,14 @@ export const GAME_INFO = {
         materias: ['Universal', 'Lengua y Literatura', 'Inglés', 'Ciencias Sociales'],
         etapas: ['Primaria', 'ESO', 'Bachillerato'],
     },
+    AHORCADO: {
+        descripcion: 'El clásico juego del ahorcado en versión digital. Adivina la palabra oculta letra a letra antes de que se complete el muñeco, con sonidos de acierto y fallo. Modos: 1 jugador (con o sin tiempo), contrarreloj (5 min adivinando todas las que puedas, con ranking) y duelo de 2 jugadores donde uno propone la palabra (20s) y el otro la adivina (10s por letra).',
+        tipoPreguntas: 'Palabras de vocabulario de cualquier materia. Funciona con recursos de Wordle y Sopa de Letras, o con palabras aleatorias del diccionario.',
+        biblioteca: 'Sí, genera palabras automáticamente del diccionario por idioma. También admite recursos del profesor.',
+        multiplayer: 'Individual y duelo local de 2 jugadores (mejor de 5).',
+        materias: ['Lengua y Literatura', 'Inglés', 'Ciencias Sociales', 'Universal'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
     STORYCUBES: {
         descripcion: 'Dados de imágenes para estimular la creatividad narrativa. El alumno lanza los dados virtuales y debe construir una historia usando las imágenes obtenidas.',
         tipoPreguntas: 'No hay preguntas. Es una actividad de expresión oral y escritura creativa libre.',
@@ -921,6 +946,14 @@ export const GAME_INFO = {
         materias: ['Geografía', 'Ciencias Sociales'],
         etapas: ['Primaria', 'ESO', 'Bachillerato'],
     },
+    IMPERIOS: {
+        descripcion: 'Juego en dos fases sobre los grandes imperios y civilizaciones de la Historia (Egipto, Roma, Inca, Mongol, Otomano, Británico...). Fase 1: localiza en el mapa mundial los países actuales que abarcó el imperio. Fase 2: responde preguntas sobre su época, religión, aportes, auge y caída.',
+        tipoPreguntas: 'Localización de países en el mapa (selección múltiple) y preguntas de opción múltiple sobre cada imperio.',
+        biblioteca: 'Sí, 20 imperios ordenados por relevancia histórica, con sus países y preguntas incluidas.',
+        multiplayer: 'Individual. Permite enviar el resultado al profesor y guardarlo en el dispositivo.',
+        materias: ['Historia', 'Geografía', 'Ciencias Sociales'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
     BIOLOGIA: {
         descripcion: 'Herramienta interactiva de biología: anatomía humana, célula, ecosistemas, reino animal y vegetal, genética y clasificación de seres vivos.',
         tipoPreguntas: 'Identificación de estructuras, completar etiquetas, quiz de conceptos biológicos.',
@@ -973,6 +1006,14 @@ export const GAME_INFO = {
     CALCULO: {
         descripcion: 'Ejercicios de cálculo mental con tiempo. Configura el tipo de operaciones (suma, resta, multiplicación, división), rango de números y tiempo límite. Ideal para agilidad aritmética.',
         tipoPreguntas: 'Operaciones aritméticas generadas automáticamente según la configuración elegida.',
+        biblioteca: 'Sí, genera ejercicios automáticamente. Sin necesidad de recurso del profesor.',
+        multiplayer: 'Individual.',
+        materias: ['Matemáticas'],
+        etapas: ['Primaria', 'ESO'],
+    },
+    DINERO: {
+        descripcion: 'Herramienta de cálculo con dinero: paga la cantidad exacta eligiendo billetes y monedas, calcula la vuelta, el precio total por unidades (proporcionalidad), el IVA (4% / 10% / 21% según el producto) y las rebajas. Genera los ejercicios automáticamente.',
+        tipoPreguntas: 'Situaciones de compra generadas automáticamente: pagar exacto, vuelta, precio total/por unidad, IVA y descuentos.',
         biblioteca: 'Sí, genera ejercicios automáticamente. Sin necesidad de recurso del profesor.',
         multiplayer: 'Individual.',
         materias: ['Matemáticas'],
@@ -1064,7 +1105,7 @@ export const MATERIAS_CONFIG = [
     {
         id: 'MATEMATICAS', label: 'Matemáticas', emoji: '🔢', color: '#009688',
         keywords: ['matemáticas', 'mates', 'math', 'calculo', 'algebra', 'geometria', 'estadistica', 'probabilidad', 'fraccion', 'ecuacion', 'funcion', 'numero', 'operacion'],
-        specificIds: ['MATH_WORLD_PORTAL', 'GEOMETRIX', 'CALCULO', 'ECUACIONES', 'FUNCIONES', 'GEOMETRÍA_ANALÍTICA', 'POLINOMIOS', 'ESTADISTICA', 'PROBABILIDAD', 'MATHLE', 'MATHLIVE', 'OLYMPICLIVE'],
+        specificIds: ['MATH_WORLD_PORTAL', 'GEOMETRIX', 'CALCULO', 'DINERO', 'ECUACIONES', 'FUNCIONES', 'GEOMETRÍA_ANALÍTICA', 'POLINOMIOS', 'ESTADISTICA', 'PROBABILIDAD', 'MATHLE', 'MATHLIVE', 'OLYMPICLIVE'],
     },
     {
         id: 'LENGUA', label: 'Lengua', emoji: '📖', color: '#7B1FA2',
@@ -1073,8 +1114,8 @@ export const MATERIAS_CONFIG = [
     },
     {
         id: 'GEO_HISTORIA', label: 'Geo e Historia', emoji: '🌍', color: '#F57C00',
-        keywords: ['geografia', 'historia', 'sociales', 'ciencias sociales', 'mapa', 'comunidades', 'europa', 'mundo', 'continente', 'pais', 'capital', 'civilizacion', 'cultura', 'prehistoria'],
-        specificIds: ['GEOGRAFIA', 'ETIQUETAS'],
+        keywords: ['geografia', 'historia', 'sociales', 'ciencias sociales', 'mapa', 'comunidades', 'europa', 'mundo', 'continente', 'pais', 'capital', 'civilizacion', 'cultura', 'prehistoria', 'imperio', 'imperios', 'edad antigua', 'edad media'],
+        specificIds: ['GEOGRAFIA', 'IMPERIOS', 'ETIQUETAS'],
     },
     {
         id: 'FISICA_QUIMICA', label: 'Física y Química', emoji: '⚗️', color: '#C62828',
@@ -1262,6 +1303,10 @@ function ShareModal({ url, titulo, onClose }) {
 export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usuario = null }) {
     // --- AÑADE ESTA LÍNEA AQUÍ ---
     const [zonaActiva, setZonaActiva] = useState('MAIN');
+    // Página de juego (SpecificGamePage) para usuarios con sesión: el alumno
+    // registrado y la vista-alumno del profe no pasan por el enrutado de Login,
+    // así que la renderizamos aquí dentro.
+    const [appPublicaActiva, setAppPublicaActiva] = useState(null);
 
     // --- AÑADE ESTE BLOQUE PARA ESCUCHAR LA URL ---
     useEffect(() => {
@@ -1299,6 +1344,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
             if (juegoParam) {
                 if (juegoParam.toLowerCase() === 'fisica')         { setSimuladoresFisica(true); return; }
                 if (juegoParam.toLowerCase() === 'geografia')      { setGeografiaApp(true);   return; }
+                if (juegoParam.toLowerCase() === 'imperios')       { setImperiosApp(true);    return; }
                 if (juegoParam.toLowerCase() === 'biologia')       { setBiologiaApp(true);    return; }
                 if (juegoParam.toLowerCase() === 'vistas_didricas') { setVistasDidricas(true); return; }
                 if (juegoParam.toLowerCase() === 'situaciones_aprendizaje') { setSituacionesAprendizaje(true); return; }
@@ -1333,6 +1379,8 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                 setZonaActiva('MATH'); setSubzonaMath('PRIMARIA'); setJuegoActivo({ tipoJuego: 'MATES_OAOA' });
             } else if (path === 'primaria/feria') {
                 setZonaActiva('MATH'); setSubzonaMath('PRIMARIA'); setJuegoActivo({ tipoJuego: 'FERIA_MATES', primaria: true });
+            } else if (path === 'primaria/dinero') {
+                setZonaActiva('MATH'); setSubzonaMath('PRIMARIA'); setJuegoActivo({ tipoJuego: 'DINERO', primaria: true });
             } else if (path === 'primaria/divisibilidad') {
                 setZonaActiva('MATH'); setSubzonaMath('PRIMARIA'); setJuegoActivo({ tipoJuego: 'DIVISIBILIDAD' });
             } else if (path === 'primaria/geometria/perimetro-area') {
@@ -1404,6 +1452,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
     const [irregularVerbs,      setIrregularVerbs]      = useState(false);
     const [musicApp,            setMusicApp]            = useState(false);
     const [geografiaApp,        setGeografiaApp]        = useState(false);
+    const [imperiosApp,         setImperiosApp]         = useState(false);
     const [biologiaApp,         setBiologiaApp]         = useState(false);
     const [gestionAula,         setGestionAula]         = useState(() => { const p = new URLSearchParams(window.location.search); return !!(p.get('gestion') || p.get('pizarra')); });
     const [vistasDidricas,      setVistasDidricas]      = useState(false);
@@ -1418,6 +1467,47 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
     const [records,        setRecords]        = useState([]);
     const [loadingRecords, setLoadingRecords] = useState(false);
     const [showPerfil,     setShowPerfil]     = useState(false);
+
+    // Mis registros (historial local de partidas en el dispositivo)
+    const [mostrarRegistros,  setMostrarRegistros]  = useState(false);
+    const [registrosTipo,     setRegistrosTipo]     = useState(null); // null = todos; tipo concreto = ese juego
+    const [resumenRegistros,  setResumenRegistros]  = useState(() => getResumenRegistros());
+    const refrescarRegistros = () => setResumenRegistros(getResumenRegistros());
+    // Al volver de un juego (juegoActivo pasa a null) recalculamos los registros locales.
+    useEffect(() => { if (!juegoActivo) refrescarRegistros(); }, [juegoActivo]);
+    // Imperios usa su propio estado (imperiosApp), no juegoActivo: refrescar al cerrarlo.
+    useEffect(() => { if (!imperiosApp) refrescarRegistros(); }, [imperiosApp]);
+    const totalRegistros = resumenRegistros.reduce((s, g) => s + g.count, 0);
+    // Mapeo id-de-tarjeta → tipo-de-registro cuando no coinciden.
+    const REGISTRO_TIPO_DE = { GEOMETRIX: 'GEOMETRIX_COMPUESTO', POLINOMIOS: 'ALGEBRA', MATES_OAOA: 'OAOA' };
+    // Tipos de registro que pertenecen a Math World (para el recuento agregado del portal).
+    const MATH_WORLD_TIPOS = ['CALCULO','DINERO','DIVISIBILIDAD','ALGEBRA','OCA','OAOA','ECUACIONES','FUNCIONES','FUNCIONES_ANALISIS','GEOMETRIX_COMPUESTO','MATHLE'];
+
+    const countRegistros = (tipo) => resumenRegistros.find(g => g.tipo === tipo)?.count || 0;
+
+    // Badge genérico que renderiza el icono Pi-contento + xN y abre los registros.
+    const badgePi = (count, onClick, titulo) => (
+        <button onClick={onClick} title={titulo}
+            style={{ position:'absolute', bottom:4, right:4, display:'flex', alignItems:'center', gap:2, background:'rgba(255,255,255,0.95)', border:'1px solid rgba(0,0,0,0.08)', borderRadius:20, padding:'1px 6px 1px 1px', cursor:'pointer', boxShadow:'0 1px 4px rgba(0,0,0,0.18)', zIndex:3, lineHeight:1 }}>
+            <img src={imgPiContento} alt="" style={{ width:17, height:17, objectFit:'cover', borderRadius:'50%', background:'#fff' }} />
+            <span style={{ fontWeight:800, fontSize:'0.68rem', color:'#1e272e' }}>x{count}</span>
+        </button>
+    );
+
+    // Badge "Pi-contento xN" para una tarjeta de juego concreto.
+    const piBadge = (juegoId, nombreJuego) => {
+        const tipo = REGISTRO_TIPO_DE[juegoId] || juegoId;
+        const count = countRegistros(tipo);
+        if (!count) return null;
+        return badgePi(count, e => { e.stopPropagation(); setRegistrosTipo(tipo); setMostrarRegistros(true); }, `Tus registros de ${nombreJuego || juegoId}`);
+    };
+
+    // Badge agregado para la tarjeta del portal Math World (suma de todos sus subjuegos).
+    const piBadgeMathWorld = () => {
+        const count = MATH_WORLD_TIPOS.reduce((s, t) => s + countRegistros(t), 0);
+        if (!count) return null;
+        return badgePi(count, e => { e.stopPropagation(); setRegistrosTipo(null); setMostrarRegistros(true); }, 'Partidas de Math World');
+    };
 
     // Notificaciones del sistema (aprobación/rechazo mini-apps, etc.)
     const [notifs,       setNotifs]       = useState([]);
@@ -1680,16 +1770,30 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
             return;
         }
 
-        const appInfo = APPS.find(a => a.id === appId);
-        if (appInfo) {
-            window.history.pushState({}, '', `/${appInfo.name.toLowerCase()}`);
-            window.dispatchEvent(new Event('popstate'));
+        // Juegos de palabra: se lanzan directamente en modo libre (igual que el
+        // atajo de la página pública, que ya los abre sin recurso)
+        if (appId === 'WORDLE' || appId === 'SOPA' || appId === 'AHORCADO') {
+            setJuegoActivo({ tipoJuego: appId, juegoLibre: true });
+            return;
         }
+
+        const appInfo = APPS.find(a => a.id === appId);
 
         // Para apps de Math World (isMath), activar el juego directamente
         if (appInfo?.isMath) {
             setJuegoActivo({ tipoJuego: appId });
             return;
+        }
+
+        if (appInfo) {
+            // Con sesión (alumno registrado / vista-alumno del profe) no hay
+            // enrutado por URL como en Login: renderizamos la página aquí.
+            if (usuario) {
+                setAppPublicaActiva(appInfo);
+                return;
+            }
+            window.history.pushState({}, '', `/${appInfo.name.toLowerCase()}`);
+            window.dispatchEvent(new Event('popstate'));
         }
     };
 
@@ -1706,6 +1810,7 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
             SOLAR_SYSTEM:       () => setJuegoActivo({ tipoJuego: 'SOLAR_SYSTEM' }),
             MUSICA:             () => setMusicApp(true),
             GEOGRAFIA:          () => setGeografiaApp(true),
+            IMPERIOS:           () => setImperiosApp(true),
             BIOLOGIA:           () => setBiologiaApp(true),
             GESTION_AULA:       () => setGestionAula(true),
             VISTAS_DIDRICAS:    () => setVistasDidricas(true),
@@ -1805,6 +1910,19 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
 
     // --- RENDERIZADO DE JUEGOS A PANTALLA COMPLETA ---
 
+    // 0. Página específica de juego (usuario con sesión: registrado / vista-alumno).
+    //    A pantalla completa para no quedar limitada por el contenedor centrado.
+    if (appPublicaActiva) return (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9000, overflowY: 'auto', background: '#f0f2f5' }}>
+            <SpecificGamePage
+                appData={appPublicaActiva}
+                usuario={usuario}
+                onLoginRequest={onLoginRequest}
+                onHome={() => setAppPublicaActiva(null)}
+            />
+        </div>
+    );
+
     // 1. Host (Profesor/Gestor)
     if (liveModeHost && hostRoomCode) {
         const tempUser = usuario || { uid: "host_invitado_" + Date.now(), displayName: "Profe Invitado", email: null };
@@ -1858,6 +1976,12 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
     if (geografiaApp) return (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, overflowY: 'auto' }}>
             <GeografiaApp onBack={() => setGeografiaApp(false)} />
+        </div>
+    );
+
+    if (imperiosApp) return (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, overflowY: 'auto' }}>
+            <ImperiosGame onBack={() => { setImperiosApp(false); window.history.pushState({}, '', '/'); }} />
         </div>
     );
 
@@ -1929,6 +2053,7 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
             { key: 'AJUSTES_REACCION',  slug: 'ajustesreaccion',   label: 'Ajuste de Reacción', emoji: '🧪', color: '#e67e22', desc: 'Ajusta coeficientes estequiométricos',  comp: AjustesReacciones },
             { key: 'CAIDA_ESCALADA',    slug: 'caidaescalada',     label: 'Caída en Escalada',  emoji: '🧗', color: '#0ea5e9', desc: 'Simulación de caída en escalada deportiva', comp: CaidaEscalada },
             { key: 'ATOMOS',            slug: 'atomos',            label: 'Átomos Interactivos',emoji: '⚛️', color: '#6366f1', desc: 'Modelo 3D del átomo + test de partículas',  comp: SimuladorAtomos },
+            { key: 'GAY_LUSAC',         slug: 'gaylusac',          label: 'Ley de Gay-Lussac',  emoji: '🌡️', color: '#dc2626', desc: 'Presión y temperatura en volumen constante', comp: GayLusac },
         ];
 
         const volverAlMenu = () => { setSimuladorFisicaActivo(null); window.history.pushState({}, '', '/fisica'); };
@@ -2022,6 +2147,7 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
 
         if (juegoActivo.tipoJuego === 'GEOMETRIX') return <Geometrix usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'CALCULO') return <CalculoMental usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
+        if (juegoActivo.tipoJuego === 'DINERO') return <CalculoDinero usuario={usuario} onExit={() => { const destino = juegoActivo.primaria ? '/primaria' : '/math_world'; window.history.pushState({}, '', destino); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'OCA') return <OcaMatematicaDirect onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'DOMINO') return <DominoMatematicoDirect onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'ECUACIONES') return <Ecuaciones usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
@@ -2108,8 +2234,9 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
         if (juegoActivo.tipoJuego === 'RULETA') return <RuletaGame recurso={juegoActivo} usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
 
         if (juegoActivo.tipoJuego === 'MATHLE') return <MathWordleGame usuario={usuario} onExit={() => setJuegoActivo(null)} />;
-        if (juegoActivo.modoEspecial === 'WORDLE' || (juegoActivo.tipoJuego === 'WORDLE' && !juegoActivo.modoEspecial)) return <TextWordleGame recursoInicial={juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} />;
-        if (juegoActivo.modoEspecial === 'SOPA' || (juegoActivo.tipoJuego === 'SOPA' && !juegoActivo.modoEspecial)) return <SopaDeLetrasGame recurso={juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.modoEspecial === 'WORDLE' || (juegoActivo.tipoJuego === 'WORDLE' && !juegoActivo.modoEspecial)) return <TextWordleGame recursoInicial={juegoActivo.juegoLibre ? undefined : juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.modoEspecial === 'SOPA' || (juegoActivo.tipoJuego === 'SOPA' && !juegoActivo.modoEspecial)) return <SopaDeLetrasGame recurso={juegoActivo.juegoLibre ? undefined : juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.modoEspecial === 'AHORCADO' || juegoActivo.tipoJuego === 'AHORCADO') return <Ahorcado recurso={juegoActivo.juegoLibre ? undefined : juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.modoEspecial === 'PILIVE_SOLO') return <PiLiveSolo recurso={juegoActivo} usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
 
         return <GamePlayer recurso={juegoActivo} usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
@@ -2132,13 +2259,14 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '25px', maxWidth: '860px', margin: '0 auto', paddingBottom: '40px' }}>
                         <div
                             onClick={() => { window.history.pushState({}, '', '/primaria/oaoa'); setJuegoActivo({ tipoJuego: 'MATES_OAOA' }); }}
-                            style={{ background: '#E0F2F1', borderRadius: '20px', padding: '30px 20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s', border: '3px solid #009688' }}
+                            style={{ position: 'relative', background: '#E0F2F1', borderRadius: '20px', padding: '30px 20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s', border: '3px solid #009688' }}
                             onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
                             onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
                         >
                             <div style={{ fontSize: '50px', marginBottom: '15px' }}>🧮</div>
                             <h3 style={{ margin: '0 0 10px 0', color: '#009688', fontSize: '1.4rem' }}>Método OAOA</h3>
                             <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>Aprende las 4 operaciones básicas paso a paso con algoritmos abiertos.</p>
+                            {piBadge('MATES_OAOA', 'Mates OAOA')}
                         </div>
                         <div
                             onClick={() => { window.history.pushState({}, '', '/primaria/feria'); setJuegoActivo({ tipoJuego: 'FERIA_MATES', primaria: true }); }}
@@ -2149,6 +2277,17 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                             <div style={{ fontSize: '50px', marginBottom: '15px' }}>🎡</div>
                             <h3 style={{ margin: '0 0 10px 0', color: '#e67e22', fontSize: '1.4rem' }}>Feria del Cálculo</h3>
                             <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>¡Supera operaciones al estilo OAOA antes de que se acabe el tiempo!</p>
+                        </div>
+                        <div
+                            onClick={() => { window.history.pushState({}, '', '/primaria/dinero'); setJuegoActivo({ tipoJuego: 'DINERO', primaria: true }); }}
+                            style={{ position: 'relative', background: '#E0F2F1', borderRadius: '20px', padding: '30px 20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s', border: '3px solid #16a085' }}
+                            onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
+                            onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                        >
+                            <div style={{ fontSize: '50px', marginBottom: '15px' }}>💶</div>
+                            <h3 style={{ margin: '0 0 10px 0', color: '#16a085', fontSize: '1.4rem' }}>Dinero</h3>
+                            <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>Paga con billetes y monedas, la vuelta, la lista de la compra, IVA y rebajas.</p>
+                            {piBadge('DINERO', 'Dinero')}
                         </div>
                         <div
                             onClick={() => { window.history.pushState({}, '', '/primaria/divisibilidad'); setJuegoActivo({ tipoJuego: 'DIVISIBILIDAD' }); }}
@@ -2276,6 +2415,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                                     style={{ border: 'none', borderRadius: 12, padding: '11px 0', cursor: 'pointer', fontWeight: 800, fontSize: '0.95rem', background: '#e67e22', color: 'white', transition: 'transform 0.15s', boxShadow: '0 4px 12px rgba(230,126,34,0.45)' }}>
                                     🎡 Feria del Cálculo
                                 </button>
+                                {piBadge('CALCULO', 'Cálculo Mental')}
                             </div>
                         );
                         return (
@@ -2305,6 +2445,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                                 <h3 style={{ margin: '0 0 10px 0', color: app.comingSoon ? '#7f8c8d' : app.color, fontSize: '1.4rem' }}>{app.name}</h3>
                                 <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>{app.desc}</p>
                                 {app.comingSoon && <span style={{ display: 'inline-block', marginTop: '15px', background: '#e0e0e0', color: '#555', padding: '5px 12px', borderRadius: '15px', fontSize: '0.8rem', fontWeight: 'bold' }}>Próximamente</span>}
+                                {piBadge(app.id, app.name)}
                             </div>
                         );
                     })}
@@ -2406,6 +2547,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                                         {/* OPCIONES DE WORDLE Y SOPA */}
                                         <button onClick={() => { setJuegoActivo({ ...recursoParaElegir, modoEspecial: 'WORDLE' }); setRecursoParaElegir(null); }} style={{ padding: '15px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>🟩 Wordle Clásico</button>
                                         <button onClick={() => { setJuegoActivo({ ...recursoParaElegir, modoEspecial: 'SOPA' }); setRecursoParaElegir(null); }} style={{ padding: '15px', background: '#FF9800', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>🔍 Sopa de Letras</button>
+                                        <button onClick={() => { setJuegoActivo({ ...recursoParaElegir, modoEspecial: 'AHORCADO' }); setRecursoParaElegir(null); }} style={{ padding: '15px', background: '#6d28d9', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>🪢 Ahorcado</button>
                                     </>
                                 )}
                             <button onClick={() => setRecursoParaElegir(null)} style={{ marginTop: '10px', background: 'transparent', border: 'none', color: '#999', cursor: 'pointer' }}>Cancelar</button>
@@ -2438,6 +2580,22 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
 
             {shareModal && <ShareModal url={shareModal.url} titulo={shareModal.titulo} onClose={() => setShareModal(null)} />}
             {infoModal && <InfoModal info={infoModal.info} name={infoModal.name} color={infoModal.color} emoji={infoModal.emoji} img={infoModal.img} onClose={() => setInfoModal(null)} />}
+
+            {/* MIS REGISTROS — historial local de partidas en el dispositivo */}
+            {totalRegistros > 0 && (
+                <button onClick={() => { setRegistrosTipo(null); setMostrarRegistros(true); }} style={{
+                    display:'flex', alignItems:'center', gap:8, margin:'0 0 16px', padding:'9px 16px',
+                    background:'rgba(255,255,255,0.15)', backdropFilter:'blur(8px)',
+                    border:'1px solid rgba(255,255,255,0.25)', borderRadius:14, color:'white',
+                    fontWeight:700, fontSize:'0.88rem', cursor:'pointer'
+                }}>
+                    📋 Mis registros
+                    <span style={{ background:'#f1c40f', color:'#1e272e', borderRadius:20, padding:'1px 9px', fontSize:'0.78rem', fontWeight:800 }}>{totalRegistros}</span>
+                </button>
+            )}
+            {mostrarRegistros && (
+                <MisRegistros tipoInicial={registrosTipo} onClose={() => { setMostrarRegistros(false); setRegistrosTipo(null); refrescarRegistros(); }} />
+            )}
             {showPerfil && usuario && <UserProfile usuario={usuario} onClose={() => setShowPerfil(false)} showSupport={false} />}
             {pictoTabuModal && <PictoTabuModal
                 usuario={usuario}
@@ -2875,6 +3033,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                                 )}
                         </div>
                         <h4 style={{ margin: 0, color: '#333', fontSize: '0.9rem' }}>{app.name}</h4>
+                        {piBadge(app.id, app.name)}
                     </div>
                 ))}
             </div>
@@ -2897,6 +3056,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                     { id: 'SOLAR_SYSTEM',        label: 'Sistema Solar',        emoji: '🪐', color: '#3B82F6', action: () => setJuegoActivo({ tipoJuego: 'SOLAR_SYSTEM' }), shareable: true },
                     { id: 'MUSICA',              label: 'Música',               emoji: '🎵', color: '#8b5cf6', action: () => setMusicApp(true), shareable: true },
                     { id: 'GEOGRAFIA',           label: 'Geografía',            emoji: '🌍', color: '#0d9488', action: () => setGeografiaApp(true), shareable: true },
+                    { id: 'IMPERIOS',            label: 'Imperios',             emoji: '🏛️', color: '#b45309', action: () => { setImperiosApp(true); window.history.pushState({}, '', '/imperios'); }, shareable: true, shareUrl: `${window.location.origin}/imperios` },
                     { id: 'BIOLOGIA',            label: 'Biología',             emoji: '🔬', color: '#16a34a', action: () => setBiologiaApp(true),  shareable: true },
                     { id: 'GESTION_AULA', label: 'Gestión Aula', emoji: '🏫', color: '#e67e22', action: () => setGestionAula(true), shareable: true, shareUrl: `${window.location.origin}${window.location.pathname}?gestion=menu` },
                     { id: 'VISTAS_DIDRICAS', label: 'Vistas Diédricas', emoji: '📐', color: '#7c3aed', action: () => setVistasDidricas(true), shareable: true },
@@ -2935,6 +3095,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                             }
                         </div>
                         <h4 style={{ margin: 0, color: tool.color, fontSize: '0.88rem', fontWeight: 700 }}>{tool.label}</h4>
+                        {tool.id === 'MATH_WORLD_PORTAL' ? piBadgeMathWorld() : piBadge(tool.id, tool.label)}
                     </div>
                 ))}
             </div>
@@ -3226,7 +3387,7 @@ export const ResourceCard = ({ r, onClick }) => {
 };
 
 // --- NUEVO COMPONENTE ENVOLTORIO PARA ENLACES DIRECTOS A Q-SENDER ---
-const QuestionSenderWrapper = ({ onHome, initialJuegoActivo }) => {
+const QuestionSenderWrapper = ({ onHome, initialJuegoActivo, usuario = null }) => {
     const [qsCode, setQsCode] = useState('');
     const [juegoActivo, setJuegoActivo] = useState(initialJuegoActivo);
     const [loadingMsg, setLoadingMsg] = useState('');
@@ -3263,7 +3424,7 @@ const QuestionSenderWrapper = ({ onHome, initialJuegoActivo }) => {
     };
 
     if (juegoActivo) {
-        return <QuestionSenderClient usuario={null} onBack={() => { setJuegoActivo(null); window.history.replaceState({}, '', '/q-sender'); }} codigoInicial={juegoActivo.codigoInicial} />;
+        return <QuestionSenderClient usuario={usuario} onBack={() => { setJuegoActivo(null); window.history.replaceState({}, '', '/q-sender'); }} codigoInicial={juegoActivo.codigoInicial} />;
     }
 
     return (
@@ -3289,7 +3450,7 @@ const QuestionSenderWrapper = ({ onHome, initialJuegoActivo }) => {
 
 
 // PÁGINA ESPECÍFICA DEL JUEGO
-export const SpecificGamePage = ({ appData, onHome, onLoginRequest }) => {
+export const SpecificGamePage = ({ appData, onHome, onLoginRequest, usuario = null }) => {
     const [tab, setTab] = useState(appData.isLive ? 'LIVE' : 'SEARCH');
     const [filtros, setFiltros] = useState({ tema: '', ciclo: '', pais: '', region: '', poblacion: '', autor: '' });
     const [mostrarMasFiltros, setMostrarMasFiltros] = useState(false);
@@ -3331,42 +3492,45 @@ const [entrando, setEntrando] = useState(false);
 
     if (juegoActivo) {
         // Usa handleExitGame en lugar de setJuegoActivo(null)
-        if (appData.id === 'GEOMETRIX' || juegoActivo.tipoJuego === 'GEOMETRIX') return <Geometrix usuario={null} onExit={handleExitGame} />;
-        if (appData.id === 'CALCULO' || juegoActivo.tipoJuego === 'CALCULO') return <CalculoMental usuario={null} onExit={handleExitGame} />;
+        if (appData.id === 'GEOMETRIX' || juegoActivo.tipoJuego === 'GEOMETRIX') return <Geometrix usuario={usuario} onExit={handleExitGame} />;
+        if (appData.id === 'CALCULO' || juegoActivo.tipoJuego === 'CALCULO') return <CalculoMental usuario={usuario} onExit={handleExitGame} />;
+        if (appData.id === 'DINERO' || juegoActivo.tipoJuego === 'DINERO') return <CalculoDinero usuario={usuario} onExit={handleExitGame} />;
         if (appData.id === 'ECUACIONES' || juegoActivo.tipoJuego === 'ECUACIONES') return <Ecuaciones onExit={handleExitGame} />;
-        if (appData.id === 'FUNCIONES' || juegoActivo.tipoJuego === 'FUNCIONES') return <Funciones usuario={null} onExit={handleExitGame} />;
-        if (appData.id === 'GEOMETRÍA_ANALÍTICA' || juegoActivo.tipoJuego === 'GEOMETRÍA_ANALÍTICA') return <GeometriaAnalitica usuario={null} onExit={handleExitGame} />;
-        if (appData.id === 'POLINOMIOS'  || juegoActivo.tipoJuego === 'POLINOMIOS')  return <AlgebraApp     usuario={null} onExit={handleExitGame} />;
-        if (appData.id === 'ESTADISTICA'  || juegoActivo.tipoJuego === 'ESTADISTICA')  return <EstadisticaApp  usuario={null} onExit={handleExitGame} />;
+        if (appData.id === 'FUNCIONES' || juegoActivo.tipoJuego === 'FUNCIONES') return <Funciones usuario={usuario} onExit={handleExitGame} />;
+        if (appData.id === 'GEOMETRÍA_ANALÍTICA' || juegoActivo.tipoJuego === 'GEOMETRÍA_ANALÍTICA') return <GeometriaAnalitica usuario={usuario} onExit={handleExitGame} />;
+        if (appData.id === 'POLINOMIOS'  || juegoActivo.tipoJuego === 'POLINOMIOS')  return <AlgebraApp     usuario={usuario} onExit={handleExitGame} />;
+        if (appData.id === 'ESTADISTICA'  || juegoActivo.tipoJuego === 'ESTADISTICA')  return <EstadisticaApp  usuario={usuario} onExit={handleExitGame} />;
         if (appData.id === 'PROBABILIDAD' || juegoActivo.tipoJuego === 'PROBABILIDAD') return <SimuladorDados                    onExit={handleExitGame} />;
         if (appData.id === 'RETOS'        || juegoActivo.tipoJuego === 'RETOS')        return <RetosApp                          onExit={handleExitGame} />;
 
     }
     // --- NUEVO: ATAJO PARA JUEGOS CON MENÚ PROPIO ---
-    if (appData.id === 'WORDLE') return <TextWordleGame usuario={null} onExit={onHome} />;
-    if (appData.id === 'MATHLE') return <MathWordleGame usuario={null} onExit={onHome} />;
-    if (appData.id === 'SOPA') return <SopaDeLetrasGame usuario={null} onExit={onHome} />;
+    if (appData.id === 'WORDLE') return <TextWordleGame usuario={usuario} onExit={onHome} />;
+    if (appData.id === 'MATHLE') return <MathWordleGame usuario={usuario} onExit={onHome} />;
+    if (appData.id === 'SOPA') return <SopaDeLetrasGame usuario={usuario} onExit={onHome} />;
+    if (appData.id === 'AHORCADO') return <Ahorcado usuario={usuario} onExit={onHome} />;
     // --------
 
 
-    if (appData.id === 'SINTAXIS') return <SintaxisGame usuario={null} onExit={onHome} />;
-if (appData.id === 'LISTENING') return <Listening usuario={null} onExit={onHome} />;
-    if (appData.id === 'ROBOTICA_BLOQUES') return <ProgramacionRobotica usuario={null} onLoginRequest={onLoginRequest} onExit={onHome} />;
+    if (appData.id === 'SINTAXIS') return <SintaxisGame usuario={usuario} onExit={onHome} />;
+if (appData.id === 'LISTENING') return <Listening usuario={usuario} onExit={onHome} />;
+    if (appData.id === 'ROBOTICA_BLOQUES') return <ProgramacionRobotica usuario={usuario} onLoginRequest={onLoginRequest} onExit={onHome} />;
 
 
-if (appData.id === 'PIKATRON_2') return <Plataformas usuario={null} onExit={onHome} />;
+if (appData.id === 'PIKATRON_2') return <Plataformas usuario={usuario} onExit={onHome} />;
     // --- NUEVO: USA handleExitGame PARA LOS DE MATES ---
-    if (appData.id === 'GEOMETRIX') return <Geometrix usuario={null} onExit={handleExitGame} />;
-    if (appData.id === 'CALCULO') return <CalculoMental usuario={null} onExit={handleExitGame} />;
-    if (appData.id === 'ECUACIONES') return <Ecuaciones usuario={null} onExit={handleExitGame} />;
-    if (appData.id === 'FUNCIONES') return <Funciones usuario={null} onExit={handleExitGame} />;
-    if (appData.id === 'GEOMETRÍA_ANALÍTICA') return <GeometriaAnalitica usuario={null} onExit={handleExitGame} />;
+    if (appData.id === 'GEOMETRIX') return <Geometrix usuario={usuario} onExit={handleExitGame} />;
+    if (appData.id === 'CALCULO') return <CalculoMental usuario={usuario} onExit={handleExitGame} />;
+    if (appData.id === 'DINERO') return <CalculoDinero usuario={usuario} onExit={handleExitGame} />;
+    if (appData.id === 'ECUACIONES') return <Ecuaciones usuario={usuario} onExit={handleExitGame} />;
+    if (appData.id === 'FUNCIONES') return <Funciones usuario={usuario} onExit={handleExitGame} />;
+    if (appData.id === 'GEOMETRÍA_ANALÍTICA') return <GeometriaAnalitica usuario={usuario} onExit={handleExitGame} />;
 
     // ------------------------// ------------------------
     // --- CASO ESPECIAL: QUESTION SENDER ---
     // --- CASO ESPECIAL: QUESTION SENDER ---
     if (appData.id === 'QUESTION_SENDER') {
-        return <QuestionSenderWrapper onHome={onHome} initialJuegoActivo={juegoActivo} />;
+        return <QuestionSenderWrapper onHome={onHome} initialJuegoActivo={juegoActivo} usuario={usuario} />;
     }
 
     const buscarEspecífico = async () => {
@@ -3517,13 +3681,14 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={null} onExit={onHo
 
     if (juegoActivo) {
         if (appData.id === 'PIKATRON' || juegoActivo.modoEspecial === 'PIKATRON') return <PikatronRun recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
-        if (appData.id === 'RULETA') return <RuletaGame recurso={juegoActivo} usuario={null} alTerminar={() => setJuegoActivo(null)} />;
+        if (appData.id === 'RULETA') return <RuletaGame recurso={juegoActivo} usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
         // --- AÑADIDO: Distinguir Wordle y Sopa ---
-        if (appData.id === 'WORDLE' || juegoActivo.modoEspecial === 'WORDLE' || (juegoActivo.tipoJuego === 'WORDLE' && !juegoActivo.modoEspecial)) return <TextWordleGame recursoInicial={juegoActivo} usuario={null} onExit={() => setJuegoActivo(null)} />;
-        if (appData.id === 'SOPA' || juegoActivo.modoEspecial === 'SOPA' || (juegoActivo.tipoJuego === 'SOPA' && !juegoActivo.modoEspecial)) return <SopaDeLetrasGame recursoInicial={juegoActivo} usuario={null} onExit={() => setJuegoActivo(null)} />;
+        if (appData.id === 'WORDLE' || juegoActivo.modoEspecial === 'WORDLE' || (juegoActivo.tipoJuego === 'WORDLE' && !juegoActivo.modoEspecial)) return <TextWordleGame recursoInicial={juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} />;
+        if (appData.id === 'SOPA' || juegoActivo.modoEspecial === 'SOPA' || (juegoActivo.tipoJuego === 'SOPA' && !juegoActivo.modoEspecial)) return <SopaDeLetrasGame recursoInicial={juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} />;
+        if (appData.id === 'AHORCADO' || juegoActivo.modoEspecial === 'AHORCADO' || juegoActivo.tipoJuego === 'AHORCADO') return <Ahorcado recurso={juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (appData.id === 'ETIQUETAS' || juegoActivo.tipoJuego === 'ETIQUETAS')     return <EtiquetaMe recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
-        if (juegoActivo.modoEspecial === 'PILIVE_SOLO') return <PiLiveSolo recurso={juegoActivo} usuario={null} alTerminar={() => setJuegoActivo(null)} />;
-        return <GamePlayer recurso={juegoActivo} usuario={null} alTerminar={() => setJuegoActivo(null)} />;
+        if (juegoActivo.modoEspecial === 'PILIVE_SOLO') return <PiLiveSolo recurso={juegoActivo} usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
+        return <GamePlayer recurso={juegoActivo} usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
     }
 
     return (
@@ -3606,6 +3771,7 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={null} onExit={onHo
                                         {/* OPCIONES DE WORDLE Y SOPA */}
                                         <button onClick={() => { setJuegoActivo({ ...recursoParaElegir, modoEspecial: 'WORDLE' }); setRecursoParaElegir(null); }} style={{ padding: '15px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>🟩 Wordle Clásico</button>
                                         <button onClick={() => { setJuegoActivo({ ...recursoParaElegir, modoEspecial: 'SOPA' }); setRecursoParaElegir(null); }} style={{ padding: '15px', background: '#FF9800', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>🔍 Sopa de Letras</button>
+                                        <button onClick={() => { setJuegoActivo({ ...recursoParaElegir, modoEspecial: 'AHORCADO' }); setRecursoParaElegir(null); }} style={{ padding: '15px', background: '#6d28d9', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.1rem', cursor: 'pointer', fontWeight: 'bold' }}>🪢 Ahorcado</button>
                                     </>
                                 )}
                             <button onClick={() => setRecursoParaElegir(null)} style={{ marginTop: '10px', background: 'transparent', border: 'none', color: '#999', cursor: 'pointer' }}>Cancelar</button>

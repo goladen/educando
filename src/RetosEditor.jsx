@@ -12,6 +12,8 @@ import 'blockly/blocks';
 import * as Es from 'blockly/msg/es';
 import { javascriptGenerator, Order } from 'blockly/javascript';
 import imgPi from './assets/pikatron-sprite.png';
+import { db } from './firebase';
+import { doc, getDoc, setDoc, arrayUnion, serverTimestamp } from 'firebase/firestore';
 
 Blockly.setLocale(Es);
 
@@ -423,6 +425,16 @@ const DISFRACES = [
 ];
 const ANDAR = [0, 2, 3]; // ciclo de caminar (como en el juego)
 
+// Progreso guardado en el propio dispositivo (sin login): ids de retos conseguidos.
+const LS_KEY = 'pikt_retos_conseguidos';
+const cargarConseguidos = () => {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(LS_KEY) || '[]'));
+  } catch {
+    return new Set();
+  }
+};
+
 export default function RetosEditor({ usuario = null, onExit }) {
   const blocklyDiv = useRef(null);
   const wsRef = useRef(null);
@@ -435,6 +447,7 @@ export default function RetosEditor({ usuario = null, onExit }) {
   const rafRef = useRef(null); // bucle de física
   const wonRef = useRef(false);
   const cogidasRef = useRef(new Set()); // índices de estrellas recogidas
+  const wrapperRef = useRef(null); // para pantalla completa
 
   const [retoIdx, setRetoIdx] = useState(0);
   const reto = RETOS[retoIdx];
@@ -447,6 +460,65 @@ export default function RetosEditor({ usuario = null, onExit }) {
   const [won, setWon] = useState(false);
   const [recogidas, setRecogidas] = useState(0); // nº de estrellas recogidas (re-render)
   const [msg, setMsg] = useState('');
+  const [done, setDone] = useState(cargarConseguidos); // retos conseguidos (este dispositivo)
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth < 820
+  );
+  const [isFs, setIsFs] = useState(false); // pantalla completa real (Fullscreen API)
+  const [pseudoFs, setPseudoFs] = useState(false); // respaldo si la API falla
+  const fullscreenOn = isFs || pseudoFs;
+
+  // Marca un reto como conseguido: lo guarda en el dispositivo y, si hay sesión,
+  // también en Firebase (para que el progreso siga al usuario en cualquier equipo).
+  const marcarConseguido = useCallback(
+    (id) => {
+      setDone((prev) => {
+        if (prev.has(id)) return prev;
+        const next = new Set(prev);
+        next.add(id);
+        try {
+          localStorage.setItem(LS_KEY, JSON.stringify([...next]));
+        } catch {
+          /* almacenamiento no disponible */
+        }
+        return next;
+      });
+      if (usuario?.uid) {
+        setDoc(
+          doc(db, 'retos_progreso', usuario.uid),
+          {
+            uid: usuario.uid,
+            email: usuario.email || '',
+            conseguidos: arrayUnion(id),
+            fecha: serverTimestamp(),
+          },
+          { merge: true }
+        ).catch(() => {
+          /* sin conexión / permisos: queda guardado en local */
+        });
+      }
+    },
+    [usuario]
+  );
+
+  // Pantalla completa: saca el editor del marco de pikt.es y oculta la barra.
+  const toggleFullscreen = useCallback(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+    const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+    if (!fsEl) {
+      const req = el.requestFullscreen || el.webkitRequestFullscreen;
+      if (req) {
+        Promise.resolve(req.call(el)).catch(() => setPseudoFs(true));
+      } else {
+        setPseudoFs(true); // navegador sin Fullscreen API (algunos iOS)
+      }
+    } else {
+      const exit = document.exitFullscreen || document.webkitExitFullscreen;
+      if (exit) exit.call(document);
+      setPseudoFs(false);
+    }
+  }, []);
 
   /* Inicializa Blockly */
   useEffect(() => {
@@ -475,6 +547,78 @@ export default function RetosEditor({ usuario = null, onExit }) {
     };
   }, []);
 
+  // Detecta móvil/estrecho para apilar la vista y poder hacer scroll.
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 820);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  // Sincroniza el estado con la Fullscreen API (botón Esc, etc.).
+  useEffect(() => {
+    const onFs = () => {
+      const on = !!(document.fullscreenElement || document.webkitFullscreenElement);
+      setIsFs(on);
+      if (on) setPseudoFs(false);
+    };
+    document.addEventListener('fullscreenchange', onFs);
+    document.addEventListener('webkitfullscreenchange', onFs);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFs);
+      document.removeEventListener('webkitfullscreenchange', onFs);
+    };
+  }, []);
+
+  // Al cambiar el tamaño/diseño, Blockly debe recalcular su lienzo.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (wsRef.current) Blockly.svgResize(wsRef.current);
+    }, 250);
+    return () => clearTimeout(t);
+  }, [isMobile, fullscreenOn]);
+
+  // Si el usuario está registrado, sincroniza el progreso con Firebase:
+  // fusiona lo de la nube con lo de este dispositivo (unión) y sube lo que falte.
+  useEffect(() => {
+    if (!usuario?.uid) return;
+    let cancel = false;
+    (async () => {
+      try {
+        const ref = doc(db, 'retos_progreso', usuario.uid);
+        const snap = await getDoc(ref);
+        const cloud = new Set((snap.exists() && snap.data().conseguidos) || []);
+        const local = cargarConseguidos();
+        const union = new Set([...cloud, ...local]);
+        if (cancel) return;
+        setDone(union);
+        try {
+          localStorage.setItem(LS_KEY, JSON.stringify([...union]));
+        } catch {
+          /* sin almacenamiento local */
+        }
+        // Sube el progreso previo sin login (o crea el documento la 1ª vez).
+        const faltan = [...local].filter((id) => !cloud.has(id));
+        if (faltan.length || !snap.exists()) {
+          await setDoc(
+            ref,
+            {
+              uid: usuario.uid,
+              email: usuario.email || '',
+              conseguidos: [...union],
+              fecha: serverTimestamp(),
+            },
+            { merge: true }
+          );
+        }
+      } catch {
+        /* offline / permisos: seguimos con el progreso local */
+      }
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [usuario?.uid, usuario?.email]);
+
   const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
   const checkWin = useCallback(() => {
@@ -491,8 +635,9 @@ export default function RetosEditor({ usuario = null, onExit }) {
       wonRef.current = true;
       setWon(true);
       setMsg('🎉 ¡Reto conseguido!');
+      marcarConseguido(reto.id);
     }
-  }, [reto]);
+  }, [reto, marcarConseguido]);
 
   const resetPi = useCallback(() => {
     cancelRef.current = true;
@@ -736,33 +881,57 @@ export default function RetosEditor({ usuario = null, onExit }) {
     { k: 'derecha', s: '▶', gc: '3 / 3' },
   ];
 
+  const mainStyle = isMobile
+    ? { ...styles.main, flexDirection: 'column', overflowY: 'auto' }
+    : styles.main;
+  const blocklyStyle = isMobile
+    ? { ...styles.blockly, flex: 'none', height: '50vh', minHeight: 300 }
+    : styles.blockly;
+  const sideStyle = isMobile
+    ? { ...styles.side, width: '100%', borderLeft: 'none', borderTop: '1px solid #334155' }
+    : styles.side;
+
   return (
-    <div style={styles.wrapper}>
+    <div
+      ref={wrapperRef}
+      style={fullscreenOn ? { ...styles.wrapper, position: 'fixed', inset: 0, zIndex: 99999 } : styles.wrapper}
+    >
       <header style={styles.header}>
-        {onExit && (
+        {onExit && !fullscreenOn && (
           <button onClick={onExit} style={styles.backBtn}>← Volver</button>
         )}
         <span style={{ fontSize: 24 }}>🎯</span>
-        <h2 style={styles.title}>Editor de retos</h2>
-        <select
-          value={retoIdx}
-          onChange={(e) => cambiarReto(Number(e.target.value))}
-          style={styles.retoSelect}
-        >
-          {RETOS.map((r, i) => (
-            <option key={r.id} value={i}>
-              Reto {r.id}: {r.titulo}
-            </option>
-          ))}
-        </select>
+        {!isMobile && <h2 style={styles.title}>Editor de retos</h2>}
+        <div style={styles.headRight}>
+          <span
+            style={styles.progreso}
+            title={usuario?.uid ? 'Progreso sincronizado en tu cuenta' : 'Progreso guardado en este dispositivo'}
+          >
+            ⭐ {done.size}/{RETOS.length} {usuario?.uid ? '☁️' : ''}
+          </span>
+          <button onClick={toggleFullscreen} style={styles.fsBtn}>
+            {fullscreenOn ? '🗗 Salir' : '⛶ Pantalla completa'}
+          </button>
+          <select
+            value={retoIdx}
+            onChange={(e) => cambiarReto(Number(e.target.value))}
+            style={styles.retoSelect}
+          >
+            {RETOS.map((r, i) => (
+              <option key={r.id} value={i}>
+                {done.has(r.id) ? '⭐ ' : ''}Reto {r.id}: {r.titulo}
+              </option>
+            ))}
+          </select>
+        </div>
       </header>
 
-      <div style={styles.main}>
-        <div ref={blocklyDiv} style={styles.blockly} />
+      <div style={mainStyle}>
+        <div ref={blocklyDiv} style={blocklyStyle} />
 
-        <aside style={styles.side}>
+        <aside style={sideStyle}>
           <div style={styles.enunciado}>
-            <b>🎯 {reto.titulo}:</b> {reto.enunciado}
+            <b>🎯 {reto.titulo}{done.has(reto.id) ? ' ⭐' : ''}:</b> {reto.enunciado}
             <div style={styles.pista}>💡 {reto.pista}</div>
             {estrellasDe(reto).length > 0 && (
               <div style={styles.contador}>
@@ -867,10 +1036,13 @@ export default function RetosEditor({ usuario = null, onExit }) {
 
 const styles = {
   wrapper: { display: 'flex', flexDirection: 'column', height: '100vh', width: '100%', background: '#0f172a', fontFamily: 'system-ui, sans-serif', overflow: 'hidden' },
-  header: { display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', background: '#1e293b', borderBottom: '1px solid #334155' },
+  header: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', background: '#1e293b', borderBottom: '1px solid #334155', flexWrap: 'wrap' },
   backBtn: { padding: '6px 12px', borderRadius: 8, border: '1px solid #475569', background: '#0f172a', color: '#e2e8f0', fontWeight: 600, cursor: 'pointer' },
   title: { margin: 0, color: '#f1f5f9', fontSize: 17, fontWeight: 800 },
-  retoSelect: { marginLeft: 'auto', padding: '7px 10px', borderRadius: 8, border: '1px solid #475569', background: '#0f172a', color: '#e2e8f0', fontSize: 13, cursor: 'pointer' },
+  headRight: { marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' },
+  progreso: { color: '#facc15', fontWeight: 800, fontSize: 13, whiteSpace: 'nowrap' },
+  fsBtn: { padding: '7px 10px', borderRadius: 8, border: '1px solid #475569', background: '#0f172a', color: '#e2e8f0', fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' },
+  retoSelect: { padding: '7px 10px', borderRadius: 8, border: '1px solid #475569', background: '#0f172a', color: '#e2e8f0', fontSize: 13, cursor: 'pointer', maxWidth: '60vw' },
   main: { display: 'flex', flex: 1, minHeight: 0 },
   blockly: { flex: 1, minWidth: 0, background: '#fff' },
   side: { width: 430, display: 'flex', flexDirection: 'column', gap: 12, padding: 14, background: '#0b1220', borderLeft: '1px solid #334155', overflow: 'auto' },

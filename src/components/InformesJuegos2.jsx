@@ -52,8 +52,8 @@ const ConfigBadge = ({ icon, label }) => (
         {icon} {label}
     </span>
 );
-const TIPO_LABEL  = { OCA:'🦆 Oca Matemática', CAZABURBUJAS:'🔵 Cazaburbujas', PIKATRON:'⚡ Pikatron', SOPA:'🔤 Sopa de Letras', WORDLE:'🟩 Wordle', MATHLE:'🔢 Mathle', PASAPALABRA:'🔠 Pasapalabra', FUNCIONES:'∫ Funciones', FUNCIONES_ANALISIS:'📈 Análisis de Funciones', APAREJADOS:'🃏 Aparejados', STORYCUBES:'🎲 Story Cubes', IRREGULAR_VERBS:'🇬🇧 Verbos Irregulares', THINKHOOT:'🦉 PiLive', MATHLIVE:'🧮 MathLive', OLYMPICLIVE:'🏅 OlympicLive', ALGEBRA:'✖️ Álgebra', DOMINO:'🁣 Dominó', ESTADISTICA:'📊 Estadística', MUSIC_COMPASS:'🎵 Entrenamiento Auditivo', MUSIC_GAMES:'🎼 Juegos Musicales', GEOGRAFIA:'🌍 Test de Geografía', BIOLOGIA:'🔬 Test de Biología', FUTBOLQUIZZ:'⚽ Fútbol Quizz' };
-const TIPO_ICON   = { OCA:'🦆', CAZABURBUJAS:'🔵', PIKATRON:'⚡', SOPA:'🔤', WORDLE:'🟩', MATHLE:'🔢', PASAPALABRA:'🔠', FUNCIONES:'∫', FUNCIONES_ANALISIS:'📈', APAREJADOS:'🃏', STORYCUBES:'🎲', IRREGULAR_VERBS:'🇬🇧', THINKHOOT:'🦉', MATHLIVE:'🧮', OLYMPICLIVE:'🏅', ALGEBRA:'✖️', DOMINO:'🁣', ESTADISTICA:'📊', MUSIC_COMPASS:'🎵', MUSIC_GAMES:'🎼', GEOGRAFIA:'🌍', BIOLOGIA:'🔬', FUTBOLQUIZZ:'⚽' };
+const TIPO_LABEL  = { OCA:'🦆 Oca Matemática', CAZABURBUJAS:'🔵 Cazaburbujas', PIKATRON:'⚡ Pikatron', SOPA:'🔤 Sopa de Letras', WORDLE:'🟩 Wordle', AHORCADO:'🪢 Ahorcado', MATHLE:'🔢 Mathle', PASAPALABRA:'🔠 Pasapalabra', FUNCIONES:'∫ Funciones', FUNCIONES_ANALISIS:'📈 Análisis de Funciones', APAREJADOS:'🃏 Aparejados', STORYCUBES:'🎲 Story Cubes', IRREGULAR_VERBS:'🇬🇧 Verbos Irregulares', THINKHOOT:'🦉 PiLive', MATHLIVE:'🧮 MathLive', OLYMPICLIVE:'🏅 OlympicLive', ALGEBRA:'✖️ Álgebra', DOMINO:'🁣 Dominó', ESTADISTICA:'📊 Estadística', MUSIC_COMPASS:'🎵 Entrenamiento Auditivo', MUSIC_GAMES:'🎼 Juegos Musicales', GEOGRAFIA:'🌍 Test de Geografía', BIOLOGIA:'🔬 Test de Biología', FUTBOLQUIZZ:'⚽ Fútbol Quizz', GEOMETRIX:'📐 Geometrix', GEOMETRIX_COMPUESTO:'🏗️ Geometrix · Compuestas', PERIMETRO_AREA:'📏 Perímetro y Área' };
+const TIPO_ICON   = { OCA:'🦆', CAZABURBUJAS:'🔵', PIKATRON:'⚡', SOPA:'🔤', WORDLE:'🟩', AHORCADO:'🪢', MATHLE:'🔢', PASAPALABRA:'🔠', FUNCIONES:'∫', FUNCIONES_ANALISIS:'📈', APAREJADOS:'🃏', STORYCUBES:'🎲', IRREGULAR_VERBS:'🇬🇧', THINKHOOT:'🦉', MATHLIVE:'🧮', OLYMPICLIVE:'🏅', ALGEBRA:'✖️', DOMINO:'🁣', ESTADISTICA:'📊', MUSIC_COMPASS:'🎵', MUSIC_GAMES:'🎼', GEOGRAFIA:'🌍', BIOLOGIA:'🔬', FUTBOLQUIZZ:'⚽', GEOMETRIX:'📐', GEOMETRIX_COMPUESTO:'🏗️', PERIMETRO_AREA:'📏' };
 const TIPO_LIVE = new Set(['THINKHOOT', 'MATHLIVE', 'OLYMPICLIVE']);
 const tipoLabel   = (t) => TIPO_LABEL[t] || ('🎮 ' + (t||'Juego'));
 const tipoIcon    = (t) => TIPO_ICON[t]  || '🎮';
@@ -793,6 +793,9 @@ const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, 
                         } else if (tipo === 'SOPA') {
                             if (cfg.idioma)      badges.push(<ConfigBadge key="id" icon="🌐" label={cfg.idioma}/>);
                             if (cfg.numPalabras) badges.push(<ConfigBadge key="np" icon="📝" label={`${cfg.numPalabras} palabras`}/>);
+                        } else if (tipo === 'AHORCADO') {
+                            if (cfg.idioma) badges.push(<ConfigBadge key="id" icon="🌐" label={cfg.idioma}/>);
+                            if (cfg.modo)   badges.push(<ConfigBadge key="modo" icon="🎮" label={cfg.modo === 'TIME_ATTACK' ? 'Contrarreloj' : 'Clásico'}/>);
                         } else if (tipo === 'IRREGULAR_VERBS') {
                             if (cfg.nivel)     badges.push(<ConfigBadge key="niv" icon="📊" label={cfg.nivel}/>);
                             if (cfg.numVerbos) badges.push(<ConfigBadge key="nv" icon="🔢" label={`${cfg.numVerbos} verbos`}/>);
@@ -805,6 +808,10 @@ const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, 
                             if (cfg.tipoElemento)  badges.push(<ConfigBadge key="te" icon="🌊" label={cfg.tipoElemento}/>);
                             if (cfg.tipoPregunta)  badges.push(<ConfigBadge key="tp" icon="❓" label={cfg.tipoPregunta}/>);
                             if (cfg.modoRespuesta) badges.push(<ConfigBadge key="mr" icon="📝" label={cfg.modoRespuesta}/>);
+                        } else if (tipo === 'IMPERIOS') {
+                            if (cfg.imperio)     badges.push(<ConfigBadge key="imp" icon="🏛️" label={cfg.imperio}/>);
+                            if (cfg.paisesTotal != null)    badges.push(<ConfigBadge key="pt" icon="🗺️" label={`${cfg.fase1Aciertos ?? 0}/${cfg.paisesTotal} países`}/>);
+                            if (cfg.preguntasTotal != null) badges.push(<ConfigBadge key="qt" icon="❓" label={`${cfg.fase2Aciertos ?? 0}/${cfg.preguntasTotal} preguntas`}/>);
                         } else if (tipo === 'BIOLOGIA') {
                           const modoLabel = { cuerpo:'Partes del Cuerpo', musculos:'Músculos', huesos:'Huesos', circulatorio:'Sist. Circulatorio', digestivo:'Sist. Digestivo', respiratorio:'Sist. Respiratorio' };
                           const modoIcon  = { cuerpo:'🧍', musculos:'💪', huesos:'🦴', circulatorio:'🫀', digestivo:'🍽️', respiratorio:'🫁' };
@@ -819,6 +826,17 @@ const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, 
                         } else if (tipo === 'FUNCIONES') {
                             const te = cfg.tipoEjercicio || jugador0.tipoEjercicio;
                             if (te) badges.push(<ConfigBadge key="te" icon="∫" label={te}/>);
+                        } else if (tipo === 'GEOMETRIX' || tipo === 'GEOMETRIX_COMPUESTO') {
+                            const modo = inf.modoJuego || jugador0.modo;
+                            const conf = inf.configuracion || jugador0.configuracion;
+                            if (modo) badges.push(<ConfigBadge key="modo" icon="🎮" label={modo}/>);
+                            if (conf) badges.push(<ConfigBadge key="conf" icon="⚙️" label={conf}/>);
+                            if (inf.figuraNombre) badges.push(<ConfigBadge key="fig" icon="🏗️" label={inf.figuraNombre}/>);
+                        } else if (tipo === 'PERIMETRO_AREA') {
+                            const modo = inf.modoJuego || jugador0.modo;
+                            const conf = inf.configuracion || jugador0.configuracion;
+                            if (modo) badges.push(<ConfigBadge key="modo" icon="🎮" label={modo}/>);
+                            if (conf) badges.push(<ConfigBadge key="conf" icon="⚙️" label={conf}/>);
                         }
                         return badges.length > 0 ? (
                             <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginBottom:10 }}>{badges}</div>
@@ -907,6 +925,36 @@ const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, 
                             ))}
                         </div>
                     )}
+                    {/* Detalle ampliado: Geometrix y Perímetro y Área (máximo feedback) */}
+                    {(tipo === 'GEOMETRIX' || tipo === 'GEOMETRIX_COMPUESTO' || tipo === 'PERIMETRO_AREA') && (() => {
+                        const j0 = jugs[0] || {};
+                        const filas = [];
+                        if (j0.puntos != null) filas.push(['🏅 Puntos', String(j0.puntos)]);
+                        if ((j0.aciertos != null) && (j0.total != null)) filas.push(['✅ Resueltas', `${j0.aciertos} / ${j0.total}`]);
+                        const modo = inf.modoJuego || j0.modo;
+                        if (modo) filas.push(['🎮 Modo', modo]);
+                        const conf = inf.configuracion || j0.configuracion;
+                        if (conf) filas.push(['⚙️ Configuración', conf]);
+                        if (tipo === 'GEOMETRIX_COMPUESTO') {
+                            if (inf.figuraNombre) filas.push(['🏗️ Figura', inf.figuraNombre]);
+                            const ao = inf.areaOk ?? j0.areaOk;
+                            const vo = inf.volumenOk ?? j0.volumenOk;
+                            if (ao != null) filas.push(['📐 Área', ao ? '✅ Correcta' : '❌ Incorrecta']);
+                            if (vo != null) filas.push(['🧊 Volumen', vo ? '✅ Correcto' : '❌ Incorrecto']);
+                        }
+                        if (!filas.length) return null;
+                        return (
+                            <div style={{ marginTop:12, padding:'10px 12px', background:'#f8f9fa', borderRadius:10, border:'1px solid #ecf0f1' }}>
+                                <div style={{ fontSize:'0.72rem', color:'#7f8c8d', fontWeight:700, letterSpacing:.5, marginBottom:8 }}>DETALLE DE LA PARTIDA</div>
+                                {filas.map(([k,v],i)=>(
+                                    <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, padding:'4px 0', borderBottom: i<filas.length-1 ? '1px solid #ecf0f1' : 'none', fontSize:'0.82rem' }}>
+                                        <span style={{ color:'#7f8c8d' }}>{k}</span>
+                                        <span style={{ color:'#2c3e50', fontWeight:600, textAlign:'right' }}>{v}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        );
+                    })()}
                 </div>
             )}
         </div>

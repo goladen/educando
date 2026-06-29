@@ -4,6 +4,7 @@ import { X, RefreshCw, Play, Trophy, AlertTriangle, Layers, Map, Heart, Maximize
 import pikatronImg from './assets/pikatron-sprite.png';
 import coinImgFile from './assets/moneda.png'; // <--- AÑADE ESTO
 import { db } from './firebase';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 import { collection, addDoc, query, where, orderBy, limit, getDocs, doc, getDoc } from 'firebase/firestore';
 // --- IMPORTACIÓN DE FONDOS ---
 import bg1 from './assets/pantalla5.jpeg';
@@ -776,6 +777,10 @@ export default function PikatronRun({ recurso, onExit, usuario, modoOlimpico = f
                 fecha: new Date(),
                 categoria: levelInfo.name || 'General' // Guardamos el nivel o categoría
             });
+            guardarRegistroLocal('PIKATRON', {
+                titulo: recurso.titulo, aciertos: score,
+                nombre: nombreFinal, via: 'ranking',
+            });
             setYaGuardado(true);
             alert("¡Puntuación guardada correctamente!");
         } catch (error) {
@@ -1112,6 +1117,10 @@ function ModalEnviarProfe({ datos, onClose }) {
                 recursoId: datos.recursoId, recursoTitulo: datos.recursoTitulo,
                 hoja: datos.hoja, codigoProfesor: code,
                 jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), aciertos: datos.aciertos, fallos: 0, hoja: datos.hoja }],
+            });
+            guardarRegistroLocal('PIKATRON', {
+                titulo: datos.recursoTitulo, aciertos: datos.aciertos,
+                nombre: nombre.trim(), curso: curso.trim(), via: 'profesor',
             });
             setEnviado(true);
         } catch(e) { setError('Error: ' + e.message); }

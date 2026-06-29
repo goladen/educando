@@ -10,6 +10,7 @@ import PaginaProfesor from './components/PaginaProfesor';
 import FuncionesEjecutivas from './FuncionesEjecutivas';
 import IrregularVerbsTest from './IrregularVerbsTest';
 import { SolarSystemViewer } from './components/LandingGames3';
+import ImperiosGame from './components/ImperiosGame';
 import PiTutorial from './components/PiTutorial';
 import Retos from './Retos';
 import AnnotationOverlay from './components/AnnotationOverlay';
@@ -99,7 +100,7 @@ function App() {
       if (slug === 'funcionesejecutivas' || slug === 'irregular_verbs' || slug === 'sistema_solar'
           || slug === 'retos' || slug === 'conectapuntos' || slug === 'sudoku'
           || slug === 'partes_planta' || slug === 'etiquetame' || slug === 'karting_track'
-          || slug === 'arkade') {
+          || slug === 'arkade' || slug === 'imperios') {
         setRutaPublica(slug);
         return;
       }
@@ -120,6 +121,7 @@ function App() {
         'api','admin','login','app',
         'irregular_verbs','sistema_solar',
         'retos','conectapuntos','sudoku',
+        'imperios','geografia',
         'fisica',
         'math_world','primaria','feria',
         'arkade',
@@ -255,6 +257,7 @@ function App() {
     if (rutaPublica === 'funcionesejecutivas') return <><FuncionesEjecutivas onBack={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'irregular_verbs') return <><IrregularVerbsTest />{anotadorUI}</>;
     if (rutaPublica === 'sistema_solar') return <><SolarSystemViewer onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
+    if (rutaPublica === 'imperios') return <><ImperiosGame onBack={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'retos') return <><Retos onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'conectapuntos') return <><Retos initialGame="CONECTA" onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'sudoku') return <><Retos initialGame="SUDOKU" onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
@@ -337,12 +340,14 @@ function App() {
                             <ProfesorDashboard usuario={usuario} googleToken={googleToken} />
                         </div>
                     ) : (
-                            <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg, #e8f0fe 0%, #dbeafe 50%, #ede9fe 100%)' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 20px', background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(8px)', boxShadow: '0 2px 8px rgba(59,130,246,0.1)', alignItems: 'center' }}>
-                                    <span style={{ color: '#1e40af' }}>Alumno: <b>{usuario.displayName}</b></span>
-                                    <button onClick={handleLogout} style={{ border: 'none', background: 'none', color: '#6b7280', cursor: 'pointer' }}>Salir</button>
+                            <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg, #0f172a 0%, #1e3a8a 55%, #312e81 100%)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 20px', background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(8px)', boxShadow: '0 2px 8px rgba(0,0,0,0.2)', alignItems: 'center' }}>
+                                    <span style={{ color: 'white' }}>Alumno: <b>{usuario.displayName}</b></span>
+                                    <button onClick={handleLogout} style={{ border: 'none', background: 'none', color: 'rgba(255,255,255,0.8)', cursor: 'pointer' }}>Salir</button>
                                 </div>
+                                <div style={{ width: '90%', maxWidth: '1000px', margin: '0 auto', padding: '0 16px' }}>
                                 <LandingGames usuario={usuario} />
+                                </div>
                                 <PiTutorial
                                     usuario={usuario}
                                     tutorialId="bienvenida_alumno"

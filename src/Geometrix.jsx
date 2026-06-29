@@ -4,6 +4,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { RotateCcw, CheckCircle, XCircle, Trophy, ArrowRight, Calculator, Ruler, Play, Users, Loader, Monitor, Copy, Save, ArrowUp, Share2 } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { db } from './firebase';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 import { doc, setDoc, updateDoc, onSnapshot, increment, collection, writeBatch, addDoc, getDoc } from 'firebase/firestore';
 import { bibliotecaGeometria } from './BibliotecaGeometria';
 import PerimetroArea from './PerimetroArea';
@@ -353,6 +354,8 @@ function ModalFigurasCompuestas({ usuario, onClose }) {
     const [resultado, setResultado] = useState(null);
     const [mostrarEnvio, setMostrarEnvio] = useState(false);
     const [codigoProfe, setCodigoProfe] = useState('');
+    const [nombreAlumno, setNombreAlumno] = useState(usuario?.displayName || '');
+    const [cursoAlumno, setCursoAlumno] = useState('');
     const [enviando, setEnviando] = useState(false);
     const [enviado, setEnviado] = useState(false);
     const [errorEnvio, setErrorEnvio] = useState('');
@@ -378,20 +381,33 @@ function ModalFigurasCompuestas({ usuario, onClose }) {
     };
 
     const enviarAlProfe = async () => {
-        if (!codigoProfe.trim()) return;
+        if (!nombreAlumno.trim()) { setErrorEnvio('Escribe tu nombre.'); return; }
+        if (!codigoProfe.trim()) { setErrorEnvio('Escribe el código del profesor.'); return; }
         setEnviando(true); setErrorEnvio('');
         try {
             const snap = await getDoc(doc(db, 'codigos_profesor', codigoProfe.toUpperCase().trim()));
             if (!snap.exists()) { setErrorEnvio('Código de profesor no encontrado.'); setEnviando(false); return; }
             const res = resultado.areaOk && resultado.volOk ? '100%' : !resultado.areaOk && !resultado.volOk ? 'Falla área y volumen' : !resultado.areaOk ? 'Falla área' : 'Falla volumen';
+            const figurasBien = (resultado.areaOk ? 1 : 0); // 1 figura compuesta; "bien" = área y volumen correctos
+            const todoOk = resultado.areaOk && resultado.volOk;
             await addDoc(collection(db, 'informes_juegos'), {
                 tipo: 'GEOMETRIX_COMPUESTO', modalidad: 'Individual',
                 codigoProfesor: codigoProfe.toUpperCase().trim(),
                 profesorUid: snap.data().uid || null,
-                alumno: usuario?.displayName || 'Anónimo', alumnoUid: usuario?.uid || null,
+                alumno: nombreAlumno.trim(), curso: cursoAlumno.trim(), alumnoUid: usuario?.uid || null,
+                modoJuego: 'Figuras compuestas',
                 figuraId: figura.id, figuraNombre: figura.nombre,
                 areaOk: resultado.areaOk, volumenOk: resultado.volOk, resultado: res,
+                jugadores: [{ nombre: nombreAlumno.trim(), curso: cursoAlumno.trim(),
+                    aciertos: todoOk ? 1 : 0, total: 1, intentos: 1,
+                    porcentaje: todoOk ? 100 : (resultado.areaOk || resultado.volOk ? 50 : 0),
+                    areaOk: resultado.areaOk, volumenOk: resultado.volOk, modo: 'Figuras compuestas' }],
                 fecha: new Date().toISOString(), timestamp: Date.now(),
+            });
+            const pctG = todoOk ? 100 : (resultado.areaOk || resultado.volOk ? 50 : 0);
+            guardarRegistroLocal('GEOMETRIX_COMPUESTO', {
+                titulo: `Compuestas · ${figura.nombre || ''}`.trim(), aciertos: pctG, intentos: 100, porcentaje: pctG,
+                nombre: nombreAlumno.trim(), curso: cursoAlumno.trim(), via: 'profesor',
             });
             setEnviado(true);
         } catch { setErrorEnvio('Error al enviar. Inténtalo de nuevo.'); }
@@ -481,12 +497,19 @@ function ModalFigurasCompuestas({ usuario, onClose }) {
                             </button>
                         ) : (
                             <div style={{ background: '#f0faf5', border: '1px solid #2ecc71', borderRadius: 12, padding: 14 }}>
+                                <p style={{ margin: '0 0 8px', fontWeight: 'bold', fontSize: '0.88rem', color: '#2c3e50' }}>Tus datos:</p>
+                                <input type="text" value={nombreAlumno} onChange={e => setNombreAlumno(e.target.value)}
+                                    placeholder="Nombre y apellido"
+                                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: '2px solid #2ecc71', fontSize: '0.95rem', outline: 'none', marginBottom: 8 }} />
+                                <input type="text" value={cursoAlumno} onChange={e => setCursoAlumno(e.target.value)}
+                                    placeholder="Curso (ej: 1º ESO A)"
+                                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: '2px solid #cfe9da', fontSize: '0.95rem', outline: 'none', marginBottom: 8 }} />
                                 <p style={{ margin: '0 0 8px', fontWeight: 'bold', fontSize: '0.88rem', color: '#2c3e50' }}>Código del profesor:</p>
                                 <div style={{ display: 'flex', gap: 8 }}>
                                     <input type="text" value={codigoProfe} onChange={e => setCodigoProfe(e.target.value.toUpperCase())}
                                         placeholder="XXXXXX" maxLength={6}
                                         style={{ flex: 1, padding: '9px 12px', borderRadius: 8, border: '2px solid #2ecc71', textAlign: 'center', fontSize: '1.1rem', outline: 'none', letterSpacing: 3 }} />
-                                    <button onClick={enviarAlProfe} disabled={enviando || !codigoProfe.trim()}
+                                    <button onClick={enviarAlProfe} disabled={enviando || !codigoProfe.trim() || !nombreAlumno.trim()}
                                         style={{ background: '#27ae60', color: 'white', border: 'none', padding: '9px 18px', borderRadius: 8, fontWeight: 'bold', cursor: 'pointer' }}>
                                         {enviando ? '⏳' : '📤 Enviar'}
                                     </button>
@@ -499,6 +522,101 @@ function ModalFigurasCompuestas({ usuario, onClose }) {
                 {enviado && (
                     <div style={{ background: '#d4edda', border: '2px solid #2ecc71', borderRadius: 12, padding: 12, textAlign: 'center', color: '#27ae60', fontWeight: 'bold', fontSize: '0.95rem' }}>
                         ✅ Informe enviado al profesor
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+// Descripción legible de la configuración elegida (modo Configurado).
+const describirConfig = (cfg) => {
+    if (!cfg) return '';
+    const tipos = [];
+    if (cfg.tipos?.area) tipos.push('Área');
+    if (cfg.tipos?.perimetro) tipos.push('Perímetro');
+    if (cfg.tipos?.volumen) tipos.push('Volumen');
+    const figs = [];
+    if (cfg.figuras?.planas2D) figs.push('2D');
+    if (cfg.figuras?.cuerpos3D) figs.push('3D');
+    return `${cfg.modoRegla ? '📏 Regla' : '🔢 Fórmulas'} · Tipos: ${tipos.join(', ') || '—'} · Figuras: ${figs.join(' y ') || '—'} · ${cfg.numEjercicios} ejercicios`;
+};
+
+// Modal "Enviar al profesor" para los modos individuales (rápido / regla / configurado).
+function ModalEnviarGeo({ datos, usuario, onClose }) {
+    const [nombre, setNombre] = useState(usuario?.displayName || '');
+    const [curso,  setCurso]  = useState('');
+    const [codigo, setCodigo] = useState('');
+    const [enviando, setEnviando] = useState(false);
+    const [enviado,  setEnviado]  = useState(false);
+    const [error,    setError]    = useState('');
+
+    const enviar = async () => {
+        const code = codigo.trim().toUpperCase();
+        if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+        if (!code) { setError('Escribe el código del profesor.'); return; }
+        setEnviando(true); setError('');
+        try {
+            const snap = await getDoc(doc(db, 'codigos_profesor', code));
+            if (!snap.exists()) { setError('Código de profesor no encontrado.'); setEnviando(false); return; }
+            const pct = datos.total > 0 ? Math.round((datos.aciertos / datos.total) * 100) : 0;
+            await addDoc(collection(db, 'informes_juegos'), {
+                tipo: 'GEOMETRIX', modalidad: 'Individual', fecha: new Date(),
+                codigoProfesor: code, profesorUid: snap.data().uid || null,
+                modoJuego: datos.modo, configuracion: datos.configDesc || null,
+                jugadores: [{
+                    nombre: nombre.trim(), curso: curso.trim(),
+                    aciertos: datos.aciertos, total: datos.total, intentos: datos.total,
+                    puntos: datos.puntos, porcentaje: pct,
+                    modo: datos.modo, ...(datos.configDesc ? { configuracion: datos.configDesc } : {}),
+                }],
+            });
+            guardarRegistroLocal('GEOMETRIX_COMPUESTO', {
+                titulo: `Geometrix · ${datos.modo}`,
+                aciertos: datos.aciertos, intentos: datos.total,
+                nombre: nombre.trim(), curso: curso.trim(), via: 'profesor',
+            });
+            setEnviado(true);
+        } catch (e) { setError('Error al enviar: ' + (e.message || '')); }
+        setEnviando(false);
+    };
+
+    const inp = { padding:'9px 12px', borderRadius:9, border:'1.5px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.08)', color:'white', fontSize:'0.9rem', outline:'none', width:'100%', boxSizing:'border-box', fontFamily:'inherit' };
+
+    return (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.78)', zIndex:10002, display:'flex', justifyContent:'center', alignItems:'center', padding:16 }}>
+            <div style={{ background:'#1e272e', border:'1px solid rgba(255,255,255,0.15)', borderRadius:20, width:'100%', maxWidth:380, padding:'26px 28px', color:'white', fontFamily:"'Segoe UI',sans-serif", boxShadow:'0 30px 80px rgba(0,0,0,0.7)' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+                    <h3 style={{ margin:0, fontSize:'1.05rem', color:'#f1c40f' }}>📤 Enviar al profesor</h3>
+                    <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', color:'#aaa', fontSize:'1.2rem' }}>✕</button>
+                </div>
+                {enviado ? (
+                    <div style={{ textAlign:'center', padding:'18px 0' }}>
+                        <div style={{ fontSize:'3rem' }}>✅</div>
+                        <div style={{ color:'#2ecc71', fontWeight:700 }}>¡Informe enviado!</div>
+                        <div style={{ color:'#aaa', fontSize:'0.88rem', marginTop:8 }}>{datos.aciertos}/{datos.total} figuras · {datos.puntos} pts</div>
+                        <button onClick={onClose} style={{ marginTop:16, padding:'9px 22px', borderRadius:10, border:'none', background:'rgba(255,255,255,0.1)', cursor:'pointer', color:'white' }}>Cerrar</button>
+                    </div>
+                ) : (
+                    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                        <div style={{ background:'rgba(255,255,255,0.06)', borderRadius:10, padding:'10px 12px', fontSize:'0.82rem', color:'#cfd6dc' }}>
+                            <div><b style={{ color:'#fff' }}>{datos.modo}</b></div>
+                            <div style={{ marginTop:3 }}>✓ {datos.aciertos}/{datos.total} figuras · {datos.puntos} pts</div>
+                            {datos.configDesc && <div style={{ marginTop:3, color:'#9aa4ad' }}>{datos.configDesc}</div>}
+                        </div>
+                        <div><label style={{ fontSize:'0.78rem', color:'#aaa', fontWeight:600, display:'block', marginBottom:4 }}>Nombre y apellido</label>
+                            <input value={nombre} onChange={e=>setNombre(e.target.value)} placeholder="Tu nombre completo" style={inp}/></div>
+                        <div><label style={{ fontSize:'0.78rem', color:'#aaa', fontWeight:600, display:'block', marginBottom:4 }}>Curso</label>
+                            <input value={curso} onChange={e=>setCurso(e.target.value)} placeholder="Ej: 1º ESO A" style={inp}/></div>
+                        <div><label style={{ fontSize:'0.78rem', color:'#aaa', fontWeight:600, display:'block', marginBottom:4 }}>Código del profesor</label>
+                            <input value={codigo} onChange={e=>setCodigo(e.target.value.toUpperCase())} placeholder="XXXXXX" maxLength={10} style={{ ...inp, letterSpacing:2, fontWeight:700 }}/></div>
+                        {error && <div style={{ color:'#e74c3c', fontSize:'0.8rem' }}>⚠ {error}</div>}
+                        <div style={{ display:'flex', gap:9, marginTop:4 }}>
+                            <button onClick={onClose} style={{ flex:1, padding:'10px', borderRadius:10, border:'1px solid rgba(255,255,255,0.2)', background:'transparent', cursor:'pointer', color:'white' }}>Cancelar</button>
+                            <button onClick={enviar} disabled={enviando} style={{ flex:2, padding:'10px', borderRadius:10, border:'none', background:enviando?'#555':'linear-gradient(135deg,#27ae60,#2ecc71)', color:'white', fontWeight:700, cursor:enviando?'default':'pointer' }}>
+                                {enviando ? 'Enviando…' : '📤 Enviar'}
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>
@@ -566,6 +684,8 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
     };
     const [gameState, setGameState] = useState('START');
     const [modoRegla, setModoRegla] = useState(false);
+    const [modoJuego, setModoJuego] = useState('');   // 'Modo rápido' | 'Modo regla' | 'Configurado'
+    const [mostrarEnvioFin, setMostrarEnvioFin] = useState(false);
     const [score, setScore] = useState(0);
     const [questionNum, setQuestionNum] = useState(1);
     const [currentProblem, setCurrentProblem] = useState(null);
@@ -620,6 +740,7 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
     const startModo1 = () => {
         const cfg = { tipos: { area: true, perimetro: true, volumen: true }, figuras: { planas2D: true, cuerpos3D: true }, numEjercicios: 10, modoRegla: false };
         setGameConfig(cfg);
+        setModoJuego('Modo rápido');
         startGame(false, cfg);
     };
 
@@ -627,6 +748,7 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
     const startModo2 = () => {
         const cfg = { tipos: { area: true, perimetro: true, volumen: true }, figuras: { planas2D: true, cuerpos3D: true }, numEjercicios: 10, modoRegla: true };
         setGameConfig(cfg);
+        setModoJuego('Modo regla');
         startGame(true, cfg);
     };
 
@@ -829,7 +951,7 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
                         </SeccionConfig>
                         <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 18 }}>
                             <button onClick={() => setShowGameConfig(false)} style={sLive.btnSec}>Cancelar</button>
-                            <button onClick={() => { setShowGameConfig(false); startGame(gameConfig.modoRegla, gameConfig); }} style={sLive.btnPri}>▶ Comenzar</button>
+                            <button onClick={() => { setShowGameConfig(false); setModoJuego('Configurado'); startGame(gameConfig.modoRegla, gameConfig); }} style={sLive.btnPri}>▶ Comenzar</button>
                         </div>
                     </div>
                 </div>
@@ -1005,8 +1127,28 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
                     <Trophy size={75} color="#f1c40f" style={{ marginBottom: 16 }} />
                     <h1 style={{ color: '#2c3e50' }}>¡Desafío Completado!</h1>
                     <div style={{ fontSize: '4rem', fontWeight: 'bold', color: '#f1c40f' }}>{score}</div>
-                    <p style={{ color: '#999', marginBottom: 28 }}>Puntos sobre {gameConfig.numEjercicios * 10}</p>
-                    <button onClick={handleExit} style={{ ...sLocal.btnPrimary, background: '#009688' }}>Salir al Menú</button>
+                    <p style={{ color: '#999', marginBottom: 6 }}>Puntos sobre {gameConfig.numEjercicios * 10}</p>
+                    <p style={{ color: '#2c3e50', fontWeight: 700, marginBottom: 22 }}>
+                        ✓ {Math.round(score / 10)}/{gameConfig.numEjercicios} figuras correctas
+                        {modoJuego && <span style={{ color: '#888', fontWeight: 500 }}> · {modoJuego}</span>}
+                    </p>
+                    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+                        <button onClick={() => setMostrarEnvioFin(true)} style={{ ...sLocal.btnPrimary, background: 'linear-gradient(135deg,#27ae60,#2ecc71)' }}>📤 Enviar al profesor</button>
+                        <button onClick={handleExit} style={{ ...sLocal.btnPrimary, background: '#009688' }}>Salir al Menú</button>
+                    </div>
+                    {mostrarEnvioFin && (
+                        <ModalEnviarGeo
+                            usuario={usuario}
+                            datos={{
+                                aciertos: Math.round(score / 10),
+                                total: gameConfig.numEjercicios,
+                                puntos: score,
+                                modo: modoJuego || 'Geometrix',
+                                configDesc: modoJuego === 'Configurado' ? describirConfig(gameConfig) : '',
+                            }}
+                            onClose={() => setMostrarEnvioFin(false)}
+                        />
+                    )}
                 </div>
             )}
         </div>

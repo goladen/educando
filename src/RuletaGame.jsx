@@ -4,6 +4,7 @@ import { db } from './firebase';
 import { doc, addDoc, getDoc, collection, query, where, getDocs, updateDoc, getCountFromServer, increment } from 'firebase/firestore';
 import Confetti from 'react-confetti';
 import { Save, CircleDollarSign, Mic, Type, Skull, Trophy, Crown, Medal, User } from 'lucide-react';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 
 // --- IMPORTACIÓN DE AUDIOS LOCALES ---
 import correctSoundFile from './assets/correct-choice-43861.mp3';
@@ -71,6 +72,10 @@ function ModalEnviarProfe({ datos, onClose }) {
                     nombre: j.nombre === datos.jugadores[0].nombre ? nombre.trim() : j.nombre,
                     curso: curso.trim(), puntos: j.puntos,
                 })),
+            });
+            guardarRegistroLocal('RULETA', {
+                titulo: datos.recursoTitulo, aciertos: datos.jugadores[0]?.puntos || 0,
+                nombre: nombre.trim(), curso: curso.trim(), via: 'profesor',
             });
             setEnviado(true);
         } catch(e) { setError('Error: ' + e.message); }
@@ -529,6 +534,10 @@ export default function RuletaGame({ recurso, usuario, alTerminar }) {
                 });
                 alert(`✅ Guardado. ¡Posición ${miPosicion}! ${medallaReal}`);
             }
+            guardarRegistroLocal('RULETA', {
+                titulo: recurso.titulo || 'Ruleta', aciertos: pts,
+                nombre: usuario?.displayName || '', via: 'ranking',
+            });
             alTerminar();
         } catch (e) { console.error(e); alert("Error al guardar."); }
     };

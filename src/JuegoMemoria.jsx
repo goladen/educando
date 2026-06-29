@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 import { addDoc, collection, doc, getDoc } from 'firebase/firestore';
 
 const JuegoMemoria = ({ onBack }) => {
@@ -308,6 +309,10 @@ const JuegoMemoria = ({ onBack }) => {
         }],
       });
 
+      guardarRegistroLocal('MEMORIA', {
+        titulo: `Memoria - ${temas[textoActual].titulo}`, aciertos: puntuacion, intentos: 100, porcentaje: puntuacion,
+        nombre: nombreAlumno.trim(), curso: cursoAlumno.trim(), via: 'profesor',
+      });
       setResultadoEnviado(true);
       setMostrarModalEnvio(false);
     } catch (e) {

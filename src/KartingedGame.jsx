@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import GameLauncher from './components/GameLauncher';
 import { db } from './firebase';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 import { doc, getDoc, collection, query, where, orderBy, limit, getDocs, addDoc, updateDoc, getCountFromServer } from 'firebase/firestore';
 
 // ─────────────────────────────────────────────
@@ -199,6 +200,11 @@ function PantallaResultados({ resultado, recurso, usuario, onSalir }) {
             } else {
                 await addDoc(collection(db, 'ranking'), { recursoId: recurso.id, recursoTitulo: recurso.titulo, tipoJuego: 'KARTINGED', categoria: resultado.hoja, email, jugador: nombre, tiempo: resultado.tiempo, tiempoFormateado: resultado.tiempoFormateado, puntos: resultado.puntos, posicion: resultado.posicion, fecha: new Date(), medalla });
             }
+            guardarRegistroLocal('KARTINGED', {
+                titulo: recurso.titulo, aciertos: resultado.acertadas ?? 0,
+                intentos: (resultado.acertadas ?? 0) + (resultado.falladas ?? 0),
+                nombre, via: 'ranking',
+            });
             setGuardado(true);
             cargarRanking();
         } catch (e) { console.error(e); }
@@ -297,6 +303,10 @@ function ModalEnviarProfe({ resultado, recurso, onClose }) {
                     tiempo: resultado.tiempo, tiempoFormateado: resultado.tiempoFormateado,
                     puntos: resultado.puntos, posicion: resultado.posicion,
                     intentos: total, aciertos: acertadas, fallos: falladas, porcentaje: pct }],
+            });
+            guardarRegistroLocal('KARTINGED', {
+                titulo: recurso.titulo, aciertos: acertadas, intentos: total,
+                nombre: nombre.trim(), curso: curso.trim(), via: 'profesor',
             });
             setEnviado(true);
         } catch (e) { setError('Error: ' + e.message); }

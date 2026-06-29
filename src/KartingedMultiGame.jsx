@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import GameLauncher from './components/GameLauncher';
 import { db } from './firebase';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 import { collection, query, where, getDocs, doc, getDoc, addDoc } from 'firebase/firestore';
 
 // ─────────────────────────────────────────
@@ -236,6 +237,10 @@ function ModalEnviarProfe({ datos, onClose }) {
                 recursoId: datos.recursoId, recursoTitulo: datos.recursoTitulo,
                 codigoProfesor: code,
                 jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), puntos: datos.puntos, posicion: datos.posicion }],
+            });
+            guardarRegistroLocal('KARTINGED_MULTI', {
+                titulo: datos.recursoTitulo, aciertos: datos.puntos ?? 0,
+                nombre: nombre.trim(), curso: curso.trim(), via: 'profesor',
             });
             setEnviado(true);
         } catch(e) { setError('Error: ' + e.message); }

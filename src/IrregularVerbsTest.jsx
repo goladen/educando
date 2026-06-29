@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { bibliotecaIrregularVerbs as verbosData } from './BibliotecaIrregularVerbs';
 import { db } from './firebase';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 import { collection, addDoc, doc, getDoc } from 'firebase/firestore';
 import { Share2, Send } from 'lucide-react';
 
@@ -27,6 +28,10 @@ function ModalEnviarProfe({ onClose, score, config }) {
         codigoProfesor: code,
         config: { nivel: config?.level, numVerbos: config?.numVerbs, modo: config?.columnsMode },
         jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), aciertos: score.points, intentos: score.maxPoints }],
+      });
+      guardarRegistroLocal('IRREGULAR_VERBS', {
+        titulo: 'Test de Verbos Irregulares', aciertos: score.points, intentos: score.maxPoints,
+        nombre: nombre.trim(), curso: curso.trim(), via: 'profesor',
       });
       setEnviado(true);
     } catch(e) { setError('Error: ' + e.message); }

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ArrowLeft, RefreshCw, CheckCircle, Send, Eye } from 'lucide-react';
 import { db } from './firebase';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 import { collection, addDoc, getDoc, doc } from 'firebase/firestore';
 
 // ─── CANVAS CONSTANTS ────────────────────────────────────────────────────────
@@ -530,6 +531,10 @@ function ModalEnviarProfe({ porcentaje, tipoFuncion, onClose }) {
                 tipo: 'FUNCIONES', modalidad: tipoFuncion || 'Elementales', fecha: new Date(),
                 codigoProfesor: code,
                 jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), correcto: porcentaje >= 70, porcentaje, tipoEjercicio: tipoFuncion, puntos: porcentaje }],
+            });
+            guardarRegistroLocal('FUNCIONES', {
+                titulo: 'Funciones', aciertos: porcentaje, intentos: 100, porcentaje,
+                nombre: nombre.trim(), curso: curso.trim(), via: 'profesor',
             });
             setEnviado(true);
         } catch (e) { setError('Error: ' + e.message); }

@@ -8,6 +8,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import MathText from './components/MathText';
 import { BIBLIOTECA } from './BibliotecaOmni';
 import { db } from './firebase';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 import { doc, setDoc, updateDoc, onSnapshot, increment, collection, addDoc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import piHappy from './assets/Pi-contento.png';
 import piAngry from './assets/Pi-enfadado.png';
@@ -589,6 +590,10 @@ function ModalEnviarOmni({ recurso, resultados, onClose }) {
         codigoProfesor: code, recursoTitulo: recurso.titulo,
         jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), porcentaje: pctTotal, correcto: pctTotal >= 60, puntos: pctTotal,
           tipoEjercicio: recurso.titulo, detalles: resultados.map(r => ({ titulo: r.titulo, pct: r.t > 0 ? Math.round(r.c / r.t * 100) : 0 })) }],
+      });
+      guardarRegistroLocal('OMNINTERACTIVE', {
+        titulo: recurso.titulo, aciertos: totalC, intentos: totalT, porcentaje: pctTotal,
+        nombre: nombre.trim(), curso: curso.trim(), via: 'profesor',
       });
       setEnviado(true);
     } catch (e) { setError('Error: ' + e.message); }

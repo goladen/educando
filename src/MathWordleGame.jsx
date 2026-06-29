@@ -2,6 +2,7 @@
 import { db } from './firebase';
 import { collection, addDoc, query, where, orderBy, limit, getDocs, doc, getDoc } from 'firebase/firestore';
 import { Trophy, X, Delete } from 'lucide-react';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 import Confetti from 'react-confetti';
 
 function ModalEnviarProfe({ datos, onClose }) {
@@ -25,6 +26,10 @@ function ModalEnviarProfe({ datos, onClose }) {
                 codigoProfesor: code,
                 config: { operacion: datos.operacion, cifras: datos.cifras },
                 jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), tiempo: datos.tiempo, intentos: datos.intentos }],
+            });
+            guardarRegistroLocal('MATHLE', {
+                titulo: `${datos.operacion || 'MathLe'} (${datos.cifras} cif) · ${datos.intentos} intentos`,
+                nombre: nombre.trim(), curso: curso.trim(), via: 'profesor',
             });
             setEnviado(true);
         } catch(e) { setError('Error: ' + e.message); }
@@ -259,6 +264,9 @@ export default function MathWordleGame({ usuario, onExit }) {
                 tiempo: Number(elapsedTime),
                 modo: modoStr,
                 operacion: gameMode
+            });
+            guardarRegistroLocal('MATHLE', {
+                titulo: modoStr, nombre: playerName.trim(), via: 'ranking',
             });
             showMessage("¡Guardado!");
             cargarRanking();

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { db } from './firebase';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 import { collection, getDocs, query, where, limit, addDoc, doc, getDoc } from 'firebase/firestore';
 
 import pikatronImgSrc  from './assets/pikatron-sprite.png';
@@ -893,6 +894,10 @@ function ModalEnviarProfe({ datos, onClose }) {
         recursoId: datos.recursoId, recursoTitulo: datos.recursoTitulo,
         hoja: datos.hoja, codigoProfesor: code,
         jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), aciertos: datos.aciertos, fallos: 0, hoja: datos.hoja }],
+      });
+      guardarRegistroLocal('PLATAFORMAS', {
+        titulo: datos.recursoTitulo, aciertos: datos.aciertos,
+        nombre: nombre.trim(), curso: curso.trim(), via: 'profesor',
       });
       setEnviado(true);
     } catch(e) { setError('Error: ' + e.message); }

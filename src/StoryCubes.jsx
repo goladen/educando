@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db } from './firebase';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 import { doc, setDoc, updateDoc, onSnapshot, collection, addDoc, getDoc, arrayUnion } from 'firebase/firestore';
 import Confetti from 'react-confetti';
 import {
@@ -123,6 +124,9 @@ function ModalEnviarProfe({ historia, jugadores, onClose }) {
                 historiaTexto: historia.map(seg =>
                     `[${seg.dados.join(' · ')}]\n${seg.nombre}: ${seg.texto || '(sin texto)'}`
                 ).join('\n\n'),
+            });
+            guardarRegistroLocal('STORYCUBES', {
+                titulo: 'Story Cubes', nombre: nombre.trim(), curso: curso.trim(), via: 'profesor',
             });
             setEnviado(true);
         } catch (e) {

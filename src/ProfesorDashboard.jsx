@@ -1037,7 +1037,19 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             </div>
         );
     }
-    if (modoVista === 'ALUMNO') return (<div style={{ position: 'relative' }}><div style={{ position: 'fixed', top: 20, right: 20, zIndex: 9999 }}><button onClick={() => setModoVista('PROFESOR')} style={{ background: '#e74c3c', color: 'white', padding: '10px 20px', borderRadius: '30px', border: 'none', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}><LogOut size={20} /> SALIR MODO ALUMNO</button></div><LandingGames usuario={usuario} /></div>);
+    if (modoVista === 'ALUMNO') return (
+        <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg, #0f172a 0%, #1e3a8a 55%, #312e81 100%)', position: 'relative' }}>
+            <div style={{ position: 'fixed', top: 20, right: 20, zIndex: 9999 }}>
+                <button onClick={() => setModoVista('PROFESOR')} style={{ background: '#e74c3c', color: 'white', padding: '10px 20px', borderRadius: '30px', border: 'none', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}><LogOut size={20} /> SALIR MODO ALUMNO</button>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 20px', background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(8px)', boxShadow: '0 2px 8px rgba(0,0,0,0.2)', alignItems: 'center' }}>
+                <span style={{ color: 'white' }}>Alumno: <b>{usuario.displayName}</b></span>
+            </div>
+            <div style={{ width: '90%', maxWidth: '1000px', margin: '0 auto', padding: '0 16px' }}>
+                <LandingGames usuario={usuario} />
+            </div>
+        </div>
+    );
 
     if (mostrandoMathWordle) {
         return (

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { db } from './firebase';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 import {
     collection, addDoc, doc, setDoc, updateDoc, onSnapshot, getDoc
 } from 'firebase/firestore';
@@ -91,6 +92,13 @@ function ModalEnviarProfe({ datos, onClose }) {
                 tema: datos.tema || '', fecha: new Date(),
                 codigoProfesor: code, jugadores: jugs,
             });
+            if (!esLive) {
+                guardarRegistroLocal('LISTENING', {
+                    titulo: datos.tema ? `Listening · ${datos.tema}` : 'Listening',
+                    aciertos: datos.aciertos, intentos: datos.total,
+                    nombre: nombre.trim(), curso: curso.trim(), via: 'profesor',
+                });
+            }
             setEnviado(true);
         } catch(e) { setError('Error: ' + e.message); }
         setEnviando(false);

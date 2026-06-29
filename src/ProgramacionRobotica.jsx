@@ -126,6 +126,7 @@ export default function ProgramacionRobotica({ usuario = null, onLoginRequest, o
       <BlocklyEditor
         usuario={usuario}
         onLoginRequest={onLoginRequest}
+        initialBoard="microbit_smarthome"
         onExit={() => setVista('hub')}
       />
     );
@@ -183,14 +184,13 @@ export default function ProgramacionRobotica({ usuario = null, onLoginRequest, o
         {/* Accesos a los editores */}
         <h3 style={styles.editoresH3}>✏️ Entra a programar</h3>
         <div style={styles.editoresRow}>
-          <div style={{ ...styles.editorBtn('#475569'), opacity: 0.65, cursor: 'not-allowed', position: 'relative' }}>
-            <span style={styles.proxBadge}>🔒 Próximamente</span>
+          <button onClick={() => setVista('bloques')} style={styles.editorBtn('#0ea5e9')}>
             <span style={{ fontSize: 34 }}>🧩</span>
             <span style={styles.editorBtnTitle}>Editor de bloques</span>
             <span style={styles.editorBtnDesc}>
-              Programar micro:bit, CyberPi/mBot2 y Arduino por bloques. (En preparación)
+              Programa la casita Smart Home, micro:bit, CyberPi/mBot2 y Arduino por bloques.
             </span>
-          </div>
+          </button>
           <button onClick={() => setVista('retos')} style={styles.editorBtn('#7c3aed')}>
             <span style={{ fontSize: 34 }}>🎯</span>
             <span style={styles.editorBtnTitle}>Editor de retos</span>

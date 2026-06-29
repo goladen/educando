@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect, useRef } from 'react';
 import { db } from './firebase';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 // AÑADIDO: 'increment' para sumar 1 al playCount
 import { doc, getDoc, setDoc, addDoc, collection, query, where, getDocs, orderBy, limit, updateDoc, getCountFromServer, increment } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
@@ -261,6 +262,10 @@ export default function AparejadosGame({ recurso, usuario, alTerminar, modoOlimp
                 });
                 alert(`✅ Puntuación Guardada. Posición #${rank}`);
             }
+            guardarRegistroLocal('APAREJADOS', {
+                titulo: recurso.titulo, aciertos: puntos,
+                nombre: nombreJugador, via: 'ranking',
+            });
             alTerminar();
         } catch (e) { console.error(e); alert("Error guardando"); }
         setGuardando(false);
@@ -668,6 +673,10 @@ function ModalEnviarProfe({ datos, onClose }) {
                 recursoId: datos.recursoId, recursoTitulo: datos.recursoTitulo,
                 hoja: datos.hoja, codigoProfesor: code,
                 jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), aciertos: datos.puntos, fallos: 0, hoja: datos.hoja }],
+            });
+            guardarRegistroLocal('APAREJADOS', {
+                titulo: datos.recursoTitulo, aciertos: datos.puntos,
+                nombre: nombre.trim(), curso: curso.trim(), via: 'profesor',
             });
             setEnviado(true);
         } catch(e) { setError('Error: ' + e.message); }

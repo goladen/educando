@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 import { addDoc, collection, doc, getDoc } from 'firebase/firestore';
 import { Share2 } from 'lucide-react';
 import JuegoMemoria from './JuegoMemoria';
@@ -329,6 +330,10 @@ const FuncionesEjecutivas = ({ onBack }) => {
         }],
       });
 
+      guardarRegistroLocal('FUNCIONES_EJECUTIVAS', {
+        titulo: 'Funciones Ejecutivas', aciertos, intentos: 10, porcentaje: aciertos * 10,
+        nombre: nombreAlumno.trim(), curso: cursoAlumno.trim(), via: 'profesor',
+      });
       setResultadoEnviado(true);
       setMostrarModalEnvio(false);
     } catch (e) {

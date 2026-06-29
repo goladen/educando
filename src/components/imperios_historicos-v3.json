@@ -1,0 +1,2326 @@
+[
+  {
+    "id": "imp-01",
+    "nombre": "Antiguo Egipto",
+    "paisesActuales": [
+      "Egipto",
+      "Sudán",
+      "Israel",
+      "Siria"
+    ],
+    "fechas": {
+      "pregunta": "¿Entre qué fechas se desarrolló principalmente la civilización del Antiguo Egipto (hasta su conquista por Roma)?",
+      "opciones": [
+        {
+          "texto": "3100 a.C. – 30 a.C.",
+          "correcta": true
+        },
+        {
+          "texto": "1500 a.C. – 476 d.C.",
+          "correcta": false
+        },
+        {
+          "texto": "500 a.C. – 1453 d.C.",
+          "correcta": false
+        },
+        {
+          "texto": "2000 a.C. – 1000 d.C.",
+          "correcta": false
+        }
+      ]
+    },
+    "religion": {
+      "pregunta": "¿Qué religión practicaban los antiguos egipcios?",
+      "opciones": [
+        {
+          "texto": "Politeísta, adoraban a múltiples dioses como Ra, Osiris y Anubis.",
+          "correcta": true
+        },
+        {
+          "texto": "Monoteísta, creían en un único dios llamado Yahvé.",
+          "correcta": false
+        },
+        {
+          "texto": "Budista, centrada en alcanzar el Nirvana.",
+          "correcta": false
+        },
+        {
+          "texto": "Animista estricta, solo adoraban a los espíritus de los árboles.",
+          "correcta": false
+        }
+      ]
+    },
+    "caracteristicas": {
+      "pregunta": "¿Cuál es una de las principales características del Antiguo Egipto?",
+      "opciones": [
+        {
+          "texto": "La construcción de pirámides monumentales y el uso de la escritura jeroglífica.",
+          "correcta": true
+        },
+        {
+          "texto": "La invención de la democracia y la filosofía clásica.",
+          "correcta": false
+        },
+        {
+          "texto": "La creación de la brújula y la pólvora.",
+          "correcta": false
+        },
+        {
+          "texto": "El desarrollo del sistema de castas y la religión védica.",
+          "correcta": false
+        }
+      ]
+    },
+    "crecimiento": {
+      "pregunta": "¿Cuál fue el principal factor geográfico y económico que permitió el crecimiento y prosperidad del Antiguo Egipto?",
+      "opciones": [
+        {
+          "texto": "El control de las crecidas del río Nilo, que garantizaba una agricultura muy fértil y excedentes alimentarios.",
+          "correcta": true
+        },
+        {
+          "texto": "El desarrollo de una red comercial exclusiva de seda con el continente americano.",
+          "correcta": false
+        },
+        {
+          "texto": "La explotación masiva de yacimientos de carbón y hierro para la industria.",
+          "correcta": false
+        },
+        {
+          "texto": "El dominio absoluto de la navegación militar por todo el océano Atlántico.",
+          "correcta": false
+        }
+      ]
+    },
+    "caida": {
+      "pregunta": "¿Qué circunstancia marcó el final definitivo de la independencia política del Antiguo Egipto?",
+      "opciones": [
+        {
+          "texto": "Las sucesivas invasiones de potencias extranjeras (asirios, persas) y finalmente la conquista por parte del Imperio Romano.",
+          "correcta": true
+        },
+        {
+          "texto": "Una glaciación repentina que congeló el caudal del río Nilo e imposibilitó la vida.",
+          "correcta": false
+        },
+        {
+          "texto": "Una gran rebelión campesina que abolió la figura del faraón e instauró una democracia.",
+          "correcta": false
+        },
+        {
+          "texto": "El impacto de un gran meteorito que destruyó las principales ciudades del delta.",
+          "correcta": false
+        }
+      ]
+    }
+  },
+  {
+    "id": "imp-02",
+    "nombre": "Imperio Romano",
+    "paisesActuales": [
+      "Italia",
+      "España",
+      "Francia",
+      "Grecia",
+      "Egipto",
+      "Turquía",
+      "Reino Unido",
+      "Túnez"
+    ],
+    "fechas": {
+      "pregunta": "¿Qué periodo abarca el Imperio Romano desde Augusto hasta la caída de Roma (Imperio de Occidente)?",
+      "opciones": [
+        {
+          "texto": "27 a.C. – 476 d.C.",
+          "correcta": true
+        },
+        {
+          "texto": "753 a.C. – 1453 d.C.",
+          "correcta": false
+        },
+        {
+          "texto": "330 d.C. – 1492 d.C.",
+          "correcta": false
+        },
+        {
+          "texto": "500 a.C. – 44 a.C.",
+          "correcta": false
+        }
+      ]
+    },
+    "religion": {
+      "pregunta": "¿Cuál fue la religión predominante en el Imperio Romano durante la mayor parte de su historia antes de Constantino?",
+      "opciones": [
+        {
+          "texto": "Politeísmo romano, adoptando y adaptando los dioses griegos (Júpiter, Marte, Minerva).",
+          "correcta": true
+        },
+        {
+          "texto": "Cristianismo católico desde su fundación.",
+          "correcta": false
+        },
+        {
+          "texto": "Judaísmo, como religión oficial del estado.",
+          "correcta": false
+        },
+        {
+          "texto": "Islam, introducido por los comerciantes en el Mediterráneo.",
+          "correcta": false
+        }
+      ]
+    },
+    "caracteristicas": {
+      "pregunta": "¿Cuál fue una de las grandes aportaciones del Imperio Romano?",
+      "opciones": [
+        {
+          "texto": "Una extensa red de calzadas, impresionantes acueductos y el Derecho Romano.",
+          "correcta": true
+        },
+        {
+          "texto": "La invención del papel y la imprenta de tipos móviles.",
+          "correcta": false
+        },
+        {
+          "texto": "El uso del sistema matemático vigesimal y el concepto del cero.",
+          "correcta": false
+        },
+        {
+          "texto": "La construcción de grandes templos escalonados llamados zigurats.",
+          "correcta": false
+        }
+      ]
+    },
+    "crecimiento": {
+      "pregunta": "¿Qué pilares clave permitieron la enorme expansión y consolidación del territorio romano?",
+      "opciones": [
+        {
+          "texto": "Su poderosa y disciplinada organización militar (las legiones) junto a la asimilación cultural y ciudadana de los pueblos conquistados.",
+          "correcta": true
+        },
+        {
+          "texto": "El uso generalizado de armas de fuego y la brújula magnética.",
+          "correcta": false
+        },
+        {
+          "texto": "Una alianza económica exclusiva con las civilizaciones precolombinas.",
+          "correcta": false
+        },
+        {
+          "texto": "La construcción de una red de túneles subterráneos por toda Europa.",
+          "correcta": false
+        }
+      ]
+    },
+    "caida": {
+      "pregunta": "¿Cuáles fueron los motivos principales de la caída del Imperio Romano de Occidente?",
+      "opciones": [
+        {
+          "texto": "La inestabilidad política interna (guerras civiles), la crisis económica y la presión de las invasiones de los pueblos bárbaros.",
+          "correcta": true
+        },
+        {
+          "texto": "La conquista militar directa a manos de los vikingos y los samuráis.",
+          "correcta": false
+        },
+        {
+          "texto": "Una inundación catastrófica permanente que sumergió la península itálica.",
+          "correcta": false
+        },
+        {
+          "texto": "El agotamiento total de las canteras de piedra para construir calzadas y defensas.",
+          "correcta": false
+        }
+      ]
+    }
+  },
+  {
+    "id": "imp-03",
+    "nombre": "Imperio Inca",
+    "paisesActuales": [
+      "Perú",
+      "Bolivia",
+      "Ecuador",
+      "Chile",
+      "Argentina",
+      "Colombia"
+    ],
+    "fechas": {
+      "pregunta": "¿En qué periodo alcanzó su máxima expansión el Imperio Inca (Tawantinsuyu) hasta la llegada de los españoles?",
+      "opciones": [
+        {
+          "texto": "1438 d.C. – 1533 d.C.",
+          "correcta": true
+        },
+        {
+          "texto": "500 a.C. – 1000 d.C.",
+          "correcta": false
+        },
+        {
+          "texto": "1200 d.C. – 1800 d.C.",
+          "correcta": false
+        },
+        {
+          "texto": "100 d.C. – 800 d.C.",
+          "correcta": false
+        }
+      ]
+    },
+    "religion": {
+      "pregunta": "¿Qué creencias religiosas tenían los incas?",
+      "opciones": [
+        {
+          "texto": "Eran politeístas, adoraban principalmente al dios Sol (Inti) y al creador Viracocha.",
+          "correcta": true
+        },
+        {
+          "texto": "Eran monoteístas y adoraban únicamente al dios Quetzalcóatl.",
+          "correcta": false
+        },
+        {
+          "texto": "Practicaban el hinduismo y creían en la reencarnación.",
+          "correcta": false
+        },
+        {
+          "texto": "Eran ateos y fundamentaban su sociedad únicamente en la filosofía natural.",
+          "correcta": false
+        }
+      ]
+    },
+    "caracteristicas": {
+      "pregunta": "¿Por qué destacó principalmente la civilización Inca?",
+      "opciones": [
+        {
+          "texto": "Por su asombrosa red de caminos (Qhapaq Ñan) and avanzada ingeniería de terrazas agrícolas.",
+          "correcta": true
+        },
+        {
+          "texto": "Por su dominio de la navegación oceánica y el comercio marítimo mundial.",
+          "correcta": false
+        },
+        {
+          "texto": "Por inventar la rueda para el transporte de mercancías.",
+          "correcta": false
+        },
+        {
+          "texto": "Por el uso de armas de fuego y armaduras de acero en sus conquistas.",
+          "correcta": false
+        }
+      ]
+    },
+    "crecimiento": {
+      "pregunta": "¿Cómo logró el Imperio Inca unificar y controlar un territorio tan accidentado en tan poco tiempo?",
+      "opciones": [
+        {
+          "texto": "Mediante una eficiente administración centralizada, un sistema de tributo en trabajo (mita) y el almacenamiento estatal de recursos.",
+          "correcta": true
+        },
+        {
+          "texto": "Gracias al uso masivo de caballería blindada y herramientas de hierro forjado.",
+          "correcta": false
+        },
+        {
+          "texto": "Estableciendo una red comercial marítima impulsada por barcos de vapor.",
+          "correcta": false
+        },
+        {
+          "texto": "Mediante la invención de la imprenta, que facilitó la rápida difusión de leyes escritas.",
+          "correcta": false
+        }
+      ]
+    },
+    "caida": {
+      "pregunta": "¿Qué factores cruciales facilitaron el rápido colapso del Imperio Inca frente a los conquistadores españoles?",
+      "opciones": [
+        {
+          "texto": "Una cruenta guerra civil dinástica entre los hermanos Huáscar y Atahualpa, sumada a las enfermedades europeas y la superioridad técnica militar.",
+          "correcta": true
+        },
+        {
+          "texto": "Una masiva erupción volcánica simultánea que cubrió los Andes de ceniza de forma permanente.",
+          "correcta": false
+        },
+        {
+          "texto": "La invasión militar por sorpresa del Imperio Mongol por el norte.",
+          "correcta": false
+        },
+        {
+          "texto": "El colapso de sus rutas comerciales debido al agotamiento del cultivo de la patata.",
+          "correcta": false
+        }
+      ]
+    }
+  },
+  {
+    "id": "imp-04",
+    "nombre": "Imperio Mongol",
+    "paisesActuales": [
+      "Mongolia",
+      "China",
+      "Rusia",
+      "Corea del Sur",
+      "Irán",
+      "Irak",
+      "Kazajistán",
+      "Ucrania"
+    ],
+    "fechas": {
+      "pregunta": "¿Entre qué siglos se formó y se fragmentó el inmenso Imperio Mongol?",
+      "opciones": [
+        {
+          "texto": "1206 d.C. – 1368 d.C.",
+          "correcta": true
+        },
+        {
+          "texto": "500 a.C. – 100 d.C.",
+          "correcta": false
+        },
+        {
+          "texto": "1500 d.C. – 1900 d.C.",
+          "correcta": false
+        },
+        {
+          "texto": "800 d.C. – 1000 d.C.",
+          "correcta": false
+        }
+      ]
+    },
+    "religion": {
+      "pregunta": "¿Cuál era la religión tradicional de los mongoles, aunque permitieron la libertad de culto en su imperio?",
+      "opciones": [
+        {
+          "texto": "El chamanismo y el tengrianismo, rindiendo culto al dios del Cielo, Tengri.",
+          "correcta": true
+        },
+        {
+          "texto": "El cristianismo ortodoxo, impuesto a todos los pueblos conquistados.",
+          "correcta": false
+        },
+        {
+          "texto": "El sintoísmo, centrado en la adoración de los kami (espíritus de la naturaleza).",
+          "correcta": false
+        },
+        {
+          "texto": "El zoroastrismo, la antigua religión persa del fuego.",
+          "correcta": false
+        }
+      ]
+    },
+    "caracteristicas": {
+      "pregunta": "¿Cuál fue el mayor logro e impacto del Imperio Mongol?",
+      "opciones": [
+        {
+          "texto": "Crear el imperio de tierras contiguas más grande de la historia y revitalizar la Ruta de la Seda.",
+          "correcta": true
+        },
+        {
+          "texto": "Conquistar toda Europa Occidental y colonizar América.",
+          "correcta": false
+        },
+        {
+          "texto": "Construir flotas masivas para circunnavegar el continente africano.",
+          "correcta": false
+        },
+        {
+          "texto": "Desarrollar el concepto moderno de derechos humanos universales en constituciones escritas.",
+          "correcta": false
+        }
+      ]
+    },
+    "crecimiento": {
+      "pregunta": "¿Qué elemento militar diferencial propició la rapidísima expansión del Imperio Mongol?",
+      "opciones": [
+        {
+          "texto": "Una formidable caballería ligera compuesta por arqueros extremadamente veloces y una estricta meritocracia militar bajo Gengis Kan.",
+          "correcta": true
+        },
+        {
+          "texto": "El control estratégico de la aviación primitiva y globos aerostáticos.",
+          "correcta": false
+        },
+        {
+          "texto": "La posesión exclusiva del secreto de la metalurgia del acero toledano.",
+          "correcta": false
+        },
+        {
+          "texto": "El uso de galeones de guerra fuertemente artillados en ríos interiores.",
+          "correcta": false
+        }
+      ]
+    },
+    "caida": {
+      "pregunta": "¿Por qué se fragmentó y decayó de forma tan acusada el gigantesco Imperio Mongol?",
+      "opciones": [
+        {
+          "texto": "Debido a las interminables disputas sucesorias entre los descendientes de Gengis Kan, que dividieron el territorio en varios khanatos independientes.",
+          "correcta": true
+        },
+        {
+          "texto": "Por la escasez absoluta y repentina de caballos en las estepas de Asia Central.",
+          "correcta": false
+        },
+        {
+          "texto": "Al ser reconquistados por un resurgimiento militar del Imperio Romano clásico.",
+          "correcta": false
+        },
+        {
+          "texto": "A causa de un terremoto devastador a escala continental que destruyó las rutas esteparias.",
+          "correcta": false
+        }
+      ]
+    }
+  },
+  {
+    "id": "imp-05",
+    "nombre": "Imperio Español",
+    "paisesActuales": [
+      "España",
+      "México",
+      "Perú",
+      "Colombia",
+      "Argentina",
+      "Filipinas",
+      "Cuba",
+      "Guinea Ecuatorial"
+    ],
+    "fechas": {
+      "pregunta": "¿Qué periodo abarca generalmente la etapa de mayor expansión y hegemonía del Imperio Español?",
+      "opciones": [
+        {
+          "texto": "1492 d.C. – 1898 d.C.",
+          "correcta": true
+        },
+        {
+          "texto": "1000 d.C. – 1492 d.C.",
+          "correcta": false
+        },
+        {
+          "texto": "1800 d.C. – 1975 d.C.",
+          "correcta": false
+        },
+        {
+          "texto": "1200 d.C. – 1500 d.C.",
+          "correcta": false
+        }
+      ]
+    },
+    "religion": {
+      "pregunta": "¿Qué religión fue el pilar ideológico y de expansión del Imperio Español?",
+      "opciones": [
+        {
+          "texto": "El catolicismo, impulsado a través de misiones y la contrarreforma.",
+          "correcta": true
+        },
+        {
+          "texto": "El protestantismo luterano.",
+          "correcta": false
+        },
+        {
+          "texto": "El islam suní.",
+          "correcta": false
+        },
+        {
+          "texto": "El politeísmo incaico asimilado por la corona.",
+          "correcta": false
+        }
+      ]
+    },
+    "caracteristicas": {
+      "pregunta": "¿Qué consecuencia global tuvo la expansión del Imperio Español?",
+      "opciones": [
+        {
+          "texto": "Inició la primera globalización comercial, el mestizaje cultural y la difusión del idioma español.",
+          "correcta": true
+        },
+        {
+          "texto": "Provocó el aislamiento total del continente americano respecto a Europa.",
+          "correcta": false
+        },
+        {
+          "texto": "Fue el primer imperio en prohibir completamente la navegación por el océano Pacífico.",
+          "correcta": false
+        },
+        {
+          "texto": "Centró su economía únicamente en la agricultura del arroz y el té.",
+          "correcta": false
+        }
+      ]
+    },
+    "crecimiento": {
+      "pregunta": "¿Qué factores determinaron el auge y la enorme hegemonía global de la Monarquía Hispánica en los siglos XVI y XVII?",
+      "opciones": [
+        {
+          "texto": "Una infantería táctica revolucionaria (los Tercios), los lazos dinásticos en Europa y la afluencia de metales preciosos extraídos de América.",
+          "correcta": true
+        },
+        {
+          "texto": "La invención pionera de la máquina de vapor y la industrialización textil.",
+          "correcta": false
+        },
+        {
+          "texto": "El control absoluto de la producción y rutas mundiales de especias asiáticas en exclusividad.",
+          "correcta": false
+        },
+        {
+          "texto": "Una economía basada estrictamente en la exportación de tecnología de aviación defensiva.",
+          "correcta": false
+        }
+      ]
+    },
+    "caida": {
+      "pregunta": "¿Qué detonantes provocaron la decadencia económica interna y la posterior pérdida de los territorios coloniales españoles?",
+      "opciones": [
+        {
+          "texto": "Las continuas y costosas guerras europeas que causaron sucesivas bancarrotas, sumadas a la posterior invasión napoleónica y las guerras de independencia americanas.",
+          "correcta": true
+        },
+        {
+          "texto": "Una invasión masiva de flotas de samuráis japoneses en las costas de la península ibérica.",
+          "correcta": false
+        },
+        {
+          "texto": "El agotamiento geológico absoluto de los campos de cultivo en toda Europa Occidental.",
+          "correcta": false
+        },
+        {
+          "texto": "La pérdida de sus colonias debido a un tratado pacífico que prohibió el uso del idioma castellano.",
+          "correcta": false
+        }
+      ]
+    }
+  },
+  {
+    "id": "imp-06",
+    "nombre": "Antigua Grecia",
+    "paisesActuales": [
+      "Grecia",
+      "Turquía",
+      "Italia",
+      "Egipto",
+      "Chipre"
+    ],
+    "fechas": {
+      "pregunta": "¿En qué marco temporal floreció la civilización de la Antigua Grecia, desde la Época Oscura hasta la absorción por Roma?",
+      "opciones": [
+        {
+          "texto": "1200 a.C. – 146 a.C.",
+          "correcta": true
+        },
+        {
+          "texto": "3000 a.C. – 1500 a.C.",
+          "correcta": false
+        },
+        {
+          "texto": "500 d.C. – 1000 d.C.",
+          "correcta": false
+        },
+        {
+          "texto": "100 a.C. – 500 d.C.",
+          "correcta": false
+        }
+      ]
+    },
+    "religion": {
+      "pregunta": "¿Qué tipo de religión articulaba la sociedad de las polis griegas?",
+      "opciones": [
+        {
+          "texto": "Politeísmo basado en el panteón olímpico (Zeus, Atenea, Poseidón) y explicaciones mitológicas.",
+          "correcta": true
+        },
+        {
+          "texto": "Zoroastrismo monista imperial.",
+          "correcta": false
+        },
+        {
+          "texto": "Islamismo temprano de carácter asambleario.",
+          "correcta": false
+        },
+        {
+          "texto": "Monoteísmo solar riguroso.",
+          "correcta": false
+        }
+      ]
+    },
+    "caracteristicas": {
+      "pregunta": "¿Cuál es un hito político y cultural central atribuido a la civilización griega?",
+      "opciones": [
+        {
+          "texto": "El nacimiento de la democracia en Atenas, el desarrollo de la filosofía occidental y el concepto de 'polis'.",
+          "correcta": true
+        },
+        {
+          "texto": "La unificación lingüística del continente africano bajo un alfabeto pictográfico.",
+          "correcta": false
+        },
+        {
+          "texto": "La construcción de una red continental de ferrocarriles de tracción animal.",
+          "correcta": false
+        },
+        {
+          "texto": "El desarrollo de la imprenta de tipos móviles metálicos.",
+          "correcta": false
+        }
+      ]
+    },
+    "crecimiento": {
+      "pregunta": "¿Qué impulsó la notable difusión e influencia de la cultura griega por todo el Mediterráneo?",
+      "opciones": [
+        {
+          "texto": "La colonización comercial marítima y posteriormente las conquistas de Alejandro Magno, que expandieron el helenismo.",
+          "correcta": true
+        },
+        {
+          "texto": "La creación de un masivo ejército de infantería acorazada mecanizada.",
+          "correcta": false
+        },
+        {
+          "texto": "El monopolio comercial absoluto sobre la venta de seda y porcelana.",
+          "correcta": false
+        },
+        {
+          "texto": "El descubrimiento de rutas comerciales a través del Círculo Polar Ártico.",
+          "correcta": false
+        }
+      ]
+    },
+    "caida": {
+      "pregunta": "¿A qué se debió el declive de la independencia de las ciudades-estado griegas?",
+      "opciones": [
+        {
+          "texto": "Las constantes guerras internas entre polis (como la del Peloponeso), que las debilitaron frente al auge de Macedonia y Roma.",
+          "correcta": true
+        },
+        {
+          "texto": "Una epidemia que eliminó por completo el uso del idioma griego en el continente.",
+          "correcta": false
+        },
+        {
+          "texto": "El hundimiento geológico masivo de la península de los Balcanes.",
+          "correcta": false
+        },
+        {
+          "texto": "Un tratado de paz que obligó a toda la población a emigrar hacia Asia Oriental.",
+          "correcta": false
+        }
+      ]
+    }
+  },
+  {
+    "id": "imp-07",
+    "nombre": "Imperio Azteca (Mexica)",
+    "paisesActuales": [
+      "México"
+    ],
+    "fechas": {
+      "pregunta": "¿Qué periodo cronológico abarca el dominio de la Triple Alianza Azteca en Mesoamérica?",
+      "opciones": [
+        {
+          "texto": "1325 d.C. – 1521 d.C.",
+          "correcta": true
+        },
+        {
+          "texto": "500 a.C. – 500 d.C.",
+          "correcta": false
+        },
+        {
+          "texto": "1000 d.C. – 1300 d.C.",
+          "correcta": false
+        },
+        {
+          "texto": "1492 d.C. – 1789 d.C.",
+          "correcta": false
+        }
+      ]
+    },
+    "religion": {
+      "pregunta": "¿Cuál era el eje de la cosmovisión religiosa de los mexicas?",
+      "opciones": [
+        {
+          "texto": "Politeísmo complejo con sacrificios rituales para alimentar a dioses como Huitzilopochtli y Quetzalcóatl.",
+          "correcta": true
+        },
+        {
+          "texto": "Islamismo de corriente sufí implantado en valles centroamericanos.",
+          "correcta": false
+        },
+        {
+          "texto": "Budismo Mahayana adaptado al entorno selvático.",
+          "correcta": false
+        },
+        {
+          "texto": "Monoteísmo cristiano primitivo sin jerarquías eclesiásticas.",
+          "correcta": false
+        }
+      ]
+    },
+    "caracteristicas": {
+      "pregunta": "¿Qué asombrosa obra de ingeniería y urbanismo caracterizó al Imperio Azteca?",
+      "opciones": [
+        {
+          "texto": "La fundación de Tenochtitlan sobre un lago, comunicada por calzadas y sustentada por islas agrícolas agrícolas (chinampas).",
+          "correcta": true
+        },
+        {
+          "texto": "La excavación de una red de canales navegables que unía el Pacífico con el Atlántico.",
+          "correcta": false
+        },
+        {
+          "texto": "La edificación de rascacielos de granito unidos por puentes colgantes de hierro.",
+          "correcta": false
+        },
+        {
+          "texto": "La forja de una red ferroviaria minera a lo largo de la Sierra Madre.",
+          "correcta": false
+        }
+      ]
+    },
+    "crecimiento": {
+      "pregunta": "¿Cómo expandieron los mexicas su hegemonía sobre el centro y sur de México?",
+      "opciones": [
+        {
+          "texto": "A través de una formidable organización militar, pactos políticos (Triple Alianza) y un estricto sistema de recaudación de tributos.",
+          "correcta": true
+        },
+        {
+          "texto": "Mediante la pacificación general por el reparto equitativo de armas de fuego de bronce.",
+          "correcta": false
+        },
+        {
+          "texto": "Por la evangelización pacífica basada en tratados de libre comercio marítimo.",
+          "correcta": false
+        },
+        {
+          "texto": "Utilizando una flota de barcos transoceánicos que controlaba el comercio caribeño.",
+          "correcta": false
+        }
+      ]
+    },
+    "caida": {
+      "pregunta": "¿Qué causó el fulminante colapso del Imperio Azteca en 1521?",
+      "opciones": [
+        {
+          "texto": "La alianza militar de los conquistadores españoles con pueblos indígenas rivales (como los tlaxcaltecas) y el impacto de epidemias.",
+          "correcta": true
+        },
+        {
+          "texto": "Una rebelión militar masiva de las órdenes de caballeros incas que invadieron desde el sur.",
+          "correcta": false
+        },
+        {
+          "texto": "Un cataclismo sísmico que sumergió por completo el valle de México bajo el agua del océano.",
+          "correcta": false
+        },
+        {
+          "texto": "El abandono voluntario de las ciudades para adentrarse en las selvas del norte.",
+          "correcta": false
+        }
+      ]
+    }
+  },
+  {
+    "id": "imp-08",
+    "nombre": "Civilización Maya",
+    "paisesActuales": [
+      "México",
+      "Guatemala",
+      "Belice",
+      "Honduras",
+      "El Salvador"
+    ],
+    "fechas": {
+      "pregunta": "¿Cuál fue el periodo de máximo esplendor (Periodo Clásico) de las grandes ciudades-estado mayas?",
+      "opciones": [
+        {
+          "texto": "250 d.C. – 900 d.C.",
+          "correcta": true
+        },
+        {
+          "texto": "1200 a.C. – 200 a.C.",
+          "correcta": false
+        },
+        {
+          "texto": "1300 d.C. – 1600 d.C.",
+          "correcta": false
+        },
+        {
+          "texto": "500 a.C. – 100 d.C.",
+          "correcta": false
+        }
+      ]
+    },
+    "religion": {
+      "pregunta": "¿Qué caracterizaba a las creencias y prácticas rituales mayas?",
+      "opciones": [
+        {
+          "texto": "Politeísmo estrechamente ligado a la astronomía, con templos piramidales y un inframundo conocido como Xibalbá.",
+          "correcta": true
+        },
+        {
+          "texto": "Catolicismo sincrético desde los inicios de su etapa preclásica.",
+          "correcta": false
+        },
+        {
+          "texto": "Judaísmo ortodoxo adaptado a los ciclos lunares americanos.",
+          "correcta": false
+        },
+        {
+          "texto": "Ateísmo racionalista de carácter estatal.",
+          "correcta": false
+        }
+      ]
+    },
+    "caracteristicas": {
+      "pregunta": "¿En qué campos del conocimiento destacó de manera excepcional la civilización maya?",
+      "opciones": [
+        {
+          "texto": "En unas matemáticas avanzadas (incluyendo el uso del cero), un calendario solar hiperpreciso y escritura jeroglífica propia.",
+          "correcta": true
+        },
+        {
+          "texto": "En la metalurgia pesada del hierro silesio y la fabricación de vidrio óptico.",
+          "correcta": false
+        },
+        {
+          "texto": "En la navegación de altura mediante el uso sistemático del astrolabio de madera.",
+          "correcta": false
+        },
+        {
+          "texto": "En la invención de la pólvora y las armas de asedio autopropulsadas.",
+          "correcta": false
+        }
+      ]
+    },
+    "crecimiento": {
+      "pregunta": "¿Qué bases socioeconómicas sostuvieron el auge de las densas urbes mayas?",
+      "opciones": [
+        {
+          "texto": "Sistemas agrícolas eficientes (como la milpa y campos elevados) conectados por activas redes comerciales terrestres y fluviales.",
+          "correcta": true
+        },
+        {
+          "texto": "La centralización absoluta del poder en una única e inmensa capital continental.",
+          "correcta": false
+        },
+        {
+          "texto": "El control monopólico de minas de oro y plata explotadas de forma industrial.",
+          "correcta": false
+        },
+        {
+          "texto": "La conquista militar sistemática de los pueblos de Sudamérica.",
+          "correcta": false
+        }
+      ]
+    },
+    "caida": {
+      "pregunta": "¿A qué atribuyen los historiadores el 'colapso maya' del periodo clásico que vació sus grandes ciudades?",
+      "opciones": [
+        {
+          "texto": "Una combinación de crisis climáticas (fuertes sequías), sobreexplotación de recursos ambientales y guerras intestinas endémicas.",
+          "correcta": true
+        },
+        {
+          "texto": "El exterminio total inmediato provocado por la llegada de las carabelas de Cristóbal Colón.",
+          "correcta": false
+        },
+        {
+          "texto": "Una invasión en masa procedente del Imperio Romano de Oriente.",
+          "correcta": false
+        },
+        {
+          "texto": "El hundimiento repentino del terreno de la península del Yucatán.",
+          "correcta": false
+        }
+      ]
+    }
+  },
+  {
+    "id": "imp-09",
+    "nombre": "Era de los Descubrimientos (Llegada de Colón a América)",
+    "paisesActuales": [
+      "España",
+      "Portugal",
+      "Bahamas",
+      "Cuba",
+      "República Dominicana",
+      "Italia"
+    ],
+    "fechas": {
+      "pregunta": "¿Qué periodo histórico enmarca este hito que conectó de forma permanente los hemisferios Oriental y Occidental?",
+      "opciones": [
+        {
+          "texto": "Finales del siglo XV – Siglo XVII (Hito: 1492)",
+          "correcta": true
+        },
+        {
+          "texto": "Siglo V – Siglo X d.C.",
+          "correcta": false
+        },
+        {
+          "texto": "1000 a.C. – 500 a.C.",
+          "correcta": false
+        },
+        {
+          "texto": "1789 d.C. – 1914 d.C.",
+          "correcta": false
+        }
+      ]
+    },
+    "religion": {
+      "pregunta": "¿Qué fenómeno religioso caracterizó globalmente a esta época de expansión ultramarina?",
+      "opciones": [
+        {
+          "texto": "El impulso de la evangelización cristiana (católica y posteriormente protestante) en los nuevos territorios americanos y asiáticos.",
+          "correcta": true
+        },
+        {
+          "texto": "La adopción masiva de los cultos solares indígenas por parte de las monarquías europeas.",
+          "correcta": false
+        },
+        {
+          "texto": "La expansión pacífica del budismo zen por las cortes ibéricas.",
+          "correcta": false
+        },
+        {
+          "texto": "La abolición total de las religiones institucionales a favor de la ciencia natural.",
+          "correcta": false
+        }
+      ]
+    },
+    "caracteristicas": {
+      "pregunta": "¿Cuál fue una consecuencia biológica e histórica fundamental de este periodo?",
+      "opciones": [
+        {
+          "texto": "El 'intercambio colombino': circulación global de alimentos (patata, maíz, caballo) y la trágica propagación de nuevas enfermedades.",
+          "correcta": true
+        },
+        {
+          "texto": "El aislamiento total de Europa respecto al resto de continentes durante dos siglos.",
+          "correcta": false
+        },
+        {
+          "texto": "La desecación artificial del océano Atlántico para facilitar rutas comerciales de carretas.",
+          "correcta": false
+        },
+        {
+          "texto": "La desaparición absoluta de las rutas de navegación mediterráneas.",
+          "correcta": false
+        }
+      ]
+    },
+    "crecimiento": {
+      "pregunta": "¿Qué innovaciones técnicas hicieron posible esta gran expansión marítima transoceánica?",
+      "opciones": [
+        {
+          "texto": "El perfeccionamiento de la cartografía, la invención de barcos como la carabela y el uso combinado del astrolabio y la brújula.",
+          "correcta": true
+        },
+        {
+          "texto": "El diseño de los primeros motores de combustión interna para barcos mercantes.",
+          "correcta": false
+        },
+        {
+          "texto": "La creación de sistemas de posicionamiento global mediante señales de torres ópticas de vapor.",
+          "correcta": false
+        },
+        {
+          "texto": "El uso de submarinos de madera propulsados a remo.",
+          "correcta": false
+        }
+      ]
+    },
+    "caida": {
+      "pregunta": "¿Qué transformaciones políticas clausuraron progresivamente esta era de exploración y conquista inicial?",
+      "opciones": [
+        {
+          "texto": "La consolidación de imperios coloniales estructurados, el auge del mercantilismo estatal y la llegada de las revoluciones e Ilustración.",
+          "correcta": true
+        },
+        {
+          "texto": "La prohibición papal absoluta de volver a navegar fuera de las aguas territoriales europeas.",
+          "correcta": false
+        },
+        {
+          "texto": "El hundimiento masivo e inexplicable de todas las flotas mercantes del mundo.",
+          "correcta": false
+        },
+        {
+          "texto": "La reconquista de las capitales europeas por parte de las civilizaciones americanas.",
+          "correcta": false
+        }
+      ]
+    }
+  },
+  {
+    "id": "imp-10",
+    "nombre": "Imperio Persa (Aqueménida)",
+    "paisesActuales": [
+      "Irán",
+      "Irak",
+      "Turquía",
+      "Egipto",
+      "Afganistán",
+      "Pakistán"
+    ],
+    "fechas": {
+      "pregunta": "¿Entre qué años dominó el Imperio Persa Aqueménida desde el Indo hasta el mar Egeo?",
+      "opciones": [
+        {
+          "texto": "550 a.C. – 330 a.C.",
+          "correcta": true
+        },
+        {
+          "texto": "1200 a.C. – 800 a.C.",
+          "correcta": false
+        },
+        {
+          "texto": "100 d.C. – 600 d.C.",
+          "correcta": false
+        },
+        {
+          "texto": "1300 d.C. – 1500 d.C.",
+          "correcta": false
+        }
+      ]
+    },
+    "religion": {
+      "pregunta": "¿Cuál era la principal religión espiritual del Imperio Persa?",
+      "opciones": [
+        {
+          "texto": "El zoroastrismo, una doctrina dualista basada en el culto a Ahura Mazda.",
+          "correcta": true
+        },
+        {
+          "texto": "El hinduismo ortodoxo de castas.",
+          "correcta": false
+        },
+        {
+          "texto": "El politeísmo olímpico importado de los Balcanes.",
+          "correcta": false
+        },
+        {
+          "texto": "El chamanismo siberiano estricto.",
+          "correcta": false
+        }
+      ]
+    },
+    "caracteristicas": {
+      "pregunta": "¿Qué famosa innovación organizativa e infraestructural implantaron los persas?",
+      "opciones": [
+        {
+          "texto": "La división en provincias autónomas gobernadas por gobernadores (satrapías) y el diseño del eficiente 'Camino Real'.",
+          "correcta": true
+        },
+        {
+          "texto": "La invención del papel moneda magnético para transacciones militares.",
+          "correcta": false
+        },
+        {
+          "texto": "La edificación de murallas de ladrillo vitrificado que rodeaban todo el golfo Pérsico.",
+          "correcta": false
+        },
+        {
+          "texto": "La instauración de un senado democrático electo por sufragio universal universal masculino.",
+          "correcta": false
+        }
+      ]
+    },
+    "crecimiento": {
+      "pregunta": "¿Qué estrategia política aplicaron reyes como Ciro el Grande para mantener unido un imperio tan diverso?",
+      "opciones": [
+        {
+          "texto": "Una notable política de tolerancia cultural y religiosa hacia los pueblos conquistados, respetando sus costumbres locales.",
+          "correcta": true
+        },
+        {
+          "texto": "El exterminio sistemático y total de cualquier etnia que no hablara persa antiguo.",
+          "correcta": false
+        },
+        {
+          "texto": "La colectivización forzosa de todas las tierras agrícolas del imperio bajo control imperial directo.",
+          "correcta": false
+        },
+        {
+          "texto": "La conversión obligatoria de toda la población al judaísmo.",
+          "correcta": false
+        }
+      ]
+    },
+    "caida": {
+      "pregunta": "¿Cómo llegó a su fin definitivo el Imperio Persa Aqueménida?",
+      "opciones": [
+        {
+          "texto": "Fue conquistado de forma fulminante por las campañas militares del rey macedonio Alejandro Magno.",
+          "correcta": true
+        },
+        {
+          "texto": "Sufrió una revolución popular obrera que abolió el imperio e instauró una federación de repúblicas.",
+          "correcta": false
+        },
+        {
+          "texto": "Fue aniquilado por las incursiones navales de los vikingos escandinavos.",
+          "correcta": false
+        },
+        {
+          "texto": "Una sequía general que destruyó permanentemente el caudal de los ríos Tigris y Éufrates.",
+          "correcta": false
+        }
+      ]
+    }
+  },
+  {
+    "id": "imp-11",
+    "nombre": "Dinastía Han (China)",
+    "paisesActuales": [
+      "China",
+      "Vietnam",
+      "Corea del Norte"
+    ],
+    "fechas": {
+      "pregunta": "¿Qué periodo temporal abarca la célebre Dinastía Han, considerada una edad de oro de la historia china?",
+      "opciones": [
+        {
+          "texto": "202 a.C. – 220 d.C.",
+          "correcta": true
+        },
+        {
+          "texto": "1000 d.C. – 1300 d.C.",
+          "correcta": false
+        },
+        {
+          "texto": "221 a.C. – 206 a.C.",
+          "correcta": false
+        },
+        {
+          "texto": "1368 d.C. – 1644 d.C.",
+          "correcta": false
+        }
+      ]
+    },
+    "religion": {
+      "pregunta": "¿Qué sistema de pensamiento se consolidó como la ideología oficial del Estado bajo los Han?",
+      "opciones": [
+        {
+          "texto": "El confucianismo, promoviendo la piedad filial, el orden y una estricta ética administrativa.",
+          "correcta": true
+        },
+        {
+          "texto": "El sintoísmo tradicional unificado.",
+          "correcta": false
+        },
+        {
+          "texto": "El catolicismo jesuita cortesano.",
+          "correcta": false
+        },
+        {
+          "texto": "El islamismo de rama chií.",
+          "correcta": false
+        }
+      ]
+    },
+    "caracteristicas": {
+      "pregunta": "¿Qué gran avance tecnológico y comercial floreció bajo el dominio de la dinastía Han?",
+      "opciones": [
+        {
+          "texto": "La invención del papel y la apertura formal de la Ruta de la Seda para comerciar con Occidente.",
+          "correcta": true
+        },
+        {
+          "texto": "La invención del telar de vapor y el motor náutico hidráulico.",
+          "correcta": false
+        },
+        {
+          "texto": "El desarrollo de la imprenta digital rotativa.",
+          "correcta": false
+        },
+        {
+          "texto": "La construcción de canales navegables que cruzaban el desierto del Gobi.",
+          "correcta": false
+        }
+      ]
+    },
+    "crecimiento": {
+      "pregunta": "¿Qué reforma organizativa interna afianzó el poder y eficiencia del Imperio Han?",
+      "opciones": [
+        {
+          "texto": "La creación de una burocracia meritocrática basada en exigentes exámenes estatales sobre textos clásicos.",
+          "correcta": true
+        },
+        {
+          "texto": "La abolición del ejército permanente a favor de milicias campesinas voluntarias sin mando.",
+          "correcta": false
+        },
+        {
+          "texto": "El establecimiento de una monarquía parlamentaria bicameral.",
+          "correcta": false
+        },
+        {
+          "texto": "El reparto equitativo de toda la riqueza monetaria imperial entre la población plebeya.",
+          "correcta": false
+        }
+      ]
+    },
+    "caida": {
+      "pregunta": "¿Qué factores determinaron el colapso final de la Dinastía Han?",
+      "opciones": [
+        {
+          "texto": "La corrupción interna de las facciones cortesanas, grandes rebeliones campesinas (como los Turbantes Amarillos) y el auge de señores de la guerra.",
+          "correcta": true
+        },
+        {
+          "texto": "La conquista militar marítima efectuada por el Imperio Español.",
+          "correcta": false
+        },
+        {
+          "texto": "Una catástrofe climática que desertificó todo el territorio cultivable de China Central.",
+          "correcta": false
+        },
+        {
+          "texto": "La abdicación voluntaria de toda la nobleza para implantar una sociedad comunal.",
+          "correcta": false
+        }
+      ]
+    }
+  },
+  {
+    "id": "imp-12",
+    "nombre": "Imperio Otomano",
+    "paisesActuales": [
+      "Turquía",
+      "Grecia",
+      "Egipto",
+      "Arabia Saudita",
+      "Irak",
+      "Hungría",
+      "Bulgaria",
+      "Siria"
+    ],
+    "fechas": {
+      "pregunta": "¿Qué prolongado marco temporal abarca la existencia del Imperio Otomano?",
+      "opciones": [
+        {
+          "texto": "1299 d.C. – 1922 d.C.",
+          "correcta": true
+        },
+        {
+          "texto": "500 d.C. – 1200 d.C.",
+          "correcta": false
+        },
+        {
+          "texto": "1492 d.C. – 1789 d.C.",
+          "correcta": false
+        },
+        {
+          "texto": "750 d.C. – 1258 d.C.",
+          "correcta": false
+        }
+      ]
+    },
+    "religion": {
+      "pregunta": "¿Cuál era la fe oficial del Imperio Otomano, cuya cabeza máxima detentaba también el título de Califa?",
+      "opciones": [
+        {
+          "texto": "El islam suní, aunque toleraban comunidades cristianas y judías bajo el estatus de 'dhimmi'.",
+          "correcta": true
+        },
+        {
+          "texto": "El cristianismo ortodoxo griego de corte imperial.",
+          "correcta": false
+        },
+        {
+          "texto": "El budismo tibetano cortesano.",
+          "correcta": false
+        },
+        {
+          "texto": "El hinduismo reformado sin sistema de castas.",
+          "correcta": false
+        }
+      ]
+    },
+    "caracteristicas": {
+      "pregunta": "¿Qué acontecimiento militar conmocionó a Europa y consolidó el poder geopolítico otomano en 1453?",
+      "opciones": [
+        {
+          "texto": "La conquista de la ciudad de Constantinopla bajo el mando de Mehmed II, poniendo fin al Imperio Bizantino.",
+          "correcta": true
+        },
+        {
+          "texto": "La firma de una alianza comercial secreta con los reinos cristianos de Escandinavia.",
+          "correcta": false
+        },
+        {
+          "texto": "La invasión marítima total de las islas británicas.",
+          "correcta": false
+        },
+        {
+          "texto": "El descubrimiento formal de rutas marítimas hacia Australia.",
+          "correcta": false
+        }
+      ]
+    },
+    "crecimiento": {
+      "pregunta": "¿Qué pilar militar diferencial impulsó la expansión otomana durante los siglos XV y XVI?",
+      "opciones": [
+        {
+          "texto": "Un ejército altamente profesionalizado con infantería de élite (los jenízaros) y un uso pionero y masivo de la artillería de pólvora.",
+          "correcta": true
+        },
+        {
+          "texto": "La dependencia exclusiva de mercenarios de caballería ligera mongola desorganizada.",
+          "correcta": false
+        },
+        {
+          "texto": "El desarrollo de barcos acorazados movidos por energía de vapor.",
+          "correcta": false
+        },
+        {
+          "texto": "El uso estratégico de elefantes de guerra asiáticos importados masivamente por aire.",
+          "correcta": false
+        }
+      ]
+    },
+    "caida": {
+      "pregunta": "¿Qué provocó la desaparición final de este secular imperio en el siglo XX?",
+      "opciones": [
+        {
+          "texto": "Un estancamiento económico y tecnológico, tensiones nacionalistas internas y su derrota total como aliados en la Primera Guerra Mundial.",
+          "correcta": true
+        },
+        {
+          "texto": "Un ataque atómico masivo efectuado por potencias americanas.",
+          "correcta": false
+        },
+        {
+          "texto": "La invasión simultánea de hordas ecuestres hunas en Anatolia.",
+          "correcta": false
+        },
+        {
+          "texto": "La conversión pacífica y voluntaria de toda la población al budismo, disolviendo el Estado.",
+          "correcta": false
+        }
+      ]
+    }
+  },
+  {
+    "id": "imp-13",
+    "nombre": "Imperio Bizantino (Romano de Oriente)",
+    "paisesActuales": [
+      "Grecia",
+      "Turquía",
+      "Italia",
+      "Egipto",
+      "Siria",
+      "Bulgaria"
+    ],
+    "fechas": {
+      "pregunta": "¿Qué milenario periodo histórico protagonizó el Imperio Bizantino, heredero de la tradición romana?",
+      "opciones": [
+        {
+          "texto": "395 d.C. – 1453 d.C.",
+          "correcta": true
+        },
+        {
+          "texto": "27 a.C. – 476 d.C.",
+          "correcta": false
+        },
+        {
+          "texto": "1000 d.C. – 1914 d.C.",
+          "correcta": false
+        },
+        {
+          "texto": "500 a.C. – 100 d.C.",
+          "correcta": false
+        }
+      ]
+    },
+    "religion": {
+      "pregunta": "¿Qué confesión religiosa se configuró como pilar de la identidad del Imperio Bizantino?",
+      "opciones": [
+        {
+          "texto": "El cristianismo ortodoxo, institucionalizado tras el cisma de Oriente con el Patriarca de Constantinopla.",
+          "correcta": true
+        },
+        {
+          "texto": "El politeísmo pagano clásico restaurado por Justiniano.",
+          "correcta": false
+        },
+        {
+          "texto": "El protestantismo calvinista temprano.",
+          "correcta": false
+        },
+        {
+          "texto": "El islamismo suní radical de corte militar.",
+          "correcta": false
+        }
+      ]
+    },
+    "caracteristicas": {
+      "pregunta": "¿Cuál es un legado cultural y jurídico fundamental del Imperio Bizantino?",
+      "opciones": [
+        {
+          "texto": "La recopilación del Derecho Romano (Código de Justiniano) y un arte arquitectónico sublime basado en cúpulas y mosaicos.",
+          "correcta": true
+        },
+        {
+          "texto": "La abolición absoluta de las leyes escritas a favor de juicios tribales orales.",
+          "correcta": false
+        },
+        {
+          "texto": "La invención de la brújula y el papel de corte de arroz.",
+          "correcta": false
+        },
+        {
+          "texto": "La implantación del primer sistema de educación obligatoria digital.",
+          "correcta": false
+        }
+      ]
+    },
+    "crecimiento": {
+      "pregunta": "¿Qué factores estratégicos permitieron la milenaria supervivencia de Bizancio frente a constantes asedios?",
+      "opciones": [
+        {
+          "texto": "La inexpugnable ubicación de su capital (Constantinopla), su sólida burocracia y el uso militar secreto del 'fuego griego'.",
+          "correcta": true
+        },
+        {
+          "texto": "Su alianza permanente de paz incondicional con todos los pueblos germánicos.",
+          "correcta": false
+        },
+        {
+          "texto": "El reasentamiento forzoso de toda su población en fortalezas subterráneas secretas.",
+          "correcta": false
+        },
+        {
+          "texto": "La posesión de una flota mercante aérea rudimentaria.",
+          "correcta": false
+        }
+      ]
+    },
+    "caida": {
+      "pregunta": "Cómo culminó la historia del Imperio Bizantino en el siglo XV?",
+      "opciones": [
+        {
+          "texto": "Debido al desgaste de las Cruzadas occidentales, crisis económicas y la toma final de su capital por los turcos otomanos.",
+          "correcta": true
+        },
+        {
+          "texto": "Por una revolución obrera interna que transformó el imperio en una comuna asamblearia.",
+          "correcta": false
+        },
+        {
+          "texto": "Al ser conquistado militarmente por flotas del Imperio Inca transatlánticas.",
+          "correcta": false
+        },
+        {
+          "texto": "Un terremoto masivo que sepultó por completo la ciudad de Constantinopla bajo el mar.",
+          "correcta": false
+        }
+      ]
+    }
+  },
+  {
+    "id": "imp-14",
+    "nombre": "Califato Abasí",
+    "paisesActuales": [
+      "Irak",
+      "Irán",
+      "Arabia Saudita",
+      "Egipto",
+      "Siria",
+      "Jordania"
+    ],
+    "fechas": {
+      "pregunta": "¿En qué etapa histórica gobernó la dinastía abasí, conocida como la Edad de Oro del Islam?",
+      "opciones": [
+        {
+          "texto": "750 d.C. – 1258 d.C.",
+          "correcta": true
+        },
+        {
+          "texto": "1200 d.C. – 1600 d.C.",
+          "correcta": false
+        },
+        {
+          "texto": "300 d.C. – 700 d.C.",
+          "correcta": false
+        },
+        {
+          "texto": "1492 d.C. – 1800 d.C.",
+          "correcta": false
+        }
+      ]
+    },
+    "religion": {
+      "pregunta": "¿Cuál era la doctrina religiosa troncal del Califato Abasí?",
+      "opciones": [
+        {
+          "texto": "El islam, articulando las leyes (sharía) y fomentando estudios teológicos y filosóficos racionales.",
+          "correcta": true
+        },
+        {
+          "texto": "El hinduismo védico de influencia persa.",
+          "correcta": false
+        },
+        {
+          "texto": "El cristianismo nestoriano de rito siríaco.",
+          "correcta": false
+        },
+        {
+          "texto": "El sintoísmo de las estepas mesopotámicas.",
+          "correcta": false
+        }
+      ]
+    },
+    "caracteristicas": {
+      "pregunta": "¿Qué hito cultural e intelectual singular definió al Califato Abasí?",
+      "opciones": [
+        {
+          "texto": "La fundación de Bagdad y la creación de la 'Casa de la Sabiduría', donde se tradujo y preservó la ciencia griega e india.",
+          "correcta": true
+        },
+        {
+          "texto": "La proscripción absoluta de la filosofía y las matemáticas en todo su territorio.",
+          "correcta": false
+        },
+        {
+          "texto": "La construcción de pirámides escalonadas de adobe dedicadas al Sol.",
+          "correcta": false
+        },
+        {
+          "texto": "La invención de la brújula marina de acero templado.",
+          "correcta": false
+        }
+      ]
+    },
+    "crecimiento": {
+      "pregunta": "¿Qué propició el colosal auge económico y cultural de los abasíes?",
+      "opciones": [
+        {
+          "texto": "La centralización administrativa en Bagdad, una gran apertura multicultural y el control de las rutas comerciales euroasiáticas.",
+          "correcta": true
+        },
+        {
+          "texto": "La conquista militar sistemática de toda la península ibérica y Francia.",
+          "correcta": false
+        },
+        {
+          "texto": "Un monopolio mundial estricto sobre la exportación del cultivo de la patata.",
+          "correcta": false
+        },
+        {
+          "texto": "La invención y uso comercial masivo de la imprenta de tipos metálicos.",
+          "correcta": false
+        }
+      ]
+    },
+    "caida": {
+      "pregunta": "¿Qué trágico suceso militar puso fin definitivo al poder central del califato en Bagdad?",
+      "opciones": [
+        {
+          "texto": "El brutal saqueo y destrucción de la ciudad de Bagdad a manos de las tropas del Imperio Mongol comandadas por Hulagu Kan.",
+          "correcta": true
+        },
+        {
+          "texto": "Invasiones vikingas fluviales masivas que conquistaron el río Tigris.",
+          "correcta": false
+        },
+        {
+          "texto": "Una rebelión interna dirigida exclusivamente por filósofos racionalistas.",
+          "correcta": false
+        },
+        {
+          "texto": "La anexión pacífica del territorio por parte del Imperio Británico.",
+          "correcta": false
+        }
+      ]
+    }
+  },
+  {
+    "id": "imp-15",
+    "nombre": "Imperio Gupta",
+    "paisesActuales": [
+      "India",
+      "Pakistán",
+      "Bangladés"
+    ],
+    "fechas": {
+      "pregunta": "¿En qué periodo histórico gobernó la dinastía Gupta, considerada la época clásica o edad de oro de la India?",
+      "opciones": [
+        {
+          "texto": "319 d.C. – 543 d.C.",
+          "correcta": true
+        },
+        {
+          "texto": "1500 a.C. – 1000 a.C.",
+          "correcta": false
+        },
+        {
+          "texto": "1200 d.C. – 1500 d.C.",
+          "correcta": false
+        },
+        {
+          "texto": "200 a.C. – 100 d.C.",
+          "correcta": false
+        }
+      ]
+    },
+    "religion": {
+      "pregunta": "¿Qué fenómeno religioso e ideológico floreció bajo el patrocinio de los soberanos Gupta?",
+      "opciones": [
+        {
+          "texto": "Un renacimiento y consolidación del hinduismo, conviviendo pacíficamente con un notable desarrollo del budismo.",
+          "correcta": true
+        },
+        {
+          "texto": "La imposición obligatoria del islamismo suní en el subcontinente.",
+          "correcta": false
+        },
+        {
+          "texto": "La adopción del zoroastrismo persa como religión oficial de la corte.",
+          "correcta": false
+        },
+        {
+          "texto": "Un ateísmo empírico generalizado de carácter estatal.",
+          "correcta": false
+        }
+      ]
+    },
+    "caracteristicas": {
+      "pregunta": "¿Qué aporte científico trascendental para la humanidad se gestó durante el Imperio Gupta?",
+      "opciones": [
+        {
+          "texto": "El desarrollo del sistema de numeración decimal, la formulación matemática del concepto del cero y grandes avances en astronomía.",
+          "correcta": true
+        },
+        {
+          "texto": "La invención de la metalurgia del aluminio y la soldadura por arco eléctrico.",
+          "correcta": false
+        },
+        {
+          "texto": "El diseño de la brújula giroscópica de precisión náutica.",
+          "correcta": false
+        },
+        {
+          "texto": "La redacción de las primeras constituciones democráticas republicanas del mundo.",
+          "correcta": false
+        }
+      ]
+    },
+    "crecimiento": {
+      "pregunta": "¿A través de qué mecanismos consolidaron los Gupta su vasto dominio sobre el norte de la India?",
+      "opciones": [
+        {
+          "texto": "Una hábil combinación de alianzas matrimoniales estratégicas, diplomacia inteligente y decididas campañas militares de expansión.",
+          "correcta": true
+        },
+        {
+          "texto": "El exterminio absoluto de todas las castas nobles locales rivales.",
+          "correcta": false
+        },
+        {
+          "texto": "El control financiero de las rutas comerciales transatlánticas.",
+          "correcta": false
+        },
+        {
+          "texto": "La industrialización acelerada de astilleros automatizados.",
+          "correcta": false
+        }
+      ]
+    },
+    "caida": {
+      "pregunta": "¿Qué causó el debilitamiento progresivo y posterior fragmentación del Imperio Gupta?",
+      "opciones": [
+        {
+          "texto": "Las oleadas de invasiones destructivas de los hunos blancos (heftalitas) combinadas con el alzamiento de gobernadores locales independientes.",
+          "correcta": true
+        },
+        {
+          "texto": "La invasión total efectuada por las legiones del emperador Julio César.",
+          "correcta": false
+        },
+        {
+          "texto": "Una plaga agrícola fulminante que erradicó la totalidad de los cultivos de arroz de Asia.",
+          "correcta": false
+        },
+        {
+          "texto": "El estallido de una guerra civil religiosa que abolió por completo el hinduismo.",
+          "correcta": false
+        }
+      ]
+    }
+  },
+  {
+    "id": "imp-16",
+    "nombre": "Shogunato Tokugawa (Periodo Edo)",
+    "paisesActuales": [
+      "Japón"
+    ],
+    "fechas": {
+      "pregunta": "¿Qué etapa histórica abarca el férreo gobierno militar del clan Tokugawa en Japón?",
+      "opciones": [
+        {
+          "texto": "1603 d.C. – 1867 d.C.",
+          "correcta": true
+        },
+        {
+          "texto": "1185 d.C. – 1333 d.C.",
+          "correcta": false
+        },
+        {
+          "texto": "500 d.C. – 1000 d.C.",
+          "correcta": false
+        },
+        {
+          "texto": "1868 d.C. – 1945 d.C.",
+          "correcta": false
+        }
+      ]
+    },
+    "religion": {
+      "pregunta": "¿Qué corrientes espirituales y filosóficas ordenaban la estructura social bajo el Shogunato?",
+      "opciones": [
+        {
+          "texto": "El neoconfucianismo como código ético civil, en perfecta armonía con el sintoísmo ancestral y el budismo zen.",
+          "correcta": true
+        },
+        {
+          "texto": "La adopción del cristianismo católico como fe oficial del Estado japonés.",
+          "correcta": false
+        },
+        {
+          "texto": "El islamismo introducido formalmente por los samuráis del norte.",
+          "correcta": false
+        },
+        {
+          "texto": "Un ateísmo marcial absoluto e institucionalizado.",
+          "correcta": false
+        }
+      ]
+    },
+    "caracteristicas": {
+      "pregunta": "¿Qué drástica política internacional definió la práctica totalidad del periodo de los Tokugawa?",
+      "opciones": [
+        {
+          "texto": "La política de aislamiento internacional casi total (Sakoku), prohibiendo la entrada de extranjeros y la salida de japoneses.",
+          "correcta": true
+        },
+        {
+          "texto": "La colonización militar masiva y expansión agresiva por todo el continente americano.",
+          "correcta": false
+        },
+        {
+          "texto": "La firma de acuerdos de libre comercio global sin ningún arancel con Europa.",
+          "correcta": false
+        },
+        {
+          "texto": "La disolución completa de la clase militar samurái.",
+          "correcta": false
+        }
+      ]
+    },
+    "crecimiento": {
+      "pregunta": "¿Cómo logró Tokugawa Ieyasu pacificar e imponer orden en un Japón devastado por guerras feudales?",
+      "opciones": [
+        {
+          "texto": "Su victoria total en la batalla de Sekigahara, la centralización del control de los señores feudales (daimyos) y estabilidad interna.",
+          "correcta": true
+        },
+        {
+          "texto": "La compra e importación de tanques de vapor blindados de origen británico.",
+          "correcta": false
+        },
+        {
+          "texto": "La proclamación de una república democrática asamblearia de campesinos.",
+          "correcta": false
+        },
+        {
+          "texto": "El exterminio pacífico de toda la casta samurái mediante edictos religiosos.",
+          "correcta": false
+        }
+      ]
+    },
+    "caida": {
+      "pregunta": "Qué desencadenó el colapso del Shogunato Tokugawa en la segunda mitad del siglo XIX?",
+      "opciones": [
+        {
+          "texto": "La presión armada extranjera para abrir fronteras (Navíos Negros de Perry), crisis económicas y la guerra civil que restauró el poder del Emperador (Restauración Meiji).",
+          "correcta": true
+        },
+        {
+          "texto": "La invasión militar masiva y exitosa del territorio efectuada por el Imperio Mongol.",
+          "correcta": false
+        },
+        {
+          "texto": "La inundación volcánica permanente de la bahía de Tokio.",
+          "correcta": false
+        },
+        {
+          "texto": "Una rebelión obrera de carácter industrializado fabril.",
+          "correcta": false
+        }
+      ]
+    }
+  },
+  {
+    "id": "imp-17",
+    "nombre": "Imperio Jemer",
+    "paisesActuales": [
+      "Camboya",
+      "Tailandia",
+      "Laos",
+      "Vietnam"
+    ],
+    "fechas": {
+      "pregunta": "¿Entre qué siglos se desarrolló el poderoso Imperio Jemer en la península de Indochina?",
+      "opciones": [
+        {
+          "texto": "Siglo IX d.C. – Siglo XV d.C. (802 – 1431)",
+          "correcta": true
+        },
+        {
+          "texto": "100 a.C. – 400 d.C.",
+          "correcta": false
+        },
+        {
+          "texto": "1500 d.C. – 1900 d.C.",
+          "correcta": false
+        },
+        {
+          "texto": "3000 a.C. – 1000 a.C.",
+          "correcta": false
+        }
+      ]
+    },
+    "religion": {
+      "pregunta": "¿Qué compleja evolución religiosa experimentó la corte del Imperio Jemer?",
+      "opciones": [
+        {
+          "texto": "Una devoción inicial hinduista (principalmente shivaísmo) que transitó gradualmente hacia el budismo theravada.",
+          "correcta": true
+        },
+        {
+          "texto": "La adopción masiva del islamismo suní procedente del Índico.",
+          "correcta": false
+        },
+        {
+          "texto": "Una conversión formal y completa al catolicismo ortodoxo copto.",
+          "correcta": false
+        },
+        {
+          "texto": "El mantenimiento estricto de un animismo exclusivamente totémico.",
+          "correcta": false
+        }
+      ]
+    },
+    "caracteristicas": {
+      "pregunta": "¿Cuál es el monumento arqueológico y arquitectónico cumbre de la civilización jemer?",
+      "opciones": [
+        {
+          "texto": "El asombroso complejo religioso de templos de Angkor Wat, centro de su vasta capital urbana preindustrial.",
+          "correcta": true
+        },
+        {
+          "texto": "La edificación de murallas ciclópeas concéntricas hechas de bloques de basalto fundido.",
+          "correcta": false
+        },
+        {
+          "texto": "La excavación de pirámides invertidas subterráneas para sepultar monarcas.",
+          "correcta": false
+        },
+        {
+          "texto": "La fundición de colosos monumentales de hierro forjado puro.",
+          "correcta": false
+        }
+      ]
+    },
+    "crecimiento": {
+      "pregunta": "¿Qué genialidad tecnológica sustentó la inmensa riqueza y densidad demográfica jemer?",
+      "opciones": [
+        {
+          "texto": "Una sofisticada ingeniería hidráulica con gigantescos depósitos (barays) y canales para controlar monzones e irrigar cultivos masivos de arroz.",
+          "correcta": true
+        },
+        {
+          "texto": "El diseño de una red comercial aérea de palomas mensajeras gigantes.",
+          "correcta": false
+        },
+        {
+          "texto": "El monopolio comercial exclusivo de yacimientos mineros de coltán.",
+          "correcta": false
+        },
+        {
+          "texto": "El uso generalizado de naves mercantes de quilla de bronce.",
+          "correcta": false
+        }
+      ]
+    },
+    "caida": {
+      "pregunta": "¿A qué obedeció el súbito abandono de su majestuosa capital, Angkor, en el siglo XV?",
+      "opciones": [
+        {
+          "texto": "Cambios climáticos extremos (monzones severos y sequías), el colapso de la red hídrica por sedimentos e incursiones de reinos tailandeses rivales.",
+          "correcta": true
+        },
+        {
+          "texto": "Una epidemia zoológica letal que erradicó la totalidad de los elefantes del sudeste asiático.",
+          "correcta": false
+        },
+        {
+          "texto": "La conquista militar transoceánica fulminante efectuada por el Imperio Romano.",
+          "correcta": false
+        },
+        {
+          "texto": "El estallido de una burbuja financiera basada en la venta de especias ficticias.",
+          "correcta": false
+        }
+      ]
+    }
+  },
+  {
+    "id": "imp-18",
+    "nombre": "Imperio Babilonio",
+    "paisesActuales": [
+      "Irak",
+      "Siria",
+      "Irán"
+    ],
+    "fechas": {
+      "pregunta": "¿En qué etapas de la antigüedad emergió e influyó el Imperio Babilonio en Oriente Próximo?",
+      "opciones": [
+        {
+          "texto": "Siglo XVIII a.C. (Hammurabi) y siglos VII-VI a.C. (Neo-babilonio)",
+          "correcta": true
+        },
+        {
+          "texto": "100 d.C. – 500 d.C.",
+          "correcta": false
+        },
+        {
+          "texto": "3000 a.C. – 2500 a.C.",
+          "correcta": false
+        },
+        {
+          "texto": "1000 d.C. – 1300 d.C.",
+          "correcta": false
+        }
+      ]
+    },
+    "religion": {
+      "pregunta": "¿Qué estructura presentaba la práctica religiosa mesopotámica de Babilonia?",
+      "opciones": [
+        {
+          "texto": "Politeísmo politeísta cimentado en deidades locales e imperiales de carácter cósmico, con el dios Marduk a la cabeza.",
+          "correcta": true
+        },
+        {
+          "texto": "Monoteísmo rígido centrado en la figura abstracta de Alá.",
+          "correcta": false
+        },
+        {
+          "texto": "Budismo primitivo importado por caravanas comerciales.",
+          "correcta": false
+        },
+        {
+          "texto": "Zoroastrismo de corte cortesano monista.",
+          "correcta": false
+        }
+      ]
+    },
+    "caracteristicas": {
+      "pregunta": "¿Cuál es uno de los monumentos jurídicos y arquitectónicos más célebres de Babilonia?",
+      "opciones": [
+        {
+          "texto": "El Código de Hammurabi (ley del talión escrita en piedra) y maravillas como los Jardines Colgantes y la Puerta de Ishtar.",
+          "correcta": true
+        },
+        {
+          "texto": "La redacción de enciclopedias ilustradas digitales de circulación pública.",
+          "correcta": false
+        },
+        {
+          "texto": "La cimentación de faros marítimos de granito en mitad del desierto.",
+          "correcta": false
+        },
+        {
+          "texto": "La abolición total de las jerarquías sociales mediante asambleas populares.",
+          "correcta": false
+        }
+      ]
+    },
+    "crecimiento": {
+      "pregunta": "¿Cómo logró el rey Hammurabi unificar y dar poder al primer Imperio Babilonio?",
+      "opciones": [
+        {
+          "texto": "Mediante campañas militares quirúrgicas, la unificación de las ciudades-estado sumerias y acadias y un código de leyes homogéneo.",
+          "correcta": true
+        },
+        {
+          "texto": "Por la evangelización armada basada en el uso de cañones pesados de pólvora.",
+          "correcta": false
+        },
+        {
+          "texto": "Utilizando flotas mercantes transatlánticas para controlar mercados mundiales.",
+          "correcta": false
+        },
+        {
+          "texto": "Mediante el reparto masivo de tierras comunales gratuitas a esclavos.",
+          "correcta": false
+        }
+      ]
+    },
+    "caida": {
+      "pregunta": "Cómo concluyó definitivamente la independencia del Imperio Babilonio en el 539 a.C.?",
+      "opciones": [
+        {
+          "texto": "Su capital fue tomada por sorpresa de forma incruenta por las tropas del rey persa Ciro el Grande.",
+          "correcta": true
+        },
+        {
+          "texto": "Fue arrasada completamente por el impacto destructivo de un asteroide.",
+          "correcta": false
+        },
+        {
+          "texto": "Sufrió una invasión masiva de legiones navales romanas comandadas por Julio César.",
+          "correcta": false
+        },
+        {
+          "texto": "La población civil abandonó voluntariamente las ciudades debido a una glaciación repentina.",
+          "correcta": false
+        }
+      ]
+    }
+  },
+  {
+    "id": "imp-19",
+    "nombre": "Imperio Británico",
+    "paisesActuales": [
+      "Reino Unido",
+      "India",
+      "Canadá",
+      "Australia",
+      "Sudáfrica",
+      "Egipto",
+      "Estados Unidos"
+    ],
+    "fechas": {
+      "pregunta": "¿En qué siglos alcanzó su etapa de máxima expansión territorial y hegemonía mundial el Imperio Británico?",
+      "opciones": [
+        {
+          "texto": "Siglo XIX – Mediados del Siglo XX",
+          "correcta": true
+        },
+        {
+          "texto": "Siglo X – Siglo XIII d.C.",
+          "correcta": false
+        },
+        {
+          "texto": "1200 a.C. – 500 a.C.",
+          "correcta": false
+        },
+        {
+          "texto": "1492 d.C. – 1600 d.C.",
+          "correcta": false
+        }
+      ]
+    },
+    "religion": {
+      "pregunta": "¿Cuál era la identidad religiosa institucional que abanderaba la metrópoli del imperio?",
+      "opciones": [
+        {
+          "texto": "El cristianismo protestante (principalmente anglicano), conviviendo con una masiva diversidad confesional en sus colonias.",
+          "correcta": true
+        },
+        {
+          "texto": "El catolicismo romano bajo control estricto del Papa.",
+          "correcta": false
+        },
+        {
+          "texto": "El islamismo sufí adoptado por la corona británica.",
+          "correcta": false
+        },
+        {
+          "texto": "Un laicismo ateo obligatorio en todos los continentes.",
+          "correcta": false
+        }
+      ]
+    },
+    "caracteristicas": {
+      "pregunta": "¿Qué transformación económica global lideró el Imperio Británico en el siglo XVIII y XIX?",
+      "opciones": [
+        {
+          "texto": "La difusión mundial de la Revolución Industrial, el auge del capitalismo global y el control de los mares (Royal Navy).",
+          "correcta": true
+        },
+        {
+          "texto": "El retorno a un modelo exclusivamente feudal basado en el trueque de cereales.",
+          "correcta": false
+        },
+        {
+          "texto": "La prohibición absoluta de utilizar carbón u otras energías fósiles.",
+          "correcta": false
+        },
+        {
+          "texto": "La creación de un mercado internacional basado en el trueque de especias precolombinas.",
+          "correcta": false
+        }
+      ]
+    },
+    "crecimiento": {
+      "pregunta": "¿Qué pilares estratégicos propiciaron que fuera apodado 'el imperio donde nunca se pone el sol'?",
+      "opciones": [
+        {
+          "texto": "Su indiscutible superioridad industrial, un poderío naval militar absoluto y compañías comerciales chartered de alcance global.",
+          "correcta": true
+        },
+        {
+          "texto": "La posesión de ejércitos ecuestres nómadas que cruzaban continentes a gran velocidad.",
+          "correcta": false
+        },
+        {
+          "texto": "La anexión pacífica de territorios mediante plebiscitos democráticos universales.",
+          "correcta": false
+        },
+        {
+          "texto": "El desarrollo pionero de satélites ópticos de comunicación por señales de humo.",
+          "correcta": false
+        }
+      ]
+    },
+    "caida": {
+      "pregunta": "¿A qué obedeció la desarticulación y descolonización del Imperio Británico en el siglo XX?",
+      "opciones": [
+        {
+          "texto": "Un severo agotamiento económico tras las dos Guerras Mundiales y el auge irresistible de movimientos nacionalistas de liberación global.",
+          "correcta": true
+        },
+        {
+          "texto": "Una invasión militar directa ejecutada por el Imperio Otomano sobre Londres.",
+          "correcta": false
+        },
+        {
+          "texto": "Un colapso geológico súbito que sumergió por completo la isla de Gran Bretaña.",
+          "correcta": false
+        },
+        {
+          "texto": "La disolución voluntaria del estado por un referéndum ecologista global.",
+          "correcta": false
+        }
+      ]
+    }
+  },
+  {
+    "id": "imp-20",
+    "nombre": "Imperio Carolingio",
+    "paisesActuales": [
+      "Francia",
+      "Alemania",
+      "Italia",
+      "Bélgica",
+      "Países Bajos",
+      "Suiza"
+    ],
+    "fechas": {
+      "pregunta": "¿Qué breve pero crucial marco temporal abarca el Imperio Carolingio unificado bajo Carlomagno?",
+      "opciones": [
+        {
+          "texto": "768 d.C. – 843 d.C. (Hasta Tratado de Verdún)",
+          "correcta": true
+        },
+        {
+          "texto": "100 a.C. – 200 d.C.",
+          "correcta": false
+        },
+        {
+          "texto": "1200 d.C. – 1400 d.C.",
+          "correcta": false
+        },
+        {
+          "texto": "3100 a.C. – 2000 a.C.",
+          "correcta": false
+        }
+      ]
+    },
+    "religion": {
+      "pregunta": "¿Qué papel jugaba la fe católica en la estructura política carolingia?",
+      "opciones": [
+        {
+          "texto": "Era el pilar de legitimación política, manteniendo una alianza estrecha e indisoluble con el Papado de Roma.",
+          "correcta": true
+        },
+        {
+          "texto": "Se perseguía activamente el catolicismo a favor de cultos paganos germánicos.",
+          "correcta": false
+        },
+        {
+          "texto": "Se profesaba formalmente el cristianismo ortodoxo bizantino.",
+          "correcta": false
+        },
+        {
+          "texto": "Se instauró el islam suní como fe oficial de las marcas militares.",
+          "correcta": false
+        }
+      ]
+    },
+    "caracteristicas": {
+      "pregunta": "¿Qué esplendor cultural caracterizó la administración carolingia?",
+      "opciones": [
+        {
+          "texto": "El 'Renacimiento carolingio': creación de escuelas palatinas, fomento de las artes y la unificación de la escritura minúscula carolingia.",
+          "correcta": true
+        },
+        {
+          "texto": "La erradicación absoluta de cualquier escuela pública o privada en Europa Occidental.",
+          "correcta": false
+        },
+        {
+          "texto": "La invención pionera del motor de vapor de baja presión.",
+          "correcta": false
+        },
+        {
+          "texto": "La redacción de leyes exclusivamente basadas en códices pictográficos americanos.",
+          "correcta": false
+        }
+      ]
+    },
+    "crecimiento": {
+      "pregunta": "¿Cómo logró Carlomagno expandir y asentar este imperio centroeuropeo?",
+      "opciones": [
+        {
+          "texto": "Mediante continuas campañas guerreras anuales contra sajones, lombardos y ávaros, estabilizando fronteras mediante marcas militares.",
+          "correcta": true
+        },
+        {
+          "texto": "Gracias al despliegue comercial masivo de flotas transoceánicas de madera.",
+          "correcta": false
+        },
+        {
+          "texto": "Estableciendo acuerdos democráticos federales con jefes de tribus nómadas de Asia.",
+          "correcta": false
+        },
+        {
+          "texto": "Mediante el monopolio financiero internacional de la banca del oro.",
+          "correcta": false
+        }
+      ]
+    },
+    "caida": {
+      "pregunta": "Qué acontecimiento diplomático y político fragmentó de forma irreversible el Imperio Carolingio?",
+      "opciones": [
+        {
+          "texto": "La división formal del territorio entre los tres nietos de Carlomagno ratificada en el Tratado de Verdún (843 d.C.).",
+          "correcta": true
+        },
+        {
+          "texto": "La invasión y conquista militar instantánea ejecutada por las legiones del Antiguo Egipto.",
+          "correcta": false
+        },
+        {
+          "texto": "Una insurrección popular pacífica que instauró repúblicas laicas modernas.",
+          "correcta": false
+        },
+        {
+          "texto": "El exterminio total de la dinastía carolingia por incursiones de samuráis japoneses.",
+          "correcta": false
+        }
+      ]
+    }
+  }
+]

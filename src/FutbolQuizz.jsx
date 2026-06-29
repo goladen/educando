@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, memo } from 'react';
 import { db } from './firebase';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, addDoc } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
 
@@ -1315,6 +1316,11 @@ function ModalEnviarProfeFutbol({ resultado, recurso, hojas, onClose }) {
                 codigoProfesor: code,
                 ganador: nombres[ganador],
                 jugadores: [mkJugador('red'), mkJugador('blue')],
+            });
+            const sr = stats.red; const totalR = sr.aciertos + sr.fallos;
+            guardarRegistroLocal('FUTBOLQUIZZ', {
+                titulo: recurso?.titulo || 'Fútbol Quizz', aciertos: sr.aciertos, intentos: totalR,
+                nombre: nombres.red, curso: curso.trim(), via: 'profesor',
             });
             setEnviado(true);
         } catch (e) { setError('Error: ' + e.message); }

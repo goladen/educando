@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import sonidoCorrecto from './assets/sonidorespcorrecta.mp3';
 import { db } from './firebase';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
 
 // ── Bloques visuales de decenas y unidades ──────────────────────────────────
@@ -192,6 +193,10 @@ function ModalEnviarProfe({ datos, onClose }) {
           sumas:  { aciertos: datos.aciertosSumas,  intentos: datos.intentosSumas  },
           restas: { aciertos: datos.aciertosRestas, intentos: datos.intentosRestas },
         }],
+      });
+      guardarRegistroLocal('OAOA', {
+        titulo: 'Mates OAOA', aciertos: totalAciertos, intentos: totalIntentos,
+        nombre: nombre.trim(), curso: curso.trim(), via: 'profesor',
       });
       setEnviado(true);
     } catch (e) { setError('Error al enviar: ' + e.message); }

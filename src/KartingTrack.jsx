@@ -6,6 +6,7 @@ import AlmacenCircuitos    from './AlmacenCircuitos';
 import KartingCreateRace   from './KartingOnline/KartingCreateRace';
 import KartingJoinRace     from './KartingOnline/KartingJoinRace';
 import { db } from './firebase';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 import { collection, query, where, getDocs, addDoc, doc, getDoc } from 'firebase/firestore';
 
 import tile01    from './kenney_racing-pack/PNG/Tiles/Asphalt road/road_asphalt01.png';
@@ -452,6 +453,10 @@ function ModalEnviarProfe({ resultado, recurso, hojas, onClose }) {
           tiempo: resultado.tiempo, tiempoFormateado: resultado.tiempoFormateado,
           posicion: resultado.posicion,
           intentos: total, aciertos: acertadas, fallos: falladas, porcentaje: pct }],
+      });
+      guardarRegistroLocal('KARTINGED_TRACK', {
+        titulo: recurso.titulo, aciertos: acertadas, intentos: total,
+        nombre: nombre.trim(), curso: curso.trim(), via: 'profesor',
       });
       setEnviado(true);
     } catch (e) { setError('Error: ' + e.message); }

@@ -12,6 +12,8 @@ import * as Blockly from 'blockly/core';
 import 'blockly/blocks'; // bloques estándar (lógica, bucles, matemáticas, texto, variables)
 import * as Es from 'blockly/msg/es'; // idioma español
 import { pythonGenerator, Order } from 'blockly/python';
+import { createWebUSBConnection, createUniversalHexFlashDataSource } from '@microbit/microbit-connection';
+import microPyHexUrl from './assets/micropython-microbit-v2.hex?url';
 import { db } from './firebase';
 import {
   collection,
@@ -76,7 +78,7 @@ const ArdOrder = {
 // (incluye P3/P4/P10/P11, usados por el montaje Smart Home de Aragón).
 const MB_PINS = [
   ['P0', '0'], ['P1', '1'], ['P2', '2'], ['P3', '3'], ['P4', '4'],
-  ['P8', '8'], ['P10', '10'], ['P11', '11'], ['P12', '12'],
+  ['P8', '8'], ['P9', '9'], ['P10', '10'], ['P11', '11'], ['P12', '12'],
   ['P13', '13'], ['P14', '14'], ['P15', '15'], ['P16', '16'],
 ];
 // Pines con entrada ANALÓGICA en el micro:bit (canales ADC: P0–P4 y P10).
@@ -115,6 +117,76 @@ const LCD_DRIVER_PY = `class _LCD:
         for ch in str(t):
             s._chr(ord(ch))`;
 
+// Driver DHT11 (humedad/temperatura) por software para micro:bit V2 (one-wire).
+// Caché de 2 s (el DHT11 solo da ~1 lectura/seg). EXPERIMENTAL: MicroPython es
+// interpretado y el timing es justo; si diera lecturas raras, para la temperatura
+// es más fiable el sensor interno de la micro:bit. Usa time.ticks_us + sleep/
+// running_time/pin de «from microbit import *».
+const DHT_DRIVER_PY = `_dht_cache = [-1, -1, -9999]
+def _dht_read(p):
+    p.write_digital(0)
+    sleep(20)
+    p.set_pull(p.PULL_UP)
+    p.read_digital()
+    n = 0
+    while p.read_digital() == 1:
+        n += 1
+        if n > 2500:
+            return None
+    n = 0
+    while p.read_digital() == 0:
+        n += 1
+        if n > 2500:
+            return None
+    n = 0
+    while p.read_digital() == 1:
+        n += 1
+        if n > 2500:
+            return None
+    d = [0, 0, 0, 0, 0]
+    for i in range(40):
+        n = 0
+        while p.read_digital() == 0:
+            n += 1
+            if n > 2500:
+                return None
+        t = time.ticks_us()
+        n = 0
+        while p.read_digital() == 1:
+            n += 1
+            if n > 2500:
+                break
+        if time.ticks_diff(time.ticks_us(), t) > 50:
+            d[i // 8] |= 1 << (7 - (i % 8))
+    if ((d[0] + d[1] + d[2] + d[3]) & 255) == d[4]:
+        return d
+    return None
+def _dht_get(p):
+    if _dht_cache[2] < 0 or running_time() - _dht_cache[2] > 2000:
+        for _try in range(3):
+            r = _dht_read(p)
+            if r:
+                _dht_cache[0] = r[2]
+                _dht_cache[1] = r[0]
+                _dht_cache[2] = running_time()
+                break
+            sleep(50)
+    return _dht_cache`;
+
+// Driver para la tira de 4 LEDs RGB (NeoPixel) del pin 14. Objeto persistente
+// `_np` para poder encender cada LED por separado sin apagar los demás.
+// i = índice 0..3 de un LED, o i < 0 para «todos».
+const RGB_DRIVER_PY = `def _rgb_set(p, i, r, g, b):
+    global _np
+    if _np is None:
+        _np = neopixel.NeoPixel(p, 4)
+    if i < 0:
+        for k in range(4):
+            _np[k] = (r, g, b)
+    else:
+        _np[i] = (r, g, b)
+    _np.show()`;
+
 // ───────────────────────────────────────────────────────────────────────────
 // MAPA DE PINES DEL MONTAJE SMART HOME (Aragón).
 // Edita aquí UNA sola vez: cada componente del kit ya queda asignado a su pin,
@@ -123,17 +195,19 @@ const LCD_DRIVER_PY = `class _LCD:
 // ───────────────────────────────────────────────────────────────────────────
 const SMARTHOME_PINS = {
   // ── ENTRADAS (sensores) ──
-  pir: '1',         // 🚶 sensor de movimiento PIR (cúpula blanca) — digital
+  pir: '15',        // 🚶 sensor de movimiento PIR (cúpula blanca) — digital
   gas: '2',         // 💨 sensor de gas / humo MQ-2 — analógico
   suelo: '3',       // 🌱 humedad del suelo (horquilla) — analógico
   luz: '4',         // 🔆 sensor de luz / fotorresistencia (LDR) — analógico
-  vapor: '10',      // 💧 sensor de vapor / lluvia (tejado) — analógico
+  vapor: '0',       // 💧 sensor de vapor / lluvia (tejado) — analógico (P0)
   boton: '11',      // 🔘 botón / sensor de choque (timbre, final de carrera) — digital
+  dht: '2',         // 🌡️ DHT11 humedad + temperatura — digital (one-wire)
   // ── SALIDAS (actuadores) ──
-  zumbador: '0',    // 🔔 zumbador (pin nativo de audio) — tono / melodía
-  servo: '8',       // 🚪 servomotor puerta / ventana (azul) — 0–180°
+  // 🔔 zumbador: micro:bit V2 → altavoz INTERNO (no usa pin; P0 lo ocupa la lluvia)
+  servo: '8',       // 🚪 servomotor de la PUERTA — 0–180°
+  servo_ventana: '9', // 🪟 servomotor de la VENTANA — 0–180°
   ventilador: '12', // 🌀 motor del ventilador — digital/PWM
-  led: '13',        // 💡 LED amarillo (lámpara de habitación) — digital o PWM
+  led: '16',        // 💡 LED amarillo (lámpara de habitación) — digital o PWM
   rgb: '14',        // 🌈 LED RGB / NeoPixel direccionable
 };
 
@@ -143,6 +217,28 @@ const pinOpts = (def, base = MB_PINS) => {
   const rest = base.filter((o) => o[1] !== def);
   return first ? [first, ...rest] : base;
 };
+
+// Genera el Python del workspace asegurando un ORDEN correcto: primero «al
+// iniciar» (se ejecuta una vez), luego el resto de bloques sueltos, y al final
+// «por siempre» (el while True). Así no entran en conflicto (si el bucle se
+// generara antes, «al iniciar» nunca correría o una variable se usaría sin crear).
+function generatePython(ws) {
+  const gen = pythonGenerator;
+  gen.init(ws);
+  const starts = [];
+  const loops = [];
+  const rest = [];
+  for (const b of ws.getTopBlocks(true)) {
+    if (b.isInsertionMarker && b.isInsertionMarker()) continue;
+    let c = gen.blockToCode(b);
+    if (Array.isArray(c)) c = c[0];
+    if (!c) continue;
+    if (b.type === 'microbit_on_start') starts.push(c);
+    else if (b.type === 'microbit_forever' || b.type === 'cyberpi_forever') loops.push(c);
+    else rest.push(c);
+  }
+  return gen.finish(starts.join('') + rest.join('') + loops.join(''));
+}
 
 let DEFINED = false;
 
@@ -1131,10 +1227,10 @@ function defineBlocksAndGenerators() {
       message0: '🌀 ventilador / motor en pin %1 %2',
       args0: [
         { type: 'field_dropdown', name: 'PIN', options: pinOpts(SMARTHOME_PINS.ventilador) },
-        { type: 'field_dropdown', name: 'STATE', options: [['encender', '1'], ['apagar', '0']] },
+        { type: 'field_dropdown', name: 'STATE', options: [['encender', '0'], ['apagar', '1']] },
       ],
       previousStatement: null, nextStatement: null, colour: '#10b981',
-      tooltip: 'Enciende o apaga el ventilador/motor (señal digital, como el toggle de MakeCode).',
+      tooltip: 'Enciende o apaga el ventilador/motor. En esta casita el motor es activo a nivel BAJO: encender = pin a 0, apagar = pin a 1.',
     },
     {
       type: 'smarthome_servo',
@@ -1144,13 +1240,58 @@ function defineBlocksAndGenerators() {
         { type: 'field_number', name: 'ANG', value: 90, min: 0, max: 180 },
       ],
       previousStatement: null, nextStatement: null, colour: '#10b981',
-      tooltip: 'Mueve el servo (puerta/ventana) al ángulo indicado (0–180°).',
+      tooltip: 'Mueve el servo de la PUERTA al ángulo indicado (0–180°).',
+    },
+    {
+      type: 'smarthome_servo_ventana',
+      message0: '🪟 servo (ventana) en pin %1 ángulo %2 °',
+      args0: [
+        { type: 'field_dropdown', name: 'PIN', options: pinOpts(SMARTHOME_PINS.servo_ventana) },
+        { type: 'field_number', name: 'ANG', value: 90, min: 0, max: 180 },
+      ],
+      previousStatement: null, nextStatement: null, colour: '#10b981',
+      tooltip: 'Mueve el servo de la VENTANA al ángulo indicado (0–180°).',
+    },
+    {
+      type: 'smarthome_fan_state',
+      message0: '🌀 ¿ventilador encendido?',
+      output: 'Boolean', colour: '#10b981',
+      tooltip: 'Verdadero si el ventilador/motor está encendido (según la última orden).',
+    },
+    {
+      type: 'microbit_on_button',
+      message0: 'si se pulsa botón %1 %2 %3',
+      args0: [
+        { type: 'field_dropdown', name: 'BTN', options: [['A', 'a'], ['B', 'b'], ['A + B', 'ab']] },
+        { type: 'input_dummy' },
+        { type: 'input_statement', name: 'DO' },
+      ],
+      previousStatement: null, nextStatement: null, colour: '20',
+      tooltip: 'Si ese botón está pulsado, ejecuta los bloques de dentro. Ponlo dentro de «por siempre».',
+    },
+    {
+      type: 'microbit_if_else',
+      message0: 'si %1 entonces %2 %3 si no %4',
+      args0: [
+        { type: 'input_value', name: 'IF', check: 'Boolean' },
+        { type: 'input_dummy' },
+        { type: 'input_statement', name: 'DO' },
+        { type: 'input_statement', name: 'ELSE' },
+      ],
+      previousStatement: null, nextStatement: null, colour: '210',
+      tooltip: 'Si se cumple la condición hace una cosa; si no, otra.',
     },
     {
       type: 'smarthome_rgb',
-      message0: '🌈 LED RGB (pin %1) color %2',
+      message0: '🌈 LED RGB (pin %1) nº %2 color %3',
       args0: [
         { type: 'field_dropdown', name: 'PIN', options: pinOpts(SMARTHOME_PINS.rgb) },
+        {
+          type: 'field_dropdown', name: 'WHICH',
+          options: [
+            ['todos', '-1'], ['1', '0'], ['2', '1'], ['3', '2'], ['4', '3'],
+          ],
+        },
         {
           type: 'field_dropdown', name: 'COLOR',
           options: [
@@ -1161,26 +1302,24 @@ function defineBlocksAndGenerators() {
         },
       ],
       previousStatement: null, nextStatement: null, colour: '#10b981',
-      tooltip: 'Pone el LED RGB / NeoPixel del color elegido (rojo=alarma, verde=seguro…).',
+      tooltip: 'Enciende un LED de la tira RGB (1–4) o todos, del color elegido. La tira tiene 4 LEDs.',
     },
 
     // — SONIDO (zumbador) —
     {
       type: 'smarthome_buzzer_tone',
-      message0: '🔔 zumbador en pin %1 tono %2 Hz durante %3 ms',
+      message0: '🔔 zumbador tono %1 Hz durante %2 ms',
       args0: [
-        { type: 'field_dropdown', name: 'PIN', options: pinOpts(SMARTHOME_PINS.zumbador) },
         { type: 'field_number', name: 'FREQ', value: 440, min: 50, max: 5000 },
         { type: 'field_number', name: 'MS', value: 300, min: 10, max: 5000 },
       ],
       previousStatement: null, nextStatement: null, colour: '#a855f7',
-      tooltip: 'Reproduce un tono en el zumbador.',
+      tooltip: 'Reproduce un tono en el altavoz interno de la micro:bit.',
     },
     {
       type: 'smarthome_buzzer_melody',
-      message0: '🔔 zumbador en pin %1 melodía %2',
+      message0: '🔔 zumbador melodía %1',
       args0: [
-        { type: 'field_dropdown', name: 'PIN', options: pinOpts(SMARTHOME_PINS.zumbador) },
         {
           type: 'field_dropdown', name: 'MELODY',
           options: [
@@ -1191,7 +1330,7 @@ function defineBlocksAndGenerators() {
         },
       ],
       previousStatement: null, nextStatement: null, colour: '#a855f7',
-      tooltip: 'Reproduce una melodía predefinida en el zumbador.',
+      tooltip: 'Reproduce una melodía en el altavoz interno de la micro:bit.',
     },
 
     // — PANTALLA LCD 1602 I²C (SCL=P19, SDA=P20) —
@@ -1218,6 +1357,53 @@ function defineBlocksAndGenerators() {
       message0: '🖥️ LCD borrar pantalla',
       previousStatement: null, nextStatement: null, colour: '#3b82f6',
       tooltip: 'Borra la pantalla LCD.',
+    },
+    {
+      type: 'smarthome_lcd_value',
+      message0: '🖥️ LCD mostrar %1 en fila %2 columna %3',
+      args0: [
+        { type: 'input_value', name: 'VAL' },
+        { type: 'field_dropdown', name: 'ROW', options: [['1', '0'], ['2', '1']] },
+        { type: 'field_number', name: 'COL', value: 0, min: 0, max: 15 },
+      ],
+      previousStatement: null, nextStatement: null, colour: '#3b82f6',
+      tooltip: 'Muestra un valor de un sensor (número o texto) en la pantalla LCD.',
+    },
+    {
+      type: 'smarthome_lcd_sensor',
+      message0: '🖥️ LCD mostrar %1 en fila %2',
+      args0: [
+        {
+          type: 'field_dropdown', name: 'SENSOR',
+          options: [
+            ['🌡️ temperatura micro:bit', 'temp'],
+            ['🌡️ temperatura (DHT11)', 'dht_t'],
+            ['💧 humedad (DHT11)', 'dht_h'],
+            ['💨 gas / humo', 'gas'],
+            ['🔊 nivel de sonido', 'sonido'],
+            ['🚶 movimiento', 'pir'],
+            ['🌱 humedad del suelo', 'suelo'],
+            ['💧 lluvia / vapor', 'lluvia'],
+          ],
+        },
+        { type: 'field_dropdown', name: 'ROW', options: [['1', '0'], ['2', '1']] },
+      ],
+      previousStatement: null, nextStatement: null, colour: '#3b82f6',
+      tooltip: 'Muestra en la LCD el sensor elegido con su nombre y unidad (°C, %, Sí/No).',
+    },
+    {
+      type: 'smarthome_dht_temp',
+      message0: '🌡️ temperatura DHT11 (°C) en pin %1',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: pinOpts(SMARTHOME_PINS.dht) }],
+      output: 'Number', colour: '#0d9488',
+      tooltip: 'Lee la temperatura del sensor DHT11 (humedad/temperatura). Experimental en micro:bit.',
+    },
+    {
+      type: 'smarthome_dht_hum',
+      message0: '💧 humedad DHT11 (%) en pin %1',
+      args0: [{ type: 'field_dropdown', name: 'PIN', options: pinOpts(SMARTHOME_PINS.dht) }],
+      output: 'Number', colour: '#0d9488',
+      tooltip: 'Lee la humedad relativa del sensor DHT11. Experimental en micro:bit.',
     },
   ]);
 
@@ -1417,9 +1603,14 @@ function defineBlocksAndGenerators() {
 
   /* ── MICRO:BIT + SMART HOME (Keyestudio · montaje Aragón) ── */
   // Sensores (lecturas)
+  // P3/P4/P6/P7/P9/P10 los comparte la matriz de LEDs: para leerlos por analógico
+  // hay que apagar la pantalla, si no devuelven valores raros o nada.
+  const matrixPin = (pin) => ['3', '4', '6', '7', '9', '10'].includes(pin);
   const shAnalog = (block, gen) => {
     mbImport(gen);
-    return [`pin${block.getFieldValue('PIN')}.read_analog()`, Order.ATOMIC];
+    const pin = block.getFieldValue('PIN');
+    if (matrixPin(pin)) gen.definitions_['display_off'] = 'display.off()';
+    return [`pin${pin}.read_analog()`, Order.ATOMIC];
   };
   P.forBlock['smarthome_luz'] = shAnalog;
   P.forBlock['smarthome_gas'] = shAnalog;
@@ -1444,13 +1635,10 @@ function defineBlocksAndGenerators() {
   P.forBlock['smarthome_rgb'] = function (block, gen) {
     mbImport(gen);
     gen.definitions_['import_neopixel'] = 'import neopixel';
+    gen.definitions_['var_np'] = '_np = None';
+    gen.definitions_['def_rgb'] = RGB_DRIVER_PY;
     const pin = block.getFieldValue('PIN');
-    gen.definitions_['def_rgb'] =
-      'def _rgb(p, r, g, b):\n' +
-      '    np = neopixel.NeoPixel(p, 1)\n' +
-      '    np[0] = (r, g, b)\n' +
-      '    np.show()';
-    return `_rgb(pin${pin}, ${block.getFieldValue('COLOR')})\n`;
+    return `_rgb_set(pin${pin}, ${block.getFieldValue('WHICH')}, ${block.getFieldValue('COLOR')})\n`;
   };
   const shPwm = (block, gen) => {
     mbImport(gen);
@@ -1460,26 +1648,57 @@ function defineBlocksAndGenerators() {
   P.forBlock['smarthome_led_bright'] = shPwm;
   P.forBlock['smarthome_fan'] = function (block, gen) {
     mbImport(gen);
-    return `pin${block.getFieldValue('PIN')}.write_digital(${block.getFieldValue('STATE')})\n`;
+    gen.definitions_['var_motor_on'] = 'motor_on = False';
+    const state = block.getFieldValue('STATE'); // '0' = encender (activo bajo), '1' = apagar
+    return `pin${block.getFieldValue('PIN')}.write_digital(${state})\nmotor_on = ${state === '0' ? 'True' : 'False'}\n`;
   };
-  P.forBlock['smarthome_servo'] = function (block, gen) {
+  P.forBlock['smarthome_fan_state'] = function (block, gen) {
+    mbImport(gen);
+    gen.definitions_['var_motor_on'] = 'motor_on = False';
+    return ['motor_on', Order.ATOMIC];
+  };
+  P.forBlock['microbit_on_button'] = function (block, gen) {
+    mbImport(gen);
+    const btn = block.getFieldValue('BTN');
+    const cond =
+      btn === 'ab'
+        ? '(button_a.is_pressed() and button_b.is_pressed())'
+        : `button_${btn}.is_pressed()`;
+    const body = gen.statementToCode(block, 'DO') || gen.INDENT + 'pass\n';
+    return `if ${cond}:\n${body}`;
+  };
+  P.forBlock['microbit_if_else'] = function (block, gen) {
+    const cond = gen.valueToCode(block, 'IF', Order.NONE) || 'False';
+    const doB = gen.statementToCode(block, 'DO') || gen.INDENT + 'pass\n';
+    const elseB = gen.statementToCode(block, 'ELSE') || gen.INDENT + 'pass\n';
+    return `if ${cond}:\n${doB}else:\n${elseB}`;
+  };
+  const shServo = (block, gen) => {
     mbImport(gen);
     gen.definitions_['def_servo'] =
       'def _servo(p, ang):\n' +
       '    p.set_analog_period(20)\n' +
       '    p.write_analog(round(26 + (128 - 26) * ang / 180))';
-    return `_servo(pin${block.getFieldValue('PIN')}, ${block.getFieldValue('ANG')})\n`;
+    const pin = block.getFieldValue('PIN');
+    // P3/P4/P6/P7/P9/P10 los comparte la matriz de LEDs: para usarlos como
+    // salida PWM (servo) hay que apagar la pantalla primero.
+    if (['3', '4', '6', '7', '9', '10'].includes(pin)) {
+      gen.definitions_['display_off'] = 'display.off()';
+    }
+    return `_servo(pin${pin}, ${block.getFieldValue('ANG')})\n`;
   };
+  P.forBlock['smarthome_servo'] = shServo;
+  P.forBlock['smarthome_servo_ventana'] = shServo;
   // Sonido
   P.forBlock['smarthome_buzzer_tone'] = function (block, gen) {
     mbImport(gen);
     gen.definitions_['import_music'] = 'import music';
-    return `music.pitch(${block.getFieldValue('FREQ')}, ${block.getFieldValue('MS')}, pin=pin${block.getFieldValue('PIN')})\n`;
+    return `music.pitch(${block.getFieldValue('FREQ')}, ${block.getFieldValue('MS')})\n`;
   };
   P.forBlock['smarthome_buzzer_melody'] = function (block, gen) {
     mbImport(gen);
     gen.definitions_['import_music'] = 'import music';
-    return `music.play(music.${block.getFieldValue('MELODY')}, pin=pin${block.getFieldValue('PIN')})\n`;
+    return `music.play(music.${block.getFieldValue('MELODY')})\n`;
   };
   // Pantalla LCD 1602 I²C. La pantalla se crea automáticamente como variable
   // global `lcd` (def. de nivel superior) la primera vez que se usa CUALQUIER
@@ -1503,6 +1722,58 @@ function defineBlocksAndGenerators() {
     lcdEnsure(gen);
     return 'lcd.clear()\n';
   };
+  P.forBlock['smarthome_lcd_value'] = function (block, gen) {
+    lcdEnsure(gen);
+    const val = gen.valueToCode(block, 'VAL', Order.NONE) || "''";
+    return `lcd.show(str(${val}), ${block.getFieldValue('COL')}, ${block.getFieldValue('ROW')})\n`;
+  };
+  // LCD con texto formateado + unidades, según el sensor elegido en el desplegable.
+  P.forBlock['smarthome_lcd_sensor'] = function (block, gen) {
+    lcdEnsure(gen);
+    mbImport(gen);
+    const P_ = SMARTHOME_PINS;
+    const sensor = block.getFieldValue('SENSOR');
+    const row = block.getFieldValue('ROW');
+    // Lectura analógica; si el pin lo comparte la matriz, apaga la pantalla.
+    const offIf = (pin) => {
+      if (matrixPin(pin)) gen.definitions_['display_off'] = 'display.off()';
+    };
+    let expr;
+    if (sensor === 'dht_t' || sensor === 'dht_h') {
+      gen.definitions_['import_time'] = 'import time';
+      gen.definitions_['class_dht'] = DHT_DRIVER_PY;
+      expr =
+        sensor === 'dht_t'
+          ? `'Temp: ' + str(_dht_get(pin${P_.dht})[0]) + ' C'`
+          : `'Humedad: ' + str(_dht_get(pin${P_.dht})[1]) + ' %'`;
+    } else if (sensor === 'temp') {
+      expr = `'Temp: ' + str(temperature()) + ' C'`;
+    } else if (sensor === 'gas') {
+      offIf(P_.gas);
+      expr = `'Gas: ' + str(pin${P_.gas}.read_analog())`;
+    } else if (sensor === 'sonido') {
+      expr = `'Sonido: ' + str(microphone.sound_level() * 100 // 255) + ' %'`;
+    } else if (sensor === 'pir') {
+      expr = `'Movim: ' + ('Si' if pin${P_.pir}.read_digital() == 1 else 'No')`;
+    } else if (sensor === 'suelo') {
+      offIf(P_.suelo);
+      expr = `'Suelo: ' + str(pin${P_.suelo}.read_analog())`;
+    } else {
+      offIf(P_.vapor);
+      expr = `'Lluvia: ' + str(pin${P_.vapor}.read_analog())`;
+    }
+    // Rellena a 16 caracteres para borrar lo que hubiera antes en esa fila.
+    return `lcd.show((${expr} + ' ' * 16)[0:16], 0, ${row})\n`;
+  };
+  // DHT11 (humedad/temperatura) — driver por software, con caché.
+  const shDht = (idx) => (block, gen) => {
+    mbImport(gen);
+    gen.definitions_['import_time'] = 'import time';
+    gen.definitions_['class_dht'] = DHT_DRIVER_PY;
+    return [`_dht_get(pin${block.getFieldValue('PIN')})[${idx}]`, Order.ATOMIC];
+  };
+  P.forBlock['smarthome_dht_temp'] = shDht(0);
+  P.forBlock['smarthome_dht_hum'] = shDht(1);
   P.forBlock['microbit_radio_group'] = function (block, gen) {
     gen.definitions_['import_radio'] = 'import radio';
     return `radio.config(group=${block.getFieldValue('GROUP')})\nradio.on()\n`;
@@ -1719,6 +1990,14 @@ function defineBlocksAndGenerators() {
     const b = A.valueToCode(block, 'B', ArdOrder.RELATIONAL) || '0';
     return [`${a} ${op} ${b}`, ArdOrder.RELATIONAL];
   };
+  A.forBlock['logic_operation'] = function (block) {
+    const isAnd = block.getFieldValue('OP') === 'AND';
+    const op = isAnd ? ' && ' : ' || ';
+    const order = isAnd ? ArdOrder.LOGICAL_AND : ArdOrder.LOGICAL_OR;
+    const a = A.valueToCode(block, 'A', order) || 'false';
+    const b = A.valueToCode(block, 'B', order) || 'false';
+    return [a + op + b, order];
+  };
   A.forBlock['controls_if'] = function (block) {
     let code = '';
     let n = 0;
@@ -1822,6 +2101,7 @@ const STD_CATEGORIES = [
     contents: [
       { kind: 'block', type: 'controls_if' },
       { kind: 'block', type: 'logic_compare' },
+      { kind: 'block', type: 'logic_operation' },
       { kind: 'block', type: 'logic_boolean' },
     ],
   },
@@ -1883,6 +2163,7 @@ const TOOLBOXES = {
       {
         kind: 'category', name: 'Entrada / Botones', colour: '20',
         contents: [
+          blk('microbit_on_button'),
           blk('microbit_button_pressed'), blk('microbit_button_was_pressed'),
           blk('microbit_button_presses'), blk('microbit_pin_touched'),
           blk('microbit_gesture'),
@@ -1919,8 +2200,9 @@ const TOOLBOXES = {
       },
       {
         kind: 'category', name: 'Control', colour: '120',
-        contents: [blk('microbit_running_time'), blk('microbit_pause')],
+        contents: [blk('microbit_if_else'), blk('microbit_running_time'), blk('microbit_pause')],
       },
+      { kind: 'category', name: 'Variables', colour: '330', custom: 'VARIABLE' },
       ...STD_CATEGORIES,
       CODE_PY,
     ],
@@ -1982,8 +2264,8 @@ const TOOLBOXES = {
         kind: 'category', name: '🏠 Sensores', colour: '#0d9488',
         contents: [
           blk('smarthome_pir'), blk('smarthome_boton'),
-          blk('smarthome_gas'), blk('smarthome_suelo'),
-          blk('smarthome_luz'), blk('smarthome_vapor'),
+          blk('smarthome_gas'), blk('smarthome_suelo'), blk('smarthome_vapor'),
+          blk('smarthome_dht_temp'), blk('smarthome_dht_hum'),
           blk('microbit_temperature'),
           blk('smarthome_analog_read'), blk('smarthome_digital_read'),
         ],
@@ -1992,7 +2274,8 @@ const TOOLBOXES = {
         kind: 'category', name: '🏠 Actuadores', colour: '#f59e0b',
         contents: [
           blk('smarthome_led'), blk('smarthome_led_bright'), blk('smarthome_rgb'),
-          blk('smarthome_fan'), blk('smarthome_servo'),
+          blk('smarthome_fan'), blk('smarthome_fan_state'),
+          blk('smarthome_servo'), blk('smarthome_servo_ventana'),
         ],
       },
       {
@@ -2002,15 +2285,22 @@ const TOOLBOXES = {
       {
         kind: 'category', name: '🏠 Pantalla LCD', colour: '#3b82f6',
         contents: [
-          blk('smarthome_lcd_init'), blk('smarthome_lcd_show'), blk('smarthome_lcd_clear'),
+          blk('smarthome_lcd_init'), blk('smarthome_lcd_sensor'),
+          blk('smarthome_lcd_show'), blk('smarthome_lcd_value'),
+          blk('smarthome_lcd_clear'),
         ],
       },
       {
         kind: 'category', name: 'Entrada / Botones', colour: '20',
         contents: [
+          blk('microbit_on_button'),
           blk('microbit_button_pressed'), blk('microbit_pin_touched'),
           blk('microbit_gesture'),
         ],
+      },
+      {
+        kind: 'category', name: 'Control', colour: '120',
+        contents: [blk('microbit_if_else'), blk('microbit_pause')],
       },
       {
         kind: 'category', name: 'Pines (avanzado)', colour: '180',
@@ -2019,6 +2309,7 @@ const TOOLBOXES = {
           blk('microbit_pin_analog_write'), blk('microbit_pin_analog_read'),
         ],
       },
+      { kind: 'category', name: 'Variables', colour: '330', custom: 'VARIABLE' },
       ...STD_CATEGORIES,
       CODE_PY,
     ],
@@ -2471,6 +2762,204 @@ const PROJECTS = [
       },
     }),
   },
+
+  // ───────── MICRO:BIT + SMART HOME (la casita) ─────────
+  {
+    id: 'sh_alarma',
+    board: 'microbit_smarthome',
+    emoji: '🚨',
+    title: 'Alarma de la casa',
+    desc: 'Si detecta movimiento (PIR) o un ruido fuerte: cierra la ventana, suena la alarma y el LED RGB parpadea en rojo.',
+    steps: [
+      'El bloque «por siempre» vigila la casa sin parar.',
+      'El «si … si no» comprueba: ¿hay movimiento (PIR) O el nivel de sonido es alto (> 150)?',
+      'Si SÍ: cierra la ventana con el servo (0°), reproduce la melodía de alarma y enciende el LED RGB en rojo.',
+      'Espera 200 ms, apaga el LED y espera otros 200 ms: así parpadea en rojo.',
+      'Si NO hay peligro: mantiene el LED RGB apagado.',
+    ],
+    state: top({
+      type: 'microbit_forever',
+      inputs: {
+        DO: {
+          block: {
+            type: 'microbit_if_else',
+            inputs: {
+              IF: {
+                block: {
+                  type: 'logic_operation',
+                  fields: { OP: 'OR' },
+                  inputs: {
+                    A: { block: { type: 'smarthome_pir', fields: { PIN: '15' } } },
+                    B: { block: cmp({ type: 'microbit_sound_level' }, 'GT', 150) },
+                  },
+                },
+              },
+              DO: {
+                block: chain([
+                  { type: 'smarthome_servo_ventana', fields: { PIN: '9', ANG: 0 } },
+                  { type: 'smarthome_buzzer_melody', fields: { MELODY: 'BADDY' } },
+                  { type: 'smarthome_rgb', fields: { PIN: '14', WHICH: '-1', COLOR: '255,0,0' } },
+                  { type: 'microbit_pause', fields: { MS: 200 } },
+                  { type: 'smarthome_rgb', fields: { PIN: '14', WHICH: '-1', COLOR: '0,0,0' } },
+                  { type: 'microbit_pause', fields: { MS: 200 } },
+                ]),
+              },
+              ELSE: {
+                block: { type: 'smarthome_rgb', fields: { PIN: '14', WHICH: '-1', COLOR: '0,0,0' } },
+              },
+            },
+          },
+        },
+      },
+    }),
+  },
+  {
+    id: 'sh_puerta',
+    board: 'microbit_smarthome',
+    emoji: '🚪',
+    title: 'Puerta y ventana con A/B',
+    desc: 'Pulsa A para abrir la puerta (P8) y la ventana (P9) a 180°, y B para cerrar ambas (0°).',
+    steps: [
+      'El bloque «por siempre» comprueba los botones todo el rato.',
+      '«si se pulsa botón A» → mueve el servo de la puerta y el de la ventana a 180° (abrir).',
+      '«si se pulsa botón B» → mueve ambos servos a 0° (cerrar).',
+      'Como están dentro de «por siempre», responden cada vez que pulsas.',
+    ],
+    state: top({
+      type: 'microbit_forever',
+      inputs: {
+        DO: {
+          block: chain([
+            {
+              type: 'microbit_on_button',
+              fields: { BTN: 'a' },
+              inputs: {
+                DO: {
+                  block: chain([
+                    { type: 'smarthome_servo', fields: { PIN: '8', ANG: 180 } },
+                    { type: 'smarthome_servo_ventana', fields: { PIN: '9', ANG: 180 } },
+                  ]),
+                },
+              },
+            },
+            {
+              type: 'microbit_on_button',
+              fields: { BTN: 'b' },
+              inputs: {
+                DO: {
+                  block: chain([
+                    { type: 'smarthome_servo', fields: { PIN: '8', ANG: 0 } },
+                    { type: 'smarthome_servo_ventana', fields: { PIN: '9', ANG: 0 } },
+                  ]),
+                },
+              },
+            },
+          ]),
+        },
+      },
+    }),
+  },
+  {
+    id: 'sh_ventilador',
+    board: 'microbit_smarthome',
+    emoji: '🌀',
+    title: 'Ventilador por temperatura',
+    desc: 'Si hace calor (más de 28°), enciende el ventilador; cuando refresca, lo apaga.',
+    steps: [
+      'El bloque «por siempre» vigila la temperatura.',
+      'El «si … si no» comprueba si la temperatura es mayor de 28°.',
+      'Si hace calor: enciende el ventilador (P12).',
+      'Si no: lo apaga. Espera medio segundo antes de volver a medir.',
+    ],
+    state: top({
+      type: 'microbit_forever',
+      inputs: {
+        DO: {
+          block: chain([
+            {
+              type: 'microbit_if_else',
+              inputs: {
+                IF: { block: cmp({ type: 'microbit_temperature' }, 'GT', 28) },
+                DO: { block: { type: 'smarthome_fan', fields: { PIN: '12', STATE: '0' } } },
+                ELSE: { block: { type: 'smarthome_fan', fields: { PIN: '12', STATE: '1' } } },
+              },
+            },
+            { type: 'microbit_pause', fields: { MS: 500 } },
+          ]),
+        },
+      },
+    }),
+  },
+  {
+    id: 'sh_clima',
+    board: 'microbit_smarthome',
+    emoji: '🌦️',
+    title: 'Clima: ventilador y ventana',
+    desc: 'Si hace calor enciende el ventilador, y si empieza a llover cierra la ventana automáticamente.',
+    steps: [
+      'El bloque «por siempre» vigila el clima sin parar.',
+      'Si la temperatura (sensor interno) es mayor de 27°: enciende el ventilador (P12); si no, lo apaga.',
+      'Si el sensor de lluvia/vapor (P10) detecta agua (valor > 500): cierra la ventana (servo P9 a 0°); si no, la abre (180°).',
+      'Espera 1 s antes de volver a comprobar.',
+    ],
+    state: top({
+      type: 'microbit_forever',
+      inputs: {
+        DO: {
+          block: chain([
+            {
+              type: 'microbit_if_else',
+              inputs: {
+                IF: { block: cmp({ type: 'microbit_temperature' }, 'GT', 27) },
+                DO: { block: { type: 'smarthome_fan', fields: { PIN: '12', STATE: '0' } } },
+                ELSE: { block: { type: 'smarthome_fan', fields: { PIN: '12', STATE: '1' } } },
+              },
+            },
+            {
+              type: 'microbit_if_else',
+              inputs: {
+                IF: { block: cmp({ type: 'smarthome_vapor', fields: { PIN: '10' } }, 'GT', 500) },
+                DO: { block: { type: 'smarthome_servo_ventana', fields: { PIN: '9', ANG: 0 } } },
+                ELSE: { block: { type: 'smarthome_servo_ventana', fields: { PIN: '9', ANG: 180 } } },
+              },
+            },
+            { type: 'microbit_pause', fields: { MS: 1000 } },
+          ]),
+        },
+      },
+    }),
+  },
+  {
+    id: 'sh_panel',
+    board: 'microbit_smarthome',
+    emoji: '📟',
+    title: 'Panel de sensores en la LCD',
+    desc: 'Muestra en la pantalla LCD, de dos en dos, el valor de cada sensor de la casa con sus unidades.',
+    steps: [
+      'El bloque «por siempre» va pasando por todos los sensores.',
+      'Cada bloque «LCD mostrar [sensor]» saca el nombre y el valor con su unidad (°C, %, Sí/No).',
+      'Se muestran dos sensores a la vez (fila 1 y fila 2).',
+      'Espera 2 s entre pareja y pareja para poder leerlos.',
+    ],
+    state: top({
+      type: 'microbit_forever',
+      inputs: {
+        DO: {
+          block: chain([
+            { type: 'smarthome_lcd_sensor', fields: { SENSOR: 'temp', ROW: '0' } },
+            { type: 'smarthome_lcd_sensor', fields: { SENSOR: 'gas', ROW: '1' } },
+            { type: 'microbit_pause', fields: { MS: 2000 } },
+            { type: 'smarthome_lcd_sensor', fields: { SENSOR: 'sonido', ROW: '0' } },
+            { type: 'smarthome_lcd_sensor', fields: { SENSOR: 'pir', ROW: '1' } },
+            { type: 'microbit_pause', fields: { MS: 2000 } },
+            { type: 'smarthome_lcd_sensor', fields: { SENSOR: 'suelo', ROW: '0' } },
+            { type: 'smarthome_lcd_sensor', fields: { SENSOR: 'lluvia', ROW: '1' } },
+            { type: 'microbit_pause', fields: { MS: 2000 } },
+          ]),
+        },
+      },
+    }),
+  },
 ];
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -2824,6 +3313,7 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
 
   const [selectedBoard, setSelectedBoard] = useState(initialBoard);
   const [isConnected, setIsConnected] = useState(false);
+  const [flashing, setFlashing] = useState(false); // flasheando MicroPython (WebUSB)
   const [generatedCode, setGeneratedCode] = useState('');
   const [logs, setLogs] = useState([]);
   const [showLibrary, setShowLibrary] = useState(false); // modal de proyectos
@@ -2865,7 +3355,7 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
       if (selectedBoard === 'arduino') {
         code = arduinoGenerator.workspaceToCode(ws);
       } else {
-        code = pythonGenerator.workspaceToCode(ws);
+        code = generatePython(ws);
       }
     } catch (e) {
       code = '// Error al generar código: ' + e.message;
@@ -3529,6 +4019,52 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
     (CONNECT_HELP[selectedBoard] || []).forEach((linea) => log('• ' + linea, 'info'));
   }, [selectedBoard, log]);
 
+  // Graba el firmware MicroPython en la micro:bit por WebUSB (DAPLink), sin salir
+  // del editor. Necesario tras usar MakeCode (que sobrescribe MicroPython).
+  const flashMicropython = useCallback(async () => {
+    if (!('usb' in navigator)) {
+      log('❌ Tu navegador no soporta WebUSB (usa Chrome/Edge en ordenador).', 'error');
+      return;
+    }
+    if (isConnected) {
+      log('⚠️ Desconecta la placa primero (el puerto solo lo puede usar una cosa a la vez).', 'error');
+      return;
+    }
+    setFlashing(true);
+    log('── Flasheando MicroPython en la micro:bit. NO la desconectes… ──', 'info');
+    let connection;
+    try {
+      const resp = await fetch(microPyHexUrl);
+      if (!resp.ok) throw new Error('no se pudo cargar el firmware');
+      const hexText = await resp.text();
+      connection = createWebUSBConnection();
+      await connection.connect(); // pide elegir la micro:bit (WebUSB)
+      let last = -1;
+      await connection.flash(createUniversalHexFlashDataSource(hexText), {
+        partial: false,
+        progress: (pct) => {
+          if (pct == null) return;
+          const p = Math.round(pct * 100);
+          if (p >= last + 10) {
+            log(`   Grabando… ${p}%`, 'info');
+            last = p;
+          }
+        },
+      });
+      log('✅ MicroPython instalado. Ahora pulsa «🔗 Conectar Placa» y ▶ Ejecuta tu programa.', 'success');
+    } catch (e) {
+      log('❌ No se pudo flashear: ' + (e?.message || e), 'error');
+      log('Revisa: cable USB de datos, placa enchufada y sin otra pestaña/programa usándola.', 'info');
+    } finally {
+      try {
+        if (connection) await connection.disconnect();
+      } catch {
+        /* ya cerrado */
+      }
+      setFlashing(false);
+    }
+  }, [isConnected, log]);
+
   const connect = useCallback(async () => {
     if (!('serial' in navigator)) {
       log('❌ Tu navegador no soporta Web Serial API.', 'error');
@@ -3772,15 +4308,27 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
         await sleep(150);
         cyberpiNeedsResetRef.current = true; // el próximo run requerirá reinicio
       } else {
-        // micro:bit: interrumpe y envía por exec en el REPL.
+        // micro:bit: RAW REPL (Ctrl-A · código · Ctrl-D). A diferencia del REPL
+        // normal, NO tiene límite de longitud de línea ni problemas de sangría,
+        // así que admite programas largos (el «exec» en una sola línea se
+        // truncaba en programas grandes → SyntaxError). Ctrl-C interrumpe primero
+        // cualquier «por siempre» que estuviera en marcha.
         log(`── Enviando al REPL (${BOARD_META[selectedBoard].lang})… ──`, 'info');
-        const oneLiner = 'exec(' + JSON.stringify(code) + ')\r\n';
-        await writeRaw('\x03');
-        await sleep(150);
-        await writeRaw('\x03');
-        await sleep(250);
-        await writeRaw(oneLiner);
-        await sleep(150);
+        await writeRaw('\r\x03\x03'); // Ctrl-C: interrumpe lo que hubiera en marcha
+        await sleep(120);
+        serialAccumRef.current = ''; // descarta el traceback/>>> del Ctrl-C
+        await writeRaw('\r\x01'); // Ctrl-A: entra en RAW REPL
+        // Espera el banner del modo raw ANTES de enviar (si no, se pierden los
+        // primeros bytes y la línea 1 sale corrupta → SyntaxError).
+        await waitForRegex(/raw REPL/, 2000);
+        serialAccumRef.current = '';
+        // Envía el programa en trozos (evita saturar el búfer serie) y ejecuta.
+        for (let i = 0; i < code.length; i += 128) {
+          await writeRaw(code.slice(i, i + 128));
+          await sleep(8);
+        }
+        await writeRaw('\x04'); // Ctrl-D: ejecutar
+        await waitForRegex(/OK|Error|Traceback/, 2000);
       }
       log('── Código enviado. Si es un bucle «por siempre», ya se ejecuta. ──', 'success');
       log('Mira la pantalla de la placa.', 'info');
@@ -4002,6 +4550,21 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
           >
             {isConnected ? '🔌 Desconectar' : '🔗 Conectar Placa'}
           </button>
+
+          {baseBoard(selectedBoard) === 'microbit' && (
+            <button
+              onClick={flashMicropython}
+              disabled={flashing || isConnected}
+              style={{
+                ...styles.btn,
+                background: flashing ? '#94a3b8' : '#7c3aed',
+                cursor: flashing || isConnected ? 'not-allowed' : 'pointer',
+              }}
+              title="Graba MicroPython en la micro:bit (necesario si antes usaste MakeCode)"
+            >
+              {flashing ? '⏳ Flasheando…' : '⚡ Flashear MicroPython'}
+            </button>
+          )}
 
           <button
             onClick={runCode}

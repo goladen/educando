@@ -1282,6 +1282,18 @@ function defineBlocksAndGenerators() {
       tooltip: 'Si se cumple la condición hace una cosa; si no, otra.',
     },
     {
+      type: 'text_unir',
+      message0: 'unir %1 %2',
+      args0: [
+        { type: 'input_value', name: 'A' },
+        { type: 'input_value', name: 'B' },
+      ],
+      inputsInline: true,
+      output: 'String',
+      colour: 160,
+      tooltip: 'Une dos textos (o un texto y un número) para formar una frase. Se pueden anidar.',
+    },
+    {
       type: 'smarthome_rgb',
       message0: '🌈 LED RGB (pin %1) nº %2 color %3',
       args0: [
@@ -1673,6 +1685,11 @@ function defineBlocksAndGenerators() {
     const elseB = gen.statementToCode(block, 'ELSE') || gen.INDENT + 'pass\n';
     return `if ${cond}:\n${doB}else:\n${elseB}`;
   };
+  P.forBlock['text_unir'] = function (block, gen) {
+    const a = gen.valueToCode(block, 'A', Order.NONE) || "''";
+    const b = gen.valueToCode(block, 'B', Order.NONE) || "''";
+    return [`str(${a}) + str(${b})`, Order.ATOMIC];
+  };
   const shServo = (block, gen) => {
     mbImport(gen);
     gen.definitions_['def_servo'] =
@@ -1998,6 +2015,11 @@ function defineBlocksAndGenerators() {
     const b = A.valueToCode(block, 'B', order) || 'false';
     return [a + op + b, order];
   };
+  A.forBlock['text_unir'] = function (block) {
+    const a = A.valueToCode(block, 'A', ArdOrder.ADDITIVE) || '""';
+    const b = A.valueToCode(block, 'B', ArdOrder.ADDITIVE) || '""';
+    return [`String(${a}) + String(${b})`, ArdOrder.ADDITIVE];
+  };
   A.forBlock['controls_if'] = function (block) {
     let code = '';
     let n = 0;
@@ -2132,7 +2154,17 @@ const STD_CATEGORIES = [
     kind: 'category',
     name: 'Texto',
     colour: '160',
-    contents: [{ kind: 'block', type: 'text' }],
+    contents: [
+      { kind: 'block', type: 'text' },
+      {
+        kind: 'block',
+        type: 'text_unir',
+        inputs: {
+          A: { shadow: { type: 'text', fields: { TEXT: 'Hola ' } } },
+          B: { shadow: { type: 'text', fields: { TEXT: 'mundo' } } },
+        },
+      },
+    ],
   },
 ];
 
@@ -3387,6 +3419,43 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
     });
     workspaceRef.current = ws;
 
+    // Categoría Variables: además de «Crear», añadimos un botón para ELIMINAR
+    // (también se puede borrar desde el desplegable del nombre de la variable).
+    ws.registerButtonCallback('CREATE_VARIABLE', (button) => {
+      Blockly.Variables.createVariableButtonHandler(button.getTargetWorkspace());
+    });
+    ws.registerButtonCallback('DELETE_VARIABLE', (button) => {
+      const w = button.getTargetWorkspace();
+      const vars = w.getAllVariables();
+      if (!vars.length) {
+        log('No hay variables que eliminar.', 'info');
+        return;
+      }
+      const names = vars.map((v) => v.name);
+      const sel = window.prompt(
+        'Escribe el nombre de la variable a eliminar:\n' + names.join(', '),
+        names[0]
+      );
+      if (!sel) return;
+      const v = vars.find((x) => x.name === sel.trim());
+      if (v) w.deleteVariableById(v.getId());
+      else log(`No existe una variable llamada «${sel}».`, 'error');
+    });
+    ws.registerToolboxCategoryCallback('VARIABLE', (w) => {
+      const xmlList = [];
+      const create = document.createElement('button');
+      create.setAttribute('text', '➕ Crear una variable…');
+      create.setAttribute('callbackKey', 'CREATE_VARIABLE');
+      xmlList.push(create);
+      if (w.getAllVariables().length > 0) {
+        const del = document.createElement('button');
+        del.setAttribute('text', '🗑️ Eliminar una variable…');
+        del.setAttribute('callbackKey', 'DELETE_VARIABLE');
+        xmlList.push(del);
+      }
+      return xmlList.concat(Blockly.Variables.flyoutCategoryBlocks(w));
+    });
+
     // Listener para regenerar el código en cada cambio relevante.
     const onChange = (e) => {
       if (e.isUiEvent || ws.isDragging()) return;
@@ -4571,6 +4640,19 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
               title="Graba MicroPython en la micro:bit (necesario si antes usaste MakeCode)"
             >
               {flashing ? '⏳ Flasheando…' : '⚡ Flashear MicroPython'}
+            </button>
+          )}
+
+          {baseBoard(selectedBoard) === 'microbit' && (
+            <button
+              onClick={() => {
+                setDontShowTut(false);
+                setShowTutorial(true);
+              }}
+              style={{ ...styles.btn, background: '#0ea5e9' }}
+              title="Volver a ver el tutorial de cómo empezar"
+            >
+              ❓ Ayuda
             </button>
           )}
 

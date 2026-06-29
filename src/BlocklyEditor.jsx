@@ -3314,6 +3314,14 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
   const [selectedBoard, setSelectedBoard] = useState(initialBoard);
   const [isConnected, setIsConnected] = useState(false);
   const [flashing, setFlashing] = useState(false); // flasheando MicroPython (WebUSB)
+  const [showTutorial, setShowTutorial] = useState(() => {
+    try {
+      return localStorage.getItem('pikt_blockly_tutorial') !== 'oculto';
+    } catch {
+      return true;
+    }
+  });
+  const [dontShowTut, setDontShowTut] = useState(false);
   const [generatedCode, setGeneratedCode] = useState('');
   const [logs, setLogs] = useState([]);
   const [showLibrary, setShowLibrary] = useState(false); // modal de proyectos
@@ -4936,6 +4944,61 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
         </div>
       )}
 
+      {/* Mini tutorial de inicio (solo para micro:bit / Smart Home) */}
+      {showTutorial && baseBoard(selectedBoard) === 'microbit' && (
+        <div style={styles.modalOverlay} onClick={() => setShowTutorial(false)}>
+          <div style={{ ...styles.modal, maxWidth: '540px' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontSize: '42px', textAlign: 'center' }}>🤖</div>
+            <h3 style={{ margin: '4px 0 14px', color: '#f1f5f9', textAlign: 'center' }}>
+              Cómo empezar con la micro:bit
+            </h3>
+            <ol style={styles.tutoList}>
+              <li style={styles.tutoItem}>
+                Pulsa <b>⚡ Flashear MicroPython</b> — <u>sin darle a conectar todavía</u>. Elige tu
+                micro:bit y espera a que termine la grabación.
+              </li>
+              <li style={styles.tutoItem}>
+                Cuando acabe, pulsa <b>🔗 Conectar Placa</b> y ya podrás <b>▶ Ejecutar</b> tus programas.
+              </li>
+              <li style={styles.tutoItem}>
+                ¿No conecta? Asegúrate de <b>no tener la placa abierta en otro sitio</b> (otra pestaña,
+                MakeCode, python.microbit.org…). Solo un programa puede usar el puerto a la vez.
+              </li>
+              <li style={styles.tutoItem}>
+                Los <b>pines</b> que ves en los bloques ya son los del <b>montaje de la casa</b>: no hace
+                falta cambiarlos.
+              </li>
+              <li style={styles.tutoItem}>
+                Explora los <b>📚 Proyectos</b> de ejemplo y <b>💾 guarda</b> los tuyos propios.
+              </li>
+            </ol>
+            <label style={styles.tutoCheck}>
+              <input
+                type="checkbox"
+                checked={dontShowTut}
+                onChange={(e) => setDontShowTut(e.target.checked)}
+              />
+              No volver a mostrar este tutorial
+            </label>
+            <button
+              onClick={() => {
+                if (dontShowTut) {
+                  try {
+                    localStorage.setItem('pikt_blockly_tutorial', 'oculto');
+                  } catch {
+                    /* sin almacenamiento */
+                  }
+                }
+                setShowTutorial(false);
+              }}
+              style={{ ...styles.btn, background: '#16a34a', width: '100%', padding: '12px', marginTop: '12px' }}
+            >
+              ¡Entendido, empezar! 🚀
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Modal: compartir proyecto con enlaces por rol */}
       {showShare && shareLinks && (
         <div style={styles.modalOverlay} onClick={() => setShowShare(false)}>
@@ -5301,6 +5364,9 @@ const styles = {
     fontSize: '15px',
   },
   modalSub: { color: '#94a3b8', fontSize: '13px', margin: '8px 0 16px', lineHeight: 1.5 },
+  tutoList: { margin: 0, padding: '0 0 0 22px', color: '#e2e8f0', fontSize: '13.5px', lineHeight: 1.55, display: 'flex', flexDirection: 'column', gap: '10px' },
+  tutoItem: { paddingLeft: '4px' },
+  tutoCheck: { display: 'flex', alignItems: 'center', gap: '8px', color: '#94a3b8', fontSize: '12.5px', marginTop: '16px', cursor: 'pointer' },
   projectGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',

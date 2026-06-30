@@ -33,6 +33,7 @@ import GranjaInteractiva from '../GranjaInteractiva';
 import Plataformas from '../Plataformas2';
 import StoryCubes from '../StoryCubes';
 import FutbolQuizz from '../FutbolQuizz';
+import PuzzleImagenes from '../PuzzleImagenes';
 import UserProfile from './UserProfile';
 import MansionPitagoricaGame from '../MansionPitagoricaGame';
 import ArkadeHub from '../MiniArcade/ArkadeHub';
@@ -647,6 +648,7 @@ export const APPS = [
     { id: 'PROBABILIDAD', name: 'Probabilidad', desc: 'Simulador de dados: tipos, múltiples dados y análisis de frecuencias.', color: '#f59e0b', emoji: '🎲', isMath: true, shareable: true },
 
     { id: 'STORYCUBES', name: 'Story Cubes', desc: 'Crea historias en equipo usando dados con imágenes.', color: '#8e44ad', emoji: '🎲', shareable: true },
+    { id: 'PUZZLE_IMAGENES', name: 'Puzzle de Imágenes', desc: 'Monta una foto recolocando sus piezas. 20 imágenes y 3 dificultades.', color: '#6c5ce7', emoji: '🧩', shareable: true },
     { id: 'FUTBOLQUIZZ', name: 'Fútbol Quizz', desc: 'Pizarra de fútbol por turnos: arrastra y dispara para marcar gol.', color: '#15803d', emoji: '⚽', shareable: true },
     { id: 'RETOS', name: 'Retos', desc: 'Conecta puntos y puzzles de lógica.', color: '#f39c12', emoji: '🧩', shareable: true },
     { id: 'TRIVIAL', name: 'Trivial', desc: 'El clásico juego de preguntas por categorías para hasta 6 jugadores.', color: '#16213e', emoji: '🎯', shareable: true },
@@ -816,6 +818,14 @@ export const GAME_INFO = {
         multiplayer: 'Sí, se puede usar en equipo o por turnos en clase.',
         materias: ['Lengua y Literatura', 'Inglés', 'Arte'],
         etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
+    PUZZLE_IMAGENES: {
+        descripcion: 'Puzzle de imágenes: una foto se corta en piezas rectangulares que se desordenan. El alumno las recoloca intercambiándolas (toca dos piezas o arrástralas). Incluye 20 imágenes precargadas, cada una con 3 dificultades (6, 12 y 24 piezas). Optimizado para móvil.',
+        tipoPreguntas: 'No hay preguntas. Es un juego visual de lógica y atención.',
+        biblioteca: 'Sí, 20 puzzles precargados (Pi, fondo marino, Pikatron, Keyestudio y más). Sin necesidad de recurso del profesor.',
+        multiplayer: 'Individual o por turnos en el mismo dispositivo (1 a 3 jugadores).',
+        materias: ['Plástica', 'Lógica', 'Atención'],
+        etapas: ['Infantil', 'Primaria', 'ESO'],
     },
     RETOS: {
         descripcion: 'Colección de puzzles y retos de pensamiento lógico: conectar puntos, laberintos, puzzles visuales y desafíos de razonamiento.',
@@ -1424,6 +1434,39 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
         return () => window.removeEventListener('popstate', checkURL);
     }, []);
 
+    // (A) Auto-reconexión a una sesión en vivo tras recargar / perder conexión.
+    // Si quedó una sesión guardada y la sala sigue activa, volvemos a entrar solos.
+    useEffect(() => {
+        let raw;
+        try { raw = localStorage.getItem('pikt_live_session'); } catch (e) { return; }
+        if (!raw) return;
+        let s;
+        try { s = JSON.parse(raw); } catch (e) { localStorage.removeItem('pikt_live_session'); return; }
+        // Caduca a las 3 h para no reconectar a partidas viejas.
+        if (!s?.sala || (Date.now() - (s.ts || 0)) > 3 * 60 * 60 * 1000) {
+            try { localStorage.removeItem('pikt_live_session'); } catch (e) {}
+            return;
+        }
+        // No pisar una entrada explícita por URL.
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('sala') || params.get('juego') || params.get('sopa') || params.get('gestion') || params.get('pizarra')) return;
+
+        getDoc(doc(db, 'live_games', s.sala)).then(snap => {
+            if (!snap.exists()) { try { localStorage.removeItem('pikt_live_session'); } catch (e) {} return; }
+            const data = snap.data();
+            const est = data.estado;
+            if (est === 'LOBBY' || est === 'COUNTDOWN' || est === 'JUEGO') {
+                setJoinLiveCode(s.sala);
+                setJoinLiveName(s.nombre || 'Invitado');
+                setJoinLiveTipoJuego(s.tipo || data.tipoJuego || '');
+                setIsMathLiveAlumno(data.config?.isMathLive === true || data.tipoJuego === 'MATHLIVE');
+                setLiveModeAlumno(true);
+            } else {
+                try { localStorage.removeItem('pikt_live_session'); } catch (e) {}
+            }
+        }).catch(() => {});
+    }, []);
+
 
 
     const [modoBusqueda, setModoBusqueda] = useState('FILTROS');
@@ -1725,6 +1768,11 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
 
         if (appId === 'STORYCUBES') {
             setJuegoActivo({ tipoJuego: 'STORYCUBES' });
+            return;
+        }
+
+        if (appId === 'PUZZLE_IMAGENES') {
+            setJuegoActivo({ tipoJuego: 'PUZZLE_IMAGENES' });
             return;
         }
 
@@ -2202,9 +2250,10 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
         if (juegoActivo.tipoJuego === 'SINTAXIS')    return <SintaxisGame  usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'LISTENING')   return <Listening     usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'STORYCUBES')  return <StoryCubes    usuario={usuario} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'PUZZLE_IMAGENES') return <PuzzleImagenes onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'FUTBOLQUIZZ') return <FutbolQuizz   onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'ARKADE')      return <ArkadeHub onExit={() => setJuegoActivo(null)} />;
-        if (juegoActivo.tipoJuego === 'RETOS')        return <RetosApp                        onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'RETOS')        return <RetosApp usuario={usuario}      onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'SOLAR_SYSTEM') return <SolarSystemViewer recursoConfig={juegoActivo.tourConfig || null} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'IRREGULAR_VERBS') return (
             <div style={{ position:'fixed', inset:0, zIndex:9999, background:'#0f0f1a', overflowY:'auto' }}>
@@ -3501,7 +3550,7 @@ const [entrando, setEntrando] = useState(false);
         if (appData.id === 'POLINOMIOS'  || juegoActivo.tipoJuego === 'POLINOMIOS')  return <AlgebraApp     usuario={usuario} onExit={handleExitGame} />;
         if (appData.id === 'ESTADISTICA'  || juegoActivo.tipoJuego === 'ESTADISTICA')  return <EstadisticaApp  usuario={usuario} onExit={handleExitGame} />;
         if (appData.id === 'PROBABILIDAD' || juegoActivo.tipoJuego === 'PROBABILIDAD') return <SimuladorDados                    onExit={handleExitGame} />;
-        if (appData.id === 'RETOS'        || juegoActivo.tipoJuego === 'RETOS')        return <RetosApp                          onExit={handleExitGame} />;
+        if (appData.id === 'RETOS'        || juegoActivo.tipoJuego === 'RETOS')        return <RetosApp usuario={usuario}        onExit={handleExitGame} />;
 
     }
     // --- NUEVO: ATAJO PARA JUEGOS CON MENÚ PROPIO ---

@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ArrowLeft, Play, RefreshCw, CheckCircle, BrainCircuit, Lock, Grid3X3, Eraser, Edit3, Clock } from 'lucide-react';
+import { ArrowLeft, Play, RefreshCw, CheckCircle, BrainCircuit, Lock, Grid3X3, Eraser, Edit3, Clock, Lightbulb } from 'lucide-react';
 import Confetti from 'react-confetti';
+import SwitchOn from './SwitchOn';
+import { getProgreso, marcarNivelCompletado, cargarProgresoFirebase, guardarProgresoFirebase } from './utils/retosProgreso';
+import { guardarRegistroLocal } from './utils/registrosLocales';
 
 // ─── NIVELES DEL JUEGO (Tableros) ─────────────────────────────────────────────
 const LEVELS = [
@@ -95,7 +98,7 @@ function useAudio() {
 }
 
 // ─── COMPONENTE DEL JUEGO "CONECTA PUNTOS" ────────────────────────────────────
-function ConectaPuntos({ levelData, onWin, onVolver, isLastLevel }) {
+function ConectaPuntos({ levelData, onWin, onVolver, isLastLevel, onComplete }) {
     const [paths, setPathsState] = useState({});
     const [isWon, setIsWon] = useState(false);
 
@@ -133,6 +136,7 @@ function ConectaPuntos({ levelData, onWin, onVolver, isLastLevel }) {
         if (allConnected) {
             audio.win();
             setIsWon(true);
+            if (onComplete) onComplete();
         }
     };
 
@@ -374,7 +378,7 @@ function ConectaPuntos({ levelData, onWin, onVolver, isLastLevel }) {
 // ─── COMPONENTE NIVEL LIBRE (dibujo sobre círculo) ───────────────────────────
 const CX = 50, CY = 50, CR = 44, SNAP = 5, MIN_DIST = 1.2;
 
-function ConectaLibre({ levelData, onWin, onVolver, isLastLevel }) {
+function ConectaLibre({ levelData, onWin, onVolver, isLastLevel, onComplete }) {
     const [pathsState, setPathsState] = useState({});
     const pathsRef   = useRef({});
     const activeRef  = useRef(null);
@@ -431,7 +435,7 @@ function ConectaLibre({ levelData, onWin, onVolver, isLastLevel }) {
             const end    = startA ? dotB : dotA;
             return Math.hypot(last.x - end.x, last.y - end.y) < 0.5;
         });
-        if (won) { audio.win(); setIsWon(true); }
+        if (won) { audio.win(); setIsWon(true); if (onComplete) onComplete(); }
     };
 
     const startDraw = (clientX, clientY) => {
@@ -645,7 +649,7 @@ const generateSudoku = (difficulty) => {
 const fmtTime = (s) => `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
 
 // ─── COMPONENTE SUDOKU ────────────────────────────────────────────────────────
-function JuegoSudoku({ onVolver }) {
+function JuegoSudoku({ onVolver, onComplete }) {
     const [difficulty, setDifficulty] = useState(null);
     const [board, setBoard] = useState([]);
     const [initialBoard, setInitialBoard] = useState([]);
@@ -703,7 +707,7 @@ function JuegoSudoku({ onVolver }) {
         } else {
             const b = board.map(row => [...row]); b[r][c] = num; setBoard(b);
             setNotes(autoCleanNotes(notes, r, c, num));
-            if (checkWin(b)) setIsWon(true);
+            if (checkWin(b)) { setIsWon(true); if (onComplete) onComplete(difficulty); }
         }
     }, [isWon, selected, initialBoard, notesMode, notes, board]);
 
@@ -844,15 +848,40 @@ function BtnCompartir({ path, title = 'pikt.es · Sala de Retos' }) {
 }
 
 // ─── MENÚ PRINCIPAL DE RETOS ──────────────────────────────────────────────────
-export default function Retos({ onExit, initialGame = null }) {
-    const [activeGame, setActiveGame] = useState(initialGame); // 'CONECTA' | 'SUDOKU' | null
+export default function Retos({ onExit, initialGame = null, usuario = null }) {
+    const [activeGame, setActiveGame] = useState(initialGame); // 'CONECTA' | 'SUDOKU' | 'SWITCHON' | null
     const [currentLevelIdx, setCurrentLevelIdx] = useState(0);
-    const [nivelesDesbloqueados, setNivelesDesbloqueados] = useState(1);
+    const [progreso, setProgreso] = useState(() => getProgreso());
+
+    // Al entrar: si el alumno está registrado, traer su progreso de Firebase y fusionarlo.
+    useEffect(() => {
+        if (!usuario?.uid) return;
+        let activo = true;
+        cargarProgresoFirebase(usuario.uid).then((fusion) => {
+            if (activo && fusion) setProgreso({ ...fusion });
+        });
+        return () => { activo = false; };
+    }, [usuario?.uid]);
+
+    // Registra que un nivel se ha superado: dispositivo + (si registrado) Firebase + "Mis registros".
+    const completarNivel = useCallback((juego, nivel, titulo) => {
+        const { progreso: nuevo, esNuevo } = marcarNivelCompletado(juego, nivel);
+        setProgreso({ ...nuevo });
+        if (esNuevo) {
+            guardarRegistroLocal('RETOS', { titulo, aciertos: 1, intentos: 1, porcentaje: 100, via: 'Reto superado' });
+            if (usuario?.uid) guardarProgresoFirebase(usuario.uid);
+        }
+    }, [usuario?.uid]);
+
+    // Niveles de "Conecta" desbloqueados: el 1 siempre, y el siguiente al máximo superado.
+    const conectaSuperados = progreso.CONECTA || [];
+    const nivelesDesbloqueados = conectaSuperados.length
+        ? Math.min(LEVELS.length, Math.max(...conectaSuperados) + 1)
+        : 1;
 
     const handleWin = () => {
         // Llamado desde el botón "Siguiente nivel" del overlay
         if (currentLevelIdx < LEVELS.length - 1) {
-            setNivelesDesbloqueados(prev => Math.max(prev, currentLevelIdx + 2));
             setCurrentLevelIdx(prev => prev + 1);
         }
     };
@@ -867,6 +896,7 @@ export default function Retos({ onExit, initialGame = null }) {
                     onWin={handleWin}
                     onVolver={() => setActiveGame(null)}
                     isLastLevel={currentLevelIdx === LEVELS.length - 1}
+                    onComplete={() => completarNivel('CONECTA', level.id, `Conecta los Puntos · Nivel ${level.id}`)}
                 />
             </div>
         );
@@ -874,8 +904,19 @@ export default function Retos({ onExit, initialGame = null }) {
 
     if (activeGame === 'SUDOKU') return (
         <div style={st.containerGame}>
-            <JuegoSudoku onVolver={() => setActiveGame(null)} />
+            <JuegoSudoku
+                onVolver={() => setActiveGame(null)}
+                onComplete={(diff) => completarNivel('SUDOKU', diff, `Sudoku · ${diff}`)}
+            />
         </div>
+    );
+
+    if (activeGame === 'SWITCHON') return (
+        <SwitchOn
+            onVolver={() => setActiveGame(null)}
+            completados={progreso.SWITCHON || []}
+            onLevelComplete={(lvl) => completarNivel('SWITCHON', lvl, `El Juego de las Luces · Nivel ${lvl}`)}
+        />
     );
 
     return (
@@ -925,7 +966,9 @@ export default function Retos({ onExit, initialGame = null }) {
                                     color: idx + 1 <= nivelesDesbloqueados ? 'white' : 'rgba(255,255,255,0.3)'
                                 }}
                             >
-                                {idx + 1 > nivelesDesbloqueados ? <Lock size={16} /> : `Nivel ${lvl.id}`}
+                                {idx + 1 > nivelesDesbloqueados
+                                    ? <Lock size={16} />
+                                    : <>Nivel {lvl.id}{conectaSuperados.includes(lvl.id) ? ' ✓' : ''}</>}
                             </button>
                         ))}
                     </div>
@@ -950,6 +993,33 @@ export default function Retos({ onExit, initialGame = null }) {
                     </p>
                     <button onClick={() => setActiveGame('SUDOKU')} style={{ width:'100%', padding:'12px', background:'#3498db', color:'white', border:'none', borderRadius:10, fontWeight:'bold', fontSize:'1.1rem', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
                         <Play size={18}/> Jugar Sudoku
+                    </button>
+                </div>
+
+                {/* TARJETA SWITCH ON (El Juego de las Luces) */}
+                <div style={st.card}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:15 }}>
+                        <div style={{ background:'#7c3aed', padding:12, borderRadius:14 }}>
+                            <Lightbulb size={24} color="white" />
+                        </div>
+                        <div style={{ background:'rgba(255,255,255,0.1)', padding:'4px 10px', borderRadius:20, fontSize:'0.8rem', color:'white', fontWeight:'bold' }}>
+                            Lógica
+                        </div>
+                    </div>
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+                        <h2 style={{ color:'white', margin:0, fontSize:'1.5rem' }}>El Juego de las Luces</h2>
+                        <BtnCompartir path="switchon" />
+                    </div>
+                    <p style={{ color:'rgba(255,255,255,0.6)', fontSize:'0.9rem', lineHeight:1.5, marginBottom:20 }}>
+                        Cambia el color de los nodos conectados hasta que tu tablero coincida con el objetivo. 6 niveles de dificultad creciente.
+                    </p>
+                    <button onClick={() => setActiveGame('SWITCHON')} style={{ width:'100%', padding:'12px', background:'#7c3aed', color:'white', border:'none', borderRadius:10, fontWeight:'bold', fontSize:'1.1rem', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+                        <Play size={18}/> Jugar
+                        {(progreso.SWITCHON || []).length > 0 && (
+                            <span style={{ fontSize:'0.85rem', fontWeight:700, background:'rgba(255,255,255,0.25)', padding:'2px 8px', borderRadius:12 }}>
+                                {(progreso.SWITCHON || []).length}/6 ✓
+                            </span>
+                        )}
                     </button>
                 </div>
 

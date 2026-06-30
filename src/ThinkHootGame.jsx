@@ -16,7 +16,14 @@ import piAngry from './assets/Pi-enfadado.png';
 import piNeutral from './assets/Pi-neutro.png';
 
 // --- AUDIOS (PRE-CARGADOS PARA EVITAR LAG) ---
-const _mkAudio = src => { let a; return { get currentTime(){ return a?.currentTime??0; }, set currentTime(v){ (a??=new Audio(src)).currentTime=v; }, play(){ return (a??=new Audio(src)).play(); } }; };
+const _mkAudio = src => { let a; return {
+    get currentTime(){ return a?.currentTime??0; },
+    set currentTime(v){ (a??=new Audio(src)).currentTime=v; },
+    play(){ return (a??=new Audio(src)).play(); },
+    // Desbloquea el audio en móvil: hay que llamarlo DENTRO de un gesto del usuario
+    // (un toque), para que luego se pueda reproducir de forma programada.
+    unlock(){ const el = (a??=new Audio(src)); el.muted = true; el.play().then(() => { el.pause(); el.currentTime = 0; el.muted = false; }).catch(() => { el.muted = false; }); }
+}; };
 const audioCorrect = _mkAudio(correctSoundFile);
 const audioWrong   = _mkAudio(wrongSoundFile);
 const audioWin     = _mkAudio(winSoundFile);
@@ -85,6 +92,7 @@ function ThinkHootHost({ codigoSala, onExit, usuario }) {
     const ytPlayerReadyRef = useRef(false);
     const watchingIntervalRef = useRef(null);
     const revealTimeoutRef = useRef(null);
+    const procesandoRef = useRef(false);   // lock síncrono del botón "Siguiente"
 
     const gameDataRef = useRef(gameData);
     useEffect(() => {
@@ -348,7 +356,12 @@ function ThinkHootHost({ codigoSala, onExit, usuario }) {
         if (esMusical) {
             await updateDoc(doc(db, "live_games", codigoSala), { fasePregunta: 'BLANK_REVEAL' });
             setTimeout(() => siguienteBlanco(), 3500);
-        } else if (!esDibujo) {
+        } else if (esDibujo) {
+            // Los dibujos los valora el profesor en la pizarra (ManualGrader).
+            // Pasamos a REVEAL SIN temporizador: avanza solo al terminar de corregir.
+            if (revealTimeoutRef.current) { clearTimeout(revealTimeoutRef.current); revealTimeoutRef.current = null; }
+            await updateDoc(doc(db, "live_games", codigoSala), { fasePregunta: 'REVEAL' });
+        } else {
             await updateDoc(doc(db, "live_games", codigoSala), { fasePregunta: 'REVEAL' });
             if (revealTimeoutRef.current) clearTimeout(revealTimeoutRef.current);
             revealTimeoutRef.current = setTimeout(async () => {
@@ -359,27 +372,37 @@ function ThinkHootHost({ codigoSala, onExit, usuario }) {
     };
 
     const siguientePregunta = async (e) => {
-        if (cargandoSiguiente) return;
-
         if (e && e.target) e.target.blur();
+
+        // Lock síncrono con ref: evita dobles disparos sin depender del estado
+        // de React (que va por detrás) y NUNCA deja el botón colgado.
+        if (procesandoRef.current) return;
+        procesandoRef.current = true;
+        setCargandoSiguiente(true);
 
         if (revealTimeoutRef.current) {
             clearTimeout(revealTimeoutRef.current);
             revealTimeoutRef.current = null;
         }
 
-        setCargandoSiguiente(true);
-
         try {
-            const nextIdx = (gameData.indicePregunta || 0) + 1;
+            // Usamos SIEMPRE el dato más fresco del snapshot, no el estado de React.
+            const data = gameDataRef.current || gameData;
+            const fase = data.fasePregunta;
+            const esPresent = data.preguntas[data.indicePregunta]?.tipo === 'PRESENTATION';
+            const nextIdx = (data.indicePregunta || 0) + 1;
 
-            // CASO 1: Si estamos respondiendo, forzamos mostrar solución
-            if (gameData.estado === 'JUEGO' && gameData.fasePregunta === 'RESPONDING' && !isPresentation) {
-                await revelarRespuestas(gameData);
+            // CASO 1: Estamos respondiendo (no presentación) → revelar solución.
+            if (data.estado === 'JUEGO' && fase === 'RESPONDING' && !esPresent) {
+                await revelarRespuestas(data);
             }
-            // CASO 2: Si ya estamos en solución, ranking o es presentación, avanzamos
-            else if (nextIdx < gameData.preguntas.length) {
-                const nextQ = gameData.preguntas[nextIdx];
+            // CASO 2: Estamos viendo la solución → saltar al ranking (sin esperar 5 s).
+            else if ((fase === 'REVEAL' || fase === 'BLANK_REVEAL')) {
+                await updateDoc(doc(db, "live_games", codigoSala), { fasePregunta: 'LEADERBOARD' });
+            }
+            // CASO 3: Ranking o presentación → avanzar a la siguiente pregunta.
+            else if (nextIdx < data.preguntas.length) {
+                const nextQ = data.preguntas[nextIdx];
                 const nextFase = nextQ?.tipo === 'MUSICAL' ? 'WATCHING' : 'RESPONDING';
                 await updateDoc(doc(db, "live_games", codigoSala), {
                     indicePregunta: nextIdx,
@@ -395,6 +418,9 @@ function ThinkHootHost({ codigoSala, onExit, usuario }) {
             }
         } catch (error) {
             console.error("Error al pasar pregunta:", error);
+        } finally {
+            // SIEMPRE liberamos: aunque no cambie ninguna fase, el botón vuelve a estar activo.
+            procesandoRef.current = false;
             setCargandoSiguiente(false);
         }
     };
@@ -493,6 +519,14 @@ function ThinkHootHost({ codigoSala, onExit, usuario }) {
         setMensajeActivo(null);
     };
 
+    // Expulsar a un jugador desde la lista lateral
+    const expulsarJugador = async (uid) => {
+        if (!uid) return;
+        const nombre = gameData?.jugadores?.[uid]?.nombre || 'este jugador';
+        if (!window.confirm(`¿Expulsar a ${nombre}?`)) return;
+        await updateDoc(doc(db, "live_games", codigoSala), { [`jugadores.${uid}`]: deleteField() });
+    };
+
     if (!gameData) return <div style={{ color: 'white', padding: 20 }}>Cargando sala...</div>;
 
     const currentQ = (gameData.indicePregunta || 0) + 1;
@@ -539,6 +573,27 @@ function ThinkHootHost({ codigoSala, onExit, usuario }) {
                     <div className="player-counter"><Users size={20} /> {jugadores.length}</div>
                 </div>
             </div>
+
+            {/* LISTA DE JUGADORES (MARGEN DERECHO, SOLO PANTALLA GRANDE) */}
+            {(faseHost === 'LOBBY' || faseHost === 'JUEGO') && (
+                <div className="host-players-sidebar">
+                    <div className="hps-header"><Users size={18} /> Jugadores ({jugadores.length})</div>
+                    <div className="hps-list">
+                        {jugadores.length === 0 && <div className="hps-empty">Esperando jugadores…</div>}
+                        {[...jugadores].sort((a, b) => (b.puntos || 0) - (a.puntos || 0)).map((j) => {
+                            const haContestado = !!(gameData.respuestasRonda && gameData.respuestasRonda[j.uid]);
+                            return (
+                                <div key={j.uid} className={`hps-item ${haContestado ? 'answered' : ''}`}>
+                                    <span className="hps-tick">{haContestado ? <CheckCircle size={18} /> : <span className="hps-dot" />}</span>
+                                    <span className="hps-name">{j.nombre}</span>
+                                    <span className="hps-pts">{j.puntos || 0}</span>
+                                    <button className="hps-kick" title="Expulsar" onClick={() => expulsarJugador(j.uid)}><UserX size={16} /></button>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
 
             {/* AVATAR PI - HOST (FIJO IZQUIERDA) */}
             {faseHost === 'JUEGO' && !isPresentation && subFase !== 'WATCHING' && (
@@ -713,6 +768,17 @@ function ThinkHootHost({ codigoSala, onExit, usuario }) {
                                             ) : (
                                                     <div className="reveal-text">{parseText(correctStr)}</div>
                                                 )}
+                                            <div className="host-controls" style={{ marginTop: 30 }}>
+                                                <button
+                                                    className="btn-next-floating"
+                                                    onClick={siguientePregunta}
+                                                    disabled={cargandoSiguiente}
+                                                    style={{ opacity: cargandoSiguiente ? 0.7 : 1, cursor: cargandoSiguiente ? 'wait' : 'pointer' }}
+                                                >
+                                                    {cargandoSiguiente ? "Procesando..." : "Ver Ranking"}
+                                                    {!cargandoSiguiente && <ArrowUp className="rotate-90" />}
+                                                </button>
+                                            </div>
                                         </div>
                                     )}
                             </div>
@@ -787,18 +853,47 @@ function ThinkHootClient({ codigoSala, usuario, onExit }) {
     const [showDudaModal, setShowDudaModal] = useState(false);
     const [enviandoProfe, setEnviandoProfe] = useState(false);
     const [enviadoProfe,  setEnviadoProfe]  = useState(false);
-    const joiningRef = useRef(false);
+    const [expulsado,     setExpulsado]     = useState(false);
+    const joiningRef   = useRef(false);
+    const wasJoinedRef = useRef(false);   // (C) ¿llegamos a estar dentro de la sala?
+    const expulsadoRef = useRef(false);   // (C) guard para no re-unirse tras un kick
 
+    // (B) Identidad por dispositivo PERO por sala: evita arrastrar el mismo
+    // invitado entre partidas distintas y permite reconectar al mismo hueco.
     const guestId = useMemo(() => {
         if (usuario?.uid) return usuario.uid;
-        const stored = localStorage.getItem('pikt_guest_id');
+        const key = `pikt_guest_id_${codigoSala}`;
+        const stored = localStorage.getItem(key);
         if (stored) return stored;
         const newId = 'guest_' + Math.random().toString(36).substring(2, 9);
-        localStorage.setItem('pikt_guest_id', newId);
+        localStorage.setItem(key, newId);
         return newId;
-    }, [usuario]);
+    }, [usuario, codigoSala]);
     const myUid = usuario?.uid || guestId;
     const myName = usuario?.displayName || "Invitado";
+
+    // (A) Persistencia de la sesión en vivo para auto-reconectar tras recarga.
+    const guardarSesionLive = () => {
+        try {
+            localStorage.setItem('pikt_live_session', JSON.stringify({
+                sala: codigoSala, nombre: myName, uid: myUid, tipo: 'THINKHOOT', ts: Date.now()
+            }));
+        } catch (e) {}
+    };
+    const limpiarSesionLive = () => { try { localStorage.removeItem('pikt_live_session'); } catch (e) {} };
+    const salirYlimpiar = () => { limpiarSesionLive(); onExit(); };
+
+    // (D) Bloquear el gesto "tirar hacia abajo para recargar" mientras se juega.
+    useEffect(() => {
+        const prevHtml = document.documentElement.style.overscrollBehaviorY;
+        const prevBody = document.body.style.overscrollBehaviorY;
+        document.documentElement.style.overscrollBehaviorY = 'contain';
+        document.body.style.overscrollBehaviorY = 'contain';
+        return () => {
+            document.documentElement.style.overscrollBehaviorY = prevHtml;
+            document.body.style.overscrollBehaviorY = prevBody;
+        };
+    }, []);
 
     useEffect(() => {
         const unsubscribe = onSnapshot(doc(db, "live_games", codigoSala), async (docSnap) => {
@@ -814,32 +909,51 @@ function ThinkHootClient({ codigoSala, usuario, onExit }) {
 
                 const jugadoresMap = data.jugadores || {};
                 if (jugadoresMap[myUid]) {
+                    wasJoinedRef.current = true;
+                    expulsadoRef.current = false;
+                    if (expulsado) setExpulsado(false);
                     setPuntuacion(jugadoresMap[myUid].puntos   || 0);
                     setAciertos(jugadoresMap[myUid].aciertos   || 0);
                     setFallos(jugadoresMap[myUid].fallos       || 0);
+                    // (E) Si el alumno reentra con un nombre distinto, lo actualizamos.
+                    if (myName && myName !== "Invitado" && jugadoresMap[myUid].nombre !== myName) {
+                        updateDoc(doc(db, "live_games", codigoSala), { [`jugadores.${myUid}.nombre`]: myName }).catch(() => {});
+                    }
+                    // (A) Guardar sesión mientras la partida está viva.
+                    if (data.estado !== 'FIN') guardarSesionLive();
                 } else {
+                    // (C) Si ESTÁBAMOS dentro y de repente no aparecemos con la partida
+                    // en marcha, el profesor nos ha expulsado: NO re-unirse.
+                    if (wasJoinedRef.current && (data.estado === 'LOBBY' || data.estado === 'JUEGO')) {
+                        expulsadoRef.current = true;
+                        setExpulsado(true);
+                        limpiarSesionLive();
+                        return;
+                    }
                     // CORRECCIÓN: Permitimos unirse en LOBBY o en JUEGO (para los tardones)
-                    if ((data.estado === 'LOBBY' || data.estado === 'JUEGO') && !joiningRef.current) {
+                    if ((data.estado === 'LOBBY' || data.estado === 'JUEGO') && !joiningRef.current && !expulsadoRef.current) {
                         joiningRef.current = true;
                         await updateDoc(doc(db, "live_games", codigoSala), {
                             [`jugadores.${myUid}`]: { uid: myUid, nombre: myName, puntos: 0, aciertos: 0, fallos: 0, joinedAt: Date.now() }
                         });
                         joiningRef.current = false;
+                        guardarSesionLive();
                     }
                 }
 
                 if (data.estado === 'FIN') {
+                    limpiarSesionLive();
                     const sorted = Object.values(jugadoresMap).sort((a, b) => b.puntos - a.puntos);
                     const rank = sorted.findIndex(j => j.uid === myUid) + 1;
                     setMyRank(rank);
                     if (rank <= 3) confetti();
                 }
-            } else { alert("Sala cerrada."); onExit(); }
+            } else { limpiarSesionLive(); alert("Sala cerrada."); onExit(); }
         });
         return () => unsubscribe();
     }, [codigoSala]);
 
-    const notificarRespuesta = async (esCorrecta, dibujoBase64 = null) => {
+    const notificarRespuesta = async (esCorrecta, dibujoBase64 = null, respuestaTexto = null) => {
         const respuestaData = {
             uid: myUid,
             correct: esCorrecta,
@@ -848,6 +962,7 @@ function ThinkHootClient({ codigoSala, usuario, onExit }) {
             processed: false
         };
         if (dibujoBase64) respuestaData.dibujo = dibujoBase64;
+        if (respuestaTexto != null && respuestaTexto !== '') respuestaData.respuesta = String(respuestaTexto);
         const updates = { [`respuestasRonda.${myUid}`]: respuestaData };
         // Incrementar aciertos o fallos directamente en el mapa del jugador
         if (esCorrecta) updates[`jugadores.${myUid}.aciertos`] = increment(1);
@@ -881,6 +996,17 @@ function ThinkHootClient({ codigoSala, usuario, onExit }) {
         setEnviandoProfe(false);
     };
 
+    if (expulsado) return (
+        <div className="game-container client-mode">
+            <EstilosComunes />
+            <EstilosThinkHoot />
+            <div className="lobby-wait">
+                <h2>Has salido de la partida</h2>
+                <p>El profesor te ha quitado de la sala.</p>
+                <button className="btn-back" style={{ maxWidth: 220, marginTop: 16 }} onClick={salirYlimpiar}>Volver</button>
+            </div>
+        </div>
+    );
     if (!gameData) return <div style={{ color: 'white', padding: 20 }}>Conectando...</div>;
     if (gameData.config?.isMathLive) {
         return <MathLive codigoSala={codigoSala} usuario={usuario} onExit={onExit} />;
@@ -892,7 +1018,7 @@ function ThinkHootClient({ codigoSala, usuario, onExit }) {
     if (preguntaActual) {
         if (preguntaActual.tipo === 'RELLENAR' && preguntaActual.bloques) textoRespuestaCorrecta = preguntaActual.bloques[1];
         else if (preguntaActual.tipo === 'MUSICAL') textoRespuestaCorrecta = preguntaActual.blancos?.[blancoActual]?.palabra || '';
-        else if (preguntaActual.tipo === 'ORDENAR') textoRespuestaCorrecta = "Orden Incorrecto";
+        else if (preguntaActual.tipo === 'ORDENAR') textoRespuestaCorrecta = (preguntaActual.bloques || []).join(' ');
         else textoRespuestaCorrecta = (preguntaActual.correcta || preguntaActual.respuesta || preguntaActual.a || "");
     }
 
@@ -905,7 +1031,7 @@ function ThinkHootClient({ codigoSala, usuario, onExit }) {
             <EstilosThinkHoot />
 
             <div className="client-header-container">
-                <button className="btn-exit" onClick={onExit} style={{ position: 'absolute', left: 10 }}>X</button>
+                <button className="btn-exit" onClick={salirYlimpiar} style={{ position: 'absolute', left: 10 }}>X</button>
                 <div className="client-score-wrapper">
                     <div className="score-badge blue-pill">{puntuacion} pts</div>
                     <div className="score-badge" style={{ background: '#27ae60', borderRadius: 0, padding: '10px 12px', fontWeight: 700, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -1033,11 +1159,26 @@ function ClientQuestionEngine({ data, config, startTime, subFase, myResult, corr
         return () => clearInterval(interval);
     }, [startTime, subFase, answeredLocal, myResult, data]);
 
-    const handleAnswer = (isCorrect, extraData = null) => {
+    const revealSoundDone = useRef(false);
+
+    const handleAnswer = (isCorrect, extraData = null, respuestaTexto = null) => {
         if (answeredLocal) return;
         setAnsweredLocal(true);
-        onResponded(isCorrect, extraData);
+        // Desbloqueamos el audio dentro del gesto del toque para que el sonido
+        // de acierto/fallo pueda sonar luego al revelarse el resultado.
+        try { audioCorrect.unlock(); audioWrong.unlock(); } catch (e) {}
+        onResponded(isCorrect, extraData, respuestaTexto);
     };
+
+    // Reproduce el sonido de acierto/fallo cuando se revela el resultado.
+    useEffect(() => {
+        if (subFase === 'RESPONDING') { revealSoundDone.current = false; return; }
+        if (data.tipo === 'DIBUJO') return; // los dibujos no tienen acierto/fallo
+        if ((subFase === 'REVEAL' || subFase === 'BLANK_REVEAL') && myResult && !revealSoundDone.current) {
+            revealSoundDone.current = true;
+            safePlay(myResult.correct ? audioCorrect : audioWrong);
+        }
+    }, [subFase, myResult]);
 
     if (data.tipo === 'PRESENTATION') {
         return <div className="waiting-others"><Monitor size={64} color="white" /><h2>¡Mira la pizarra!</h2></div>;
@@ -1069,6 +1210,12 @@ function ClientQuestionEngine({ data, config, startTime, subFase, myResult, corr
                     {fueCorrecta ? <CheckCircle size={50} color="#2ecc71" /> : <XCircle size={50} color="#ff003c" />}
                     <div className="neon-title">{fueCorrecta ? '¡CORRECTO!' : (!myResult ? '¡TIEMPO!' : '¡INCORRECTO!')}</div>
                     {fueCorrecta && <div className="points-added">+{puntosGanados} pts</div>}
+                    {!fueCorrecta && myResult?.respuesta && (
+                        <>
+                            <div className="neon-label">Tu respuesta:</div>
+                            <div className="neon-answer wrong">{myResult.respuesta}</div>
+                        </>
+                    )}
                     {!fueCorrecta && correctAnswerText && (
                         <>
                             <div className="neon-label">La palabra era:</div>
@@ -1108,6 +1255,12 @@ function ClientQuestionEngine({ data, config, startTime, subFase, myResult, corr
                     <div className="neon-card error">
                         <XCircle size={50} color="#ff003c" />
                         <div className="neon-title">{mensajeError}</div>
+                        {myResult?.respuesta && (
+                            <>
+                                <div className="neon-label">Tu respuesta:</div>
+                                <div className="neon-answer wrong">{parseText(myResult.respuesta)}</div>
+                            </>
+                        )}
                         {correctAnswerText && (
                             <>
                                 <div className="neon-label">La respuesta correcta era:</div>
@@ -1211,9 +1364,9 @@ const QuestionDisplay = memo(function QuestionDisplay({ data, onAnswer, disabled
     // FUNCIONES ORDENAR
     const addToSlot = (block, i) => { if (isHostView || disabled) return; const firstEmpty = slots.findIndex(s => s === null); if (firstEmpty !== -1) { const n = [...slots]; n[firstEmpty] = block; setSlots(n); } };
     const removeFromSlot = (i) => { if (isHostView || disabled) return; const n = [...slots]; n[i] = null; setSlots(n); };
-    const confirmarOrden = () => { if (slots.some(s => s === null)) return; onAnswer(JSON.stringify(slots) === JSON.stringify(data.bloques)); };
+    const confirmarOrden = () => { if (slots.some(s => s === null)) return; onAnswer(JSON.stringify(slots) === JSON.stringify(data.bloques), null, slots.join(' ')); };
 
-    const responderCompletar = () => { if (!isHostView) onAnswer(clean(texto) === clean(data.bloques?.[1])); };
+    const responderCompletar = () => { if (!isHostView) onAnswer(clean(texto) === clean(data.bloques?.[1]), null, texto); };
 
     // --- LÓGICA EXCLUSIVA DE RENDERIZADO ---
     const isOrdenar = data.tipo === 'ORDENAR';
@@ -1261,13 +1414,13 @@ const QuestionDisplay = memo(function QuestionDisplay({ data, onAnswer, disabled
                         <input
                             value={texto}
                             onChange={e => setTexto(e.target.value)}
-                            onKeyDown={e => { if (e.key === 'Enter') onAnswer(clean(texto) === clean(blanco?.palabra || '')); }}
+                            onKeyDown={e => { if (e.key === 'Enter') onAnswer(clean(texto) === clean(blanco?.palabra || ''), null, texto); }}
                             className="input-hueco-amarillo"
                             placeholder="Escribe la palabra..."
                             disabled={disabled}
                             autoFocus
                         />
-                        <button className="btn-confirmar-amarillo" onClick={() => onAnswer(clean(texto) === clean(blanco?.palabra || ''))} disabled={disabled}>ENVIAR</button>
+                        <button className="btn-confirmar-amarillo" onClick={() => onAnswer(clean(texto) === clean(blanco?.palabra || ''), null, texto)} disabled={disabled}>ENVIAR</button>
                     </div>
                 )}
                 {isHostView && <div style={{ color: '#888', fontSize: '1rem' }}>Alumnos escribiendo la palabra...</div>}
@@ -1336,8 +1489,8 @@ const QuestionDisplay = memo(function QuestionDisplay({ data, onAnswer, disabled
             {/* 3. RESPUESTA CORTA CLIENTE: ESTILO RULETA */}
             {isShortAnswer && !isHostView && (
                 <div className="short-answer-ruleta">
-                    <input placeholder="Escribe tu respuesta..." value={texto} onChange={e => setTexto(e.target.value)} disabled={disabled} onKeyDown={(e) => { if (e.key === 'Enter') onAnswer(clean(texto) === clean(data.a || data.respuesta)) }} />
-                    <button onClick={() => onAnswer(clean(texto) === clean(data.a || data.respuesta))} disabled={disabled}>ENVIAR</button>
+                    <input placeholder="Escribe tu respuesta..." value={texto} onChange={e => setTexto(e.target.value)} disabled={disabled} onKeyDown={(e) => { if (e.key === 'Enter') onAnswer(clean(texto) === clean(data.a || data.respuesta), null, texto) }} />
+                    <button onClick={() => onAnswer(clean(texto) === clean(data.a || data.respuesta), null, texto)} disabled={disabled}>ENVIAR</button>
                 </div>
             )}
 
@@ -1567,8 +1720,9 @@ const EstilosThinkHoot = () => (
         .neon-card.error .neon-title { color: #ff003c; text-shadow: 0 0 10px #ff003c; }
         .neon-card.success .neon-title { color: #2ecc71; text-shadow: 0 0 10px #2ecc71; }
         .neon-card.neutral .neon-title { color: #f1c40f; text-shadow: 0 0 10px #f1c40f; }
-        .neon-label { color: #ccc; margin-bottom: 10px; }
-        .neon-answer { font-size: 1.5rem; font-weight: bold; background: rgba(255,0,60,0.1); padding: 10px; border-radius: 8px; border: 1px solid #ff003c; width: 100%; }
+        .neon-label { color: #ccc; margin-bottom: 6px; margin-top: 10px; font-size: 0.95rem; }
+        .neon-answer { font-size: 1.5rem; font-weight: bold; background: rgba(46,204,113,0.12); padding: 10px; border-radius: 8px; border: 1px solid #2ecc71; color: #2ecc71; width: 100%; }
+        .neon-answer.wrong { background: rgba(255,0,60,0.1); border: 1px solid #ff003c; color: #ff6b81; text-decoration: line-through; }
         .points-added { font-size: 2rem; font-weight: bold; color: #f1c40f; animation: bounce 1s infinite; }
         .points-added.big { font-size: 3rem; }
 
@@ -1605,6 +1759,34 @@ const EstilosThinkHoot = () => (
             padding-top: 60px; /* Espacio para el header fijo */
         }
         .host-mode .top-hud { position: absolute; top: 0; left: 0; right: 0; z-index:100 }
+
+        /* LISTA DE JUGADORES (MARGEN DERECHO) — solo pantalla grande */
+        .host-players-sidebar { display: none; }
+        @media (min-width: 1024px) {
+            .host-players-sidebar {
+                display: flex; flex-direction: column;
+                position: absolute; top: 70px; right: 16px; bottom: 16px;
+                width: 280px; z-index: 60;
+                background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.12);
+                border-radius: 14px; overflow: hidden; backdrop-filter: blur(4px);
+            }
+            .host-mode .game-area-host { padding-right: 312px; }
+        }
+        .hps-header { padding: 12px 14px; font-family: 'Righteous', sans-serif; color: #f1c40f;
+            font-size: 1rem; display: flex; align-items: center; gap: 8px;
+            background: rgba(0,0,0,0.25); border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .hps-list { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+        .hps-empty { color: #95a5a6; font-size: 0.85rem; text-align: center; padding: 16px 8px; }
+        .hps-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px;
+            background: rgba(255,255,255,0.06); transition: background 0.2s; }
+        .hps-item.answered { background: rgba(46,204,113,0.18); }
+        .hps-tick { width: 20px; display: flex; align-items: center; justify-content: center; color: #2ecc71; flex-shrink: 0; }
+        .hps-dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.35); display: inline-block; }
+        .hps-name { flex: 1; color: white; font-weight: 700; font-size: 0.92rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .hps-pts { color: #f1c40f; font-weight: 700; font-size: 0.85rem; flex-shrink: 0; }
+        .hps-kick { background: rgba(231,76,60,0.25); border: none; color: #e74c3c; width: 30px; height: 30px;
+            border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s; }
+        .hps-kick:hover { background: #e74c3c; color: white; }
         
         .room-code { color: white; font-size: 1.5rem; font-weight: bold; }
         .room-code span { color: #f1c40f; }

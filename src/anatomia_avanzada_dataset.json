@@ -1,0 +1,542 @@
+[
+  {
+    "id": "org-01",
+    "nombre": "Cerebro",
+    "categoria": "Órgano",
+    "sistema": "Sistema Nervioso",
+    "descripcion": "Centro de control del cuerpo, responsable del pensamiento, la memoria y el control del resto de órganos.",
+    "dificultad": "Fácil",
+    "imagenUrl": "/assets/anatomia/cerebro.jpg"
+  },
+  {
+    "id": "org-02",
+    "nombre": "Corazón",
+    "categoria": "Órgano",
+    "sistema": "Sistema Cardiovascular",
+    "descripcion": "Músculo que bombea la sangre rica en oxígeno a todas las partes del cuerpo.",
+    "dificultad": "Fácil",
+    "imagenUrl": "/assets/anatomia/corazon.jpg"
+  },
+  {
+    "id": "org-03",
+    "nombre": "Pulmones",
+    "categoria": "Órgano",
+    "sistema": "Sistema Respiratorio",
+    "descripcion": "Par de órganos encargados de la respiración y el intercambio de oxígeno y dióxido de carbono.",
+    "dificultad": "Fácil",
+    "imagenUrl": "/assets/anatomia/pulmones.jpg"
+  },
+  {
+    "id": "org-04",
+    "nombre": "Estómago",
+    "categoria": "Órgano",
+    "sistema": "Sistema Digestivo",
+    "descripcion": "Órgano donde los alimentos se mezclan con los jugos gástricos para la digestión.",
+    "dificultad": "Fácil",
+    "imagenUrl": "/assets/anatomia/estomago.jpg"
+  },
+  {
+    "id": "org-05",
+    "nombre": "Hígado",
+    "categoria": "Órgano",
+    "sistema": "Sistema Digestivo",
+    "descripcion": "El órgano interno más grande. Produce la bilis, desintoxica la sangre y almacena energía.",
+    "dificultad": "Media",
+    "imagenUrl": "/assets/anatomia/higado.jpg"
+  },
+  {
+    "id": "org-06",
+    "nombre": "Páncreas",
+    "categoria": "Órgano",
+    "sistema": "Sistema Endocrino y Digestivo",
+    "descripcion": "Glándula que produce insulina para regular el azúcar y enzimas para la digestión.",
+    "dificultad": "Media",
+    "imagenUrl": "/assets/anatomia/pancreas.jpg"
+  },
+  {
+    "id": "org-07",
+    "nombre": "Intestino delgado",
+    "categoria": "Órgano",
+    "sistema": "Sistema Digestivo",
+    "descripcion": "Tubo largo donde se absorbe la mayor parte de los nutrientes.",
+    "dificultad": "Media",
+    "imagenUrl": "/assets/anatomia/intestino_delgado.jpg"
+  },
+  {
+    "id": "org-08",
+    "nombre": "Intestino grueso",
+    "categoria": "Órgano",
+    "sistema": "Sistema Digestivo",
+    "descripcion": "Sección final del tracto digestivo que absorbe agua y forma las heces.",
+    "dificultad": "Media",
+    "imagenUrl": "/assets/anatomia/intestino_grueso.jpg"
+  },
+  {
+    "id": "org-09",
+    "nombre": "Riñones",
+    "categoria": "Órgano",
+    "sistema": "Sistema Excretor",
+    "descripcion": "Órganos que filtran la sangre para producir orina y eliminar desechos.",
+    "dificultad": "Media",
+    "imagenUrl": "/assets/anatomia/rinones.jpg"
+  },
+  {
+    "id": "org-10",
+    "nombre": "Vejiga urinaria",
+    "categoria": "Órgano",
+    "sistema": "Sistema Excretor",
+    "descripcion": "Órgano hueco que almacena la orina.",
+    "dificultad": "Media",
+    "imagenUrl": "/assets/anatomia/vejiga.jpg"
+  },
+  {
+    "id": "org-11",
+    "nombre": "Bazo",
+    "categoria": "Órgano",
+    "sistema": "Sistema Linfático",
+    "descripcion": "Filtra la sangre, destruye glóbulos rojos viejos y ayuda al sistema inmune.",
+    "dificultad": "Difícil",
+    "imagenUrl": "/assets/anatomia/bazo.jpg"
+  },
+  {
+    "id": "org-12",
+    "nombre": "Vesícula biliar",
+    "categoria": "Órgano",
+    "sistema": "Sistema Digestivo",
+    "descripcion": "Almacena y concentra la bilis producida por el hígado.",
+    "dificultad": "Difícil",
+    "imagenUrl": "/assets/anatomia/vesicula.jpg"
+  },
+  {
+    "id": "org-13",
+    "nombre": "Tiroides",
+    "categoria": "Órgano",
+    "sistema": "Sistema Endocrino",
+    "descripcion": "Glándula en el cuello que regula el metabolismo del cuerpo.",
+    "dificultad": "Difícil",
+    "imagenUrl": "/assets/anatomia/tiroides.jpg"
+  },
+  {
+    "id": "org-14",
+    "nombre": "Hipófisis (Glándula pituitaria)",
+    "categoria": "Órgano",
+    "sistema": "Sistema Endocrino",
+    "descripcion": "Glándula maestra en la base del cerebro que controla a otras glándulas.",
+    "dificultad": "Experto",
+    "imagenUrl": "/assets/anatomia/hipofisis.jpg"
+  },
+  {
+    "id": "org-15",
+    "nombre": "Glándulas suprarrenales",
+    "categoria": "Órgano",
+    "sistema": "Sistema Endocrino",
+    "descripcion": "Situadas sobre los riñones, producen hormonas como la adrenalina y el cortisol.",
+    "dificultad": "Experto",
+    "imagenUrl": "/assets/anatomia/suprarrenales.jpg"
+  },
+  {
+    "id": "org-16",
+    "nombre": "Médula espinal",
+    "categoria": "Órgano",
+    "sistema": "Sistema Nervioso",
+    "descripcion": "Cordón de tejido nervioso que transmite mensajes entre el cerebro y el cuerpo.",
+    "dificultad": "Difícil",
+    "imagenUrl": "/assets/anatomia/medula_espinal.jpg"
+  },
+  {
+    "id": "org-17",
+    "nombre": "Laringe",
+    "categoria": "Órgano",
+    "sistema": "Sistema Respiratorio",
+    "descripcion": "Contiene las cuerdas vocales, es fundamental para la fonación.",
+    "dificultad": "Difícil",
+    "imagenUrl": "/assets/anatomia/laringe.jpg"
+  },
+  {
+    "id": "org-18",
+    "nombre": "Timo",
+    "categoria": "Órgano",
+    "sistema": "Sistema Linfático",
+    "descripcion": "Glándula clave en el desarrollo del sistema inmunológico durante la infancia.",
+    "dificultad": "Experto",
+    "imagenUrl": "/assets/anatomia/timo.jpg"
+  },
+  {
+    "id": "hue-01",
+    "nombre": "Cráneo",
+    "categoria": "Hueso",
+    "sistema": "Sistema Óseo",
+    "descripcion": "Estructura ósea que protege el encéfalo.",
+    "dificultad": "Fácil",
+    "imagenUrl": "/assets/anatomia/craneo.jpg"
+  },
+  {
+    "id": "hue-02",
+    "nombre": "Mandíbula",
+    "categoria": "Hueso",
+    "sistema": "Sistema Óseo",
+    "descripcion": "Único hueso móvil de la cabeza.",
+    "dificultad": "Fácil",
+    "imagenUrl": "/assets/anatomia/mandibula.jpg"
+  },
+  {
+    "id": "hue-03",
+    "nombre": "Clavícula",
+    "categoria": "Hueso",
+    "sistema": "Sistema Óseo",
+    "descripcion": "Conecta el esternón con la escápula.",
+    "dificultad": "Media",
+    "imagenUrl": "/assets/anatomia/clavicula.jpg"
+  },
+  {
+    "id": "hue-04",
+    "nombre": "Esternón",
+    "categoria": "Hueso",
+    "sistema": "Sistema Óseo",
+    "descripcion": "Hueso plano situado en el centro del pecho.",
+    "dificultad": "Media",
+    "imagenUrl": "/assets/anatomia/esternon.jpg"
+  },
+  {
+    "id": "hue-05",
+    "nombre": "Columna vertebral",
+    "categoria": "Hueso",
+    "sistema": "Sistema Óseo",
+    "descripcion": "Estructura articulada que soporta el tronco y protege la médula espinal.",
+    "dificultad": "Fácil",
+    "imagenUrl": "/assets/anatomia/columna.jpg"
+  },
+  {
+    "id": "hue-06",
+    "nombre": "Pelvis",
+    "categoria": "Hueso",
+    "sistema": "Sistema Óseo",
+    "descripcion": "Estructura ósea en forma de cuenco en la parte inferior del tronco.",
+    "dificultad": "Media",
+    "imagenUrl": "/assets/anatomia/pelvis.jpg"
+  },
+  {
+    "id": "hue-07",
+    "nombre": "Húmero",
+    "categoria": "Hueso",
+    "sistema": "Sistema Óseo",
+    "descripcion": "El hueso más largo del brazo.",
+    "dificultad": "Media",
+    "imagenUrl": "/assets/anatomia/humero.jpg"
+  },
+  {
+    "id": "hue-08",
+    "nombre": "Radio",
+    "categoria": "Hueso",
+    "sistema": "Sistema Óseo",
+    "descripcion": "Hueso del antebrazo situado en el lado del dedo pulgar.",
+    "dificultad": "Media",
+    "imagenUrl": "/assets/anatomia/radio.jpg"
+  },
+  {
+    "id": "hue-09",
+    "nombre": "Cúbito",
+    "categoria": "Hueso",
+    "sistema": "Sistema Óseo",
+    "descripcion": "Hueso del antebrazo situado en el lado del dedo meñique.",
+    "dificultad": "Difícil",
+    "imagenUrl": "/assets/anatomia/cubito.jpg"
+  },
+  {
+    "id": "hue-10",
+    "nombre": "Fémur",
+    "categoria": "Hueso",
+    "sistema": "Sistema Óseo",
+    "descripcion": "El hueso más largo y fuerte del cuerpo humano.",
+    "dificultad": "Fácil",
+    "imagenUrl": "/assets/anatomia/femur.jpg"
+  },
+  {
+    "id": "hue-11",
+    "nombre": "Tibia",
+    "categoria": "Hueso",
+    "sistema": "Sistema Óseo",
+    "descripcion": "El hueso principal de la pierna, debajo de la rodilla.",
+    "dificultad": "Media",
+    "imagenUrl": "/assets/anatomia/tibia.jpg"
+  },
+  {
+    "id": "hue-12",
+    "nombre": "Peroné",
+    "categoria": "Hueso",
+    "sistema": "Sistema Óseo",
+    "descripcion": "Hueso delgado de la pierna situado en la parte externa.",
+    "dificultad": "Difícil",
+    "imagenUrl": "/assets/anatomia/perone.jpg"
+  },
+  {
+    "id": "hue-13",
+    "nombre": "Escápula (Omóplato)",
+    "categoria": "Hueso",
+    "sistema": "Sistema Óseo",
+    "descripcion": "Hueso plano y triangular en la parte posterior del hombro.",
+    "dificultad": "Difícil",
+    "imagenUrl": "/assets/anatomia/escapula.jpg"
+  },
+  {
+    "id": "hue-14",
+    "nombre": "Hueso Frontal",
+    "categoria": "Hueso",
+    "sistema": "Sistema Óseo",
+    "descripcion": "Hueso del cráneo que forma la frente.",
+    "dificultad": "Media",
+    "imagenUrl": "/assets/anatomia/frontal_hueso.jpg"
+  },
+  {
+    "id": "hue-15",
+    "nombre": "Hueso Occipital",
+    "categoria": "Hueso",
+    "sistema": "Sistema Óseo",
+    "descripcion": "Hueso que forma la parte posterior e inferior del cráneo.",
+    "dificultad": "Difícil",
+    "imagenUrl": "/assets/anatomia/occipital.jpg"
+  },
+  {
+    "id": "hue-16",
+    "nombre": "Hueso Esfenoides",
+    "categoria": "Hueso",
+    "sistema": "Sistema Óseo",
+    "descripcion": "Hueso con forma de mariposa situado en la base del cráneo.",
+    "dificultad": "Experto",
+    "imagenUrl": "/assets/anatomia/esfenoides.jpg"
+  },
+  {
+    "id": "hue-17",
+    "nombre": "Atlas (C1)",
+    "categoria": "Hueso",
+    "sistema": "Sistema Óseo",
+    "descripcion": "La primera vértebra cervical que soporta el peso del cráneo.",
+    "dificultad": "Experto",
+    "imagenUrl": "/assets/anatomia/atlas.jpg"
+  },
+  {
+    "id": "hue-18",
+    "nombre": "Axis (C2)",
+    "categoria": "Hueso",
+    "sistema": "Sistema Óseo",
+    "descripcion": "Segunda vértebra cervical que permite la rotación de la cabeza.",
+    "dificultad": "Experto",
+    "imagenUrl": "/assets/anatomia/axis.jpg"
+  },
+  {
+    "id": "hue-19",
+    "nombre": "Sacro",
+    "categoria": "Hueso",
+    "sistema": "Sistema Óseo",
+    "descripcion": "Hueso triangular en la base de la columna, formado por vértebras fusionadas.",
+    "dificultad": "Difícil",
+    "imagenUrl": "/assets/anatomia/sacro.jpg"
+  },
+  {
+    "id": "hue-20",
+    "nombre": "Maxilar superior",
+    "categoria": "Hueso",
+    "sistema": "Sistema Óseo",
+    "descripcion": "Hueso de la cara que aloja los dientes superiores.",
+    "dificultad": "Difícil",
+    "imagenUrl": "/assets/anatomia/maxilar.jpg"
+  },
+  {
+    "id": "hue-21",
+    "nombre": "Calcáneo",
+    "categoria": "Hueso",
+    "sistema": "Sistema Óseo",
+    "descripcion": "Hueso que forma el talón del pie.",
+    "dificultad": "Experto",
+    "imagenUrl": "/assets/anatomia/calcaneo.jpg"
+  },
+  {
+    "id": "hue-22",
+    "nombre": "Estribo",
+    "categoria": "Hueso",
+    "sistema": "Sistema Óseo",
+    "descripcion": "El hueso más pequeño del cuerpo humano, situado en el oído medio.",
+    "dificultad": "Difícil",
+    "imagenUrl": "/assets/anatomia/estribo.jpg"
+  },
+  {
+    "id": "mus-01",
+    "nombre": "Masetero",
+    "categoria": "Músculo",
+    "sistema": "Sistema Muscular",
+    "descripcion": "El músculo principal de la masticación.",
+    "dificultad": "Media",
+    "imagenUrl": "/assets/anatomia/masetero.jpg"
+  },
+  {
+    "id": "mus-02",
+    "nombre": "Esternocleidomastoideo",
+    "categoria": "Músculo",
+    "sistema": "Sistema Muscular",
+    "descripcion": "Músculo del cuello que permite girar e inclinar la cabeza.",
+    "dificultad": "Difícil",
+    "imagenUrl": "/assets/anatomia/esternocleidomastoideo.jpg"
+  },
+  {
+    "id": "mus-03",
+    "nombre": "Deltoides",
+    "categoria": "Músculo",
+    "sistema": "Sistema Muscular",
+    "descripcion": "Músculo que forma el contorno del hombro.",
+    "dificultad": "Media",
+    "imagenUrl": "/assets/anatomia/deltoides.jpg"
+  },
+  {
+    "id": "mus-04",
+    "nombre": "Pectoral mayor",
+    "categoria": "Músculo",
+    "sistema": "Sistema Muscular",
+    "descripcion": "Músculo grande que cubre la parte superior del pecho.",
+    "dificultad": "Fácil",
+    "imagenUrl": "/assets/anatomia/pectoral.jpg"
+  },
+  {
+    "id": "mus-05",
+    "nombre": "Bíceps braquial",
+    "categoria": "Músculo",
+    "sistema": "Sistema Muscular",
+    "descripcion": "Músculo frontal del brazo que permite doblar el codo.",
+    "dificultad": "Fácil",
+    "imagenUrl": "/assets/anatomia/biceps.jpg"
+  },
+  {
+    "id": "mus-06",
+    "nombre": "Tríceps braquial",
+    "categoria": "Músculo",
+    "sistema": "Sistema Muscular",
+    "descripcion": "Músculo posterior del brazo responsable de extender el codo.",
+    "dificultad": "Media",
+    "imagenUrl": "/assets/anatomia/triceps.jpg"
+  },
+  {
+    "id": "mus-07",
+    "nombre": "Trapecio",
+    "categoria": "Músculo",
+    "sistema": "Sistema Muscular",
+    "descripcion": "Músculo en la nuca y la parte superior de la espalda.",
+    "dificultad": "Media",
+    "imagenUrl": "/assets/anatomia/trapecio.jpg"
+  },
+  {
+    "id": "mus-08",
+    "nombre": "Dorsal ancho",
+    "categoria": "Músculo",
+    "sistema": "Sistema Muscular",
+    "descripcion": "El músculo más grande del tronco, ubicado en la espalda.",
+    "dificultad": "Difícil",
+    "imagenUrl": "/assets/anatomia/dorsal.jpg"
+  },
+  {
+    "id": "mus-09",
+    "nombre": "Recto del abdomen",
+    "categoria": "Músculo",
+    "sistema": "Sistema Muscular",
+    "descripcion": "Músculo frontal del vientre ('abdominales').",
+    "dificultad": "Fácil",
+    "imagenUrl": "/assets/anatomia/abdominales.jpg"
+  },
+  {
+    "id": "mus-10",
+    "nombre": "Glúteo mayor",
+    "categoria": "Músculo",
+    "sistema": "Sistema Muscular",
+    "descripcion": "El músculo más potente de la zona pélvica.",
+    "dificultad": "Fácil",
+    "imagenUrl": "/assets/anatomia/gluteo.jpg"
+  },
+  {
+    "id": "mus-11",
+    "nombre": "Cuádriceps femoral",
+    "categoria": "Músculo",
+    "sistema": "Sistema Muscular",
+    "descripcion": "Músculo de la parte anterior del muslo, extensor de la rodilla.",
+    "dificultad": "Media",
+    "imagenUrl": "/assets/anatomia/cuadriceps.jpg"
+  },
+  {
+    "id": "mus-12",
+    "nombre": "Isquiotibiales",
+    "categoria": "Músculo",
+    "sistema": "Sistema Muscular",
+    "descripcion": "Músculos en la parte posterior del muslo que flexionan la rodilla.",
+    "dificultad": "Media",
+    "imagenUrl": "/assets/anatomia/isquiotibiales.jpg"
+  },
+  {
+    "id": "mus-13",
+    "nombre": "Gastrocnemio (Gemelos)",
+    "categoria": "Músculo",
+    "sistema": "Sistema Muscular",
+    "descripcion": "Músculos de la pantorrilla fundamentales para caminar.",
+    "dificultad": "Fácil",
+    "imagenUrl": "/assets/anatomia/gemelos.jpg"
+  },
+  {
+    "id": "mus-14",
+    "nombre": "Diafragma",
+    "categoria": "Músculo",
+    "sistema": "Sistema Muscular",
+    "descripcion": "Músculo principal de la respiración que separa el tórax del abdomen.",
+    "dificultad": "Difícil",
+    "imagenUrl": "/assets/anatomia/diafragma.jpg"
+  },
+  {
+    "id": "mus-15",
+    "nombre": "Sartorio",
+    "categoria": "Músculo",
+    "sistema": "Sistema Muscular",
+    "descripcion": "El músculo más largo del cuerpo, cruza el muslo en diagonal.",
+    "dificultad": "Experto",
+    "imagenUrl": "/assets/anatomia/sartorio.jpg"
+  },
+  {
+    "id": "mus-16",
+    "nombre": "Tibial anterior",
+    "categoria": "Músculo",
+    "sistema": "Sistema Muscular",
+    "descripcion": "Músculo en la parte frontal de la pierna que permite flexionar el pie hacia arriba.",
+    "dificultad": "Difícil",
+    "imagenUrl": "/assets/anatomia/tibial_anterior.jpg"
+  },
+  {
+    "id": "mus-17",
+    "nombre": "Romboides",
+    "categoria": "Músculo",
+    "sistema": "Sistema Muscular",
+    "descripcion": "Músculos en la parte superior de la espalda que retraen la escápula.",
+    "dificultad": "Experto",
+    "imagenUrl": "/assets/anatomia/romboides.jpg"
+  },
+  {
+    "id": "mus-18",
+    "nombre": "Psoas ilíaco",
+    "categoria": "Músculo",
+    "sistema": "Sistema Muscular",
+    "descripcion": "Poderoso flexor de la cadera que conecta la columna lumbar con el fémur.",
+    "dificultad": "Experto",
+    "imagenUrl": "/assets/anatomia/psoas.jpg"
+  },
+  {
+    "id": "mus-19",
+    "nombre": "Intercostales",
+    "categoria": "Músculo",
+    "sistema": "Sistema Muscular",
+    "descripcion": "Músculos situados entre las costillas que asisten en la respiración.",
+    "dificultad": "Difícil",
+    "imagenUrl": "/assets/anatomia/intercostales.jpg"
+  },
+  {
+    "id": "mus-20",
+    "nombre": "Sóleo",
+    "categoria": "Músculo",
+    "sistema": "Sistema Muscular",
+    "descripcion": "Músculo ancho y plano situado debajo de los gemelos en la pantorrilla.",
+    "dificultad": "Experto",
+    "imagenUrl": "/assets/anatomia/soleo.jpg"
+  }
+]

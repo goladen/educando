@@ -4,30 +4,33 @@ import { guardarRegistroLocal } from './utils/registrosLocales';
 import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
 import { RotateCcw, CheckCircle, Trophy, Clock, Delete, Settings, SkipForward, Share2, Coins } from 'lucide-react';
 import Confetti from 'react-confetti';
+import sndAcierto from './assets/correct.mp3';
+import sndFallo from './assets/sonidomonedamal.mp3';
 
-// ─── Imágenes de billetes y monedas ───────────────────────────────────────────
-// Sube los archivos a src/assets/dinero/ con estos nombres. Mientras no existan,
+// Reproduce un sonido corto sin bloquear (cada toque crea su propia instancia)
+const playSound = (src) => { try { const a = new Audio(src); a.volume = 0.6; a.play().catch(() => {}); } catch { /* noop */ } };
+
+// ─── Imágenes de billetes y monedas (src/assets/Euros/) ───────────────────────
+// Monedas en .png y billetes en .jpg, de 1 céntimo a 100 €. Si faltara alguna,
 // se dibuja un respaldo con el valor para que la herramienta funcione igual.
-const dineroImgs = import.meta.glob('./assets/dinero/*.{png,jpg,jpeg,webp,avif,svg}', { eager: true, import: 'default' });
-const getDineroImg = (file) => dineroImgs[`./assets/dinero/${file}`] || null;
+const dineroImgs = import.meta.glob('./assets/Euros/*.{png,jpg,jpeg,webp,avif,svg}', { eager: true, import: 'default' });
+const getDineroImg = (file) => dineroImgs[`./assets/Euros/${file}`] || null;
 
 // Valores en CÉNTIMOS para evitar errores con decimales.
 const DENOMINACIONES = [
-    { val: 50000, label: '500 €',    tipo: 'billete', file: 'billete_500.png', bg: '#9b59b6' },
-    { val: 20000, label: '200 €',    tipo: 'billete', file: 'billete_200.png', bg: '#f1c40f' },
-    { val: 10000, label: '100 €',    tipo: 'billete', file: 'billete_100.png', bg: '#27ae60' },
-    { val: 5000,  label: '50 €',     tipo: 'billete', file: 'billete_50.png',  bg: '#e67e22' },
-    { val: 2000,  label: '20 €',     tipo: 'billete', file: 'billete_20.png',  bg: '#3498db' },
-    { val: 1000,  label: '10 €',     tipo: 'billete', file: 'billete_10.png',  bg: '#e74c3c' },
-    { val: 500,   label: '5 €',      tipo: 'billete', file: 'billete_5.png',   bg: '#7f8c8d' },
-    { val: 200,   label: '2 €',      tipo: 'moneda',  file: 'moneda_2e.png',   bg: '#bdc3c7' },
-    { val: 100,   label: '1 €',      tipo: 'moneda',  file: 'moneda_1e.png',   bg: '#f1c40f' },
-    { val: 50,    label: '50 cént',  tipo: 'moneda',  file: 'moneda_50c.png',  bg: '#f39c12' },
-    { val: 20,    label: '20 cént',  tipo: 'moneda',  file: 'moneda_20c.png',  bg: '#f39c12' },
-    { val: 10,    label: '10 cént',  tipo: 'moneda',  file: 'moneda_10c.png',  bg: '#f39c12' },
-    { val: 5,     label: '5 cént',   tipo: 'moneda',  file: 'moneda_5c.png',   bg: '#d35400' },
-    { val: 2,     label: '2 cént',   tipo: 'moneda',  file: 'moneda_2c.png',   bg: '#d35400' },
-    { val: 1,     label: '1 cént',   tipo: 'moneda',  file: 'moneda_1c.png',   bg: '#d35400' },
+    { val: 10000, label: '100 €',    tipo: 'billete', file: '100eu.jpg',   bg: '#27ae60' },
+    { val: 5000,  label: '50 €',     tipo: 'billete', file: '50eu.jpg',    bg: '#e67e22' },
+    { val: 2000,  label: '20 €',     tipo: 'billete', file: '20eu.jpg',    bg: '#3498db' },
+    { val: 1000,  label: '10 €',     tipo: 'billete', file: '10eu.jpg',    bg: '#e74c3c' },
+    { val: 500,   label: '5 €',      tipo: 'billete', file: '5eu.jpg',     bg: '#7f8c8d' },
+    { val: 200,   label: '2 €',      tipo: 'moneda',  file: '2eu.png',     bg: '#bdc3c7' },
+    { val: 100,   label: '1 €',      tipo: 'moneda',  file: '1eu.png',     bg: '#f1c40f' },
+    { val: 50,    label: '50 cént',  tipo: 'moneda',  file: '50_cent.png', bg: '#f39c12' },
+    { val: 20,    label: '20 cént',  tipo: 'moneda',  file: '20cent.png',  bg: '#f39c12' },
+    { val: 10,    label: '10 cént',  tipo: 'moneda',  file: '10cent.png',  bg: '#f39c12' },
+    { val: 5,     label: '5 cént',   tipo: 'moneda',  file: '5cent.png',   bg: '#d35400' },
+    { val: 2,     label: '2 cént',   tipo: 'moneda',  file: '2cent.png',   bg: '#d35400' },
+    { val: 1,     label: '1 cént',   tipo: 'moneda',  file: '1cent.png',   bg: '#d35400' },
 ];
 
 // ─── Contexto: productos (con su tipo de IVA y precio unidad orientativo) ──────
@@ -436,12 +439,229 @@ function ModalEnviarProfe({ datos, onClose }) {
     );
 }
 
+// ─── Zona jugable reutilizable (enunciado + respuesta + acciones) ──────────────
+// No incluye tarjeta exterior: el contenedor (single o dual) la aporta.
+function BoardPlay({ problem, seleccion, cesta, showSolution, isMobile, pieceSize, visibles,
+                     addPieza, quitarPieza, addProducto, quitarProducto, limpiar, comprobar, pasar }) {
+    if (!problem) return null;
+    const esCompra = problem.modo === 'PRODUCTOS';
+    const totalSel = Object.entries(seleccion).reduce((s, [v, n]) => s + Number(v) * n, 0);
+    const totalCesta = Object.entries(cesta).reduce((s, [idx, n]) => s + PRODUCTOS[idx].precio * n, 0);
+
+    return (
+        <>
+            {/* Enunciado */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: isMobile ? '2.4rem' : '3rem' }}>{problem.emoji}</span>
+                <span style={{ fontSize: isMobile ? '1.05rem' : '1.25rem', fontWeight: 700, color: '#2c3e50', textAlign: 'left', maxWidth: 460 }}>{problem.enunciado}</span>
+            </div>
+
+            {esCompra ? (
+                <>
+                    {/* Marcador gastado / te sobra */}
+                    <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginBottom: 14, flexWrap: 'wrap' }}>
+                        <div style={{ background: '#f8f9fa', borderRadius: 14, padding: '8px 16px', border: '2px solid #e0e0e0', minWidth: 110 }}>
+                            <span style={{ fontSize: '0.78rem', color: '#7f8c8d', display: 'block' }}>🛒 Gastado</span>
+                            <div style={{ fontSize: isMobile ? '1.5rem' : '1.9rem', fontWeight: 'bold', color: totalCesta === problem.answerCents && totalCesta > 0 ? '#27ae60' : '#16a085' }}>{fmt(totalCesta)}</div>
+                        </div>
+                        <div style={{ background: '#f8f9fa', borderRadius: 14, padding: '8px 16px', border: '2px solid #e0e0e0', minWidth: 110 }}>
+                            <span style={{ fontSize: '0.78rem', color: '#7f8c8d', display: 'block' }}>👛 Te sobra</span>
+                            <div style={{ fontSize: isMobile ? '1.5rem' : '1.9rem', fontWeight: 'bold', color: (problem.dinero - totalCesta) === problem.sobra ? '#27ae60' : (problem.dinero - totalCesta < 0 ? '#e74c3c' : '#e67e22') }}>
+                                {fmt(problem.dinero - totalCesta)}
+                            </div>
+                        </div>
+                    </div>
+
+                    {showSolution && (
+                        <div style={{ fontSize: '0.9rem', color: '#27ae60', fontWeight: 700, marginBottom: 10 }}>
+                            ✅ Tenías que gastar {problem.displayAnswer}
+                        </div>
+                    )}
+
+                    {/* Carrito */}
+                    {!showSolution && totalCesta > 0 && (
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', marginBottom: 12 }}>
+                            {Object.keys(cesta).map(idx => {
+                                const p = PRODUCTOS[idx];
+                                return (
+                                    <button key={idx} onClick={() => quitarProducto(idx)} title={`Quitar ${p.nombre}`}
+                                        style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 4, background: '#eef7f3', border: '2px solid #16a08555', borderRadius: 10, padding: '5px 9px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 700, color: '#2c3e50' }}>
+                                        <span style={{ fontSize: '1.1rem' }}>{p.emoji}</span>×{cesta[idx]}
+                                    </button>
+                                );
+                            })}
+                            <button onClick={limpiar} style={{ ...st.btnVolver, padding: '6px 12px', fontSize: '0.8rem' }}><Delete size={14} /> Vaciar</button>
+                        </div>
+                    )}
+
+                    {/* Lista de precios del supermercado */}
+                    {!showSolution && (
+                        <div style={{ background: '#eef7f3', borderRadius: 14, padding: 10, marginBottom: 16 }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isMobile ? 2 : 4}, 1fr)`, gap: 7 }}>
+                                {PRODUCTOS.map((p, idx) => (
+                                    <button key={idx} onClick={() => addProducto(idx)}
+                                        style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'white', border: cesta[idx] ? '2px solid #16a085' : '2px solid #e0e0e0', borderRadius: 10, padding: '7px 8px', cursor: 'pointer', textAlign: 'left' }}>
+                                        <span style={{ fontSize: '1.3rem' }}>{p.emoji}</span>
+                                        <span style={{ flex: 1, minWidth: 0 }}>
+                                            <span style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#2c3e50', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.nombre}</span>
+                                            <span style={{ fontSize: '0.78rem', color: '#16a085', fontWeight: 700 }}>{fmt(p.precio)}</span>
+                                        </span>
+                                        {cesta[idx] > 0 && <span style={{ background: '#16a085', color: 'white', borderRadius: '50%', width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.72rem', fontWeight: 800 }}>{cesta[idx]}</span>}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </>
+            ) : (
+                <>
+                    {/* Total reunido / respuesta — con billetes y monedas */}
+                    <div style={{ background: '#f8f9fa', borderRadius: 14, padding: '10px 16px', marginBottom: 14, border: '2px solid #e0e0e0' }}>
+                        <span style={{ fontSize: '0.85rem', color: '#7f8c8d', display: 'block', marginBottom: 2 }}>
+                            {showSolution
+                                ? (problem.tipo === 'pagar' ? '✅ Tenías que reunir:' : '✅ Solución:')
+                                : (problem.tipo === 'pagar' ? 'Llevas reunido:' : 'Tu respuesta:')}
+                        </span>
+                        <div style={{ fontSize: isMobile ? '2rem' : '2.6rem', fontWeight: 'bold', color: showSolution ? '#27ae60' : (totalSel === problem.answerCents && totalSel > 0 ? '#27ae60' : '#16a085') }}>
+                            {showSolution ? problem.displayAnswer : fmt(totalSel)}
+                        </div>
+                    </div>
+
+                    {/* Piezas elegidas */}
+                    {!showSolution && totalSel > 0 && (
+                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', marginBottom: 14, minHeight: pieceSize }}>
+                            {DENOMINACIONES.filter(d => seleccion[d.val]).map(d => (
+                                <PiezaDinero key={d.val} d={d} size={pieceSize * 0.85} badge={seleccion[d.val]} onClick={() => quitarPieza(d.val)} />
+                            ))}
+                            <button onClick={limpiar} style={{ ...st.btnVolver, padding: '6px 12px', fontSize: '0.8rem' }}><Delete size={14} /> Vaciar</button>
+                        </div>
+                    )}
+
+                    {/* Cajón de denominaciones */}
+                    {!showSolution && (
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginBottom: 16, background: '#eef7f3', borderRadius: 14, padding: 12 }}>
+                            {visibles.map(d => (
+                                <PiezaDinero key={d.val} d={d} size={pieceSize} onClick={() => addPieza(d.val)} />
+                            ))}
+                        </div>
+                    )}
+                </>
+            )}
+
+            {/* Solución (al pasar) */}
+            {showSolution && (
+                <div style={{ background: '#fff8e1', border: '2px solid #ffe082', borderRadius: 12, padding: '10px 14px', marginBottom: 16, color: '#8d6e00', fontWeight: 600, fontSize: '0.95rem' }}>
+                    👁 {problem.pista}
+                </div>
+            )}
+
+            {/* Acciones */}
+            {!showSolution && (
+                <div style={{ display: 'flex', gap: 10 }}>
+                    <button onClick={pasar} style={st.btnSkip} title="Pasar (−2 pts, ver solución)"><SkipForward size={18} /> Pasar</button>
+                    <button onClick={comprobar} style={{ ...st.btnSuccess, flex: 2 }}><CheckCircle size={20} /> Comprobar</button>
+                </div>
+            )}
+        </>
+    );
+}
+
+// ─── Tablero independiente para el modo dual ───────────────────────────────────
+function TableroDual({ idx, accent, isMobile }) {
+    const [estado, setEstado] = useState('MENU'); // MENU | PLAY
+    const [config, setConfig] = useState(null);
+    const [problem, setProblem] = useState(null);
+    const [seleccion, setSeleccion] = useState({});
+    const [cesta, setCesta] = useState({});
+    const [feedback, setFeedback] = useState(null);
+    const [showSolution, setShowSolution] = useState(false);
+    const [score, setScore] = useState(0);
+    const [aciertos, setAciertos] = useState(0);
+    const [fallos, setFallos] = useState(0);
+
+    const pieceSize = isMobile ? 34 : 40;
+    const visibles = config ? DENOMINACIONES.filter(d => d.val <= Math.max(200, Math.round(config.maxPrecio * 100))) : [];
+
+    const nuevo = (cfg) => { setProblem(generarProblema(cfg)); setSeleccion({}); setCesta({}); setShowSolution(false); };
+    const empezar = (cfg) => { setConfig(cfg); setScore(0); setAciertos(0); setFallos(0); setFeedback(null); nuevo(cfg); setEstado('PLAY'); };
+
+    const esCompra = problem?.modo === 'PRODUCTOS';
+    const totalSel = Object.entries(seleccion).reduce((s, [v, n]) => s + Number(v) * n, 0);
+    const totalCesta = Object.entries(cesta).reduce((s, [i, n]) => s + PRODUCTOS[i].precio * n, 0);
+    const totalActual = esCompra ? totalCesta : totalSel;
+
+    const addPieza = (val) => { if (!showSolution) setSeleccion(p => ({ ...p, [val]: (p[val] || 0) + 1 })); };
+    const quitarPieza = (val) => setSeleccion(p => { const n = (p[val] || 0) - 1; const x = { ...p }; if (n <= 0) delete x[val]; else x[val] = n; return x; });
+    const addProducto = (i) => { if (!showSolution) setCesta(c => ({ ...c, [i]: (c[i] || 0) + 1 })); };
+    const quitarProducto = (i) => setCesta(c => { const n = (c[i] || 0) - 1; const x = { ...c }; if (n <= 0) delete x[i]; else x[i] = n; return x; });
+    const limpiar = () => { setSeleccion({}); setCesta({}); };
+
+    const comprobar = () => {
+        if (!problem || showSolution || feedback) return;
+        if (totalActual === problem.answerCents) {
+            playSound(sndAcierto);
+            setScore(s => s + 10); setAciertos(a => a + 1); setFeedback('CORRECT');
+            setTimeout(() => { setFeedback(null); nuevo(config); }, 700);
+        } else {
+            playSound(sndFallo);
+            setScore(s => Math.max(0, s - 3)); setFallos(f => f + 1); setFeedback('INCORRECT');
+            setTimeout(() => setFeedback(null), 700);
+        }
+    };
+    const pasar = () => {
+        if (!problem || showSolution || feedback) return;
+        setFallos(f => f + 1); setScore(s => Math.max(0, s - 2)); setShowSolution(true); setFeedback('SKIP');
+        setTimeout(() => { setFeedback(null); nuevo(config); }, 2000);
+    };
+
+    const borderColor = feedback === 'CORRECT' ? '#2ecc71' : feedback === 'INCORRECT' ? '#e74c3c' : feedback === 'SKIP' ? '#f39c12' : `${accent}44`;
+
+    return (
+        <div style={{ flex: 1, minWidth: 0, background: 'white', borderRadius: 18, border: `4px solid ${borderColor}`, padding: isMobile ? '10px 8px' : '16px 14px', boxShadow: '0 8px 20px rgba(0,0,0,0.08)', transition: 'border-color 0.2s', boxSizing: 'border-box' }}>
+            {/* Cabecera del jugador */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+                <span style={{ fontWeight: 800, color: accent, fontSize: '1rem' }}>👤 Jugador {idx}</span>
+                {estado === 'PLAY' && (
+                    <>
+                        <span style={{ fontWeight: 800, color: accent, display: 'flex', alignItems: 'center', gap: 3 }}><Trophy size={14} /> {score}</span>
+                        <span style={{ fontWeight: 700, color: '#27ae60' }}>✅ {aciertos}</span>
+                        <span style={{ fontWeight: 700, color: '#e74c3c' }}>❌ {fallos}</span>
+                        <button onClick={() => setEstado('MENU')} style={{ ...st.btnVolver, padding: '5px 10px', fontSize: '0.78rem' }}><Settings size={13} /> Modo</button>
+                    </>
+                )}
+            </div>
+
+            {estado === 'MENU' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 9, padding: '6px 2px' }}>
+                    <p style={{ textAlign: 'center', color: '#999', fontSize: '0.85rem', margin: '0 0 4px' }}>Elige un modo de juego</p>
+                    {MODOS_PRESET.filter(m => m.cfg).map(m => (
+                        <button key={m.id} onClick={() => empezar(m.cfg)}
+                            style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', background: 'white', border: `2px solid ${m.color}`, borderRadius: 14, cursor: 'pointer', textAlign: 'left' }}>
+                            <div style={{ background: m.color, borderRadius: 10, width: 38, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem', flexShrink: 0 }}>{m.icon}</div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontWeight: 'bold', color: '#2c3e50', fontSize: '0.95rem' }}>{m.label}</div>
+                                <div style={{ color: '#888', fontSize: '0.76rem' }}>{m.desc}</div>
+                            </div>
+                        </button>
+                    ))}
+                </div>
+            ) : (
+                <BoardPlay problem={problem} seleccion={seleccion} cesta={cesta} showSolution={showSolution}
+                    isMobile={isMobile} pieceSize={pieceSize} visibles={visibles}
+                    addPieza={addPieza} quitarPieza={quitarPieza} addProducto={addProducto} quitarProducto={quitarProducto}
+                    limpiar={limpiar} comprobar={comprobar} pasar={pasar} />
+            )}
+        </div>
+    );
+}
+
 // ─── Componente principal ──────────────────────────────────────────────────────
 export default function CalculoDineroGame({ usuario, onExit }) {
     const [gameState, setGameState] = useState('START');
     const [config, setConfig] = useState(DEFAULT_CONFIG);
     const [showConfig, setShowConfig] = useState(false);
     const [mostrarEnvio, setMostrarEnvio] = useState(false);
+    const [dual, setDual] = useState(false);
 
     const [timeLeft, setTimeLeft] = useState(DEFAULT_CONFIG.tiempo);
     const [score, setScore] = useState(0);
@@ -522,10 +742,12 @@ export default function CalculoDineroGame({ usuario, onExit }) {
     const limpiar = () => { setSeleccion({}); setCesta({}); };
 
     const acierto = () => {
+        playSound(sndAcierto);
         setScore(s => s + 10); setAciertos(a => a + 1); setFeedback('CORRECT');
         setTimeout(() => { setFeedback(null); avanzar(); }, 700);
     };
     const fallo = () => {
+        playSound(sndFallo);
         setScore(s => Math.max(0, s - 3)); setFallos(f => f + 1); setFeedback('INCORRECT');
         setTimeout(() => setFeedback(null), 700);
     };
@@ -558,6 +780,23 @@ export default function CalculoDineroGame({ usuario, onExit }) {
     const borderColor = feedback === 'CORRECT' ? '#2ecc71' : feedback === 'INCORRECT' ? '#e74c3c' : feedback === 'SKIP' ? '#f39c12' : 'transparent';
     const visibles = DENOMINACIONES.filter(d => d.val <= Math.max(200, Math.round(config.maxPrecio * 100)));
     const pieceSize = isMobile ? 42 : 52;
+
+    // ── MODO DUAL: pantalla partida, cada jugador elige su modo y juega solo ──
+    if (dual) {
+        return (
+            <div style={st.container}>
+                <div style={st.header}>
+                    <button onClick={() => setDual(false)} style={st.btnVolver}><RotateCcw size={16} /> Salir del dual</button>
+                    <span style={{ fontWeight: 800, color: '#16a085', fontSize: '1rem' }}>👥 Modo dual · 2 jugadores</span>
+                    <button onClick={compartir} style={st.btnVolver} title="Compartir"><Share2 size={16} /></button>
+                </div>
+                <div style={{ display: 'flex', gap: 12, flexDirection: isMobile ? 'column' : 'row', alignItems: 'stretch' }}>
+                    <TableroDual idx={1} accent="#3498db" isMobile={isMobile} />
+                    <TableroDual idx={2} accent="#e74c3c" isMobile={isMobile} />
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div style={st.container}>
@@ -614,6 +853,27 @@ export default function CalculoDineroGame({ usuario, onExit }) {
                                 <span style={{ color: m.color, fontSize: '1.3rem', flexShrink: 0 }}>›</span>
                             </button>
                         ))}
+
+                        {/* Separador */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '2px 0' }}>
+                            <div style={{ flex: 1, height: 1, background: '#eee' }} />
+                            <span style={{ color: '#bbb', fontSize: '0.75rem' }}>2 jugadores</span>
+                            <div style={{ flex: 1, height: 1, background: '#eee' }} />
+                        </div>
+
+                        {/* Modo dual */}
+                        <button onClick={() => setDual(true)}
+                            style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', background: 'white', border: '2px solid #8e44ad', borderRadius: 16, cursor: 'pointer', textAlign: 'left', boxShadow: '0 3px 10px rgba(0,0,0,0.07)', width: '100%' }}
+                            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 20px #8e44ad33'; }}
+                            onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 3px 10px rgba(0,0,0,0.07)'; }}
+                        >
+                            <div style={{ background: '#8e44ad', borderRadius: 12, width: 46, height: 46, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', flexShrink: 0 }}>👥</div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontWeight: 'bold', color: '#2c3e50', fontSize: '1rem', marginBottom: 3 }}>Modo dual</div>
+                                <div style={{ color: '#888', fontSize: '0.82rem' }}>Pantalla partida · cada jugador elige su propio modo y juega a la vez</div>
+                            </div>
+                            <span style={{ color: '#8e44ad', fontSize: '1.3rem', flexShrink: 0 }}>›</span>
+                        </button>
                     </div>
                 </div>
             )}
@@ -621,118 +881,10 @@ export default function CalculoDineroGame({ usuario, onExit }) {
             {/* JUEGO */}
             {gameState === 'PLAYING' && problem && (
                 <div style={{ ...st.centerCard, maxWidth: 640, border: `4px solid ${borderColor}`, transition: 'border-color 0.2s, transform 0.2s', transform: feedback === 'CORRECT' ? 'scale(1.02)' : 'none' }}>
-                    {/* Enunciado */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: isMobile ? '2.4rem' : '3rem' }}>{problem.emoji}</span>
-                        <span style={{ fontSize: isMobile ? '1.05rem' : '1.25rem', fontWeight: 700, color: '#2c3e50', textAlign: 'left', maxWidth: 460 }}>{problem.enunciado}</span>
-                    </div>
-
-                    {esCompra ? (
-                        <>
-                            {/* Marcador gastado / te sobra */}
-                            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginBottom: 14, flexWrap: 'wrap' }}>
-                                <div style={{ background: '#f8f9fa', borderRadius: 14, padding: '8px 16px', border: '2px solid #e0e0e0', minWidth: 120 }}>
-                                    <span style={{ fontSize: '0.78rem', color: '#7f8c8d', display: 'block' }}>🛒 Gastado</span>
-                                    <div style={{ fontSize: isMobile ? '1.5rem' : '1.9rem', fontWeight: 'bold', color: totalCesta === problem.answerCents && totalCesta > 0 ? '#27ae60' : '#16a085' }}>{fmt(totalCesta)}</div>
-                                </div>
-                                <div style={{ background: '#f8f9fa', borderRadius: 14, padding: '8px 16px', border: '2px solid #e0e0e0', minWidth: 120 }}>
-                                    <span style={{ fontSize: '0.78rem', color: '#7f8c8d', display: 'block' }}>👛 Te sobra</span>
-                                    <div style={{ fontSize: isMobile ? '1.5rem' : '1.9rem', fontWeight: 'bold', color: (problem.dinero - totalCesta) === problem.sobra ? '#27ae60' : (problem.dinero - totalCesta < 0 ? '#e74c3c' : '#e67e22') }}>
-                                        {fmt(problem.dinero - totalCesta)}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {showSolution && (
-                                <div style={{ fontSize: '0.9rem', color: '#27ae60', fontWeight: 700, marginBottom: 10 }}>
-                                    ✅ Tenías que gastar {problem.displayAnswer}
-                                </div>
-                            )}
-
-                            {/* Carrito */}
-                            {!showSolution && totalCesta > 0 && (
-                                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', marginBottom: 12 }}>
-                                    {Object.keys(cesta).map(idx => {
-                                        const p = PRODUCTOS[idx];
-                                        return (
-                                            <button key={idx} onClick={() => quitarProducto(idx)} title={`Quitar ${p.nombre}`}
-                                                style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 4, background: '#eef7f3', border: '2px solid #16a08555', borderRadius: 10, padding: '5px 9px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 700, color: '#2c3e50' }}>
-                                                <span style={{ fontSize: '1.1rem' }}>{p.emoji}</span>×{cesta[idx]}
-                                            </button>
-                                        );
-                                    })}
-                                    <button onClick={limpiar} style={{ ...st.btnVolver, padding: '6px 12px', fontSize: '0.8rem' }}><Delete size={14} /> Vaciar</button>
-                                </div>
-                            )}
-
-                            {/* Lista de precios del supermercado */}
-                            {!showSolution && (
-                                <div style={{ background: '#eef7f3', borderRadius: 14, padding: 10, marginBottom: 16 }}>
-                                    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isMobile ? 2 : 4}, 1fr)`, gap: 7 }}>
-                                        {PRODUCTOS.map((p, idx) => (
-                                            <button key={idx} onClick={() => addProducto(idx)}
-                                                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'white', border: cesta[idx] ? '2px solid #16a085' : '2px solid #e0e0e0', borderRadius: 10, padding: '7px 8px', cursor: 'pointer', textAlign: 'left' }}>
-                                                <span style={{ fontSize: '1.3rem' }}>{p.emoji}</span>
-                                                <span style={{ flex: 1, minWidth: 0 }}>
-                                                    <span style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#2c3e50', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.nombre}</span>
-                                                    <span style={{ fontSize: '0.78rem', color: '#16a085', fontWeight: 700 }}>{fmt(p.precio)}</span>
-                                                </span>
-                                                {cesta[idx] > 0 && <span style={{ background: '#16a085', color: 'white', borderRadius: '50%', width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.72rem', fontWeight: 800 }}>{cesta[idx]}</span>}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </>
-                    ) : (
-                        <>
-                            {/* Total reunido / respuesta — con billetes y monedas */}
-                            <div style={{ background: '#f8f9fa', borderRadius: 14, padding: '10px 16px', marginBottom: 14, border: '2px solid #e0e0e0' }}>
-                                <span style={{ fontSize: '0.85rem', color: '#7f8c8d', display: 'block', marginBottom: 2 }}>
-                                    {showSolution
-                                        ? (problem.tipo === 'pagar' ? '✅ Tenías que reunir:' : '✅ Solución:')
-                                        : (problem.tipo === 'pagar' ? 'Llevas reunido:' : 'Tu respuesta:')}
-                                </span>
-                                <div style={{ fontSize: isMobile ? '2rem' : '2.6rem', fontWeight: 'bold', color: showSolution ? '#27ae60' : (totalSel === problem.answerCents && totalSel > 0 ? '#27ae60' : '#16a085') }}>
-                                    {showSolution ? problem.displayAnswer : fmt(totalSel)}
-                                </div>
-                            </div>
-
-                            {/* Piezas elegidas */}
-                            {!showSolution && totalSel > 0 && (
-                                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', marginBottom: 14, minHeight: pieceSize }}>
-                                    {DENOMINACIONES.filter(d => seleccion[d.val]).map(d => (
-                                        <PiezaDinero key={d.val} d={d} size={pieceSize * 0.85} badge={seleccion[d.val]} onClick={() => quitarPieza(d.val)} />
-                                    ))}
-                                    <button onClick={limpiar} style={{ ...st.btnVolver, padding: '6px 12px', fontSize: '0.8rem' }}><Delete size={14} /> Vaciar</button>
-                                </div>
-                            )}
-
-                            {/* Cajón de denominaciones */}
-                            {!showSolution && (
-                                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginBottom: 16, background: '#eef7f3', borderRadius: 14, padding: 12 }}>
-                                    {visibles.map(d => (
-                                        <PiezaDinero key={d.val} d={d} size={pieceSize} onClick={() => addPieza(d.val)} />
-                                    ))}
-                                </div>
-                            )}
-                        </>
-                    )}
-
-                    {/* Solución (al pasar) */}
-                    {showSolution && (
-                        <div style={{ background: '#fff8e1', border: '2px solid #ffe082', borderRadius: 12, padding: '10px 14px', marginBottom: 16, color: '#8d6e00', fontWeight: 600, fontSize: '0.95rem' }}>
-                            👁 {problem.pista}
-                        </div>
-                    )}
-
-                    {/* Acciones */}
-                    {!showSolution && (
-                        <div style={{ display: 'flex', gap: 10 }}>
-                            <button onClick={pasar} style={st.btnSkip} title="Pasar (−2 pts, ver solución)"><SkipForward size={18} /> Pasar</button>
-                            <button onClick={comprobar} style={{ ...st.btnSuccess, flex: 2 }}><CheckCircle size={20} /> Comprobar</button>
-                        </div>
-                    )}
+                    <BoardPlay problem={problem} seleccion={seleccion} cesta={cesta} showSolution={showSolution}
+                        isMobile={isMobile} pieceSize={pieceSize} visibles={visibles}
+                        addPieza={addPieza} quitarPieza={quitarPieza} addProducto={addProducto} quitarProducto={quitarProducto}
+                        limpiar={limpiar} comprobar={comprobar} pasar={pasar} />
                 </div>
             )}
 

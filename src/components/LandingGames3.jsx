@@ -1120,17 +1120,17 @@ export const MATERIAS_CONFIG = [
     {
         id: 'LENGUA', label: 'Lengua', emoji: '📖', color: '#7B1FA2',
         keywords: ['lengua', 'castellano', 'español', 'literatura', 'gramatica', 'sintaxis', 'vocabulario', 'comprension', 'escritura', 'lectura', 'texto', 'ortografia'],
-        specificIds: ['SINTAXIS', 'STORYCUBES'],
+        specificIds: ['SINTAXIS', 'STORYCUBES', 'LENGUA_SIGNOS', 'LINEA_TIEMPO'],
     },
     {
         id: 'GEO_HISTORIA', label: 'Geo e Historia', emoji: '🌍', color: '#F57C00',
         keywords: ['geografia', 'historia', 'sociales', 'ciencias sociales', 'mapa', 'comunidades', 'europa', 'mundo', 'continente', 'pais', 'capital', 'civilizacion', 'cultura', 'prehistoria', 'imperio', 'imperios', 'edad antigua', 'edad media'],
-        specificIds: ['GEOGRAFIA', 'IMPERIOS', 'ETIQUETAS'],
+        specificIds: ['GEOGRAFIA', 'IMPERIOS', 'LINEA_TIEMPO', 'ETIQUETAS'],
     },
     {
         id: 'FISICA_QUIMICA', label: 'Física y Química', emoji: '⚗️', color: '#C62828',
         keywords: ['fisica', 'quimica', 'ciencias', 'energia', 'fuerza', 'reaccion', 'elemento', 'atomo', 'molecula', 'electricidad', 'movimiento', 'calor', 'luz', 'ondas'],
-        specificIds: ['SIMULADORES_FISICA', 'ETIQUETAS'],
+        specificIds: ['SIMULADORES_FISICA', 'SOLAR_SYSTEM', 'ETIQUETAS'],
     },
     {
         id: 'BIOLOGIA', label: 'Biología', emoji: '🔬', color: '#2E7D32',
@@ -1145,22 +1145,49 @@ export const MATERIAS_CONFIG = [
     {
         id: 'TECNOLOGIA', label: 'Tecnología', emoji: '⚙️', color: '#546E7A',
         keywords: ['tecnologia', 'tecno', 'informatica', 'robotica', 'circuito', 'maquina', 'programacion', 'dibujo tecnico', 'diseño', 'vistas', 'mecanismo'],
-        specificIds: ['VISTAS_DIDRICAS', 'MINIAPP_CREATOR'],
+        specificIds: ['VISTAS_DIDRICAS', 'ROBOTICA_BLOQUES'],
     },
     {
         id: 'PLASTICA', label: 'Plástica', emoji: '🎨', color: '#AD1457',
         keywords: ['plastica', 'arte', 'dibujo', 'visual', 'pintura', 'artistica', 'escultura', 'color', 'forma', 'volumen', 'perspectiva'],
-        specificIds: ['STORYCUBES'],
+        specificIds: ['STORYCUBES', 'EAE', 'PUZZLE_IMAGENES', 'VISTAS_DIDRICAS'],
     },
     {
         id: 'IDIOMAS', label: 'Idiomas', emoji: '🌐', color: '#1565C0',
         keywords: ['ingles', 'english', 'frances', 'french', 'aleman', 'german', 'idioma', 'lengua extranjera', 'irregular', 'verbo', 'listening', 'speaking', 'grammar'],
-        specificIds: ['IRREGULAR_VERBS', 'LISTENING', 'SINTAXIS'],
+        specificIds: ['IRREGULAR_VERBS', 'LISTENING'],
     },
 ];
 
+// Slug "bonito" por materia para el enlace directo (pikt.es/<slug>) y para reflejarlo en la URL
+const MATERIA_ROUTE = {
+    MATEMATICAS: 'mates',
+    LENGUA: 'lengua',
+    GEO_HISTORIA: 'gyh',
+    FISICA_QUIMICA: 'fyq',
+    BIOLOGIA: 'bio',
+    MUSICA: 'music',
+    TECNOLOGIA: 'tecno',
+    PLASTICA: 'plastica',
+    IDIOMAS: 'idiomas',
+};
+// Mapa inverso (con alias) para reconocer la ruta entrante → id de materia
+const MATERIA_SLUGS = {
+    mates: 'MATEMATICAS', matematicas: 'MATEMATICAS', matecas: 'MATEMATICAS',
+    lengua: 'LENGUA', lenguaje: 'LENGUA',
+    gyh: 'GEO_HISTORIA', geohistoria: 'GEO_HISTORIA', 'geo-historia': 'GEO_HISTORIA', sociales: 'GEO_HISTORIA',
+    fyq: 'FISICA_QUIMICA', fisic: 'FISICA_QUIMICA', 'fisica-quimica': 'FISICA_QUIMICA', fisicaquimica: 'FISICA_QUIMICA',
+    bio: 'BIOLOGIA', biologia: 'BIOLOGIA',
+    music: 'MUSICA', musica: 'MUSICA',
+    tecno: 'TECNOLOGIA', tecnologia: 'TECNOLOGIA',
+    plastica: 'PLASTICA', plastik: 'PLASTICA',
+    idiomas: 'IDIOMAS', ingles: 'IDIOMAS',
+};
+
 const MATH_ONLY_IDS = new Set(['MATHLIVE']);
-const GESTION_IDS = ['GESTION_AULA', 'QUESTION_SENDER', 'OMNINTERACTIVE', 'VIDEOQUIZZ'];
+const GESTION_IDS = ['GESTION_AULA', 'QUESTION_SENDER', 'OMNINTERACTIVE', 'VIDEOQUIZZ', 'FUNCIONES_EJECUTIVAS'];
+// Herramientas con IA, siempre disponibles en todas las materias (separadas de la gestión de aula)
+const IA_IDS = ['MINIAPP_CREATOR'];
 
 const EXTRA_TOOLS = {
     OMNINTERACTIVE:     { id: 'OMNINTERACTIVE',     name: 'Omninteractive',   emoji: '📚', color: '#6D28D9' },
@@ -1169,11 +1196,14 @@ const EXTRA_TOOLS = {
     SOLAR_SYSTEM:       { id: 'SOLAR_SYSTEM',       name: 'Sistema Solar',    emoji: '🪐', color: '#3B82F6' },
     MUSICA:             { id: 'MUSICA',             name: 'Música',           emoji: '🎵', color: '#8b5cf6' },
     GEOGRAFIA:          { id: 'GEOGRAFIA',          name: 'Geografía',        emoji: '🌍', color: '#0d9488' },
+    IMPERIOS:           { id: 'IMPERIOS',           name: 'Imperios',         emoji: '🏛️', color: '#b45309' },
     BIOLOGIA:           { id: 'BIOLOGIA',           name: 'Biología',         emoji: '🔬', color: '#16a34a' },
     GESTION_AULA:       { id: 'GESTION_AULA',       name: 'Gestión Aula',     emoji: '🏫', color: '#e67e22' },
     VISTAS_DIDRICAS:    { id: 'VISTAS_DIDRICAS',    name: 'Vistas Diédricas', emoji: '📐', color: '#7c3aed' },
     SIMULADORES_FISICA: { id: 'SIMULADORES_FISICA', name: 'Física',           emoji: '🔭', color: '#e74c3c' },
     MINIAPP_CREATOR:    { id: 'MINIAPP_CREATOR',    name: 'Creación App con IA', emoji: '🤖', color: '#0ea5e9' },
+    LINEA_TIEMPO:       { id: 'LINEA_TIEMPO',       name: 'Línea del Tiempo', emoji: '🕰️', color: '#2980b9' },
+    ROBOTICA_BLOQUES:   { id: 'ROBOTICA_BLOQUES',   name: 'Programación y Robótica', emoji: '🤖', color: '#0EA5E9' },
 };
 
 // --- FUNCIONES DE AYUDA PARA BÚSQUEDA INTELIGENTE ---
@@ -1347,6 +1377,15 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                 const key = SLUG_MAP[path.slice(7)];
                 setSimuladoresFisica(true);
                 if (key) setSimuladorFisicaActivo(key);
+                return;
+            }
+
+            // Vista directa por materia: pikt.es/mates, /lengua, /gyh, /tecno, /idiomas, /music, /bio, /fyq, /plastica
+            if (MATERIA_SLUGS[path]) {
+                setZonaActiva('MAIN'); setJuegoActivo(null); setSubzonaMath(null);
+                setTabPrincipal('MATERIA');
+                setMateriaActiva(MATERIA_SLUGS[path]);
+                cargarRecursosPorMateria(MATERIA_SLUGS[path]);
                 return;
             }
 
@@ -1865,6 +1904,8 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
             MINIAPP_CREATOR:    () => setMiniAppCreator(true),
             SIMULADORES_FISICA: () => { setSimuladoresFisica(true); window.history.pushState({}, '', '/fisica'); },
             QUESTION_SENDER:    () => setJuegoActivo({ tipoJuego: 'QUESTION_SENDER' }),
+            LINEA_TIEMPO:       () => setJuegoActivo({ tipoJuego: 'LINEA_TIEMPO' }),
+            ROBOTICA_BLOQUES:   () => setJuegoActivo({ tipoJuego: 'ROBOTICA_BLOQUES' }),
         };
         if (TOOL_ACTIONS[id]) TOOL_ACTIONS[id]();
         else abrirJuego(id);
@@ -2743,7 +2784,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                             boxShadow: tabPrincipal === 'TODAS' ? '0 2px 10px rgba(241,196,15,0.5)' : 'none' }}
                     >🎮 Todas</button>
                     <button
-                        onClick={() => { setTabPrincipal('MATERIA'); cargarRecursosPorMateria(materiaActiva); }}
+                        onClick={() => { setTabPrincipal('MATERIA'); cargarRecursosPorMateria(materiaActiva); if (MATERIA_ROUTE[materiaActiva]) window.history.pushState({}, '', `/${MATERIA_ROUTE[materiaActiva]}`); }}
                         style={{ padding: '10px 18px', borderRadius: 20, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '0.92rem', transition: 'all 0.2s',
                             background: tabPrincipal === 'MATERIA' ? '#f1c40f' : 'rgba(255,255,255,0.2)',
                             color: tabPrincipal === 'MATERIA' ? '#333' : 'white',
@@ -2924,6 +2965,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                     (!MATH_ONLY_IDS.has(a.id) || materiaActiva === 'MATEMATICAS')
                 );
                 const gestionApps = GESTION_IDS.map(id => getToolData(id)).filter(Boolean);
+                const iaApps = IA_IDS.map(id => getToolData(id)).filter(Boolean);
                 const recursos = recursosPorMateria[materiaActiva];
 
                 const miniCard = (app, onClick) => (
@@ -2951,7 +2993,11 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                         <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 6, marginBottom: 24, scrollbarWidth: 'none' }}>
                             {MATERIAS_CONFIG.map(m => (
                                 <button key={m.id}
-                                    onClick={() => { setMateriaActiva(m.id); cargarRecursosPorMateria(m.id); }}
+                                    onClick={() => {
+                                        setMateriaActiva(m.id);
+                                        cargarRecursosPorMateria(m.id);
+                                        if (MATERIA_ROUTE[m.id]) window.history.pushState({}, '', `/${MATERIA_ROUTE[m.id]}`);
+                                    }}
                                     style={{ flexShrink: 0, padding: '8px 16px', borderRadius: 20, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem', transition: 'all 0.2s', whiteSpace: 'nowrap',
                                         background: materiaActiva === m.id ? m.color : 'rgba(255,255,255,0.18)',
                                         color: materiaActiva === m.id ? 'white' : 'rgba(255,255,255,0.8)',
@@ -2985,6 +3031,16 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 12, marginBottom: 28 }}>
                             {gestionApps.map(app => miniCard(app, () => openById(app.id)))}
                         </div>
+
+                        {/* Crea tu app con IA */}
+                        {iaApps.length > 0 && (<>
+                            <h3 style={{ color: '#0ea5e9', textShadow: '0 1px 3px rgba(0,0,0,0.4)', marginBottom: 14, fontSize: '1.05rem' }}>
+                                🤖 Crea tu app con IA
+                            </h3>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 12, marginBottom: 28 }}>
+                                {iaApps.map(app => miniCard(app, () => openById(app.id)))}
+                            </div>
+                        </>)}
 
                         {/* Recursos de la comunidad */}
                         <h3 style={{ color: materia.color, textShadow: '0 1px 3px rgba(0,0,0,0.4)', marginBottom: 14, fontSize: '1.05rem' }}>

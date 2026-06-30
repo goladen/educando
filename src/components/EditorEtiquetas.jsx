@@ -120,6 +120,9 @@ export default function EditorEtiquetas({ datos, setDatos, onClose, usuario }) {
                 hojas,
                 creadoEn:      datosEfectivos.creadoEn || Date.now(),
                 actualizadoEn: Date.now(),
+                // Necesario para que el recurso aparezca en la biblioteca y en las vistas por materia,
+                // que ordenan/filtran por 'fechaCreacion' (Firestore excluye los docs sin este campo).
+                fechaCreacion: datosEfectivos.fechaCreacion || new Date(),
             };
 
             await setDoc(doc(collection(db, 'resources'), docId), payload);
@@ -448,10 +451,14 @@ export default function EditorEtiquetas({ datos, setDatos, onClose, usuario }) {
                             {/* El wrapper NO tiene overflow:hidden para que las etiquetas
                                 puedan salir más allá del borde de la imagen */}
                             <div style={{ textAlign: 'center' }}>
-                                <div
+                                <div style={st.imageWrapper}>
+                                  {/* Caja interna: envuelve EXACTAMENTE la imagen. Las coordenadas de
+                                      los marcadores son % de la imagen (no del wrapper con padding),
+                                      para que coincidan editor y juego en cualquier pantalla. */}
+                                  <div
                                     ref={containerRef}
-                                    style={st.imageWrapper}
-                                >
+                                    style={st.imageBox}
+                                  >
                                     {/* 1. IMAGEN */}
                                     <img
                                         src={hojaActual.imageUrl}
@@ -554,6 +561,7 @@ export default function EditorEtiquetas({ datos, setDatos, onClose, usuario }) {
                                             </button>
                                         </div>
                                     ))}
+                                  </div>
                                 </div>
                             </div>
 
@@ -983,6 +991,13 @@ const st = {
         // padding extra para que haya margen alrededor donde poner las etiquetas
         padding: 60,
         boxSizing: 'border-box',
+    },
+    // Caja que envuelve EXACTAMENTE la imagen (base de coordenadas de los marcadores)
+    imageBox: {
+        position: 'relative',
+        display: 'inline-block',
+        lineHeight: 0,
+        fontSize: 0,
     },
     image: {
         display: 'block',

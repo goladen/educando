@@ -125,6 +125,16 @@ function App() {
         'fisica',
         'math_world','primaria','feria',
         'arkade',
+        // Vistas por materia (pikt.es/<materia>)
+        'mates','matematicas','matecas',
+        'lengua','lenguaje',
+        'gyh','geohistoria','geo-historia','sociales',
+        'fyq','fisic','fisica-quimica','fisicaquimica',
+        'bio','biologia',
+        'music',
+        'tecno','tecnologia',
+        'plastica','plastik',
+        'idiomas','ingles',
       ]);
       if (slug && !RUTAS_RESERVADAS.has(slug) && !slug.startsWith('fisica/') && !slug.startsWith('primaria/')) {
         // Check if it's a professor page slug

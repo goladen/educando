@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { db } from './firebase';
 import { guardarRegistroLocal } from './utils/registrosLocales';
-import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, addDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, doc, getDoc, addDoc } from 'firebase/firestore';
 import {
     Search, Key, ChevronDown, ChevronUp, Filter,
     CheckCircle, XCircle, RotateCcw, ArrowLeft, Play,
@@ -207,10 +207,20 @@ function PantallaBusqueda({ onElegir, onExit, onPartesPlanta }) {
                     alert('Código no encontrado.');
                 }
             } else {
-                const snap = await getDocs(query(ref, orderBy('fechaCreacion', 'desc'), limit(200)));
+                // Filtramos por tipoJuego en Firestore (sin orderBy: Firestore excluye los docs
+                // que no tienen el campo 'fechaCreacion', y los recursos de Etiquetas antiguos no lo tienen).
+                const snap = await getDocs(query(ref, where('tipoJuego', '==', 'ETIQUETAS'), limit(200)));
                 const raw  = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+                // Orden por fecha más reciente, tolerando distintos campos/formatos de fecha.
+                const ts = (r) => {
+                    const f = r.fechaCreacion ?? r.creadoEn ?? r.actualizadoEn ?? 0;
+                    if (f && typeof f.seconds === 'number') return f.seconds * 1000; // Timestamp Firestore
+                    if (f instanceof Date) return f.getTime();
+                    const n = new Date(f).getTime();
+                    return Number.isNaN(n) ? Number(f) || 0 : n;
+                };
+                raw.sort((a, b) => ts(b) - ts(a));
                 const filtrados = raw.filter(r => {
-                    if (r.tipoJuego !== 'ETIQUETAS') return false;
                     if (r.isFinished !== true) return false;
                     if (filtros.tema && !checkFuzzyMatch(r.titulo, filtros.tema) && !checkFuzzyMatch(r.temas, filtros.tema) &&
                         !(r.hojas?.some(h => checkFuzzyMatch(h.nombreHoja, filtros.tema)))) return false;
@@ -671,27 +681,30 @@ function PantallaJuego({ recurso, hoja, onJugarDeNuevo, onCambiarDiagrama, onSal
             <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px' }}>
                 <div style={{ maxWidth: 1000, margin: '0 auto' }}>
 
-                    {/* Image wrapper */}
+                    {/* Image wrapper (padding = margen visual donde caen las etiquetas) */}
                     <div style={{
-                        position: 'relative', display: 'inline-block', width: '100%',
+                        position: 'relative', display: 'block', width: 'fit-content', maxWidth: '100%', margin: '0 auto',
                         background: 'white', borderRadius: 14,
                         padding: 60, boxSizing: 'border-box',
                         boxShadow: '0 8px 28px rgba(0,0,0,0.3)',
                     }}>
+                      {/* Caja interna: envuelve EXACTAMENTE la imagen. Las coordenadas de los
+                          marcadores son % de la imagen (igual que en el editor) → siempre alineados. */}
+                      <div style={{ position: 'relative', display: 'inline-block', lineHeight: 0, fontSize: 0 }}>
                         <img
                             src={imageUrl} alt="diagrama"
-                            style={{ display: 'block', width: '100%', height: 'auto', borderRadius: 8, userSelect: 'none' }}
+                            style={{ display: 'block', maxWidth: '100%', maxHeight: '60vh', objectFit: 'contain', borderRadius: 8, userSelect: 'none' }}
                             draggable="false"
                         />
 
-                        {/* Paint overlay: mismo área que la imagen (dentro del padding de 60px) */}
+                        {/* Paint overlay: exactamente sobre la imagen */}
                         {hoja.paintData && (
                             <img
                                 src={hoja.paintData}
                                 alt=""
                                 style={{
-                                    position: 'absolute', top: 60, left: 60,
-                                    width: 'calc(100% - 120px)', height: 'auto',
+                                    position: 'absolute', top: 0, left: 0,
+                                    width: '100%', height: '100%',
                                     zIndex: 1, pointerEvents: 'none',
                                 }}
                                 draggable="false"
@@ -827,6 +840,7 @@ function PantallaJuego({ recurso, hoja, onJugarDeNuevo, onCambiarDiagrama, onSal
                                 </div>
                             );
                         })}
+                      </div>
                     </div>
 
                     {/* Banco de etiquetas (solo modo ARRASTRAR, antes de evaluar) */}

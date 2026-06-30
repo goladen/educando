@@ -54,7 +54,34 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f4ff; color: #
 .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
 .info-box { background: #f8f7ff; border-radius: 8px; padding: 12px; font-size: 0.88em; }
 footer { text-align: center; padding: 20px; font-size: 0.85em; color: #999; }
-@media (max-width: 600px) { .hero h1 { font-size: 1.8em; } .app-grid { grid-template-columns: 1fr; } .info-grid { grid-template-columns: 1fr; } }
+/* Evitar desbordes horizontales y permitir que palabras largas/enlaces se partan */
+html, body { max-width: 100%; overflow-x: hidden; }
+.section p, .app-card p, .steps li .step-text, .btn-item, .info-box, .alert { overflow-wrap: break-word; word-break: break-word; }
+.section h2 { flex-wrap: wrap; }
+
+@media (max-width: 600px) {
+  .hero { padding: 30px 16px; }
+  .hero h1 { font-size: 1.7em; }
+  .hero p { font-size: 1.05em; }
+  .container { padding: 18px 12px; }
+  .section { padding: 18px 16px; border-radius: 14px; margin-bottom: 18px; }
+  .section h2 { font-size: 1.25em; gap: 6px; }
+  .section h3 { font-size: 1.02em; }
+  .app-grid { grid-template-columns: 1fr; gap: 12px; }
+  .method-grid { grid-template-columns: 1fr; }
+  .info-grid { grid-template-columns: 1fr; }
+  .btn-legend { gap: 8px; }
+  .btn-item { width: 100%; }
+}
+
+@media (max-width: 380px) {
+  .hero h1 { font-size: 1.45em; }
+  .section { padding: 15px 13px; }
+  .section h2 { font-size: 1.15em; }
+  .app-card { padding: 13px; }
+  .app-card .emoji { font-size: 1.8em; }
+  .link-btn { padding: 9px 16px; font-size: 0.92em; }
+}
 
 /* ─── BOTÓN PDF ─────────────────────────────────────────────────────────── */
 .pdf-btn {
@@ -214,6 +241,12 @@ footer { text-align: center; padding: 20px; font-size: 0.85em; color: #999; }
         <p>Compite con minijuegos y ejercicios de cálculo en formato olímpico. Los alumnos se enfrentan entre ellos en pruebas rápidas de habilidades matemáticas.</p>
         <span class="tag">Minijuegos</span><span class="tag orange">Cálculo</span>
       </div>
+      <div class="app-card new">
+        <span class="emoji">🎨</span>
+        <h4>PictoTabú <span class="new-badge">NUEVO</span></h4>
+        <p>Un alumno dibuja o describe un concepto sin usar las palabras prohibidas y el resto de la clase adivina. Muy dinámico para repaso de vocabulario en cualquier materia o idioma. El profesor crea el recurso con los conceptos y sus palabras tabú.</p>
+        <span class="tag">Adivinar</span><span class="tag green">Vocabulario</span><span class="tag orange">Toda la clase</span>
+      </div>
     </div>
   </div>
 
@@ -306,6 +339,42 @@ footer { text-align: center; padding: 20px; font-size: 0.85em; color: #999; }
         <p>Puzzles y retos de lógica: conecta puntos, resuelve enigmas visuales y pruebas de pensamiento lateral. Ideal para desarrollar el razonamiento lógico y la concentración.</p>
         <span class="tag green">Lógica</span><span class="tag">Razonamiento</span>
       </div>
+      <div class="app-card new">
+        <span class="emoji">🪢</span>
+        <h4>Ahorcado <span class="new-badge">NUEVO</span></h4>
+        <p>El clásico ahorcado digital: adivina la palabra letra a letra. Tres modos: 1 jugador (con o sin tiempo), contrarreloj de 5 minutos con ranking y duelo de 2 jugadores (uno propone la palabra y el otro la adivina). Genera palabras del diccionario por idioma o usa recursos de Wordle y Sopa.</p>
+        <span class="tag green">Vocabulario</span><span class="tag orange">3 modos</span><span class="tag">Duelo</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">🧩</span>
+        <h4>Puzzle de Imágenes <span class="new-badge">NUEVO</span></h4>
+        <p>Una foto se corta en piezas que se desordenan y el alumno las recoloca. Incluye 20 imágenes precargadas, cada una con 3 dificultades (6, 12 y 24 piezas). Optimizado para móvil. Sin necesidad de recurso del profesor.</p>
+        <span class="tag green">Atención</span><span class="tag pink">Lógica visual</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">⚽</span>
+        <h4>Fútbol Quizz <span class="new-badge">NUEVO</span></h4>
+        <p>Pizarra de fútbol por turnos: antes de tirar, el equipo responde una pregunta; si acierta arrastra y dispara para marcar gol, si falla pasa el turno. Marcador de goles y aciertos. Reutiliza recursos de PiLive, Burbujas y Pasapalabra, o se juega en modo libre.</p>
+        <span class="tag green">2 equipos</span><span class="tag orange">Repaso</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">🎯</span>
+        <h4>Trivial <span class="new-badge">NUEVO</span></h4>
+        <p>El clásico trivial adaptado al aula: preguntas por categorías, tablero de juego y hasta 6 jugadores simultáneos. Perfecto para repasos temáticos. El profesor crea el recurso con las preguntas por categoría.</p>
+        <span class="tag green">Por categorías</span><span class="tag">Hasta 6 jugadores</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">🏴‍☠️</span>
+        <h4>Duelo Piratas <span class="new-badge">NUEVO</span></h4>
+        <p>Duelo de barcos piratas para 2 jugadores con cualquier recurso del aula: cada respuesta correcta dispara un cañonazo al barco rival. Admite opción múltiple, aparejados y pasapalabra. Se carga con el código de acceso del profesor.</p>
+        <span class="tag green">2 jugadores</span><span class="tag orange">Cualquier recurso</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">🕹️</span>
+        <h4>Arkade <span class="new-badge">NUEVO</span></h4>
+        <p>Recopilación de minijuegos arcade clásicos (Tetris y más) para momentos de desconexión o como recompensa en clase. Sin necesidad de recurso del profesor.</p>
+        <span class="tag green">Arcade</span><span class="tag">Clásicos</span>
+      </div>
     </div>
   </div>
 
@@ -388,6 +457,18 @@ footer { text-align: center; padding: 20px; font-size: 0.85em; color: #999; }
         <p>Tablas de frecuencias, parámetros estadísticos (media, mediana, moda, desviación) y representación gráfica: histogramas, diagramas de barras y sectores.</p>
         <span class="tag green">Estadística</span><span class="tag">Gráficos</span>
       </div>
+      <div class="app-card new">
+        <span class="emoji">🎲</span>
+        <h4>Probabilidad <span class="new-badge">NUEVO</span></h4>
+        <p>Simulador de dados interactivo para el estudio de la probabilidad. Permite elegir el tipo de dado, lanzar varios dados a la vez, realizar experimentos y analizar las frecuencias relativas obtenidas.</p>
+        <span class="tag green">Probabilidad</span><span class="tag">Simulación</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">💶</span>
+        <h4>Cálculo con Dinero <span class="new-badge">NUEVO</span></h4>
+        <p>Paga la cantidad exacta eligiendo billetes y monedas, calcula la vuelta, el precio total por unidades (proporcionalidad), el IVA (4%/10%/21%) y las rebajas. Genera los ejercicios automáticamente. Ideal para matemáticas de la vida cotidiana.</p>
+        <span class="tag green">Vida cotidiana</span><span class="tag orange">IVA y rebajas</span>
+      </div>
     </div>
   </div>
 
@@ -450,6 +531,54 @@ footer { text-align: center; padding: 20px; font-size: 0.85em; color: #999; }
         <p>Juego de dominó con fracciones y operaciones matemáticas. Los alumnos colocan piezas emparejando resultados de operaciones. Trabaja fracciones, decimales y equivalencias.</p>
         <span class="tag green">Fracciones</span><span class="tag">Dominó</span>
       </div>
+      <div class="app-card new">
+        <span class="emoji">🔬</span>
+        <h4>Biología <span class="new-badge">NUEVO</span></h4>
+        <p>Herramienta interactiva de biología: anatomía humana, célula, ecosistemas, reino animal y vegetal, genética y clasificación de seres vivos. Con identificación de estructuras, completar etiquetas y quiz de conceptos.</p>
+        <span class="tag green">Ciencias Naturales</span><span class="tag blue">Anatomía y célula</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">🏛️</span>
+        <h4>Imperios <span class="new-badge">NUEVO</span></h4>
+        <p>Juego en dos fases sobre los grandes imperios de la Historia (Egipto, Roma, Inca, Mongol, Otomano, Británico...). Fase 1: localiza en el mapa los países que abarcó. Fase 2: responde preguntas sobre su época, religión, aportes y caída. 20 imperios incluidos.</p>
+        <span class="tag green">Historia</span><span class="tag blue">Mapa interactivo</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">📐</span>
+        <h4>Vistas Diédricas <span class="new-badge">NUEVO</span></h4>
+        <p>Visualizador interactivo de vistas diédricas (planta, alzado y perfil). El alumno practica la lectura y el dibujo de las vistas ortogonales de objetos 3D. Incluye biblioteca de modelos y ejercicios de representación.</p>
+        <span class="tag green">Dibujo Técnico</span><span class="tag">Tecnología</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">🔭</span>
+        <h4>Física y Química <span class="new-badge">NUEVO</span></h4>
+        <p>Colección de 6 simuladores de Física interactivos: colisiones, plano inclinado, tiro parabólico, caída libre, péndulo y Ley de Ohm. El alumno experimenta modificando los parámetros y observa el resultado en tiempo real.</p>
+        <span class="tag green">Simuladores</span><span class="tag orange">Experimentar</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">🤟</span>
+        <h4>Lengua de Signos <span class="new-badge">NUEVO</span></h4>
+        <p>Transcribe y aprende el alfabeto manual de la lengua de signos española. El alumno escribe texto y ve cómo se deletrea con las manos, practicando el abecedario dactilológico.</p>
+        <span class="tag green">Inclusión</span><span class="tag blue">Abecedario</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">🕰️</span>
+        <h4>Línea del Tiempo <span class="new-badge">NUEVO</span></h4>
+        <p>El alumno ordena eventos arrastrándolos a su posición cronológica correcta sobre una línea temporal. Ideal para Historia, Literatura o Ciencias. El profesor crea el recurso con los eventos y sus fechas.</p>
+        <span class="tag green">Cronología</span><span class="tag">Arrastrar</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">🤖</span>
+        <h4>Programación y Robótica <span class="new-badge">NUEVO</span></h4>
+        <p>Entorno de programación por bloques para tres placas educativas: BBC Micro:bit V2 (MicroPython), CyberPi/mBot2 (Python) y Arduino (C++). Genera el código en tiempo real y conecta la placa por USB (Web Serial) para enviar el programa.</p>
+        <span class="tag green">Robótica</span><span class="tag blue">Bloques</span><span class="tag orange">Micro:bit · Arduino</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">🌱</span>
+        <h4>Situaciones de Aprendizaje <span class="new-badge">NUEVO</span></h4>
+        <p>Herramienta para el profesor que ayuda a diseñar situaciones de aprendizaje alineadas con la normativa LOMLOE: competencias, criterios de evaluación, saberes básicos y secuencia de actividades.</p>
+        <span class="tag green">LOMLOE</span><span class="tag blue">Programación docente</span>
+      </div>
     </div>
   </div>
 
@@ -499,6 +628,17 @@ footer { text-align: center; padding: 20px; font-size: 0.85em; color: #999; }
       <div class="btn-item"><div class="btn-dot" style="background:#d4edda;">📤</div><span>Los alumnos envían respuestas al buzón del grupo</span></div>
       <div class="btn-item"><div class="btn-dot" style="background:#cce5ff;">👁️</div><span>El profesor ve las respuestas en tiempo real</span></div>
       <div class="btn-item"><div class="btn-dot" style="background:#fff3cd;">🔑</div><span>Acceso mediante código de grupo generado por el profe</span></div>
+    </div>
+  </div>
+
+  <!-- SECCIÓN: CREACIÓN DE APP CON IA -->
+  <div class="section">
+    <h2>🤖 Creación de App con IA <span class="new-badge">NUEVO</span></h2>
+    <p style="margin-bottom:15px;font-size:0.93em;">Editor de mini-aplicaciones interactivas con asistencia de <strong>inteligencia artificial</strong>. Describe en lenguaje natural la idea de actividad o recurso que necesitas y la IA genera el código (HTML/JS) al instante. Puedes probar la app, retocar la petición, guardarla y <strong>compartirla con tu clase como una URL</strong>. Está <strong>siempre disponible en todas las materias</strong>, separada del resto de herramientas.</p>
+    <div class="btn-legend">
+      <div class="btn-item"><div class="btn-dot" style="background:#cce5ff;">💬</div><span>Describe la app que quieres y la IA la crea por ti</span></div>
+      <div class="btn-item"><div class="btn-dot" style="background:#d4edda;">▶️</div><span>Pruébala al momento y ajústala con nuevas indicaciones</span></div>
+      <div class="btn-item"><div class="btn-dot" style="background:#fff3cd;">🔗</div><span>Guárdala y compártela con tus alumnos mediante un enlace</span></div>
     </div>
   </div>
 

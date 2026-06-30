@@ -34,12 +34,12 @@ const TITULOS = {
   'org-07': { es: 'Intestino delgado', en: 'Small intestine' },
   'org-08': { es: 'Intestino grueso', en: 'Large intestine' },
   'org-09': { es: 'Riñón', en: 'Kidney' },
-  'org-10': { es: 'Vejiga urinaria', en: 'Urinary bladder' },
+  'org-10': { es: 'Urinary bladder', en: 'Urinary bladder' }, // es daba el sistema urinario completo
   'org-11': { es: 'Bazo', en: 'Spleen' },
   'org-12': { es: 'Vesícula biliar', en: 'Gallbladder' },
   'org-13': { es: 'Glándula tiroides', en: 'Thyroid' },
   'org-14': { es: 'Hipófisis', en: 'Pituitary gland' },
-  'org-15': { es: 'Glándula suprarrenal', en: 'Adrenal gland' },
+  'org-15': { es: 'Adrenal gland', en: 'Adrenal gland' }, // es cogía el sistema urinario
   'org-16': { es: 'Médula espinal', en: 'Spinal cord' },
   'org-17': { es: 'Laringe', en: 'Larynx' },
   'org-18': { es: 'Timo', en: 'Thymus' },
@@ -89,16 +89,27 @@ const TITULOS = {
   'mus-20': { es: 'Músculo sóleo', en: 'Soleus muscle' },
 };
 
-function getJson(url) {
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function getJsonRaw(url) {
   return new Promise((resolve, reject) => {
-    https.get(url, { headers: { 'User-Agent': 'educando-anatomia/1.0 (uso educativo)' } }, (res) => {
+    https.get(url, { headers: { 'User-Agent': 'educando-anatomia/1.0 (https://educando.app; contacto: goladen@gmail.com) node-https' } }, (res) => {
       let data = '';
       res.on('data', (c) => (data += c));
-      res.on('end', () => {
-        try { resolve(JSON.parse(data)); } catch (e) { reject(e); }
-      });
+      res.on('end', () => resolve({ status: res.statusCode, body: data }));
     }).on('error', reject);
   });
+}
+
+// Reintenta con backoff si Wikipedia responde 429 (demasiadas peticiones).
+async function getJson(url) {
+  for (let intento = 1; intento <= 5; intento++) {
+    const { status, body } = await getJsonRaw(url);
+    if (status === 200) { try { return JSON.parse(body); } catch (e) { return null; } }
+    if (status === 429) { await sleep(2000 * intento); continue; }
+    return null;
+  }
+  return null;
 }
 
 // Devuelve la URL de la imagen principal del artículo, o null.
@@ -114,15 +125,26 @@ async function buscarImagen(lang, titulo) {
   return null;
 }
 
-function descargar(url, destino) {
+function descargarUnaVez(url, destino) {
   return new Promise((resolve, reject) => {
     const archivo = fs.createWriteStream(destino);
-    https.get(url, { headers: { 'User-Agent': 'educando-anatomia/1.0 (uso educativo)' } }, (res) => {
-      if (res.statusCode !== 200) { archivo.close(); fs.unlink(destino, () => {}); return reject(`HTTP ${res.statusCode}`); }
+    https.get(url, { headers: { 'User-Agent': 'educando-anatomia/1.0 (https://educando.app; contacto: goladen@gmail.com) node-https' } }, (res) => {
+      if (res.statusCode !== 200) { archivo.close(); fs.unlink(destino, () => {}); return reject({ status: res.statusCode }); }
       res.pipe(archivo);
       archivo.on('finish', () => archivo.close(() => resolve()));
-    }).on('error', (err) => { fs.unlink(destino, () => {}); reject(err.message); });
+    }).on('error', (err) => { fs.unlink(destino, () => {}); reject({ msg: err.message }); });
   });
+}
+
+// Descarga con reintentos: upload.wikimedia.org limita la tasa (429).
+async function descargar(url, destino) {
+  for (let intento = 1; intento <= 5; intento++) {
+    try { return await descargarUnaVez(url, destino); }
+    catch (e) {
+      if (e.status === 429 && intento < 5) { await sleep(2500 * intento); continue; }
+      throw new Error(e.status ? `HTTP ${e.status}` : e.msg);
+    }
+  }
 }
 
 (async () => {
@@ -147,6 +169,7 @@ function descargar(url, destino) {
       if (!src) { console.error(`❌ Sin imagen: ${item.nombre}`); fallidas.push(item.nombre); continue; }
 
       await descargar(src, destino);
+      await sleep(800); // pausa para no saturar Wikipedia
       const animada = /\.(gif|webp)(\?|$)/i.test(src);
       if (animada) animadas.push(`${item.nombre} (${path.basename(src.split('?')[0])})`);
       console.log(`✅ ${nombreArchivo}  ←  ${decodeURIComponent(src.split('/').pop())}`);

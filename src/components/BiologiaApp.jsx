@@ -4,6 +4,7 @@ import { db } from '../firebase';
 import { collection, addDoc, doc, getDoc, setDoc, onSnapshot, updateDoc, increment } from 'firebase/firestore';
 import correctSoundFile from '../assets/correct-choice-43861.mp3';
 import wrongSoundFile   from '../assets/negative_beeps-6008.mp3';
+import ANATOMIA         from '../anatomia_avanzada_dataset.json';
 
 const N_PREGUNTAS = 10;
 const TIEMPO      = 20;
@@ -202,20 +203,43 @@ const SYSTEM_QUESTION = {
   circulatorio:'del sistema circulatorio', digestivo:'del sistema digestivo', respiratorio:'del sistema respiratorio',
 };
 
+// Fusiona pares derecho/izquierdo en un solo elemento que resalta AMBOS lados.
+// (En una silueta de frente no se distingue qué lado es cuál, así que la
+//  respuesta pasa a ser genérica: "Bíceps" en vez de "Bíceps derecho".)
+const LATERAL_RE = /\s+(derech[oa]s?|izquierd[oa]s?)$/i;
+const mergeBilateral = (pool) => {
+  const map = new Map();
+  const orden = [];
+  for (const el of pool) {
+    const nombre = el.nombre.replace(LATERAL_RE, '').trim();
+    const id     = el.id.replace(/_[di]$/, '');
+    if (map.has(nombre)) {
+      map.get(nombre).shapes.push(el.shape);
+    } else {
+      const merged = { ...el, id, nombre, shape: el.shape, shapes: [el.shape] };
+      map.set(nombre, merged);
+      orden.push(nombre);
+    }
+  }
+  return orden.map(n => map.get(n));
+};
+
 const getPool = (modo, nivel) => {
-  if (modo === 'cuerpo')       return CUERPO_PARTES;
+  // Sistemas internos: se mantiene izquierdo/derecho (es anatómicamente distinto).
   if (modo === 'circulatorio') return CIRCULATORIO;
   if (modo === 'digestivo')    return DIGESTIVO;
   if (modo === 'respiratorio') return RESPIRATORIO;
+  // Cuerpo / músculos / huesos: se fusiona izquierdo/derecho.
+  if (modo === 'cuerpo')       return mergeBilateral(CUERPO_PARTES);
   if (modo === 'musculos') {
-    if (nivel === 'basico') return MUSCULOS_BASE;
-    if (nivel === 'medio')  return [...MUSCULOS_BASE, ...MUSCULOS_EXTRA_MEDIO];
-    return [...MUSCULOS_BASE, ...MUSCULOS_EXTRA_MEDIO, ...MUSCULOS_EXTRA_PRO];
+    if (nivel === 'basico') return mergeBilateral(MUSCULOS_BASE);
+    if (nivel === 'medio')  return mergeBilateral([...MUSCULOS_BASE, ...MUSCULOS_EXTRA_MEDIO]);
+    return mergeBilateral([...MUSCULOS_BASE, ...MUSCULOS_EXTRA_MEDIO, ...MUSCULOS_EXTRA_PRO]);
   }
   if (modo === 'huesos') {
-    if (nivel === 'basico') return HUESOS_BASE;
-    if (nivel === 'medio')  return [...HUESOS_BASE, ...HUESOS_EXTRA_MEDIO];
-    return [...HUESOS_BASE, ...HUESOS_EXTRA_MEDIO, ...HUESOS_EXTRA_PRO];
+    if (nivel === 'basico') return mergeBilateral(HUESOS_BASE);
+    if (nivel === 'medio')  return mergeBilateral([...HUESOS_BASE, ...HUESOS_EXTRA_MEDIO]);
+    return mergeBilateral([...HUESOS_BASE, ...HUESOS_EXTRA_MEDIO, ...HUESOS_EXTRA_PRO]);
   }
   return [];
 };
@@ -242,6 +266,98 @@ const playSound = type => {
 
 const generarOpciones = (correcto, pool) =>
   shuffle([correcto, ...shuffle(pool.filter(p => p.id !== correcto.id)).slice(0, 3)]);
+
+// ── Dataset de anatomía (imágenes reales) ──────────────────────────────────────
+const CATEGORIAS = ['Órgano', 'Hueso', 'Músculo'];
+const SISTEMAS = [...new Set(ANATOMIA.map(a => a.sistema))];
+
+// Busca en el dataset la imagen que corresponde a un nombre de elemento SVG
+// (p.ej. "Bíceps" → "Bíceps braquial"). Devuelve el item o null.
+const findAnatomia = (nombre) => {
+  const n = norm(nombre);
+  if (!n) return null;
+  return ANATOMIA.find(d => {
+    const dn = norm(d.nombre);
+    return dn === n || dn.startsWith(n + ' ') || n.startsWith(dn + ' ');
+  }) || null;
+};
+
+// Inverso: dado un nombre del dataset, localiza el elemento en una silueta SVG
+// para mostrar "dónde está". Devuelve { modo, nivel, id } o null.
+const ESQUEMA_FUENTES = [
+  { modo:'cuerpo',       nivel:'basico'   },
+  { modo:'musculos',     nivel:'avanzado' },
+  { modo:'huesos',       nivel:'avanzado' },
+  { modo:'circulatorio', nivel:'basico'   },
+  { modo:'digestivo',    nivel:'basico'   },
+  { modo:'respiratorio', nivel:'basico'   },
+];
+const findEsquema = (nombre) => {
+  const n = norm(nombre);
+  if (!n) return null;
+  for (const f of ESQUEMA_FUENTES) {
+    const el = getPool(f.modo, f.nivel).find(e => {
+      const en = norm(e.nombre);
+      return en === n || en.startsWith(n + ' ') || n.startsWith(en + ' ');
+    });
+    if (el) return { modo:f.modo, nivel:f.nivel, id:el.id };
+  }
+  return null;
+};
+
+const DIF_COLOR = { 'Fácil':'#22c55e', 'Media':'#f59e0b', 'Difícil':'#f97316', 'Experto':'#ef4444' };
+
+// Posición aproximada de CADA elemento del dataset sobre la silueta (viewBox 0 0 280 520).
+// Cada entrada es una lista de puntos {cx,cy} (dos para estructuras pares: pulmones, riñones, fémur...).
+const LOCALIZACION = {
+  // Órganos
+  'org-01':[{cx:140,cy:48}], 'org-02':[{cx:126,cy:150}], 'org-03':[{cx:112,cy:150},{cx:160,cy:150}],
+  'org-04':[{cx:120,cy:195}], 'org-05':[{cx:165,cy:180}], 'org-06':[{cx:132,cy:212}],
+  'org-07':[{cx:135,cy:250}], 'org-08':[{cx:130,cy:235}], 'org-09':[{cx:108,cy:225},{cx:172,cy:225}],
+  'org-10':[{cx:140,cy:288}], 'org-11':[{cx:172,cy:196}], 'org-12':[{cx:170,cy:193}],
+  'org-13':[{cx:140,cy:100}], 'org-14':[{cx:140,cy:62}], 'org-15':[{cx:108,cy:208},{cx:172,cy:208}],
+  'org-16':[{cx:140,cy:185}], 'org-17':[{cx:140,cy:108}], 'org-18':[{cx:140,cy:138}],
+  // Huesos
+  'hue-01':[{cx:140,cy:48}], 'hue-02':[{cx:140,cy:82}], 'hue-03':[{cx:115,cy:114},{cx:165,cy:114}],
+  'hue-04':[{cx:140,cy:150}], 'hue-05':[{cx:140,cy:190}], 'hue-06':[{cx:140,cy:288}],
+  'hue-07':[{cx:72,cy:150},{cx:208,cy:150}], 'hue-08':[{cx:55,cy:238},{cx:225,cy:238}],
+  'hue-09':[{cx:50,cy:238},{cx:230,cy:238}], 'hue-10':[{cx:113,cy:320},{cx:167,cy:320}],
+  'hue-11':[{cx:113,cy:430},{cx:167,cy:430}], 'hue-12':[{cx:120,cy:430},{cx:160,cy:430}],
+  'hue-13':[{cx:100,cy:132},{cx:180,cy:132}], 'hue-14':[{cx:140,cy:40}], 'hue-15':[{cx:140,cy:42}],
+  'hue-16':[{cx:140,cy:56}], 'hue-17':[{cx:140,cy:96}], 'hue-18':[{cx:140,cy:102}],
+  'hue-19':[{cx:140,cy:292}], 'hue-20':[{cx:140,cy:74}], 'hue-21':[{cx:108,cy:478},{cx:162,cy:478}],
+  'hue-22':[{cx:140,cy:55}],
+  // Músculos
+  'mus-01':[{cx:140,cy:72}], 'mus-02':[{cx:128,cy:100},{cx:152,cy:100}], 'mus-03':[{cx:80,cy:128},{cx:200,cy:128}],
+  'mus-04':[{cx:120,cy:140},{cx:160,cy:140}], 'mus-05':[{cx:72,cy:155},{cx:208,cy:155}],
+  'mus-06':[{cx:72,cy:165},{cx:208,cy:165}], 'mus-07':[{cx:140,cy:118}], 'mus-08':[{cx:105,cy:160},{cx:175,cy:160}],
+  'mus-09':[{cx:140,cy:215}], 'mus-10':[{cx:116,cy:285},{cx:164,cy:285}], 'mus-11':[{cx:113,cy:320},{cx:167,cy:320}],
+  'mus-12':[{cx:113,cy:332},{cx:167,cy:332}], 'mus-13':[{cx:113,cy:420},{cx:167,cy:420}], 'mus-14':[{cx:140,cy:200}],
+  'mus-15':[{cx:122,cy:320},{cx:158,cy:320}], 'mus-16':[{cx:113,cy:412},{cx:167,cy:412}], 'mus-17':[{cx:140,cy:138}],
+  'mus-18':[{cx:140,cy:268}], 'mus-19':[{cx:120,cy:165},{cx:160,cy:165}], 'mus-20':[{cx:113,cy:428},{cx:167,cy:428}],
+};
+
+// Silueta con marcador(es) en la posición aproximada del elemento.
+function EsquemaLocalizacion({ puntos, color = '#0ea5e9' }) {
+  return (
+    <svg viewBox="0 0 280 520" style={{ width:'100%', maxWidth:220, display:'block', margin:'0 auto' }}>
+      {BG_SHAPES.map((s, i) => (
+        <SvgShape key={i} s={s} fill="rgba(148,163,184,0.22)" stroke="#475569" strokeWidth={1} />
+      ))}
+      {(puntos || []).map((p, i) => (
+        <g key={i}>
+          <circle cx={p.cx} cy={p.cy} r={10} fill={color} stroke="#fff" strokeWidth={2}>
+            <animate attributeName="r" values="9;13;9" dur="1.4s" repeatCount="indefinite" />
+          </circle>
+          <circle cx={p.cx} cy={p.cy} r={10} fill="none" stroke={color} strokeWidth={2} opacity={0.6}>
+            <animate attributeName="r" values="10;22;10" dur="1.4s" repeatCount="indefinite" />
+            <animate attributeName="opacity" values="0.6;0;0.6" dur="1.4s" repeatCount="indefinite" />
+          </circle>
+        </g>
+      ))}
+    </svg>
+  );
+}
 
 // ── SVG Shape ─────────────────────────────────────────────────────────────────
 const SvgShape = ({ s, fill, stroke = '#555', strokeWidth = 1, opacity = 1, filter }) => {
@@ -396,17 +512,18 @@ function BiologiaAppInner({ onBack, onCreateLive, onJoinLive }) {
           const stroke = isFeedback
             ? (feedbackOk ? '#15803d' : '#b91c1c')
             : isHL ? '#92400e' : '#fff';
-          return (
+          // Un elemento puede tener varios trozos (lados fusionados): se dibujan todos.
+          return (el.shapes || [el.shape]).map((sh, k) => (
             <SvgShape
-              key={el.id}
-              s={el.shape}
+              key={el.id + '_' + k}
+              s={sh}
               fill={fill}
               stroke={stroke}
               strokeWidth={isHL ? 2.5 : 0.8}
               opacity={isHL ? 1 : (highlightId ? 0.18 : 0.55)}
               filter={isHL && glowing && !isFeedback ? 'url(#glow-bio)' : undefined}
             />
-          );
+          ));
         })}
       </svg>
     );
@@ -415,6 +532,16 @@ function BiologiaAppInner({ onBack, onCreateLive, onJoinLive }) {
   // ── Styles ──────────────────────────────────────────────────────────────────
   const bg   = 'linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #0f172a 100%)';
   const card = { background:'rgba(255,255,255,0.05)', borderRadius:14, padding:'16px 18px', border:'1px solid rgba(255,255,255,0.1)' };
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // ANATOMÍA CON IMÁGENES (modo nuevo)
+  // ══════════════════════════════════════════════════════════════════════════════
+  if (pantalla === 'imagenes') {
+    return <AnatomiaQuiz onBack={() => setPantalla('intro')} />;
+  }
+  if (pantalla === 'estudiar') {
+    return <AnatomiaEstudio onBack={() => setPantalla('intro')} />;
+  }
 
   // ══════════════════════════════════════════════════════════════════════════════
   // INTRO
@@ -429,6 +556,35 @@ function BiologiaAppInner({ onBack, onCreateLive, onJoinLive }) {
           <h1 style={{ margin:0, fontSize:'1.5rem', fontWeight:700 }}>🔬 Biología</h1>
         </div>
 
+        {/* Modo Anatomía con imágenes (NUEVO) */}
+        <button onClick={() => setPantalla('imagenes')} style={{
+          width:'100%', marginBottom:14, padding:'16px 18px', textAlign:'left', cursor:'pointer',
+          background:'linear-gradient(135deg, #7c3aed, #4f46e5)', border:'none', borderRadius:14, color:'#fff',
+          display:'flex', alignItems:'center', gap:14,
+        }}>
+          <span style={{ fontSize:'2rem' }}>📸</span>
+          <span style={{ flex:1 }}>
+            <span style={{ display:'block', fontSize:'1.05rem', fontWeight:800 }}>Anatomía con imágenes</span>
+            <span style={{ display:'block', fontSize:'0.8rem', opacity:0.85, marginTop:2 }}>Mira la imagen y acierta el nombre, el tipo y el sistema · {ANATOMIA.length} elementos</span>
+          </span>
+          <span style={{ background:'rgba(255,255,255,0.25)', borderRadius:8, padding:'3px 8px', fontSize:'0.65rem', fontWeight:800, letterSpacing:'0.05em' }}>NUEVO</span>
+        </button>
+
+        {/* Modo Estudiar (sin puntos) */}
+        <button onClick={() => setPantalla('estudiar')} style={{
+          width:'100%', marginBottom:14, padding:'16px 18px', textAlign:'left', cursor:'pointer',
+          background:'linear-gradient(135deg, #0ea5e9, #0369a1)', border:'none', borderRadius:14, color:'#fff',
+          display:'flex', alignItems:'center', gap:14,
+        }}>
+          <span style={{ fontSize:'2rem' }}>📚</span>
+          <span style={{ flex:1 }}>
+            <span style={{ display:'block', fontSize:'1.05rem', fontWeight:800 }}>Estudiar anatomía</span>
+            <span style={{ display:'block', fontSize:'0.8rem', opacity:0.85, marginTop:2 }}>Mira la imagen, sus características y dónde está · sin puntos</span>
+          </span>
+        </button>
+
+        {/* System selector */}
+        <div style={{ fontSize:'0.72rem', color:'#64748b', margin:'0 2px 8px', textTransform:'uppercase', letterSpacing:'0.05em' }}>O practica con la silueta</div>
         {/* System selector */}
         <div style={{ ...card, marginBottom:14 }}>
           <div style={{ fontSize:'0.78rem', color:'#94a3b8', marginBottom:10, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em' }}>Elige el sistema</div>
@@ -549,23 +705,37 @@ function BiologiaAppInner({ onBack, onCreateLive, onJoinLive }) {
             ¿Cómo se llama esta parte {SYSTEM_QUESTION[modoJuego]}?
           </div>
 
-          {/* SVG */}
-          <div style={{ position:'relative', maxWidth:240, margin:'0 auto', width:'100%' }}>
-            <BodySVG
-              highlightId={item?.id}
-              feedbackOk={fase === 'feedback' ? correcto : undefined}
-            />
-            {fase === 'feedback' && (
-              <div style={{
-                position:'absolute', bottom:0, left:'50%', transform:'translateX(-50%)',
-                background: correcto ? 'rgba(34,197,94,0.92)' : 'rgba(239,68,68,0.92)',
-                color:'#fff', borderRadius:8, padding:'6px 16px', fontSize:'0.88rem',
-                fontWeight:700, whiteSpace:'nowrap', boxShadow:'0 2px 8px rgba(0,0,0,0.35)',
-              }}>
-                {correcto ? `✓ ${item?.nombre}` : `✗ ${item?.nombre}`}
+          {/* SVG + imagen real (en feedback) */}
+          {(() => {
+            const dato = fase === 'feedback' ? findAnatomia(item?.nombre) : null;
+            return (
+              <div style={{ display:'flex', flexWrap:'wrap', justifyContent:'center', alignItems:'flex-start', gap:14, width:'100%' }}>
+                <div style={{ position:'relative', maxWidth:240, flex:'1 1 200px', minWidth:180 }}>
+                  <BodySVG
+                    highlightId={item?.id}
+                    feedbackOk={fase === 'feedback' ? correcto : undefined}
+                  />
+                  {fase === 'feedback' && (
+                    <div style={{
+                      position:'absolute', bottom:0, left:'50%', transform:'translateX(-50%)',
+                      background: correcto ? 'rgba(34,197,94,0.92)' : 'rgba(239,68,68,0.92)',
+                      color:'#fff', borderRadius:8, padding:'6px 16px', fontSize:'0.88rem',
+                      fontWeight:700, whiteSpace:'nowrap', boxShadow:'0 2px 8px rgba(0,0,0,0.35)',
+                    }}>
+                      {correcto ? `✓ ${item?.nombre}` : `✗ ${item?.nombre}`}
+                    </div>
+                  )}
+                </div>
+                {dato && (
+                  <div style={{ flex:'1 1 200px', maxWidth:260, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:12, padding:10, alignSelf:'center' }}>
+                    <img src={dato.imagenUrl} alt={dato.nombre} loading="lazy"
+                      style={{ width:'100%', maxHeight:200, objectFit:'contain', borderRadius:8, background:'#fff' }} />
+                    <div style={{ fontSize:'0.78rem', color:'#94a3b8', marginTop:8, lineHeight:1.35 }}>{dato.descripcion}</div>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            );
+          })()}
 
           {/* Answers */}
           {fase === 'jugando' && modo === 'seleccionar' && (
@@ -717,13 +887,13 @@ const SECCIONES_BIO = [
 ];
 
 function getPoolBio(seccionId) {
-  if (seccionId === 'cuerpo')           return CUERPO_PARTES;
-  if (seccionId === 'musculos_basico')  return MUSCULOS_BASE;
-  if (seccionId === 'musculos_medio')   return [...MUSCULOS_BASE, ...MUSCULOS_EXTRA_MEDIO];
-  if (seccionId === 'musculos_avanzado')return [...MUSCULOS_BASE, ...MUSCULOS_EXTRA_MEDIO, ...MUSCULOS_EXTRA_PRO];
-  if (seccionId === 'huesos_basico')    return HUESOS_BASE;
-  if (seccionId === 'huesos_medio')     return [...HUESOS_BASE, ...HUESOS_EXTRA_MEDIO];
-  if (seccionId === 'huesos_avanzado')  return [...HUESOS_BASE, ...HUESOS_EXTRA_MEDIO, ...HUESOS_EXTRA_PRO];
+  if (seccionId === 'cuerpo')           return mergeBilateral(CUERPO_PARTES);
+  if (seccionId === 'musculos_basico')  return mergeBilateral(MUSCULOS_BASE);
+  if (seccionId === 'musculos_medio')   return mergeBilateral([...MUSCULOS_BASE, ...MUSCULOS_EXTRA_MEDIO]);
+  if (seccionId === 'musculos_avanzado')return mergeBilateral([...MUSCULOS_BASE, ...MUSCULOS_EXTRA_MEDIO, ...MUSCULOS_EXTRA_PRO]);
+  if (seccionId === 'huesos_basico')    return mergeBilateral(HUESOS_BASE);
+  if (seccionId === 'huesos_medio')     return mergeBilateral([...HUESOS_BASE, ...HUESOS_EXTRA_MEDIO]);
+  if (seccionId === 'huesos_avanzado')  return mergeBilateral([...HUESOS_BASE, ...HUESOS_EXTRA_MEDIO, ...HUESOS_EXTRA_PRO]);
   if (seccionId === 'circulatorio')     return CIRCULATORIO;
   if (seccionId === 'digestivo')        return DIGESTIVO;
   if (seccionId === 'respiratorio')     return RESPIRATORIO;
@@ -770,14 +940,14 @@ function BodySVGLive({ modo, nivel, highlightId, feedbackOk }) {
       {BG_SHAPES.map((s, i) => <SvgShape key={i} s={s} fill="rgba(100,116,139,0.18)" stroke="#334155" />)}
       {pool.map(e => {
         const isHL = e.id === highlightId;
-        return (
-          <SvgShape key={e.id} s={e.shape}
+        return (e.shapes || [e.shape]).map((sh, k) => (
+          <SvgShape key={e.id + '_' + k} s={sh}
             fill={isHL ? (feedbackOk === true ? '#22c55e' : feedbackOk === false ? '#ef4444' : color) : 'rgba(100,116,139,0.22)'}
             stroke={isHL ? '#fff' : '#475569'}
             strokeWidth={isHL ? 2.5 : 1}
             opacity={isHL ? 1 : 0.5}
           />
-        );
+        ));
       })}
       {highlightElem && (
         <text x="140" y="498" textAnchor="middle" fill="#f1f5f9" fontSize="11" fontWeight="600">{highlightElem.nombre}</text>
@@ -1221,6 +1391,412 @@ function BiologiaLiveClient({ codigo, player, onSalir }) {
             </div>
           ))}
           <button onClick={onSalir} style={{ width:'100%', marginTop:14, padding:'12px', background:'rgba(255,255,255,0.1)', border:'none', borderRadius:10, color:'#f1f5f9', cursor:'pointer', fontWeight:700 }}>Volver al inicio</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// ANATOMÍA CON IMÁGENES — quiz tipo test sobre el dataset (imágenes / GIF)
+// ════════════════════════════════════════════════════════════════════════════════
+const TIPOS_PREGUNTA = [
+  { id:'nombre',      label:'Nombre',            desc:'¿Cómo se llama?' },
+  { id:'categoria',   label:'Órgano/Hueso/Músculo', desc:'¿Qué tipo es?' },
+  { id:'sistema',     label:'Sistema',           desc:'¿A qué sistema pertenece?' },
+  { id:'descripcion', label:'Descripción',       desc:'Adivina por la descripción' },
+];
+
+const distractoresNombre = (item, pool) => {
+  const mismaCat = pool.filter(p => p.id !== item.id && p.categoria === item.categoria);
+  let pick = shuffle(mismaCat).slice(0, 3);
+  if (pick.length < 3) pick = [...pick, ...shuffle(pool.filter(p => p.id !== item.id && !pick.includes(p))).slice(0, 3 - pick.length)];
+  return pick.map(p => p.nombre);
+};
+
+const crearPregunta = (item, tipo, pool) => {
+  if (tipo === 'categoria') {
+    return { item, tipo, enunciado:'¿Qué tipo de estructura es?', correcta:item.categoria,
+      opciones: shuffle([...CATEGORIAS]) };
+  }
+  if (tipo === 'sistema') {
+    const otros = shuffle(SISTEMAS.filter(s => s !== item.sistema)).slice(0, 3);
+    return { item, tipo, enunciado:'¿A qué sistema pertenece?', correcta:item.sistema,
+      opciones: shuffle([item.sistema, ...otros]) };
+  }
+  // nombre / descripcion → responder el nombre
+  const enunciado = tipo === 'descripcion'
+    ? `«${item.descripcion}»  ¿De qué se trata?`
+    : '¿Cómo se llama?';
+  return { item, tipo, enunciado, correcta:item.nombre,
+    opciones: shuffle([item.nombre, ...distractoresNombre(item, pool)]) };
+};
+
+function AnatomiaQuiz({ onBack }) {
+  const [pantalla, setPantalla] = useState('config');
+  const [filtroCat, setFiltroCat] = useState('todos');
+  const [tipos, setTipos] = useState({ nombre:true, categoria:true, sistema:true, descripcion:true });
+  const [nQ, setNQ] = useState(10);
+
+  const [preguntas, setPreguntas] = useState([]);
+  const [idx, setIdx] = useState(0);
+  const [fase, setFase] = useState('jugando');   // jugando | feedback
+  const [elegida, setElegida] = useState(null);
+  const [respuestas, setRespuestas] = useState([]);
+
+  const [modalEnviar, setModalEnviar] = useState(false);
+  const [mNombre, setMNombre] = useState('');
+  const [mCurso, setMCurso] = useState('');
+  const [mCodigo, setMCodigo] = useState('');
+  const [enviando, setEnviando] = useState(false);
+
+  const bg = 'linear-gradient(135deg, #1e1b4b 0%, #0f172a 60%, #1e1b4b 100%)';
+  const card = { background:'rgba(255,255,255,0.05)', borderRadius:14, padding:'16px 18px', border:'1px solid rgba(255,255,255,0.1)' };
+  const ACCENT = '#7c3aed';
+
+  const poolFiltrado = filtroCat === 'todos' ? ANATOMIA : ANATOMIA.filter(a => a.categoria === filtroCat);
+  const tiposActivos = TIPOS_PREGUNTA.filter(t => tipos[t.id]).map(t => t.id);
+
+  const iniciar = () => {
+    if (poolFiltrado.length < 4 || tiposActivos.length === 0) return;
+    const items = shuffle(poolFiltrado).slice(0, Math.min(nQ, poolFiltrado.length));
+    const pregs = items.map(item => {
+      const tipo = tiposActivos[Math.floor(Math.random() * tiposActivos.length)];
+      return crearPregunta(item, tipo, ANATOMIA);
+    });
+    setPreguntas(pregs);
+    setIdx(0); setRespuestas([]); setFase('jugando'); setElegida(null);
+    setPantalla('quiz');
+  };
+
+  const responder = (opcion) => {
+    if (fase !== 'jugando') return;
+    const preg = preguntas[idx];
+    const ok = norm(opcion) === norm(preg.correcta);
+    playSound(ok ? 'CORRECT' : 'WRONG');
+    setElegida(opcion);
+    setFase('feedback');
+    setRespuestas(prev => [...prev, { correcto: ok, nombre: preg.item.nombre, tipo: preg.tipo }]);
+  };
+
+  const siguiente = () => {
+    const next = idx + 1;
+    if (next >= preguntas.length) { setPantalla('resultado'); return; }
+    setIdx(next); setFase('jugando'); setElegida(null);
+  };
+
+  const enviarAlProfesor = async (aciertos, total) => {
+    if (!mNombre.trim()) { alert('Introduce tu nombre'); return; }
+    const cod = mCodigo.trim().toUpperCase();
+    if (cod.length < 3) { alert('Introduce el código de tu profesor'); return; }
+    setEnviando(true);
+    try {
+      const snap = await getDoc(doc(db, 'codigos_profesor', cod));
+      if (!snap.exists()) { alert('Código de profesor no encontrado.'); setEnviando(false); return; }
+      const pct = Math.round((aciertos / total) * 100);
+      await addDoc(collection(db, 'informes_juegos'), {
+        tipo: 'BIOLOGIA', modalidad: 'Individual', fecha: new Date(),
+        codigoProfesor: cod,
+        config: { modoJuego: 'anatomia_imagenes', filtroCategoria: filtroCat, tipos: tiposActivos },
+        jugadores: [{ nombre: mNombre.trim(), curso: mCurso.trim(), aciertos, intentos: total, fallos: total - aciertos, porcentaje: pct }],
+      });
+      alert('✅ Resultado enviado al profesor.');
+      setModalEnviar(false); setMNombre(''); setMCurso(''); setMCodigo('');
+    } catch (e) { alert('Error: ' + e.message); }
+    setEnviando(false);
+  };
+
+  // ── CONFIG ────────────────────────────────────────────────────────────────
+  if (pantalla === 'config') {
+    const puede = poolFiltrado.length >= 4 && tiposActivos.length > 0;
+    return (
+      <div style={{ minHeight:'100vh', background:bg, color:'#f1f5f9', padding:'20px 16px', fontFamily:'sans-serif' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:22 }}>
+          <button onClick={onBack} style={{ background:'rgba(255,255,255,0.1)', border:'none', color:'#f1f5f9', borderRadius:8, padding:'8px 14px', cursor:'pointer', fontSize:'0.9rem' }}>← Volver</button>
+          <h1 style={{ margin:0, fontSize:'1.4rem', fontWeight:700 }}>📸 Anatomía con imágenes</h1>
+        </div>
+
+        {/* Categoría */}
+        <div style={{ ...card, marginBottom:14 }}>
+          <div style={{ fontSize:'0.78rem', color:'#94a3b8', marginBottom:10, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em' }}>¿Sobre qué quieres practicar?</div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+            {[['todos','Todos','🧬'],['Órgano','Órganos','🫀'],['Hueso','Huesos','🦴'],['Músculo','Músculos','💪']].map(([v,l,e]) => {
+              const count = v === 'todos' ? ANATOMIA.length : ANATOMIA.filter(a => a.categoria === v).length;
+              return (
+                <button key={v} onClick={() => setFiltroCat(v)} style={{
+                  background: filtroCat === v ? ACCENT : 'rgba(255,255,255,0.06)',
+                  border:`2px solid ${filtroCat === v ? ACCENT : 'rgba(255,255,255,0.1)'}`,
+                  color:'#f1f5f9', borderRadius:10, padding:'12px 8px', cursor:'pointer',
+                  fontSize:'0.85rem', fontWeight: filtroCat === v ? 700 : 400, display:'flex', alignItems:'center', gap:8,
+                }}>
+                  <span style={{ fontSize:'1.3rem' }}>{e}</span>
+                  <span style={{ flex:1, textAlign:'left' }}>{l}</span>
+                  <span style={{ fontSize:'0.72rem', color:'#cbd5e1' }}>{count}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Tipos de pregunta */}
+        <div style={{ ...card, marginBottom:14 }}>
+          <div style={{ fontSize:'0.78rem', color:'#94a3b8', marginBottom:10, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em' }}>Tipos de pregunta</div>
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {TIPOS_PREGUNTA.map(t => (
+              <button key={t.id} onClick={() => setTipos(p => ({ ...p, [t.id]: !p[t.id] }))} style={{
+                background: tipos[t.id] ? `${ACCENT}33` : 'rgba(255,255,255,0.04)',
+                border:`2px solid ${tipos[t.id] ? ACCENT : 'rgba(255,255,255,0.1)'}`,
+                color:'#f1f5f9', borderRadius:10, padding:'10px 12px', cursor:'pointer',
+                display:'flex', alignItems:'center', gap:10, textAlign:'left',
+              }}>
+                <span style={{ fontSize:'1.1rem' }}>{tipos[t.id] ? '☑️' : '⬜'}</span>
+                <span style={{ flex:1 }}><strong style={{ fontSize:'0.88rem' }}>{t.label}</strong> <span style={{ fontSize:'0.76rem', color:'#94a3b8' }}>· {t.desc}</span></span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Nº preguntas */}
+        <div style={{ ...card, marginBottom:20 }}>
+          <div style={{ fontSize:'0.78rem', color:'#94a3b8', marginBottom:10, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em' }}>Nº de preguntas</div>
+          <div style={{ display:'flex', gap:8 }}>
+            {[5,10,15,20].map(n => (
+              <button key={n} onClick={() => setNQ(n)} disabled={n > poolFiltrado.length} style={{
+                flex:1, background: nQ === n ? ACCENT : 'rgba(255,255,255,0.06)',
+                border:`2px solid ${nQ === n ? ACCENT : 'rgba(255,255,255,0.1)'}`,
+                color:'#f1f5f9', borderRadius:10, padding:'10px', cursor: n > poolFiltrado.length ? 'not-allowed' : 'pointer',
+                opacity: n > poolFiltrado.length ? 0.4 : 1, fontWeight: nQ === n ? 700 : 400,
+              }}>{n}</button>
+            ))}
+          </div>
+        </div>
+
+        <button onClick={iniciar} disabled={!puede} style={{
+          width:'100%', padding:'16px', background: puede ? ACCENT : '#334155', color:'#fff', border:'none',
+          borderRadius:12, fontSize:'1.1rem', fontWeight:700, cursor: puede ? 'pointer' : 'not-allowed', opacity: puede ? 1 : 0.5,
+        }}>
+          ▶ Empezar test
+        </button>
+        {!puede && <div style={{ textAlign:'center', color:'#f87171', fontSize:'0.78rem', marginTop:8 }}>Elige al menos un tipo de pregunta y una categoría con 4+ elementos.</div>}
+      </div>
+    );
+  }
+
+  // ── QUIZ ──────────────────────────────────────────────────────────────────
+  if (pantalla === 'quiz') {
+    const preg = preguntas[idx];
+    if (!preg) return null;
+    const mostrarImagen = true; // siempre mostramos la imagen del elemento
+    const tInfo = TIPOS_PREGUNTA.find(t => t.id === preg.tipo);
+
+    return (
+      <div style={{ minHeight:'100vh', background:bg, color:'#f1f5f9', fontFamily:'sans-serif', display:'flex', flexDirection:'column' }}>
+        {/* Top bar */}
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 14px', background:'rgba(0,0,0,0.3)', borderBottom:'1px solid rgba(255,255,255,0.08)' }}>
+          <button onClick={() => setPantalla('config')} style={{ background:'rgba(255,255,255,0.1)', border:'none', color:'#f1f5f9', borderRadius:8, padding:'6px 12px', cursor:'pointer', fontSize:'0.85rem' }}>✕</button>
+          <span style={{ fontSize:'0.85rem', color:'#94a3b8' }}>{idx + 1}/{preguntas.length}</span>
+          <div style={{ width:100, height:6, background:'rgba(255,255,255,0.1)', borderRadius:3, overflow:'hidden' }}>
+            <div style={{ width:`${((idx + 1) / preguntas.length) * 100}%`, height:'100%', background:ACCENT, borderRadius:3, transition:'width 0.3s' }} />
+          </div>
+        </div>
+
+        <div style={{ flex:1, display:'flex', flexWrap:'wrap', alignItems:'flex-start', justifyContent:'center', gap:16, padding:'16px', overflowY:'auto', maxWidth:900, margin:'0 auto', width:'100%', boxSizing:'border-box' }}>
+          {/* Imagen (derecha en escritorio, arriba en móvil) */}
+          {mostrarImagen && (
+            <div style={{ flex:'1 1 260px', maxWidth:360, order:2 }}>
+              <div style={{ background:'#fff', borderRadius:14, padding:8, boxShadow:'0 6px 20px rgba(0,0,0,0.35)' }}>
+                <img src={preg.item.imagenUrl} alt={fase === 'feedback' ? preg.item.nombre : 'elemento'} loading="eager"
+                  style={{ width:'100%', maxHeight:340, objectFit:'contain', borderRadius:8, display:'block' }} />
+              </div>
+            </div>
+          )}
+
+          {/* Pregunta + opciones */}
+          <div style={{ flex:'1 1 280px', maxWidth:420, order:1 }}>
+            <div style={{ fontSize:'0.72rem', color:ACCENT, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:6 }}>{tInfo?.label}</div>
+            <div style={{ fontSize:'1.05rem', color:'#e2e8f0', fontWeight:700, marginBottom:14, lineHeight:1.35 }}>{preg.enunciado}</div>
+
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {preg.opciones.map((op, i) => {
+                let bgc = 'rgba(255,255,255,0.07)', bd = 'rgba(255,255,255,0.12)', cl = '#f1f5f9';
+                if (fase === 'feedback') {
+                  const esCorrecta = norm(op) === norm(preg.correcta);
+                  const esElegida = op === elegida;
+                  if (esCorrecta) { bgc = 'rgba(34,197,94,0.18)'; bd = '#22c55e'; cl = '#86efac'; }
+                  else if (esElegida) { bgc = 'rgba(239,68,68,0.15)'; bd = '#ef4444'; cl = '#fca5a5'; }
+                  else { cl = '#64748b'; }
+                }
+                return (
+                  <button key={i} onClick={() => responder(op)} disabled={fase === 'feedback'} style={{
+                    background:bgc, border:`2px solid ${bd}`, color:cl, borderRadius:10, padding:'13px 14px',
+                    cursor: fase === 'feedback' ? 'default' : 'pointer', fontSize:'0.92rem', fontWeight:500, textAlign:'left',
+                  }}>
+                    {fase === 'feedback' && norm(op) === norm(preg.correcta) && '✓ '}
+                    {op}
+                  </button>
+                );
+              })}
+            </div>
+
+            {fase === 'feedback' && (
+              <div style={{ marginTop:14, padding:'12px 14px', background:'rgba(255,255,255,0.05)', borderRadius:12, border:'1px solid rgba(255,255,255,0.1)' }}>
+                <div style={{ fontWeight:800, fontSize:'1rem', marginBottom:4 }}>{preg.item.nombre}</div>
+                <div style={{ fontSize:'0.78rem', color:'#a5b4fc', marginBottom:6 }}>{preg.item.categoria} · {preg.item.sistema}</div>
+                <div style={{ fontSize:'0.82rem', color:'#94a3b8', lineHeight:1.4 }}>{preg.item.descripcion}</div>
+                <button onClick={siguiente} style={{ width:'100%', marginTop:12, padding:'12px', background:ACCENT, color:'#fff', border:'none', borderRadius:10, fontWeight:700, cursor:'pointer', fontSize:'0.95rem' }}>
+                  {idx + 1 < preguntas.length ? 'Siguiente →' : 'Ver resultado'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── RESULTADO ───────────────────────────────────────────────────────────────
+  if (pantalla === 'resultado') {
+    const aciertos = respuestas.filter(r => r.correcto).length;
+    const total = respuestas.length || 1;
+    const pct = Math.round((aciertos / total) * 100);
+    const emoji = pct >= 90 ? '🏆' : pct >= 70 ? '⭐' : pct >= 50 ? '💪' : '📚';
+
+    return (
+      <div style={{ minHeight:'100vh', background:bg, color:'#f1f5f9', padding:'20px 16px', fontFamily:'sans-serif' }}>
+        <div style={{ maxWidth:420, margin:'0 auto' }}>
+          <div style={{ textAlign:'center', marginBottom:22 }}>
+            <div style={{ fontSize:'3rem', marginBottom:8 }}>{emoji}</div>
+            <h2 style={{ margin:'0 0 4px', fontSize:'1.5rem' }}>{aciertos}/{total} correctas</h2>
+            <div style={{ fontSize:'2rem', fontWeight:800, color: pct >= 70 ? '#22c55e' : pct >= 50 ? '#f59e0b' : '#ef4444' }}>{pct}%</div>
+          </div>
+
+          <div style={{ ...card, marginBottom:14 }}>
+            {respuestas.map((r, i) => (
+              <div key={i} style={{ display:'flex', alignItems:'center', gap:10, padding:'7px 0', borderBottom: i < respuestas.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
+                <span>{r.correcto ? '✅' : '❌'}</span>
+                <span style={{ flex:1, fontSize:'0.86rem', color: r.correcto ? '#86efac' : '#fca5a5' }}>{r.nombre}</span>
+                <span style={{ fontSize:'0.72rem', color:'#64748b' }}>{TIPOS_PREGUNTA.find(t => t.id === r.tipo)?.label}</span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            <button onClick={() => setModalEnviar(true)} style={{ background:ACCENT, border:'none', color:'#fff', borderRadius:12, padding:'14px', cursor:'pointer', fontWeight:700, fontSize:'1rem' }}>📤 Enviar al Profesor</button>
+            <button onClick={iniciar} style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.15)', color:'#f1f5f9', borderRadius:12, padding:'14px', cursor:'pointer', fontWeight:600 }}>🔄 Repetir</button>
+            <button onClick={() => setPantalla('config')} style={{ background:'transparent', border:'1px solid rgba(255,255,255,0.1)', color:'#94a3b8', borderRadius:12, padding:'12px', cursor:'pointer' }}>← Cambiar opciones</button>
+          </div>
+        </div>
+
+        {modalEnviar && (
+          <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:100, padding:20 }}>
+            <div style={{ background:'#1e293b', borderRadius:16, padding:24, width:'100%', maxWidth:380, border:'1px solid rgba(255,255,255,0.1)' }}>
+              <h3 style={{ margin:'0 0 16px', fontSize:'1.1rem' }}>📤 Enviar resultado al profesor</h3>
+              <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:16 }}>
+                <input value={mNombre} onChange={e => setMNombre(e.target.value)} placeholder="Tu nombre" style={inp} />
+                <input value={mCurso} onChange={e => setMCurso(e.target.value)} placeholder="Curso (ej: 3ºA)" style={inp} />
+                <input value={mCodigo} onChange={e => setMCodigo(e.target.value)} placeholder="Código del profesor" style={{ ...inp, textTransform:'uppercase' }} />
+              </div>
+              <div style={{ display:'flex', gap:10 }}>
+                <button onClick={() => enviarAlProfesor(aciertos, total)} disabled={enviando} style={{ flex:1, background:ACCENT, border:'none', color:'#fff', borderRadius:10, padding:'12px', cursor:'pointer', fontWeight:700 }}>
+                  {enviando ? 'Enviando...' : 'Enviar'}
+                </button>
+                <button onClick={() => setModalEnviar(false)} style={{ flex:1, background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.12)', color:'#f1f5f9', borderRadius:10, padding:'12px', cursor:'pointer' }}>Cancelar</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return null;
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// MODO ESTUDIO — ficha de cada elemento (imagen, características, esquema). Sin puntos.
+// ════════════════════════════════════════════════════════════════════════════════
+function AnatomiaEstudio({ onBack }) {
+  const [cat, setCat] = useState('Órgano');
+  const [sel, setSel] = useState(null);
+
+  const ACCENT = '#0ea5e9';
+  const bg = 'linear-gradient(135deg, #0c4a6e 0%, #0f172a 60%, #0c4a6e 100%)';
+  const lista = ANATOMIA.filter(a => a.categoria === cat);
+  const puntos = sel ? LOCALIZACION[sel.id] : null;
+
+  const CATS = [['Órgano','Órganos','🫀'],['Músculo','Músculos','💪'],['Hueso','Huesos','🦴']];
+
+  return (
+    <div style={{ minHeight:'100vh', background:bg, color:'#f1f5f9', padding:'20px 16px', fontFamily:'sans-serif' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:18 }}>
+        <button onClick={onBack} style={{ background:'rgba(255,255,255,0.1)', border:'none', color:'#f1f5f9', borderRadius:8, padding:'8px 14px', cursor:'pointer', fontSize:'0.9rem' }}>← Volver</button>
+        <h1 style={{ margin:0, fontSize:'1.4rem', fontWeight:700 }}>📚 Estudiar anatomía</h1>
+      </div>
+
+      {/* Tabs categoría */}
+      <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+        {CATS.map(([v,l,e]) => (
+          <button key={v} onClick={() => setCat(v)} style={{
+            flex:1, background: cat === v ? ACCENT : 'rgba(255,255,255,0.06)',
+            border:`2px solid ${cat === v ? ACCENT : 'rgba(255,255,255,0.1)'}`,
+            color:'#f1f5f9', borderRadius:10, padding:'10px 6px', cursor:'pointer',
+            fontWeight: cat === v ? 700 : 400, fontSize:'0.85rem',
+          }}>
+            <span style={{ fontSize:'1.2rem', marginRight:6 }}>{e}</span>{l}
+            <span style={{ fontSize:'0.72rem', color:'#cbd5e1', marginLeft:6 }}>{ANATOMIA.filter(a => a.categoria === v).length}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Rejilla de tarjetas */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(140px, 1fr))', gap:12 }}>
+        {lista.map(item => (
+          <button key={item.id} onClick={() => setSel(item)} style={{
+            background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:12,
+            padding:8, cursor:'pointer', textAlign:'left', color:'#f1f5f9', display:'flex', flexDirection:'column', gap:6,
+          }}>
+            <div style={{ background:'#fff', borderRadius:8, overflow:'hidden', aspectRatio:'4/3', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <img src={item.imagenUrl} alt={item.nombre} loading="lazy" style={{ width:'100%', height:'100%', objectFit:'contain' }} />
+            </div>
+            <div style={{ fontWeight:700, fontSize:'0.85rem', lineHeight:1.2 }}>{item.nombre}</div>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:4 }}>
+              <span style={{ fontSize:'0.68rem', color:'#94a3b8', flex:1, lineHeight:1.2 }}>{item.sistema}</span>
+              <span style={{ fontSize:'0.6rem', fontWeight:700, color:'#0f172a', background:DIF_COLOR[item.dificultad]||'#94a3b8', borderRadius:5, padding:'1px 5px' }}>{item.dificultad}</span>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {/* Modal de ficha */}
+      {sel && (
+        <div onClick={e => e.target === e.currentTarget && setSel(null)} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.75)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:200, padding:16 }}>
+          <div style={{ background:'#0f172a', border:'1px solid rgba(255,255,255,0.12)', borderRadius:16, padding:20, width:'100%', maxWidth:640, maxHeight:'92vh', overflowY:'auto' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:10, marginBottom:12 }}>
+              <div>
+                <h2 style={{ margin:'0 0 4px', fontSize:'1.4rem' }}>{sel.nombre}</h2>
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                  <span style={{ fontSize:'0.72rem', fontWeight:700, background:'rgba(14,165,233,0.2)', color:'#7dd3fc', borderRadius:6, padding:'2px 8px' }}>{sel.categoria}</span>
+                  <span style={{ fontSize:'0.72rem', fontWeight:700, background:'rgba(255,255,255,0.08)', color:'#cbd5e1', borderRadius:6, padding:'2px 8px' }}>{sel.sistema}</span>
+                  <span style={{ fontSize:'0.72rem', fontWeight:700, background:DIF_COLOR[sel.dificultad]||'#94a3b8', color:'#0f172a', borderRadius:6, padding:'2px 8px' }}>{sel.dificultad}</span>
+                </div>
+              </div>
+              <button onClick={() => setSel(null)} style={{ background:'rgba(255,255,255,0.1)', border:'none', color:'#f1f5f9', borderRadius:8, width:34, height:34, cursor:'pointer', fontSize:'1.1rem', flexShrink:0 }}>×</button>
+            </div>
+
+            <div style={{ display:'flex', flexWrap:'wrap', gap:16, alignItems:'flex-start' }}>
+              {/* Imagen */}
+              <div style={{ flex:'1 1 240px', background:'#fff', borderRadius:12, padding:8 }}>
+                <img src={sel.imagenUrl} alt={sel.nombre} style={{ width:'100%', maxHeight:300, objectFit:'contain', display:'block' }} />
+              </div>
+              {/* Esquema de localización (aprox.) — disponible para todos */}
+              <div style={{ flex:'1 1 200px', background:'rgba(255,255,255,0.04)', borderRadius:12, padding:'10px 8px' }}>
+                <div style={{ fontSize:'0.72rem', color:'#94a3b8', textAlign:'center', marginBottom:4, fontWeight:600 }}>📍 Dónde se encuentra (aprox.)</div>
+                <EsquemaLocalizacion puntos={puntos} />
+              </div>
+            </div>
+
+            <div style={{ marginTop:14, fontSize:'0.92rem', color:'#e2e8f0', lineHeight:1.5 }}>{sel.descripcion}</div>
+          </div>
         </div>
       )}
     </div>

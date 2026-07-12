@@ -1903,23 +1903,31 @@ export default function TrivialGame({ onExit, onBuscar }) {
                             </>);
 
                             // CORTA — respuesta libre
-                            if (tipo === 'CORTA') return (<>
+                            if (tipo === 'CORTA') {
+                                const checkCorta = () => {
+                                    if (!inputCorta.trim() || mostrandoRespuesta) return;
+                                    const alts = qData.alternativas || [];
+                                    const correcto = clean(inputCorta) === clean(qData.a) || alts.some(a => clean(inputCorta) === clean(a));
+                                    responderPregunta(correcto);
+                                };
+                                return (<>
                                 <h2 style={{ color: 'white', fontSize: isMobile ? '1.2rem' : '1.7rem', margin: isMobile ? '14px 0 18px' : '20px 0 24px', lineHeight: 1.4 }}>{qData.q}</h2>
                                 <input
                                     value={inputCorta}
                                     onChange={e => setInputCorta(e.target.value)}
-                                    onKeyDown={e => { if (e.key === 'Enter' && inputCorta.trim() && !mostrandoRespuesta) responderPregunta(clean(inputCorta) === clean(qData.a)); }}
+                                    onKeyDown={e => { if (e.key === 'Enter') checkCorta(); }}
                                     placeholder="Escribe tu respuesta…"
                                     autoFocus
                                     disabled={mostrandoRespuesta}
                                     style={{ width: '100%', boxSizing: 'border-box', background: '#0f172a', border: '2px solid #475569', borderRadius: 10, color: 'white', padding: '14px 16px', fontSize: isMobile ? '1rem' : '1.15rem', fontFamily: 'inherit', outline: 'none', marginBottom: 12, opacity: mostrandoRespuesta ? 0.4 : 1 }}
                                 />
                                 <button
-                                    onClick={() => { if (inputCorta.trim() && !mostrandoRespuesta) responderPregunta(clean(inputCorta) === clean(qData.a)); }}
+                                    onClick={checkCorta}
                                     disabled={!inputCorta.trim() || mostrandoRespuesta}
                                     style={{ ...st.btnAnswer, background: '#1d4ed8', border: 'none', fontWeight: 800, opacity: (inputCorta.trim() && !mostrandoRespuesta) ? 1 : 0.4 }}
                                 >Responder</button>
                             </>);
+                            }
 
                             // RELLENAR — texto con hueco
                             if (tipo === 'RELLENAR') {

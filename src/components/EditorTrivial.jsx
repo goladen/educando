@@ -390,7 +390,9 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
         } else if (formTipo === 'CORTA') {
             if (!formQ.trim()) { setErrorForm('Escribe la pregunta.'); return; }
             if (!formA.trim()) { setErrorForm('Escribe la respuesta.'); return; }
+            const alts = formAlternativas.map(s => s.trim()).filter(Boolean);
             data = { ...data, q: formQ.trim(), a: formA.trim() };
+            if (alts.length) data = { ...data, alternativas: alts };
         } else if (formTipo === 'RELLENAR') {
             if (!formBloques[0].trim()) { setErrorForm('Escribe el texto antes del hueco.'); return; }
             if (!formBloques[1].trim()) { setErrorForm('Escribe la respuesta correcta.'); return; }
@@ -460,7 +462,8 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
             if (editForm.tipo === 'SELECCION') {
                 upd = { ...upd, q: editForm.q.trim(), a: editForm.a.trim(), w: editForm.w.map(s => s.trim()) };
             } else if (editForm.tipo === 'CORTA') {
-                upd = { ...upd, q: editForm.q.trim(), a: editForm.a.trim() };
+                const alts = (editForm.alternativas || []).map(s => s.trim()).filter(Boolean);
+                upd = { ...upd, q: editForm.q.trim(), a: editForm.a.trim(), alternativas: alts };
             } else if (editForm.tipo === 'RELLENAR') {
                 const b = (editForm.bloques || ['', '', '']).map(s => s.trim());
                 while (b.length < 3) b.push('');
@@ -537,7 +540,7 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
             const base = { tipo, categoria: pend.categoria, autorUid: 'externo', autorNombre, fechaCreacion: serverTimestamp(), orden: Date.now(), ...lecturaData };
             let data = base;
             if (tipo === 'SELECCION') data = { ...base, q: pend.q, a: pend.a, w: pend.w };
-            else if (tipo === 'CORTA') data = { ...base, q: pend.q, a: pend.a };
+            else if (tipo === 'CORTA') data = { ...base, q: pend.q, a: pend.a, ...(pend.alternativas?.length ? { alternativas: pend.alternativas } : {}) };
             else if (tipo === 'RELLENAR') { const alts = pend.alternativas?.length ? { alternativas: pend.alternativas } : {}; data = { ...base, bloques: pend.bloques, ...alts }; }
             else if (tipo === 'ORDENAR') data = { ...base, q: pend.q, bloques: pend.bloques };
             const ref = await addDoc(collection(db, 'trivial_recursos', recursoId, 'preguntas'), data);
@@ -864,11 +867,11 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                                 ? <input value={previewInput} onChange={e => setPreviewInput(e.target.value)} placeholder="Escribe tu respuesta…" style={{ width: '100%', boxSizing: 'border-box', background: '#0f172a', border: '2px solid #475569', borderRadius: 10, color: 'white', padding: '14px 16px', fontSize: '1rem', fontFamily: 'inherit', outline: 'none' }} />
                                 : <div style={{ background: '#0d2b1b', border: '2px solid #4ade80', borderRadius: 10, padding: '14px 18px', color: '#4ade80', fontSize: '1.1rem', fontWeight: 700 }}>✓ {p.a}</div>
                             }
-                            {!previewRevelado && previewInput.trim() && (
-                                <div style={{ marginTop: 10, color: cleanPrev(previewInput) === cleanPrev(p.a) ? '#4ade80' : '#f87171', fontSize: '0.85rem', fontWeight: 700 }}>
-                                    {cleanPrev(previewInput) === cleanPrev(p.a) ? '✓ Correcto' : '✗ Incorrecto'}
-                                </div>
-                            )}
+                            {!previewRevelado && previewInput.trim() && (() => {
+                                const alts = p.alternativas || [];
+                                const ok = cleanPrev(previewInput) === cleanPrev(p.a) || alts.some(a => cleanPrev(previewInput) === cleanPrev(a));
+                                return <div style={{ marginTop: 10, color: ok ? '#4ade80' : '#f87171', fontSize: '0.85rem', fontWeight: 700 }}>{ok ? '✓ Correcto' : '✗ Incorrecto'}</div>;
+                            })()}
                         </>)}
 
                         {tipo === 'RELLENAR' && (<>
@@ -928,6 +931,70 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                 </div>
             );
         })()}
+
+        {/* ── CATEGORY CONFIG MODAL ── */}
+        {esCreador && recursoId && catConfigAbierto && (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 3500, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+                onClick={e => { if (e.target === e.currentTarget) { setCatConfigAbierto(false); setEmojiPickerAbierto(false); } }}>
+                <div style={{ background: '#1e293b', borderRadius: 20, width: '100%', maxWidth: 520, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 80px rgba(0,0,0,0.8)', overflow: 'hidden', borderTop: `6px solid ${catHex}` }}>
+                    {/* Header */}
+                    <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid #334155', flexShrink: 0 }}>
+                        <span style={{ fontSize: '1.2rem' }}>⚙</span>
+                        <div style={{ flex: 1, color: '#f1f5f9', fontWeight: 700, fontSize: '0.95rem' }}>Configurar {catData.emoji} {catData.nombre}</div>
+                        <button onClick={() => { setCatConfigAbierto(false); setEmojiPickerAbierto(false); }} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1.2rem', padding: '2px 6px', lineHeight: 1 }}>✕</button>
+                    </div>
+                    {/* Body (scrollable) */}
+                    <div style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                        <div style={{ display: 'flex', gap: 10 }}>
+                            <div style={{ flex: '0 0 64px', position: 'relative' }} ref={emojiPickerRef}>
+                                <div style={labelStyle}>Emoji</div>
+                                <button
+                                    onClick={() => setEmojiPickerAbierto(p => !p)}
+                                    style={{ width: '100%', background: '#0f172a', border: `1px solid ${catHex}60`, borderRadius: 8, color: '#f1f5f9', padding: '7px 4px', fontSize: '1.5rem', textAlign: 'center', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                >{catData.emoji}</button>
+                                {emojiPickerAbierto && (
+                                    <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 100, background: '#1e293b', border: '1px solid #334155', borderRadius: 14, boxShadow: '0 12px 40px rgba(0,0,0,0.6)', width: 320, maxHeight: 300, overflowY: 'auto', padding: 14 }}>
+                                        {EMOJI_GRUPOS.map(grupo => (
+                                            <div key={grupo.label} style={{ marginBottom: 12 }}>
+                                                <div style={{ color: '#64748b', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>{grupo.label}</div>
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                                    {grupo.emojis.map(em => (
+                                                        <button key={em} onClick={() => { updateCat('emoji', em); setEmojiPickerAbierto(false); }}
+                                                            style={{ background: catData.emoji === em ? `${catHex}30` : 'transparent', border: catData.emoji === em ? `1px solid ${catHex}` : '1px solid transparent', borderRadius: 7, padding: '5px 6px', fontSize: '1.3rem', cursor: 'pointer', lineHeight: 1, transition: '0.1s' }}
+                                                            onMouseEnter={e => e.currentTarget.style.background = '#334155'}
+                                                            onMouseLeave={e => e.currentTarget.style.background = catData.emoji === em ? `${catHex}30` : 'transparent'}
+                                                        >{em}</button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                                <div style={labelStyle}>Nombre</div>
+                                <input value={catData.nombre} onChange={e => updateCat('nombre', e.target.value)} placeholder="Ej: Historia de España" style={{ width: '100%', background: '#0f172a', border: `1px solid ${catHex}60`, borderRadius: 8, color: '#f1f5f9', padding: '9px 13px', fontSize: '0.9rem', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
+                            </div>
+                        </div>
+                        <div>
+                            <div style={labelStyle}>Descripción</div>
+                            <textarea value={catData.desc} onChange={e => updateCat('desc', e.target.value)} placeholder="Describe el contenido de esta categoría…" rows={2} style={{ width: '100%', boxSizing: 'border-box', background: '#0f172a', border: `1px solid ${catHex}60`, borderRadius: 8, color: '#f1f5f9', padding: '9px 13px', fontSize: '0.88rem', resize: 'vertical', fontFamily: 'inherit', outline: 'none' }} />
+                        </div>
+                        <div>
+                            <div style={labelStyle}>Imagen de portada</div>
+                            <ImageSearchPanel currentUrl={catData.imagen} onSelect={url => updateCat('imagen', url)} accentColor={catHex} />
+                        </div>
+                    </div>
+                    {/* Footer */}
+                    <div style={{ borderTop: '1px solid #334155', padding: '14px 20px', display: 'flex', gap: 10, justifyContent: 'flex-end', background: '#0f172a', flexShrink: 0 }}>
+                        <button onClick={() => { setCatConfigAbierto(false); setEmojiPickerAbierto(false); }} style={{ background: '#334155', border: 'none', color: '#94a3b8', padding: '9px 18px', borderRadius: 9, cursor: 'pointer', fontSize: '0.88rem' }}>Cerrar</button>
+                        <button onClick={guardarCategoria} disabled={guardandoCat} style={{ background: savedCat ? '#166534' : catHex, border: 'none', color: 'white', padding: '9px 22px', borderRadius: 9, cursor: guardandoCat ? 'default' : 'pointer', fontWeight: 700, fontSize: '0.88rem', opacity: guardandoCat ? 0.7 : 1, transition: 'background 0.3s' }}>
+                            {guardandoCat ? 'Guardando…' : savedCat ? '✓ Guardado' : '✓ Guardar categoría'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
 
             {/* ─── HEADER ─── */}
             <div style={{ background: '#1e293b', borderBottom: '1px solid #334155', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
@@ -1058,62 +1125,13 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                         </div>
                     )}
 
-                    {/* ── CATEGORY CONFIG PANEL ── */}
+                    {/* ── CATEGORY CONFIG TRIGGER ── */}
                     {esCreador && recursoId && (
-                        <div style={{ background: '#1e293b', borderRadius: 14, border: `1px solid ${catHex}50`, overflow: 'hidden' }}>
-                            <button onClick={() => setCatConfigAbierto(p => !p)} style={{ width: '100%', padding: '12px 18px', background: 'none', border: 'none', color: catHex, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.88rem', fontWeight: 700 }}>
-                                <span style={{ fontSize: '0.8rem', transition: 'transform 0.2s', transform: catConfigAbierto ? 'rotate(90deg)' : 'none', display: 'inline-block' }}>▶</span>
-                                ⚙ Configurar categoría · {catData.emoji} {catData.nombre}
-                            </button>
-                            {catConfigAbierto && (
-                                <div style={{ padding: '0 18px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                    <div style={{ display: 'flex', gap: 10 }}>
-                                        <div style={{ flex: '0 0 64px', position: 'relative' }} ref={emojiPickerRef}>
-                                            <div style={labelStyle}>Emoji</div>
-                                            <button
-                                                onClick={() => setEmojiPickerAbierto(p => !p)}
-                                                style={{ width: '100%', background: '#0f172a', border: `1px solid ${catHex}60`, borderRadius: 8, color: '#f1f5f9', padding: '7px 4px', fontSize: '1.5rem', textAlign: 'center', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                            >{catData.emoji}</button>
-                                            {emojiPickerAbierto && (
-                                                <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 100, background: '#1e293b', border: '1px solid #334155', borderRadius: 14, boxShadow: '0 12px 40px rgba(0,0,0,0.6)', width: 320, maxHeight: 380, overflowY: 'auto', padding: 14 }}>
-                                                    {EMOJI_GRUPOS.map(grupo => (
-                                                        <div key={grupo.label} style={{ marginBottom: 12 }}>
-                                                            <div style={{ color: '#64748b', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>{grupo.label}</div>
-                                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                                                                {grupo.emojis.map(em => (
-                                                                    <button key={em} onClick={() => { updateCat('emoji', em); setEmojiPickerAbierto(false); }}
-                                                                        style={{ background: catData.emoji === em ? `${catHex}30` : 'transparent', border: catData.emoji === em ? `1px solid ${catHex}` : '1px solid transparent', borderRadius: 7, padding: '5px 6px', fontSize: '1.3rem', cursor: 'pointer', lineHeight: 1, transition: '0.1s' }}
-                                                                        onMouseEnter={e => e.currentTarget.style.background = '#334155'}
-                                                                        onMouseLeave={e => e.currentTarget.style.background = catData.emoji === em ? `${catHex}30` : 'transparent'}
-                                                                    >{em}</button>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div style={{ flex: 1 }}>
-                                            <div style={labelStyle}>Nombre</div>
-                                            <input value={catData.nombre} onChange={e => updateCat('nombre', e.target.value)} placeholder="Ej: Historia de España" style={{ width: '100%', background: '#0f172a', border: `1px solid ${catHex}60`, borderRadius: 8, color: '#f1f5f9', padding: '9px 13px', fontSize: '0.9rem', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <div style={labelStyle}>Descripción</div>
-                                        <textarea value={catData.desc} onChange={e => updateCat('desc', e.target.value)} placeholder="Describe el contenido de esta categoría…" rows={2} style={{ width: '100%', boxSizing: 'border-box', background: '#0f172a', border: `1px solid ${catHex}60`, borderRadius: 8, color: '#f1f5f9', padding: '9px 13px', fontSize: '0.88rem', resize: 'vertical', fontFamily: 'inherit', outline: 'none' }} />
-                                    </div>
-                                    <div>
-                                        <div style={labelStyle}>Imagen de portada</div>
-                                        <ImageSearchPanel currentUrl={catData.imagen} onSelect={url => updateCat('imagen', url)} accentColor={catHex} />
-                                    </div>
-                                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                                        <button onClick={guardarCategoria} disabled={guardandoCat} style={{ background: savedCat ? '#166534' : catHex, border: 'none', color: 'white', padding: '8px 22px', borderRadius: 8, cursor: guardandoCat ? 'default' : 'pointer', fontWeight: 700, fontSize: '0.88rem', opacity: guardandoCat ? 0.7 : 1, transition: 'background 0.3s' }}>
-                                            {guardandoCat ? 'Guardando…' : savedCat ? '✓ Guardado' : '✓ Guardar categoría'}
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
+                        <button onClick={() => setCatConfigAbierto(true)} style={{ background: '#1e293b', borderRadius: 14, border: `1px solid ${catHex}50`, width: '100%', padding: '12px 18px', color: catHex, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.88rem', fontWeight: 700, textAlign: 'left' }}>
+                            <span style={{ fontSize: '1rem' }}>⚙</span>
+                            Configurar categoría · {catData.emoji} {catData.nombre}
+                            <span style={{ marginLeft: 'auto', color: '#475569' }}>›</span>
+                        </button>
                     )}
 
                     {/* ── Add question form ── */}
@@ -1128,7 +1146,7 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                                     {/* Tipo de pregunta */}
                                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                                         <span style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>Tipo:</span>
-                                        <select value={formTipo} onChange={e => { setFormTipo(e.target.value); setFormBloques(['', '']); }} style={{ background: '#0f172a', border: `1px solid ${catHex}60`, borderRadius: 8, color: '#f1f5f9', padding: '7px 10px', fontSize: '0.84rem', fontFamily: 'inherit', outline: 'none', cursor: 'pointer', flex: 1 }}>
+                                        <select value={formTipo} onChange={e => { setFormTipo(e.target.value); setFormBloques(['', '']); setFormAlternativas([]); }} style={{ background: '#0f172a', border: `1px solid ${catHex}60`, borderRadius: 8, color: '#f1f5f9', padding: '7px 10px', fontSize: '0.84rem', fontFamily: 'inherit', outline: 'none', cursor: 'pointer', flex: 1 }}>
                                             <option value="SELECCION">🔘 Selección múltiple</option>
                                             <option value="CORTA">✏️ Respuesta corta</option>
                                             <option value="RELLENAR">📝 Rellenar el hueco</option>
@@ -1149,10 +1167,18 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                                         ))}
                                     </>)}
 
-                                    {/* CORTA: solo respuesta */}
-                                    {formTipo === 'CORTA' && (
+                                    {/* CORTA: respuesta principal + alternativas válidas */}
+                                    {formTipo === 'CORTA' && (<>
                                         <input value={formA} onChange={e => setFormA(e.target.value)} placeholder="✓ Respuesta (se compara ignorando acentos y mayúsculas)" style={{ width: '100%', boxSizing: 'border-box', background: '#0d2b1b', border: '2px solid #2ecc71', borderRadius: 8, color: '#4ade80', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
-                                    )}
+                                        <div style={{ color: '#64748b', fontSize: '0.76rem', marginTop: 4 }}>Otras respuestas válidas (opcional — también se dan por correctas):</div>
+                                        {formAlternativas.map((alt, i) => (
+                                            <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                                <input value={alt} onChange={e => setFormAlternativas(prev => { const n = [...prev]; n[i] = e.target.value; return n; })} placeholder={`Respuesta válida ${i + 1}`} style={{ flex: 1, background: '#0d2b1b', border: '1px solid #2ecc7160', borderRadius: 7, color: '#4ade80', padding: '7px 11px', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none' }} />
+                                                <button onClick={() => setFormAlternativas(prev => prev.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '1rem', padding: '0 4px' }}>✕</button>
+                                            </div>
+                                        ))}
+                                        <button onClick={() => setFormAlternativas(prev => [...prev, ''])} style={{ background: '#0f172a', border: '1px dashed #2ecc7140', color: '#4ade80', borderRadius: 7, padding: '6px 10px', cursor: 'pointer', fontSize: '0.78rem', alignSelf: 'flex-start' }}>+ Añadir respuesta válida</button>
+                                    </>)}
 
                                     {/* RELLENAR: texto + hueco + respuesta */}
                                     {formTipo === 'RELLENAR' && (<>
@@ -1254,9 +1280,17 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                                                 <input key={i} value={w} onChange={e => { const nw = [...(editForm.w || ['','',''])]; nw[i] = e.target.value; setEditForm(f => ({ ...f, w: nw })); }} placeholder={`✗ Incorrecta ${i + 1}`} style={{ background: '#2a0d0d', border: '2px solid #e74c3c', borderRadius: 8, color: '#fca5a5', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
                                             ))}
                                         </>)}
-                                        {editForm.tipo === 'CORTA' && (
+                                        {editForm.tipo === 'CORTA' && (<>
                                             <input value={editForm.a} onChange={e => setEditForm(f => ({ ...f, a: e.target.value }))} placeholder="✓ Respuesta" style={{ background: '#0d2b1b', border: '2px solid #2ecc71', borderRadius: 8, color: '#4ade80', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
-                                        )}
+                                            <div style={{ color: '#64748b', fontSize: '0.76rem' }}>Otras respuestas válidas (opcional):</div>
+                                            {(editForm.alternativas || []).map((alt, i) => (
+                                                <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                                    <input value={alt} onChange={e => setEditForm(f => { const n=[...(f.alternativas||[])]; n[i]=e.target.value; return {...f,alternativas:n}; })} placeholder={`Respuesta válida ${i+1}`} style={{ flex:1, background:'#0d2b1b', border:'1px solid #2ecc7160', borderRadius:7, color:'#4ade80', padding:'7px 11px', fontSize:'0.85rem', fontFamily:'inherit', outline:'none' }} />
+                                                    <button onClick={() => setEditForm(f => ({...f, alternativas: (f.alternativas||[]).filter((_,j)=>j!==i)}))} style={{ background:'none', border:'none', color:'#ef4444', cursor:'pointer', fontSize:'1rem', padding:'0 4px' }}>✕</button>
+                                                </div>
+                                            ))}
+                                            <button onClick={() => setEditForm(f => ({...f, alternativas: [...(f.alternativas||[]), '']}))} style={{ background:'#0f172a', border:'1px dashed #2ecc7140', color:'#4ade80', borderRadius:7, padding:'6px 10px', cursor:'pointer', fontSize:'0.78rem', alignSelf:'flex-start' }}>+ Añadir respuesta válida</button>
+                                        </>)}
                                         {editForm.tipo === 'RELLENAR' && (<>
                                             <input value={editForm.bloques?.[0] || ''} onChange={e => setEditForm(f => { const b = [...(f.bloques||['','',''])]; b[0]=e.target.value; return {...f,bloques:b}; })} placeholder="Texto antes del hueco" style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 8, color: '#f1f5f9', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />
                                             <input value={editForm.bloques?.[1] || ''} onChange={e => setEditForm(f => { const b = [...(f.bloques||['','',''])]; b[1]=e.target.value; return {...f,bloques:b}; })} placeholder="✓ Respuesta correcta" style={{ background: '#0d2b1b', border: '2px solid #2ecc71', borderRadius: 8, color: '#4ade80', padding: '9px 13px', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }} />

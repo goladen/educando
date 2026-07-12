@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, doc, getDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 
 const CAT_IDS  = ['geo', 'esp', 'his', 'art', 'cie', 'dep'];
 const CAT_HEX  = { geo: '#3498db', esp: '#e84393', his: '#f1c40f', art: '#9b59b6', cie: '#2ecc71', dep: '#e67e22' };
@@ -45,6 +45,34 @@ export default function TrivialEnvioForm({ codigoInicial, onBack }) {
     const [curso,     setCurso]     = useState('');
     const [error,     setError]     = useState('');
     const [enviando,  setEnviando]  = useState(false);
+
+    // ── Ayuda / consulta de preguntas guardadas ──
+    const [showInfo,     setShowInfo]     = useState(false);
+    const [showGuardadas,setShowGuardadas]= useState(false);
+    const [guardadas,    setGuardadas]    = useState(null);   // { geo:[], esp:[], ... }
+    const [catGuardadas, setCatGuardadas] = useState('geo');
+    const [cargandoGuardadas, setCargandoGuardadas] = useState(false);
+
+    const abrirGuardadas = async () => {
+        setShowGuardadas(true);
+        const firstCat = CAT_IDS.find(id => info?.categorias?.[id]) || 'geo';
+        setCatGuardadas(firstCat);
+        if (guardadas || !info?.recursoId) return;
+        setCargandoGuardadas(true);
+        try {
+            const snap = await getDocs(collection(db, 'trivial_recursos', info.recursoId, 'preguntas'));
+            const porCat = { geo: [], esp: [], his: [], art: [], cie: [], dep: [] };
+            snap.docs.forEach(d => {
+                const q = { id: d.id, ...d.data() };
+                if (porCat[q.categoria]) porCat[q.categoria].push(q);
+            });
+            setGuardadas(porCat);
+        } catch (e) {
+            console.error(e);
+            setGuardadas({ geo: [], esp: [], his: [], art: [], cie: [], dep: [] });
+        }
+        setCargandoGuardadas(false);
+    };
 
     useEffect(() => {
         if (codigoInicial) buscar(codigoInicial);
@@ -170,7 +198,12 @@ export default function TrivialEnvioForm({ codigoInicial, onBack }) {
                     ...lecturaData,
                 };
                 if (p.tipo === 'SELECCION') return addDoc(col, { ...base, q: p.q.trim(), a: p.a.trim(), w: p.w.map(s => s.trim()) });
-                if (p.tipo === 'CORTA')     return addDoc(col, { ...base, q: p.q.trim(), a: p.a.trim() });
+                if (p.tipo === 'CORTA') {
+                    const alts = (p.alternativas || []).map(s => s.trim()).filter(Boolean);
+                    const cData = { ...base, q: p.q.trim(), a: p.a.trim() };
+                    if (alts.length) cData.alternativas = alts;
+                    return addDoc(col, cData);
+                }
                 if (p.tipo === 'RELLENAR') {
                     const alts = (p.alternativas || []).map(s => s.trim()).filter(Boolean);
                     const rData = { ...base, bloques: [p.bloques[0].trim(), p.bloques[1].trim(), p.bloques[2]?.trim() || ''] };
@@ -234,9 +267,101 @@ export default function TrivialEnvioForm({ codigoInicial, onBack }) {
     );
 
     // ─── RENDER: FORMULARIO ───────────────────────────────────────────────────
+    const TIPO_AYUDA = {
+        SELECCION: 'El jugador elige entre 4 opciones. Escribe la respuesta correcta y 3 incorrectas.',
+        CORTA:     'El jugador escribe la respuesta. Puedes añadir varias respuestas válidas (sinónimos, con o sin artículo…).',
+        RELLENAR:  'Una frase con un hueco. El jugador escribe la palabra que falta; puedes admitir alternativas.',
+        ORDENAR:   'El jugador ordena una lista. Escribe los elementos en el orden correcto (se mostrarán desordenados).',
+    };
     return (
         <div style={{ ...wrap, justifyContent: 'flex-start', paddingTop: 20, paddingBottom: 40 }}>
             {onBack && <button onClick={onBack} style={{ ...btnVolver, position: 'static', marginBottom: 12 }}>← Volver</button>}
+
+            {/* ── MODAL: cómo enviar ── */}
+            {showInfo && (
+                <div style={modalOverlay} onClick={e => { if (e.target === e.currentTarget) setShowInfo(false); }}>
+                    <div style={modalBox}>
+                        <div style={modalHeader}>
+                            <span style={{ fontWeight: 700, color: '#1e293b', fontSize: '1rem' }}>ℹ️ ¿Cómo enviar una pregunta?</span>
+                            <button onClick={() => setShowInfo(false)} style={modalClose}>✕</button>
+                        </div>
+                        <div style={{ padding: 20, overflowY: 'auto' }}>
+                            <ol style={{ margin: 0, paddingLeft: 20, color: '#334155', fontSize: '0.9rem', lineHeight: 1.6 }}>
+                                <li style={{ marginBottom: 12 }}><strong>Elige la categoría</strong> de cada pregunta en el primer desplegable de la tarjeta. En este Trivial puedes elegir entre: {CAT_IDS.map((id, i) => { const c = catInfo(id, info?.categorias); return <span key={id}>{i > 0 ? ', ' : ''}<strong>{c.emoji} {c.nombre}</strong></span>; })}.</li>
+                                <li style={{ marginBottom: 12 }}><strong>Elige el tipo de pregunta</strong> en el segundo desplegable:
+                                    <ul style={{ marginTop: 6, paddingLeft: 18 }}>
+                                        {TIPOS.map(t => (
+                                            <li key={t.id} style={{ marginBottom: 5 }}><strong>{t.icon} {t.label}:</strong> {TIPO_AYUDA[t.id]}</li>
+                                        ))}
+                                    </ul>
+                                </li>
+                                <li style={{ marginBottom: 12 }}><strong>Rellena la pregunta y las respuestas</strong> según el tipo elegido.</li>
+                                <li style={{ marginBottom: 12 }}>Pulsa <strong>＋ Añadir otra pregunta</strong> si quieres enviar varias.</li>
+                                <li style={{ marginBottom: 12 }}>Escribe <strong>tu nombre</strong> (y curso) abajo y pulsa <strong>Enviar</strong>.</li>
+                            </ol>
+                            <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 10, padding: '12px 14px', marginTop: 14, color: '#0369a1', fontSize: '0.82rem' }}>
+                                💡 El profesor revisará tus preguntas y las añadirá al Trivial si las aprueba.
+                            </div>
+                        </div>
+                        <div style={modalFooter}>
+                            <button onClick={() => setShowInfo(false)} style={btnPrimary}>Entendido</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── MODAL: preguntas guardadas ── */}
+            {showGuardadas && (
+                <div style={modalOverlay} onClick={e => { if (e.target === e.currentTarget) setShowGuardadas(false); }}>
+                    <div style={modalBox}>
+                        <div style={modalHeader}>
+                            <span style={{ fontWeight: 700, color: '#1e293b', fontSize: '1rem' }}>📚 Preguntas guardadas</span>
+                            <button onClick={() => setShowGuardadas(false)} style={modalClose}>✕</button>
+                        </div>
+                        {/* Category tabs */}
+                        <div style={{ display: 'flex', gap: 6, padding: '12px 16px 0', flexWrap: 'wrap', flexShrink: 0 }}>
+                            {CAT_IDS.map(id => {
+                                const c = catInfo(id, info?.categorias);
+                                const activo = id === catGuardadas;
+                                const n = guardadas?.[id]?.length ?? 0;
+                                return (
+                                    <button key={id} onClick={() => setCatGuardadas(id)}
+                                        style={{ background: activo ? c.hex : c.hex + '15', color: activo ? 'white' : c.hex, border: `1.5px solid ${c.hex}`, borderRadius: 8, padding: '5px 10px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
+                                        {c.emoji} {c.nombre} <span style={{ background: activo ? 'rgba(255,255,255,0.3)' : c.hex + '30', borderRadius: 8, padding: '0 6px', fontSize: '0.72rem' }}>{n}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <div style={{ padding: 16, overflowY: 'auto', flex: 1 }}>
+                            {cargandoGuardadas && <p style={{ color: '#64748b', textAlign: 'center', padding: 20 }}>Cargando…</p>}
+                            {!cargandoGuardadas && (guardadas?.[catGuardadas]?.length ?? 0) === 0 && (
+                                <p style={{ color: '#94a3b8', textAlign: 'center', padding: 24, fontSize: '0.9rem' }}>Todavía no hay preguntas guardadas en esta categoría.</p>
+                            )}
+                            {!cargandoGuardadas && (guardadas?.[catGuardadas] || []).map((q, i) => {
+                                const tipoIcon = { SELECCION: '🔘', CORTA: '✏️', RELLENAR: '🔲', ORDENAR: '🔀' }[q.tipo] || '🔘';
+                                let enunciado = q.q;
+                                if (q.tipo === 'RELLENAR') enunciado = `${q.bloques?.[0] || ''} ____ ${q.bloques?.[2] || ''}`.trim();
+                                let respuesta = '';
+                                if (q.tipo === 'SELECCION' || q.tipo === 'CORTA') respuesta = q.a;
+                                else if (q.tipo === 'RELLENAR') respuesta = q.bloques?.[1];
+                                else if (q.tipo === 'ORDENAR') respuesta = (q.bloques || []).join(' → ');
+                                const alts = q.alternativas || [];
+                                return (
+                                    <div key={q.id || i} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 14px', marginBottom: 8 }}>
+                                        <div style={{ color: '#1e293b', fontSize: '0.9rem', fontWeight: 600, marginBottom: 4 }}>{tipoIcon} {enunciado}</div>
+                                        {respuesta && <div style={{ color: '#16a34a', fontSize: '0.82rem' }}>✓ {respuesta}</div>}
+                                        {alts.length > 0 && <div style={{ color: '#64748b', fontSize: '0.76rem', marginTop: 2 }}>También válidas: {alts.join(', ')}</div>}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <div style={modalFooter}>
+                            <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.78rem', flex: 1 }}>Consulta las que ya existen para no repetirlas.</p>
+                            <button onClick={() => setShowGuardadas(false)} style={{ ...btnPrimary, width: 'auto', padding: '10px 20px' }}>Cerrar</button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Header */}
             <div style={{ ...card, marginBottom: 20, textAlign: 'center', paddingTop: 24, paddingBottom: 20 }}>
@@ -250,14 +375,23 @@ export default function TrivialEnvioForm({ codigoInicial, onBack }) {
                 {info?.creadorNombre && (
                     <p style={{ color: '#64748b', margin: 0, fontSize: '0.88rem' }}>Enviando preguntas a <strong>{info.creadorNombre}</strong></p>
                 )}
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 14, flexWrap: 'wrap' }}>
+                    <button onClick={() => setShowInfo(true)} style={{ background: '#eff6ff', border: '1.5px solid #bfdbfe', color: '#1d4ed8', borderRadius: 9, padding: '8px 14px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        ℹ️ ¿Cómo enviar una pregunta?
+                    </button>
+                    <button onClick={abrirGuardadas} style={{ background: '#f0fdf4', border: '1.5px solid #bbf7d0', color: '#16a34a', borderRadius: 9, padding: '8px 14px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        📚 Ver preguntas guardadas
+                    </button>
+                </div>
             </div>
 
             {/* Question cards */}
             <div style={{ width: '100%', maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {preguntas.map((p, idx) => {
                     const ci = catInfo(p.cat, info?.categorias);
+                    const catImg = info?.categorias?.[p.cat]?.imagen;
                     return (
-                        <div key={idx} style={{ background: 'white', borderRadius: 16, padding: '20px', boxShadow: '0 4px 16px rgba(0,0,0,0.1)', border: `2px solid ${ci.hex}40` }}>
+                        <div key={idx} style={{ background: catImg ? `linear-gradient(rgba(255,255,255,0.90), rgba(255,255,255,0.93)), url(${catImg}) center/cover` : 'white', borderRadius: 16, padding: '20px', boxShadow: '0 4px 16px rgba(0,0,0,0.1)', border: `2px solid ${ci.hex}40` }}>
                             {/* Card header: category + type + delete */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
                                 <span style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.92rem', flexShrink: 0 }}>Pregunta {idx + 1}</span>
@@ -316,11 +450,21 @@ export default function TrivialEnvioForm({ codigoInicial, onBack }) {
                                     <label style={lbl}>Pregunta</label>
                                     <textarea value={p.q} onChange={e => updateQ(idx, 'q', e.target.value)} placeholder="Escribe aquí la pregunta…" rows={2} style={{ ...inputBase, resize: 'vertical', fontFamily: 'inherit' }} />
                                 </div>
-                                <div>
+                                <div style={{ marginBottom: 10 }}>
                                     <label style={{ ...lbl, color: '#16a34a' }}>✓ Respuesta correcta</label>
                                     <input value={p.a} onChange={e => updateQ(idx, 'a', e.target.value)} placeholder="Respuesta exacta (el jugador deberá escribirla)" style={{ ...inputBase, borderColor: '#86efac', background: '#f0fdf4', color: '#166534' }} />
                                 </div>
-                                <p style={{ color: '#94a3b8', fontSize: '0.75rem', margin: '8px 0 0' }}>El jugador escribe la respuesta. Acentos y mayúsculas se ignoran al comparar.</p>
+                                <div>
+                                    <label style={lbl}>Otras respuestas válidas <span style={{ color: '#94a3b8', fontWeight: 400 }}>(opcional)</span></label>
+                                    {(p.alternativas || []).map((alt, ai) => (
+                                        <div key={ai} style={{ display: 'flex', gap: 7, marginBottom: 6, alignItems: 'center' }}>
+                                            <input value={alt} onChange={e => { setPreguntas(prev => { const next=[...prev]; const alts=[...(next[idx].alternativas||[])]; alts[ai]=e.target.value; next[idx]={...next[idx],alternativas:alts}; return next; }); }} placeholder={`Respuesta válida ${ai+1}`} style={{ ...inputBase, flex: 1, marginBottom: 0, borderColor: '#86efac', background: '#f0fdf4', color: '#166534' }} />
+                                            <button onClick={() => setPreguntas(prev => { const next=[...prev]; next[idx]={...next[idx],alternativas:(next[idx].alternativas||[]).filter((_,j)=>j!==ai)}; return next; })} style={{ background:'#fef2f2', border:'1px solid #fecaca', color:'#ef4444', borderRadius:6, padding:'6px 8px', cursor:'pointer', fontSize:'0.75rem', flexShrink:0 }}>✕</button>
+                                        </div>
+                                    ))}
+                                    <button onClick={() => setPreguntas(prev => { const next=[...prev]; next[idx]={...next[idx],alternativas:[...(next[idx].alternativas||[]),'']};return next; })} style={{ background:'#f0fdf4', border:'1px dashed #86efac', color:'#16a34a', borderRadius:6, padding:'6px 12px', cursor:'pointer', fontSize:'0.78rem' }}>+ Añadir respuesta válida</button>
+                                </div>
+                                <p style={{ color: '#94a3b8', fontSize: '0.75rem', margin: '8px 0 0' }}>El jugador escribe la respuesta. Acentos y mayúsculas se ignoran al comparar, y cualquiera de las respuestas válidas se da por correcta.</p>
                             </>)}
 
                             {/* ── RELLENAR ── */}
@@ -450,3 +594,8 @@ const inputBase  = { width: '100%', padding: '10px 13px', borderRadius: 8, borde
 const btnPrimary = { width: '100%', padding: '14px', background: 'linear-gradient(135deg, #1d4ed8, #4f46e5)', color: 'white', border: 'none', borderRadius: 10, fontSize: '1rem', fontWeight: 700, cursor: 'pointer', boxShadow: '0 8px 20px rgba(29,78,216,0.4)' };
 const btnVolver  = { background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontSize: '0.88rem', alignSelf: 'flex-start', marginBottom: 16 };
 const lbl        = { display: 'block', fontSize: '0.75rem', color: '#64748b', marginBottom: 4, fontWeight: 600 };
+const modalOverlay = { position: 'fixed', inset: 0, zIndex: 4000, background: 'rgba(15,23,42,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 };
+const modalBox     = { background: 'white', borderRadius: 18, width: '100%', maxWidth: 540, maxHeight: '88vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 80px rgba(0,0,0,0.4)', overflow: 'hidden' };
+const modalHeader  = { padding: '16px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 };
+const modalFooter  = { padding: '14px 20px', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, background: '#f8fafc' };
+const modalClose   = { background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1.2rem', lineHeight: 1, padding: '2px 6px' };

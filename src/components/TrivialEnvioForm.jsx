@@ -32,8 +32,8 @@ const IDIOMAS = [
     { value: 'ca-ES', label: '🏴 Catalán' },
 ];
 
-function emptyQ(defaultCat) {
-    return { tipo: 'SELECCION', q: '', a: '', w: ['', '', ''], bloques: ['', '', ''], alternativas: [], lectura: '', lecturaIdioma: 'es-ES', cat: defaultCat || 'geo' };
+function emptyQ() {
+    return { tipo: 'SELECCION', q: '', a: '', w: ['', '', ''], bloques: ['', '', ''], alternativas: [], lectura: '', lecturaIdioma: 'es-ES', cat: '' };
 }
 
 export default function TrivialEnvioForm({ codigoInicial, onBack }) {
@@ -388,8 +388,8 @@ export default function TrivialEnvioForm({ codigoInicial, onBack }) {
             {/* Question cards */}
             <div style={{ width: '100%', maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {preguntas.map((p, idx) => {
-                    const ci = catInfo(p.cat, info?.categorias);
-                    const catImg = info?.categorias?.[p.cat]?.imagen;
+                    const ci = p.cat ? catInfo(p.cat, info?.categorias) : { nombre: '', emoji: '', hex: '#cbd5e1' };
+                    const catImg = p.cat ? info?.categorias?.[p.cat]?.imagen : null;
                     return (
                         <div key={idx} style={{ background: catImg ? `linear-gradient(rgba(255,255,255,0.90), rgba(255,255,255,0.93)), url(${catImg}) center/cover` : 'white', borderRadius: 16, padding: '20px', boxShadow: '0 4px 16px rgba(0,0,0,0.1)', border: `2px solid ${ci.hex}40` }}>
                             {/* Card header: category + type + delete */}
@@ -399,9 +399,10 @@ export default function TrivialEnvioForm({ codigoInicial, onBack }) {
                                 {/* Category */}
                                 <select
                                     value={p.cat}
-                                    onChange={e => updateQ(idx, 'cat', e.target.value)}
-                                    style={{ background: ci.hex + '18', border: `1.5px solid ${ci.hex}`, color: ci.hex, borderRadius: 8, padding: '5px 9px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', outline: 'none', flex: 1, minWidth: 130 }}
+                                    onChange={e => { updateQ(idx, 'cat', e.target.value); setError(''); }}
+                                    style={{ background: p.cat ? ci.hex + '18' : '#fff7ed', border: `1.5px solid ${p.cat ? ci.hex : '#f59e0b'}`, color: p.cat ? ci.hex : '#b45309', borderRadius: 8, padding: '5px 9px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', outline: 'none', flex: 1, minWidth: 130 }}
                                 >
+                                    <option value="" disabled>👉 Elige categoría…</option>
                                     {CAT_IDS.map(id => {
                                         const c = catInfo(id, info?.categorias);
                                         return <option key={id} value={id}>{c.emoji} {c.nombre}</option>;

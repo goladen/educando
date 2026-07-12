@@ -130,7 +130,16 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
     const [errorGuardar, setErrorGuardar] = useState('');
     const [copiado,      setCopiado]      = useState('');
 
+    // ── Responsive ───────────────────────────────────────────────────────────────
+    const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 768);
+
     // ── Effects ────────────────────────────────────────────────────────────────
+    useEffect(() => {
+        const onResize = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
+    }, []);
+
     useEffect(() => {
         if (!emojiPickerAbierto) return;
         const handler = (e) => { if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target)) setEmojiPickerAbierto(false); };
@@ -562,6 +571,19 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
         } catch (e) { console.error(e); }
     };
 
+    const cambiarCategoriaPendiente = (pend, nuevaCat) => {
+        const fromCat = pend.categoria;
+        if (!nuevaCat || nuevaCat === fromCat) return;
+        // Mover en el estado local para que aparezca bajo la pestaña correcta
+        setPendientes(prev => ({
+            ...prev,
+            [fromCat]: (prev[fromCat] || []).filter(p => p.id !== pend.id),
+            [nuevaCat]: [...(prev[nuevaCat] || []), { ...pend, categoria: nuevaCat }],
+        }));
+        // Persistir por si el profesor recarga antes de aceptar
+        updateDoc(doc(db, 'trivial_recursos', recursoId, 'preguntas_pendientes', pend.id), { categoria: nuevaCat }).catch(e => console.error(e));
+    };
+
     // ── Collaboration ──────────────────────────────────────────────────────────
     const agregarColaboradorPorEmail = async () => {
         if (!emailNuevo.trim()) return;
@@ -593,6 +615,7 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
     const catHex        = CAT_HEX[tabActiva];
     const pregsCat      = preguntas[tabActiva];
     const pendientesCat = pendientes[tabActiva] || [];
+    const todasPendientes = CAT_IDS.flatMap(id => pendientes[id] || []);
     const totalPreguntas = Object.values(preguntas).reduce((s, arr) => s + arr.length, 0);
     const totalPendientes = Object.values(pendientes).reduce((s, arr) => s + arr.length, 0);
 
@@ -1052,10 +1075,10 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
             </div>
 
             {/* ─── MAIN AREA ─── */}
-            <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: isMobile ? 'column' : 'row', overflow: isMobile ? 'auto' : 'hidden' }}>
 
                 {/* ── Questions column ── */}
-                <div style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div style={{ flex: 1, overflowY: isMobile ? 'visible' : 'auto', padding: isMobile ? 14 : 20, display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 }}>
 
                     {esNuevo && !recursoId && (
                         <div style={{ background: '#1e3a8a22', border: '1px solid #3b82f660', borderRadius: 12, padding: '14px 18px', color: '#93c5fd', fontSize: '0.9rem' }}>
@@ -1063,19 +1086,19 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                         </div>
                     )}
 
-                    {/* ── PENDING QUESTIONS for this category ── */}
-                    {esCreador && pendientesCat.length > 0 && (
+                    {/* ── PENDING QUESTIONS (todas las categorías) ── */}
+                    {esCreador && todasPendientes.length > 0 && (
                         <div style={{ background: '#1c1a07', border: '1.5px solid #f59e0b60', borderRadius: 14, overflow: 'hidden' }}>
                             <div style={{ background: '#f59e0b18', borderBottom: '1px solid #f59e0b30', padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <span style={{ fontSize: '1rem' }}>🕐</span>
                                 <span style={{ color: '#f59e0b', fontWeight: 700, fontSize: '0.88rem' }}>
-                                    Pendientes de revisión — {pendientesCat.length} pregunta{pendientesCat.length !== 1 ? 's' : ''}
+                                    Pendientes de revisión — {todasPendientes.length} pregunta{todasPendientes.length !== 1 ? 's' : ''}
                                 </span>
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '14px 18px' }}>
-                                {pendientesCat.map(pend => (
+                                {todasPendientes.map(pend => (
                                     <div key={pend.id} style={{ background: '#0f172a', borderRadius: 10, padding: '13px 16px', border: '1px solid #f59e0b30' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
                                             <div style={{ flex: 1, minWidth: 0 }}>
                                                 <div style={{ color: '#94a3b8', fontSize: '0.72rem', marginBottom: 5 }}>
                                                     ✉ <strong style={{ color: '#f59e0b' }}>{pend.enviadoPor?.nombre}</strong>
@@ -1103,6 +1126,19 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                                                         </div>
                                                     </>);
                                                 })()}
+                                            </div>
+                                            <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                                                <div style={{ color: '#64748b', fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>Categoría</div>
+                                                <select
+                                                    value={pend.categoria}
+                                                    onChange={e => cambiarCategoriaPendiente(pend, e.target.value)}
+                                                    title="Cambiar la categoría de esta pregunta"
+                                                    style={{ background: '#0f172a', border: `1px solid ${CAT_HEX[pend.categoria] || '#334155'}`, color: CAT_HEX[pend.categoria] || '#f1f5f9', borderRadius: 7, padding: '4px 6px', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer', outline: 'none', maxWidth: 130 }}
+                                                >
+                                                    {CAT_IDS.map(id => (
+                                                        <option key={id} value={id}>{categorias[id].emoji} {categorias[id].nombre}</option>
+                                                    ))}
+                                                </select>
                                             </div>
                                         </div>
                                         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
@@ -1419,7 +1455,7 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
 
                 {/* ── COLLABORATION PANEL ── */}
                 {panelColab && (
-                    <div style={{ width: 300, background: '#1e293b', borderLeft: '1px solid #334155', overflowY: 'auto', padding: 18, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 20 }}>
+                    <div style={{ width: isMobile ? '100%' : 300, background: '#1e293b', borderLeft: isMobile ? 'none' : '1px solid #334155', borderTop: isMobile ? '1px solid #334155' : 'none', overflowY: isMobile ? 'visible' : 'auto', padding: 18, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 20, boxSizing: 'border-box' }}>
 
                         {/* ── RECEIVE QUESTIONS (Question Sender) ── */}
                         {esCreador && recursoId && (
@@ -1472,6 +1508,22 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                                     <CopyBtn texto={codigoJuego} id="juego" copiado={copiado} copiar={copiar} />
                                 </div>
                                 <p style={{ color: '#475569', fontSize: '0.75rem', margin: '6px 0 0' }}>Los alumnos usan este código en el buscador del juego.</p>
+                            </div>
+                        )}
+
+                        {/* ── Direct play link ── */}
+                        {recursoId && (
+                            <div>
+                                <div style={labelStyle}>Enlace directo para jugar</div>
+                                <button
+                                    onClick={() => copiar(`${window.location.origin}${window.location.pathname}?trivial=${recursoId}`, 'link_jugar')}
+                                    style={{ width: '100%', background: copiado === 'link_jugar' ? '#0a2a18' : '#0f172a', border: '1px solid #38bdf840', color: copiado === 'link_jugar' ? '#4ade80' : '#38bdf8', padding: '10px 12px', borderRadius: 8, cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600, textAlign: 'left', transition: '0.2s' }}
+                                >
+                                    {copiado === 'link_jugar' ? '✓ ¡Enlace copiado!' : '🔗 Copiar enlace del Trivial'}
+                                </button>
+                                <p style={{ color: '#475569', fontSize: '0.73rem', margin: '6px 0 0', lineHeight: 1.5 }}>
+                                    Quien abra este enlace entra directamente a este Trivial con las preguntas cargadas, sin necesidad de registrarse.
+                                </p>
                             </div>
                         )}
 

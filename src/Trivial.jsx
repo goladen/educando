@@ -393,7 +393,7 @@ const GET_PLAYER_POS_STYLE = (index) => {
 };
 
 // ─── 3. COMPONENTE REACT (UI + INTEGRACIÓN CANVAS) ───────────────────────────
-export default function TrivialGame({ onExit, onBuscar }) {
+export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
     // ─── RESPONSIVE ───
     const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 640);
     useEffect(() => {
@@ -413,6 +413,7 @@ export default function TrivialGame({ onExit, onBuscar }) {
     const [cargandoBusq,    setCargandoBusq]    = useState(false);
     const [busqError,       setBusqError]       = useState('');
     const [busqIniciada,    setBusqIniciada]    = useState(false);
+    const [linkCopiadoId,   setLinkCopiadoId]   = useState(null);
     const [recursoIdFB,       setRecursoIdFB]       = useState(null);
     const [categoriasRecurso, setCategoriasRecurso] = useState(null); // categorias del recurso cargado
     const [errorPreguntas,    setErrorPreguntas]    = useState('');
@@ -426,7 +427,8 @@ export default function TrivialGame({ onExit, onBuscar }) {
     const [diceLanding, setDiceLanding] = useState(false);
     const diceAnimRef = useRef(null);
     const [modalData, setModalData] = useState(null);
-    const [timeLeft, setTimeLeft] = useState(15);
+    const [timeLeft, setTimeLeft] = useState(40);
+    const [tiempoPregunta, setTiempoPregunta] = useState(40); // segundos por pregunta (configurable, mín. 40)
     const [inputCorta, setInputCorta] = useState('');
     const [ordenSlots, setOrdenSlots] = useState({ available: [], slots: [] }); // for ORDENAR type
 
@@ -498,6 +500,22 @@ export default function TrivialGame({ onExit, onBuscar }) {
         setFuentePreguntas('FIREBASE');
         setPantalla('SETUP');
     };
+
+    // ─── ENLACE DIRECTO: cargar recurso por ID y saltar a configuración ───
+    useEffect(() => {
+        if (!recursoIdInicial) return;
+        let cancel = false;
+        (async () => {
+            try {
+                const snap = await getDoc(doc(db, 'trivial_recursos', recursoIdInicial));
+                if (cancel) return;
+                if (snap.exists()) {
+                    seleccionarRecurso({ id: snap.id, ...snap.data() });
+                }
+            } catch (e) { console.error('Trivial deep link error:', e); }
+        })();
+        return () => { cancel = true; };
+    }, [recursoIdInicial]);
 
     // ─── INICIAR JUEGO ───
     const iniciarJuego = async () => {
@@ -1027,7 +1045,7 @@ export default function TrivialGame({ onExit, onBuscar }) {
         }
 
         setMostrandoRespuesta(false);
-        setTimeLeft(15);
+        setTimeLeft(tiempoPregunta);
         setGameState('QUESTION');
         setModalData({
             node, isFinal,
@@ -1382,9 +1400,23 @@ export default function TrivialGame({ onExit, onBuscar }) {
                                                 <div style={{ color: '#64748b', fontSize: '0.82rem' }}>por {r.creadorNombre || 'Anónimo'}</div>
                                                 {r.descripcion && <div style={{ color: '#94a3b8', fontSize: '0.83rem', marginTop: 5, lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{r.descripcion}</div>}
                                             </div>
-                                            <button style={{ background: 'linear-gradient(135deg, #a855f7, #7c3aed)', border: 'none', color: 'white', padding: '8px 16px', borderRadius: 10, cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem', flexShrink: 0 }}>
-                                                Jugar →
-                                            </button>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
+                                                <button style={{ background: 'linear-gradient(135deg, #a855f7, #7c3aed)', border: 'none', color: 'white', padding: '8px 16px', borderRadius: 10, cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem' }}>
+                                                    Jugar →
+                                                </button>
+                                                <button
+                                                    onClick={e => {
+                                                        e.stopPropagation();
+                                                        try { navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}?trivial=${r.id}`); } catch(err) {}
+                                                        setLinkCopiadoId(r.id);
+                                                        setTimeout(() => setLinkCopiadoId(prev => prev === r.id ? null : prev), 1600);
+                                                    }}
+                                                    title="Copiar enlace directo a este Trivial"
+                                                    style={{ background: linkCopiadoId === r.id ? '#0a2a18' : 'transparent', border: `1px solid ${linkCopiadoId === r.id ? '#4ade80' : '#475569'}`, color: linkCopiadoId === r.id ? '#4ade80' : '#94a3b8', padding: '6px 12px', borderRadius: 10, cursor: 'pointer', fontWeight: 600, fontSize: '0.78rem', whiteSpace: 'nowrap' }}
+                                                >
+                                                    {linkCopiadoId === r.id ? '✓ Copiado' : '🔗 Compartir'}
+                                                </button>
+                                            </div>
                                         </div>
                                         {/* Category pills */}
                                         <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
@@ -1434,7 +1466,7 @@ export default function TrivialGame({ onExit, onBuscar }) {
         const pasos = [
             { n: '1', titulo: 'Lanza el dado', texto: 'En tu turno pulsa el botón para tirar. El número indica cuántas casillas puedes avanzar.' },
             { n: '2', titulo: 'Elige tu casilla', texto: 'Haz clic en cualquiera de los destinos resaltados para mover tu ficha.' },
-            { n: '3', titulo: 'Responde la pregunta', texto: 'Al caer en una casilla de color se muestra una pregunta de esa categoría. Tienes 15 segundos.' },
+            { n: '3', titulo: 'Responde la pregunta', texto: `Al caer en una casilla de color se muestra una pregunta de esa categoría. Tienes ${tiempoPregunta} segundos.` },
             { n: '4', titulo: 'Consigue quesitos', texto: 'Si aciertas en una casilla especial (nodo grande) obtienes el quesito de ese color.' },
             { n: '5', titulo: '¡Gana el primero!', texto: 'Llega al centro con todos los quesitos y responde la pregunta final para ganar.' },
         ];
@@ -1577,7 +1609,7 @@ export default function TrivialGame({ onExit, onBuscar }) {
                         justifyContent: 'center',
                     }}>
                         {[
-                            { icon: '⏱', texto: '15 segundos por pregunta' },
+                            { icon: '⏱', texto: `${tiempoPregunta} segundos por pregunta` },
                             { icon: '🎲', texto: 'Turno pasa si fallas' },
                             { icon: '🏆', texto: 'Necesitas los 6 quesitos para ir al centro' },
                             { icon: '🎯', texto: 'Responde bien en el centro para ganar' },
@@ -1642,6 +1674,17 @@ export default function TrivialGame({ onExit, onBuscar }) {
                             style={{ padding: '10px 20px', borderRadius: 10, fontSize: '1.2rem', background: '#0f172a', color: 'white', border: '2px solid #38bdf8', outline: 'none' }}
                         >
                             {[1,2,3,4,5,6].map(n => <option key={n} value={n}>{n} Jugadores</option>)}
+                        </select>
+                    </div>
+
+                    <div style={{ marginBottom: 20, textAlign: 'center' }}>
+                        <label style={{ color: 'white', fontWeight: 'bold', marginRight: 15 }}>⏱ Tiempo por pregunta:</label>
+                        <select
+                            value={tiempoPregunta}
+                            onChange={e => setTiempoPregunta(Number(e.target.value))}
+                            style={{ padding: '10px 20px', borderRadius: 10, fontSize: '1.1rem', background: '#0f172a', color: 'white', border: '2px solid #38bdf8', outline: 'none' }}
+                        >
+                            {[40, 60, 90, 120, 180].map(s => <option key={s} value={s}>{s} segundos</option>)}
                         </select>
                     </div>
 
@@ -1881,7 +1924,7 @@ export default function TrivialGame({ onExit, onBuscar }) {
                         </div>
 
                         <div style={{ height: 6, background: '#334155', borderRadius: 4, margin: '12px 0', overflow: 'hidden' }}>
-                            <div style={{ height: '100%', width: `${(timeLeft / 15) * 100}%`, background: timeLeft > 5 ? '#2ecc71' : '#e74c3c', transition: 'width 1s linear, background 0.3s' }} />
+                            <div style={{ height: '100%', width: `${(timeLeft / tiempoPregunta) * 100}%`, background: timeLeft > 5 ? '#2ecc71' : '#e74c3c', transition: 'width 1s linear, background 0.3s' }} />
                         </div>
 
                         {/* Pregunta */}

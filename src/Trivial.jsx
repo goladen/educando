@@ -1168,7 +1168,7 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
             if (modalData.node.type === 'wedge') {
                 const catId  = modalData.node.color.id;
                 const catHex = modalData.node.color.hex;
-                const catName = modalData.node.color.name;
+                const catName = categoriasRecursoRef.current?.[catId]?.nombre || modalData.node.color.name;
                 setPlayers(prev => {
                     const np = [...prev];
                     if (np[activePlayerIdx].wedges.includes(catId)) {
@@ -1897,7 +1897,7 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <div style={{ fontSize: isMobile ? '0.95rem' : '1.1rem', textTransform: 'uppercase', letterSpacing: 2, color: modalData.color.hex, fontWeight: 'bold' }}>
-                                    {modalData.color.name}
+                                    {categoriasRecurso?.[modalData.color.id]?.nombre || modalData.color.name}
                                 </div>
                                 {modalData.qData?.lectura && (
                                     <button

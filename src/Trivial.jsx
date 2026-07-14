@@ -2,8 +2,21 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Dices, Trophy, ArrowLeft, Timer, Users, Play, Maximize2, Minimize2 } from 'lucide-react';
 import { db } from './firebase';
 import { collection, getDocs, query, where, orderBy, limit, doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
-import { useT } from './i18n/LanguageContext';
+import { useT, useLanguage } from './i18n/LanguageContext';
 import LanguageSelector from './i18n/LanguageSelector';
+import { IDIOMAS } from './i18n/translateGemini';
+
+// Etiqueta con las banderas de los idiomas a los que está traducido un recurso.
+function BadgeIdiomas({ idiomas, style }) {
+    const lista = (idiomas || []).filter(c => IDIOMAS[c] && c !== 'es');
+    if (!lista.length) return null;
+    return (
+        <span title={`Traducido a: ${lista.map(c => IDIOMAS[c].etiqueta).join(', ')}`}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: '#a855f722', border: '1px solid #a855f755', color: '#c084fc', borderRadius: 8, padding: '1px 8px', fontSize: '0.72rem', fontWeight: 700, ...style }}>
+            🌐 {lista.map(c => IDIOMAS[c].bandera).join(' ')}
+        </span>
+    );
+}
 import PREGUNTAS_JSON from './preguntas_trivial.json';
 import PREGUNTAS_PRIMARIA from './preguntas_trivial_primaria.json';
 import PREGUNTAS_SUPER from './preguntas_trivial_super.json';
@@ -397,6 +410,26 @@ const GET_PLAYER_POS_STYLE = (index) => {
 // ─── 3. COMPONENTE REACT (UI + INTEGRACIÓN CANVAS) ───────────────────────────
 export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
     const t = useT();
+    const { idioma, primeCache } = useLanguage();
+
+    // Precarga en la caché de idioma las traducciones REVISADAS que el profe
+    // guardó en el recurso (traducciones[idioma] por pregunta). Así los t() del
+    // juego las muestran al instante y sin llamar a Gemini.
+    const primeTraducciones = (pregsPorCat) => {
+        if (idioma === 'es' || !pregsPorCat) return;
+        const pares = {};
+        for (const p of Object.values(pregsPorCat).flat()) {
+            const tr = p?.traducciones?.[idioma];
+            if (!tr) continue;
+            if (tr.q && p.q) pares[p.q] = tr.q;
+            if (tr.a && p.a) pares[p.a] = tr.a;
+            if (Array.isArray(tr.w) && Array.isArray(p.w)) p.w.forEach((w, i) => { if (tr.w[i] && w) pares[w] = tr.w[i]; });
+            if (tr.b0 && p.bloques?.[0]) pares[p.bloques[0]] = tr.b0;
+            if (tr.b2 && p.bloques?.[2]) pares[p.bloques[2]] = tr.b2;
+        }
+        if (Object.keys(pares).length) primeCache(idioma, pares);
+    };
+
     // ─── RESPONSIVE ───
     const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 640);
     useEffect(() => {
@@ -422,6 +455,7 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
     const modoDificilRef = useRef(false);
     useEffect(() => { modoDificilRef.current = modoDificil; }, [modoDificil]);
     const [recursoIdFB,       setRecursoIdFB]       = useState(null);
+    const [recursoIdiomas,    setRecursoIdiomas]    = useState([]); // idiomasTraducidos del recurso elegido
     const [categoriasRecurso, setCategoriasRecurso] = useState(null); // categorias del recurso cargado
     const [errorPreguntas,    setErrorPreguntas]    = useState('');
 
@@ -504,6 +538,7 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
     const seleccionarRecurso = async (recurso) => {
         setCodigoFirebase(recurso.codigoJuego || '');
         setRecursoIdFB(recurso.id);
+        setRecursoIdiomas(recurso.idiomasTraducidos || []);
         setFuentePreguntas('FIREBASE');
         setModoDificil(false);
         setDificilPorCat(null);
@@ -608,6 +643,7 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
         }
 
         preguntasRef.current = pregsFinales;
+        primeTraducciones(pregsFinales);
 
         const nuevosJugadores = [];
         for(let i=0; i<numPlayers; i++){
@@ -718,6 +754,7 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                         }
                     });
                     preguntasRef.current = Object.keys(fbPregs).length > 0 ? fbPregs : PREGUNTAS_JSON;
+                    primeTraducciones(fbPregs);
                     setRecursoIdFB(data.recursoIdFB);
                     if (recursoDoc.exists()) setCategoriasRecurso(recursoDoc.data().categorias || null);
                 } catch (e) {
@@ -1425,7 +1462,10 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 10 }}>
                                             <div style={{ flex: 1, minWidth: 0 }}>
                                                 <div style={{ color: 'white', fontWeight: 800, fontSize: '1.05rem', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>🎯 {r.titulo}</div>
-                                                <div style={{ color: '#64748b', fontSize: '0.82rem' }}>por {r.creadorNombre || 'Anónimo'}</div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                                    <span style={{ color: '#64748b', fontSize: '0.82rem' }}>por {r.creadorNombre || 'Anónimo'}</span>
+                                                    <BadgeIdiomas idiomas={r.idiomasTraducidos} />
+                                                </div>
                                                 {r.descripcion && <div style={{ color: '#94a3b8', fontSize: '0.83rem', marginTop: 5, lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{r.descripcion}</div>}
                                             </div>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
@@ -1747,8 +1787,11 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                             </div>
                         </>) : (<>
                             <span style={{ fontSize: '1.2rem' }}>🎯</span>
-                            <div>
-                                <div style={{ color: '#a855f7', fontWeight: 700, fontSize: '0.88rem' }}>{t('Trivial personalizado')}</div>
+                            <div style={{ flex: 1 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                    <span style={{ color: '#a855f7', fontWeight: 700, fontSize: '0.88rem' }}>{t('Trivial personalizado')}</span>
+                                    <BadgeIdiomas idiomas={recursoIdiomas} />
+                                </div>
                                 <div style={{ color: '#64748b', fontSize: '0.78rem', fontFamily: 'monospace', letterSpacing: 1 }}>{codigoFirebase}</div>
                             </div>
                         </>)}

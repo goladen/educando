@@ -4,6 +4,27 @@ import {
     collection, doc, addDoc, setDoc, getDocs, updateDoc, deleteDoc,
     query, where, serverTimestamp, orderBy
 } from 'firebase/firestore';
+import { traducirLote, IDIOMAS } from '../i18n/translateGemini';
+
+// Idiomas ofrecidos para traducir un recurso (sin el original español).
+const IDIOMAS_TRAD = Object.entries(IDIOMAS).filter(([c]) => c !== 'es');
+
+// Campos de una pregunta que el juego MUESTRA traducidos (coherente con Trivial.jsx):
+// enunciado siempre; en SELECCIÓN las opciones; en RELLENAR los fragmentos de la
+// frase (NO la respuesta escrita ni los bloques de ORDENAR, que son la solución).
+function camposTraducibles(p) {
+    const tipo = p.tipo || 'SELECCION';
+    const campos = []; // [claveCampo, textoOriginal]
+    if (p.q && p.q.trim()) campos.push(['q', p.q]);
+    if (tipo === 'SELECCION') {
+        if (p.a && p.a.trim()) campos.push(['a', p.a]);
+        (p.w || []).forEach((w, i) => { if (w && w.trim()) campos.push([`w${i}`, w]); });
+    } else if (tipo === 'RELLENAR') {
+        if (p.bloques?.[0]?.trim()) campos.push(['b0', p.bloques[0]]);
+        if (p.bloques?.[2]?.trim()) campos.push(['b2', p.bloques[2]]);
+    }
+    return campos;
+}
 
 const CAT_HEX = { geo: '#3498db', esp: '#e84393', his: '#f1c40f', art: '#9b59b6', cie: '#2ecc71', dep: '#e67e22' };
 
@@ -130,6 +151,18 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
     const [guardando,    setGuardando]    = useState(false);
     const [errorGuardar, setErrorGuardar] = useState('');
     const [copiado,      setCopiado]      = useState('');
+
+    // ── Traducción del recurso ─────────────────────────────────────────────────
+    const [tradPanel,     setTradPanel]     = useState(false);
+    const [tradIdioma,    setTradIdioma]    = useState('en');
+    const [traduciendo,   setTraduciendo]   = useState(false);
+    const [tradProgreso,  setTradProgreso]  = useState('');
+    const [tradError,     setTradError]     = useState('');
+    const [tradGuardando, setTradGuardando] = useState(false);
+    const [tradGuardado,  setTradGuardado]  = useState(false);
+    const [idiomasTrad,   setIdiomasTrad]   = useState(recurso?.idiomasTraducidos || []);
+    // Borrador de revisión: { [pregId]: { q, a, w:[...], b0, b2 } } (solo campos aplicables)
+    const [tradBorrador,  setTradBorrador]  = useState({});
 
     // ── Responsive ───────────────────────────────────────────────────────────────
     const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 768);
@@ -619,6 +652,152 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
         navigator.clipboard.writeText(texto).then(() => { setCopiado(key); setTimeout(() => setCopiado(''), 2000); });
     };
 
+    // ── Traducción del recurso ─────────────────────────────────────────────────
+    const todasLasPreguntas = () => CAT_IDS.flatMap(cat => preguntas[cat] || []);
+
+    // Construye el borrador de revisión a partir de lo ya guardado en Firebase.
+    const borradorDesdeGuardado = (lang) => {
+        const b = {};
+        for (const p of todasLasPreguntas()) {
+            const guardado = p.traducciones?.[lang];
+            if (guardado) b[p.id] = { ...guardado };
+        }
+        return b;
+    };
+
+    const abrirTradPanel = () => {
+        if (!recursoId) { setErrorGuardar('Guarda el recurso primero (botón "Crear" arriba).'); return; }
+        setTradError(''); setTradGuardado(false);
+        setTradBorrador(borradorDesdeGuardado(tradIdioma));
+        setTradPanel(true);
+    };
+
+    const cambiarTradIdioma = (lang) => {
+        setTradIdioma(lang);
+        setTradError(''); setTradGuardado(false);
+        setTradBorrador(borradorDesdeGuardado(lang));
+    };
+
+    // Traduce con IA todas las preguntas al idioma elegido → rellena el borrador.
+    const traducirTodas = async () => {
+        setTraduciendo(true); setTradError(''); setTradGuardado(false);
+        try {
+            const pregs = todasLasPreguntas();
+            // 1) Reunir todos los textos únicos a traducir.
+            const unicos = [...new Set(pregs.flatMap(p => camposTraducibles(p).map(([, txt]) => txt)))];
+            if (!unicos.length) { setTradError('No hay preguntas que traducir.'); setTraduciendo(false); return; }
+
+            // 2) Traducir en lotes de 40.
+            const mapa = new Map();
+            const LOTE = 40;
+            for (let i = 0; i < unicos.length; i += LOTE) {
+                const chunk = unicos.slice(i, i + LOTE);
+                setTradProgreso(`Traduciendo ${Math.min(i + LOTE, unicos.length)}/${unicos.length}…`);
+                const trad = await traducirLote(chunk, tradIdioma);
+                chunk.forEach((orig, j) => mapa.set(orig, trad[j]));
+            }
+            setTradProgreso('');
+
+            // 3) Volcar por pregunta y campo en el borrador (respetando ediciones previas).
+            setTradBorrador(prev => {
+                const b = { ...prev };
+                for (const p of pregs) {
+                    const entry = { ...(b[p.id] || {}) };
+                    for (const [campo, orig] of camposTraducibles(p)) {
+                        const tr = mapa.get(orig);
+                        if (tr == null) continue;
+                        if (campo.startsWith('w')) {
+                            const idx = Number(campo.slice(1));
+                            entry.w = entry.w || [];
+                            entry.w[idx] = tr;
+                        } else {
+                            entry[campo] = tr;
+                        }
+                    }
+                    b[p.id] = entry;
+                }
+                return b;
+            });
+        } catch (e) {
+            console.error(e);
+            setTradError('No se pudo traducir (¿proxy /api/gemini caído?). Inténtalo de nuevo.');
+            setTradProgreso('');
+        }
+        setTraduciendo(false);
+    };
+
+    const editarTrad = (pregId, campo, valor) => {
+        setTradBorrador(prev => {
+            const entry = { ...(prev[pregId] || {}) };
+            if (campo.startsWith('w')) {
+                const idx = Number(campo.slice(1));
+                entry.w = [...(entry.w || [])];
+                entry.w[idx] = valor;
+            } else {
+                entry[campo] = valor;
+            }
+            return { ...prev, [pregId]: entry };
+        });
+    };
+
+    // Guarda traducciones[lang] en cada pregunta + marca idiomas disponibles en el recurso.
+    const guardarTraducciones = async () => {
+        if (!recursoId) return;
+        setTradGuardando(true); setTradError('');
+        try {
+            const pregs = todasLasPreguntas();
+            const ops = [];
+            for (const p of pregs) {
+                const entry = tradBorrador[p.id];
+                if (!entry) continue;
+                // Guardar solo campos con contenido, limpiando w vacíos.
+                const limpio = {};
+                if (entry.q?.trim()) limpio.q = entry.q.trim();
+                if (entry.a?.trim()) limpio.a = entry.a.trim();
+                if (Array.isArray(entry.w) && entry.w.some(x => x?.trim())) limpio.w = entry.w.map(x => (x || '').trim());
+                if (entry.b0?.trim()) limpio.b0 = entry.b0.trim();
+                if (entry.b2?.trim()) limpio.b2 = entry.b2.trim();
+                if (!Object.keys(limpio).length) continue;
+                ops.push(
+                    updateDoc(doc(db, 'trivial_recursos', recursoId, 'preguntas', p.id), { [`traducciones.${tradIdioma}`]: limpio })
+                );
+            }
+            await Promise.all(ops);
+            // Registrar el idioma como disponible en el recurso.
+            const nuevosIdiomas = Array.from(new Set([...idiomasTrad, tradIdioma]));
+            await updateDoc(doc(db, 'trivial_recursos', recursoId), {
+                idiomasTraducidos: nuevosIdiomas,
+                fechaModificacion: serverTimestamp(),
+            });
+            setIdiomasTrad(nuevosIdiomas);
+            // Reflejar en el estado local para no perder lo guardado al reabrir.
+            setPreguntas(prev => {
+                const next = { ...prev };
+                for (const cat of CAT_IDS) {
+                    next[cat] = (prev[cat] || []).map(p => {
+                        const entry = tradBorrador[p.id];
+                        if (!entry) return p;
+                        const limpio = {};
+                        if (entry.q?.trim()) limpio.q = entry.q.trim();
+                        if (entry.a?.trim()) limpio.a = entry.a.trim();
+                        if (Array.isArray(entry.w) && entry.w.some(x => x?.trim())) limpio.w = entry.w.map(x => (x || '').trim());
+                        if (entry.b0?.trim()) limpio.b0 = entry.b0.trim();
+                        if (entry.b2?.trim()) limpio.b2 = entry.b2.trim();
+                        if (!Object.keys(limpio).length) return p;
+                        return { ...p, traducciones: { ...(p.traducciones || {}), [tradIdioma]: limpio } };
+                    });
+                }
+                return next;
+            });
+            setTradGuardado(true);
+            setTimeout(() => setTradGuardado(false), 2500);
+        } catch (e) {
+            console.error(e);
+            setTradError('Error al guardar las traducciones.');
+        }
+        setTradGuardando(false);
+    };
+
     // ── Derived ────────────────────────────────────────────────────────────────
     const catData       = categorias[tabActiva];
     const catHex        = CAT_HEX[tabActiva];
@@ -1028,6 +1207,94 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
             </div>
         )}
 
+            {/* ─── TRANSLATE MODAL ─── */}
+            {tradPanel && (() => {
+                const pregs = todasLasPreguntas();
+                const totalTraducidas = pregs.filter(p => tradBorrador[p.id] && Object.keys(tradBorrador[p.id]).length).length;
+                return (
+                    <div style={{ position: 'fixed', inset: 0, zIndex: 4000, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+                        onClick={e => { if (e.target === e.currentTarget && !traduciendo && !tradGuardando) setTradPanel(false); }}>
+                        <div style={{ background: '#1e293b', borderRadius: 20, width: '100%', maxWidth: 720, maxHeight: '92vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 80px rgba(0,0,0,0.8)', overflow: 'hidden' }}>
+                            {/* Header */}
+                            <div style={{ background: '#0f172a', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid #334155', flexShrink: 0 }}>
+                                <span style={{ fontSize: '1.2rem' }}>🌐</span>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ color: '#f1f5f9', fontWeight: 700, fontSize: '0.95rem' }}>Traducir preguntas</div>
+                                    <div style={{ color: '#64748b', fontSize: '0.72rem' }}>Traduce con IA y revisa antes de guardar</div>
+                                </div>
+                                <button onClick={() => !traduciendo && !tradGuardando && setTradPanel(false)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1.2rem', padding: '2px 6px', lineHeight: 1 }}>✕</button>
+                            </div>
+
+                            {/* Language tabs */}
+                            <div style={{ display: 'flex', gap: 6, padding: '12px 20px', borderBottom: '1px solid #334155', flexShrink: 0, flexWrap: 'wrap' }}>
+                                {IDIOMAS_TRAD.map(([cod, info]) => {
+                                    const activo = cod === tradIdioma;
+                                    const yaGuardado = idiomasTrad.includes(cod);
+                                    return (
+                                        <button key={cod} onClick={() => cambiarTradIdioma(cod)} disabled={traduciendo}
+                                            style={{ background: activo ? '#a855f7' : '#0f172a', border: `1px solid ${activo ? '#a855f7' : '#334155'}`, color: activo ? 'white' : '#94a3b8', padding: '6px 14px', borderRadius: 20, cursor: traduciendo ? 'default' : 'pointer', fontSize: '0.82rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            {info.bandera} {info.etiqueta}{yaGuardado && <span title="Guardado" style={{ color: activo ? 'white' : '#4ade80' }}>✓</span>}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Actions */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 20px', borderBottom: '1px solid #334155', flexShrink: 0 }}>
+                                <button onClick={traducirTodas} disabled={traduciendo || tradGuardando}
+                                    style={{ background: '#7c3aed', border: 'none', color: 'white', padding: '9px 16px', borderRadius: 8, cursor: traduciendo ? 'default' : 'pointer', fontSize: '0.85rem', fontWeight: 700, opacity: traduciendo ? 0.7 : 1 }}>
+                                    {traduciendo ? (tradProgreso || 'Traduciendo…') : `✨ Traducir ${pregs.length} preguntas con IA`}
+                                </button>
+                                <span style={{ color: '#64748b', fontSize: '0.78rem', marginLeft: 'auto' }}>{totalTraducidas}/{pregs.length} con traducción</span>
+                            </div>
+
+                            {tradError && <div style={{ background: '#7f1d1d', color: '#fca5a5', padding: '8px 20px', fontSize: '0.82rem', flexShrink: 0 }}>⚠ {tradError}</div>}
+
+                            {/* Review list */}
+                            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                                {pregs.length === 0 && <div style={{ color: '#64748b', textAlign: 'center', padding: 30 }}>Este recurso aún no tiene preguntas.</div>}
+                                {pregs.map(p => {
+                                    const campos = camposTraducibles(p);
+                                    if (!campos.length) return null;
+                                    const entry = tradBorrador[p.id] || {};
+                                    const hex = CAT_HEX[p.categoria] || '#64748b';
+                                    return (
+                                        <div key={p.id} style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 12, padding: '12px 14px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                                                <span style={{ background: hex + '22', color: hex, border: `1px solid ${hex}55`, borderRadius: 6, padding: '1px 8px', fontSize: '0.7rem', fontWeight: 700 }}>{categorias[p.categoria]?.nombre || p.categoria}</span>
+                                                <span style={{ color: '#475569', fontSize: '0.7rem' }}>{p.tipo || 'SELECCION'}</span>
+                                            </div>
+                                            {campos.map(([campo, orig]) => {
+                                                const val = campo.startsWith('w') ? (entry.w?.[Number(campo.slice(1))] ?? '') : (entry[campo] ?? '');
+                                                const etiqueta = campo === 'q' ? 'Enunciado' : campo === 'a' ? 'Respuesta' : campo.startsWith('w') ? `Opción ${Number(campo.slice(1)) + 1}` : campo === 'b0' ? 'Texto antes' : 'Texto después';
+                                                return (
+                                                    <div key={campo} style={{ marginBottom: 8 }}>
+                                                        <div style={{ color: '#64748b', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>{etiqueta}</div>
+                                                        <div style={{ color: '#94a3b8', fontSize: '0.82rem', marginBottom: 4, lineHeight: 1.3 }}>{orig}</div>
+                                                        <input value={val} onChange={e => editarTrad(p.id, campo, e.target.value)}
+                                                            placeholder="(sin traducir)"
+                                                            style={{ width: '100%', boxSizing: 'border-box', background: '#1e293b', border: `1px solid ${val ? '#a855f7' : '#334155'}`, borderRadius: 8, color: '#e2e8f0', padding: '8px 10px', fontSize: '0.86rem', outline: 'none' }} />
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Footer */}
+                            <div style={{ padding: '14px 20px', borderTop: '1px solid #334155', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+                                {tradGuardado && <span style={{ color: '#4ade80', fontSize: '0.85rem', fontWeight: 700 }}>✓ Guardado</span>}
+                                <button onClick={guardarTraducciones} disabled={tradGuardando || traduciendo || totalTraducidas === 0}
+                                    style={{ marginLeft: 'auto', background: '#16a34a', border: 'none', color: 'white', padding: '10px 22px', borderRadius: 8, cursor: (tradGuardando || totalTraducidas === 0) ? 'default' : 'pointer', fontSize: '0.9rem', fontWeight: 700, opacity: (tradGuardando || totalTraducidas === 0) ? 0.6 : 1 }}>
+                                    {tradGuardando ? 'Guardando…' : '💾 Guardar traducción'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
+
             {/* ─── HEADER ─── */}
             <div style={{ background: '#1e293b', borderBottom: '1px solid #334155', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
                 <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1.3rem', padding: '2px 8px', lineHeight: 1, borderRadius: 6 }}>←</button>
@@ -1052,6 +1319,11 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                     <button onClick={() => setPanelColab(p => !p)} style={{ background: panelColab ? '#1e3a8a' : '#1e293b', border: '1px solid #3b82f6', color: '#60a5fa', padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
                         👥 Colaborar
                     </button>
+                    {esCreador && (
+                        <button onClick={abrirTradPanel} style={{ background: '#1e293b', border: '1px solid #a855f7', color: '#c084fc', padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
+                            🌐 Traducir
+                        </button>
+                    )}
                     {esCreador && (
                         <button onClick={guardarRecurso} disabled={guardando} style={{ background: '#1d4ed8', border: 'none', color: 'white', padding: '8px 18px', borderRadius: 8, cursor: guardando ? 'default' : 'pointer', fontSize: '0.9rem', fontWeight: 700, opacity: guardando ? 0.7 : 1 }}>
                             {guardando ? '…' : esNuevo ? '✓ Crear' : '✓ Guardar'}

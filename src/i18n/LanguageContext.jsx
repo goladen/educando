@@ -14,6 +14,8 @@
 // Gemini (por lotes) y se cachea en memoria + localStorage para no repetirla.
 import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import { IDIOMA_ORIGEN, IDIOMAS, traducirLote } from './translateGemini.js';
+import { STATIC_TRANSLATIONS } from './staticTranslations.js';
+import { STATIC_TRANSLATIONS_GAMES } from './staticTranslations.games.js';
 
 const LS_IDIOMA = 'pikt_idioma';
 const LS_CACHE = 'pikt_i18n_cache_v2';
@@ -77,12 +79,37 @@ export function LanguageProvider({ children }) {
         timer.current = setTimeout(flush, 250); // agrupa los textos de un render
     }, [flush]);
 
+    // Precarga traducciones ya revisadas (p.ej. las que el profe guardó en
+    // Firebase para un recurso). Así t() las devuelve al instante y sin Gemini.
+    // pares: { 'texto original': 'traducción', ... }
+    const primeCache = useCallback((lang, pares) => {
+        if (!lang || lang === IDIOMA_ORIGEN || !pares) return;
+        setCache((prev) => {
+            const siguiente = { ...prev };
+            let cambio = false;
+            for (const [orig, trad] of Object.entries(pares)) {
+                if (typeof orig !== 'string' || typeof trad !== 'string' || !orig.trim() || !trad.trim()) continue;
+                const key = `${lang}:${orig}`;
+                if (siguiente[key] !== trad) { siguiente[key] = trad; cambio = true; }
+            }
+            if (!cambio) return prev;
+            try { localStorage.setItem(LS_CACHE, JSON.stringify(siguiente)); } catch { /* cuota llena */ }
+            return siguiente;
+        });
+    }, []);
+
     // t(texto): devuelve la traducción si existe; si no, encola y devuelve el
     // original como fallback mientras llega.
     const t = useCallback((texto) => {
         if (idioma === IDIOMA_ORIGEN || typeof texto !== 'string' || !texto.trim()) return texto;
+        // 1) Diccionarios fijos (UI/config + textos largos de juegos): gratis,
+        //    instantáneo, sin Gemini.
+        const fijo = STATIC_TRANSLATIONS[idioma]?.[texto] ?? STATIC_TRANSLATIONS_GAMES[idioma]?.[texto];
+        if (fijo !== undefined) return fijo;
+        // 2) Caché de traducciones dinámicas ya resueltas.
         const key = `${idioma}:${texto}`;
         if (key in cache) return cache[key];
+        // 3) Contenido dinámico nuevo → traducir con Gemini (una vez por navegador).
         encolar(texto);
         return texto;
     }, [idioma, cache, encolar]);
@@ -90,7 +117,7 @@ export function LanguageProvider({ children }) {
     useEffect(() => () => clearTimeout(timer.current), []);
 
     return (
-        <LanguageContext.Provider value={{ idioma, setIdioma, t, idiomas: IDIOMAS }}>
+        <LanguageContext.Provider value={{ idioma, setIdioma, t, primeCache, idiomas: IDIOMAS }}>
             {children}
         </LanguageContext.Provider>
     );

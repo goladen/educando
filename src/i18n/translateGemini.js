@@ -40,7 +40,7 @@ Rules:
 
 ${JSON.stringify(entrada)}`;
 
-    const MODELOS = ['gemini-2.0-flash', 'gemini-2.5-flash'];
+    const MODELOS = ['gemini-2.5-flash', 'gemini-2.0-flash'];
     let ultimoError = null;
 
     for (const model of MODELOS) {

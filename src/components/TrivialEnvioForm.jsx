@@ -33,7 +33,7 @@ const IDIOMAS = [
 ];
 
 function emptyQ() {
-    return { tipo: 'SELECCION', q: '', a: '', w: ['', '', ''], bloques: ['', '', ''], alternativas: [], lectura: '', lecturaIdioma: 'es-ES', cat: '' };
+    return { tipo: 'SELECCION', q: '', a: '', w: ['', '', ''], bloques: ['', '', ''], alternativas: [], lectura: '', lecturaIdioma: 'es-ES', cat: '', dificultad: 'normal' };
 }
 
 export default function TrivialEnvioForm({ codigoInicial, onBack }) {
@@ -192,6 +192,7 @@ export default function TrivialEnvioForm({ codigoInicial, onBack }) {
                 const base = {
                     tipo: p.tipo,
                     categoria: p.cat,
+                    dificultad: p.dificultad || 'normal',
                     enviadoPor: { nombre: nombre.trim(), curso: curso.trim() },
                     fechaCreacion: serverTimestamp(),
                     estado: 'PENDIENTE',
@@ -423,6 +424,17 @@ export default function TrivialEnvioForm({ codigoInicial, onBack }) {
                                 {preguntas.length > 1 && (
                                     <button onClick={() => removeQ(idx)} style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#ef4444', borderRadius: 7, padding: '5px 10px', cursor: 'pointer', fontSize: '0.8rem', flexShrink: 0 }}>✕</button>
                                 )}
+                            </div>
+
+                            {/* Difficulty */}
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 14 }}>
+                                <span style={{ ...lbl, marginBottom: 0, flexShrink: 0 }}>Dificultad:</span>
+                                {['normal', 'dificil'].map(niv => (
+                                    <button key={niv} type="button" onClick={() => updateQ(idx, 'dificultad', niv)}
+                                        style={{ background: (p.dificultad || 'normal') === niv ? (niv === 'dificil' ? '#ffedd5' : '#dcfce7') : 'white', border: `1.5px solid ${(p.dificultad || 'normal') === niv ? (niv === 'dificil' ? '#f97316' : '#22c55e') : '#e2e8f0'}`, color: (p.dificultad || 'normal') === niv ? (niv === 'dificil' ? '#c2410c' : '#15803d') : '#94a3b8', borderRadius: 8, padding: '5px 12px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}>
+                                        {niv === 'dificil' ? '🔥 Difícil' : '🟢 Normal'}
+                                    </button>
+                                ))}
                             </div>
 
                             {/* ── SELECCION ── */}

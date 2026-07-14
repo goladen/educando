@@ -97,6 +97,7 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
     const [formAlternativas,   setFormAlternativas] = useState([]);
     const [formLectura,        setFormLectura]      = useState('');
     const [formLecturaIdioma,  setFormLecturaIdioma]= useState('es-ES');
+    const [formDificultad,     setFormDificultad]   = useState('normal'); // 'normal' | 'dificil'
     const [guardandoPregunta,  setGuardandoPregunta]= useState(false);
     const [errorForm,          setErrorForm]        = useState('');
 
@@ -156,7 +157,7 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
         // Clear question form when switching tabs
         setFormAbierto(false);
         setFormTipo('SELECCION'); setFormQ(''); setFormA(''); setFormW(['', '', '']); setFormBloques(['', '']); setFormAlternativas([]);
-        setFormLectura(''); setFormLecturaIdioma('es-ES'); setErrorForm('');
+        setFormLectura(''); setFormLecturaIdioma('es-ES'); setFormDificultad('normal'); setErrorForm('');
     }, [recursoId, tabActiva]);
 
     useEffect(() => {
@@ -389,7 +390,7 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
         if (!recursoId) { setErrorGuardar('Guarda el recurso primero (botón "Crear" arriba).'); return; }
 
         const lecturaData = formLectura.trim() ? { lectura: formLectura.trim(), lecturaIdioma: formLecturaIdioma } : {};
-        let data = { categoria: tabActiva, tipo: formTipo, autorUid: usuario.uid, autorNombre: usuario.displayName || usuario.email, fechaCreacion: serverTimestamp(), orden: Date.now(), ...lecturaData };
+        let data = { categoria: tabActiva, tipo: formTipo, dificultad: formDificultad, autorUid: usuario.uid, autorNombre: usuario.displayName || usuario.email, fechaCreacion: serverTimestamp(), orden: Date.now(), ...lecturaData };
 
         if (formTipo === 'SELECCION') {
             if (!formQ.trim()) { setErrorForm('Escribe la pregunta.'); return; }
@@ -419,7 +420,7 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
             const ref = await addDoc(collection(db, 'trivial_recursos', recursoId, 'preguntas'), data);
             setPreguntas(prev => ({ ...prev, [tabActiva]: [...prev[tabActiva], { id: ref.id, ...data }] }));
             setFormQ(''); setFormA(''); setFormW(['', '', '']); setFormBloques(['', '']); setFormAlternativas([]);
-            setFormLectura(''); setFormLecturaIdioma('es-ES'); setFormAbierto(false);
+            setFormLectura(''); setFormLecturaIdioma('es-ES'); setFormDificultad('normal'); setFormAbierto(false);
         } catch (e) { console.error(e); setErrorForm('Error al guardar la pregunta.'); }
         setGuardandoPregunta(false);
     };
@@ -458,7 +459,7 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
         setEditandoPregId(p.id);
         const bloques = [...(p.bloques || ['', ''])];
         while (bloques.length < 3) bloques.push('');
-        setEditForm({ tipo: p.tipo || 'SELECCION', q: p.q || '', a: p.a || '', w: [...(p.w || ['', '', ''])], bloques, alternativas: [...(p.alternativas || [])], autorNombre: p.autorNombre || '', lectura: p.lectura || '', lecturaIdioma: p.lecturaIdioma || 'es-ES' });
+        setEditForm({ tipo: p.tipo || 'SELECCION', q: p.q || '', a: p.a || '', w: [...(p.w || ['', '', ''])], bloques, alternativas: [...(p.alternativas || [])], autorNombre: p.autorNombre || '', lectura: p.lectura || '', lecturaIdioma: p.lecturaIdioma || 'es-ES', dificultad: p.dificultad || 'normal' });
     };
 
     const guardarEdicion = async () => {
@@ -467,7 +468,7 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
             const lecturaUpd = editForm.lectura.trim()
                 ? { lectura: editForm.lectura.trim(), lecturaIdioma: editForm.lecturaIdioma }
                 : { lectura: '', lecturaIdioma: editForm.lecturaIdioma };
-            let upd = { tipo: editForm.tipo, autorNombre: editForm.autorNombre.trim(), ...lecturaUpd };
+            let upd = { tipo: editForm.tipo, dificultad: editForm.dificultad || 'normal', autorNombre: editForm.autorNombre.trim(), ...lecturaUpd };
             if (editForm.tipo === 'SELECCION') {
                 upd = { ...upd, q: editForm.q.trim(), a: editForm.a.trim(), w: editForm.w.map(s => s.trim()) };
             } else if (editForm.tipo === 'CORTA') {
@@ -546,7 +547,7 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
             const autorNombre = pend.enviadoPor.nombre + (pend.enviadoPor.curso ? ` (${pend.enviadoPor.curso})` : '');
             const tipo = pend.tipo || 'SELECCION';
             const lecturaData = pend.lectura ? { lectura: pend.lectura, lecturaIdioma: pend.lecturaIdioma || 'es-ES' } : {};
-            const base = { tipo, categoria: pend.categoria, autorUid: 'externo', autorNombre, fechaCreacion: serverTimestamp(), orden: Date.now(), ...lecturaData };
+            const base = { tipo, categoria: pend.categoria, dificultad: pend.dificultad || 'normal', autorUid: 'externo', autorNombre, fechaCreacion: serverTimestamp(), orden: Date.now(), ...lecturaData };
             let data = base;
             if (tipo === 'SELECCION') data = { ...base, q: pend.q, a: pend.a, w: pend.w };
             else if (tipo === 'CORTA') data = { ...base, q: pend.q, a: pend.a, ...(pend.alternativas?.length ? { alternativas: pend.alternativas } : {}) };
@@ -582,6 +583,14 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
         }));
         // Persistir por si el profesor recarga antes de aceptar
         updateDoc(doc(db, 'trivial_recursos', recursoId, 'preguntas_pendientes', pend.id), { categoria: nuevaCat }).catch(e => console.error(e));
+    };
+
+    const cambiarDificultadPendiente = (pend, nuevaDif) => {
+        setPendientes(prev => ({
+            ...prev,
+            [pend.categoria]: (prev[pend.categoria] || []).map(p => p.id === pend.id ? { ...p, dificultad: nuevaDif } : p),
+        }));
+        updateDoc(doc(db, 'trivial_recursos', recursoId, 'preguntas_pendientes', pend.id), { dificultad: nuevaDif }).catch(e => console.error(e));
     };
 
     // ── Collaboration ──────────────────────────────────────────────────────────
@@ -1139,6 +1148,15 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                                                         <option key={id} value={id}>{categorias[id].emoji} {categorias[id].nombre}</option>
                                                     ))}
                                                 </select>
+                                                <div style={{ marginTop: 6 }}>
+                                                    <button
+                                                        onClick={() => cambiarDificultadPendiente(pend, pend.dificultad === 'dificil' ? 'normal' : 'dificil')}
+                                                        title="Cambiar dificultad"
+                                                        style={{ background: pend.dificultad === 'dificil' ? '#7c2d12' : '#0f172a', border: `1px solid ${pend.dificultad === 'dificil' ? '#f97316' : '#334155'}`, color: pend.dificultad === 'dificil' ? '#fdba74' : '#94a3b8', borderRadius: 7, padding: '4px 8px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
+                                                    >
+                                                        {pend.dificultad === 'dificil' ? '🔥 Difícil' : '🟢 Normal'}
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
@@ -1188,6 +1206,17 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                                             <option value="RELLENAR">📝 Rellenar el hueco</option>
                                             <option value="ORDENAR">🔢 Ordenar elementos</option>
                                         </select>
+                                    </div>
+
+                                    {/* Dificultad */}
+                                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                        <span style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>Dificultad:</span>
+                                        {['normal', 'dificil'].map(niv => (
+                                            <button key={niv} type="button" onClick={() => setFormDificultad(niv)}
+                                                style={{ flex: 1, background: formDificultad === niv ? (niv === 'dificil' ? '#7c2d12' : '#14532d') : '#0f172a', border: `1px solid ${formDificultad === niv ? (niv === 'dificil' ? '#f97316' : '#22c55e') : '#334155'}`, color: formDificultad === niv ? (niv === 'dificil' ? '#fdba74' : '#86efac') : '#94a3b8', borderRadius: 8, padding: '7px 10px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}>
+                                                {niv === 'dificil' ? '🔥 Difícil' : '🟢 Normal'}
+                                            </button>
+                                        ))}
                                     </div>
 
                                     {/* Campos comunes: pregunta principal */}
@@ -1260,7 +1289,7 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
 
                                     {errorForm && <div style={{ color: '#fca5a5', fontSize: '0.82rem' }}>⚠ {errorForm}</div>}
                                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                                        <button onClick={() => { setFormAbierto(false); setFormQ(''); setFormA(''); setFormW(['', '', '']); setFormBloques(['', '']); setFormAlternativas([]); setErrorForm(''); }} style={{ background: '#334155', border: 'none', color: '#94a3b8', padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontSize: '0.85rem' }}>Cancelar</button>
+                                        <button onClick={() => { setFormAbierto(false); setFormQ(''); setFormA(''); setFormW(['', '', '']); setFormBloques(['', '']); setFormAlternativas([]); setFormDificultad('normal'); setErrorForm(''); }} style={{ background: '#334155', border: 'none', color: '#94a3b8', padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontSize: '0.85rem' }}>Cancelar</button>
                                         <button onClick={agregarPregunta} disabled={guardandoPregunta} style={{ background: catHex, border: 'none', color: 'white', padding: '8px 22px', borderRadius: 8, cursor: guardandoPregunta ? 'default' : 'pointer', fontWeight: 700, fontSize: '0.88rem', opacity: guardandoPregunta ? 0.6 : 1 }}>
                                             {guardandoPregunta ? 'Guardando…' : '✓ Añadir pregunta'}
                                         </button>
@@ -1306,6 +1335,15 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                                                 <option value="RELLENAR">📝 Rellenar el hueco</option>
                                                 <option value="ORDENAR">🔢 Ordenar elementos</option>
                                             </select>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                            <span style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase' }}>Dificultad:</span>
+                                            {['normal', 'dificil'].map(niv => (
+                                                <button key={niv} type="button" onClick={() => setEditForm(f => ({ ...f, dificultad: niv }))}
+                                                    style={{ background: (editForm.dificultad || 'normal') === niv ? (niv === 'dificil' ? '#7c2d12' : '#14532d') : '#0f172a', border: `1px solid ${(editForm.dificultad || 'normal') === niv ? (niv === 'dificil' ? '#f97316' : '#22c55e') : '#334155'}`, color: (editForm.dificultad || 'normal') === niv ? (niv === 'dificil' ? '#fdba74' : '#86efac') : '#94a3b8', borderRadius: 7, padding: '5px 10px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}>
+                                                    {niv === 'dificil' ? '🔥 Difícil' : '🟢 Normal'}
+                                                </button>
+                                            ))}
                                         </div>
                                         {(editForm.tipo === 'SELECCION' || editForm.tipo === 'CORTA' || editForm.tipo === 'ORDENAR') && (
                                             <textarea value={editForm.q} onChange={e => setEditForm(f => ({ ...f, q: e.target.value }))} placeholder="Pregunta…" rows={2} style={{ width: '100%', boxSizing: 'border-box', background: '#0f172a', border: '1px solid #334155', borderRadius: 8, color: '#f1f5f9', padding: '9px 13px', fontSize: '0.9rem', resize: 'vertical', fontFamily: 'inherit', outline: 'none' }} />
@@ -1381,6 +1419,7 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                                             <div style={{ color: '#475569', fontSize: '0.72rem', marginBottom: 6, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                                                 <span>{tipoLabel}</span>
                                                 <span>#{idx + 1} · {p.autorNombre}</span>
+                                                {p.dificultad === 'dificil' && <span style={{ color: '#fdba74', fontSize: '0.68rem', background: '#7c2d12', borderRadius: 4, padding: '1px 6px', fontWeight: 700 }}>🔥 DIFÍCIL</span>}
                                                 {p.lectura && <span style={{ color: '#38bdf8', fontSize: '0.68rem', background: '#0c2a4a', borderRadius: 4, padding: '1px 5px' }}>🔊 {({ 'es-ES': 'ES', 'fr-FR': 'FR', 'en-US': 'EN', 'ca-ES': 'CA' }[p.lecturaIdioma] || 'ES')}</span>}
                                             </div>
                                             {/* Pregunta */}

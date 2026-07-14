@@ -414,6 +414,10 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
     const [busqError,       setBusqError]       = useState('');
     const [busqIniciada,    setBusqIniciada]    = useState(false);
     const [linkCopiadoId,   setLinkCopiadoId]   = useState(null);
+    const [dificilPorCat,   setDificilPorCat]   = useState(null); // { geo: n, ... } del recurso seleccionado
+    const [modoDificil,     setModoDificil]     = useState(false);
+    const modoDificilRef = useRef(false);
+    useEffect(() => { modoDificilRef.current = modoDificil; }, [modoDificil]);
     const [recursoIdFB,       setRecursoIdFB]       = useState(null);
     const [categoriasRecurso, setCategoriasRecurso] = useState(null); // categorias del recurso cargado
     const [errorPreguntas,    setErrorPreguntas]    = useState('');
@@ -494,12 +498,29 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
         setCargandoBusq(false);
     };
 
-    const seleccionarRecurso = (recurso) => {
+    const seleccionarRecurso = async (recurso) => {
         setCodigoFirebase(recurso.codigoJuego || '');
         setRecursoIdFB(recurso.id);
         setFuentePreguntas('FIREBASE');
+        setModoDificil(false);
+        setDificilPorCat(null);
         setPantalla('SETUP');
+        // Contar preguntas difíciles por categoría para ofrecer el modo difícil
+        try {
+            const snap = await getDocs(collection(db, 'trivial_recursos', recurso.id, 'preguntas'));
+            const counts = { geo: 0, esp: 0, his: 0, art: 0, cie: 0, dep: 0 };
+            snap.forEach(d => {
+                const q = d.data();
+                if (q.dificultad === 'dificil' && counts[q.categoria] !== undefined) counts[q.categoria]++;
+            });
+            setDificilPorCat(counts);
+        } catch (e) { console.error('Error contando dificultad:', e); }
     };
+
+    const MIN_DIFICIL_POR_CAT = 5;
+    const CAT_IDS_HARD = ['geo', 'esp', 'his', 'art', 'cie', 'dep'];
+    const modoDificilDisponible = fuentePreguntas === 'FIREBASE' && dificilPorCat
+        && CAT_IDS_HARD.every(c => (dificilPorCat[c] || 0) >= MIN_DIFICIL_POR_CAT);
 
     // ─── ENLACE DIRECTO: cargar recurso por ID y saltar a configuración ───
     useEffect(() => {
@@ -1031,7 +1052,11 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
         const isFinal = isCenter && p.wedges.length === 6;
         
         let qCat = isCenter ? COLORS[Math.floor(Math.random() * COLORS.length)].id : catId;
-        const qList = preguntasRef.current[qCat] || preguntasRef.current['geo'] || PREGUNTAS['geo'];
+        let qList = preguntasRef.current[qCat] || preguntasRef.current['geo'] || PREGUNTAS['geo'];
+        if (modoDificilRef.current) {
+            const hard = qList.filter(q => q.dificultad === 'dificil');
+            if (hard.length) qList = hard;
+        }
         const qData = qList[Math.floor(Math.random() * qList.length)];
         const tipo = qData.tipo || 'SELECCION';
 
@@ -1211,7 +1236,7 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
 
                     {/* Opción 1: Preguntas integradas */}
                     <div
-                        onClick={() => { setFuentePreguntas('JSON'); setPantalla('SETUP'); }}
+                        onClick={() => { setFuentePreguntas('JSON'); setModoDificil(false); setDificilPorCat(null); setPantalla('SETUP'); }}
                         style={{ flex: 1, minWidth: isMobile ? '100%' : 280, background: 'rgba(30,41,59,0.9)', border: '2px solid #334155', borderRadius: 20, padding: isMobile ? '24px 20px' : 36, cursor: 'pointer', textAlign: 'center', transition: 'border-color 0.2s, transform 0.2s', position: 'relative', overflow: 'hidden' }}
                         onMouseEnter={e => { e.currentTarget.style.borderColor = '#38bdf8'; e.currentTarget.style.transform = 'translateY(-4px)'; }}
                         onMouseLeave={e => { e.currentTarget.style.borderColor = '#334155'; e.currentTarget.style.transform = 'translateY(0)'; }}
@@ -1237,7 +1262,7 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
 
                     {/* Opción 2: Trivial Primaria */}
                     <div
-                        onClick={() => { setFuentePreguntas('JSON_PRIMARIA'); setPantalla('SETUP'); }}
+                        onClick={() => { setFuentePreguntas('JSON_PRIMARIA'); setModoDificil(false); setDificilPorCat(null); setPantalla('SETUP'); }}
                         style={{ flex: 1, minWidth: isMobile ? '100%' : 280, background: 'rgba(30,41,59,0.9)', border: '2px solid #334155', borderRadius: 20, padding: isMobile ? '24px 20px' : 36, cursor: 'pointer', textAlign: 'center', transition: 'border-color 0.2s, transform 0.2s', position: 'relative', overflow: 'hidden' }}
                         onMouseEnter={e => { e.currentTarget.style.borderColor = '#34d399'; e.currentTarget.style.transform = 'translateY(-4px)'; }}
                         onMouseLeave={e => { e.currentTarget.style.borderColor = '#334155'; e.currentTarget.style.transform = 'translateY(0)'; }}
@@ -1260,7 +1285,7 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
 
                     {/* Opción 3: Super Trivial */}
                     <div
-                        onClick={() => { setFuentePreguntas('JSON_SUPER'); setPantalla('SETUP'); }}
+                        onClick={() => { setFuentePreguntas('JSON_SUPER'); setModoDificil(false); setDificilPorCat(null); setPantalla('SETUP'); }}
                         style={{ flex: 1, minWidth: isMobile ? '100%' : 280, background: 'rgba(30,41,59,0.9)', border: '2px solid #334155', borderRadius: 20, padding: isMobile ? '24px 20px' : 36, cursor: 'pointer', textAlign: 'center', transition: 'border-color 0.2s, transform 0.2s', position: 'relative', overflow: 'hidden' }}
                         onMouseEnter={e => { e.currentTarget.style.borderColor = '#f59e0b'; e.currentTarget.style.transform = 'translateY(-4px)'; }}
                         onMouseLeave={e => { e.currentTarget.style.borderColor = '#334155'; e.currentTarget.style.transform = 'translateY(0)'; }}
@@ -1687,6 +1712,24 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                             {[40, 60, 90, 120, 180].map(s => <option key={s} value={s}>{s} segundos</option>)}
                         </select>
                     </div>
+
+                    {/* Modo difícil (solo si hay ≥5 preguntas difíciles en cada categoría) */}
+                    {modoDificilDisponible && (
+                        <button
+                            type="button"
+                            onClick={() => setModoDificil(m => !m)}
+                            style={{ width: '100%', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12, background: modoDificil ? 'linear-gradient(135deg, #7c2d12, #9a3412)' : '#0f172a', border: `2px solid ${modoDificil ? '#f97316' : '#334155'}`, borderRadius: 12, padding: '12px 16px', cursor: 'pointer', textAlign: 'left', transition: '0.15s' }}
+                        >
+                            <span style={{ fontSize: '1.6rem' }}>🔥</span>
+                            <div style={{ flex: 1 }}>
+                                <div style={{ color: modoDificil ? '#fdba74' : '#e2e8f0', fontWeight: 800, fontSize: '0.95rem' }}>Modo difícil</div>
+                                <div style={{ color: modoDificil ? '#fed7aa' : '#64748b', fontSize: '0.78rem' }}>Solo preguntas marcadas como difíciles</div>
+                            </div>
+                            <div style={{ width: 46, height: 26, borderRadius: 20, background: modoDificil ? '#f97316' : '#334155', position: 'relative', transition: '0.15s', flexShrink: 0 }}>
+                                <div style={{ position: 'absolute', top: 3, left: modoDificil ? 23 : 3, width: 20, height: 20, borderRadius: '50%', background: 'white', transition: 'left 0.15s' }} />
+                            </div>
+                        </button>
+                    )}
 
                     {/* Info sobre la fuente de preguntas (read-only) */}
                     <div style={{ marginBottom: 20, background: '#0f172a', borderRadius: 12, padding: '12px 16px', border: '1px solid #334155', display: 'flex', alignItems: 'center', gap: 10 }}>

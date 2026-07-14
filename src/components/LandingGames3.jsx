@@ -5,6 +5,8 @@ import { Search, Key, Filter, Zap, Play, Home, ChevronDown, ChevronUp, Mail, Lin
 import GamePlayer from '../GamePlayer';
 import MisRegistros from './MisRegistros';
 import { getResumenRegistros } from '../utils/registrosLocales';
+import { useT } from '../i18n/LanguageContext';
+import LanguageSelector from '../i18n/LanguageSelector';
 import KartingTrack from '../KartingTrack';
 import KartingedMultiGame from '../KartingedMultiGame';
 import RacingGame3D from '../RacingGame3D';
@@ -1341,6 +1343,7 @@ function ShareModal({ url, titulo, onClose }) {
 }
 
 export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usuario = null }) {
+    const t = useT();
     // --- AÑADE ESTA LÍNEA AQUÍ ---
     const [zonaActiva, setZonaActiva] = useState('MAIN');
     // Página de juego (SpecificGamePage) para usuarios con sesión: el alumno
@@ -2679,7 +2682,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                     border:'1px solid rgba(255,255,255,0.25)', borderRadius:14, color:'white',
                     fontWeight:700, fontSize:'0.88rem', cursor:'pointer'
                 }}>
-                    📋 Mis registros
+                    📋 {t('Mis registros')}
                     <span style={{ background:'#f1c40f', color:'#1e272e', borderRadius:20, padding:'1px 9px', fontSize:'0.78rem', fontWeight:800 }}>{totalRegistros}</span>
                 </button>
             )}
@@ -2707,6 +2710,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                 <div style={{ display:'flex', alignItems:'center', gap:10, background:'rgba(255,255,255,0.15)', backdropFilter:'blur(8px)', borderRadius:14, padding:'8px 16px', marginBottom:16, flexWrap:'wrap', position:'relative' }}>
                     {usuario.photoURL && <img src={usuario.photoURL} alt="avatar" style={{ width:34, height:34, borderRadius:'50%', border:'2px solid rgba(255,255,255,0.6)' }} />}
                     <span style={{ color:'white', fontWeight:700, fontSize:'0.9rem', flex:1 }}>{usuario.displayName}</span>
+
                     {/* Campana de notificaciones */}
                     <div style={{ position:'relative' }}>
                         <button onClick={() => setShowNotifs(v => !v)}
@@ -2722,10 +2726,10 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                         {showNotifs && (
                             <div style={{ position:'absolute', top:'calc(100% + 8px)', right:0, background:'white', borderRadius:14, boxShadow:'0 8px 32px rgba(0,0,0,0.18)', width:320, zIndex:9000, overflow:'hidden', border:'1px solid #e2e8f0' }}>
                                 <div style={{ padding:'12px 16px', borderBottom:'1px solid #f1f5f9', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                                    <span style={{ fontWeight:800, color:'#1e293b', fontSize:'0.9rem' }}>🔔 Notificaciones</span>
+                                    <span style={{ fontWeight:800, color:'#1e293b', fontSize:'0.9rem' }}>🔔 {t('Notificaciones')}</span>
                                     <div style={{ display:'flex', gap:6 }}>
                                         {notifs.length > 0 && (
-                                            <button onClick={marcarTodasLeidas} style={{ background:'none', border:'none', cursor:'pointer', color:'#6c63ff', fontWeight:700, fontSize:'0.75rem' }}>Marcar todas leídas</button>
+                                            <button onClick={marcarTodasLeidas} style={{ background:'none', border:'none', cursor:'pointer', color:'#6c63ff', fontWeight:700, fontSize:'0.75rem' }}>{t('Marcar todas leídas')}</button>
                                         )}
                                         <button onClick={() => setShowNotifs(false)} style={{ background:'none', border:'none', cursor:'pointer', color:'#94a3b8', fontSize:'1rem', lineHeight:1 }}>✕</button>
                                     </div>
@@ -2782,22 +2786,25 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                             background: tabPrincipal === 'TODAS' ? '#f1c40f' : 'rgba(255,255,255,0.2)',
                             color: tabPrincipal === 'TODAS' ? '#333' : 'white',
                             boxShadow: tabPrincipal === 'TODAS' ? '0 2px 10px rgba(241,196,15,0.5)' : 'none' }}
-                    >🎮 Todas</button>
+                    >🎮 {t('Todas')}</button>
                     <button
                         onClick={() => { setTabPrincipal('MATERIA'); cargarRecursosPorMateria(materiaActiva); if (MATERIA_ROUTE[materiaActiva]) window.history.pushState({}, '', `/${MATERIA_ROUTE[materiaActiva]}`); }}
                         style={{ padding: '10px 18px', borderRadius: 20, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '0.92rem', transition: 'all 0.2s',
                             background: tabPrincipal === 'MATERIA' ? '#f1c40f' : 'rgba(255,255,255,0.2)',
                             color: tabPrincipal === 'MATERIA' ? '#333' : 'white',
                             boxShadow: tabPrincipal === 'MATERIA' ? '0 2px 10px rgba(241,196,15,0.5)' : 'none' }}
-                    >📚 Por Materia</button>
+                    >📚 {t('Por Materia')}</button>
                 </div>
-                <button
-                    onClick={() => setBuscadorVisible(true)}
-                    title="Buscar recurso"
-                    style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.35)', color: 'white', borderRadius: 12, padding: '10px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: '0.9rem', flexShrink: 0 }}
-                >
-                    <Search size={18} /> Buscar
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                    <LanguageSelector compacto />
+                    <button
+                        onClick={() => setBuscadorVisible(true)}
+                        title="Buscar recurso"
+                        style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.35)', color: 'white', borderRadius: 12, padding: '10px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: '0.9rem' }}
+                    >
+                        <Search size={18} /> {t('Buscar')}
+                    </button>
+                </div>
             </div>
 
             {/* ── SELECTOR DUELO DE PIRATAS ── */}

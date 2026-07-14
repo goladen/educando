@@ -2203,7 +2203,7 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
                                     >
                                         <div style={{ fontSize: 44, marginBottom: 10 }}>{sim.emoji}</div>
                                         <h3 style={{ color: sim.color, margin: '0 0 6px', fontSize: '1rem', fontWeight: 800 }}>{sim.label}</h3>
-                                        <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.8rem', margin: 0 }}>{sim.desc}</p>
+                                        <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.8rem', margin: 0 }}>{t(sim.desc)}</p>
                                         <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.7rem', margin: '8px 0 0', fontFamily: 'monospace' }}>pikt.es/fisica/{sim.slug}</p>
                                     </div>
                                 </div>
@@ -2492,7 +2492,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                                 <div style={{ textAlign: 'center', marginBottom: 4 }}>
                                     <div style={{ fontSize: '44px', marginBottom: '8px' }}>🧠</div>
                                     <h3 style={{ margin: '0 0 6px 0', color: app.color, fontSize: '1.3rem' }}>Cálculo</h3>
-                                    <p style={{ margin: 0, color: '#666', fontSize: '0.88rem' }}>{app.desc}</p>
+                                    <p style={{ margin: 0, color: '#666', fontSize: '0.88rem' }}>{t(app.desc)}</p>
                                 </div>
                                 <button
                                     onClick={() => abrirJuego('CALCULO')}
@@ -2536,7 +2536,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                                 )}
                                 <div style={{ fontSize: '50px', marginBottom: '15px', filter: app.comingSoon ? 'grayscale(100%)' : 'none' }}>{app.emoji}</div>
                                 <h3 style={{ margin: '0 0 10px 0', color: app.comingSoon ? '#7f8c8d' : app.color, fontSize: '1.4rem' }}>{app.name}</h3>
-                                <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>{app.desc}</p>
+                                <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>{t(app.desc)}</p>
                                 {app.comingSoon && <span style={{ display: 'inline-block', marginTop: '15px', background: '#e0e0e0', color: '#555', padding: '5px 12px', borderRadius: '15px', fontSize: '0.8rem', fontWeight: 'bold' }}>Próximamente</span>}
                                 {piBadge(app.id, app.name)}
                             </div>
@@ -3099,7 +3099,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                             }
                         </div>
                         <h3 style={{ margin: 0, color: app.color, fontSize: '1.4rem', fontWeight: 'bold' }}>{app.name}</h3>
-                        <p style={{ margin: '10px 0 0 0', fontSize: '0.9rem', color: '#555', lineHeight: '1.3' }}>{app.desc}</p>
+                        <p style={{ margin: '10px 0 0 0', fontSize: '0.9rem', color: '#555', lineHeight: '1.3' }}>{t(app.desc)}</p>
                     </div>
                 ))}
             </div>
@@ -3565,6 +3565,7 @@ const QuestionSenderWrapper = ({ onHome, initialJuegoActivo, usuario = null }) =
 
 // PÁGINA ESPECÍFICA DEL JUEGO
 export const SpecificGamePage = ({ appData, onHome, onLoginRequest, usuario = null }) => {
+    const t = useT();
     const [tab, setTab] = useState(appData.isLive ? 'LIVE' : 'SEARCH');
     const [filtros, setFiltros] = useState({ tema: '', ciclo: '', pais: '', region: '', poblacion: '', autor: '' });
     const [mostrarMasFiltros, setMostrarMasFiltros] = useState(false);
@@ -3904,7 +3905,7 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={usuario} onExit={o
                         <img src={appData.img} alt={appData.name} style={{ width: '100px', borderRadius:'15px' }} onError={(e) => e.target.style.display = 'none'} />
                     </div>
                     <h1 style={{ color: appData.color, margin: '15px 0 5px 0', fontSize: '2.5rem' }}>{appData.name}</h1>
-                    <p style={{ color: appData.color, fontStyle: 'italic', fontSize: '1.1rem', marginBottom: '20px' }}>{appData.desc}</p>
+                    <p style={{ color: appData.color, fontStyle: 'italic', fontSize: '1.1rem', marginBottom: '20px' }}>{t(appData.desc)}</p>
 
                     {/* CONTENEDOR DE BOTONES */}
                     <div style={{ display: 'flex', gap: '15px', justifyContent: 'center', flexWrap: 'wrap' }}>

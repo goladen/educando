@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Dices, Trophy, ArrowLeft, Timer, Users, Play, Maximize2, Minimize2 } from 'lucide-react';
 import { db } from './firebase';
 import { collection, getDocs, query, where, orderBy, limit, doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { useT } from './i18n/LanguageContext';
+import LanguageSelector from './i18n/LanguageSelector';
 import PREGUNTAS_JSON from './preguntas_trivial.json';
 import PREGUNTAS_PRIMARIA from './preguntas_trivial_primaria.json';
 import PREGUNTAS_SUPER from './preguntas_trivial_super.json';
@@ -394,6 +396,7 @@ const GET_PLAYER_POS_STYLE = (index) => {
 
 // ─── 3. COMPONENTE REACT (UI + INTEGRACIÓN CANVAS) ───────────────────────────
 export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
+    const t = useT();
     // ─── RESPONSIVE ───
     const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 640);
     useEffect(() => {
@@ -1229,7 +1232,7 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                 </div>
 
                 <h1 style={{ color: 'white', fontSize: 'clamp(2.5rem, 8vw, 5rem)', margin: 0, fontWeight: 900, letterSpacing: 6, textShadow: '0 0 50px rgba(255,255,255,0.15)' }}>TRIVIAL</h1>
-                <p style={{ color: '#64748b', marginBottom: isMobile ? 24 : 50, fontSize: '1.1rem', letterSpacing: 2 }}>JUEGO DE PREGUNTAS</p>
+                <p style={{ color: '#64748b', marginBottom: isMobile ? 24 : 50, fontSize: '1.1rem', letterSpacing: 2 }}>{t('JUEGO DE PREGUNTAS')}</p>
 
                 {/* Dos opciones */}
                 <div style={{ display: 'flex', gap: isMobile ? 14 : 20, flexWrap: 'wrap', justifyContent: 'center', width: '100%', maxWidth: 820, padding: isMobile ? '0 4px' : 0 }}>
@@ -1246,17 +1249,17 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                             {COLORS.map(c => <div key={c.id} style={{ flex: 1, background: c.hex }} />)}
                         </div>
                         <div style={{ fontSize: '3.5rem', marginBottom: 14 }}>🎮</div>
-                        <h2 style={{ color: 'white', margin: '0 0 10px', fontSize: '1.6rem' }}>Trivial Clásico</h2>
+                        <h2 style={{ color: 'white', margin: '0 0 10px', fontSize: '1.6rem' }}>{t('Trivial Clásico')}</h2>
                         <p style={{ color: '#94a3b8', margin: '0 0 20px', lineHeight: 1.6 }}>
-                            {totalPreguntas} preguntas en las 6 categorías clásicas. Empieza a jugar directamente.
+                            {totalPreguntas} {t('preguntas en las 6 categorías clásicas. Empieza a jugar directamente.')}
                         </p>
                         <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 24 }}>
                             {COLORS.map(c => (
-                                <span key={c.id} style={{ background: c.hex, color: 'white', padding: '4px 12px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 'bold', textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>{c.name}</span>
+                                <span key={c.id} style={{ background: c.hex, color: 'white', padding: '4px 12px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 'bold', textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>{t(c.name)}</span>
                             ))}
                         </div>
                         <button style={{ background: 'linear-gradient(135deg, #38bdf8, #2563eb)', color: 'white', border: 'none', padding: '14px 0', borderRadius: 30, fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', width: '100%', boxShadow: '0 8px 25px rgba(37,99,235,0.4)' }}>
-                            Jugar al clásico →
+                            {t('Jugar al clásico')} →
                         </button>
                     </div>
 
@@ -1269,17 +1272,17 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                     >
                         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 6, background: 'linear-gradient(135deg, #34d399, #059669)' }} />
                         <div style={{ fontSize: '3.5rem', marginBottom: 14 }}>🌟</div>
-                        <h2 style={{ color: 'white', margin: '0 0 10px', fontSize: '1.6rem' }}>Trivial Primaria</h2>
+                        <h2 style={{ color: 'white', margin: '0 0 10px', fontSize: '1.6rem' }}>{t('Trivial Primaria')}</h2>
                         <p style={{ color: '#94a3b8', margin: '0 0 20px', lineHeight: 1.6 }}>
-                            {totalPrimaria} preguntas adaptadas para alumnos de primaria. Categorías más sencillas y amenas.
+                            {totalPrimaria} {t('preguntas adaptadas para alumnos de primaria. Categorías más sencillas y amenas.')}
                         </p>
                         <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 24 }}>
                             {COLORS.map(c => (
-                                <span key={c.id} style={{ background: c.hex, color: 'white', padding: '4px 12px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 'bold', textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>{c.name}</span>
+                                <span key={c.id} style={{ background: c.hex, color: 'white', padding: '4px 12px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 'bold', textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>{t(c.name)}</span>
                             ))}
                         </div>
                         <button style={{ background: 'linear-gradient(135deg, #34d399, #059669)', color: 'white', border: 'none', padding: '14px 0', borderRadius: 30, fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', width: '100%', boxShadow: '0 8px 25px rgba(5,150,105,0.4)' }}>
-                            Jugar a primaria →
+                            {t('Jugar a primaria')} →
                         </button>
                     </div>
 
@@ -1292,17 +1295,17 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                     >
                         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 6, background: 'linear-gradient(135deg, #f59e0b, #d97706)' }} />
                         <div style={{ fontSize: '3.5rem', marginBottom: 14 }}>⚡</div>
-                        <h2 style={{ color: 'white', margin: '0 0 10px', fontSize: '1.6rem' }}>Super Trivial</h2>
+                        <h2 style={{ color: 'white', margin: '0 0 10px', fontSize: '1.6rem' }}>{t('Super Trivial')}</h2>
                         <p style={{ color: '#94a3b8', margin: '0 0 20px', lineHeight: 1.6 }}>
-                            {totalSuper} preguntas con todos los tipos: selección, respuesta corta, rellenar el hueco y ordenar.
+                            {totalSuper} {t('preguntas con todos los tipos: selección, respuesta corta, rellenar el hueco y ordenar.')}
                         </p>
                         <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 24 }}>
-                            {['🔘 Selección', '✏️ Corta', '🔲 Rellenar', '🔀 Ordenar'].map(t => (
-                                <span key={t} style={{ background: 'rgba(245,158,11,0.2)', color: '#fbbf24', border: '1px solid #f59e0b50', padding: '4px 10px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 'bold' }}>{t}</span>
+                            {['🔘 Selección', '✏️ Corta', '🔲 Rellenar', '🔀 Ordenar'].map(lbl => (
+                                <span key={lbl} style={{ background: 'rgba(245,158,11,0.2)', color: '#fbbf24', border: '1px solid #f59e0b50', padding: '4px 10px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 'bold' }}>{t(lbl)}</span>
                             ))}
                         </div>
                         <button style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', border: 'none', padding: '14px 0', borderRadius: 30, fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', width: '100%', boxShadow: '0 8px 25px rgba(245,158,11,0.4)' }}>
-                            Jugar al Super Trivial →
+                            {t('Jugar al Super Trivial')} →
                         </button>
                     </div>
 
@@ -1315,12 +1318,12 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                     >
                         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 6, background: 'linear-gradient(135deg, #a855f7, #7c3aed)' }} />
                         <div style={{ fontSize: '3.5rem', marginBottom: 14 }}>🔍</div>
-                        <h2 style={{ color: 'white', margin: '0 0 10px', fontSize: '1.6rem' }}>Buscar Trivial</h2>
+                        <h2 style={{ color: 'white', margin: '0 0 10px', fontSize: '1.6rem' }}>{t('Buscar Trivial')}</h2>
                         <p style={{ color: '#94a3b8', margin: '0 0 20px', lineHeight: 1.6 }}>
-                            Explora todos los triviales públicos. Filtra por título, autor o ve todos los disponibles.
+                            {t('Explora todos los triviales públicos. Filtra por título, autor o ve todos los disponibles.')}
                         </p>
                         <button style={{ background: 'linear-gradient(135deg, #a855f7, #7c3aed)', color: 'white', border: 'none', padding: '14px 0', borderRadius: 30, fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', width: '100%', boxShadow: '0 8px 25px rgba(168,85,247,0.4)' }}>
-                            Explorar triviales →
+                            {t('Explorar triviales')} →
                         </button>
                     </div>
 
@@ -1328,13 +1331,13 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                     <div style={{ flex: 1, minWidth: isMobile ? '100%' : 280, background: 'rgba(30,41,59,0.9)', border: '2px solid #334155', borderRadius: 20, padding: isMobile ? '24px 20px' : 36, textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
                         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 6, background: 'linear-gradient(135deg, #f59e0b, #d97706)' }} />
                         <div style={{ fontSize: '3.5rem', marginBottom: 14 }}>🔄</div>
-                        <h2 style={{ color: 'white', margin: '0 0 10px', fontSize: '1.6rem' }}>Continuar partida</h2>
+                        <h2 style={{ color: 'white', margin: '0 0 10px', fontSize: '1.6rem' }}>{t('Continuar partida')}</h2>
                         <p style={{ color: '#94a3b8', margin: '0 0 20px', lineHeight: 1.6 }}>
-                            Introduce el código de 6 letras que recibiste al guardar la partida.
+                            {t('Introduce el código de 6 letras que recibiste al guardar la partida.')}
                         </p>
                         <input
                             type="text"
-                            placeholder="CÓDIGO DE PARTIDA"
+                            placeholder={t('CÓDIGO DE PARTIDA')}
                             value={codigoCargar}
                             onChange={e => setCodigoCargar(e.target.value.toUpperCase())}
                             onKeyDown={e => { if (e.key === 'Enter' && codigoCargar.trim().length >= 4) cargarPartida(); }}
@@ -1346,14 +1349,14 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                             disabled={codigoCargar.trim().length < 4 || estadoCarga === 'CARGANDO'}
                             style={{ background: codigoCargar.trim().length >= 4 ? 'linear-gradient(135deg, #f59e0b, #d97706)' : '#1e293b', color: codigoCargar.trim().length >= 4 ? 'white' : '#475569', border: '2px solid', borderColor: codigoCargar.trim().length >= 4 ? 'transparent' : '#334155', padding: '14px 0', borderRadius: 30, fontSize: '1rem', fontWeight: 'bold', cursor: codigoCargar.trim().length >= 4 ? 'pointer' : 'not-allowed', width: '100%', transition: '0.2s', boxShadow: codigoCargar.trim().length >= 4 ? '0 8px 25px rgba(245,158,11,0.4)' : 'none' }}
                         >
-                            {estadoCarga === 'CARGANDO' ? 'Cargando…' : 'Continuar partida →'}
+                            {estadoCarga === 'CARGANDO' ? t('Cargando…') : `${t('Continuar partida')} →`}
                         </button>
                     </div>
                 </div>
 
                 {onExit && (
                     <button onClick={onExit} style={{ marginTop: 40, background: 'transparent', border: 'none', color: '#475569', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <ArrowLeft size={16} /> Volver al menú
+                        <ArrowLeft size={16} /> {t('Volver al menú')}
                     </button>
                 )}
             </div>
@@ -1520,7 +1523,7 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                         onClick={() => setPantalla('SETUP')}
                         style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.9rem', fontWeight: 600 }}
                     >
-                        <ArrowLeft size={16} /> Configuración
+                        <ArrowLeft size={16} /> {t('Configuración')}
                     </button>
                     <div style={{ flex: 1, textAlign: 'center' }}>
                         <span style={{ color: '#f1f5f9', fontWeight: 900, fontSize: '1.2rem', letterSpacing: 2 }}>🎯 TRIVIAL</span>
@@ -1541,18 +1544,18 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                     <div style={{ textAlign: 'center', marginBottom: 48 }}>
                         <div style={{ fontSize: '4rem', marginBottom: 12, filter: 'drop-shadow(0 4px 12px rgba(56,189,248,0.4))' }}>🎯</div>
                         <h1 style={{ color: '#f1f5f9', fontSize: '2.4rem', fontWeight: 900, margin: '0 0 10px', letterSpacing: 1 }}>
-                            ¿Cómo se juega?
+                            {t('¿Cómo se juega?')}
                         </h1>
                         <p style={{ color: '#64748b', fontSize: '1.05rem', margin: 0, maxWidth: 520, marginInline: 'auto' }}>
-                            El clásico juego de conocimiento para {players.length} jugador{players.length !== 1 ? 'es' : ''}.<br />
-                            Reúne los 6 quesitos y demuestra que lo sabes todo.
+                            {t('El clásico juego de conocimiento para')} {players.length} {players.length !== 1 ? t('jugadores') : t('jugador')}.<br />
+                            {t('Reúne los 6 quesitos y demuestra que lo sabes todo.')}
                         </p>
                     </div>
 
                     {/* Pasos */}
                     <div style={{ marginBottom: 52 }}>
                         <h2 style={{ color: '#94a3b8', fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 20 }}>
-                            Cómo jugar
+                            {t('Cómo jugar')}
                         </h2>
                         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
                             {pasos.map(p => (
@@ -1573,8 +1576,8 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                                         flexShrink: 0, boxShadow: '0 4px 12px rgba(29,78,216,0.4)',
                                     }}>{p.n}</div>
                                     <div>
-                                        <div style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.97rem', marginBottom: 4 }}>{p.titulo}</div>
-                                        <div style={{ color: '#64748b', fontSize: '0.85rem', lineHeight: 1.55 }}>{p.texto}</div>
+                                        <div style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.97rem', marginBottom: 4 }}>{t(p.titulo)}</div>
+                                        <div style={{ color: '#64748b', fontSize: '0.85rem', lineHeight: 1.55 }}>{t(p.texto)}</div>
                                     </div>
                                 </div>
                             ))}
@@ -1584,7 +1587,7 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                     {/* Categorías */}
                     <div style={{ marginBottom: 52 }}>
                         <h2 style={{ color: '#94a3b8', fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 20 }}>
-                            Las 6 categorías
+                            {t('Las 6 categorías')}
                         </h2>
                         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10 }}>
                             {cats.map(c => (
@@ -1613,8 +1616,8 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                                             : c.emoji}
                                     </div>
                                     <div>
-                                        <div style={{ color: c.hex, fontWeight: 800, fontSize: isMobile ? '0.88rem' : '1rem', marginBottom: 2 }}>{c.name}</div>
-                                        {!isMobile && <div style={{ color: '#64748b', fontSize: '0.82rem', lineHeight: 1.5 }}>{c.desc}</div>}
+                                        <div style={{ color: c.hex, fontWeight: 800, fontSize: isMobile ? '0.88rem' : '1rem', marginBottom: 2 }}>{t(c.name)}</div>
+                                        {!isMobile && <div style={{ color: '#64748b', fontSize: '0.82rem', lineHeight: 1.5 }}>{t(c.desc)}</div>}
                                     </div>
                                 </div>
                             ))}
@@ -1638,10 +1641,10 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                             { icon: '🎲', texto: 'Turno pasa si fallas' },
                             { icon: '🏆', texto: 'Necesitas los 6 quesitos para ir al centro' },
                             { icon: '🎯', texto: 'Responde bien en el centro para ganar' },
-                        ].map((t, i) => (
+                        ].map((tip, i) => (
                             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#94a3b8', fontSize: '0.9rem' }}>
-                                <span style={{ fontSize: '1.3rem' }}>{t.icon}</span>
-                                {t.texto}
+                                <span style={{ fontSize: '1.3rem' }}>{tip.icon}</span>
+                                {t(tip.texto)}
                             </div>
                         ))}
                     </div>
@@ -1666,10 +1669,10 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                             onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.05)'; e.currentTarget.style.boxShadow = '0 12px 40px rgba(29,78,216,0.65)'; }}
                             onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 8px 32px rgba(29,78,216,0.5)'; }}
                         >
-                            ¡A jugar!
+                            {t('¡A jugar!')}
                         </button>
                         <p style={{ color: '#334155', fontSize: '0.82rem', marginTop: 14 }}>
-                            Jugadores: {players.map(p => p.name).join(', ')}
+                            {t('Jugadores:')} {players.map(p => p.name).join(', ')}
                         </p>
                     </div>
                 </div>
@@ -1682,34 +1685,37 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
             <div style={{ ...st.appContainer, height: 'auto', minHeight: '100dvh', justifyContent: 'center', alignItems: isMobile ? 'flex-start' : 'center', overflow: 'auto', padding: isMobile ? '16px' : 0 }}>
                 <FullscreenBtn />
                 <div style={{ background: 'rgba(30, 41, 59, 0.95)', padding: isMobile ? '20px 16px' : 40, borderRadius: 20, width: '100%', maxWidth: 500, margin: isMobile ? '16px' : 0, boxSizing: 'border-box', boxShadow: '0 25px 50px rgba(0,0,0,0.5)', border: '2px solid #334155' }}>
-                    <button onClick={() => setPantalla('INTRO')} style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 20, fontWeight: 'bold', fontSize: '0.9rem' }}>
-                        <ArrowLeft size={16} /> Volver
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 20 }}>
+                        <button onClick={() => setPantalla('INTRO')} style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 'bold', fontSize: '0.9rem' }}>
+                            <ArrowLeft size={16} /> {t('Volver')}
+                        </button>
+                        <LanguageSelector compacto />
+                    </div>
                     <div style={{ textAlign: 'center', marginBottom: 30 }}>
                         <Users size={60} color="#38bdf8" style={{ marginBottom: 15 }} />
-                        <h1 style={{ color: 'white', margin: 0, fontSize: '2.5rem' }}>Configurar Partida</h1>
-                        <p style={{ color: '#94a3b8' }}>Hasta 6 jugadores en la misma pantalla.</p>
+                        <h1 style={{ color: 'white', margin: 0, fontSize: '2.5rem' }}>{t('Configurar Partida')}</h1>
+                        <p style={{ color: '#94a3b8' }}>{t('Hasta 6 jugadores en la misma pantalla.')}</p>
                     </div>
 
                     <div style={{ marginBottom: 20, textAlign: 'center' }}>
-                        <label style={{ color: 'white', fontWeight: 'bold', marginRight: 15 }}>Número de Jugadores:</label>
+                        <label style={{ color: 'white', fontWeight: 'bold', marginRight: 15 }}>{t('Número de Jugadores:')}</label>
                         <select
                             value={numPlayers}
                             onChange={e => setNumPlayers(Number(e.target.value))}
                             style={{ padding: '10px 20px', borderRadius: 10, fontSize: '1.2rem', background: '#0f172a', color: 'white', border: '2px solid #38bdf8', outline: 'none' }}
                         >
-                            {[1,2,3,4,5,6].map(n => <option key={n} value={n}>{n} Jugadores</option>)}
+                            {[1,2,3,4,5,6].map(n => <option key={n} value={n}>{n} {t('Jugadores')}</option>)}
                         </select>
                     </div>
 
                     <div style={{ marginBottom: 20, textAlign: 'center' }}>
-                        <label style={{ color: 'white', fontWeight: 'bold', marginRight: 15 }}>⏱ Tiempo por pregunta:</label>
+                        <label style={{ color: 'white', fontWeight: 'bold', marginRight: 15 }}>⏱ {t('Tiempo por pregunta:')}</label>
                         <select
                             value={tiempoPregunta}
                             onChange={e => setTiempoPregunta(Number(e.target.value))}
                             style={{ padding: '10px 20px', borderRadius: 10, fontSize: '1.1rem', background: '#0f172a', color: 'white', border: '2px solid #38bdf8', outline: 'none' }}
                         >
-                            {[40, 60, 90, 120, 180].map(s => <option key={s} value={s}>{s} segundos</option>)}
+                            {[40, 60, 90, 120, 180].map(s => <option key={s} value={s}>{s} {t('segundos')}</option>)}
                         </select>
                     </div>
 
@@ -1722,8 +1728,8 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                         >
                             <span style={{ fontSize: '1.6rem' }}>🔥</span>
                             <div style={{ flex: 1 }}>
-                                <div style={{ color: modoDificil ? '#fdba74' : '#e2e8f0', fontWeight: 800, fontSize: '0.95rem' }}>Modo difícil</div>
-                                <div style={{ color: modoDificil ? '#fed7aa' : '#64748b', fontSize: '0.78rem' }}>Solo preguntas marcadas como difíciles</div>
+                                <div style={{ color: modoDificil ? '#fdba74' : '#e2e8f0', fontWeight: 800, fontSize: '0.95rem' }}>{t('Modo difícil')}</div>
+                                <div style={{ color: modoDificil ? '#fed7aa' : '#64748b', fontSize: '0.78rem' }}>{t('Solo preguntas marcadas como difíciles')}</div>
                             </div>
                             <div style={{ width: 46, height: 26, borderRadius: 20, background: modoDificil ? '#f97316' : '#334155', position: 'relative', transition: '0.15s', flexShrink: 0 }}>
                                 <div style={{ position: 'absolute', top: 3, left: modoDificil ? 23 : 3, width: 20, height: 20, borderRadius: '50%', background: 'white', transition: 'left 0.15s' }} />
@@ -1736,13 +1742,13 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                         {fuentePreguntas === 'JSON' ? (<>
                             <span style={{ fontSize: '1.2rem' }}>📄</span>
                             <div>
-                                <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: '0.88rem' }}>Trivial Clásico</div>
-                                <div style={{ color: '#64748b', fontSize: '0.78rem' }}>{Object.values(PREGUNTAS_JSON).flat().length} preguntas en {Object.keys(PREGUNTAS_JSON).length} categorías</div>
+                                <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: '0.88rem' }}>{t('Trivial Clásico')}</div>
+                                <div style={{ color: '#64748b', fontSize: '0.78rem' }}>{Object.values(PREGUNTAS_JSON).flat().length} {t('preguntas en')} {Object.keys(PREGUNTAS_JSON).length} {t('categorías')}</div>
                             </div>
                         </>) : (<>
                             <span style={{ fontSize: '1.2rem' }}>🎯</span>
                             <div>
-                                <div style={{ color: '#a855f7', fontWeight: 700, fontSize: '0.88rem' }}>Trivial personalizado</div>
+                                <div style={{ color: '#a855f7', fontWeight: 700, fontSize: '0.88rem' }}>{t('Trivial personalizado')}</div>
                                 <div style={{ color: '#64748b', fontSize: '0.78rem', fontFamily: 'monospace', letterSpacing: 1 }}>{codigoFirebase}</div>
                             </div>
                         </>)}
@@ -1769,9 +1775,9 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                         </div>
                     )}
                     <button onClick={() => { setErrorPreguntas(''); iniciarJuego(); }} disabled={cargando} style={{ ...st.btnRoll, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, opacity: cargando ? 0.7 : 1, cursor: cargando ? 'wait' : 'pointer' }}>
-                        <Play size={20}/> {cargando ? 'Cargando preguntas...' : 'Empezar Juego'}
+                        <Play size={20}/> {cargando ? t('Cargando preguntas...') : t('Empezar Juego')}
                     </button>
-                    <button onClick={() => { setPantalla('INTRO'); setCategoriasRecurso(null); setErrorPreguntas(''); }} style={{ width: '100%', background: 'transparent', border: 'none', color: '#64748b', padding: 12, marginTop: 5, cursor: 'pointer', fontWeight: 'bold' }}>← Volver al inicio</button>
+                    <button onClick={() => { setPantalla('INTRO'); setCategoriasRecurso(null); setErrorPreguntas(''); }} style={{ width: '100%', background: 'transparent', border: 'none', color: '#64748b', padding: 12, marginTop: 5, cursor: 'pointer', fontWeight: 'bold' }}>← {t('Volver al inicio')}</button>
                 </div>
             </div>
         );
@@ -1940,7 +1946,7 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <div style={{ fontSize: isMobile ? '0.95rem' : '1.1rem', textTransform: 'uppercase', letterSpacing: 2, color: modalData.color.hex, fontWeight: 'bold' }}>
-                                    {categoriasRecurso?.[modalData.color.id]?.nombre || modalData.color.name}
+                                    {t(categoriasRecurso?.[modalData.color.id]?.nombre || modalData.color.name)}
                                 </div>
                                 {modalData.qData?.lectura && (
                                     <button
@@ -1980,10 +1986,10 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
 
                             // SELECCION — opción múltiple (por defecto)
                             if (tipo === 'SELECCION' || !tipo) return (<>
-                                <h2 style={{ color: 'white', fontSize: isMobile ? '1.2rem' : '1.7rem', margin: isMobile ? '14px 0 18px' : '20px 0 30px', lineHeight: 1.4 }}>{qData.q}</h2>
+                                <h2 style={{ color: 'white', fontSize: isMobile ? '1.2rem' : '1.7rem', margin: isMobile ? '14px 0 18px' : '20px 0 30px', lineHeight: 1.4 }}>{t(qData.q)}</h2>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 8 : 12 }}>
                                     {modalData.answers.map((ans, i) => (
-                                        <button key={i} onClick={() => !mostrandoRespuesta && responderPregunta(ans === modalData.correct)} disabled={mostrandoRespuesta} style={{ ...st.btnAnswer, padding: isMobile ? '13px 14px' : 20, fontSize: isMobile ? '0.95rem' : '1.2rem', opacity: mostrandoRespuesta ? 0.4 : 1, cursor: mostrandoRespuesta ? 'default' : 'pointer' }}>{ans}</button>
+                                        <button key={i} onClick={() => !mostrandoRespuesta && responderPregunta(ans === modalData.correct)} disabled={mostrandoRespuesta} style={{ ...st.btnAnswer, padding: isMobile ? '13px 14px' : 20, fontSize: isMobile ? '0.95rem' : '1.2rem', opacity: mostrandoRespuesta ? 0.4 : 1, cursor: mostrandoRespuesta ? 'default' : 'pointer' }}>{t(ans)}</button>
                                     ))}
                                 </div>
                             </>);
@@ -1997,12 +2003,12 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                                     responderPregunta(correcto);
                                 };
                                 return (<>
-                                <h2 style={{ color: 'white', fontSize: isMobile ? '1.2rem' : '1.7rem', margin: isMobile ? '14px 0 18px' : '20px 0 24px', lineHeight: 1.4 }}>{qData.q}</h2>
+                                <h2 style={{ color: 'white', fontSize: isMobile ? '1.2rem' : '1.7rem', margin: isMobile ? '14px 0 18px' : '20px 0 24px', lineHeight: 1.4 }}>{t(qData.q)}</h2>
                                 <input
                                     value={inputCorta}
                                     onChange={e => setInputCorta(e.target.value)}
                                     onKeyDown={e => { if (e.key === 'Enter') checkCorta(); }}
-                                    placeholder="Escribe tu respuesta…"
+                                    placeholder={t('Escribe tu respuesta…')}
                                     autoFocus
                                     disabled={mostrandoRespuesta}
                                     style={{ width: '100%', boxSizing: 'border-box', background: '#0f172a', border: '2px solid #475569', borderRadius: 10, color: 'white', padding: '14px 16px', fontSize: isMobile ? '1rem' : '1.15rem', fontFamily: 'inherit', outline: 'none', marginBottom: 12, opacity: mostrandoRespuesta ? 0.4 : 1 }}
@@ -2011,7 +2017,7 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                                     onClick={checkCorta}
                                     disabled={!inputCorta.trim() || mostrandoRespuesta}
                                     style={{ ...st.btnAnswer, background: '#1d4ed8', border: 'none', fontWeight: 800, opacity: (inputCorta.trim() && !mostrandoRespuesta) ? 1 : 0.4 }}
-                                >Responder</button>
+                                >{t('Responder')}</button>
                             </>);
                             }
 
@@ -2026,15 +2032,15 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                                 };
                                 return (<>
                                     <div style={{ color: 'white', fontSize: isMobile ? '1.15rem' : '1.5rem', margin: isMobile ? '14px 0 18px' : '20px 0 24px', lineHeight: 1.6 }}>
-                                        <span>{qData.bloques?.[0]} </span>
+                                        <span>{t(qData.bloques?.[0])} </span>
                                         <span style={{ borderBottom: '3px solid #38bdf8', padding: '0 12px', color: '#38bdf8', fontWeight: 700 }}>___</span>
-                                        {qData.bloques?.[2] && <span> {qData.bloques[2]}</span>}
+                                        {qData.bloques?.[2] && <span> {t(qData.bloques[2])}</span>}
                                     </div>
                                     <input
                                         value={inputCorta}
                                         onChange={e => setInputCorta(e.target.value)}
                                         onKeyDown={e => { if (e.key === 'Enter') checkRellenar(); }}
-                                        placeholder="Completa el hueco…"
+                                        placeholder={t('Completa el hueco…')}
                                         autoFocus
                                         style={{ width: '100%', boxSizing: 'border-box', background: '#0f172a', border: '2px solid #38bdf8', borderRadius: 10, color: '#38bdf8', padding: '14px 16px', fontSize: isMobile ? '1rem' : '1.15rem', fontFamily: 'inherit', outline: 'none', marginBottom: 12 }}
                                     />
@@ -2042,7 +2048,7 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                                         onClick={checkRellenar}
                                         disabled={!inputCorta.trim()}
                                         style={{ ...st.btnAnswer, background: '#0e7490', border: 'none', fontWeight: 800, opacity: inputCorta.trim() ? 1 : 0.4 }}
-                                    >Responder</button>
+                                    >{t('Responder')}</button>
                                 </>);
                             }
 
@@ -2055,10 +2061,10 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                                     responderPregunta(JSON.stringify(elegidos) === JSON.stringify(qData.bloques));
                                 };
                                 return (<>
-                                    {qData.q && <h2 style={{ color: 'white', fontSize: isMobile ? '1rem' : '1.3rem', margin: isMobile ? '10px 0 14px' : '14px 0 20px', lineHeight: 1.4 }}>{qData.q}</h2>}
+                                    {qData.q && <h2 style={{ color: 'white', fontSize: isMobile ? '1rem' : '1.3rem', margin: isMobile ? '10px 0 14px' : '14px 0 20px', lineHeight: 1.4 }}>{t(qData.q)}</h2>}
                                     {/* Slots elegidos — orden de click */}
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, minHeight: 44, background: '#0f172a', borderRadius: 10, padding: '8px 10px', marginBottom: 10, border: '2px dashed #334155' }}>
-                                        {elegidos.length === 0 && <span style={{ color: '#475569', fontSize: '0.85rem', alignSelf: 'center' }}>Toca los elementos en el orden correcto</span>}
+                                        {elegidos.length === 0 && <span style={{ color: '#475569', fontSize: '0.85rem', alignSelf: 'center' }}>{t('Toca los elementos en el orden correcto')}</span>}
                                         {elegidos.map((s, i) => (
                                             <button key={i} onClick={() => setOrdenSlots(prev => ({ slots: prev.slots.filter(t => t !== s), available: [...prev.available, s] }))}
                                                 style={{ background: '#1d4ed8', border: 'none', color: 'white', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: 600 }}>
@@ -2077,7 +2083,7 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                                     </div>
                                     <button onClick={confirmarOrden} disabled={!completo}
                                         style={{ ...st.btnAnswer, background: '#166534', border: 'none', fontWeight: 800, opacity: completo ? 1 : 0.4 }}>
-                                        Confirmar orden
+                                        {t('Confirmar orden')}
                                     </button>
                                 </>);
                             }
@@ -2096,11 +2102,11 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                             return (
                                 <div style={{ marginTop: 16, background: 'rgba(239,68,68,0.12)', border: '2px solid #ef4444', borderRadius: 14, padding: isMobile ? '14px 16px' : '20px 24px' }}>
                                     <div style={{ color: '#f87171', fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>
-                                        ✗ Respuesta incorrecta
+                                        ✗ {t('Respuesta incorrecta')}
                                     </div>
-                                    <div style={{ color: '#94a3b8', fontSize: '0.82rem', marginBottom: 6 }}>La respuesta correcta era:</div>
+                                    <div style={{ color: '#94a3b8', fontSize: '0.82rem', marginBottom: 6 }}>{t('La respuesta correcta era:')}</div>
                                     <div style={{ color: '#4ade80', fontSize: isMobile ? '1.1rem' : '1.35rem', fontWeight: 800, lineHeight: 1.4, marginBottom: wedgePerdido ? 12 : 16 }}>
-                                        {respuesta}
+                                        {tipo === 'SELECCION' ? t(respuesta) : respuesta}
                                     </div>
                                     {wedgePerdido && (
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: `${wedgePerdido.catHex}18`, border: `2px solid ${wedgePerdido.catHex}80`, borderRadius: 10, padding: '10px 14px', marginBottom: 14 }}>

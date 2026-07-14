@@ -3240,6 +3240,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
 
 // MODAL DE INFORMACIÓN DE JUEGO/HERRAMIENTA
 function InfoModal({ info, name, color, emoji, img, onClose }) {
+    const t = useT();
     if (!info) return null;
     return (
         <div
@@ -3262,7 +3263,7 @@ function InfoModal({ info, name, color, emoji, img, onClose }) {
                         <h2 style={{ margin: 0, color: 'white', fontSize: '1.3rem', fontWeight: 800 }}>{name}</h2>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 6 }}>
                             {info.etapas?.map(e => (
-                                <span key={e} style={{ background: 'rgba(255,255,255,0.25)', color: 'white', borderRadius: 20, padding: '2px 10px', fontSize: '0.72rem', fontWeight: 700 }}>{e}</span>
+                                <span key={e} style={{ background: 'rgba(255,255,255,0.25)', color: 'white', borderRadius: 20, padding: '2px 10px', fontSize: '0.72rem', fontWeight: 700 }}>{t(e)}</span>
                             ))}
                         </div>
                     </div>
@@ -3273,10 +3274,10 @@ function InfoModal({ info, name, color, emoji, img, onClose }) {
                 <div style={{ padding: '18px 20px 20px' }}>
                     {/* Materias */}
                     <div style={{ marginBottom: 14 }}>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>Materias</div>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>{t('Materias')}</div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                             {info.materias?.map(m => (
-                                <span key={m} style={{ background: (MATERIA_COLORS[m] || '#607D8B') + '20', color: MATERIA_COLORS[m] || '#607D8B', border: `1px solid ${MATERIA_COLORS[m] || '#607D8B'}50`, borderRadius: 20, padding: '3px 12px', fontSize: '0.78rem', fontWeight: 700 }}>{m}</span>
+                                <span key={m} style={{ background: (MATERIA_COLORS[m] || '#607D8B') + '20', color: MATERIA_COLORS[m] || '#607D8B', border: `1px solid ${MATERIA_COLORS[m] || '#607D8B'}50`, borderRadius: 20, padding: '3px 12px', fontSize: '0.78rem', fontWeight: 700 }}>{t(m)}</span>
                             ))}
                         </div>
                     </div>
@@ -3292,10 +3293,11 @@ function InfoModal({ info, name, color, emoji, img, onClose }) {
 }
 
 function InfoRow({ icon, label, text }) {
+    const t = useT();
     return (
         <div style={{ marginBottom: 12, padding: '10px 14px', background: '#F8FAFC', borderRadius: 12, borderLeft: '3px solid #E2E8F0' }}>
-            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 3 }}>{icon} {label}</div>
-            <div style={{ fontSize: '0.88rem', color: '#334155', lineHeight: 1.5 }}>{text}</div>
+            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 3 }}>{icon} {t(label)}</div>
+            <div style={{ fontSize: '0.88rem', color: '#334155', lineHeight: 1.5 }}>{t(text)}</div>
         </div>
     );
 }

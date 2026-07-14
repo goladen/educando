@@ -63,6 +63,8 @@ ${JSON.stringify(entrada)}`;
         }
     }
 
-    console.warn('[i18n] Falló la traducción, se usan los textos originales:', ultimoError?.message);
-    return textos;
+    // Importante: NO devolvemos los originales aquí. Si lo hiciéramos, el
+    // contexto cachearía el español como "traducción" y no reintentaría nunca.
+    // Lanzamos para que quien llama decida (y no cachee).
+    throw new Error(`[i18n] Falló la traducción: ${ultimoError?.message || 'desconocido'}`);
 }

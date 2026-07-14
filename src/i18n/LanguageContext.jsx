@@ -16,7 +16,7 @@ import { createContext, useContext, useEffect, useRef, useState, useCallback } f
 import { IDIOMA_ORIGEN, IDIOMAS, traducirLote } from './translateGemini.js';
 
 const LS_IDIOMA = 'pikt_idioma';
-const LS_CACHE = 'pikt_i18n_cache_v1';
+const LS_CACHE = 'pikt_i18n_cache_v2';
 const LanguageContext = createContext(null);
 
 function leerCache() {
@@ -52,7 +52,15 @@ export function LanguageProvider({ children }) {
         pendientes.current.clear();
         if (!textos.length) return;
 
-        const traducciones = await traducirLote(textos, idiomaActual);
+        let traducciones;
+        try {
+            traducciones = await traducirLote(textos, idiomaActual);
+        } catch (err) {
+            // Fallo (p.ej. /api/gemini caído): NO cacheamos nada para poder
+            // reintentar más tarde. t() seguirá mostrando el original.
+            console.warn(err?.message || err);
+            return;
+        }
         setCache((prev) => {
             const siguiente = { ...prev };
             textos.forEach((original, i) => {

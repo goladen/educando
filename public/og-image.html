@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Generador og-image · PiKT</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0f1220; min-height: 100vh; display: flex; flex-direction: column;
+         align-items: center; gap: 20px; padding: 30px; font-family: 'Segoe UI', Arial, sans-serif; color:#e6e9f5; }
+  h1 { font-size: 22px; }
+  canvas { width: 1200px; max-width: 100%; height: auto; border-radius: 12px;
+           box-shadow: 0 20px 60px rgba(0,0,0,.5); background:#1b2030; }
+  .bar { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; justify-content:center; }
+  button { background: #22c55e; color: #fff; border: 0; border-radius: 12px;
+           padding: 14px 28px; font-size: 18px; font-weight: 700; cursor: pointer; }
+  button.alt { background: #334155; }
+  .hint { color: #9aa3bd; font-size: 14px; max-width: 1000px; line-height: 1.7; }
+  code { background: #1e2436; padding: 2px 7px; border-radius: 6px; color: #ffd83d; }
+  #msg { font-size: 15px; min-height: 22px; font-weight: 700; }
+  .ok { color:#4ade80; } .err { color:#f87171; }
+  .warn { background:#3a2a13; border:1px solid #b4770f; color:#fde68a; border-radius:10px;
+          padding:12px 16px; max-width:1000px; font-size:14px; line-height:1.6; }
+</style>
+</head>
+<body>
+  <h1>Generador de og-image (1200×630)</h1>
+
+  <div class="warn">
+    ⚠️ <b>Ábrelo desde el servidor de desarrollo</b>, no con doble clic.
+    Con <code>npm run dev</code> corriendo, entra en
+    <code>http://localhost:5173/og-image.html</code>.
+    Si lo abres como archivo (<code>file://</code>) el navegador bloquea la exportación.
+  </div>
+
+  <canvas id="cv" width="2400" height="1260"></canvas>
+
+  <div id="msg"></div>
+  <div class="bar">
+    <button onclick="descargar()">⬇ Descargar og-image.png</button>
+    <button class="alt" onclick="render()">↻ Redibujar</button>
+  </div>
+
+  <p class="hint">
+    <b>Pasos:</b> 1) Guarda tus 4 capturas en <code>public/assets/og/</code> como
+    <code>1.png</code>, <code>2.png</code>, <code>3.png</code>, <code>4.png</code>.
+    2) Con el dev server abierto, entra en <code>http://localhost:5173/og-image.html</code>.
+    3) Pulsa <b>Descargar</b>. 4) Mueve el PNG a <code>public/og-image.png</code> y sube el proyecto.
+  </p>
+
+<script>
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const S = 2;                 // escala (2400x1260 -> nitidez), diseño en 1200x630
+const W = 1200, H = 630;
+const msg = document.getElementById('msg');
+let images = [];
+
+function loadImg(src){
+  return new Promise(res => {
+    const im = new Image();
+    im.onload = () => res({ ok:true, im });
+    im.onerror = () => res({ ok:false, im:null });
+    im.src = src + '?t=' + Date.now();   // evita caché
+  });
+}
+
+function roundRectPath(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+
+function drawShot(cell, res){
+  const {x,y,w,h} = cell;
+  ctx.save();
+  roundRectPath(x,y,w,h,18);
+  ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 4;
+  ctx.stroke();
+  ctx.clip();
+  if (res && res.ok){
+    // object-fit: cover
+    const im = res.im;
+    const ir = im.width/im.height, cr = w/h;
+    let dw, dh, dx, dy;
+    if (ir > cr){ dh = h; dw = h*ir; dx = x-(dw-w)/2; dy = y; }
+    else { dw = w; dh = w/ir; dx = x; dy = y-(dh-h)/2; }
+    ctx.drawImage(im, dx, dy, dw, dh);
+  } else {
+    ctx.fillStyle = '#1b2030'; ctx.fillRect(x,y,w,h);
+    ctx.fillStyle = '#7c88a8'; ctx.font = '600 20px Segoe UI, Arial';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('Falta captura', x+w/2, y+h/2);
+  }
+  ctx.restore();
+}
+
+function render(){
+  ctx.setTransform(S,0,0,S,0,0);
+  ctx.clearRect(0,0,W,H);
+
+  // Fondo degradado
+  const g = ctx.createLinearGradient(0,0,W,H);
+  g.addColorStop(0,'#6c63ff'); g.addColorStop(.55,'#a855f7'); g.addColorStop(1,'#7c3aed');
+  ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+
+  // Collage 2x2 rotado a la derecha
+  ctx.save();
+  ctx.translate(W*0.68, H*0.5);
+  ctx.rotate(-8*Math.PI/180);
+  const cw=300, ch=250, gap=20;
+  const cells = [
+    {x:-cw-gap/2, y:-ch-gap/2, w:cw, h:ch},
+    {x: gap/2,    y:-ch-gap/2, w:cw, h:ch},
+    {x:-cw-gap/2, y: gap/2,    w:cw, h:ch},
+    {x: gap/2,    y: gap/2,    w:cw, h:ch},
+  ];
+  cells.forEach((c,i)=>{
+    ctx.save();
+    ctx.shadowColor='rgba(0,0,0,.45)'; ctx.shadowBlur=40; ctx.shadowOffsetY=18;
+    drawShot(c, images[i]);
+    ctx.restore();
+  });
+  ctx.restore();
+
+  // Velo para legibilidad del texto (izquierda)
+  const veil = ctx.createLinearGradient(0,0,W,0);
+  veil.addColorStop(0,'rgba(108,99,255,.97)');
+  veil.addColorStop(.42,'rgba(108,99,255,.85)');
+  veil.addColorStop(.62,'rgba(108,99,255,0)');
+  ctx.fillStyle = veil; ctx.fillRect(0,0,W,H);
+
+  // Texto marca
+  ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillStyle='#fff';
+  ctx.font='800 92px Segoe UI, Arial';
+  ctx.fillText('PiKT', 55, 175);
+  ctx.fillStyle='#ffd83d'; ctx.fillText('.', 55+ctx.measureText('PiKT').width, 175);
+
+  ctx.fillStyle='#fff'; ctx.font='700 34px Segoe UI, Arial';
+  ctx.fillText('Juegos educativos', 58, 235);
+  ctx.fillText('para tu clase', 58, 278);
+
+  ctx.font='700 24px Segoe UI, Arial'; ctx.fillStyle='rgba(255,255,255,.95)';
+  ctx.fillText('+40 juegos y herramientas', 58, 330);
+
+  // Chips
+  const chips=['Gratis','Sin registro','Listo para proyectar'];
+  let cx=58; const cy=360, chH=40;
+  ctx.font='700 20px Segoe UI, Arial';
+  chips.forEach(t=>{
+    const tw=ctx.measureText(t).width, pad=18, w=tw+pad*2;
+    ctx.fillStyle='rgba(255,255,255,.18)';
+    roundRectPath(cx,cy,w,chH,chH/2); ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,.4)'; ctx.lineWidth=1.5;
+    roundRectPath(cx,cy,w,chH,chH/2); ctx.stroke();
+    ctx.fillStyle='#fff'; ctx.fillText(t, cx+pad, cy+27);
+    cx += w+12;
+  });
+
+  ctx.fillStyle='#ffd83d'; ctx.font='800 30px Segoe UI, Arial';
+  ctx.fillText('pikt.es', 58, 470);
+
+  msg.textContent=''; msg.className='';
+}
+
+async function boot(){
+  msg.textContent='Cargando capturas…';
+  images = await Promise.all([1,2,3,4].map(n=>loadImg('./assets/og/'+n+'.png')));
+  const faltan = images.filter(r=>!r.ok).length;
+  render();
+  if (faltan){ msg.className='err'; msg.textContent='Faltan '+faltan+' captura(s) en public/assets/og/ (1.png…4.png). Se dibujan huecos.'; }
+  else { msg.className='ok'; msg.textContent='4 capturas cargadas. Listo para descargar.'; }
+}
+
+function descargar(){
+  try{
+    const url = cv.toDataURL('image/png');   // salta al catch si el canvas está contaminado (file://)
+    const a=document.createElement('a'); a.download='og-image.png'; a.href=url; a.click();
+    msg.className='ok'; msg.textContent='Descargado og-image.png';
+  }catch(e){
+    msg.className='err';
+    msg.textContent='No se puede exportar: abre la página desde http://localhost (npm run dev), no con doble clic (file://).';
+  }
+}
+
+boot();
+</script>
+</body>
+</html>

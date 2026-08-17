@@ -654,7 +654,7 @@ export const APPS = [
     { id: 'FUTBOLQUIZZ', name: 'Fútbol Quizz', desc: 'Pizarra de fútbol por turnos: arrastra y dispara para marcar gol.', color: '#15803d', emoji: '⚽', shareable: true },
     { id: 'RETOS', name: 'Retos', desc: 'Conecta puntos y puzzles de lógica.', color: '#f39c12', emoji: '🧩', shareable: true },
     { id: 'TRIVIAL', name: 'Trivial', desc: 'El clásico juego de preguntas por categorías para hasta 6 jugadores.', color: '#16213e', emoji: '🎯', shareable: true },
-    { id: 'CLIMBING', name: 'Climbing', desc: 'Trivial de escalada y simulador de caída. Se abre en una pestaña nueva.', color: '#0ea5e9', emoji: '🧗', shareable: true },
+    { id: 'CLIMBING', name: 'Climbing', desc: 'Trivial de escalada y simulador de caída. Se abre en una pestaña nueva.', color: '#0ea5e9', emoji: '🧗', shareable: true, shareUrl: `${window.location.origin}/escalada` },
     { id: 'DUELO_PIRATAS_RECURSO', name: 'Duelo Piratas', desc: '2 jugadores · cañonazos con tu recurso · múltiple opción, aparejados o pasapalabra.', color: '#0a1628', emoji: '🏴‍☠️', shareable: true },
     {
         id: 'ARKADE',

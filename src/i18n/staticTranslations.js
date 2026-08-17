@@ -139,6 +139,7 @@ export const STATIC_TRANSLATIONS = {
         "Siguiente →": "Next →",
         "Ver rankings": "View rankings",
         "Rankings": "Rankings",
+        "Salir": "Exit",
     },
     ca: {
         "Todas": "Totes",
@@ -265,6 +266,7 @@ export const STATIC_TRANSLATIONS = {
         "Siguiente →": "Següent →",
         "Ver rankings": "Veure rànquings",
         "Rankings": "Rànquings",
+        "Salir": "Sortir",
     },
     fr: {
         "Todas": "Toutes",
@@ -391,5 +393,6 @@ export const STATIC_TRANSLATIONS = {
         "Siguiente →": "Suivant →",
         "Ver rankings": "Voir les classements",
         "Rankings": "Classements",
+        "Salir": "Quitter",
     },
 };

@@ -11,11 +11,26 @@ import TrivialEnvioForm from './components/TrivialEnvioForm';
 const CLIMBING_TRIVIAL_ID = 'ki0UtmWJ5nOiXLsBJ9Vb';
 
 const CARDS = [
-    { key: 'TRIVIAL',  emoji: '🧗', titulo: 'Trivial de escalada', desc: 'Preguntas por categorías sobre escalada, hasta 6 jugadores.', color: '#16213e' },
-    { key: 'WHOKNOWS', emoji: '🧠', titulo: 'Who Knows?',          desc: 'Test cronometrado por categorías con ranking global.', color: '#22c55e' },
-    { key: 'SEND',     emoji: '✉️', titulo: 'Send your question',  desc: 'Envía tus preguntas al banco de escalada para que el profe las revise.', color: '#f59e0b' },
-    { key: 'SIM',      emoji: '🪂', titulo: 'Simulador de caída',   desc: 'Fuerzas de una caída deportiva según cuerda, factor y anclaje.', color: '#0ea5e9' },
+    { key: 'TRIVIAL',  path: 'trivial',    emoji: '🧗', titulo: 'Trivial de escalada', desc: 'Preguntas por categorías sobre escalada, hasta 6 jugadores.', color: '#16213e' },
+    { key: 'WHOKNOWS', path: 'whoknows',   emoji: '🧠', titulo: 'Who Knows?',          desc: 'Test cronometrado por categorías con ranking global.', color: '#22c55e' },
+    { key: 'SEND',     path: 'send',       emoji: '✉️', titulo: 'Send your question',  desc: 'Envía tus preguntas al banco de escalada para que el profe las revise.', color: '#f59e0b' },
+    { key: 'SIM',      path: 'simulador',  emoji: '🪂', titulo: 'Simulador de caída',   desc: 'Fuerzas de una caída deportiva según cuerda, factor y anclaje.', color: '#0ea5e9' },
 ];
+
+// Rutas anidadas: pikt.es/escalada/<path>
+const PATH_TO_VISTA = { trivial: 'TRIVIAL', whoknows: 'WHOKNOWS', send: 'SEND', simulador: 'SIM' };
+const VISTA_TO_PATH = { TRIVIAL: 'trivial', WHOKNOWS: 'whoknows', SEND: 'send', SIM: 'simulador' };
+const enlaceActividad = (path) => `${window.location.origin}/escalada/${path}`;
+
+// Lee el segmento tras /escalada/ (o el legacy ?a=) para saber qué actividad abrir.
+function vistaDesdeUrl() {
+    try {
+        const seg = window.location.pathname.replace(/^\/|\/$/g, '').split('/');
+        if (seg[0] === 'escalada' && seg[1]) return PATH_TO_VISTA[seg[1]] || 'MENU';
+        const a = new URLSearchParams(window.location.search).get('a');
+        return PATH_TO_VISTA[a] || 'MENU';
+    } catch { return 'MENU'; }
+}
 
 // Obtiene el código de envío del recurso de escalada y abre el formulario de envío.
 function EnvioEscalada({ onBack }) {
@@ -51,10 +66,29 @@ function EnvioEscalada({ onBack }) {
 }
 
 export default function ClimbingHub({ onExit }) {
-    const [vista, setVista] = useState('MENU'); // MENU | TRIVIAL | SIM
+    // Vista inicial según la ruta /escalada/<path> (o el legacy ?a=).
+    const [vista, setVista] = useState(vistaDesdeUrl);
+    const [copiado, setCopiado] = useState('');
 
-    const volverMenu = () => setVista('MENU');
+    // Navega a una actividad actualizando la URL a /escalada/<path>.
+    const navegar = (v) => {
+        setVista(v);
+        const path = VISTA_TO_PATH[v];
+        window.history.pushState({}, '', path ? `/escalada/${path}` : '/escalada');
+    };
+    const volverMenu = () => navegar('MENU');
     const cerrar = () => { if (onExit) onExit(); else { try { window.close(); } catch { /* noop */ } window.location.href = '/'; } };
+    const copiarEnlace = (path, key) => {
+        try { navigator.clipboard.writeText(enlaceActividad(path)); } catch { /* noop */ }
+        setCopiado(key); setTimeout(() => setCopiado(c => (c === key ? '' : c)), 1600);
+    };
+
+    // Sincroniza la vista con los botones atrás/adelante del navegador.
+    useEffect(() => {
+        const onPop = () => setVista(vistaDesdeUrl());
+        window.addEventListener('popstate', onPop);
+        return () => window.removeEventListener('popstate', onPop);
+    }, []);
 
     if (vista === 'TRIVIAL') {
         return <TrivialGame recursoIdInicial={CLIMBING_TRIVIAL_ID} onExit={volverMenu} />;
@@ -95,14 +129,19 @@ export default function ClimbingHub({ onExit }) {
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 20, width: '100%', maxWidth: 720 }}>
                 {CARDS.map(c => (
-                    <button key={c.key} onClick={() => setVista(c.key)}
+                    <div key={c.key} onClick={() => navegar(c.key)} role="button" tabIndex={0}
                         onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = `0 16px 40px ${c.color}66`; }}
                         onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.4)'; }}
-                        style={{ background: 'rgba(255,255,255,0.05)', border: `2px solid ${c.color}`, borderRadius: 22, padding: '34px 22px', cursor: 'pointer', color: 'white', textAlign: 'center', transition: 'transform 0.18s, box-shadow 0.18s', boxShadow: '0 8px 24px rgba(0,0,0,0.4)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+                        style={{ position: 'relative', background: 'rgba(255,255,255,0.05)', border: `2px solid ${c.color}`, borderRadius: 22, padding: '34px 22px', cursor: 'pointer', color: 'white', textAlign: 'center', transition: 'transform 0.18s, box-shadow 0.18s', boxShadow: '0 8px 24px rgba(0,0,0,0.4)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+                        <button onClick={e => { e.stopPropagation(); copiarEnlace(c.path, c.key); }}
+                            title="Copiar enlace directo"
+                            style={{ position: 'absolute', top: 10, right: 10, background: copiado === c.key ? '#0a2a18' : 'rgba(255,255,255,0.1)', border: `1px solid ${copiado === c.key ? '#4ade80' : 'rgba(255,255,255,0.2)'}`, color: copiado === c.key ? '#4ade80' : '#cbd5e1', borderRadius: 9, padding: '5px 9px', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            {copiado === c.key ? '✓ Copiado' : '🔗 Compartir'}
+                        </button>
                         <span style={{ fontSize: '3.4rem', lineHeight: 1 }}>{c.emoji}</span>
                         <span style={{ fontSize: '1.35rem', fontWeight: 800 }}>{c.titulo}</span>
                         <span style={{ color: '#94a3b8', fontSize: '0.92rem', lineHeight: 1.4 }}>{c.desc}</span>
-                    </button>
+                    </div>
                 ))}
             </div>
         </div>

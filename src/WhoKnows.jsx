@@ -11,6 +11,19 @@ const _failAudio = new Audio(wrongSound);
 const playOk = () => { try { _okAudio.currentTime = 0; _okAudio.play().catch(() => {}); } catch { /* noop */ } };
 const playFail = () => { try { _failAudio.currentTime = 0; _failAudio.play().catch(() => {}); } catch { /* noop */ } };
 
+// Animación de la burbuja flotante de puntos (se inyecta una sola vez).
+if (typeof document !== 'undefined' && !document.getElementById('whoknows-float-css')) {
+    const s = document.createElement('style');
+    s.id = 'whoknows-float-css';
+    s.textContent = `@keyframes wkFloat {
+        0%   { transform: translate(-50%,10px) scale(0.5); opacity: 0; }
+        18%  { transform: translate(-50%,-8px) scale(1.15); opacity: 1; }
+        70%  { opacity: 1; }
+        100% { transform: translate(-50%,-130px) scale(1); opacity: 0; }
+    }`;
+    document.head.appendChild(s);
+}
+
 // ─── Config ──────────────────────────────────────────────────────────────────
 const RECURSO_ID = 'ki0UtmWJ5nOiXLsBJ9Vb'; // Trivial de escalada
 const TIEMPO = 30;            // segundos por pregunta
@@ -78,6 +91,14 @@ export default function WhoKnows({ onExit }) {
     const [ordenSlots, setOrdenSlots] = useState({ available: [], slots: [] });
     const [answers, setAnswers] = useState([]); // opciones barajadas (SELECCION)
     const startRef = useRef(0);
+    const [floater, setFloater] = useState(null); // { id, text, ok } burbuja de puntos
+    const floaterTimer = useRef(null);
+    const mostrarFloater = (text, ok) => {
+        const id = Date.now();
+        setFloater({ id, text, ok });
+        clearTimeout(floaterTimer.current);
+        floaterTimer.current = setTimeout(() => setFloater(f => (f && f.id === id ? null : f)), 1200);
+    };
 
     // Ranking
     const [nombre, setNombre] = useState('');
@@ -192,10 +213,12 @@ export default function WhoKnows({ onExit }) {
             const puntos = Math.round(PTS_MIN + (PTS_MAX - PTS_MIN) * (restanteMs / (TIEMPO * 1000)));
             setScore(s => s + puntos);
             setResultado({ ok: true, puntos });
+            mostrarFloater(`+${puntos}`, true);
             playOk();
         } else {
             setScore(s => s + PTS_FALLO);
             setResultado({ ok: false, puntos: PTS_FALLO });
+            mostrarFloater(`${PTS_FALLO}`, false);
             playFail();
         }
         setRespondida(true);
@@ -425,9 +448,17 @@ export default function WhoKnows({ onExit }) {
     return (
         <div style={wrap}>
             {isMobile && <div style={{ position: 'fixed', top: 10, right: 10, zIndex: 50 }}><LanguageSelector compacto /></div>}
+            {/* Burbuja flotante de puntos */}
+            {floater && (
+                <div key={floater.id} style={{ position: 'fixed', top: '36%', left: '50%', zIndex: 100, pointerEvents: 'none', color: 'white', fontWeight: 900, fontSize: isMobile ? '1.9rem' : '2.4rem', padding: '10px 22px', borderRadius: 999, whiteSpace: 'nowrap', background: floater.ok ? 'linear-gradient(135deg,#16a34a,#22c55e)' : 'linear-gradient(135deg,#b91c1c,#ef4444)', boxShadow: `0 10px 34px ${floater.ok ? 'rgba(34,197,94,0.55)' : 'rgba(239,68,68,0.55)'}`, animation: 'wkFloat 1.2s ease-out forwards' }}>
+                    {floater.text}
+                </div>
+            )}
             {/* Barra superior */}
             <div style={{ width: '100%', maxWidth: 620, display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-                <span style={{ background: catInfo.hex + '22', color: catInfo.hex, border: `1px solid ${catInfo.hex}66`, borderRadius: 8, padding: '3px 10px', fontSize: isMobile ? '0.74rem' : '0.8rem', fontWeight: 700, maxWidth: isMobile ? 130 : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{catInfo.emoji} {t(catInfo.nombre)}</span>
+                <button onClick={() => { if (window.speechSynthesis) window.speechSynthesis.cancel(); setFase('CONFIG'); }} title={t('Salir')}
+                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid #334155', color: '#cbd5e1', borderRadius: 8, padding: isMobile ? '4px 9px' : '5px 11px', cursor: 'pointer', fontWeight: 700, fontSize: isMobile ? '0.85rem' : '0.82rem', flexShrink: 0 }}>{isMobile ? '✕' : `← ${t('Salir')}`}</button>
+                <span style={{ background: catInfo.hex + '22', color: catInfo.hex, border: `1px solid ${catInfo.hex}66`, borderRadius: 8, padding: '3px 10px', fontSize: isMobile ? '0.74rem' : '0.8rem', fontWeight: 700, maxWidth: isMobile ? 110 : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{catInfo.emoji} {t(catInfo.nombre)}</span>
                 <span style={{ color: '#64748b', fontSize: isMobile ? '0.78rem' : '0.85rem', whiteSpace: 'nowrap' }}>{isMobile ? `${idx + 1}/${cola.length}` : `${t('Pregunta')} ${idx + 1}/${cola.length}`}</span>
                 <span style={{ marginLeft: 'auto', fontWeight: 900, color: '#22c55e', fontSize: isMobile ? '0.95rem' : '1rem', whiteSpace: 'nowrap' }}>{score} {t('pts')}</span>
                 {!isMobile && <LanguageSelector compacto />}

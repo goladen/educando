@@ -108,10 +108,12 @@ function App() {
       if (slug === 'funcionesejecutivas' || slug === 'irregular_verbs' || slug === 'sistema_solar'
           || slug === 'retos' || slug === 'conectapuntos' || slug === 'sudoku'
           || slug === 'partes_planta' || slug === 'etiquetame' || slug === 'karting_track'
-          || slug === 'arkade' || slug === 'imperios' || slug === 'escalada' || slug === 'whoknows') {
+          || slug === 'arkade' || slug === 'imperios' || slug === 'whoknows') {
         setRutaPublica(slug);
         return;
       }
+      // Hub de escalada y sus subrutas (/escalada, /escalada/whoknows, …)
+      if (slug === 'escalada' || slug.startsWith('escalada/')) { setRutaPublica('escalada'); return; }
       const RUTAS_RESERVADAS = new Set([
         'partes_planta',
         'populares','inicio',

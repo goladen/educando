@@ -654,6 +654,7 @@ export const APPS = [
     { id: 'FUTBOLQUIZZ', name: 'Fútbol Quizz', desc: 'Pizarra de fútbol por turnos: arrastra y dispara para marcar gol.', color: '#15803d', emoji: '⚽', shareable: true },
     { id: 'RETOS', name: 'Retos', desc: 'Conecta puntos y puzzles de lógica.', color: '#f39c12', emoji: '🧩', shareable: true },
     { id: 'TRIVIAL', name: 'Trivial', desc: 'El clásico juego de preguntas por categorías para hasta 6 jugadores.', color: '#16213e', emoji: '🎯', shareable: true },
+    { id: 'CLIMBING', name: 'Climbing', desc: 'Trivial de escalada y simulador de caída. Se abre en una pestaña nueva.', color: '#0ea5e9', emoji: '🧗', shareable: true },
     { id: 'DUELO_PIRATAS_RECURSO', name: 'Duelo Piratas', desc: '2 jugadores · cañonazos con tu recurso · múltiple opción, aparejados o pasapalabra.', color: '#0a1628', emoji: '🏴‍☠️', shareable: true },
     {
         id: 'ARKADE',
@@ -843,6 +844,14 @@ export const GAME_INFO = {
         biblioteca: 'No incluye biblioteca propia. Requiere recurso del profesor.',
         multiplayer: 'Sí, hasta 6 jugadores simultáneos (en el mismo dispositivo o en red).',
         materias: ['Universal'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
+    CLIMBING: {
+        descripcion: 'Portal de escalada (pikt.es/escalada) con varias actividades: un Trivial por categorías sobre escalada, el test cronometrado Who Knows? con ranking global, el envío de preguntas al banco y un simulador de fuerzas de una caída deportiva. Se abre en una pestaña nueva.',
+        tipoPreguntas: 'Preguntas de escalada por categorías (selección múltiple, respuesta corta, rellenar el hueco y ordenar) en el Trivial y en Who Knows?. El simulador de caída no usa preguntas.',
+        biblioteca: 'Sí, incluye el banco de preguntas de escalada. Los alumnos pueden enviar nuevas preguntas para que el profesor las revise y apruebe.',
+        multiplayer: 'Trivial: hasta 6 jugadores en el mismo dispositivo. Who Knows?: individual con ranking global. Simulador: individual.',
+        materias: ['Educación Física', 'Ciencias Naturales', 'Física'],
         etapas: ['Primaria', 'ESO', 'Bachillerato'],
     },
     DUELO_PIRATAS_RECURSO: {
@@ -1780,6 +1789,11 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
     };
     const abrirJuego = (appId) => {
 
+        // Climbing: abre una pestaña nueva con el hub (trivial de escalada + simulador de caída)
+        if (appId === 'CLIMBING') {
+            window.open('/escalada', '_blank');
+            return;
+        }
 
             // Si pinchan en el portal, cambiamos de pantalla y CREAMOS LA URL
         if (appId === 'MATH_WORLD_PORTAL') {

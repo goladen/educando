@@ -515,11 +515,16 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
             } else if (editForm.tipo === 'ORDENAR') {
                 upd = { ...upd, q: editForm.q.trim(), bloques: editForm.bloques.filter(s => s.trim()) };
             }
+            // La pregunta cambió → invalidar sus traducciones (todos los idiomas)
+            // para que se vuelvan a pedir la próxima vez que se traduzca.
+            upd = { ...upd, traducciones: {} };
             await updateDoc(doc(db, 'trivial_recursos', recursoId, 'preguntas', editandoPregId), upd);
             setPreguntas(prev => ({
                 ...prev,
                 [tabActiva]: prev[tabActiva].map(p => p.id === editandoPregId ? { ...p, ...upd } : p)
             }));
+            // Quitar la pregunta del borrador de revisión para que cuente como pendiente.
+            setTradBorrador(prev => { const n = { ...prev }; delete n[editandoPregId]; return n; });
             setEditandoPregId(null);
             setEditForm(null);
         } catch (e) { console.error(e); }
@@ -683,8 +688,16 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
         setTraduciendo(true); setTradError(''); setTradGuardado(false);
         try {
             const pregs = todasLasPreguntas();
-            // 1) Reunir todos los textos únicos a traducir.
-            const unicos = [...new Set(pregs.flatMap(p => camposTraducibles(p).map(([, txt]) => txt)))];
+            // Solo las pendientes: las que aún NO tienen traducción en este idioma
+            // (ni guardada ni en el borrador actual). Al editar una pregunta se le
+            // borra la traducción, así vuelve a considerarse pendiente.
+            const pendientesTrad = pregs.filter(p => {
+                const e = tradBorrador[p.id];
+                return !(e && Object.keys(e).length);
+            });
+            if (!pendientesTrad.length) { setTradError('✓ Todas las preguntas ya están traducidas a este idioma. Edita una pregunta para volver a traducirla.'); setTraduciendo(false); return; }
+            // 1) Reunir todos los textos únicos a traducir (solo de las pendientes).
+            const unicos = [...new Set(pendientesTrad.flatMap(p => camposTraducibles(p).map(([, txt]) => txt)))];
             if (!unicos.length) { setTradError('No hay preguntas que traducir.'); setTraduciendo(false); return; }
 
             // 2) Traducir en lotes de 40.
@@ -701,7 +714,7 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
             // 3) Volcar por pregunta y campo en el borrador (respetando ediciones previas).
             setTradBorrador(prev => {
                 const b = { ...prev };
-                for (const p of pregs) {
+                for (const p of pendientesTrad) {
                     const entry = { ...(b[p.id] || {}) };
                     for (const [campo, orig] of camposTraducibles(p)) {
                         const tr = mapa.get(orig);
@@ -1210,7 +1223,9 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
             {/* ─── TRANSLATE MODAL ─── */}
             {tradPanel && (() => {
                 const pregs = todasLasPreguntas();
-                const totalTraducidas = pregs.filter(p => tradBorrador[p.id] && Object.keys(tradBorrador[p.id]).length).length;
+                const traducibles = pregs.filter(p => camposTraducibles(p).length);
+                const totalTraducidas = traducibles.filter(p => tradBorrador[p.id] && Object.keys(tradBorrador[p.id]).length).length;
+                const pendientesCount = traducibles.length - totalTraducidas;
                 return (
                     <div style={{ position: 'fixed', inset: 0, zIndex: 4000, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
                         onClick={e => { if (e.target === e.currentTarget && !traduciendo && !tradGuardando) setTradPanel(false); }}>
@@ -1241,11 +1256,11 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
 
                             {/* Actions */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 20px', borderBottom: '1px solid #334155', flexShrink: 0 }}>
-                                <button onClick={traducirTodas} disabled={traduciendo || tradGuardando}
-                                    style={{ background: '#7c3aed', border: 'none', color: 'white', padding: '9px 16px', borderRadius: 8, cursor: traduciendo ? 'default' : 'pointer', fontSize: '0.85rem', fontWeight: 700, opacity: traduciendo ? 0.7 : 1 }}>
-                                    {traduciendo ? (tradProgreso || 'Traduciendo…') : `✨ Traducir ${pregs.length} preguntas con IA`}
+                                <button onClick={traducirTodas} disabled={traduciendo || tradGuardando || pendientesCount === 0}
+                                    style={{ background: pendientesCount === 0 ? '#334155' : '#7c3aed', border: 'none', color: 'white', padding: '9px 16px', borderRadius: 8, cursor: (traduciendo || pendientesCount === 0) ? 'default' : 'pointer', fontSize: '0.85rem', fontWeight: 700, opacity: traduciendo ? 0.7 : 1 }}>
+                                    {traduciendo ? (tradProgreso || 'Traduciendo…') : pendientesCount === 0 ? '✓ Todas traducidas' : `✨ Traducir ${pendientesCount} pendiente${pendientesCount !== 1 ? 's' : ''} con IA`}
                                 </button>
-                                <span style={{ color: '#64748b', fontSize: '0.78rem', marginLeft: 'auto' }}>{totalTraducidas}/{pregs.length} con traducción</span>
+                                <span style={{ color: '#64748b', fontSize: '0.78rem', marginLeft: 'auto' }}>{totalTraducidas}/{traducibles.length} con traducción</span>
                             </div>
 
                             {tradError && <div style={{ background: '#7f1d1d', color: '#fca5a5', padding: '8px 20px', fontSize: '0.82rem', flexShrink: 0 }}>⚠ {tradError}</div>}
@@ -1258,11 +1273,25 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                                     if (!campos.length) return null;
                                     const entry = tradBorrador[p.id] || {};
                                     const hex = CAT_HEX[p.categoria] || '#64748b';
+                                    // Estado: pendiente (sin traducir) / sin guardar (traducida o editada) / guardada.
+                                    const limpioRev = {};
+                                    if (entry.q?.trim()) limpioRev.q = entry.q.trim();
+                                    if (entry.a?.trim()) limpioRev.a = entry.a.trim();
+                                    if (Array.isArray(entry.w) && entry.w.some(x => x?.trim())) limpioRev.w = entry.w.map(x => (x || '').trim());
+                                    if (entry.b0?.trim()) limpioRev.b0 = entry.b0.trim();
+                                    if (entry.b2?.trim()) limpioRev.b2 = entry.b2.trim();
+                                    const tieneTrad = Object.keys(limpioRev).length > 0;
+                                    const guardadoLang = p.traducciones?.[tradIdioma];
+                                    const estado = !tieneTrad ? 'pendiente'
+                                        : (guardadoLang && JSON.stringify(guardadoLang) === JSON.stringify(limpioRev)) ? 'guardada'
+                                        : 'sinGuardar';
+                                    const estadoBadge = { pendiente: { t: 'Pendiente', c: '#64748b' }, sinGuardar: { t: '● Sin guardar', c: '#f59e0b' }, guardada: { t: '✓ Guardada', c: '#22c55e' } }[estado];
                                     return (
-                                        <div key={p.id} style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 12, padding: '12px 14px' }}>
+                                        <div key={p.id} style={{ background: '#0f172a', border: `1px solid ${estado === 'sinGuardar' ? '#f59e0b55' : '#334155'}`, borderRadius: 12, padding: '12px 14px' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                                                 <span style={{ background: hex + '22', color: hex, border: `1px solid ${hex}55`, borderRadius: 6, padding: '1px 8px', fontSize: '0.7rem', fontWeight: 700 }}>{categorias[p.categoria]?.nombre || p.categoria}</span>
                                                 <span style={{ color: '#475569', fontSize: '0.7rem' }}>{p.tipo || 'SELECCION'}</span>
+                                                <span style={{ marginLeft: 'auto', color: estadoBadge.c, fontSize: '0.68rem', fontWeight: 800 }}>{estadoBadge.t}</span>
                                             </div>
                                             {campos.map(([campo, orig]) => {
                                                 const val = campo.startsWith('w') ? (entry.w?.[Number(campo.slice(1))] ?? '') : (entry[campo] ?? '');
@@ -1693,6 +1722,10 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                                                 <span>#{idx + 1} · {p.autorNombre}</span>
                                                 {p.dificultad === 'dificil' && <span style={{ color: '#fdba74', fontSize: '0.68rem', background: '#7c2d12', borderRadius: 4, padding: '1px 6px', fontWeight: 700 }}>🔥 DIFÍCIL</span>}
                                                 {p.lectura && <span style={{ color: '#38bdf8', fontSize: '0.68rem', background: '#0c2a4a', borderRadius: 4, padding: '1px 5px' }}>🔊 {({ 'es-ES': 'ES', 'fr-FR': 'FR', 'en-US': 'EN', 'ca-ES': 'CA' }[p.lecturaIdioma] || 'ES')}</span>}
+                                                {p.traducciones && ['en', 'fr', 'ca'].filter(l => p.traducciones[l]).map(l => {
+                                                    const m = { en: { t: 'I', c: '#3b82f6', n: 'inglés' }, fr: { t: 'F', c: '#ef4444', n: 'francés' }, ca: { t: 'C', c: '#eab308', n: 'catalán' } }[l];
+                                                    return <span key={l} title={`Traducida a ${m.n}`} style={{ color: m.c, fontSize: '0.66rem', background: m.c + '22', border: `1px solid ${m.c}55`, borderRadius: 4, padding: '1px 5px', fontWeight: 800 }}>{m.t}</span>;
+                                                })}
                                             </div>
                                             {/* Pregunta */}
                                             {tipo !== 'RELLENAR' && p.q && (

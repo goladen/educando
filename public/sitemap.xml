@@ -1,35 +1,35 @@
 ﻿<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://pikt.es/</loc>
+    <loc>https://www.pikt.es/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://pikt.es/populares</loc>
+    <loc>https://www.pikt.es/populares</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
 
-  <url><loc>https://pikt.es/pasapalabra</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://pikt.es/burbujas</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://pikt.es/pikatron</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://pikt.es/aparejados</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://pikt.es/ruleta</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://pikt.es/wordle</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://pikt.es/sopa_letras</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://pikt.es/sintaxis</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://www.pikt.es/pasapalabra</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://www.pikt.es/burbujas</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://www.pikt.es/pikatron</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://www.pikt.es/aparejados</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://www.pikt.es/ruleta</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://www.pikt.es/wordle</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://www.pikt.es/sopa_letras</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://www.pikt.es/sintaxis</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
 
-  <url><loc>https://pikt.es/mathle</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://pikt.es/geometrix</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://pikt.es/calculo</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://pikt.es/ecuaciones</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://www.pikt.es/mathle</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://www.pikt.es/geometrix</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://www.pikt.es/calculo</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://www.pikt.es/ecuaciones</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
 
-  <url><loc>https://pikt.es/pilive</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
-  <url><loc>https://pikt.es/mathlive</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
-  <url><loc>https://pikt.es/olympic_live</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://www.pikt.es/pilive</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://www.pikt.es/mathlive</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://www.pikt.es/olympic_live</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
 
-  <url><loc>https://pikt.es/q-sender</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
-  <url><loc>https://pikt.es/guia-pikt-es.html</loc><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://pikt.es/politica.html</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://www.pikt.es/q-sender</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://www.pikt.es/guia-pikt-es.html</loc><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://www.pikt.es/politica.html</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
 </urlset>

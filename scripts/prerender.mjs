@@ -21,7 +21,7 @@ const DIST = process.env.PRERENDER_DIST
   ? resolve(process.env.PRERENDER_DIST)
   : resolve(__dirname, '..', 'dist');
 const SRC_HTML = resolve(DIST, 'index.html');
-const SITE = 'https://pikt.es';
+const SITE = 'https://www.pikt.es';
 const OG_IMAGE = `${SITE}/og-image.png`;
 
 if (!existsSync(SRC_HTML)) {

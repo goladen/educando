@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://pikt.es/sitemap.xml
+Sitemap: https://www.pikt.es/sitemap.xml

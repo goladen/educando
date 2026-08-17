@@ -24,6 +24,8 @@ import EtiquetaMe from './EtiquetaMe';
 import KartingTrack from './KartingTrack';
 import ArkadeHub from './MiniArcade/ArkadeHub';
 import VideoQuizzApp from './VideoQuizzApp';
+import ClimbingHub from './ClimbingHub';
+import WhoKnows from './WhoKnows';
 
 const TUTORIAL_ALUMNO = [
     {
@@ -55,6 +57,7 @@ function App() {
     const [miniappId,         setMiniappId]         = useState(null);
     const [trivialEnvioCode,  setTrivialEnvioCode]  = useState(null);
     const [trivialRecursoId,  setTrivialRecursoId]  = useState(null);
+    const [climbing,          setClimbing]          = useState(false);
     const [questionSenderCode,setQuestionSenderCode]= useState(null);
 
     // ANNOTATION OVERLAY + PIZARRA DESDE CAPTURA
@@ -87,6 +90,7 @@ function App() {
       if (mid) { setMiniappId(mid); return; }
       const trivialEnvio = params.get('trivial_envio');
       if (trivialEnvio) { setTrivialEnvioCode(trivialEnvio.toUpperCase()); return; }
+      if (params.get('climbing')) { setClimbing(true); return; }
       const trivialR = params.get('trivial');
       if (trivialR) { setTrivialRecursoId(trivialR); return; }
       const qsc = params.get('c');
@@ -104,7 +108,7 @@ function App() {
       if (slug === 'funcionesejecutivas' || slug === 'irregular_verbs' || slug === 'sistema_solar'
           || slug === 'retos' || slug === 'conectapuntos' || slug === 'sudoku'
           || slug === 'partes_planta' || slug === 'etiquetame' || slug === 'karting_track'
-          || slug === 'arkade' || slug === 'imperios') {
+          || slug === 'arkade' || slug === 'imperios' || slug === 'escalada' || slug === 'whoknows') {
         setRutaPublica(slug);
         return;
       }
@@ -264,6 +268,8 @@ function App() {
         </>
     );
 
+    if (rutaPublica === 'escalada') return <ClimbingHub onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
+    if (rutaPublica === 'whoknows') return <WhoKnows onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
     if (rutaPublica === 'karting_track') return <KartingTrack />;
     if (rutaPublica === 'arkade') return <ArkadeHub onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
     if (rutaPublica === 'partes_planta') return <PartesPlantaGame onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
@@ -283,6 +289,8 @@ function App() {
     if (trivialEnvioCode) return <TrivialEnvioForm codigoInicial={trivialEnvioCode} onBack={() => { setTrivialEnvioCode(null); window.history.pushState({}, '', '/'); }} />;
 
     // Enlace directo a un Trivial de un recurso concreto (no requiere login)
+    if (climbing) return <ClimbingHub onExit={() => { setClimbing(false); window.history.pushState({}, '', '/'); }} />;
+
     if (trivialRecursoId) return <TrivialGame recursoIdInicial={trivialRecursoId} onExit={() => { setTrivialRecursoId(null); window.history.pushState({}, '', '/'); }} />;
 
     // Formulario público de envío de preguntas a cualquier recurso vía código ?c=CODE (no requiere login)

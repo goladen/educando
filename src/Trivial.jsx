@@ -478,6 +478,8 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
     const [cargando, setCargando] = useState(false);
     const [controlsOcultos, setControlsOcultos] = useState(false);
     const preguntasRef = useRef(PREGUNTAS);
+    // Preguntas ya mostradas por categoría (para no repetir hasta agotar la categoría).
+    const preguntasUsadasRef = useRef({});
 
     const activePlayerIdxRef = useRef(0);
     useEffect(() => { activePlayerIdxRef.current = activePlayerIdx; }, [activePlayerIdx]);
@@ -643,6 +645,7 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
         }
 
         preguntasRef.current = pregsFinales;
+        preguntasUsadasRef.current = {}; // reiniciar control de no-repetición
         primeTraducciones(pregsFinales);
 
         const nuevosJugadores = [];
@@ -765,6 +768,7 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                 preguntasRef.current = PREGUNTAS_JSON;
             }
 
+            preguntasUsadasRef.current = {}; // reiniciar control de no-repetición
             setPlayers(jugadoresRestaurados);
             setActivePlayerIdx(data.turnoActivo || 0);
             setPantalla('PLAYING');
@@ -1097,7 +1101,15 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
             const hard = qList.filter(q => q.dificultad === 'dificil');
             if (hard.length) qList = hard;
         }
-        const qData = qList[Math.floor(Math.random() * qList.length)];
+        // No repetir preguntas hasta que hayan salido todas las de la categoría.
+        const idOf = q => q.id ?? q.q ?? (q.bloques ? q.bloques.join('|') : JSON.stringify(q));
+        const usadasKey = qCat + (modoDificilRef.current ? ':h' : '');
+        let vistas = preguntasUsadasRef.current[usadasKey] || new Set();
+        let disponibles = qList.filter(q => !vistas.has(idOf(q)));
+        if (disponibles.length === 0) { vistas = new Set(); disponibles = qList; } // agotada → rebarajar
+        const qData = disponibles[Math.floor(Math.random() * disponibles.length)];
+        vistas.add(idOf(qData));
+        preguntasUsadasRef.current[usadasKey] = vistas;
         const tipo = qData.tipo || 'SELECCION';
 
         // Prepare type-specific state
@@ -1726,7 +1738,7 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                 <FullscreenBtn />
                 <div style={{ background: 'rgba(30, 41, 59, 0.95)', padding: isMobile ? '20px 16px' : 40, borderRadius: 20, width: '100%', maxWidth: 500, margin: isMobile ? '16px' : 0, boxSizing: 'border-box', boxShadow: '0 25px 50px rgba(0,0,0,0.5)', border: '2px solid #334155' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 20 }}>
-                        <button onClick={() => setPantalla('INTRO')} style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 'bold', fontSize: '0.9rem' }}>
+                        <button onClick={() => { if (recursoIdInicial) { onExit?.(); return; } setPantalla('INTRO'); }} style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 'bold', fontSize: '0.9rem' }}>
                             <ArrowLeft size={16} /> {t('Volver')}
                         </button>
                         <LanguageSelector compacto />
@@ -1820,7 +1832,7 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                     <button onClick={() => { setErrorPreguntas(''); iniciarJuego(); }} disabled={cargando} style={{ ...st.btnRoll, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, opacity: cargando ? 0.7 : 1, cursor: cargando ? 'wait' : 'pointer' }}>
                         <Play size={20}/> {cargando ? t('Cargando preguntas...') : t('Empezar Juego')}
                     </button>
-                    <button onClick={() => { setPantalla('INTRO'); setCategoriasRecurso(null); setErrorPreguntas(''); }} style={{ width: '100%', background: 'transparent', border: 'none', color: '#64748b', padding: 12, marginTop: 5, cursor: 'pointer', fontWeight: 'bold' }}>← {t('Volver al inicio')}</button>
+                    <button onClick={() => { if (recursoIdInicial) { onExit?.(); return; } setPantalla('INTRO'); setCategoriasRecurso(null); setErrorPreguntas(''); }} style={{ width: '100%', background: 'transparent', border: 'none', color: '#64748b', padding: 12, marginTop: 5, cursor: 'pointer', fontWeight: 'bold' }}>← {t('Volver al inicio')}</button>
                 </div>
             </div>
         );

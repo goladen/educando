@@ -85,6 +85,10 @@ export default function WhoKnows({ onExit }) {
     const [guardado, setGuardado] = useState(false);
     const [ranking, setRanking] = useState(null);
     const [miEntradaId, setMiEntradaId] = useState(null);
+    // Visor de rankings por categoría
+    const [rankingsAll, setRankingsAll] = useState(null);
+    const [rkCat, setRkCat] = useState('mix');
+    const [rkModo, setRkModo] = useState('rapido');
 
     // ── Cargar preguntas del recurso ─────────────────────────────────────────
     useEffect(() => {
@@ -218,6 +222,15 @@ export default function WhoKnows({ onExit }) {
         } catch (e) { console.error(e); setRanking([]); }
     };
 
+    const abrirRankings = async () => {
+        setFase('RANKINGS');
+        if (rankingsAll) return;
+        try {
+            const snap = await getDocs(query(collection(db, 'whoknows_scores'), where('recursoId', '==', RECURSO_ID)));
+            setRankingsAll(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        } catch (e) { console.error(e); setRankingsAll([]); }
+    };
+
     const guardarPuntuacion = async () => {
         if (!nombre.trim() || guardado) return;
         setGuardando(true);
@@ -285,6 +298,68 @@ export default function WhoKnows({ onExit }) {
                         style={{ width: '100%', background: 'linear-gradient(135deg,#22c55e,#16a34a)', border: 'none', color: 'white', padding: '15px', borderRadius: 14, cursor: 'pointer', fontWeight: 800, fontSize: '1.1rem' }}>
                         ▶ {t('Empezar')}
                     </button>
+                    <button onClick={abrirRankings}
+                        style={{ width: '100%', marginTop: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid #334155', color: '#e2e8f0', padding: '13px', borderRadius: 14, cursor: 'pointer', fontWeight: 700, fontSize: '1rem' }}>
+                        🏆 {t('Ver rankings')}
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    // ── VISOR DE RANKINGS POR CATEGORÍA ──────────────────────────────────────
+    if (fase === 'RANKINGS') {
+        const catsRank = ['mix', ...CAT_IDS.filter(c => (preguntasPorCat[c] || []).length > 0)];
+        const lista = (rankingsAll || []).filter(r => r.modo === rkModo && (r.categoria || 'mix') === rkCat)
+            .sort((a, b) => (b.puntuacion || 0) - (a.puntuacion || 0)).slice(0, 20);
+        return (
+            <div style={wrap}>
+                <button style={btnBack} onClick={() => setFase('CONFIG')}>← {t('Volver')}</button>
+                <div style={{ position: 'fixed', top: 12, right: 12, zIndex: 50 }}><LanguageSelector compacto /></div>
+                <div style={{ textAlign: 'center', margin: isMobile ? '8px 0 16px' : '24px 0 18px' }}>
+                    <div style={{ fontSize: isMobile ? '2.4rem' : '3rem' }}>🏆</div>
+                    <h1 style={{ margin: '6px 0 2px', fontSize: 'clamp(1.5rem,5vw,2.2rem)', fontWeight: 900 }}>{t('Rankings')}</h1>
+                </div>
+
+                <div style={{ width: '100%', maxWidth: 480 }}>
+                    {/* Modo */}
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                        {['rapido', 'master'].map(m => (
+                            <button key={m} onClick={() => setRkModo(m)}
+                                style={{ flex: 1, background: rkModo === m ? '#7c3aed' : 'rgba(255,255,255,0.05)', border: `2px solid ${rkModo === m ? '#a855f7' : '#334155'}`, color: 'white', borderRadius: 10, padding: '9px', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>
+                                {m === 'master' ? `👑 ${t('Master')}` : `⚡ ${t('Rápido')}`}
+                            </button>
+                        ))}
+                    </div>
+                    {/* Categorías */}
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+                        {catsRank.map(c => {
+                            const activo = rkCat === c;
+                            const hex = c === 'mix' ? '#0ea5e9' : (cats[c]?.hex || '#64748b');
+                            return (
+                                <button key={c} onClick={() => setRkCat(c)}
+                                    style={{ background: activo ? hex : 'rgba(255,255,255,0.05)', border: `1.5px solid ${activo ? hex : '#334155'}`, color: activo ? 'white' : '#cbd5e1', borderRadius: 20, padding: '5px 12px', cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem' }}>
+                                    {c === 'mix' ? `🎲 ${t('Mix')}` : `${cats[c]?.emoji || ''} ${t(cats[c]?.nombre || c)}`}
+                                </button>
+                            );
+                        })}
+                    </div>
+                    {/* Tabla */}
+                    {rankingsAll === null ? <div style={{ color: '#64748b' }}>{t('Cargando…')}</div>
+                        : lista.length === 0 ? <div style={{ color: '#64748b', textAlign: 'center', padding: 24 }}>{t('Aún no hay puntuaciones. ¡Sé el primero!')}</div> : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                {lista.map((r, i) => {
+                                    const medal = ['🥇', '🥈', '🥉'][i] || `${i + 1}.`;
+                                    return (
+                                        <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid #334155', borderRadius: 10, padding: '9px 14px' }}>
+                                            <span style={{ minWidth: 28, textAlign: 'center', fontWeight: 800 }}>{medal}</span>
+                                            <span style={{ flex: 1, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.nombre}</span>
+                                            <span style={{ fontWeight: 900, color: '#22c55e', minWidth: 52, textAlign: 'right' }}>{r.puntuacion}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
                 </div>
             </div>
         );

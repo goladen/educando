@@ -137,6 +137,8 @@ export const STATIC_TRANSLATIONS = {
         "Respuesta correcta:": "Correct answer:",
         "Ver resultado →": "See result →",
         "Siguiente →": "Next →",
+        "Ver rankings": "View rankings",
+        "Rankings": "Rankings",
     },
     ca: {
         "Todas": "Totes",
@@ -261,6 +263,8 @@ export const STATIC_TRANSLATIONS = {
         "Respuesta correcta:": "Resposta correcta:",
         "Ver resultado →": "Veure resultat →",
         "Siguiente →": "Següent →",
+        "Ver rankings": "Veure rànquings",
+        "Rankings": "Rànquings",
     },
     fr: {
         "Todas": "Toutes",
@@ -385,5 +389,7 @@ export const STATIC_TRANSLATIONS = {
         "Respuesta correcta:": "Bonne réponse :",
         "Ver resultado →": "Voir le résultat →",
         "Siguiente →": "Suivant →",
+        "Ver rankings": "Voir les classements",
+        "Rankings": "Classements",
     },
 };

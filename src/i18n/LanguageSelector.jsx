@@ -3,7 +3,7 @@
 //   <LanguageSelector />
 import { useLanguage } from './LanguageContext';
 
-export default function LanguageSelector({ compacto = false }) {
+export default function LanguageSelector({ compacto = false, fill = false }) {
     const { idioma, setIdioma, idiomas } = useLanguage();
 
     return (
@@ -19,6 +19,8 @@ export default function LanguageSelector({ compacto = false }) {
                 background: '#fff',
                 fontSize: compacto ? 13 : 14,
                 cursor: 'pointer',
+                width: fill ? '100%' : undefined,
+                maxWidth: '100%',
             }}
         >
             {Object.entries(idiomas).map(([codigo, info]) => (

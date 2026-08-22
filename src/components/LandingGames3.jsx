@@ -7,6 +7,7 @@ import MisRegistros from './MisRegistros';
 import { getResumenRegistros } from '../utils/registrosLocales';
 import { useT } from '../i18n/LanguageContext';
 import LanguageSelector from '../i18n/LanguageSelector';
+import FullscreenBtn from '../MiniArcade/FullscreenBtn';
 import KartingTrack from '../KartingTrack';
 import KartingedMultiGame from '../KartingedMultiGame';
 import RacingGame3D from '../RacingGame3D';
@@ -1584,6 +1585,14 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
     const [simuladoresFisica,   setSimuladoresFisica]   = useState(false);
     const [simuladorFisicaActivo, setSimuladorFisicaActivo] = useState(null);
 
+    // Ancho de ventana para adaptar la interfaz en móvil (evita apelotonamiento)
+    const [esMovilVista, setEsMovilVista] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 640);
+    useEffect(() => {
+        const onResize = () => setEsMovilVista(window.innerWidth <= 640);
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
+    }, []);
+
     // Estados alumno logueado
     const [vistaAlumno,    setVistaAlumno]    = useState('MAIN'); // 'MAIN' | 'RECORDS'
     const [records,        setRecords]        = useState([]);
@@ -2822,11 +2831,12 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
             )}
 
             {/* ── TABS PRINCIPALES + BOTÓN LUPA ── */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 10 }}>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 10, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flex: esMovilVista ? '1 1 100%' : '0 1 auto' }}>
                     <button
                         onClick={() => setTabPrincipal('TODAS')}
                         style={{ padding: '10px 18px', borderRadius: 20, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '0.92rem', transition: 'all 0.2s',
+                            flex: esMovilVista ? '1 1 0' : '0 0 auto',
                             background: tabPrincipal === 'TODAS' ? '#f1c40f' : 'rgba(255,255,255,0.2)',
                             color: tabPrincipal === 'TODAS' ? '#333' : 'white',
                             boxShadow: tabPrincipal === 'TODAS' ? '0 2px 10px rgba(241,196,15,0.5)' : 'none' }}
@@ -2834,17 +2844,21 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                     <button
                         onClick={() => { setTabPrincipal('MATERIA'); cargarRecursosPorMateria(materiaActiva); if (MATERIA_ROUTE[materiaActiva]) window.history.pushState({}, '', `/${MATERIA_ROUTE[materiaActiva]}`); }}
                         style={{ padding: '10px 18px', borderRadius: 20, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '0.92rem', transition: 'all 0.2s',
+                            flex: esMovilVista ? '1 1 0' : '0 0 auto',
                             background: tabPrincipal === 'MATERIA' ? '#f1c40f' : 'rgba(255,255,255,0.2)',
                             color: tabPrincipal === 'MATERIA' ? '#333' : 'white',
                             boxShadow: tabPrincipal === 'MATERIA' ? '0 2px 10px rgba(241,196,15,0.5)' : 'none' }}
                     >📚 {t('Por Materia')}</button>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-                    <LanguageSelector compacto />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: esMovilVista ? '1 1 100%' : '0 0 auto' }}>
+                    <div style={{ flex: esMovilVista ? '1 1 0' : '0 0 auto', minWidth: 0 }}>
+                        <LanguageSelector compacto fill={esMovilVista} />
+                    </div>
+                    <FullscreenBtn style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.35)', borderRadius: 12, padding: '10px 12px', flex: '0 0 auto' }} />
                     <button
                         onClick={() => setBuscadorVisible(true)}
                         title="Buscar recurso"
-                        style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.35)', color: 'white', borderRadius: 12, padding: '10px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: '0.9rem' }}
+                        style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.35)', color: 'white', borderRadius: 12, padding: '10px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontWeight: 700, fontSize: '0.9rem', flex: esMovilVista ? '0 0 auto' : '0 0 auto', whiteSpace: 'nowrap' }}
                     >
                         <Search size={18} /> {t('Buscar')}
                     </button>
@@ -3197,7 +3211,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
             <h2 style={{ color: 'white', textShadow: '0 2px 4px rgba(0,0,0,0.5)', textAlign: 'center', marginBottom: '20px', marginTop: '30px' }}>
                 🛠️ Herramientas Clase
             </h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '15px', marginBottom: '40px', maxWidth: '900px', margin: '0 auto 40px auto' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: esMovilVista ? '1fr 1fr' : 'repeat(auto-fit, minmax(140px, 1fr))', gap: '15px', marginBottom: '40px', maxWidth: '900px', margin: '0 auto 40px auto' }}>
                 {[
 { id: 'LENGUA_SIGNOS',   label: 'Lengua Signos',   emoji: '🤟',  color: '#2563EB', action: () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }), shareable: true },
                     { id: 'SINTAXIS',        label: 'Sintaxis',        emoji: '🖍️',  color: '#3498db', action: () => setJuegoActivo({ tipoJuego: 'SINTAXIS' }), shareable: true },

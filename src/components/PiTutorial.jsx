@@ -14,8 +14,13 @@ import piContento from '../assets/Pi-contento.png';
  *   pasos      — [{ texto: string }, ...]
  *   inline     — true: el botón minimizado aparece en el flujo del DOM (para barras de botones)
  *                false (default): el botón minimizado es position:fixed (esquina inferior-derecha)
+ *   usarLocalStorage — true: persiste "visto" en localStorage en vez de Firestore
+ *                      (para visitantes SIN loguear). Requiere tutorialId.
+ *   accion     — { label, onClick } opcional: botón extra en el último paso (p. ej. "Entrar")
+ *   ocultarMinimizado — true: no muestra el botón/mascota cuando está minimizado
+ *                       (para mensajes de una sola vez, p. ej. en la landing)
  */
-export default function PiTutorial({ usuario, tutorialId, pasos = [], inline = false }) {
+export default function PiTutorial({ usuario, tutorialId, pasos = [], inline = false, usarLocalStorage = false, accion = null, ocultarMinimizado = false }) {
     const [estado, setEstado]           = useState('cargando');
     const [paso, setPaso]               = useState(0);
     const [textoMostrado, setTexto]     = useState('');
@@ -27,6 +32,12 @@ export default function PiTutorial({ usuario, tutorialId, pasos = [], inline = f
 
     // ── Comprobar si ya fue visto ──────────────────────────────────────
     useEffect(() => {
+        // Visitante sin loguear: persistimos en localStorage
+        if (usarLocalStorage && tutorialId) {
+            const visto = localStorage.getItem('pitut_' + tutorialId);
+            setEstado(visto ? 'minimizado' : 'visible');
+            return;
+        }
         if (!usuario || !tutorialId) { setEstado('minimizado'); return; }
         getDoc(doc(db, 'users', usuario.uid))
             .then(snap => {
@@ -34,7 +45,7 @@ export default function PiTutorial({ usuario, tutorialId, pasos = [], inline = f
                 setEstado(vistos.includes(tutorialId) ? 'minimizado' : 'visible');
             })
             .catch(() => setEstado('minimizado'));
-    }, [usuario, tutorialId]);
+    }, [usuario, tutorialId, usarLocalStorage]);
 
     // ── Máquina de escribir + TTS ──────────────────────────────────────
     useEffect(() => {
@@ -72,6 +83,10 @@ export default function PiTutorial({ usuario, tutorialId, pasos = [], inline = f
 
     // ── Helpers ────────────────────────────────────────────────────────
     const marcarVisto = async () => {
+        if (usarLocalStorage && tutorialId) {
+            try { localStorage.setItem('pitut_' + tutorialId, '1'); } catch (_) {}
+            return;
+        }
         if (!usuario) return;
         try {
             const ref  = doc(db, 'users', usuario.uid);
@@ -187,6 +202,11 @@ export default function PiTutorial({ usuario, tutorialId, pasos = [], inline = f
                                         <button onClick={handleCerrar}    style={btn.secondary}>Omitir</button>
                                         <button onClick={handleSiguiente} style={btn.primary}>Siguiente →</button>
                                     </>
+                                ) : accion ? (
+                                    <>
+                                        <button onClick={handleCerrar} style={btn.secondary}>Ahora no</button>
+                                        <button onClick={() => { window.speechSynthesis?.cancel(); marcarVisto(); setEstado('minimizado'); accion.onClick?.(); }} style={btn.primary}>{accion.label}</button>
+                                    </>
                                 ) : (
                                     <button onClick={handleCerrar} style={btn.primary}>¡Entendido! 👍</button>
                                 )}
@@ -214,7 +234,7 @@ export default function PiTutorial({ usuario, tutorialId, pasos = [], inline = f
                 · inline=true  → en el flujo del DOM
                 · inline=false → position:fixed esquina inferior-derecha
             ═══════════════════════════════════════ */}
-            {estado === 'minimizado' && (
+            {estado === 'minimizado' && !ocultarMinimizado && (
                 inline
                     /* ── Botón inline (dentro de una barra de botones) ── */
                     ? (

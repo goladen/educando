@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { auth, db } from './firebase';
 import { signOut, onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, setDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, query, where, getDocs, increment } from "firebase/firestore";
 import ProfesorDashboard from './ProfesorDashboard';
 import LandingGames from './components/LandingGames3';
 import Login from './Login';
@@ -152,6 +152,19 @@ function App() {
           .then(snap => { if (!snap.empty) setPaginaTarget({ slug, uid: snap.docs[0].id }); })
           .catch(()=>{});
       }
+    }, []);
+
+    // CONTADOR DE VISITANTES ÚNICOS — 1 por dispositivo (guest o logueado). Doc: stats/visitantes
+    useEffect(() => {
+        if (localStorage.getItem('pikt_visitante_contado')) return;
+        (async () => {
+            try {
+                await setDoc(doc(db, 'stats', 'visitantes'), { count: increment(1) }, { merge: true });
+                localStorage.setItem('pikt_visitante_contado', '1');
+            } catch (e) {
+                console.warn('Contador visitantes:', e);
+            }
+        })();
     }, []);
 
     // DETECTAR DEEP LINK AL MONTAR (funciona para todos: registrados, sin registrar, invitados)

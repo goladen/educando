@@ -12,6 +12,8 @@ import { db } from './firebase';
 import SopaDeLetrasGame from './SopaDeLetrasGame';
 import BuscadorPaginas from './components/BuscadorPaginas';
 import PaginaProfesor from './components/PaginaProfesor';
+import ContadorVisitantes from './components/ContadorVisitantes';
+import PiTutorial from './components/PiTutorial';
 
 export default function Login({ setGoogleToken }) {
     const [error, setError] = useState(null);
@@ -184,12 +186,22 @@ export default function Login({ setGoogleToken }) {
             <div style={{ width: '80%', maxWidth: '1000px', margin: '80px auto 0 auto', padding: '0 20px', zIndex: 10 }}>
                 <div style={{ textAlign: 'center', color: 'white', marginBottom: '20px', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
                     <h1 style={{ fontSize: '3rem', margin: 0 }}>PiKT</h1>
-                    <p style={{ fontSize: '1.2rem', fontStyle: 'italic', opacity: 0.9 }}>Juega, aprende y repite</p>
+                    <p style={{ fontSize: '1.2rem', fontStyle: 'italic', opacity: 0.9, marginBottom: '12px' }}>Juega, aprende y repite</p>
+                    <ContadorVisitantes />
                 </div>
 
                 {/* AQUÍ CARGA EL COMPONENTE QUE HAS ACTUALIZADO ARRIBA */}
                 <LandingGames />
             </div>
+
+            {/* Recomendación de Pi al visitante nuevo (una vez por dispositivo) */}
+            <PiTutorial
+                usarLocalStorage
+                ocultarMinimizado
+                tutorialId="recomendacion_login"
+                pasos={[{ texto: '¡Hola! Soy Pi 👋 Este sitio es totalmente gratuito y sin publicidad. Si te registras (es gratis y rápido), nos ayudas muchísimo a mantenerlo vivo para todos. 💜' }]}
+                accion={{ label: 'Entrar con Google', onClick: handleLogin }}
+            />
         </div>
 
 

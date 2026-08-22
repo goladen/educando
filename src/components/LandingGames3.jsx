@@ -27,6 +27,8 @@ import Geometrix from '../Geometrix';
 import CalculoMental from '../CalculoMental';
 import CalculoDinero from '../CalculoDinero';
 import Ecuaciones from '../Ecuaciones';
+import EcuacionSistemas from '../EcuacionSistemas';
+import PotenciasRaices from '../PotenciasRaices';
 import Funciones from '../Funciones';
 import GeometriaAnalitica from '../Funciones2'
 import PerimetroArea from '../PerimetroArea';
@@ -641,11 +643,21 @@ export const APPS = [
         isMath: true,
         shareable: true
     },
+    {
+        id: 'ECUACION_SISTEMAS',
+        name: 'Sistemas de Ecuaciones',
+        desc: 'Resuelve sistemas 2x2, 3x3 y retos visuales.',
+        color: '#6c5ce7',
+        emoji: '🧮',
+        isMath: true,
+        shareable: true
+    },
     { id: 'FUNCIONES', name: 'Funciones', desc: 'Características de funciones, Representación', color: '#4CAF50', emoji: '📈', isMath: true, shareable: true },
     { id: 'GEOMETRÍA_ANALÍTICA', name: 'Geometría_Analítica', desc: 'Rectas, parábolas y análisis gráfico.', color: '#4CAF50', emoji: '♐​', isMath: true, shareable: true },
 
 
     { id: 'POLINOMIOS',   name: 'Álgebra',      desc: 'Operaciones con polinomios.',              color: '#FF9800', emoji: '✖️', isMath: true, shareable: true },
+    { id: 'POTENCIAS_RAICES', name: 'Potencias y Raíces', desc: 'Propiedades de potencias y raíces: ejercicios aleatorios.', color: '#0ea5e9', emoji: '⚡', isMath: true, shareable: true },
     { id: 'ESTADISTICA',  name: 'Estadística',  desc: 'Tablas, parámetros y representación gráfica.', color: '#9C27B0', emoji: '📊', isMath: true, shareable: true },
     { id: 'PROBABILIDAD', name: 'Probabilidad', desc: 'Simulador de dados: tipos, múltiples dados y análisis de frecuencias.', color: '#f59e0b', emoji: '🎲', isMath: true, shareable: true },
 
@@ -1048,6 +1060,22 @@ export const GAME_INFO = {
         materias: ['Matemáticas'],
         etapas: ['ESO', 'Bachillerato'],
     },
+    ECUACION_SISTEMAS: {
+        descripcion: 'Herramienta gamificada para resolver sistemas de ecuaciones: retos visuales con emojis, sistemas 2x2 aleatorios (fácil/medio/difícil, por reducción y sustitución), sistemas 2x2 con fracciones y denominadores, matrices 3x3 por Gauss y una colección de problemas de enunciado con solución paso a paso y explicación. Incluye guía paso a paso, lienzo de operaciones y modo dual para 2 jugadores.',
+        tipoPreguntas: 'Sistemas 2x2 (aleatorios por dificultad) y 3x3, con y sin denominadores, retos visuales de deducción y 15 problemas de enunciado resueltos paso a paso.',
+        biblioteca: 'Sí, incluye un banco de sistemas de distintos niveles y tipos.',
+        multiplayer: 'Individual y modo dual (2 jugadores compiten en paralelo en la misma pantalla). Envío de informe al profesor con el código docente.',
+        materias: ['Matemáticas'],
+        etapas: ['ESO', 'Bachillerato'],
+    },
+    POTENCIAS_RAICES: {
+        descripcion: 'Práctica de potencias y raíces con ejercicios generados aleatoriamente (basados en la relación de 4º ESO): calcular potencias (base negativa, exponente 0 y negativos), base fraccionaria, pasar a potencia de base entera, todas las propiedades (producto/cociente de igual base, potencia de potencia, mismo exponente, base racional), sacar factor común (c·bⁿ), notación científica, y raíces (extraer factor y sumar/restar raíces equivalentes). Incluye teoría y autocorrección con sonido.',
+        tipoPreguntas: 'Potencias y propiedades, base fraccionaria/entera, factor común, notación científica y raíces. Ejercicios aleatorios ilimitados con «Generar nuevos». Teoría con explicaciones visuales animadas (mini-vídeo) de por qué se cumple cada propiedad.',
+        biblioteca: 'Sí, genera ejercicios automáticamente por tipo.',
+        multiplayer: 'Individual, modo dual (2 tableros independientes, cada uno elige su tipo) y modo competición «tirón de cuerda» (mismo tipo, ejercicios distintos, meta configurable). Puntuación en % al corregir y envío de informe al profesor con el código docente.',
+        materias: ['Matemáticas'],
+        etapas: ['ESO', 'Bachillerato'],
+    },
     FUNCIONES: {
         descripcion: 'Explorador interactivo de funciones matemáticas: representación gráfica en el plano cartesiano, análisis de dominio, recorrido, crecimiento, extremos y simetrías.',
         tipoPreguntas: 'Análisis y representación de funciones. La herramienta genera ejemplos automáticamente.',
@@ -1126,7 +1154,7 @@ export const MATERIAS_CONFIG = [
     {
         id: 'MATEMATICAS', label: 'Matemáticas', emoji: '🔢', color: '#009688',
         keywords: ['matemáticas', 'mates', 'math', 'calculo', 'algebra', 'geometria', 'estadistica', 'probabilidad', 'fraccion', 'ecuacion', 'funcion', 'numero', 'operacion'],
-        specificIds: ['MATH_WORLD_PORTAL', 'GEOMETRIX', 'CALCULO', 'DINERO', 'ECUACIONES', 'FUNCIONES', 'GEOMETRÍA_ANALÍTICA', 'POLINOMIOS', 'ESTADISTICA', 'PROBABILIDAD', 'MATHLE', 'MATHLIVE', 'OLYMPICLIVE'],
+        specificIds: ['MATH_WORLD_PORTAL', 'GEOMETRIX', 'CALCULO', 'DINERO', 'ECUACIONES', 'ECUACION_SISTEMAS', 'FUNCIONES', 'GEOMETRÍA_ANALÍTICA', 'POLINOMIOS', 'POTENCIAS_RAICES', 'ESTADISTICA', 'PROBABILIDAD', 'MATHLE', 'MATHLIVE', 'OLYMPICLIVE'],
     },
     {
         id: 'LENGUA', label: 'Lengua', emoji: '📖', color: '#7B1FA2',
@@ -2257,6 +2285,8 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
         if (juegoActivo.tipoJuego === 'OCA') return <OcaMatematicaDirect onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'DOMINO') return <DominoMatematicoDirect onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'ECUACIONES') return <Ecuaciones usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
+        if (juegoActivo.tipoJuego === 'ECUACION_SISTEMAS') return <EcuacionSistemas onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
+        if (juegoActivo.tipoJuego === 'POTENCIAS_RAICES') return <PotenciasRaices onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'FUNCIONES') return <Funciones onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'GEOMETRÍA_ANALÍTICA') return <GeometriaAnalitica onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'POLINOMIOS')  return <AlgebraApp      usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
@@ -3625,6 +3655,8 @@ const [entrando, setEntrando] = useState(false);
         if (appData.id === 'CALCULO' || juegoActivo.tipoJuego === 'CALCULO') return <CalculoMental usuario={usuario} onExit={handleExitGame} />;
         if (appData.id === 'DINERO' || juegoActivo.tipoJuego === 'DINERO') return <CalculoDinero usuario={usuario} onExit={handleExitGame} />;
         if (appData.id === 'ECUACIONES' || juegoActivo.tipoJuego === 'ECUACIONES') return <Ecuaciones onExit={handleExitGame} />;
+        if (appData.id === 'ECUACION_SISTEMAS' || juegoActivo.tipoJuego === 'ECUACION_SISTEMAS') return <EcuacionSistemas onExit={handleExitGame} />;
+        if (appData.id === 'POTENCIAS_RAICES' || juegoActivo.tipoJuego === 'POTENCIAS_RAICES') return <PotenciasRaices onExit={handleExitGame} />;
         if (appData.id === 'FUNCIONES' || juegoActivo.tipoJuego === 'FUNCIONES') return <Funciones usuario={usuario} onExit={handleExitGame} />;
         if (appData.id === 'GEOMETRÍA_ANALÍTICA' || juegoActivo.tipoJuego === 'GEOMETRÍA_ANALÍTICA') return <GeometriaAnalitica usuario={usuario} onExit={handleExitGame} />;
         if (appData.id === 'POLINOMIOS'  || juegoActivo.tipoJuego === 'POLINOMIOS')  return <AlgebraApp     usuario={usuario} onExit={handleExitGame} />;
@@ -3652,6 +3684,8 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={usuario} onExit={o
     if (appData.id === 'CALCULO') return <CalculoMental usuario={usuario} onExit={handleExitGame} />;
     if (appData.id === 'DINERO') return <CalculoDinero usuario={usuario} onExit={handleExitGame} />;
     if (appData.id === 'ECUACIONES') return <Ecuaciones usuario={usuario} onExit={handleExitGame} />;
+    if (appData.id === 'ECUACION_SISTEMAS') return <EcuacionSistemas onExit={handleExitGame} />;
+    if (appData.id === 'POTENCIAS_RAICES') return <PotenciasRaices onExit={handleExitGame} />;
     if (appData.id === 'FUNCIONES') return <Funciones usuario={usuario} onExit={handleExitGame} />;
     if (appData.id === 'GEOMETRÍA_ANALÍTICA') return <GeometriaAnalitica usuario={usuario} onExit={handleExitGame} />;
 

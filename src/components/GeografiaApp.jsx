@@ -3,6 +3,7 @@ import { db } from '../firebase';
 import { collection, addDoc, doc, getDoc, setDoc, onSnapshot, updateDoc, increment } from 'firebase/firestore';
 import correctSoundFile from '../assets/correct-choice-43861.mp3';
 import wrongSoundFile   from '../assets/negative_beeps-6008.mp3';
+import { CompeticionCuerda } from './TironCuerdaEscena';
 
 const WORLD_URL    = 'https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson';
 const ESP_PROV_URL = 'https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/spain-provinces.geojson';
@@ -559,8 +560,128 @@ const drawRio = (ctx, x1, y1, x2, y2) => {
 const inp = { width:'100%', padding:'9px 12px', borderRadius:9, border:'1.5px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.08)', color:'#f1f5f9', fontSize:'0.92rem', outline:'none', boxSizing:'border-box' };
 
 // ── Component ─────────────────────────────────────────────────────────────────
+// ── Panel NATIVO de competición (opción múltiple con banderas/capitales) ───────
+const _sampleDistintos = (arr, n, excluir) => {
+  const pool = [...new Set(arr)].filter((x) => x !== excluir);
+  const out = [];
+  while (out.length < n && pool.length) out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  return out;
+};
+const _barajar = (a) => a.map((v) => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map((p) => p[1]);
+
+// Genera el trazado SVG de la silueta de un país (todas sus islas/polígonos)
+const siluetaPathData = (feature) => {
+  const geom = feature.geometry;
+  const polys = geom.type === 'Polygon' ? [geom.coordinates] : geom.type === 'MultiPolygon' ? geom.coordinates : [];
+  let minLon = 180, maxLon = -180, minLat = 90, maxLat = -90;
+  polys.forEach((poly) => poly.forEach((ring) => ring.forEach(([lo, la]) => {
+    if (lo < minLon) minLon = lo; if (lo > maxLon) maxLon = lo;
+    if (la < minLat) minLat = la; if (la > maxLat) maxLat = la;
+  })));
+  const W = 220, H = 150, pad = 12;
+  const latC = (minLat + maxLat) / 2;
+  const cos = Math.max(0.1, Math.cos((latC * Math.PI) / 180));
+  const lonSpan = Math.max(maxLon - minLon, 0.01), latSpan = Math.max(maxLat - minLat, 0.01);
+  const scale = Math.min((W - 2 * pad) / (lonSpan * cos), (H - 2 * pad) / latSpan);
+  const offX = (W - lonSpan * cos * scale) / 2, offY = (H - latSpan * scale) / 2;
+  const px = (lo) => (offX + (lo - minLon) * cos * scale).toFixed(1);
+  const py = (la) => (offY + (maxLat - la) * scale).toFixed(1);
+  let d = '';
+  polys.forEach((poly) => poly.forEach((ring) => {
+    if (ring.length < 3) return;
+    ring.forEach(([lo, la], i) => { d += (i === 0 ? 'M' : 'L') + px(lo) + ',' + py(la) + ' '; });
+    d += 'Z ';
+  }));
+  return { d, W, H };
+};
+
+function PanelGeoCompeticion({ aplicar, bloqueado, equipo, tipo = 'mix', ambito = 'Todo el mundo' }) {
+  const color = equipo === 1 ? '#3498db' : '#e74c3c';
+  const esProv = ambito === 'Provincias';
+  // Pools filtrados por ámbito
+  const filtB = ambito === 'Todo el mundo' || esProv ? PAISES_BANDERAS : PAISES_BANDERAS.filter((p) => p.continente === ambito);
+  const paisesB = filtB.length >= 4 ? filtB : PAISES_BANDERAS;
+  const filtF = ambito === 'Todo el mundo' || esProv ? PAISES : PAISES.filter((p) => p.continente === ambito);
+  const paisesF = filtF.length >= 4 ? filtF : PAISES;
+  const prevRef = useRef(null);
+
+  const genOne = () => {
+    // ── Provincias de España: siluetas ──
+    if (esProv) {
+      if (!_espCache) return { pregunta: 'Cargando mapa…', opciones: [] };
+      let it = PROVINCIAS[Math.floor(Math.random() * PROVINCIAS.length)], feat = findFeature(_espCache, it), tries = 0;
+      while (!feat && tries < 12) { it = PROVINCIAS[Math.floor(Math.random() * PROVINCIAS.length)]; feat = findFeature(_espCache, it); tries++; }
+      if (feat) return { pregunta: '¿Qué provincia es?', silueta: siluetaPathData(feat), correcta: it.nombre, opciones: _barajar([it.nombre, ..._sampleDistintos(PROVINCIAS.map((p) => p.nombre), 3, it.nombre)]) };
+      return { pregunta: 'Cargando mapa…', opciones: [] };
+    }
+
+    const item = paisesB[Math.floor(Math.random() * paisesB.length)];
+    const tipos = ['capital', 'pais', 'bandera'];
+    if (_worldCache) tipos.push('silueta');
+    const t = (tipo && tipo !== 'mix') ? tipo : tipos[Math.floor(Math.random() * tipos.length)];
+    let pregunta, flag = null, correcta, pool;
+    if (t === 'silueta' && _worldCache) {
+      let it = paisesF[Math.floor(Math.random() * paisesF.length)], feat = findFeature(_worldCache, it), tries = 0;
+      while (!feat && tries < 12) { it = paisesF[Math.floor(Math.random() * paisesF.length)]; feat = findFeature(_worldCache, it); tries++; }
+      if (feat) return { pregunta: '¿Qué país es este?', silueta: siluetaPathData(feat), correcta: it.nombre, opciones: _barajar([it.nombre, ..._sampleDistintos(paisesF.map((p) => p.nombre), 3, it.nombre)]) };
+    }
+    if (t === 'capital') { pregunta = `¿Cuál es la capital de ${item.nombre}?`; correcta = item.capital; pool = paisesB.map((p) => p.capital); }
+    else if (t === 'pais') { pregunta = `¿Qué país tiene por capital ${item.capital}?`; correcta = item.nombre; pool = paisesB.map((p) => p.nombre); }
+    else { pregunta = '¿A qué país pertenece esta bandera?'; flag = FLAG_URL(item.iso2); correcta = item.nombre; pool = paisesB.map((p) => p.nombre); }
+    return { pregunta, flag, correcta, opciones: _barajar([correcta, ..._sampleDistintos(pool, 3, correcta)]) };
+  };
+  // Evita repetir la pregunta anterior (misma pregunta + respuesta)
+  const gen = () => {
+    let q, tries = 0;
+    const clave = (x) => `${x.pregunta}|${x.correcta}`;
+    do { q = genOne(); tries++; } while (clave(q) === prevRef.current && tries < 10);
+    prevRef.current = clave(q);
+    return q;
+  };
+  const [q, setQ] = useState(gen);
+  const [sel, setSel] = useState(null);
+
+  const responder = (op) => {
+    if (bloqueado || sel) return;
+    const ok = op === q.correcta;
+    setSel(op);
+    try { const a = new Audio(ok ? correctSoundFile : wrongSoundFile); a.volume = 0.5; a.play().catch(() => {}); } catch (e) { /* noop */ }
+    aplicar(ok);
+    setTimeout(() => { setSel(null); setQ(gen()); }, 950);
+  };
+
+  return (
+    <div style={{ background: 'white', borderRadius: 16, padding: 14, border: `3px solid ${sel ? (sel === q.correcta ? '#10b981' : '#ef4444') : color}`, boxShadow: '0 4px 15px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ fontWeight: 900, color }}>{equipo === 1 ? '🔵 Equipo 1' : '🔴 Equipo 2'}</div>
+      {q.flag && <img src={q.flag} alt="bandera" style={{ width: 120, height: 80, objectFit: 'cover', borderRadius: 8, alignSelf: 'center', border: '1px solid #e2e8f0' }} />}
+      {q.silueta && (
+        <svg viewBox={`0 0 ${q.silueta.W} ${q.silueta.H}`} width="200" height="136" style={{ alignSelf: 'center', background: '#eef2f7', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+          <path d={q.silueta.d} fill="#334155" stroke="#0f172a" strokeWidth="0.6" strokeLinejoin="round" />
+        </svg>
+      )}
+      <div style={{ fontWeight: 700, color: '#1e293b', textAlign: 'center', minHeight: 40, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{q.pregunta}</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        {q.opciones.map((op, i) => {
+          const estado = sel ? (op === q.correcta ? 'ok' : (op === sel ? 'bad' : '')) : '';
+          return (
+            <button key={i} onClick={() => responder(op)} disabled={!!sel || bloqueado}
+              style={{ padding: '10px 8px', borderRadius: 10, border: '2px solid #e2e8f0', cursor: (sel || bloqueado) ? 'default' : 'pointer', fontWeight: 700, fontSize: '0.9rem',
+                background: estado === 'ok' ? '#d1fae5' : estado === 'bad' ? '#fee2e2' : '#f8fafc', color: '#1e293b' }}>
+              {op}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function GeografiaAppInner({ onBack, onCreateLive, onJoinLive }) {
   const [pantalla,          setPantalla]          = useState('intro');
+  const [tipoComp,          setTipoComp]          = useState('mix'); // tipo de pregunta en competición
+  const [worldReady,        setWorldReady]        = useState(!!_worldCache); // geojson cargado (para siluetas)
+  const [espReady,          setEspReady]          = useState(!!_espCache);   // geojson provincias ESP
+  const [ambitoComp,        setAmbitoComp]        = useState('Todo el mundo'); // ámbito de la competición
   const [modoJuego,         setModoJuego]         = useState('mundo');
   const [continente,        setContinente]        = useState('Europa');
   const [ambitoFisico,      setAmbitoFisico]      = useState('España');
@@ -616,6 +737,16 @@ function GeografiaAppInner({ onBack, onCreateLive, onJoinLive }) {
     if (modoJuego === 'fisico') ensureFeatures('mundo');
     else if (modoJuego !== 'banderas') ensureFeatures(modoJuego);
   }, [modoJuego, ensureFeatures]);
+
+  // Carga los mapas para las siluetas de la competición (mundo y provincias ESP)
+  useEffect(() => {
+    let alive = true;
+    if (_worldCache) setWorldReady(true);
+    else fetch(WORLD_URL).then((r) => r.json()).then((d) => { _worldCache = d.features; if (alive) setWorldReady(true); }).catch(() => {});
+    if (_espCache) setEspReady(true);
+    else fetch(ESP_PROV_URL).then((r) => r.json()).then((d) => { _espCache = d.features; if (alive) setEspReady(true); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
 
   const redraw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -1047,6 +1178,11 @@ function GeografiaAppInner({ onBack, onCreateLive, onJoinLive }) {
             {cargando ? '⏳ Cargando mapas…' : '¡Empezar!'}
           </button>
 
+          <button onClick={() => setPantalla('competicion')}
+            style={{ width:'100%', marginTop:10, padding:'13px 0', borderRadius:14, border:'none', background:'linear-gradient(135deg,#f39c12,#e67e22)', color:'white', fontSize:'1rem', fontWeight:900, cursor:'pointer' }}>
+            🪢 Competición por equipos (tirón de cuerda)
+          </button>
+
           {/* Live mode */}
           <div style={{ marginTop:16, borderTop:'1px solid rgba(255,255,255,0.1)', paddingTop:16 }}>
             <div style={{ fontSize:'0.72rem', color:'rgba(255,255,255,0.45)', marginBottom:10, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em' }}>🔴 Juego en Vivo</div>
@@ -1063,6 +1199,43 @@ function GeografiaAppInner({ onBack, onCreateLive, onJoinLive }) {
               </button>
             </div>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── COMPETICIÓN POR EQUIPOS (tirón de cuerda) ──────────────────────────────
+  if (pantalla === 'competicion') {
+    return (
+      <div style={{ minHeight:'100vh', background:'linear-gradient(135deg,#1e3a5f 0%,#1e40af 50%,#0f766e 100%)', padding:16, boxSizing:'border-box' }}>
+        <button onClick={() => setPantalla('intro')} style={{ background:'rgba(255,255,255,0.15)', border:'none', color:'white', borderRadius:8, padding:'7px 14px', cursor:'pointer', fontSize:'0.9rem', marginBottom:12 }}>← Salir</button>
+        <div style={{ maxWidth:1000, margin:'0 auto', background:'#f1f5f9', borderRadius:20, padding:16 }}>
+          <CompeticionCuerda onSalir={() => setPantalla('intro')}
+            configExtra={(
+              <>
+                <div style={{ display:'flex', gap:8, justifyContent:'center', flexWrap:'wrap', alignItems:'center', marginBottom:8 }}>
+                  <span style={{ color:'#7d6608' }}>Ámbito:</span>
+                  {[...CONTINENTES, 'Provincias'].map((a) => (
+                    <button key={a} onClick={() => setAmbitoComp(a)}
+                      style={{ padding:'5px 11px', borderRadius:20, cursor:'pointer', fontWeight:800, fontSize:'0.78rem', border:'2px solid #0d9488', background: ambitoComp===a ? '#0d9488' : 'white', color: ambitoComp===a ? 'white' : '#0d9488' }}>
+                      {a === 'Provincias' ? '🗺️ Provincias ESP' : a}{a==='Provincias' && !espReady ? ' ⏳' : ''}
+                    </button>
+                  ))}
+                </div>
+                {ambitoComp !== 'Provincias' && (
+                  <div style={{ display:'flex', gap:8, justifyContent:'center', flexWrap:'wrap', alignItems:'center', marginBottom:8 }}>
+                    <span style={{ color:'#7d6608' }}>Preguntas:</span>
+                    {[['mix','🎲 Mix'],['bandera','🚩 Banderas'],['capital','🏛️ Capitales'],['pais','🌍 País por capital'],['silueta','🗺️ Silueta']].map(([id,lbl]) => (
+                      <button key={id} onClick={() => setTipoComp(id)}
+                        style={{ padding:'5px 11px', borderRadius:20, cursor:'pointer', fontWeight:800, fontSize:'0.78rem', border:'2px solid #3b82f6', background: tipoComp===id ? '#3b82f6' : 'white', color: tipoComp===id ? 'white' : '#3b82f6' }}>
+                        {lbl}{id==='silueta' && !worldReady ? ' ⏳' : ''}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+            renderPanel={(equipo, api) => <PanelGeoCompeticion key={`${api.key}-${ambitoComp}-${tipoComp}-${worldReady}-${espReady}`} equipo={equipo} aplicar={api.aplicar} bloqueado={api.bloqueado} tipo={tipoComp} ambito={ambitoComp} />} />
         </div>
       </div>
     );

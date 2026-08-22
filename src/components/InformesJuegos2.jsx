@@ -552,6 +552,30 @@ export default function InformesJuegos({ usuario, googleToken }) {
                                         onBuscarJugador={setBusquedaJugador}
                                     />
                                 );
+                                if (tipo === 'ECUACION_SISTEMAS') return (
+                                    <EcuacionSistemasCard
+                                        key={inf.id} inf={inf}
+                                        onBorrar={()=>borrar(inf.id)}
+                                        borrando={borrando===inf.id}
+                                        borradoOk={borrandoOk===inf.id}
+                                        modoSeleccion={modoSeleccion}
+                                        seleccionado={selec}
+                                        onSeleccionar={()=>toggleSeleccion(inf.id)}
+                                        onBuscarJugador={setBusquedaJugador}
+                                    />
+                                );
+                                if (tipo === 'POTENCIAS_RAICES') return (
+                                    <PotenciasRaicesCard
+                                        key={inf.id} inf={inf}
+                                        onBorrar={()=>borrar(inf.id)}
+                                        borrando={borrando===inf.id}
+                                        borradoOk={borrandoOk===inf.id}
+                                        modoSeleccion={modoSeleccion}
+                                        seleccionado={selec}
+                                        onSeleccionar={()=>toggleSeleccion(inf.id)}
+                                        onBuscarJugador={setBusquedaJugador}
+                                    />
+                                );
                                 if (tipo === 'STORYCUBES') return (
                                     <StoryCubesCard
                                         key={inf.id} inf={inf}
@@ -1245,6 +1269,145 @@ const CalculoCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, selecc
                     )}
                 </div>
             )}
+            {confirmar && (
+                <div style={{ background:'#fdecea', borderTop:'1px solid #fdd', padding:'10px 15px', display:'flex', alignItems:'center', gap:10, fontSize:'0.83rem' }}>
+                    <AlertTriangle size={14} color="#e74c3c"/>
+                    <span style={{ flex:1, color:'#c0392b' }}>¿Eliminar este informe?</span>
+                    <button onClick={()=>{setConfirmar(false);onBorrar();}} disabled={borrando} style={{ padding:'4px 12px', borderRadius:7, border:'none', background:'#e74c3c', color:'white', cursor:'pointer', fontWeight:700, fontSize:'0.8rem' }}>{borrando?'Borrando…':'Eliminar'}</button>
+                    <button onClick={()=>setConfirmar(false)} style={{ padding:'4px 10px', borderRadius:7, border:'1px solid #ddd', background:'white', cursor:'pointer', fontSize:'0.8rem' }}>Cancelar</button>
+                </div>
+            )}
+            {borradoOk && <div style={{ background:'#e8f5e9', padding:'8px 15px', fontSize:'0.8rem', color:'#27ae60', display:'flex', alignItems:'center', gap:6 }}><CheckCircle size={13}/>Eliminado</div>}
+        </div>
+    );
+};
+
+// ─── Tarjeta especial para Sistemas de Ecuaciones ────────────────────────────
+const EcuacionSistemasCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccionado, onSeleccionar, onBuscarJugador }) => {
+    const [expandido, setExpandido] = useState(false);
+    const [confirmar, setConfirmar] = useState(false);
+    const j = (inf.jugadores || [])[0] || {};
+    const pct = j.porcentaje ?? (j.intentos > 0 ? Math.round((j.aciertos / j.intentos) * 100) : 0);
+    const pctColor = p => p >= 80 ? '#27ae60' : p >= 50 ? '#e67e22' : '#e74c3c';
+    const porTipo = j.porTipo || [];
+    const porDificultad = j.porDificultad || [];
+    const problemas = j.problemasResueltos || [];
+
+    return (
+        <div style={{ background:'white', borderRadius:13, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', overflow:'hidden', border: seleccionado?'2px solid #1565C0':'1.5px solid #e8e8e8' }}>
+            {/* Cabecera */}
+            <div onClick={modoSeleccion ? onSeleccionar : () => setExpandido(p => !p)}
+                style={{ padding:'11px 15px', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', cursor:'pointer' }}>
+                {modoSeleccion && <input type="checkbox" checked={seleccionado} onChange={e=>{e.stopPropagation();onSeleccionar();}} onClick={e=>e.stopPropagation()} style={{ width:17,height:17,cursor:'pointer',accentColor:'#1565C0' }}/>}
+                <span style={{ fontSize:'1.4rem' }}>🧮</span>
+                <div style={{ flex:1, minWidth:120 }}>
+                    <div style={{ fontWeight:700, color:'#2c3e50', fontSize:'0.92rem' }}>Sistemas de Ecuaciones</div>
+                    <div style={{ fontSize:'0.74rem', color:'#95a5a6', display:'flex', alignItems:'center', gap:4, flexWrap:'wrap' }}>
+                        <Clock size={10}/>{fmtFecha(inf.fecha)}
+                        {j.nombre && <> · <span onClick={e=>{e.stopPropagation();onBuscarJugador?.(j.nombre);}} style={{ cursor:'pointer', borderBottom:'1px dotted #aaa', fontWeight:600, color:'#2c3e50' }}>{j.nombre}</span></>}
+                        {j.curso && <span style={{ color:'#aaa' }}>({j.curso})</span>}
+                    </div>
+                </div>
+                <span style={{ padding:'2px 8px', borderRadius:20, background:'#f3f4f6', fontWeight:700, fontSize:'0.78rem', color:pctColor(pct) }}>{pct}%</span>
+                <span style={{ padding:'2px 8px', borderRadius:20, background:'#e8f5e9', fontWeight:700, fontSize:'0.78rem', color:'#27ae60' }}>✓ {j.aciertos??0}/{j.intentos??0}</span>
+                {expandido ? <ChevronUp size={16} color="#95a5a6"/> : <ChevronDown size={16} color="#95a5a6"/>}
+                {!modoSeleccion && <button onClick={e=>{e.stopPropagation();setConfirmar(true);}} style={{ padding:'4px 7px', borderRadius:7, border:'1px solid #fdd', background:'#fdecea', color:'#e74c3c', cursor:'pointer' }}><Trash2 size={13}/></button>}
+            </div>
+
+            {/* Detalle */}
+            {expandido && (
+                <div style={{ padding:'6px 15px 14px', borderTop:'1px solid #f0f0f0', fontSize:'0.82rem', color:'#34495e' }}>
+                    <div style={{ display:'flex', gap:8, flexWrap:'wrap', margin:'8px 0' }}>
+                        <span style={{ padding:'3px 10px', borderRadius:20, background:'#e8f5e9', color:'#27ae60', fontWeight:700 }}>✓ {j.aciertos??0} correctos</span>
+                        <span style={{ padding:'3px 10px', borderRadius:20, background:'#fff4e6', color:'#e67e22', fontWeight:700 }}>👁 {j.revelados??0} vistos sin resolver</span>
+                        <span style={{ padding:'3px 10px', borderRadius:20, background:'#eef2ff', color:'#4b3db3', fontWeight:700 }}>Σ {j.intentos??0} ejercicios</span>
+                    </div>
+
+                    {porTipo.length > 0 && (
+                        <div style={{ marginTop:8 }}>
+                            <div style={{ fontWeight:700, color:'#7f8c8d', fontSize:'0.76rem', textTransform:'uppercase', marginBottom:4 }}>Por tipo</div>
+                            {porTipo.map((t, i) => (
+                                <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'2px 0', borderBottom:'1px dashed #eee' }}>
+                                    <span>{t.label}</span><span style={{ fontWeight:700 }}>{t.aciertos}/{t.total} ✓</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {porDificultad.length > 0 && (
+                        <div style={{ marginTop:10 }}>
+                            <div style={{ fontWeight:700, color:'#7f8c8d', fontSize:'0.76rem', textTransform:'uppercase', marginBottom:4 }}>Dificultad (2x2 aleatorio)</div>
+                            {porDificultad.map((d, i) => (
+                                <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'2px 0', borderBottom:'1px dashed #eee' }}>
+                                    <span>{d.label}</span><span style={{ fontWeight:700 }}>{d.aciertos}/{d.total} ✓</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {problemas.length > 0 && (
+                        <div style={{ marginTop:10 }}>
+                            <div style={{ fontWeight:700, color:'#7f8c8d', fontSize:'0.76rem', textTransform:'uppercase', marginBottom:4 }}>Problemas resueltos ({problemas.length})</div>
+                            <div style={{ color:'#57606f', fontSize:'0.78rem' }}>{problemas.join(', ')}</div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {confirmar && (
+                <div style={{ background:'#fdecea', borderTop:'1px solid #fdd', padding:'10px 15px', display:'flex', alignItems:'center', gap:10, fontSize:'0.83rem' }}>
+                    <AlertTriangle size={14} color="#e74c3c"/>
+                    <span style={{ flex:1, color:'#c0392b' }}>¿Eliminar este informe?</span>
+                    <button onClick={()=>{setConfirmar(false);onBorrar();}} disabled={borrando} style={{ padding:'4px 12px', borderRadius:7, border:'none', background:'#e74c3c', color:'white', cursor:'pointer', fontWeight:700, fontSize:'0.8rem' }}>{borrando?'Borrando…':'Eliminar'}</button>
+                    <button onClick={()=>setConfirmar(false)} style={{ padding:'4px 10px', borderRadius:7, border:'1px solid #ddd', background:'white', cursor:'pointer', fontSize:'0.8rem' }}>Cancelar</button>
+                </div>
+            )}
+            {borradoOk && <div style={{ background:'#e8f5e9', padding:'8px 15px', fontSize:'0.8rem', color:'#27ae60', display:'flex', alignItems:'center', gap:6 }}><CheckCircle size={13}/>Eliminado</div>}
+        </div>
+    );
+};
+
+// ─── Tarjeta especial para Potencias y Raíces ────────────────────────────────
+const PotenciasRaicesCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccionado, onSeleccionar, onBuscarJugador }) => {
+    const [expandido, setExpandido] = useState(false);
+    const [confirmar, setConfirmar] = useState(false);
+    const j = (inf.jugadores || [])[0] || {};
+    const pct = j.porcentaje ?? (j.intentos > 0 ? Math.round((j.aciertos / j.intentos) * 100) : 0);
+    const pctColor = p => p >= 75 ? '#27ae60' : p >= 50 ? '#e67e22' : '#e74c3c';
+    const porTipo = j.porTipo || [];
+
+    return (
+        <div style={{ background:'white', borderRadius:13, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', overflow:'hidden', border: seleccionado?'2px solid #1565C0':'1.5px solid #e8e8e8' }}>
+            <div onClick={modoSeleccion ? onSeleccionar : () => setExpandido(p => !p)}
+                style={{ padding:'11px 15px', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', cursor:'pointer' }}>
+                {modoSeleccion && <input type="checkbox" checked={seleccionado} onChange={e=>{e.stopPropagation();onSeleccionar();}} onClick={e=>e.stopPropagation()} style={{ width:17,height:17,cursor:'pointer',accentColor:'#1565C0' }}/>}
+                <span style={{ fontSize:'1.4rem' }}>⚡</span>
+                <div style={{ flex:1, minWidth:120 }}>
+                    <div style={{ fontWeight:700, color:'#2c3e50', fontSize:'0.92rem' }}>Potencias y Raíces</div>
+                    <div style={{ fontSize:'0.74rem', color:'#95a5a6', display:'flex', alignItems:'center', gap:4, flexWrap:'wrap' }}>
+                        <Clock size={10}/>{fmtFecha(inf.fecha)}
+                        {j.nombre && <> · <span onClick={e=>{e.stopPropagation();onBuscarJugador?.(j.nombre);}} style={{ cursor:'pointer', borderBottom:'1px dotted #aaa', fontWeight:600, color:'#2c3e50' }}>{j.nombre}</span></>}
+                        {j.curso && <span style={{ color:'#aaa' }}>({j.curso})</span>}
+                    </div>
+                </div>
+                <span style={{ padding:'2px 8px', borderRadius:20, background:'#f3f4f6', fontWeight:700, fontSize:'0.78rem', color:pctColor(pct) }}>{pct}%</span>
+                <span style={{ padding:'2px 8px', borderRadius:20, background:'#e8f5e9', fontWeight:700, fontSize:'0.78rem', color:'#27ae60' }}>✓ {j.aciertos??0}/{j.intentos??0}</span>
+                {expandido ? <ChevronUp size={16} color="#95a5a6"/> : <ChevronDown size={16} color="#95a5a6"/>}
+                {!modoSeleccion && <button onClick={e=>{e.stopPropagation();setConfirmar(true);}} style={{ padding:'4px 7px', borderRadius:7, border:'1px solid #fdd', background:'#fdecea', color:'#e74c3c', cursor:'pointer' }}><Trash2 size={13}/></button>}
+            </div>
+
+            {expandido && porTipo.length > 0 && (
+                <div style={{ padding:'6px 15px 14px', borderTop:'1px solid #f0f0f0', fontSize:'0.82rem', color:'#34495e' }}>
+                    <div style={{ fontWeight:700, color:'#7f8c8d', fontSize:'0.76rem', textTransform:'uppercase', margin:'8px 0 4px' }}>Por tipo de ejercicio</div>
+                    {porTipo.map((t, i) => (
+                        <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'3px 0', borderBottom:'1px dashed #eee' }}>
+                            <span>{t.label}</span>
+                            <span style={{ fontWeight:700, color:pctColor(t.porcentaje) }}>{t.porcentaje}% <span style={{ color:'#95a5a6', fontWeight:500 }}>({t.aciertos}/{t.intentos})</span></span>
+                        </div>
+                    ))}
+                </div>
+            )}
+
             {confirmar && (
                 <div style={{ background:'#fdecea', borderTop:'1px solid #fdd', padding:'10px 15px', display:'flex', alignItems:'center', gap:10, fontSize:'0.83rem' }}>
                     <AlertTriangle size={14} color="#e74c3c"/>

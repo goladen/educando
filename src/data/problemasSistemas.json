@@ -1,0 +1,240 @@
+[
+  {
+    "id": "p1",
+    "titulo": "Problema 1 · Número de dos cifras",
+    "enunciado": "Calcula un número sabiendo que la suma de sus dos cifras es 10; y que, si invertimos el orden de dichas cifras, el número obtenido es 36 unidades mayor que el inicial.",
+    "incognitas": { "x": "cifra de las decenas", "y": "cifra de las unidades" },
+    "sistema": ["x + y = 10", "y - x = 4"],
+    "pasos": [
+      "🧠 Planteamiento: llamamos x a la cifra de las decenas e y a la de las unidades. El número es 10x + y y, al invertirlo, 10y + x.",
+      "① La suma de las cifras es 10:  x + y = 10.",
+      "② El invertido supera en 36 al original:  (10y + x) − (10x + y) = 36  →  9y − 9x = 36  →  y − x = 4.",
+      "🔧 Sumamos las dos ecuaciones:  (x + y) + (y − x) = 10 + 4  →  2y = 14  →  y = 7.",
+      "🔧 Sustituimos:  x + 7 = 10  →  x = 3."
+    ],
+    "solucion": { "x": 3, "y": 7 },
+    "explicacion": "Las cifras son 3 y 7, así que el número buscado es 37 (y su invertido, 73, es 37 + 36)."
+  },
+  {
+    "id": "p2",
+    "titulo": "Problema 2 · Ángulos de un triángulo rectángulo",
+    "enunciado": "En un triángulo rectángulo, uno de sus ángulos agudos es 12° mayor que el otro. ¿Cuánto miden sus tres ángulos?",
+    "incognitas": { "x": "ángulo agudo mayor (°)", "y": "ángulo agudo menor (°)" },
+    "sistema": ["x + y = 90", "x - y = 12"],
+    "pasos": [
+      "🧠 Planteamiento: en un triángulo rectángulo un ángulo mide 90°, así que los dos agudos suman 90°.",
+      "① x + y = 90.",
+      "② Un ángulo es 12° mayor que el otro:  x − y = 12.",
+      "🔧 Sumamos las ecuaciones:  2x = 102  →  x = 51.",
+      "🔧 Sustituimos:  51 + y = 90  →  y = 39."
+    ],
+    "solucion": { "x": 51, "y": 39 },
+    "explicacion": "Los ángulos del triángulo miden 90°, 51° y 39°."
+  },
+  {
+    "id": "p3",
+    "titulo": "Problema 3 · Dos coches que se encuentran",
+    "enunciado": "La distancia entre dos ciudades, A y B, es de 255 km. Un coche sale de A hacia B a 90 km/h. Al mismo tiempo, sale otro de B hacia A a 80 km/h. Calcula el tiempo que tardan en encontrarse y la distancia recorrida por cada uno.",
+    "incognitas": { "x": "km recorridos por el coche de A", "y": "km recorridos por el coche de B" },
+    "sistema": ["x + y = 255", "x/90 = y/80"],
+    "pasos": [
+      "🧠 Planteamiento: salen a la vez y se encuentran a la vez, luego viajan el mismo tiempo t. Sea x la distancia del coche de A e y la del de B.",
+      "① Juntos cubren los 255 km:  x + y = 255.",
+      "② Mismo tiempo:  t = x/90 = y/80  →  80x = 90y  →  8x = 9y.",
+      "🔧 Despejamos x = 255 − y y sustituimos:  8(255 − y) = 9y  →  2040 − 8y = 9y  →  17y = 2040  →  y = 120.",
+      "🔧 Entonces x = 255 − 120 = 135."
+    ],
+    "solucion": { "x": 135, "y": 120 },
+    "explicacion": "El coche de A recorre 135 km y el de B, 120 km. Como t = 135/90 = 1,5 h, se encuentran a la hora y media (1 h 30 min)."
+  },
+  {
+    "id": "p4",
+    "titulo": "Problema 4 · Cifra igual a la tercera parte",
+    "enunciado": "Halla un número de dos cifras sabiendo que la primera cifra es igual a la tercera parte de la segunda; y que si invertimos el orden de sus cifras, obtenemos otro número que excede en 54 unidades al inicial.",
+    "incognitas": { "x": "cifra de las decenas", "y": "cifra de las unidades" },
+    "sistema": ["3x = y", "y - x = 6"],
+    "pasos": [
+      "🧠 Planteamiento: x = cifra de las decenas, y = cifra de las unidades. Número = 10x + y.",
+      "① La primera cifra es la tercera parte de la segunda:  x = y/3  →  3x = y.",
+      "② El invertido excede en 54:  (10y + x) − (10x + y) = 54  →  9y − 9x = 54  →  y − x = 6.",
+      "🔧 Sustituimos y = 3x:  3x − x = 6  →  2x = 6  →  x = 3, y = 9."
+    ],
+    "solucion": { "x": 3, "y": 9 },
+    "explicacion": "El número es 39 (su invertido, 93, es 39 + 54)."
+  },
+  {
+    "id": "p5",
+    "titulo": "Problema 5 · Bases de un trapecio",
+    "enunciado": "La base mayor de un trapecio mide el triple que su base menor. La altura del trapecio es de 4 cm y su área es de 24 cm². Calcula la longitud de sus dos bases.",
+    "incognitas": { "x": "base menor (cm)", "y": "base mayor (cm)" },
+    "sistema": ["y = 3x", "x + y = 12"],
+    "pasos": [
+      "🧠 Planteamiento: x = base menor, y = base mayor. Área del trapecio = (B + b)·h / 2.",
+      "① La base mayor es el triple de la menor:  y = 3x.",
+      "② Área = 24 con h = 4:  (x + y)·4 / 2 = 24  →  (x + y)·2 = 24  →  x + y = 12.",
+      "🔧 Sustituimos y = 3x:  x + 3x = 12  →  4x = 12  →  x = 3, y = 9."
+    ],
+    "solucion": { "x": 3, "y": 9 },
+    "explicacion": "La base menor mide 3 cm y la base mayor 9 cm."
+  },
+  {
+    "id": "p6",
+    "titulo": "Problema 6 · Razón de edades",
+    "enunciado": "La razón entre las edades de dos personas es de 2/3. Sabiendo que se llevan 15 años, ¿cuál es la edad de cada una de ellas?",
+    "incognitas": { "x": "edad de la persona más joven", "y": "edad de la persona mayor" },
+    "sistema": ["3x = 2y", "y - x = 15"],
+    "pasos": [
+      "🧠 Planteamiento: x = edad menor, y = edad mayor.",
+      "① La razón de sus edades es 2/3:  x/y = 2/3  →  3x = 2y.",
+      "② Se llevan 15 años:  y − x = 15.",
+      "🔧 De 3x = 2y  →  y = 3x/2. Sustituimos:  3x/2 − x = 15  →  x/2 = 15  →  x = 30.",
+      "🔧 Entonces y = 30 + 15 = 45."
+    ],
+    "solucion": { "x": 30, "y": 45 },
+    "explicacion": "Tienen 30 y 45 años (y en efecto 30/45 = 2/3)."
+  },
+  {
+    "id": "p7",
+    "titulo": "Problema 7 · Un número excede a otro",
+    "enunciado": "Un número excede en 12 unidades a otro; y si restáramos 4 unidades a cada uno de ellos, entonces el primero sería igual al doble del segundo. Halla los dos números.",
+    "incognitas": { "x": "número mayor", "y": "número menor" },
+    "sistema": ["x - y = 12", "x - 4 = 2(y - 4)"],
+    "pasos": [
+      "🧠 Planteamiento: x = número mayor, y = número menor.",
+      "① El primero excede en 12 al otro:  x − y = 12.",
+      "② Restando 4 a cada uno, el primero es el doble del segundo:  x − 4 = 2(y − 4)  →  x = 2y − 4.",
+      "🔧 Sustituimos en x − y = 12:  (2y − 4) − y = 12  →  y − 4 = 12  →  y = 16.",
+      "🔧 Entonces x = 2·16 − 4 = 28."
+    ],
+    "solucion": { "x": 28, "y": 16 },
+    "explicacion": "Los números son 28 y 16 (al quitar 4: 24 y 12, y 24 = 2·12)."
+  },
+  {
+    "id": "p8",
+    "titulo": "Problema 8 · Triángulo isósceles",
+    "enunciado": "El perímetro de un triángulo isósceles es de 19 cm. La longitud de cada uno de sus lados iguales excede en 2 cm al doble de la longitud del lado desigual. ¿Cuánto miden los lados del triángulo?",
+    "incognitas": { "x": "longitud de cada lado igual (cm)", "y": "longitud del lado desigual (cm)" },
+    "sistema": ["2x + y = 19", "x = 2y + 2"],
+    "pasos": [
+      "🧠 Planteamiento: x = lado igual, y = lado desigual.",
+      "① Perímetro:  2x + y = 19.",
+      "② Cada lado igual excede en 2 al doble del desigual:  x = 2y + 2.",
+      "🔧 Sustituimos:  2(2y + 2) + y = 19  →  4y + 4 + y = 19  →  5y = 15  →  y = 3.",
+      "🔧 Entonces x = 2·3 + 2 = 8."
+    ],
+    "solucion": { "x": 8, "y": 3 },
+    "explicacion": "Los lados iguales miden 8 cm y el desigual 3 cm (8 + 8 + 3 = 19)."
+  },
+  {
+    "id": "p9",
+    "titulo": "Problema 9 · Pablo y Alicia",
+    "enunciado": "Pablo y Alicia llevan entre los dos 160 €. Si Alicia le da 10 € a Pablo, ambos tendrán la misma cantidad. ¿Cuánto dinero lleva cada uno?",
+    "incognitas": { "x": "dinero de Pablo (€)", "y": "dinero de Alicia (€)" },
+    "sistema": ["x + y = 160", "y - x = 20"],
+    "pasos": [
+      "🧠 Planteamiento: x = dinero de Pablo, y = dinero de Alicia.",
+      "① Entre los dos:  x + y = 160.",
+      "② Si Alicia da 10 € a Pablo quedan iguales:  x + 10 = y − 10  →  y − x = 20.",
+      "🔧 Sumamos las ecuaciones:  2y = 180  →  y = 90.",
+      "🔧 Entonces x = 160 − 90 = 70."
+    ],
+    "solucion": { "x": 70, "y": 90 },
+    "explicacion": "Pablo lleva 70 € y Alicia 90 € (tras el intercambio, 80 € cada uno)."
+  },
+  {
+    "id": "p10",
+    "titulo": "Problema 10 · Número capicúa",
+    "enunciado": "La suma de las tres cifras de un número capicúa es igual a 12. La cifra de las decenas excede en 4 unidades al doble de la cifra de las centenas. Halla dicho número.",
+    "incognitas": { "x": "cifra de las centenas (= unidades)", "y": "cifra de las decenas" },
+    "sistema": ["2x + y = 12", "y = 2x + 4"],
+    "pasos": [
+      "🧠 Planteamiento: al ser capicúa de 3 cifras, centenas = unidades = x, y las decenas = y. Número = 100x + 10y + x.",
+      "① La suma de las tres cifras es 12:  x + y + x = 12  →  2x + y = 12.",
+      "② Las decenas exceden en 4 al doble de las centenas:  y = 2x + 4.",
+      "🔧 Sustituimos:  2x + (2x + 4) = 12  →  4x + 4 = 12  →  4x = 8  →  x = 2, y = 8."
+    ],
+    "solucion": { "x": 2, "y": 8 },
+    "explicacion": "El número capicúa es 282."
+  },
+  {
+    "id": "p11",
+    "titulo": "Problema 11 · Dimensiones de un rectángulo",
+    "enunciado": "El perímetro de un rectángulo es de 22 cm, y sabemos que su base es 5 cm más larga que su altura. Halla las dimensiones del rectángulo.",
+    "incognitas": { "x": "base (cm)", "y": "altura (cm)" },
+    "sistema": ["x + y = 11", "x = y + 5"],
+    "pasos": [
+      "🧠 Planteamiento: x = base, y = altura.",
+      "① Perímetro 22:  2(x + y) = 22  →  x + y = 11.",
+      "② La base es 5 cm mayor que la altura:  x = y + 5.",
+      "🔧 Sustituimos:  (y + 5) + y = 11  →  2y = 6  →  y = 3.",
+      "🔧 Entonces x = 3 + 5 = 8."
+    ],
+    "solucion": { "x": 8, "y": 3 },
+    "explicacion": "La base mide 8 cm y la altura 3 cm."
+  },
+  {
+    "id": "p12",
+    "titulo": "Problema 12 · Mezcla de líquidos",
+    "enunciado": "Hemos mezclado dos tipos de líquido; el primero de 0,94 €/litro y el segundo de 0,86 €/litro, obteniendo 40 litros de mezcla a 0,89 €/litro. ¿Cuántos litros hemos puesto de cada clase?",
+    "incognitas": { "x": "litros del líquido de 0,94 €/l", "y": "litros del líquido de 0,86 €/l" },
+    "sistema": ["x + y = 40", "0,94x + 0,86y = 35,6"],
+    "pasos": [
+      "🧠 Planteamiento: x = litros del primer líquido, y = litros del segundo.",
+      "① En total 40 litros:  x + y = 40.",
+      "② Coste total (40 l a 0,89 €/l = 35,6 €):  0,94x + 0,86y = 35,6.",
+      "🔧 Despejamos x = 40 − y y sustituimos:  0,94(40 − y) + 0,86y = 35,6  →  37,6 − 0,08y = 35,6.",
+      "🔧 −0,08y = −2  →  y = 25, y x = 40 − 25 = 15."
+    ],
+    "solucion": { "x": 15, "y": 25 },
+    "explicacion": "Se mezclan 15 litros del líquido de 0,94 €/l y 25 litros del de 0,86 €/l."
+  },
+  {
+    "id": "p13",
+    "titulo": "Problema 13 · Doble y mitad",
+    "enunciado": "El doble de un número más la mitad de otro suman 7; y, si sumamos 7 al primero de ellos, obtenemos el quíntuplo del otro. Halla dichos números.",
+    "incognitas": { "x": "primer número", "y": "segundo número" },
+    "sistema": ["2x + y/2 = 7", "x + 7 = 5y"],
+    "pasos": [
+      "🧠 Planteamiento: x = primer número, y = segundo número.",
+      "① El doble del primero más la mitad del segundo suman 7:  2x + y/2 = 7.",
+      "② Sumando 7 al primero se obtiene el quíntuplo del segundo:  x + 7 = 5y  →  x = 5y − 7.",
+      "🔧 Sustituimos y multiplicamos por 2:  4(5y − 7) + y = 14  →  20y − 28 + y = 14  →  21y = 42  →  y = 2.",
+      "🔧 Entonces x = 5·2 − 7 = 3."
+    ],
+    "solucion": { "x": 3, "y": 2 },
+    "explicacion": "Los números son 3 y 2 (2·3 + 2/2 = 7 y 3 + 7 = 5·2)."
+  },
+  {
+    "id": "p14",
+    "titulo": "Problema 14 · Ángulos de un triángulo",
+    "enunciado": "Dos de los ángulos de un triángulo suman 122°. El tercero de sus ángulos excede en 4 grados al menor de los otros dos. ¿Cuánto miden los ángulos del triángulo?",
+    "incognitas": { "x": "ángulo mayor de los dos que suman 122°", "y": "ángulo menor de los dos que suman 122°" },
+    "sistema": ["x + y = 122", "x + 2y = 176"],
+    "pasos": [
+      "🧠 Planteamiento: sean x e y los dos ángulos que suman 122° (x el mayor).",
+      "① x + y = 122. El tercer ángulo mide 180 − (x + y) = 180 − 122 = 58°.",
+      "② El tercero excede en 4° al menor (y):  58 = y + 4. Reordenando 180 − x − y = y + 4  →  x + 2y = 176.",
+      "🔧 Restamos (x + 2y) − (x + y) = 176 − 122  →  y = 54.",
+      "🔧 Entonces x = 122 − 54 = 68."
+    ],
+    "solucion": { "x": 68, "y": 54 },
+    "explicacion": "Los ángulos miden 68°, 54° y 58° (58 = 54 + 4)."
+  },
+  {
+    "id": "p15",
+    "titulo": "Problema 15 · Dos inversiones",
+    "enunciado": "Una persona invierte una cantidad en un producto y obtiene un 5% de beneficio. En un segundo producto obtiene un 3,5% de beneficio. Sabiendo que en total invirtió 10 000 €, y que los beneficios de la primera inversión superan en 300 € a los de la segunda, ¿cuánto dinero invirtió en cada producto?",
+    "incognitas": { "x": "dinero invertido en el primer producto (€)", "y": "dinero invertido en el segundo producto (€)" },
+    "sistema": ["x + y = 10000", "0,05x - 0,035y = 300"],
+    "pasos": [
+      "🧠 Planteamiento: x = € invertidos en el primer producto, y = en el segundo.",
+      "① En total 10 000 €:  x + y = 10000.",
+      "② Beneficios 5% y 3,5%; el primero supera en 300 € al segundo:  0,05x − 0,035y = 300.",
+      "🔧 Multiplicamos la 2ª por 200 para quitar decimales:  10x − 7y = 60000.",
+      "🔧 De x = 10000 − y:  10(10000 − y) − 7y = 60000  →  100000 − 17y = 60000  →  17y = 40000  →  y ≈ 2352,94.",
+      "🔧 Entonces x = 10000 − 2352,94 ≈ 7647,06."
+    ],
+    "solucion": { "x": 7647.06, "y": 2352.94 },
+    "explicacion": "Invirtió unos 7647,06 € en el primer producto y 2352,94 € en el segundo (valores exactos 130000/17 € y 40000/17 €). Al ser decimales, se admite un pequeño margen al validar."
+  }
+]

@@ -1,6 +1,8 @@
 import React, { useState, useCallback } from 'react';
 import sonidoCorrecto from './assets/correct-choice-43861.mp3';
 import sonidoFallo    from './assets/negative_beeps-6008.mp3';
+import pikaSprite     from './assets/pikatron-sprite2.png';
+import pikaSprite1    from './assets/pikatron-sprite.png';
 
 const CSS = `
   @keyframes tironP1 {
@@ -31,6 +33,13 @@ const CSS = `
     0%   { background: rgba(244,67,54,0.45); }
     100% { background: rgba(244,67,54,0); }
   }
+  @keyframes tcHeaveL{0%,100%{transform:rotate(-9deg)}50%{transform:rotate(-19deg)}}
+  @keyframes tcHeaveR{0%,100%{transform:rotate(9deg)}50%{transform:rotate(19deg)}}
+  @keyframes tcCelebrate{0%,100%{transform:rotate(-5deg)}50%{transform:rotate(5deg)}}
+  @keyframes tcWinJump{0%,100%{transform:translateY(0)}40%{transform:translateY(-9px)}}
+  @keyframes tcDust{0%{opacity:.55;transform:translateX(-50%) scale(.5)}100%{opacity:0;transform:translateX(-50%) scale(1.7)}}
+  @keyframes tcRopeB{0%,100%{transform:translateY(0)}50%{transform:translateY(2px)}}
+  @keyframes tcPikaRun{0%{background-position:0% 0%}50%{background-position:0% 100%}100%{background-position:0% 0%}}
 `;
 
 const LIMITE = 10;
@@ -200,67 +209,92 @@ function Teclado({ valor, onDigit, onErase, onConfirm, tipoNum, color }) {
   );
 }
 
-// ── Zona cuerda ───────────────────────────────────────────────────────────────
-function ZonaCuerda({ diff, ganador }) {
-  const offset = diff * 4;
-
+// ── Muñequito dibujado (SVG), mirando a la derecha ─────────────────────────────
+function FiguraSVG({ shirt, hair, w = 48, h = 70 }) {
   return (
-    <div style={{
-      position:'relative', height:96, display:'flex', alignItems:'center',
-      background:'linear-gradient(180deg,#1a1a2e,#0f3460)',
-      flexShrink:0, overflow:'hidden',
-    }}>
-      <div style={{ position:'absolute', left:'50%', top:0, bottom:0, width:2,
-        background:'rgba(255,255,255,0.12)', zIndex:1 }}/>
+    <svg viewBox="-22 -64 46 68" width={w} height={h} style={{ overflow:'visible', display:'block' }}>
+      <path d="M-12,0 L-1,-26" stroke="#324a5f" strokeWidth="5" strokeLinecap="round" fill="none" />
+      <path d="M13,0 L5,-14 L0,-27" stroke="#3a5568" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <path d="M0,-25 L-6,-46" stroke={shirt} strokeWidth="12" strokeLinecap="round" fill="none" />
+      <path d="M-5,-44 L18,-33" stroke={shirt} strokeWidth="6" strokeLinecap="round" fill="none" />
+      <circle cx="18" cy="-33" r="3.6" fill="#f6c9a0" />
+      <circle cx="-8" cy="-52" r="7.6" fill="#f6c9a0" />
+      {hair === 'pony'
+        ? <><path d="M-16,-54 a8.5,8.5 0 0 1 15,-2 l-2,5 z" fill="#7a4a1e" /><path d="M-14,-56 q-12,6 -9,21 q1,6 6,6" fill="none" stroke="#7a4a1e" strokeWidth="6" strokeLinecap="round" /></>
+        : <path d="M-16,-52 a8,8 0 0 1 15,-3 l-2,4 z" fill="#3a2817" />}
+    </svg>
+  );
+}
 
-      <div style={{
-        position:'absolute', left:0, right:0, top:0, bottom:0,
-        transform:`translateX(${offset}%)`,
-        transition:'transform 0.35s cubic-bezier(0.34,1.56,0.64,1)',
-        display:'flex', alignItems:'center', zIndex:2,
-      }}>
-        <div style={{
-          position:'absolute', left:'6%', fontSize:'2.2rem',
-          display:'inline-block', transform:'scaleX(-1)',
-          animation: ganador === 1 ? 'ganadorBounce 0.45s ease infinite' : 'tironP1 0.7s ease-in-out infinite',
-          filter: ganador === 1 ? 'drop-shadow(0 0 8px #FFE234)' : 'none',
-        }}>🏋️</div>
+// ── Personajes elegibles por equipo ────────────────────────────────────────────
+const PERSONAJES = [
+  { id: 'pi-azul',  label: 'Pi Azul',   kind: 'sprite', src: pikaSprite,  hue: 'none', face: 'left' },
+  { id: 'pi-rojo',  label: 'Pi Rojo',   kind: 'sprite', src: pikaSprite,  hue: 'hue-rotate(150deg) saturate(1.5)', face: 'left' },
+  { id: 'pi-verde', label: 'Pi Verde',  kind: 'sprite', src: pikaSprite,  hue: 'hue-rotate(75deg) saturate(1.2)', face: 'left' },
+  { id: 'pi-morado',label: 'Pi Morado', kind: 'sprite', src: pikaSprite,  hue: 'hue-rotate(230deg) saturate(1.3)', face: 'left' },
+  { id: 'pikatron', label: 'Pikatron',  kind: 'sprite', src: pikaSprite1, hue: 'none', face: 'right' },
+  { id: 'chica',    label: 'Chica',     kind: 'svg',    shirt: '#2f7fd8', hair: 'pony', face: 'right' },
+  { id: 'chico',    label: 'Chico',     kind: 'svg',    shirt: '#e14b4b', hair: 'short', face: 'right' },
+];
+const getPersonaje = (id) => PERSONAJES.find((p) => p.id === id) || PERSONAJES[0];
 
-        <div style={{
-          position:'absolute', left:'11%', right:'11%', height:10,
-          background:'repeating-linear-gradient(90deg,#8B6914 0px,#C8921A 6px,#8B6914 12px)',
-          borderRadius:5, boxShadow:'0 3px 10px rgba(0,0,0,0.5)',
-          animation:'cuerda 0.6s ease-in-out infinite',
-        }}>
-          <div style={{
-            position:'absolute', left:'50%', bottom:8, transform:'translateX(-50%)',
-            animation:'banderin 0.7s ease-in-out infinite',
-            display:'flex', flexDirection:'column', alignItems:'center',
-          }}>
-            <div style={{ width:2, height:24, background:'#FFE234' }}/>
-            <div style={{
-              width:20, height:14,
-              background:'linear-gradient(135deg,#E53935,#FF5722)',
-              clipPath:'polygon(0 0,100% 0,80% 100%,0 100%)',
-            }}/>
+// Miniatura del personaje (para el selector)
+function PreviewPersonaje({ p, size = 34 }) {
+  if (p.kind === 'sprite') {
+    return <div style={{ width: size, height: size, backgroundImage: `url(${p.src})`, backgroundSize: '200% 200%', backgroundPosition: '0% 0%', backgroundRepeat: 'no-repeat', filter: p.hue !== 'none' ? p.hue : 'none', imageRendering: 'auto' }} />;
+  }
+  return <div style={{ width: size, height: size, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}><FiguraSVG shirt={p.shirt} hair={p.hair} w={size * 0.7} h={size} /></div>;
+}
+
+// ── Zona cuerda por EQUIPOS · personaje configurable por equipo ────────────────
+function ZonaCuerda({ diff, ganador, charL, charR }) {
+  const off = diff * (30 / LIMITE);
+  const POS = [3, 12, 21];
+
+  const miembro = (side, idx) => {
+    const win = (side === 'L' && ganador === 1) || (side === 'R' && ganador === 2);
+    const delay = `${idx * 0.13}s`;
+    const anclaje = side === 'L' ? { left: `${POS[idx]}%` } : { right: `${POS[idx]}%` };
+    const p = side === 'L' ? charL : charR;
+    // Cada personaje mira al centro según su orientación de origen
+    const face = p.face || (p.kind === 'sprite' ? 'left' : 'right');
+    const desired = side === 'L' ? 'right' : 'left';
+    const faceFlip = face !== desired;
+    const leanAnim = win ? 'tcCelebrate' : (side === 'L' ? 'tcHeaveL' : 'tcHeaveR');
+    const cuerpo = p.kind === 'sprite'
+      ? <div style={{ width:46, height:46, backgroundImage:`url(${p.src})`, backgroundSize:'200% 200%', backgroundRepeat:'no-repeat', animation:'tcPikaRun 0.55s steps(1) infinite', animationDelay:delay, filter: p.hue !== 'none' ? p.hue : 'none' }} />
+      : <FiguraSVG shirt={p.shirt} hair={p.hair} />;
+    return (
+      <div key={side+idx} style={{ position:'absolute', bottom:16, ...anclaje, zIndex:5-idx }}>
+        <div style={{ animation: win ? 'tcWinJump 0.6s ease-in-out infinite' : 'none', filter: win ? 'drop-shadow(0 0 7px #FFE234)' : 'none' }}>
+          <div style={{ transformOrigin:'50% 100%', animation:`${leanAnim} 0.8s ease-in-out infinite`, animationDelay:delay }}>
+            <div style={{ transform: faceFlip ? 'scaleX(-1)' : 'none' }}>{cuerpo}</div>
           </div>
         </div>
-
-        <div style={{
-          position:'absolute', right:'6%', fontSize:'2.2rem',
-          display:'inline-block',
-          animation: ganador === 2 ? 'ganadorBounce 0.45s ease infinite' : 'tironP2 0.7s ease-in-out infinite',
-          filter: ganador === 2 ? 'drop-shadow(0 0 8px #FFE234)' : 'none',
-        }}>🏋️</div>
+        <span style={{ position:'absolute', bottom:-2, left:'50%', width:22, height:7, borderRadius:'50%', background:'#fff', animation:'tcDust 0.9s ease-out infinite', animationDelay:delay }} />
       </div>
+    );
+  };
 
-      <div style={{
-        position:'absolute', bottom:5, left:'50%', transform:'translateX(-50%)',
-        background:'rgba(0,0,0,0.6)', borderRadius:20, padding:'2px 12px',
-        fontSize:'0.7rem', color:'rgba(255,255,255,0.45)', fontWeight:700,
-        zIndex:5, whiteSpace:'nowrap',
-      }}>
-        {diff === 0 ? '— Empate —' : diff < 0 ? `J1 lleva +${Math.abs(diff)}` : `J2 lleva +${diff}`}
+  return (
+    <div style={{ position:'relative', height:140, overflow:'hidden', flexShrink:0,
+      background:'linear-gradient(180deg,#0b2447 0%,#19376d 58%,#3aa15f 58%,#1c7a43 100%)', boxShadow:'inset 0 -10px 18px rgba(0,0,0,0.25)' }}>
+      <div style={{ position:'absolute', left:'50%', top:0, bottom:24, width:2, background:'rgba(255,255,255,0.14)', zIndex:1 }}/>
+      <div style={{ position:'absolute', inset:0, transform:`translateX(${off}%)`, transition:'transform 0.4s cubic-bezier(0.34,1.56,0.64,1)', zIndex:2 }}>
+        <div style={{ position:'absolute', left:'24%', right:'24%', bottom:40, height:9, borderRadius:5,
+          background:'repeating-linear-gradient(62deg,#5c3a0e 0 3px,#9a6a18 3px 6px,#d29a2c 6px 8px,#9a6a18 8px 10px)',
+          boxShadow:'0 2px 5px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.25), inset 0 -2px 3px rgba(0,0,0,0.35)',
+          animation:'tcRopeB 0.75s ease-in-out infinite', zIndex:3 }}>
+          <div style={{ position:'absolute', left:'50%', top:-24, transform:'translateX(-50%)' }}>
+            <div style={{ width:2, height:26, background:'#FFE234' }}/>
+            <div style={{ position:'absolute', top:0, left:2, width:16, height:11, background:'linear-gradient(135deg,#E53935,#FF5722)', clipPath:'polygon(0 0,100% 0,80% 100%,0 100%)' }}/>
+          </div>
+        </div>
+        {[0,1,2].map((i) => miembro('L', i))}
+        {[0,1,2].map((i) => miembro('R', i))}
+      </div>
+      <div style={{ position:'absolute', bottom:5, left:'50%', transform:'translateX(-50%)', background:'rgba(0,0,0,0.6)', borderRadius:20, padding:'2px 12px', fontSize:'0.7rem', color:'rgba(255,255,255,0.85)', fontWeight:700, zIndex:6, whiteSpace:'nowrap' }}>
+        {diff === 0 ? '— ¡Igualados! —' : diff < 0 ? `🔵 Equipo 1 +${Math.abs(diff)}` : `🔴 Equipo 2 +${diff}`}
       </div>
     </div>
   );
@@ -324,6 +358,8 @@ export default function TironCuerdaJuego({ primaria = false }) {
   const [flashP1,  setFlashP1]  = useState(null);
   const [flashP2,  setFlashP2]  = useState(null);
   const [ganador,  setGanador]  = useState(null);
+  const [charLId, setCharLId] = useState('pi-azul'); // personaje Equipo 1
+  const [charRId, setCharRId] = useState('pi-rojo'); // personaje Equipo 2
 
   const audioOk   = React.useRef(new Audio(sonidoCorrecto));
   const audioFail = React.useRef(new Audio(sonidoFallo));
@@ -456,6 +492,30 @@ export default function TironCuerdaJuego({ primaria = false }) {
         </div>
       </div>
 
+      {/* Personaje por equipo */}
+      {[{ eq: 1, sel: charLId, set: setCharLId, color: '#42A5F5' }, { eq: 2, sel: charRId, set: setCharRId, color: '#EF5350' }].map((team) => (
+        <div key={team.eq} style={{ marginBottom: 16, width: '100%', maxWidth: 360 }}>
+          <div style={{ fontSize: '0.72rem', color: team.color, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8, textAlign: 'center' }}>
+            Personaje · Equipo {team.eq}
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
+            {PERSONAJES.map((p) => {
+              const activo = team.sel === p.id;
+              return (
+                <button key={p.id} onClick={() => team.set(p.id)} title={p.label} style={{
+                  padding: 4, borderRadius: 10, border: '2px solid', borderColor: activo ? team.color : 'rgba(255,255,255,0.1)',
+                  background: activo ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)', cursor: 'pointer',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', width: 52,
+                }}>
+                  <PreviewPersonaje p={p} size={34} />
+                  <span style={{ fontSize: '0.55rem', color: activo ? 'white' : 'rgba(255,255,255,0.5)', fontWeight: 700, marginTop: 2, whiteSpace: 'nowrap' }}>{p.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+
       <button onClick={iniciar} style={{ ...btnBase, padding:'16px 44px', fontSize:'1.1rem',
         background:'linear-gradient(135deg,#f093fb,#f5576c)', color:'white',
         boxShadow:'0 8px 24px rgba(245,87,108,0.4)' }}>
@@ -492,7 +552,7 @@ export default function TironCuerdaJuego({ primaria = false }) {
         <span style={{ color:'rgba(255,255,255,0.2)', fontSize:'0.7rem' }}>Meta ±{LIMITE}</span>
       </div>
 
-      <ZonaCuerda diff={diff} ganador={ganador} />
+      <ZonaCuerda diff={diff} ganador={ganador} charL={getPersonaje(charLId)} charR={getPersonaje(charRId)} />
 
       <div style={{ flex:1, display:'flex', overflow:'hidden' }}>
         <PanelJugador jugador={1} op={opP1} valor={val1}

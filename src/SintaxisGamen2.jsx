@@ -7,6 +7,9 @@ import { CheckCircle, XCircle, RotateCcw, Play, Trophy, PaintBucket, ArrowRight,
 import { CATEGORIAS, NIVELES, FRASES } from './BibliotecaFrases';
 import { CATEGORIAS_FR, NIVELES_FR, FRASES_FR } from './BibliotecaFrances';
 import { CATEGORIAS_CA, NIVELLS_CA, FRASES_CA } from './BibliotecaCatalana';
+import { CompeticionCuerda } from './components/TironCuerdaEscena';
+import correctSoundFile from './assets/correct-choice-43861.mp3';
+import wrongSoundFile from './assets/negative_beeps-6008.mp3';
 
 
 
@@ -225,6 +228,7 @@ function SintaxisApp({ onExit, recursoInicial}) {
     if (screen === 'LOCAL')          return <ModoLocal         nivel={nivelSel} recurso={recurso} onBack={() => setScreen('MODOS')} />;
     if (screen === 'CONTRARRELOJ')   return <ModoContrarreloj  nivel={nivelSel} recurso={recurso} onBack={() => setScreen('MODOS')} />;
     if (screen === 'DUAL')           return <ModoDual          nivel={nivelSel} recurso={recurso} onBack={() => setScreen('MODOS')} />;
+    if (screen === 'COMPETICION')    return <ModoCompeticion   nivel={nivelSel} recurso={recurso} onBack={() => setScreen('MODOS')} />;
 
     if (screen === 'MODOS') return (
         <PantallaModos
@@ -233,6 +237,7 @@ function SintaxisApp({ onExit, recursoInicial}) {
             onLocal={() => setScreen('LOCAL')}
             onContrarreloj={() => setScreen('CONTRARRELOJ')}
             onDual={() => setScreen('DUAL')}
+            onCompeticion={() => setScreen('COMPETICION')}
             onLive={() => setShowLiveConfig(true)}
             joinCode={joinCode} setJoinCode={setJoinCode} onUnirse={unirse}
             showLiveConfig={showLiveConfig} setShowLiveConfig={setShowLiveConfig}
@@ -1382,7 +1387,7 @@ function BuscadorRecursos({ onSelect }) {
 // ─────────────────────────────────────────────────────────────────────
 // PANTALLA 2 — SELECCIÓN DE MODO
 // ─────────────────────────────────────────────────────────────────────
-function PantallaModos({ nivelSel, recurso, onBack, onLocal, onContrarreloj, onDual, onLive,
+function PantallaModos({ nivelSel, recurso, onBack, onLocal, onContrarreloj, onDual, onCompeticion, onLive,
     joinCode, setJoinCode, onUnirse,
     showLiveConfig, setShowLiveConfig, liveConfig, setLiveConfig, crearSala, creandoSala }) {
 
@@ -1405,6 +1410,12 @@ function PantallaModos({ nivelSel, recurso, onBack, onLocal, onContrarreloj, onD
             label: '👥 Modo Dual',
             desc: 'Dos jugadores, dos frases distintas en la misma pantalla.',
             color: '#27ae60', action: onDual,
+            warning: '⚠️ Diseñado para pantallas grandes',
+        },
+        {
+            label: '🪢 Competición por equipos',
+            desc: 'Tirón de cuerda: analiza la frase. ¡Solo suma si aciertas el 100%!',
+            color: '#f39c12', action: onCompeticion,
             warning: '⚠️ Diseñado para pantallas grandes',
         },
     ];
@@ -1747,6 +1758,87 @@ function ModoLocal({ nivel, recurso, onBack }) {
                 }
             </div>
             {mostrarEnvio && <ModalEnviarProfe datos={{puntos:score,aciertos,total,porcentaje:total>0?Math.round(aciertos/total*100):0,nivel:NIVELES.find(n=>n.id===nivel)?.label||'Todos',idioma:'ES',modalidad:'Individual'}} onClose={()=>setMostrarEnvio(false)}/>}
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// MODO COMPETICIÓN (tirón de cuerda) — punto solo si el análisis es 100%
+// ─────────────────────────────────────────────────────────────────────
+const _sndSint = (ok) => { try { const a = new Audio(ok ? correctSoundFile : wrongSoundFile); a.volume = 0.5; a.play().catch(() => {}); } catch (e) { /* noop */ } };
+
+function PanelSintaxis({ equipo, nivel, recurso, aplicar, bloqueado }) {
+    const color = equipo === 1 ? '#3498db' : '#e74c3c';
+    const pool = getPool(nivel, recurso);
+    const bagRef = useRef(createBag(pool));
+    const [frase, setFrase] = useState(() => pickFromBag(bagRef.current, pool));
+    const [answers, setAnswers] = useState(() => frase.tokens.map(() => []));
+    const [catSel, setCatSel] = useState(Object.keys(CATEGORIAS)[0]);
+    const [results, setResults] = useState(null);
+    const [feedback, setFeedback] = useState(null);
+
+    useEffect(() => { setAnswers(frase.tokens.map(() => [])); setResults(null); }, [frase]);
+
+    const clickWord = (i) => {
+        if (results || bloqueado) return;
+        setAnswers((prev) => { const a = prev.map((x) => [...x]); const c = a[i]; if (c.includes(catSel)) a[i] = c.filter((x) => x !== catSel); else if (c.length < 2) a[i] = [...c, catSel]; return a; });
+    };
+
+    const comprobar = () => {
+        if (results || bloqueado) return;
+        const r = comprobarFrase(frase.tokens, answers);
+        const allOk = r.length > 0 && r.every((x) => x.ok);
+        setResults(r); setFeedback(allOk ? 'ok' : 'bad');
+        _sndSint(allOk);
+        aplicar(allOk);
+        setTimeout(() => { setFeedback(null); setResults(null); setCatSel(Object.keys(CATEGORIAS)[0]); setFrase(pickFromBag(bagRef.current, pool)); }, 1500);
+    };
+
+    return (
+        <div style={{ background: 'white', borderRadius: 16, padding: 12, border: `3px solid ${feedback ? (feedback === 'ok' ? '#10b981' : '#ef4444') : color}`, boxShadow: '0 4px 15px rgba(0,0,0,0.08)' }}>
+            <div style={{ fontWeight: 900, color, marginBottom: 8 }}>{equipo === 1 ? '🔵 Equipo 1' : '🔴 Equipo 2'}</div>
+            {!results && <Paleta catSel={catSel} setCatSel={setCatSel} nivel={nivel} tokens={frase.tokens} />}
+            <FraseTokens tokens={frase.tokens} answers={answers} onClickWord={clickWord} readonly={!!results} results={results} />
+            {!results && (
+                <div style={{ textAlign: 'center', marginTop: 12 }}>
+                    <button onClick={comprobar} disabled={bloqueado} style={{ ...g.btnSuccess, opacity: bloqueado ? 0.5 : 1, cursor: bloqueado ? 'default' : 'pointer' }}><CheckCircle size={16} /> Comprobar</button>
+                </div>
+            )}
+            {feedback && (
+                <div style={{ textAlign: 'center', marginTop: 8, fontWeight: 800, color: feedback === 'ok' ? '#10b981' : '#ef4444' }}>
+                    {feedback === 'ok' ? '✅ ¡100% correcto! Tiras de la cuerda' : '❌ No está perfecto (no cuenta)'}
+                </div>
+            )}
+        </div>
+    );
+}
+
+function ModoCompeticion({ nivel, recurso, onBack }) {
+    const [nivelComp, setNivelComp] = useState(nivel || null);
+    return (
+        <div style={g.container}>
+            <div style={g.header}>
+                <button onClick={onBack} style={g.btnBack}><RotateCcw size={16} /> Menú</button>
+                <span style={g.titulo}>🪢 Competición</span>
+                <div style={{ width: 60 }} />
+            </div>
+            <div style={{ maxWidth: 1040, margin: '16px auto', padding: '0 12px' }}>
+                <CompeticionCuerda onSalir={onBack}
+                    configExtra={(
+                        <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
+                            <span style={{ color: '#7d6608' }}>Dificultad:</span>
+                            <button onClick={() => setNivelComp(null)}
+                                style={{ padding: '5px 11px', borderRadius: 20, cursor: 'pointer', fontWeight: 800, fontSize: '0.78rem', border: '2px solid #3498db', background: nivelComp === null ? '#3498db' : 'white', color: nivelComp === null ? 'white' : '#3498db' }}>🎲 Todas</button>
+                            {NIVELES.map((n) => (
+                                <button key={n.id} onClick={() => setNivelComp(n.id)}
+                                    style={{ padding: '5px 11px', borderRadius: 20, cursor: 'pointer', fontWeight: 800, fontSize: '0.78rem', border: `2px solid ${n.color || '#3498db'}`, background: nivelComp === n.id ? (n.color || '#3498db') : 'white', color: nivelComp === n.id ? 'white' : (n.color || '#3498db') }}>
+                                    {n.emoji} {n.label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                    renderPanel={(equipo, api) => <PanelSintaxis key={`${api.key}-${nivelComp || 'all'}`} equipo={equipo} nivel={nivelComp} recurso={recurso} aplicar={api.aplicar} bloqueado={api.bloqueado} />} />
+            </div>
         </div>
     );
 }

@@ -5,6 +5,7 @@ import { collection, addDoc, doc, getDoc, setDoc, onSnapshot, updateDoc, increme
 import correctSoundFile from '../assets/correct-choice-43861.mp3';
 import wrongSoundFile   from '../assets/negative_beeps-6008.mp3';
 import ANATOMIA         from '../anatomia_avanzada_dataset.json';
+import { CompeticionCuerda } from './TironCuerdaEscena';
 
 const N_PREGUNTAS = 10;
 const TIEMPO      = 20;
@@ -224,24 +225,31 @@ const mergeBilateral = (pool) => {
   return orden.map(n => map.get(n));
 };
 
+// Partes que están en la ESPALDA (misma zona de la silueta frontal que otra frontal)
+const POSTERIOR = new Set(['trapecio', 'gemelos', 'triceps', 'dorsal', 'gluteo', 'isquiotibial', 'soleo', 'escapula', 'columna', 'calcaneo']);
+const tagVista = (list) => list.map((el) => ({
+  ...el,
+  vista: el.vista || (POSTERIOR.has((el.id || '').replace(/_[di]$/, '')) ? 'posterior' : 'frontal'),
+}));
+
 const getPool = (modo, nivel) => {
+  let list = [];
   // Sistemas internos: se mantiene izquierdo/derecho (es anatómicamente distinto).
-  if (modo === 'circulatorio') return CIRCULATORIO;
-  if (modo === 'digestivo')    return DIGESTIVO;
-  if (modo === 'respiratorio') return RESPIRATORIO;
+  if (modo === 'circulatorio') list = CIRCULATORIO;
+  else if (modo === 'digestivo') list = DIGESTIVO;
+  else if (modo === 'respiratorio') list = RESPIRATORIO;
   // Cuerpo / músculos / huesos: se fusiona izquierdo/derecho.
-  if (modo === 'cuerpo')       return mergeBilateral(CUERPO_PARTES);
-  if (modo === 'musculos') {
-    if (nivel === 'basico') return mergeBilateral(MUSCULOS_BASE);
-    if (nivel === 'medio')  return mergeBilateral([...MUSCULOS_BASE, ...MUSCULOS_EXTRA_MEDIO]);
-    return mergeBilateral([...MUSCULOS_BASE, ...MUSCULOS_EXTRA_MEDIO, ...MUSCULOS_EXTRA_PRO]);
-  }
-  if (modo === 'huesos') {
-    if (nivel === 'basico') return mergeBilateral(HUESOS_BASE);
-    if (nivel === 'medio')  return mergeBilateral([...HUESOS_BASE, ...HUESOS_EXTRA_MEDIO]);
-    return mergeBilateral([...HUESOS_BASE, ...HUESOS_EXTRA_MEDIO, ...HUESOS_EXTRA_PRO]);
-  }
-  return [];
+  else if (modo === 'cuerpo') list = mergeBilateral(CUERPO_PARTES);
+  else if (modo === 'musculos') {
+    if (nivel === 'basico') list = mergeBilateral(MUSCULOS_BASE);
+    else if (nivel === 'medio') list = mergeBilateral([...MUSCULOS_BASE, ...MUSCULOS_EXTRA_MEDIO]);
+    else list = mergeBilateral([...MUSCULOS_BASE, ...MUSCULOS_EXTRA_MEDIO, ...MUSCULOS_EXTRA_PRO]);
+  } else if (modo === 'huesos') {
+    if (nivel === 'basico') list = mergeBilateral(HUESOS_BASE);
+    else if (nivel === 'medio') list = mergeBilateral([...HUESOS_BASE, ...HUESOS_EXTRA_MEDIO]);
+    else list = mergeBilateral([...HUESOS_BASE, ...HUESOS_EXTRA_MEDIO, ...HUESOS_EXTRA_PRO]);
+  } else return [];
+  return tagVista(list);
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -372,8 +380,107 @@ const SvgShape = ({ s, fill, stroke = '#555', strokeWidth = 1, opacity = 1, filt
 const inp = { width:'100%', padding:'9px 12px', borderRadius:9, border:'1.5px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.08)', color:'#f1f5f9', fontSize:'0.92rem', outline:'none', boxSizing:'border-box' };
 
 // ── Component ─────────────────────────────────────────────────────────────────
+// ── Panel NATIVO de competición: ¿a qué sistema pertenece? ─────────────────────
+const _bioSample = (arr, n, excl) => { const pool = [...new Set(arr)].filter((x) => x !== excl); const out = []; while (out.length < n && pool.length) out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]); return out; };
+const _bioBarajar = (a) => a.map((v) => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map((p) => p[1]);
+const BIO_MODOS = Object.keys(SYSTEM_LABEL);
+
+function PanelBioCompeticion({ aplicar, bloqueado, equipo, tipo = 'mix', ambito = 'todos', formato = 'texto' }) {
+  const color = equipo === 1 ? '#3498db' : '#e74c3c';
+  const prevRef = useRef(null);
+  const genOne = () => {
+    // ── FOTO: imagen de anatomía → elegir el nombre ──
+    if (formato === 'foto') {
+      const item = ANATOMIA[Math.floor(Math.random() * ANATOMIA.length)];
+      const correcta = item.nombre;
+      return { formato: 'foto', img: item.imagenUrl, intro: '¿Qué es?', correcta, opciones: _bioBarajar([correcta, ..._bioSample(ANATOMIA.map((a) => a.nombre), 3, correcta)]) };
+    }
+    // Elegir sistema (según ámbito)
+    const single = ambito && ambito !== 'todos';
+    let modo, pool;
+    if (single) { modo = ambito; pool = getPool(modo, 'pro') || []; }
+    else { for (let k = 0; k < 12; k++) { modo = BIO_MODOS[Math.floor(Math.random() * BIO_MODOS.length)]; pool = getPool(modo, 'pro'); if (pool && pool.length) break; } }
+    if (!pool || !pool.length) { modo = 'musculos'; pool = getPool('musculos', 'pro'); }
+    const item = pool[Math.floor(Math.random() * pool.length)];
+
+    // ── ESQUEMA: señala una parte en la silueta → elegir el nombre ──
+    if (formato === 'esquema') {
+      const correcta = item.nombre;
+      const mismos = pool.map((x) => x.nombre).filter((n) => n !== correcta);
+      let bag = mismos.length >= 3 ? mismos : (() => { let b = []; BIO_MODOS.forEach((m) => { const p = getPool(m, 'pro'); if (p) b = b.concat(p.map((x) => x.nombre)); }); return b; })();
+      return { formato: 'esquema', modo, highlightId: item.id, vista: item.vista, intro: '¿Qué parte está señalada?', correcta, opciones: _bioBarajar([correcta, ..._bioSample(bag, 3, correcta)]) };
+    }
+
+    // ── TEXTO (por defecto): ¿qué sistema? / ¿qué parte? ──
+    const t = single ? 'parte' : ((tipo && tipo !== 'mix') ? tipo : (Math.random() < 0.5 ? 'sistema' : 'parte'));
+    if (t === 'parte') {
+      const correcta = item.nombre;
+      let bag = [];
+      BIO_MODOS.filter((m) => m !== modo).forEach((m) => { const p = getPool(m, 'pro'); if (p) bag = bag.concat(p.map((x) => x.nombre)); });
+      return { formato: 'texto', intro: `¿Cuál pertenece a: ${SYSTEM_LABEL[modo]}?`, foco: null, correcta, opciones: _bioBarajar([correcta, ..._bioSample(bag, 3, correcta)]) };
+    }
+    const correcta = SYSTEM_LABEL[modo];
+    return { formato: 'texto', intro: '¿A qué sistema pertenece?', foco: item.nombre, correcta, opciones: _bioBarajar([correcta, ..._bioSample(Object.values(SYSTEM_LABEL), 3, correcta)]) };
+  };
+  // Evita repetir la pregunta anterior (misma respuesta correcta / parte señalada)
+  const gen = () => {
+    let q, tries = 0;
+    const clave = (x) => `${x.foco || x.highlightId || ''}|${x.correcta}`;
+    do { q = genOne(); tries++; } while (clave(q) === prevRef.current && tries < 10);
+    prevRef.current = clave(q);
+    return q;
+  };
+  const [q, setQ] = useState(gen);
+  const [sel, setSel] = useState(null);
+  const responder = (op) => {
+    if (bloqueado || sel) return;
+    const ok = op === q.correcta;
+    setSel(op);
+    try { const a = new Audio(ok ? correctSoundFile : wrongSoundFile); a.volume = 0.5; a.play().catch(() => {}); } catch (e) { /* noop */ }
+    aplicar(ok);
+    setTimeout(() => { setSel(null); setQ(gen()); }, 1050);
+  };
+  return (
+    <div style={{ background: 'white', borderRadius: 16, padding: 14, border: `3px solid ${sel ? (sel === q.correcta ? '#10b981' : '#ef4444') : color}`, boxShadow: '0 4px 15px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ fontWeight: 900, color }}>{equipo === 1 ? '🔵 Equipo 1' : '🔴 Equipo 2'}</div>
+      {q.formato === 'esquema' && (
+        <div style={{ background: '#0f172a', borderRadius: 12, padding: 6, position: 'relative' }}>
+          {q.vista && (
+            <span style={{ position: 'absolute', top: 8, left: 8, background: q.vista === 'posterior' ? 'rgba(2,132,199,0.9)' : 'rgba(217,119,6,0.9)', color: 'white', borderRadius: 20, padding: '2px 10px', fontSize: '0.72rem', fontWeight: 800, zIndex: 2 }}>
+              {q.vista === 'posterior' ? '🔄 Espalda' : '👤 Frente'}
+            </span>
+          )}
+          <BodySVGLive modo={q.modo} nivel="pro" highlightId={q.highlightId} ocultarNombre feedbackOk={sel ? (sel === q.correcta) : undefined} />
+        </div>
+      )}
+      {q.formato === 'foto' && q.img && (
+        <img src={q.img} alt="anatomía" loading="lazy" style={{ width: '100%', maxHeight: 190, objectFit: 'contain', borderRadius: 10, background: '#f1f5f9' }} />
+      )}
+      <div style={{ fontWeight: 700, color: '#1e293b', textAlign: 'center', minHeight: 40, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <span style={{ fontSize: '0.85rem', color: '#64748b' }}>{q.intro}</span>
+        {q.foco && <span style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>{q.foco}</span>}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        {q.opciones.map((op, i) => {
+          const estado = sel ? (op === q.correcta ? 'ok' : (op === sel ? 'bad' : '')) : '';
+          return (
+            <button key={i} onClick={() => responder(op)} disabled={!!sel || bloqueado}
+              style={{ padding: '10px 8px', borderRadius: 10, border: '2px solid #e2e8f0', cursor: (sel || bloqueado) ? 'default' : 'pointer', fontWeight: 700, fontSize: '0.85rem',
+                background: estado === 'ok' ? '#d1fae5' : estado === 'bad' ? '#fee2e2' : '#f8fafc', color: '#1e293b' }}>
+              {op}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function BiologiaAppInner({ onBack, onCreateLive, onJoinLive }) {
   const [pantalla,    setPantalla]    = useState('intro');
+  const [tipoComp,    setTipoComp]    = useState('mix'); // tipo de pregunta en competición
+  const [ambitoBio,   setAmbitoBio]   = useState('todos'); // sistema elegido en competición
+  const [formatoBio,  setFormatoBio]  = useState('texto'); // texto | esquema | foto
   const [modoJuego,   setModoJuego]   = useState('cuerpo');
   const [nivel,       setNivel]       = useState('basico');
   const [modo,        setModo]        = useState('seleccionar');
@@ -539,6 +646,54 @@ function BiologiaAppInner({ onBack, onCreateLive, onJoinLive }) {
   if (pantalla === 'imagenes') {
     return <AnatomiaQuiz onBack={() => setPantalla('intro')} />;
   }
+  if (pantalla === 'competicion') {
+    return (
+      <div style={{ minHeight:'100vh', background:'linear-gradient(135deg,#0f172a,#1e293b)', padding:16, boxSizing:'border-box' }}>
+        <button onClick={() => setPantalla('intro')} style={{ background:'rgba(255,255,255,0.12)', border:'none', color:'#f1f5f9', borderRadius:8, padding:'7px 14px', cursor:'pointer', fontSize:'0.9rem', marginBottom:12 }}>← Salir</button>
+        <div style={{ maxWidth:1000, margin:'0 auto', background:'#f1f5f9', borderRadius:20, padding:16 }}>
+          <CompeticionCuerda onSalir={() => setPantalla('intro')}
+            configExtra={(
+              <>
+                <div style={{ display:'flex', gap:8, justifyContent:'center', flexWrap:'wrap', alignItems:'center', marginBottom:8 }}>
+                  <span style={{ color:'#7d6608' }}>Formato:</span>
+                  {[['texto','📝 Texto'],['esquema','🧍 Esquema'],['foto','📷 Foto']].map(([id,lbl]) => (
+                    <button key={id} onClick={() => setFormatoBio(id)}
+                      style={{ padding:'5px 11px', borderRadius:20, cursor:'pointer', fontWeight:800, fontSize:'0.78rem', border:'2px solid #7c3aed', background: formatoBio===id ? '#7c3aed' : 'white', color: formatoBio===id ? 'white' : '#7c3aed' }}>
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+                {formatoBio !== 'foto' && (
+                  <div style={{ display:'flex', gap:8, justifyContent:'center', flexWrap:'wrap', alignItems:'center', marginBottom:8 }}>
+                    <span style={{ color:'#7d6608' }}>Sistema:</span>
+                    <button onClick={() => setAmbitoBio('todos')}
+                      style={{ padding:'5px 11px', borderRadius:20, cursor:'pointer', fontWeight:800, fontSize:'0.78rem', border:'2px solid #dc2626', background: ambitoBio==='todos' ? '#dc2626' : 'white', color: ambitoBio==='todos' ? 'white' : '#dc2626' }}>🎲 Todos</button>
+                    {Object.keys(SYSTEM_LABEL).map((m) => (
+                      <button key={m} onClick={() => setAmbitoBio(m)}
+                        style={{ padding:'5px 11px', borderRadius:20, cursor:'pointer', fontWeight:800, fontSize:'0.78rem', border:'2px solid #dc2626', background: ambitoBio===m ? '#dc2626' : 'white', color: ambitoBio===m ? 'white' : '#dc2626' }}>
+                        {SYSTEM_EMOJI[m]} {SYSTEM_LABEL[m]}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {formatoBio === 'texto' && ambitoBio === 'todos' && (
+                  <div style={{ display:'flex', gap:8, justifyContent:'center', flexWrap:'wrap', alignItems:'center', marginBottom:8 }}>
+                    <span style={{ color:'#7d6608' }}>Preguntas:</span>
+                    {[['mix','🎲 Mix'],['sistema','🧭 ¿Qué sistema?'],['parte','🫀 ¿Qué parte?']].map(([id,lbl]) => (
+                      <button key={id} onClick={() => setTipoComp(id)}
+                        style={{ padding:'5px 11px', borderRadius:20, cursor:'pointer', fontWeight:800, fontSize:'0.78rem', border:'2px solid #2563eb', background: tipoComp===id ? '#2563eb' : 'white', color: tipoComp===id ? 'white' : '#2563eb' }}>
+                        {lbl}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+            renderPanel={(equipo, api) => <PanelBioCompeticion key={`${api.key}-${formatoBio}-${ambitoBio}-${tipoComp}`} equipo={equipo} aplicar={api.aplicar} bloqueado={api.bloqueado} tipo={tipoComp} ambito={ambitoBio} formato={formatoBio} />} />
+        </div>
+      </div>
+    );
+  }
   if (pantalla === 'estudiar') {
     return <AnatomiaEstudio onBack={() => setPantalla('intro')} />;
   }
@@ -580,6 +735,19 @@ function BiologiaAppInner({ onBack, onCreateLive, onJoinLive }) {
           <span style={{ flex:1 }}>
             <span style={{ display:'block', fontSize:'1.05rem', fontWeight:800 }}>Estudiar anatomía</span>
             <span style={{ display:'block', fontSize:'0.8rem', opacity:0.85, marginTop:2 }}>Mira la imagen, sus características y dónde está · sin puntos</span>
+          </span>
+        </button>
+
+        {/* Competición por equipos */}
+        <button onClick={() => setPantalla('competicion')} style={{
+          width:'100%', marginBottom:14, padding:'16px 18px', textAlign:'left', cursor:'pointer',
+          background:'linear-gradient(135deg,#f39c12,#e67e22)', border:'none', borderRadius:14, color:'#fff',
+          display:'flex', alignItems:'center', gap:14,
+        }}>
+          <span style={{ fontSize:'2rem' }}>🪢</span>
+          <span style={{ flex:1 }}>
+            <span style={{ display:'block', fontSize:'1.05rem', fontWeight:800 }}>Competición por equipos</span>
+            <span style={{ display:'block', fontSize:'0.8rem', opacity:0.9, marginTop:2 }}>Tirón de cuerda 2 equipos · ¿a qué sistema pertenece cada parte?</span>
           </span>
         </button>
 
@@ -704,6 +872,14 @@ function BiologiaAppInner({ onBack, onCreateLive, onJoinLive }) {
           <div style={{ textAlign:'center', fontSize:'0.95rem', color:'#e2e8f0', fontWeight:600 }}>
             ¿Cómo se llama esta parte {SYSTEM_QUESTION[modoJuego]}?
           </div>
+          {/* Aviso de vista (frontal/posterior) para evitar ambigüedad delante/detrás */}
+          {item?.vista && (
+            <div style={{ textAlign:'center' }}>
+              <span style={{ display:'inline-block', background: item.vista === 'posterior' ? 'rgba(2,132,199,0.22)' : 'rgba(217,119,6,0.22)', color: item.vista === 'posterior' ? '#7dd3fc' : '#fcd34d', border:`1px solid ${item.vista === 'posterior' ? '#0284c7' : '#d97706'}`, borderRadius:20, padding:'3px 12px', fontSize:'0.78rem', fontWeight:700 }}>
+                {item.vista === 'posterior' ? '🔄 Vista posterior (espalda)' : '👤 Vista frontal'}
+              </span>
+            </div>
+          )}
 
           {/* SVG + imagen real (en feedback) */}
           {(() => {
@@ -931,7 +1107,7 @@ function generarPreguntasBio(config) {
 }
 
 // ── Live SVG body (standalone) ────────────────────────────────────────────────
-function BodySVGLive({ modo, nivel, highlightId, feedbackOk }) {
+function BodySVGLive({ modo, nivel, highlightId, feedbackOk, ocultarNombre }) {
   const pool = getPool(modo, nivel);
   const color = SYSTEM_COLOR[modo] || '#64748b';
   const highlightElem = pool.find(e => e.id === highlightId);
@@ -949,7 +1125,7 @@ function BodySVGLive({ modo, nivel, highlightId, feedbackOk }) {
           />
         ));
       })}
-      {highlightElem && (
+      {highlightElem && !ocultarNombre && (
         <text x="140" y="498" textAnchor="middle" fill="#f1f5f9" fontSize="11" fontWeight="600">{highlightElem.nombre}</text>
       )}
     </svg>

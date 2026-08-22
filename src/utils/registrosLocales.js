@@ -23,6 +23,7 @@ export const JUEGOS_REGISTRO_META = {
     OCA:                 { nombre: 'Oca Matemática',      emoji: '🎲', color: '#27ae60' },
     OAOA:                { nombre: 'Mates OAOA',          emoji: '🔢', color: '#2980b9' },
     ECUACIONES:          { nombre: 'Ecuaciones',          emoji: '🟰', color: '#c0392b' },
+    ECUACION_SISTEMAS:   { nombre: 'Sistemas de Ecuaciones', emoji: '🧮', color: '#6c5ce7' },
     FUNCIONES:           { nombre: 'Funciones',           emoji: '📈', color: '#2c3e50' },
     FUNCIONES_ANALISIS:  { nombre: 'Análisis Funciones',  emoji: '📉', color: '#34495e' },
     GEOMETRIX_COMPUESTO: { nombre: 'Geometrix',           emoji: '📐', color: '#d35400' },

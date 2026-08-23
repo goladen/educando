@@ -72,6 +72,8 @@ import AjustesReacciones from '../Simuladores física/AjustesReacciones';
 import CaidaEscalada from '../Simuladores física/CaidaEscalada';
 import SimuladorAtomos from '../Simuladores física/SimuladorAtomos';
 import GayLusac from '../Simuladores física/GayLusac';
+import SimuladorEclipse from '../Simuladores física/SimuladorEclipse';
+import SimuladorSistemaSolar from '../Simuladores física/SimuladorSistemaSolar';
 import RetosApp from '../Retos';
 import SimuladorDados from '../Probabilidad';
 import TrivialGame from '../Trivial';
@@ -1414,7 +1416,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
             // Física: rutas /fisica y /fisica/<slug>
             if (path === 'fisica') { setSimuladoresFisica(true); return; }
             if (path.startsWith('fisica/')) {
-                const SLUG_MAP = { colisiones:'COLISIONES', planoinclinado:'PLANO_INCLINADO', tiroparabolico:'TIRO_PARABOLICO', caidalibre:'CAIDA_LIBRE', pendulo:'PENDULO', leydeohm:'LEY_OHM', enlacemoleculas:'ENLACE_MOLECULAS', ajustesreaccion:'AJUSTES_REACCION', caidaescalada:'CAIDA_ESCALADA' };
+                const SLUG_MAP = { colisiones:'COLISIONES', planoinclinado:'PLANO_INCLINADO', tiroparabolico:'TIRO_PARABOLICO', caidalibre:'CAIDA_LIBRE', pendulo:'PENDULO', leydeohm:'LEY_OHM', enlacemoleculas:'ENLACE_MOLECULAS', ajustesreaccion:'AJUSTES_REACCION', caidaescalada:'CAIDA_ESCALADA', atomos:'ATOMOS', gaylusac:'GAY_LUSAC', eclipse:'ECLIPSE', sistemasolar:'SISTEMA_SOLAR' };
                 const key = SLUG_MAP[path.slice(7)];
                 setSimuladoresFisica(true);
                 if (key) setSimuladorFisicaActivo(key);
@@ -2197,6 +2199,8 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
             { key: 'CAIDA_ESCALADA',    slug: 'caidaescalada',     label: 'Caída en Escalada',  emoji: '🧗', color: '#0ea5e9', desc: 'Simulación de caída en escalada deportiva', comp: CaidaEscalada },
             { key: 'ATOMOS',            slug: 'atomos',            label: 'Átomos Interactivos',emoji: '⚛️', color: '#6366f1', desc: 'Modelo 3D del átomo + test de partículas',  comp: SimuladorAtomos },
             { key: 'GAY_LUSAC',         slug: 'gaylusac',          label: 'Ley de Gay-Lussac',  emoji: '🌡️', color: '#dc2626', desc: 'Presión y temperatura en volumen constante', comp: GayLusac },
+            { key: 'ECLIPSE',           slug: 'eclipse',           label: 'Eclipse Solar',      emoji: '🌒', color: '#f59e0b', desc: 'Modelo 3D Sol–Tierra–Luna + vista del eclipse', comp: SimuladorEclipse },
+            { key: 'SISTEMA_SOLAR',     slug: 'sistemasolar',      label: 'Sistema Solar y Leyes de Newton', emoji: '🪐', color: '#6366f1', desc: 'Planetas 3D a escala, órbitas, galaxia, leyes de Newton y tests', comp: SimuladorSistemaSolar },
         ];
 
         const volverAlMenu = () => { setSimuladorFisicaActivo(null); window.history.pushState({}, '', '/fisica'); };

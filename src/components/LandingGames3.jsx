@@ -55,8 +55,9 @@ import LenguaSignos from '../LenguaSignos';
 import MusicApp from '../MusicApp';
 import GeografiaApp from './GeografiaApp';
 import ImperiosGame from './ImperiosGame';
+import QuienEsQuien from '../QuienEsQuien';
 import BiologiaApp  from './BiologiaApp';
-import HerramientasClase from '../GestionAula';
+import HerramientasClase, { PizarraApp } from '../GestionAula';
 import AlgebraApp from '../Algebra';
 import VistasDidricas from '../VistasDidricas';
 import MiniAppCreator from './MiniAppCreator';
@@ -990,6 +991,22 @@ export const GAME_INFO = {
         materias: ['Historia', 'Geografía', 'Ciencias Sociales'],
         etapas: ['Primaria', 'ESO', 'Bachillerato'],
     },
+    PIZARRA_TEMATICA: {
+        descripcion: 'Pizarra temática con modos General, Música, Geografía y Animación. Dibuja a mano, formas, texto e imágenes en hasta 5 capas, inserta imágenes del banco (vehículos, planetas, anatomía…), y anima cualquier elemento haciéndolo seguir un camino con giro, tiempo, bucle y sonido. Es la misma pizarra que hay dentro de Gestión de Aula. Se puede compartir en tiempo real.',
+        tipoPreguntas: 'Herramienta de dibujo y animación por capas; sin preguntas.',
+        biblioteca: 'Banco de imágenes propio (vehículos, personajes, sistema solar, euros, anatomía) + sonidos.',
+        multiplayer: 'Pizarra compartida en tiempo real (ver/editar por código).',
+        materias: ['Universal', 'Plástica', 'Música', 'Geografía'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
+    QUIEN_ES_QUIEN: {
+        descripcion: 'Dinámica para conocerse en clase en dos fases. Fase 1: cada alumno rellena un formulario (nombre, nº de hermanos, deporte, comida, lugar más lejano, película/serie favorita y una frase que le define), que se guarda por código de profesor y grupo. Fase 2: juego de "unir con líneas" por rondas donde hay que adivinar qué respuesta corresponde a cada compañero. El profesor tiene un panel para ver la tabla, gestionar los grupos y borrar los datos.',
+        tipoPreguntas: 'Emparejar nombres con respuestas (deporte, hermanos, comida, lugar, película, frase) uniendo con líneas; las respuestas repetidas se agrupan.',
+        biblioteca: 'No. Los datos los generan los propios alumnos con el formulario (colección clase_alumnos).',
+        multiplayer: 'Colaborativo de aula: los alumnos rellenan sus datos y se juega en grupo. El profesor gestiona desde su panel.',
+        materias: ['Tutoría', 'Universal'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
     BIOLOGIA: {
         descripcion: 'Herramienta interactiva de biología: anatomía humana, célula, ecosistemas, reino animal y vegetal, genética y clasificación de seres vivos.',
         tipoPreguntas: 'Identificación de estructuras, completar etiquetas, quiz de conceptos biológicos.',
@@ -1437,6 +1454,8 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                 if (juegoParam.toLowerCase() === 'fisica')         { setSimuladoresFisica(true); return; }
                 if (juegoParam.toLowerCase() === 'geografia')      { setGeografiaApp(true);   return; }
                 if (juegoParam.toLowerCase() === 'imperios')       { setImperiosApp(true);    return; }
+                if (juegoParam.toLowerCase() === 'quienesquien')   { setQuienEsQuienApp(true); return; }
+                if (juegoParam.toLowerCase() === 'pizarra')        { setPizarraApp(true);     return; }
                 if (juegoParam.toLowerCase() === 'biologia')       { setBiologiaApp(true);    return; }
                 if (juegoParam.toLowerCase() === 'vistas_didricas') { setVistasDidricas(true); return; }
                 if (juegoParam.toLowerCase() === 'situaciones_aprendizaje') { setSituacionesAprendizaje(true); return; }
@@ -1578,6 +1597,8 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
     const [musicApp,            setMusicApp]            = useState(false);
     const [geografiaApp,        setGeografiaApp]        = useState(false);
     const [imperiosApp,         setImperiosApp]         = useState(false);
+    const [quienEsQuienApp,     setQuienEsQuienApp]     = useState(false);
+    const [pizarraApp,          setPizarraApp]          = useState(false);
     const [biologiaApp,         setBiologiaApp]         = useState(false);
     const [gestionAula,         setGestionAula]         = useState(() => { const p = new URLSearchParams(window.location.search); return !!(p.get('gestion') || p.get('pizarra')); });
     const [vistasDidricas,      setVistasDidricas]      = useState(false);
@@ -1610,6 +1631,8 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
     useEffect(() => { if (!juegoActivo) refrescarRegistros(); }, [juegoActivo]);
     // Imperios usa su propio estado (imperiosApp), no juegoActivo: refrescar al cerrarlo.
     useEffect(() => { if (!imperiosApp) refrescarRegistros(); }, [imperiosApp]);
+    // ¿Quién es quién? usa su propio estado (quienEsQuienApp): refrescar al cerrarlo.
+    useEffect(() => { if (!quienEsQuienApp) refrescarRegistros(); }, [quienEsQuienApp]);
     const totalRegistros = resumenRegistros.reduce((s, g) => s + g.count, 0);
     // Mapeo id-de-tarjeta → tipo-de-registro cuando no coinciden.
     const REGISTRO_TIPO_DE = { GEOMETRIX: 'GEOMETRIX_COMPUESTO', POLINOMIOS: 'ALGEBRA', MATES_OAOA: 'OAOA' };
@@ -1954,6 +1977,8 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
             MUSICA:             () => setMusicApp(true),
             GEOGRAFIA:          () => setGeografiaApp(true),
             IMPERIOS:           () => setImperiosApp(true),
+            QUIEN_ES_QUIEN:     () => setQuienEsQuienApp(true),
+            PIZARRA_TEMATICA:   () => setPizarraApp(true),
             BIOLOGIA:           () => setBiologiaApp(true),
             GESTION_AULA:       () => setGestionAula(true),
             VISTAS_DIDRICAS:    () => setVistasDidricas(true),
@@ -2127,6 +2152,19 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
     if (imperiosApp) return (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, overflowY: 'auto' }}>
             <ImperiosGame onBack={() => { setImperiosApp(false); window.history.pushState({}, '', '/'); }} />
+        </div>
+    );
+
+    if (quienEsQuienApp) return (
+        <QuienEsQuien usuario={usuario} onExit={() => { setQuienEsQuienApp(false); window.history.pushState({}, '', '/'); }} />
+    );
+    if (pizarraApp) return (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#f1f5f9', overflow: 'auto', padding: '54px 12px 20px' }}>
+            <button onClick={() => { setPizarraApp(false); window.history.pushState({}, '', '/'); }}
+                style={{ position: 'fixed', top: 12, left: 12, zIndex: 10000, padding: '8px 14px', borderRadius: 10, border: 'none', background: '#fff', color: '#334155', fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}>
+                ← Volver
+            </button>
+            <PizarraApp />
         </div>
     );
 
@@ -3231,6 +3269,8 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                     { id: 'MUSICA',              label: 'Música',               emoji: '🎵', color: '#8b5cf6', action: () => setMusicApp(true), shareable: true },
                     { id: 'GEOGRAFIA',           label: 'Geografía',            emoji: '🌍', color: '#0d9488', action: () => setGeografiaApp(true), shareable: true },
                     { id: 'IMPERIOS',            label: 'Imperios',             emoji: '🏛️', color: '#b45309', action: () => { setImperiosApp(true); window.history.pushState({}, '', '/imperios'); }, shareable: true, shareUrl: `${window.location.origin}/imperios` },
+                    { id: 'QUIEN_ES_QUIEN',      label: '¿Quién es quién?',     emoji: '🕵️', color: '#7c3aed', action: () => { setQuienEsQuienApp(true); window.history.pushState({}, '', '/quienesquien'); }, shareable: true, shareUrl: `${window.location.origin}/quienesquien` },
+                    { id: 'PIZARRA_TEMATICA',    label: 'Pizarra temática',     emoji: '🎬', color: '#0ea5e9', action: () => { setPizarraApp(true); window.history.pushState({}, '', '/pizarra'); }, shareable: true, shareUrl: `${window.location.origin}/pizarra` },
                     { id: 'BIOLOGIA',            label: 'Biología',             emoji: '🔬', color: '#16a34a', action: () => setBiologiaApp(true),  shareable: true },
                     { id: 'GESTION_AULA', label: 'Gestión Aula', emoji: '🏫', color: '#e67e22', action: () => setGestionAula(true), shareable: true, shareUrl: `${window.location.origin}${window.location.pathname}?gestion=menu` },
                     { id: 'VISTAS_DIDRICAS', label: 'Vistas Diédricas', emoji: '📐', color: '#7c3aed', action: () => setVistasDidricas(true), shareable: true },

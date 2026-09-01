@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import GruposTab, { AgrupacionesTab } from './GruposTab';
 import MapaAula from './MapaAula';
+import { QuienEsQuienPanel } from '../QuienEsQuien';
 import ModalAgregarAGrupo from './ModalAgregarAGrupo';
 import { db } from '../firebase';
 import {
@@ -348,6 +349,7 @@ export default function InformesJuegos({ usuario, googleToken }) {
                     { id:'grupos',       label:'👥 Grupos' },
                     { id:'agrupaciones', label:'🗂 Agrupaciones' },
                     { id:'plano',        label:'🪑 Plano' },
+                    { id:'quienesquien', label:'🕵️ ¿Quién es quién?' },
                 ].map(t => (
                     <button key={t.id} onClick={() => setPestañaActiva(t.id)}
                         style={{ padding:'10px 16px', border:'none', background:'none', fontWeight: pestañaActiva===t.id ? 700 : 400,
@@ -365,7 +367,9 @@ export default function InformesJuegos({ usuario, googleToken }) {
             {pestañaActiva === 'agrupaciones' && <AgrupacionesTab usuario={usuario} />}
             {/* ── Tab Plano de clase ────────────────────────────────────── */}
             {pestañaActiva === 'plano' && <MapaAula usuario={usuario} />}
-            {pestañaActiva !== 'grupos' && pestañaActiva !== 'agrupaciones' && pestañaActiva !== 'plano' && <>
+            {/* ── Tab ¿Quién es quién? ──────────────────────────────────── */}
+            {pestañaActiva === 'quienesquien' && <QuienEsQuienPanel usuario={usuario} />}
+            {pestañaActiva !== 'grupos' && pestañaActiva !== 'agrupaciones' && pestañaActiva !== 'plano' && pestañaActiva !== 'quienesquien' && <>
 
             {/* ── Cabecera ─────────────────────────────────────────────── */}
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:22, flexWrap:'wrap', gap:10 }}>

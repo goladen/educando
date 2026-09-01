@@ -15,6 +15,12 @@ const MiniAppCreator = lazy(() => import('./components/MiniAppCreator'));
 const RecortesExtrem = lazy(() => import('./components/RecortesExtrem'));
 import { db } from './firebase';
 import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
+import { BANCO_IMAGENES } from './pizarraBancoImagenes';
+import { SONIDOS, reproducirSonido } from './pizarraSonidos';
+import { suavizarCamino, muestrearCamino, anguloEnCamino, difAngulo, longitudCamino } from './pizarraAnimacion';
+import PlanetaEsfera, { renderEsferaDataURL } from './PlanetaEsfera';
+
+const NUM_CAPAS = 5;
 
 // ─── UTILIDADES MATEMÁTICAS ───────────────────────────────────────────────────
 // Formatea una expresión amigable a código evaluable por JS
@@ -817,6 +823,29 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
     const [redrawTick,     setRedrawTick]     = useState(0);
     const [modoPizarra,    setModoPizarra]    = useState(initialModo);
 
+    // Capas + animación + banco de imágenes
+    const [capaActiva,     setCapaActiva]     = useState(0);
+    const [capasVisibles,  setCapasVisibles]  = useState(Array(NUM_CAPAS).fill(true));
+    const [playing,        setPlaying]        = useState(false);
+    const [caminoDur,      setCaminoDur]      = useState(4);
+    const [caminoLoop,     setCaminoLoop]     = useState(true);
+    const [caminoSonido,   setCaminoSonido]   = useState('none');
+    const [caminoSonidoLoop, setCaminoSonidoLoop] = useState(true);
+    const [capasOpen,      setCapasOpen]      = useState(false);
+    const [bancoOpen,      setBancoOpen]      = useState(false);
+    const [bancoCat,       setBancoCat]       = useState(BANCO_IMAGENES[0]?.id || '');
+    const playStartRef   = useRef(0);
+    const deltaSuaveRef  = useRef(new Map());
+    const rafAnimRef     = useRef(null);
+    const caminoRef      = useRef(null);   // trazo del camino en curso [{x,y}]
+    const ultimaURef     = useRef(new Map()); // u previa por elemento (para relanzar sonido en loop)
+    const capaActivaRef  = useRef(0);
+    const playingRef     = useRef(false);
+    const capasVisiblesRef = useRef(capasVisibles);
+    useEffect(() => { capaActivaRef.current = capaActiva; }, [capaActiva]);
+    useEffect(() => { playingRef.current = playing; }, [playing]);
+    useEffect(() => { capasVisiblesRef.current = capasVisibles; }, [capasVisibles]);
+
     // Multi-page
     const [paginas,   setPaginas]   = useState([[]]);
     const [paginaIdx, setPaginaIdx] = useState(0);
@@ -1037,8 +1066,9 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
 
     // Tag elem with author in collaborative mode
     const tagElem = (elem) => {
-        if (modoRef.current !== 'editar' || !miIdRef.current) return elem;
-        return { ...elem, autorId: miIdRef.current, autorColor: miColorRef.current };
+        const base = { ...elem, capa: elem.capa ?? capaActivaRef.current };
+        if (modoRef.current !== 'editar' || !miIdRef.current) return base;
+        return { ...base, autorId: miIdRef.current, autorColor: miColorRef.current };
     };
 
     // ── Music staff with sound ────────────────────────────────────────────────
@@ -1117,7 +1147,50 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
         return () => document.removeEventListener('fullscreenchange', h);
     }, []);
 
-    useEffect(() => { dibujarCanvas(); }, [elementos, previewElement, redrawTick, paginaIdx, selIdxs, lassoRect]);
+    useEffect(() => { dibujarCanvas(); }, [elementos, previewElement, redrawTick, paginaIdx, selIdxs, lassoRect, capasVisibles, playing]);
+
+    // ── Bucle de reproducción de animaciones ──────────────────────────────────
+    useEffect(() => {
+        if (!playing) { if (rafAnimRef.current) cancelAnimationFrame(rafAnimRef.current); return; }
+        playStartRef.current = performance.now();
+        deltaSuaveRef.current = new Map();
+        ultimaURef.current = new Map();
+        const tick = () => {
+            const now = performance.now();
+            // Sonidos: al arrancar y en cada vuelta del loop
+            paginasRef.current[paginaIdx]?.forEach((item) => {
+                if (!item.anim || !item.anim.sonido || item.anim.sonido === 'none') return;
+                if (!item.anim.path || item.anim.path.length < 2) return;
+                const key = item.animId || item.id || item.anim.path[0].x;
+                const elapsed = (now - playStartRef.current) / 1000;
+                let u = item.anim.dur > 0 ? elapsed / item.anim.dur : 1;
+                const uMod = item.anim.loop ? ((u % 1) + 1) % 1 : Math.min(1, u);
+                const prevU = ultimaURef.current.get(key);
+                const arranca = prevU == null;
+                const dioVuelta = prevU != null && item.anim.loop && uMod < prevU;
+                if (arranca || (dioVuelta && item.anim.sonidoLoop !== false)) reproducirSonido(item.anim.sonido);
+                ultimaURef.current.set(key, uMod);
+            });
+            triggerRedraw();
+            rafAnimRef.current = requestAnimationFrame(tick);
+        };
+        rafAnimRef.current = requestAnimationFrame(tick);
+        return () => { if (rafAnimRef.current) cancelAnimationFrame(rafAnimRef.current); };
+    }, [playing, paginaIdx]);
+
+    // Al seleccionar un elemento ya animado, reflejar sus ajustes en los controles.
+    useEffect(() => {
+        if (herramienta !== 'camino') return;
+        const pg = paginas[paginaIdx] || [];
+        const anims = selIdxs.map(i => pg[i]?.anim).filter(Boolean);
+        if (anims.length === 1) {
+            const a = anims[0];
+            if (typeof a.dur === 'number') setCaminoDur(a.dur);
+            setCaminoLoop(a.loop !== false);
+            setCaminoSonido(a.sonido || 'none');
+            setCaminoSonidoLoop(a.sonidoLoop !== false);
+        }
+    }, [selIdxs, herramienta]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // ── Image cache ─────────────────────────────────────────────────────────
     const getOrLoadImg = (item) => {
@@ -1126,6 +1199,43 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
         img.src = item.src;
         img.onload = () => { imageCacheRef.current[item.id] = img; triggerRedraw(); };
         return null;
+    };
+
+    // ── Banco de imágenes ────────────────────────────────────────────────────
+    const insertarImagenBanco = (url) => {
+        const id = Date.now() + Math.floor(Math.random() * 1000);
+        const img = new Image();
+        img.onload = () => {
+            let w = img.naturalWidth || 120, h = img.naturalHeight || 120;
+            const max = 160;
+            if (w > max) { h = h * max / w; w = max; }
+            if (h > max) { w = w * max / h; h = max; }
+            imageCacheRef.current[id] = img;
+            const cx = 140 - panRef.current.x, cy = 140 - panRef.current.y;
+            setElementos(prev => [...prev, tagElem({ t: 'image', id, src: url, x: cx, y: cy, w, h })]);
+        };
+        img.onerror = () => {
+            const cx = 140 - panRef.current.x, cy = 140 - panRef.current.y;
+            setElementos(prev => [...prev, tagElem({ t: 'image', id, src: url, x: cx, y: cy, w: 120, h: 120 })]);
+        };
+        img.src = url;
+        setBancoOpen(false);
+        setHerramienta('lasso');
+    };
+
+    // Actualiza en vivo la animación de los elementos seleccionados que ya tengan una.
+    const actualizarAnimSel = (patch) => {
+        setElementos(prev => prev.map((it, i) => (selIdxs.includes(i) && it.anim) ? { ...it, anim: { ...it.anim, ...patch } } : it));
+    };
+
+    // ── Capas ────────────────────────────────────────────────────────────────
+    const toggleCapaVis = (i) => setCapasVisibles(v => v.map((x, j) => j === i ? !x : x));
+    const limpiarCapa = (i) => {
+        const n = (paginasRef.current[paginaIdx] || []).filter(el => (el.capa ?? 0) === i).length;
+        if (!n) return;
+        if (!confirm(`¿Vaciar la capa ${i + 1}? (${n} elemento${n === 1 ? '' : 's'})`)) return;
+        setElementos(prev => prev.filter(el => (el.capa ?? 0) !== i));
+        setSelIdxs([]);
     };
 
     // ── Save / export ───────────────────────────────────────────────────────
@@ -1564,17 +1674,41 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
 
     const rectsOverlap = (a, b) => a.x1 <= b.x2 && a.x2 >= b.x1 && a.y1 <= b.y2 && a.y2 >= b.y1;
 
+    const trasladarElem = (item, dx, dy) => {
+        if (item.t === 'draw') return { ...item, pts: item.pts.map(p => ({ x: p.x + dx, y: p.y + dy })) };
+        if (item.t === 'text') return { ...item, x: item.x + dx, y: item.y + dy };
+        if (item.t === 'graph' || item.t === 'axes') return { ...item, cx: item.cx + dx, cy: item.cy + dy };
+        if (item.t === 'image' || item.t === 'music_staff') return { ...item, x: item.x + dx, y: item.y + dy };
+        if (item.t === 'staff' || item.t === 'note' || item.t === 'rest' || item.t === 'acc')
+            return { ...item, x: item.x + dx, y: item.y + dy };
+        return { ...item, x1: item.x1 + dx, y1: item.y1 + dy, x2: item.x2 + dx, y2: item.y2 + dy };
+    };
+
     const moverSeleccion = (idxs, dx, dy) => {
-        setElementos(prev => prev.map((item, i) => {
-            if (!idxs.includes(i)) return item;
-            if (item.t === 'draw') return { ...item, pts: item.pts.map(p => ({ x: p.x + dx, y: p.y + dy })) };
-            if (item.t === 'text') return { ...item, x: item.x + dx, y: item.y + dy };
-            if (item.t === 'graph' || item.t === 'axes') return { ...item, cx: item.cx + dx, cy: item.cy + dy };
-            if (item.t === 'image' || item.t === 'music_staff') return { ...item, x: item.x + dx, y: item.y + dy };
-            if (item.t === 'staff' || item.t === 'note' || item.t === 'rest' || item.t === 'acc')
-                return { ...item, x: item.x + dx, y: item.y + dy };
-            return { ...item, x1: item.x1 + dx, y1: item.y1 + dy, x2: item.x2 + dx, y2: item.y2 + dy };
-        }));
+        setElementos(prev => prev.map((item, i) => idxs.includes(i) ? trasladarElem(item, dx, dy) : item));
+    };
+
+    const bboxCentro = (item) => { const b = getBbox(item); return { x: (b.x1 + b.x2) / 2, y: (b.y1 + b.y2) / 2 }; };
+
+    // Devuelve una copia del elemento transformada según su animación en el instante now.
+    const transformarElemAnim = (item, now) => {
+        const anim = item.anim;
+        if (!anim || !anim.path || anim.path.length < 2) return item;
+        const elapsed = (now - playStartRef.current) / 1000;
+        let u = anim.dur > 0 ? elapsed / anim.dur : 1;
+        if (anim.loop) u = ((u % 1) + 1) % 1;
+        else u = Math.max(0, Math.min(1, u));
+        const s = muestrearCamino(anim.path, u);
+        const p0 = anim.path[0];
+        const angObjetivo = anguloEnCamino(anim.path, u) - anguloEnCamino(anim.path, 0);
+        const key = item.animId || 'a';
+        const prev = deltaSuaveRef.current.get(key);
+        const delta = prev == null ? angObjetivo : prev + difAngulo(angObjetivo, prev) * 0.18;
+        deltaSuaveRef.current.set(key, delta);
+        const c = bboxCentro(item);
+        let e2 = applyRotationToElem(item, c.x, c.y, delta);
+        e2 = trasladarElem(e2, s.x - p0.x, s.y - p0.y);
+        return e2;
     };
 
     // ── Draw pipeline ────────────────────────────────────────────────────────
@@ -1669,7 +1803,45 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
         musicPlayHitRef.current = [];
         ctx.save();
         ctx.translate(panRef.current.x, panRef.current.y);
-        elementos.forEach((item, idx) => dibujarItem(ctx, item, selIdxs.includes(idx)));
+        // Dibujo ordenado por capas (0 abajo → 4 arriba); se omiten las capas ocultas.
+        const now = performance.now();
+        for (let capa = 0; capa < NUM_CAPAS; capa++) {
+            if (!capasVisibles[capa]) continue;
+            elementos.forEach((item, idx) => {
+                if ((item.capa ?? 0) !== capa) return;
+                const render = (playing && item.anim) ? transformarElemAnim(item, now) : item;
+                dibujarItem(ctx, render, selIdxs.includes(idx));
+            });
+        }
+
+        // Caminos de animación (visibles solo en edición)
+        if (!playing) {
+            elementos.forEach((item) => {
+                if (!item.anim || !item.anim.path || item.anim.path.length < 2) return;
+                const p = item.anim.path;
+                ctx.save();
+                ctx.beginPath(); ctx.moveTo(p[0].x, p[0].y);
+                for (let i = 1; i < p.length; i++) ctx.lineTo(p[i].x, p[i].y);
+                ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 2; ctx.setLineDash([8, 6]); ctx.stroke();
+                ctx.setLineDash([]);
+                const a = p[p.length - 2], b = p[p.length - 1];
+                const ang = Math.atan2(b.y - a.y, b.x - a.x);
+                ctx.translate(b.x, b.y); ctx.rotate(ang);
+                ctx.fillStyle = '#f59e0b';
+                ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-11, -6); ctx.lineTo(-11, 6); ctx.closePath(); ctx.fill();
+                ctx.restore();
+            });
+        }
+        // Camino en curso mientras se dibuja
+        if (caminoRef.current && caminoRef.current.length > 1) {
+            const p = caminoRef.current;
+            ctx.save();
+            ctx.beginPath(); ctx.moveTo(p[0].x, p[0].y);
+            for (let i = 1; i < p.length; i++) ctx.lineTo(p[i].x, p[i].y);
+            ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 3; ctx.setLineDash([8, 5]); ctx.stroke();
+            ctx.restore();
+        }
+
         if (previewElement) dibujarItem(ctx, previewElement, false);
 
         if (lassoRect) {
@@ -1878,6 +2050,13 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
             }
         }
 
+        if (herramienta === 'camino') {
+            if (!selIdxs.length) { alert('Selecciona antes uno o varios elementos (herramienta ⬚) para darles movimiento.'); return; }
+            caminoRef.current = [{ x, y }];
+            setDibujando(true);
+            return;
+        }
+
         if (herramienta === 'text') {
             if (textoInput.trim()) {
                 setElementos(prev => [...prev, tagElem({ t: 'text', txt: textoInput.trim(), x, y, color: drawColor, grosor, fontSize: textoFontSize })]);
@@ -2004,6 +2183,12 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
         const pos = getPos(e);
         const { x, y, rawX, rawY } = pos;
 
+        // Camino de animación en curso
+        if (herramienta === 'camino' && caminoRef.current) {
+            caminoRef.current.push({ x, y });
+            triggerRedraw();
+            return;
+        }
         // Pan
         if (herramienta === 'pan' && panStartRef.current) {
             const canvas = canvasRef.current;
@@ -2063,6 +2248,20 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
         panStartRef.current  = null;
         selMoveRef.current   = null;
         selHandleRef.current = null;
+
+        // Cierre del camino de animación → asignar a los elementos seleccionados
+        if (herramienta === 'camino' && caminoRef.current) {
+            const bruto = caminoRef.current;
+            caminoRef.current = null;
+            setDibujando(false);
+            if (bruto.length < 2 || longitudCamino(bruto) < 12) { triggerRedraw(); return; }
+            const path = suavizarCamino(bruto);
+            const sel = selIdxs;
+            setElementos(prev => prev.map((item, i) => sel.includes(i)
+                ? { ...item, animId: `an_${Date.now()}_${i}`, anim: { path, dur: caminoDur, loop: caminoLoop, sonido: caminoSonido, sonidoLoop: caminoSonidoLoop } }
+                : item));
+            return;
+        }
 
         if (herramienta === 'lasso' && dibujando && lassoRect) {
             const w = lassoRect.x2 - lassoRect.x1, h = lassoRect.y2 - lassoRect.y1;
@@ -2157,8 +2356,8 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
     const ERASER_SVG = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='22'%3E%3Crect x='1' y='1' width='34' height='20' rx='3' fill='%23fde8e8' stroke='%23e74c3c' stroke-width='1.5'/%3E%3Crect x='23' y='1' width='12' height='20' rx='0 3 3 0' fill='%23e74c3c' opacity='0.7'/%3E%3Cline x1='23' y1='1' x2='23' y2='21' stroke='%23e74c3c' stroke-width='1.5'/%3E%3C/svg%3E") 1 20, cell`;
     const CURSOR_MAP = { pan: 'grab', lasso: 'crosshair', paste: 'crosshair', text: 'text', graph: 'crosshair', axes: 'crosshair', geo_place: 'crosshair', eraser: ERASER_SVG };
 
-    const ToolBtn = ({ id, icon, label }) => (
-        <button onClick={() => { setHerramienta(id); setSelIdxs([]); setLassoRect(null); }} title={label}
+    const ToolBtn = ({ id, icon, label, keepSel }) => (
+        <button onClick={() => { setHerramienta(id); if (!keepSel) { setSelIdxs([]); setLassoRect(null); } }} title={label}
             style={{ padding: 7, background: herramienta === id ? '#3498db' : 'transparent', color: herramienta === id ? 'white' : '#2c3e50', border: 'none', borderRadius: 8, cursor: 'pointer', display:'flex', alignItems:'center' }}>
             {icon}
         </button>
@@ -2171,11 +2370,12 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
             <div style={{ background: '#ecf0f1', padding: '7px 10px', display: 'flex', gap: 8, alignItems: 'center', borderBottom: '2px solid #bdc3c7', flexWrap: 'wrap' }}>
 
                 {/* Mode selector */}
-                <select value={modoPizarra} onChange={e => { setModoPizarra(e.target.value); setHerramienta('draw'); setSelIdxs([]); setGeoTool(null); setGeoPaisData(null); setGeoBusqueda(''); setPendingInsert(null); }}
+                <select value={modoPizarra} onChange={e => { const m = e.target.value; setModoPizarra(m); setHerramienta(m === 'animacion' ? 'lasso' : 'draw'); setSelIdxs([]); setGeoTool(null); setGeoPaisData(null); setGeoBusqueda(''); setPendingInsert(null); setPlaying(false); caminoRef.current = null; }}
                     style={{ padding:'4px 8px', borderRadius:8, border:'2px solid #3498db', fontWeight:'bold', cursor:'pointer', background:'white', color:'#2c3e50', fontSize:'0.85rem' }}>
                     <option value="general">🖌 General</option>
                     <option value="musica">🎵 Música</option>
                     <option value="geo">🌍 Geografía</option>
+                    <option value="animacion">🎬 Animación</option>
                 </select>
 
                 {/* Common tools: draw, text, eraser, lasso, pan */}
@@ -2186,6 +2386,63 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
                     <ToolBtn id="lasso"  icon={<span style={{fontSize:'1rem',fontWeight:'bold'}}>⬚</span>} label="Seleccionar / Mover / Redimensionar / Girar" />
                     <ToolBtn id="pan"    icon={<Move size={18}/>}    label="Mover lienzo" />
                 </div>
+
+                {/* Capas */}
+                <div style={{ position:'relative', display:'flex', gap:3, alignItems:'center', borderRight:'2px solid #bdc3c7', paddingRight:8 }}>
+                    {Array.from({ length: NUM_CAPAS }, (_, i) => {
+                        const activa = capaActiva === i, visible = capasVisibles[i];
+                        return (
+                            <button key={i} onClick={() => setCapaActiva(i)}
+                                title={`Activar capa ${i + 1}`}
+                                style={{ width:26, height:26, borderRadius:6, cursor:'pointer', fontWeight:700, fontSize:'0.8rem',
+                                    border: activa ? '2px solid #2c3e50' : '1px solid #bdc3c7',
+                                    background: visible ? (activa ? '#2c3e50' : '#fff') : '#e5e7eb',
+                                    color: visible ? (activa ? '#fff' : '#2c3e50') : '#9ca3af',
+                                    textDecoration: visible ? 'none' : 'line-through' }}>
+                                {i + 1}
+                            </button>
+                        );
+                    })}
+                    <button onClick={() => setCapasOpen(o => !o)} title="Gestionar capas (ocultar / limpiar)"
+                        style={{ width:26, height:26, borderRadius:6, cursor:'pointer', border:'1px solid #bdc3c7', background:'#fff', color:'#2c3e50', fontSize:'0.9rem' }}>
+                        ⚙️
+                    </button>
+                    {capasOpen && (
+                        <>
+                            <div onClick={() => setCapasOpen(false)} style={{ position:'fixed', inset:0, zIndex:40 }} />
+                            <div style={{ position:'absolute', top:'110%', left:0, zIndex:41, background:'#fff', border:'1px solid #cbd5e1', borderRadius:10, boxShadow:'0 8px 24px rgba(0,0,0,0.18)', padding:8, width:230 }}>
+                                <div style={{ fontSize:'0.72rem', fontWeight:700, color:'#64748b', textTransform:'uppercase', letterSpacing:0.4, marginBottom:6 }}>Capas</div>
+                                {Array.from({ length: NUM_CAPAS }, (_, i) => {
+                                    const activa = capaActiva === i, visible = capasVisibles[i];
+                                    const nEl = (paginas[paginaIdx] || []).filter(el => (el.capa ?? 0) === i).length;
+                                    return (
+                                        <div key={i} style={{ display:'flex', alignItems:'center', gap:6, padding:'5px 6px', marginBottom:3, borderRadius:8,
+                                            background: activa ? '#eef2ff' : 'transparent', border: activa ? '1px solid #c7d2fe' : '1px solid transparent' }}>
+                                            <button onClick={() => setCapaActiva(i)} title="Activar"
+                                                style={{ flex:1, textAlign:'left', border:'none', background:'none', cursor:'pointer', fontWeight: activa ? 700 : 500, fontSize:'0.82rem', color:'#334155' }}>
+                                                Capa {i + 1} <span style={{ color:'#94a3b8', fontWeight:400 }}>({nEl})</span>
+                                            </button>
+                                            <button onClick={() => toggleCapaVis(i)} title={visible ? 'Ocultar' : 'Mostrar'}
+                                                style={{ border:'none', background:'none', cursor:'pointer', fontSize:'1rem' }}>
+                                                {visible ? '👁️' : '🙈'}
+                                            </button>
+                                            <button onClick={() => limpiarCapa(i)} title="Limpiar capa" disabled={!nEl}
+                                                style={{ border:'none', background:'none', cursor: nEl ? 'pointer' : 'default', fontSize:'0.95rem', opacity: nEl ? 1 : 0.3 }}>
+                                                🗑️
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </>
+                    )}
+                </div>
+
+                {/* Banco de imágenes */}
+                <button onClick={() => setBancoOpen(true)} title="Banco de imágenes"
+                    style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 10px', background:'#0ea5e9', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700, fontSize:'0.8rem', whiteSpace:'nowrap' }}>
+                    <ImageIcon size={15}/> Banco
+                </button>
 
                 {/* ── GENERAL MODE ── */}
                 {modoPizarra === 'general' && <>
@@ -2260,6 +2517,49 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
                             title="Crear pentagrama con sonido">
                             🎵 Con sonido
                         </button>
+                    </div>
+                </>}
+
+                {/* ── ANIMATION MODE ── */}
+                {modoPizarra === 'animacion' && <>
+                    <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
+                        <ToolBtn id="camino" keepSel icon={<span style={{fontSize:'1.05rem',lineHeight:1}}>➰</span>} label="Dibujar el camino del elemento seleccionado" />
+                        <label style={{ display:'flex', alignItems:'center', gap:4, fontSize:'0.78rem', color:'#2c3e50', fontWeight:600 }}>
+                            ⏱️
+                            <input type="number" min={0.5} max={60} step={0.5} value={caminoDur}
+                                onChange={e => { const v = +e.target.value; setCaminoDur(v); actualizarAnimSel({ dur: v }); }}
+                                style={{ width:52, padding:'3px 5px', borderRadius:6, border:'1px solid #bdc3c7' }} /> s
+                        </label>
+                        <label style={{ display:'flex', alignItems:'center', gap:4, fontSize:'0.78rem', color:'#2c3e50', fontWeight:600 }}>
+                            <input type="checkbox" checked={caminoLoop} onChange={e => { setCaminoLoop(e.target.checked); actualizarAnimSel({ loop: e.target.checked }); }} /> Loop
+                        </label>
+                        <label style={{ display:'flex', alignItems:'center', gap:4, fontSize:'0.78rem', color:'#2c3e50', fontWeight:600 }}>
+                            🔊
+                            <select value={caminoSonido} onChange={e => { setCaminoSonido(e.target.value); actualizarAnimSel({ sonido: e.target.value }); if (e.target.value !== 'none') reproducirSonido(e.target.value); }}
+                                style={{ padding:'3px 6px', borderRadius:6, border:'1px solid #bdc3c7', fontSize:'0.78rem', maxWidth:140 }}>
+                                {SONIDOS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                            </select>
+                        </label>
+                        {caminoSonido !== 'none' && (
+                            <label style={{ display:'flex', alignItems:'center', gap:4, fontSize:'0.78rem', color:'#2c3e50', fontWeight:600 }}
+                                title="Repetir el sonido en cada vuelta del recorrido (si no, suena solo al empezar)">
+                                <input type="checkbox" checked={caminoSonidoLoop} onChange={e => { setCaminoSonidoLoop(e.target.checked); actualizarAnimSel({ sonidoLoop: e.target.checked }); }} /> 🔁 sonido
+                            </label>
+                        )}
+                        {selIdxs.length > 0 && herramienta === 'camino' && (
+                            <button onClick={() => { setElementos(prev => prev.map((it, i) => selIdxs.includes(i) ? { ...it, anim: null } : it)); }}
+                                style={{ padding:'4px 10px', borderRadius:8, border:'1px solid #e5e7eb', background:'#fff', color:'#6b7280', cursor:'pointer', fontSize:'0.75rem', fontWeight:600 }}>
+                                Quitar animación
+                            </button>
+                        )}
+                        <button onClick={() => setPlaying(p => !p)}
+                            style={{ display:'flex', alignItems:'center', gap:5, padding:'6px 14px', borderRadius:8, border:'none', cursor:'pointer', fontWeight:700, fontSize:'0.82rem',
+                                background: playing ? '#ef4444' : '#22c55e', color:'#fff' }}>
+                            {playing ? <><Square size={14}/> Detener</> : <><Play size={14}/> Reproducir</>}
+                        </button>
+                        <span style={{ fontSize:'0.72rem', color:'#7f8c8d' }}>
+                            Selecciona con ⬚ → ➰ dibuja el camino → ▶
+                        </span>
                     </div>
                 </>}
 
@@ -2605,6 +2905,44 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
             {calcVisible && <CalculadoraFlotante onClose={() => setCalcVisible(false)} onCopiar={res => { setTextoPegar(res); setHerramienta('paste'); setCalcVisible(false); }} />}
             {grafVisible  && <GraficadoraFlotante onClose={() => setGrafVisible(false)} onInsertar={cfg => { setGraficaConfig(cfg); setHerramienta('graph'); setGrafVisible(false); }} />}
             {showMusicStaff && <MusicStaffPanel onInsert={handleInsertMusicStaff} onClose={() => setShowMusicStaff(false)} />}
+            {/* ── Banco de imágenes ──────────────────────────────────────── */}
+            {bancoOpen && (
+                <div onClick={() => setBancoOpen(false)}
+                    style={{ position:'fixed', inset:0, zIndex:10000, background:'rgba(15,23,42,0.55)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+                    <div onClick={e => e.stopPropagation()}
+                        style={{ background:'#fff', borderRadius:14, width:'min(860px,96vw)', maxHeight:'88vh', display:'flex', flexDirection:'column', overflow:'hidden', boxShadow:'0 20px 60px rgba(0,0,0,0.4)' }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:8, padding:'12px 16px', background:'#0ea5e9', color:'#fff' }}>
+                            <ImageIcon size={18}/> <b style={{ flex:1 }}>Banco de imágenes</b>
+                            <span style={{ fontSize:'0.78rem', opacity:0.9 }}>Se inserta en la capa {capaActiva + 1}</span>
+                            <button onClick={() => setBancoOpen(false)} style={{ background:'none', border:'none', color:'#fff', cursor:'pointer' }}><X size={18}/></button>
+                        </div>
+                        <div style={{ display:'flex', gap:6, flexWrap:'wrap', padding:'10px 16px', borderBottom:'1px solid #e5e7eb' }}>
+                            {BANCO_IMAGENES.map(cat => (
+                                <button key={cat.id} onClick={() => setBancoCat(cat.id)}
+                                    style={{ padding:'5px 12px', borderRadius:20, border:'none', cursor:'pointer', fontWeight:700, fontSize:'0.78rem',
+                                        background: bancoCat === cat.id ? '#0f172a' : '#e2e8f0', color: bancoCat === cat.id ? '#fff' : '#334155' }}>
+                                    {cat.label} <span style={{ opacity:0.6 }}>({cat.items.length})</span>
+                                </button>
+                            ))}
+                        </div>
+                        <div style={{ overflowY:'auto', padding:16, display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(88px,1fr))', gap:10 }}>
+                            {(BANCO_IMAGENES.find(c => c.id === bancoCat)?.items || []).map((img, i) => (
+                                <button key={i} title={img.nombre}
+                                    onClick={() => {
+                                        if (img.esfera) renderEsferaDataURL(img.url, 256).then(u => insertarImagenBanco(u || img.url));
+                                        else insertarImagenBanco(img.url);
+                                    }}
+                                    style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4, padding:6, border:'1px solid #e5e7eb', borderRadius:10, background:'#f8fafc', cursor:'pointer' }}>
+                                    {img.esfera
+                                        ? <div style={{ height:64, display:'flex', alignItems:'center', justifyContent:'center' }}><PlanetaEsfera src={img.url} size={64} /></div>
+                                        : <img src={img.url} alt={img.nombre} loading="lazy" style={{ width:'100%', height:64, objectFit:'contain' }} />}
+                                    <span style={{ fontSize:'0.66rem', color:'#64748b', textAlign:'center', lineHeight:1.1, maxHeight:24, overflow:'hidden' }}>{img.nombre}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
             {/* ── Buscador de imágenes Wikimedia ──────────────────────────── */}
             {imgBuscador && (
                 <div style={{ position:'absolute', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.45)', zIndex:400, display:'flex', alignItems:'center', justifyContent:'center' }}

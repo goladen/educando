@@ -402,23 +402,43 @@ function PantallaInstrucciones({ recurso, hoja, onEmpezar }) {
 // ─────────────────────────────────────────────
 // COMPONENTE PRINCIPAL
 // ─────────────────────────────────────────────
-export default function KartingedGame({ usuario, alTerminar }) {
-    const [fase, setFase] = useState('PREVIO');       // PREVIO | INSTRUCCIONES | JUGANDO | RESULTADO
-    const [recurso, setRecurso]   = useState(null);
-    const [hoja,    setHoja]      = useState('General');
+export default function KartingedGame({
+    usuario, alTerminar,
+    // ── Contrato "modo olímpico" (Control de Aula / OlympicLive): recurso ya cargado,
+    //    salta el selector y reporta la puntuación en vez de mostrar su pantalla propia ──
+    recurso: recursoProp = null, modoOlimpico = false, tiempoOlimpico = null,
+    hojaOlimpica = 'General', onOlimpicoFinish = null,
+    onExit = null,
+}) {
+    const salir = alTerminar || onExit || (() => {});
+    const [fase, setFase] = useState(modoOlimpico && recursoProp ? 'INSTRUCCIONES' : 'PREVIO'); // PREVIO | INSTRUCCIONES | JUGANDO | RESULTADO
+    const [recurso, setRecurso]   = useState(modoOlimpico ? recursoProp : null);
+    const [hoja,    setHoja]      = useState(modoOlimpico ? (hojaOlimpica || 'General') : 'General');
     const [resultado, setResultado] = useState(null);
+
+    // Ref al callback de puntuación para no re-registrar el listener en cada render.
+    const finishRef = useRef(onOlimpicoFinish);
+    finishRef.current = onOlimpicoFinish;
 
     // Escuchar el postMessage de Unity cuando termina la carrera
     useEffect(() => {
         const handler = (e) => {
             if (e.data?.type === 'KARTINGED_RESULT') {
-                setResultado(e.data.data);
-                setFase('RESULTADO');
+                const data = e.data.data || {};
+                if (modoOlimpico) {
+                    // Reporta los puntos (mayor = mejor, coherente con el resto de juegos puntuables).
+                    if (finishRef.current) finishRef.current(Number(data.puntos) || 0);
+                    setResultado(data);
+                    setFase('FIN_OLIMPICO');
+                } else {
+                    setResultado(data);
+                    setFase('RESULTADO');
+                }
             }
         };
         window.addEventListener('message', handler);
         return () => window.removeEventListener('message', handler);
-    }, []);
+    }, [modoOlimpico]);
 
     const iniciarJuego = (rec, hojaElegida) => {
         setRecurso(rec);
@@ -432,8 +452,20 @@ export default function KartingedGame({ usuario, alTerminar }) {
     if (fase === 'INSTRUCCIONES')
         return <PantallaInstrucciones recurso={recurso} hoja={hoja} onEmpezar={() => setFase('JUGANDO')} />;
 
+    // En modo olímpico no se muestra la pantalla de resultados propia: la puntuación ya se
+    // ha reportado y el contenedor (Control de Aula) gestiona el ranking global.
+    if (fase === 'FIN_OLIMPICO')
+        return (
+            <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg,#1a1a2e,#16213e,#0f3460)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'white', fontFamily: "'Segoe UI',sans-serif", gap: 10 }}>
+                <div style={{ fontSize: '3.5rem' }}>🏁</div>
+                <h2 style={{ margin: 0, color: '#FFD700' }}>¡Carrera terminada!</h2>
+                {resultado && <div style={{ opacity: 0.85 }}>🏆 {resultado.puntos} puntos · ⏱ {resultado.tiempoFormateado}</div>}
+                <div style={{ opacity: 0.7, fontSize: '0.9rem' }}>Puntuación enviada.</div>
+            </div>
+        );
+
     if (fase === 'RESULTADO' && resultado)
-        return <PantallaResultados resultado={resultado} recurso={recurso} usuario={usuario} onSalir={alTerminar} />;
+        return <PantallaResultados resultado={resultado} recurso={recurso} usuario={usuario} onSalir={salir} />;
 
     // JUGANDO — iframe con recursoId y hoja en la URL
     const hojaParam = encodeURIComponent(hoja);
@@ -444,7 +476,7 @@ export default function KartingedGame({ usuario, alTerminar }) {
             src={iframeSrc}
             title="Karting Educativo"
             onMessage={(data) => { if (data.type === 'KARTINGED_RESULT') setResultado(data.data); }}
-            onSalir={alTerminar}
+            onSalir={salir}
         />
     );
 }

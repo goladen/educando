@@ -28,6 +28,7 @@ import ArkadeHub from './MiniArcade/ArkadeHub';
 import VideoQuizzApp from './VideoQuizzApp';
 import ClimbingHub from './ClimbingHub';
 import WhoKnows from './WhoKnows';
+import { StudentJoinView } from './ControlAula';
 
 const TUTORIAL_ALUMNO = [
     {
@@ -61,6 +62,7 @@ function App() {
     const [trivialRecursoId,  setTrivialRecursoId]  = useState(null);
     const [climbing,          setClimbing]          = useState(false);
     const [questionSenderCode,setQuestionSenderCode]= useState(null);
+    const [aulaCode,          setAulaCode]          = useState(null); // Control de Aula: alumno vía ?aula=CODE o /join
 
     // ANNOTATION OVERLAY + PIZARRA DESDE CAPTURA
     const [annotationOpen,   setAnnotationOpen]   = useState(false);
@@ -88,6 +90,8 @@ function App() {
 
     useEffect(() => {
       const params = new URLSearchParams(window.location.search);
+      const aula = params.get('aula');
+      if (aula !== null) { setAulaCode(aula.toUpperCase()); return; }
       const mid = params.get('miniapp');
       if (mid) { setMiniappId(mid); return; }
       const trivialEnvio = params.get('trivial_envio');
@@ -107,6 +111,7 @@ function App() {
       const uid = params.get('p');
       if (uid) { setPaginaTarget({ uid }); return; }
       const slug = window.location.pathname.replace(/^\//, '').replace(/\/$/, '').trim().toLowerCase();
+      if (slug === 'join') { setAulaCode(''); return; }
       if (slug === 'funcionesejecutivas' || slug === 'irregular_verbs' || slug === 'sistema_solar'
           || slug === 'retos' || slug === 'conectapuntos' || slug === 'sudoku'
           || slug === 'partes_planta' || slug === 'etiquetame' || slug === 'karting_track'
@@ -131,7 +136,7 @@ function App() {
         'geometrix','calculo','funciones','funciones2','geometria_analitica','geometriaanalitica',
         'ecuaciones','oca','domino','musica',
         'algebra','polinomios','estadistica','probabilidad',
-        'api','admin','login','app',
+        'api','admin','login','app','join',
         'irregular_verbs','sistema_solar',
         'retos','conectapuntos','sudoku',
         'imperios','geografia','quienesquien','pizarra',
@@ -301,6 +306,9 @@ function App() {
     if (rutaPublica === 'retos') return <><Retos onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'conectapuntos') return <><Retos initialGame="CONECTA" onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'sudoku') return <><Retos initialGame="SUDOKU" onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
+
+    // Vista del alumno de Control de Aula (no requiere login) — ?aula=CODE o /join
+    if (aulaCode !== null) return <StudentJoinView codigoInicial={aulaCode} onExit={() => { setAulaCode(null); window.history.pushState({}, '', '/'); }} />;
 
     // Mini-app pública (no requiere login)
     if (miniappId) return <MiniAppViewer miniappId={miniappId} onBack={() => { setMiniappId(null); window.history.pushState({}, '', '/'); }} />;

@@ -6,8 +6,9 @@ import {
     PenTool, Type, Circle, Square as SquareIcon, Triangle, Hexagon,
     Box, Calculator as CalcIcon, X, Camera, Activity, ChevronDown, ChevronUp,
     Move, Maximize2, Minimize2, Image as ImageIcon, ZoomIn, ZoomOut, Share2,
-    Users, LayoutGrid
+    Users, LayoutGrid, Radio
 } from 'lucide-react';
+import { TeacherControlPanel } from './ControlAula';
 import Confetti from 'react-confetti';
 import GeografiaPanel from './components/GeografiaPanel';
 import MusicStaffPanel from './components/MusicStaffPanel';
@@ -3678,7 +3679,7 @@ export default function HerramientasClase({ onExit, initialTool }) {
         const params = new URLSearchParams(window.location.search);
         if (params.get('pizarra')) return 'pizarra';
         const g = params.get('gestion');
-        if (['ruleta', 'pizarra', 'reloj', 'grupos', 'plano', 'miniapp', 'recortes'].includes(g)) return g;
+        if (['ruleta', 'pizarra', 'reloj', 'grupos', 'plano', 'miniapp', 'recortes', 'control'].includes(g)) return g;
         return null;
     });
     const [shareModal, setShareModal] = useState(null); // { url, titulo }
@@ -3693,6 +3694,7 @@ export default function HerramientasClase({ onExit, initialTool }) {
         { id: 'plano',    icon: <LayoutGrid size={40}/>,   titulo: 'Plano de Clase',     desc: 'Organiza los asientos de tu aula con un plano visual.',    color: '#1565C0' },
         { id: 'miniapp',  icon: <span style={{fontSize:36}}>⚡</span>, titulo: 'App con IA', desc: 'Genera una mini-aplicación interactiva con Claude o Gemini y previsualízala al instante.', color: '#7c3aed' },
         { id: 'recortes', icon: <span style={{fontSize:36}}>✂️</span>, titulo: 'Recortes Extrem', desc: 'Carga una imagen o PDF y haz varios recortes a la vez para crear una matriz de imágenes.', color: '#16a085' },
+        { id: 'control',  icon: <Radio size={40}/>,       titulo: 'Control de Aula',    desc: 'Crea una sala, controla la presencia de tus alumnos en tiempo real y lánzales juegos.', color: '#4f46e5' },
     ];
 
     return (
@@ -3764,6 +3766,7 @@ export default function HerramientasClase({ onExit, initialTool }) {
                     {activa === 'plano'    && <PlanoAulaLibre />}
                     {activa === 'miniapp'  && <Suspense fallback={<div style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Cargando…</div>}><MiniAppCreator onAbrirViewer={(id) => window.open(`/?miniapp=${id}`, '_blank')} /></Suspense>}
                     {activa === 'recortes' && <Suspense fallback={<div style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Cargando…</div>}><RecortesExtrem /></Suspense>}
+                    {activa === 'control'  && <TeacherControlPanel />}
                 </div>
             )}
 

@@ -6,7 +6,7 @@ import {
     PenTool, Type, Circle, Square as SquareIcon, Triangle, Hexagon,
     Box, Calculator as CalcIcon, X, Camera, Activity, ChevronDown, ChevronUp,
     Move, Maximize2, Minimize2, Image as ImageIcon, ZoomIn, ZoomOut, Share2,
-    Users, LayoutGrid, Radio
+    Users, LayoutGrid, Radio, Plus
 } from 'lucide-react';
 import { TeacherControlPanel } from './ControlAula';
 import Confetti from 'react-confetti';
@@ -3480,6 +3480,7 @@ function PlanoAulaLibre() {
     const [selSeat, setSelSeat] = useState(null);
     const [selUnassign, setSelUnassign] = useState(null);
     const [dragging, setDragging] = useState(null);
+    const [nuevoAlumno, setNuevoAlumno] = useState('');
 
     const alumnos = alumnosTxt.split(/[\n,]+/).map(a => a.trim()).filter(Boolean);
     const asignados = new Set(mesas.flatMap(m => m.asientos.map(s => s.alumno)).filter(Boolean));
@@ -3538,6 +3539,23 @@ function PlanoAulaLibre() {
     };
 
     const onClickUnassigned = n => { setSelSeat(null); setSelUnassign(prev => prev===n ? null : n); };
+
+    // Añade un alumno nuevo a la lista sin volver a la pantalla de edición.
+    // Evita duplicados (ignorando mayúsculas/espacios) y limpia el campo.
+    const agregarAlumno = () => {
+        const nom = nuevoAlumno.trim();
+        if (!nom) return;
+        if (alumnos.some(a => a.toLowerCase() === nom.toLowerCase())) { setNuevoAlumno(''); return; }
+        setAlumnosTxt(prev => (prev.trim() ? prev.replace(/\s*$/, '') + ', ' : '') + nom);
+        setNuevoAlumno('');
+    };
+
+    // Elimina un alumno de la lista y lo quita del asiento donde estuviera.
+    const eliminarAlumno = nom => {
+        setAlumnosTxt(alumnos.filter(a => a !== nom).join(', '));
+        setMesas(prev => prev.map(m => ({ ...m, asientos: m.asientos.map(s => s.alumno===nom ? {...s, alumno:null} : s) })));
+        if (selUnassign === nom) setSelUnassign(null);
+    };
 
     const rellenar = () => {
         const todos = [...alumnos].sort(() => Math.random() - 0.5);
@@ -3647,12 +3665,32 @@ function PlanoAulaLibre() {
                         ) : (
                             <div style={{ display:'flex', flexDirection:'column', gap:4, maxHeight:280, overflowY:'auto' }}>
                                 {noAsignados.map(n => (
-                                    <div key={n} onClick={() => onClickUnassigned(n)} style={{ padding:'6px 10px', borderRadius:8, cursor:'pointer', background:selUnassign===n?'#1565C0':'#e8f0fe', color:selUnassign===n?'white':'#1565C0', fontSize:'0.8rem', fontWeight:600, transition:'all 0.1s', border:'1.5px solid '+(selUnassign===n?'#1565C0':'transparent'), wordBreak:'break-word' }}>
-                                        {n}
+                                    <div key={n} style={{ display:'flex', alignItems:'center', gap:4, background:selUnassign===n?'#1565C0':'#e8f0fe', borderRadius:8, border:'1.5px solid '+(selUnassign===n?'#1565C0':'transparent'), transition:'all 0.1s' }}>
+                                        <div onClick={() => onClickUnassigned(n)} style={{ flex:1, minWidth:0, padding:'6px 10px', cursor:'pointer', color:selUnassign===n?'white':'#1565C0', fontSize:'0.8rem', fontWeight:600, wordBreak:'break-word' }}>
+                                            {n}
+                                        </div>
+                                        <button onClick={() => eliminarAlumno(n)} title="Eliminar alumno"
+                                            style={{ background:'none', border:'none', cursor:'pointer', color:selUnassign===n?'rgba(255,255,255,0.85)':'#e74c3c', padding:'4px 6px', display:'flex', alignItems:'center', flexShrink:0 }}>
+                                            <X size={12}/>
+                                        </button>
                                     </div>
                                 ))}
                             </div>
                         )}
+                        {/* Añadir alumno nuevo sin volver a la pantalla de edición */}
+                        <div style={{ marginTop:12, borderTop:'1px solid #e0e4f0', paddingTop:12 }}>
+                            <div style={{ fontWeight:700, color:'#2c3e50', fontSize:'0.78rem', marginBottom:6 }}>Añadir alumno</div>
+                            <div style={{ display:'flex', gap:5 }}>
+                                <input value={nuevoAlumno} onChange={e => setNuevoAlumno(e.target.value)}
+                                    onKeyDown={e => { if (e.key==='Enter') agregarAlumno(); }}
+                                    placeholder="Nombre…"
+                                    style={{ flex:1, minWidth:0, padding:'6px 8px', borderRadius:7, border:'1.5px solid #e0e4f0', fontSize:'0.8rem', outline:'none', fontFamily:'inherit' }}/>
+                                <button onClick={agregarAlumno}
+                                    style={{ padding:'6px 10px', borderRadius:7, border:'none', background:'#1565C0', color:'white', cursor:'pointer', display:'flex', alignItems:'center', flexShrink:0 }}>
+                                    <Plus size={14}/>
+                                </button>
+                            </div>
+                        </div>
                         {(selSeat || selUnassign) && (
                             <div style={{ marginTop:12, padding:'8px 10px', background:'#fff8e1', borderRadius:8, fontSize:'0.74rem', color:'#856404', lineHeight:1.4 }}>
                                 {selUnassign

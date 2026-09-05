@@ -12,6 +12,7 @@ import IrregularVerbsTest from './IrregularVerbsTest';
 import { SolarSystemViewer } from './components/LandingGames3';
 import ImperiosGame from './components/ImperiosGame';
 import QuienEsQuien from './QuienEsQuien';
+import BunkerDisparo from './BunkerDisparo';
 import { PizarraApp } from './GestionAula';
 import PiTutorial from './components/PiTutorial';
 import Retos from './Retos';
@@ -116,7 +117,7 @@ function App() {
           || slug === 'retos' || slug === 'conectapuntos' || slug === 'sudoku'
           || slug === 'partes_planta' || slug === 'etiquetame' || slug === 'karting_track'
           || slug === 'arkade' || slug === 'imperios' || slug === 'whoknows'
-          || slug === 'quienesquien' || slug === 'pizarra') {
+          || slug === 'quienesquien' || slug === 'pizarra' || slug === 'bunker') {
         setRutaPublica(slug);
         return;
       }
@@ -139,7 +140,7 @@ function App() {
         'api','admin','login','app','join',
         'irregular_verbs','sistema_solar',
         'retos','conectapuntos','sudoku',
-        'imperios','geografia','quienesquien','pizarra',
+        'imperios','geografia','quienesquien','pizarra','bunker',
         'fisica',
         'math_world','primaria','feria',
         'arkade',
@@ -302,6 +303,7 @@ function App() {
     if (rutaPublica === 'sistema_solar') return <><SolarSystemViewer onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'imperios') return <><ImperiosGame onBack={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'quienesquien') return <><QuienEsQuien onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
+    if (rutaPublica === 'bunker') return <><BunkerDisparo onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'pizarra') return <><div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#f1f5f9', overflow: 'auto', padding: '54px 12px 20px' }}><button onClick={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} style={{ position: 'fixed', top: 12, left: 12, zIndex: 10000, padding: '8px 14px', borderRadius: 10, border: 'none', background: '#fff', color: '#334155', fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}>← Volver</button><PizarraApp /></div>{anotadorUI}</>;
     if (rutaPublica === 'retos') return <><Retos onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'conectapuntos') return <><Retos initialGame="CONECTA" onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;

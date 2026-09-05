@@ -34,6 +34,9 @@ function ModalCrearGrupo({ profesorUid, onClose, onSaved, grupoExistente }) {
     const [resumenImport,  setResumenImport]  = useState(null);
     const [sheetsUrl,      setSheetsUrl]      = useState('');
     const [mostrarUrl,     setMostrarUrl]     = useState(false);
+    const [mostrarPegar,   setMostrarPegar]   = useState(false);
+    const [textoPegar,     setTextoPegar]     = useState('');
+    const [grupoPegar,     setGrupoPegar]     = useState('');
     const fileRef = useRef();
 
     const añadirManual = () => {
@@ -44,6 +47,27 @@ function ModalCrearGrupo({ profesorUid, onClose, onSaved, grupoExistente }) {
     };
 
     const eliminarAlumno = (id) => setAlumnos(prev => prev.filter(a => a.id !== id));
+
+    // Añade varios nombres pegados desde una columna de hoja de cálculo (uno por línea)
+    const pegarNombres = () => {
+        const grupoStr = grupoPegar.trim();
+        const nombres = textoPegar
+            .split(/\r?\n/)
+            .map(l => l.split('\t')[0].trim())   // por si pegan varias columnas, coge la primera
+            .filter(Boolean);
+        if (nombres.length === 0) { setError('No hay nombres que añadir.'); return; }
+        setAlumnos(prev => {
+            const listado = [...prev];
+            nombres.forEach(nombreStr => {
+                const existe = listado.some(a => a.nombre.trim().toLowerCase() === nombreStr.toLowerCase());
+                if (!existe) listado.push({ id: uid(), nombre: nombreStr, grupo: grupoStr });
+            });
+            return sortAlpha(listado);
+        });
+        setError('');
+        setResumenImport({ alumnos: nombres.length, cols: [] });
+        setTextoPegar(''); setGrupoPegar(''); setMostrarPegar(false);
+    };
 
     // ── Procesador común de filas ─────────────────────────────────────────────
     // Formato: fila 0 = cabeceras (col0=Nombre, col1=Grupo, col2+=calificaciones)
@@ -219,6 +243,34 @@ function ModalCrearGrupo({ profesorUid, onClose, onSaved, grupoExistente }) {
                             <Plus size={16}/> Añadir
                         </button>
                     </div>
+                </div>
+
+                <div style={{ marginBottom:12 }}>
+                    <button onClick={() => setMostrarPegar(v => !v)} style={ms.btnBlue}>
+                        📋 Pegar lista de nombres
+                    </button>
+                    {mostrarPegar && (
+                        <div style={{ marginTop:8 }}>
+                            <div style={{ fontSize:'0.75rem', color:'#95a5a6', marginBottom:6 }}>
+                                Copia una columna de nombres de tu hoja de cálculo y pégala aquí (un nombre por línea).
+                            </div>
+                            <textarea
+                                value={textoPegar}
+                                onChange={e => setTextoPegar(e.target.value)}
+                                placeholder={"Ana García\nLuis Pérez\nMaría López\n…"}
+                                rows={6}
+                                style={{ ...ms.input, width:'100%', resize:'vertical', fontFamily:'inherit' }}
+                            />
+                            <div style={{ display:'flex', gap:8, marginTop:6, flexWrap:'wrap', alignItems:'center' }}>
+                                <input value={grupoPegar} onChange={e => setGrupoPegar(e.target.value)}
+                                    placeholder="Subgrupo para todos (opcional)"
+                                    style={{ ...ms.input, flex:1, minWidth:140 }}/>
+                                <button onClick={pegarNombres} style={ms.btnGreen} disabled={!textoPegar.trim()}>
+                                    <Plus size={16}/> Añadir {textoPegar.split(/\r?\n/).map(l=>l.split('\t')[0].trim()).filter(Boolean).length || ''} nombres
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div style={{ marginBottom:16 }}>

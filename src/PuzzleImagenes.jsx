@@ -80,11 +80,65 @@ export default function PuzzleImagenes({ onExit }) {
     const [solved, setSolved]   = useState(false);
     const [drag, setDrag]       = useState(null);     // { from, x, y } durante el arrastre
     const [segundos, setSegundos] = useState(0);      // tiempo transcurrido
+    const [urlInput, setUrlInput] = useState('');     // URL para puzzle personalizado
+    const [urlError, setUrlError] = useState('');     // aviso si la imagen no carga
 
     const boardRef = useRef(null);
     const pointerStart = useRef(null);
     const inicioRef = useRef(null);   // marca de tiempo de inicio de la partida
     const guardadoRef = useRef(false); // evita guardar el registro dos veces
+    const audioRef = useRef(null);    // AudioContext para los efectos de sonido
+
+    // ── Sonido: pequeño "clic/whoosh" sintetizado al intercambiar dos fichas ──────
+    const playSwap = useCallback(() => {
+        try {
+            if (!audioRef.current) {
+                const AC = window.AudioContext || window.webkitAudioContext;
+                if (!AC) return;
+                audioRef.current = new AC();
+            }
+            const ctx = audioRef.current;
+            if (ctx.state === 'suspended') ctx.resume();
+            const t = ctx.currentTime;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(520, t);
+            osc.frequency.exponentialRampToValueAtTime(880, t + 0.09);
+            gain.gain.setValueAtTime(0.0001, t);
+            gain.gain.exponentialRampToValueAtTime(0.22, t + 0.015);
+            gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.start(t); osc.stop(t + 0.18);
+        } catch { /* silencio si el audio no está disponible */ }
+    }, []);
+
+    // ── Sonido: pequeña fanfarria ascendente al completar el puzzle ───────────────
+    const playVictoria = useCallback(() => {
+        try {
+            if (!audioRef.current) {
+                const AC = window.AudioContext || window.webkitAudioContext;
+                if (!AC) return;
+                audioRef.current = new AC();
+            }
+            const ctx = audioRef.current;
+            if (ctx.state === 'suspended') ctx.resume();
+            const t0 = ctx.currentTime;
+            const notas = [523.25, 659.25, 783.99, 1046.5]; // Do-Mi-Sol-Do
+            notas.forEach((f, i) => {
+                const t = t0 + i * 0.13;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(f, t);
+                gain.gain.setValueAtTime(0.0001, t);
+                gain.gain.exponentialRampToValueAtTime(0.25, t + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.start(t); osc.stop(t + 0.32);
+            });
+        } catch { /* silencio si el audio no está disponible */ }
+    }, []);
 
     const cfg = dif ? DIFICULTADES[dif] : null;
     const N = cfg ? cfg.cols * cfg.rows : 0;
@@ -118,6 +172,7 @@ export default function PuzzleImagenes({ onExit }) {
     useEffect(() => {
         if (!solved || guardadoRef.current || !puzzle || !cfg) return;
         guardadoRef.current = true;
+        playVictoria();
         const total = inicioRef.current ? Math.floor((Date.now() - inicioRef.current) / 1000) : segundos;
         setSegundos(total);
         guardarRegistroLocal('PUZZLE_IMAGENES', {
@@ -129,9 +184,41 @@ export default function PuzzleImagenes({ onExit }) {
 
     const volverMenu = () => { setPuzzle(null); setDif(null); setOrder([]); };
 
+    // Crea un puzzle personalizado a partir de la URL de una imagen cualquiera.
+    // Prueba varias fuentes en orden hasta que una cargue:
+    //   1) la URL directa,
+    //   2) un proxy de imágenes (images.weserv.nl) que evita bloqueos anti-hotlink
+    //      y errores tipo ERR_HTTP2_PROTOCOL_ERROR reservando la imagen con CORS.
+    // Sin crossOrigin: el tablero pinta la imagen con CSS background-image (no lee
+    // píxeles), así que no hace falta CORS para jugar.
+    const usarUrlPersonalizada = () => {
+        const url = urlInput.trim();
+        setUrlError('');
+        if (!url) return;
+        setUrlError('Cargando imagen…');
+        const sinProto = url.replace(/^https?:\/\//, '');
+        const candidatos = [
+            url,
+            `https://images.weserv.nl/?url=${encodeURIComponent(sinProto)}`,
+            `https://images.weserv.nl/?url=ssl:${encodeURIComponent(sinProto)}`,
+        ];
+        const probar = (i) => {
+            if (i >= candidatos.length) {
+                setUrlError('No se pudo cargar esa imagen. La web puede estar bloqueando el enlace; prueba con otra imagen o descárgala y súbela a un servicio como imgur.');
+                return;
+            }
+            const img = new Image();
+            img.onload = () => { setUrlError(''); setPuzzle({ id: 'custom', nombre: 'Mi imagen', img: candidatos[i], custom: true }); };
+            img.onerror = () => probar(i + 1);
+            img.src = candidatos[i];
+        };
+        probar(0);
+    };
+
     // Intercambia las piezas de dos celdas
     const swap = useCallback((a, b) => {
         if (a === b || a == null || b == null) return;
+        playSwap();
         setOrder(prev => {
             const next = [...prev];
             [next[a], next[b]] = [next[b], next[a]];
@@ -139,7 +226,7 @@ export default function PuzzleImagenes({ onExit }) {
             return next;
         });
         setMoves(m => m + 1);
-    }, []);
+    }, [playSwap]);
 
     // ── Detección de la celda bajo un punto de la pantalla (para soltar) ───────
     const celdaEnPunto = (x, y) => {
@@ -219,6 +306,22 @@ export default function PuzzleImagenes({ onExit }) {
     if (!puzzle) {
         return (
             <Pantalla onExit={onExit} titulo="🧩 Puzzle de Imágenes" subtitulo="Elige una imagen para montar el puzzle">
+                {/* Puzzle personalizado a partir de una URL de imagen */}
+                <div style={{ background: '#fff', border: '2px dashed #a29bfe', borderRadius: 14, padding: '14px 16px', marginBottom: 20, boxShadow: '0 3px 10px rgba(0,0,0,0.08)' }}>
+                    <div style={{ fontWeight: 800, color: '#2c3e50', marginBottom: 8, fontSize: 15 }}>🔗 Crea tu propio puzzle</div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <input
+                            type="url"
+                            value={urlInput}
+                            onChange={e => { setUrlInput(e.target.value); setUrlError(''); }}
+                            onKeyDown={e => { if (e.key === 'Enter') usarUrlPersonalizada(); }}
+                            placeholder="Pega aquí la URL de una imagen (https://…)"
+                            style={{ flex: '1 1 240px', minWidth: 0, border: '2px solid #dfe6e9', borderRadius: 10, padding: '10px 12px', fontSize: 14, outline: 'none' }}
+                        />
+                        <button onClick={usarUrlPersonalizada} style={botonAccion('#6c5ce7')}>➕ Usar imagen</button>
+                    </div>
+                    {urlError && <div style={{ color: '#e74c3c', fontSize: 13, marginTop: 8, fontWeight: 600 }}>{urlError}</div>}
+                </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 14 }}>
                     {PUZZLES.map(p => (
                         <button key={p.id} onClick={() => setPuzzle(p)}

@@ -18,6 +18,7 @@ import MathLive from '../MathLive';
 import OlympicLive from '../OlympicLive';
 import QuestionSenderClient from '../QuestionSenderClient';
 import PikatronRun from '../PikatronRun';
+import BunkerDisparo from '../BunkerDisparo';
 import TextWordleGame from '../TextWordleGame';
 import MathWordleGame from '../MathWordleGame';
 import SopaDeLetrasGame from '../SopaDeLetrasGame';
@@ -510,6 +511,15 @@ export const APPS = [
         shareable: true
     },
     {
+        id: 'BUNKER',
+        name: 'Bunker',
+        desc: 'Shooter 3D: dispara a las respuestas incorrectas.',
+        color: '#27ae60',
+        emoji: '🎯',
+        isSpecial: true,
+        shareable: true
+    },
+    {
         id: 'KARTINGED',
         name: 'Karting',
         desc: 'Carreras de karts con preguntas en los checkpoints.',
@@ -668,8 +678,8 @@ export const APPS = [
     { id: 'STORYCUBES', name: 'Story Cubes', desc: 'Crea historias en equipo usando dados con imágenes.', color: '#8e44ad', emoji: '🎲', shareable: true },
     { id: 'PUZZLE_IMAGENES', name: 'Puzzle de Imágenes', desc: 'Monta una foto recolocando sus piezas. 20 imágenes y 3 dificultades.', color: '#6c5ce7', emoji: '🧩', shareable: true },
     { id: 'FUTBOLQUIZZ', name: 'Fútbol Quizz', desc: 'Pizarra de fútbol por turnos: arrastra y dispara para marcar gol.', color: '#15803d', emoji: '⚽', shareable: true },
-    { id: 'RETOS', name: 'Retos', desc: 'Conecta puntos y puzzles de lógica.', color: '#f39c12', emoji: '🧩', shareable: true },
-    { id: 'TRIVIAL', name: 'Trivial', desc: 'El clásico juego de preguntas por categorías para hasta 6 jugadores.', color: '#16213e', emoji: '🎯', shareable: true },
+    { id: 'RETOS', name: 'Retos', desc: 'Conecta puntos y puzzles de lógica.', color: '#f39c12', emoji: '💡', shareable: true },
+    { id: 'TRIVIAL', name: 'Trivial', desc: 'El clásico juego de preguntas por categorías para hasta 6 jugadores.', color: '#16213e', emoji: '❓', shareable: true },
     { id: 'CLIMBING', name: 'Climbing', desc: 'Trivial de escalada y simulador de caída. Se abre en una pestaña nueva.', color: '#0ea5e9', emoji: '🧗', shareable: true, shareUrl: `${window.location.origin}/escalada` },
     { id: 'DUELO_PIRATAS_RECURSO', name: 'Duelo Piratas', desc: '2 jugadores · cañonazos con tu recurso · múltiple opción, aparejados o pasapalabra.', color: '#0a1628', emoji: '🏴‍☠️', shareable: true },
     {
@@ -699,6 +709,14 @@ export const GAME_INFO = {
         tipoPreguntas: 'Preguntas de opción múltiple de cualquier materia y nivel. El profesor crea el recurso.',
         biblioteca: 'No incluye biblioteca propia. Requiere recurso del profesor.',
         multiplayer: 'Individual (modo competición por puntuación).',
+        materias: ['Universal'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
+    BUNKER: {
+        descripcion: 'Shooter 3D en primera persona: cada pregunta hace aparecer soldados, cada uno con una respuesta sobre la cabeza. Dispara a las respuestas incorrectas y deja en pie la correcta para pasar a la siguiente pregunta. Cuidado: si disparas a la correcta pierdes vida y los enemigos avanzan hacia ti.',
+        tipoPreguntas: 'Opción múltiple (1 correcta + hasta 3 incorrectas). Usa los mismos recursos que Burbujas/Pikatron. También se puede jugar sin recurso, con 4 materias integradas (Matemáticas, Geografía, Inglés y Ciencias).',
+        biblioteca: 'Incluye 4 bancos propios de preguntas (modo libre) y un buscador de recursos públicos del profesor.',
+        multiplayer: 'Individual. Compatible con ratón/teclado y pantalla táctil.',
         materias: ['Universal'],
         etapas: ['Primaria', 'ESO', 'Bachillerato'],
     },
@@ -1884,6 +1902,12 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
             return;
         }
 
+        if (appId === 'BUNKER') {
+            window.history.pushState({}, '', '/bunker');
+            setJuegoActivo({ tipoJuego: 'BUNKER' });
+            return;
+        }
+
         if (appId === 'STORYCUBES') {
             setJuegoActivo({ tipoJuego: 'STORYCUBES' });
             return;
@@ -2404,6 +2428,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
         if (juegoActivo.tipoJuego === 'KARTINGED_MULTI') return <KartingedMultiGame alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'RACING3D') return <RacingGame3D usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'MANSION_PITAGORICA') return <MansionPitagoricaGame alTerminar={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'BUNKER') return <BunkerDisparo usuario={usuario} recurso={juegoActivo.recurso || null} autoStart={!!juegoActivo.recurso} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'TRIVIAL') {
             const salirTrivial = () => {
                 window.history.pushState({}, '', window.location.pathname);

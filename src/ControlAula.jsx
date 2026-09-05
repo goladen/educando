@@ -18,6 +18,7 @@ import {
     doc, setDoc, updateDoc, onSnapshot, collection, getDoc, getDocs,
     query, where, serverTimestamp, deleteField,
 } from 'firebase/firestore';
+import { onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { Radio, Rocket, Bell, Link as LinkIcon, LogIn, Trophy, Gamepad2 } from 'lucide-react';
 import usePresenceRoom, { ESTADO } from './hooks/usePresenceRoom';
 
@@ -127,6 +128,8 @@ export function JuegoOlimpicoRunner({ modo, recurso, hoja, tiempo, usuario, onFi
 // PANEL DEL PROFESOR
 // ═════════════════════════════════════════════════════════════════════════════
 export function TeacherControlPanel() {
+    const [user, setUser] = useState(() => auth.currentUser);
+    const [loginError, setLoginError] = useState('');
     const [codigo] = useState(() => generarCodigo());
     const [alumnos, setAlumnos] = useState([]);
     const [salaAbierta, setSalaAbierta] = useState(false);
@@ -150,14 +153,28 @@ export function TeacherControlPanel() {
     const roomRef = useMemo(() => doc(db, 'control_rooms', codigo), [codigo]);
     const game = room?.game || null;
 
-    // Crear la sala + suscripciones.
+    // Sesión del profesor (crear sala requiere estar autenticado — regla request.auth != null).
+    useEffect(() => onAuthStateChanged(auth, (u) => setUser(u)), []);
+
+    const iniciarSesion = async () => {
+        setLoginError('');
+        try {
+            const provider = new GoogleAuthProvider();
+            await signInWithPopup(auth, provider);
+        } catch (e) {
+            setLoginError('No se pudo iniciar sesión. Inténtalo de nuevo.');
+        }
+    };
+
+    // Crear la sala + suscripciones (solo con profesor autenticado).
     useEffect(() => {
+        if (!user) return;
         let vivo = true;
         (async () => {
             try {
                 await setDoc(roomRef, {
                     code: codigo,
-                    ownerUid: auth.currentUser?.uid || null,
+                    ownerUid: user?.uid || null,
                     createdAt: serverTimestamp(),
                     active: true,
                     currentRoute: null,
@@ -193,11 +210,11 @@ export function TeacherControlPanel() {
             updateDoc(roomRef, { active: false }).catch(() => {});
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [codigo]);
+    }, [codigo, user]);
 
     // Cargar recursos puntuables del profesor.
     useEffect(() => {
-        const uid = auth.currentUser?.uid;
+        const uid = user?.uid;
         if (!uid) return;
         setCargandoRec(true);
         getDocs(query(collection(db, 'resources'), where('profesorUid', '==', uid)))
@@ -210,7 +227,7 @@ export function TeacherControlPanel() {
             })
             .catch((e) => console.error('Cargando recursos', e))
             .finally(() => setCargandoRec(false));
-    }, []);
+    }, [user]);
 
     useEffect(() => {
         const id = setInterval(() => forceTick((t) => t + 1), 3000);
@@ -306,6 +323,24 @@ export function TeacherControlPanel() {
         const s = map[est] || map[ESTADO.ACTIVO];
         return <span style={{ background: s.bg, color: s.c, borderRadius: 20, padding: '3px 10px', fontSize: '0.78rem', fontWeight: 700, whiteSpace: 'nowrap' }}>{s.txt}</span>;
     };
+
+    // Sin sesión: no se puede crear la sala (regla request.auth != null) → pedir login.
+    if (!user) {
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', textAlign: 'center', padding: 24, fontFamily: "'Segoe UI', sans-serif" }}>
+                <Radio size={44} color="#4f46e5" style={{ marginBottom: 12 }} />
+                <h2 style={{ color: '#1e293b', margin: '0 0 6px' }}>Control de Aula</h2>
+                <p style={{ color: '#64748b', maxWidth: 380, margin: '0 0 20px' }}>
+                    Para crear una sala necesitas iniciar sesión como profesor. Tus alumnos entrarán sin cuenta con el código o el QR.
+                </p>
+                <button onClick={iniciarSesion}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: '#4f46e5', color: 'white', border: 'none', borderRadius: 12, padding: '13px 26px', cursor: 'pointer', fontWeight: 800, fontSize: '1rem' }}>
+                    <LogIn size={18} /> Iniciar sesión con Google
+                </button>
+                {loginError && <div style={{ color: '#dc2626', fontSize: '0.85rem', marginTop: 12 }}>{loginError}</div>}
+            </div>
+        );
+    }
 
     return (
         <div style={{ fontFamily: "'Segoe UI', sans-serif" }}>

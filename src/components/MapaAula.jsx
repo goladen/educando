@@ -52,7 +52,7 @@ function htmlPlano(nombre, mesas, grupoNombre) {
         const isP = m.tipo === 'profesor';
         const w   = Math.round((isP ? 180 : deskWidth(m.asientos.length)) * sc);
         const seats = m.asientos.map(s =>
-            `<div style="flex:1;border:1px solid ${isP?'#e67e22':'#1565C0'};border-radius:4px;padding:3px;font-size:0.67rem;font-weight:600;min-height:34px;display:flex;align-items:center;justify-content:center;text-align:center;background:${s.alumno?'#e8f5e9':'#f8f9fa'};color:${s.alumno?'#2c3e50':'#bbb'}">${s.alumno||'vacío'}</div>`
+            `<div style="flex:1;border:1px solid ${isP?'#e67e22':(s.alumno?'#a5d6a7':'#f5c6c2')};border-radius:4px;padding:3px;font-size:0.67rem;font-weight:600;min-height:34px;display:flex;align-items:center;justify-content:center;text-align:center;background:${isP?'#fdf3e7':(s.alumno?'#e8f5e9':'#fdeceb')};color:${isP?'#e67e22':'#2c3e50'}">${isP?'profe':(s.alumno||'')}</div>`
         ).join('');
         return `<div style="position:absolute;left:${Math.round(m.x*sc)}px;top:${Math.round(m.y*sc)}px;width:${w}px;border:2px solid ${isP?'#e67e22':'#1565C0'};border-radius:8px;overflow:hidden">
   <div style="background:${isP?'#e67e22':'#1565C0'};color:white;font-size:0.58rem;font-weight:700;padding:2px 6px">${isP?'👨‍🏫 PROFESOR':''}</div>
@@ -131,19 +131,22 @@ function DeskCard({ mesa, selSeat, selUnassign, onStartDrag, onClickSeat, onDele
                 {mesa.asientos.map((s, idx) => {
                     const isSel    = selSeat?.deskId === mesa.id && selSeat?.seatIdx === idx;
                     const isTarget = !isSel && selUnassign !== null && !s.alumno;
-                    const bg     = isSel ? '#fdecea' : isTarget ? '#e8f0fe' : s.alumno ? '#e8f5e9' : '#f8faff';
+                    // Ocupado → verde suave · vacío → rojo suave
+                    const bg     = isSel ? '#fdecea' : isTarget ? '#e8f0fe' : s.alumno ? '#e8f5e9' : '#fdeceb';
                     const border = isSel ? '2px solid #e74c3c'
                         : isTarget ? '2px dashed #1565C0'
-                        : s.alumno ? '1.5px solid #a5d6a7' : '1.5px solid #e0e4f0';
+                        : s.alumno ? '1.5px solid #a5d6a7' : '1.5px solid #f5c6c2';
                     return (
-                        <div key={s.id} onClick={() => onClickSeat(mesa.id, idx)} style={{
+                        <div key={s.id} onClick={() => { if (!isP) onClickSeat(mesa.id, idx); }} style={{
                             width: SEAT_W, minHeight: 42, borderRadius: 6, border, background: bg,
-                            cursor: 'pointer', display: 'flex', alignItems: 'center',
+                            cursor: isP ? 'default' : 'pointer', display: 'flex', alignItems: 'center',
                             justifyContent: 'center', padding: '2px 3px', textAlign: 'center',
                             fontSize: '0.65rem', fontWeight: 600, color: '#2c3e50',
                             wordBreak: 'break-word', lineHeight: 1.2, transition: 'all 0.1s',
                         }}>
-                            {s.alumno || <span style={{ color: '#ccc', fontWeight: 400 }}>vacío</span>}
+                            {isP
+                                ? <span style={{ color: '#e67e22', fontWeight: 700 }}>profe</span>
+                                : (s.alumno || null)}
                         </div>
                     );
                 })}

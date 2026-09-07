@@ -3263,9 +3263,29 @@ function GruposLibre() {
     // grupos: Array<{ nombre: string, alumnos: string[] }>
     const [grupos, setGrupos] = useState([]);
 
-    const alumnos = alumnosTxt.split(/[\n,]+/).map(a => a.trim()).filter(Boolean);
+    // Si el texto tiene saltos de línea (p.ej. pegado desde una hoja de cálculo),
+    // cada línea es un alumno aunque contenga comas. Si es una sola línea, se separa por comas.
+    const hayLineas = /\n/.test(alumnosTxt);
+    const alumnos = alumnosTxt.split(hayLineas ? /\n+/ : /,+/).map(a => a.trim()).filter(Boolean);
+
+    // Intercambio manual de alumnos entre grupos: {gi, ai} del primero seleccionado
+    const [selAlumno, setSelAlumno] = useState(null);
+
+    const clickAlumno = (gi, ai) => {
+        if (!selAlumno) { setSelAlumno({ gi, ai }); return; }
+        if (selAlumno.gi === gi && selAlumno.ai === ai) { setSelAlumno(null); return; }
+        setGrupos(prev => {
+            const next = prev.map(g => ({ ...g, alumnos: [...g.alumnos] }));
+            const a = next[selAlumno.gi].alumnos[selAlumno.ai];
+            next[selAlumno.gi].alumnos[selAlumno.ai] = next[gi].alumnos[ai];
+            next[gi].alumnos[ai] = a;
+            return next;
+        });
+        setSelAlumno(null);
+    };
 
     const generar = () => {
+        setSelAlumno(null);
         const n = Math.min(Math.max(1, numGrupos), alumnos.length);
         if (n === 0) return;
         const shuffled = [...alumnos].sort(() => Math.random() - 0.5);
@@ -3318,7 +3338,7 @@ h1{font-size:1.2rem;color:#2c3e50;margin-bottom:14px;}
                 {/* Textarea alumnos */}
                 <div style={{ flex:'1 1 220px', minWidth:0, boxSizing:'border-box' }}>
                     <label style={{ display:'block', fontWeight:700, color:'#2c3e50', fontSize:'0.85rem', marginBottom:6 }}>
-                        Alumnos <span style={{ fontWeight:400, color:'#95a5a6' }}>(separados por coma)</span>
+                        Alumnos <span style={{ fontWeight:400, color:'#95a5a6' }}>(separados por coma o salto de línea)</span>
                     </label>
                     <textarea value={alumnosTxt} onChange={e => setAlumnosTxt(e.target.value)} rows={5}
                         style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid #e0e4f0', fontSize:'0.88rem', fontFamily:'inherit', outline:'none', resize:'vertical', boxSizing:'border-box', display:'block' }}/>
@@ -3354,6 +3374,15 @@ h1{font-size:1.2rem;color:#2c3e50;margin-bottom:14px;}
                 </div>
             </div>
 
+            {/* Aviso de intercambio */}
+            {grupos.length > 0 && (
+                <div style={{ fontSize:'0.78rem', color:selAlumno?'#9b59b6':'#95a5a6', marginBottom:10, fontWeight:selAlumno?700:400 }}>
+                    {selAlumno
+                        ? '👆 Toca otro alumno para intercambiarlo (o el mismo para cancelar)'
+                        : '💡 Toca un alumno y luego otro para intercambiarlos entre grupos'}
+                </div>
+            )}
+
             {/* Resultado */}
             {grupos.length > 0 ? (
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(min(180px, 100%), 1fr))', gap:12 }}>
@@ -3370,11 +3399,16 @@ h1{font-size:1.2rem;color:#2c3e50;margin-bottom:14px;}
                                     <span style={{ background:col, color:'white', borderRadius:12, padding:'2px 8px', fontSize:'0.72rem', fontWeight:700, flexShrink:0 }}>{grupo.alumnos.length}</span>
                                 </div>
                                 <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
-                                    {grupo.alumnos.map((alumno, j) => (
-                                        <div key={j} style={{ padding:'6px 10px', borderRadius:8, background:'white', fontSize:'0.84rem', fontWeight:600, color:'#2c3e50', boxShadow:'0 1px 4px rgba(0,0,0,0.07)', wordBreak:'break-word' }}>
-                                            {alumno}
-                                        </div>
-                                    ))}
+                                    {grupo.alumnos.map((alumno, j) => {
+                                        const sel = selAlumno?.gi === i && selAlumno?.ai === j;
+                                        return (
+                                            <div key={j} onClick={() => clickAlumno(i, j)}
+                                                title="Toca este y otro alumno para intercambiarlos"
+                                                style={{ padding:'6px 10px', borderRadius:8, background:sel?col:'white', color:sel?'white':'#2c3e50', fontSize:'0.84rem', fontWeight:600, boxShadow:'0 1px 4px rgba(0,0,0,0.07)', wordBreak:'break-word', cursor:'pointer', border:`1.5px solid ${sel?col:'transparent'}`, transition:'all 0.1s' }}>
+                                                {alumno}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         );
@@ -3384,7 +3418,7 @@ h1{font-size:1.2rem;color:#2c3e50;margin-bottom:14px;}
                 <div style={{ textAlign:'center', padding:'40px 20px', color:'#95a5a6', background:'#f8f9fc', borderRadius:14, border:'1.5px dashed #e0e4f0' }}>
                     <div style={{ fontSize:'3rem', marginBottom:10 }}>👥</div>
                     <div style={{ fontWeight:600, marginBottom:4 }}>Añade alumnos y pulsa "Generar grupos"</div>
-                    <div style={{ fontSize:'0.8rem' }}>Puedes pegar una lista separada por comas</div>
+                    <div style={{ fontSize:'0.8rem' }}>Puedes pegar una lista separada por comas o una fila por alumno</div>
                 </div>
             )}
         </div>
@@ -3496,7 +3530,11 @@ function PlanoAulaLibre() {
     const [dragging, setDragging] = useState(null);
     const [nuevoAlumno, setNuevoAlumno] = useState('');
 
-    const alumnos = alumnosTxt.split(/[\n,]+/).map(a => a.trim()).filter(Boolean);
+    // Si el texto tiene saltos de línea (p.ej. pegado desde una hoja de cálculo),
+    // cada línea es un alumno aunque contenga comas. Si es una sola línea, se separa por comas.
+    const hayLineas = /\n/.test(alumnosTxt);
+    const sep = hayLineas ? '\n' : ', ';
+    const alumnos = alumnosTxt.split(hayLineas ? /\n+/ : /,+/).map(a => a.trim()).filter(Boolean);
     const asignados = new Set(mesas.flatMap(m => m.asientos.map(s => s.alumno)).filter(Boolean));
     const noAsignados = alumnos.filter(n => !asignados.has(n));
     const totalAsientos = mesas.filter(m => m.tipo === 'alumno').reduce((s, m) => s + m.asientos.length, 0);
@@ -3560,13 +3598,13 @@ function PlanoAulaLibre() {
         const nom = nuevoAlumno.trim();
         if (!nom) return;
         if (alumnos.some(a => a.toLowerCase() === nom.toLowerCase())) { setNuevoAlumno(''); return; }
-        setAlumnosTxt(prev => (prev.trim() ? prev.replace(/\s*$/, '') + ', ' : '') + nom);
+        setAlumnosTxt(prev => (prev.trim() ? prev.replace(/\s*$/, '') + sep : '') + nom);
         setNuevoAlumno('');
     };
 
     // Elimina un alumno de la lista y lo quita del asiento donde estuviera.
     const eliminarAlumno = nom => {
-        setAlumnosTxt(alumnos.filter(a => a !== nom).join(', '));
+        setAlumnosTxt(alumnos.filter(a => a !== nom).join(sep));
         setMesas(prev => prev.map(m => ({ ...m, asientos: m.asientos.map(s => s.alumno===nom ? {...s, alumno:null} : s) })));
         if (selUnassign === nom) setSelUnassign(null);
     };

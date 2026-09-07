@@ -56,6 +56,7 @@ import LenguaSignos from '../LenguaSignos';
 import MusicApp from '../MusicApp';
 import GeografiaApp from './GeografiaApp';
 import ImperiosGame from './ImperiosGame';
+import ComunidadesPublico from './ComunidadesPublico';
 import QuienEsQuien from '../QuienEsQuien';
 import BiologiaApp  from './BiologiaApp';
 import HerramientasClase, { PizarraApp } from '../GestionAula';
@@ -1615,6 +1616,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
     const [musicApp,            setMusicApp]            = useState(false);
     const [geografiaApp,        setGeografiaApp]        = useState(false);
     const [imperiosApp,         setImperiosApp]         = useState(false);
+    const [comunidadesApp,      setComunidadesApp]      = useState(false);
     const [quienEsQuienApp,     setQuienEsQuienApp]     = useState(false);
     const [pizarraApp,          setPizarraApp]          = useState(false);
     const [biologiaApp,         setBiologiaApp]         = useState(false);
@@ -2176,6 +2178,12 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
     if (imperiosApp) return (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, overflowY: 'auto' }}>
             <ImperiosGame onBack={() => { setImperiosApp(false); window.history.pushState({}, '', '/'); }} />
+        </div>
+    );
+
+    if (comunidadesApp) return (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, overflowY: 'auto' }}>
+            <ComunidadesPublico onExit={() => { setComunidadesApp(false); window.history.pushState({}, '', '/'); }} />
         </div>
     );
 
@@ -3293,6 +3301,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                     { id: 'SOLAR_SYSTEM',        label: 'Sistema Solar',        emoji: '🪐', color: '#3B82F6', action: () => setJuegoActivo({ tipoJuego: 'SOLAR_SYSTEM' }), shareable: true },
                     { id: 'MUSICA',              label: 'Música',               emoji: '🎵', color: '#8b5cf6', action: () => setMusicApp(true), shareable: true },
                     { id: 'GEOGRAFIA',           label: 'Geografía',            emoji: '🌍', color: '#0d9488', action: () => setGeografiaApp(true), shareable: true },
+                    { id: 'COMUNIDADES', label: 'Comunidades', emoji: '👥', color: '#1565C0', action: () => { setComunidadesApp(true); window.history.pushState({}, '', '/comunidades'); }, shareable: true, shareUrl: `${window.location.origin}/comunidades` },
                     { id: 'IMPERIOS',            label: 'Imperios',             emoji: '🏛️', color: '#b45309', action: () => { setImperiosApp(true); window.history.pushState({}, '', '/imperios'); }, shareable: true, shareUrl: `${window.location.origin}/imperios` },
                     { id: 'QUIEN_ES_QUIEN',      label: '¿Quién es quién?',     emoji: '🕵️', color: '#7c3aed', action: () => { setQuienEsQuienApp(true); window.history.pushState({}, '', '/quienesquien'); }, shareable: true, shareUrl: `${window.location.origin}/quienesquien` },
                     { id: 'PIZARRA_TEMATICA',    label: 'Pizarra temática',     emoji: '🎬', color: '#0ea5e9', action: () => { setPizarraApp(true); window.history.pushState({}, '', '/pizarra'); }, shareable: true, shareUrl: `${window.location.origin}/pizarra` },

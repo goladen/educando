@@ -11,6 +11,7 @@ import FuncionesEjecutivas from './FuncionesEjecutivas';
 import IrregularVerbsTest from './IrregularVerbsTest';
 import { SolarSystemViewer } from './components/LandingGames3';
 import ImperiosGame from './components/ImperiosGame';
+import ComunidadesPublico from './components/ComunidadesPublico';
 import QuienEsQuien from './QuienEsQuien';
 import BunkerDisparo from './BunkerDisparo';
 import { PizarraApp } from './GestionAula';
@@ -123,6 +124,8 @@ function App() {
       }
       // Hub de escalada y sus subrutas (/escalada, /escalada/whoknows, …)
       if (slug === 'escalada' || slug.startsWith('escalada/')) { setRutaPublica('escalada'); return; }
+      // Comunidades públicas (/comunidades, /comunidad/<id>, /comunidad/<id>/curso/<cursoId>)
+      if (slug === 'comunidades' || slug === 'comunidad' || slug.startsWith('comunidad/')) { setRutaPublica('comunidades'); return; }
       const RUTAS_RESERVADAS = new Set([
         'partes_planta',
         'populares','inicio',
@@ -141,6 +144,7 @@ function App() {
         'irregular_verbs','sistema_solar',
         'retos','conectapuntos','sudoku',
         'imperios','geografia','quienesquien','pizarra','bunker',
+        'comunidades','comunidad',
         'fisica',
         'math_world','primaria','feria',
         'arkade',
@@ -308,6 +312,12 @@ function App() {
     if (rutaPublica === 'retos') return <><Retos onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'conectapuntos') return <><Retos initialGame="CONECTA" onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'sudoku') return <><Retos initialGame="SUDOKU" onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
+    if (rutaPublica === 'comunidades') {
+        const parts = window.location.pathname.split('/').filter(Boolean);
+        const comId   = parts[0] === 'comunidad' ? (parts[1] || null) : null;
+        const cursoId = parts[2] === 'curso' ? (parts[3] || null) : null;
+        return <ComunidadesPublico comunidadId={comId} cursoId={cursoId} onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
+    }
 
     // Vista del alumno de Control de Aula (no requiere login) — ?aula=CODE o /join
     if (aulaCode !== null) return <StudentJoinView codigoInicial={aulaCode} onExit={() => { setAulaCode(null); window.history.pushState({}, '', '/'); }} />;

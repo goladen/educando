@@ -1,0 +1,159 @@
+═══════════════════════════════════════════════════════════════════════════════
+ REGLAS DE SEGURIDAD FIRESTORE — Comunidades de profesores
+═══════════════════════════════════════════════════════════════════════════════
+
+⚠️  Estas reglas son lo que REALMENTE protege la privacidad. El filtrado en el
+    cliente NO es seguridad: sin ellas, cualquiera con la consola/API podría leer
+    los grupos de alumnos compartidos y los mensajes, aunque la UI no los muestre.
+
+Pega este bloque DENTRO de `match /databases/{database}/documents { ... }` en
+Firebase Console → Firestore → Reglas. NO borres las reglas de otras colecciones,
+solo AÑADE esto.
+
+─────────────────────────────────────────────────────────────────────────────
+
+    // ── COMUNIDADES ───────────────────────────────────────────────────────
+    match /comunidades/{comId} {
+
+      function com()   { return get(/databases/$(database)/documents/comunidades/$(comId)).data; }
+      function esMiembro() { return request.auth != null && request.auth.uid in com().miembros; }
+      function esCreador() { return request.auth != null && com().creadorUid == request.auth.uid; }
+
+      // Ver el "escaparate" (nombre, imagen, web, lista de uids de miembros,
+      // fecha del último mensaje): PÚBLICO, para la vista de comunidades sin login
+      // en la landing. NO se expone ningún contenido de chat (solo fecha/uid) ni
+      // los grupos/mensajes/listados (gateados en subcolecciones más abajo).
+      allow read: if true;
+
+      // Crear: usuario registrado que se pone como creador y único miembro.
+      allow create: if request.auth != null
+        && request.resource.data.creadorUid == request.auth.uid
+        && request.resource.data.miembros == [request.auth.uid];
+
+      allow delete: if request.auth != null
+        && resource.data.creadorUid == request.auth.uid;
+
+      allow update: if request.auth != null && (
+        // (a) El creador puede editar todo (incluida la lista de miembros:
+        //     aprobar solicitudes, expulsar…).
+        resource.data.creadorUid == request.auth.uid
+        ||
+        // (b) Aceptar invitación: añadirse a sí mismo SOLO si tiene invitación.
+        (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['miembros'])
+          && request.resource.data.miembros.toSet()
+               .difference(resource.data.miembros.toSet()).hasOnly([request.auth.uid])
+          && resource.data.miembros.toSet()
+               .difference(request.resource.data.miembros.toSet()).size() == 0
+          && exists(/databases/$(database)/documents/comunidades/$(comId)/invitaciones/$(request.auth.uid))
+        )
+        ||
+        // (c) Salir: quitarse a sí mismo.
+        (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['miembros'])
+          && resource.data.miembros.toSet()
+               .difference(request.resource.data.miembros.toSet()).hasOnly([request.auth.uid])
+          && request.resource.data.miembros.toSet()
+               .difference(resource.data.miembros.toSet()).size() == 0
+        )
+        ||
+        // (d) Resumen de "último mensaje" del chat: cualquier miembro puede
+        //     actualizar SOLO estos tres campos (para el aviso de la campanita).
+        (
+          esMiembro()
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['ultimoMensajeAt', 'ultimoMensajePor'])
+        )
+      );
+
+      // ── GRUPOS COMPARTIDOS (solo NOMBRES de alumnos, nunca notas) ────────
+      match /grupos_compartidos/{sid} {
+        allow read:   if esMiembro();
+        allow create: if esMiembro() && request.resource.data.compartidoPor == request.auth.uid;
+        allow update: if false;   // instantáneas inmutables
+        allow delete: if request.auth != null &&
+          (resource.data.compartidoPor == request.auth.uid || esCreador());
+      }
+
+      // ── MENSAJES entre miembros ─────────────────────────────────────────
+      match /mensajes/{mid} {
+        allow read:   if esMiembro();
+        allow create: if esMiembro() && request.resource.data.autorUid == request.auth.uid;
+        allow delete: if request.auth != null &&
+          (resource.data.autorUid == request.auth.uid || esCreador());
+        allow update: if false;
+      }
+
+      // ── INVITACIONES (id del doc = uid del invitado) ────────────────────
+      match /invitaciones/{invitedUid} {
+        // La ve el invitado (para la campanita) y el creador.
+        allow read:   if request.auth != null &&
+          (request.auth.uid == invitedUid || esCreador());
+        // Solo el creador invita.
+        allow create: if esCreador() && invitedUid == request.resource.data.paraUid;
+        // La borra el invitado (aceptar/rechazar) o el creador (revocar).
+        allow delete: if request.auth != null &&
+          (request.auth.uid == invitedUid || esCreador());
+        allow update: if false;
+      }
+
+      // ── CURSOS DEL CENTRO ───────────────────────────────────────────────
+      // El doc del curso es PÚBLICO (solo nombre), para poder agrupar el
+      // calendario público. Lo gestiona cualquier miembro.
+      match /cursos/{cursoId} {
+        allow read:   if true;   // nombre del curso público (calendario público)
+        allow create: if esMiembro();
+        allow update: if esMiembro();
+        allow delete: if esMiembro();
+
+        // Listado de alumnos y plano del aula: SOLO miembros.
+        match /privado/{doc} {
+          allow read, write: if esMiembro();
+        }
+      }
+
+      // ── CALENDARIO (eventos de todos los cursos) ────────────────────────
+      // PÚBLICO de lectura; solo los miembros añaden/editan/borran.
+      match /eventos/{evId} {
+        allow read:   if true;   // calendario público (sin login)
+        allow create: if esMiembro() && request.resource.data.autorUid == request.auth.uid;
+        allow update: if esMiembro();
+        allow delete: if esMiembro();
+      }
+
+      // ── SOLICITUDES DE ACCESO (id del doc = uid del solicitante) ─────────
+      match /solicitudes/{uid} {
+        // La ve el creador (para aprobar) y el propio solicitante.
+        allow read:   if request.auth != null &&
+          (request.auth.uid == uid || esCreador());
+        // Cualquier registrado pide acceso para sí mismo.
+        allow create: if request.auth != null && request.auth.uid == uid
+          && request.resource.data.uid == uid;
+        // La borra el solicitante (cancelar) o el creador (aprobar/denegar).
+        allow delete: if request.auth != null &&
+          (request.auth.uid == uid || esCreador());
+        allow update: if false;
+      }
+    }
+
+    // ── ÍNDICE de invitaciones para la campanita ──────────────────────────
+    // Permite al invitado consultar TODAS sus invitaciones con un
+    // collectionGroup('invitaciones') where paraUid == su uid.
+    match /{path=**}/invitaciones/{invitedUid} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.paraUid;
+    }
+
+─────────────────────────────────────────────────────────────────────────────
+ NOTA sobre la vista pública (recursos y páginas de los miembros):
+   No necesita reglas nuevas. Reutiliza colecciones ya públicas:
+     · resources con isPrivate == false
+     · paginas_profesores con publicada == true
+   La app consulta esas colecciones usando la lista de uids (comunidades.miembros),
+   que es legible por cualquier registrado.
+
+ CORREOS de los miembros: se leen de la colección `users` por uid. Si tu colección
+   `users` NO permite lectura a usuarios registrados y quieres mostrar los correos
+   dentro de la comunidad, añade:
+     match /users/{uid} { allow read: if request.auth != null; }
+   (o una regla más estricta si prefieres).
+═══════════════════════════════════════════════════════════════════════════════

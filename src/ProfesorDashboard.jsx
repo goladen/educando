@@ -28,6 +28,7 @@ import SintaxisGame from './SintaxisGamen2';
 
 import { MousePointer2, Rocket, Search as SearchIcon, Car, Clock } from 'lucide-react';
 import InformesJuegos from './components/InformesJuegos2';
+import ComunidadesTab from './components/ComunidadesTab';
 import TrivialPartidasView from './components/TrivialPartidasView';
 import TrivialRecursosManager from './components/TrivialRecursosManager';
 import PiTutorial from './components/PiTutorial';
@@ -1085,6 +1086,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                     <li style={styles.menuItem} onClick={() => { setPresentacionEditar(null); navegar('PRESENTACIONES'); }}>📊 Presentaciones</li>
                     <li style={styles.menuItem} onClick={() => navegar('MI_PAGINA')}>🌐 Mi Página</li>
                     <li style={styles.menuItem} onClick={() => navegar('TRIVIAL')}>🎯 Trivial</li>
+                    <li style={styles.menuItem} onClick={() => navegar('COMUNIDADES')}>👥 Comunidades</li>
 
                     {/* --- CAMBIA ESTAS DOS LÍNEAS PARA LOS ENLACES EXTERNOS --- */}
                     <li style={styles.menuItem} onClick={() => {
@@ -1160,6 +1162,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                 />
             )}
             {modoDashboard === 'INFORMES' && <InformesJuegos usuario={usuario} googleToken={googleToken} />}
+            {modoDashboard === 'COMUNIDADES' && <ComunidadesTab usuario={usuario} />}
             {modoDashboard === 'TRIVIAL' && (
                 <div style={{ maxWidth: 600, margin: '0 auto', padding: '20px 0' }}>
                     <h2 style={{ fontWeight: 800, fontSize: 28, marginBottom: 32, color: '#2c3e50' }}>🎯 Trivial</h2>

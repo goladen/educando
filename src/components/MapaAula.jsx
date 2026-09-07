@@ -7,6 +7,7 @@ import {
 import { Plus, Trash2, Save, RefreshCw, X, ChevronLeft, CheckCircle } from 'lucide-react';
 
 const rndId = () => Math.random().toString(36).slice(2, 10);
+const EMPTY_ARR = [];   // referencia estable para el prop grupos por defecto (evita bucle en useEffect)
 
 const CANVAS_W  = 760;
 const CANVAS_H  = 520;
@@ -167,7 +168,9 @@ function DeskCard({ mesa, selSeat, selUnassign, onStartDrag, onClickSeat, onDele
 }
 
 // ─── Editor del aula ──────────────────────────────────────────────────────────
-function EditorAula({ planInicial, grupos, profesorUid, onSaved, onBack }) {
+// poolAlumnos: si se pasa, se usa como lista de alumnos (oculta el selector de grupo).
+// onGuardar: si se pasa, se llama con { nombre, mesas, grupoNombre } en vez de escribir en planos_aula.
+export function EditorAula({ planInicial, grupos = EMPTY_ARR, profesorUid, onSaved, onBack, poolAlumnos = null, onGuardar = null, backLabel = 'Mis planos' }) {
     const [mesas,        setMesas]        = useState(planInicial?.mesas       || defaultLayout());
     const [nombre,       setNombre]       = useState(planInicial?.nombre      || 'Plano sin título');
     const [grupoId,      setGrupoId]      = useState(planInicial?.grupoId     || '');
@@ -185,7 +188,7 @@ function EditorAula({ planInicial, grupos, profesorUid, onSaved, onBack }) {
         setGrupoAlumnos(grupos.find(g => g.id === grupoId)?.alumnos || []);
     }, [grupoId, grupos]);
 
-    const todosAlumnos = [...grupoAlumnos.map(a => a.nombre), ...alumnosExtra];
+    const todosAlumnos = [...(poolAlumnos || grupoAlumnos.map(a => a.nombre)), ...alumnosExtra];
     const asignados    = new Set(mesas.flatMap(m => m.asientos.map(s => s.alumno)).filter(Boolean));
     const noAsignados  = todosAlumnos.filter(n => !asignados.has(n));
 
@@ -293,13 +296,17 @@ function EditorAula({ planInicial, grupos, profesorUid, onSaved, onBack }) {
     const guardar = async () => {
         setGuardando(true);
         try {
-            const id = planInicial?.id || rndId();
-            const grupoNombre = grupos.find(g => g.id === grupoId)?.nombre || '';
-            await setDoc(doc(db, 'planos_aula', id), {
-                id, profesorUid, nombre, grupoId, grupoNombre,
-                mesas, alumnosExtra,
-                fechaCreacion: planInicial?.fechaCreacion || serverTimestamp()
-            }, { merge: true });
+            const grupoNombre = grupos.find(g => g.id === grupoId)?.nombre || planInicial?.grupoNombre || '';
+            if (onGuardar) {
+                await onGuardar({ nombre, mesas, grupoNombre });
+            } else {
+                const id = planInicial?.id || rndId();
+                await setDoc(doc(db, 'planos_aula', id), {
+                    id, profesorUid, nombre, grupoId, grupoNombre,
+                    mesas, alumnosExtra,
+                    fechaCreacion: planInicial?.fechaCreacion || serverTimestamp()
+                }, { merge: true });
+            }
             setGuardadoOk(true); setTimeout(() => setGuardadoOk(false), 2500);
             onSaved?.();
         } catch (e) { alert('Error al guardar: ' + e.message); }
@@ -320,15 +327,17 @@ function EditorAula({ planInicial, grupos, profesorUid, onSaved, onBack }) {
             {/* Cabecera */}
             <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14, flexWrap:'wrap' }}>
                 <button onClick={onBack} style={{ display:'flex', alignItems:'center', gap:5, padding:'7px 12px', borderRadius:8, border:'1px solid #ddd', background:'white', cursor:'pointer', fontSize:'0.82rem', color:'#555' }}>
-                    <ChevronLeft size={14}/> Mis planos
+                    <ChevronLeft size={14}/> {backLabel}
                 </button>
                 <input value={nombre} onChange={e => setNombre(e.target.value)}
                     style={{ flex:1, minWidth:140, padding:'7px 12px', borderRadius:8, border:'1.5px solid #e0e4f0', fontSize:'0.9rem', outline:'none', fontFamily:'inherit', fontWeight:700 }}/>
-                <select value={grupoId} onChange={e => setGrupoId(e.target.value)}
-                    style={{ padding:'7px 10px', borderRadius:8, border:'1.5px solid #e0e4f0', fontSize:'0.84rem', outline:'none', background:'white' }}>
-                    <option value="">Sin grupo</option>
-                    {grupos.map(g => <option key={g.id} value={g.id}>👥 {g.nombre} ({g.alumnos?.length||0})</option>)}
-                </select>
+                {!poolAlumnos && (
+                    <select value={grupoId} onChange={e => setGrupoId(e.target.value)}
+                        style={{ padding:'7px 10px', borderRadius:8, border:'1.5px solid #e0e4f0', fontSize:'0.84rem', outline:'none', background:'white' }}>
+                        <option value="">Sin grupo</option>
+                        {grupos.map(g => <option key={g.id} value={g.id}>👥 {g.nombre} ({g.alumnos?.length||0})</option>)}
+                    </select>
+                )}
                 <button onClick={imprimir} style={{ padding:'7px 12px', borderRadius:8, border:'1px solid #bdc3c7', background:'white', cursor:'pointer', fontSize:'0.82rem', color:'#555' }}>
                     🖨 Imprimir
                 </button>

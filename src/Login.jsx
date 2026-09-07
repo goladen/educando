@@ -11,6 +11,7 @@ import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from './firebase';
 import SopaDeLetrasGame from './SopaDeLetrasGame';
 import BuscadorPaginas from './components/BuscadorPaginas';
+import ComunidadesPublico from './components/ComunidadesPublico';
 import PaginaProfesor from './components/PaginaProfesor';
 import ContadorVisitantes from './components/ContadorVisitantes';
 import PiTutorial from './components/PiTutorial';
@@ -35,6 +36,8 @@ export default function Login({ setGoogleToken }) {
             } else if (path === 'populares') {
                 setVistaActual('POPULARES');
                 cargarPopulares();
+            } else if (path === 'comunidades' || path.startsWith('comunidad')) {
+                setVistaActual('COMUNIDADES');
             } else {
                 // Buscamos si la ruta coincide con algún juego
                 const app = APPS.find(a => a.name.toLowerCase() === path || a.id.toLowerCase() === path);
@@ -90,6 +93,10 @@ export default function Login({ setGoogleToken }) {
         else if (opcion === 'instagram') window.open('https://www.instagram.com/pikt314/', '_blank');
         else if (opcion === 'privacidad') window.open('https://www.pikt.es/politica.html', '_blank');
         else if (opcion === 'paginas-profesores') setVistaActual('PAGINAS_PROFESORES');
+        else if (opcion === 'comunidades') {
+            window.history.pushState({}, '', '/comunidades');
+            setVistaActual('COMUNIDADES');
+        }
     };
 
     // --- RENDERIZADO CONDICIONAL DE VISTAS ---
@@ -104,6 +111,18 @@ export default function Login({ setGoogleToken }) {
         return <BuscadorPaginas
             onSelect={slug => setPaginaProfesorSlug(slug)}
             onBack={() => setVistaActual('MAIN')}
+        />;
+    }
+
+    // COMUNIDADES (público, sin registro)
+    if (vistaActual === 'COMUNIDADES') {
+        const parts = window.location.pathname.split('/').filter(Boolean);
+        const comId   = parts[0] === 'comunidad' ? (parts[1] || null) : null;
+        const cursoId = parts[2] === 'curso' ? (parts[3] || null) : null;
+        return <ComunidadesPublico
+            comunidadId={comId}
+            cursoId={cursoId}
+            onExit={() => { window.history.pushState({}, '', '/'); setVistaActual('MAIN'); }}
         />;
     }
 
@@ -174,6 +193,7 @@ export default function Login({ setGoogleToken }) {
                             <li style={styles.menuItem} onClick={() => handleMenuClick('inicio')}>🏠 Inicio</li>
                             <li style={styles.menuItem} onClick={() => handleMenuClick('populares')}>🔥 Los juegos más populares</li>
                             <li style={styles.menuItem} onClick={() => handleMenuClick('paginas-profesores')}>👨‍🏫 Páginas de profesores</li>
+                            <li style={styles.menuItem} onClick={() => handleMenuClick('comunidades')}>👥 Comunidades</li>
                             <li style={styles.menuItem} onClick={() => handleMenuClick('que-hacer')}>❓ ¿Qué puedo hacer?</li>
                             <li style={styles.menuItem} onClick={() => handleMenuClick('instagram')}>📸 Síguenos en Instagram</li>
                             <li style={styles.menuItem} onClick={() => handleMenuClick('privacidad')}>🔒 Política de privacidad</li>

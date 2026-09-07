@@ -3415,20 +3415,31 @@ function htmlPlanoLibre(nombre, mesas) {
         const isP = m.tipo === 'profesor';
         const w = Math.round((isP ? 180 : plano_deskW(m.asientos.length)) * sc);
         const seats = m.asientos.map(s =>
-            `<div style="flex:1;border:1px solid ${isP?'#e67e22':(s.alumno?'#a5d6a7':'#f5c6c2')};border-radius:4px;padding:3px;font-size:0.67rem;font-weight:600;min-height:34px;display:flex;align-items:center;justify-content:center;text-align:center;background:${isP?'#fdf3e7':(s.alumno?'#e8f5e9':'#fdeceb')};color:${isP?'#e67e22':'#2c3e50'}">${isP?'profe':(s.alumno||'')}</div>`
+            `<div style="flex:1;border:1px solid ${isP?'#e67e22':(s.alumno?'#a5d6a7':'#f5c6c2')};border-radius:4px;padding:3px;font-size:0.67rem;font-weight:600;min-height:34px;display:flex;align-items:center;justify-content:center;text-align:center;background:${isP?'#fdf3e7':(s.alumno?'#e8f5e9':'#fdeceb')};color:${isP?'#e67e22':'#2c3e50'}"><span class="txt">${isP?'profe':(s.alumno||'')}</span></div>`
         ).join('');
-        return `<div style="position:absolute;left:${Math.round(m.x*sc)}px;top:${Math.round(m.y*sc)}px;width:${w}px;border:2px solid ${isP?'#e67e22':'#1565C0'};border-radius:8px;overflow:hidden"><div style="background:${isP?'#e67e22':'#1565C0'};color:white;font-size:0.58rem;font-weight:700;padding:2px 6px">${isP?'👨‍🏫 PROFESOR':''}</div><div style="display:flex;gap:3px;padding:3px">${seats}</div></div>`;
+        return `<div style="position:absolute;left:${Math.round(m.x*sc)}px;top:${Math.round(m.y*sc)}px;width:${w}px;border:2px solid ${isP?'#e67e22':'#1565C0'};border-radius:8px;overflow:hidden"><div style="background:${isP?'#e67e22':'#1565C0'};color:white;font-size:0.58rem;font-weight:700;padding:2px 6px">${isP?'<span class="txt">👨‍🏫 PROFESOR</span>':''}</div><div style="display:flex;gap:3px;padding:3px">${seats}</div></div>`;
     }).join('');
     return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>${nombre}</title>
 <style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;padding:20px;}
 h1{font-size:1.3rem;color:#1565C0;margin-bottom:3px;}p{font-size:0.78rem;color:#7f8c8d;margin-bottom:14px;}
-.btn{display:block;margin:0 auto 14px;padding:8px 24px;background:#1565C0;color:white;border:none;border-radius:6px;font-size:0.9rem;font-weight:700;cursor:pointer;}
-@media print{.btn{display:none;}}</style></head><body>
+.btn{display:inline-block;margin:0 4px 14px;padding:8px 24px;background:#1565C0;color:white;border:none;border-radius:6px;font-size:0.9rem;font-weight:700;cursor:pointer;}
+.btn.sec{background:#7f8c8d;}
+.bar{text-align:center;}
+.txt{display:inline-block;transition:transform .25s;}
+#board.inv .txt{transform:rotate(180deg);}
+@media print{.bar{display:none;}}</style></head><body>
+<div class="bar">
 <button class="btn" onclick="window.print()">🖨 Imprimir</button>
+<button class="btn sec" onclick="toggleDir()">🔄 Invertir textos</button>
+</div>
 <h1>${nombre}</h1><p>${asig} alumnos asignados</p>
-<div style="position:relative;width:${W}px;height:${H}px;border:2px solid #e0e4f0;border-radius:10px;background:#f8faff;overflow:hidden">
-<div style="text-align:center;position:absolute;top:3px;left:0;right:0;font-size:0.6rem;color:#bdc3c7;font-weight:700">▲ PIZARRA / FRENTE</div>
-${desks}</div></body></html>`;
+<div id="board" style="position:relative;width:${W}px;height:${H}px;border:2px solid #e0e4f0;border-radius:10px;background:#f8faff;overflow:hidden">
+<div style="text-align:center;position:absolute;top:3px;left:0;right:0;font-size:0.6rem;color:#bdc3c7;font-weight:700"><span class="txt">▲ PIZARRA / FRENTE</span></div>
+${desks}</div>
+<script>
+function toggleDir(){ document.getElementById('board').classList.toggle('inv'); }
+</script>
+</body></html>`;
 }
 
 function DeskCardLibre({ mesa, selSeat, selUnassign, onStartDrag, onClickSeat, onDelete, onAddSeat, onRemoveSeat }) {

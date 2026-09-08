@@ -235,16 +235,34 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
     const toggleMenu = () => setMenuOpen(!menuOpen);
     
     // NAVEGACIÓN MENÚ
-    const navegar = (destino) => {
+    // Aplica los defaults de cada modo (sin tocar la URL)
+    const aplicarModo = (destino) => {
         setModoDashboard(destino);
-        setMenuOpen(false);
-        // Reset defaults si vuelve a juegos
         if (destino === 'PRO') setJuegoSeleccionado('CAZABURBUJAS');
         if (destino === 'CLASICO') setJuegoSeleccionado('PASAPALABRA');
         if (destino === 'LIVE') setJuegoSeleccionado('THINKHOOT');
         if (destino === 'INFORMES') setJuegoSeleccionado('PASAPALABRA'); // reset opcional
-
     };
+    const navegar = (destino) => {
+        aplicarModo(destino);
+        setMenuOpen(false);
+        // Refleja la pestaña en la URL (?panel=…) para que se conserve al recargar
+        const url = destino === 'CLASICO' ? '/' : `/?panel=${destino.toLowerCase()}`;
+        window.history.pushState({}, '', url);
+    };
+
+    // Restaura la pestaña desde la URL (?panel=…) al cargar y con atrás/adelante
+    useEffect(() => {
+        const PANELES = ['CLASICO', 'PRO', 'LIVE', 'BUSCADOR_GLOBAL', 'HERRAMIENTAS', 'PRESENTACIONES', 'MI_PAGINA', 'TRIVIAL', 'COMUNIDADES', 'INFORMES'];
+        const sync = () => {
+            const p = new URLSearchParams(window.location.search).get('panel');
+            if (p && PANELES.includes(p.toUpperCase())) aplicarModo(p.toUpperCase());
+        };
+        sync();
+        window.addEventListener('popstate', sync);
+        return () => window.removeEventListener('popstate', sync);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const ejecutarBusqueda = () => setFiltrosActivos(filtrosInput);
     const limpiarBusqueda = () => { const v = { pais: '', region: '', poblacion: '', tema: '' }; setFiltrosInput(v); setFiltrosActivos(v); };

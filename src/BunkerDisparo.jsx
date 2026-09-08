@@ -281,23 +281,27 @@ function montarMotor({ root, preguntasInput, onEnd, onScore }) {
     scene.fog = new THREE.Fog(0x05070a, 10, 46);
     const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 200);
     camera.position.set(0, 1.7, 0);
-    const renderer = new THREE.WebGLRenderer({ antialias: !IS_TOUCH, powerPreference: 'high-performance' });
-    renderer.setPixelRatio(Math.min(devicePixelRatio, IS_TOUCH ? 1.5 : 2));
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    // Antialiasing + mayor densidad de píxeles también en móvil (escena ligera): mucho más nítido
+    renderer.setPixelRatio(Math.min(devicePixelRatio, IS_TOUCH ? 2 : 2.5));
     renderer.setSize(innerWidth, innerHeight);
-    renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.25;
     if ('outputColorSpace' in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
-    if (!IS_TOUCH) { renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; }
+    // Sombras también en móvil (mapa más pequeño): aportan mucha profundidad
+    renderer.shadowMap.enabled = true; renderer.shadowMap.type = IS_TOUCH ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
     renderer.domElement.style.cssText = 'position:absolute;inset:0;z-index:0;display:block;';
     root.insertBefore(renderer.domElement, root.firstChild);
     const onResize = () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); };
     on(window, 'resize', onResize);
 
-    scene.add(new THREE.AmbientLight(0x445566, 0.7));
-    const key = new THREE.PointLight(0x7fffb0, 1.1, 34); key.position.set(0, 9, 0); scene.add(key);
-    const sun = new THREE.DirectionalLight(0xbfe8ff, 0.5); sun.position.set(8, 12, 6); scene.add(sun);
-    if (!IS_TOUCH) { sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024); const sc = sun.shadow.camera; sc.left = sc.bottom = -26; sc.right = sc.top = 26; sc.near = 1; sc.far = 40; sun.shadow.bias = -0.002; }
-    const rim = new THREE.PointLight(0xffb84d, 0.6, 40); rim.position.set(12, 4, -12); scene.add(rim);
-    const rim2 = new THREE.PointLight(0x5b8bff, 0.5, 40); rim2.position.set(-12, 4, 12); scene.add(rim2);
+    scene.add(new THREE.AmbientLight(0x445566, 0.55));
+    scene.add(new THREE.HemisphereLight(0x9fd8ff, 0x0a1418, 0.55)); // cielo/suelo → gradiente suave
+    const key = new THREE.PointLight(0x7fffb0, 1.2, 34); key.position.set(0, 9, 0); scene.add(key);
+    const sun = new THREE.DirectionalLight(0xdff0ff, 0.75); sun.position.set(8, 14, 6); scene.add(sun);
+    sun.castShadow = true; sun.shadow.mapSize.set(IS_TOUCH ? 1024 : 2048, IS_TOUCH ? 1024 : 2048);
+    { const sc = sun.shadow.camera; sc.left = sc.bottom = -26; sc.right = sc.top = 26; sc.near = 1; sc.far = 44; sun.shadow.bias = -0.0018; }
+    const rim = new THREE.PointLight(0xffb84d, 0.7, 42); rim.position.set(12, 4, -12); scene.add(rim);
+    const rim2 = new THREE.PointLight(0x5b8bff, 0.6, 42); rim2.position.set(-12, 4, 12); scene.add(rim2);
 
     // ===== Texturas procedurales =====
     function makeTex(draw, size = 256, repeat = 1) {
@@ -601,12 +605,9 @@ function montarMotor({ root, preguntasInput, onEnd, onScore }) {
             if (e.hp <= 0) killEnemy(e);
         }
     }
-    function shoot() {
-        if (gameOver || !running || reloading) return;
-        if (ammo <= 0) { SFX.empty(); return; }
-        ammo--; SFX.shoot(); updateHUD();
-        gunKick = 1; flash.visible = true; setTimeout(() => { flash.visible = false; }, 50);
-        muzzleLight.position.copy(camera.position); muzzleLight.intensity = 2.5; setTimeout(() => muzzleLight.intensity = 0, 60);
+    // Busca a qué apunta el centro de la pantalla (mismo cálculo para la mira y el disparo).
+    // Devuelve { hitEnemy, hitPoint, wallHits, ray }.
+    function buscarObjetivo() {
         raycaster.setFromCamera({ x: 0, y: 0 }, camera);
         const ray = raycaster.ray;
         const hits = raycaster.intersectObjects(enemies.map(e => e.mesh), true);
@@ -634,7 +635,21 @@ function montarMotor({ root, preguntasInput, onEnd, onScore }) {
         }
         // Si hay una pared más cerca que el enemigo, el disparo queda tapado
         if (hitEnemy && hitDist > wallDist) hitEnemy = null;
-
+        return { hitEnemy, hitPoint, wallHits, ray };
+    }
+    // Actualiza el color de la mira según a qué apuntas (llamado cada frame)
+    function actualizarMira() {
+        const { hitEnemy } = buscarObjetivo();
+        crosshair.classList.toggle('lock', !!hitEnemy && !hitEnemy.isCorrect);
+        crosshair.classList.toggle('lock-bad', !!hitEnemy && !!hitEnemy.isCorrect);
+    }
+    function shoot() {
+        if (gameOver || !running || reloading) return;
+        if (ammo <= 0) { SFX.empty(); return; }
+        ammo--; SFX.shoot(); updateHUD();
+        gunKick = 1; flash.visible = true; setTimeout(() => { flash.visible = false; }, 50);
+        muzzleLight.position.copy(camera.position); muzzleLight.intensity = 2.5; setTimeout(() => muzzleLight.intensity = 0, 60);
+        const { hitEnemy, hitPoint, wallHits, ray } = buscarObjetivo();
         const muzzle = new THREE.Vector3(0.28, -0.2, -1.1).applyMatrix4(camera.matrixWorld);
         const endPt = hitEnemy ? hitPoint : (wallHits.length ? wallHits[0].point : ray.at(60, new THREE.Vector3()));
         tracer(muzzle, endPt);
@@ -770,6 +785,7 @@ function montarMotor({ root, preguntasInput, onEnd, onScore }) {
             if (p.life <= 0) { scene.remove(p.mesh); parts.splice(i, 1); }
         }
         dust.rotation.y += dt * 0.01;
+        if (running && !gameOver) actualizarMira();
         drawMinimap();
         renderer.render(scene, camera);
     }
@@ -810,11 +826,16 @@ const HUD_CSS = `
 .bunker-root { position:fixed; inset:0; background:#05070a; font-family:'Courier New', monospace; overflow:hidden; touch-action:none; z-index:9998; }
 .bunker-root * { -webkit-tap-highlight-color:transparent; box-sizing:border-box; }
 .bunker-root #hud { position:absolute; inset:0; pointer-events:none; color:#c7d0d6; user-select:none; z-index:5; }
-.bunker-root #crosshair { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:22px; height:22px; }
-.bunker-root #crosshair::before, .bunker-root #crosshair::after { content:''; position:absolute; background:#7fffb0; }
-.bunker-root #crosshair::before { top:10px; left:0; width:22px; height:2px; }
-.bunker-root #crosshair::after  { top:0; left:10px; width:2px; height:22px; }
-.bunker-root #crosshair.hit::before, .bunker-root #crosshair.hit::after { background:#ffb84d; }
+.bunker-root #crosshair { position:absolute; top:50%; left:50%; width:30px; height:30px; transform:translate(-50%,-50%); transition:transform .08s; --xc:#7fffb0; }
+.bunker-root #crosshair .dot { position:absolute; top:50%; left:50%; width:3px; height:3px; border-radius:50%; transform:translate(-50%,-50%); background:var(--xc); box-shadow:0 0 5px var(--xc); }
+.bunker-root #crosshair .tick { position:absolute; background:var(--xc); box-shadow:0 0 3px var(--xc); }
+.bunker-root #crosshair .t { top:0; left:50%; width:2px; height:9px; transform:translateX(-50%); }
+.bunker-root #crosshair .b { bottom:0; left:50%; width:2px; height:9px; transform:translateX(-50%); }
+.bunker-root #crosshair .l { left:0; top:50%; width:9px; height:2px; transform:translateY(-50%); }
+.bunker-root #crosshair .r { right:0; top:50%; width:9px; height:2px; transform:translateY(-50%); }
+.bunker-root #crosshair.lock { --xc:#ffb84d; transform:translate(-50%,-50%) scale(1.18) rotate(45deg); }
+.bunker-root #crosshair.lock-bad { --xc:#ff5b5b; transform:translate(-50%,-50%) scale(1.18); }
+.bunker-root #crosshair.hit { --xc:#ffffff; }
 .bunker-root #stats { position:absolute; bottom:max(20px, env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); display:flex; gap:22px; align-items:flex-end; }
 .bunker-root .stat { display:flex; flex-direction:column; gap:4px; align-items:center; }
 .bunker-root .stat-label { font-size:10px; letter-spacing:2px; color:#5c6b70; }
@@ -972,7 +993,7 @@ export default function BunkerDisparo({ recurso = null, onExit, usuario, autoSta
                 <div id="lowhp"></div>
                 <div id="hit-flash"></div>
                 <div id="heal-flash"></div>
-                <div id="crosshair"></div>
+                <div id="crosshair"><i className="tick t"></i><i className="tick b"></i><i className="tick l"></i><i className="tick r"></i><i className="dot"></i></div>
                 <div id="wave-banner">PREGUNTA <b id="wave-num">1</b><span id="wave-total"></span></div>
                 <div id="question"></div>
                 <div id="wave-toast"></div>

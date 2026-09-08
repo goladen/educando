@@ -28,10 +28,10 @@ async function compartir(titulo, url) {
     catch { window.prompt('Copia el enlace:', url); }
 }
 
-function BtnCompartir({ titulo, url }) {
+function BtnCompartir({ titulo, url, full }) {
     return (
         <button onClick={() => compartir(titulo, url)} title="Compartir enlace"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, border: '1.5px solid #cdd6ea', background: 'white', color: AZUL, cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
+            style={{ display: full ? 'flex' : 'inline-flex', width: full ? '100%' : undefined, justifyContent: 'center', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 8, border: '1.5px solid #cdd6ea', background: 'white', color: AZUL, cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
             <Share2 size={14} /> Compartir
         </button>
     );
@@ -196,17 +196,19 @@ function CentroPublico({ comunidadId, tab, cursoFoco, unirse, onTab, onCurso, on
             {tab === 'calendarios' && (
                 <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
-                        <h2 style={{ ...st.h2, margin: 0 }}><Calendar size={20} /> Calendarios de los grupos</h2>
+                        <h2 style={{ ...st.h2, margin: 0 }}><Calendar size={20} /> Calendarios</h2>
+                        {cursos.length > 0 && (
+                            <select value={cursoFoco || 'todos'}
+                                onChange={e => e.target.value === 'todos' ? onTab('calendarios') : onCurso(e.target.value)}
+                                style={{ padding: '8px 12px', borderRadius: 9, border: '1.5px solid #cdd6ea', fontSize: '0.88rem', background: 'white', color: '#2c3e50', cursor: 'pointer', fontWeight: 600 }}>
+                                <option value="todos">Todos los grupos</option>
+                                {cursos.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                            </select>
+                        )}
                         <div style={{ marginLeft: 'auto' }}>
-                            <BtnCompartir titulo={`Calendarios de ${comunidad.nombre}`} url={`${origin}/comunidad/${comunidad.id}/calendarios`} />
+                            <BtnCompartir titulo={cursoFoco ? `Calendario de ${cursos.find(c => c.id === cursoFoco)?.nombre || ''}` : `Calendarios de ${comunidad.nombre}`} url={cursoFoco ? `${origin}/comunidad/${comunidad.id}/curso/${cursoFoco}` : `${origin}/comunidad/${comunidad.id}/calendarios`} />
                         </div>
                     </div>
-
-                    {cursoFoco && (
-                        <button onClick={() => onTab('calendarios')} style={{ ...st.backBtn, marginTop: 0 }}>
-                            <ChevronLeft size={15} /> Ver todos los grupos
-                        </button>
-                    )}
 
                     {cursosMostrar.length === 0 ? (
                         <div style={st.vacio}>Este centro todavía no tiene grupos con calendario.</div>
@@ -267,9 +269,9 @@ function ListaComunidades({ onAbrir, origin, isMobile }) {
                                     <div style={{ fontWeight: 700, color: '#2c3e50', flex: 1 }}>{c.nombre}</div>
                                 </div>
                                 {c.descripcion && <p style={{ margin: 0, color: '#7f8c8d', fontSize: '0.82rem', minHeight: 18 }}>{c.descripcion}</p>}
-                                <div style={{ display: 'flex', gap: 6, marginTop: 'auto' }}>
-                                    <button onClick={() => onAbrir(c.id)} style={{ ...st.btnPrimary, flex: 1, justifyContent: 'center' }}>Ver centro</button>
-                                    <BtnCompartir titulo={c.nombre} url={`${origin}/comunidad/${c.id}`} />
+                                <div style={{ display: 'flex', gap: 6, marginTop: 'auto', flexDirection: isMobile ? 'column' : 'row' }}>
+                                    <button onClick={() => onAbrir(c.id)} style={{ ...st.btnPrimary, ...(isMobile ? { width: '100%' } : { flex: 1 }), justifyContent: 'center' }}>Ver centro</button>
+                                    <BtnCompartir titulo={c.nombre} url={`${origin}/comunidad/${c.id}`} full={isMobile} />
                                 </div>
                             </div>
                         </div>

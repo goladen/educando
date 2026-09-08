@@ -663,9 +663,11 @@ const TIPOS_EVENTO = {
 function PlanoView({ plano }) {
     if (!plano || !plano.mesas?.length) return <div style={st.vacioMini}>Sin plano.</div>;
     const sc = 0.62;
+    const cw = plano.canvasW || CANVAS_W;
+    const ch = plano.canvasH || CANVAS_H;
     return (
         <div style={{ overflowX: 'auto' }}>
-            <div style={{ position: 'relative', width: CANVAS_W * sc, height: CANVAS_H * sc, background: 'linear-gradient(180deg,#f0f4ff,#f8faff)', border: '2px solid #e0e4f0', borderRadius: 12, flexShrink: 0 }}>
+            <div style={{ position: 'relative', width: cw * sc, height: ch * sc, background: 'linear-gradient(180deg,#f0f4ff,#f8faff)', border: '2px solid #e0e4f0', borderRadius: 12, flexShrink: 0 }}>
                 <div style={{ position: 'absolute', top: 2, left: 0, right: 0, textAlign: 'center', fontSize: '0.55rem', color: '#bdc3c7', fontWeight: 700 }}>▲ PIZARRA / FRENTE</div>
                 {plano.mesas.map(m => {
                     const isP = m.tipo === 'profesor';
@@ -1041,9 +1043,28 @@ function CursoDetalle({ usuario, comunidad, curso, onBack }) {
     const [modalPlano, setModalPlano]     = useState(false);
     const [planoEdit, setPlanoEdit]       = useState(null); // null | { id: string|null, data: plano|null }
     const [copiadoListado, setCopiadoListado] = useState(false);
+    const [mostrarCopiaModal, setMostrarCopiaModal] = useState(false);
+    const [copiandoListado, setCopiandoListado] = useState(false);
+    const [nuevoAlumno, setNuevoAlumno]   = useState('');
     const privRef = doc(db, 'comunidades', comunidad.id, 'cursos', curso.id, 'privado', 'data');
 
+    const guardarListaAlumnos = async (lista) => {
+        try { await setDoc(privRef, { listado: lista }, { merge: true }); }
+        catch (e) { alert('No se pudo guardar: ' + e.message); }
+    };
+    const añadirAlumno = () => {
+        const n = nuevoAlumno.trim(); if (!n) return;
+        guardarListaAlumnos([...(priv?.listado || []), { id: nuevoId(), nombre: n, grupo: '' }]);
+        setNuevoAlumno('');
+    };
+    const eliminarAlumno = (id) => guardarListaAlumnos((priv?.listado || []).filter(a => a.id !== id));
+    const renombrarAlumno = (id, nombre) => {
+        const n = (nombre || '').trim(); if (!n) return;
+        guardarListaAlumnos((priv?.listado || []).map(a => a.id === id ? { ...a, nombre: n } : a));
+    };
+
     const copiarListadoAMisGrupos = async () => {
+        setCopiandoListado(true);
         try {
             await addDoc(collection(db, 'grupos_profesor'), {
                 profesorUid: usuario.uid,
@@ -1052,8 +1073,10 @@ function CursoDetalle({ usuario, comunidad, curso, onBack }) {
                 columnas: [], celdas: {},
                 fechaCreacion: serverTimestamp(),
             });
+            setMostrarCopiaModal(false);
             setCopiadoListado(true); setTimeout(() => setCopiadoListado(false), 2500);
         } catch (e) { alert('No se pudo copiar: ' + e.message); }
+        setCopiandoListado(false);
     };
 
     useEffect(() => onSnapshot(privRef, s => setPriv(s.exists() ? s.data() : { listado: [], planos: [] }), () => setPriv({ listado: [], planos: [] })), [comunidad.id, curso.id]);
@@ -1099,24 +1122,37 @@ function CursoDetalle({ usuario, comunidad, curso, onBack }) {
                             <div style={{ fontSize: '0.8rem', color: '#7f8c8d' }}>{priv.listado?.length || 0} alumnos · solo visible para miembros</div>
                             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                                 {priv.listado?.length > 0 && (
-                                    <button onClick={copiarListadoAMisGrupos} style={{ ...st.btnSec, color: copiadoListado ? '#27ae60' : AZUL, borderColor: copiadoListado ? '#27ae60' : '#cdd6ea' }}>
+                                    <button onClick={() => setMostrarCopiaModal(true)} style={{ ...st.btnSec, color: copiadoListado ? '#27ae60' : AZUL, borderColor: copiadoListado ? '#27ae60' : '#cdd6ea' }}>
                                         {copiadoListado ? <><CheckCircle size={15} /> Copiado</> : <><Copy size={15} /> Copiar a mi zona</>}
                                     </button>
                                 )}
                                 <button onClick={() => setModalListado(true)} style={st.btnPrimary}><ClipboardList size={15} /> Definir listado</button>
                             </div>
                         </div>
-                        {(!priv.listado || priv.listado.length === 0) ? <div style={st.vacio}>Sin listado. Pulsa «Definir listado».</div> : (
+                        {(!priv.listado || priv.listado.length === 0) ? <div style={st.vacio}>Sin listado. Pulsa «Definir listado» o añade alumnos uno a uno abajo.</div> : (
                             <div style={{ border: '1px solid #e0e4f0', borderRadius: 10, overflow: 'hidden' }}>
                                 {priv.listado.map((a, i) => (
-                                    <div key={a.id || i} style={{ padding: '7px 12px', borderBottom: '1px solid #f3f3f3', background: i % 2 ? '#fafafa' : 'white', display: 'flex', gap: 8 }}>
-                                        <span style={{ color: '#bdc3c7', fontSize: '0.8rem', width: 22 }}>{i + 1}</span>
-                                        <span style={{ color: '#2c3e50' }}>{a.nombre}</span>
-                                        {a.grupo && <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: '#95a5a6' }}>{a.grupo}</span>}
+                                    <div key={a.id || i} style={{ padding: '5px 10px', borderBottom: '1px solid #f3f3f3', background: i % 2 ? '#fafafa' : 'white', display: 'flex', gap: 8, alignItems: 'center' }}>
+                                        <span style={{ color: '#bdc3c7', fontSize: '0.8rem', width: 22, flexShrink: 0 }}>{i + 1}</span>
+                                        <input defaultValue={a.nombre}
+                                            onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                                            onBlur={e => { const v = e.target.value.trim(); if (v && v !== a.nombre) renombrarAlumno(a.id, v); else if (!v) e.target.value = a.nombre; }}
+                                            style={{ flex: 1, minWidth: 0, border: '1px solid transparent', borderRadius: 6, padding: '5px 6px', fontSize: '0.86rem', color: '#2c3e50', fontFamily: 'inherit', outline: 'none', background: 'transparent' }}
+                                            onFocus={e => { e.target.style.background = '#fff'; e.target.style.borderColor = '#cdd6ea'; }} />
+                                        {a.grupo && <span style={{ fontSize: '0.72rem', color: '#95a5a6', flexShrink: 0 }}>{a.grupo}</span>}
+                                        <button onClick={() => eliminarAlumno(a.id)} title="Eliminar alumno" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#e74c3c', padding: 2, flexShrink: 0 }}><Trash2 size={14} /></button>
                                     </div>
                                 ))}
                             </div>
                         )}
+
+                        {/* Añadir un alumno */}
+                        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                            <input value={nuevoAlumno} onChange={e => setNuevoAlumno(e.target.value)} onKeyDown={e => e.key === 'Enter' && añadirAlumno()}
+                                placeholder="Añadir un alumno…" style={{ ...st.input, marginBottom: 0, flex: 1 }} />
+                            <button onClick={añadirAlumno} disabled={!nuevoAlumno.trim()} style={st.btnPrimary}><Plus size={15} /> Añadir</button>
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: '#bdc3c7', marginTop: 6 }}>Toca un nombre para reescribirlo (se guarda al salir del campo).</div>
                     </div>
                 )}
                 {sub === 'plano' && (planoEdit ? (
@@ -1170,6 +1206,35 @@ function CursoDetalle({ usuario, comunidad, curso, onBack }) {
                     </div>
                 )}
             </>}
+
+            {mostrarCopiaModal && (
+                <div style={st.overlay} onClick={() => setMostrarCopiaModal(false)}>
+                    <div style={{ ...st.panel, maxWidth: 470 }} onClick={e => e.stopPropagation()}>
+                        <div style={st.header}>
+                            <div style={st.hTitle}><Copy size={19} color={AZUL} /> Copiar a tu zona personal</div>
+                            <button onClick={() => setMostrarCopiaModal(false)} style={st.closeBtn}><X size={18} /></button>
+                        </div>
+                        <p style={{ margin: '0 0 12px', color: '#555', fontSize: '0.9rem', lineHeight: 1.55 }}>
+                            Se creará un grupo con estos <strong>{priv?.listado?.length || 0} alumnos</strong> en <strong>Informes → Grupos</strong> (tu cuaderno personal). Allí, de forma privada, podrás:
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}><Users size={16} color={AZUL} style={{ marginTop: 2, flexShrink: 0 }} /><span style={{ fontSize: '0.86rem', color: '#2c3e50' }}>Crear tus propios <strong>subgrupos</strong>.</span></div>
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}><span style={{ fontSize: 15, marginTop: 1 }}>🪑</span><span style={{ fontSize: '0.86rem', color: '#2c3e50' }}>Hacer <strong>planos de clase</strong>.</span></div>
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}><span style={{ fontSize: 15, marginTop: 1 }}>📝</span><span style={{ fontSize: '0.86rem', color: '#2c3e50' }}>Usarlo para apuntar <strong>calificaciones</strong>.</span></div>
+                        </div>
+                        <div style={{ ...st.aviso, marginBottom: 14 }}>
+                            <ShieldCheck size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+                            Es una copia: lo que hagas en tu zona no afecta al curso de la comunidad.
+                        </div>
+                        <div style={st.btnRow}>
+                            <button onClick={() => setMostrarCopiaModal(false)} style={st.btnSec}>Cancelar</button>
+                            <button onClick={copiarListadoAMisGrupos} disabled={copiandoListado} style={st.btnPrimary}>
+                                {copiandoListado ? <><RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Copiando…</> : <><CheckCircle size={15} /> Confirmar</>}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {modalListado && <ModalListado usuario={usuario} comunidad={comunidad} onClose={() => setModalListado(false)} onGuardado={guardarListado} />}
             {modalPlano && <ModalElegirPlano usuario={usuario} onClose={() => setModalPlano(false)} onElegido={async (po) => { await upsertPlano(po, null); setModalPlano(false); }} />}
@@ -1304,6 +1369,10 @@ function PanelCalendarios({ usuario, comunidad }) {
 
     const cursoSel = cursos.find(c => c.id === sel);
     const chip = (activo, color) => ({ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 20, border: `1.5px solid ${color}`, background: activo ? color : 'white', color: activo ? 'white' : color, cursor: 'pointer', fontWeight: 700, fontSize: '0.84rem', whiteSpace: 'nowrap' });
+    const actualizarCurso = async (campos) => {
+        try { await updateDoc(doc(db, 'comunidades', comunidad.id, 'cursos', sel), campos); }
+        catch (e) { alert('No se pudo guardar el ajuste: ' + e.message); }
+    };
 
     return (
         <div>
@@ -1319,7 +1388,22 @@ function PanelCalendarios({ usuario, comunidad }) {
                 : cursos.length === 0 ? <div style={st.vacio}>No hay cursos con calendario. Créalos en la pestaña «Cursos».</div>
                 : sel === 'todos'
                     ? <Calendario usuario={usuario} comunidad={comunidad} puedeEditar />
-                    : <Calendario usuario={usuario} comunidad={comunidad} cursoId={cursoSel.id} cursoNombre={cursoSel.nombre} acento={cursoSel.color} sinFinde={!!cursoSel.sinFinde} puedeEditar />}
+                    : cursoSel && (
+                        <div>
+                            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12, padding: '10px 12px', background: '#f8f9fb', borderRadius: 10, fontSize: '0.82rem', color: '#555' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    🎨 Color <input type="color" value={cursoSel.color || '#1565C0'} onChange={e => actualizarCurso({ color: e.target.value })} style={{ width: 34, height: 24, border: 'none', background: 'none', cursor: 'pointer', padding: 0 }} />
+                                </label>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                                    <input type="checkbox" checked={!!cursoSel.sinFinde} onChange={e => actualizarCurso({ sinFinde: e.target.checked })} /> Ocultar fines de semana
+                                </label>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                                    <input type="checkbox" checked={!!cursoSel.oculto} onChange={e => actualizarCurso({ oculto: e.target.checked })} /> Ocultar en la parte pública
+                                </label>
+                            </div>
+                            <Calendario usuario={usuario} comunidad={comunidad} cursoId={cursoSel.id} cursoNombre={cursoSel.nombre} acento={cursoSel.color} sinFinde={!!cursoSel.sinFinde} puedeEditar />
+                        </div>
+                    )}
         </div>
     );
 }

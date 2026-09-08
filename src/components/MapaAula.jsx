@@ -8,6 +8,7 @@ import { Plus, Trash2, Save, RefreshCw, X, ChevronLeft, CheckCircle } from 'luci
 
 const rndId = () => Math.random().toString(36).slice(2, 10);
 const EMPTY_ARR = [];   // referencia estable para el prop grupos por defecto (evita bucle en useEffect)
+const btnMini = { width: 22, height: 22, borderRadius: 6, border: '1px solid #cdd6ea', background: 'white', cursor: 'pointer', fontSize: '0.95rem', fontWeight: 700, color: '#1565C0', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 };
 
 const CANVAS_W  = 760;
 const CANVAS_H  = 520;
@@ -43,10 +44,10 @@ function defaultLayout() {
 }
 
 // ─── HTML de impresión ────────────────────────────────────────────────────────
-function htmlPlano(nombre, mesas, grupoNombre) {
+function htmlPlano(nombre, mesas, grupoNombre, cw = CANVAS_W, ch = CANVAS_H) {
     const sc   = 0.88;
-    const W    = Math.round(CANVAS_W * sc);
-    const H    = Math.round(CANVAS_H * sc);
+    const W    = Math.round(cw * sc);
+    const H    = Math.round(ch * sc);
     const asig = mesas.flatMap(m => m.asientos).filter(s => s.alumno).length;
 
     const desks = mesas.map(m => {
@@ -182,6 +183,8 @@ export function EditorAula({ planInicial, grupos = EMPTY_ARR, profesorUid, onSav
     const [dragging,     setDragging]     = useState(null);
     const [guardando,    setGuardando]    = useState(false);
     const [guardadoOk,   setGuardadoOk]  = useState(false);
+    const [canvasW,      setCanvasW]      = useState(planInicial?.canvasW || CANVAS_W);
+    const [canvasH,      setCanvasH]      = useState(planInicial?.canvasH || CANVAS_H);
 
     useEffect(() => {
         if (!grupoId) { setGrupoAlumnos([]); return; }
@@ -203,8 +206,8 @@ export function EditorAula({ planInicial, grupos = EMPTY_ARR, profesorUid, onSav
                 const w = m.tipo === 'profesor' ? 180 : deskWidth(m.asientos.length);
                 return {
                     ...m,
-                    x: Math.max(0, Math.min(CANVAS_W - w,   dragging.startDX + dx)),
-                    y: Math.max(0, Math.min(CANVAS_H - 74,  dragging.startDY + dy))
+                    x: Math.max(0, Math.min(canvasW - w,   dragging.startDX + dx)),
+                    y: Math.max(0, Math.min(canvasH - 74,  dragging.startDY + dy))
                 };
             }));
         };
@@ -278,10 +281,14 @@ export function EditorAula({ planInicial, grupos = EMPTY_ARR, profesorUid, onSav
         setMesas(newMesas); setSelSeat(null); setSelUnassign(null);
     };
 
-    const añadirMesa = () => setMesas(prev => [...prev, {
-        id: rndId(), tipo: 'alumno', x: 40, y: 50,
-        asientos: [{ id: rndId(), alumno: null }, { id: rndId(), alumno: null }]
-    }]);
+    const añadirMesa = () => {
+        // Coloca la mesa nueva al final y agranda el lienzo para que siempre haya sitio
+        setMesas(prev => [...prev, {
+            id: rndId(), tipo: 'alumno', x: 40, y: Math.max(50, canvasH - 60),
+            asientos: [{ id: rndId(), alumno: null }, { id: rndId(), alumno: null }]
+        }]);
+        setCanvasH(h => h + 110);
+    };
 
     const eliminarMesa = id => { setMesas(prev => prev.filter(m => m.id !== id)); setSelSeat(null); };
 
@@ -298,12 +305,12 @@ export function EditorAula({ planInicial, grupos = EMPTY_ARR, profesorUid, onSav
         try {
             const grupoNombre = grupos.find(g => g.id === grupoId)?.nombre || planInicial?.grupoNombre || '';
             if (onGuardar) {
-                await onGuardar({ nombre, mesas, grupoNombre });
+                await onGuardar({ nombre, mesas, grupoNombre, canvasW, canvasH });
             } else {
                 const id = planInicial?.id || rndId();
                 await setDoc(doc(db, 'planos_aula', id), {
                     id, profesorUid, nombre, grupoId, grupoNombre,
-                    mesas, alumnosExtra,
+                    mesas, alumnosExtra, canvasW, canvasH,
                     fechaCreacion: planInicial?.fechaCreacion || serverTimestamp()
                 }, { merge: true });
             }
@@ -315,7 +322,7 @@ export function EditorAula({ planInicial, grupos = EMPTY_ARR, profesorUid, onSav
 
     const imprimir = () => {
         const w = window.open('', '_blank');
-        w.document.write(htmlPlano(nombre, mesas, grupos.find(g => g.id === grupoId)?.nombre || ''));
+        w.document.write(htmlPlano(nombre, mesas, grupos.find(g => g.id === grupoId)?.nombre || '', canvasW, canvasH));
         w.document.close();
     };
 
@@ -357,6 +364,17 @@ export function EditorAula({ planInicial, grupos = EMPTY_ARR, profesorUid, onSav
                 <button onClick={añadirMesa} style={{ display:'flex', alignItems:'center', gap:5, padding:'6px 12px', borderRadius:8, border:'1px solid #bdc3c7', background:'white', cursor:'pointer', fontSize:'0.82rem', color:'#555' }}>
                     <Plus size={13}/> Mesa
                 </button>
+
+                {/* Ampliar / reducir el lienzo */}
+                <div style={{ display:'flex', alignItems:'center', gap:4, padding:'3px 6px', borderRadius:8, border:'1px solid #e0e4f0', background:'#f8faff' }}>
+                    <span style={{ fontSize:'0.72rem', color:'#95a5a6', fontWeight:600 }}>Lienzo</span>
+                    <span style={{ fontSize:'0.72rem', color:'#7f8c8d' }}>Ancho</span>
+                    <button onClick={() => setCanvasW(w => Math.max(400, w - 120))} style={btnMini} title="Menos ancho">−</button>
+                    <button onClick={() => setCanvasW(w => w + 120)} style={btnMini} title="Más ancho">+</button>
+                    <span style={{ fontSize:'0.72rem', color:'#7f8c8d', marginLeft:4 }}>Alto</span>
+                    <button onClick={() => setCanvasH(h => Math.max(320, h - 100))} style={btnMini} title="Menos alto">−</button>
+                    <button onClick={() => setCanvasH(h => h + 100)} style={btnMini} title="Más alto">+</button>
+                </div>
                 {selSeat && selAlumno && (
                     <button onClick={vaciarAsiento} style={{ display:'flex', alignItems:'center', gap:4, padding:'6px 11px', borderRadius:8, border:'1px solid #e74c3c', background:'#fdecea', color:'#e74c3c', cursor:'pointer', fontSize:'0.82rem' }}>
                         <X size={12}/> Vaciar asiento
@@ -375,7 +393,7 @@ export function EditorAula({ planInicial, grupos = EMPTY_ARR, profesorUid, onSav
                 {/* Canvas */}
                 <div style={{ overflowX:'auto', flexShrink:0 }}>
                     <div style={{
-                        position:'relative', width:CANVAS_W, height:CANVAS_H,
+                        position:'relative', width:canvasW, height:canvasH,
                         background:'linear-gradient(180deg,#f0f4ff 0%,#f8faff 100%)',
                         border:'2px solid #e0e4f0', borderRadius:14,
                         cursor: dragging?'grabbing':'default'

@@ -1071,6 +1071,63 @@ const MATERIAS_DEF = () => ([
     { id: 'm5', nombre: 'Educación Física', profesor: '', color: '#e67e22' },
 ]);
 
+// ── 5 plantillas de diseño para el horario ────────────────────────────────────
+const hexA = (hex, aa) => (typeof hex === 'string' && /^#[0-9a-f]{6}$/i.test(hex)) ? hex + aa : hex;
+const CELDA_BASE = { minHeight: 44, display: 'flex', flexDirection: 'column', justifyContent: 'center', overflow: 'hidden' };
+const PLANTILLAS = {
+    colores: {
+        label: 'Colores', gap: 3,
+        wrap: { background: '#fff', padding: 6, borderRadius: 10 },
+        dia: { textAlign: 'center', fontWeight: 700, color: '#7f8c8d', fontSize: '0.76rem', padding: '4px 0' },
+        franja: { display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', color: '#7f8c8d', background: '#f4f6f8', borderRadius: 6, padding: 2, fontWeight: 600, textAlign: 'center' },
+        celda: (m) => ({ ...CELDA_BASE, borderRadius: 7, padding: 4, background: m ? m.color : '#fbfcfe', border: m ? 'none' : '1.5px solid #eef1f6' }),
+        nombre: (m) => ({ color: '#fff', fontWeight: 700, fontSize: '0.7rem', lineHeight: 1.15 }),
+        prof: (m) => ({ color: 'rgba(255,255,255,0.9)', fontSize: '0.6rem' }),
+    },
+    pastel: {
+        label: 'Suave', gap: 4,
+        wrap: { background: '#fff', padding: 8, borderRadius: 14 },
+        dia: { textAlign: 'center', fontWeight: 700, color: '#64748b', fontSize: '0.76rem', padding: '4px 0' },
+        franja: { display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', color: '#64748b', background: '#f1f5f9', borderRadius: 10, padding: 2, fontWeight: 600, textAlign: 'center' },
+        celda: (m) => ({ ...CELDA_BASE, borderRadius: 12, padding: '5px 7px', background: m ? hexA(m.color, '22') : '#fff', border: m ? `1.5px solid ${hexA(m.color, '55')}` : '1px dashed #e2e8f0' }),
+        nombre: (m) => ({ color: m ? m.color : '#94a3b8', fontWeight: 800, fontSize: '0.7rem', lineHeight: 1.15 }),
+        prof: (m) => ({ color: m ? m.color : '#94a3b8', opacity: 0.8, fontSize: '0.6rem' }),
+    },
+    tarjetas: {
+        label: 'Tarjetas', gap: 6,
+        wrap: { background: '#f1f5f9', padding: 8, borderRadius: 14 },
+        dia: { textAlign: 'center', fontWeight: 700, color: '#fff', background: '#334155', borderRadius: 8, padding: '5px 0', fontSize: '0.74rem' },
+        franja: { display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', color: '#fff', background: '#334155', borderRadius: 8, padding: 2, fontWeight: 700, textAlign: 'center' },
+        celda: (m) => ({ ...CELDA_BASE, borderRadius: 10, padding: 6, background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', borderTop: m ? `4px solid ${m.color}` : '4px solid #e2e8f0' }),
+        nombre: (m) => ({ color: m ? '#1e293b' : '#cbd5e1', fontWeight: 700, fontSize: '0.7rem', lineHeight: 1.15 }),
+        prof: (m) => ({ color: '#64748b', fontSize: '0.6rem' }),
+    },
+    minimal: {
+        label: 'Líneas', gap: 2,
+        wrap: { background: '#fff', padding: 6, borderRadius: 8 },
+        dia: { textAlign: 'center', fontWeight: 600, color: '#94a3b8', fontSize: '0.72rem', padding: '4px 0', letterSpacing: 0.5, textTransform: 'uppercase' },
+        franja: { display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600, textAlign: 'center' },
+        celda: (m) => ({ ...CELDA_BASE, borderRadius: 0, padding: '6px 8px', background: '#fff', borderLeft: `4px solid ${m ? m.color : 'transparent'}`, borderBottom: '1px solid #f1f5f9' }),
+        nombre: (m) => ({ color: m ? '#334155' : '#cbd5e1', fontWeight: 700, fontSize: '0.72rem', lineHeight: 1.15 }),
+        prof: (m) => ({ color: '#94a3b8', fontSize: '0.6rem' }),
+    },
+    oscuro: {
+        label: 'Neón', gap: 4,
+        wrap: { background: '#0f172a', padding: 8, borderRadius: 14 },
+        dia: { textAlign: 'center', fontWeight: 700, color: '#93c5fd', fontSize: '0.74rem', padding: '4px 0' },
+        franja: { display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', color: '#93c5fd', background: '#1e293b', borderRadius: 8, padding: 2, fontWeight: 700, textAlign: 'center' },
+        celda: (m) => ({ ...CELDA_BASE, borderRadius: 10, padding: '5px 7px', background: m ? hexA(m.color, '2e') : '#1e293b', border: m ? `1.5px solid ${m.color}` : '1px solid #1e293b', boxShadow: m ? `0 0 8px ${hexA(m.color, '66')}` : 'none' }),
+        nombre: (m) => ({ color: m ? '#fff' : '#475569', fontWeight: 700, fontSize: '0.7rem', lineHeight: 1.15 }),
+        prof: (m) => ({ color: '#cbd5e1', opacity: 0.85, fontSize: '0.6rem' }),
+    },
+};
+const PLANTILLAS_ORDEN = ['colores', 'pastel', 'tarjetas', 'minimal', 'oscuro'];
+const getPlantilla = (id) => PLANTILLAS[id] || PLANTILLAS.colores;
+const contenidoMateria = (P, m) => m ? (<>
+    <div style={P.nombre(m)}>{m.nombre}</div>
+    {m.profesor && <div style={P.prof(m)}>{m.profesor}</div>}
+</>) : null;
+
 // Vista de solo lectura del horario (para la parte pública)
 export function HorarioView({ horario }) {
     if (!horario || !horario.materias) return null;
@@ -1078,24 +1135,18 @@ export function HorarioView({ horario }) {
     const celdas = horario.celdas || {};
     const materiaDe = (id) => (horario.materias || []).find(m => m.id === id);
     if (!franjas.length) return null;
+    const P = getPlantilla(horario.plantilla);
     return (
         <div style={{ overflowX: 'auto' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '72px repeat(5, minmax(80px, 1fr))', gap: 3, minWidth: 500 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '72px repeat(5, minmax(80px, 1fr))', gap: P.gap, minWidth: 500, ...P.wrap }}>
                 <div />
-                {DIAS_SEM.map(d => <div key={d} style={{ textAlign: 'center', fontWeight: 700, color: '#7f8c8d', fontSize: '0.74rem', padding: '4px 0' }}>{d}</div>)}
+                {DIAS_SEM.map(d => <div key={d} style={P.dia}>{d}</div>)}
                 {franjas.map((f, i) => (
                     <React.Fragment key={i}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', color: '#7f8c8d', background: '#f8f9fb', borderRadius: 6, padding: 2, textAlign: 'center' }}>{f}</div>
+                        <div style={P.franja}>{f}</div>
                         {DIAS_SEM.map((_, d) => {
                             const m = materiaDe(celdas[`${d}_${i}`]);
-                            return (
-                                <div key={d} style={{ minHeight: 42, borderRadius: 6, border: '1.5px solid #eef1f6', background: m ? m.color : 'white', padding: 3, display: 'flex', flexDirection: 'column', justifyContent: 'center', overflow: 'hidden' }}>
-                                    {m && <>
-                                        <div style={{ color: 'white', fontWeight: 700, fontSize: '0.68rem', lineHeight: 1.15 }}>{m.nombre}</div>
-                                        {m.profesor && <div style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.58rem' }}>{m.profesor}</div>}
-                                    </>}
-                                </div>
-                            );
+                            return <div key={d} style={P.celda(m)}>{contenidoMateria(P, m)}</div>;
                         })}
                     </React.Fragment>
                 ))}
@@ -1110,12 +1161,15 @@ function HorarioCurso({ horario, onSave, nombre, publicUrl }) {
         franjas: horario?.franjas || ['1', '2', '3', '4', '5', '6', '7', '8'],
         materias: horario?.materias || MATERIAS_DEF(),
         celdas: horario?.celdas || {},
+        plantilla: horario?.plantilla || 'colores',
     };
+    const P = getPlantilla(h.plantilla);
     const [sel, setSel]       = useState(null);   // materia seleccionada por clic
     const [drag, setDrag]     = useState(null);   // materia arrastrada
     const [editMat, setEditMat] = useState(false);
 
     const guardar = (campos) => onSave({ ...h, ...campos });
+    const setPlantilla = (id) => guardar({ plantilla: id });
     const setFranja = (i, v) => { const f = [...h.franjas]; f[i] = v; guardar({ franjas: f }); };
     const addFranja = () => guardar({ franjas: [...h.franjas, String(h.franjas.length + 1)] });
     const delFranja = () => {
@@ -1147,27 +1201,39 @@ function HorarioCurso({ horario, onSave, nombre, publicUrl }) {
 
     return (
         <div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
-                <ExportBar targetRef={gridRef} nombre={nombre || 'Horario'} classroomUrl={publicUrl} pdfLandscape />
+            {/* Selector de plantilla */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.78rem', color: '#7f8c8d', fontWeight: 600 }}>🎨 Diseño:</span>
+                {PLANTILLAS_ORDEN.map(id => {
+                    const activo = h.plantilla === id;
+                    return (
+                        <button key={id} onClick={() => setPlantilla(id)}
+                            style={{ padding: '5px 12px', borderRadius: 20, border: `1.5px solid ${activo ? AZUL : '#e0e4f0'}`, background: activo ? AZUL : 'white', color: activo ? 'white' : '#555', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 700 }}>
+                            {PLANTILLAS[id].label}
+                        </button>
+                    );
+                })}
+                <div style={{ marginLeft: 'auto' }}>
+                    <ExportBar targetRef={gridRef} nombre={nombre || 'Horario'} classroomUrl={publicUrl} pdfLandscape />
+                </div>
             </div>
+
             <div style={{ overflowX: 'auto' }}>
-                <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: '72px repeat(5, minmax(88px, 1fr))', gap: 3, minWidth: 520, background: 'white', padding: 4 }}>
+                <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: '72px repeat(5, minmax(88px, 1fr))', gap: P.gap, minWidth: 520, ...P.wrap }}>
                     <div />
-                    {DIAS_SEM.map(d => <div key={d} style={{ textAlign: 'center', fontWeight: 700, color: '#7f8c8d', fontSize: '0.76rem', padding: '4px 0' }}>{d}</div>)}
+                    {DIAS_SEM.map(d => <div key={d} style={P.dia}>{d}</div>)}
                     {h.franjas.map((f, i) => (
                         <React.Fragment key={i}>
-                            <input defaultValue={f} onBlur={e => { if (e.target.value !== f) setFranja(i, e.target.value); }} title="Franja horaria" style={franjaInput} />
+                            <input defaultValue={f} onBlur={e => { if (e.target.value !== f) setFranja(i, e.target.value); }} title="Franja horaria"
+                                style={{ ...franjaInput, background: P.franja.background || '#f8f9fb', color: P.franja.color || '#555', borderRadius: P.franja.borderRadius || 6, fontWeight: P.franja.fontWeight || 600, border: '1px solid ' + (P.franja.background && P.franja.background !== '#f8f9fb' ? 'transparent' : '#e0e4f0') }} />
                             {DIAS_SEM.map((_, d) => {
                                 const mid = h.celdas[`${d}_${i}`]; const m = mid && materiaDe(mid);
                                 return (
                                     <div key={d} onClick={() => clicCelda(d, i)}
                                         onDragOver={e => { if (drag) e.preventDefault(); }}
                                         onDrop={e => { e.preventDefault(); if (drag) asignar(d, i, drag); }}
-                                        style={{ minHeight: 46, borderRadius: 6, border: `1.5px ${(sel || drag) ? 'dashed #94a3b8' : 'solid #eef1f6'}`, background: m ? m.color : 'white', cursor: 'pointer', padding: 3, display: 'flex', flexDirection: 'column', justifyContent: 'center', overflow: 'hidden' }}>
-                                        {m && <>
-                                            <div style={{ color: 'white', fontWeight: 700, fontSize: '0.7rem', lineHeight: 1.15 }}>{m.nombre}</div>
-                                            {m.profesor && <div style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.6rem' }}>{m.profesor}</div>}
-                                        </>}
+                                        style={{ ...P.celda(m), cursor: 'pointer', ...((sel || drag) ? { outline: '2px dashed #94a3b8', outlineOffset: '-2px' } : {}) }}>
+                                        {contenidoMateria(P, m)}
                                     </div>
                                 );
                             })}
@@ -1212,6 +1278,64 @@ function HorarioCurso({ horario, onSave, nombre, publicUrl }) {
                 </div>
             )}
             <div style={{ fontSize: '0.72rem', color: '#bdc3c7', marginTop: 8 }}>Arrastra una materia a una celda, o toca la materia y luego la celda. Toca una celda ocupada para vaciarla.</div>
+        </div>
+    );
+}
+
+// ─── Generador de subgrupos aleatorios ────────────────────────────────────────
+const COLORES_SG = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#e67e22', '#c0392b', '#16a085', '#8e44ad'];
+function GeneradorSubgrupos({ alumnos, nombre }) {
+    const nombres = (alumnos || []).map(a => a.nombre).filter(Boolean);
+    const [modo, setModo]   = useState('grupos'); // 'grupos' | 'porgrupo'
+    const [n, setN]         = useState(4);
+    const [grupos, setGrupos] = useState(null);
+    const ref = useRef();
+
+    const generar = () => {
+        const baraja = [...nombres].sort(() => Math.random() - 0.5);
+        if (baraja.length === 0) { setGrupos([]); return; }
+        const numGrupos = modo === 'grupos'
+            ? Math.max(1, Math.min(n, baraja.length))
+            : Math.max(1, Math.ceil(baraja.length / Math.max(1, n)));
+        const res = Array.from({ length: numGrupos }, () => []);
+        baraja.forEach((nom, i) => res[i % numGrupos].push(nom));
+        setGrupos(res);
+    };
+
+    const chip = (activo) => ({ padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${activo ? AZUL : '#e0e4f0'}`, background: activo ? AZUL : 'white', color: activo ? 'white' : '#555', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700 });
+
+    if (nombres.length === 0) return <div style={st.vacio}>Define primero el listado de alumnos en la pestaña «Listado».</div>;
+
+    return (
+        <div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14, padding: '10px 12px', background: '#f8f9fb', borderRadius: 10 }}>
+                <div style={{ display: 'flex', gap: 4 }}>
+                    <button onClick={() => setModo('grupos')} style={chip(modo === 'grupos')}>Nº de grupos</button>
+                    <button onClick={() => setModo('porgrupo')} style={chip(modo === 'porgrupo')}>Alumnos por grupo</button>
+                </div>
+                <input type="number" min={1} max={nombres.length} value={n} onChange={e => setN(Math.max(1, parseInt(e.target.value) || 1))} style={{ ...st.input, marginBottom: 0, width: 72 }} />
+                <span style={{ fontSize: '0.8rem', color: '#7f8c8d' }}>{modo === 'grupos' ? 'grupos' : 'por grupo'} · {nombres.length} alumnos</span>
+                <button onClick={generar} style={st.btnPrimary}>🎲 Generar</button>
+            </div>
+
+            {grupos && (
+                <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
+                        <button onClick={generar} style={st.miniBtn}><RefreshCw size={13} /> Volver a generar</button>
+                        <ExportBar targetRef={ref} nombre={nombre || 'Subgrupos'} />
+                    </div>
+                    <div ref={ref} style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', background: 'white', padding: 8, borderRadius: 10 }}>
+                        {grupos.map((g, i) => (
+                            <div key={i} style={{ borderRadius: 12, border: `2px solid ${COLORES_SG[i % COLORES_SG.length]}`, overflow: 'hidden' }}>
+                                <div style={{ background: COLORES_SG[i % COLORES_SG.length], color: 'white', fontWeight: 700, padding: '6px 10px', fontSize: '0.85rem' }}>Grupo {i + 1} · {g.length}</div>
+                                <div style={{ padding: '6px 10px' }}>
+                                    {g.map((nom, j) => <div key={j} style={{ fontSize: '0.84rem', color: '#2c3e50', padding: '2px 0', borderBottom: j < g.length - 1 ? '1px solid #f3f3f3' : 'none' }}>{nom}</div>)}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </>
+            )}
         </div>
     );
 }
@@ -1295,8 +1419,8 @@ function CursoDetalle({ usuario, comunidad, curso, onBack }) {
         <div>
             <button onClick={onBack} style={st.backBtn}><ChevronLeft size={16} /> Cursos</button>
             <h2 style={{ margin: '0 0 12px', color: '#2c3e50', display: 'flex', alignItems: 'center', gap: 8 }}><GraduationCap size={22} color={AZUL} /> {curso.nombre}</h2>
-            <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '2px solid #e0e4f0' }}>
-                {[['listado', '📋 Listado'], ['horario', '🕐 Horario'], ['plano', '🪑 Plano'], ['calendario', '📅 Calendario']].map(([id, lbl]) => (
+            <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '2px solid #e0e4f0', flexWrap: 'wrap' }}>
+                {[['listado', '📋 Listado'], ['subgrupos', '🎲 Subgrupos'], ['horario', '🕐 Horario'], ['plano', '🪑 Plano'], ['calendario', '📅 Calendario']].map(([id, lbl]) => (
                     <button key={id} onClick={() => setSub(id)} style={{ ...st.tabBtn, color: sub === id ? AZUL : '#7f8c8d', borderBottom: sub === id ? `3px solid ${AZUL}` : '3px solid transparent', fontWeight: sub === id ? 700 : 500 }}>{lbl}</button>
                 ))}
             </div>
@@ -1341,6 +1465,7 @@ function CursoDetalle({ usuario, comunidad, curso, onBack }) {
                         <div style={{ fontSize: '0.72rem', color: '#bdc3c7', marginTop: 6 }}>Toca un nombre para reescribirlo (se guarda al salir del campo).</div>
                     </div>
                 )}
+                {sub === 'subgrupos' && <GeneradorSubgrupos alumnos={priv.listado} nombre={`Subgrupos ${curso.nombre}`} />}
                 {sub === 'horario' && (
                     <div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', marginBottom: 12, padding: '10px 12px', background: '#f8f9fb', borderRadius: 10, fontSize: '0.82rem', color: '#555' }}>

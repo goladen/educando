@@ -56,7 +56,7 @@ function htmlPlano(nombre, mesas, grupoNombre, cw = CANVAS_W, ch = CANVAS_H) {
         const seats = m.asientos.map(s =>
             `<div style="flex:1;border:1px solid ${isP?'#e67e22':(s.alumno?'#a5d6a7':'#f5c6c2')};border-radius:4px;padding:3px;font-size:0.67rem;font-weight:600;min-height:34px;display:flex;align-items:center;justify-content:center;text-align:center;background:${isP?'#fdf3e7':(s.alumno?'#e8f5e9':'#fdeceb')};color:${isP?'#e67e22':'#2c3e50'}"><span class="txt">${isP?'profe':(s.alumno||'')}</span></div>`
         ).join('');
-        return `<div style="position:absolute;left:${Math.round(m.x*sc)}px;top:${Math.round(m.y*sc)}px;width:${w}px;border:2px solid ${isP?'#e67e22':'#1565C0'};border-radius:8px;overflow:hidden">
+        return `<div style="position:absolute;left:${Math.round(m.x*sc)}px;top:${Math.round(m.y*sc)}px;width:${w}px;border:2px solid ${isP?'#e67e22':'#1565C0'};border-radius:8px;overflow:hidden;transform:rotate(${m.rot||0}deg);transform-origin:center center">
   <div style="background:${isP?'#e67e22':'#1565C0'};color:white;font-size:0.58rem;font-weight:700;padding:2px 6px">${isP?'<span class="txt">👨‍🏫 PROFESOR</span>':''}</div>
   <div style="display:flex;gap:3px;padding:3px">${seats}</div>
 </div>`;
@@ -88,7 +88,7 @@ function toggleDir(){ document.getElementById('board').classList.toggle('inv'); 
 }
 
 // ─── Tarjeta de mesa ──────────────────────────────────────────────────────────
-function DeskCard({ mesa, selSeat, selUnassign, onStartDrag, onClickSeat, onDelete, onAddSeat, onRemoveSeat }) {
+function DeskCard({ mesa, selSeat, selUnassign, onStartDrag, onClickSeat, onDelete, onAddSeat, onRemoveSeat, onRotate }) {
     const isP  = mesa.tipo === 'profesor';
     const col  = isP ? '#e67e22' : '#1565C0';
     const n    = mesa.asientos.length;
@@ -99,7 +99,8 @@ function DeskCard({ mesa, selSeat, selUnassign, onStartDrag, onClickSeat, onDele
             position: 'absolute', left: mesa.x, top: mesa.y, width: w,
             borderRadius: 10, border: `2px solid ${col}`,
             background: 'white', boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
-            overflow: 'hidden', userSelect: 'none', zIndex: 1
+            overflow: 'hidden', userSelect: 'none', zIndex: 1,
+            transform: `rotate(${mesa.rot || 0}deg)`, transformOrigin: 'center center'
         }}>
             {/* Barra de arrastre */}
             <div onMouseDown={e => { e.preventDefault(); onStartDrag(e, mesa.id); }}
@@ -130,13 +131,24 @@ function DeskCard({ mesa, selSeat, selUnassign, onStartDrag, onClickSeat, onDele
                     </div>
                 )}
 
-                <button
-                    onMouseDown={e => e.stopPropagation()}
-                    onClick={e => { e.stopPropagation(); onDelete(mesa.id); }}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer',
-                        color: 'rgba(255,255,255,0.8)', padding: '1px 2px', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-                    <X size={isP ? 0 : 10}/>
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+                    <button
+                        onMouseDown={e => e.stopPropagation()}
+                        onClick={e => { e.stopPropagation(); onRotate(mesa.id); }}
+                        title="Girar 90°"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.9)', padding: '1px 2px', display: 'flex', alignItems: 'center' }}>
+                        <RefreshCw size={11}/>
+                    </button>
+                    {!isP && (
+                        <button
+                            onMouseDown={e => e.stopPropagation()}
+                            onClick={e => { e.stopPropagation(); onDelete(mesa.id); }}
+                            title="Eliminar mesa"
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.8)', padding: '1px 2px', display: 'flex', alignItems: 'center' }}>
+                            <X size={10}/>
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Asientos */}
@@ -292,6 +304,8 @@ export function EditorAula({ planInicial, grupos = EMPTY_ARR, profesorUid, onSav
 
     const eliminarMesa = id => { setMesas(prev => prev.filter(m => m.id !== id)); setSelSeat(null); };
 
+    const rotarMesa = id => setMesas(prev => prev.map(m => m.id === id ? { ...m, rot: ((m.rot || 0) + 90) % 360 } : m));
+
     const vaciarAsiento = () => {
         if (!selSeat) return;
         setMesas(prev => prev.map(m => m.id !== selSeat.deskId ? m : {
@@ -405,7 +419,7 @@ export function EditorAula({ planInicial, grupos = EMPTY_ARR, profesorUid, onSav
                             <DeskCard key={m.id} mesa={m}
                                 selSeat={selSeat} selUnassign={selUnassign}
                                 onStartDrag={startDrag} onClickSeat={onClickSeat}
-                                onDelete={eliminarMesa} onAddSeat={addSeat} onRemoveSeat={removeSeat}/>
+                                onDelete={eliminarMesa} onAddSeat={addSeat} onRemoveSeat={removeSeat} onRotate={rotarMesa}/>
                         ))}
                     </div>
                 </div>

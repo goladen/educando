@@ -7,7 +7,7 @@ import {
     RefreshCw, GraduationCap, Calendar, Lock, LayoutGrid, FileText,
     UserPlus, Check, Clock, LogIn
 } from 'lucide-react';
-import { Calendario, EscaparateMiembros } from './ComunidadesTab';
+import { Calendario, EscaparateMiembros, HorarioView } from './ComunidadesTab';
 
 const AZUL = '#1565C0';
 
@@ -135,7 +135,7 @@ function CentroPublico({ comunidadId, tab, cursoFoco, unirse, onTab, onCurso, on
                 if (!s.exists()) { setError('Esta comunidad no existe.'); setCargando(false); return; }
                 setComunidad({ id: s.id, ...s.data() });
                 const cs = await getDocs(collection(db, 'comunidades', comunidadId, 'cursos'));
-                const docs = cs.docs.map(d => ({ id: d.id, ...d.data() })).filter(c => !c.oculto);
+                const docs = cs.docs.map(d => ({ id: d.id, ...d.data() })).filter(c => !c.oculto || (c.horario && !c.horarioOculto));
                 docs.sort((a, b) => (a.orden ?? 9999) - (b.orden ?? 9999) || (a.nombre || '').localeCompare(b.nombre || '', 'es'));
                 setCursos(docs);
             } catch (e) { setError('No se pudo cargar: ' + e.message); }
@@ -219,7 +219,13 @@ function CentroPublico({ comunidadId, tab, cursoFoco, unirse, onTab, onCurso, on
                                 <h3 style={{ margin: 0, color: '#2c3e50', flex: 1, cursor: 'pointer' }} onClick={() => onCurso(c.id)}>{c.nombre}</h3>
                                 <BtnCompartir titulo={`Calendario de ${c.nombre}`} url={`${origin}/comunidad/${comunidad.id}/curso/${c.id}`} />
                             </div>
-                            <Calendario usuario={{}} comunidad={comunidad} cursoId={c.id} cursoNombre={c.nombre} puedeEditar={false} sinFinde={!!c.sinFinde} acento={c.color} />
+                            {!c.oculto && <Calendario usuario={{}} comunidad={comunidad} cursoId={c.id} cursoNombre={c.nombre} puedeEditar={false} sinFinde={!!c.sinFinde} acento={c.color} />}
+                            {c.horario && !c.horarioOculto && (
+                                <div style={{ marginTop: c.oculto ? 0 : 14 }}>
+                                    <h4 style={{ margin: '0 0 8px', color: '#2c3e50', fontSize: '0.92rem' }}>🕐 Horario</h4>
+                                    <HorarioView horario={c.horario} />
+                                </div>
+                            )}
                         </div>
                     ))}
                 </div>

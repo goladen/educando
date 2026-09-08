@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '../firebase';
+import { descargarPNG, descargarPDF, compartirClassroom } from '../utils/exportar';
 import {
     collection, query, where, getDocs, getDoc, setDoc,
     doc, addDoc, updateDoc, deleteDoc, arrayUnion, arrayRemove,
@@ -10,7 +11,7 @@ import {
     Eye, RefreshCw, CheckCircle, ChevronLeft, Lock, Globe, UserCircle,
     Mail, Send, MessageSquare, UserPlus, Clock, Check, ExternalLink,
     FileText, LayoutGrid, ShieldCheck, ChevronRight, GraduationCap, ClipboardList, Calendar,
-    MoreVertical, Pencil
+    MoreVertical, Pencil, Image as ImageIcon, Download
 } from 'lucide-react';
 import { EditorAula } from './MapaAula';
 
@@ -40,6 +41,19 @@ async function eliminarComunidadCompleta(comId) {
         await Promise.all(snap.docs.map(d => deleteDoc(d.ref)));
     }
     await deleteDoc(doc(db, 'comunidades', comId));
+}
+
+// ─── Barra de exportación (imagen / PDF / Classroom) ──────────────────────────
+function ExportBar({ targetRef, nombre, classroomUrl, compact, pdfLandscape }) {
+    const [busy, setBusy] = useState(false);
+    const run = async (fn) => { setBusy(true); try { await fn(targetRef.current, nombre); } catch (e) { alert('No se pudo exportar: ' + e.message); } setBusy(false); };
+    return (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <button onClick={() => run(descargarPNG)} disabled={busy} style={st.miniBtn} title="Descargar imagen (PNG)"><ImageIcon size={13} />{compact ? '' : ' Imagen'}</button>
+            <button onClick={() => run((el, n) => descargarPDF(el, n, pdfLandscape ? { orientacion: 'l' } : undefined))} disabled={busy} style={st.miniBtn} title="Descargar PDF"><Download size={13} />{compact ? '' : ' PDF'}</button>
+            {classroomUrl && <button onClick={() => compartirClassroom(classroomUrl, nombre)} style={st.miniBtn} title="Compartir en Google Classroom"><GraduationCap size={13} />{compact ? '' : ' Classroom'}</button>}
+        </div>
+    );
 }
 
 // ─── Modal: crear comunidad ───────────────────────────────────────────────────
@@ -660,21 +674,24 @@ const TIPOS_EVENTO = {
 };
 
 // ─── Plano del aula en solo lectura ───────────────────────────────────────────
-function PlanoView({ plano }) {
+function PlanoView({ plano, nombre, exportable }) {
+    const ref = useRef();
     if (!plano || !plano.mesas?.length) return <div style={st.vacioMini}>Sin plano.</div>;
     const sc = 0.62;
     const cw = plano.canvasW || CANVAS_W;
     const ch = plano.canvasH || CANVAS_H;
     return (
+      <div>
+        {exportable && <div style={{ marginBottom: 8 }}><ExportBar targetRef={ref} nombre={`Plano ${nombre || ''}`.trim()} /></div>}
         <div style={{ overflowX: 'auto' }}>
-            <div style={{ position: 'relative', width: cw * sc, height: ch * sc, background: 'linear-gradient(180deg,#f0f4ff,#f8faff)', border: '2px solid #e0e4f0', borderRadius: 12, flexShrink: 0 }}>
+            <div ref={ref} style={{ position: 'relative', width: cw * sc, height: ch * sc, background: 'linear-gradient(180deg,#f0f4ff,#f8faff)', border: '2px solid #e0e4f0', borderRadius: 12, flexShrink: 0 }}>
                 <div style={{ position: 'absolute', top: 2, left: 0, right: 0, textAlign: 'center', fontSize: '0.55rem', color: '#bdc3c7', fontWeight: 700 }}>▲ PIZARRA / FRENTE</div>
                 {plano.mesas.map(m => {
                     const isP = m.tipo === 'profesor';
                     const col = isP ? '#e67e22' : '#1565C0';
                     const w = (isP ? 180 : deskWidth(m.asientos.length)) * sc;
                     return (
-                        <div key={m.id} style={{ position: 'absolute', left: m.x * sc, top: m.y * sc, width: w, borderRadius: 7, border: `2px solid ${col}`, background: 'white', overflow: 'hidden' }}>
+                        <div key={m.id} style={{ position: 'absolute', left: m.x * sc, top: m.y * sc, width: w, borderRadius: 7, border: `2px solid ${col}`, background: 'white', overflow: 'hidden', transform: `rotate(${m.rot || 0}deg)`, transformOrigin: 'center center' }}>
                             <div style={{ background: col, height: 12 }} />
                             <div style={{ display: 'flex', gap: SEAT_GAP * sc, padding: 2 }}>
                                 {m.asientos.map(s => (
@@ -688,6 +705,7 @@ function PlanoView({ plano }) {
                 })}
             </div>
         </div>
+      </div>
     );
 }
 
@@ -789,6 +807,7 @@ export function Calendario({ usuario, comunidad, cursoId, cursoNombre, puedeEdit
     const [menuEv, setMenuEv]   = useState(null);       // id de evento con menú abierto
     const [copiar, setCopiar]   = useState(null);       // evento a copiar
     const [dragId, setDragId]   = useState(null);       // id de evento arrastrado
+    const calRef = useRef(null);                        // para exportar a imagen/PDF
 
     useEffect(() => {
         const ref = collection(db, 'comunidades', comunidad.id, 'eventos');
@@ -881,16 +900,21 @@ export function Calendario({ usuario, comunidad, cursoId, cursoNombre, puedeEdit
     const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
     const hoyKey = `${hoy.getFullYear()}-${pad(hoy.getMonth() + 1)}-${pad(hoy.getDate())}`;
     const eventosDiaSel = diaSel ? eventos.filter(e => e.fecha === diaSel) : [];
+    const publicUrl = `${window.location.origin}/comunidad/${comunidad.id}/${cursoId ? 'curso/' + cursoId : 'calendarios'}`;
+    const nombreExport = `${cursoNombre ? cursoNombre + ' - ' : ''}Calendario ${MESES[ver.m]} ${ver.y}`;
 
     return (
         <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
                 <button onClick={() => cambiarMes(-1)} style={st.miniBtn}><ChevronLeft size={14} /></button>
-                <div style={{ fontWeight: 700, color: '#2c3e50', flex: 1, textAlign: 'center' }}>{MESES[ver.m]} {ver.y}</div>
+                <div style={{ fontWeight: 700, color: '#2c3e50', flex: 1, textAlign: 'center', minWidth: 120 }}>{MESES[ver.m]} {ver.y}</div>
                 <button onClick={() => cambiarMes(1)} style={st.miniBtn}><ChevronRight size={14} /></button>
                 {puedeEditar && <button onClick={() => abrirForm(hoy.getMonth() === ver.m ? hoy.getDate() : 1)} style={{ ...st.btnPrimary, background: ACC }}><Plus size={15} /> Evento</button>}
+                <ExportBar targetRef={calRef} nombre={nombreExport} classroomUrl={publicUrl} compact />
             </div>
 
+            <div ref={calRef} style={{ background: 'white', padding: 6, borderRadius: 8 }}>
+            <div style={{ textAlign: 'center', fontWeight: 700, color: '#2c3e50', fontSize: '0.92rem', marginBottom: 6 }}>{cursoNombre ? cursoNombre + ' · ' : ''}{MESES[ver.m]} {ver.y}</div>
             <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols},1fr)`, gap: 3 }}>
                 {(sinFinde ? ['L', 'M', 'X', 'J', 'V'] : ['L', 'M', 'X', 'J', 'V', 'S', 'D']).map((d, i) => <div key={i} style={{ textAlign: 'center', fontSize: '0.7rem', fontWeight: 700, color: '#95a5a6', padding: 2 }}>{d}</div>)}
                 {celdas.map((d, i) => {
@@ -921,6 +945,7 @@ export function Calendario({ usuario, comunidad, cursoId, cursoNombre, puedeEdit
                         </div>
                     );
                 })}
+            </div>
             </div>
 
             {/* Popover del día pulsado (sale de la celda) */}
@@ -1035,6 +1060,162 @@ function ModalCopiarEvento({ evento, cursos, cursoActual, onClose, onCopiar }) {
     );
 }
 
+// ─── Horario semanal del curso (L-V × franjas, materias arrastrables) ─────────
+const PALETA_COLORES = ['#e74c3c', '#1565C0', '#8e44ad', '#16a34a', '#e67e22', '#0891b2', '#db2777', '#ca8a04', '#4f46e5', '#0d9488'];
+const DIAS_SEM = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+const MATERIAS_DEF = () => ([
+    { id: 'm1', nombre: 'Matemáticas', profesor: '', color: '#e74c3c' },
+    { id: 'm2', nombre: 'Lengua', profesor: '', color: '#1565C0' },
+    { id: 'm3', nombre: 'Geografía e Historia', profesor: '', color: '#8e44ad' },
+    { id: 'm4', nombre: 'Inglés', profesor: '', color: '#16a34a' },
+    { id: 'm5', nombre: 'Educación Física', profesor: '', color: '#e67e22' },
+]);
+
+// Vista de solo lectura del horario (para la parte pública)
+export function HorarioView({ horario }) {
+    if (!horario || !horario.materias) return null;
+    const franjas = horario.franjas || [];
+    const celdas = horario.celdas || {};
+    const materiaDe = (id) => (horario.materias || []).find(m => m.id === id);
+    if (!franjas.length) return null;
+    return (
+        <div style={{ overflowX: 'auto' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '72px repeat(5, minmax(80px, 1fr))', gap: 3, minWidth: 500 }}>
+                <div />
+                {DIAS_SEM.map(d => <div key={d} style={{ textAlign: 'center', fontWeight: 700, color: '#7f8c8d', fontSize: '0.74rem', padding: '4px 0' }}>{d}</div>)}
+                {franjas.map((f, i) => (
+                    <React.Fragment key={i}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', color: '#7f8c8d', background: '#f8f9fb', borderRadius: 6, padding: 2, textAlign: 'center' }}>{f}</div>
+                        {DIAS_SEM.map((_, d) => {
+                            const m = materiaDe(celdas[`${d}_${i}`]);
+                            return (
+                                <div key={d} style={{ minHeight: 42, borderRadius: 6, border: '1.5px solid #eef1f6', background: m ? m.color : 'white', padding: 3, display: 'flex', flexDirection: 'column', justifyContent: 'center', overflow: 'hidden' }}>
+                                    {m && <>
+                                        <div style={{ color: 'white', fontWeight: 700, fontSize: '0.68rem', lineHeight: 1.15 }}>{m.nombre}</div>
+                                        {m.profesor && <div style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.58rem' }}>{m.profesor}</div>}
+                                    </>}
+                                </div>
+                            );
+                        })}
+                    </React.Fragment>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function HorarioCurso({ horario, onSave, nombre, publicUrl }) {
+    const gridRef = useRef();
+    const h = {
+        franjas: horario?.franjas || ['1', '2', '3', '4', '5', '6', '7', '8'],
+        materias: horario?.materias || MATERIAS_DEF(),
+        celdas: horario?.celdas || {},
+    };
+    const [sel, setSel]       = useState(null);   // materia seleccionada por clic
+    const [drag, setDrag]     = useState(null);   // materia arrastrada
+    const [editMat, setEditMat] = useState(false);
+
+    const guardar = (campos) => onSave({ ...h, ...campos });
+    const setFranja = (i, v) => { const f = [...h.franjas]; f[i] = v; guardar({ franjas: f }); };
+    const addFranja = () => guardar({ franjas: [...h.franjas, String(h.franjas.length + 1)] });
+    const delFranja = () => {
+        if (h.franjas.length <= 1) return;
+        const idx = h.franjas.length - 1;
+        const c = { ...h.celdas }; DIAS_SEM.forEach((_, d) => delete c[`${d}_${idx}`]);
+        guardar({ franjas: h.franjas.slice(0, -1), celdas: c });
+    };
+    const addMateria = () => guardar({ materias: [...h.materias, { id: nuevoId(), nombre: 'Nueva materia', profesor: '', color: PALETA_COLORES[h.materias.length % PALETA_COLORES.length] }] });
+    const setMateria = (id, campos) => guardar({ materias: h.materias.map(m => m.id === id ? { ...m, ...campos } : m) });
+    const delMateria = (id) => {
+        const c = { ...h.celdas }; Object.keys(c).forEach(k => { if (c[k] === id) delete c[k]; });
+        guardar({ materias: h.materias.filter(m => m.id !== id), celdas: c });
+        if (sel === id) setSel(null);
+    };
+    const asignar = (d, i, materiaId) => {
+        const c = { ...h.celdas }; const key = `${d}_${i}`;
+        if (materiaId == null) delete c[key]; else c[key] = materiaId;
+        guardar({ celdas: c });
+    };
+    const materiaDe = (id) => h.materias.find(m => m.id === id);
+    const clicCelda = (d, i) => {
+        const key = `${d}_${i}`;
+        if (sel) asignar(d, i, sel);
+        else if (h.celdas[key]) asignar(d, i, null);
+    };
+
+    const franjaInput = { width: '100%', boxSizing: 'border-box', border: '1px solid #e0e4f0', borderRadius: 6, padding: '4px 4px', fontSize: '0.72rem', textAlign: 'center', color: '#555', fontFamily: 'inherit', outline: 'none', background: '#f8f9fb' };
+
+    return (
+        <div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+                <ExportBar targetRef={gridRef} nombre={nombre || 'Horario'} classroomUrl={publicUrl} pdfLandscape />
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+                <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: '72px repeat(5, minmax(88px, 1fr))', gap: 3, minWidth: 520, background: 'white', padding: 4 }}>
+                    <div />
+                    {DIAS_SEM.map(d => <div key={d} style={{ textAlign: 'center', fontWeight: 700, color: '#7f8c8d', fontSize: '0.76rem', padding: '4px 0' }}>{d}</div>)}
+                    {h.franjas.map((f, i) => (
+                        <React.Fragment key={i}>
+                            <input defaultValue={f} onBlur={e => { if (e.target.value !== f) setFranja(i, e.target.value); }} title="Franja horaria" style={franjaInput} />
+                            {DIAS_SEM.map((_, d) => {
+                                const mid = h.celdas[`${d}_${i}`]; const m = mid && materiaDe(mid);
+                                return (
+                                    <div key={d} onClick={() => clicCelda(d, i)}
+                                        onDragOver={e => { if (drag) e.preventDefault(); }}
+                                        onDrop={e => { e.preventDefault(); if (drag) asignar(d, i, drag); }}
+                                        style={{ minHeight: 46, borderRadius: 6, border: `1.5px ${(sel || drag) ? 'dashed #94a3b8' : 'solid #eef1f6'}`, background: m ? m.color : 'white', cursor: 'pointer', padding: 3, display: 'flex', flexDirection: 'column', justifyContent: 'center', overflow: 'hidden' }}>
+                                        {m && <>
+                                            <div style={{ color: 'white', fontWeight: 700, fontSize: '0.7rem', lineHeight: 1.15 }}>{m.nombre}</div>
+                                            {m.profesor && <div style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.6rem' }}>{m.profesor}</div>}
+                                        </>}
+                                    </div>
+                                );
+                            })}
+                        </React.Fragment>
+                    ))}
+                </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <button onClick={addFranja} style={st.miniBtn}><Plus size={13} /> Franja</button>
+                <button onClick={delFranja} disabled={h.franjas.length <= 1} style={st.miniBtn}>− Franja</button>
+                {sel && <span style={{ fontSize: '0.75rem', color: AZUL }}>Toca una celda para colocar «{materiaDe(sel)?.nombre}» · <button onClick={() => setSel(null)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.75rem', padding: 0 }}>cancelar</button></span>}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '16px 0 8px', flexWrap: 'wrap' }}>
+                <h3 style={{ ...st.h3, margin: 0 }}>Materias</h3>
+                <button onClick={() => setEditMat(v => !v)} style={{ ...st.miniBtn, marginLeft: 'auto' }}>{editMat ? 'Hecho' : <><Pencil size={13} /> Editar</>}</button>
+                <button onClick={addMateria} style={st.btnPrimary}><Plus size={14} /> Materia</button>
+            </div>
+
+            {!editMat ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {h.materias.map(m => (
+                        <div key={m.id} draggable onDragStart={() => setDrag(m.id)} onDragEnd={() => setDrag(null)}
+                            onClick={() => setSel(sel === m.id ? null : m.id)}
+                            style={{ display: 'flex', flexDirection: 'column', padding: '6px 12px', borderRadius: 10, background: m.color, color: 'white', cursor: 'grab', border: sel === m.id ? '3px solid #2c3e50' : '3px solid transparent', minWidth: 80 }}>
+                            <span style={{ fontWeight: 700, fontSize: '0.82rem' }}>{m.nombre}</span>
+                            {m.profesor && <span style={{ fontSize: '0.68rem', opacity: 0.9 }}>{m.profesor}</span>}
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {h.materias.map(m => (
+                        <div key={m.id} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                            <input type="color" value={m.color} onChange={e => setMateria(m.id, { color: e.target.value })} style={{ width: 30, height: 26, border: 'none', background: 'none', cursor: 'pointer', padding: 0 }} />
+                            <input defaultValue={m.nombre} onBlur={e => { const v = e.target.value.trim(); if (v && v !== m.nombre) setMateria(m.id, { nombre: v }); }} placeholder="Materia" style={{ ...st.input, marginBottom: 0, flex: 1, minWidth: 120 }} />
+                            <input defaultValue={m.profesor} onBlur={e => { const v = e.target.value.trim(); if (v !== m.profesor) setMateria(m.id, { profesor: v }); }} placeholder="Profesor (opcional)" style={{ ...st.input, marginBottom: 0, flex: 1, minWidth: 120 }} />
+                            <button onClick={() => delMateria(m.id)} style={{ ...st.miniBtn, color: '#e74c3c', borderColor: '#f3c9c4' }}><Trash2 size={13} /></button>
+                        </div>
+                    ))}
+                </div>
+            )}
+            <div style={{ fontSize: '0.72rem', color: '#bdc3c7', marginTop: 8 }}>Arrastra una materia a una celda, o toca la materia y luego la celda. Toca una celda ocupada para vaciarla.</div>
+        </div>
+    );
+}
+
 // ─── Detalle de un curso (miembro) ────────────────────────────────────────────
 function CursoDetalle({ usuario, comunidad, curso, onBack }) {
     const [sub, setSub]       = useState('listado');
@@ -1104,13 +1285,18 @@ function CursoDetalle({ usuario, comunidad, curso, onBack }) {
         try { await updateDoc(doc(db, 'comunidades', comunidad.id, 'cursos', curso.id), campos); }
         catch (e) { alert('No se pudo guardar el ajuste: ' + e.message); }
     };
+    // El horario va en el doc del curso (público de lectura) para poder mostrarlo fuera
+    const saveHorario = async (hor) => {
+        try { await updateDoc(doc(db, 'comunidades', comunidad.id, 'cursos', curso.id), { horario: hor }); }
+        catch (e) { alert('No se pudo guardar el horario: ' + e.message); }
+    };
 
     return (
         <div>
             <button onClick={onBack} style={st.backBtn}><ChevronLeft size={16} /> Cursos</button>
             <h2 style={{ margin: '0 0 12px', color: '#2c3e50', display: 'flex', alignItems: 'center', gap: 8 }}><GraduationCap size={22} color={AZUL} /> {curso.nombre}</h2>
             <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '2px solid #e0e4f0' }}>
-                {[['listado', '📋 Listado'], ['plano', '🪑 Plano'], ['calendario', '📅 Calendario']].map(([id, lbl]) => (
+                {[['listado', '📋 Listado'], ['horario', '🕐 Horario'], ['plano', '🪑 Plano'], ['calendario', '📅 Calendario']].map(([id, lbl]) => (
                     <button key={id} onClick={() => setSub(id)} style={{ ...st.tabBtn, color: sub === id ? AZUL : '#7f8c8d', borderBottom: sub === id ? `3px solid ${AZUL}` : '3px solid transparent', fontWeight: sub === id ? 700 : 500 }}>{lbl}</button>
                 ))}
             </div>
@@ -1155,6 +1341,18 @@ function CursoDetalle({ usuario, comunidad, curso, onBack }) {
                         <div style={{ fontSize: '0.72rem', color: '#bdc3c7', marginTop: 6 }}>Toca un nombre para reescribirlo (se guarda al salir del campo).</div>
                     </div>
                 )}
+                {sub === 'horario' && (
+                    <div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', marginBottom: 12, padding: '10px 12px', background: '#f8f9fb', borderRadius: 10, fontSize: '0.82rem', color: '#555' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                                <input type="checkbox" checked={!!curso.horarioOculto} onChange={e => actualizarCurso({ horarioOculto: e.target.checked })} /> Ocultar horario en la parte pública
+                            </label>
+                        </div>
+                        <HorarioCurso horario={curso.horario || priv.horario} onSave={saveHorario}
+                            nombre={`Horario ${curso.nombre}`}
+                            publicUrl={curso.horarioOculto ? null : `${window.location.origin}/comunidad/${comunidad.id}/curso/${curso.id}`} />
+                    </div>
+                )}
                 {sub === 'plano' && (planoEdit ? (
                     <EditorAula
                         planInicial={planoEdit.data || undefined}
@@ -1182,7 +1380,7 @@ function CursoDetalle({ usuario, comunidad, curso, onBack }) {
                                             <button onClick={() => setPlanoEdit({ id: p.id, data: p })} style={st.miniBtn}><Pencil size={13} /> Editar</button>
                                             <button onClick={() => borrarPlanoItem(p.id)} style={{ ...st.miniBtn, color: '#e74c3c', borderColor: '#f3c9c4' }}><Trash2 size={13} /></button>
                                         </div>
-                                        <PlanoView plano={p} />
+                                        <PlanoView plano={p} nombre={`${curso.nombre} ${p.nombre || ''}`} exportable />
                                     </div>
                                 ))}
                             </div>

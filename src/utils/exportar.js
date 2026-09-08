@@ -1,9 +1,10 @@
 // Utilidades para exportar un elemento del DOM a imagen/PDF y compartir en Classroom.
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
+// html2canvas y jspdf se cargan de forma perezosa (solo al exportar) para no
+// engordar el bundle inicial.
 
 async function capturar(el) {
     if (!el) throw new Error('No hay nada que exportar.');
+    const html2canvas = (await import('html2canvas')).default;
     return html2canvas(el, { backgroundColor: '#ffffff', scale: 2, useCORS: true, logging: false });
 }
 
@@ -17,6 +18,7 @@ export async function descargarPNG(el, nombre = 'export') {
 
 export async function descargarPDF(el, nombre = 'export', opts = {}) {
     const canvas = await capturar(el);
+    const { jsPDF } = await import('jspdf');
     const img = canvas.toDataURL('image/png');
     // Orientación forzada ('l' apaisado / 'p' vertical) → página A4 con la imagen ajustada y centrada
     if (opts.orientacion === 'l' || opts.orientacion === 'p') {

@@ -62,6 +62,8 @@ export default defineConfig({
           // lucide-react — usado por todos los chunks de juegos, vendor propio para
           // evitar que quede embebido en games-live y genere dep circular.
           if (id.includes('/node_modules/lucide-react')) return 'vendor-icons';
+          // html2canvas + jspdf — solo para exportar plano/horario/calendario a imagen/PDF
+          if (id.includes('/node_modules/html2canvas') || id.includes('/node_modules/jspdf')) return 'vendor-export';
           // MotoMiniJuego importa CazaBurbujasGame (games-misc) → incluirlo en
           // games-misc rompe la dependencia circular games-live ↔ games-misc.
           if (id.includes('MotoMiniJuego')) return 'games-misc';
@@ -107,7 +109,7 @@ export default defineConfig({
         // Excluir rutas Unity del navigate fallback — sin esto el SW sirve
         // el index.html de React dentro del iframe de Unity
         navigateFallbackDenylist: [/^\/api/, /^\/kartinged/, /^\/kartingedmulti/, /^\/racing3d/, /^\/pikt-viewer\.html/],
-        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
+        maximumFileSizeToCacheInBytes: 12 * 1024 * 1024,
         skipWaiting: true,
         clientsClaim: true,
       },

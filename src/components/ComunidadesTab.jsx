@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '../firebase';
-import { descargarPNG, descargarPDF, compartirClassroom } from '../utils/exportar';
+import { descargarPNG, descargarPDF, compartirClassroom, imprimirElemento } from '../utils/exportar';
 import {
     collection, query, where, getDocs, getDoc, setDoc,
     doc, addDoc, updateDoc, deleteDoc, arrayUnion, arrayRemove,
@@ -11,7 +11,7 @@ import {
     Eye, RefreshCw, CheckCircle, ChevronLeft, Lock, Globe, UserCircle,
     Mail, Send, MessageSquare, UserPlus, Clock, Check, ExternalLink,
     FileText, LayoutGrid, ShieldCheck, ChevronRight, GraduationCap, ClipboardList, Calendar,
-    MoreVertical, Pencil, Image as ImageIcon, Download
+    MoreVertical, Pencil, Image as ImageIcon, Download, Printer
 } from 'lucide-react';
 import { EditorAula } from './MapaAula';
 
@@ -51,6 +51,7 @@ function ExportBar({ targetRef, nombre, classroomUrl, compact, pdfLandscape }) {
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <button onClick={() => run(descargarPNG)} disabled={busy} style={st.miniBtn} title="Descargar imagen (PNG)"><ImageIcon size={13} />{compact ? '' : ' Imagen'}</button>
             <button onClick={() => run((el, n) => descargarPDF(el, n, pdfLandscape ? { orientacion: 'l' } : undefined))} disabled={busy} style={st.miniBtn} title="Descargar PDF"><Download size={13} />{compact ? '' : ' PDF'}</button>
+            <button onClick={() => run(imprimirElemento)} disabled={busy} style={st.miniBtn} title="Imprimir"><Printer size={13} />{compact ? '' : ' Imprimir'}</button>
             {classroomUrl && <button onClick={() => compartirClassroom(classroomUrl, nombre)} style={st.miniBtn} title="Compartir en Google Classroom"><GraduationCap size={13} />{compact ? '' : ' Classroom'}</button>}
         </div>
     );
@@ -676,22 +677,62 @@ const TIPOS_EVENTO = {
 // ─── Plano del aula en solo lectura ───────────────────────────────────────────
 function PlanoView({ plano, nombre, exportable }) {
     const ref = useRef();
+    const [bonito, setBonito] = useState(true);
     if (!plano || !plano.mesas?.length) return <div style={st.vacioMini}>Sin plano.</div>;
     const sc = 0.62;
     const cw = plano.canvasW || CANVAS_W;
     const ch = plano.canvasH || CANVAS_H;
+
+    const fondoBonito = 'repeating-linear-gradient(0deg, rgba(0,0,0,0.045) 0 1px, transparent 1px 30px), repeating-linear-gradient(90deg, rgba(0,0,0,0.045) 0 1px, transparent 1px 30px), linear-gradient(180deg,#d3e6df,#bfd8d0)';
+
     return (
       <div>
-        {exportable && <div style={{ marginBottom: 8 }}><ExportBar targetRef={ref} nombre={`Plano ${nombre || ''}`.trim()} /></div>}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 4 }}>
+                <button onClick={() => setBonito(true)} style={{ ...st.miniBtn, ...(bonito ? { background: AZUL, color: 'white', borderColor: AZUL } : {}) }}>🎨 Vista bonita</button>
+                <button onClick={() => setBonito(false)} style={{ ...st.miniBtn, ...(!bonito ? { background: AZUL, color: 'white', borderColor: AZUL } : {}) }}>Vista simple</button>
+            </div>
+            {exportable && <div style={{ marginLeft: 'auto' }}><ExportBar targetRef={ref} nombre={`Plano ${nombre || ''}`.trim()} /></div>}
+        </div>
         <div style={{ overflowX: 'auto' }}>
-            <div ref={ref} style={{ position: 'relative', width: cw * sc, height: ch * sc, background: 'linear-gradient(180deg,#f0f4ff,#f8faff)', border: '2px solid #e0e4f0', borderRadius: 12, flexShrink: 0 }}>
-                <div style={{ position: 'absolute', top: 2, left: 0, right: 0, textAlign: 'center', fontSize: '0.55rem', color: '#bdc3c7', fontWeight: 700 }}>▲ PIZARRA / FRENTE</div>
+            <div ref={ref} style={{ position: 'relative', width: cw * sc, height: ch * sc, background: bonito ? fondoBonito : 'linear-gradient(180deg,#f0f4ff,#f8faff)', border: bonito ? '3px solid #cbb89a' : '2px solid #e0e4f0', borderRadius: 12, flexShrink: 0 }}>
+                {bonito ? (
+                    <div style={{ position: 'absolute', top: 6, left: '26%', right: '26%', height: 20, background: 'linear-gradient(#2f6b4f,#245a41)', border: '3px solid #8a5a2b', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#eaf5ef', fontSize: '0.5rem', fontWeight: 700, letterSpacing: 1, boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>PIZARRA</div>
+                ) : (
+                    <div style={{ position: 'absolute', top: 2, left: 0, right: 0, textAlign: 'center', fontSize: '0.55rem', color: '#bdc3c7', fontWeight: 700 }}>▲ PIZARRA / FRENTE</div>
+                )}
                 {plano.mesas.map(m => {
                     const isP = m.tipo === 'profesor';
-                    const col = isP ? '#e67e22' : '#1565C0';
                     const w = (isP ? 180 : deskWidth(m.asientos.length)) * sc;
+                    const posBase = { position: 'absolute', left: m.x * sc, top: m.y * sc, width: w, transform: `rotate(${m.rot || 0}deg)`, transformOrigin: 'center center' };
+
+                    // ── Vista bonita: mesa de madera + silla ──────────────────
+                    if (bonito) {
+                        if (isP) return (
+                            <div key={m.id} style={posBase}>
+                                <div style={{ width: '100%', height: 28, background: 'linear-gradient(160deg,#3a3f4b,#22262e)', borderRadius: 6, boxShadow: '0 3px 6px rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#e8b06a', fontSize: '0.5rem', fontWeight: 700, letterSpacing: 0.5 }}>👩‍🏫 PROFE</div>
+                            </div>
+                        );
+                        return (
+                            <div key={m.id} style={{ ...posBase, display: 'flex', gap: SEAT_GAP * sc, alignItems: 'flex-start' }}>
+                                {m.asientos.map(s => {
+                                    const len = (s.alumno || '').length;
+                                    const fz = len > 16 ? '0.42rem' : len > 10 ? '0.48rem' : '0.54rem';
+                                    return (
+                                        <div key={s.id} style={{ width: SEAT_W * sc, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                                            <div style={{ width: '100%', minHeight: 22, background: s.alumno ? 'linear-gradient(160deg,#f2ce8d,#d8a860)' : 'linear-gradient(160deg,#efe3cf,#dcc9a8)', border: '1px solid #b98a44', borderRadius: 5, boxShadow: '0 2px 3px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: fz, fontWeight: 700, color: '#5b4321', textAlign: 'center', lineHeight: 1.08, padding: '3px 3px', wordBreak: 'break-word', hyphens: 'auto' }}>{s.alumno || ''}</div>
+                                            <div style={{ width: '60%', height: 8, background: 'linear-gradient(#5b6b7a,#3d4a58)', borderRadius: '2px 2px 5px 5px', boxShadow: '0 1px 2px rgba(0,0,0,0.3)' }} />
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        );
+                    }
+
+                    // ── Vista simple (la de antes) ────────────────────────────
+                    const col = isP ? '#e67e22' : '#1565C0';
                     return (
-                        <div key={m.id} style={{ position: 'absolute', left: m.x * sc, top: m.y * sc, width: w, borderRadius: 7, border: `2px solid ${col}`, background: 'white', overflow: 'hidden', transform: `rotate(${m.rot || 0}deg)`, transformOrigin: 'center center' }}>
+                        <div key={m.id} style={{ ...posBase, borderRadius: 7, border: `2px solid ${col}`, background: 'white', overflow: 'hidden' }}>
                             <div style={{ background: col, height: 12 }} />
                             <div style={{ display: 'flex', gap: SEAT_GAP * sc, padding: 2 }}>
                                 {m.asientos.map(s => (

@@ -544,6 +544,18 @@ export default function InformesJuegos({ usuario, googleToken }) {
                             {informesFiltFinal.map(inf => {
                                 const tipo = inf._tipoJuego || inf.tipo || '';
                                 const selec = seleccionados.has(inf.id);
+                                if (tipo === 'ENIGMIC') return (
+                                    <EnigmicCard
+                                        key={inf.id} inf={inf}
+                                        onBorrar={()=>borrar(inf.id)}
+                                        borrando={borrando===inf.id}
+                                        borradoOk={borrandoOk===inf.id}
+                                        modoSeleccion={modoSeleccion}
+                                        seleccionado={selec}
+                                        onSeleccionar={()=>toggleSeleccion(inf.id)}
+                                        onBuscarJugador={setBusquedaJugador}
+                                    />
+                                );
                                 if (tipo === 'MUSIC_COMPASS') return (
                                     <MusicCompassCard
                                         key={inf.id} inf={inf}
@@ -1426,6 +1438,54 @@ const PotenciasRaicesCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion
 };
 
 // ─── Tarjeta especial para Entrenamiento Auditivo (MusicCompass) ─────────────
+const EnigmicCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccionado, onSeleccionar, onBuscarJugador }) => {
+    const [confirmar, setConfirmar] = useState(false);
+    const j = (inf.jugadores || [])[0] || {};
+    const pct = j.porcentaje ?? (j.intentos > 0 ? Math.round((j.aciertos / j.intentos) * 100) : 0);
+    const pctColor = p => p >= 80 ? '#27ae60' : p >= 50 ? '#e67e22' : '#e74c3c';
+    const mmss = s => s == null ? null : `${Math.floor(s/60)}m ${String(s%60).padStart(2,'0')}s`;
+
+    return (
+        <div style={{ background:'white', borderRadius:13, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', border: seleccionado?'2px solid #1565C0':'1.5px solid #e8e8e8' }}>
+            <div onClick={modoSeleccion?onSeleccionar:undefined} style={{ padding:'11px 15px', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', cursor:modoSeleccion?'pointer':'default' }}>
+                {modoSeleccion && <input type="checkbox" checked={seleccionado} onChange={e=>{e.stopPropagation();onSeleccionar();}} onClick={e=>e.stopPropagation()} style={{ width:17,height:17,cursor:'pointer',accentColor:'#1565C0' }}/>}
+                <span style={{ fontSize:'1.4rem' }}>🕵️‍♂️</span>
+                <div style={{ flex:1, minWidth:150 }}>
+                    <div style={{ fontWeight:700, color:'#2c3e50', fontSize:'0.92rem' }}>Enigmic · acertijos de lógica</div>
+                    <div style={{ fontSize:'0.74rem', color:'#95a5a6' }}>
+                        {fmtFecha(inf.fecha)}
+                        {j.nombre && <> · <span onClick={e=>{e.stopPropagation();onBuscarJugador?.(j.nombre);}} style={{ cursor:'pointer', borderBottom:'1px dotted #aaa', fontWeight:600, color:'#2c3e50' }}>{j.nombre}</span></>}
+                        {j.curso && <span style={{ marginLeft:5, color:'#aaa' }}>({j.curso})</span>}
+                    </div>
+                </div>
+                <span style={{ padding:'2px 8px', borderRadius:20, background:'#f3f4f6', fontWeight:700, fontSize:'0.78rem', color:pctColor(pct) }}>{pct}%</span>
+                <span style={{ padding:'2px 8px', borderRadius:20, background:'#e8f5e9', fontWeight:700, fontSize:'0.78rem', color:'#27ae60' }}>✓ {j.aciertos??0}/{j.intentos??0}</span>
+                {!modoSeleccion && <button onClick={e=>{e.stopPropagation();setConfirmar(true);}} style={{ padding:'4px 7px', borderRadius:7, border:'1px solid #fdd', background:'#fdecea', color:'#e74c3c', cursor:'pointer' }}><Trash2 size={13}/></button>}
+            </div>
+            <div style={{ padding:'0 15px 11px', display:'flex', gap:6, flexWrap:'wrap' }}>
+                {j.idioma && <span style={{ fontSize:'0.72rem', background:'#ede9fe', color:'#6d28d9', borderRadius:20, padding:'2px 9px', fontWeight:600 }}>{j.idioma}</span>}
+                {j.nivel && <span style={{ fontSize:'0.72rem', background:'#fef3c7', color:'#b45309', borderRadius:20, padding:'2px 9px', fontWeight:600 }}>Nivel {j.nivel}</span>}
+                {j.tablero && <span style={{ fontSize:'0.72rem', background:'#e0f2fe', color:'#0369a1', borderRadius:20, padding:'2px 9px', fontWeight:600 }}>Tablero {j.tablero}</span>}
+                {j.modo && <span style={{ fontSize:'0.72rem', background:'#ecfeff', color:'#0e7490', borderRadius:20, padding:'2px 9px', fontWeight:600 }}>{j.modo === 'Solo escucha' ? '🎧' : '📖'} {j.modo}</span>}
+                {j.tiempoTotal ? <span style={{ fontSize:'0.72rem', background:'#f3f4f6', color:'#475569', borderRadius:20, padding:'2px 9px', fontWeight:600 }}>⏱️ {mmss(j.tiempoTotal)}</span> : null}
+                {j.ayudas ? <span style={{ fontSize:'0.72rem', background:'#fee2e2', color:'#b91c1c', borderRadius:20, padding:'2px 9px', fontWeight:600 }}>💡 {j.ayudas} ayudas</span> : null}
+                {Array.isArray(j.categorias) && j.categorias.map(c => (
+                    <span key={c} style={{ fontSize:'0.72rem', background:'#f1f5f9', color:'#475569', borderRadius:20, padding:'2px 9px' }}>{c}</span>
+                ))}
+            </div>
+            {confirmar && (
+                <div style={{ background:'#fdecea', borderTop:'1px solid #fdd', padding:'10px 15px', display:'flex', alignItems:'center', gap:10, fontSize:'0.83rem' }}>
+                    <AlertTriangle size={14} color="#e74c3c"/>
+                    <span style={{ flex:1, color:'#c0392b' }}>¿Eliminar este informe?</span>
+                    <button onClick={()=>{setConfirmar(false);onBorrar();}} disabled={borrando} style={{ padding:'4px 12px', borderRadius:7, border:'none', background:'#e74c3c', color:'white', cursor:'pointer', fontWeight:700, fontSize:'0.8rem' }}>{borrando?'Borrando…':'Eliminar'}</button>
+                    <button onClick={()=>setConfirmar(false)} style={{ padding:'4px 10px', borderRadius:7, border:'1px solid #ddd', background:'white', cursor:'pointer', fontSize:'0.8rem' }}>Cancelar</button>
+                </div>
+            )}
+            {borradoOk && <div style={{ background:'#e8f5e9', padding:'8px 15px', fontSize:'0.8rem', color:'#27ae60', display:'flex', alignItems:'center', gap:6 }}><CheckCircle size={13}/>Eliminado</div>}
+        </div>
+    );
+};
+
 const MusicCompassCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccionado, onSeleccionar, onBuscarJugador }) => {
     const [expandido,  setExpandido]  = useState(false);
     const [confirmar,  setConfirmar]  = useState(false);

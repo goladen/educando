@@ -12,8 +12,10 @@ import IrregularVerbsTest from './IrregularVerbsTest';
 import { SolarSystemViewer } from './components/LandingGames3';
 import ImperiosGame from './components/ImperiosGame';
 import ComunidadesPublico from './components/ComunidadesPublico';
+import CompeticionPublica from './components/CompeticionPublica';
 import QuienEsQuien from './QuienEsQuien';
 import BunkerDisparo from './BunkerDisparo';
+import EnigmicLogic from './EnigmicLogic';
 import { PizarraApp } from './GestionAula';
 import PiTutorial from './components/PiTutorial';
 import Retos from './Retos';
@@ -118,7 +120,8 @@ function App() {
           || slug === 'retos' || slug === 'conectapuntos' || slug === 'sudoku'
           || slug === 'partes_planta' || slug === 'etiquetame' || slug === 'karting_track'
           || slug === 'arkade' || slug === 'imperios' || slug === 'whoknows'
-          || slug === 'quienesquien' || slug === 'pizarra' || slug === 'bunker') {
+          || slug === 'quienesquien' || slug === 'pizarra' || slug === 'bunker'
+          || slug === 'enigmic') {
         setRutaPublica(slug);
         return;
       }
@@ -126,6 +129,7 @@ function App() {
       if (slug === 'escalada' || slug.startsWith('escalada/')) { setRutaPublica('escalada'); return; }
       // Comunidades públicas (/comunidades, /comunidad/<id>, /comunidad/<id>/curso/<cursoId>)
       if (slug === 'comunidades' || slug === 'comunidad' || slug.startsWith('comunidad/')) { setRutaPublica('comunidades'); return; }
+      if (slug === 'competicion' || slug.startsWith('competicion/')) { setRutaPublica('competicion'); return; }
       const RUTAS_RESERVADAS = new Set([
         'partes_planta',
         'populares','inicio',
@@ -143,8 +147,8 @@ function App() {
         'api','admin','login','app','join',
         'irregular_verbs','sistema_solar',
         'retos','conectapuntos','sudoku',
-        'imperios','geografia','quienesquien','pizarra','bunker',
-        'comunidades','comunidad',
+        'imperios','geografia','quienesquien','pizarra','bunker','enigmic',
+        'comunidades','comunidad','competicion',
         'fisica',
         'math_world','primaria','feria',
         'arkade',
@@ -307,6 +311,7 @@ function App() {
     if (rutaPublica === 'sistema_solar') return <><SolarSystemViewer onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'imperios') return <><ImperiosGame onBack={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'quienesquien') return <><QuienEsQuien onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
+    if (rutaPublica === 'enigmic') return <><EnigmicLogic onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'bunker') return <><BunkerDisparo onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'pizarra') return <><div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#f1f5f9', overflow: 'auto', padding: '54px 12px 20px' }}><button onClick={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} style={{ position: 'fixed', top: 12, left: 12, zIndex: 10000, padding: '8px 14px', borderRadius: 10, border: 'none', background: '#fff', color: '#334155', fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}>← Volver</button><PizarraApp /></div>{anotadorUI}</>;
     if (rutaPublica === 'retos') return <><Retos onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
@@ -317,6 +322,11 @@ function App() {
         const comId   = parts[0] === 'comunidad' ? (parts[1] || null) : null;
         const cursoId = parts[2] === 'curso' ? (parts[3] || null) : null;
         return <ComunidadesPublico comunidadId={comId} cursoId={cursoId} onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
+    }
+    if (rutaPublica === 'competicion') {
+        const parts = window.location.pathname.split('/').filter(Boolean);
+        const compId = parts[0] === 'competicion' ? (parts[1] || null) : null;
+        return <CompeticionPublica compId={compId} onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
     }
 
     // Vista del alumno de Control de Aula (no requiere login) — ?aula=CODE o /join

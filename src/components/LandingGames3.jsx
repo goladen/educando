@@ -19,6 +19,7 @@ import OlympicLive from '../OlympicLive';
 import QuestionSenderClient from '../QuestionSenderClient';
 import PikatronRun from '../PikatronRun';
 import BunkerDisparo from '../BunkerDisparo';
+import EnigmicLogic from '../EnigmicLogic';
 import TextWordleGame from '../TextWordleGame';
 import MathWordleGame from '../MathWordleGame';
 import SopaDeLetrasGame from '../SopaDeLetrasGame';
@@ -512,6 +513,17 @@ export const APPS = [
         shareable: true
     },
     {
+        id: 'ENIGMIC',
+        name: 'Enigmic',
+        isHerramienta: true,
+        desc: 'Acertijos de lógica tipo Einstein en inglés, francés, catalán y español.',
+        color: '#7c3aed',
+        emoji: '🕵️',
+        isSpecial: true,
+        shareable: true,
+        shareUrl: `${window.location.origin}/enigmic`
+    },
+    {
         id: 'BUNKER',
         name: 'Bunker',
         desc: 'Shooter 3D: dispara a las respuestas incorrectas.',
@@ -711,6 +723,14 @@ export const GAME_INFO = {
         biblioteca: 'No incluye biblioteca propia. Requiere recurso del profesor.',
         multiplayer: 'Individual (modo competición por puntuación).',
         materias: ['Universal'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
+    ENIGMIC: {
+        descripcion: 'Acertijo de lógica (cuadrado latino / puzzle de Einstein) para clase de idiomas. El tablero tiene N casillas y varias categorías (profesiones, acciones, objetos, colores, comidas, mascotas, países); cada elemento ocupa una casilla distinta. El alumno lee las pistas EN EL IDIOMA QUE ESTUDIA y deduce dónde va cada uno. El generador garantiza que cada enigma tiene una única solución posible.',
+        tipoPreguntas: 'Pistas generadas automáticamente en inglés, francés, catalán o español: posición ("The doctor is in position 3"), enlaces entre categorías ("The doctor sings"), negaciones ("does not wear blue") y preposiciones de lugar ("immediately to the left of", "next to", "between … and …", "at one of the two ends").',
+        biblioteca: 'Biblioteca propia de vocabulario (7 categorías × 6 elementos) en español, inglés, francés y catalán. Dos modos: leer las pistas o solo escucharlas (comprensión oral, sin texto ni traducción). Tablero de 5 o 6 casillas y de 2 a 5 categorías. No necesita recurso del profesor.',
+        multiplayer: 'Individual. También se puede proyectar y resolver en gran grupo.',
+        materias: ['Inglés', 'Francés', 'Catalán', 'Lengua y Literatura', 'Matemáticas'],
         etapas: ['Primaria', 'ESO', 'Bachillerato'],
     },
     BUNKER: {
@@ -1904,6 +1924,12 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
             return;
         }
 
+        if (appId === 'ENIGMIC') {
+            window.history.pushState({}, '', '/enigmic');
+            setJuegoActivo({ tipoJuego: 'ENIGMIC' });
+            return;
+        }
+
         if (appId === 'BUNKER') {
             window.history.pushState({}, '', '/bunker');
             setJuegoActivo({ tipoJuego: 'BUNKER' });
@@ -2436,6 +2462,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
         if (juegoActivo.tipoJuego === 'KARTINGED_MULTI') return <KartingedMultiGame alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'RACING3D') return <RacingGame3D usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'MANSION_PITAGORICA') return <MansionPitagoricaGame alTerminar={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'ENIGMIC') return <EnigmicLogic usuario={usuario} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'BUNKER') return <BunkerDisparo usuario={usuario} recurso={juegoActivo.recurso || null} autoStart={!!juegoActivo.recurso} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'TRIVIAL') {
             const salirTrivial = () => {
@@ -3298,6 +3325,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                     { id: 'VIDEOQUIZZ',      label: 'VideoQuizz',      emoji: '🎬',  color: '#DC2626', action: () => setVideoQuizz(true), shareable: true },
                     { id: 'FUNCIONES_EJECUTIVAS', label: 'Funciones Ejecutivas', emoji: '🧠', color: '#FF5722', action: () => setFuncionesEjecutivas(true), shareable: true },
                     { id: 'IRREGULAR_VERBS',     label: 'Irregular Verbs',     emoji: '📝', color: '#0369a1', action: () => setIrregularVerbs(true), shareable: true },
+                    { id: 'ENIGMIC',             label: 'Enigmic',             emoji: '🕵️', color: '#7c3aed', action: () => abrirJuego('ENIGMIC'), shareable: true, shareUrl: `${window.location.origin}/enigmic` },
                     { id: 'SOLAR_SYSTEM',        label: 'Sistema Solar',        emoji: '🪐', color: '#3B82F6', action: () => setJuegoActivo({ tipoJuego: 'SOLAR_SYSTEM' }), shareable: true },
                     { id: 'MUSICA',              label: 'Música',               emoji: '🎵', color: '#8b5cf6', action: () => setMusicApp(true), shareable: true },
                     { id: 'GEOGRAFIA',           label: 'Geografía',            emoji: '🌍', color: '#0d9488', action: () => setGeografiaApp(true), shareable: true },

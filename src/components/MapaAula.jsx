@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { imprimirElemento } from '../utils/exportar';
 import { db } from '../firebase';
 import {
     collection, query, where, getDocs, doc,
@@ -197,6 +198,8 @@ export function EditorAula({ planInicial, grupos = EMPTY_ARR, profesorUid, onSav
     const [guardadoOk,   setGuardadoOk]  = useState(false);
     const [canvasW,      setCanvasW]      = useState(planInicial?.canvasW || CANVAS_W);
     const [canvasH,      setCanvasH]      = useState(planInicial?.canvasH || CANVAS_H);
+    const [bonito,       setBonito]       = useState(false);   // previsualización "vista bonita"
+    const canvasRef = useRef();
 
     useEffect(() => {
         if (!grupoId) { setGrupoAlumnos([]); return; }
@@ -334,7 +337,9 @@ export function EditorAula({ planInicial, grupos = EMPTY_ARR, profesorUid, onSav
         setGuardando(false);
     };
 
-    const imprimir = () => {
+    const imprimir = async () => {
+        // Vista bonita → imprime lo que se ve (captura del lienzo). Vista simple → HTML limpio.
+        if (bonito) { try { await imprimirElemento(canvasRef.current, nombre); } catch (e) { alert('No se pudo imprimir: ' + e.message); } return; }
         const w = window.open('', '_blank');
         w.document.write(htmlPlano(nombre, mesas, grupos.find(g => g.id === grupoId)?.nombre || '', canvasW, canvasH));
         w.document.close();
@@ -379,6 +384,12 @@ export function EditorAula({ planInicial, grupos = EMPTY_ARR, profesorUid, onSav
                     <Plus size={13}/> Mesa
                 </button>
 
+                {/* Cambiar vista: editar (simple) / bonita (previsualización) */}
+                <div style={{ display:'flex', gap:2 }}>
+                    <button onClick={() => setBonito(false)} title="Editar" style={{ padding:'6px 12px', borderRadius:'8px 0 0 8px', border:'1px solid #bdc3c7', background: !bonito?'#1565C0':'white', color: !bonito?'white':'#555', cursor:'pointer', fontSize:'0.82rem', fontWeight:600 }}>✏️ Editar</button>
+                    <button onClick={() => setBonito(true)} title="Vista bonita" style={{ padding:'6px 12px', borderRadius:'0 8px 8px 0', border:'1px solid #bdc3c7', borderLeft:'none', background: bonito?'#1565C0':'white', color: bonito?'white':'#555', cursor:'pointer', fontSize:'0.82rem', fontWeight:600 }}>🎨 Vista bonita</button>
+                </div>
+
                 {/* Ampliar / reducir el lienzo */}
                 <div style={{ display:'flex', alignItems:'center', gap:4, padding:'3px 6px', borderRadius:8, border:'1px solid #e0e4f0', background:'#f8faff' }}>
                     <span style={{ fontSize:'0.72rem', color:'#95a5a6', fontWeight:600 }}>Lienzo</span>
@@ -406,21 +417,52 @@ export function EditorAula({ planInicial, grupos = EMPTY_ARR, profesorUid, onSav
             <div style={{ display:'flex', gap:14, alignItems:'flex-start' }}>
                 {/* Canvas */}
                 <div style={{ overflowX:'auto', flexShrink:0 }}>
-                    <div style={{
+                    <div ref={canvasRef} style={{
                         position:'relative', width:canvasW, height:canvasH,
-                        background:'linear-gradient(180deg,#f0f4ff 0%,#f8faff 100%)',
-                        border:'2px solid #e0e4f0', borderRadius:14,
+                        background: bonito
+                            ? 'repeating-linear-gradient(0deg, rgba(0,0,0,0.045) 0 1px, transparent 1px 48px), repeating-linear-gradient(90deg, rgba(0,0,0,0.045) 0 1px, transparent 1px 48px), linear-gradient(180deg,#d3e6df,#bfd8d0)'
+                            : 'linear-gradient(180deg,#f0f4ff 0%,#f8faff 100%)',
+                        border: bonito ? '3px solid #cbb89a' : '2px solid #e0e4f0', borderRadius:14,
                         cursor: dragging?'grabbing':'default'
                     }}>
-                        <div style={{ position:'absolute', top:3, left:0, right:0, textAlign:'center', fontSize:'0.62rem', color:'#bdc3c7', fontWeight:700, pointerEvents:'none' }}>
-                            ▲ PIZARRA / FRENTE DE CLASE
-                        </div>
-                        {mesas.map(m => (
-                            <DeskCard key={m.id} mesa={m}
-                                selSeat={selSeat} selUnassign={selUnassign}
-                                onStartDrag={startDrag} onClickSeat={onClickSeat}
-                                onDelete={eliminarMesa} onAddSeat={addSeat} onRemoveSeat={removeSeat} onRotate={rotarMesa}/>
-                        ))}
+                        {bonito ? (
+                            <div style={{ position:'absolute', top:8, left:'30%', right:'30%', height:30, background:'linear-gradient(#2f6b4f,#245a41)', border:'4px solid #8a5a2b', borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', color:'#eaf5ef', fontSize:'0.72rem', fontWeight:700, letterSpacing:2, pointerEvents:'none' }}>PIZARRA</div>
+                        ) : (
+                            <div style={{ position:'absolute', top:3, left:0, right:0, textAlign:'center', fontSize:'0.62rem', color:'#bdc3c7', fontWeight:700, pointerEvents:'none' }}>
+                                ▲ PIZARRA / FRENTE DE CLASE
+                            </div>
+                        )}
+                        {mesas.map(m => {
+                            if (!bonito) return (
+                                <DeskCard key={m.id} mesa={m}
+                                    selSeat={selSeat} selUnassign={selUnassign}
+                                    onStartDrag={startDrag} onClickSeat={onClickSeat}
+                                    onDelete={eliminarMesa} onAddSeat={addSeat} onRemoveSeat={removeSeat} onRotate={rotarMesa}/>
+                            );
+                            // ── Previsualización bonita (no interactiva) ──
+                            const isP = m.tipo === 'profesor';
+                            const w = isP ? 180 : deskWidth(m.asientos.length);
+                            const pos = { position:'absolute', left:m.x, top:m.y, width:w, transform:`rotate(${m.rot||0}deg)`, transformOrigin:'center center' };
+                            if (isP) return (
+                                <div key={m.id} style={pos}>
+                                    <div style={{ height:44, background:'linear-gradient(160deg,#3a3f4b,#22262e)', borderRadius:8, boxShadow:'0 3px 8px rgba(0,0,0,0.35)', display:'flex', alignItems:'center', justifyContent:'center', color:'#e8b06a', fontWeight:700, fontSize:'0.8rem', letterSpacing:0.5 }}>👩‍🏫 PROFE</div>
+                                </div>
+                            );
+                            return (
+                                <div key={m.id} style={{ ...pos, display:'flex', gap:SEAT_GAP, alignItems:'flex-start' }}>
+                                    {m.asientos.map(s => {
+                                        const len = (s.alumno || '').length;
+                                        const fz = len > 16 ? '0.62rem' : len > 10 ? '0.72rem' : '0.82rem';
+                                        return (
+                                            <div key={s.id} style={{ width:SEAT_W, display:'flex', flexDirection:'column', alignItems:'center', gap:3 }}>
+                                                <div style={{ width:'100%', minHeight:34, background: s.alumno?'linear-gradient(160deg,#f2ce8d,#d8a860)':'linear-gradient(160deg,#efe3cf,#dcc9a8)', border:'1.5px solid #b98a44', borderRadius:8, boxShadow:'0 2px 4px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.5)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:fz, fontWeight:700, color:'#5b4321', textAlign:'center', lineHeight:1.08, padding:'4px', wordBreak:'break-word' }}>{s.alumno || ''}</div>
+                                                <div style={{ width:'60%', height:13, background:'linear-gradient(#5b6b7a,#3d4a58)', borderRadius:'3px 3px 7px 7px', boxShadow:'0 1px 3px rgba(0,0,0,0.3)' }} />
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
 

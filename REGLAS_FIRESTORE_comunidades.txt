@@ -12,6 +12,26 @@ solo AÑADE esto.
 
 ─────────────────────────────────────────────────────────────────────────────
 
+    // ── COMPETICIONES ─────────────────────────────────────────────────────
+    // El doc es PÚBLICO de lectura (página pública de ranking). Solo el dueño
+    // escribe (categorías, puntuaciones, modo de inscripción…).
+    match /competiciones/{compId} {
+      function comp() { return get(/databases/$(database)/documents/competiciones/$(compId)).data; }
+      allow read: if true;
+      allow create: if request.auth != null && request.resource.data.profesorUid == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.profesorUid == request.auth.uid;
+
+      // Participantes: lectura pública (ranking). Alta por el dueño siempre; y
+      // auto-inscripción pública SEGÚN el modo de inscripción de la competición.
+      match /participantes/{pid} {
+        allow read: if true;
+        allow create: if (request.auth != null && comp().profesorUid == request.auth.uid)
+          || (comp().inscripcion == 'auto'       && request.resource.data.estado == 'aceptada')
+          || (comp().inscripcion == 'aprobacion' && request.resource.data.estado == 'pendiente');
+        allow update, delete: if request.auth != null && comp().profesorUid == request.auth.uid;
+      }
+    }
+
     // ── COMUNIDADES ───────────────────────────────────────────────────────
     match /comunidades/{comId} {
 

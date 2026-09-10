@@ -1,5 +1,5 @@
 import { useState, lazy, Suspense } from 'react';
-import { Wrench, Table, FileQuestion, RefreshCw, Camera, BarChart2, BookOpen, Tv2, Shield, Code2, Film } from 'lucide-react';
+import { Wrench, Table, FileQuestion, RefreshCw, Camera, BarChart2, BookOpen, Tv2, Shield, Code2, Film, Presentation } from 'lucide-react';
 import VideoTimelineEditor from '../VideoTimelineEditor';
 
 import ToolExportarGoogleSheets from './ToolExportarGoogleSheets';
@@ -10,13 +10,16 @@ import FotoAOmni from './FotoAOmni';
 import VideoAPre from './VideoAPresentacion';
 import InformesJuegos from './InformesJuegos2';
 import AdminRecursosUploader from './AdminRecursosUploader';
+import PresentationList from './PresentationList';
 const MiniAppCreator = lazy(() => import('./MiniAppCreator'));
+const PresentationEditor = lazy(() => import('./PresentationEditor'));
 
 const ADMIN_EMAIL = 'goladen@gmail.com';
 
 export default function TeacherTools({ usuario, googleToken, perfilProfesor, onOpenEditorOmni }) {
     const [herramientaActiva, setHerramientaActiva] = useState(null);
     const [showFotoOmni, setShowFotoOmni] = useState(false);
+    const [presentacionEditar, setPresentacionEditar] = useState(null); // null = lista, {} = nueva, obj = editar
     const isAdmin = usuario?.email === ADMIN_EMAIL;
 
     if (herramientaActiva === 'SHEETS')         return <ToolExportarGoogleSheets usuario={usuario} googleToken={googleToken} onBack={() => setHerramientaActiva(null)} />;
@@ -36,6 +39,32 @@ export default function TeacherTools({ usuario, googleToken, perfilProfesor, onO
             </Suspense>
         </div>
     );
+
+    if (herramientaActiva === 'PRESENTACIONES') {
+        if (presentacionEditar !== null) return (
+            <Suspense fallback={<div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>Cargando editor…</div>}>
+                <PresentationEditor
+                    usuario={usuario}
+                    presentacionInicial={presentacionEditar}
+                    onClose={() => setPresentacionEditar(null)}
+                    onSaved={(id) => setPresentacionEditar(prev => ({ ...prev, id }))}
+                />
+            </Suspense>
+        );
+        return (
+            <div style={{ padding: '20px 16px' }}>
+                <button onClick={() => setHerramientaActiva(null)}
+                    style={{ marginBottom: 20, padding: '7px 14px', borderRadius: 8, border: '1px solid #dde', background: 'white', cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 5, color: '#555' }}>
+                    ← Volver a herramientas
+                </button>
+                <PresentationList
+                    usuario={usuario}
+                    onNew={() => setPresentacionEditar({})}
+                    onEdit={(pres) => setPresentacionEditar(pres)}
+                />
+            </div>
+        );
+    }
 
     if (herramientaActiva === 'VIDEO_EDITOR') return (
         <VideoTimelineEditor onBack={() => setHerramientaActiva(null)} />
@@ -129,6 +158,17 @@ export default function TeacherTools({ usuario, googleToken, perfilProfesor, onO
                     <h3 style={{ margin: '0 0 10px 0', color: '#6D28D9' }}>Foto → Recurso Omni</h3>
                     <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>
                         Fotografía una ficha de ejercicios y la IA la convierte en un recurso Omninteractive editable.
+                    </p>
+                </div>
+
+                {/* ── Presentaciones ── */}
+                <div onClick={() => { setPresentacionEditar(null); setHerramientaActiva('PRESENTACIONES'); }} style={{ ...cardStyle, borderLeft: '4px solid #F59E0B' }}>
+                    <div style={{ background: '#FEF3C7', padding: '15px', borderRadius: '50%', marginBottom: '15px' }}>
+                        <Presentation size={32} color="#B45309" />
+                    </div>
+                    <h3 style={{ margin: '0 0 10px 0', color: '#B45309' }}>Presentaciones</h3>
+                    <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>
+                        Crea y edita presentaciones interactivas para proyectar en clase o compartir con tus alumnos.
                     </p>
                 </div>
 

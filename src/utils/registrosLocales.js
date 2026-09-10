@@ -51,6 +51,7 @@ export const JUEGOS_REGISTRO_META = {
     KARTINGED_MULTI:     { nombre: 'Karting Multi',       emoji: '🏎️', color: '#0984e3' },
     QUIEN_ES_QUIEN:      { nombre: '¿Quién es quién?',    emoji: '🕵️', color: '#7c3aed' },
     BUNKER:              { nombre: 'Bunker',              emoji: '🎯', color: '#27ae60' },
+    ENIGMIC:             { nombre: 'Enigmic',             emoji: '🕵️', color: '#7c3aed' },
 };
 
 export const metaDe = (tipo) => JUEGOS_REGISTRO_META[tipo] || { nombre: tipo, emoji: '🎮', color: '#718093' };

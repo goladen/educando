@@ -39,6 +39,19 @@ export async function descargarPDF(el, nombre = 'export', opts = {}) {
     pdf.save(`${nombre}.pdf`);
 }
 
+// Captura el elemento y abre el diálogo de impresión del navegador con la imagen
+// (permite "Guardar como PDF" o imprimir en papel, respetando la vista actual).
+export async function imprimirElemento(el, titulo = '') {
+    const canvas = await capturar(el);
+    const img = canvas.toDataURL('image/png');
+    const w = window.open('', '_blank');
+    if (!w) { alert('Permite las ventanas emergentes para imprimir.'); return; }
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${titulo}</title>
+<style>@page{margin:8mm}html,body{margin:0;padding:0}img{width:100%;height:auto;display:block}</style></head>
+<body><img src="${img}" onload="setTimeout(function(){window.focus();window.print();},150)"></body></html>`);
+    w.document.close();
+}
+
 // Abre el diálogo oficial "Compartir en Classroom" con un enlace (Classroom no admite
 // subir archivos por URL; comparte un enlace público al recurso).
 export function compartirClassroom(url, titulo = '') {

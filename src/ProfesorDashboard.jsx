@@ -29,6 +29,7 @@ import SintaxisGame from './SintaxisGamen2';
 import { MousePointer2, Rocket, Search as SearchIcon, Car, Clock } from 'lucide-react';
 import InformesJuegos from './components/InformesJuegos2';
 import ComunidadesTab from './components/ComunidadesTab';
+import CompeticionesTab from './components/CompeticionesTab';
 import TrivialPartidasView from './components/TrivialPartidasView';
 import TrivialRecursosManager from './components/TrivialRecursosManager';
 import PiTutorial from './components/PiTutorial';
@@ -253,7 +254,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
 
     // Restaura la pestaña desde la URL (?panel=…) al cargar y con atrás/adelante
     useEffect(() => {
-        const PANELES = ['CLASICO', 'PRO', 'LIVE', 'BUSCADOR_GLOBAL', 'HERRAMIENTAS', 'PRESENTACIONES', 'MI_PAGINA', 'TRIVIAL', 'COMUNIDADES', 'INFORMES'];
+        const PANELES = ['CLASICO', 'PRO', 'LIVE', 'BUSCADOR_GLOBAL', 'HERRAMIENTAS', 'PRESENTACIONES', 'MI_PAGINA', 'TRIVIAL', 'TRIVIAL_PARTIDAS', 'TRIVIAL_RECURSOS', 'COMUNIDADES', 'COMPETICIONES', 'INFORMES'];
         const sync = () => {
             const p = new URLSearchParams(window.location.search).get('panel');
             if (p && PANELES.includes(p.toUpperCase())) aplicarModo(p.toUpperCase());
@@ -1101,18 +1102,13 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                     <li style={styles.menuItem} onClick={() => navegar('LIVE')}>Recursos Live</li>   {/* ← NUEVO */}
                     <li style={styles.menuItem} onClick={() => navegar('BUSCADOR_GLOBAL')}>Buscador de Recursos</li>
                     <li style={styles.menuItem} onClick={() => navegar('HERRAMIENTAS')}>Herramientas del Profesor</li>
-                    <li style={styles.menuItem} onClick={() => { setPresentacionEditar(null); navegar('PRESENTACIONES'); }}>📊 Presentaciones</li>
+                    {/* 📊 Presentaciones → ahora dentro de "Herramientas del Profesor" */}
                     <li style={styles.menuItem} onClick={() => navegar('MI_PAGINA')}>🌐 Mi Página</li>
-                    <li style={styles.menuItem} onClick={() => navegar('TRIVIAL')}>🎯 Trivial</li>
+                    {/* 🎯 Trivial → ahora dentro de "Recursos PRO" */}
                     <li style={styles.menuItem} onClick={() => navegar('COMUNIDADES')}>👥 Comunidades</li>
+                    <li style={styles.menuItem} onClick={() => navegar('COMPETICIONES')}>🏆 Competiciones</li>
 
-                    {/* --- CAMBIA ESTAS DOS LÍNEAS PARA LOS ENLACES EXTERNOS --- */}
-                    <li style={styles.menuItem} onClick={() => {
-                        setMenuOpen(false);
-                        window.open('https://www.pikt.es/politica.html', '_blank');
-                    }}>
-                        Privacidad y Datos
-                    </li>
+                    {/* Privacidad y Datos → movido al pie del menú, junto al logo */}
                     <li style={styles.menuItem} onClick={() => {
                         setMenuOpen(false);
                         window.open('/guia-pikt-es.html', '_blank');
@@ -1120,7 +1116,16 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                         Más Información
                     </li>
                 </ul>
-                <div style={styles.menuFooter}>PiKT © 2024</div></div></div>)}
+                <div style={styles.menuFooter}>
+                    <span
+                        onClick={() => { setMenuOpen(false); window.open('https://www.pikt.es/politica.html', '_blank'); }}
+                        style={styles.menuFooterLink}
+                    >
+                        Privacidad y Datos
+                    </span>
+                    <span style={{ margin: '0 8px' }}>·</span>
+                    PiKT © 2024
+                </div></div></div>)}
 
             {/* BARRA SUPERIOR (PERFIL, AYUDA) */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', flexWrap: 'wrap', gap: '10px', marginBottom: '30px', paddingBottom: '15px', marginTop:'60px' }}>
@@ -1181,8 +1186,10 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
             )}
             {modoDashboard === 'INFORMES' && <InformesJuegos usuario={usuario} googleToken={googleToken} />}
             {modoDashboard === 'COMUNIDADES' && <ComunidadesTab usuario={usuario} />}
+            {modoDashboard === 'COMPETICIONES' && <CompeticionesTab usuario={usuario} />}
             {modoDashboard === 'TRIVIAL' && (
                 <div style={{ maxWidth: 600, margin: '0 auto', padding: '20px 0' }}>
+                    <button onClick={() => navegar('PRO')} style={estiloVolverTrivial}>← Volver a Recursos PRO</button>
                     <h2 style={{ fontWeight: 800, fontSize: 28, marginBottom: 32, color: '#2c3e50' }}>🎯 Trivial</h2>
                     <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
                         <button
@@ -1203,6 +1210,9 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                         </button>
                     </div>
                 </div>
+            )}
+            {(modoDashboard === 'TRIVIAL_PARTIDAS' || modoDashboard === 'TRIVIAL_RECURSOS') && (
+                <button onClick={() => navegar('TRIVIAL')} style={estiloVolverTrivial}>← Volver a Trivial</button>
             )}
             {modoDashboard === 'TRIVIAL_PARTIDAS' && <TrivialPartidasView usuario={usuario} />}
             {modoDashboard === 'TRIVIAL_RECURSOS' && <TrivialRecursosManager usuario={usuario} />}
@@ -1383,6 +1393,13 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                                             color: juegoSeleccionado === 'SOLAR_SYSTEM' ? 'white' : '#555'
                                         }}>
                                         <span style={{fontSize:14}}>🪐</span> <span className="btn-text">Solar</span>
+                                    </button>
+                                    <button onClick={() => navegar('TRIVIAL')} className="header-btn"
+                                        style={{
+                                            padding: '8px 20px', borderRadius: '20px',
+                                            background: 'white', color: '#555'
+                                        }}>
+                                        <span style={{fontSize:14}}>🎯</span> <span className="btn-text">Trivial</span>
                                     </button>
 
                                 </>
@@ -1790,7 +1807,7 @@ const btnStyle = (bg, color) => ({ flex: 1, padding: '8px', background: bg, colo
 const actionBtnStyle = (bg) => ({ padding: '10px 20px', background: bg, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', fontWeight: 'bold' });
 const inputStyle = { width: '100%', padding: '10px', borderRadius: '5px', border: '1px solid #ccc', boxSizing: 'border-box', marginBottom: '10px' };
 const inputFilter = { padding: '8px', borderRadius: '5px', border: '1px solid #ccc', fontSize: '13px', width: '120px' };
-const styles = { menuButton: { position: 'absolute', top: '20px', left: '20px', background: '#ecf0f1', border: '1px solid #bdc3c7', borderRadius: '8px', padding: '8px', cursor: 'pointer', zIndex: 50 }, helpButtonTop: { background: 'white', border: 'none', borderRadius: '50%', width:'40px', height:'40px', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', boxShadow:'0 2px 5px rgba(0,0,0,0.1)' }, menuOverlay: { position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.5)', zIndex: 9999, display: 'flex', justifyContent: 'flex-start' }, menuPanel: { width: '80%', maxWidth: '300px', height: '100%', backgroundColor: 'white', boxShadow: '2px 0 10px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', animation: 'slideIn 0.3s ease-out' }, menuHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px', borderBottom: '1px solid #eee' }, menuTitle: { margin: 0, color: '#2c3e50', fontSize: '1.5rem', fontWeight: 'bold' }, closeButton: { background: 'transparent', border: 'none', cursor: 'pointer' }, menuList: { listStyle: 'none', padding: '0', margin: '0', flex: 1 }, menuItem: { padding: '20px', borderBottom: '1px solid #f0f0f0', color: '#34495e', fontSize: '1.1rem', fontWeight: '500', cursor: 'pointer' }, menuFooter: { padding: '20px', textAlign: 'center', color: '#bdc3c7', fontSize: '0.8rem', borderTop: '1px solid #eee' } };
+const styles = { menuButton: { position: 'absolute', top: '20px', left: '20px', background: '#ecf0f1', border: '1px solid #bdc3c7', borderRadius: '8px', padding: '8px', cursor: 'pointer', zIndex: 50 }, helpButtonTop: { background: 'white', border: 'none', borderRadius: '50%', width:'40px', height:'40px', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', boxShadow:'0 2px 5px rgba(0,0,0,0.1)' }, menuOverlay: { position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.5)', zIndex: 9999, display: 'flex', justifyContent: 'flex-start' }, menuPanel: { width: '80%', maxWidth: '300px', height: '100%', backgroundColor: 'white', boxShadow: '2px 0 10px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', animation: 'slideIn 0.3s ease-out' }, menuHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px', borderBottom: '1px solid #eee' }, menuTitle: { margin: 0, color: '#2c3e50', fontSize: '1.5rem', fontWeight: 'bold' }, closeButton: { background: 'transparent', border: 'none', cursor: 'pointer' }, menuList: { listStyle: 'none', padding: '0', margin: '0', flex: 1 }, menuItem: { padding: '20px', borderBottom: '1px solid #f0f0f0', color: '#34495e', fontSize: '1.1rem', fontWeight: '500', cursor: 'pointer' }, menuFooter: { padding: '20px', textAlign: 'center', color: '#bdc3c7', fontSize: '0.8rem', borderTop: '1px solid #eee' }, menuFooterLink: { color: '#7f8c8d', cursor: 'pointer', textDecoration: 'underline' } };
 const styleSheet = document.createElement("style"); styleSheet.innerText = `@keyframes slideIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }`; document.head.appendChild(styleSheet);
 const ResponsiveStyles = () => (
     <style>{`
@@ -1867,3 +1884,5 @@ const ResponsiveStyles = () => (
         }
     `}</style>
 );
+// Botón "volver" de las vistas de Trivial (dentro de Recursos PRO)
+const estiloVolverTrivial = { marginBottom: 20, padding: '7px 14px', borderRadius: 8, border: '1px solid #dde', background: 'white', cursor: 'pointer', fontSize: '0.85rem', color: '#555', display: 'block' };

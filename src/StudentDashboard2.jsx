@@ -187,7 +187,10 @@ export default function StudentDashboard2({ usuario }) {
             {vistaActual === 'MAIN' && (
                 <div style={{ width: '80%', maxWidth: '1000px', margin: '80px auto 0 auto', padding: '0 20px', zIndex: 10 }}>
                     <div style={{ textAlign: 'center', color: 'white', marginBottom: '20px', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
-                        <h1 style={{ fontSize: '3rem', margin: 0 }}>PiKT</h1>
+                        <h1 style={{ fontSize: '3rem', margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '14px' }}>
+                            <img src="/icon-192.png?v=2" alt="" style={{ width: '64px', height: '64px', borderRadius: '50%', boxShadow: '0 4px 12px rgba(0,0,0,0.35)' }} />
+                            PiKT
+                        </h1>
                         <p style={{ fontSize: '1.2rem', fontStyle: 'italic', opacity: 0.9 }}>Hola, {usuario.displayName?.split(' ')[0] || 'Alumno'}</p>
                     </div>
 

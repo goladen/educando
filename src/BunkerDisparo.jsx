@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import * as THREE from 'three';
-import { X, Play, Trophy, Search, RefreshCw, Save, Target, ArrowLeft } from 'lucide-react';
+import { X, Play, Trophy, Search, RefreshCw, Save, Target, ArrowLeft, Volume2, VolumeX } from 'lucide-react';
+import sndAplausos from './assets/applause-small-audience-97257.mp3';
+import sndGameOver from './assets/gameover.mp3';
 import { db } from './firebase';
 import { guardarRegistroLocal } from './utils/registrosLocales';
 import { collection, query, where, getDocs, addDoc, orderBy, limit, doc, getDoc } from 'firebase/firestore';
@@ -224,12 +226,32 @@ function recursoAHojas(recurso) {
 }
 
 // =====================================================================
+//  REALIDAD VIRTUAL (WebXR) — gafas Meta Quest desde su navegador
+//  La sesión debe pedirse dentro de un clic del usuario.
+// =====================================================================
+const OPCIONES_XR = { optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking'] };
+const pedirSesionVR = () => navigator.xr.requestSession('immersive-vr', OPCIONES_XR);
+
+function useVRSoportado() {
+    const [ok, setOk] = useState(false);
+    useEffect(() => {
+        let vivo = true;
+        if (typeof navigator !== 'undefined' && navigator.xr && navigator.xr.isSessionSupported) {
+            navigator.xr.isSessionSupported('immersive-vr').then(r => { if (vivo) setOk(!!r); }).catch(() => { });
+        }
+        return () => { vivo = false; };
+    }, []);
+    return ok;
+}
+
+// =====================================================================
 //  MOTOR DEL SHOOTER (Three.js) — se monta cuando gameState === 'PLAYING'
 //  Devuelve una función de limpieza.
 // =====================================================================
-function montarMotor({ root, preguntasInput, onEnd, onScore }) {
+function montarMotor({ root, preguntasInput, onEnd, onScore, xrSession = null }) {
     const VEL_ENEMIGO = 0.9;
-    const CASTIGO_CORRECTA = 25;
+    const CASTIGO_CORRECTA = 25; // vida que pierdes al disparar a la respuesta correcta
+    const CASTIGO_PUNTOS = 10;   // puntos que se restan por lo mismo (una baja suma 10)
     const ARENA = 22;
     const AMMO_MAX = 12;
 
@@ -244,7 +266,12 @@ function montarMotor({ root, preguntasInput, onEnd, onScore }) {
 
     // ===== Audio =====
     let actx = null;
-    function audio() { if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); return actx; }
+    function audio() {
+        if (actx && actx.state === 'closed') return null; // partida terminada: los sonidos con retardo ya no suenan
+        if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+        if (actx.state === 'suspended') actx.resume();
+        return actx;
+    }
     function beep({ f = 440, f2 = null, t = 0.1, type = 'square', vol = 0.15 }) {
         try {
             const c = audio(); const o = c.createOscillator(); const g = c.createGain();
@@ -291,11 +318,13 @@ function montarMotor({ root, preguntasInput, onEnd, onScore }) {
     renderer.shadowMap.enabled = true; renderer.shadowMap.type = IS_TOUCH ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
     renderer.domElement.style.cssText = 'position:absolute;inset:0;z-index:0;display:block;';
     root.insertBefore(renderer.domElement, root.firstChild);
-    const onResize = () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); };
+    renderer.xr.enabled = true;
+    renderer.xr.setReferenceSpaceType('local-floor'); // en VR la altura de la cámara es la real del jugador
+    const onResize = () => { if (renderer.xr.isPresenting) return; camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); };
     on(window, 'resize', onResize);
 
     scene.add(new THREE.AmbientLight(0x445566, 0.55));
-    scene.add(new THREE.HemisphereLight(0x9fd8ff, 0x0a1418, 0.55)); // cielo/suelo → gradiente suave
+    const hemi = new THREE.HemisphereLight(0x9fd8ff, 0x0a1418, 0.55); scene.add(hemi); // cielo/suelo → gradiente suave
     const key = new THREE.PointLight(0x7fffb0, 1.2, 34); key.position.set(0, 9, 0); scene.add(key);
     const sun = new THREE.DirectionalLight(0xdff0ff, 0.75); sun.position.set(8, 14, 6); scene.add(sun);
     sun.castShadow = true; sun.shadow.mapSize.set(IS_TOUCH ? 1024 : 2048, IS_TOUCH ? 1024 : 2048);
@@ -333,9 +362,10 @@ function montarMotor({ root, preguntasInput, onEnd, onScore }) {
     ceil.rotation.x = Math.PI / 2; ceil.position.y = 6; scene.add(ceil);
     const beamMat = new THREE.MeshStandardMaterial({ color: 0x1a2328, roughness: .7, metalness: .3 });
     for (let i = -ARENA + 4; i < ARENA; i += 8) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.5, ARENA * 2), beamMat); b.position.set(i, 5.75, 0); scene.add(b); const b2 = new THREE.Mesh(new THREE.BoxGeometry(ARENA * 2, 0.5, 0.4), beamMat); b2.position.set(0, 5.75, i); scene.add(b2); }
+    const lampLights = [];
     for (let x = -14; x <= 14; x += 14) for (let z = -14; z <= 14; z += 14) {
         const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.1, 0.5), new THREE.MeshBasicMaterial({ color: 0xd8fff0 })); lamp.position.set(x, 5.45, z); scene.add(lamp);
-        const pl = new THREE.PointLight(0xa8ffd0, 0.35, 16); pl.position.set(x, 5.2, z); scene.add(pl);
+        const pl = new THREE.PointLight(0xa8ffd0, 0.35, 16); pl.position.set(x, 5.2, z); scene.add(pl); lampLights.push(pl);
     }
 
     const wallMat = new THREE.MeshStandardMaterial({ map: wallTex, roughness: .85 });
@@ -388,7 +418,10 @@ function montarMotor({ root, preguntasInput, onEnd, onScore }) {
     gun.add(mkPart(new THREE.BoxGeometry(0.03, 0.03, 0.2), new THREE.MeshBasicMaterial({ color: 0x7fffb0 }), 0, 0.06, -0.15));
     const flash = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 8), new THREE.MeshBasicMaterial({ color: 0xfff2a0 })); flash.position.set(0, 0, -0.65); flash.visible = false; gun.add(flash);
     gun.position.set(0.28, -0.28, -0.6);
-    camera.add(gun); scene.add(camera);
+    // "rig" = el jugador. La cámara va dentro: en VR las gafas la mueven dentro del rig.
+    const rig = new THREE.Group();
+    rig.add(camera); camera.add(gun); scene.add(rig);
+    const playerPos = new THREE.Vector3(0, 1.7, 0); // posición real de la cabeza (se actualiza cada frame)
     const muzzleLight = new THREE.PointLight(0xffe08a, 0, 8); scene.add(muzzleLight);
     let gunKick = 0, bob = 0;
 
@@ -396,6 +429,9 @@ function montarMotor({ root, preguntasInput, onEnd, onScore }) {
     let hp = 100, ammo = 12;
     let reloading = false, score = 0, wave = 1, gameOver = false, running = false;
     let shakeT = 0, shakeA = 0;
+    let panelSucio = true, vrToast = '', vrToastHasta = 0; // panel 3D de VR
+    // Preguntas acertadas = superadas sin haber disparado a la respuesta correcta
+    let acertadas = 0, falladas = 0, falloEnPregunta = false;
     const hpFill = $('hp-fill'), ammoTxt = $('ammo-txt'), scoreNum = $('score-num'), waveNum = $('wave-num'),
         hitFlash = $('hit-flash'), healFlash = $('heal-flash'), waveToast = $('wave-toast'), crosshair = $('crosshair'),
         lowhp = $('lowhp'), qEl = $('question'), clickHint = $('click-hint');
@@ -406,9 +442,13 @@ function montarMotor({ root, preguntasInput, onEnd, onScore }) {
         lowhp.style.background = hp <= 35 ? 'radial-gradient(ellipse at center, transparent 45%, rgba(255,40,40,.45) 100%)' : 'radial-gradient(ellipse at center, transparent 50%, rgba(255,40,40,0) 100%)';
         ammoTxt.innerHTML = (reloading ? '··' : ammo) + `<small>/${AMMO_MAX}</small>`;
         scoreNum.textContent = score; waveNum.textContent = wave;
+        panelSucio = true;
         onScore(score);
     }
-    function toast(txt) { waveToast.textContent = txt; waveToast.style.opacity = 1; setTimeout(() => waveToast.style.opacity = 0, 1600); }
+    function toast(txt) {
+        waveToast.textContent = txt; waveToast.style.opacity = 1; setTimeout(() => waveToast.style.opacity = 0, 1600);
+        vrToast = txt; vrToastHasta = performance.now() + 1600; panelSucio = true;
+    }
     function reload() {
         if (reloading || ammo === AMMO_MAX || gameOver || !running) return;
         reloading = true; SFX.reload(); updateHUD();
@@ -502,30 +542,7 @@ function montarMotor({ root, preguntasInput, onEnd, onScore }) {
     // ===== Enemigos =====
     const GRUNT = { color: 0xd23c3c, glow: 0xff5b5b, hp: 30, speed: 1.6, scale: 1.0, dmg: 8, pts: 10 };
     const enemies = [];
-    function buildEnemy(T) {
-        const g = new THREE.Group();
-        const armor = new THREE.MeshStandardMaterial({ color: T.color, roughness: .5, metalness: .35, emissive: T.color, emissiveIntensity: .15 });
-        const dark = new THREE.MeshStandardMaterial({ color: 0x1a1f24, roughness: .8, metalness: .4 });
-        const glowM = new THREE.MeshBasicMaterial({ color: T.glow });
-        const part = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); g.add(m); return m; };
-        const torso = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.8, 0.45), armor); torso.position.y = 1.15; g.add(torso);
-        part(new THREE.BoxGeometry(0.3, 0.25, 0.05), glowM, 0, 1.2, 0.25);
-        part(new THREE.BoxGeometry(0.5, 0.3, 0.4), dark, 0, 0.65, 0);
-        part(new THREE.BoxGeometry(0.42, 0.4, 0.42), dark, 0, 1.8, 0);
-        part(new THREE.BoxGeometry(0.34, 0.1, 0.06), glowM, 0, 1.82, 0.22);
-        const horn1 = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.25, 0.08), armor); horn1.position.set(-0.18, 2.05, 0); g.add(horn1);
-        const horn2 = horn1.clone(); horn2.position.x = 0.18; g.add(horn2);
-        const sh1 = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.22, 0.5), armor); sh1.position.set(-0.48, 1.5, 0); g.add(sh1);
-        const sh2 = sh1.clone(); sh2.position.x = 0.48; g.add(sh2);
-        const mkArm = (side) => { const p = new THREE.Group(); p.position.set(0.48 * side, 1.45, 0); const a = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.7, 0.2), dark); a.position.y = -0.4; p.add(a); const claw = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.18, 0.24), armor); claw.position.y = -0.8; p.add(claw); g.add(p); return p; };
-        const armL = mkArm(-1), armR = mkArm(1);
-        const mkLeg = (side) => { const p = new THREE.Group(); p.position.set(0.18 * side, 0.55, 0); const l = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.55, 0.25), dark); l.position.y = -0.28; p.add(l); const boot = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.14, 0.34), armor); boot.position.set(0, -0.55, 0.04); p.add(boot); g.add(p); return p; };
-        const legL = mkLeg(-1), legR = mkLeg(1);
-        const blob = new THREE.Mesh(new THREE.CircleGeometry(0.55, 14), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: .45 })); blob.rotation.x = -Math.PI / 2; blob.position.y = 0.02; g.add(blob);
-        g.scale.setScalar(T.scale);
-        g.traverse(o => { if (o.isMesh) o.castShadow = true; });
-        return { g, limbs: { armL, armR, legL, legR }, flashable: [armor], glowM, height: 2.1 * T.scale };
-    }
+    // buildEnemy está definido fuera del motor (lo reutilizan las pantallas finales)
     function makeLabel(text) {
         const c = document.createElement('canvas'); const g = c.getContext('2d');
         g.font = 'bold 64px Courier New, monospace';
@@ -561,7 +578,8 @@ function montarMotor({ root, preguntasInput, onEnd, onScore }) {
     function spawnWave() {
         if (wave > orden.length) { winGame(); return; }
         preguntaActual = PREGUNTAS[orden[wave - 1]];
-        qEl.textContent = preguntaActual.q;
+        qEl.textContent = preguntaActual.q; panelSucio = true;
+        falloEnPregunta = false;
         let respuestas = [{ t: preguntaActual.ok, ok: true }, ...preguntaActual.mal.slice(0, 3).map(t => ({ t, ok: false }))];
         for (let i = respuestas.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [respuestas[i], respuestas[j]] = [respuestas[j], respuestas[i]]; }
         const n = respuestas.length;
@@ -596,7 +614,8 @@ function montarMotor({ root, preguntasInput, onEnd, onScore }) {
     }
     function impactoEnemigo(e, point) {
         if (e.isCorrect) {
-            SFX.hurt(); damagePlayer(CASTIGO_CORRECTA); toast('¡ESA ERA LA CORRECTA!');
+            score -= CASTIGO_PUNTOS; falloEnPregunta = true;
+            SFX.hurt(); damagePlayer(CASTIGO_CORRECTA); toast(`¡ESA ERA LA CORRECTA! −${CASTIGO_PUNTOS} PTS`);
             e.flashable.forEach(m => { m.emissive.setHex(0x7fffb0); m.emissiveIntensity = 1.5; }); setTimeout(() => e.flashable.forEach(m => { m.emissive.setHex(GRUNT.color); m.emissiveIntensity = .15; }), 250);
         } else {
             e.hp -= 15; SFX.hit(); sparks(point, 0xff5b5b);
@@ -607,10 +626,17 @@ function montarMotor({ root, preguntasInput, onEnd, onScore }) {
     }
     // Busca a qué apunta el centro de la pantalla (mismo cálculo para la mira y el disparo).
     // Devuelve { hitEnemy, hitPoint, wallHits, ray }.
+    const tmpM = new THREE.Matrix4();
     function buscarObjetivo() {
-        raycaster.setFromCamera({ x: 0, y: 0 }, camera);
+        if (renderer.xr.isPresenting && manoActiva) {
+            // En VR se apunta con el mando (rayo que sale hacia delante desde la mano)
+            rig.updateMatrixWorld(true);
+            raycaster.ray.origin.setFromMatrixPosition(manoActiva.matrixWorld);
+            raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tmpM.identity().extractRotation(manoActiva.matrixWorld));
+            raycaster.camera = camera; // necesario para intersectar los sprites de las etiquetas
+        } else raycaster.setFromCamera({ x: 0, y: 0 }, camera);
         const ray = raycaster.ray;
-        const hits = raycaster.intersectObjects(enemies.map(e => e.mesh), true);
+        const hits = raycaster.intersectObjects(enemies.map(e => e.mesh), true).filter(h => h.object.userData.enemy);
         const wallHits = raycaster.intersectObjects(covers.map(c => c.mesh).concat(wallMeshes), false);
         const wallDist = wallHits.length ? wallHits[0].distance : Infinity;
 
@@ -639,18 +665,30 @@ function montarMotor({ root, preguntasInput, onEnd, onScore }) {
     }
     // Actualiza el color de la mira según a qué apuntas (llamado cada frame)
     function actualizarMira() {
-        const { hitEnemy } = buscarObjetivo();
+        const { hitEnemy, hitPoint, wallHits, ray } = buscarObjetivo();
         crosshair.classList.toggle('lock', !!hitEnemy && !hitEnemy.isCorrect);
         crosshair.classList.toggle('lock-bad', !!hitEnemy && !!hitEnemy.isCorrect);
+        if (renderer.xr.isPresenting && manoActiva) {
+            // Láser + punto de mira en VR, con el mismo código de colores que la mira 2D
+            const col = hitEnemy ? (hitEnemy.isCorrect ? 0xff5b5b : 0xffb84d) : 0x7fffb0;
+            laser.material.color.setHex(col); punto.material.color.setHex(col);
+            const dist = hitEnemy ? ray.origin.distanceTo(hitPoint) : (wallHits.length ? wallHits[0].distance : 30);
+            laser.scale.z = Math.max(0.01, dist - 0.4);
+            punto.position.set(0, 0, -dist);
+            punto.scale.setScalar(hitEnemy ? 1.6 : 1);
+            laser.visible = punto.visible = true;
+        }
     }
     function shoot() {
         if (gameOver || !running || reloading) return;
         if (ammo <= 0) { SFX.empty(); return; }
         ammo--; SFX.shoot(); updateHUD();
         gunKick = 1; flash.visible = true; setTimeout(() => { flash.visible = false; }, 50);
-        muzzleLight.position.copy(camera.position); muzzleLight.intensity = 2.5; setTimeout(() => muzzleLight.intensity = 0, 60);
+        muzzleLight.position.copy(playerPos); muzzleLight.intensity = 2.5; setTimeout(() => muzzleLight.intensity = 0, 60);
         const { hitEnemy, hitPoint, wallHits, ray } = buscarObjetivo();
-        const muzzle = new THREE.Vector3(0.28, -0.2, -1.1).applyMatrix4(camera.matrixWorld);
+        const enVR = renderer.xr.isPresenting && manoActiva;
+        const muzzle = enVR ? flash.getWorldPosition(new THREE.Vector3()) : new THREE.Vector3(0.28, -0.2, -1.1).applyMatrix4(camera.matrixWorld);
+        if (enVR) vibrar(manoActiva, 0.6, 50);
         const endPt = hitEnemy ? hitPoint : (wallHits.length ? wallHits[0].point : ray.at(60, new THREE.Vector3()));
         tracer(muzzle, endPt);
         if (!hitEnemy && wallHits.length) sparks(wallHits[0].point, 0xffb84d);
@@ -663,6 +701,7 @@ function montarMotor({ root, preguntasInput, onEnd, onScore }) {
         score += e.pts; SFX.kill(); updateHUD();
         if (Math.random() < 0.15 && packs.length < 2) spawnPack();
         if (wrongLeft() === 0 && running) {
+            if (falloEnPregunta) falladas++; else acertadas++;
             enemies.forEach(c => { c.flashable.forEach(m => { m.emissive.setHex(0x7fffb0); m.emissiveIntensity = 1.2; }); c.leaving = true; });
             toast('¡CORRECTO: ' + preguntaActual.ok.toUpperCase() + '!');
             setTimeout(() => { if (killed) return; enemies.forEach(c => scene.remove(c.mesh)); enemies.length = 0; wave++; spawnWave(); }, 1600);
@@ -671,17 +710,208 @@ function montarMotor({ root, preguntasInput, onEnd, onScore }) {
     function damagePlayer(n) {
         hp -= n; SFX.hurt(); shakeT = 0.25; shakeA = 0.04;
         hitFlash.style.background = 'rgba(255,60,60,.4)'; setTimeout(() => hitFlash.style.background = 'rgba(255,60,60,0)', 130);
+        if (renderer.xr.isPresenting) { tintarVR(0xff3c3c, 0.45); manos.forEach(m => vibrar(m, 1, 140)); }
         updateHUD();
         if (hp <= 0 && !gameOver) endGame();
     }
 
+    // ===== Realidad virtual (WebXR) =====
+    const SPEED_VR = 3; // más lento que en 2D: moverse con el stick marea menos
+    const UP = new THREE.Vector3(0, 1, 0), tmpV = new THREE.Vector3(), tmpV2 = new THREE.Vector3();
+
+    // Panel flotante con pregunta + marcadores (el HUD HTML no se ve dentro de las gafas)
+    const vrCanvas = document.createElement('canvas'); vrCanvas.width = 1024; vrCanvas.height = 420;
+    const vrCtx = vrCanvas.getContext('2d');
+    const vrTex = new THREE.CanvasTexture(vrCanvas); vrTex.minFilter = THREE.LinearFilter;
+    if ('colorSpace' in vrTex) vrTex.colorSpace = THREE.SRGBColorSpace;
+    const vrPanel = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 1.7 * 420 / 1024), new THREE.MeshBasicMaterial({ map: vrTex, transparent: true, depthTest: false, depthWrite: false, toneMapped: false }));
+    vrPanel.renderOrder = 20; vrPanel.visible = false; scene.add(vrPanel);
+    let hudYaw = null, hudSiguiendo = true;
+
+    function lineasTexto(g, txt, maxW) {
+        const out = []; let cur = '';
+        String(txt).split(/\s+/).forEach(w => { const t = cur ? cur + ' ' + w : w; if (cur && g.measureText(t).width > maxW) { out.push(cur); cur = w; } else cur = t; });
+        if (cur) out.push(cur);
+        return out;
+    }
+    function dibujarPanelVR() {
+        const g = vrCtx, W = vrCanvas.width, H = vrCanvas.height;
+        g.clearRect(0, 0, W, H);
+        g.fillStyle = 'rgba(5,7,10,0.85)'; g.fillRect(0, 0, W, H);
+        g.strokeStyle = '#263238'; g.lineWidth = 4; g.strokeRect(2, 2, W - 4, H - 4);
+        g.fillStyle = '#7fffb0'; g.fillRect(W / 2 - 50, 22, 100, 5);
+        g.textAlign = 'center'; g.textBaseline = 'middle';
+        // Pregunta: hasta 3 líneas, reduciendo la letra si no cabe
+        let fs = 64, ls;
+        for (; ;) { g.font = `bold ${fs}px Courier New, monospace`; ls = lineasTexto(g, preguntaActual ? preguntaActual.q : '', W - 80); if (ls.length <= 3 || fs <= 32) break; fs -= 6; }
+        ls = ls.slice(0, 3);
+        const lh = fs * 1.15, y0 = 145 - (ls.length - 1) * lh / 2;
+        g.fillStyle = '#e7f3ec'; ls.forEach((l, i) => g.fillText(l, W / 2, y0 + i * lh));
+        if (vrToast) { g.font = 'bold 40px Courier New, monospace'; g.fillStyle = '#7fffb0'; g.fillText(vrToast, W / 2, 285); }
+        // Marcadores
+        const by = 362;
+        g.textAlign = 'left'; g.font = '28px Courier New, monospace'; g.fillStyle = '#5c6b70'; g.fillText('VIDA', 40, by);
+        g.fillStyle = '#12181b'; g.fillRect(125, by - 14, 280, 28);
+        g.fillStyle = hp > 35 ? '#7fffb0' : '#ff5b5b'; g.fillRect(125, by - 14, 280 * Math.max(0, hp) / 100, 28);
+        g.fillStyle = '#5c6b70'; g.fillText('BALAS', 440, by);
+        g.fillStyle = '#ffb84d'; g.font = 'bold 40px Courier New, monospace'; g.fillText(reloading ? '··' : String(ammo), 545, by);
+        g.textAlign = 'right'; g.font = '28px Courier New, monospace'; g.fillStyle = '#5c6b70'; g.fillText(`P ${Math.min(wave, orden.length)}/${orden.length} · PUNTOS`, W - 110, by);
+        g.fillStyle = '#e7f3ec'; g.font = 'bold 40px Courier New, monospace'; g.fillText(String(score), W - 40, by);
+        vrTex.needsUpdate = true;
+    }
+
+    // Tinte de pantalla (daño / curación / poca vida): esfera alrededor de la cabeza
+    const tinteVR = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 12), new THREE.MeshBasicMaterial({ color: 0xff3c3c, transparent: true, opacity: 0, side: THREE.BackSide, depthTest: false, depthWrite: false, toneMapped: false }));
+    tinteVR.renderOrder = 30; tinteVR.visible = false; camera.add(tinteVR);
+    let tinteA = 0;
+    function tintarVR(color, a) { tinteVR.material.color.setHex(color); tinteA = a; }
+
+    function actualizarPanelVR(dt) {
+        if (vrToast && performance.now() > vrToastHasta) { vrToast = ''; panelSucio = true; }
+        if (panelSucio) { dibujarPanelVR(); panelSucio = false; }
+        // El panel sigue la mirada con retraso (solo cuando te giras bastante), sin ir pegado a la cara
+        camera.getWorldDirection(tmpV);
+        const yawCabeza = Math.atan2(-tmpV.x, -tmpV.z);
+        if (hudYaw === null) hudYaw = yawCabeza;
+        const d = Math.atan2(Math.sin(yawCabeza - hudYaw), Math.cos(yawCabeza - hudYaw));
+        if (Math.abs(d) > 0.6) hudSiguiendo = true;
+        if (hudSiguiendo) { hudYaw += d * Math.min(1, dt * 3); if (Math.abs(d) < 0.05) hudSiguiendo = false; }
+        vrPanel.position.set(playerPos.x - Math.sin(hudYaw) * 2.4, playerPos.y + 0.65, playerPos.z - Math.cos(hudYaw) * 2.4);
+        vrPanel.lookAt(playerPos);
+        // Tinte
+        tinteA = Math.max(0, tinteA - dt * 2.5);
+        const baseA = hp <= 35 && running ? 0.1 : 0;
+        if (tinteA < baseA) { tinteVR.material.color.setHex(0xff3c3c); tinteA = baseA; }
+        tinteVR.material.opacity = tinteA; tinteVR.visible = tinteA > 0.005;
+    }
+
+    // Mandos: el que aprieta el gatillo lleva el arma y el láser
+    let manoActiva = null;
+    const laser = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -1)]), new THREE.LineBasicMaterial({ color: 0x7fffb0, transparent: true, opacity: 0.7, toneMapped: false }));
+    laser.position.z = -0.4;
+    const punto = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), new THREE.MeshBasicMaterial({ color: 0x7fffb0, depthTest: false, toneMapped: false }));
+    punto.renderOrder = 15;
+    laser.visible = punto.visible = false;
+    function usarMano(c) {
+        manoActiva = c;
+        c.add(gun); c.add(laser); c.add(punto);
+        gun.position.set(0, 0, 0.08); gun.rotation.set(0, 0, 0); gun.scale.setScalar(0.7); // cañón alineado con el rayo
+    }
+    function vibrar(c, fuerza, ms) {
+        const gp = c && c.userData.gamepad; if (!gp) return;
+        try {
+            if (gp.hapticActuators && gp.hapticActuators[0]) gp.hapticActuators[0].pulse(fuerza, ms);
+            else if (gp.vibrationActuator) gp.vibrationActuator.playEffect('dual-rumble', { duration: ms, strongMagnitude: fuerza, weakMagnitude: fuerza });
+        } catch (e) { }
+    }
+    const manos = [0, 1].map(i => {
+        const c = renderer.xr.getController(i);
+        const cuerpo = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.035, 0.12), new THREE.MeshStandardMaterial({ color: 0x3a464c, roughness: .6 }));
+        cuerpo.position.z = 0.06; c.add(cuerpo);
+        c.addEventListener('connected', e => {
+            c.userData.conectado = true; c.userData.gamepad = e.data.gamepad || null; c.userData.hand = e.data.handedness;
+            if (e.data.handedness === 'right' || !manoActiva) usarMano(c);
+        });
+        c.addEventListener('disconnected', () => {
+            c.userData.conectado = false; c.userData.gamepad = null;
+            if (manoActiva === c) { const otra = manos.find(m => m !== c && m.userData.conectado); if (otra) usarMano(otra); }
+        });
+        c.addEventListener('selectstart', () => { audio(); if (manoActiva !== c) usarMano(c); shoot(); });
+        c.addEventListener('squeezestart', () => reload());
+        rig.add(c);
+        return c;
+    });
+
+    // Sticks: izquierdo = moverse hacia donde miras · derecho = giro a saltos de 45° · A/B/X/Y = recargar
+    let giroListo = true, recargaPrev = false;
+    function controlesVR(dt) {
+        let mx = 0, my = 0, gx = 0, recarga = false;
+        manos.forEach(m => {
+            const gp = m.userData.gamepad; if (!gp || !gp.axes) return;
+            const ax = gp.axes.length >= 4 ? gp.axes[2] : (gp.axes[0] || 0);
+            const ay = gp.axes.length >= 4 ? gp.axes[3] : (gp.axes[1] || 0);
+            if (m.userData.hand === 'left') { mx = ax; my = ay; } else gx = ax;
+            if (gp.buttons && [4, 5].some(b => gp.buttons[b] && gp.buttons[b].pressed)) recarga = true;
+        });
+        if (recarga && !recargaPrev) reload();
+        recargaPrev = recarga;
+
+        if (Math.abs(gx) < 0.3) giroListo = true;
+        else if (giroListo && Math.abs(gx) > 0.7) {
+            giroListo = false;
+            const ang = gx > 0 ? -Math.PI / 4 : Math.PI / 4;
+            // girar el rig alrededor de la cabeza (no del centro del rig)
+            tmpV.set(rig.position.x - playerPos.x, 0, rig.position.z - playerPos.z).applyAxisAngle(UP, ang);
+            rig.position.x = playerPos.x + tmpV.x; rig.position.z = playerPos.z + tmpV.z;
+            rig.rotation.y += ang;
+        }
+
+        if (Math.hypot(mx, my) < 0.15) return;
+        camera.getWorldDirection(tmpV); tmpV.y = 0;
+        if (tmpV.lengthSq() < 1e-4) return;
+        tmpV.normalize();
+        const der = tmpV2.set(-tmpV.z, 0, tmpV.x);
+        const k = SPEED_VR * dt;
+        const nx = Math.max(-ARENA + 1.2, Math.min(ARENA - 1.2, playerPos.x + (tmpV.x * -my + der.x * mx) * k));
+        const nz = Math.max(-ARENA + 1.2, Math.min(ARENA - 1.2, playerPos.z + (tmpV.z * -my + der.z * mx) * k));
+        if (!collides(nx, playerPos.z)) rig.position.x += nx - playerPos.x;
+        if (!collides(playerPos.x, nz)) rig.position.z += nz - playerPos.z;
+    }
+
+    // Entrar/salir de VR: ajustes de rendimiento para Quest y restaurar la vista 2D al salir
+    function modoVR(activo) {
+        vrPanel.visible = activo;
+        sun.castShadow = !activo;
+        lampLights.forEach(l => l.visible = !activo);
+        muzzleLight.visible = !activo;
+        hemi.intensity = activo ? 1.1 : 0.55;
+        crosshair.style.display = activo ? 'none' : '';
+        if (activo) {
+            renderer.xr.setFoveation(1);
+            hudYaw = null; hudSiguiendo = true; panelSucio = true;
+        } else {
+            camera.getWorldDirection(tmpV);
+            yaw = tYaw = Math.atan2(-tmpV.x, -tmpV.z); pitch = tPitch = 0;
+            rig.position.set(playerPos.x, 0, playerPos.z); rig.rotation.set(0, 0, 0);
+            camera.position.set(0, 1.7, 0); camera.fov = 75; camera.zoom = 1;
+            laser.removeFromParent(); punto.removeFromParent(); manoActiva = null;
+            camera.add(gun); gun.scale.setScalar(1); gun.rotation.set(0, 0, 0); gun.position.set(0.28, -0.28, -0.6);
+            tinteVR.visible = false; tinteA = 0;
+            onResize();
+        }
+    }
+    const onXRStart = () => modoVR(true), onXREnd = () => modoVR(false);
+    renderer.xr.addEventListener('sessionstart', onXRStart);
+    renderer.xr.addEventListener('sessionend', onXREnd);
+    disposeFns.push(() => { renderer.xr.removeEventListener('sessionstart', onXRStart); renderer.xr.removeEventListener('sessionend', onXREnd); });
+
+    async function entrarVR(session) {
+        try {
+            await renderer.xr.setSession(session);
+        } catch (err) {
+            // Sin 'local-floor': usar 'local' y subir el rig a la altura de los ojos
+            try { renderer.xr.setReferenceSpaceType('local'); await renderer.xr.setSession(session); rig.position.y = 1.6; }
+            catch (e2) { console.error('WebXR', e2); try { session.end(); } catch (e3) { } }
+        }
+    }
+    // Botón "VR" dentro de la partida (p. ej. si se entró por enlace directo sin pasar por el tutorial)
+    const vrBtn = $('vr-btn');
+    if (vrBtn && navigator.xr && navigator.xr.isSessionSupported) {
+        navigator.xr.isSessionSupported('immersive-vr').then(ok => { if (ok && !killed) vrBtn.hidden = false; }).catch(() => { });
+        on(vrBtn, 'click', () => {
+            if (renderer.xr.isPresenting) return;
+            pedirSesionVR().then(s => { if (killed) { s.end(); return; } entrarVR(s); }).catch(err => console.warn('No se pudo abrir VR', err));
+        });
+    }
+
     // ===== Bucle =====
-    const clock = new THREE.Clock(); const SPEED = 5.5;
+    const timer = new THREE.Timer(); const SPEED = 5.5;
+    disposeFns.push(() => timer.dispose());
     function collides(x, z) {
         for (const c of covers) if (Math.abs(x - c.mesh.position.x) < c.hw && Math.abs(z - c.mesh.position.z) < c.hd) return true;
         return false;
     }
-    let killed = false, rafId = 0;
+    let killed = false;
     const mmC = $('minimap'), mm = mmC.getContext('2d');
     function drawMinimap() {
         const S = mmC.width, k = S / (ARENA * 2);
@@ -690,7 +920,7 @@ function montarMotor({ root, preguntasInput, onEnd, onScore }) {
         covers.forEach(c => mm.fillRect((c.mesh.position.x - c.hw + 0.5 + ARENA) * k, (c.mesh.position.z - c.hd + 0.5 + ARENA) * k, (c.hw - 0.5) * 2 * k, (c.hd - 0.5) * 2 * k));
         packs.forEach(p => { mm.fillStyle = '#7fffb0'; mm.fillRect((p.position.x + ARENA) * k - 2, (p.position.z + ARENA) * k - 2, 4, 4); });
         enemies.forEach(e => { mm.fillStyle = '#' + e.color.toString(16).padStart(6, '0'); mm.beginPath(); mm.arc((e.mesh.position.x + ARENA) * k, (e.mesh.position.z + ARENA) * k, 2.6, 0, 7); mm.fill(); });
-        const px = (camera.position.x + ARENA) * k, pz = (camera.position.z + ARENA) * k;
+        const px = (playerPos.x + ARENA) * k, pz = (playerPos.z + ARENA) * k;
         mm.save(); mm.translate(px, pz); mm.rotate(-yaw);
         mm.fillStyle = '#e7f3ec'; mm.beginPath(); mm.moveTo(0, -7); mm.lineTo(5, 5); mm.lineTo(0, 2); mm.lineTo(-5, 5); mm.closePath(); mm.fill();
         mm.strokeStyle = 'rgba(231,243,236,.25)'; mm.beginPath(); mm.moveTo(0, 0); mm.lineTo(-14, -28); mm.lineTo(14, -28); mm.closePath(); mm.stroke();
@@ -699,47 +929,58 @@ function montarMotor({ root, preguntasInput, onEnd, onScore }) {
     }
     function animate() {
         if (killed) return;
-        rafId = requestAnimationFrame(animate);
-        const dt = Math.min(clock.getDelta(), 0.05);
-        // Giro y mira por teclado (flechas ←/→ giran, W/S suben/bajan) — coexiste con el táctil
-        if (running && !gameOver) {
-            const TURN = 2.0 * SENS, AIM = 1.5 * SENS;
-            if (look.l) tYaw += TURN * dt;
-            if (look.r) tYaw -= TURN * dt;
-            if (look.up) tPitch = Math.min(1.3, tPitch + AIM * dt);
-            if (look.down) tPitch = Math.max(-1.3, tPitch - AIM * dt);
-        }
-        const sm = 1 - Math.pow(0.001, dt);
-        yaw += (tYaw - yaw) * sm; pitch += (tPitch - pitch) * sm;
-        if (ASSIST && running && !gameOver) {
-            let best = null, bestA = 0.14;
-            enemies.forEach(e => { if (e.leaving) return; const v = new THREE.Vector3(e.mesh.position.x, e.h * 0.55, e.mesh.position.z).sub(camera.position); const d = v.length(); const fw = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(pitch, yaw, 0, 'YXZ')); const ang = fw.angleTo(v); if (ang < bestA && d < 18) { best = v; bestA = ang; } });
-            if (best) { const ty = Math.atan2(-best.x, -best.z), tp = Math.atan2(best.y, Math.hypot(best.x, best.z)); let dy = ty - yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); tYaw += dy * dt * 2.2; yaw += dy * dt * 2.2; tPitch += (tp - pitch) * dt * 1.5; pitch += (tp - pitch) * dt * 1.5; }
-        }
-        camera.rotation.set(pitch, yaw, 0, 'YXZ');
+        timer.update();
+        const dt = Math.min(timer.getDelta(), 0.05);
+        const vr = renderer.xr.isPresenting;
+        camera.getWorldPosition(playerPos);
+
+        if (!vr) {
+            // Giro y mira por teclado (flechas ←/→ giran, W/S suben/bajan) — coexiste con el táctil
+            if (running && !gameOver) {
+                const TURN = 2.0 * SENS, AIM = 1.5 * SENS;
+                if (look.l) tYaw += TURN * dt;
+                if (look.r) tYaw -= TURN * dt;
+                if (look.up) tPitch = Math.min(1.3, tPitch + AIM * dt);
+                if (look.down) tPitch = Math.max(-1.3, tPitch - AIM * dt);
+            }
+            const sm = 1 - Math.pow(0.001, dt);
+            yaw += (tYaw - yaw) * sm; pitch += (tPitch - pitch) * sm;
+            if (ASSIST && running && !gameOver) {
+                let best = null, bestA = 0.14;
+                enemies.forEach(e => { if (e.leaving) return; const v = new THREE.Vector3(e.mesh.position.x, e.h * 0.55, e.mesh.position.z).sub(playerPos); const d = v.length(); const fw = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(pitch, yaw, 0, 'YXZ')); const ang = fw.angleTo(v); if (ang < bestA && d < 18) { best = v; bestA = ang; } });
+                if (best) { const ty = Math.atan2(-best.x, -best.z), tp = Math.atan2(best.y, Math.hypot(best.x, best.z)); let dy = ty - yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); tYaw += dy * dt * 2.2; yaw += dy * dt * 2.2; tPitch += (tp - pitch) * dt * 1.5; pitch += (tp - pitch) * dt * 1.5; }
+            }
+            camera.rotation.set(pitch, yaw, 0, 'YXZ');
+        } else if (running && !gameOver) controlesVR(dt);
 
         if (running && !gameOver) {
-            const fwd = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw)), right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
-            const dir = new THREE.Vector3();
-            if (move.f) dir.add(fwd); if (move.b) dir.sub(fwd);
-            if (IS_TOUCH) { dir.add(fwd.clone().multiplyScalar(-joyY)); dir.add(right.clone().multiplyScalar(joyX)); }
-            const moving = dir.lengthSq() > 0.01;
-            if (dir.lengthSq() > 1) dir.normalize();
-            const step = dir.multiplyScalar(SPEED * dt);
-            let nx = Math.max(-ARENA + 1.2, Math.min(ARENA - 1.2, camera.position.x + step.x));
-            let nz = Math.max(-ARENA + 1.2, Math.min(ARENA - 1.2, camera.position.z + step.z));
-            if (!collides(nx, camera.position.z)) camera.position.x = nx;
-            if (!collides(camera.position.x, nz)) camera.position.z = nz;
-
-            bob += (moving ? dt * 10 : 0);
             gunKick = Math.max(0, gunKick - dt * 8);
-            gun.position.set(0.28 + Math.sin(bob) * 0.012, -0.28 + Math.abs(Math.cos(bob)) * 0.015 + gunKick * 0.06, -0.6 + gunKick * 0.12);
-            gun.rotation.x = gunKick * 0.35;
-            if (shakeT > 0) { shakeT -= dt; camera.position.y = 1.7 + (Math.random() - .5) * shakeA; } else camera.position.y = 1.7;
+            if (!vr) {
+                const fwd = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw)), right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+                const dir = new THREE.Vector3();
+                if (move.f) dir.add(fwd); if (move.b) dir.sub(fwd);
+                if (IS_TOUCH) { dir.add(fwd.clone().multiplyScalar(-joyY)); dir.add(right.clone().multiplyScalar(joyX)); }
+                const moving = dir.lengthSq() > 0.01;
+                if (dir.lengthSq() > 1) dir.normalize();
+                const step = dir.multiplyScalar(SPEED * dt);
+                let nx = Math.max(-ARENA + 1.2, Math.min(ARENA - 1.2, rig.position.x + step.x));
+                let nz = Math.max(-ARENA + 1.2, Math.min(ARENA - 1.2, rig.position.z + step.z));
+                if (!collides(nx, rig.position.z)) rig.position.x = nx;
+                if (!collides(rig.position.x, nz)) rig.position.z = nz;
+
+                bob += (moving ? dt * 10 : 0);
+                gun.position.set(0.28 + Math.sin(bob) * 0.012, -0.28 + Math.abs(Math.cos(bob)) * 0.015 + gunKick * 0.06, -0.6 + gunKick * 0.12);
+                gun.rotation.x = gunKick * 0.35;
+                if (shakeT > 0) { shakeT -= dt; camera.position.y = 1.7 + (Math.random() - .5) * shakeA; } else camera.position.y = 1.7;
+            } else {
+                // En VR nada de sacudidas de cámara (marea): solo retroceso del arma en la mano
+                gun.position.set(0, 0, 0.08 + gunKick * 0.05);
+                gun.rotation.x = gunKick * 0.35;
+            }
 
             enemies.forEach(e => {
                 if (e.leaving) { e.mesh.position.y += dt * 3; e.mesh.rotation.y += dt * 6; return; }
-                const to = new THREE.Vector3(camera.position.x - e.mesh.position.x, 0, camera.position.z - e.mesh.position.z);
+                const to = new THREE.Vector3(playerPos.x - e.mesh.position.x, 0, playerPos.z - e.mesh.position.z);
                 const dist = to.length();
                 const stopDist = e.isCorrect ? 4 : 1.5 + e.w * 0.5;
                 if (dist > stopDist) {
@@ -749,7 +990,7 @@ function montarMotor({ root, preguntasInput, onEnd, onScore }) {
                     const nx = e.mesh.position.x + to.x * e.speed * dt, nz = e.mesh.position.z + to.z * e.speed * dt;
                     if (!collides(nx, e.mesh.position.z)) e.mesh.position.x = nx; else e.mesh.position.z += (Math.random() - .5) * e.speed * dt * 2;
                     if (!collides(e.mesh.position.x, nz)) e.mesh.position.z = nz; else e.mesh.position.x += (Math.random() - .5) * e.speed * dt * 2;
-                    e.mesh.lookAt(camera.position.x, 0, camera.position.z);
+                    e.mesh.lookAt(playerPos.x, 0, playerPos.z);
                     e.phase += dt * e.speed * 5;
                     const s = Math.sin(e.phase);
                     e.limbs.legL.rotation.x = s * 0.7; e.limbs.legR.rotation.x = -s * 0.7;
@@ -758,7 +999,7 @@ function montarMotor({ root, preguntasInput, onEnd, onScore }) {
                 } else if (e.isCorrect) {
                     e.limbs.legL.rotation.x = e.limbs.legR.rotation.x = 0;
                     e.limbs.armL.rotation.x = e.limbs.armR.rotation.x = 0;
-                    e.mesh.lookAt(camera.position.x, 0, camera.position.z);
+                    e.mesh.lookAt(playerPos.x, 0, playerPos.z);
                 } else {
                     e.cd -= dt;
                     e.limbs.legL.rotation.x = e.limbs.legR.rotation.x = 0;
@@ -770,9 +1011,11 @@ function montarMotor({ root, preguntasInput, onEnd, onScore }) {
 
             for (let i = packs.length - 1; i >= 0; i--) {
                 const p = packs[i]; p.rotation.y += dt * 2; p.position.y = 0.5 + Math.sin(performance.now() * 0.004) * 0.12;
-                if (p.position.distanceTo(camera.position) < 1.4) {
+                // distancia horizontal (en VR la altura de la cabeza es la real, sentado o de pie)
+                if (Math.hypot(p.position.x - playerPos.x, p.position.z - playerPos.z) < 0.8) {
                     hp = Math.min(100, hp + 35); SFX.heal(); updateHUD();
                     healFlash.style.background = 'rgba(127,255,176,.25)'; setTimeout(() => healFlash.style.background = 'rgba(127,255,176,0)', 200);
+                    if (vr) tintarVR(0x7fffb0, 0.3);
                     scene.remove(p); packs.splice(i, 1);
                 }
             }
@@ -786,37 +1029,338 @@ function montarMotor({ root, preguntasInput, onEnd, onScore }) {
         }
         dust.rotation.y += dt * 0.01;
         if (running && !gameOver) actualizarMira();
-        drawMinimap();
+        if (vr) actualizarPanelVR(dt); else drawMinimap();
         renderer.render(scene, camera);
     }
 
     function winGame() {
         gameOver = true; running = false; SFX.wave();
         if (document.pointerLockElement) document.exitPointerLock();
-        onEnd({ win: true, score, total: orden.length, alcanzada: orden.length });
+        onEnd({ win: true, score, total: orden.length, alcanzada: orden.length, acertadas, falladas });
     }
     function endGame() {
         gameOver = true; running = false; SFX.boom();
         if (document.pointerLockElement) document.exitPointerLock();
-        onEnd({ win: false, score, total: orden.length, alcanzada: wave });
+        onEnd({ win: false, score, total: orden.length, alcanzada: wave, acertadas, falladas });
     }
 
     // Arrancar
     updateHUD();
     running = true;
     spawnWave();
-    animate();
+    renderer.setAnimationLoop(animate); // setAnimationLoop (no rAF) para que funcione también dentro de WebXR
+    if (xrSession) entrarVR(xrSession);
 
     // ===== Limpieza =====
     return () => {
         killed = true;
-        cancelAnimationFrame(rafId);
+        renderer.setAnimationLoop(null);
         disposeFns.forEach(fn => { try { fn(); } catch (e) { } });
         if (document.pointerLockElement) document.exitPointerLock();
-        try { renderer.dispose(); } catch (e) { }
         if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
         try { if (actx) actx.close(); } catch (e) { }
+        // Si seguimos en VR (fin de partida), cerrar la sesión antes de liberar el renderer
+        let liberado = false;
+        const liberar = () => { if (liberado) return; liberado = true; try { renderer.dispose(); } catch (e) { } };
+        const sesion = renderer.xr.getSession();
+        if (sesion) {
+            renderer.xr.addEventListener('sessionend', liberar);
+            sesion.end().catch(liberar);
+            setTimeout(liberar, 2000);
+        } else liberar();
     };
+}
+
+// =====================================================================
+//  SOLDADO (modelo low-poly compartido por el motor y las pantallas finales)
+//  T = { color, glow, scale }
+// =====================================================================
+function buildEnemy(T) {
+    const g = new THREE.Group();
+    const armor = new THREE.MeshStandardMaterial({ color: T.color, roughness: .5, metalness: .35, emissive: T.color, emissiveIntensity: .15 });
+    const dark = new THREE.MeshStandardMaterial({ color: 0x1a1f24, roughness: .8, metalness: .4 });
+    const glowM = new THREE.MeshBasicMaterial({ color: T.glow });
+    const part = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); g.add(m); return m; };
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.8, 0.45), armor); torso.position.y = 1.15; g.add(torso);
+    part(new THREE.BoxGeometry(0.3, 0.25, 0.05), glowM, 0, 1.2, 0.25);
+    part(new THREE.BoxGeometry(0.5, 0.3, 0.4), dark, 0, 0.65, 0);
+    part(new THREE.BoxGeometry(0.42, 0.4, 0.42), dark, 0, 1.8, 0);
+    part(new THREE.BoxGeometry(0.34, 0.1, 0.06), glowM, 0, 1.82, 0.22);
+    const horn1 = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.25, 0.08), armor); horn1.position.set(-0.18, 2.05, 0); g.add(horn1);
+    const horn2 = horn1.clone(); horn2.position.x = 0.18; g.add(horn2);
+    const sh1 = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.22, 0.5), armor); sh1.position.set(-0.48, 1.5, 0); g.add(sh1);
+    const sh2 = sh1.clone(); sh2.position.x = 0.48; g.add(sh2);
+    const mkArm = (side) => { const p = new THREE.Group(); p.position.set(0.48 * side, 1.45, 0); const a = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.7, 0.2), dark); a.position.y = -0.4; p.add(a); const claw = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.18, 0.24), armor); claw.position.y = -0.8; p.add(claw); g.add(p); return p; };
+    const armL = mkArm(-1), armR = mkArm(1);
+    const mkLeg = (side) => { const p = new THREE.Group(); p.position.set(0.18 * side, 0.55, 0); const l = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.55, 0.25), dark); l.position.y = -0.28; p.add(l); const boot = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.14, 0.34), armor); boot.position.set(0, -0.55, 0.04); p.add(boot); g.add(p); return p; };
+    const legL = mkLeg(-1), legR = mkLeg(1);
+    const blob = new THREE.Mesh(new THREE.CircleGeometry(0.55, 14), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: .45 })); blob.rotation.x = -Math.PI / 2; blob.position.y = 0.02; g.add(blob);
+    g.scale.setScalar(T.scale);
+    g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+    return { g, limbs: { armL, armR, legL, legR }, flashable: [armor], glowM, height: 2.1 * T.scale };
+}
+
+// =====================================================================
+//  PANTALLAS FINALES — música sintetizada (Web Audio, sin archivos)
+// =====================================================================
+const BPM_FIESTA = 128;
+const midiHz = m => 440 * Math.pow(2, (m - 69) / 12);
+
+// Tema chiptune de celebración: melodía + bajo + bombo/palmas/charles, 3 vueltas y acorde final
+function musicaCelebracion(ctx, destino) {
+    const beat = 60 / BPM_FIESTA, corchea = beat / 2;
+    const t0 = ctx.currentTime + 0.15;
+    const nota = (m, t, dur, tipo, vol) => {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = tipo; o.frequency.value = midiHz(m);
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        o.connect(g); g.connect(destino); o.start(t); o.stop(t + dur + 0.02);
+    };
+    const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.5), ctx.sampleRate);
+    const data = buf.getChannelData(0); for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    const ruido = (t, dur, vol, corte) => {
+        const s = ctx.createBufferSource(); s.buffer = buf;
+        const fl = ctx.createBiquadFilter(); fl.type = 'highpass'; fl.frequency.value = corte;
+        const g = ctx.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        s.connect(fl); fl.connect(g); g.connect(destino); s.start(t); s.stop(t + dur + 0.02);
+    };
+    const bombo = t => {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.15);
+        g.gain.setValueAtTime(0.5, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+        o.connect(g); g.connect(destino); o.start(t); o.stop(t + 0.22);
+    };
+    const MELODIA = [
+        [72, 76, 79, 84, 79, 76, 79, 84],       // Do
+        [77, 81, 84, 81, 77, 81, 84, 86],       // Fa
+        [79, 83, 86, 83, 79, 83, 86, 88],       // Sol
+        [84, null, 79, null, 84, 86, 88, null], // Do
+    ];
+    const BAJO = [48, 41, 43, 48];
+    const VUELTAS = 3;
+    for (let v = 0; v < VUELTAS; v++) for (let c = 0; c < 4; c++) {
+        const tc = t0 + (v * 4 + c) * beat * 4;
+        MELODIA[c].forEach((m, i) => { if (m) nota(m, tc + i * corchea, corchea * 0.9, 'square', 0.06); });
+        for (let b = 0; b < 4; b++) {
+            const tb = tc + b * beat;
+            nota(BAJO[c] + (b % 2 ? 12 : 0), tb, beat * 0.8, 'triangle', 0.22);
+            bombo(tb);
+            if (b % 2) ruido(tb, 0.12, 0.22, 1500);    // palmada en 2 y 4
+            ruido(tb + corchea, 0.04, 0.07, 7000);     // charles a contratiempo
+        }
+    }
+    const tf = t0 + VUELTAS * 16 * beat;
+    [72, 76, 79, 84].forEach((m, i) => nota(m, tf + i * 0.06, 1.6, 'square', 0.05));
+    nota(48, tf, 1.6, 'triangle', 0.25); ruido(tf, 0.45, 0.25, 800);
+}
+
+// "Trombón triste" (solo si no se puede reproducir gameover.mp3)
+function tromboneTriste(ctx, destino) {
+    const t0 = ctx.currentTime + 0.05;
+    [[67, 0, 0.42], [66, 0.45, 0.42], [65, 0.9, 0.42], [64, 1.35, 1.5]].forEach(([m, d, dur], i) => {
+        const t = t0 + d;
+        const o = ctx.createOscillator(), g = ctx.createGain(), fl = ctx.createBiquadFilter();
+        o.type = 'sawtooth'; o.frequency.value = midiHz(m - 12);
+        fl.type = 'lowpass'; fl.frequency.value = 900;
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.25, t + 0.04);
+        g.gain.setValueAtTime(0.25, t + dur - 0.12); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        if (i === 3) { const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 6; lg.gain.value = 5; lfo.connect(lg); lg.connect(o.frequency); lfo.start(t); lfo.stop(t + dur); }
+        o.connect(fl); fl.connect(g); g.connect(destino); o.start(t); o.stop(t + dur + 0.05);
+    });
+}
+
+// =====================================================================
+//  ESCENA FINAL 3D — victoria: soldado verde bailando en pista de baile con confeti
+//                    derrota: soldado rojo celebrando tu caída, luz roja y ceniza
+// =====================================================================
+function EscenaFinal({ victoria, sonido }) {
+    const montaje = useRef(null);
+    const audioRef = useRef({ master: null, els: [] });
+    const sonidoInicial = useRef(sonido);
+
+    // --- Escena ---
+    useEffect(() => {
+        const cont = montaje.current; if (!cont) return;
+        const ancho = () => cont.clientWidth || 1, alto = () => cont.clientHeight || 1;
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        renderer.setSize(ancho(), alto());
+        renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.2;
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        renderer.domElement.style.cssText = 'display:block;width:100%;height:100%;';
+        cont.appendChild(renderer.domElement);
+
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.Fog(victoria ? 0x0b1020 : 0x120406, 6, 15);
+        const camera = new THREE.PerspectiveCamera(40, ancho() / alto(), 0.1, 60);
+        scene.add(new THREE.AmbientLight(0xffffff, victoria ? 0.55 : 0.22));
+        scene.add(new THREE.HemisphereLight(victoria ? 0x9fd8ff : 0xff7a7a, 0x080808, victoria ? 0.8 : 0.45));
+        const key = new THREE.DirectionalLight(0xffffff, victoria ? 1.1 : 0.5); key.position.set(2, 5, 4); scene.add(key);
+
+        const PALETA = [0xff5b5b, 0xffb84d, 0xf1c40f, 0x7fffb0, 0x5b8bff, 0xc56cf0];
+        const heroe = buildEnemy(victoria ? { color: 0x27ae60, glow: 0x7fffb0, scale: 1 } : { color: 0xd23c3c, glow: 0xff5b5b, scale: 1.05 });
+        heroe.flashable.forEach(m => { m.emissiveIntensity = 0.3; });
+        scene.add(heroe.g);
+
+        // Mover una articulación suavemente hacia una pose objetivo
+        const pose = (obj, x, z, k) => { obj.rotation.x += (x - obj.rotation.x) * k; obj.rotation.z += (z - obj.rotation.z) * k; };
+
+        let baldosas = [], confeti = null, confetiDatos = [], focos = [], compinches = [], ceniza = null, luzRoja = null;
+        if (victoria) {
+            // Pista de baile
+            const geoB = new THREE.PlaneGeometry(0.76, 0.76);
+            for (let x = -3; x <= 3; x++) for (let z = -3; z <= 2; z++) {
+                const m = new THREE.Mesh(geoB, new THREE.MeshBasicMaterial({ color: PALETA[(x + z + 12) % PALETA.length], transparent: true, opacity: 0.5 }));
+                m.rotation.x = -Math.PI / 2; m.position.set(x * 0.8, 0.005, z * 0.8); scene.add(m); baldosas.push(m);
+            }
+            // Focos de colores girando
+            [0xff5b5b, 0x5b8bff, 0xf1c40f].forEach((c, i) => { const l = new THREE.PointLight(c, 7, 0, 2); l.userData.fase = i * (Math.PI * 2 / 3); scene.add(l); focos.push(l); });
+            // Confeti
+            const N = 170;
+            confeti = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.07, 0.11), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }), N);
+            const col = new THREE.Color();
+            for (let i = 0; i < N; i++) {
+                confetiDatos.push({ p: new THREE.Vector3((Math.random() - .5) * 7, Math.random() * 5, (Math.random() - .5) * 4 - 0.5), v: 0.5 + Math.random() * 0.9, rx: Math.random() * 6, ry: Math.random() * 6, w: 2 + Math.random() * 5, fase: Math.random() * 6 });
+                confeti.setColorAt(i, col.setHex(PALETA[i % PALETA.length]));
+            }
+            scene.add(confeti);
+            camera.position.set(0, 1.5, 4.6);
+        } else {
+            // Suelo oscuro, dos soldados más al fondo y el arma del jugador tirada
+            const suelo = new THREE.Mesh(new THREE.CircleGeometry(6, 32), new THREE.MeshStandardMaterial({ color: 0x140a0b, roughness: 1 }));
+            suelo.rotation.x = -Math.PI / 2; scene.add(suelo);
+            [[-1.7, -1.8], [1.8, -2.1]].forEach(([x, z], i) => { const c = buildEnemy({ color: 0x8e2323, glow: 0xff5b5b, scale: 0.9 }); c.g.position.set(x, 0, z); c.g.rotation.y = -x * 0.2; c.fase = i * 1.7; scene.add(c.g); compinches.push(c); });
+            const armaMat = new THREE.MeshStandardMaterial({ color: 0x2a353b, roughness: .5, metalness: .4 });
+            const arma = new THREE.Group();
+            const cañon = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.55), armaMat); cañon.position.z = -0.3; arma.add(cañon);
+            arma.add(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.16, 0.3), armaMat));
+            arma.position.set(0.55, 0.06, 1.1); arma.rotation.set(0, 0.9, Math.PI / 2); scene.add(arma);
+            luzRoja = new THREE.PointLight(0xff2a2a, 6, 0, 2); luzRoja.position.set(0, 3, -1.5); scene.add(luzRoja);
+            // Ceniza cayendo
+            const n = 220, pos = new Float32Array(n * 3);
+            for (let i = 0; i < n; i++) { pos[i * 3] = (Math.random() - .5) * 8; pos[i * 3 + 1] = Math.random() * 5; pos[i * 3 + 2] = (Math.random() - .5) * 5; }
+            const geoC = new THREE.BufferGeometry(); geoC.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+            ceniza = new THREE.Points(geoC, new THREE.PointsMaterial({ color: 0x9a8a8a, size: 0.035, transparent: true, opacity: 0.7 }));
+            scene.add(ceniza);
+            camera.position.set(0, 0.5, 4.4);
+        }
+
+        const dummy = new THREE.Object3D();
+        const timer = new THREE.Timer();
+        let raf = 0, ultimoBeat = -1;
+        const animar = () => {
+            raf = requestAnimationFrame(animar);
+            timer.update();
+            const dt = Math.min(timer.getDelta(), 0.05), t = timer.getElapsed();
+            const g = heroe.g, L = heroe.limbs, k = Math.min(1, dt * 12);
+            if (victoria) {
+                const b = t / (60 / BPM_FIESTA);          // tiempo en beats
+                const fase = b * Math.PI;                  // sin(fase): un ciclo cada 2 beats
+                const s = Math.sin(fase);
+                const paso = Math.floor(b / 8) % 3;        // cambia de baile cada 2 compases
+                g.position.y = Math.abs(s) * 0.12;
+                g.rotation.z = s * 0.08;
+                if (paso === 0) {        // brazos arriba saludando
+                    pose(L.armL, 0, -2.6 + Math.sin(fase * 2) * 0.35, k); pose(L.armR, 0, 2.6 + Math.sin(fase * 2 + Math.PI) * 0.35, k);
+                    pose(L.legL, Math.max(0, s) * 0.5, 0, k); pose(L.legR, Math.max(0, -s) * 0.5, 0, k);
+                    g.rotation.y = Math.sin(fase * 0.5) * 0.5;
+                } else if (paso === 1) { // puñetazos al aire alternos
+                    pose(L.armL, -1.4 - Math.max(0, s) * 1.5, -0.15, k); pose(L.armR, -1.4 - Math.max(0, -s) * 1.5, 0.15, k);
+                    pose(L.legL, s * 0.35, 0, k); pose(L.legR, -s * 0.35, 0, k);
+                    g.rotation.y += (0 - g.rotation.y) * k;
+                } else {                 // vuelta completa con brazos abiertos
+                    pose(L.armL, 0, -1.5 + s * 0.4, k); pose(L.armR, 0, 1.5 - s * 0.4, k);
+                    pose(L.legL, Math.max(0, s) * 0.7, 0, k); pose(L.legR, Math.max(0, -s) * 0.7, 0, k);
+                    g.rotation.y = ((b % 8) / 8) * Math.PI * 2;
+                }
+                heroe.glowM.color.setHSL(((b * 0.125) % 1), 0.9, 0.65);
+                // Pista: cambia de color en cada beat
+                const beatEntero = Math.floor(b);
+                if (beatEntero !== ultimoBeat) { ultimoBeat = beatEntero; baldosas.forEach((m, i) => m.material.color.setHex(PALETA[(i * 7 + beatEntero * 3 + (Math.random() < 0.3 ? 1 : 0)) % PALETA.length])); }
+                focos.forEach(l => { const a = t * 1.3 + l.userData.fase; l.position.set(Math.cos(a) * 2.6, 2.4 + Math.sin(t * 2 + l.userData.fase) * 0.5, Math.sin(a) * 2.6); });
+                confetiDatos.forEach((c, i) => {
+                    c.p.y -= c.v * dt; c.p.x += Math.sin(t * 1.5 + c.fase) * dt * 0.3;
+                    if (c.p.y < 0) { c.p.y = 5 + Math.random(); c.p.x = (Math.random() - .5) * 7; }
+                    dummy.position.copy(c.p); dummy.rotation.set(c.rx + t * c.w, c.ry + t * c.w * 0.7, 0); dummy.updateMatrix();
+                    confeti.setMatrixAt(i, dummy.matrix);
+                });
+                confeti.instanceMatrix.needsUpdate = true;
+                camera.position.x = Math.sin(t * 0.35) * 0.9;
+                camera.lookAt(0, 1.15, 0);
+            } else {
+                // Se ríe y agita el puño; los compinches le acompañan
+                g.position.y = Math.abs(Math.sin(t * 9)) * 0.035;
+                g.rotation.x = -0.08;
+                g.rotation.y = Math.sin(t * 0.8) * 0.18;
+                pose(L.armR, -2.7 + Math.sin(t * 6) * 0.35, 0.1, k);
+                pose(L.armL, -0.25, -0.55, k);
+                compinches.forEach(c => {
+                    c.g.position.y = Math.abs(Math.sin(t * 8 + c.fase)) * 0.03;
+                    pose(c.limbs.armL, -2.5 + Math.sin(t * 5 + c.fase) * 0.4, -0.1, k);
+                    pose(c.limbs.armR, -2.5 + Math.sin(t * 5 + c.fase + Math.PI) * 0.4, 0.1, k);
+                });
+                luzRoja.intensity = 5 + Math.sin(t * 2.2) * 2.5;
+                heroe.glowM.color.setRGB(1, 0.2 + Math.abs(Math.sin(t * 3)) * 0.3, 0.2);
+                const p = ceniza.geometry.attributes.position;
+                for (let i = 0; i < p.count; i++) { let y = p.getY(i) - dt * 0.35; if (y < 0) y = 5; p.setY(i, y); p.setX(i, p.getX(i) + Math.sin(t + i) * dt * 0.05); }
+                p.needsUpdate = true;
+                // Acercamiento lento de la cámara, en contrapicado
+                const z = Math.max(3.1, 4.4 - t * 0.22);
+                camera.position.set(Math.sin(t * 0.3) * 0.3, 0.5 + (4.4 - z) * 0.15, z);
+                camera.lookAt(0, 1.35, 0);
+            }
+            renderer.render(scene, camera);
+        };
+        animar();
+
+        const ro = new ResizeObserver(() => { camera.aspect = ancho() / alto(); camera.updateProjectionMatrix(); renderer.setSize(ancho(), alto()); });
+        ro.observe(cont);
+        return () => {
+            cancelAnimationFrame(raf); ro.disconnect(); timer.dispose();
+            scene.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose()); });
+            renderer.dispose();
+            if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
+        };
+    }, [victoria]);
+
+    // --- Sonido ---
+    useEffect(() => {
+        let ctx = null, master = null;
+        try { ctx = new (window.AudioContext || window.webkitAudioContext)(); master = ctx.createGain(); master.gain.value = sonidoInicial.current ? 1 : 0; master.connect(ctx.destination); } catch (e) { ctx = null; }
+        const els = [];
+        let vivo = true; // en StrictMode (dev) el efecto se monta, desmonta y vuelve a montar
+        const reproducir = (src, vol, alFallar) => {
+            const el = new Audio(src); el.volume = vol; el.muted = !sonidoInicial.current; els.push(el);
+            // AbortError = lo hemos pausado nosotros al desmontar: no es un fallo real
+            el.play().catch(err => { if (vivo && alFallar && (!err || err.name !== 'AbortError')) alFallar(); });
+        };
+        if (victoria) {
+            if (ctx) musicaCelebracion(ctx, master);
+            reproducir(sndAplausos, 0.45);
+        } else {
+            reproducir(sndGameOver, 0.8, () => { if (ctx && ctx.state !== 'closed') tromboneTriste(ctx, master); });
+        }
+        audioRef.current = { master, els };
+        // Si el navegador bloqueó el audio, arranca al primer toque (la música empieza desde el principio)
+        const desbloquear = () => { if (ctx && ctx.state === 'suspended') ctx.resume(); };
+        window.addEventListener('pointerdown', desbloquear);
+        return () => {
+            vivo = false;
+            window.removeEventListener('pointerdown', desbloquear);
+            els.forEach(el => { try { el.pause(); } catch (e) { } });
+            try { if (ctx) ctx.close(); } catch (e) { }
+            audioRef.current = { master: null, els: [] };
+        };
+    }, [victoria]);
+
+    // --- Silenciar / activar ---
+    useEffect(() => {
+        const { master, els } = audioRef.current;
+        if (master) master.gain.value = sonido ? 1 : 0;
+        els.forEach(el => { el.muted = !sonido; });
+    }, [sonido]);
+
+    return <div ref={montaje} style={{ position: 'absolute', inset: 0 }} />;
 }
 
 // =====================================================================
@@ -871,6 +1415,19 @@ const HUD_CSS = `
 .bunker-root.touch #click-hint { display:none; }
 .bunker-root #bunker-exit { position:absolute; top:max(12px, env(safe-area-inset-top)); left:12px; z-index:10; pointer-events:all; background:rgba(5,7,10,.6); border:1px solid #263238; color:#c7d0d6; width:36px; height:36px; border-radius:6px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
 .bunker-root #bunker-exit:hover { border-color:#7fffb0; color:#7fffb0; }
+.bunker-root #vr-btn { position:absolute; top:max(12px, env(safe-area-inset-top)); left:56px; z-index:10; pointer-events:all; background:rgba(5,7,10,.6); border:1px solid #7fffb0; color:#7fffb0; height:36px; padding:0 12px; border-radius:6px; font-family:inherit; font-size:12px; letter-spacing:1px; cursor:pointer; }
+.bunker-root #vr-btn:hover { background:rgba(127,255,176,.15); }
+/* Pantallas finales */
+@keyframes bkPop { 0% { transform:scale(.3); opacity:0; } 60% { transform:scale(1.12); opacity:1; } 100% { transform:scale(1); opacity:1; } }
+@keyframes bkBrillo { 0%,100% { text-shadow:0 0 18px rgba(127,255,176,.6), 0 0 40px rgba(241,196,15,.35); } 50% { text-shadow:0 0 28px rgba(241,196,15,.85), 0 0 60px rgba(127,255,176,.5); } }
+@keyframes bkCaer { 0% { transform:translateY(-50px); opacity:0; } 100% { transform:translateY(0); opacity:1; } }
+@keyframes bkGlitch { 0%,100% { transform:translate(0); } 25% { transform:translate(-4px,1px); } 50% { transform:translate(4px,-1px); } 75% { transform:translate(-2px,-1px); } }
+@keyframes bkParpadeo { 0%,19%,21%,62%,64%,100% { opacity:1; } 20%,63% { opacity:.35; } }
+.bunker-root .bk-fin-escena { position:relative; width:100%; max-width:720px; height:min(46vh, 400px); min-height:230px; }
+.bunker-root .bk-fin-sonido { position:absolute; top:10px; right:12px; z-index:3; width:40px; height:40px; border-radius:50%; border:1px solid rgba(255,255,255,.25); background:rgba(5,7,10,.55); color:#e7f3ec; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+.bunker-root .bk-fin-win { color:#7fffb0; font-family:monospace; font-size:clamp(1.8rem,7vw,2.8rem); letter-spacing:4px; margin:-22px 0 0; text-align:center; position:relative; z-index:2; animation:bkPop .7s cubic-bezier(.2,1.4,.4,1) both, bkBrillo 1.9s ease-in-out .7s infinite; }
+.bunker-root .bk-fin-over { color:#ff5b5b; font-family:monospace; font-size:clamp(2.2rem,9vw,3.4rem); letter-spacing:6px; margin:-22px 0 0; text-align:center; position:relative; z-index:2; text-shadow:3px 0 rgba(0,255,255,.35), -3px 0 rgba(255,0,80,.55), 0 0 26px rgba(255,60,60,.6); animation:bkCaer .6s ease-out both, bkGlitch .3s steps(2) .6s 4, bkParpadeo 3s linear 1.8s infinite; }
+.bunker-root #wave-banner { left:130px; }
 `;
 
 // =====================================================================
@@ -879,12 +1436,21 @@ const HUD_CSS = `
 export default function BunkerDisparo({ recurso = null, onExit, usuario, autoStart = false }) {
     const [gameState, setGameState] = useState('MENU'); // MENU | PLAYING | WIN | GAMEOVER
     const [score, setScore] = useState(0);
-    const [resultado, setResultado] = useState({ win: false, alcanzada: 0, total: 0 });
+    const [resultado, setResultado] = useState({ win: false, alcanzada: 0, total: 0, acertadas: 0, falladas: 0 });
     const [fuente, setFuente] = useState({ titulo: 'Modo Libre', categoria: 'General', recursoId: null });
 
     const rootRef = useRef(null);
     const preguntasRef = useRef([]);
     const cleanupRef = useRef(null);
+
+    // Realidad virtual: la sesión se pide en el clic y se entrega al motor al montarse
+    const vrSoportado = useVRSoportado();
+    const xrSesionRef = useRef(null);
+    const jugarEnVR = async (alAbrir) => {
+        try { xrSesionRef.current = await pedirSesionVR(); }
+        catch (e) { console.warn(e); alert('No se pudo abrir el modo de realidad virtual en este navegador.'); return; }
+        alAbrir();
+    };
 
     // Ranking / envío
     const [verRanking, setVerRanking] = useState(false);
@@ -892,6 +1458,7 @@ export default function BunkerDisparo({ recurso = null, onExit, usuario, autoSta
     const [nombreInvitado, setNombreInvitado] = useState('');
     const [guardando, setGuardando] = useState(false);
     const [yaGuardado, setYaGuardado] = useState(false);
+    const [sonidoFinal, setSonidoFinal] = useState(true); // música de las pantallas finales
 
     const ultimoInicioRef = useRef(null); // para reiniciar la misma partida
 
@@ -923,13 +1490,15 @@ export default function BunkerDisparo({ recurso = null, onExit, usuario, autoSta
         const cleanup = montarMotor({
             root: rootRef.current,
             preguntasInput: preguntasRef.current,
+            xrSession: xrSesionRef.current,
             onScore: (s) => setScore(s),
-            onEnd: ({ win, score: sc, alcanzada, total }) => {
+            onEnd: ({ win, score: sc, alcanzada, total, acertadas, falladas }) => {
                 setScore(sc);
-                setResultado({ win, alcanzada, total });
+                setResultado({ win, alcanzada, total, acertadas, falladas });
                 setGameState(win ? 'WIN' : 'GAMEOVER');
             },
         });
+        xrSesionRef.current = null;
         cleanupRef.current = cleanup;
         return () => { if (cleanupRef.current) cleanupRef.current(); cleanupRef.current = null; };
     }, [gameState]);
@@ -978,6 +1547,7 @@ export default function BunkerDisparo({ recurso = null, onExit, usuario, autoSta
         return (
             <TutorialBunker
                 onStart={() => setGameState('PLAYING')}
+                onStartVR={vrSoportado ? () => jugarEnVR(() => setGameState('PLAYING')) : null}
                 onVolver={() => setGameState('MENU')}
             />
         );
@@ -997,7 +1567,7 @@ export default function BunkerDisparo({ recurso = null, onExit, usuario, autoSta
                 <div id="wave-banner">PREGUNTA <b id="wave-num">1</b><span id="wave-total"></span></div>
                 <div id="question"></div>
                 <div id="wave-toast"></div>
-                <div id="score">BAJAS<span className="num" id="score-num">0</span></div>
+                <div id="score">PUNTOS<span className="num" id="score-num">0</span></div>
                 <div id="click-hint">↑↓ MOVER · ←→ GIRAR · ARRASTRA EL RATÓN = APUNTAR · ESPACIO/CLIC DISPARAR · R RECARGAR</div>
                 <canvas id="minimap" width="140" height="140"></canvas>
                 <div id="stats">
@@ -1018,19 +1588,34 @@ export default function BunkerDisparo({ recurso = null, onExit, usuario, autoSta
                 </div>
             </div>
             <button id="bunker-exit" title="Salir" onClick={() => onExit && onExit()}><X size={20} /></button>
+            {gameState === 'PLAYING' && <button id="vr-btn" hidden title="Jugar con gafas de realidad virtual">🕶️ VR</button>}
 
             {/* OVERLAYS DE FIN */}
             {(gameState === 'WIN' || gameState === 'GAMEOVER') && (
-                <div style={overlayStyle}>
-                    {gameState === 'WIN' ? <Trophy size={72} color="#7fffb0" style={{ marginBottom: 16 }} /> : <Target size={72} color="#ff5b5b" style={{ marginBottom: 16 }} />}
-                    <h1 style={{ color: gameState === 'WIN' ? '#7fffb0' : '#ff5b5b', fontFamily: 'monospace', fontSize: '2.6rem', letterSpacing: 4, margin: 0, textShadow: '0 0 24px rgba(127,255,176,.3)' }}>
-                        {gameState === 'WIN' ? 'MISIÓN CUMPLIDA' : 'HAS CAÍDO'}
+                <div style={{
+                    ...overlayStyle, justifyContent: 'flex-start', padding: '0 0 24px',
+                    background: gameState === 'WIN'
+                        ? 'radial-gradient(ellipse at 50% 25%, #1b2a4a 0%, #070a14 55%, #05070a 100%)'
+                        : 'radial-gradient(ellipse at 50% 25%, #3a0b10 0%, #12050a 55%, #05070a 100%)',
+                }}>
+                  {/* margin auto: centra si cabe y permite hacer scroll si no */}
+                  <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', margin: 'auto 0' }}>
+                    <div className="bk-fin-escena">
+                        <EscenaFinal victoria={gameState === 'WIN'} sonido={sonidoFinal} />
+                        <button className="bk-fin-sonido" onClick={() => setSonidoFinal(v => !v)} title={sonidoFinal ? 'Silenciar' : 'Activar sonido'}>
+                            {sonidoFinal ? <Volume2 size={18} /> : <VolumeX size={18} />}
+                        </button>
+                    </div>
+                  <div style={{ width: '100%', maxWidth: 420, padding: '0 20px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <h1 className={gameState === 'WIN' ? 'bk-fin-win' : 'bk-fin-over'}>
+                        {gameState === 'WIN' ? '¡MISIÓN CUMPLIDA!' : 'GAME OVER'}
                     </h1>
                     <p style={{ color: '#a7b6bb', fontFamily: 'monospace', margin: '14px 0', textAlign: 'center' }}>
                         {gameState === 'WIN'
-                            ? <>Has superado las <b style={{ color: '#e7f3ec' }}>{resultado.total}</b> preguntas.</>
-                            : <>Llegaste a la pregunta <b style={{ color: '#e7f3ec' }}>{resultado.alcanzada}</b> de {resultado.total}.</>}
-                        <br />Bajas: <b style={{ color: '#e7f3ec' }}>{score}</b>
+                            ? <>🎉 ¡Has superado las <b style={{ color: '#e7f3ec' }}>{resultado.total}</b> preguntas! 🎉</>
+                            : <>Te han eliminado en la pregunta <b style={{ color: '#e7f3ec' }}>{resultado.alcanzada}</b> de {resultado.total}.</>}
+                        <br />Preguntas acertadas: <b style={{ color: '#7fffb0' }}>{resultado.acertadas}</b> de {resultado.total}
+                        <br />Puntos: <b style={{ color: '#e7f3ec' }}>{score}</b>
                     </p>
 
                     {!yaGuardado ? (
@@ -1055,14 +1640,26 @@ export default function BunkerDisparo({ recurso = null, onExit, usuario, autoSta
                     <button onClick={() => setMostrarEnvio(true)} style={{ ...btnStyle, background: 'linear-gradient(135deg,#27ae60,#2ecc71)', boxShadow: '0 4px 0 #1e8449' }}>📤 Enviar al profesor</button>
                     <button onClick={() => setVerRanking(true)} style={{ ...btnStyle, background: '#8e44ad', boxShadow: '0 4px 0 #6c3483' }}><Trophy size={20} /> Ver ranking</button>
                     <button onClick={reiniciar} style={{ ...btnStyle, background: '#e74c3c', boxShadow: '0 4px 0 #c0392b' }}><RefreshCw size={20} /> Reintentar</button>
+                    {vrSoportado && (
+                        <button onClick={() => jugarEnVR(reiniciar)} style={{ ...btnStyle, background: '#16a085', boxShadow: '0 4px 0 #117a65' }}>🕶️ Reintentar con gafas VR</button>
+                    )}
                     <button onClick={volverMenu} style={{ marginTop: 16, background: 'none', border: '1px solid #444', color: '#8a9aa0', padding: '8px 20px', borderRadius: 20, cursor: 'pointer', fontFamily: 'monospace' }}>Menú</button>
 
                     {mostrarEnvio && (
                         <ModalEnviarProfe
-                            datos={{ recursoId: fuente.recursoId, recursoTitulo: fuente.titulo, hoja: fuente.categoria, aciertos: score }}
+                            datos={{
+                                recursoId: fuente.recursoId, recursoTitulo: fuente.titulo, hoja: fuente.categoria,
+                                acertadas: resultado.acertadas || 0,
+                                jugadas: (resultado.acertadas || 0) + (resultado.falladas || 0),
+                                total: resultado.total || 0,
+                                puntuacion: score,
+                                completado: resultado.win,
+                            }}
                             onClose={() => setMostrarEnvio(false)}
                         />
                     )}
+                  </div>
+                  </div>
                     {verRanking && <PantallaRanking fuente={fuente} onBack={() => setVerRanking(false)} />}
                 </div>
             )}
@@ -1101,7 +1698,7 @@ const TUTO_ARTS = [
     </svg>`,
 ];
 
-function TutorialBunker({ onStart, onVolver }) {
+function TutorialBunker({ onStart, onStartVR, onVolver }) {
     const [i, setI] = useState(0);
     const isTouch = typeof window !== 'undefined' && (('ontouchstart' in window) || navigator.maxTouchPoints > 0);
 
@@ -1112,7 +1709,7 @@ function TutorialBunker({ onStart, onVolver }) {
         },
         {
             titulo: 'LA REGLA', art: TUTO_ARTS[1],
-            texto: <><b>Dispara a las respuestas incorrectas.</b> Cuando caigan, la correcta se retira y pasas a la siguiente pregunta.<br /><span style={{ color: '#ff5b5b' }}>Si disparas a la correcta pierdes 25 de vida.</span></>,
+            texto: <><b>Dispara a las respuestas incorrectas.</b> Cuando caigan, la correcta se retira y pasas a la siguiente pregunta.<br /><span style={{ color: '#ff5b5b' }}>Si disparas a la correcta pierdes 25 de vida y 10 puntos, y esa pregunta no cuenta como acertada.</span></>,
         },
         {
             titulo: 'PELIGRO', art: TUTO_ARTS[2],
@@ -1127,6 +1724,9 @@ function TutorialBunker({ onStart, onVolver }) {
                     </div>
                     <div><b style={{ color: '#7fffb0' }}>Pantalla táctil</b><br />
                         <span style={{ color: '#a7b6bb' }}>Pulgar <b>izquierdo</b>: joystick para moverte. Pulgar <b>derecho</b>: arrastra para mirar. Botón <b>FUEGO</b> dispara (mantén para ráfaga), <b>R</b> recarga.</span>
+                    </div>
+                    <div><b style={{ color: '#7fffb0' }}>Gafas VR (Meta Quest)</b><br />
+                        <span style={{ color: '#a7b6bb' }}>Apunta con el <b>mando</b> y dispara con el <b>gatillo</b>. Stick <b>izquierdo</b> para moverte, stick <b>derecho</b> para girar. <b>Botón lateral</b> o <b>A/B/X/Y</b> recargan.</span>
                     </div>
                     <div style={{ color: '#5c6b70', fontSize: 11 }}>{isTouch ? 'Mejor en horizontal.' : 'Consejo: apunta con el ratón y muévete con las flechas a la vez.'}</div>
                 </div>
@@ -1161,6 +1761,11 @@ function TutorialBunker({ onStart, onVolver }) {
                 <button onClick={onStart} style={{ ...btnStyle, marginTop: 0, background: '#27ae60', boxShadow: '0 4px 0 #1e8449' }}>
                     <Play size={20} /> {ultima ? 'EMPEZAR' : 'EMPEZAR YA'}
                 </button>
+                {onStartVR && (
+                    <button onClick={onStartVR} style={{ ...btnStyle, marginTop: 10, background: '#16a085', boxShadow: '0 4px 0 #117a65' }}>
+                        🕶️ JUGAR CON GAFAS VR
+                    </button>
+                )}
                 <button onClick={onVolver} style={{ marginTop: 12, background: 'none', border: '1px solid #444', color: '#8a9aa0', padding: '8px 20px', borderRadius: 20, cursor: 'pointer', fontFamily: 'monospace', width: '100%' }}>Volver al menú</button>
             </div>
         </div>
@@ -1394,9 +1999,18 @@ function ModalEnviarProfe({ datos, onClose }) {
                 tipo: 'BUNKER', modalidad: 'Individual', fecha: new Date(),
                 recursoId: datos.recursoId || null, recursoTitulo: datos.recursoTitulo,
                 hoja: datos.hoja, codigoProfesor: code,
-                jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), aciertos: datos.aciertos, fallos: 0, hoja: datos.hoja }],
+                jugadores: [{
+                    nombre: nombre.trim(), curso: curso.trim(), hoja: datos.hoja,
+                    aciertos: datos.acertadas,                    // preguntas acertadas
+                    fallos: datos.jugadas - datos.acertadas,       // superadas tras disparar a la correcta
+                    intentos: datos.jugadas,                       // preguntas superadas
+                    total: datos.total,                            // preguntas de la partida
+                    porcentaje: datos.total > 0 ? Math.round((datos.acertadas / datos.total) * 100) : 0,
+                    puntuacion: datos.puntuacion,
+                    completado: !!datos.completado,
+                }],
             });
-            guardarRegistroLocal('BUNKER', { titulo: datos.recursoTitulo, aciertos: datos.aciertos, nombre: nombre.trim(), curso: curso.trim(), via: 'profesor' });
+            guardarRegistroLocal('BUNKER', { titulo: datos.recursoTitulo, aciertos: datos.acertadas, puntuacion: datos.puntuacion, nombre: nombre.trim(), curso: curso.trim(), via: 'profesor' });
             setEnviado(true);
         } catch (e) { setError('Error: ' + e.message); }
         setEnviando(false);
@@ -1413,7 +2027,7 @@ function ModalEnviarProfe({ datos, onClose }) {
                     <div style={{ textAlign: 'center', padding: '20px 0' }}>
                         <div style={{ fontSize: '3rem', marginBottom: 10 }}>✅</div>
                         <div style={{ color: '#2ecc71', fontWeight: 700, fontSize: '1.1rem' }}>¡Informe enviado!</div>
-                        <div style={{ marginTop: 8, color: '#aaa', fontSize: '0.9rem' }}>{datos.aciertos} puntos</div>
+                        <div style={{ marginTop: 8, color: '#aaa', fontSize: '0.9rem' }}>{datos.acertadas}/{datos.total} preguntas acertadas · {datos.puntuacion} puntos</div>
                         <button onClick={onClose} style={{ marginTop: 16, padding: '9px 22px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer', color: 'white', fontFamily: 'inherit' }}>Cerrar</button>
                     </div>
                 ) : (

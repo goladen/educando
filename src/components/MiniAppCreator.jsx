@@ -4,6 +4,11 @@ import { db, auth } from '../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, addDoc, getDocs, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
 import { buildSrcdoc } from '../utils/miniAppSrcdoc';
+import { callGeminiProxy, extractText } from '../geminiProxy';
+import {
+  TIPOS_PUNTUACION, PUNTUACION_DEFAULT, normalizarConfigPuntuacion,
+  instruccionesPuntuacion, sanitizarPuntuacion,
+} from '../utils/miniAppPuntuacion';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const DEFAULT_CODE = `function App() {
@@ -23,31 +28,91 @@ const DEFAULT_CODE = `function App() {
   );
 }`;
 
-const AI_PROMPT = `Crea un componente React llamado App para usar en una pizarra digital de aula.
+const ADMIN_EMAIL = 'goladen@gmail.com';
 
-REGLAS ESTRICTAS:
-- NO uses ningún import ni export
+const BASE_RULES = `- NO uses ningún import ni export
 - NO uses librerías externas (solo React puro)
 - Las variables de hook ya están disponibles: useState, useEffect, useRef, useCallback, useMemo, useReducer
-- Usa únicamente estilos inline (style={{}}) — no className, no Tailwind, no CSS externo
+- Usa únicamente estilos inline (style={{}}) — no className, no Tailwind, no CSS externo`;
+
+const RESPONSIVE_RULES = `DISEÑO RESPONSIVE OBLIGATORIO (la app se usará en tres tipos de pantalla):
+- Pizarra digital / monitor grande del aula: textos y botones grandes, legibles a varios metros, alto contraste
+- Ordenador (portátil o sobremesa): uso con ratón y teclado, aprovecha el ancho disponible
+- Móvil y tablet (vertical y horizontal): uso táctil, botones de al menos 44px, sin scroll horizontal
+- Detecta el tamaño con window.innerWidth/innerHeight en un useState + useEffect con listener de 'resize' y adapta la disposición (columnas → filas, tamaños de fuente, márgenes)
+- Usa medidas relativas (%, clamp(), vw/vh, flexbox con flexWrap, grid con auto-fit) en lugar de anchos fijos en píxeles
+- Si usas canvas, ajusta su tamaño al contenedor y al devicePixelRatio, y recalcúlalo al redimensionar
+- Soporta tanto eventos de ratón como táctiles (usa pointer events: onPointerDown/onPointerMove/onPointerUp)`;
+
+const AI_PROMPT = `Crea un componente React llamado App para usar en el aula (pizarra digital, ordenador y móvil).
+
+REGLAS ESTRICTAS:
+${BASE_RULES}
 - Devuelve SOLO el bloque de código del componente App, listo para pegar, sin ningún texto adicional
+
+${RESPONSIVE_RULES}
 
 Descripción de la aplicación que quiero:
 [ESCRIBE TU DESCRIPCIÓN AQUÍ]`;
 
-const CONVERT_PROMPT = `Tengo el siguiente programa escrito en [ESPECIFICA EL LENGUAJE/FRAMEWORK: Python, Vue, JavaScript vanilla, p5.js, etc.] y quiero convertirlo a un componente React llamado App para usarlo en una pizarra digital de aula.
+const CONVERT_PROMPT = `Tengo el siguiente programa escrito en [ESPECIFICA EL LENGUAJE/FRAMEWORK: Python, Vue, JavaScript vanilla, p5.js, etc.] y quiero convertirlo a un componente React llamado App para usarlo en el aula (pizarra digital, ordenador y móvil).
 
 REGLAS ESTRICTAS para la conversión:
-- NO uses ningún import ni export
-- NO uses librerías externas (solo React puro)
-- Las variables de hook ya están disponibles: useState, useEffect, useRef, useCallback, useMemo, useReducer
-- Usa únicamente estilos inline (style={{}}) — no className, no Tailwind, no CSS externo
+${BASE_RULES}
 - Adapta la lógica al entorno del navegador (sin sistema de archivos, sin servidor, sin base de datos)
 - Si el original usa canvas o animaciones, conviértelos usando useRef y useEffect con requestAnimationFrame
 - Devuelve SOLO el bloque de código del componente App, listo para pegar, sin ningún texto adicional
 
+${RESPONSIVE_RULES}
+
 Aquí está el código a convertir:
 [PEGA AQUÍ TU CÓDIGO]`;
+
+// Prompts para la llamada directa a Gemini (panel admin)
+const GEMINI_MODOS = {
+  crear: {
+    label: '💡 Crear nueva',
+    placeholder: 'Describe la app: p. ej. «Ruleta para elegir alumno al azar con nombres editables y sonido al parar»',
+    build: (texto) => AI_PROMPT.replace('[ESCRIBE TU DESCRIPCIÓN AQUÍ]', texto),
+  },
+  convertir: {
+    label: '🔄 Convertir código',
+    placeholder: 'Pega aquí el código a convertir (Python, Vue, JS vanilla, p5.js…)',
+    build: (texto) => CONVERT_PROMPT
+      .replace('[ESPECIFICA EL LENGUAJE/FRAMEWORK: Python, Vue, JavaScript vanilla, p5.js, etc.]', 'otro lenguaje o framework (detéctalo tú)')
+      .replace('[PEGA AQUÍ TU CÓDIGO]', texto),
+  },
+  modificar: {
+    label: '✏️ Modificar el del editor',
+    placeholder: 'Qué quieres cambiar del código actual: p. ej. «Añade un temporizador y un marcador de puntos»',
+    build: (texto, codigoActual) => `Tengo este componente React llamado App para usar en el aula (pizarra digital, ordenador y móvil) y quiero modificarlo.
+
+REGLAS ESTRICTAS:
+${BASE_RULES}
+- Mantén el nombre del componente App y conserva lo que ya funciona salvo que se pida lo contrario
+- Devuelve SOLO el código COMPLETO del componente App modificado, listo para pegar, sin ningún texto adicional
+
+${RESPONSIVE_RULES}
+
+Cambios que quiero:
+${texto}
+
+Código actual:
+${codigoActual}`,
+  },
+};
+
+// Quita las vallas ```jsx ... ``` y texto suelto alrededor del código devuelto por la IA
+function limpiarCodigoIA(raw) {
+  const m = raw.match(/```(?:jsx|javascript|js|tsx|react)?\s*\n([\s\S]*?)```/i);
+  return (m ? m[1] : raw).trim();
+}
+
+// Añade las instrucciones del módulo «Enviar al profesor» justo tras las reglas de diseño
+function conModuloPuntuacion(prompt, cfg) {
+  const instr = instruccionesPuntuacion(cfg);
+  return instr ? prompt.replace(RESPONSIVE_RULES, () => `${RESPONSIVE_RULES}\n\n${instr}`) : prompt;
+}
 
 const MATERIAS = [
   'General', 'Matemáticas', 'Lengua', 'Inglés', 'Ciencias Naturales',
@@ -226,7 +291,7 @@ function MiniAppGallery({ onCargar, onAbrir }) {
                     {isOpen ? '▲ Cerrar' : '▶ Ver app'}
                   </button>
                   <button
-                    onClick={() => { onCargar(app.code); window.scrollTo({ top:0, behavior:'smooth' }); }}
+                    onClick={() => { onCargar(app); window.scrollTo({ top:0, behavior:'smooth' }); }}
                     style={{ flex:1, padding:'6px 0', background:'rgba(108,99,255,0.1)', color:'#6c63ff', border:'1px solid rgba(108,99,255,0.25)', borderRadius:7, cursor:'pointer', fontSize:'0.75rem', fontWeight:700 }}>
                     ✏️ Cargar en editor
                   </button>
@@ -262,6 +327,18 @@ export default function MiniAppCreator({ onAbrirViewer }) {
   const [currentUser, setCurrentUser] = useState(auth.currentUser);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const previewIframeRef = useRef(null);
+  const [editorMsg, setEditorMsg]   = useState('');
+
+  // Gemini directo (solo admin)
+  const [geminiModo, setGeminiModo]         = useState('crear');
+  const [geminiTexto, setGeminiTexto]       = useState('');
+  const [geminiCargando, setGeminiCargando] = useState(false);
+  const [geminiError, setGeminiError]       = useState('');
+  const isAdmin = currentUser?.email === ADMIN_EMAIL;
+
+  // Módulo «Enviar al profesor»
+  const [puntuacionCfg, setPuntuacionCfg]       = useState(PUNTUACION_DEFAULT);
+  const [pruebaPuntuacion, setPruebaPuntuacion] = useState(null);
 
   // Submission state
   const [showSubmit, setShowSubmit] = useState(false);
@@ -276,6 +353,24 @@ export default function MiniAppCreator({ onAbrirViewer }) {
     window.addEventListener('message', h);
     return () => window.removeEventListener('message', h);
   }, []);
+
+  // Prueba del módulo «Enviar al profesor» en la previsualización (no guarda nada)
+  useEffect(() => {
+    const h = (e) => {
+      if (e.data?.type !== 'miniapp-score') return;
+      if (!previewIframeRef.current || e.source !== previewIframeRef.current.contentWindow) return;
+      if (!puntuacionCfg.activo) {
+        setPruebaPuntuacion({ ok:false, texto:'⚠ La app llamó a enviarPuntuacion, pero el módulo «Enviar al profesor» no está activado.' });
+        return;
+      }
+      const p = sanitizarPuntuacion(e.data.datos, puntuacionCfg);
+      setPruebaPuntuacion(p
+        ? { ok:true,  texto:`📤 Prueba de envío: ${p.resumen}${p.porcentaje != null ? ` (${p.porcentaje}%)` : ''}. En la app publicada el alumno podrá mandarlo al profesor; aquí no se guarda.` }
+        : { ok:false, texto:`⚠ La app envió datos no válidos para «${TIPOS_PUNTUACION[puntuacionCfg.tipo].label}». Revisa la llamada a enviarPuntuacion.` });
+    };
+    window.addEventListener('message', h);
+    return () => window.removeEventListener('message', h);
+  }, [puntuacionCfg]);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, u => setCurrentUser(u));
@@ -303,17 +398,80 @@ export default function MiniAppCreator({ onAbrirViewer }) {
   }, [code]);
 
   const copyPrompt = () => {
-    navigator.clipboard.writeText(AI_PROMPT).then(() => {
+    navigator.clipboard.writeText(conModuloPuntuacion(AI_PROMPT, puntuacionCfg)).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
   };
 
   const copyConvertPrompt = () => {
-    navigator.clipboard.writeText(CONVERT_PROMPT).then(() => {
+    navigator.clipboard.writeText(conModuloPuntuacion(CONVERT_PROMPT, puntuacionCfg)).then(() => {
       setCopiedConvert(true);
       setTimeout(() => setCopiedConvert(false), 2000);
     });
+  };
+
+  // ── Acciones del editor (todos los usuarios) ──
+  const avisarEditor = (msg) => { setEditorMsg(msg); setTimeout(() => setEditorMsg(''), 2000); };
+
+  const borrarCodigo = () => {
+    if (!code.trim()) return;
+    if (!window.confirm('¿Borrar todo el código del editor?')) return;
+    setCode('');
+  };
+
+  const copiarCodigo = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      avisarEditor('✅ Código copiado');
+    } catch {
+      avisarEditor('⚠ No se pudo copiar');
+    }
+  };
+
+  const pegarCodigo = async () => {
+    try {
+      const texto = await navigator.clipboard.readText();
+      if (!texto.trim()) { avisarEditor('⚠ El portapapeles está vacío'); return; }
+      setCode(limpiarCodigoIA(texto));
+      avisarEditor('✅ Código pegado');
+    } catch {
+      alert('Tu navegador no permite leer el portapapeles desde la web. Haz clic en el editor y pulsa Ctrl+V (o mantén pulsado y «Pegar» en el móvil).');
+    }
+  };
+
+  // ── Generación directa con Gemini (solo admin) ──
+  const generarConGemini = async () => {
+    if (!geminiTexto.trim()) { alert('Escribe una descripción o pega el código.'); return; }
+    if (geminiModo === 'modificar' && !code.trim()) { alert('El editor está vacío: no hay código que modificar.'); return; }
+    setGeminiCargando(true);
+    setGeminiError('');
+    const prompt = conModuloPuntuacion(GEMINI_MODOS[geminiModo].build(geminiTexto.trim(), code), puntuacionCfg);
+    const MODELOS = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+    let ultimoError = null;
+    try {
+      for (const model of MODELOS) {
+        try {
+          const data = await callGeminiProxy({
+            model,
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.7, maxOutputTokens: 32768 },
+          });
+          const nuevo = limpiarCodigoIA(extractText(data));
+          if (!nuevo) throw new Error('Gemini no devolvió código');
+          setCode(nuevo);
+          setRunCode(nuevo);
+          setRuntimeError('');
+          setIframeKey(k => k + 1);
+          return;
+        } catch (err) {
+          ultimoError = err;
+        }
+      }
+      setGeminiError(ultimoError?.message || 'Error desconocido');
+    } finally {
+      setGeminiCargando(false);
+    }
   };
 
   const startDrag = (e) => {
@@ -335,6 +493,7 @@ export default function MiniAppCreator({ onAbrirViewer }) {
         descripcion: descripcion.trim(),
         materia,
         code,
+        puntuacion:  normalizarConfigPuntuacion(puntuacionCfg),
         autorId:     user.uid,
         autorNombre: user.displayName || user.email,
         autorEmail:  user.email,
@@ -349,9 +508,11 @@ export default function MiniAppCreator({ onAbrirViewer }) {
     }
   };
 
-  const handleCargarEnEditor = (appCode) => {
-    setCode(appCode);
-    setRunCode(appCode);
+  const handleCargarEnEditor = (app) => {
+    setCode(app.code);
+    setRunCode(app.code);
+    setPuntuacionCfg(app.puntuacion ? normalizarConfigPuntuacion(app.puntuacion) : PUNTUACION_DEFAULT);
+    setPruebaPuntuacion(null);
     setIframeKey(k => k + 1);
   };
 
@@ -383,6 +544,50 @@ export default function MiniAppCreator({ onAbrirViewer }) {
         <div style={{ background:'#ede9fe', borderRadius:8, padding:'8px 12px', fontSize:'0.75rem', color:'#5b21b6', lineHeight:1.5 }}>
           <strong>🌐 Para alojar en pikt.es:</strong> usa el botón <em>«Enviar como herramienta pública»</em> que aparece debajo del editor. El administrador revisará el código y, si lo aprueba, tu app quedará disponible en un enlace único tipo <code style={{ background:'#ddd6fe', padding:'1px 5px', borderRadius:4 }}>pikt.es/?miniapp=ID</code> que podrás compartir con tus alumnos sin que nadie necesite cuenta.
         </div>
+      </div>
+
+      {/* ── Módulo «Enviar al profesor» ───────────────────────────────────── */}
+      <div style={{ background:'#fffbeb', border:'1px solid #fde68a', borderRadius:10, padding:'10px 14px', marginBottom:14 }}>
+        <label style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer', fontWeight:700, fontSize:'0.82rem', color:'#92400e' }}>
+          <input type="checkbox" checked={puntuacionCfg.activo}
+            onChange={e => { setPuntuacionCfg(c => ({ ...c, activo: e.target.checked })); setPruebaPuntuacion(null); }}
+            style={{ width:16, height:16, accentColor:'#d97706', cursor:'pointer' }} />
+          📤 Añadir módulo «Enviar puntuación al profesor»
+        </label>
+        <p style={{ margin:'4px 0 0 24px', fontSize:'0.73rem', color:'#78350f', lineHeight:1.4 }}>
+          Actívalo si la app es un juego o ejercicio con resultado. Los prompts incluirán las instrucciones y, en la app publicada, el alumno podrá enviar su resultado con su nombre y el código del profesor (aparecerá en Informes).
+        </p>
+        {puntuacionCfg.activo && (
+          <div style={{ marginTop:10, marginLeft:24, display:'flex', flexDirection:'column', gap:8 }}>
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+              {Object.entries(TIPOS_PUNTUACION).map(([id, t]) => (
+                <button key={id} onClick={() => { setPuntuacionCfg(c => ({ ...c, tipo: id })); setPruebaPuntuacion(null); }}
+                  style={{ padding:'5px 12px', borderRadius:20, cursor:'pointer', fontSize:'0.75rem', fontWeight:700,
+                    background: puntuacionCfg.tipo === id ? '#d97706' : '#fff', color: puntuacionCfg.tipo === id ? '#fff' : '#92400e',
+                    border: `1px solid ${puntuacionCfg.tipo === id ? '#d97706' : '#fcd34d'}` }}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+              <input value={puntuacionCfg.etiqueta} maxLength={30}
+                onChange={e => setPuntuacionCfg(c => ({ ...c, etiqueta: e.target.value }))}
+                placeholder="Qué se mide (opcional): p. ej. «palabras», «estrellas»"
+                style={{ flex:'2 1 220px', padding:'6px 10px', borderRadius:8, border:'1px solid #fcd34d', fontSize:'0.8rem', outline:'none', background:'#fff' }} />
+              {puntuacionCfg.tipo === 'puntos' && (
+                <input type="number" min="1" value={puntuacionCfg.max ?? ''}
+                  onChange={e => setPuntuacionCfg(c => ({ ...c, max: e.target.value === '' ? null : Number(e.target.value) }))}
+                  placeholder="Máximo posible (opcional)"
+                  style={{ flex:'1 1 150px', padding:'6px 10px', borderRadius:8, border:'1px solid #fcd34d', fontSize:'0.8rem', outline:'none', background:'#fff' }} />
+              )}
+            </div>
+            <div style={{ fontSize:'0.72rem', color:'#78350f', lineHeight:1.5 }}>
+              Si escribes el código a mano, llama al terminar a{' '}
+              <code style={{ background:'#fef3c7', padding:'1px 6px', borderRadius:4 }}>{TIPOS_PUNTUACION[puntuacionCfg.tipo].ejemplo}</code>
+              {' '}— la app solo puede enviar esos números; nunca accede a la base de datos.
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Prompts para IA ───────────────────────────────────────────────── */}
@@ -418,14 +623,67 @@ export default function MiniAppCreator({ onAbrirViewer }) {
 
       </div>
 
+      {/* ── Generar directamente con Gemini (solo admin) ──────────────────── */}
+      {isAdmin && (
+        <div style={{ background:'linear-gradient(135deg, #eff6ff, #f5f3ff)', border:'1px solid #a5b4fc', borderRadius:10, padding:'12px 14px', marginBottom:14 }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, flexWrap:'wrap', marginBottom:8 }}>
+            <p style={{ margin:0, fontWeight:800, fontSize:'0.85rem', color:'#3730a3' }}>✨ Generar con Gemini (directo)</p>
+            <span style={{ fontSize:'0.68rem', color:'#6366f1', background:'#e0e7ff', padding:'2px 8px', borderRadius:20, fontWeight:700 }}>admin</span>
+          </div>
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
+            {Object.entries(GEMINI_MODOS).map(([id, m]) => (
+              <button key={id} onClick={() => setGeminiModo(id)} disabled={geminiCargando}
+                style={{ padding:'5px 12px', borderRadius:20, cursor:'pointer', fontSize:'0.75rem', fontWeight:700,
+                  background: geminiModo === id ? '#4f46e5' : '#fff', color: geminiModo === id ? '#fff' : '#4338ca',
+                  border: `1px solid ${geminiModo === id ? '#4f46e5' : '#c7d2fe'}` }}>
+                {m.label}
+              </button>
+            ))}
+          </div>
+          <textarea value={geminiTexto} onChange={e => setGeminiTexto(e.target.value)} disabled={geminiCargando}
+            placeholder={GEMINI_MODOS[geminiModo].placeholder}
+            rows={geminiModo === 'convertir' ? 6 : 3}
+            onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) generarConGemini(); }}
+            style={{ width:'100%', boxSizing:'border-box', padding:'8px 12px', borderRadius:8, border:'1px solid #c7d2fe', fontSize:'0.85rem', outline:'none', resize:'vertical',
+              fontFamily: geminiModo === 'convertir' ? "'Fira Code', monospace" : 'inherit', background:'#fff' }} />
+          <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:8, flexWrap:'wrap' }}>
+            <button onClick={generarConGemini} disabled={geminiCargando}
+              style={{ padding:'8px 18px', background: geminiCargando ? '#94a3b8' : 'linear-gradient(135deg, #4f46e5, #7c3aed)', color:'#fff', border:'none', borderRadius:8,
+                cursor: geminiCargando ? 'wait' : 'pointer', fontWeight:800, fontSize:'0.85rem' }}>
+              {geminiCargando ? '⏳ Generando…' : '✨ Generar y ejecutar'}
+            </button>
+            <span style={{ fontSize:'0.7rem', color:'#64748b' }}>
+              {geminiModo === 'modificar' ? 'Usa el código actual del editor. ' : 'Reemplaza el código del editor. '}
+              Diseño adaptado a pizarra, ordenador y móvil · Ctrl+Enter
+            </span>
+          </div>
+          {geminiError && (
+            <p style={{ margin:'8px 0 0', color:'#dc2626', fontSize:'0.78rem', fontFamily:'monospace', whiteSpace:'pre-wrap' }}>⚠ {geminiError}</p>
+          )}
+        </div>
+      )}
+
       {/* ── Editor ────────────────────────────────────────────────────────── */}
       <div style={{ marginBottom:8 }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6, gap:8, flexWrap:'wrap' }}>
           <span style={{ fontWeight:700, fontSize:'0.85rem', color:'#374151' }}>📝 Código JSX</span>
-          <button onClick={handleRun}
-            style={{ padding:'7px 18px', background:'linear-gradient(135deg, #6c63ff, #3b82f6)', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:800, fontSize:'0.9rem', boxShadow:'0 2px 6px rgba(108,99,255,0.35)' }}>
-            ▶ Ejecutar
-          </button>
+          <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+            {editorMsg && <span style={{ fontSize:'0.72rem', color:'#475569', fontWeight:700 }}>{editorMsg}</span>}
+            {[
+              { onClick: borrarCodigo, label: '🗑 Borrar', title: 'Borrar todo el código', color:'#dc2626', bg:'#fef2f2', border:'#fecaca' },
+              { onClick: copiarCodigo, label: '📋 Copiar', title: 'Copiar el código al portapapeles', color:'#374151', bg:'#f1f5f9', border:'#e2e8f0' },
+              { onClick: pegarCodigo,  label: '📥 Pegar',  title: 'Reemplazar el código por el del portapapeles', color:'#374151', bg:'#f1f5f9', border:'#e2e8f0' },
+            ].map(b => (
+              <button key={b.label} onClick={b.onClick} title={b.title}
+                style={{ padding:'6px 10px', background:b.bg, color:b.color, border:`1px solid ${b.border}`, borderRadius:8, cursor:'pointer', fontWeight:700, fontSize:'0.78rem' }}>
+                {b.label}
+              </button>
+            ))}
+            <button onClick={handleRun}
+              style={{ padding:'7px 18px', background:'linear-gradient(135deg, #6c63ff, #3b82f6)', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:800, fontSize:'0.9rem', boxShadow:'0 2px 6px rgba(108,99,255,0.35)' }}>
+              ▶ Ejecutar
+            </button>
+          </div>
         </div>
         <LiveProvider code={code} noInline language="jsx">
           <div style={{ borderRadius:8, overflow:'hidden', border:'1px solid #d1d5db' }}>
@@ -434,6 +692,14 @@ export default function MiniAppCreator({ onAbrirViewer }) {
           </div>
         </LiveProvider>
       </div>
+
+      {/* ── Prueba del módulo «Enviar al profesor» ────────────────────────── */}
+      {pruebaPuntuacion && (
+        <div style={{ background: pruebaPuntuacion.ok ? '#fffbeb' : '#fef2f2', border:`1px solid ${pruebaPuntuacion.ok ? '#fde68a' : '#fecaca'}`, borderRadius:8, padding:'8px 12px', marginBottom:8, display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:8 }}>
+          <span style={{ color: pruebaPuntuacion.ok ? '#92400e' : '#dc2626', fontSize:'0.8rem' }}>{pruebaPuntuacion.texto}</span>
+          <button onClick={() => setPruebaPuntuacion(null)} style={{ background:'none', border:'none', cursor:'pointer', color:'#9ca3af' }}>✕</button>
+        </div>
+      )}
 
       {/* ── Runtime error ─────────────────────────────────────────────────── */}
       {runtimeError && (

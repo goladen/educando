@@ -8,6 +8,7 @@ import {
     UserPlus, Check, Clock, LogIn
 } from 'lucide-react';
 import { Calendario, EscaparateMiembros, HorarioView } from './ComunidadesTab';
+import { fondoUrl } from '../utils/fondos';
 
 const AZUL = '#1565C0';
 
@@ -219,11 +220,11 @@ function CentroPublico({ comunidadId, tab, cursoFoco, unirse, onTab, onCurso, on
                                 <h3 style={{ margin: 0, color: '#2c3e50', flex: 1, cursor: 'pointer' }} onClick={() => onCurso(c.id)}>{c.nombre}</h3>
                                 <BtnCompartir titulo={`Calendario de ${c.nombre}`} url={`${origin}/comunidad/${comunidad.id}/curso/${c.id}`} />
                             </div>
-                            {!c.oculto && <Calendario usuario={{}} comunidad={comunidad} cursoId={c.id} cursoNombre={c.nombre} puedeEditar={false} sinFinde={!!c.sinFinde} acento={c.color} />}
+                            {!c.oculto && <Calendario usuario={{}} comunidad={comunidad} cursoId={c.id} cursoNombre={c.nombre} puedeEditar={false} sinFinde={!!c.sinFinde} acento={c.color} fondo={fondoUrl(c.fondoCalendario)} />}
                             {c.horario && !c.horarioOculto && (
                                 <div style={{ marginTop: c.oculto ? 0 : 14 }}>
                                     <h4 style={{ margin: '0 0 8px', color: '#2c3e50', fontSize: '0.92rem' }}>🕐 Horario</h4>
-                                    <HorarioView horario={c.horario} />
+                                    <HorarioView horario={c.horario} fondo={fondoUrl(c.fondoHorario)} />
                                 </div>
                             )}
                         </div>

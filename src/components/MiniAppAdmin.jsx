@@ -5,6 +5,7 @@ import {
   orderBy, query, serverTimestamp, addDoc,
 } from 'firebase/firestore';
 import { buildSrcdoc } from '../utils/miniAppSrcdoc';
+import { TIPOS_PUNTUACION } from '../utils/miniAppPuntuacion';
 
 const ESTADOS = { pendiente:'🕐 Pendiente', aprobada:'✅ Aprobada', rechazada:'❌ Rechazada' };
 const COLORES  = { pendiente:'#f59e0b', aprobada:'#10b981', rechazada:'#ef4444' };
@@ -154,6 +155,13 @@ export default function MiniAppAdmin({ usuario }) {
                   por <b>{app.autorNombre}</b> · {app.autorEmail}
                   {app.creadoEn?.toDate && (' · ' + app.creadoEn.toDate().toLocaleDateString('es-ES'))}
                   {app.materia && <span style={{ marginLeft:6, background:'#ede9fe', color:'#7c3aed', padding:'1px 6px', borderRadius:10, fontWeight:700 }}>{app.materia}</span>}
+                  {app.puntuacion?.activo && (
+                    <span style={{ marginLeft:6, background:'#fef3c7', color:'#b45309', padding:'1px 6px', borderRadius:10, fontWeight:700 }}>
+                      📤 Envía al profesor: {TIPOS_PUNTUACION[app.puntuacion.tipo]?.label || app.puntuacion.tipo}
+                      {app.puntuacion.etiqueta ? ` (${app.puntuacion.etiqueta})` : ''}
+                      {app.puntuacion.max ? ` · máx ${app.puntuacion.max}` : ''}
+                    </span>
+                  )}
                 </span>
               </div>
               <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>

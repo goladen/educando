@@ -31,6 +31,14 @@ export function buildSrcdoc(code) {
     window.addEventListener('unhandledrejection', function(e) {
       window.parent.postMessage({ type:'miniapp-error', msg: String(e.reason) }, '*');
     });
+    // Módulo «Enviar al profesor»: la web principal valida los datos y pide nombre + código
+    window.enviarPuntuacion = function(datos) {
+      try {
+        window.parent.postMessage({ type:'miniapp-score', datos: JSON.parse(JSON.stringify(datos || {})) }, '*');
+      } catch (e) {
+        window.parent.postMessage({ type:'miniapp-error', msg: 'enviarPuntuacion: datos no válidos' }, '*');
+      }
+    };
   </script>
   <style>* { box-sizing: border-box; } body { margin: 0; padding: 8px; font-family: system-ui, sans-serif; }</style>
 </head>

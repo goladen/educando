@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { buildSrcdoc } from '../utils/miniAppSrcdoc';
+import { sanitizarPuntuacion } from '../utils/miniAppPuntuacion';
+import MiniAppEnviarProfe from './MiniAppEnviarProfe';
 
 export default function MiniAppViewer({ miniappId, onBack }) {
   const [app, setApp]             = useState(null);
@@ -11,6 +13,8 @@ export default function MiniAppViewer({ miniappId, onBack }) {
   const [iframeKey, setIframeKey] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const iframeRef = useRef(null);
+  const [puntuacion, setPuntuacion]     = useState(null);
+  const [mostrarEnvio, setMostrarEnvio] = useState(false);
 
   useEffect(() => {
     const h = () => setIsFullscreen(!!document.fullscreenElement);
@@ -44,6 +48,21 @@ export default function MiniAppViewer({ miniappId, onBack }) {
     window.addEventListener('message', h);
     return () => window.removeEventListener('message', h);
   }, []);
+
+  // Puntuación enviada por la mini-app: solo desde su iframe y solo si el módulo está activo
+  useEffect(() => {
+    const h = (e) => {
+      if (e.data?.type !== 'miniapp-score') return;
+      if (!iframeRef.current || e.source !== iframeRef.current.contentWindow) return;
+      if (!app?.puntuacion?.activo) return;
+      const p = sanitizarPuntuacion(e.data.datos, app.puntuacion);
+      if (!p) { setRuntimeError('La app intentó enviar una puntuación con datos no válidos.'); return; }
+      setPuntuacion(p);
+      setMostrarEnvio(true);
+    };
+    window.addEventListener('message', h);
+    return () => window.removeEventListener('message', h);
+  }, [app]);
 
   if (loading) return (
     <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'100vh', fontFamily:'system-ui' }}>
@@ -84,6 +103,13 @@ export default function MiniAppViewer({ miniappId, onBack }) {
           style={{ background:'rgba(108,99,255,0.3)', border:'none', color:'#c4b5fd', borderRadius:8, padding:'6px 12px', cursor:'pointer', fontSize:'0.8rem', fontWeight:700 }}>
           ↺ Recargar
         </button>
+        {app.puntuacion?.activo && (
+          <button onClick={() => setMostrarEnvio(true)} disabled={!puntuacion}
+            title={puntuacion ? 'Enviar tu resultado al profesor' : 'Termina la actividad para poder enviar tu resultado'}
+            style={{ background: puntuacion ? 'linear-gradient(135deg,#f1c40f,#e67e22)' : 'rgba(255,255,255,0.07)', border:'none', color: puntuacion ? '#fff' : '#64748b', borderRadius:8, padding:'6px 12px', cursor: puntuacion ? 'pointer' : 'not-allowed', fontSize:'0.8rem', fontWeight:700 }}>
+            📤 Enviar al profesor
+          </button>
+        )}
         <button onClick={toggleFullscreen}
           style={{ background:'rgba(108,99,255,0.3)', border:'none', color:'#c4b5fd', borderRadius:8, padding:'6px 12px', cursor:'pointer', fontSize:'0.8rem', fontWeight:700 }}>
           {isFullscreen ? '⤡ Salir de pantalla completa' : '⛶ Pantalla completa'}
@@ -106,6 +132,10 @@ export default function MiniAppViewer({ miniappId, onBack }) {
         title={app.titulo}
         style={{ width:'100%', height:'calc(100vh - 58px)', border:'none', display:'block', background:'#fff' }}
       />
+
+      {mostrarEnvio && puntuacion && (
+        <MiniAppEnviarProfe app={app} config={app.puntuacion} puntuacion={puntuacion} onClose={() => setMostrarEnvio(false)} />
+      )}
     </div>
   );
 }

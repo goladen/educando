@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 
 .env
+
+# Copia local de las reglas de Firestore (se gestionan en la consola, no se suben)
+firebase-reglas/

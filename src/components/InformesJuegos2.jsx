@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import GruposTab, { AgrupacionesTab } from './GruposTab';
 import MapaAula from './MapaAula';
 import { QuienEsQuienPanel } from '../QuienEsQuien';
+import { PreguntasTexto } from '../EditorEscritura';
 import ModalAgregarAGrupo from './ModalAgregarAGrupo';
 import { db } from '../firebase';
 import {
@@ -53,8 +54,8 @@ const ConfigBadge = ({ icon, label }) => (
         {icon} {label}
     </span>
 );
-const TIPO_LABEL  = { OCA:'🦆 Oca Matemática', CAZABURBUJAS:'🔵 Cazaburbujas', PIKATRON:'⚡ Pikatron', SOPA:'🔤 Sopa de Letras', WORDLE:'🟩 Wordle', AHORCADO:'🪢 Ahorcado', MATHLE:'🔢 Mathle', PASAPALABRA:'🔠 Pasapalabra', FUNCIONES:'∫ Funciones', FUNCIONES_ANALISIS:'📈 Análisis de Funciones', APAREJADOS:'🃏 Aparejados', STORYCUBES:'🎲 Story Cubes', IRREGULAR_VERBS:'🇬🇧 Verbos Irregulares', THINKHOOT:'🦉 PiLive', MATHLIVE:'🧮 MathLive', OLYMPICLIVE:'🏅 OlympicLive', ALGEBRA:'✖️ Álgebra', DOMINO:'🁣 Dominó', ESTADISTICA:'📊 Estadística', MUSIC_COMPASS:'🎵 Entrenamiento Auditivo', MUSIC_GAMES:'🎼 Juegos Musicales', GEOGRAFIA:'🌍 Test de Geografía', BIOLOGIA:'🔬 Test de Biología', FUTBOLQUIZZ:'⚽ Fútbol Quizz', GEOMETRIX:'📐 Geometrix', GEOMETRIX_COMPUESTO:'🏗️ Geometrix · Compuestas', PERIMETRO_AREA:'📏 Perímetro y Área' };
-const TIPO_ICON   = { OCA:'🦆', CAZABURBUJAS:'🔵', PIKATRON:'⚡', SOPA:'🔤', WORDLE:'🟩', AHORCADO:'🪢', MATHLE:'🔢', PASAPALABRA:'🔠', FUNCIONES:'∫', FUNCIONES_ANALISIS:'📈', APAREJADOS:'🃏', STORYCUBES:'🎲', IRREGULAR_VERBS:'🇬🇧', THINKHOOT:'🦉', MATHLIVE:'🧮', OLYMPICLIVE:'🏅', ALGEBRA:'✖️', DOMINO:'🁣', ESTADISTICA:'📊', MUSIC_COMPASS:'🎵', MUSIC_GAMES:'🎼', GEOGRAFIA:'🌍', BIOLOGIA:'🔬', FUTBOLQUIZZ:'⚽', GEOMETRIX:'📐', GEOMETRIX_COMPUESTO:'🏗️', PERIMETRO_AREA:'📏' };
+const TIPO_LABEL  = { ESCRITURA:'✍️ Trabajo de escritura', MINIAPP:'⚡ Mini-app', OCA:'🦆 Oca Matemática', CAZABURBUJAS:'🔵 Cazaburbujas', PIKATRON:'⚡ Pikatron', SOPA:'🔤 Sopa de Letras', WORDLE:'🟩 Wordle', AHORCADO:'🪢 Ahorcado', MATHLE:'🔢 Mathle', PASAPALABRA:'🔠 Pasapalabra', FUNCIONES:'∫ Funciones', FUNCIONES_ANALISIS:'📈 Análisis de Funciones', APAREJADOS:'🃏 Aparejados', STORYCUBES:'🎲 Story Cubes', IRREGULAR_VERBS:'🇬🇧 Verbos Irregulares', THINKHOOT:'🦉 PiLive', MATHLIVE:'🧮 MathLive', OLYMPICLIVE:'🏅 OlympicLive', ALGEBRA:'✖️ Álgebra', DOMINO:'🁣 Dominó', ESTADISTICA:'📊 Estadística', MUSIC_COMPASS:'🎵 Entrenamiento Auditivo', MUSIC_GAMES:'🎼 Juegos Musicales', GEOGRAFIA:'🌍 Test de Geografía', BIOLOGIA:'🔬 Test de Biología', FUTBOLQUIZZ:'⚽ Fútbol Quizz', BUNKER:'🎯 Bunker Quiz', GEOMETRIX:'📐 Geometrix', GEOMETRIX_COMPUESTO:'🏗️ Geometrix · Compuestas', PERIMETRO_AREA:'📏 Perímetro y Área' };
+const TIPO_ICON   = { ESCRITURA:'✍️', MINIAPP:'⚡', OCA:'🦆', CAZABURBUJAS:'🔵', PIKATRON:'⚡', SOPA:'🔤', WORDLE:'🟩', AHORCADO:'🪢', MATHLE:'🔢', PASAPALABRA:'🔠', FUNCIONES:'∫', FUNCIONES_ANALISIS:'📈', APAREJADOS:'🃏', STORYCUBES:'🎲', IRREGULAR_VERBS:'🇬🇧', THINKHOOT:'🦉', MATHLIVE:'🧮', OLYMPICLIVE:'🏅', ALGEBRA:'✖️', DOMINO:'🁣', ESTADISTICA:'📊', MUSIC_COMPASS:'🎵', MUSIC_GAMES:'🎼', GEOGRAFIA:'🌍', BIOLOGIA:'🔬', FUTBOLQUIZZ:'⚽', BUNKER:'🎯', GEOMETRIX:'📐', GEOMETRIX_COMPUESTO:'🏗️', PERIMETRO_AREA:'📏' };
 const TIPO_LIVE = new Set(['THINKHOOT', 'MATHLIVE', 'OLYMPICLIVE']);
 const tipoLabel   = (t) => TIPO_LABEL[t] || ('🎮 ' + (t||'Juego'));
 const tipoIcon    = (t) => TIPO_ICON[t]  || '🎮';
@@ -544,6 +545,30 @@ export default function InformesJuegos({ usuario, googleToken }) {
                             {informesFiltFinal.map(inf => {
                                 const tipo = inf._tipoJuego || inf.tipo || '';
                                 const selec = seleccionados.has(inf.id);
+                                if (tipo === 'ESCRITURA') return (
+                                    <EscrituraCard
+                                        key={inf.id} inf={inf}
+                                        onBorrar={()=>borrar(inf.id)}
+                                        borrando={borrando===inf.id}
+                                        borradoOk={borrandoOk===inf.id}
+                                        modoSeleccion={modoSeleccion}
+                                        seleccionado={selec}
+                                        onSeleccionar={()=>toggleSeleccion(inf.id)}
+                                        onBuscarJugador={setBusquedaJugador}
+                                    />
+                                );
+                                if (tipo === 'MINIAPP') return (
+                                    <MiniAppCard
+                                        key={inf.id} inf={inf}
+                                        onBorrar={()=>borrar(inf.id)}
+                                        borrando={borrando===inf.id}
+                                        borradoOk={borrandoOk===inf.id}
+                                        modoSeleccion={modoSeleccion}
+                                        seleccionado={selec}
+                                        onSeleccionar={()=>toggleSeleccion(inf.id)}
+                                        onBuscarJugador={setBusquedaJugador}
+                                    />
+                                );
                                 if (tipo === 'ENIGMIC') return (
                                     <EnigmicCard
                                         key={inf.id} inf={inf}
@@ -643,6 +668,18 @@ export default function InformesJuegos({ usuario, googleToken }) {
                                 );
                                 if (tipo === 'LINEA_TIEMPO') return (
                                     <LineaTiempoCard
+                                        key={inf.id} inf={inf}
+                                        onBorrar={()=>borrar(inf.id)}
+                                        borrando={borrando===inf.id}
+                                        borradoOk={borrandoOk===inf.id}
+                                        modoSeleccion={modoSeleccion}
+                                        seleccionado={selec}
+                                        onSeleccionar={()=>toggleSeleccion(inf.id)}
+                                        onBuscarJugador={setBusquedaJugador}
+                                    />
+                                );
+                                if (tipo === 'BUNKER') return (
+                                    <BunkerCard
                                         key={inf.id} inf={inf}
                                         onBorrar={()=>borrar(inf.id)}
                                         borrando={borrando===inf.id}
@@ -1145,6 +1182,78 @@ const OAOACard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccion
 };
 
 // ─── Tarjeta especial para Línea del Tiempo ──────────────────────────────────
+// ─── Tarjeta especial para Bunker Quiz ───────────────────────────────────────
+const BunkerCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccionado, onSeleccionar, onBuscarJugador }) => {
+    const [confirmar, setConfirmar] = useState(false);
+    const j = (inf.jugadores || [])[0] || {};
+    // Informes antiguos: solo guardaban la puntuación en "aciertos" (sin total de preguntas)
+    const esAntiguo = j.total == null && j.puntuacion == null;
+    const acertadas = esAntiguo ? null : (j.aciertos ?? 0);
+    const total = j.total ?? 0;
+    const puntos = esAntiguo ? j.aciertos : j.puntuacion;
+    const pct = j.porcentaje ?? (total > 0 ? Math.round(((acertadas || 0) / total) * 100) : 0);
+    const pctColor = p => p >= 80 ? '#27ae60' : p >= 50 ? '#e67e22' : '#e74c3c';
+
+    return (
+        <div style={{ background:'white', borderRadius:13, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', overflow:'hidden', border: seleccionado ? '2px solid #1565C0' : '1.5px solid #e8e8e8', transition:'border 0.1s' }}>
+            <div onClick={modoSeleccion ? onSeleccionar : undefined} style={{ padding:'11px 15px', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', cursor: modoSeleccion ? 'pointer' : 'default', background: seleccionado ? '#f0f4ff' : 'white' }}>
+                {modoSeleccion && (
+                    <input type="checkbox" checked={seleccionado} onChange={e=>{e.stopPropagation();onSeleccionar();}} onClick={e=>e.stopPropagation()} style={{ width:17, height:17, cursor:'pointer', accentColor:'#1565C0', flexShrink:0 }}/>
+                )}
+                <span style={{ fontSize:'1.4rem' }}>🎯</span>
+                <div style={{ flex:1, minWidth:100 }}>
+                    <div style={{ fontWeight:700, color:'#2c3e50', fontSize:'0.92rem' }}>
+                        {inf.recursoTitulo || 'Bunker Quiz'}
+                        {inf.hoja && <span style={{ marginLeft:8, fontWeight:400, color:'#7f8c8d', fontSize:'0.8rem' }}>{inf.hoja}</span>}
+                    </div>
+                    <div style={{ fontSize:'0.74rem', color:'#95a5a6', marginTop:1 }}>
+                        {fmtFecha(inf.fecha)}
+                        {j.nombre && <> · <span onClick={e=>{e.stopPropagation();onBuscarJugador?.(j.nombre);}} style={{ cursor:'pointer', borderBottom:'1px dotted #aaa', fontWeight:600, color:'#2c3e50' }}>{j.nombre}</span></>}
+                        {j.curso && <span style={{ marginLeft:5, color:'#aaa' }}>({j.curso})</span>}
+                    </div>
+                </div>
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+                    {!esAntiguo && (
+                        <>
+                            <span style={{ padding:'2px 8px', borderRadius:20, background:'#e8f5e9', fontWeight:700, fontSize:'0.78rem', color:'#27ae60' }} title="Preguntas acertadas (sin disparar a la respuesta correcta)">
+                                ✓ {acertadas}/{total} preguntas
+                            </span>
+                            {j.fallos > 0 && (
+                                <span style={{ padding:'2px 8px', borderRadius:20, background:'#fdecea', fontWeight:700, fontSize:'0.78rem', color:'#e74c3c' }} title="Preguntas en las que disparó a la respuesta correcta">
+                                    ✗ {j.fallos}
+                                </span>
+                            )}
+                            <span style={{ padding:'2px 8px', borderRadius:20, background:'#f3f4f6', fontWeight:700, fontSize:'0.78rem', color:pctColor(pct) }}>{pct}%</span>
+                        </>
+                    )}
+                    <span style={{ padding:'2px 8px', borderRadius:20, background:'#fff4e0', fontWeight:700, fontSize:'0.78rem', color:'#e67e22' }}>
+                        ⭐ {puntos ?? '—'} pts
+                    </span>
+                    {j.completado != null && (
+                        <span style={{ padding:'2px 8px', borderRadius:20, background:'#f3f4f6', fontSize:'0.74rem', color:'#7f8c8d' }}>
+                            {j.completado ? '🏆 Completado' : '💀 Eliminado'}
+                        </span>
+                    )}
+                </div>
+                {!modoSeleccion && (
+                    <button onClick={e=>{e.stopPropagation();setConfirmar(true);}} style={{ padding:'4px 7px', borderRadius:7, border:'1px solid #fdd', background:'#fdecea', color:'#e74c3c', cursor:'pointer', flexShrink:0 }} title="Eliminar informe">
+                        <Trash2 size={13}/>
+                    </button>
+                )}
+            </div>
+            {confirmar && (
+                <div style={{ background:'#fdecea', borderTop:'1px solid #fdd', padding:'10px 15px', display:'flex', alignItems:'center', gap:10, fontSize:'0.83rem' }}>
+                    <AlertTriangle size={14} color="#e74c3c"/>
+                    <span style={{ flex:1, color:'#c0392b' }}>¿Eliminar este informe?</span>
+                    <button onClick={()=>{setConfirmar(false);onBorrar();}} disabled={borrando} style={{ padding:'4px 12px', borderRadius:7, border:'none', background:'#e74c3c', color:'white', cursor:'pointer', fontWeight:700, fontSize:'0.8rem' }}>{borrando?'Borrando…':'Eliminar'}</button>
+                    <button onClick={()=>setConfirmar(false)} style={{ padding:'4px 10px', borderRadius:7, border:'1px solid #ddd', background:'white', cursor:'pointer', fontSize:'0.8rem' }}>Cancelar</button>
+                </div>
+            )}
+            {borradoOk && <div style={{ background:'#e8f5e9', padding:'8px 15px', fontSize:'0.8rem', color:'#27ae60', display:'flex', alignItems:'center', gap:6 }}><CheckCircle size={13}/>Eliminado</div>}
+        </div>
+    );
+};
+
 const LineaTiempoCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccionado, onSeleccionar, onBuscarJugador }) => {
     const [confirmar, setConfirmar] = useState(false);
     const j = (inf.jugadores || [])[0] || {};
@@ -1438,6 +1547,94 @@ const PotenciasRaicesCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion
 };
 
 // ─── Tarjeta especial para Entrenamiento Auditivo (MusicCompass) ─────────────
+// Trabajo de escritura (Control de Aula · EditorEscritura.jsx): texto entregado + preguntas del profesor sobre él.
+const EscrituraCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccionado, onSeleccionar, onBuscarJugador }) => {
+    const [confirmar, setConfirmar] = useState(false);
+    const [abierto, setAbierto] = useState(false);
+    const j = (inf.jugadores || [])[0] || {};
+    const palabras = inf.palabras ?? j.palabras ?? 0;
+    const colorPal = (inf.maxPalabras > 0 && palabras > inf.maxPalabras) ? '#dc2626'
+        : (inf.minPalabras > 0 && palabras < inf.minPalabras) ? '#d97706' : '#16a34a';
+    const numPreguntas = (inf.preguntas || []).length;
+
+    return (
+        <div style={{ background:'white', borderRadius:13, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', border: seleccionado?'2px solid #1565C0':'1.5px solid #e8e8e8' }}>
+            <div onClick={modoSeleccion?onSeleccionar:()=>setAbierto(a=>!a)} style={{ padding:'11px 15px', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', cursor:'pointer' }}>
+                {modoSeleccion && <input type="checkbox" checked={seleccionado} onChange={e=>{e.stopPropagation();onSeleccionar();}} onClick={e=>e.stopPropagation()} style={{ width:17,height:17,cursor:'pointer',accentColor:'#1565C0' }}/>}
+                <span style={{ fontSize:'1.4rem' }}>✍️</span>
+                <div style={{ flex:1, minWidth:150 }}>
+                    <div style={{ fontWeight:700, color:'#2c3e50', fontSize:'0.92rem' }}>Escritura · {inf.titulo || 'sin título'}</div>
+                    <div style={{ fontSize:'0.74rem', color:'#95a5a6' }}>
+                        {fmtFecha(inf.fecha)}
+                        {j.nombre && <> · <span onClick={e=>{e.stopPropagation();onBuscarJugador?.(j.nombre);}} style={{ cursor:'pointer', borderBottom:'1px dotted #aaa', fontWeight:600, color:'#2c3e50' }}>{j.nombre}</span></>}
+                        {inf.sala && <span style={{ marginLeft:5, color:'#aaa' }}>(sala {inf.sala})</span>}
+                    </div>
+                </div>
+                <span style={{ padding:'2px 8px', borderRadius:20, background:'#f3f4f6', fontWeight:700, fontSize:'0.78rem', color:colorPal }}>{palabras} palabras</span>
+                <span style={{ padding:'2px 8px', borderRadius:20, background:'#ecfeff', fontWeight:700, fontSize:'0.78rem', color:'#0e7490' }}>❓ {numPreguntas}</span>
+                {inf.pegadosBloqueados > 0 && <span title="Intentos de pegar bloqueados" style={{ padding:'2px 8px', borderRadius:20, background:'#fee2e2', fontWeight:700, fontSize:'0.78rem', color:'#b91c1c' }}>🚫 {inf.pegadosBloqueados}</span>}
+                {inf.salidasPestana > 0 && <span title="Salidas de la pestaña" style={{ padding:'2px 8px', borderRadius:20, background:'#fef3c7', fontWeight:700, fontSize:'0.78rem', color:'#b45309' }}>👀 {inf.salidasPestana}</span>}
+                {!modoSeleccion && (abierto ? <ChevronUp size={16} color="#95a5a6"/> : <ChevronDown size={16} color="#95a5a6"/>)}
+                {!modoSeleccion && <button onClick={e=>{e.stopPropagation();setConfirmar(true);}} style={{ padding:'4px 7px', borderRadius:7, border:'1px solid #fdd', background:'#fdecea', color:'#e74c3c', cursor:'pointer' }}><Trash2 size={13}/></button>}
+            </div>
+            {abierto && !modoSeleccion && (
+                <div style={{ borderTop:'1px solid #f0f0f0', padding:'12px 15px', display:'flex', flexDirection:'column', gap:12 }}>
+                    {inf.consigna && <div style={{ fontSize:'0.82rem', color:'#475569', background:'#f0fdfa', borderLeft:'4px solid #14b8a6', borderRadius:8, padding:'7px 10px', whiteSpace:'pre-wrap' }}>{inf.consigna}</div>}
+                    <div style={{ whiteSpace:'pre-wrap', fontFamily:"Georgia, 'Times New Roman', serif", fontSize:'1rem', lineHeight:1.7, color:'#1e293b', maxHeight:420, overflowY:'auto' }}>
+                        {inf.texto || <span style={{ color:'#94a3b8' }}>(vacío)</span>}
+                    </div>
+                    <PreguntasTexto key={inf.id} informeId={inf.id} preguntasIniciales={inf.preguntas || []} />
+                </div>
+            )}
+            {confirmar && (
+                <div style={{ background:'#fdecea', borderTop:'1px solid #fdd', padding:'10px 15px', display:'flex', alignItems:'center', gap:10, fontSize:'0.83rem' }}>
+                    <AlertTriangle size={14} color="#e74c3c"/>
+                    <span style={{ flex:1, color:'#c0392b' }}>¿Eliminar este texto y sus preguntas?</span>
+                    <button onClick={()=>{setConfirmar(false);onBorrar();}} disabled={borrando} style={{ padding:'4px 12px', borderRadius:7, border:'none', background:'#e74c3c', color:'white', cursor:'pointer', fontWeight:700, fontSize:'0.8rem' }}>{borrando?'Borrando…':'Eliminar'}</button>
+                    <button onClick={()=>setConfirmar(false)} style={{ padding:'4px 10px', borderRadius:7, border:'1px solid #ddd', background:'white', cursor:'pointer', fontSize:'0.8rem' }}>Cancelar</button>
+                </div>
+            )}
+            {borradoOk && <div style={{ background:'#e8f5e9', padding:'8px 15px', fontSize:'0.8rem', color:'#27ae60', display:'flex', alignItems:'center', gap:6 }}><CheckCircle size={13}/>Eliminado</div>}
+        </div>
+    );
+};
+
+const MiniAppCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccionado, onSeleccionar, onBuscarJugador }) => {
+    const [confirmar, setConfirmar] = useState(false);
+    const j = (inf.jugadores || [])[0] || {};
+    const pct = j.porcentaje;
+    const pctColor = p => p >= 80 ? '#27ae60' : p >= 50 ? '#e67e22' : '#e74c3c';
+
+    return (
+        <div style={{ background:'white', borderRadius:13, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', border: seleccionado?'2px solid #1565C0':'1.5px solid #e8e8e8' }}>
+            <div onClick={modoSeleccion?onSeleccionar:undefined} style={{ padding:'11px 15px', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', cursor:modoSeleccion?'pointer':'default' }}>
+                {modoSeleccion && <input type="checkbox" checked={seleccionado} onChange={e=>{e.stopPropagation();onSeleccionar();}} onClick={e=>e.stopPropagation()} style={{ width:17,height:17,cursor:'pointer',accentColor:'#1565C0' }}/>}
+                <span style={{ fontSize:'1.4rem' }}>⚡</span>
+                <div style={{ flex:1, minWidth:150 }}>
+                    <div style={{ fontWeight:700, color:'#2c3e50', fontSize:'0.92rem' }}>Mini-app · {inf.recursoTitulo || 'sin título'}</div>
+                    <div style={{ fontSize:'0.74rem', color:'#95a5a6' }}>
+                        {fmtFecha(inf.fecha)}
+                        {j.nombre && <> · <span onClick={e=>{e.stopPropagation();onBuscarJugador?.(j.nombre);}} style={{ cursor:'pointer', borderBottom:'1px dotted #aaa', fontWeight:600, color:'#2c3e50' }}>{j.nombre}</span></>}
+                        {j.curso && <span style={{ marginLeft:5, color:'#aaa' }}>({j.curso})</span>}
+                    </div>
+                </div>
+                {j.resumen && <span style={{ padding:'2px 8px', borderRadius:20, background:'#fef3c7', fontWeight:700, fontSize:'0.78rem', color:'#b45309' }}>📤 {j.resumen}</span>}
+                {pct != null && <span style={{ padding:'2px 8px', borderRadius:20, background:'#f3f4f6', fontWeight:700, fontSize:'0.78rem', color:pctColor(pct) }}>{pct}%</span>}
+                {!modoSeleccion && <button onClick={e=>{e.stopPropagation();setConfirmar(true);}} style={{ padding:'4px 7px', borderRadius:7, border:'1px solid #fdd', background:'#fdecea', color:'#e74c3c', cursor:'pointer' }}><Trash2 size={13}/></button>}
+            </div>
+            {confirmar && (
+                <div style={{ background:'#fdecea', borderTop:'1px solid #fdd', padding:'10px 15px', display:'flex', alignItems:'center', gap:10, fontSize:'0.83rem' }}>
+                    <AlertTriangle size={14} color="#e74c3c"/>
+                    <span style={{ flex:1, color:'#c0392b' }}>¿Eliminar este informe?</span>
+                    <button onClick={()=>{setConfirmar(false);onBorrar();}} disabled={borrando} style={{ padding:'4px 12px', borderRadius:7, border:'none', background:'#e74c3c', color:'white', cursor:'pointer', fontWeight:700, fontSize:'0.8rem' }}>{borrando?'Borrando…':'Eliminar'}</button>
+                    <button onClick={()=>setConfirmar(false)} style={{ padding:'4px 10px', borderRadius:7, border:'1px solid #ddd', background:'white', cursor:'pointer', fontSize:'0.8rem' }}>Cancelar</button>
+                </div>
+            )}
+            {borradoOk && <div style={{ background:'#e8f5e9', padding:'8px 15px', fontSize:'0.8rem', color:'#27ae60', display:'flex', alignItems:'center', gap:6 }}><CheckCircle size={13}/>Eliminado</div>}
+        </div>
+    );
+};
+
 const EnigmicCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccionado, onSeleccionar, onBuscarJugador }) => {
     const [confirmar, setConfirmar] = useState(false);
     const j = (inf.jugadores || [])[0] || {};

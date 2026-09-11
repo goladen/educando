@@ -21,6 +21,7 @@ import {
 import { onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { Radio, Rocket, Bell, Link as LinkIcon, LogIn, Trophy, Gamepad2 } from 'lucide-react';
 import usePresenceRoom, { ESTADO } from './hooks/usePresenceRoom';
+import { EditorEscrituraAlumno, FormEscritura, PanelEscrituraProfesor } from './EditorEscritura';
 
 // Juegos puntuables cargados bajo demanda (comparten el contrato modoOlimpico).
 const PasapalabraGame  = lazy(() => import('./PasapalabraGame'));
@@ -152,6 +153,7 @@ export function TeacherControlPanel() {
 
     const roomRef = useMemo(() => doc(db, 'control_rooms', codigo), [codigo]);
     const game = room?.game || null;
+    const escritura = room?.escritura || null;
 
     // Sesión del profesor (crear sala requiere estar autenticado — regla request.auth != null).
     useEffect(() => onAuthStateChanged(auth, (u) => setUser(u)), []);
@@ -180,6 +182,7 @@ export function TeacherControlPanel() {
                     currentRoute: null,
                     currentLabel: null,
                     game: null,
+                    escritura: null,
                 }, { merge: true });
                 if (vivo) setSalaAbierta(true);
             } catch (e) { console.error('No se pudo crear la sala', e); }
@@ -229,6 +232,15 @@ export function TeacherControlPanel() {
             .finally(() => setCargandoRec(false));
     }, [user]);
 
+    // Código de profesor (users/{uid}.codigoProfesor): los textos de escritura se guardan en Informes con él.
+    const [codigoProfesor, setCodigoProfesor] = useState(null);
+    useEffect(() => {
+        if (!user?.uid) return;
+        getDoc(doc(db, 'users', user.uid))
+            .then((snap) => setCodigoProfesor(snap.data()?.codigoProfesor || ''))
+            .catch(() => setCodigoProfesor(''));
+    }, [user]);
+
     useEffect(() => {
         const id = setInterval(() => forceTick((t) => t + 1), 3000);
         return () => clearInterval(id);
@@ -261,6 +273,7 @@ export function TeacherControlPanel() {
         try {
             await updateDoc(roomRef, {
                 currentRoute: null, currentLabel: null,
+                escritura: deleteField(),
                 game: {
                     launchId, modo: modoSel,
                     recursoId: recursoSel.id,
@@ -294,12 +307,35 @@ export function TeacherControlPanel() {
     // Lanzador de actividad web (iframe, no puntuable).
     const lanzarWeb = async (url, label) => {
         if (!url) return;
+        if (escritura && !window.confirm('Hay un trabajo de escritura abierto. ¿Cerrarlo y lanzar la actividad? (Descarga antes los textos)')) return;
         try {
             await updateDoc(roomRef, {
                 game: deleteField(),
+                escritura: deleteField(),
                 currentRoute: absoluteUrl(url), currentLabel: label || url,
             });
         } catch (e) { console.error(e); }
+    };
+
+    // Trabajo de escritura (EditorEscritura.jsx): editor sin corrector ni pegado en cada dispositivo.
+    const lanzarEscritura = async (config) => {
+        try {
+            await updateDoc(roomRef, {
+                game: deleteField(),
+                currentRoute: null, currentLabel: null,
+                escritura: {
+                    ...config,
+                    codigoProfesor: codigoProfesor || null,   // las entregas se guardan en informes_juegos con él
+                    profesorUid: user?.uid || null,
+                    taskId: `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                    state: 'WRITING',
+                    startedAt: Date.now(),
+                },
+            });
+        } catch (e) { console.error(e); }
+    };
+    const cerrarEscritura = async () => {
+        try { await updateDoc(roomRef, { escritura: deleteField() }); } catch (e) { console.error(e); }
     };
     const detenerWeb = async () => {
         try { await updateDoc(roomRef, { currentRoute: null, currentLabel: null }); } catch (e) { console.error(e); }
@@ -401,10 +437,20 @@ export function TeacherControlPanel() {
                 <ResumenCard color="#f59e0b" label="Incidencias de foco" valor={totalIncidencias} icon={<Bell size={16} />} />
                 <ResumenCard color="#059669" label="Estado sala" valor={salaAbierta ? 'Abierta' : '…'} />
                 {game && <ResumenCard color="#7c3aed" label="Partida" valor={`${game.recursoTitulo} · ${game.modo}`} />}
+                {escritura && <ResumenCard color="#0f766e" label="Escritura" valor={escritura.titulo} />}
             </div>
 
-            {/* ── ZONA DE PARTIDA PUNTUABLE ── */}
-            {game ? (
+            {/* ── ZONA DE PARTIDA PUNTUABLE / TRABAJO DE ESCRITURA ── */}
+            {escritura && !game ? (
+                <PanelEscrituraProfesor
+                    tarea={escritura}
+                    alumnos={alumnos}
+                    codigo={codigo}
+                    roomRef={roomRef}
+                    esConectado={(a) => estadoEfectivo(a) !== ESTADO.DESCONECTADO}
+                    onCerrar={cerrarEscritura}
+                />
+            ) : game ? (
                 <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 14, padding: 16, marginBottom: 18 }}>
                     {game.state === 'FIN' ? (
                         <>
@@ -443,6 +489,7 @@ export function TeacherControlPanel() {
                     )}
                 </div>
             ) : (
+                <>
                 <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 14, padding: 16, marginBottom: 18 }}>
                     <h3 style={{ margin: '0 0 12px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}>
                         <Gamepad2 size={20} color="#7c3aed" /> Lanzar partida puntuable
@@ -495,6 +542,8 @@ export function TeacherControlPanel() {
                         </>
                     )}
                 </div>
+                <FormEscritura onLanzar={lanzarEscritura} numConectados={conectados.length} codigoProfesor={codigoProfesor} />
+                </>
             )}
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(340px,100%),1fr))', gap: 18 }}>
@@ -724,8 +773,11 @@ export function StudentJoinView({ codigoInicial = '', onExit }) {
 
             {/* Contenido */}
             <div style={{ flex: 1, position: 'relative' }}>
-                {/* 1) Partida puntuable en curso y aún no la he terminado → jugar */}
-                {jugandoAhora ? (
+                {/* 0) Trabajo de escritura abierto → editor */}
+                {room?.escritura ? (
+                    <EditorEscrituraAlumno key={room.escritura.taskId} tarea={room.escritura} codigo={codigo} studentId={studentId} nombre={nombre} focusLostCount={focusLostCount} />
+                /* 1) Partida puntuable en curso y aún no la he terminado → jugar */
+                ) : jugandoAhora ? (
                     recursoListo ? (
                         <div style={{ position: 'absolute', inset: 0, overflow: 'auto' }}>
                             <JuegoOlimpicoRunner

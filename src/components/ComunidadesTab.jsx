@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '../firebase';
 import { descargarPNG, descargarPDF, compartirClassroom, imprimirElemento } from '../utils/exportar';
+import { FONDOS, fondoUrl, fondoBg } from '../utils/fondos';
 import {
     collection, query, where, getDocs, getDoc, setDoc,
     doc, addDoc, updateDoc, deleteDoc, arrayUnion, arrayRemove,
@@ -54,6 +55,30 @@ function ExportBar({ targetRef, nombre, classroomUrl, compact, pdfLandscape }) {
             <button onClick={() => run(imprimirElemento)} disabled={busy} style={st.miniBtn} title="Imprimir"><Printer size={13} />{compact ? '' : ' Imprimir'}</button>
             {classroomUrl && <button onClick={() => compartirClassroom(classroomUrl, nombre)} style={st.miniBtn} title="Compartir en Google Classroom"><GraduationCap size={13} />{compact ? '' : ' Classroom'}</button>}
         </div>
+    );
+}
+
+// ─── Selector de fondo con miniaturas ─────────────────────────────────────────
+function SelectorFondo({ value, onChange }) {
+    return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+            {FONDOS.map(f => {
+                const activo = (value || '') === f.id;
+                return (
+                    <button key={f.id} onClick={() => onChange(f.id)} title={f.label}
+                        style={{
+                            width: 30, height: 30, borderRadius: 7, cursor: 'pointer', padding: 0, flexShrink: 0,
+                            border: activo ? `2.5px solid ${AZUL}` : '1.5px solid #cdd6ea',
+                            backgroundImage: f.url ? `url(${f.url})` : 'none',
+                            backgroundSize: 'cover', backgroundPosition: 'center',
+                            backgroundColor: f.url ? '#fff' : '#f1f3f7',
+                            position: 'relative', overflow: 'hidden',
+                        }}>
+                        {!f.url && <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#95a5a6', fontSize: '0.85rem' }}>⊘</span>}
+                    </button>
+                );
+            })}
+        </span>
     );
 }
 
@@ -836,7 +861,7 @@ function ModalListado({ usuario, comunidad, onClose, onGuardado }) {
 }
 
 // ─── Calendario (mes) ─────────────────────────────────────────────────────────
-export function Calendario({ usuario, comunidad, cursoId, cursoNombre, puedeEditar, sinFinde = false, acento }) {
+export function Calendario({ usuario, comunidad, cursoId, cursoNombre, puedeEditar, sinFinde = false, acento, fondo }) {
     const ACC = acento || AZUL;
     const hoy = new Date();
     const [eventos, setEventos] = useState([]);
@@ -954,7 +979,7 @@ export function Calendario({ usuario, comunidad, cursoId, cursoNombre, puedeEdit
                 <ExportBar targetRef={calRef} nombre={nombreExport} classroomUrl={publicUrl} compact />
             </div>
 
-            <div ref={calRef} style={{ background: 'white', padding: 6, borderRadius: 8 }}>
+            <div ref={calRef} style={{ background: 'white', padding: fondo ? 10 : 6, borderRadius: 8, ...fondoBg(fondo) }}>
             <div style={{ textAlign: 'center', fontWeight: 700, color: '#2c3e50', fontSize: '0.92rem', marginBottom: 6 }}>{cursoNombre ? cursoNombre + ' · ' : ''}{MESES[ver.m]} {ver.y}</div>
             <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols},1fr)`, gap: 3 }}>
                 {(sinFinde ? ['L', 'M', 'X', 'J', 'V'] : ['L', 'M', 'X', 'J', 'V', 'S', 'D']).map((d, i) => <div key={i} style={{ textAlign: 'center', fontSize: '0.7rem', fontWeight: 700, color: '#95a5a6', padding: 2 }}>{d}</div>)}
@@ -1170,7 +1195,7 @@ const contenidoMateria = (P, m) => m ? (<>
 </>) : null;
 
 // Vista de solo lectura del horario (para la parte pública)
-export function HorarioView({ horario }) {
+export function HorarioView({ horario, fondo }) {
     if (!horario || !horario.materias) return null;
     const franjas = horario.franjas || [];
     const celdas = horario.celdas || {};
@@ -1179,7 +1204,7 @@ export function HorarioView({ horario }) {
     const P = getPlantilla(horario.plantilla);
     return (
         <div style={{ overflowX: 'auto' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '72px repeat(5, minmax(80px, 1fr))', gap: P.gap, minWidth: 500, ...P.wrap }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '72px repeat(5, minmax(80px, 1fr))', gap: P.gap, minWidth: 500, ...P.wrap, ...fondoBg(fondo) }}>
                 <div />
                 {DIAS_SEM.map(d => <div key={d} style={P.dia}>{d}</div>)}
                 {franjas.map((f, i) => (
@@ -1196,7 +1221,7 @@ export function HorarioView({ horario }) {
     );
 }
 
-function HorarioCurso({ horario, onSave, nombre, publicUrl }) {
+function HorarioCurso({ horario, onSave, nombre, publicUrl, fondo }) {
     const gridRef = useRef();
     const h = {
         franjas: horario?.franjas || ['1', '2', '3', '4', '5', '6', '7', '8'],
@@ -1260,7 +1285,7 @@ function HorarioCurso({ horario, onSave, nombre, publicUrl }) {
             </div>
 
             <div style={{ overflowX: 'auto' }}>
-                <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: '72px repeat(5, minmax(88px, 1fr))', gap: P.gap, minWidth: 520, ...P.wrap }}>
+                <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: '72px repeat(5, minmax(88px, 1fr))', gap: P.gap, minWidth: 520, ...P.wrap, ...fondoBg(fondo) }}>
                     <div />
                     {DIAS_SEM.map(d => <div key={d} style={P.dia}>{d}</div>)}
                     {h.franjas.map((f, i) => (
@@ -1513,10 +1538,14 @@ function CursoDetalle({ usuario, comunidad, curso, onBack }) {
                             <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
                                 <input type="checkbox" checked={!!curso.horarioOculto} onChange={e => actualizarCurso({ horarioOculto: e.target.checked })} /> Ocultar horario en la parte pública
                             </label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                🖼️ Fondo <SelectorFondo value={curso.fondoHorario} onChange={id => actualizarCurso({ fondoHorario: id })} />
+                            </div>
                         </div>
                         <HorarioCurso horario={curso.horario || priv.horario} onSave={saveHorario}
                             nombre={`Horario ${curso.nombre}`}
-                            publicUrl={curso.horarioOculto ? null : `${window.location.origin}/comunidad/${comunidad.id}/curso/${curso.id}`} />
+                            publicUrl={curso.horarioOculto ? null : `${window.location.origin}/comunidad/${comunidad.id}/curso/${curso.id}`}
+                            fondo={fondoUrl(curso.fondoHorario)} />
                     </div>
                 )}
                 {sub === 'plano' && (planoEdit ? (
@@ -1565,8 +1594,11 @@ function CursoDetalle({ usuario, comunidad, curso, onBack }) {
                             <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
                                 <input type="checkbox" checked={!!curso.oculto} onChange={e => actualizarCurso({ oculto: e.target.checked })} /> Ocultar en la parte pública
                             </label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                🖼️ Fondo <SelectorFondo value={curso.fondoCalendario} onChange={id => actualizarCurso({ fondoCalendario: id })} />
+                            </div>
                         </div>
-                        <Calendario usuario={usuario} comunidad={comunidad} cursoId={curso.id} cursoNombre={curso.nombre} puedeEditar sinFinde={!!curso.sinFinde} acento={curso.color} />
+                        <Calendario usuario={usuario} comunidad={comunidad} cursoId={curso.id} cursoNombre={curso.nombre} puedeEditar sinFinde={!!curso.sinFinde} acento={curso.color} fondo={fondoUrl(curso.fondoCalendario)} />
                     </div>
                 )}
             </>}
@@ -1764,8 +1796,11 @@ function PanelCalendarios({ usuario, comunidad }) {
                                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
                                     <input type="checkbox" checked={!!cursoSel.oculto} onChange={e => actualizarCurso({ oculto: e.target.checked })} /> Ocultar en la parte pública
                                 </label>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                    🖼️ Fondo <SelectorFondo value={cursoSel.fondoCalendario} onChange={id => actualizarCurso({ fondoCalendario: id })} />
+                                </div>
                             </div>
-                            <Calendario usuario={usuario} comunidad={comunidad} cursoId={cursoSel.id} cursoNombre={cursoSel.nombre} acento={cursoSel.color} sinFinde={!!cursoSel.sinFinde} puedeEditar />
+                            <Calendario usuario={usuario} comunidad={comunidad} cursoId={cursoSel.id} cursoNombre={cursoSel.nombre} acento={cursoSel.color} sinFinde={!!cursoSel.sinFinde} puedeEditar fondo={fondoUrl(cursoSel.fondoCalendario)} />
                         </div>
                     )}
         </div>

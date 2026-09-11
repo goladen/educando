@@ -59,6 +59,7 @@ import GeografiaApp from './GeografiaApp';
 import ImperiosGame from './ImperiosGame';
 import ComunidadesPublico from './ComunidadesPublico';
 import QuienEsQuien from '../QuienEsQuien';
+import QuienEsQuienHistorico from '../QuienEsQuienHistorico';
 import BiologiaApp  from './BiologiaApp';
 import HerramientasClase, { PizarraApp } from '../GestionAula';
 import AlgebraApp from '../Algebra';
@@ -1046,6 +1047,14 @@ export const GAME_INFO = {
         materias: ['Tutoría', 'Universal'],
         etapas: ['Primaria', 'ESO', 'Bachillerato'],
     },
+    QUIEN_HISTORICO: {
+        descripcion: 'Juego de deducción sobre personajes históricos (mandatarios y líderes, artistas y científicos). Hay un personaje secreto en un tablero de caras y el juego revela pistas una a una (sexo, época, continente, campo, país y datos curiosos). El jugador va tachando las caras que no encajan hasta adivinar quién es. Menos pistas usadas = más estrellas.',
+        tipoPreguntas: 'Deducción por descarte a partir de pistas sobre 90 personajes históricos (30 mandatarios, 30 artistas, 30 científicos).',
+        biblioteca: 'Sí, base de datos incluida de 90 personajes con fotos, época, nacionalidad y datos curiosos. Se puede jugar por categoría o mezclados.',
+        multiplayer: 'Individual.',
+        materias: ['Historia', 'Ciencias Sociales', 'Cultura general'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
     BIOLOGIA: {
         descripcion: 'Herramienta interactiva de biología: anatomía humana, célula, ecosistemas, reino animal y vegetal, genética y clasificación de seres vivos.',
         tipoPreguntas: 'Identificación de estructuras, completar etiquetas, quiz de conceptos biológicos.',
@@ -1494,6 +1503,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                 if (juegoParam.toLowerCase() === 'geografia')      { setGeografiaApp(true);   return; }
                 if (juegoParam.toLowerCase() === 'imperios')       { setImperiosApp(true);    return; }
                 if (juegoParam.toLowerCase() === 'quienesquien')   { setQuienEsQuienApp(true); return; }
+                if (juegoParam.toLowerCase() === 'quienhistorico') { setQuienHistoricoApp(true); return; }
                 if (juegoParam.toLowerCase() === 'pizarra')        { setPizarraApp(true);     return; }
                 if (juegoParam.toLowerCase() === 'biologia')       { setBiologiaApp(true);    return; }
                 if (juegoParam.toLowerCase() === 'vistas_didricas') { setVistasDidricas(true); return; }
@@ -1638,6 +1648,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
     const [imperiosApp,         setImperiosApp]         = useState(false);
     const [comunidadesApp,      setComunidadesApp]      = useState(false);
     const [quienEsQuienApp,     setQuienEsQuienApp]     = useState(false);
+    const [quienHistoricoApp,   setQuienHistoricoApp]   = useState(false);
     const [pizarraApp,          setPizarraApp]          = useState(false);
     const [biologiaApp,         setBiologiaApp]         = useState(false);
     const [gestionAula,         setGestionAula]         = useState(() => { const p = new URLSearchParams(window.location.search); return !!(p.get('gestion') || p.get('pizarra')); });
@@ -1673,6 +1684,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
     useEffect(() => { if (!imperiosApp) refrescarRegistros(); }, [imperiosApp]);
     // ¿Quién es quién? usa su propio estado (quienEsQuienApp): refrescar al cerrarlo.
     useEffect(() => { if (!quienEsQuienApp) refrescarRegistros(); }, [quienEsQuienApp]);
+    useEffect(() => { if (!quienHistoricoApp) refrescarRegistros(); }, [quienHistoricoApp]);
     const totalRegistros = resumenRegistros.reduce((s, g) => s + g.count, 0);
     // Mapeo id-de-tarjeta → tipo-de-registro cuando no coinciden.
     const REGISTRO_TIPO_DE = { GEOMETRIX: 'GEOMETRIX_COMPUESTO', POLINOMIOS: 'ALGEBRA', MATES_OAOA: 'OAOA' };
@@ -2030,6 +2042,7 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
             GEOGRAFIA:          () => setGeografiaApp(true),
             IMPERIOS:           () => setImperiosApp(true),
             QUIEN_ES_QUIEN:     () => setQuienEsQuienApp(true),
+            QUIEN_HISTORICO:    () => setQuienHistoricoApp(true),
             PIZARRA_TEMATICA:   () => setPizarraApp(true),
             BIOLOGIA:           () => setBiologiaApp(true),
             GESTION_AULA:       () => setGestionAula(true),
@@ -2215,6 +2228,10 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
 
     if (quienEsQuienApp) return (
         <QuienEsQuien usuario={usuario} onExit={() => { setQuienEsQuienApp(false); window.history.pushState({}, '', '/'); }} />
+    );
+
+    if (quienHistoricoApp) return (
+        <QuienEsQuienHistorico onExit={() => { setQuienHistoricoApp(false); window.history.pushState({}, '', '/'); }} />
     );
     if (pizarraApp) return (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#f1f5f9', overflow: 'auto', padding: '54px 12px 20px' }}>
@@ -3332,6 +3349,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                     { id: 'COMUNIDADES', label: 'Comunidades', emoji: '👥', color: '#1565C0', action: () => { setComunidadesApp(true); window.history.pushState({}, '', '/comunidades'); }, shareable: true, shareUrl: `${window.location.origin}/comunidades` },
                     { id: 'IMPERIOS',            label: 'Imperios',             emoji: '🏛️', color: '#b45309', action: () => { setImperiosApp(true); window.history.pushState({}, '', '/imperios'); }, shareable: true, shareUrl: `${window.location.origin}/imperios` },
                     { id: 'QUIEN_ES_QUIEN',      label: '¿Quién es quién?',     emoji: '🕵️', color: '#7c3aed', action: () => { setQuienEsQuienApp(true); window.history.pushState({}, '', '/quienesquien'); }, shareable: true, shareUrl: `${window.location.origin}/quienesquien` },
+                    { id: 'QUIEN_HISTORICO',     label: '¿Quién es quién? histórico', emoji: '🧐', color: '#8e44ad', action: () => { setQuienHistoricoApp(true); window.history.pushState({}, '', '/quienhistorico'); }, shareable: true, shareUrl: `${window.location.origin}/quienhistorico` },
                     { id: 'PIZARRA_TEMATICA',    label: 'Pizarra temática',     emoji: '🎬', color: '#0ea5e9', action: () => { setPizarraApp(true); window.history.pushState({}, '', '/pizarra'); }, shareable: true, shareUrl: `${window.location.origin}/pizarra` },
                     { id: 'BIOLOGIA',            label: 'Biología',             emoji: '🔬', color: '#16a34a', action: () => setBiologiaApp(true),  shareable: true },
                     { id: 'GESTION_AULA', label: 'Gestión Aula', emoji: '🏫', color: '#e67e22', action: () => setGestionAula(true), shareable: true, shareUrl: `${window.location.origin}${window.location.pathname}?gestion=menu` },

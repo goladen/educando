@@ -14,6 +14,7 @@ import ImperiosGame from './components/ImperiosGame';
 import ComunidadesPublico from './components/ComunidadesPublico';
 import CompeticionPublica from './components/CompeticionPublica';
 import QuienEsQuien from './QuienEsQuien';
+import QuienEsQuienHistorico from './QuienEsQuienHistorico';
 import BunkerDisparo from './BunkerDisparo';
 import EnigmicLogic from './EnigmicLogic';
 import { PizarraApp } from './GestionAula';
@@ -120,7 +121,7 @@ function App() {
           || slug === 'retos' || slug === 'conectapuntos' || slug === 'sudoku'
           || slug === 'partes_planta' || slug === 'etiquetame' || slug === 'karting_track'
           || slug === 'arkade' || slug === 'imperios' || slug === 'whoknows'
-          || slug === 'quienesquien' || slug === 'pizarra' || slug === 'bunker'
+          || slug === 'quienesquien' || slug === 'quienhistorico' || slug === 'pizarra' || slug === 'bunker'
           || slug === 'enigmic') {
         setRutaPublica(slug);
         return;
@@ -147,7 +148,7 @@ function App() {
         'api','admin','login','app','join',
         'irregular_verbs','sistema_solar',
         'retos','conectapuntos','sudoku',
-        'imperios','geografia','quienesquien','pizarra','bunker','enigmic',
+        'imperios','geografia','quienesquien','quienhistorico','pizarra','bunker','enigmic',
         'comunidades','comunidad','competicion',
         'fisica',
         'math_world','primaria','feria',
@@ -311,6 +312,7 @@ function App() {
     if (rutaPublica === 'sistema_solar') return <><SolarSystemViewer onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'imperios') return <><ImperiosGame onBack={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'quienesquien') return <><QuienEsQuien onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
+    if (rutaPublica === 'quienhistorico') return <><QuienEsQuienHistorico onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'enigmic') return <><EnigmicLogic onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'bunker') return <><BunkerDisparo onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'pizarra') return <><div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#f1f5f9', overflow: 'auto', padding: '54px 12px 20px' }}><button onClick={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} style={{ position: 'fixed', top: 12, left: 12, zIndex: 10000, padding: '8px 14px', borderRadius: 10, border: 'none', background: '#fff', color: '#334155', fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}>← Volver</button><PizarraApp /></div>{anotadorUI}</>;

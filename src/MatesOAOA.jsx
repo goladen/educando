@@ -270,7 +270,7 @@ function ModalEnviarProfe({ datos, onClose }) {
 }
 
 // ── Componente principal ──────────────────────────────────────────────────────
-export default function SimuladorOAOA() {
+export default function SimuladorOAOA({ embebido = false, onProgreso = null, onEnviar = null }) {
   // Inicializar con números aleatorios desde el primer render
   const [op, setOp]     = useState('suma');
   const initReto        = generarReto('suma');
@@ -314,6 +314,12 @@ export default function SimuladorOAOA() {
     }
     return () => clearInterval(timerRef.current);
   }, [timerOn, fin]);
+
+  // ── Reportar resultados al contenedor (recopilatorio del Método OAOA) ──────
+  useEffect(() => {
+    if (!onProgreso) return;
+    onProgreso({ aciertosSumas, intentosSumas, aciertosRestas, intentosRestas });
+  }, [aciertosSumas, intentosSumas, aciertosRestas, intentosRestas, onProgreso]);
 
   const colorTimer = segundos > 60 ? '#4CAF50' : segundos > 30 ? '#FF9800' : '#E91E63';
   const pctTimer   = (segundos / 180) * 100;
@@ -401,10 +407,10 @@ export default function SimuladorOAOA() {
     return (
       <>
       <div style={{
-        maxWidth: 600, margin: '0 auto', padding: '80px 20px 60px',
+        maxWidth: 600, margin: '0 auto', padding: embebido ? '20px 20px 60px' : '80px 20px 60px',
         fontFamily: "'Segoe UI', Nunito, Arial, sans-serif",
         background: 'linear-gradient(160deg, #fff8f0 0%, #f0f9ff 100%)',
-        minHeight: '100vh', textAlign: 'center'
+        minHeight: embebido ? 'auto' : '100vh', textAlign: 'center'
       }}>
         <style>{keyframesCSS}</style>
         <div style={{ fontSize: '5rem', marginBottom: 12 }}>🏆</div>
@@ -432,7 +438,7 @@ export default function SimuladorOAOA() {
             color: 'white', border: 'none', borderRadius: 20, cursor: 'pointer',
             boxShadow: '0 6px 20px rgba(255,107,53,0.35)'
           }}>⏱ Jugar de nuevo</button>
-          <button onClick={() => setMostrarEnvio(true)} style={{
+          <button onClick={() => (onEnviar ? onEnviar() : setMostrarEnvio(true))} style={{
             padding: '15px 32px', fontSize: '1rem', fontWeight: 700,
             background: 'linear-gradient(135deg, #f1c40f, #e67e22)',
             color: 'white', border: 'none', borderRadius: 18, cursor: 'pointer',
@@ -460,10 +466,10 @@ export default function SimuladorOAOA() {
   return (
     <>
     <div style={{
-      maxWidth: 880, margin: '0 auto', padding: '70px 14px 50px',
+      maxWidth: 880, margin: '0 auto', padding: embebido ? '14px 14px 50px' : '70px 14px 50px',
       fontFamily: "'Segoe UI', Nunito, Arial, sans-serif",
       background: 'linear-gradient(160deg, #fff8f0 0%, #f0f9ff 100%)',
-      minHeight: '100vh',
+      minHeight: embebido ? 'auto' : '100vh',
     }}>
       <style>{keyframesCSS}</style>
 
@@ -672,7 +678,7 @@ export default function SimuladorOAOA() {
             borderRadius: 18, cursor: 'pointer'
           }}>🎲 Nuevo reto</button>
         )}
-        <button onClick={() => setMostrarEnvio(true)} style={{
+        <button onClick={() => (onEnviar ? onEnviar() : setMostrarEnvio(true))} style={{
           padding: '14px 24px', fontSize: '0.9rem', fontWeight: 700,
           background: 'linear-gradient(135deg, #f1c40f, #e67e22)',
           color: 'white', border: 'none', borderRadius: 18, cursor: 'pointer',

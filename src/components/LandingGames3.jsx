@@ -83,7 +83,7 @@ import RetosApp from '../Retos';
 import SimuladorDados from '../Probabilidad';
 import TrivialGame from '../Trivial';
 import ExpresionArtEscri from '../ExpresionArtEscri';
-import SimuladorOAOA from '../MatesOAOA';
+import MetodoOAOA from '../MetodoOAOA';
 import JuegoFeriaOAOA from '../FeriaMates';
 import JuegoDivisibilidad from '../Divisibilidad';
 import DueloPiratas from '../DueloPiratas';
@@ -2419,9 +2419,8 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
         if (juegoActivo.tipoJuego === 'ESTADISTICA') return <EstadisticaApp  usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'PROBABILIDAD') return <SimuladorDados onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'MATES_OAOA') return (
-            <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#f0faf9', overflowY: 'auto' }}>
-                <button onClick={() => { window.history.pushState({}, '', '/primaria'); setJuegoActivo(null); }} style={{ position: 'fixed', top: 14, left: 14, zIndex: 10000, background: '#009688', color: 'white', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem' }}>← Volver</button>
-                <SimuladorOAOA />
+            <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#f0faf9', overflow: 'hidden' }}>
+                <MetodoOAOA onExit={() => { window.history.pushState({}, '', '/primaria'); setJuegoActivo(null); }} />
             </div>
         );
         if (juegoActivo.tipoJuego === 'FERIA_MATES') return (
@@ -2530,7 +2529,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                         >
                             <div style={{ fontSize: '50px', marginBottom: '15px' }}>🧮</div>
                             <h3 style={{ margin: '0 0 10px 0', color: '#009688', fontSize: '1.4rem' }}>Método OAOA</h3>
-                            <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>Aprende las 4 operaciones básicas paso a paso con algoritmos abiertos.</p>
+                            <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>Bloques de decenas y unidades, monstruo comenúmeros, regletas y restas, geoplano y caminos flexibles.</p>
                             {piBadge('MATES_OAOA', 'Mates OAOA')}
                         </div>
                         <div

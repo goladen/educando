@@ -1127,6 +1127,18 @@ const OAOACard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccion
     const pctTotal  = j.porcentaje ?? (j.intentos > 0 ? Math.round((j.aciertos / j.intentos) * 100) : 0);
     const pctColor  = p => p >= 80 ? '#27ae60' : p >= 50 ? '#e67e22' : '#e74c3c';
 
+    // Recopilatorio del Método OAOA completo (informes nuevos; los antiguos no lo traen)
+    const o = j.oaoa || null;
+    const estrategias = (o && Array.isArray(o.estrategias)) ? o.estrategias : [];
+    const combinaciones = (o && Array.isArray(o.monstruo?.combinaciones)) ? o.monstruo.combinaciones : [];
+    const estimaciones = (o && Array.isArray(o.estimacion?.detalle)) ? o.estimacion.detalle : [];
+    const precios = (o && Array.isArray(o.precios?.detalle)) ? o.precios.detalle : [];
+    const [verDetalle, setVerDetalle] = useState(false);
+
+    const Chip = ({ bg, color, children }) => (
+        <span style={{ padding:'2px 8px', borderRadius:20, background:bg, color, fontWeight:700, fontSize:'0.78rem' }}>{children}</span>
+    );
+
     return (
         <div style={{ background:'white', borderRadius:13, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', overflow:'hidden', border: seleccionado ? '2px solid #1565C0' : '1.5px solid #e8e8e8', transition:'border 0.1s' }}>
             {/* Cabecera */}
@@ -1137,7 +1149,7 @@ const OAOACard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccion
                 <span style={{ fontSize:'1.4rem' }}>🧮</span>
                 <div style={{ flex:1, minWidth:100 }}>
                     <div style={{ fontWeight:700, color:'#2c3e50', fontSize:'0.92rem' }}>
-                        Bloques OAOA
+                        {o ? 'Método OAOA' : 'Bloques OAOA'}
                         <span style={{ marginLeft:8, fontWeight:400, color:'#7f8c8d', fontSize:'0.8rem' }}>Cálculo Primaria</span>
                     </div>
                     <div style={{ fontSize:'0.74rem', color:'#95a5a6', marginTop:1 }}>
@@ -1168,6 +1180,88 @@ const OAOACard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccion
                     </button>
                 )}
             </div>
+
+            {/* Recopilatorio de las demás actividades del Método OAOA */}
+            {o && (
+                <div style={{ borderTop:'1px solid #f0f0f0', padding:'9px 15px' }}>
+                    <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+                        <Chip bg="#eef2ff" color="#4F46E5">👾 {o.monstruo?.total ?? combinaciones.length} descomposiciones</Chip>
+                        <Chip bg="#e0f2fe" color="#0284C7">🎯 {o.retos?.superados ?? 0} retos</Chip>
+                        <Chip bg="#e8f5e9" color="#059669">➖ {o.restasReg?.resueltas ?? 0}/{o.restasReg?.intentos ?? 0} regletas</Chip>
+                        <Chip bg="#e8f5e9" color="#059669">📐 {o.geoplano?.correctas ?? 0}/{o.geoplano?.intentos ?? 0} figuras</Chip>
+                        {(o.estimacion?.realizadas > 0) && (
+                            <Chip bg="#fce7f3" color="#DB2777">📏 {o.estimacion.realizadas} estimaciones · media {o.estimacion.notaMedia}/100</Chip>
+                        )}
+                        {(o.precios?.realizadas > 0) && (
+                            <Chip bg="#fce7f3" color="#DB2777">🛒 {o.precios.realizadas} precios · media {o.precios.notaMedia}/100 · {o.precios.totalesAcertados ?? 0} totales ✓</Chip>
+                        )}
+                        <Chip bg="#fff8e1" color="#B45309">💡 {estrategias.length} estrategias</Chip>
+                        {(estrategias.length > 0 || combinaciones.length > 0 || estimaciones.length > 0 || precios.length > 0) && (
+                            <button
+                                onClick={e=>{e.stopPropagation();setVerDetalle(v=>!v);}}
+                                style={{ marginLeft:'auto', padding:'2px 9px', borderRadius:20, border:'1px solid #ddd', background:'white', cursor:'pointer', fontSize:'0.75rem', fontWeight:600, color:'#7f8c8d' }}
+                            >
+                                {verDetalle ? 'Ocultar' : 'Ver detalle'}
+                            </button>
+                        )}
+                    </div>
+
+                    {verDetalle && (
+                        <div style={{ marginTop:9, display:'flex', flexDirection:'column', gap:9 }}>
+                            {estrategias.length > 0 && (
+                                <div>
+                                    <div style={{ fontSize:'0.72rem', fontWeight:700, color:'#B45309', marginBottom:4 }}>💡 CÓMO LO HA PENSADO</div>
+                                    {estrategias.map((e, i) => (
+                                        <div key={`oaoa-est-${i}`} style={{ background:'#fffbeb', border:'1px solid #fde68a', borderRadius:9, padding:'6px 9px', marginBottom:4 }}>
+                                            <div style={{ fontSize:'0.78rem', fontWeight:700, color:'#92400e' }}>{e.expr}</div>
+                                            <div style={{ fontSize:'0.8rem', color:'#334155', lineHeight:1.4, whiteSpace:'pre-wrap' }}>{e.texto}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            {estimaciones.length > 0 && (
+                                <div>
+                                    <div style={{ fontSize:'0.72rem', fontWeight:700, color:'#DB2777', marginBottom:4 }}>📏 ESTIMACIONES DE TAMAÑO</div>
+                                    <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                                        {estimaciones.map((e, i) => (
+                                            <span key={`oaoa-est-${i}`} style={{
+                                                background: e.nota >= 70 ? '#e8f5e9' : e.nota >= 40 ? '#fff8e1' : '#fdecea',
+                                                color:      e.nota >= 70 ? '#166534' : e.nota >= 40 ? '#92400e' : '#c0392b',
+                                                border:'1px solid rgba(0,0,0,0.08)', borderRadius:8, padding:'2px 7px', fontSize:'0.75rem', fontWeight:700
+                                            }}>{e.objeto}: {e.nota}</span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {precios.length > 0 && (
+                                <div>
+                                    <div style={{ fontSize:'0.72rem', fontWeight:700, color:'#DB2777', marginBottom:4 }}>🛒 ESTIMACIÓN DE PRECIOS</div>
+                                    <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                                        {precios.map((p, i) => (
+                                            <span key={`oaoa-pre-${i}`} style={{
+                                                background: p.nota >= 70 ? '#e8f5e9' : p.nota >= 40 ? '#fff8e1' : '#fdecea',
+                                                color:      p.nota >= 70 ? '#166534' : p.nota >= 40 ? '#92400e' : '#c0392b',
+                                                border:'1px solid rgba(0,0,0,0.08)', borderRadius:8, padding:'2px 7px', fontSize:'0.75rem', fontWeight:700
+                                            }}>{p.articulo}: {p.nota} · total {p.acertoCompra ? '✓' : '✗'}</span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {combinaciones.length > 0 && (
+                                <div>
+                                    <div style={{ fontSize:'0.72rem', fontWeight:700, color:'#4F46E5', marginBottom:4 }}>👾 DESCOMPOSICIONES DESCUBIERTAS</div>
+                                    <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                                        {combinaciones.map((c, i) => (
+                                            <span key={`oaoa-comb-${i}`} style={{ background:'#eef2ff', color:'#3730a3', border:'1px solid #c7d2fe', borderRadius:8, padding:'2px 7px', fontSize:'0.75rem', fontWeight:700 }}>{c}</span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
+
             {confirmar && (
                 <div style={{ background:'#fdecea', borderTop:'1px solid #fdd', padding:'10px 15px', display:'flex', alignItems:'center', gap:10, fontSize:'0.83rem' }}>
                     <AlertTriangle size={14} color="#e74c3c"/>

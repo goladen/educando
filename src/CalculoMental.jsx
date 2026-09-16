@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from './firebase';
 import { guardarRegistroLocal } from './utils/registrosLocales';
+import { sonidoCorrecto, sonidoIncorrecto, sonidoPasar, sonidoFinal, sonidoActivo, setSonidoActivo, despertarAudio } from './utils/sonidosFeedback';
 import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
-import { RotateCcw, CheckCircle, Trophy, Clock, Brain, Delete, Settings, SkipForward, Share2 } from 'lucide-react';
+import { RotateCcw, CheckCircle, Trophy, Clock, Brain, Delete, Settings, SkipForward, Share2, Volume2, VolumeX } from 'lucide-react';
 import Confetti from 'react-confetti';
 import OcaMatematica from './OcaMatematica';
 import DominoMatematico from './dominofracciones';
+import AscensorEnteros from './AscensorEnteros';
 
 // ─── Configuración por defecto ────────────────────────────────────────────────
 const DEFAULT_CONFIG = {
@@ -390,8 +392,10 @@ function ModalEnviarProfe({ datos, onClose }) {
 
 export default function CalculoMentalGame({ usuario, onExit }) {
     const [gameState, setGameState] = useState('START');
+    const [sonido, setSonido] = useState(() => sonidoActivo());
     const [showOca, setShowOca] = useState(false);
     const [showDomino, setShowDomino] = useState(false);
+    const [showAscensor, setShowAscensor] = useState(false);
     const [mostrarEnvio, setMostrarEnvio] = useState(false);
     const [config, setConfig] = useState(DEFAULT_CONFIG);
     const [showConfig, setShowConfig] = useState(false);
@@ -428,6 +432,9 @@ export default function CalculoMentalGame({ usuario, onExit }) {
     const isMobile = typeof window !== 'undefined' && window.innerWidth <= 600;
 
     const modoEjercicios = !!config.numEjercicios;
+
+    // Sonido de fin de partida
+    useEffect(() => { if (gameState === 'END') sonidoFinal(); }, [gameState]);
 
     // Temporizador (solo en modo tiempo)
     useEffect(() => {
@@ -481,6 +488,7 @@ export default function CalculoMentalGame({ usuario, onExit }) {
     }, [finished1, finished2]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const startGame = (cfg = config) => {
+        despertarAudio();
         setConfig(cfg);
         setScore(0);
         setScore1(0); setScore2(0);
@@ -527,28 +535,34 @@ export default function CalculoMentalGame({ usuario, onExit }) {
     const check1 = () => {
         if (status1 !== null || !currentProblem) return;
         if (Math.abs(currentAnswer - currentProblem.answer) < 0.001) {
+            sonidoCorrecto();
             setScore1(s => s + 10); setAciertos(a => a + 1); setAciertos1(a => a + 1); setStatus1('ok');
         } else {
+            sonidoIncorrecto();
             setScore1(s => Math.max(0, s - 3)); setFallos(f => f + 1); setFallos1(f => f + 1); setStatus1('err');
             setTimeout(() => setStatus1(p => p === 'err' ? null : p), 500);
         }
     };
     const skip1 = () => {
         if (status1 !== null) return;
+        sonidoPasar();
         setScore1(s => Math.max(0, s - 2)); setSkips(sk => sk + 1);
         setFallos(f => f + 1); setFallos1(f => f + 1); setStatus1('skip');
     };
     const check2 = () => {
         if (status2 !== null || !currentProblem2) return;
         if (Math.abs(currentAnswer2 - currentProblem2.answer) < 0.001) {
+            sonidoCorrecto();
             setScore2(s => s + 10); setAciertos(a => a + 1); setAciertos2(a => a + 1); setStatus2('ok');
         } else {
+            sonidoIncorrecto();
             setScore2(s => Math.max(0, s - 3)); setFallos(f => f + 1); setFallos2(f => f + 1); setStatus2('err');
             setTimeout(() => setStatus2(p => p === 'err' ? null : p), 500);
         }
     };
     const skip2 = () => {
         if (status2 !== null) return;
+        sonidoPasar();
         setScore2(s => Math.max(0, s - 2)); setSkips(sk => sk + 1);
         setFallos(f => f + 1); setFallos2(f => f + 1); setStatus2('skip');
     };
@@ -558,6 +572,7 @@ export default function CalculoMentalGame({ usuario, onExit }) {
         if (!currentProblem || showSolution) return;
         const isCorrect = Math.abs(currentAnswer - currentProblem.answer) < 0.001;
         if (isCorrect) {
+            sonidoCorrecto();
             setScore(s => s + 10); setAciertos(a => a + 1); setFeedback('CORRECT');
             setTimeout(() => {
                 setFeedback(null);
@@ -565,6 +580,7 @@ export default function CalculoMentalGame({ usuario, onExit }) {
                 else { setCurrentAnswer(0); setCurrentProblem(generarProblema(config)); setShowSolution(false); }
             }, 600);
         } else {
+            sonidoIncorrecto();
             setScore(s => Math.max(0, s - 3)); setFallos(f => f + 1); setFeedback('INCORRECT');
             setTimeout(() => setFeedback(null), 600);
         }
@@ -572,6 +588,7 @@ export default function CalculoMentalGame({ usuario, onExit }) {
 
     const handleSkip = () => {
         if (!currentProblem || showSolution) return;
+        sonidoPasar();
         setSkips(s => s + 1); setFallos(f => f + 1); setScore(s => Math.max(0, s - 2));
         setShowSolution(true); setFeedback('SKIP');
         setTimeout(() => {
@@ -583,6 +600,7 @@ export default function CalculoMentalGame({ usuario, onExit }) {
 
     if (showOca) return <OcaMatematica onExit={() => setShowOca(false)} />;
     if (showDomino) return <DominoMatematico onExit={() => setShowDomino(false)} />;
+    if (showAscensor) return <AscensorEnteros onExit={() => setShowAscensor(false)} />;
 
     const handleExit = () => {
         clearInterval(timerRef.current);
@@ -639,6 +657,10 @@ export default function CalculoMentalGame({ usuario, onExit }) {
                 <button onClick={handleExit} style={st.btnVolver}><RotateCcw size={16} /> Salir</button>
                 <button onClick={compartir} style={st.btnVolver} title="Compartir">
                     <Share2 size={16} />
+                </button>
+                <button onClick={() => { const nuevo = !sonido; setSonido(setSonidoActivo(nuevo)); if (nuevo) { despertarAudio(); sonidoCorrecto(); } }}
+                    style={st.btnVolver} title={sonido ? 'Silenciar' : 'Activar sonido'}>
+                    {sonido ? <Volume2 size={16} /> : <VolumeX size={16} />}
                 </button>
                 {gameState === 'PLAYING' && (
                     <div style={st.scoreFlex}>
@@ -711,6 +733,30 @@ export default function CalculoMentalGame({ usuario, onExit }) {
                                 <span style={{ color: m.color, fontSize: '1.3rem', flexShrink: 0 }}>›</span>
                             </button>
                         ))}
+
+                        {/* Separador */}
+                        <div style={{ display:'flex', alignItems:'center', gap:10, margin:'2px 0' }}>
+                            <div style={{ flex:1, height:1, background:'#eee' }} />
+                            <span style={{ color:'#bbb', fontSize:'0.75rem' }}>números enteros</span>
+                            <div style={{ flex:1, height:1, background:'#eee' }} />
+                        </div>
+
+                        {/* El Ascensor (enteros) */}
+                        <button onClick={() => setShowAscensor(true)}
+                            style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 18px',
+                                background:'white', border:'2px solid #1565C0', borderRadius:16,
+                                cursor:'pointer', textAlign:'left', transition:'transform 0.15s, box-shadow 0.15s',
+                                boxShadow:'0 3px 10px rgba(0,0,0,0.07)', width:'100%' }}
+                            onMouseEnter={e => { e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 8px 20px #1565C033'; }}
+                            onMouseLeave={e => { e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow='0 3px 10px rgba(0,0,0,0.07)'; }}
+                        >
+                            <div style={{ background:'#1565C0', borderRadius:12, width:46, height:46, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.5rem', flexShrink:0 }}>🛗</div>
+                            <div style={{ flex:1 }}>
+                                <div style={{ fontWeight:'bold', color:'#2c3e50', fontSize:'1rem', marginBottom:3 }}>El Ascensor</div>
+                                <div style={{ color:'#888', fontSize:'0.82rem' }}>Suma y resta de enteros subiendo y bajando plantas · modo libre y retos</div>
+                            </div>
+                            <span style={{ color:'#1565C0', fontSize:'1.3rem' }}>›</span>
+                        </button>
 
                         {/* Separador */}
                         <div style={{ display:'flex', alignItems:'center', gap:10, margin:'2px 0' }}>

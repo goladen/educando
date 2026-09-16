@@ -2,6 +2,7 @@
 import { db } from './firebase';
 import { doc, getDoc, addDoc, updateDoc, onSnapshot, increment, deleteField, collection, writeBatch } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
+import QRSalaBoton from './components/QRSalaBoton';
 import { MessageSquare, X, UserX, ThumbsUp, ThumbsDown, ArrowUp, Users, Play, Send, Loader, Trophy, CheckCircle, XCircle, Medal, Save, Monitor, Delete, ArrowLeftRight } from 'lucide-react';
 // --- AUDIOS ---
 import correctSoundFile from './assets/correct-choice-43861.mp3';
@@ -490,6 +491,7 @@ function MathLiveHost({ codigoSala, onExit, usuario }) {
                     <div className="lobby-screen">
                         <h1>¡Únete a la partida!</h1>
                         <div className="big-code">{codigoSala}</div>
+                        <div style={{ margin: '4px 0 10px' }}><QRSalaBoton codigo={codigoSala} /></div>
                         <p>Esperando jugadores...</p>
                         <div className="players-grid">{jugadores.map((j, i) => (<div key={i} className="player-chip">{j.nombre}</div>))}</div>
                         <button className="btn-start-big" onClick={empezarPartida} disabled={jugadores.length === 0} style={{ opacity: jugadores.length === 0 ? 0.5 : 1 }}>

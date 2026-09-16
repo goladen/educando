@@ -19,6 +19,7 @@ export const JUEGOS_REGISTRO_META = {
     // --- Resto de juegos y herramientas ---
     CALCULO:             { nombre: 'Cálculo Mental',      emoji: '🧮', color: '#e67e22' },
     DIVISIBILIDAD:       { nombre: 'Divisibilidad',       emoji: '➗', color: '#16a085' },
+    FRACCIONES:          { nombre: 'Fracciones',          emoji: '🍰', color: '#7b1fa2' },
     ALGEBRA:             { nombre: 'Álgebra',             emoji: '🅰️', color: '#9b59b6' },
     OCA:                 { nombre: 'Oca Matemática',      emoji: '🎲', color: '#27ae60' },
     OAOA:                { nombre: 'Mates OAOA',          emoji: '🔢', color: '#2980b9' },
@@ -53,6 +54,7 @@ export const JUEGOS_REGISTRO_META = {
     QUIEN_HISTORICO:     { nombre: '¿Quién es quién? histórico', emoji: '🧐', color: '#8e44ad' },
     BUNKER:              { nombre: 'Bunker',              emoji: '🎯', color: '#27ae60' },
     ENIGMIC:             { nombre: 'Enigmic',             emoji: '🕵️', color: '#7c3aed' },
+    CALAMAR:             { nombre: 'Luz roja · Luz verde', emoji: '🦑', color: '#e6317f' },
 };
 
 export const metaDe = (tipo) => JUEGOS_REGISTRO_META[tipo] || { nombre: tipo, emoji: '🎮', color: '#718093' };

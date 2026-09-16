@@ -19,6 +19,7 @@ import OlympicLive from '../OlympicLive';
 import QuestionSenderClient from '../QuestionSenderClient';
 import PikatronRun from '../PikatronRun';
 import BunkerDisparo from '../BunkerDisparo';
+import JuegoCalamar from '../JuegoCalamar';
 import EnigmicLogic from '../EnigmicLogic';
 import TextWordleGame from '../TextWordleGame';
 import MathWordleGame from '../MathWordleGame';
@@ -29,6 +30,7 @@ import Listening from '../ListeningGame'
 import Geometrix from '../Geometrix';
 import CalculoMental from '../CalculoMental';
 import CalculoDinero from '../CalculoDinero';
+import Fracciones from '../Fracciones';
 import Ecuaciones from '../Ecuaciones';
 import EcuacionSistemas from '../EcuacionSistemas';
 import PotenciasRaices from '../PotenciasRaices';
@@ -525,6 +527,16 @@ export const APPS = [
         shareUrl: `${window.location.origin}/enigmic`
     },
     {
+        id: 'CALAMAR',
+        name: 'Calamar',
+        desc: 'Luz roja · luz verde: avanza acertando preguntas.',
+        color: '#e6317f',
+        emoji: '🦑',
+        isSpecial: true,
+        shareable: true,
+        shareUrl: `${window.location.origin}/calamar`
+    },
+    {
         id: 'BUNKER',
         name: 'Bunker',
         desc: 'Shooter 3D: dispara a las respuestas incorrectas.',
@@ -603,7 +615,7 @@ export const APPS = [
     {
         id: 'LISTENING',
         name: 'Listening',
-        desc: 'Escucha y completa.',
+        desc: 'Escucha y completa. Inglés y francés.',
         color: '#3498db',
         emoji: '🙉​',
         isSpecial: false,
@@ -649,6 +661,16 @@ export const APPS = [
         emoji: '💶',
         isMath: true,
         shareable: true
+    },
+    {
+        id: 'FRACCIONES',
+        name: 'Fracciones',
+        desc: 'Laboratorio visual, ejercicios y tirón de cuerda.',
+        color: '#7b1fa2',
+        emoji: '🍰',
+        isMath: true,
+        shareable: true,
+        shareUrl: `${typeof window !== 'undefined' ? window.location.origin : ''}/fracciones`
     },
     {
         id: 'ETIQUETAS',
@@ -732,6 +754,14 @@ export const GAME_INFO = {
         biblioteca: 'Biblioteca propia de vocabulario (7 categorías × 6 elementos) en español, inglés, francés y catalán. Dos modos: leer las pistas o solo escucharlas (comprensión oral, sin texto ni traducción). Tablero de 5 o 6 casillas y de 2 a 5 categorías. No necesita recurso del profesor.',
         multiplayer: 'Individual. También se puede proyectar y resolver en gran grupo.',
         materias: ['Inglés', 'Francés', 'Catalán', 'Lengua y Literatura', 'Matemáticas'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
+    CALAMAR: {
+        descripcion: 'Juego 3D inspirado en "luz roja, luz verde": los jugadores avanzan por la pista hacia la muñeca gigante, que gira la cabeza cada pocos segundos. Con la LUZ VERDE se responde: cada acierto es un paso adelante y cada fallo un paso atrás. Si alguien responde con la LUZ ROJA, la muñeca lo detecta y queda eliminado. Gana quien llega a la meta. Al terminar se guardan por separado las preguntas acertadas y las falladas.',
+        tipoPreguntas: 'Cualquier recurso: selección múltiple, respuesta corta, rellenar hueco y ordenar (formato PiLive/PRO y Burbujas).',
+        biblioteca: 'Buscador de recursos públicos del profesor y un modo libre con preguntas variadas de varias materias.',
+        multiplayer: 'Individual y online: el profesor crea una sala (código + QR) y todos los alumnos corren a la vez en la misma pista, con la luz sincronizada.',
+        materias: ['Universal'],
         etapas: ['Primaria', 'ESO', 'Bachillerato'],
     },
     BUNKER: {
@@ -936,11 +966,11 @@ export const GAME_INFO = {
         etapas: ['ESO', 'Bachillerato'],
     },
     LISTENING: {
-        descripcion: 'Actividad de comprensión oral en inglés. El alumno escucha un audio y responde preguntas o completa huecos. Mejora la comprensión auditiva.',
-        tipoPreguntas: 'Comprensión oral: huecos, opción múltiple. Recurso creado por el profesor con audio y preguntas.',
-        biblioteca: 'No incluye biblioteca propia. El profesor sube el audio y crea las preguntas.',
-        multiplayer: 'Individual.',
-        materias: ['Inglés', 'Lengua Extranjera'],
+        descripcion: 'Comprensión oral en inglés y francés. El alumno escucha un audio de un minuto y completa los huecos del texto, que va apareciendo al ritmo de la grabación. La velocidad de reproducción se puede bajar (x0.5) para los que necesitan más tiempo.',
+        tipoPreguntas: 'Huecos en la transcripción: escribir la palabra u opción múltiple (4 opciones). 7 huecos por tema.',
+        biblioteca: 'Biblioteca propia: 95 temas en inglés (Listen a Minute) y temas en francés por nivel (A1-A2, B1).',
+        multiplayer: 'Individual o sala en vivo: el profesor proyecta el audio, los alumnos responden desde su dispositivo y pueden entrar escaneando un QR.',
+        materias: ['Inglés', 'Francés', 'Lengua Extranjera'],
         etapas: ['ESO', 'Bachillerato'],
     },
     ETIQUETAS: {
@@ -1048,11 +1078,11 @@ export const GAME_INFO = {
         etapas: ['Primaria', 'ESO', 'Bachillerato'],
     },
     QUIEN_HISTORICO: {
-        descripcion: 'Juego de deducción sobre personajes históricos (mandatarios y líderes, artistas y científicos). Hay un personaje secreto en un tablero de caras y el juego revela pistas una a una (sexo, época, continente, campo, país y datos curiosos). El jugador va tachando las caras que no encajan hasta adivinar quién es. Menos pistas usadas = más estrellas.',
-        tipoPreguntas: 'Deducción por descarte a partir de pistas sobre 90 personajes históricos (30 mandatarios, 30 artistas, 30 científicos).',
-        biblioteca: 'Sí, base de datos incluida de 90 personajes con fotos, época, nacionalidad y datos curiosos. Se puede jugar por categoría o mezclados.',
+        descripcion: 'Juego de deducción sobre personajes históricos (mandatarios y líderes, artistas y científicos). Hay un personaje secreto y el juego revela pistas una a una, en orden aleatorio (época, país, campo y datos curiosos); el jugador va descartando hasta adivinar quién es. Modos: al azar, elegir el personaje o crear uno propio con tus pistas. TAMBIÉN SIRVE PARA TRABAJAR IDIOMAS: la interfaz y las pistas están disponibles en español, inglés, francés y catalán, ideal para practicar comprensión lectora en la lengua que se estudia.',
+        tipoPreguntas: 'Deducción por descarte a partir de pistas sobre 120 personajes históricos (40 mandatarios, 40 artistas, 40 científicos). Disponible en es/en/fr/ca.',
+        biblioteca: 'Sí, base de datos incluida de 120 personajes con fotos, época, país y datos curiosos. Se puede jugar por categoría o mezclados, y crear personajes propios.',
         multiplayer: 'Individual.',
-        materias: ['Historia', 'Ciencias Sociales', 'Cultura general'],
+        materias: ['Historia', 'Ciencias Sociales', 'Cultura general', 'Idiomas', 'Inglés', 'Francés', 'Catalán'],
         etapas: ['Primaria', 'ESO', 'Bachillerato'],
     },
     BIOLOGIA: {
@@ -1117,6 +1147,14 @@ export const GAME_INFO = {
         tipoPreguntas: 'Situaciones de compra generadas automáticamente: pagar exacto, vuelta, precio total/por unidad, IVA y descuentos.',
         biblioteca: 'Sí, genera ejercicios automáticamente. Sin necesidad de recurso del profesor.',
         multiplayer: 'Individual.',
+        materias: ['Matemáticas'],
+        etapas: ['Primaria', 'ESO'],
+    },
+    FRACCIONES: {
+        descripcion: 'Fracciones de forma visual con rectángulos divididos. Laboratorio para manipular numerador y denominador en tiempo real (equivalencia, suma, resta, multiplicación, división, potencia y raíz cuadrada), base de ejercicios generados automáticamente y modo «tirón de cuerda» por equipos.',
+        tipoPreguntas: 'Identificar la fracción pintada, fracciones equivalentes, simplificar y operaciones (suma, resta, multiplicación, división, potencia y raíz). Se generan automáticamente por niveles.',
+        biblioteca: 'Sí, genera los ejercicios automáticamente. Sin necesidad de recurso del profesor.',
+        multiplayer: 'Individual y por equipos (tirón de cuerda a 2 bandas en la misma pantalla).',
         materias: ['Matemáticas'],
         etapas: ['Primaria', 'ESO'],
     },
@@ -1222,7 +1260,7 @@ export const MATERIAS_CONFIG = [
     {
         id: 'MATEMATICAS', label: 'Matemáticas', emoji: '🔢', color: '#009688',
         keywords: ['matemáticas', 'mates', 'math', 'calculo', 'algebra', 'geometria', 'estadistica', 'probabilidad', 'fraccion', 'ecuacion', 'funcion', 'numero', 'operacion'],
-        specificIds: ['MATH_WORLD_PORTAL', 'GEOMETRIX', 'CALCULO', 'DINERO', 'ECUACIONES', 'ECUACION_SISTEMAS', 'FUNCIONES', 'GEOMETRÍA_ANALÍTICA', 'POLINOMIOS', 'POTENCIAS_RAICES', 'ESTADISTICA', 'PROBABILIDAD', 'MATHLE', 'MATHLIVE', 'OLYMPICLIVE'],
+        specificIds: ['MATH_WORLD_PORTAL', 'GEOMETRIX', 'CALCULO', 'DINERO', 'FRACCIONES', 'ECUACIONES', 'ECUACION_SISTEMAS', 'FUNCIONES', 'GEOMETRÍA_ANALÍTICA', 'POLINOMIOS', 'POTENCIAS_RAICES', 'ESTADISTICA', 'PROBABILIDAD', 'MATHLE', 'MATHLIVE', 'OLYMPICLIVE'],
     },
     {
         id: 'LENGUA', label: 'Lengua', emoji: '📖', color: '#7B1FA2',
@@ -1262,7 +1300,7 @@ export const MATERIAS_CONFIG = [
     {
         id: 'IDIOMAS', label: 'Idiomas', emoji: '🌐', color: '#1565C0',
         keywords: ['ingles', 'english', 'frances', 'french', 'aleman', 'german', 'idioma', 'lengua extranjera', 'irregular', 'verbo', 'listening', 'speaking', 'grammar'],
-        specificIds: ['IRREGULAR_VERBS', 'LISTENING'],
+        specificIds: ['IRREGULAR_VERBS', 'LISTENING', 'QUIEN_HISTORICO', 'ENIGMIC'],
     },
 ];
 
@@ -1311,6 +1349,7 @@ const EXTRA_TOOLS = {
     MINIAPP_CREATOR:    { id: 'MINIAPP_CREATOR',    name: 'Creación App con IA', emoji: '🤖', color: '#0ea5e9' },
     LINEA_TIEMPO:       { id: 'LINEA_TIEMPO',       name: 'Línea del Tiempo', emoji: '🕰️', color: '#2980b9' },
     ROBOTICA_BLOQUES:   { id: 'ROBOTICA_BLOQUES',   name: 'Programación y Robótica', emoji: '🤖', color: '#0EA5E9' },
+    QUIEN_HISTORICO:    { id: 'QUIEN_HISTORICO',    name: '¿Quién es quién? histórico', emoji: '🧐', color: '#8e44ad' },
 };
 
 // --- FUNCIONES DE AYUDA PARA BÚSQUEDA INTELIGENTE ---
@@ -1526,6 +1565,12 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                 setJuegoActivo({ tipoJuego: juegoParam.toUpperCase(), tourConfig, verbInitialConfig, sharedProject });
                 return;
             }
+            // Entrada directa a una sesión en vivo (QR del profesor): ?live=CODIGO
+            const liveParam = params.get('live');
+            if (liveParam) {
+                setLiveJoinCode(liveParam.toUpperCase().trim());
+                return;
+            }
             const salaParam = params.get('sala');
             if (salaParam && /^\d{6}$/.test(salaParam)) {
                 setPictoTabuInitCode(salaParam);
@@ -1553,6 +1598,10 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                 setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'FERIA_MATES' });
             } else if (path === 'calculo') {
                 setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'CALCULO' });
+            } else if (path === 'fracciones') {
+                setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'FRACCIONES' });
+            } else if (path === 'primaria/fracciones') {
+                setZonaActiva('MATH'); setSubzonaMath('PRIMARIA'); setJuegoActivo({ tipoJuego: 'FRACCIONES', primaria: true });
             } else if (path === 'geometrix') {
                 setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'GEOMETRIX' });
             } else if (path === 'ecuaciones') {
@@ -1575,6 +1624,8 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                 setZonaActiva('MATH'); setSubzonaMath(null); setJuegoActivo(null);
             } else if (path === 'arkade') {
                 setJuegoActivo({ tipoJuego: 'ARKADE' });
+            } else if (path === 'calamar') {
+                setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'CALAMAR' });
             } else if (path === '' || path === 'inicio') {
                 setZonaActiva('MAIN'); setJuegoActivo(null); setSubzonaMath(null);
             }
@@ -1599,7 +1650,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
         }
         // No pisar una entrada explícita por URL.
         const params = new URLSearchParams(window.location.search);
-        if (params.get('sala') || params.get('juego') || params.get('sopa') || params.get('gestion') || params.get('pizarra')) return;
+        if (params.get('sala') || params.get('live') || params.get('juego') || params.get('sopa') || params.get('gestion') || params.get('pizarra')) return;
 
         getDoc(doc(db, 'live_games', s.sala)).then(snap => {
             if (!snap.exists()) { try { localStorage.removeItem('pikt_live_session'); } catch (e) {} return; }
@@ -1689,7 +1740,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
     // Mapeo id-de-tarjeta → tipo-de-registro cuando no coinciden.
     const REGISTRO_TIPO_DE = { GEOMETRIX: 'GEOMETRIX_COMPUESTO', POLINOMIOS: 'ALGEBRA', MATES_OAOA: 'OAOA' };
     // Tipos de registro que pertenecen a Math World (para el recuento agregado del portal).
-    const MATH_WORLD_TIPOS = ['CALCULO','DINERO','DIVISIBILIDAD','ALGEBRA','OCA','OAOA','ECUACIONES','FUNCIONES','FUNCIONES_ANALISIS','GEOMETRIX_COMPUESTO','MATHLE'];
+    const MATH_WORLD_TIPOS = ['CALCULO','DINERO','FRACCIONES','DIVISIBILIDAD','ALGEBRA','OCA','OAOA','ECUACIONES','FUNCIONES','FUNCIONES_ANALISIS','GEOMETRIX_COMPUESTO','MATHLE'];
 
     const countRegistros = (tipo) => resumenRegistros.find(g => g.tipo === tipo)?.count || 0;
 
@@ -1772,6 +1823,8 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
     const [pictoTabuModal, setPictoTabuModal] = useState(false);
     const [pictoTabuInitCode, setPictoTabuInitCode] = useState('');
     const [joinLiveHostId, setJoinLiveHostId] = useState(null);
+    // Entrada directa a una sesión en vivo por QR / enlace: pikt.es/?live=CODIGO
+    const [liveJoinCode, setLiveJoinCode] = useState('');
     // Estados Live Host (Presentador)
     const [liveModeHost, setLiveModeHost] = useState(false);
     const [hostRoomCode, setHostRoomCode] = useState('');
@@ -1945,6 +1998,12 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
         if (appId === 'BUNKER') {
             window.history.pushState({}, '', '/bunker');
             setJuegoActivo({ tipoJuego: 'BUNKER' });
+            return;
+        }
+
+        if (appId === 'CALAMAR') {
+            window.history.pushState({}, '', '/calamar');
+            setJuegoActivo({ tipoJuego: 'CALAMAR' });
             return;
         }
 
@@ -2176,6 +2235,8 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
         if (tipoFinal === 'OLYMPICLIVE') return <OlympicLive isHost={false} codigoSala={typeof joinCode !== 'undefined' ? joinCode : joinLiveCode} usuario={{ displayName: typeof joinName !== 'undefined' ? joinName : joinLiveName, email: null }} onExit={() => setLiveModeAlumno(false)} />;
         if (tipoFinal === 'MATHLIVE' || isMathLiveAlumno) return <MathLive isHost={false} codigoSala={typeof joinCode !== 'undefined' ? joinCode : joinLiveCode} usuario={{ displayName: typeof joinName !== 'undefined' ? joinName : joinLiveName, email: null }} onExit={() => setLiveModeAlumno(false)} />;
         if (tipoFinal === 'EAE') return <ExpresionArtEscri isHost={false} codigoSala={joinLiveCode} usuario={{ uid: joinLiveHostId || null, displayName: joinLiveName, email: null }} onExit={() => { setLiveModeAlumno(false); setJoinLiveHostId(null); }} />;
+        if (tipoFinal === 'LISTENING') return <Listening codigoSala={typeof joinCode !== 'undefined' ? joinCode : joinLiveCode} usuario={{ displayName: typeof joinName !== 'undefined' ? joinName : joinLiveName, email: null }} onExit={() => setLiveModeAlumno(false)} />;
+        if (tipoFinal === 'CALAMAR') return <JuegoCalamar codigoSala={typeof joinCode !== 'undefined' ? joinCode : joinLiveCode} usuario={{ displayName: typeof joinName !== 'undefined' ? joinName : joinLiveName, email: null }} onExit={() => setLiveModeAlumno(false)} />;
 
         return <ThinkHootGame isHost={false} codigoSala={typeof joinCode !== 'undefined' ? joinCode : joinLiveCode} usuario={{ displayName: typeof joinName !== 'undefined' ? joinName : joinLiveName, email: null }} onExit={() => setLiveModeAlumno(false)} />;
     }
@@ -2408,6 +2469,7 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
         if (juegoActivo.tipoJuego === 'GEOMETRIX') return <Geometrix usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'CALCULO') return <CalculoMental usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'DINERO') return <CalculoDinero usuario={usuario} onExit={() => { const destino = juegoActivo.primaria ? '/primaria' : '/math_world'; window.history.pushState({}, '', destino); setJuegoActivo(null); }} />;
+        if (juegoActivo.tipoJuego === 'FRACCIONES') return <Fracciones usuario={usuario} onExit={() => { const destino = juegoActivo.primaria ? '/primaria' : '/math_world'; window.history.pushState({}, '', destino); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'OCA') return <OcaMatematicaDirect onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'DOMINO') return <DominoMatematicoDirect onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'ECUACIONES') return <Ecuaciones usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
@@ -2480,6 +2542,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
         if (juegoActivo.tipoJuego === 'MANSION_PITAGORICA') return <MansionPitagoricaGame alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'ENIGMIC') return <EnigmicLogic usuario={usuario} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'BUNKER') return <BunkerDisparo usuario={usuario} recurso={juegoActivo.recurso || null} autoStart={!!juegoActivo.recurso} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
+        if (juegoActivo.tipoJuego === 'CALAMAR') return <JuegoCalamar usuario={usuario} recurso={juegoActivo.recurso || null} autoStart={!!juegoActivo.recurso} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'TRIVIAL') {
             const salirTrivial = () => {
                 window.history.pushState({}, '', window.location.pathname);
@@ -2552,6 +2615,17 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                             <h3 style={{ margin: '0 0 10px 0', color: '#16a085', fontSize: '1.4rem' }}>Dinero</h3>
                             <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>Paga con billetes y monedas, la vuelta, la lista de la compra, IVA y rebajas.</p>
                             {piBadge('DINERO', 'Dinero')}
+                        </div>
+                        <div
+                            onClick={() => { window.history.pushState({}, '', '/primaria/fracciones'); setJuegoActivo({ tipoJuego: 'FRACCIONES', primaria: true }); }}
+                            style={{ position: 'relative', background: '#F3E5F5', borderRadius: '20px', padding: '30px 20px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.1)', transition: 'transform 0.2s', border: '3px solid #7b1fa2' }}
+                            onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
+                            onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                        >
+                            <div style={{ fontSize: '50px', marginBottom: '15px' }}>🍰</div>
+                            <h3 style={{ margin: '0 0 10px 0', color: '#7b1fa2', fontSize: '1.4rem' }}>Fracciones</h3>
+                            <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>Laboratorio visual con rectángulos, ejercicios y tirón de cuerda por equipos.</p>
+                            {piBadge('FRACCIONES', 'Fracciones')}
                         </div>
                         <div
                             onClick={() => { window.history.pushState({}, '', '/primaria/divisibilidad'); setJuegoActivo({ tipoJuego: 'DIVISIBILIDAD' }); }}
@@ -2861,6 +2935,22 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                 <MisRegistros tipoInicial={registrosTipo} onClose={() => { setMostrarRegistros(false); setRegistrosTipo(null); refrescarRegistros(); }} />
             )}
             {showPerfil && usuario && <UserProfile usuario={usuario} onClose={() => setShowPerfil(false)} showSupport={false} />}
+            {liveJoinCode && !liveModeAlumno && (
+                <UnirseLiveQRModal
+                    codigo={liveJoinCode}
+                    usuario={usuario}
+                    onClose={() => { setLiveJoinCode(''); try { window.history.replaceState({}, '', '/'); } catch (e) {} }}
+                    onEntrar={(code, nombre, data) => {
+                        setJoinLiveCode(code);
+                        setJoinLiveName(nombre);
+                        setJoinLiveHostId(data?.hostId || null);
+                        setJoinLiveTipoJuego(data?.tipoJuego || '');
+                        setIsMathLiveAlumno(data?.config?.isMathLive === true || data?.tipoJuego === 'MATHLIVE');
+                        setLiveModeAlumno(true);
+                        setLiveJoinCode('');
+                    }}
+                />
+            )}
             {pictoTabuModal && <PictoTabuModal
                 usuario={usuario}
                 initialCode={pictoTabuInitCode}
@@ -3791,6 +3881,7 @@ const [entrando, setEntrando] = useState(false);
         if (appData.id === 'GEOMETRIX' || juegoActivo.tipoJuego === 'GEOMETRIX') return <Geometrix usuario={usuario} onExit={handleExitGame} />;
         if (appData.id === 'CALCULO' || juegoActivo.tipoJuego === 'CALCULO') return <CalculoMental usuario={usuario} onExit={handleExitGame} />;
         if (appData.id === 'DINERO' || juegoActivo.tipoJuego === 'DINERO') return <CalculoDinero usuario={usuario} onExit={handleExitGame} />;
+        if (appData.id === 'FRACCIONES' || juegoActivo.tipoJuego === 'FRACCIONES') return <Fracciones usuario={usuario} onExit={handleExitGame} />;
         if (appData.id === 'ECUACIONES' || juegoActivo.tipoJuego === 'ECUACIONES') return <Ecuaciones onExit={handleExitGame} />;
         if (appData.id === 'ECUACION_SISTEMAS' || juegoActivo.tipoJuego === 'ECUACION_SISTEMAS') return <EcuacionSistemas onExit={handleExitGame} />;
         if (appData.id === 'POTENCIAS_RAICES' || juegoActivo.tipoJuego === 'POTENCIAS_RAICES') return <PotenciasRaices onExit={handleExitGame} />;
@@ -3820,6 +3911,7 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={usuario} onExit={o
     if (appData.id === 'GEOMETRIX') return <Geometrix usuario={usuario} onExit={handleExitGame} />;
     if (appData.id === 'CALCULO') return <CalculoMental usuario={usuario} onExit={handleExitGame} />;
     if (appData.id === 'DINERO') return <CalculoDinero usuario={usuario} onExit={handleExitGame} />;
+    if (appData.id === 'FRACCIONES') return <Fracciones usuario={usuario} onExit={handleExitGame} />;
     if (appData.id === 'ECUACIONES') return <Ecuaciones usuario={usuario} onExit={handleExitGame} />;
     if (appData.id === 'ECUACION_SISTEMAS') return <EcuacionSistemas onExit={handleExitGame} />;
     if (appData.id === 'POTENCIAS_RAICES') return <PotenciasRaices onExit={handleExitGame} />;
@@ -4244,6 +4336,65 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={usuario} onExit={o
 
 
 
+}
+
+// ─── Entrada directa a sesión en vivo vía QR / enlace (?live=CODIGO) ────────
+function UnirseLiveQRModal({ codigo, usuario, onClose, onEntrar }) {
+    const [nombre, setNombre] = useState(usuario?.displayName || '');
+    const [sala, setSala] = useState(null);
+    const [estado, setEstado] = useState('CARGANDO'); // CARGANDO | LISTA | ERROR
+    const [entrando, setEntrando] = useState(false);
+
+    useEffect(() => {
+        let vivo = true;
+        getDoc(doc(db, 'live_games', codigo)).then(snap => {
+            if (!vivo) return;
+            if (!snap.exists()) { setEstado('ERROR'); return; }
+            setSala(snap.data());
+            setEstado('LISTA');
+        }).catch(() => { if (vivo) setEstado('ERROR'); });
+        return () => { vivo = false; };
+    }, [codigo]);
+
+    const entrar = () => {
+        if (!nombre.trim()) return alert('Escribe tu nombre para entrar.');
+        setEntrando(true);
+        onEntrar(codigo, nombre.trim(), sala);
+    };
+
+    return (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 12000, background: 'rgba(8,12,24,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, backdropFilter: 'blur(4px)' }}>
+            <div style={{ background: 'white', borderRadius: 22, padding: '26px 24px', maxWidth: 420, width: '100%', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.45)' }}>
+                {estado === 'CARGANDO' && <div style={{ color: '#475569', fontWeight: 700 }}>Buscando la sala {codigo}…</div>}
+
+                {estado === 'ERROR' && (
+                    <>
+                        <div style={{ fontSize: '2.4rem', marginBottom: 8 }}>😕</div>
+                        <div style={{ fontWeight: 800, color: '#1e293b', marginBottom: 6 }}>No existe una sesión en vivo con el código {codigo}</div>
+                        <div style={{ color: '#64748b', fontSize: '0.88rem', marginBottom: 18 }}>Puede que el profesor aún no la haya creado o que ya haya terminado.</div>
+                        <button onClick={onClose} style={{ padding: '11px 22px', borderRadius: 12, border: 'none', background: '#3498db', color: 'white', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Ir al inicio</button>
+                    </>
+                )}
+
+                {estado === 'LISTA' && (
+                    <>
+                        <div style={{ fontSize: '2.4rem', marginBottom: 6 }}>🎮</div>
+                        <div style={{ fontWeight: 900, color: '#1e293b', fontSize: '1.15rem' }}>{sala?.recursoTitulo || 'Sesión en vivo'}</div>
+                        <div style={{ color: '#94a3b8', fontSize: '0.8rem', fontWeight: 700, letterSpacing: 2, margin: '6px 0 18px' }}>SALA {codigo}</div>
+                        <input autoFocus value={nombre} onChange={e => setNombre(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') entrar(); }}
+                            placeholder="Tu nombre"
+                            style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: '2px solid #e2e8f0', fontSize: '1.05rem', textAlign: 'center', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+                        <button onClick={entrar} disabled={entrando}
+                            style={{ width: '100%', marginTop: 12, padding: '13px', borderRadius: 12, border: 'none', background: entrando ? '#95a5a6' : 'linear-gradient(135deg,#3498db,#2980b9)', color: 'white', fontWeight: 800, fontSize: '1rem', cursor: entrando ? 'default' : 'pointer', fontFamily: 'inherit' }}>
+                            {entrando ? 'Entrando…' : 'ENTRAR AL JUEGO'}
+                        </button>
+                        <button onClick={onClose} style={{ marginTop: 10, background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '0.85rem', fontFamily: 'inherit' }}>Cancelar</button>
+                    </>
+                )}
+            </div>
+        </div>
+    );
 }
 
 // ─── PictoTabú Modal (crear/unirse) ─────────────────────────────────────────

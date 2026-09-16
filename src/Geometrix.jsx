@@ -9,6 +9,7 @@ import { doc, setDoc, updateDoc, onSnapshot, increment, collection, writeBatch, 
 import { bibliotecaGeometria } from './BibliotecaGeometria';
 import PerimetroArea from './PerimetroArea';
 import Visor3dPoliedrosEuler from './Visor3dPoliedrosEuler';
+import SalaGeometria3D from './SalaGeometria3D';
 
 // --- AUDIOS Y AVATARES (Estética MathLive) ---
 import correctSoundFile from './assets/correct-choice-43861.mp3';
@@ -698,7 +699,7 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
     const [drawMode, setDrawMode] = useState(false);
     const [showCalc, setShowCalc] = useState(false);
     const [showFigurasCompuestas, setShowFigurasCompuestas] = useState(false);
-    const [herramienta, setHerramienta] = useState(null); // 'perimetro' | 'poliedros'
+    const [herramienta, setHerramienta] = useState(null); // 'perimetro' | 'poliedros' | 'sala3d'
 
     // Modo 3 config
     const [showGameConfig, setShowGameConfig] = useState(false);
@@ -914,6 +915,10 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
         </>);
     };
 
+    if (herramienta === 'sala3d') {
+        return <SalaGeometria3D onExit={() => setHerramienta(null)} />;
+    }
+
     if (herramienta) {
         const esPerimetro = herramienta === 'perimetro';
         return (
@@ -1051,6 +1056,9 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
                         </button>
                         <button onClick={() => setHerramienta('poliedros')} style={{ ...sLocal.btnPrimary, background: '#5E35B1' }}>
                             🔷 Poliedros 3D · Euler <span style={{ fontSize: '0.8rem', opacity: 0.85 }}>(girar y contar)</span>
+                        </button>
+                        <button onClick={() => setHerramienta('sala3d')} style={{ ...sLocal.btnPrimary, background: '#0D47A1' }}>
+                            🥽 Sala de Geometría 3D <span style={{ fontSize: '0.8rem', opacity: 0.85 }}>(VR, regla y GeoGebra)</span>
                         </button>
 
                         <div style={{ width: '100%', maxWidth: 320, height: 2, background: '#eee', margin: '6px 0' }} />

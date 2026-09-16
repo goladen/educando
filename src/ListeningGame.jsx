@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { db } from './firebase';
 import { guardarRegistroLocal } from './utils/registrosLocales';
 import {
@@ -8,10 +8,14 @@ import {
     Volume2, Play, Pause, RotateCcw, Send, Users,
     ChevronRight, ArrowLeft, Trophy, Clock, Loader, CheckCircle, XCircle, Headphones
 } from 'lucide-react';
-import { NIVELES_LISTENING, LISTENING_ITEMS } from './BibliotecaListening';
+import { IDIOMAS_LISTENING, getIdioma, getItems, getItem, IDIOMA_POR_DEFECTO } from './listeningIdiomas';
+import QRSalaBoton from './components/QRSalaBoton';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 const AUDIO_DURACION_EST = 62; // segundos estimados por audio (~1 min)
+
+// Velocidades de reproducción disponibles en el reproductor de listening
+const VELOCIDADES = [0.5, 0.75, 1, 1.25, 1.5];
 
 const generarCodigo = () =>
     Array.from({ length: 6 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
@@ -149,17 +153,73 @@ function ModalEnviarProfe({ datos, onClose }) {
     );
 }
 
-// ─── Reproductor de audio ─────────────────────────────────────────────────────
-function AudioPlayer({ url, onTimeUpdate, onEnded, controlRef, small = false }) {
+// ─── Reproductor: cáscara común (audio mp3 y voz del navegador) ──────────────
+function PlayerShell({ playing, onToggle, onRestart, progress, currentTime, duration, onSeek,
+                       velocidad, setVelocidad, small, aviso, children }) {
+    return (
+        <div style={{ background: small ? 'rgba(255,255,255,0.1)' : '#1a1a2e', borderRadius: 16, padding: small ? '10px 14px' : '16px 20px' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                {children}
+                <button onClick={onRestart} title="Reiniciar" style={{ background:'rgba(255,255,255,0.15)', border:'none', borderRadius:'50%', width:32, height:32, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                    <RotateCcw size={14} color="white"/>
+                </button>
+                <button onClick={onToggle} style={{ background:'#3498db', border:'none', borderRadius:'50%', width: small ? 36 : 44, height: small ? 36 : 44, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, boxShadow:'0 4px 12px rgba(52,152,219,0.5)' }}>
+                    {playing ? <Pause size={small?16:20} color="white"/> : <Play size={small?16:20} color="white"/>}
+                </button>
+                <div style={{ flex:1 }}>
+                    <div onClick={onSeek} style={{ height:6, background:'rgba(255,255,255,0.15)', borderRadius:3, cursor: onSeek ? 'pointer' : 'default', overflow:'hidden' }}>
+                        <div style={{ height:'100%', width:`${progress}%`, background:'#3498db', transition:'width 0.3s linear', borderRadius:3 }}/>
+                    </div>
+                    <div style={{ display:'flex', justifyContent:'space-between', marginTop:4, fontSize:'0.7rem', color:'rgba(255,255,255,0.5)' }}>
+                        <span>{fmtTime(currentTime)}</span>
+                        <span>{fmtTime(duration)}</span>
+                    </div>
+                </div>
+                <div style={{ display:'flex', alignItems:'center', gap:5, flexShrink:0 }}>
+                    <Volume2 size={16} color="rgba(255,255,255,0.4)"/>
+                    <div style={{ display:'flex', gap:3 }}>
+                        {VELOCIDADES.map(v => (
+                            <button key={v} onClick={() => setVelocidad(v)} title={`Velocidad x${v}`}
+                                style={{
+                                    padding: small ? '2px 5px' : '3px 7px', borderRadius:8, cursor:'pointer',
+                                    border: velocidad === v ? '1.5px solid #3498db' : '1.5px solid rgba(255,255,255,0.18)',
+                                    background: velocidad === v ? 'rgba(52,152,219,0.35)' : 'rgba(255,255,255,0.06)',
+                                    color: velocidad === v ? 'white' : 'rgba(255,255,255,0.55)',
+                                    fontSize: small ? '0.62rem' : '0.68rem', fontWeight: velocidad === v ? 800 : 600,
+                                    fontFamily:'inherit', lineHeight:1.2
+                                }}>
+                                x{v}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            </div>
+            {aviso && (
+                <div style={{ marginTop:8, fontSize:'0.72rem', color:'rgba(255,255,255,0.45)', display:'flex', alignItems:'center', gap:6 }}>
+                    🗣️ {aviso}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ─── Reproductor de audio (mp3) ───────────────────────────────────────────────
+function AudioPlayer({ url, onTimeUpdate, onEnded, onError, controlRef, small = false }) {
     const audioRef = useRef(null);
     const [playing, setPlaying] = useState(false);
     const [progress, setProgress] = useState(0);
     const [duration, setDuration] = useState(0);
     const [currentTime, setCurrentTime] = useState(0);
+    const [velocidad, setVelocidad] = useState(1);
 
     useEffect(() => {
         if (controlRef) controlRef.current = audioRef.current;
     }, []);
+
+    // Mantener la velocidad elegida al cambiar de audio
+    useEffect(() => {
+        if (audioRef.current) audioRef.current.playbackRate = velocidad;
+    }, [velocidad, url]);
 
     const toggle = () => {
         const a = audioRef.current;
@@ -178,7 +238,10 @@ function AudioPlayer({ url, onTimeUpdate, onEnded, controlRef, small = false }) 
     };
 
     const handleEnded = () => { setPlaying(false); if (onEnded) onEnded(); };
-    const handleLoaded = () => setDuration(audioRef.current?.duration || 0);
+    const handleLoaded = () => {
+        setDuration(audioRef.current?.duration || 0);
+        if (audioRef.current) audioRef.current.playbackRate = velocidad;
+    };
 
     const seek = (e) => {
         const a = audioRef.current;
@@ -194,26 +257,145 @@ function AudioPlayer({ url, onTimeUpdate, onEnded, controlRef, small = false }) 
     };
 
     return (
-        <div style={{ background: small ? 'rgba(255,255,255,0.1)' : '#1a1a2e', borderRadius: 16, padding: small ? '10px 14px' : '16px 20px', display:'flex', alignItems:'center', gap:10 }}>
-            <audio ref={audioRef} src={url} onTimeUpdate={handleTimeUpdate} onEnded={handleEnded} onLoadedMetadata={handleLoaded}/>
-            <button onClick={restart} title="Reiniciar" style={{ background:'rgba(255,255,255,0.15)', border:'none', borderRadius:'50%', width:32, height:32, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                <RotateCcw size={14} color="white"/>
-            </button>
-            <button onClick={toggle} style={{ background:'#3498db', border:'none', borderRadius:'50%', width: small ? 36 : 44, height: small ? 36 : 44, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, boxShadow:'0 4px 12px rgba(52,152,219,0.5)' }}>
-                {playing ? <Pause size={small?16:20} color="white"/> : <Play size={small?16:20} color="white"/>}
-            </button>
-            <div style={{ flex:1 }}>
-                <div onClick={seek} style={{ height:6, background:'rgba(255,255,255,0.15)', borderRadius:3, cursor:'pointer', overflow:'hidden' }}>
-                    <div style={{ height:'100%', width:`${progress}%`, background:'#3498db', transition:'width 0.3s linear', borderRadius:3 }}/>
-                </div>
-                <div style={{ display:'flex', justifyContent:'space-between', marginTop:4, fontSize:'0.7rem', color:'rgba(255,255,255,0.5)' }}>
-                    <span>{fmtTime(currentTime)}</span>
-                    <span>{fmtTime(duration)}</span>
-                </div>
-            </div>
-            <Volume2 size={16} color="rgba(255,255,255,0.4)" style={{ flexShrink:0 }}/>
-        </div>
+        <PlayerShell playing={playing} onToggle={toggle} onRestart={restart} progress={progress}
+            currentTime={currentTime} duration={duration} onSeek={seek}
+            velocidad={velocidad} setVelocidad={setVelocidad} small={small}>
+            <audio ref={audioRef} src={url} onTimeUpdate={handleTimeUpdate} onEnded={handleEnded}
+                onLoadedMetadata={handleLoaded} onError={onError} style={{ display:'none' }}/>
+        </PlayerShell>
     );
+}
+
+// ─── Reproductor con la voz del navegador (cuando no hay mp3) ─────────────────
+// Se lee frase a frase: Chrome corta los textos largos en una sola utterance.
+function TTSPlayer({ texto, lang = 'en-GB', onTimeUpdate, onEnded, small = false }) {
+    const [playing, setPlaying] = useState(false);
+    const [velocidad, setVelocidad] = useState(1);
+    const [avance, setAvance] = useState(0);   // 0..1 del texto leído
+    const idxRef = useRef(0);                  // frase actual
+    const velRef = useRef(1);
+    const cancelRef = useRef(false);
+
+    const soportado = typeof window !== 'undefined' && 'speechSynthesis' in window;
+    const frases = useMemo(
+        // Sin lookbehind: Safari antiguo no lo soporta y rompería el módulo entero
+        () => (String(texto || '').match(/[^.!?]+[.!?]*\s*/g) || [String(texto || '')]).filter(x => x.trim().length),
+        [texto]
+    );
+    const largos = useMemo(() => {
+        const total = frases.reduce((a, f) => a + f.length, 0) || 1;
+        let acc = 0;
+        return frases.map(f => { const ini = acc / total; acc += f.length; return ini; });
+    }, [frases]);
+
+    const duracion = AUDIO_DURACION_EST;
+
+    useEffect(() => {
+        velRef.current = velocidad;
+    }, [velocidad]);
+
+    // Parar la voz al desmontar o al cambiar de texto
+    useEffect(() => {
+        return () => { cancelRef.current = true; if (soportado) window.speechSynthesis.cancel(); };
+    }, [texto]);
+
+    const reportar = (fraccion) => {
+        setAvance(fraccion);
+        if (onTimeUpdate) onTimeUpdate(fraccion * duracion);
+    };
+
+    const hablarDesde = (i) => {
+        if (!soportado || i >= frases.length) {
+            setPlaying(false);
+            if (i >= frases.length) { reportar(1); if (onEnded) onEnded(); }
+            return;
+        }
+        idxRef.current = i;
+        const u = new SpeechSynthesisUtterance(frases[i]);
+        u.lang = lang;
+        u.rate = velRef.current;
+        const ini = largos[i];
+        const fin = i + 1 < largos.length ? largos[i + 1] : 1;
+        u.onboundary = (e) => {
+            const dentro = frases[i].length ? Math.min(1, (e.charIndex || 0) / frases[i].length) : 1;
+            reportar(ini + (fin - ini) * dentro);
+        };
+        u.onend = () => {
+            if (cancelRef.current) return;
+            reportar(fin);
+            hablarDesde(i + 1);
+        };
+        u.onerror = () => { if (!cancelRef.current) setPlaying(false); };
+        window.speechSynthesis.speak(u);
+    };
+
+    const toggle = () => {
+        if (!soportado) return;
+        if (playing) {
+            window.speechSynthesis.pause();
+            setPlaying(false);
+            return;
+        }
+        if (window.speechSynthesis.paused && window.speechSynthesis.speaking) {
+            window.speechSynthesis.resume();
+            setPlaying(true);
+            return;
+        }
+        cancelRef.current = false;
+        window.speechSynthesis.cancel();
+        setPlaying(true);
+        hablarDesde(idxRef.current >= frases.length ? 0 : idxRef.current);
+    };
+
+    const restart = () => {
+        if (!soportado) return;
+        cancelRef.current = true;
+        window.speechSynthesis.cancel();
+        idxRef.current = 0;
+        reportar(0);
+        setTimeout(() => { cancelRef.current = false; setPlaying(true); hablarDesde(0); }, 60);
+    };
+
+    // Cambiar de velocidad relanza la frase actual con el nuevo rate
+    const cambiarVelocidad = (v) => {
+        setVelocidad(v);
+        velRef.current = v;
+        if (playing && soportado) {
+            cancelRef.current = true;
+            window.speechSynthesis.cancel();
+            const i = idxRef.current;
+            setTimeout(() => { cancelRef.current = false; hablarDesde(i); }, 60);
+        }
+    };
+
+    if (!soportado) {
+        return (
+            <div style={{ background: small ? 'rgba(255,255,255,0.1)' : '#1a1a2e', borderRadius:16, padding:'14px 18px', color:'rgba(255,255,255,0.6)', fontSize:'0.85rem' }}>
+                ⚠️ Este navegador no puede leer el texto en voz alta y el audio todavía no está disponible.
+            </div>
+        );
+    }
+
+    return (
+        <PlayerShell playing={playing} onToggle={toggle} onRestart={restart}
+            progress={avance * 100} currentTime={avance * duracion} duration={duracion}
+            onSeek={null} velocidad={velocidad} setVelocidad={cambiarVelocidad} small={small}
+            aviso="Audio leído por la voz del dispositivo (aún no hay grabación para este tema)."/>
+    );
+}
+
+// ─── Reproductor del listening: mp3 si existe, voz del navegador si no ────────
+function ListeningPlayer({ item, lang, onTimeUpdate, onEnded, controlRef, small = false }) {
+    const [sinAudio, setSinAudio] = useState(!item?.audioUrl);
+
+    useEffect(() => { setSinAudio(!item?.audioUrl); }, [item?.id]);
+
+    if (!item) return null;
+    if (sinAudio) {
+        return <TTSPlayer texto={item.fullTranscript} lang={lang} onTimeUpdate={onTimeUpdate} onEnded={onEnded} small={small}/>;
+    }
+    return <AudioPlayer url={item.audioUrl} onTimeUpdate={onTimeUpdate} onEnded={onEnded}
+        controlRef={controlRef} small={small} onError={() => setSinAudio(true)}/>;
 }
 
 const fmtTime = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -301,7 +483,7 @@ function TranscriptView({ segmentos, modo, respuestas, onRespuesta, frasesRevela
 }
 
 // ─── Pantalla selección de idioma ─────────────────────────────────────────────
-function PantallaIdioma({ onIngles, onBack }) {
+function PantallaIdioma({ onIdioma, onBack }) {
     return (
         <div style={{ minHeight:'100vh', background:'linear-gradient(135deg,#1a1a2e,#16213e)', fontFamily:"'Segoe UI',sans-serif", display:'flex', flexDirection:'column' }}>
             <div style={{ background:'rgba(255,255,255,0.05)', padding:'20px 24px', display:'flex', alignItems:'center', gap:12 }}>
@@ -316,38 +498,36 @@ function PantallaIdioma({ onIngles, onBack }) {
             </div>
             <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', padding:32 }}>
                 <div style={{ display:'flex', gap:24, flexWrap:'wrap', justifyContent:'center' }}>
-                    <button onClick={onIngles}
-                        style={{ width:220, padding:'32px 24px', borderRadius:24, border:'2px solid rgba(52,152,219,0.5)', background:'rgba(52,152,219,0.12)', cursor:'pointer', color:'white', fontFamily:'inherit', textAlign:'center', transition:'all 0.2s' }}
-                        onMouseEnter={e=>{e.currentTarget.style.background='rgba(52,152,219,0.25)';e.currentTarget.style.borderColor='#3498db';}}
-                        onMouseLeave={e=>{e.currentTarget.style.background='rgba(52,152,219,0.12)';e.currentTarget.style.borderColor='rgba(52,152,219,0.5)';}}>
-                        <div style={{ fontSize:'3rem', marginBottom:12 }}>🇬🇧</div>
-                        <div style={{ fontWeight:800, fontSize:'1.3rem', marginBottom:6 }}>English</div>
-                        <div style={{ fontSize:'0.8rem', color:'rgba(255,255,255,0.5)' }}>Listening Practice · 95 topics</div>
-                    </button>
-                    <div style={{ width:220, padding:'32px 24px', borderRadius:24, border:'2px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.03)', color:'rgba(255,255,255,0.3)', fontFamily:'inherit', textAlign:'center' }}>
-                        <div style={{ fontSize:'3rem', marginBottom:12, opacity:0.5 }}>🇫🇷</div>
-                        <div style={{ fontWeight:800, fontSize:'1.3rem', marginBottom:6 }}>Français</div>
-                        <div style={{ fontSize:'0.8rem', color:'rgba(255,255,255,0.25)', marginBottom:14 }}>Écouter</div>
-                        <span style={{ background:'rgba(230,126,34,0.2)', border:'1px solid rgba(230,126,34,0.4)', borderRadius:20, padding:'4px 12px', fontSize:'0.75rem', color:'#e67e22' }}>Próximamente</span>
-                    </div>
+                    {Object.values(IDIOMAS_LISTENING).map(idi => (
+                        <button key={idi.id} onClick={() => onIdioma(idi.id)}
+                            style={{ width:220, padding:'32px 24px', borderRadius:24, border:'2px solid rgba(52,152,219,0.5)', background:'rgba(52,152,219,0.12)', cursor:'pointer', color:'white', fontFamily:'inherit', textAlign:'center', transition:'all 0.2s' }}
+                            onMouseEnter={e=>{e.currentTarget.style.background='rgba(52,152,219,0.25)';e.currentTarget.style.borderColor='#3498db';}}
+                            onMouseLeave={e=>{e.currentTarget.style.background='rgba(52,152,219,0.12)';e.currentTarget.style.borderColor='rgba(52,152,219,0.5)';}}>
+                            <div style={{ fontSize:'3rem', marginBottom:12 }}>{idi.flag}</div>
+                            <div style={{ fontWeight:800, fontSize:'1.3rem', marginBottom:6 }}>{idi.label}</div>
+                            <div style={{ fontSize:'0.8rem', color:'rgba(255,255,255,0.5)' }}>{idi.subtitulo}</div>
+                            <div style={{ fontSize:'0.72rem', color:'rgba(255,255,255,0.3)', marginTop:6 }}>{idi.items.length} temas</div>
+                        </button>
+                    ))}
                 </div>
             </div>
         </div>
     );
 }
 
-// ─── Hub inglés: 3 opciones ────────────────────────────────────────────────────
-function PantallaInglesHub({ onExplorar, onCrearSala, onUnirse, onBack }) {
+// ─── Hub del idioma: 3 opciones ────────────────────────────────────────────────
+function PantallaHubIdioma({ idioma, onExplorar, onCrearSala, onUnirse, onBack }) {
+    const idi = getIdioma(idioma);
     return (
         <div style={{ minHeight:'100vh', background:'linear-gradient(135deg,#1a1a2e,#16213e)', fontFamily:"'Segoe UI',sans-serif", display:'flex', flexDirection:'column' }}>
             <div style={{ background:'rgba(255,255,255,0.05)', padding:'20px 24px', display:'flex', alignItems:'center', gap:12 }}>
                 <button onClick={onBack} style={{ background:'rgba(255,255,255,0.1)', border:'none', borderRadius:10, padding:'8px 14px', color:'white', cursor:'pointer', display:'flex', alignItems:'center', gap:6, fontSize:'0.88rem' }}>
                     <ArrowLeft size={16}/> Volver
                 </button>
-                <span style={{ fontSize:'1.4rem' }}>🇬🇧</span>
+                <span style={{ fontSize:'1.4rem' }}>{idi.flag}</span>
                 <div>
-                    <div style={{ color:'white', fontWeight:800, fontSize:'1.2rem' }}>English Listening</div>
-                    <div style={{ color:'rgba(255,255,255,0.5)', fontSize:'0.78rem' }}>Listen a Minute · 95 topics</div>
+                    <div style={{ color:'white', fontWeight:800, fontSize:'1.2rem' }}>{idi.label} Listening</div>
+                    <div style={{ color:'rgba(255,255,255,0.5)', fontSize:'0.78rem' }}>{idi.subtitulo}</div>
                 </div>
             </div>
             <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', padding:32 }}>
@@ -392,14 +572,14 @@ function PantallaInglesHub({ onExplorar, onCrearSala, onUnirse, onBack }) {
 }
 
 // ─── Pantalla explorar: colección completa ─────────────────────────────────────
-function PantallaExplorar({ onSel, onBack }) {
+function PantallaExplorar({ idioma, onSel, onBack }) {
     const [filtro, setFiltro] = useState(null);
     const [busqueda, setBusqueda] = useState('');
 
-    const items = LISTENING_ITEMS.filter(it => {
-        if (filtro === 'A-G' && !['A','B','C','D','E','F','G'].includes(it.letter)) return false;
-        if (filtro === 'H-N' && !['H','I','J','K','L','M','N'].includes(it.letter)) return false;
-        if (filtro === 'O-Z' && !['O','P','Q','R','S','T','U','V','W','X','Y','Z'].includes(it.letter)) return false;
+    const idi = getIdioma(idioma);
+    const nivelActivo = idi.niveles.find(n => n.id === filtro);
+    const items = idi.items.filter(it => {
+        if (nivelActivo?.test && !nivelActivo.test(it)) return false;
         if (busqueda && !it.titulo.toLowerCase().includes(busqueda.toLowerCase())) return false;
         return true;
     });
@@ -412,19 +592,19 @@ function PantallaExplorar({ onSel, onBack }) {
                 </button>
                 <Headphones size={28} color="#3498db"/>
                 <div>
-                    <div style={{ color:'white', fontWeight:800, fontSize:'1.2rem' }}>Explorar Listening</div>
-                    <div style={{ color:'rgba(255,255,255,0.5)', fontSize:'0.78rem' }}>Listen a Minute · 95 topics</div>
+                    <div style={{ color:'white', fontWeight:800, fontSize:'1.2rem' }}>{idi.flag} Explorar Listening</div>
+                    <div style={{ color:'rgba(255,255,255,0.5)', fontSize:'0.78rem' }}>{idi.subtitulo}</div>
                 </div>
             </div>
             <div style={{ maxWidth:800, margin:'0 auto', padding:'20px 16px' }}>
                 <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:16 }}>
-                    {NIVELES_LISTENING.map(n => (
+                    {idi.niveles.map(n => (
                         <button key={String(n.id)} onClick={() => setFiltro(f => f===n.id ? null : n.id)}
                             style={{ padding:'6px 14px', borderRadius:20, border:`2px solid ${filtro===n.id?n.color:'rgba(255,255,255,0.15)'}`, background: filtro===n.id?n.color:'transparent', color:'white', cursor:'pointer', fontFamily:'inherit', fontWeight: filtro===n.id?700:400, fontSize:'0.82rem' }}>
                             {n.emoji} {n.label}
                         </button>
                     ))}
-                    <input value={busqueda} onChange={e=>setBusqueda(e.target.value)} placeholder="🔍 Search topic..."
+                    <input value={busqueda} onChange={e=>setBusqueda(e.target.value)} placeholder={idi.buscarPlaceholder}
                         style={{ marginLeft:'auto', padding:'6px 14px', borderRadius:20, border:'2px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.08)', color:'white', outline:'none', fontSize:'0.82rem', fontFamily:'inherit', minWidth:160 }}/>
                 </div>
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))', gap:10 }}>
@@ -534,7 +714,7 @@ function PantallaModo({ item, onModo, onBack }) {
 }
 
 // ─── Juego individual ──────────────────────────────────────────────────────────
-function JuegoIndividual({ item, modo, onBack }) {
+function JuegoIndividual({ item, modo, idioma, onBack }) {
     const segmentos = parsearTranscript(item.gappedTranscript, item.gaps);
     const frases = dividirEnFrases(segmentos);
     const tiempos = estimarTiemposFrases(frases);
@@ -577,7 +757,7 @@ function JuegoIndividual({ item, modo, onBack }) {
             <div style={{ maxWidth:760, margin:'0 auto', padding:'16px 16px 40px' }}>
                 {/* Audio */}
                 <div style={{ marginBottom:16 }}>
-                    <AudioPlayer url={item.audioUrl} onTimeUpdate={onTimeUpdate} controlRef={audioRef}/>
+                    <ListeningPlayer item={item} lang={getIdioma(idioma).lang} onTimeUpdate={onTimeUpdate} controlRef={audioRef}/>
                 </div>
 
                 {/* Instrucción */}
@@ -681,6 +861,9 @@ function ListeningLiveHost({ codigoSala, onExit }) {
     const salaRef = useRef(null);
     const [mostrarEnvio, setMostrarEnvio] = useState(false);
 
+    // El idioma del listening viaja en el documento de la sala
+    const idiomaSala = sala?.idioma || IDIOMA_POR_DEFECTO;
+
     useEffect(() => {
         const unsub = onSnapshot(doc(db, 'live_games', codigoSala), snap => {
             if (!snap.exists()) return;
@@ -691,7 +874,7 @@ function ListeningLiveHost({ codigoSala, onExit }) {
     }, [codigoSala]);
 
     const empezarRonda = async (itemId) => {
-        const item = LISTENING_ITEMS.find(i => i.id === itemId);
+        const item = getItem(idiomaSala, itemId);
         if (!item) return;
         await updateDoc(doc(db, 'live_games', codigoSala), {
             estado: 'JUGANDO', itemActual: itemId,
@@ -707,7 +890,7 @@ function ListeningLiveHost({ codigoSala, onExit }) {
     if (!sala) return <div style={{ minHeight:'100vh', background:'#1a1a2e', display:'flex', alignItems:'center', justifyContent:'center' }}><Loader size={40} color="white"/></div>;
 
     const jugadores = Object.values(sala.jugadores || {});
-    const itemActual = sala.itemActual ? LISTENING_ITEMS.find(i => i.id === sala.itemActual) : null;
+    const itemActual = sala.itemActual ? getItem(idiomaSala, sala.itemActual) : null;
     const ranking = [...jugadores].sort((a, b) => (b.puntos || 0) - (a.puntos || 0));
 
     const datosFin = {
@@ -719,7 +902,7 @@ function ListeningLiveHost({ codigoSala, onExit }) {
         <div style={{ minHeight:'100vh', background:'linear-gradient(135deg,#1a1a2e,#16213e)', fontFamily:"'Segoe UI',sans-serif", color:'white' }}>
             <div style={{ padding:'14px 20px', background:'rgba(0,0,0,0.3)', display:'flex', alignItems:'center', gap:12 }}>
                 <Headphones size={22} color="#3498db"/>
-                <span style={{ fontWeight:700, flex:1 }}>Listening Online — Sala: <strong style={{ letterSpacing:2 }}>{codigoSala}</strong></span>
+                <span style={{ fontWeight:700, flex:1 }}>{getIdioma(idiomaSala).flag} Listening Online — Sala: <strong style={{ letterSpacing:2 }}>{codigoSala}</strong></span>
                 <span style={{ fontSize:'0.8rem', color:'rgba(255,255,255,0.5)' }}><Users size={13} style={{ verticalAlign:'middle' }}/> {jugadores.length} alumnos</span>
                 <button onClick={onExit} style={{ padding:'6px 12px', borderRadius:8, border:'1px solid rgba(255,255,255,0.2)', background:'transparent', color:'rgba(255,255,255,0.6)', cursor:'pointer', fontSize:'0.8rem' }}>✕ Salir</button>
             </div>
@@ -733,6 +916,7 @@ function ListeningLiveHost({ codigoSala, onExit }) {
                             <div style={{ fontSize:'0.78rem', color:'rgba(255,255,255,0.4)', fontWeight:600, letterSpacing:2, marginBottom:6 }}>CÓDIGO DE SALA</div>
                             <div style={{ fontSize:'3rem', fontWeight:900, letterSpacing:10, color:'white', fontFamily:'monospace' }}>{codigoSala}</div>
                             <div style={{ fontSize:'0.78rem', color:'rgba(255,255,255,0.4)', marginTop:6 }}>Comparte este código con tus alumnos</div>
+                            <div style={{ marginTop:12 }}><QRSalaBoton codigo={codigoSala} /></div>
                         </div>
                         <h2 style={{ marginBottom:20 }}>Selecciona un listening para la clase</h2>
                         {/* Config modo + tiempo */}
@@ -766,7 +950,7 @@ function ListeningLiveHost({ codigoSala, onExit }) {
                         </div>
                         {/* Topics grid */}
                         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(150px,1fr))', gap:8 }}>
-                            {LISTENING_ITEMS.map(it => (
+                            {getItems(idiomaSala).map(it => (
                                 <button key={it.id} onClick={() => empezarRonda(it.id)}
                                     style={{ padding:'12px 10px', borderRadius:12, border:'1.5px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.06)', cursor:'pointer', color:'white', fontFamily:'inherit', textAlign:'left' }}>
                                     <div style={{ fontWeight:800, color:'#3498db', fontSize:'0.9rem' }}>{it.letter}</div>
@@ -788,7 +972,7 @@ function ListeningLiveHost({ codigoSala, onExit }) {
                         </div>
                         {/* Audio del host */}
                         <div style={{ marginBottom:20 }}>
-                            <AudioPlayer url={itemActual.audioUrl}/>
+                            <ListeningPlayer item={itemActual} lang={getIdioma(idiomaSala).lang}/>
                         </div>
                         {/* Transcript completo del host - oculto por defecto */}
                         <TranscriptHostToggle transcript={itemActual.fullTranscript} gapped={itemActual.gappedTranscript} gaps={itemActual.gaps}/>
@@ -902,7 +1086,7 @@ function ListeningLiveClient({ codigoSala, onExit, usuario, initialNombre }) {
 
     const enviarRespuestas = async () => {
         if (enviado || !sala?.itemActual) return;
-        const item = LISTENING_ITEMS.find(i => i.id === sala.itemActual);
+        const item = getItem(sala?.idioma || IDIOMA_POR_DEFECTO, sala.itemActual);
         if (!item) return;
         const aciertos = item.gaps.filter(g => cleanText(respuestas[g.gap_number]) === cleanText(g.answer)).length;
         setEnviado(true);
@@ -917,7 +1101,7 @@ function ListeningLiveClient({ codigoSala, onExit, usuario, initialNombre }) {
 
     const jugadores = Object.values(sala.jugadores || {});
     const yo = sala.jugadores?.[uid];
-    const item = sala.itemActual ? LISTENING_ITEMS.find(i => i.id === sala.itemActual) : null;
+    const item = sala.itemActual ? getItem(sala.idioma || IDIOMA_POR_DEFECTO, sala.itemActual) : null;
     const segmentos = item ? parsearTranscript(item.gappedTranscript, item.gaps) : [];
     const pct = yo ? Math.round((yo.aciertos || 0) / 7 * 100) : 0;
 
@@ -1033,10 +1217,11 @@ function ListeningLiveClient({ codigoSala, onExit, usuario, initialNombre }) {
 }
 
 // ─── Crear sala online ────────────────────────────────────────────────────────
-async function crearSalaListening() {
+async function crearSalaListening(idioma = IDIOMA_POR_DEFECTO) {
     const codigo = generarCodigo();
     await setDoc(doc(db, 'live_games', codigo), {
         tipoJuego: 'LISTENING',
+        idioma,
         estado: 'LOBBY',
         jugadores: {},
         itemActual: null,
@@ -1050,6 +1235,7 @@ async function crearSalaListening() {
 // ─── Export principal ─────────────────────────────────────────────────────────
 export default function ListeningGame({ onExit, isHost, codigoSala: codigoExterno, usuario }) {
     const [pantalla, setPantalla]         = useState('IDIOMA');
+    const [idioma, setIdioma]             = useState(IDIOMA_POR_DEFECTO);
     const [itemSel, setItemSel]           = useState(null);
     const [modo, setModo]                 = useState(null);
     const [internalHost, setInternalHost] = useState(null);
@@ -1058,7 +1244,7 @@ export default function ListeningGame({ onExit, isHost, codigoSala: codigoExtern
 
     // Modo externo (desde LandingGames)
     if (isHost && codigoExterno) return <ListeningLiveHost codigoSala={codigoExterno} onExit={onExit || (()=>{})} />;
-    if (codigoExterno) return <ListeningLiveClient codigoSala={codigoExterno} onExit={onExit || (()=>{})} usuario={usuario}/>;
+    if (codigoExterno) return <ListeningLiveClient codigoSala={codigoExterno} onExit={onExit || (()=>{})} usuario={usuario} initialNombre={usuario?.displayName || ''}/>;
 
     // Modo interno
     if (internalHost) return <ListeningLiveHost codigoSala={internalHost} onExit={() => setInternalHost(null)}/>;
@@ -1069,23 +1255,24 @@ export default function ListeningGame({ onExit, isHost, codigoSala: codigoExtern
             onModo={m => { setModo(m); setPantalla('JUEGO'); }}/>;
     }
     if (pantalla === 'JUEGO' && itemSel && modo) {
-        return <JuegoIndividual item={itemSel} modo={modo}
+        return <JuegoIndividual item={itemSel} modo={modo} idioma={idioma}
             onBack={() => { setModo(null); setPantalla('EXPLORAR'); }}/>;
     }
     if (pantalla === 'EXPLORAR') {
-        return <PantallaExplorar onBack={() => setPantalla('INGLES_HUB')}
+        return <PantallaExplorar idioma={idioma} onBack={() => setPantalla('HUB')}
             onSel={item => { setItemSel(item); setPantalla('MODO'); }}/>;
     }
     if (pantalla === 'UNIRSE') {
-        return <PantallaUnirse onBack={() => setPantalla('INGLES_HUB')}
+        return <PantallaUnirse onBack={() => setPantalla('HUB')}
             onUnirse={(code, nombre) => { setClientNombre(nombre); setInternalClient(code); }}/>;
     }
-    if (pantalla === 'INGLES_HUB') {
-        return <PantallaInglesHub
+    if (pantalla === 'HUB') {
+        return <PantallaHubIdioma
+            idioma={idioma}
             onBack={() => setPantalla('IDIOMA')}
             onExplorar={() => setPantalla('EXPLORAR')}
-            onCrearSala={async () => { const c = await crearSalaListening(); setInternalHost(c); }}
+            onCrearSala={async () => { const c = await crearSalaListening(idioma); setInternalHost(c); }}
             onUnirse={() => setPantalla('UNIRSE')}/>;
     }
-    return <PantallaIdioma onBack={onExit} onIngles={() => setPantalla('INGLES_HUB')}/>;
+    return <PantallaIdioma onBack={onExit} onIdioma={id => { setIdioma(id); setPantalla('HUB'); }}/>;
 }

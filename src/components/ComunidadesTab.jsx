@@ -1211,18 +1211,21 @@ export function HorarioView({ horario, fondo }) {
     const P = getPlantilla(horario.plantilla);
     return (
         <div style={{ overflowX: 'auto' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '72px repeat(5, minmax(80px, 1fr))', gap: P.gap, minWidth: 500, ...P.wrap, ...fondoBg(fondo) }}>
-                <div />
-                {DIAS_SEM.map(d => <div key={d} style={P.dia}>{d}</div>)}
-                {franjas.map((f, i) => (
-                    <React.Fragment key={i}>
-                        <div style={P.franja}>{f}</div>
-                        {DIAS_SEM.map((_, d) => {
-                            const m = materiaDe(celdas[`${d}_${i}`]);
-                            return <div key={d} style={P.celda(m)}>{contenidoMateria(P, m)}</div>;
-                        })}
-                    </React.Fragment>
-                ))}
+            <div style={{ minWidth: 500, ...P.wrap, ...fondoBg(fondo) }}>
+                {horario.titulo && <div style={{ textAlign: 'center', fontWeight: 800, color: '#2c3e50', fontSize: '1.02rem', padding: '2px 0 8px' }}>{horario.titulo}</div>}
+                <div style={{ display: 'grid', gridTemplateColumns: '72px repeat(5, minmax(80px, 1fr))', gap: P.gap }}>
+                    <div />
+                    {DIAS_SEM.map(d => <div key={d} style={P.dia}>{d}</div>)}
+                    {franjas.map((f, i) => (
+                        <React.Fragment key={i}>
+                            <div style={P.franja}>{f}</div>
+                            {DIAS_SEM.map((_, d) => {
+                                const m = materiaDe(celdas[`${d}_${i}`]);
+                                return <div key={d} style={P.celda(m)}>{contenidoMateria(P, m)}</div>;
+                            })}
+                        </React.Fragment>
+                    ))}
+                </div>
             </div>
         </div>
     );
@@ -1333,6 +1336,7 @@ export function HorarioCurso({ horario, onSave, nombre, publicUrl, fondo }) {
         materias: horario?.materias || MATERIAS_DEF(),
         celdas: horario?.celdas || {},
         plantilla: horario?.plantilla || 'colores',
+        titulo: horario?.titulo || '',
     };
     const P = getPlantilla(h.plantilla);
     const [sel, setSel]       = useState(null);   // materia seleccionada por clic
@@ -1349,6 +1353,29 @@ export function HorarioCurso({ horario, onSave, nombre, publicUrl, fondo }) {
         const c = { ...h.celdas }; DIAS_SEM.forEach((_, d) => delete c[`${d}_${idx}`]);
         guardar({ franjas: h.franjas.slice(0, -1), celdas: c });
     };
+    // Inserta una franja vacía DEBAJO de la fila `pos` (desplaza las de abajo)
+    const insertarFranja = (pos) => {
+        const nf = [...h.franjas]; nf.splice(pos + 1, 0, '');
+        const nc = {};
+        Object.keys(h.celdas).forEach(k => {
+            const partes = k.split('_'); const d = partes[0]; const fi = Number(partes[1]);
+            nc[`${d}_${fi > pos ? fi + 1 : fi}`] = h.celdas[k];
+        });
+        guardar({ franjas: nf, celdas: nc });
+    };
+    // Borra una franja concreta (desplaza hacia arriba las de debajo)
+    const borrarFranja = (pos) => {
+        if (h.franjas.length <= 1) return;
+        const nf = h.franjas.filter((_, i) => i !== pos);
+        const nc = {};
+        Object.keys(h.celdas).forEach(k => {
+            const partes = k.split('_'); const d = partes[0]; const fi = Number(partes[1]);
+            if (fi === pos) return;
+            nc[`${d}_${fi > pos ? fi - 1 : fi}`] = h.celdas[k];
+        });
+        guardar({ franjas: nf, celdas: nc });
+    };
+    const setTitulo = (t) => guardar({ titulo: t });
     const addMateria = () => guardar({ materias: [...h.materias, { id: nuevoId(), nombre: 'Nueva materia', profesor: '', color: PALETA_COLORES[h.materias.length % PALETA_COLORES.length] }] });
     const setMateria = (id, campos) => guardar({ materias: h.materias.map(m => m.id === id ? { ...m, ...campos } : m) });
     const delMateria = (id) => {
@@ -1372,6 +1399,14 @@ export function HorarioCurso({ horario, onSave, nombre, publicUrl, fondo }) {
 
     return (
         <div>
+            {/* Título del horario (sale en la impresión) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.78rem', color: '#7f8c8d', fontWeight: 600 }}>📝 Título:</span>
+                <input key={`tit-${h.titulo}`} defaultValue={h.titulo} onBlur={e => { const v = e.target.value.trim(); if (v !== h.titulo) setTitulo(v); }}
+                    placeholder="Título del horario (p. ej. 1º ESO A)"
+                    style={{ flex: 1, minWidth: 160, maxWidth: 380, padding: '7px 10px', borderRadius: 8, border: '1.5px solid #e0e4f0', fontSize: '0.9rem', outline: 'none', fontFamily: 'inherit', color: '#2c3e50', fontWeight: 600 }} />
+            </div>
+
             {/* Selector de plantilla */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '0.78rem', color: '#7f8c8d', fontWeight: 600 }}>🎨 Diseño:</span>
@@ -1389,13 +1424,21 @@ export function HorarioCurso({ horario, onSave, nombre, publicUrl, fondo }) {
             </div>
 
             <div style={{ overflowX: 'auto' }}>
-                <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: '72px repeat(5, minmax(88px, 1fr))', gap: P.gap, minWidth: 520, ...P.wrap, ...fondoBg(fondo) }}>
+                <div ref={gridRef} style={{ minWidth: 520, ...P.wrap, ...fondoBg(fondo) }}>
+                    {h.titulo && <div style={{ textAlign: 'center', fontWeight: 800, color: '#2c3e50', fontSize: '1.05rem', padding: '2px 0 8px' }}>{h.titulo}</div>}
+                    <div style={{ display: 'grid', gridTemplateColumns: '72px repeat(5, minmax(88px, 1fr))', gap: P.gap }}>
                     <div />
                     {DIAS_SEM.map(d => <div key={d} style={P.dia}>{d}</div>)}
                     {h.franjas.map((f, i) => (
                         <React.Fragment key={i}>
-                            <input defaultValue={f} onBlur={e => { if (e.target.value !== f) setFranja(i, e.target.value); }} title="Franja horaria"
-                                style={{ ...franjaInput, background: P.franja.background || '#f8f9fb', color: P.franja.color || '#555', borderRadius: P.franja.borderRadius || 6, fontWeight: P.franja.fontWeight || 600, border: '1px solid ' + (P.franja.background && P.franja.background !== '#f8f9fb' ? 'transparent' : '#e0e4f0') }} />
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, justifyContent: 'center' }}>
+                                <input key={`f-${h.franjas.length}-${i}`} defaultValue={f} onBlur={e => { if (e.target.value !== f) setFranja(i, e.target.value); }} title="Franja horaria"
+                                    style={{ ...franjaInput, background: P.franja.background || '#f8f9fb', color: P.franja.color || '#555', borderRadius: P.franja.borderRadius || 6, fontWeight: P.franja.fontWeight || 600, border: '1px solid ' + (P.franja.background && P.franja.background !== '#f8f9fb' ? 'transparent' : '#e0e4f0') }} />
+                                <div style={{ display: 'flex', gap: 2 }}>
+                                    <button onClick={() => insertarFranja(i)} title="Insertar una franja debajo" style={{ flex: 1, border: '1px dashed #cdd6ea', background: 'white', color: AZUL, borderRadius: 5, cursor: 'pointer', fontSize: '0.6rem', fontWeight: 700, padding: '1px 0', lineHeight: 1 }}>＋</button>
+                                    <button onClick={() => borrarFranja(i)} disabled={h.franjas.length <= 1} title="Borrar esta franja" style={{ flex: 1, border: '1px dashed #f3c9c4', background: 'white', color: '#e74c3c', borderRadius: 5, cursor: 'pointer', fontSize: '0.6rem', fontWeight: 700, padding: '1px 0', lineHeight: 1, opacity: h.franjas.length <= 1 ? 0.4 : 1 }}>✕</button>
+                                </div>
+                            </div>
                             {DIAS_SEM.map((_, d) => {
                                 const mid = h.celdas[`${d}_${i}`]; const m = mid && materiaDe(mid);
                                 return (
@@ -1409,6 +1452,7 @@ export function HorarioCurso({ horario, onSave, nombre, publicUrl, fondo }) {
                             })}
                         </React.Fragment>
                     ))}
+                    </div>
                 </div>
             </div>
 

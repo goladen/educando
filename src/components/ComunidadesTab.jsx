@@ -1235,10 +1235,14 @@ Devuelve ÚNICAMENTE un JSON válido (sin markdown, sin explicaciones) con esta 
 {"franjas":["8:30-9:20","9:25-10:15"],"celdas":[["Matemáticas","Lengua","","",""]]}
 - "franjas": las etiquetas horarias de cada franja lectiva, en orden.
 - "celdas": una fila por franja (mismo orden que "franjas") y EXACTAMENTE 5 columnas (Lunes, Martes, Miércoles, Jueves, Viernes). Usa "" para celdas vacías.`;
-    const data = await callGeminiProxy({
-        model: 'gemini-2.0-flash',
-        contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64 } }] }],
-    });
+    const contents = [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64 } }] }];
+    const MODELOS = ['gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-flash-latest'];
+    let data = null, ultimoError = null;
+    for (const model of MODELOS) {
+        try { data = await callGeminiProxy({ model, contents }); ultimoError = null; break; }
+        catch (e) { ultimoError = e; if (!/no longer available|not found|404|not supported/i.test(e.message)) break; }
+    }
+    if (!data) throw ultimoError || new Error('No se pudo contactar con la IA.');
     const text = extractText(data).replace(/```json/gi, '').replace(/```/g, '').trim();
     const json = JSON.parse(text);
     const franjas = (json.franjas || []).map(x => String(x));

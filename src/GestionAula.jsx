@@ -11,6 +11,9 @@ import {
 import { TeacherControlPanel } from './ControlAula';
 import Confetti from 'react-confetti';
 import GeografiaPanel from './components/GeografiaPanel';
+import { HorarioCurso } from './components/ComunidadesTab';
+import { imprimirElemento } from './utils/exportar';
+import { FONDOS, fondoUrl } from './utils/fondos';
 import MusicStaffPanel from './components/MusicStaffPanel';
 const MiniAppCreator = lazy(() => import('./components/MiniAppCreator'));
 const RecortesExtrem = lazy(() => import('./components/RecortesExtrem'));
@@ -3260,8 +3263,11 @@ const COLORES_GRUPOS_LIB = ['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6','#
 function GruposLibre() {
     const [alumnosTxt, setAlumnosTxt] = useState("Ana, Luis, Carlos, Marta, Sofía, Diego, Elena, Pablo");
     const [numGrupos, setNumGrupos] = useState(3);
+    const [modoGrupos, setModoGrupos] = useState('grupos'); // 'grupos' (nº de grupos) | 'porgrupo' (alumnos por grupo)
     // grupos: Array<{ nombre: string, alumnos: string[] }>
     const [grupos, setGrupos] = useState([]);
+    const [addNombre, setAddNombre] = useState('');
+    const [addGrupo, setAddGrupo]   = useState(0);
 
     // Si el texto tiene saltos de línea (p.ej. pegado desde una hoja de cálculo),
     // cada línea es un alumno aunque contenga comas. Si es una sola línea, se separa por comas.
@@ -3286,8 +3292,11 @@ function GruposLibre() {
 
     const generar = () => {
         setSelAlumno(null);
-        const n = Math.min(Math.max(1, numGrupos), alumnos.length);
-        if (n === 0) return;
+        if (alumnos.length === 0) return;
+        const val = Math.max(1, numGrupos);
+        const n = modoGrupos === 'grupos'
+            ? Math.min(val, alumnos.length)
+            : Math.max(1, Math.ceil(alumnos.length / val));
         const shuffled = [...alumnos].sort(() => Math.random() - 0.5);
         const result = Array.from({ length: n }, (_, i) => ({
             nombre: grupos[i]?.nombre || `Grupo ${i + 1}`,
@@ -3297,8 +3306,23 @@ function GruposLibre() {
         setGrupos(result);
     };
 
+    // Añade un alumno concreto a un grupo ya creado (p. ej. si llega tarde)
+    const añadirAGrupo = () => {
+        const nom = addNombre.trim();
+        if (!nom || grupos.length === 0) return;
+        const gi = Math.min(addGrupo, grupos.length - 1);
+        setGrupos(prev => prev.map((g, i) => i === gi ? { ...g, alumnos: [...g.alumnos, nom] } : g));
+        setAddNombre('');
+    };
+
     const setNombre = (i, nombre) =>
         setGrupos(prev => prev.map((g, j) => j === i ? { ...g, nombre } : g));
+
+    // Quita un alumno de los grupos generados (NO de la lista de alumnos de arriba)
+    const quitarAlumno = (gi, ai) => {
+        setSelAlumno(null);
+        setGrupos(prev => prev.map((g, j) => j === gi ? { ...g, alumnos: g.alumnos.filter((_, k) => k !== ai) } : g));
+    };
 
     const imprimir = () => {
         const cols = COLORES_GRUPOS_LIB;
@@ -3347,8 +3371,12 @@ h1{font-size:1.2rem;color:#2c3e50;margin-bottom:14px;}
 
                 {/* Panel de control */}
                 <div style={{ flex:'1 1 180px', minWidth:180, boxSizing:'border-box', background:'#f8f9fc', border:'1.5px solid #e0e4f0', borderRadius:12, padding:16, display:'flex', flexDirection:'column', gap:12 }}>
+                    <div style={{ display:'flex', gap:4 }}>
+                        <button onClick={() => setModoGrupos('grupos')} style={{ flex:1, padding:'6px 4px', borderRadius:8, border:'1.5px solid '+(modoGrupos==='grupos'?'#9b59b6':'#e0e4f0'), background:modoGrupos==='grupos'?'#9b59b6':'white', color:modoGrupos==='grupos'?'white':'#555', cursor:'pointer', fontSize:'0.76rem', fontWeight:700 }}>Nº de grupos</button>
+                        <button onClick={() => setModoGrupos('porgrupo')} style={{ flex:1, padding:'6px 4px', borderRadius:8, border:'1.5px solid '+(modoGrupos==='porgrupo'?'#9b59b6':'#e0e4f0'), background:modoGrupos==='porgrupo'?'#9b59b6':'white', color:modoGrupos==='porgrupo'?'white':'#555', cursor:'pointer', fontSize:'0.76rem', fontWeight:700 }}>Alumnos/grupo</button>
+                    </div>
                     <div>
-                        <div style={{ fontWeight:700, color:'#2c3e50', fontSize:'0.85rem', marginBottom:10 }}>Número de grupos</div>
+                        <div style={{ fontWeight:700, color:'#2c3e50', fontSize:'0.85rem', marginBottom:10 }}>{modoGrupos==='grupos' ? 'Número de grupos' : 'Alumnos por grupo'}</div>
                         <div style={{ display:'flex', alignItems:'center', gap:10, justifyContent:'center' }}>
                             <button onClick={() => setNumGrupos(n => Math.max(1, n-1))}
                                 style={{ width:36, height:36, borderRadius:'50%', border:'1.5px solid #bdc3c7', background:'white', cursor:'pointer', fontSize:'1.2rem', fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>−</button>
@@ -3383,6 +3411,21 @@ h1{font-size:1.2rem;color:#2c3e50;margin-bottom:14px;}
                 </div>
             )}
 
+            {/* Añadir un alumno concreto a un grupo (p. ej. si llega tarde) */}
+            {grupos.length > 0 && (
+                <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap', marginBottom:12, padding:'10px 12px', background:'#f8f9fc', border:'1.5px solid #e0e4f0', borderRadius:10 }}>
+                    <span style={{ fontSize:'0.8rem', color:'#7f8c8d', fontWeight:600 }}>➕ Añadir a un grupo:</span>
+                    <input value={addNombre} onChange={e => setAddNombre(e.target.value)} onKeyDown={e => e.key==='Enter' && añadirAGrupo()} placeholder="Nombre del alumno…"
+                        style={{ padding:'6px 10px', borderRadius:8, border:'1.5px solid #e0e4f0', fontSize:'0.84rem', outline:'none', fontFamily:'inherit', flex:'1 1 140px', minWidth:120 }}/>
+                    <select value={addGrupo} onChange={e => setAddGrupo(Number(e.target.value))}
+                        style={{ padding:'6px 10px', borderRadius:8, border:'1.5px solid #e0e4f0', fontSize:'0.84rem', background:'white' }}>
+                        {grupos.map((g, i) => <option key={i} value={i}>{g.nombre}</option>)}
+                    </select>
+                    <button onClick={añadirAGrupo} disabled={!addNombre.trim()}
+                        style={{ padding:'7px 14px', borderRadius:8, border:'none', background:addNombre.trim()?'#9b59b6':'#ddd', color:'white', fontWeight:700, fontSize:'0.84rem', cursor:addNombre.trim()?'pointer':'default' }}>Añadir</button>
+                </div>
+            )}
+
             {/* Resultado */}
             {grupos.length > 0 ? (
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(min(180px, 100%), 1fr))', gap:12 }}>
@@ -3404,8 +3447,10 @@ h1{font-size:1.2rem;color:#2c3e50;margin-bottom:14px;}
                                         return (
                                             <div key={j} onClick={() => clickAlumno(i, j)}
                                                 title="Toca este y otro alumno para intercambiarlos"
-                                                style={{ padding:'6px 10px', borderRadius:8, background:sel?col:'white', color:sel?'white':'#2c3e50', fontSize:'0.84rem', fontWeight:600, boxShadow:'0 1px 4px rgba(0,0,0,0.07)', wordBreak:'break-word', cursor:'pointer', border:`1.5px solid ${sel?col:'transparent'}`, transition:'all 0.1s' }}>
-                                                {alumno}
+                                                style={{ padding:'6px 10px', borderRadius:8, background:sel?col:'white', color:sel?'white':'#2c3e50', fontSize:'0.84rem', fontWeight:600, boxShadow:'0 1px 4px rgba(0,0,0,0.07)', cursor:'pointer', border:`1.5px solid ${sel?col:'transparent'}`, transition:'all 0.1s', display:'flex', alignItems:'center', gap:6 }}>
+                                                <span style={{ flex:1, wordBreak:'break-word' }}>{alumno}</span>
+                                                <button onClick={e => { e.stopPropagation(); quitarAlumno(i, j); }} title="Quitar de los grupos (no borra de la lista)"
+                                                    style={{ background:'none', border:'none', cursor:'pointer', color:sel?'white':'#e74c3c', padding:0, flexShrink:0, fontSize:'0.95rem', lineHeight:1, fontWeight:700 }}>✕</button>
                                             </div>
                                         );
                                     })}
@@ -3421,6 +3466,37 @@ h1{font-size:1.2rem;color:#2c3e50;margin-bottom:14px;}
                     <div style={{ fontSize:'0.8rem' }}>Puedes pegar una lista separada por comas o una fila por alumno</div>
                 </div>
             )}
+        </div>
+    );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// HORARIO LIBRE — editor de horario sin registro (guarda en el navegador)
+// ══════════════════════════════════════════════════════════════════════════════
+function HorarioLibre() {
+    const KEY = 'horario_libre_v1', FKEY = 'horario_libre_fondo';
+    const [horario, setHorario] = useState(() => {
+        try { const s = localStorage.getItem(KEY); return s ? JSON.parse(s) : undefined; } catch { return undefined; }
+    });
+    const [fondoId, setFondoId] = useState(() => { try { return localStorage.getItem(FKEY) || ''; } catch { return ''; } });
+    const save = (h) => { setHorario(h); try { localStorage.setItem(KEY, JSON.stringify(h)); } catch (_) {} };
+    const setFondo = (id) => { setFondoId(id); try { localStorage.setItem(FKEY, id); } catch (_) {} };
+    return (
+        <div>
+            <div style={{ fontSize:'0.82rem', color:'#7f8c8d', marginBottom:10 }}>Crea tu horario, arrastra las materias a las celdas y descárgalo o imprímelo. Se guarda en este navegador.</div>
+            <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', marginBottom:10 }}>
+                <span style={{ fontSize:'0.82rem', color:'#7f8c8d', fontWeight:600 }}>🖼️ Fondo</span>
+                {FONDOS.map(f => {
+                    const activo = (fondoId || '') === f.id;
+                    return (
+                        <button key={f.id} onClick={() => setFondo(f.id)} title={f.label}
+                            style={{ width:30, height:30, borderRadius:7, cursor:'pointer', padding:0, flexShrink:0, border: activo?'2.5px solid #1565C0':'1.5px solid #cdd6ea', backgroundImage: f.url?`url(${f.url})`:'none', backgroundSize:'cover', backgroundPosition:'center', backgroundColor: f.url?'#fff':'#f1f3f7', position:'relative', overflow:'hidden' }}>
+                            {!f.url && <span style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', color:'#95a5a6', fontSize:'0.85rem' }}>⊘</span>}
+                        </button>
+                    );
+                })}
+            </div>
+            <HorarioCurso horario={horario} onSave={save} nombre="Horario" fondo={fondoUrl(fondoId)} />
         </div>
     );
 }
@@ -3529,6 +3605,11 @@ function PlanoAulaLibre() {
     const [selUnassign, setSelUnassign] = useState(null);
     const [dragging, setDragging] = useState(null);
     const [nuevoAlumno, setNuevoAlumno] = useState('');
+    const [bonito, setBonito] = useState(false);
+    const [girarTxt, setGirarTxt] = useState(false);
+    const canvasRef = useRef();
+    const printRef  = useRef();
+    const rotP = girarTxt ? { display:'inline-block', transform:'rotate(180deg)' } : null;
 
     // Si el texto tiene saltos de línea (p.ej. pegado desde una hoja de cálculo),
     // cada línea es un alumno aunque contenga comas. Si es una sola línea, se separa por comas.
@@ -3629,7 +3710,8 @@ function PlanoAulaLibre() {
         setSelSeat(null);
     };
 
-    const imprimir = () => {
+    const imprimir = async () => {
+        if (bonito) { try { await imprimirElemento(printRef.current, 'Plano de Clase'); } catch (e) { alert('No se pudo imprimir: ' + e.message); } return; }
         const w = window.open('', '_blank');
         w.document.write(htmlPlanoLibre('Plano de Clase', mesas));
         w.document.close();
@@ -3671,6 +3753,11 @@ function PlanoAulaLibre() {
                         style={{ padding:'7px 12px', borderRadius:8, border:'1px solid #bdc3c7', background:'white', cursor:'pointer', fontSize:'0.82rem', color:'#555', whiteSpace:'nowrap' }}>
                         + Mesa
                     </button>
+                    <div style={{ display:'flex', gap:2 }}>
+                        <button onClick={() => setBonito(false)} title="Editar" style={{ padding:'7px 12px', borderRadius:'8px 0 0 8px', border:'1px solid #bdc3c7', background:!bonito?'#1565C0':'white', color:!bonito?'white':'#555', cursor:'pointer', fontSize:'0.82rem', fontWeight:600, whiteSpace:'nowrap' }}>✏️ Editar</button>
+                        <button onClick={() => setBonito(true)} title="Vista bonita" style={{ padding:'7px 12px', borderRadius:'0 8px 8px 0', border:'1px solid #bdc3c7', borderLeft:'none', background:bonito?'#1565C0':'white', color:bonito?'white':'#555', cursor:'pointer', fontSize:'0.82rem', fontWeight:600, whiteSpace:'nowrap' }}>🎨 Vista bonita</button>
+                    </div>
+                    {bonito && <button onClick={() => setGirarTxt(v => !v)} title="Girar los textos" style={{ padding:'7px 12px', borderRadius:8, border:'1px solid #bdc3c7', background:girarTxt?'#1565C0':'white', color:girarTxt?'white':'#555', cursor:'pointer', fontSize:'0.82rem', fontWeight:600, whiteSpace:'nowrap' }}>🔄 Girar textos</button>}
                     {selSeat && selAlumno && (
                         <button onClick={vaciarAsiento}
                             style={{ display:'flex', alignItems:'center', gap:4, padding:'7px 11px', borderRadius:8, border:'1px solid #e74c3c', background:'#fdecea', color:'#e74c3c', cursor:'pointer', fontSize:'0.82rem', whiteSpace:'nowrap' }}>
@@ -3693,14 +3780,50 @@ function PlanoAulaLibre() {
             <div style={{ display:'flex', gap:14, alignItems:'flex-start', flexWrap:'wrap' }}>
                 {/* Canvas — scroll horizontal en pantallas estrechas */}
                 <div style={{ flex:'1 1 500px', minWidth:0, overflowX:'auto' }}>
-                    <div style={{ position:'relative', width:PLANO_W, height:PLANO_H, background:'linear-gradient(180deg,#f0f4ff 0%,#f8faff 100%)', border:'2px solid #e0e4f0', borderRadius:14, cursor:dragging?'grabbing':'default' }}>
-                        <div style={{ position:'absolute', top:3, left:0, right:0, textAlign:'center', fontSize:'0.62rem', color:'#bdc3c7', fontWeight:700, pointerEvents:'none' }}>▲ PIZARRA / FRENTE DE CLASE</div>
-                        {mesas.map(m => (
-                            <DeskCardLibre key={m.id} mesa={m} selSeat={selSeat} selUnassign={selUnassign}
-                                onStartDrag={startDrag} onClickSeat={onClickSeat}
-                                onDelete={eliminarMesa} onAddSeat={addSeat} onRemoveSeat={removeSeat}/>
-                        ))}
+                  <div ref={printRef} style={{ width:PLANO_W }}>
+                    {bonito && <div style={{ background:'#fff', border:'3px solid #cbb89a', borderBottom:'none', borderRadius:'12px 12px 0 0', padding:'8px 10px', fontWeight:800, color:'#5b4321', textAlign:'center', fontSize:'1rem' }}>🪑 Plano de Clase</div>}
+                    <div ref={canvasRef} style={{
+                        position:'relative', width:PLANO_W, height:PLANO_H,
+                        background: bonito
+                            ? 'repeating-linear-gradient(0deg, rgba(0,0,0,0.045) 0 1px, transparent 1px 48px), repeating-linear-gradient(90deg, rgba(0,0,0,0.045) 0 1px, transparent 1px 48px), linear-gradient(180deg,#d3e6df,#bfd8d0)'
+                            : 'linear-gradient(180deg,#f0f4ff 0%,#f8faff 100%)',
+                        border: bonito ? '3px solid #cbb89a' : '2px solid #e0e4f0', borderRadius:14, cursor:dragging?'grabbing':'default' }}>
+                        {bonito ? (
+                            <div style={{ position:'absolute', top:8, left:'30%', right:'30%', height:30, background:'linear-gradient(#2f6b4f,#245a41)', border:'4px solid #8a5a2b', borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', color:'#eaf5ef', fontSize:'0.72rem', fontWeight:700, letterSpacing:2, pointerEvents:'none' }}>PIZARRA</div>
+                        ) : (
+                            <div style={{ position:'absolute', top:3, left:0, right:0, textAlign:'center', fontSize:'0.62rem', color:'#bdc3c7', fontWeight:700, pointerEvents:'none' }}>▲ PIZARRA / FRENTE DE CLASE</div>
+                        )}
+                        {mesas.map(m => {
+                            if (!bonito) return (
+                                <DeskCardLibre key={m.id} mesa={m} selSeat={selSeat} selUnassign={selUnassign}
+                                    onStartDrag={startDrag} onClickSeat={onClickSeat}
+                                    onDelete={eliminarMesa} onAddSeat={addSeat} onRemoveSeat={removeSeat}/>
+                            );
+                            const isP = m.tipo === 'profesor';
+                            const w = isP ? 180 : plano_deskW(m.asientos.length);
+                            const pos = { position:'absolute', left:m.x, top:m.y, width:w };
+                            if (isP) return (
+                                <div key={m.id} style={pos}>
+                                    <div style={{ height:44, background:'linear-gradient(160deg,#3a3f4b,#22262e)', borderRadius:8, boxShadow:'0 3px 8px rgba(0,0,0,0.35)', display:'flex', alignItems:'center', justifyContent:'center', color:'#e8b06a', fontWeight:700, fontSize:'0.8rem', letterSpacing:0.5 }}><span style={rotP||undefined}>👩‍🏫 PROFE</span></div>
+                                </div>
+                            );
+                            return (
+                                <div key={m.id} style={{ ...pos, display:'flex', gap:PLANO_SG, alignItems:'flex-start' }}>
+                                    {m.asientos.map(s => {
+                                        const len = (s.alumno || '').length;
+                                        const fz = len > 16 ? '0.62rem' : len > 10 ? '0.72rem' : '0.82rem';
+                                        return (
+                                            <div key={s.id} style={{ width:PLANO_SW, display:'flex', flexDirection:'column', alignItems:'center', gap:3 }}>
+                                                <div style={{ width:'100%', minHeight:34, background: s.alumno?'linear-gradient(160deg,#f2ce8d,#d8a860)':'linear-gradient(160deg,#efe3cf,#dcc9a8)', border:'1.5px solid #b98a44', borderRadius:8, boxShadow:'0 2px 4px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.5)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:fz, fontWeight:700, color:'#5b4321', textAlign:'center', lineHeight:1.08, padding:'4px', wordBreak:'break-word' }}><span style={rotP||undefined}>{s.alumno || ''}</span></div>
+                                                <div style={{ width:'60%', height:13, background:'linear-gradient(#5b6b7a,#3d4a58)', borderRadius:'3px 3px 7px 7px', boxShadow:'0 1px 3px rgba(0,0,0,0.3)' }} />
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            );
+                        })}
                     </div>
+                  </div>
                 </div>
 
                 {/* Sidebar alumnos sin asignar */}
@@ -3769,7 +3892,7 @@ export default function HerramientasClase({ onExit, initialTool }) {
         const params = new URLSearchParams(window.location.search);
         if (params.get('pizarra')) return 'pizarra';
         const g = params.get('gestion');
-        if (['ruleta', 'pizarra', 'reloj', 'grupos', 'plano', 'miniapp', 'recortes', 'control'].includes(g)) return g;
+        if (['ruleta', 'pizarra', 'reloj', 'grupos', 'plano', 'horario', 'miniapp', 'recortes', 'control'].includes(g)) return g;
         return null;
     });
     const [shareModal, setShareModal] = useState(null); // { url, titulo }
@@ -3782,6 +3905,7 @@ export default function HerramientasClase({ onExit, initialTool }) {
         { id: 'reloj',    icon: <Clock size={40}/>,        titulo: 'Gestor de Tiempo',   desc: 'Cronómetro y Temporizador de cuenta atrás.',               color: '#2ecc71' },
         { id: 'grupos',   icon: <Users size={40}/>,        titulo: 'Grupos de Clase',    desc: 'Crea subgrupos aleatorios a partir de una lista de alumnos.', color: '#9b59b6' },
         { id: 'plano',    icon: <LayoutGrid size={40}/>,   titulo: 'Plano de Clase',     desc: 'Organiza los asientos de tu aula con un plano visual.',    color: '#1565C0' },
+        { id: 'horario',  icon: <span style={{fontSize:36}}>🕐</span>, titulo: 'Horario de Clase', desc: 'Crea el horario semanal con materias arrastrables, plantillas y fondos. Descárgalo o imprímelo.', color: '#0891b2' },
         { id: 'miniapp',  icon: <span style={{fontSize:36}}>⚡</span>, titulo: 'App con IA', desc: 'Genera una mini-aplicación interactiva con Claude o Gemini y previsualízala al instante.', color: '#7c3aed' },
         { id: 'recortes', icon: <span style={{fontSize:36}}>✂️</span>, titulo: 'Recortes Extrem', desc: 'Carga una imagen o PDF y haz varios recortes a la vez para crear una matriz de imágenes.', color: '#16a085' },
         { id: 'control',  icon: <Radio size={40}/>,       titulo: 'Control de Aula',    desc: 'Crea una sala, controla la presencia de tus alumnos en tiempo real y lánzales juegos.', color: '#4f46e5' },
@@ -3854,6 +3978,7 @@ export default function HerramientasClase({ onExit, initialTool }) {
                     {activa === 'pizarra'  && <PizarraApp />}
                     {activa === 'grupos'   && <GruposLibre />}
                     {activa === 'plano'    && <PlanoAulaLibre />}
+                    {activa === 'horario'  && <HorarioLibre />}
                     {activa === 'miniapp'  && <Suspense fallback={<div style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Cargando…</div>}><MiniAppCreator onAbrirViewer={(id) => window.open(`/?miniapp=${id}`, '_blank')} /></Suspense>}
                     {activa === 'recortes' && <Suspense fallback={<div style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Cargando…</div>}><RecortesExtrem /></Suspense>}
                     {activa === 'control'  && <TeacherControlPanel />}

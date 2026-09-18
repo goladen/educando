@@ -199,7 +199,10 @@ export function EditorAula({ planInicial, grupos = EMPTY_ARR, profesorUid, onSav
     const [canvasW,      setCanvasW]      = useState(planInicial?.canvasW || CANVAS_W);
     const [canvasH,      setCanvasH]      = useState(planInicial?.canvasH || CANVAS_H);
     const [bonito,       setBonito]       = useState(false);   // previsualización "vista bonita"
+    const [girarTxt,     setGirarTxt]     = useState(false);   // girar los textos (imprimir desde el otro lado)
     const canvasRef = useRef();
+    const printRef  = useRef();            // envuelve título + lienzo para imprimir
+    const rotP = girarTxt ? { display: 'inline-block', transform: 'rotate(180deg)' } : null;
 
     useEffect(() => {
         if (!grupoId) { setGrupoAlumnos([]); return; }
@@ -339,7 +342,7 @@ export function EditorAula({ planInicial, grupos = EMPTY_ARR, profesorUid, onSav
 
     const imprimir = async () => {
         // Vista bonita → imprime lo que se ve (captura del lienzo). Vista simple → HTML limpio.
-        if (bonito) { try { await imprimirElemento(canvasRef.current, nombre); } catch (e) { alert('No se pudo imprimir: ' + e.message); } return; }
+        if (bonito) { try { await imprimirElemento(printRef.current, nombre); } catch (e) { alert('No se pudo imprimir: ' + e.message); } return; }
         const w = window.open('', '_blank');
         w.document.write(htmlPlano(nombre, mesas, grupos.find(g => g.id === grupoId)?.nombre || '', canvasW, canvasH));
         w.document.close();
@@ -389,6 +392,7 @@ export function EditorAula({ planInicial, grupos = EMPTY_ARR, profesorUid, onSav
                     <button onClick={() => setBonito(false)} title="Editar" style={{ padding:'6px 12px', borderRadius:'8px 0 0 8px', border:'1px solid #bdc3c7', background: !bonito?'#1565C0':'white', color: !bonito?'white':'#555', cursor:'pointer', fontSize:'0.82rem', fontWeight:600 }}>✏️ Editar</button>
                     <button onClick={() => setBonito(true)} title="Vista bonita" style={{ padding:'6px 12px', borderRadius:'0 8px 8px 0', border:'1px solid #bdc3c7', borderLeft:'none', background: bonito?'#1565C0':'white', color: bonito?'white':'#555', cursor:'pointer', fontSize:'0.82rem', fontWeight:600 }}>🎨 Vista bonita</button>
                 </div>
+                {bonito && <button onClick={() => setGirarTxt(v => !v)} title="Girar los textos" style={{ padding:'6px 12px', borderRadius:8, border:'1px solid #bdc3c7', background: girarTxt?'#1565C0':'white', color: girarTxt?'white':'#555', cursor:'pointer', fontSize:'0.82rem', fontWeight:600 }}>🔄 Girar textos</button>}
 
                 {/* Ampliar / reducir el lienzo */}
                 <div style={{ display:'flex', alignItems:'center', gap:4, padding:'3px 6px', borderRadius:8, border:'1px solid #e0e4f0', background:'#f8faff' }}>
@@ -417,6 +421,8 @@ export function EditorAula({ planInicial, grupos = EMPTY_ARR, profesorUid, onSav
             <div style={{ display:'flex', gap:14, alignItems:'flex-start' }}>
                 {/* Canvas */}
                 <div style={{ overflowX:'auto', flexShrink:0 }}>
+                  <div ref={printRef} style={{ width: canvasW }}>
+                    {bonito && <div style={{ background:'#fff', border:'3px solid #cbb89a', borderBottom:'none', borderRadius:'12px 12px 0 0', padding:'8px 10px', fontWeight:800, color:'#5b4321', textAlign:'center', fontSize:'1rem' }}>🪑 {nombre}</div>}
                     <div ref={canvasRef} style={{
                         position:'relative', width:canvasW, height:canvasH,
                         background: bonito
@@ -445,7 +451,7 @@ export function EditorAula({ planInicial, grupos = EMPTY_ARR, profesorUid, onSav
                             const pos = { position:'absolute', left:m.x, top:m.y, width:w, transform:`rotate(${m.rot||0}deg)`, transformOrigin:'center center' };
                             if (isP) return (
                                 <div key={m.id} style={pos}>
-                                    <div style={{ height:44, background:'linear-gradient(160deg,#3a3f4b,#22262e)', borderRadius:8, boxShadow:'0 3px 8px rgba(0,0,0,0.35)', display:'flex', alignItems:'center', justifyContent:'center', color:'#e8b06a', fontWeight:700, fontSize:'0.8rem', letterSpacing:0.5 }}>👩‍🏫 PROFE</div>
+                                    <div style={{ height:44, background:'linear-gradient(160deg,#3a3f4b,#22262e)', borderRadius:8, boxShadow:'0 3px 8px rgba(0,0,0,0.35)', display:'flex', alignItems:'center', justifyContent:'center', color:'#e8b06a', fontWeight:700, fontSize:'0.8rem', letterSpacing:0.5 }}><span style={rotP||undefined}>👩‍🏫 PROFE</span></div>
                                 </div>
                             );
                             return (
@@ -455,7 +461,7 @@ export function EditorAula({ planInicial, grupos = EMPTY_ARR, profesorUid, onSav
                                         const fz = len > 16 ? '0.62rem' : len > 10 ? '0.72rem' : '0.82rem';
                                         return (
                                             <div key={s.id} style={{ width:SEAT_W, display:'flex', flexDirection:'column', alignItems:'center', gap:3 }}>
-                                                <div style={{ width:'100%', minHeight:34, background: s.alumno?'linear-gradient(160deg,#f2ce8d,#d8a860)':'linear-gradient(160deg,#efe3cf,#dcc9a8)', border:'1.5px solid #b98a44', borderRadius:8, boxShadow:'0 2px 4px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.5)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:fz, fontWeight:700, color:'#5b4321', textAlign:'center', lineHeight:1.08, padding:'4px', wordBreak:'break-word' }}>{s.alumno || ''}</div>
+                                                <div style={{ width:'100%', minHeight:34, background: s.alumno?'linear-gradient(160deg,#f2ce8d,#d8a860)':'linear-gradient(160deg,#efe3cf,#dcc9a8)', border:'1.5px solid #b98a44', borderRadius:8, boxShadow:'0 2px 4px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.5)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:fz, fontWeight:700, color:'#5b4321', textAlign:'center', lineHeight:1.08, padding:'4px', wordBreak:'break-word' }}><span style={rotP||undefined}>{s.alumno || ''}</span></div>
                                                 <div style={{ width:'60%', height:13, background:'linear-gradient(#5b6b7a,#3d4a58)', borderRadius:'3px 3px 7px 7px', boxShadow:'0 1px 3px rgba(0,0,0,0.3)' }} />
                                             </div>
                                         );
@@ -464,6 +470,7 @@ export function EditorAula({ planInicial, grupos = EMPTY_ARR, profesorUid, onSav
                             );
                         })}
                     </div>
+                  </div>
                 </div>
 
                 {/* Panel lateral */}

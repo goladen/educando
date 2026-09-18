@@ -259,6 +259,7 @@ function montarMotor({ root, preguntasInput, onEnd, onScore, xrSession = null })
     if (IS_TOUCH) root.classList.add('touch');
     let SENS = 1;
     const ASSIST = IS_TOUCH;
+    const MAX_PITCH = 0.72; // límite de mira arriba/abajo (~41°): evita quedarse mirando al suelo o al techo
 
     const $ = id => root.querySelector('#' + id);
     const disposeFns = [];
@@ -304,15 +305,15 @@ function montarMotor({ root, preguntasInput, onEnd, onScore, xrSession = null })
 
     // ===== Escena =====
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x05070a);
-    scene.fog = new THREE.Fog(0x05070a, 10, 46);
+    scene.background = new THREE.Color(0x0b1119);
+    scene.fog = new THREE.Fog(0x0b1119, 18, 62);
     const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 200);
     camera.position.set(0, 1.7, 0);
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     // Antialiasing + mayor densidad de píxeles también en móvil (escena ligera): mucho más nítido
     renderer.setPixelRatio(Math.min(devicePixelRatio, IS_TOUCH ? 2 : 2.5));
     renderer.setSize(innerWidth, innerHeight);
-    renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.25;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.5;
     if ('outputColorSpace' in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
     // Sombras también en móvil (mapa más pequeño): aportan mucha profundidad
     renderer.shadowMap.enabled = true; renderer.shadowMap.type = IS_TOUCH ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
@@ -323,9 +324,9 @@ function montarMotor({ root, preguntasInput, onEnd, onScore, xrSession = null })
     const onResize = () => { if (renderer.xr.isPresenting) return; camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); };
     on(window, 'resize', onResize);
 
-    scene.add(new THREE.AmbientLight(0x445566, 0.55));
-    const hemi = new THREE.HemisphereLight(0x9fd8ff, 0x0a1418, 0.55); scene.add(hemi); // cielo/suelo → gradiente suave
-    const key = new THREE.PointLight(0x7fffb0, 1.2, 34); key.position.set(0, 9, 0); scene.add(key);
+    scene.add(new THREE.AmbientLight(0x6a7f95, 1.0));
+    const hemi = new THREE.HemisphereLight(0xbfe4ff, 0x1a2430, 1.15); scene.add(hemi); // cielo/suelo → gradiente suave
+    const key = new THREE.PointLight(0x7fffb0, 1.5, 40); key.position.set(0, 9, 0); scene.add(key);
     const sun = new THREE.DirectionalLight(0xdff0ff, 0.75); sun.position.set(8, 14, 6); scene.add(sun);
     sun.castShadow = true; sun.shadow.mapSize.set(IS_TOUCH ? 1024 : 2048, IS_TOUCH ? 1024 : 2048);
     { const sc = sun.shadow.camera; sc.left = sc.bottom = -26; sc.right = sc.top = 26; sc.near = 1; sc.far = 44; sun.shadow.bias = -0.0018; }
@@ -338,9 +339,9 @@ function montarMotor({ root, preguntasInput, onEnd, onScore, xrSession = null })
         const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(repeat, repeat); return t;
     }
     const floorTex = makeTex((g, s) => {
-        g.fillStyle = '#0e1418'; g.fillRect(0, 0, s, s);
-        for (let i = 0; i < 400; i++) { g.fillStyle = `rgba(255,255,255,${Math.random() * 0.03})`; g.fillRect(Math.random() * s, Math.random() * s, 2, 2); }
-        g.strokeStyle = '#1c2a2f'; g.lineWidth = 3; g.strokeRect(2, 2, s - 4, s - 4);
+        g.fillStyle = '#1a2732'; g.fillRect(0, 0, s, s);
+        for (let i = 0; i < 400; i++) { g.fillStyle = `rgba(255,255,255,${Math.random() * 0.04})`; g.fillRect(Math.random() * s, Math.random() * s, 2, 2); }
+        g.strokeStyle = '#2b3e46'; g.lineWidth = 3; g.strokeRect(2, 2, s - 4, s - 4);
         g.strokeStyle = '#121a1e'; g.lineWidth = 1; g.beginPath(); g.moveTo(s / 2, 0); g.lineTo(s / 2, s); g.moveTo(0, s / 2); g.lineTo(s, s / 2); g.stroke();
         g.fillStyle = '#1a262b'; [[12, 12], [s - 20, 12], [12, s - 20], [s - 20, s - 20]].forEach(([x, y]) => { g.beginPath(); g.arc(x + 4, y + 4, 3, 0, 7); g.fill(); });
     }, 256, 22);
@@ -365,7 +366,7 @@ function montarMotor({ root, preguntasInput, onEnd, onScore, xrSession = null })
     const lampLights = [];
     for (let x = -14; x <= 14; x += 14) for (let z = -14; z <= 14; z += 14) {
         const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.1, 0.5), new THREE.MeshBasicMaterial({ color: 0xd8fff0 })); lamp.position.set(x, 5.45, z); scene.add(lamp);
-        const pl = new THREE.PointLight(0xa8ffd0, 0.35, 16); pl.position.set(x, 5.2, z); scene.add(pl); lampLights.push(pl);
+        const pl = new THREE.PointLight(0xa8ffd0, 0.6, 22); pl.position.set(x, 5.2, z); scene.add(pl); lampLights.push(pl);
     }
 
     const wallMat = new THREE.MeshStandardMaterial({ map: wallTex, roughness: .85 });
@@ -491,7 +492,7 @@ function montarMotor({ root, preguntasInput, onEnd, onScore, xrSession = null })
         if (!mDown) return;
         const dx = e.clientX - mLast.x, dy = e.clientY - mLast.y;
         tYaw -= dx * 0.004 * SENS;
-        tPitch = Math.max(-1.3, Math.min(1.3, tPitch - dy * 0.004 * SENS));
+        tPitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, tPitch - dy * 0.003 * SENS));
         mMoved += Math.abs(dx) + Math.abs(dy);
         mLast = { x: e.clientX, y: e.clientY };
     });
@@ -523,7 +524,7 @@ function montarMotor({ root, preguntasInput, onEnd, onScore, xrSession = null })
         on(lookZone, 'touchstart', e => { const t = e.changedTouches[0]; if (lookId === null) { lookId = t.identifier; lookLast = { x: t.clientX, y: t.clientY }; lookStart = performance.now(); lookMoved = 0; } e.preventDefault(); }, { passive: false });
         on(lookZone, 'touchmove', e => {
             for (const t of e.changedTouches) if (t.identifier === lookId) {
-                tYaw -= (t.clientX - lookLast.x) * 0.0045 * SENS; tPitch = Math.max(-1.3, Math.min(1.3, tPitch - (t.clientY - lookLast.y) * 0.0045 * SENS));
+                tYaw -= (t.clientX - lookLast.x) * 0.0045 * SENS; tPitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, tPitch - (t.clientY - lookLast.y) * 0.0022 * SENS));
                 lookMoved += Math.abs(t.clientX - lookLast.x) + Math.abs(t.clientY - lookLast.y); lookLast = { x: t.clientX, y: t.clientY };
             }
             e.preventDefault();
@@ -940,8 +941,8 @@ function montarMotor({ root, preguntasInput, onEnd, onScore, xrSession = null })
                 const TURN = 2.0 * SENS, AIM = 1.5 * SENS;
                 if (look.l) tYaw += TURN * dt;
                 if (look.r) tYaw -= TURN * dt;
-                if (look.up) tPitch = Math.min(1.3, tPitch + AIM * dt);
-                if (look.down) tPitch = Math.max(-1.3, tPitch - AIM * dt);
+                if (look.up) tPitch = Math.min(MAX_PITCH, tPitch + AIM * dt);
+                if (look.down) tPitch = Math.max(-MAX_PITCH, tPitch - AIM * dt);
             }
             const sm = 1 - Math.pow(0.001, dt);
             yaw += (tYaw - yaw) * sm; pitch += (tPitch - pitch) * sm;
@@ -950,6 +951,7 @@ function montarMotor({ root, preguntasInput, onEnd, onScore, xrSession = null })
                 enemies.forEach(e => { if (e.leaving) return; const v = new THREE.Vector3(e.mesh.position.x, e.h * 0.55, e.mesh.position.z).sub(playerPos); const d = v.length(); const fw = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(pitch, yaw, 0, 'YXZ')); const ang = fw.angleTo(v); if (ang < bestA && d < 18) { best = v; bestA = ang; } });
                 if (best) { const ty = Math.atan2(-best.x, -best.z), tp = Math.atan2(best.y, Math.hypot(best.x, best.z)); let dy = ty - yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); tYaw += dy * dt * 2.2; yaw += dy * dt * 2.2; tPitch += (tp - pitch) * dt * 1.5; pitch += (tp - pitch) * dt * 1.5; }
             }
+            pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, pitch)); tPitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, tPitch));
             camera.rotation.set(pitch, yaw, 0, 'YXZ');
         } else if (running && !gameOver) controlesVR(dt);
 

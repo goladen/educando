@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
 import { descargarPNG, descargarPDF, compartirClassroom, imprimirElemento } from '../utils/exportar';
 import { FONDOS, fondoUrl, fondoBg } from '../utils/fondos';
+import { callGeminiProxy, extractText } from '../geminiProxy';
 import {
     collection, query, where, getDocs, getDoc, setDoc,
     doc, addDoc, updateDoc, deleteDoc, arrayUnion, arrayRemove,
@@ -703,6 +704,8 @@ const TIPOS_EVENTO = {
 function PlanoView({ plano, nombre, exportable }) {
     const ref = useRef();
     const [bonito, setBonito] = useState(true);
+    const [girar, setGirar] = useState(false);
+    const rotTxt = girar ? { display: 'inline-block', transform: 'rotate(180deg)' } : null;
     if (!plano || !plano.mesas?.length) return <div style={st.vacioMini}>Sin plano.</div>;
     const sc = 0.62;
     const cw = plano.canvasW || CANVAS_W;
@@ -717,10 +720,13 @@ function PlanoView({ plano, nombre, exportable }) {
                 <button onClick={() => setBonito(true)} style={{ ...st.miniBtn, ...(bonito ? { background: AZUL, color: 'white', borderColor: AZUL } : {}) }}>🎨 Vista bonita</button>
                 <button onClick={() => setBonito(false)} style={{ ...st.miniBtn, ...(!bonito ? { background: AZUL, color: 'white', borderColor: AZUL } : {}) }}>Vista simple</button>
             </div>
+            {bonito && <button onClick={() => setGirar(v => !v)} style={{ ...st.miniBtn, ...(girar ? { background: AZUL, color: 'white', borderColor: AZUL } : {}) }}>🔄 Girar textos</button>}
             {exportable && <div style={{ marginLeft: 'auto' }}><ExportBar targetRef={ref} nombre={`Plano ${nombre || ''}`.trim()} /></div>}
         </div>
         <div style={{ overflowX: 'auto' }}>
-            <div ref={ref} style={{ position: 'relative', width: cw * sc, height: ch * sc, background: bonito ? fondoBonito : 'linear-gradient(180deg,#f0f4ff,#f8faff)', border: bonito ? '3px solid #cbb89a' : '2px solid #e0e4f0', borderRadius: 12, flexShrink: 0 }}>
+          <div ref={ref} style={{ width: cw * sc }}>
+            {bonito && <div style={{ background: '#fff', border: '2px solid #cbb89a', borderBottom: 'none', borderRadius: '10px 10px 0 0', padding: '6px 10px', fontWeight: 800, color: '#5b4321', textAlign: 'center', fontSize: '0.9rem' }}>🪑 {nombre || 'Plano de clase'}</div>}
+            <div style={{ position: 'relative', width: cw * sc, height: ch * sc, background: bonito ? fondoBonito : 'linear-gradient(180deg,#f0f4ff,#f8faff)', border: bonito ? '3px solid #cbb89a' : '2px solid #e0e4f0', borderRadius: bonito ? '0 0 12px 12px' : 12, flexShrink: 0 }}>
                 {bonito ? (
                     <div style={{ position: 'absolute', top: 6, left: '26%', right: '26%', height: 20, background: 'linear-gradient(#2f6b4f,#245a41)', border: '3px solid #8a5a2b', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#eaf5ef', fontSize: '0.5rem', fontWeight: 700, letterSpacing: 1, boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>PIZARRA</div>
                 ) : (
@@ -735,7 +741,7 @@ function PlanoView({ plano, nombre, exportable }) {
                     if (bonito) {
                         if (isP) return (
                             <div key={m.id} style={posBase}>
-                                <div style={{ width: '100%', height: 28, background: 'linear-gradient(160deg,#3a3f4b,#22262e)', borderRadius: 6, boxShadow: '0 3px 6px rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#e8b06a', fontSize: '0.5rem', fontWeight: 700, letterSpacing: 0.5 }}>👩‍🏫 PROFE</div>
+                                <div style={{ width: '100%', height: 28, background: 'linear-gradient(160deg,#3a3f4b,#22262e)', borderRadius: 6, boxShadow: '0 3px 6px rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#e8b06a', fontSize: '0.5rem', fontWeight: 700, letterSpacing: 0.5 }}><span style={rotTxt || undefined}>👩‍🏫 PROFE</span></div>
                             </div>
                         );
                         return (
@@ -745,7 +751,7 @@ function PlanoView({ plano, nombre, exportable }) {
                                     const fz = len > 16 ? '0.42rem' : len > 10 ? '0.48rem' : '0.54rem';
                                     return (
                                         <div key={s.id} style={{ width: SEAT_W * sc, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                                            <div style={{ width: '100%', minHeight: 22, background: s.alumno ? 'linear-gradient(160deg,#f2ce8d,#d8a860)' : 'linear-gradient(160deg,#efe3cf,#dcc9a8)', border: '1px solid #b98a44', borderRadius: 5, boxShadow: '0 2px 3px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: fz, fontWeight: 700, color: '#5b4321', textAlign: 'center', lineHeight: 1.08, padding: '3px 3px', wordBreak: 'break-word', hyphens: 'auto' }}>{s.alumno || ''}</div>
+                                            <div style={{ width: '100%', minHeight: 22, background: s.alumno ? 'linear-gradient(160deg,#f2ce8d,#d8a860)' : 'linear-gradient(160deg,#efe3cf,#dcc9a8)', border: '1px solid #b98a44', borderRadius: 5, boxShadow: '0 2px 3px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: fz, fontWeight: 700, color: '#5b4321', textAlign: 'center', lineHeight: 1.08, padding: '3px 3px', wordBreak: 'break-word', hyphens: 'auto' }}><span style={rotTxt || undefined}>{s.alumno || ''}</span></div>
                                             <div style={{ width: '60%', height: 8, background: 'linear-gradient(#5b6b7a,#3d4a58)', borderRadius: '2px 2px 5px 5px', boxShadow: '0 1px 2px rgba(0,0,0,0.3)' }} />
                                         </div>
                                     );
@@ -770,6 +776,7 @@ function PlanoView({ plano, nombre, exportable }) {
                     );
                 })}
             </div>
+          </div>
         </div>
       </div>
     );
@@ -1221,8 +1228,102 @@ export function HorarioView({ horario, fondo }) {
     );
 }
 
-function HorarioCurso({ horario, onSave, nombre, publicUrl, fondo }) {
+// ─── Extraer un horario desde una foto con IA (Gemini visión) ─────────────────
+async function extraerHorarioFoto(base64, mimeType) {
+    const prompt = `Eres un asistente que lee un HORARIO ESCOLAR SEMANAL de la foto (formato español: columnas = días de Lunes a Viernes; filas = franjas horarias). Si hay una LEYENDA de materias, úsala para escribir el NOMBRE COMPLETO de la asignatura de cada celda (no el código). Ignora las filas de "recreo". Si una celda tiene dos asignaturas (optativas), únelas con " / ".
+Devuelve ÚNICAMENTE un JSON válido (sin markdown, sin explicaciones) con esta estructura EXACTA:
+{"franjas":["8:30-9:20","9:25-10:15"],"celdas":[["Matemáticas","Lengua","","",""]]}
+- "franjas": las etiquetas horarias de cada franja lectiva, en orden.
+- "celdas": una fila por franja (mismo orden que "franjas") y EXACTAMENTE 5 columnas (Lunes, Martes, Miércoles, Jueves, Viernes). Usa "" para celdas vacías.`;
+    const data = await callGeminiProxy({
+        model: 'gemini-2.0-flash',
+        contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64 } }] }],
+    });
+    const text = extractText(data).replace(/```json/gi, '').replace(/```/g, '').trim();
+    const json = JSON.parse(text);
+    const franjas = (json.franjas || []).map(x => String(x));
+    const filas = json.celdas || [];
+    const mapaId = {};
+    const materias = [];
+    const norm2 = s => (s || '').trim();
+    filas.forEach(fila => (fila || []).forEach(cell => {
+        const nom = norm2(cell);
+        const k = nom.toLowerCase();
+        if (nom && !mapaId[k]) {
+            const id = nuevoId();
+            mapaId[k] = id;
+            materias.push({ id, nombre: nom, profesor: '', color: PALETA_COLORES[materias.length % PALETA_COLORES.length] });
+        }
+    }));
+    const celdas = {};
+    filas.forEach((fila, i) => (fila || []).forEach((cell, d) => {
+        const nom = norm2(cell);
+        if (nom && d < 5) celdas[`${d}_${i}`] = mapaId[nom.toLowerCase()];
+    }));
+    return { franjas: franjas.length ? franjas : filas.map((_, i) => String(i + 1)), materias, celdas };
+}
+
+function ModalImportarHorario({ onClose, onImport }) {
+    const [img, setImg]       = useState(null);   // { dataUrl, base64, mime }
+    const [estado, setEstado] = useState('idle'); // idle | extrayendo
+    const [error, setError]   = useState('');
+    const onFile = (e) => {
+        const f = e.target.files[0]; if (!f) return;
+        const r = new FileReader();
+        r.onload = () => {
+            const image = new Image();
+            image.onload = () => {
+                const max = 1600;
+                const scale = Math.min(1, max / Math.max(image.width, image.height));
+                const cw = Math.round(image.width * scale), ch = Math.round(image.height * scale);
+                const canvas = document.createElement('canvas'); canvas.width = cw; canvas.height = ch;
+                canvas.getContext('2d').drawImage(image, 0, 0, cw, ch);
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                setImg({ dataUrl, base64: dataUrl.split(',')[1], mime: 'image/jpeg' });
+                setError('');
+            };
+            image.onerror = () => setError('No se pudo abrir la imagen.');
+            image.src = r.result;
+        };
+        r.readAsDataURL(f);
+    };
+    const extraer = async () => {
+        if (!img) return;
+        setEstado('extrayendo'); setError('');
+        try {
+            const hor = await extraerHorarioFoto(img.base64, img.mime);
+            if (!hor.materias.length) { setError('No se detectaron materias. Prueba con una foto más nítida y recta.'); setEstado('idle'); return; }
+            onImport(hor);
+        } catch (e) { setError('No se pudo leer la foto: ' + e.message); setEstado('idle'); }
+    };
+    return (
+        <div style={st.overlay} onClick={onClose}>
+            <div style={{ ...st.panel, maxWidth: 460 }} onClick={e => e.stopPropagation()}>
+                <div style={st.header}><div style={st.hTitle}>📷 Importar horario de una foto</div><button onClick={onClose} style={st.closeBtn}><X size={18} /></button></div>
+                <div style={{ fontSize: '0.83rem', color: '#7f8c8d', marginBottom: 10 }}>Sube una foto del horario del grupo. La IA intentará leer las materias de cada hora. Después podrás revisarlo y editarlo.</div>
+                <input type="file" accept="image/*" onChange={onFile} style={{ marginBottom: 10 }} />
+                {img && <img src={img.dataUrl} alt="" style={{ width: '100%', maxHeight: 240, objectFit: 'contain', borderRadius: 8, border: '1px solid #e0e4f0', marginBottom: 10 }} />}
+                {error && <div style={{ ...st.error, marginBottom: 10 }}>{error}</div>}
+                <div style={st.btnRow}>
+                    <button onClick={onClose} style={st.btnSec}>Cancelar</button>
+                    <button onClick={extraer} disabled={!img || estado === 'extrayendo'} style={st.btnPrimary}>
+                        {estado === 'extrayendo' ? <><RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Leyendo…</> : <>✨ Extraer horario</>}
+                    </button>
+                </div>
+                <div style={{ fontSize: '0.72rem', color: '#bdc3c7', marginTop: 8 }}>La IA puede equivocarse: revisa el resultado antes de usarlo.</div>
+                <style>{spin}</style>
+            </div>
+        </div>
+    );
+}
+
+const ADMIN_HORARIO = 'goladen@gmail.com';   // por ahora, importar de foto solo para el admin logueado
+
+export function HorarioCurso({ horario, onSave, nombre, publicUrl, fondo }) {
     const gridRef = useRef();
+    const [importar, setImportar] = useState(false);
+    const [puedeImportar, setPuedeImportar] = useState((auth.currentUser?.email || '') === ADMIN_HORARIO);
+    useEffect(() => auth.onAuthStateChanged(u => setPuedeImportar((u?.email || '') === ADMIN_HORARIO)), []);
     const h = {
         franjas: horario?.franjas || ['1', '2', '3', '4', '5', '6', '7', '8'],
         materias: horario?.materias || MATERIAS_DEF(),
@@ -1279,9 +1380,8 @@ function HorarioCurso({ horario, onSave, nombre, publicUrl, fondo }) {
                         </button>
                     );
                 })}
-                <div style={{ marginLeft: 'auto' }}>
-                    <ExportBar targetRef={gridRef} nombre={nombre || 'Horario'} classroomUrl={publicUrl} pdfLandscape />
-                </div>
+                {puedeImportar && <button onClick={() => setImportar(true)} style={{ ...st.miniBtn, marginLeft: 'auto' }} title="Extraer de una foto con IA">📷 Importar de foto</button>}
+                <div style={puedeImportar ? undefined : { marginLeft: 'auto' }}><ExportBar targetRef={gridRef} nombre={nombre || 'Horario'} classroomUrl={publicUrl} pdfLandscape /></div>
             </div>
 
             <div style={{ overflowX: 'auto' }}>
@@ -1344,6 +1444,8 @@ function HorarioCurso({ horario, onSave, nombre, publicUrl, fondo }) {
                 </div>
             )}
             <div style={{ fontSize: '0.72rem', color: '#bdc3c7', marginTop: 8 }}>Arrastra una materia a una celda, o toca la materia y luego la celda. Toca una celda ocupada para vaciarla.</div>
+
+            {importar && <ModalImportarHorario onClose={() => setImportar(false)} onImport={(hor) => { onSave({ ...h, franjas: hor.franjas, materias: hor.materias, celdas: hor.celdas }); setImportar(false); }} />}
         </div>
     );
 }
@@ -1351,11 +1453,16 @@ function HorarioCurso({ horario, onSave, nombre, publicUrl, fondo }) {
 // ─── Generador de subgrupos aleatorios ────────────────────────────────────────
 const COLORES_SG = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#e67e22', '#c0392b', '#16a085', '#8e44ad'];
 function GeneradorSubgrupos({ alumnos, nombre }) {
-    const nombres = (alumnos || []).map(a => a.nombre).filter(Boolean);
+    const lista = (alumnos || []).filter(a => a.nombre);
     const [modo, setModo]   = useState('grupos'); // 'grupos' | 'porgrupo'
     const [n, setN]         = useState(4);
     const [grupos, setGrupos] = useState(null);
+    const [excluidos, setExcluidos] = useState(new Set());
     const ref = useRef();
+
+    const presentes = lista.filter(a => !excluidos.has(a.id));
+    const nombres = presentes.map(a => a.nombre);
+    const toggle = (id) => setExcluidos(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
 
     const generar = () => {
         const baraja = [...nombres].sort(() => Math.random() - 0.5);
@@ -1370,18 +1477,34 @@ function GeneradorSubgrupos({ alumnos, nombre }) {
 
     const chip = (activo) => ({ padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${activo ? AZUL : '#e0e4f0'}`, background: activo ? AZUL : 'white', color: activo ? 'white' : '#555', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700 });
 
-    if (nombres.length === 0) return <div style={st.vacio}>Define primero el listado de alumnos en la pestaña «Listado».</div>;
+    if (lista.length === 0) return <div style={st.vacio}>Define primero el listado de alumnos en la pestaña «Listado».</div>;
 
     return (
         <div>
+            {/* Listado con presentes/ausentes */}
+            <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: '0.8rem', color: '#7f8c8d', marginBottom: 6 }}>Toca un alumno para marcarlo <strong>ausente</strong> (no entra en los grupos; no se borra del listado). {presentes.length}/{lista.length} presentes.</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {lista.map(a => {
+                        const fuera = excluidos.has(a.id);
+                        return (
+                            <button key={a.id} onClick={() => toggle(a.id)} title={fuera ? 'Marcar presente' : 'Marcar ausente'}
+                                style={{ padding: '5px 11px', borderRadius: 16, border: '1.5px solid ' + (fuera ? '#e0e4f0' : '#b6e2c1'), background: fuera ? '#f1f3f7' : '#eafaf0', color: fuera ? '#aeb6bf' : '#2c3e50', textDecoration: fuera ? 'line-through' : 'none', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
+                                {a.nombre}
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14, padding: '10px 12px', background: '#f8f9fb', borderRadius: 10 }}>
                 <div style={{ display: 'flex', gap: 4 }}>
                     <button onClick={() => setModo('grupos')} style={chip(modo === 'grupos')}>Nº de grupos</button>
                     <button onClick={() => setModo('porgrupo')} style={chip(modo === 'porgrupo')}>Alumnos por grupo</button>
                 </div>
-                <input type="number" min={1} max={nombres.length} value={n} onChange={e => setN(Math.max(1, parseInt(e.target.value) || 1))} style={{ ...st.input, marginBottom: 0, width: 72 }} />
-                <span style={{ fontSize: '0.8rem', color: '#7f8c8d' }}>{modo === 'grupos' ? 'grupos' : 'por grupo'} · {nombres.length} alumnos</span>
-                <button onClick={generar} style={st.btnPrimary}>🎲 Generar</button>
+                <input type="number" min={1} max={presentes.length || 1} value={n} onChange={e => setN(Math.max(1, parseInt(e.target.value) || 1))} style={{ ...st.input, marginBottom: 0, width: 72 }} />
+                <span style={{ fontSize: '0.8rem', color: '#7f8c8d' }}>{modo === 'grupos' ? 'grupos' : 'por grupo'} · {presentes.length} alumnos</span>
+                <button onClick={generar} disabled={presentes.length === 0} style={st.btnPrimary}>🎲 Generar</button>
             </div>
 
             {grupos && (

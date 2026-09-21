@@ -1434,7 +1434,7 @@ export function HorarioCurso({ horario, onSave, nombre, publicUrl, fondo }) {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 2, justifyContent: 'center' }}>
                                 <input key={`f-${h.franjas.length}-${i}`} defaultValue={f} onBlur={e => { if (e.target.value !== f) setFranja(i, e.target.value); }} title="Franja horaria"
                                     style={{ ...franjaInput, background: P.franja.background || '#f8f9fb', color: P.franja.color || '#555', borderRadius: P.franja.borderRadius || 6, fontWeight: P.franja.fontWeight || 600, border: '1px solid ' + (P.franja.background && P.franja.background !== '#f8f9fb' ? 'transparent' : '#e0e4f0') }} />
-                                <div style={{ display: 'flex', gap: 2 }}>
+                                <div data-html2canvas-ignore="true" style={{ display: 'flex', gap: 2 }}>
                                     <button onClick={() => insertarFranja(i)} title="Insertar una franja debajo" style={{ flex: 1, border: '1px dashed #cdd6ea', background: 'white', color: AZUL, borderRadius: 5, cursor: 'pointer', fontSize: '0.6rem', fontWeight: 700, padding: '1px 0', lineHeight: 1 }}>＋</button>
                                     <button onClick={() => borrarFranja(i)} disabled={h.franjas.length <= 1} title="Borrar esta franja" style={{ flex: 1, border: '1px dashed #f3c9c4', background: 'white', color: '#e74c3c', borderRadius: 5, cursor: 'pointer', fontSize: '0.6rem', fontWeight: 700, padding: '1px 0', lineHeight: 1, opacity: h.franjas.length <= 1 ? 0.4 : 1 }}>✕</button>
                                 </div>
@@ -1978,6 +1978,261 @@ function PanelCalendarios({ usuario, comunidad }) {
     );
 }
 
+// ═══ PROFESORES (directorio + guardias) ═══════════════════════════════════════
+const CARGOS_COMUNES = ['Director/a', 'Jefe/a de estudios', 'Secretario/a', 'Jefe/a de departamento', 'Coordinador/a TIC', 'Coordinador/a de bienestar'];
+const nombreProfe = (p) => `${p.nombre || ''} ${p.apellidos || ''}`.trim() || 'Profesor/a';
+
+function ModalProfesor({ profe, onClose, onGuardar }) {
+    const [p, setP] = useState(profe || { nombre: '', apellidos: '', departamento: '', gruposClase: '', atencionProf: '', esTutor: false, grupoTutor: '', atencionTutor: '', cargos: [], publico: false });
+    const set = (k, v) => setP(prev => ({ ...prev, [k]: v }));
+    const toggleCargo = (c) => setP(prev => ({ ...prev, cargos: (prev.cargos || []).includes(c) ? prev.cargos.filter(x => x !== c) : [...(prev.cargos || []), c] }));
+    return (
+        <div style={st.overlay} onClick={onClose}>
+            <div style={{ ...st.panel, maxWidth: 520 }} onClick={e => e.stopPropagation()}>
+                <div style={st.header}><div style={st.hTitle}><UserCircle size={19} color={AZUL} /> {profe ? 'Editar' : 'Nuevo'} profesor/a</div><button onClick={onClose} style={st.closeBtn}><X size={18} /></button></div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <div style={{ flex: 1, minWidth: 160 }}><div style={st.label}>Nombre</div><input autoFocus value={p.nombre} onChange={e => set('nombre', e.target.value)} style={st.input} /></div>
+                    <div style={{ flex: 1, minWidth: 160 }}><div style={st.label}>Apellidos</div><input value={p.apellidos} onChange={e => set('apellidos', e.target.value)} style={st.input} /></div>
+                </div>
+                <div style={st.label}>Departamento</div>
+                <input value={p.departamento} onChange={e => set('departamento', e.target.value)} placeholder="Ej: Matemáticas" style={st.input} />
+                <div style={st.label}>Grupos en los que da clase</div>
+                <input value={p.gruposClase} onChange={e => set('gruposClase', e.target.value)} placeholder="Ej: 1ºA, 2ºB, 3ºC" style={st.input} />
+                <div style={st.label}>Atención a familias (profesor)</div>
+                <input value={p.atencionProf} onChange={e => set('atencionProf', e.target.value)} placeholder="Ej: Martes 9:25-10:15" style={st.input} />
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', margin: '4px 0 10px' }}>
+                    <input type="checkbox" checked={!!p.esTutor} onChange={e => set('esTutor', e.target.checked)} /> Es tutor/a
+                </label>
+                {p.esTutor && (
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <div style={{ flex: 1, minWidth: 150 }}><div style={st.label}>Grupo del que es tutor/a</div><input value={p.grupoTutor} onChange={e => set('grupoTutor', e.target.value)} placeholder="Ej: 1ºA" style={st.input} /></div>
+                        <div style={{ flex: 1, minWidth: 150 }}><div style={st.label}>Atención a familias (tutoría)</div><input value={p.atencionTutor} onChange={e => set('atencionTutor', e.target.value)} placeholder="Ej: Lunes 12:35" style={st.input} /></div>
+                    </div>
+                )}
+                <div style={st.label}>Cargos</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                    {CARGOS_COMUNES.map(c => {
+                        const on = (p.cargos || []).includes(c);
+                        return <button key={c} onClick={() => toggleCargo(c)} style={{ padding: '5px 10px', borderRadius: 16, border: `1.5px solid ${on ? AZUL : '#e0e4f0'}`, background: on ? AZUL : 'white', color: on ? 'white' : '#555', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600 }}>{c}</button>;
+                    })}
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 4 }}>
+                    <input type="checkbox" checked={!!p.publico} onChange={e => set('publico', e.target.checked)} /> <Globe size={14} /> Mostrar en la parte pública
+                </label>
+                <div style={st.btnRow}>
+                    <button onClick={onClose} style={st.btnSec}>Cancelar</button>
+                    <button onClick={() => { if ((p.nombre + p.apellidos).trim()) onGuardar(p); }} disabled={!(p.nombre + p.apellidos).trim()} style={st.btnPrimary}>Guardar</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// Ficha/tarjeta de un profesor (reutilizable en interno y público)
+export function FichaProfesor({ p }) {
+    return (
+        <div style={{ background: 'white', borderRadius: 12, padding: 14, boxShadow: '0 2px 6px rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ fontWeight: 700, color: '#2c3e50', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                <UserCircle size={16} color={AZUL} /> {nombreProfe(p)}
+                {p.esTutor && <span style={{ fontSize: '0.66rem', background: '#e8f5e9', color: '#27ae60', padding: '1px 7px', borderRadius: 8, fontWeight: 700 }}>Tutor/a {p.grupoTutor || ''}</span>}
+            </div>
+            {p.departamento && <div style={{ fontSize: '0.8rem', color: '#7f8c8d' }}>Dpto: {p.departamento}</div>}
+            {(p.cargos || []).length > 0 && <div style={{ fontSize: '0.78rem', color: '#8e44ad', fontWeight: 600 }}>{p.cargos.join(' · ')}</div>}
+            {p.gruposClase && <div style={{ fontSize: '0.78rem', color: '#555' }}>Da clase en: {p.gruposClase}</div>}
+            {p.atencionProf && <div style={{ fontSize: '0.76rem', color: '#95a5a6' }}>Atención familias: {p.atencionProf}</div>}
+            {p.esTutor && p.atencionTutor && <div style={{ fontSize: '0.76rem', color: '#95a5a6' }}>Atención tutoría: {p.atencionTutor}</div>}
+        </div>
+    );
+}
+
+function ProfesoradoLista({ usuario, comunidad }) {
+    const [profes, setProfes]   = useState([]);
+    const [cargando, setCargando] = useState(true);
+    const [editar, setEditar]   = useState(null);
+    const [borrar, setBorrar]   = useState(null);
+
+    useEffect(() => onSnapshot(collection(db, 'comunidades', comunidad.id, 'profesores'), snap => {
+        const d = snap.docs.map(x => ({ id: x.id, ...x.data() }));
+        d.sort((a, b) => (a.apellidos || '').localeCompare(b.apellidos || '', 'es') || (a.nombre || '').localeCompare(b.nombre || '', 'es'));
+        setProfes(d); setCargando(false);
+    }, () => setCargando(false)), [comunidad.id]);
+
+    const guardar = async (p) => {
+        try {
+            if (p.id) { const { id, ...datos } = p; await setDoc(doc(db, 'comunidades', comunidad.id, 'profesores', id), datos, { merge: true }); }
+            else await addDoc(collection(db, 'comunidades', comunidad.id, 'profesores'), { ...p, fecha: serverTimestamp() });
+            setEditar(null);
+        } catch (e) { alert('No se pudo guardar: ' + e.message); }
+    };
+    const eliminar = async (id) => { try { await deleteDoc(doc(db, 'comunidades', comunidad.id, 'profesores', id)); } catch (e) { alert('Error: ' + e.message); } setBorrar(null); };
+
+    return (
+        <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+                <div style={{ fontSize: '0.8rem', color: '#7f8c8d' }}>{profes.length} profesores · los marcados como públicos se ven fuera</div>
+                <button onClick={() => setEditar({})} style={st.btnPrimary}><Plus size={15} /> Añadir profesor</button>
+            </div>
+            {cargando ? <div style={st.loader}><RefreshCw size={22} style={{ animation: 'spin 1s linear infinite' }} /></div>
+                : profes.length === 0 ? <div style={st.vacio}>Aún no hay profesores. Añade el primero.</div>
+                : (
+                    <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
+                        {profes.map(p => (
+                            <div key={p.id} style={{ position: 'relative' }}>
+                                <FichaProfesor p={p} />
+                                <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center' }}>
+                                    {p.publico && <span style={{ ...st.chipPub, fontSize: '0.64rem' }}><Globe size={11} /> Público</span>}
+                                    <button onClick={() => setEditar(p)} style={{ ...st.miniBtn, marginLeft: 'auto' }}><Pencil size={13} /> Editar</button>
+                                    {borrar === p.id ? (
+                                        <><button onClick={() => eliminar(p.id)} style={{ ...st.miniBtn, color: 'white', background: '#e74c3c', borderColor: '#e74c3c' }}>Sí</button><button onClick={() => setBorrar(null)} style={st.miniBtn}>No</button></>
+                                    ) : <button onClick={() => setBorrar(p.id)} style={{ ...st.miniBtn, color: '#e74c3c', borderColor: '#f3c9c4' }}><Trash2 size={13} /></button>}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            {editar && <ModalProfesor profe={editar.id ? editar : null} onClose={() => setEditar(null)} onGuardar={guardar} />}
+        </div>
+    );
+}
+
+// ─── Editor de guardias (rejilla con profesores + contador de guardias) ────────
+export function GuardiasEditor({ usuario, comunidad, soloLectura }) {
+    const gridRef = useRef();
+    const [profes, setProfes] = useState([]);
+    const [g, setG] = useState(null);       // { franjas, celdas: { "d_i": [{nombre,hechas}] } }
+    const [sel, setSel] = useState(null);    // nombre de profe seleccionado en la paleta
+    const [drag, setDrag] = useState(null);
+    const [importar, setImportar] = useState(false);
+    const gRef = doc(db, 'comunidades', comunidad.id, 'guardias', 'data');
+    const esAdmin = (auth.currentUser?.email || '') === ADMIN_HORARIO;
+
+    useEffect(() => onSnapshot(collection(db, 'comunidades', comunidad.id, 'profesores'), snap => {
+        const d = snap.docs.map(x => ({ id: x.id, ...x.data() }));
+        d.sort((a, b) => (a.apellidos || '').localeCompare(b.apellidos || '', 'es'));
+        setProfes(d);
+    }, () => {}), [comunidad.id]);
+    useEffect(() => onSnapshot(gRef, s => setG(s.exists() ? s.data() : { franjas: ['1ª', '2ª', '3ª', '4ª', '5ª', '6ª'], celdas: {} }), () => setG({ franjas: ['1ª', '2ª', '3ª', '4ª', '5ª', '6ª'], celdas: {} })), [comunidad.id]);
+
+    if (!g) return <div style={st.loader}><RefreshCw size={22} style={{ animation: 'spin 1s linear infinite' }} /></div>;
+    const franjas = g.franjas || [];
+    const celdas = g.celdas || {};
+    const guardar = (nuevo) => setDoc(gRef, { franjas: nuevo.franjas ?? franjas, celdas: nuevo.celdas ?? celdas }).catch(e => alert('Error: ' + e.message));
+
+    const setFranja = (i, v) => { const f = [...franjas]; f[i] = v; guardar({ franjas: f }); };
+    const addFranja = () => guardar({ franjas: [...franjas, ''] });
+    const delFranja = () => { if (franjas.length <= 1) return; const c = { ...celdas }; DIAS_SEM.forEach((_, d) => delete c[`${d}_${franjas.length - 1}`]); guardar({ franjas: franjas.slice(0, -1), celdas: c }); };
+    const addProfe = (d, i, nombre) => {
+        const key = `${d}_${i}`; const arr = celdas[key] || [];
+        if (arr.some(x => x.nombre === nombre)) return;
+        guardar({ celdas: { ...celdas, [key]: [...arr, { nombre, hechas: 0 }] } });
+    };
+    const cambiarHechas = (d, i, idx, delta) => {
+        const key = `${d}_${i}`; const arr = (celdas[key] || []).map((x, j) => j === idx ? { ...x, hechas: Math.max(0, (x.hechas || 0) + delta) } : x);
+        guardar({ celdas: { ...celdas, [key]: arr } });
+    };
+    const quitarProfe = (d, i, idx) => {
+        const key = `${d}_${i}`; const arr = (celdas[key] || []).filter((_, j) => j !== idx);
+        const nc = { ...celdas }; if (arr.length) nc[key] = arr; else delete nc[key];
+        guardar({ celdas: nc });
+    };
+    const clicCelda = (d, i) => { if (sel && !soloLectura) addProfe(d, i, sel); };
+
+    const editable = !soloLectura;
+
+    return (
+        <div>
+            {editable && (
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.78rem', color: '#7f8c8d', fontWeight: 600 }}>🛡️ Guardias — toca un profesor y luego una celda:</span>
+                    {esAdmin && <button onClick={() => setImportar(true)} style={st.miniBtn}>📷 Importar de foto</button>}
+                    <div style={{ marginLeft: esAdmin ? 0 : 'auto' }}><ExportBar targetRef={gridRef} nombre="Guardias" pdfLandscape /></div>
+                </div>
+            )}
+            {editable && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                    {profes.length === 0 ? <span style={{ fontSize: '0.8rem', color: '#bdc3c7' }}>Añade profesores en la pestaña Profesorado.</span>
+                        : profes.map(p => { const nom = nombreProfe(p); const activo = sel === nom; return (
+                            <button key={p.id} draggable onDragStart={() => setDrag(nom)} onDragEnd={() => setDrag(null)} onClick={() => setSel(activo ? null : nom)}
+                                style={{ padding: '5px 11px', borderRadius: 16, border: `1.5px solid ${activo ? AZUL : '#cdd6ea'}`, background: activo ? AZUL : 'white', color: activo ? 'white' : '#2c3e50', cursor: 'grab', fontSize: '0.8rem', fontWeight: 600 }}>{nom}</button>
+                        ); })}
+                </div>
+            )}
+
+            <div style={{ overflowX: 'auto' }}>
+                <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: '64px repeat(5, minmax(120px, 1fr))', gap: 3, minWidth: 640, background: 'white', padding: 6, borderRadius: 8 }}>
+                    <div />
+                    {DIAS_SEM.map(d => <div key={d} style={{ textAlign: 'center', fontWeight: 700, color: '#7f8c8d', fontSize: '0.76rem', padding: '4px 0' }}>{d}</div>)}
+                    {franjas.map((f, i) => (
+                        <React.Fragment key={i}>
+                            {editable
+                                ? <input value={f} onChange={e => setFranja(i, e.target.value)} style={{ width: '100%', boxSizing: 'border-box', border: '1px solid #e0e4f0', borderRadius: 6, padding: '4px', fontSize: '0.7rem', textAlign: 'center', color: '#555', fontFamily: 'inherit', outline: 'none', background: '#f8f9fb' }} />
+                                : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', color: '#7f8c8d', background: '#f4f6f8', borderRadius: 6 }}>{f}</div>}
+                            {DIAS_SEM.map((_, d) => {
+                                const arr = celdas[`${d}_${i}`] || [];
+                                return (
+                                    <div key={d} onClick={() => clicCelda(d, i)}
+                                        onDragOver={e => { if (drag && editable) e.preventDefault(); }}
+                                        onDrop={e => { if (drag && editable) { e.preventDefault(); addProfe(d, i, drag); } }}
+                                        style={{ minHeight: 46, borderRadius: 6, border: `1.5px ${(sel || drag) && editable ? 'dashed #94a3b8' : 'solid #eef1f6'}`, background: 'white', padding: 3, cursor: editable ? 'pointer' : 'default', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                        {arr.map((x, idx) => (
+                                            <div key={idx} onClick={e => { e.stopPropagation(); if (editable) cambiarHechas(d, i, idx, 1); }}
+                                                title={editable ? 'Clic: +1 guardia realizada' : ''}
+                                                style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#eef4ff', border: '1px solid #d6e2f5', borderRadius: 6, padding: '2px 5px', fontSize: '0.72rem', color: '#2c3e50', cursor: editable ? 'pointer' : 'default' }}>
+                                                <span style={{ flex: 1, wordBreak: 'break-word', fontWeight: 600 }}>{x.nombre}</span>
+                                                {x.hechas > 0 && <span style={{ background: '#27ae60', color: 'white', borderRadius: 10, padding: '0 6px', fontSize: '0.66rem', fontWeight: 800 }}>{x.hechas}</span>}
+                                                {editable && (
+                                                    <span data-html2canvas-ignore="true" style={{ display: 'flex', gap: 2 }}>
+                                                        <button onClick={e => { e.stopPropagation(); cambiarHechas(d, i, idx, -1); }} title="−1" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#e67e22', fontWeight: 800, fontSize: '0.8rem', padding: 0, lineHeight: 1 }}>−</button>
+                                                        <button onClick={e => { e.stopPropagation(); quitarProfe(d, i, idx); }} title="Quitar" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#e74c3c', fontWeight: 700, fontSize: '0.72rem', padding: 0, lineHeight: 1 }}>✕</button>
+                                                    </span>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            })}
+                        </React.Fragment>
+                    ))}
+                </div>
+            </div>
+            {editable && (
+                <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                    <button onClick={addFranja} style={st.miniBtn}><Plus size={13} /> Franja</button>
+                    <button onClick={delFranja} disabled={franjas.length <= 1} style={st.miniBtn}>− Franja</button>
+                    {sel && <span style={{ fontSize: '0.75rem', color: AZUL, alignSelf: 'center' }}>Toca una celda para poner a «{sel}» · <button onClick={() => setSel(null)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.75rem', padding: 0 }}>cancelar</button></span>}
+                </div>
+            )}
+            <div style={{ fontSize: '0.72rem', color: '#bdc3c7', marginTop: 8 }}>Clic en un profesor de una celda: +1 a las guardias que ha hecho. Usa − para restar y ✕ para quitarlo.</div>
+
+            {importar && <ModalImportarHorario onClose={() => setImportar(false)} onImport={(hor) => {
+                const idToName = {}; (hor.materias || []).forEach(m => { idToName[m.id] = m.nombre; });
+                const nc = {};
+                Object.keys(hor.celdas || {}).forEach(k => {
+                    const nombres = String(idToName[hor.celdas[k]] || '').split('/').map(x => x.trim()).filter(Boolean);
+                    if (nombres.length) nc[k] = nombres.map(n => ({ nombre: n, hechas: 0 }));
+                });
+                guardar({ franjas: hor.franjas, celdas: nc });
+                setImportar(false);
+            }} />}
+        </div>
+    );
+}
+
+function ProfesoresPanel({ usuario, comunidad }) {
+    const [sub, setSub] = useState('lista');
+    return (
+        <div>
+            <div style={{ display: 'flex', gap: 4, marginBottom: 14, borderBottom: '2px solid #e0e4f0', flexWrap: 'wrap' }}>
+                {[['lista', '👥 Profesorado'], ['guardias', '🛡️ Guardias']].map(([id, lbl]) => (
+                    <button key={id} onClick={() => setSub(id)} style={{ ...st.tabBtn, color: sub === id ? AZUL : '#7f8c8d', borderBottom: sub === id ? `3px solid ${AZUL}` : '3px solid transparent', fontWeight: sub === id ? 700 : 500 }}>{lbl}</button>
+                ))}
+            </div>
+            {sub === 'lista' && <ProfesoradoLista usuario={usuario} comunidad={comunidad} />}
+            {sub === 'guardias' && <GuardiasEditor usuario={usuario} comunidad={comunidad} />}
+        </div>
+    );
+}
+
 // ─── Detalle de una comunidad (soy miembro) ───────────────────────────────────
 function DetalleComunidad({ usuario, comunidad, onBack, onSalir, onCambio }) {
     const [tab, setTab] = useState('cursos'); // cursos | calendario | mensajes | miembros
@@ -2066,7 +2321,7 @@ function DetalleComunidad({ usuario, comunidad, onBack, onSalir, onCambio }) {
 
             {/* Tabs */}
             <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '2px solid #e0e4f0' }}>
-                {[['cursos', '📚 Cursos'], ['calendario', '📅 Calendario'], ['mensajes', '💬 Mensajes'], ['miembros', '👤 Miembros']].map(([id, lbl]) => (
+                {[['cursos', '📚 Cursos'], ['calendario', '📅 Calendario'], ['profesores', '👤 Profesores'], ['mensajes', '💬 Mensajes'], ['miembros', '👤 Miembros']].map(([id, lbl]) => (
                     <button key={id} onClick={() => setTab(id)} style={{ ...st.tabBtn, color: tab === id ? AZUL : '#7f8c8d', borderBottom: tab === id ? `3px solid ${AZUL}` : '3px solid transparent', fontWeight: tab === id ? 700 : 500 }}>{lbl}</button>
                 ))}
             </div>
@@ -2105,6 +2360,7 @@ function DetalleComunidad({ usuario, comunidad, onBack, onSalir, onCambio }) {
             )}
 
             {tab === 'cursos' && <CursosPanel usuario={usuario} comunidad={comunidad} />}
+            {tab === 'profesores' && <ProfesoresPanel usuario={usuario} comunidad={comunidad} />}
             {tab === 'calendario' && <PanelCalendarios usuario={usuario} comunidad={comunidad} />}
             {tab === 'mensajes' && <PanelMensajes usuario={usuario} comunidad={comunidad} />}
             {tab === 'miembros' && <PanelMiembros usuario={usuario} comunidad={comunidad} onCambio={onCambio} />}

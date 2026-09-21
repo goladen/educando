@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
-import { collection, getDocs, getDoc, doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc, setDoc, serverTimestamp, query, where } from 'firebase/firestore';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import {
     Users, ArrowLeft, ChevronLeft, Share2, Globe, ExternalLink,
     RefreshCw, GraduationCap, Calendar, Lock, LayoutGrid, FileText,
     UserPlus, Check, Clock, LogIn
 } from 'lucide-react';
-import { Calendario, EscaparateMiembros, HorarioView } from './ComunidadesTab';
+import { Calendario, EscaparateMiembros, HorarioView, FichaProfesor } from './ComunidadesTab';
 import { fondoUrl } from '../utils/fondos';
 
 const AZUL = '#1565C0';
@@ -45,7 +45,7 @@ function parsePath() {
         const comId = parts[1];
         if (parts[2] === 'curso') return { comId, tab: 'calendarios', cursoId: parts[3] || null, unirse: false };
         if (parts[2] === 'unirse') return { comId, tab: 'recursos', cursoId: null, unirse: true };
-        const tab = ['recursos', 'paginas', 'calendarios'].includes(parts[2]) ? parts[2] : 'recursos';
+        const tab = ['recursos', 'paginas', 'calendarios', 'profesores'].includes(parts[2]) ? parts[2] : 'recursos';
         return { comId, tab, cursoId: null, unirse: false };
     }
     return { comId: null, tab: 'recursos', cursoId: null, unirse: false };
@@ -119,12 +119,14 @@ const TABS = [
     { id: 'recursos',    label: 'Recursos',    icon: LayoutGrid },
     { id: 'paginas',     label: 'Páginas',     icon: FileText },
     { id: 'calendarios', label: 'Calendarios', icon: Calendar },
+    { id: 'profesores',  label: 'Profesorado', icon: Users },
 ];
 
 // ─── Vista de un centro/comunidad ─────────────────────────────────────────────
 function CentroPublico({ comunidadId, tab, cursoFoco, unirse, onTab, onCurso, onVolver, origin, isMobile }) {
     const [comunidad, setComunidad] = useState(null);
     const [cursos, setCursos]       = useState([]);
+    const [profes, setProfes]       = useState([]);
     const [cargando, setCargando]   = useState(true);
     const [error, setError]         = useState('');
 
@@ -139,6 +141,12 @@ function CentroPublico({ comunidadId, tab, cursoFoco, unirse, onTab, onCurso, on
                 const docs = cs.docs.map(d => ({ id: d.id, ...d.data() })).filter(c => !c.oculto || (c.horario && !c.horarioOculto));
                 docs.sort((a, b) => (a.orden ?? 9999) - (b.orden ?? 9999) || (a.nombre || '').localeCompare(b.nombre || '', 'es'));
                 setCursos(docs);
+                try {
+                    const ps = await getDocs(query(collection(db, 'comunidades', comunidadId, 'profesores'), where('publico', '==', true)));
+                    const pd = ps.docs.map(d => ({ id: d.id, ...d.data() }));
+                    pd.sort((a, b) => (a.apellidos || '').localeCompare(b.apellidos || '', 'es'));
+                    setProfes(pd);
+                } catch (_) {}
             } catch (e) { setError('No se pudo cargar: ' + e.message); }
             setCargando(false);
         })();
@@ -192,6 +200,17 @@ function CentroPublico({ comunidadId, tab, cursoFoco, unirse, onTab, onCurso, on
             {/* Contenido según pestaña */}
             {(tab === 'recursos' || tab === 'paginas') && (
                 <EscaparateMiembros comunidad={comunidad} soloSeccion={tab} />
+            )}
+
+            {tab === 'profesores' && (
+                <div>
+                    <h2 style={{ ...st.h2 }}><Users size={20} /> Profesorado</h2>
+                    {profes.length === 0 ? <div style={st.vacio}>Este centro no ha publicado el profesorado.</div> : (
+                        <div style={{ display: 'grid', gap: 10, gridTemplateColumns: `repeat(auto-fill, minmax(${isMobile ? 200 : 240}px, 1fr))` }}>
+                            {profes.map(p => <FichaProfesor key={p.id} p={p} />)}
+                        </div>
+                    )}
+                </div>
             )}
 
             {tab === 'calendarios' && (

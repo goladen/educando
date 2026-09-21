@@ -141,6 +141,17 @@ solo AÑADE esto.
         allow delete: if esMiembro();
       }
 
+      // ── PROFESORADO (directorio) ────────────────────────────────────────
+      // Los miembros lo ven/editan; los marcados como público se ven fuera.
+      match /profesores/{pid} {
+        allow read:   if esMiembro() || resource.data.publico == true;
+        allow create, update, delete: if esMiembro();
+      }
+      // ── GUARDIAS (rejilla de guardias) — solo miembros ──────────────────
+      match /guardias/{doc} {
+        allow read, write: if esMiembro();
+      }
+
       // ── SOLICITUDES DE ACCESO (id del doc = uid del solicitante) ─────────
       match /solicitudes/{uid} {
         // La ve el creador (para aprobar) y el propio solicitante.

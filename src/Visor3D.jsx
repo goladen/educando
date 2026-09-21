@@ -377,8 +377,10 @@ function EscenaModelo({ modelo, onVolver, esAdmin = false, onPuntosGuardados, et
         );
 
         /* ---- bucle de render ---- */
-        const reloj = new THREE.Clock();
+        // THREE.Timer sustituye a Clock, que quedó obsoleto en three 0.18x.
+        const reloj = new THREE.Timer();
         renderer.setAnimationLoop(() => {
+            reloj.update();
             const dt = reloj.getDelta();
             if (mezclador) mezclador.update(dt);
 

@@ -716,6 +716,65 @@ async function apiCloudinary(accion, extra = {}) {
     return data;
 }
 
+/** Trae un modelo de Sketchfab a Cloudinary en un solo paso. */
+function ImportadorSketchfab({ onImportado }) {
+    const [enlace, setEnlace] = useState('');
+    const [fase, setFase]     = useState(null);   // texto del paso en curso
+    const [error, setError]   = useState(null);
+    const [aviso, setAviso]   = useState(null);
+
+    const importar = async () => {
+        if (!enlace.trim()) return;
+        setError(null); setAviso(null);
+        setFase('Buscando el modelo en Sketchfab…');
+        try {
+            const user = auth.currentUser;
+            if (!user) throw new Error('Necesitas iniciar sesión.');
+            const idToken = await user.getIdToken();
+
+            setFase('Descargando, empaquetando en .glb y subiendo a Cloudinary… (puede tardar un minuto)');
+            const r = await fetch('/api/sketchfab', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+                body: JSON.stringify({ enlace: enlace.trim() }),
+            });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data?.error || `Error ${r.status}`);
+
+            setEnlace('');
+            setAviso(`✅ «${data.ficha.nombre}» importado (${data.origen?.glbMB} MB). Revisa su ficha y publícalo.`);
+            onImportado(data.ficha);
+        } catch (e) {
+            setError(e.message);
+        } finally {
+            setFase(null);
+        }
+    };
+
+    return (
+        <div style={{ background: 'rgba(45,212,191,0.08)', border: '1px solid rgba(45,212,191,0.3)', borderRadius: 14, padding: 16, marginBottom: 18 }}>
+            <div style={{ color: '#2dd4bf', fontWeight: 800, fontSize: '0.92rem', marginBottom: 4 }}>⬇️ Importar desde Sketchfab</div>
+            <p style={{ color: '#94a3b8', fontSize: '0.76rem', margin: '0 0 10px', lineHeight: 1.5 }}>
+                Pega el enlace del modelo (vale el corto, <code>skfb.ly/…</code>). Se descarga, se convierte a .glb,
+                se sube a tu Cloudinary y se rellena la atribución sola.
+            </p>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <input value={enlace} onChange={e => setEnlace(e.target.value)} disabled={!!fase}
+                    onKeyDown={e => { if (e.key === 'Enter') importar(); }}
+                    placeholder="https://skfb.ly/66Wsn"
+                    style={{ flex: 1, minWidth: 220, padding: '9px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.07)', color: '#fff', fontSize: '0.86rem' }} />
+                <button onClick={importar} disabled={!!fase || !enlace.trim()}
+                    style={{ padding: '9px 18px', borderRadius: 10, border: 'none', background: fase ? 'rgba(255,255,255,0.12)' : '#2dd4bf', color: fase ? '#94a3b8' : '#0f172a', fontWeight: 800, cursor: fase ? 'default' : 'pointer', fontSize: '0.86rem' }}>
+                    {fase ? '⏳' : 'Importar'}
+                </button>
+            </div>
+            {fase  && <p style={{ color: '#94a3b8', fontSize: '0.78rem', marginTop: 8 }}>{fase}</p>}
+            {aviso && <p style={{ color: '#2dd4bf', fontSize: '0.8rem', marginTop: 8 }}>{aviso}</p>}
+            {error && <p style={{ color: '#f87171', fontSize: '0.8rem', marginTop: 8, lineHeight: 1.5 }}>⚠️ {error}</p>}
+        </div>
+    );
+}
+
 function PanelAdminCloudinary({ publicados, onCerrar, onCambio, onVer }) {
     const [assets, setAssets]   = useState([]);
     const [cargando, setCarga]  = useState(true);
@@ -777,6 +836,8 @@ function PanelAdminCloudinary({ publicados, onCerrar, onCambio, onVer }) {
                         {uso.almacenamiento?.usage != null && <> · {(uso.almacenamiento.usage / 1073741824).toFixed(2)} GB almacenados</>}
                     </p>
                 )}
+
+                <ImportadorSketchfab onImportado={(ficha) => { cargar(carpeta); setEdit(ficha); }} />
 
                 <div style={{ display: 'flex', gap: 8, marginBottom: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
                     <input value={carpeta} onChange={e => setCarpeta(e.target.value)} placeholder="carpeta (prefijo)"

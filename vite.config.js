@@ -46,20 +46,20 @@ function geminiDevPlugin() {
   };
 }
 
-// Plugin que emula /api/cloudinary en desarrollo (equivalente a la Vercel function).
-// Reutiliza el mismo handler para no duplicar la lógica de autenticación.
-function cloudinaryDevPlugin() {
+// Emula en desarrollo los endpoints de /api que son funciones de Vercel,
+// reutilizando el mismo handler para no duplicar lógica.
+function apiDevPlugin(ruta, modulo) {
   return {
-    name: 'cloudinary-dev-api',
+    name: `dev-api${ruta.replace(/\//g, '-')}`,
     configureServer(server) {
-      server.middlewares.use('/api/cloudinary', async (req, res) => {
+      server.middlewares.use(ruta, async (req, res) => {
         if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
         if (req.method !== 'POST') { res.writeHead(405); res.end('Method not allowed'); return; }
         let body = '';
         req.on('data', chunk => { body += chunk; });
         req.on('end', async () => {
           try {
-            const { default: handler } = await import('./api/cloudinary.js');
+            const { default: handler } = await import(modulo);
             req.body = body ? JSON.parse(body) : {};
             // Adaptador mínimo del objeto `res` de Vercel sobre el de Node.
             const shim = {
@@ -125,7 +125,8 @@ export default defineConfig({
   },
   plugins: [
     geminiDevPlugin(),
-    cloudinaryDevPlugin(),
+    apiDevPlugin('/api/cloudinary', './api/cloudinary.js'),
+    apiDevPlugin('/api/sketchfab', './api/sketchfab.js'),
     react(),
     VitePWA({
       registerType: 'autoUpdate',

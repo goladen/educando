@@ -17,8 +17,7 @@
 // process.env, el prefijo VITE_ solo afecta al empaquetado del cliente.
 
 import { createHash } from 'node:crypto';
-
-const ADMIN_EMAIL = 'goladen@gmail.com';
+import { exigirAdmin, credencialesCloudinary } from './_auth.js';
 
 /**
  * Firma de Cloudinary: parámetros ordenados alfabéticamente, unidos como
@@ -29,21 +28,6 @@ function firmar(params, secret) {
     return createHash('sha1').update(cadena + secret).digest('hex');
 }
 
-/** Valida el idToken contra Google y devuelve el email verificado. */
-async function emailDelToken(idToken) {
-    const key = process.env.VITE_FIREBASE_API_KEY || process.env.FIREBASE_WEB_API_KEY;
-    if (!key) throw new Error('Falta VITE_FIREBASE_API_KEY en el servidor');
-
-    const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${key}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken }),
-    });
-    const data = await r.json();
-    if (!r.ok || !data.users?.length) return null;
-    return data.users[0].email || null;
-}
-
 export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -52,26 +36,13 @@ export default async function handler(req, res) {
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-    // El cloud name se comparte con el cliente: una sola variable para los dos.
-    const cloud  = process.env.VITE_CLOUDINARY_CLOUD || process.env.CLOUDINARY_CLOUD_NAME;
-    const apiKey = process.env.CLOUDINARY_API_KEY;
-    const secret = process.env.CLOUDINARY_API_SECRET;
-    if (!cloud || !apiKey || !secret) {
+    if (!(await exigirAdmin(req, res))) return;
+
+    const creds = credencialesCloudinary();
+    if (!creds) {
         return res.status(500).json({ error: 'Cloudinary no está configurado en el servidor (VITE_CLOUDINARY_CLOUD / CLOUDINARY_API_KEY / CLOUDINARY_API_SECRET).' });
     }
-
-    // ── autenticación ───────────────────────────────────────────────────────
-    const idToken = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
-    if (!idToken) return res.status(401).json({ error: 'Falta el token de sesión.' });
-
-    let email;
-    try {
-        email = await emailDelToken(idToken);
-    } catch (e) {
-        return res.status(500).json({ error: e.message });
-    }
-    if (!email) return res.status(401).json({ error: 'Sesión no válida.' });
-    if (email !== ADMIN_EMAIL) return res.status(403).json({ error: 'Solo el administrador puede consultar los assets de Cloudinary.' });
+    const { cloud, apiKey, secret } = creds;
 
     // ── llamada a Cloudinary ────────────────────────────────────────────────
     const { accion = 'listar', carpeta = 'modelos3d', cursor = null, publicId = null } = req.body || {};

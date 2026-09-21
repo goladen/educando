@@ -15,6 +15,7 @@ import {
     leerSalas, guardarSala, borrarSala, repartirEnSala,
 } from './modelos3d';
 import Sala3D from './Sala3D';
+import SelectorEmoji from './SelectorEmoji';
 import { guardarRegistroLocal } from './utils/registrosLocales';
 import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
 import { db } from './firebase';
@@ -1279,6 +1280,7 @@ export default function Visor3D({ onExit, modeloInicial = null, usuario = null }
     if (salaActiva) return (
         <Sala3D
             sala={salaActiva}
+            modelos={[...MODELOS_3D, ...publicados]}
             puedeEditar={!!usuarioAuth?.uid && salaActiva.autorUid === usuarioAuth.uid}
             onGuardar={async (s) => { const g = await guardarSala(s); setSalaActiva(g); recargarSalas(); }}
             onExaminar={(pieza) => {
@@ -1489,7 +1491,7 @@ function PanelSalas({ salas, modelos, uid, nombreUsuario, esAdmin, onEntrar, onC
                     <h3 style={{ color: '#fff', margin: '0 0 14px', fontSize: '1rem' }}>🏛️ Nueva sala</h3>
                     <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
                         <input style={{ ...campo, flex: 1 }} value={titulo} onChange={e => setTitulo(e.target.value)} placeholder="Sala de Anatomía" />
-                        <input style={{ ...campo, width: 70 }} value={emoji} onChange={e => setEmoji(e.target.value)} maxLength={4} />
+                        <div style={{ width: 84 }}><SelectorEmoji valor={emoji} onCambio={setEmoji} titulo="Icono de la sala" /></div>
                     </div>
 
                     <div style={{ color: '#94a3b8', fontSize: '0.76rem', fontWeight: 700, marginBottom: 8 }}>
@@ -1646,7 +1648,7 @@ function FormularioModelo({ onGuardar, onCancelar, esAdmin = false }) {
                     <input style={campo} value={url} onChange={e => setUrl(e.target.value)} placeholder="https://res.cloudinary.com/…/raw/upload/…/modelo.glb" />
                 </div>
                 <div><label style={etiqueta}>Nombre</label><input style={campo} value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Cráneo humano" /></div>
-                <div><label style={etiqueta}>Emoji</label><input style={campo} value={emoji} onChange={e => setEmoji(e.target.value)} maxLength={4} /></div>
+                <div><label style={etiqueta}>Icono</label><SelectorEmoji valor={emoji} onCambio={setEmoji} /></div>
                 <div>
                     <label style={etiqueta}>Categoría</label>
                     <select style={campo} value={categoria} onChange={e => setCat(e.target.value)}>
@@ -2032,7 +2034,7 @@ function FichaPublicacion({ modelo, onGuardar, onCancelar }) {
 
                 <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                     <div><label style={etiqueta}>Nombre</label><input style={campo} value={m.nombre || ''} onChange={set('nombre')} /></div>
-                    <div><label style={etiqueta}>Emoji</label><input style={campo} value={m.emoji || ''} onChange={set('emoji')} maxLength={4} /></div>
+                    <div><label style={etiqueta}>Icono</label><SelectorEmoji valor={m.emoji || '🧊'} onCambio={v => setM(prev => ({ ...prev, emoji: v }))} /></div>
                     <div>
                         <label style={etiqueta}>Categoría</label>
                         <select style={campo} value={m.categoria || 'OTROS'} onChange={set('categoria')}>

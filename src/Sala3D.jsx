@@ -56,7 +56,7 @@ function carteles(texto) {
     return tex;
 }
 
-export default function Sala3D({ sala, onSalir, onExaminar, puedeEditar = false, onGuardar }) {
+export default function Sala3D({ sala, onSalir, onExaminar, puedeEditar = false, onGuardar, modelos = [] }) {
     const contRef  = useRef(null);
     const vrBtnRef = useRef(null);
     const api      = useRef({});
@@ -76,6 +76,7 @@ export default function Sala3D({ sala, onSalir, onExaminar, puedeEditar = false,
     useEffect(() => { piezasRef.current = piezas; }, [piezas]);
     const [guardando, setGuardando] = useState(false);
     const [aviso, setAviso]         = useState(null);
+    const [añadiendo, setAñadiendo] = useState(false);
 
     /* ---------- escena ---------- */
     useEffect(() => {
@@ -463,6 +464,37 @@ export default function Sala3D({ sala, onSalir, onExaminar, puedeEditar = false,
     const mover = (i, cambios) => aplicar(piezas.map((p, j) => (j === i ? { ...p, ...cambios } : p)));
     const quitar = (i) => { aplicar(piezas.filter((_, j) => j !== i)); setSeleccion(null); };
 
+    /** Añade un modelo del catálogo a la sala, delante de donde estás mirando. */
+    const añadir = async (modelo) => {
+        const { camara, cargarPieza } = api.current;
+        if (!cargarPieza) return;
+        if (piezas.length >= 12) { setAviso('Máximo 12 piezas por sala'); return; }
+
+        // Colocarla a un par de metros por delante, ya orientada hacia la cámara.
+        const delante = new THREE.Vector3();
+        camara.getWorldDirection(delante);
+        delante.y = 0; delante.normalize();
+        const p = camara.getWorldPosition(new THREE.Vector3()).addScaledVector(delante, 2.2);
+
+        const pieza = {
+            pid: `p${Date.now().toString(36)}`,
+            url: modelo.url,
+            nombre: modelo.nombre,
+            emoji: modelo.emoji || '🧊',
+            altura: modelo.escalaReal > 0 ? modelo.escalaReal : 1.6,
+            pedestal: true,
+            pos: [p.x, 0, p.z],
+            rotY: Math.atan2(-delante.x, -delante.z),
+        };
+
+        setAñadiendo(false);
+        setCargando(c => ({ ...c, total: c.total + 1 }));
+        setPiezas(prev => [...prev, pieza]);
+        setAviso('Cambios sin guardar');
+        await cargarPieza(pieza);
+        setSeleccion(piezasRef.current.length - 1);
+    };
+
     const guardar = async () => {
         setGuardando(true);
         try {
@@ -527,6 +559,11 @@ export default function Sala3D({ sala, onSalir, onExaminar, puedeEditar = false,
                         </button>
                     )}
                     {editar && (
+                        <button style={btn(añadiendo)} onClick={() => setAñadiendo(a => !a)}>
+                            ➕ Añadir modelo
+                        </button>
+                    )}
+                    {editar && (
                         <button style={{ ...btn(false), background: '#2dd4bf', color: '#0f172a', opacity: guardando ? 0.6 : 1 }}
                             onClick={guardar} disabled={guardando}>
                             {guardando ? '💾 Guardando…' : '💾 Guardar sala'}
@@ -535,6 +572,34 @@ export default function Sala3D({ sala, onSalir, onExaminar, puedeEditar = false,
                     {aviso && <div style={{ color: aviso.startsWith('Error') ? '#f87171' : '#2dd4bf', fontSize: '0.7rem' }}>{aviso}</div>}
                     <div style={{ color: '#64748b', fontSize: '0.66rem', lineHeight: 1.5, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 6 }}>
                         WASD para caminar<br />Arrastra para mirar<br />Pincha una pieza para verla
+                    </div>
+                </div>
+            )}
+
+            {/* Catálogo para añadir una pieza más */}
+            {añadiendo && !enVR && (
+                <div style={{ position: 'absolute', top: 60, right: 212, zIndex: 5, width: 'min(280px, calc(100% - 24px))',
+                    background: 'rgba(15,23,42,0.95)', borderRadius: 14, padding: 12, backdropFilter: 'blur(6px)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+                        <div style={{ flex: 1, color: '#2dd4bf', fontWeight: 800, fontSize: '0.86rem' }}>➕ Añadir a la sala</div>
+                        <button onClick={() => setAñadiendo(false)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
+                    </div>
+                    <p style={{ color: '#94a3b8', fontSize: '0.72rem', margin: '0 0 9px', lineHeight: 1.5 }}>
+                        Aparecerá delante de ti. Luego pincha el suelo para moverla. ({piezas.length}/12)
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 5, maxHeight: 280, overflowY: 'auto' }}>
+                        {modelos.length === 0 && <div style={{ color: '#64748b', fontSize: '0.78rem' }}>No hay modelos en el catálogo.</div>}
+                        {modelos.map((m, i) => {
+                            const yaEsta = piezas.some(p => p.url === m.url);
+                            return (
+                                <button key={m.url + i} onClick={() => añadir(m)}
+                                    style={{ textAlign: 'left', padding: '8px 10px', borderRadius: 10, cursor: 'pointer', border: 'none',
+                                        background: 'rgba(255,255,255,0.07)', color: '#e2e8f0', fontSize: '0.8rem', fontWeight: 600 }}>
+                                    {m.emoji || '🧊'} {m.nombre}
+                                    {yaEsta && <span style={{ color: '#64748b', fontWeight: 400 }}> · ya está</span>}
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
             )}

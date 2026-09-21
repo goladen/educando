@@ -91,6 +91,87 @@ export async function despublicarModelo(id) {
     await deleteDoc(doc(db, COLECCION_MODELOS, id));
 }
 
+/* ---------- salas 3D (varios modelos en un mismo espacio) ---------- */
+/*
+ * Una sala reúne varios modelos del catálogo en una escena por la que se puede
+ * caminar, también con gafas VR. Ej.: "Anatomía" con musculatura y esqueleto.
+ *
+ * Documento: {
+ *   titulo, descripcion, emoji, color,
+ *   autorUid, autorNombre, publico,
+ *   piezas: [{ url, nombre, emoji, pos:[x,y,z], rotY, altura, pedestal }],
+ *   creado, actualizado
+ * }
+ * `altura` son metros reales del modelo en la sala (1.7 ≈ una persona).
+ */
+
+export const COLECCION_SALAS = 'modelos3d_salas';
+
+export async function leerSalas() {
+    const { db } = await import('./firebase');
+    const { collection, getDocs } = await import('firebase/firestore');
+    const snap = await getDocs(collection(db, COLECCION_SALAS));
+    return snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (b.actualizado || 0) - (a.actualizado || 0));
+}
+
+export async function guardarSala(sala) {
+    const { db } = await import('./firebase');
+    const { doc, setDoc, addDoc, collection } = await import('firebase/firestore');
+
+    const datos = {
+        titulo: String(sala.titulo || 'Sala').slice(0, 90),
+        descripcion: String(sala.descripcion || '').slice(0, 300),
+        emoji: sala.emoji || '🏛️',
+        color: sala.color || '#0d9488',
+        autorUid: sala.autorUid,
+        autorNombre: String(sala.autorNombre || '').slice(0, 80),
+        publico: sala.publico !== false,
+        piezas: (sala.piezas || []).slice(0, 12).map((p, i) => ({
+            // pid estable: permite sincronizar la escena 3D con el estado sin
+            // depender del orden del array.
+            pid: p.pid || `p${i}_${Math.random().toString(36).slice(2, 8)}`,
+            url: p.url,
+            nombre: String(p.nombre || '').slice(0, 80),
+            emoji: p.emoji || '🧊',
+            pos: [Number(p.pos?.[0]) || 0, Number(p.pos?.[1]) || 0, Number(p.pos?.[2]) || 0],
+            rotY: Number(p.rotY) || 0,
+            altura: Number(p.altura) || 1.6,
+            pedestal: p.pedestal !== false,
+        })),
+        creado: sala.creado || Date.now(),
+        actualizado: Date.now(),
+    };
+
+    if (sala.id) {
+        await setDoc(doc(db, COLECCION_SALAS, sala.id), datos);
+        return { id: sala.id, ...datos };
+    }
+    const ref = await addDoc(collection(db, COLECCION_SALAS), datos);
+    return { id: ref.id, ...datos };
+}
+
+export async function borrarSala(id) {
+    const { db } = await import('./firebase');
+    const { doc, deleteDoc } = await import('firebase/firestore');
+    await deleteDoc(doc(db, COLECCION_SALAS, id));
+}
+
+/** Coloca las piezas en semicírculo mirando al centro, como en un museo. */
+export function repartirEnSala(piezas) {
+    const n = piezas.length || 1;
+    const radio = Math.max(2.2, n * 0.75);
+    return piezas.map((p, i) => {
+        const ang = Math.PI * (0.15 + 0.7 * (n === 1 ? 0.5 : i / (n - 1)));
+        return {
+            ...p,
+            pos: [Math.cos(ang) * radio, 0, -Math.abs(Math.sin(ang)) * radio],
+            rotY: -ang + Math.PI / 2,
+        };
+    });
+}
+
 /* ---------- conjuntos de etiquetas (uno por profesor) ---------- */
 /*
  * El catálogo de modelos lo sube el administrador, pero CADA PROFESOR puede

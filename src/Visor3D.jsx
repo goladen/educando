@@ -12,7 +12,9 @@ import {
     borrarModeloLocal, validarUrlModelo, leerModelosPublicados, publicarModelo,
     despublicarModelo, guardarPuntosModelo, leerConjuntosEtiquetas,
     guardarConjuntoEtiquetas, borrarConjuntoEtiquetas,
+    leerSalas, guardarSala, borrarSala, repartirEnSala,
 } from './modelos3d';
+import Sala3D from './Sala3D';
 import { guardarRegistroLocal } from './utils/registrosLocales';
 import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
 import { db } from './firebase';
@@ -312,13 +314,21 @@ function EscenaModelo({ modelo, onVolver, esAdmin = false, onPuntosGuardados, et
 
                 // Centrar en su propio origen y normalizar: los modelos de
                 // Sketchfab vienen en escalas y orígenes muy dispares.
+                //
+                // El centrado va en la raíz y la escala en un grupo PADRE. Si se
+                // hicieran las dos cosas sobre el mismo objeto, el modelo
+                // quedaría desplazado centro*(k-1): no se nota cuando el origen
+                // ya está en el centro, pero descoloca los que no lo están.
                 const caja = new THREE.Box3().setFromObject(raiz);
                 const tam = caja.getSize(new THREE.Vector3());
                 const centro = caja.getCenter(new THREE.Vector3());
                 const mayor = Math.max(tam.x, tam.y, tam.z) || 1;
                 raiz.position.sub(centro);
-                raiz.scale.multiplyScalar(1 / mayor);
-                pivote.add(raiz);
+
+                const escalador = new THREE.Group();
+                escalador.scale.setScalar(1 / mayor);
+                escalador.add(raiz);
+                pivote.add(escalador);
 
                 // En VR el modelo mide lo que diga escalaReal (o 1 m de lado mayor).
                 escalaVR = modelo.escalaReal > 0 ? modelo.escalaReal : 1;
@@ -349,6 +359,9 @@ function EscenaModelo({ modelo, onVolver, esAdmin = false, onPuntosGuardados, et
 
                 // Mallas con nombre: en los modelos de anatomía cada músculo
                 // suele ser una, y sirven para crear los puntos de golpe.
+                // Hay que refrescar las matrices antes de medir: el grupo se
+                // acaba de añadir y todavía no ha pasado por ningún render.
+                pivote.updateMatrixWorld(true);
                 const conNombre = [];
                 raiz.traverse(o => {
                     if (!o.isMesh || !o.name || o.name.startsWith('Object_')) return;
@@ -1162,6 +1175,9 @@ export default function Visor3D({ onExit, modeloInicial = null, usuario = null }
     const [form, setForm]           = useState(false);
     const [admin, setAdmin]         = useState(false);
     const [copiado, setCopiado]     = useState(false);
+    const [salas, setSalas]         = useState([]);
+    const [salaActiva, setSalaActiva] = useState(null);
+    const [pestana, setPestana]     = useState('MODELOS');   // MODELOS | SALAS
     // Juego de etiquetas indicado en el enlace compartido (?etiquetas=<id>).
     const [etiquetasUrl] = useState(() => {
         try { return new URLSearchParams(window.location.search).get('etiquetas'); } catch (_) { return null; }
@@ -1183,6 +1199,22 @@ export default function Visor3D({ onExit, modeloInicial = null, usuario = null }
     }, [esAdmin]);
 
     useEffect(() => { recargarPublicados(); }, [recargarPublicados]);
+
+    const recargarSalas = useCallback(() => {
+        leerSalas()
+            .then(s => setSalas(s.filter(x => x.publico !== false || x.autorUid === usuarioAuth?.uid)))
+            .catch(err => console.warn('[Visor3D] no se pudieron leer las salas:', err));
+    }, [usuarioAuth?.uid]);
+
+    useEffect(() => { recargarSalas(); }, [recargarSalas]);
+
+    // Sala indicada en el enlace: /visor3d?sala=<id>
+    useEffect(() => {
+        const id = new URLSearchParams(window.location.search).get('sala');
+        if (!id || !salas.length || salaActiva) return;
+        const s = salas.find(x => x.id === id);
+        if (s) { setSalaActiva(s); setPestana('SALAS'); }
+    }, [salas, salaActiva]);
 
     // Modelo compartido por URL: /visor3d?modelo=<url>&nombre=…
     useEffect(() => {
@@ -1244,6 +1276,21 @@ export default function Visor3D({ onExit, modeloInicial = null, usuario = null }
         />
     );
 
+    if (salaActiva) return (
+        <Sala3D
+            sala={salaActiva}
+            puedeEditar={!!usuarioAuth?.uid && salaActiva.autorUid === usuarioAuth.uid}
+            onGuardar={async (s) => { const g = await guardarSala(s); setSalaActiva(g); recargarSalas(); }}
+            onExaminar={(pieza) => {
+                // Abrir esa pieza en el visor individual, con sus etiquetas.
+                const ficha = publicados.find(p => p.url === pieza.url);
+                setSalaActiva(null);
+                setModelo(ficha || { url: pieza.url, nombre: pieza.nombre, emoji: pieza.emoji });
+            }}
+            onSalir={() => { setSalaActiva(null); window.history.pushState({}, '', '/visor3d'); }}
+        />
+    );
+
     if (admin) return (
         <PanelAdminCloudinary
             publicados={publicados}
@@ -1264,10 +1311,30 @@ export default function Visor3D({ onExit, modeloInicial = null, usuario = null }
 
             <div style={{ maxWidth: 1000, margin: '0 auto' }}>
                 <h1 style={{ color: '#fff', textAlign: 'center', margin: '0 0 6px', fontSize: 'clamp(1.5rem,4vw,2.2rem)' }}>🧊 Visor 3D</h1>
-                <p style={{ color: '#94a3b8', textAlign: 'center', margin: '0 0 26px', fontSize: '0.92rem' }}>
+                <p style={{ color: '#94a3b8', textAlign: 'center', margin: '0 0 18px', fontSize: '0.92rem' }}>
                     Modelos para explorar girándolos, acercándolos… y con gafas de realidad virtual.
                 </p>
 
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 22 }}>
+                    {[['MODELOS', '🧊 Modelos'], ['SALAS', '🏛️ Salas']].map(([id, txt]) => (
+                        <button key={id} onClick={() => setPestana(id)}
+                            style={{ padding: '8px 18px', borderRadius: 999, border: 'none', cursor: 'pointer', fontWeight: 800, fontSize: '0.85rem',
+                                background: pestana === id ? '#2dd4bf' : 'rgba(255,255,255,0.08)',
+                                color: pestana === id ? '#0f172a' : '#94a3b8' }}>{txt}</button>
+                    ))}
+                </div>
+
+                {pestana === 'SALAS' && (
+                    <PanelSalas
+                        salas={salas} modelos={[...MODELOS_3D, ...publicados]}
+                        uid={usuarioAuth?.uid} nombreUsuario={usuarioAuth?.displayName || usuarioAuth?.email || 'Profesor'}
+                        esAdmin={esAdmin}
+                        onEntrar={(s) => { setSalaActiva(s); window.history.pushState({}, '', `/visor3d?sala=${s.id}`); }}
+                        onCambio={recargarSalas}
+                    />
+                )}
+
+                {pestana === 'MODELOS' && <>
                 {todos.length === 0 && !form && (
                     <div style={{ background: 'rgba(255,255,255,0.06)', border: '1px dashed rgba(255,255,255,0.2)', borderRadius: 16, padding: 24, color: '#cbd5e1', textAlign: 'center', marginBottom: 20 }}>
                         <div style={{ fontSize: '2rem', marginBottom: 8 }}>📦</div>
@@ -1338,7 +1405,132 @@ export default function Visor3D({ onExit, modeloInicial = null, usuario = null }
                     </div>}
 
                 <AyudaSketchfab />
+                </>}
             </div>
+        </div>
+    );
+}
+
+/* ---------- salas: listado y creación ---------- */
+
+function PanelSalas({ salas, modelos, uid, nombreUsuario, esAdmin, onEntrar, onCambio }) {
+    const [creando, setCreando] = useState(false);
+    const [titulo, setTitulo]   = useState('');
+    const [emoji, setEmoji]     = useState('🏛️');
+    const [elegidos, setElegidos] = useState([]);
+    const [guardando, setGuardando] = useState(false);
+    const [error, setError]     = useState(null);
+
+    const alternar = (m) => setElegidos(prev =>
+        prev.some(x => x.url === m.url) ? prev.filter(x => x.url !== m.url) : [...prev, m]);
+
+    const crear = async () => {
+        if (!uid) { setError('Inicia sesión para crear una sala.'); return; }
+        if (!titulo.trim()) { setError('Ponle un nombre a la sala.'); return; }
+        if (!elegidos.length) { setError('Elige al menos un modelo.'); return; }
+        setGuardando(true); setError(null);
+        try {
+            const piezas = repartirEnSala(elegidos.map(m => ({
+                url: m.url, nombre: m.nombre, emoji: m.emoji || '🧊',
+                altura: m.escalaReal > 0 ? m.escalaReal : 1.6, pedestal: true, pos: [0, 0, 0], rotY: 0,
+            })));
+            await guardarSala({
+                titulo: titulo.trim(), emoji, autorUid: uid, autorNombre: nombreUsuario,
+                publico: true, piezas,
+            });
+            setCreando(false); setTitulo(''); setElegidos([]);
+            onCambio();
+        } catch (e) {
+            setError(e.message);
+        } finally {
+            setGuardando(false);
+        }
+    };
+
+    const eliminar = async (s) => {
+        if (!window.confirm(`¿Borrar la sala "${s.titulo}"? Los modelos no se tocan.`)) return;
+        try { await borrarSala(s.id); onCambio(); } catch (e) { alert(e.message); }
+    };
+
+    const campo = { width: '100%', padding: '9px 11px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.07)', color: '#fff', fontSize: '0.86rem', boxSizing: 'border-box' };
+
+    return (
+        <div style={{ marginBottom: 26 }}>
+            {salas.length === 0 && !creando && (
+                <div style={{ background: 'rgba(255,255,255,0.06)', border: '1px dashed rgba(255,255,255,0.2)', borderRadius: 16, padding: 24, color: '#cbd5e1', textAlign: 'center', marginBottom: 18 }}>
+                    <div style={{ fontSize: '2rem', marginBottom: 8 }}>🏛️</div>
+                    <p style={{ margin: '0 0 6px', fontWeight: 700 }}>Todavía no hay salas</p>
+                    <p style={{ margin: 0, fontSize: '0.85rem', opacity: 0.8 }}>
+                        Una sala reúne varios modelos en un mismo espacio por el que se puede caminar, también con gafas VR.
+                    </p>
+                </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 14, marginBottom: 18 }}>
+                {salas.map(s => (
+                    <div key={s.id} onClick={() => onEntrar(s)}
+                        style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 16, padding: 16, cursor: 'pointer', position: 'relative', border: '1px solid rgba(45,212,191,0.25)' }}>
+                        {(esAdmin || s.autorUid === uid) && (
+                            <button onClick={e => { e.stopPropagation(); eliminar(s); }}
+                                style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(255,255,255,0.12)', border: 'none', borderRadius: 8, padding: '3px 7px', cursor: 'pointer', color: '#fca5a5', fontSize: '0.72rem' }}>🗑</button>
+                        )}
+                        <div style={{ fontSize: '2rem', textAlign: 'center' }}>{s.emoji || '🏛️'}</div>
+                        <h3 style={{ margin: '6px 0 0', color: '#fff', fontSize: '0.95rem', textAlign: 'center' }}>{s.titulo}</h3>
+                        <div style={{ color: '#2dd4bf', fontSize: '0.7rem', textAlign: 'center', marginTop: 4, fontWeight: 700 }}>
+                            {s.piezas?.length || 0} modelo{(s.piezas?.length || 0) === 1 ? '' : 's'}
+                        </div>
+                        <div style={{ color: '#64748b', fontSize: '0.66rem', textAlign: 'center', marginTop: 2 }}>{s.autorNombre}</div>
+                    </div>
+                ))}
+            </div>
+
+            {creando ? (
+                <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 16, padding: 20 }}>
+                    <h3 style={{ color: '#fff', margin: '0 0 14px', fontSize: '1rem' }}>🏛️ Nueva sala</h3>
+                    <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+                        <input style={{ ...campo, flex: 1 }} value={titulo} onChange={e => setTitulo(e.target.value)} placeholder="Sala de Anatomía" />
+                        <input style={{ ...campo, width: 70 }} value={emoji} onChange={e => setEmoji(e.target.value)} maxLength={4} />
+                    </div>
+
+                    <div style={{ color: '#94a3b8', fontSize: '0.76rem', fontWeight: 700, marginBottom: 8 }}>
+                        Modelos de la sala ({elegidos.length} elegidos · máximo 12)
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8, maxHeight: 260, overflowY: 'auto', marginBottom: 6 }}>
+                        {modelos.map((m, i) => {
+                            const puesto = elegidos.some(x => x.url === m.url);
+                            return (
+                                <button key={m.url + i} onClick={() => alternar(m)}
+                                    style={{ textAlign: 'left', padding: '9px 11px', borderRadius: 10, cursor: 'pointer',
+                                        border: puesto ? '1px solid #2dd4bf' : '1px solid transparent',
+                                        background: puesto ? 'rgba(45,212,191,0.15)' : 'rgba(255,255,255,0.06)' }}>
+                                    <div style={{ color: '#e2e8f0', fontSize: '0.8rem', fontWeight: 600 }}>
+                                        {puesto ? '✓ ' : ''}{m.emoji || '🧊'} {m.nombre}
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
+                    {modelos.length === 0 && <div style={{ color: '#fbbf24', fontSize: '0.78rem' }}>Primero publica algún modelo en el catálogo.</div>}
+
+                    {error && <p style={{ color: '#f87171', fontSize: '0.8rem', marginTop: 10 }}>⚠️ {error}</p>}
+
+                    <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+                        <button onClick={crear} disabled={guardando}
+                            style={{ padding: '10px 18px', borderRadius: 10, border: 'none', background: '#2dd4bf', color: '#0f172a', fontWeight: 800, cursor: 'pointer' }}>
+                            {guardando ? 'Creando…' : 'Crear sala'}
+                        </button>
+                        <button onClick={() => { setCreando(false); setError(null); }}
+                            style={{ padding: '10px 18px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: '#cbd5e1', fontWeight: 700, cursor: 'pointer' }}>Cancelar</button>
+                    </div>
+                </div>
+            ) : (
+                <div style={{ textAlign: 'center' }}>
+                    <button onClick={() => setCreando(true)}
+                        style={{ padding: '12px 22px', borderRadius: 12, border: 'none', background: '#2dd4bf', color: '#0f172a', fontWeight: 800, cursor: 'pointer', fontSize: '0.95rem' }}>
+                        ➕ Crear sala
+                    </button>
+                </div>
+            )}
         </div>
     );
 }
@@ -1515,6 +1707,93 @@ async function apiCloudinary(accion, extra = {}) {
     return data;
 }
 
+/**
+ * Borrado definitivo de un modelo: el archivo en Cloudinary, su ficha del
+ * catálogo y los juegos de etiquetas que dependían de él (quedarían huérfanos).
+ * Es irreversible, así que se pide escribir BORRAR.
+ */
+function ConfirmarBorrado({ asset, ficha, onHecho, onCancelar }) {
+    const [conjuntos, setConjuntos] = useState(null);
+    const [texto, setTexto] = useState('');
+    const [borrando, setBorrando] = useState(false);
+    const [error, setError] = useState(null);
+
+    useEffect(() => {
+        leerConjuntosEtiquetas(asset.url)
+            .then(setConjuntos)
+            .catch(() => setConjuntos([]));
+    }, [asset.url]);
+
+    const borrar = async () => {
+        setBorrando(true); setError(null);
+        try {
+            // 1) El archivo en Cloudinary.
+            await apiCloudinary('borrar', { publicId: asset.publicId });
+            // 2) Los juegos de etiquetas que apuntaban a él.
+            for (const c of conjuntos || []) {
+                try { await borrarConjuntoEtiquetas(c.id); } catch (_) {}
+            }
+            // 3) Su ficha del catálogo.
+            if (ficha?.id) { try { await despublicarModelo(ficha.id); } catch (_) {} }
+            onHecho();
+        } catch (e) {
+            setError(e.message);
+            setBorrando(false);
+        }
+    };
+
+    const nombre = ficha?.nombre || asset.publicId.split('/').pop();
+    const listo = texto.trim().toUpperCase() === 'BORRAR' && conjuntos !== null && !borrando;
+
+    return (
+        <div onClick={borrando ? undefined : onCancelar}
+            style={{ position: 'fixed', inset: 0, zIndex: 10003, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+            <div onClick={e => e.stopPropagation()} style={{ background: '#1e293b', borderRadius: 16, padding: 24, width: '100%', maxWidth: 440 }}>
+                <h3 style={{ color: '#f87171', margin: '0 0 6px', fontSize: '1.05rem' }}>🗑 Borrar «{nombre}»</h3>
+                <p style={{ color: '#94a3b8', fontSize: '0.84rem', margin: '0 0 14px', lineHeight: 1.6 }}>
+                    Esto <b style={{ color: '#fca5a5' }}>no se puede deshacer</b>. Se borrará:
+                </p>
+
+                <ul style={{ color: '#cbd5e1', fontSize: '0.82rem', lineHeight: 1.8, margin: '0 0 14px', paddingLeft: 20 }}>
+                    <li>El archivo <code style={{ fontSize: '0.76rem' }}>{asset.publicId}</code> de Cloudinary ({(asset.bytes / 1048576).toFixed(1)} MB)</li>
+                    {ficha && <li>Su ficha del catálogo (dejará de verse en pikt.es)</li>}
+                    {conjuntos === null
+                        ? <li style={{ opacity: 0.6 }}>Comprobando juegos de etiquetas…</li>
+                        : conjuntos.length > 0
+                            ? <li style={{ color: '#fbbf24' }}>
+                                <b>{conjuntos.length} juego{conjuntos.length > 1 ? 's' : ''} de etiquetas</b>
+                                {conjuntos.some(c => c.autorNombre) && <> de: {[...new Set(conjuntos.map(c => c.autorNombre).filter(Boolean))].join(', ')}</>}
+                              </li>
+                            : <li style={{ opacity: 0.6 }}>No tiene juegos de etiquetas</li>}
+                </ul>
+
+                {conjuntos?.length > 0 && (
+                    <p style={{ color: '#fbbf24', fontSize: '0.78rem', margin: '0 0 12px', lineHeight: 1.5 }}>
+                        ⚠️ Hay etiquetas hechas por otros profesores. Sin el modelo no sirven de nada, pero perderán ese trabajo.
+                    </p>
+                )}
+
+                <label style={{ color: '#94a3b8', fontSize: '0.75rem', fontWeight: 700, display: 'block', marginBottom: 5 }}>
+                    Escribe BORRAR para confirmar
+                </label>
+                <input value={texto} onChange={e => setTexto(e.target.value)} disabled={borrando}
+                    style={{ width: '100%', padding: '9px 11px', borderRadius: 10, border: '1px solid rgba(248,113,113,0.4)', background: 'rgba(255,255,255,0.07)', color: '#fff', fontSize: '0.9rem', letterSpacing: 2, fontWeight: 700, boxSizing: 'border-box' }} />
+
+                {error && <p style={{ color: '#f87171', fontSize: '0.8rem', marginTop: 10 }}>⚠️ {error}</p>}
+
+                <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+                    <button onClick={borrar} disabled={!listo}
+                        style={{ padding: '10px 18px', borderRadius: 10, border: 'none', background: listo ? '#ef4444' : 'rgba(255,255,255,0.1)', color: listo ? '#fff' : '#64748b', fontWeight: 800, cursor: listo ? 'pointer' : 'default' }}>
+                        {borrando ? 'Borrando…' : 'Borrar definitivamente'}
+                    </button>
+                    <button onClick={onCancelar} disabled={borrando}
+                        style={{ padding: '10px 18px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: '#cbd5e1', fontWeight: 700, cursor: 'pointer' }}>Cancelar</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 /** Trae un modelo de Sketchfab a Cloudinary en un solo paso. */
 function ImportadorSketchfab({ onImportado }) {
     const [enlace, setEnlace] = useState('');
@@ -1580,6 +1859,7 @@ function PanelAdminCloudinary({ publicados, onCerrar, onCambio, onVer }) {
     const [error, setError]     = useState(null);
     const [uso, setUso]         = useState(null);
     const [editando, setEdit]   = useState(null);   // asset en edición
+    const [borrando, setBorrando] = useState(null); // asset pendiente de borrar
     const [carpeta, setCarpeta] = useState('modelos3d');
 
     const cargar = useCallback(async (prefijo = carpeta) => {
@@ -1688,12 +1968,14 @@ function PanelAdminCloudinary({ publicados, onCerrar, onCambio, onVer }) {
                                     </button>
                                     <button onClick={() => setEdit({ ...ficha, url: a.url, publicId: a.publicId })}
                                         style={{ ...st.btn, background: 'rgba(255,255,255,0.12)', color: '#e2e8f0' }}>✏️</button>
-                                    <button onClick={() => quitar(ficha)}
-                                        style={{ ...st.btn, background: 'rgba(248,113,113,0.18)', color: '#fca5a5' }}>🗑</button>
+                                    <button onClick={() => quitar(ficha)} title="Quitarlo del catálogo (el archivo se conserva en Cloudinary)"
+                                        style={{ ...st.btn, background: 'rgba(255,255,255,0.12)', color: '#cbd5e1' }}>👁‍🗨 Retirar</button>
                                 </>) : (
                                     <button onClick={() => setEdit({ url: a.url, publicId: a.publicId, nombre: a.publicId.split('/').pop().replace(/\.(glb|gltf)$/i, ''), emoji: '🧊', categoria: 'OTROS', licencia: 'CC BY 4.0', visible: true })}
                                         style={{ ...st.btn, background: '#2dd4bf', color: '#0f172a' }}>➕ Publicar</button>
                                 )}
+                                <button onClick={() => setBorrando({ asset: a, ficha })} title="Borrar el archivo de Cloudinary (definitivo)"
+                                    style={{ ...st.btn, background: 'rgba(248,113,113,0.18)', color: '#fca5a5' }}>🗑</button>
                             </div>
                         </div>
                     );
@@ -1711,6 +1993,14 @@ function PanelAdminCloudinary({ publicados, onCerrar, onCambio, onVer }) {
                     </div>
                 ))}
             </div>
+
+            {borrando && (
+                <ConfirmarBorrado
+                    asset={borrando.asset} ficha={borrando.ficha}
+                    onCancelar={() => setBorrando(null)}
+                    onHecho={() => { setBorrando(null); cargar(carpeta); onCambio(); }}
+                />
+            )}
 
             {editando && (
                 <FichaPublicacion

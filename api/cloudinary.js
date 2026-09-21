@@ -98,16 +98,23 @@ export default async function handler(req, res) {
 
         if (accion === 'borrar') {
             if (!publicId) return res.status(400).json({ error: 'Falta publicId.' });
-            const body = new URLSearchParams();
-            body.append('public_ids[]', publicId);
-            const r = await fetch(`${base}/resources/raw/upload`, {
+            // La Admin API espera los public_ids en la QUERY STRING: en un DELETE
+            // no lee el cuerpo del formulario y respondería "ok" sin borrar nada.
+            const q = new URLSearchParams();
+            q.append('public_ids[]', publicId);
+            const r = await fetch(`${base}/resources/raw/upload?${q}`, {
                 method: 'DELETE',
-                headers: { Authorization: auth, 'Content-Type': 'application/x-www-form-urlencoded' },
-                body,
+                headers: { Authorization: auth },
             });
             const data = await r.json();
             if (!r.ok) return res.status(r.status).json({ error: data?.error?.message || 'Error de Cloudinary' });
-            return res.status(200).json({ ok: true, borrado: data.deleted });
+
+            // data.deleted = { "<public_id>": "deleted" | "not_found" }
+            const estado = data?.deleted?.[publicId] || 'desconocido';
+            if (estado !== 'deleted') {
+                return res.status(404).json({ error: `Cloudinary no ha borrado el archivo (estado: ${estado}).`, deleted: data.deleted });
+            }
+            return res.status(200).json({ ok: true, publicId, estado });
         }
 
         return res.status(400).json({ error: `Acción desconocida: ${accion}` });

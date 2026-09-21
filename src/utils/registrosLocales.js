@@ -55,6 +55,7 @@ export const JUEGOS_REGISTRO_META = {
     BUNKER:              { nombre: 'Bunker',              emoji: '🎯', color: '#27ae60' },
     ENIGMIC:             { nombre: 'Enigmic',             emoji: '🕵️', color: '#7c3aed' },
     CALAMAR:             { nombre: 'Luz roja · Luz verde', emoji: '🦑', color: '#e6317f' },
+    VISOR_3D:            { nombre: 'Visor 3D',            emoji: '🧊', color: '#0d9488' },
 };
 
 export const metaDe = (tipo) => JUEGOS_REGISTRO_META[tipo] || { nombre: tipo, emoji: '🎮', color: '#718093' };

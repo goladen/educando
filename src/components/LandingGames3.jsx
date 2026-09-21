@@ -746,7 +746,7 @@ export const APPS = [
 export const GAME_INFO = {
     VISOR_3D: {
         descripcion: 'Visor de modelos 3D para clase. El alumno gira, acerca y examina piezas reales (un cráneo, una máquina, un templo) arrastrando con el ratón o el dedo, y puede ver la malla de triángulos o reproducir las animaciones que traiga el modelo. Con unas gafas de realidad virtual (Quest y similares) se entra en modo inmersivo: el modelo aparece flotando delante y se agarra, se gira y se agranda con los mandos. El profesor añade modelos descargados de Sketchfab subiéndolos a Cloudinary o pegando su URL, y comparte cada uno con un enlace que funciona sin registrarse.',
-        tipoPreguntas: 'No tiene preguntas: es una herramienta de exploración y observación. Se puede combinar con EtiquetaMe o Q-Sender para que el alumno responda sobre lo que ha observado.',
+        tipoPreguntas: 'Dos modos. En "etiquetas" el profesor marca puntos sobre el modelo (un músculo, una pieza) con su nombre y una explicación, y el alumno los pincha para leerla. En "modo reto" se ocultan los nombres y el alumno debe localizar la pieza que se le pide pinchando el marcador correcto; al terminar puede enviar el resultado al profesor.',
         biblioteca: 'Galería propia: los modelos fijos del centro más los que añada el profesor en su navegador. Formato admitido: .glb / .gltf (en Sketchfab, "Download 3D model → Autoconverted format → glTF"). Cada modelo muestra autor y licencia, como exigen las licencias Creative Commons.',
         multiplayer: 'Individual. También sirve para proyectar en clase y explorar en gran grupo, o para pasar las gafas de VR por turnos.',
         materias: ['Universal', 'Biología y Geología', 'Ciencias Sociales', 'Historia', 'Tecnología', 'Plástica'],

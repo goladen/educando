@@ -91,6 +91,107 @@ export async function despublicarModelo(id) {
     await deleteDoc(doc(db, COLECCION_MODELOS, id));
 }
 
+/* ---------- conjuntos de etiquetas (uno por profesor) ---------- */
+/*
+ * El catálogo de modelos lo sube el administrador, pero CADA PROFESOR puede
+ * crear su propio juego de etiquetas sobre el mismo modelo: distinto nivel,
+ * distinta asignatura, distinto idioma. Por eso van en su propia colección y
+ * no dentro del documento del modelo.
+ *
+ * Documento: {
+ *   modeloUrl, modeloNombre,        // a qué modelo pertenece
+ *   titulo,                         // "Músculos del brazo · 3º ESO"
+ *   autorUid, autorNombre,
+ *   puntos: [{ id, nombre, info, pos }],
+ *   publico,                        // si lo ven los demás profesores
+ *   creado, actualizado
+ * }
+ */
+
+export const COLECCION_ETIQUETAS = 'modelos3d_etiquetas';
+
+/** Conjuntos de etiquetas de un modelo. Consulta por un solo campo: sin índice. */
+export async function leerConjuntosEtiquetas(modeloUrl) {
+    if (!modeloUrl) return [];
+    const { db } = await import('./firebase');
+    const { collection, query, where, getDocs } = await import('firebase/firestore');
+    const q = query(collection(db, COLECCION_ETIQUETAS), where('modeloUrl', '==', modeloUrl));
+    const snap = await getDocs(q);
+    return snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (b.actualizado || 0) - (a.actualizado || 0));
+}
+
+export async function guardarConjuntoEtiquetas(conjunto) {
+    const { db } = await import('./firebase');
+    const { doc, setDoc, addDoc, collection } = await import('firebase/firestore');
+
+    const datos = {
+        modeloUrl: conjunto.modeloUrl,
+        modeloNombre: conjunto.modeloNombre || '',
+        titulo: String(conjunto.titulo || 'Mis etiquetas').slice(0, 90),
+        autorUid: conjunto.autorUid,
+        autorNombre: String(conjunto.autorNombre || '').slice(0, 80),
+        publico: conjunto.publico !== false,
+        puntos: (conjunto.puntos || []).map(p => ({
+            id: p.id,
+            nombre: String(p.nombre || '').slice(0, 80),
+            info: String(p.info || '').slice(0, 2000),
+            pos: [Number(p.pos[0]) || 0, Number(p.pos[1]) || 0, Number(p.pos[2]) || 0],
+        })),
+        creado: conjunto.creado || Date.now(),
+        actualizado: Date.now(),
+    };
+
+    if (conjunto.id) {
+        await setDoc(doc(db, COLECCION_ETIQUETAS, conjunto.id), datos);
+        return { id: conjunto.id, ...datos };
+    }
+    const ref = await addDoc(collection(db, COLECCION_ETIQUETAS), datos);
+    return { id: ref.id, ...datos };
+}
+
+export async function borrarConjuntoEtiquetas(id) {
+    const { db } = await import('./firebase');
+    const { doc, deleteDoc } = await import('firebase/firestore');
+    await deleteDoc(doc(db, COLECCION_ETIQUETAS, id));
+}
+
+/* ---------- puntos de interés (etiquetas sobre el modelo) ---------- */
+/*
+ * Cada punto: { id, nombre, info, pos: [x, y, z] }
+ * `pos` va en el espacio local del modelo YA centrado y normalizado, así que
+ * no depende del zoom ni de la escala con que se vea.
+ *
+ * Se guardan junto al modelo: en Firestore si está publicado (lo ven todos),
+ * y en localStorage si es un modelo propio de este navegador.
+ */
+
+export async function guardarPuntosModelo(modelo, puntos) {
+    const limpios = (puntos || []).map(p => ({
+        id: p.id,
+        nombre: String(p.nombre || '').slice(0, 80),
+        info: String(p.info || '').slice(0, 2000),
+        pos: [Number(p.pos[0]) || 0, Number(p.pos[1]) || 0, Number(p.pos[2]) || 0],
+    }));
+
+    if (modelo.publicado && modelo.id) {
+        const { db } = await import('./firebase');
+        const { doc, updateDoc } = await import('firebase/firestore');
+        await updateDoc(doc(db, COLECCION_MODELOS, modelo.id), { puntos: limpios, actualizado: Date.now() });
+        return limpios;
+    }
+
+    // Modelo local: se actualiza su entrada en localStorage.
+    const lista = leerModelosLocales();
+    const i = lista.findIndex(m => m.url === modelo.url);
+    if (i >= 0) {
+        lista[i] = { ...lista[i], puntos: limpios };
+        try { localStorage.setItem(CLAVE, JSON.stringify(lista)); } catch (_) {}
+    }
+    return limpios;
+}
+
 /* ---------- modelos añadidos por el profesor (este navegador) ---------- */
 
 const CLAVE = 'pikt_modelos3d';

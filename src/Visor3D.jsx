@@ -10,10 +10,15 @@ import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
 import {
     MODELOS_3D, CATEGORIAS_3D, leerModelosLocales, guardarModeloLocal,
     borrarModeloLocal, validarUrlModelo, leerModelosPublicados, publicarModelo,
-    despublicarModelo,
+    despublicarModelo, guardarPuntosModelo, leerConjuntosEtiquetas,
+    guardarConjuntoEtiquetas, borrarConjuntoEtiquetas,
 } from './modelos3d';
+import { guardarRegistroLocal } from './utils/registrosLocales';
+import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
+import { db } from './firebase';
 import { cloudinaryListo, subirModelo, subirModeloFirmado, esUrlCloudinary, MAX_MB } from './config/cloudinary';
 import { auth } from './firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 const ADMIN_EMAIL = 'goladen@gmail.com';
 
@@ -21,7 +26,26 @@ const ADMIN_EMAIL = 'goladen@gmail.com';
 /*  ESCENA 3D                                                            */
 /* ===================================================================== */
 
-function EscenaModelo({ modelo, onVolver }) {
+/** Dibuja el marcador de un punto: un círculo con su número. */
+function texturaMarcador(numero, color) {
+    const c = document.createElement('canvas');
+    c.width = c.height = 128;
+    const g = c.getContext('2d');
+    g.beginPath(); g.arc(64, 64, 52, 0, Math.PI * 2);
+    g.fillStyle = color; g.fill();
+    g.lineWidth = 8; g.strokeStyle = '#ffffff'; g.stroke();
+    if (numero != null) {
+        g.fillStyle = '#0f172a';
+        g.font = 'bold 62px system-ui, sans-serif';
+        g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText(String(numero), 64, 70);
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+}
+
+function EscenaModelo({ modelo, onVolver, esAdmin = false, onPuntosGuardados, etiquetasIniciales = null, usuarioActual = null }) {
     const contRef  = useRef(null);
     const vrBtnRef = useRef(null);
     const api      = useRef({});
@@ -36,6 +60,120 @@ function EscenaModelo({ modelo, onVolver }) {
     const [wireframe, setWireframe]   = useState(false);
     const [enVR, setEnVR]             = useState(false);
     const [panel, setPanel]           = useState(true);
+
+    // Conjuntos de etiquetas: el del catálogo (admin) y los de cada profesor.
+    const [conjuntos, setConjuntos]   = useState([]);
+    const [activoId, setActivoId]     = useState(etiquetasIniciales || null);
+    const [selector, setSelector]     = useState(false);
+
+    // Puntos de interés y sus tres modos: ver, editar y reto.
+    const [puntos, setPuntos]         = useState(() => modelo.puntos || []);
+    const [modo, setModo]             = useState('VER');       // VER | EDITAR | RETO
+    const [seleccionado, setSelec]    = useState(null);        // punto abierto en la ficha
+    const [editando, setEditando]     = useState(null);        // punto en el formulario
+    const [guardando, setGuardando]   = useState(false);
+    const [mallas, setMallas]         = useState([]);          // nombres de malla del modelo
+    const [reto, setReto]             = useState(null);        // { orden, i, aciertos, intentos, fallos, ultimo }
+    const [mostrarEnvio, setEnvio]    = useState(false);
+
+    // La escena se monta una sola vez; para que sus listeners usen siempre la
+    // lógica actual (modo, reto…) se la pasamos por esta referencia.
+    const alClicarRef = useRef(() => {});
+
+    const uid = usuarioActual?.uid || null;
+    const nombreUsuario = usuarioActual?.displayName || usuarioActual?.email || 'Profesor';
+
+    /* ---------- carga de los conjuntos de etiquetas ---------- */
+    const recargarConjuntos = useCallback(async () => {
+        // El conjunto "base" son las etiquetas que el admin guarda en el propio
+        // modelo; los demás vienen de la colección, uno por profesor.
+        const base = (modelo.puntos?.length || esAdmin)
+            ? [{ id: '__base__', base: true, titulo: 'Etiquetas del catálogo', autorNombre: 'pikt.es',
+                 puntos: modelo.puntos || [], publico: true }]
+            : [];
+        let remotos = [];
+        try {
+            remotos = await leerConjuntosEtiquetas(modelo.url);
+        } catch (e) {
+            console.warn('[Visor3D] no se pudieron leer los conjuntos de etiquetas:', e);
+        }
+        // Cada profesor ve los públicos y siempre los suyos.
+        const visibles = remotos.filter(c => c.publico !== false || c.autorUid === uid);
+        const todos = [...base, ...visibles];
+        setConjuntos(todos);
+        return todos;
+    }, [modelo.url, modelo.puntos, esAdmin, uid]);
+
+    useEffect(() => {
+        let vivo = true;
+        recargarConjuntos().then(todos => {
+            if (!vivo) return;
+            // Elegido: el de la URL, si no el que tenga etiquetas, si no el primero.
+            const preferido = todos.find(c => c.id === activoId)
+                || todos.find(c => c.puntos?.length)
+                || todos[0] || null;
+            setActivoId(preferido?.id || null);
+            setPuntos(preferido?.puntos || []);
+        });
+        return () => { vivo = false; };
+    }, [recargarConjuntos]);   // eslint-disable-line react-hooks/exhaustive-deps
+
+    const conjuntoActivo = conjuntos.find(c => c.id === activoId) || null;
+    // Editar: el admin manda en el conjunto del catálogo; cada profesor, en el suyo.
+    const puedeEditar = conjuntoActivo
+        ? (conjuntoActivo.base ? esAdmin : (!!uid && (conjuntoActivo.autorUid === uid || esAdmin)))
+        : false;
+
+    const cambiarConjunto = (id) => {
+        const c = conjuntos.find(x => x.id === id);
+        setActivoId(id);
+        setPuntos(c?.puntos || []);
+        setSelec(null); setModo('VER'); setReto(null); setSelector(false);
+    };
+
+    /** Crea un conjunto nuevo para este profesor, vacío o copiando el actual. */
+    const crearConjunto = async (copiar) => {
+        if (!uid) { alert('Inicia sesión para crear tus propias etiquetas.'); return; }
+        setSelector(false);
+        setGuardando(true);
+        try {
+            const nuevo = await guardarConjuntoEtiquetas({
+                modeloUrl: modelo.url,
+                modeloNombre: modelo.nombre,
+                titulo: `Etiquetas de ${nombreUsuario.split(' ')[0]}`,
+                autorUid: uid,
+                autorNombre: nombreUsuario,
+                publico: true,
+                puntos: copiar ? puntos : [],
+            });
+            setConjuntos(prev => [...prev, nuevo]);
+            setActivoId(nuevo.id);
+            setPuntos(nuevo.puntos);
+            setModo('EDITAR');
+        } catch (e) {
+            alert('No se ha podido crear el conjunto: ' + e.message);
+        } finally {
+            setGuardando(false);
+        }
+    };
+
+    const renombrarConjunto = async (titulo) => {
+        if (!conjuntoActivo || conjuntoActivo.base) return;
+        const actualizado = { ...conjuntoActivo, titulo, puntos };
+        await guardarConjuntoEtiquetas(actualizado);
+        setConjuntos(prev => prev.map(c => (c.id === actualizado.id ? actualizado : c)));
+    };
+
+    const eliminarConjunto = async () => {
+        if (!conjuntoActivo || conjuntoActivo.base) return;
+        if (!window.confirm(`¿Borrar el conjunto "${conjuntoActivo.titulo}" y todas sus etiquetas?`)) return;
+        await borrarConjuntoEtiquetas(conjuntoActivo.id);
+        const resto = conjuntos.filter(c => c.id !== conjuntoActivo.id);
+        setConjuntos(resto);
+        setActivoId(resto[0]?.id || null);
+        setPuntos(resto[0]?.puntos || []);
+        setModo('VER');
+    };
 
     /* ---------- montaje de la escena ---------- */
     useEffect(() => {
@@ -87,6 +225,11 @@ function EscenaModelo({ modelo, onVolver }) {
         // Pivote: contiene el modelo ya centrado y normalizado a 1 unidad.
         const pivote = new THREE.Group();
         escena.add(pivote);
+
+        // Marcadores de los puntos de interés: cuelgan del pivote, así que
+        // siguen al modelo cuando se gira, se escala o se agarra en VR.
+        const marcadores = new THREE.Group();
+        pivote.add(marcadores);
 
         const controles = new OrbitControls(camara, renderer.domElement);
         controles.enableDamping = true;
@@ -201,8 +344,21 @@ function EscenaModelo({ modelo, onVolver }) {
                 controles.target.set(0, 0, 0);
                 controles.update();
 
-                api.current = { camara, controles, materiales, mezclador, clipsGltf, colocarEnEscritorio };
+                api.current = { camara, controles, materiales, mezclador, clipsGltf, colocarEnEscritorio, marcadores, pivote };
                 setStats({ triangulos: Math.round(triangulos), materiales: materiales.size });
+
+                // Mallas con nombre: en los modelos de anatomía cada músculo
+                // suele ser una, y sirven para crear los puntos de golpe.
+                const conNombre = [];
+                raiz.traverse(o => {
+                    if (!o.isMesh || !o.name || o.name.startsWith('Object_')) return;
+                    const caja = new THREE.Box3().setFromObject(o);
+                    if (caja.isEmpty()) return;
+                    const c = caja.getCenter(new THREE.Vector3());
+                    pivote.worldToLocal(c);
+                    conNombre.push({ nombre: o.name.replace(/[_.]/g, ' ').trim(), pos: [c.x, c.y, c.z] });
+                });
+                setMallas(conNombre);
                 setListo(true);
             },
             (ev) => {
@@ -260,6 +416,43 @@ function EscenaModelo({ modelo, onVolver }) {
             renderer.render(escena, camara);
         });
 
+        /* ---- clic sobre el modelo o sobre un marcador ---- */
+        // Se distingue clic de arrastre: al orbitar no debe dispararse nada.
+        const rayo = new THREE.Raycaster();
+        const puntero = new THREE.Vector2();
+        let bajada = null;
+
+        const alPulsar = (ev) => { bajada = { x: ev.clientX, y: ev.clientY, t: Date.now() }; };
+        const alSoltar = (ev) => {
+            if (!bajada) return;
+            const movido = Math.hypot(ev.clientX - bajada.x, ev.clientY - bajada.y);
+            const tardanza = Date.now() - bajada.t;
+            bajada = null;
+            if (movido > 6 || tardanza > 600) return;   // ha sido un arrastre
+
+            const r = renderer.domElement.getBoundingClientRect();
+            puntero.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
+            puntero.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
+            rayo.setFromCamera(puntero, camara);
+
+            // Primero los marcadores: son pequeños y deben tener prioridad.
+            const enMarcador = rayo.intersectObjects(marcadores.children, false)[0];
+            if (enMarcador) {
+                alClicarRef.current({ idPunto: enMarcador.object.userData.idPunto });
+                return;
+            }
+            const enModelo = rayo.intersectObject(pivote, true)
+                .find(i => i.object.isMesh);
+            if (enModelo) {
+                const local = pivote.worldToLocal(enModelo.point.clone());
+                alClicarRef.current({ pos: [local.x, local.y, local.z] });
+            } else {
+                alClicarRef.current({ vacio: true });
+            }
+        };
+        renderer.domElement.addEventListener('pointerdown', alPulsar);
+        renderer.domElement.addEventListener('pointerup', alSoltar);
+
         /* ---- botón de VR (solo si el visor lo soporta) ---- */
         if (navigator.xr?.isSessionSupported) {
             navigator.xr.isSessionSupported('immersive-vr').then(ok => {
@@ -298,6 +491,8 @@ function EscenaModelo({ modelo, onVolver }) {
             renderer.xr.removeEventListener('sessionstart', onXRStart);
             renderer.xr.removeEventListener('sessionend', onXREnd);
             window.removeEventListener('resize', onResize);
+            renderer.domElement.removeEventListener('pointerdown', alPulsar);
+            renderer.domElement.removeEventListener('pointerup', alSoltar);
             ro.disconnect();
             aLimpiar.forEach(f => { try { f(); } catch (_) {} });
             controles.dispose();
@@ -337,6 +532,136 @@ function EscenaModelo({ modelo, onVolver }) {
         mezclador.stopAllAction();
         if (clipActivo >= 0 && clipsGltf[clipActivo]) mezclador.clipAction(clipsGltf[clipActivo]).reset().play();
     }, [clipActivo, listo]);
+
+    /* ---------- marcadores: se redibujan cuando cambian puntos o modo ---------- */
+    useEffect(() => {
+        const { marcadores } = api.current;
+        if (!marcadores) return;
+
+        // En el reto los marcadores van sin número, para que haya que saberlo.
+        const enReto = modo === 'RETO';
+        marcadores.clear();
+
+        puntos.forEach((p, i) => {
+            const acertado = enReto && reto?.resueltos?.includes(p.id);
+            const color = acertado ? '#22c55e' : enReto ? '#facc15' : '#2dd4bf';
+            const mat = new THREE.SpriteMaterial({
+                map: texturaMarcador(enReto ? null : i + 1, color),
+                depthTest: false, transparent: true,
+            });
+            const sp = new THREE.Sprite(mat);
+            sp.position.set(p.pos[0], p.pos[1], p.pos[2]);
+            sp.scale.setScalar(0.075);
+            sp.renderOrder = 999;
+            sp.userData.idPunto = p.id;
+            marcadores.add(sp);
+        });
+
+        return () => {
+            marcadores.children.forEach(s => { s.material.map?.dispose(); s.material.dispose(); });
+        };
+    }, [puntos, modo, reto?.resueltos, listo]);
+
+    /* ---------- qué hacer al clicar, según el modo ---------- */
+    useEffect(() => {
+        alClicarRef.current = (info) => {
+            // --- Reto: hay que acertar el marcador que toca ---
+            if (modo === 'RETO' && reto && !reto.terminado) {
+                if (!info.idPunto) return;
+                const objetivo = reto.orden[reto.i];
+                const acierto = info.idPunto === objetivo.id;
+                setReto(r => {
+                    const siguiente = r.i + 1;
+                    return {
+                        ...r,
+                        i: siguiente,
+                        aciertos: r.aciertos + (acierto ? 1 : 0),
+                        intentos: r.intentos + 1,
+                        resueltos: acierto ? [...r.resueltos, objetivo.id] : r.resueltos,
+                        ultimo: { acierto, nombre: objetivo.nombre, info: objetivo.info },
+                        terminado: siguiente >= r.orden.length,
+                    };
+                });
+                return;
+            }
+
+            // --- Edición: clic en el modelo = punto nuevo ---
+            if (modo === 'EDITAR') {
+                if (info.idPunto) { setEditando(puntos.find(p => p.id === info.idPunto) || null); return; }
+                if (info.pos) {
+                    setEditando({ id: `p${Date.now().toString(36)}`, nombre: '', info: '', pos: info.pos, nuevo: true });
+                }
+                return;
+            }
+
+            // --- Ver: abrir la ficha del punto ---
+            setSelec(info.idPunto ? puntos.find(p => p.id === info.idPunto) || null : null);
+        };
+    }, [modo, puntos, reto]);
+
+    /* ---------- guardar los puntos ---------- */
+    const guardarPuntos = useCallback(async (nuevos) => {
+        setPuntos(nuevos);
+        setGuardando(true);
+        try {
+            if (conjuntoActivo?.base) {
+                // Conjunto del catálogo: vive dentro del documento del modelo.
+                await guardarPuntosModelo(modelo, nuevos);
+                onPuntosGuardados?.(nuevos);
+            } else if (conjuntoActivo) {
+                const actualizado = await guardarConjuntoEtiquetas({ ...conjuntoActivo, puntos: nuevos });
+                setConjuntos(prev => prev.map(c => (c.id === actualizado.id ? actualizado : c)));
+            }
+        } catch (e) {
+            console.warn('[Visor3D] no se pudieron guardar los puntos:', e);
+            alert('No se han podido guardar las etiquetas: ' + e.message);
+        } finally {
+            setGuardando(false);
+        }
+    }, [modelo, conjuntoActivo, onPuntosGuardados]);
+
+    const aplicarEdicion = (p) => {
+        if (!p.nombre.trim()) return;
+        const limpio = { id: p.id, nombre: p.nombre.trim(), info: (p.info || '').trim(), pos: p.pos };
+        const existe = puntos.some(x => x.id === p.id);
+        guardarPuntos(existe ? puntos.map(x => (x.id === p.id ? limpio : x)) : [...puntos, limpio]);
+        setEditando(null);
+    };
+
+    const borrarPunto = (id) => {
+        guardarPuntos(puntos.filter(p => p.id !== id));
+        setEditando(null);
+    };
+
+    const generarDesdeMallas = () => {
+        const nuevas = mallas
+            .filter(m => !puntos.some(p => p.nombre.toLowerCase() === m.nombre.toLowerCase()))
+            .slice(0, 60)
+            .map((m, i) => ({ id: `m${Date.now().toString(36)}${i}`, nombre: m.nombre, info: '', pos: m.pos }));
+        if (!nuevas.length) { alert('No hay mallas con nombre nuevas que añadir.'); return; }
+        guardarPuntos([...puntos, ...nuevas]);
+    };
+
+    /* ---------- modo reto ---------- */
+    const empezarReto = () => {
+        const mezclado = [...puntos].sort(() => Math.random() - 0.5).slice(0, 10);
+        setSelec(null);
+        setReto({ orden: mezclado, i: 0, aciertos: 0, intentos: 0, resueltos: [], ultimo: null, terminado: false });
+        setModo('RETO');
+    };
+
+    const salirDelReto = () => { setReto(null); setModo('VER'); };
+
+    // Al acabar el reto se guarda el registro local (icono de Pi en la landing).
+    useEffect(() => {
+        if (!reto?.terminado) return;
+        guardarRegistroLocal('VISOR_3D', {
+            titulo: modelo.nombre,
+            aciertos: reto.aciertos,
+            intentos: reto.intentos,
+            via: 'local',
+        });
+    }, [reto?.terminado]);   // eslint-disable-line react-hooks/exhaustive-deps
 
     const resetCamara = () => {
         const { camara, controles, colocarEnEscritorio } = api.current;
@@ -395,6 +720,19 @@ function EscenaModelo({ modelo, onVolver }) {
                         <button style={btn(autoRotar)} onClick={() => setAutoRotar(v => !v)}>🔄 Girar solo</button>
                         <button style={btn(wireframe)} onClick={() => setWireframe(v => !v)}>🕸️ Malla</button>
                         <button style={btn(false)} onClick={resetCamara}>🎯 Centrar</button>
+                        {puntos.length > 0 && modo !== 'RETO' && (
+                            <button style={btn(false)} onClick={empezarReto}>🎯 Modo reto</button>
+                        )}
+                        {modo !== 'RETO' && (
+                            <button style={btn(selector)} onClick={() => setSelector(s => !s)}>
+                                🏷️ {conjuntoActivo ? conjuntoActivo.titulo.slice(0, 16) : 'Etiquetas'}
+                            </button>
+                        )}
+                        {puedeEditar && modo !== 'RETO' && (
+                            <button style={btn(modo === 'EDITAR')} onClick={() => { setModo(m => (m === 'EDITAR' ? 'VER' : 'EDITAR')); setSelec(null); }}>
+                                ✏️ Editar
+                            </button>
+                        )}
                         {clips.length > 0 && (
                             <select value={clipActivo} onChange={e => setClipActivo(Number(e.target.value))}
                                 style={{ padding: '7px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.12)', color: '#e2e8f0', fontSize: '0.78rem', fontWeight: 700 }}>
@@ -428,11 +766,373 @@ function EscenaModelo({ modelo, onVolver }) {
                 </div>
             )}
 
-            {listo && !enVR && (
+            {listo && !enVR && modo === 'VER' && !seleccionado && (
                 <div style={{ position: 'absolute', bottom: 12, right: 12, zIndex: 3, color: '#64748b', fontSize: '0.68rem', textAlign: 'right', pointerEvents: 'none' }}>
-                    Arrastra para girar · rueda para acercar<br />dos dedos para mover
+                    Arrastra para girar · rueda para acercar
+                    {puntos.length > 0 && <><br />Pincha en los números para leer la etiqueta</>}
                 </div>
             )}
+
+            {/* Ficha de una etiqueta (modo ver) */}
+            {seleccionado && modo === 'VER' && (
+                <div style={{ position: 'absolute', right: 12, bottom: 12, zIndex: 4, width: 'min(330px, calc(100% - 24px))',
+                    background: 'rgba(15,23,42,0.94)', color: '#e2e8f0', padding: '14px 16px', borderRadius: 14, backdropFilter: 'blur(6px)' }}>
+                    <button onClick={() => setSelec(null)}
+                        style={{ float: 'right', background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1.1rem', lineHeight: 1 }}>✕</button>
+                    <div style={{ fontWeight: 800, color: '#2dd4bf', fontSize: '1rem', marginBottom: 6 }}>
+                        {puntos.findIndex(p => p.id === seleccionado.id) + 1}. {seleccionado.nombre}
+                    </div>
+                    {seleccionado.info
+                        ? <div style={{ fontSize: '0.84rem', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{seleccionado.info}</div>
+                        : <div style={{ fontSize: '0.8rem', opacity: 0.5 }}>Sin información añadida.</div>}
+                </div>
+            )}
+
+            {/* Selector de conjuntos de etiquetas */}
+            {selector && !enVR && (
+                <SelectorConjuntos
+                    conjuntos={conjuntos} activoId={activoId} uid={uid} esAdmin={esAdmin}
+                    modelo={modelo}
+                    onElegir={cambiarConjunto}
+                    onCrear={crearConjunto}
+                    onRenombrar={renombrarConjunto}
+                    onEliminar={eliminarConjunto}
+                    onCerrar={() => setSelector(false)}
+                />
+            )}
+
+            {/* Panel de edición de etiquetas */}
+            {modo === 'EDITAR' && !enVR && (
+                <PanelEtiquetas
+                    puntos={puntos} mallas={mallas} guardando={guardando}
+                    onEditar={setEditando} onBorrar={borrarPunto}
+                    onGenerar={generarDesdeMallas} onCerrar={() => setModo('VER')}
+                />
+            )}
+
+            {editando && (
+                <FormularioEtiqueta
+                    punto={editando}
+                    onGuardar={aplicarEdicion}
+                    onBorrar={() => borrarPunto(editando.id)}
+                    onCancelar={() => setEditando(null)}
+                />
+            )}
+
+            {/* Modo reto */}
+            {modo === 'RETO' && reto && !enVR && (
+                <PanelReto
+                    reto={reto} modelo={modelo}
+                    onSalir={salirDelReto}
+                    onRepetir={empezarReto}
+                    onEnviar={() => setEnvio(true)}
+                />
+            )}
+
+            {mostrarEnvio && (
+                <ModalEnviarProfe
+                    datos={{ aciertos: reto?.aciertos || 0, intentos: reto?.intentos || 0, titulo: modelo.nombre }}
+                    onClose={() => setEnvio(false)}
+                />
+            )}
+        </div>
+    );
+}
+
+/* ===================================================================== */
+/*  ETIQUETAS: panel, formulario y modo reto                             */
+/* ===================================================================== */
+
+/** Elegir entre los juegos de etiquetas del modelo, o crear el propio. */
+function SelectorConjuntos({ conjuntos, activoId, uid, esAdmin, modelo, onElegir, onCrear, onRenombrar, onEliminar, onCerrar }) {
+    const [renombrando, setRenombrando] = useState(false);
+    const [titulo, setTitulo] = useState('');
+    const activo = conjuntos.find(c => c.id === activoId);
+    const mio = activo && !activo.base && activo.autorUid === uid;
+
+    const compartir = () => {
+        const p = new URLSearchParams();
+        p.set('modelo', modelo.url);
+        if (modelo.nombre) p.set('nombre', modelo.nombre);
+        if (activoId && activoId !== '__base__') p.set('etiquetas', activoId);
+        const url = `${window.location.origin}/visor3d?${p.toString()}`;
+        if (navigator.share) { navigator.share({ title: modelo.nombre, url }).catch(() => {}); return; }
+        navigator.clipboard?.writeText(url).then(() => alert('Enlace copiado (incluye este juego de etiquetas).'));
+    };
+
+    return (
+        <div style={{ position: 'absolute', right: 12, top: 60, zIndex: 5, width: 'min(300px, calc(100% - 24px))',
+            background: 'rgba(15,23,42,0.95)', borderRadius: 14, padding: 12, backdropFilter: 'blur(6px)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ flex: 1, color: '#2dd4bf', fontWeight: 800, fontSize: '0.88rem' }}>🏷️ Juegos de etiquetas</div>
+                <button onClick={onCerrar} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5, maxHeight: 220, overflowY: 'auto', marginBottom: 10 }}>
+                {conjuntos.length === 0 && (
+                    <div style={{ color: '#64748b', fontSize: '0.78rem' }}>Este modelo aún no tiene etiquetas.</div>
+                )}
+                {conjuntos.map(c => {
+                    const esActivo = c.id === activoId;
+                    const esMio = !c.base && c.autorUid === uid;
+                    return (
+                        <button key={c.id} onClick={() => onElegir(c.id)}
+                            style={{ textAlign: 'left', padding: '8px 10px', borderRadius: 10, cursor: 'pointer',
+                                border: esActivo ? '1px solid #2dd4bf' : '1px solid transparent',
+                                background: esActivo ? 'rgba(45,212,191,0.14)' : 'rgba(255,255,255,0.06)' }}>
+                            <div style={{ color: '#e2e8f0', fontSize: '0.82rem', fontWeight: 700 }}>
+                                {c.titulo} {esMio && <span style={{ color: '#2dd4bf', fontSize: '0.68rem' }}>· tuyo</span>}
+                            </div>
+                            <div style={{ color: '#64748b', fontSize: '0.68rem' }}>
+                                {c.puntos?.length || 0} etiquetas · {c.autorNombre || 'anónimo'}
+                                {c.publico === false && ' · privado'}
+                            </div>
+                        </button>
+                    );
+                })}
+            </div>
+
+            {renombrando ? (
+                <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                    <input autoFocus value={titulo} onChange={e => setTitulo(e.target.value)}
+                        placeholder="Nombre del conjunto"
+                        style={{ flex: 1, padding: '7px 9px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.07)', color: '#fff', fontSize: '0.8rem' }} />
+                    <button onClick={() => { onRenombrar(titulo.trim() || activo.titulo); setRenombrando(false); }}
+                        style={{ padding: '7px 11px', borderRadius: 9, border: 'none', background: '#2dd4bf', color: '#0f172a', fontWeight: 800, cursor: 'pointer', fontSize: '0.78rem' }}>OK</button>
+                </div>
+            ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <button onClick={() => onCrear(false)}
+                        style={{ padding: '8px 10px', borderRadius: 10, border: 'none', background: '#2dd4bf', color: '#0f172a', fontWeight: 800, fontSize: '0.78rem', cursor: 'pointer' }}>
+                        ➕ Crear mis etiquetas
+                    </button>
+                    {conjuntos.some(c => c.puntos?.length) && (
+                        <button onClick={() => onCrear(true)}
+                            style={{ padding: '8px 10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.18)', background: 'transparent', color: '#cbd5e1', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer' }}>
+                            ⧉ Copiar estas y adaptarlas
+                        </button>
+                    )}
+                    <button onClick={compartir}
+                        style={{ padding: '8px 10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.18)', background: 'transparent', color: '#cbd5e1', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer' }}>
+                        🔗 Compartir con estas etiquetas
+                    </button>
+                    {(mio || (esAdmin && activo && !activo.base)) && (
+                        <div style={{ display: 'flex', gap: 6 }}>
+                            <button onClick={() => { setTitulo(activo.titulo); setRenombrando(true); }}
+                                style={{ flex: 1, padding: '7px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: '#94a3b8', fontSize: '0.75rem', cursor: 'pointer' }}>✏️ Renombrar</button>
+                            <button onClick={onEliminar}
+                                style={{ padding: '7px 10px', borderRadius: 9, border: 'none', background: 'rgba(248,113,113,0.18)', color: '#fca5a5', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}>🗑</button>
+                        </div>
+                    )}
+                    {!uid && <div style={{ color: '#fbbf24', fontSize: '0.7rem', lineHeight: 1.4 }}>Inicia sesión para crear tus propias etiquetas.</div>}
+                </div>
+            )}
+        </div>
+    );
+}
+
+function PanelEtiquetas({ puntos, mallas, guardando, onEditar, onBorrar, onGenerar, onCerrar }) {
+    const sinMallas = mallas.filter(m => !puntos.some(p => p.nombre.toLowerCase() === m.nombre.toLowerCase())).length;
+
+    return (
+        <div style={{ position: 'absolute', left: 12, top: 60, zIndex: 4, width: 'min(300px, calc(100% - 24px))', maxHeight: 'calc(100% - 140px)',
+            background: 'rgba(15,23,42,0.93)', borderRadius: 14, padding: 12, backdropFilter: 'blur(6px)', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ flex: 1, color: '#2dd4bf', fontWeight: 800, fontSize: '0.88rem' }}>🏷️ Etiquetas</div>
+                {guardando && <span style={{ color: '#64748b', fontSize: '0.7rem', marginRight: 6 }}>guardando…</span>}
+                <button onClick={onCerrar} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
+            </div>
+
+            <p style={{ color: '#94a3b8', fontSize: '0.74rem', margin: '0 0 10px', lineHeight: 1.5 }}>
+                Pincha sobre el modelo para poner una etiqueta nueva, o sobre un número para editarla.
+            </p>
+
+            {sinMallas > 0 && (
+                <button onClick={onGenerar}
+                    style={{ padding: '8px 10px', borderRadius: 10, border: '1px dashed rgba(45,212,191,0.5)', background: 'transparent', color: '#2dd4bf', fontWeight: 700, fontSize: '0.76rem', cursor: 'pointer', marginBottom: 10 }}>
+                    ✨ Crear {sinMallas} desde las piezas del modelo
+                </button>
+            )}
+
+            <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                {puntos.length === 0 && <div style={{ color: '#64748b', fontSize: '0.78rem' }}>Todavía no hay etiquetas.</div>}
+                {puntos.map((p, i) => (
+                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.06)', borderRadius: 9, padding: '7px 9px' }}>
+                        <span style={{ background: '#2dd4bf', color: '#0f172a', width: 20, height: 20, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 800, flexShrink: 0 }}>{i + 1}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ color: '#e2e8f0', fontSize: '0.8rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.nombre}</div>
+                            {!p.info && <div style={{ color: '#fbbf24', fontSize: '0.64rem' }}>sin información</div>}
+                        </div>
+                        <button onClick={() => onEditar(p)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: '0.8rem' }}>✏️</button>
+                        <button onClick={() => onBorrar(p.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#f87171', fontSize: '0.8rem' }}>🗑</button>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function FormularioEtiqueta({ punto, onGuardar, onBorrar, onCancelar }) {
+    const [p, setP] = useState(punto);
+    useEffect(() => { setP(punto); }, [punto]);
+
+    const campo = { width: '100%', padding: '9px 11px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.07)', color: '#fff', fontSize: '0.88rem', boxSizing: 'border-box', fontFamily: 'inherit' };
+    const etiqueta = { color: '#94a3b8', fontSize: '0.73rem', fontWeight: 700, display: 'block', marginBottom: 4 };
+
+    return (
+        <div onClick={onCancelar} style={{ position: 'fixed', inset: 0, zIndex: 10001, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+            <div onClick={e => e.stopPropagation()} style={{ background: '#1e293b', borderRadius: 16, padding: 22, width: '100%', maxWidth: 440 }}>
+                <h3 style={{ color: '#fff', margin: '0 0 14px', fontSize: '1rem' }}>
+                    {p.nuevo ? '🏷️ Nueva etiqueta' : '✏️ Editar etiqueta'}
+                </h3>
+
+                <div style={{ marginBottom: 12 }}>
+                    <label style={etiqueta}>Etiqueta (lo que se ve al pinchar)</label>
+                    <input autoFocus style={campo} value={p.nombre}
+                        onChange={e => setP(prev => ({ ...prev, nombre: e.target.value }))}
+                        placeholder="Bíceps braquial" />
+                </div>
+
+                <div>
+                    <label style={etiqueta}>Información extra</label>
+                    <textarea style={{ ...campo, minHeight: 110, resize: 'vertical' }} value={p.info || ''}
+                        onChange={e => setP(prev => ({ ...prev, info: e.target.value }))}
+                        placeholder="Flexiona el codo y supina el antebrazo. Se inserta en…" />
+                </div>
+
+                <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+                    <button onClick={() => onGuardar(p)} disabled={!p.nombre.trim()}
+                        style={{ padding: '10px 18px', borderRadius: 10, border: 'none', background: p.nombre.trim() ? '#2dd4bf' : 'rgba(255,255,255,0.12)', color: p.nombre.trim() ? '#0f172a' : '#64748b', fontWeight: 800, cursor: p.nombre.trim() ? 'pointer' : 'default' }}>Guardar</button>
+                    <button onClick={onCancelar}
+                        style={{ padding: '10px 18px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: '#cbd5e1', fontWeight: 700, cursor: 'pointer' }}>Cancelar</button>
+                    {!p.nuevo && (
+                        <button onClick={onBorrar}
+                            style={{ marginLeft: 'auto', padding: '10px 14px', borderRadius: 10, border: 'none', background: 'rgba(248,113,113,0.18)', color: '#fca5a5', fontWeight: 700, cursor: 'pointer' }}>🗑 Borrar</button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function PanelReto({ reto, modelo, onSalir, onRepetir, onEnviar }) {
+    const { orden, i, aciertos, intentos, ultimo, terminado } = reto;
+    const pct = intentos ? Math.round((aciertos / intentos) * 100) : 0;
+
+    if (terminado) return (
+        <div style={{ position: 'absolute', inset: 0, zIndex: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(15,23,42,0.85)', padding: 16 }}>
+            <div style={{ background: '#1e293b', borderRadius: 18, padding: 26, textAlign: 'center', maxWidth: 380, width: '100%' }}>
+                <div style={{ fontSize: '2.6rem' }}>{pct >= 80 ? '🏆' : pct >= 50 ? '👏' : '💪'}</div>
+                <h3 style={{ color: '#fff', margin: '8px 0 4px' }}>{aciertos} de {intentos}</h3>
+                <p style={{ color: '#94a3b8', fontSize: '0.86rem', margin: '0 0 18px' }}>{modelo.nombre} · {pct}% de aciertos</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                    <button onClick={onEnviar} style={{ padding: '11px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#f1c40f,#e67e22)', color: '#fff', fontWeight: 800, cursor: 'pointer' }}>📤 Enviar al profesor</button>
+                    <button onClick={onRepetir} style={{ padding: '11px', borderRadius: 12, border: 'none', background: '#2dd4bf', color: '#0f172a', fontWeight: 800, cursor: 'pointer' }}>🔁 Otra vez</button>
+                    <button onClick={onSalir} style={{ padding: '11px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: '#cbd5e1', fontWeight: 700, cursor: 'pointer' }}>Volver a explorar</button>
+                </div>
+            </div>
+        </div>
+    );
+
+    return (
+        <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', top: 12, zIndex: 4, width: 'min(420px, calc(100% - 24px))',
+            background: 'rgba(15,23,42,0.93)', borderRadius: 14, padding: '12px 16px', backdropFilter: 'blur(6px)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                <span style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 700 }}>{i + 1}/{orden.length}</span>
+                <span style={{ flex: 1, color: '#22c55e', fontSize: '0.72rem', fontWeight: 700 }}>✓ {aciertos}</span>
+                <button onClick={onSalir} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '0.95rem' }}>✕</button>
+            </div>
+            <div style={{ color: '#e2e8f0', fontSize: '0.95rem', fontWeight: 700 }}>
+                ¿Dónde está <span style={{ color: '#2dd4bf' }}>{orden[i]?.nombre}</span>?
+            </div>
+            <div style={{ color: '#64748b', fontSize: '0.72rem', marginTop: 3 }}>Gira el modelo y pincha el marcador correcto.</div>
+            {ultimo && (
+                <div style={{ marginTop: 9, paddingTop: 9, borderTop: '1px solid rgba(255,255,255,0.1)', fontSize: '0.78rem', color: ultimo.acierto ? '#22c55e' : '#f87171' }}>
+                    {ultimo.acierto ? '✅ ¡Bien!' : `❌ Ese no era: ${ultimo.nombre}`}
+                    {ultimo.info && <div style={{ color: '#94a3b8', marginTop: 3, lineHeight: 1.5 }}>{ultimo.info}</div>}
+                </div>
+            )}
+        </div>
+    );
+}
+
+/** Envío del resultado del reto al profesor (colección informes_juegos). */
+function ModalEnviarProfe({ datos, onClose }) {
+    const [codigo, setCodigo] = useState('');
+    const [nombre, setNombre] = useState('');
+    const [curso, setCurso]   = useState('');
+    const [enviando, setEnviando] = useState(false);
+    const [enviado, setEnviado]   = useState(false);
+    const [error, setError]       = useState('');
+
+    const enviar = async () => {
+        const code = codigo.trim().toUpperCase();
+        if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+        if (!code)          { setError('Escribe el código del profesor.'); return; }
+        setEnviando(true); setError('');
+        try {
+            const snap = await getDoc(doc(db, 'codigos_profesor', code));
+            if (!snap.exists()) { setError('Código no encontrado.'); setEnviando(false); return; }
+            const porcentaje = Math.round((datos.aciertos / Math.max(1, datos.intentos)) * 100);
+            await addDoc(collection(db, 'informes_juegos'), {
+                tipo: 'VISOR_3D',
+                modalidad: 'Individual',
+                fecha: new Date(),
+                codigoProfesor: code,
+                modelo: datos.titulo || '',
+                jugadores: [{
+                    nombre: nombre.trim(),
+                    curso: curso.trim(),
+                    aciertos: datos.aciertos,
+                    intentos: datos.intentos,
+                    porcentaje,
+                    modelo: datos.titulo || '',
+                }],
+            });
+            guardarRegistroLocal('VISOR_3D', {
+                titulo: datos.titulo, aciertos: datos.aciertos, intentos: datos.intentos,
+                nombre: nombre.trim(), curso: curso.trim(), via: 'profesor',
+            });
+            setEnviado(true);
+        } catch (e) { setError('Error: ' + e.message); }
+        setEnviando(false);
+    };
+
+    const inp = { padding: '9px 12px', borderRadius: 9, border: '1.5px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: 'white', fontSize: '0.9rem', outline: 'none', width: '100%', boxSizing: 'border-box', fontFamily: 'inherit' };
+    const lab = { fontSize: '0.78rem', color: '#aaa', fontWeight: 600, display: 'block', marginBottom: 4 };
+
+    return (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 10002, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
+            <div style={{ background: '#1e272e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, width: '100%', maxWidth: 380, padding: '26px 28px', color: 'white' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                    <h3 style={{ margin: 0, fontSize: '1.05rem', color: '#f1c40f' }}>📤 Enviar al profesor</h3>
+                    <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#aaa', fontSize: '1.2rem' }}>✕</button>
+                </div>
+                {enviado ? (
+                    <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                        <div style={{ fontSize: '3rem' }}>✅</div>
+                        <div style={{ color: '#2ecc71', fontWeight: 700 }}>¡Informe enviado!</div>
+                        <div style={{ color: '#aaa', fontSize: '0.88rem', marginTop: 8 }}>{datos.aciertos}/{datos.intentos} aciertos</div>
+                        <button onClick={onClose} style={{ marginTop: 16, padding: '9px 22px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer', color: 'white' }}>Cerrar</button>
+                    </div>
+                ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        <div><label style={lab}>Nombre y apellido</label>
+                            <input value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Tu nombre completo" style={inp} /></div>
+                        <div><label style={lab}>Curso</label>
+                            <input value={curso} onChange={e => setCurso(e.target.value)} placeholder="Ej: 3º ESO B" style={inp} /></div>
+                        <div><label style={lab}>Código del profesor</label>
+                            <input value={codigo} onChange={e => setCodigo(e.target.value.toUpperCase())} placeholder="Ej: PROF01" maxLength={10} style={{ ...inp, letterSpacing: 2, fontWeight: 700 }} /></div>
+                        {error && <div style={{ color: '#e74c3c', fontSize: '0.8rem' }}>⚠ {error}</div>}
+                        <div style={{ display: 'flex', gap: 9, marginTop: 4 }}>
+                            <button onClick={onClose} style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', cursor: 'pointer', color: 'white' }}>Cancelar</button>
+                            <button onClick={enviar} disabled={enviando} style={{ flex: 2, padding: '10px', borderRadius: 10, border: 'none', background: enviando ? '#555' : 'linear-gradient(135deg,#3498db,#2980b9)', color: 'white', fontWeight: 700, cursor: enviando ? 'default' : 'pointer' }}>
+                                {enviando ? 'Enviando…' : '📤 Enviar'}
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
@@ -460,8 +1160,18 @@ export default function Visor3D({ onExit, modeloInicial = null, usuario = null }
     const [form, setForm]           = useState(false);
     const [admin, setAdmin]         = useState(false);
     const [copiado, setCopiado]     = useState(false);
+    // Juego de etiquetas indicado en el enlace compartido (?etiquetas=<id>).
+    const [etiquetasUrl] = useState(() => {
+        try { return new URLSearchParams(window.location.search).get('etiquetas'); } catch (_) { return null; }
+    });
 
-    const email = usuario?.email || auth.currentUser?.email || '';
+    // Firebase restaura la sesión de forma asíncrona: si se lee auth.currentUser
+    // en el primer render (entrar directo a /visor3d o recargar) todavía es null
+    // y el admin no se reconocería. Por eso escuchamos el cambio de sesión.
+    const [usuarioAuth, setUsuarioAuth] = useState(() => auth.currentUser);
+    useEffect(() => onAuthStateChanged(auth, setUsuarioAuth), []);
+
+    const email = usuario?.email || usuarioAuth?.email || '';
     const esAdmin = email === ADMIN_EMAIL;
 
     const recargarPublicados = useCallback(() => {
@@ -489,6 +1199,16 @@ export default function Visor3D({ onExit, modeloInicial = null, usuario = null }
         });
     }, [modeloInicial]);
 
+    // Un enlace compartido solo lleva la URL del .glb, no las etiquetas. Cuando
+    // llega el catálogo publicado, se las añadimos buscando por esa URL.
+    useEffect(() => {
+        if (!modelo || modelo.puntos || !publicados.length) return;
+        const ficha = publicados.find(p => p.url === modelo.url);
+        if (ficha?.puntos?.length) {
+            setModelo(m => ({ ...m, id: ficha.id, publicado: true, puntos: ficha.puntos }));
+        }
+    }, [publicados, modelo?.url]);   // eslint-disable-line react-hooks/exhaustive-deps
+
     const abrir = (m) => {
         setModelo(m);
         window.history.pushState({}, '', `/visor3d?${enlaceDe(m)}`);
@@ -505,7 +1225,22 @@ export default function Visor3D({ onExit, modeloInicial = null, usuario = null }
         navigator.clipboard?.writeText(url).then(() => { setCopiado(true); setTimeout(() => setCopiado(false), 2000); });
     };
 
-    if (modelo) return <EscenaModelo modelo={modelo} onVolver={volverGaleria} />;
+    // Los modelos los publica el admin, pero cada profesor puede tener su
+    // propio juego de etiquetas: eso se decide dentro de la escena.
+    if (modelo) return (
+        <EscenaModelo
+            modelo={modelo}
+            esAdmin={esAdmin}
+            usuarioActual={usuarioAuth}
+            etiquetasIniciales={etiquetasUrl}
+            onPuntosGuardados={(p) => {
+                setModelo(m => ({ ...m, puntos: p }));
+                if (modelo.publicado) recargarPublicados();
+                else setLocales(leerModelosLocales());
+            }}
+            onVolver={volverGaleria}
+        />
+    );
 
     if (admin) return (
         <PanelAdminCloudinary
@@ -571,7 +1306,22 @@ export default function Visor3D({ onExit, modeloInicial = null, usuario = null }
                     ? <FormularioModelo
                         esAdmin={esAdmin}
                         onCancelar={() => setForm(false)}
-                        onGuardar={(m) => { setLocales(guardarModeloLocal(m)); setForm(false); }} />
+                        onGuardar={async (m, alCatalogo) => {
+                            if (alCatalogo) {
+                                // Admin: va al catálogo de Firestore y lo ve todo el mundo.
+                                try {
+                                    await publicarModelo(m);
+                                    recargarPublicados();
+                                } catch (e) {
+                                    alert('Se subió a Cloudinary, pero no se pudo publicar: ' + e.message
+                                        + '\n\nQueda guardado en este navegador.');
+                                    setLocales(guardarModeloLocal(m));
+                                }
+                            } else {
+                                setLocales(guardarModeloLocal(m));
+                            }
+                            setForm(false);
+                        }} />
                     : <div style={{ textAlign: 'center', display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
                         <button onClick={() => setForm(true)}
                             style={{ padding: '12px 22px', borderRadius: 12, border: 'none', background: '#2dd4bf', color: '#0f172a', fontWeight: 800, cursor: 'pointer', fontSize: '0.95rem' }}>
@@ -603,6 +1353,8 @@ function FormularioModelo({ onGuardar, onCancelar, esAdmin = false }) {
     const [fuente, setFuente]     = useState('');
     const [descripcion, setDesc]  = useState('');
     const [escalaReal, setEscala] = useState('');
+    const [publicId, setPublicId] = useState('');
+    const [publicar, setPublicar] = useState(esAdmin);
     const [subiendo, setSubiendo] = useState(false);
     const [progreso, setProg]     = useState(0);
     const [error, setError]       = useState(null);
@@ -617,8 +1369,9 @@ function FormularioModelo({ onGuardar, onCancelar, esAdmin = false }) {
             const subida = esAdmin
                 ? subirModeloFirmado(file, { idToken: await auth.currentUser.getIdToken(), onProgress: setProg })
                 : subirModelo(file, { onProgress: setProg });
-            const { url: secure } = await subida;
+            const { url: secure, publicId: pid } = await subida;
             setUrl(secure);
+            setPublicId(pid || '');
             setNombre(prev => prev || file.name.replace(/\.(glb|gltf)$/i, ''));
         } catch (err) {
             setError(err.message);
@@ -636,7 +1389,33 @@ function FormularioModelo({ onGuardar, onCancelar, esAdmin = false }) {
             id: `local_${Date.now()}`, nombre: nombre.trim(), url: url.trim(), emoji: emoji || '🧊',
             categoria, autor: autor.trim(), licencia: licencia.trim(), fuente: fuente.trim(),
             descripcion: descripcion.trim(), escalaReal: Number(escalaReal) || 0,
-        });
+            publicId,
+        }, publicar && esAdmin);
+    };
+
+    // Trae nombre, autor y licencia de Sketchfab sin descargar el modelo:
+    // útil cuando el archivo se ha optimizado y subido a mano.
+    const traerFicha = async () => {
+        if (!fuente.trim()) return;
+        setError(null);
+        try {
+            const idToken = await auth.currentUser.getIdToken();
+            const r = await fetch('/api/sketchfab', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+                body: JSON.stringify({ enlace: fuente.trim(), soloInfo: true }),
+            });
+            const data = await r.json();
+            const f = data.ficha;
+            if (!f) throw new Error(data?.error || 'No he podido leer los datos de ese modelo.');
+            setNombre(prev => prev || f.nombre);
+            setAutor(f.autor || '');
+            setLic(f.licencia || '');
+            setFuente(f.fuente || fuente);
+            setDesc(prev => prev || f.descripcion || '');
+        } catch (e) {
+            setError(e.message);
+        }
     };
 
     const campo = { width: '100%', padding: '9px 11px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.07)', color: '#fff', fontSize: '0.86rem', boxSizing: 'border-box' };
@@ -683,9 +1462,27 @@ function FormularioModelo({ onGuardar, onCancelar, esAdmin = false }) {
                 <div><label style={etiqueta}>Tamaño real en VR (m, opcional)</label><input style={campo} value={escalaReal} onChange={e => setEscala(e.target.value)} placeholder="0.2" /></div>
                 <div><label style={etiqueta}>Autor (atribución)</label><input style={campo} value={autor} onChange={e => setAutor(e.target.value)} placeholder="Autor del modelo" /></div>
                 <div><label style={etiqueta}>Licencia</label><input style={campo} value={licencia} onChange={e => setLic(e.target.value)} /></div>
-                <div style={{ gridColumn: '1 / -1' }}><label style={etiqueta}>Enlace de origen (Sketchfab)</label><input style={campo} value={fuente} onChange={e => setFuente(e.target.value)} placeholder="https://sketchfab.com/3d-models/…" /></div>
+                <div style={{ gridColumn: '1 / -1' }}>
+                    <label style={etiqueta}>Enlace de origen (Sketchfab)</label>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <input style={campo} value={fuente} onChange={e => setFuente(e.target.value)} placeholder="https://skfb.ly/…" />
+                        {esAdmin && (
+                            <button onClick={traerFicha} disabled={!fuente.trim()} title="Rellenar autor y licencia desde Sketchfab"
+                                style={{ padding: '9px 14px', borderRadius: 10, border: '1px solid rgba(45,212,191,0.5)', background: 'transparent', color: '#2dd4bf', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontSize: '0.8rem' }}>
+                                ⬇️ Datos
+                            </button>
+                        )}
+                    </div>
+                </div>
                 <div style={{ gridColumn: '1 / -1' }}><label style={etiqueta}>Descripción para el alumno</label><input style={campo} value={descripcion} onChange={e => setDesc(e.target.value)} /></div>
             </div>
+
+            {esAdmin && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#e2e8f0', fontSize: '0.82rem', marginTop: 14, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={publicar} onChange={e => setPublicar(e.target.checked)} />
+                    Publicar en el catálogo (lo verán todos los usuarios)
+                </label>
+            )}
 
             {error && <p style={{ color: '#f87171', fontSize: '0.8rem', marginTop: 12 }}>⚠️ {error}</p>}
 

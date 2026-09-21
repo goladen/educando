@@ -103,11 +103,13 @@ export default async function handler(req, res) {
     if (!creds) return res.status(500).json({ error: 'Cloudinary no está configurado en el servidor.' });
 
     const token = process.env.SKETCHFAB_API_TOKEN;
-    if (!token) {
+    const { enlace, carpeta = 'modelos3d', soloInfo = false } = req.body || {};
+
+    // Los metadatos son públicos; solo la descarga necesita el token. Por eso
+    // la comprobación va más abajo: así `soloInfo` funciona sin configurarlo.
+    if (!token && !soloInfo) {
         return res.status(500).json({ error: 'Falta SKETCHFAB_API_TOKEN en el servidor (Sketchfab → Settings → Password & API → API Token).' });
     }
-
-    const { enlace, carpeta = 'modelos3d', soloInfo = false } = req.body || {};
 
     try {
         const uid = await resolverUid(enlace);

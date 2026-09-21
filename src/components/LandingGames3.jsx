@@ -21,6 +21,7 @@ import PikatronRun from '../PikatronRun';
 import BunkerDisparo from '../BunkerDisparo';
 import JuegoCalamar from '../JuegoCalamar';
 import EnigmicLogic from '../EnigmicLogic';
+import Visor3D from '../Visor3D';
 import TextWordleGame from '../TextWordleGame';
 import MathWordleGame from '../MathWordleGame';
 import SopaDeLetrasGame from '../SopaDeLetrasGame';
@@ -633,6 +634,17 @@ export const APPS = [
         shareable: true
     },
     {
+        id: 'VISOR_3D',
+        name: 'Visor_3D',
+        desc: 'Explora modelos 3D descargables, también con gafas de realidad virtual.',
+        color: '#0d9488',
+        emoji: '🧊',
+        isSpecial: false,
+        isHerramienta: true,
+        shareable: true,
+        shareUrl: `${typeof window !== 'undefined' ? window.location.origin : ''}/visor3d`
+    },
+    {
         id: 'MATH_WORLD_PORTAL',
         name: 'Math World',
         desc: 'Entra a la zona exclusiva de aplicaciones matemáticas.',
@@ -732,6 +744,14 @@ export const APPS = [
 
 // --- CATÁLOGO DE INFORMACIÓN POR JUEGO/HERRAMIENTA ---
 export const GAME_INFO = {
+    VISOR_3D: {
+        descripcion: 'Visor de modelos 3D para clase. El alumno gira, acerca y examina piezas reales (un cráneo, una máquina, un templo) arrastrando con el ratón o el dedo, y puede ver la malla de triángulos o reproducir las animaciones que traiga el modelo. Con unas gafas de realidad virtual (Quest y similares) se entra en modo inmersivo: el modelo aparece flotando delante y se agarra, se gira y se agranda con los mandos. El profesor añade modelos descargados de Sketchfab subiéndolos a Cloudinary o pegando su URL, y comparte cada uno con un enlace que funciona sin registrarse.',
+        tipoPreguntas: 'No tiene preguntas: es una herramienta de exploración y observación. Se puede combinar con EtiquetaMe o Q-Sender para que el alumno responda sobre lo que ha observado.',
+        biblioteca: 'Galería propia: los modelos fijos del centro más los que añada el profesor en su navegador. Formato admitido: .glb / .gltf (en Sketchfab, "Download 3D model → Autoconverted format → glTF"). Cada modelo muestra autor y licencia, como exigen las licencias Creative Commons.',
+        multiplayer: 'Individual. También sirve para proyectar en clase y explorar en gran grupo, o para pasar las gafas de VR por turnos.',
+        materias: ['Universal', 'Biología y Geología', 'Ciencias Sociales', 'Historia', 'Tecnología', 'Plástica'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
     PASAPALABRA: {
         descripcion: 'Juego de vocabulario tipo concurso televisivo. El alumno debe adivinar una palabra por cada letra del abecedario usando la pista dada. Ideal para repasar vocabulario de cualquier materia.',
         tipoPreguntas: 'Definiciones o pistas que llevan a una palabra (una por cada letra del abecedario). El profesor crea las preguntas desde el Panel Docente.',
@@ -1624,6 +1644,8 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                 setZonaActiva('MATH'); setSubzonaMath(null); setJuegoActivo(null);
             } else if (path === 'arkade') {
                 setJuegoActivo({ tipoJuego: 'ARKADE' });
+            } else if (path === 'visor3d') {
+                setVisor3dApp(true);
             } else if (path === 'calamar') {
                 setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'CALAMAR' });
             } else if (path === '' || path === 'inicio') {
@@ -1702,6 +1724,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
     const [quienHistoricoApp,   setQuienHistoricoApp]   = useState(false);
     const [pizarraApp,          setPizarraApp]          = useState(false);
     const [biologiaApp,         setBiologiaApp]         = useState(false);
+    const [visor3dApp,          setVisor3dApp]          = useState(false);
     const [gestionAula,         setGestionAula]         = useState(() => { const p = new URLSearchParams(window.location.search); return !!(p.get('gestion') || p.get('pizarra')); });
     const [vistasDidricas,      setVistasDidricas]      = useState(false);
     const [situacionesAprendizaje, setSituacionesAprendizaje] = useState(false);
@@ -1986,6 +2009,12 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
         }
         if (appId === 'MANSION_PITAGORICA') {
             setJuegoActivo({ tipoJuego: 'MANSION_PITAGORICA' });
+            return;
+        }
+
+        if (appId === 'VISOR_3D') {
+            window.history.pushState({}, '', '/visor3d');
+            setVisor3dApp(true);
             return;
         }
 
@@ -2279,6 +2308,10 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, overflowY: 'auto' }}>
             <ImperiosGame onBack={() => { setImperiosApp(false); window.history.pushState({}, '', '/'); }} />
         </div>
+    );
+
+    if (visor3dApp) return (
+        <Visor3D usuario={usuario} onExit={() => { setVisor3dApp(false); window.history.pushState({}, '', '/'); }} />
     );
 
     if (comunidadesApp) return (
@@ -3447,6 +3480,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                     { id: 'SIMULADORES_FISICA', label: 'Física y Química', emoji: '🔭', color: '#e74c3c', action: () => { setSimuladoresFisica(true); window.history.pushState({}, '', '/fisica'); }, shareable: true, shareUrl: `${window.location.origin}/fisica` },
                     { id: 'ROBOTICA_BLOQUES', label: 'Programación y robótica', emoji: '🤖', color: '#0EA5E9', action: () => setJuegoActivo({ tipoJuego: 'ROBOTICA_BLOQUES' }), shareable: true, shareUrl: `${window.location.origin}${window.location.pathname}?juego=robotica_bloques` },
                     { id: 'SITUACIONES_APRENDIZAJE', label: 'Situaciones de Aprendizaje', emoji: '🌱', color: '#15803d', action: () => setSituacionesAprendizaje(true), shareable: true, shareUrl: `${window.location.origin}${window.location.pathname}?juego=situaciones_aprendizaje` },
+                    { id: 'VISOR_3D', label: 'Visor 3D', emoji: '🧊', color: '#0d9488', action: () => { setVisor3dApp(true); window.history.pushState({}, '', '/visor3d'); }, shareable: true, shareUrl: `${window.location.origin}/visor3d` },
                 ].map(tool => (
                     <div key={tool.id} onClick={tool.action} style={{ background: '#ffffbf', borderRadius: '15px', padding: '15px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transition: 'transform 0.2s', border: `2px solid ${tool.color}20`, position: 'relative' }}
                         onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-3px)'}

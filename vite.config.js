@@ -46,6 +46,43 @@ function geminiDevPlugin() {
   };
 }
 
+// Plugin que emula /api/cloudinary en desarrollo (equivalente a la Vercel function).
+// Reutiliza el mismo handler para no duplicar la lógica de autenticación.
+function cloudinaryDevPlugin() {
+  return {
+    name: 'cloudinary-dev-api',
+    configureServer(server) {
+      server.middlewares.use('/api/cloudinary', async (req, res) => {
+        if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
+        if (req.method !== 'POST') { res.writeHead(405); res.end('Method not allowed'); return; }
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', async () => {
+          try {
+            const { default: handler } = await import('./api/cloudinary.js');
+            req.body = body ? JSON.parse(body) : {};
+            // Adaptador mínimo del objeto `res` de Vercel sobre el de Node.
+            const shim = {
+              setHeader: (k, v) => res.setHeader(k, v),
+              status(code) {
+                this._code = code;
+                return {
+                  json: (data) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(data)); },
+                  end:  () => { res.writeHead(code); res.end(); },
+                };
+              },
+            };
+            await handler(req, shim);
+          } catch (e) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: e.message }));
+          }
+        });
+      });
+    },
+  };
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   build: {
@@ -88,6 +125,7 @@ export default defineConfig({
   },
   plugins: [
     geminiDevPlugin(),
+    cloudinaryDevPlugin(),
     react(),
     VitePWA({
       registerType: 'autoUpdate',

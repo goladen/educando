@@ -4,6 +4,8 @@ import { collection, addDoc, doc, getDoc, setDoc, onSnapshot, updateDoc, increme
 import correctSoundFile from '../assets/correct-choice-43861.mp3';
 import wrongSoundFile   from '../assets/negative_beeps-6008.mp3';
 import { CompeticionCuerda } from './TironCuerdaEscena';
+import ModalEnviarCompeticion from './ModalEnviarCompeticion';
+import { leerRetoUrl } from '../utils/retoLink';
 
 const WORLD_URL    = 'https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson';
 const ESP_PROV_URL = 'https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/spain-provinces.geojson';
@@ -334,8 +336,8 @@ const ELEMENTOS_GEO = [
 ];
 
 // ── Config ────────────────────────────────────────────────────────────────────
-const CONTINENTES    = ['Todo el mundo', 'Europa', 'América', 'África', 'Asia', 'Oceanía'];
-const AMBITOS_FISICO = ['España', 'Europa', 'América', 'África', 'Asia', 'Oceanía', 'Todo el mundo'];
+export const CONTINENTES    = ['Todo el mundo', 'Europa', 'América', 'África', 'Asia', 'Oceanía'];
+export const AMBITOS_FISICO = ['España', 'Europa', 'América', 'África', 'Asia', 'Oceanía', 'Todo el mundo'];
 const N_PREGUNTAS    = 10;
 const TIEMPO         = 20;
 
@@ -677,17 +679,20 @@ function PanelGeoCompeticion({ aplicar, bloqueado, equipo, tipo = 'mix', ambito 
 }
 
 function GeografiaAppInner({ onBack, onCreateLive, onJoinLive }) {
+  // Reto por enlace: configuración fija (y, si viene de una competición, envío allí)
+  const [reto] = useState(() => leerRetoUrl());
+  const esRetoCompeticion = !!(reto && reto.compId && reto.catId);
   const [pantalla,          setPantalla]          = useState('intro');
   const [tipoComp,          setTipoComp]          = useState('mix'); // tipo de pregunta en competición
   const [worldReady,        setWorldReady]        = useState(!!_worldCache); // geojson cargado (para siluetas)
   const [espReady,          setEspReady]          = useState(!!_espCache);   // geojson provincias ESP
   const [ambitoComp,        setAmbitoComp]        = useState('Todo el mundo'); // ámbito de la competición
-  const [modoJuego,         setModoJuego]         = useState('mundo');
-  const [continente,        setContinente]        = useState('Europa');
-  const [ambitoFisico,      setAmbitoFisico]      = useState('España');
-  const [tipoFisico,        setTipoFisico]        = useState('mixto');
-  const [tipoPreguntaBandera, setTipoPreguntaBandera] = useState('nombre');
-  const [modo,              setModo]              = useState('seleccionar');
+  const [modoJuego,         setModoJuego]         = useState(reto?.config?.modoJuego || 'mundo');
+  const [continente,        setContinente]        = useState(reto?.config?.continente || 'Europa');
+  const [ambitoFisico,      setAmbitoFisico]      = useState(reto?.config?.ambitoFisico || 'España');
+  const [tipoFisico,        setTipoFisico]        = useState(reto?.config?.tipoFisico || 'mixto');
+  const [tipoPreguntaBandera, setTipoPreguntaBandera] = useState(reto?.config?.tipoPreguntaBandera || 'nombre');
+  const [modo,              setModo]              = useState(reto?.config?.modo || 'seleccionar');
   const [worldFeats,        setWorldFeats]        = useState(null);
   const [espFeats,          setEspFeats]          = useState(null);
   const [cargando,          setCargando]          = useState(false);
@@ -866,12 +871,13 @@ function GeografiaAppInner({ onBack, onCreateLive, onJoinLive }) {
     }, 1600);
   }, [idx, preguntas]);
 
+  const nPreguntasReto = Number(reto?.config?.nPreguntas) || N_PREGUNTAS;
   const iniciarTest = () => {
     let qs;
     if (modoJuego === 'banderas') {
       const pool = getPoolBanderas(continente);
       if (pool.length < 4) return;
-      qs = shuffle(pool).slice(0, Math.min(N_PREGUNTAS, pool.length)).map(p => {
+      qs = shuffle(pool).slice(0, Math.min(nPreguntasReto, pool.length)).map(p => {
         const preguntaTipo = tipoPreguntaBandera === 'mixto'
           ? (Math.random() > 0.5 ? 'nombre' : 'capital')
           : tipoPreguntaBandera;
@@ -886,11 +892,11 @@ function GeografiaAppInner({ onBack, onCreateLive, onJoinLive }) {
     } else if (modoJuego === 'fisico') {
       const pool = getPoolFisico(ambitoFisico, tipoFisico);
       if (pool.length < 2) return;
-      qs = shuffle(pool).slice(0, Math.min(N_PREGUNTAS, pool.length));
+      qs = shuffle(pool).slice(0, Math.min(nPreguntasReto, pool.length));
     } else {
       const pool = getPool(modoJuego, continente);
       if (pool.length < 2) return;
-      qs = shuffle(pool).slice(0, Math.min(N_PREGUNTAS, pool.length));
+      qs = shuffle(pool).slice(0, Math.min(nPreguntasReto, pool.length));
     }
     setPreguntas(qs);
     setIdx(0);
@@ -1048,6 +1054,43 @@ function GeografiaAppInner({ onBack, onCreateLive, onJoinLive }) {
   }, [redraw]);
 
   const onTouchEnd = useCallback(() => { isPanRef.current = false; lastTouchRef.current = null; }, []);
+
+  // ── RETO POR ENLACE: configuración fija, sin menú de opciones ──────────────
+  if (pantalla === 'intro' && reto) {
+    const poolSize = modoJuego === 'fisico' ? getPoolFisico(ambitoFisico, tipoFisico).length
+      : modoJuego === 'banderas' ? getPoolBanderas(continente).length
+      : getPool(modoJuego, continente).length;
+    const canStart = poolSize >= 2 && !cargando;
+    const chips = [
+      ({ mundo: '🌍 Países', provincias: '🗺️ Provincias ESP', fisico: '🏔️ Geografía física', banderas: '🚩 Banderas' })[modoJuego] || modoJuego,
+      (modoJuego === 'mundo' || modoJuego === 'banderas') && `📍 ${continente}`,
+      modoJuego === 'fisico' && `📍 ${ambitoFisico} · ${tipoFisico}`,
+      modoJuego === 'banderas' && `❓ ${tipoPreguntaBandera === 'capital' ? 'capitales' : tipoPreguntaBandera === 'mixto' ? 'nombre y capital' : 'nombre del país'}`,
+      modo === 'escribir' ? '✏️ Escribir el nombre' : '🖱️ Elegir opción',
+      `🔢 ${nPreguntasReto} preguntas`,
+    ].filter(Boolean);
+    return (
+      <div style={{ minHeight:'100vh', background:'linear-gradient(135deg,#1e3a5f 0%,#1e40af 50%,#0f766e 100%)', display:'flex', alignItems:'center', justifyContent:'center', padding:'30px 20px', fontFamily:'sans-serif' }}>
+        <div style={{ background:'rgba(255,255,255,0.08)', backdropFilter:'blur(12px)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:24, padding:'30px 24px', maxWidth:460, width:'100%', textAlign:'center', color:'white' }}>
+          <div style={{ fontSize:'2.6rem' }}>🎯</div>
+          <h1 style={{ margin:'6px 0 2px', fontSize:'1.4rem' }}>{reto.titulo || 'Reto de Geografía'}</h1>
+          <p style={{ color:'rgba(255,255,255,0.6)', fontSize:'0.86rem', margin:'0 0 16px' }}>Todos los participantes responden con esta misma configuración</p>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:7, justifyContent:'center', marginBottom:18 }}>
+            {chips.map((c, i) => <span key={i} style={{ background:'rgba(255,255,255,0.12)', borderRadius:20, padding:'6px 13px', fontSize:'0.82rem', fontWeight:700 }}>{c}</span>)}
+          </div>
+          {esRetoCompeticion && (
+            <div style={{ background:'rgba(245,158,11,0.2)', color:'#fde68a', borderRadius:10, padding:'8px 12px', fontSize:'0.8rem', fontWeight:600, marginBottom:16 }}>
+              🏆 Prueba de competición · al terminar envía tu puntuación con tu alias y tu contraseña
+            </div>
+          )}
+          <button onClick={iniciarTest} disabled={!canStart}
+            style={{ width:'100%', padding:'14px 0', borderRadius:14, border:'none', background:'#3b82f6', color:'white', fontSize:'1.05rem', fontWeight:900, cursor: canStart ? 'pointer' : 'not-allowed', opacity: canStart ? 1 : 0.5 }}>
+            {cargando ? 'Cargando mapa…' : '▶ Empezar el reto'}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // ── INTRO ──────────────────────────────────────────────────────────────────
   if (pantalla === 'intro') {
@@ -1276,13 +1319,23 @@ function GeografiaAppInner({ onBack, onCreateLive, onJoinLive }) {
             <button onClick={iniciarTest} style={{ flex:1, padding:'12px 0', borderRadius:12, border:'none', background:'#3b82f6', color:'white', fontWeight:900, cursor:'pointer' }}>🔄 Repetir</button>
           </div>
           <button onClick={() => setModalEnviar(true)}
-            style={{ width:'100%', padding:'11px 0', borderRadius:12, border:'none', background:'rgba(124,58,237,0.85)', color:'white', fontWeight:700, fontSize:'0.92rem', cursor:'pointer' }}>
-            📤 Enviar resultado al Profesor
+            style={{ width:'100%', padding:'11px 0', borderRadius:12, border:'none', background: esRetoCompeticion ? 'linear-gradient(135deg,#f39c12,#e67e22)' : 'rgba(124,58,237,0.85)', color:'white', fontWeight:700, fontSize:'0.92rem', cursor:'pointer' }}>
+            {esRetoCompeticion ? '🏆 Enviar a la competición' : '📤 Enviar resultado al Profesor'}
           </button>
         </div>
 
+        {/* Reto de competición: el resultado va solo a esa prueba, no a informes */}
+        {modalEnviar && esRetoCompeticion && (
+          <ModalEnviarCompeticion
+            compId={reto.compId} catId={reto.catId}
+            puntos={aciertos} detalle={{ aciertos, total, porcentaje: pct }}
+            nombreJuego="Geografía" tituloReto={reto.titulo || ''}
+            onClose={() => setModalEnviar(false)}
+          />
+        )}
+
         {/* Modal enviar */}
-        {modalEnviar && (
+        {modalEnviar && !esRetoCompeticion && (
           <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.78)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:16 }}>
             <div style={{ background:'#1e1b4b', borderRadius:18, padding:28, width:'100%', maxWidth:380, border:'1.5px solid rgba(167,139,250,0.3)', boxShadow:'0 20px 60px rgba(0,0,0,0.6)' }}>
               <h3 style={{ margin:'0 0 18px', color:'#f1f5f9', fontSize:'1.1rem', fontWeight:700 }}>📤 Enviar al Profesor</h3>

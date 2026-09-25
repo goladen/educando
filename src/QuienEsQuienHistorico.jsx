@@ -56,8 +56,18 @@ function FotoPersonaje({ p, size = 92 }) {
     );
 }
 
-export default function QuienEsQuienHistorico({ onExit, onBack }) {
-    const { idioma, setIdioma, idiomas } = useLanguage();
+// Puntos por personaje acertado en Control de Aula: 10 por estrella (rendirse = 0).
+export const PUNTOS_POR_ESTRELLA_PH = 10;
+const estrellasDe = (nPistas) => (nPistas <= 2 ? 3 : nPistas <= 4 ? 2 : 1);
+
+// `aula` (opcional, Control de Aula · AppsAula.jsx): { config, rondasMax, onProgreso, onTerminar }.
+// config = { idioma, modo, cat, dif, sinNombres, elegidoId, customNombre, customWiki, customPistas }.
+// Con él se salta el SETUP, se juega con la configuración del profe y se informa de los puntos tras cada personaje.
+export default function QuienEsQuienHistorico({ onExit, onBack, aula = null }) {
+    const lang = useLanguage();
+    const { setIdioma, idiomas } = lang;
+    const idioma = aula?.config?.idioma || lang.idioma; // en el aula manda el idioma del profe (sin tocar el global)
+    const cfg = aula?.config || {};
     const t = (s) => trPH(idioma, s); // traducción empaquetada, sin Gemini
     // Texto de una pista traducido por piezas (plantilla + valor).
     const clueText = (p) => {
@@ -68,15 +78,19 @@ export default function QuienEsQuienHistorico({ onExit, onBack }) {
     };
     const salir = onExit || onBack || (() => {});
     const [fase, setFase] = useState('SETUP'); // SETUP | JUGANDO | FIN
-    const [modo, setModo] = useState('AZAR');  // AZAR | ELEGIR | CREAR
-    const [cat, setCat] = useState('__MEZCLA__');
-    const [dif, setDif] = useState(16);
-    const [sinNombres, setSinNombres] = useState(false);
-    const [elegidoId, setElegidoId] = useState('');
+    const [modo, setModo] = useState(cfg.modo || 'AZAR');  // AZAR | ELEGIR | CREAR
+    const [cat, setCat] = useState(cfg.cat || '__MEZCLA__');
+    const [dif, setDif] = useState(cfg.dif || 16);
+    const [sinNombres, setSinNombres] = useState(!!cfg.sinNombres);
+    const [elegidoId, setElegidoId] = useState(cfg.elegidoId || '');
     // Personaje personalizado
-    const [customNombre, setCustomNombre] = useState('');
-    const [customWiki, setCustomWiki] = useState('');
-    const [customPistas, setCustomPistas] = useState(['', '', '']);
+    const [customNombre, setCustomNombre] = useState(cfg.customNombre || '');
+    const [customWiki, setCustomWiki] = useState(cfg.customWiki || '');
+    const [customPistas, setCustomPistas] = useState(cfg.customPistas?.length ? cfg.customPistas : ['', '', '']);
+    // Control de Aula: puntos acumulados y personajes terminados (acertados o rendidos).
+    const [puntosAula, setPuntosAula] = useState(0);
+    const [rondasAula, setRondasAula] = useState(0);
+    const limiteAula = !!aula && aula.rondasMax > 0 && rondasAula >= aula.rondasMax;
 
     const [playMode, setPlayMode] = useState('BOARD'); // BOARD | TEXTO
     const [board, setBoard] = useState([]);
@@ -131,12 +145,23 @@ export default function QuienEsQuienHistorico({ onExit, onBack }) {
         iniComun(s, construirPistas(s, mezclado), 'BOARD', b);
     };
 
+    // Control de Aula: empezar directamente + informar tras cada personaje.
+    useEffect(() => {
+        if (aula) empezar();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+    useEffect(() => {
+        if (rondasAula > 0) aula?.onProgreso?.({ puntos: puntosAula, rondas: rondasAula });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [rondasAula]);
+
     const otraPista = () => setNPistas((n) => Math.min(n + 1, pistas.length));
 
     const ganar = () => {
         setResultado('gano');
         setFase('FIN');
-        const estrellas = nPistas <= 2 ? 3 : nPistas <= 4 ? 2 : 1;
+        const estrellas = estrellasDe(nPistas);
+        if (aula) { setPuntosAula((p) => p + estrellas * PUNTOS_POR_ESTRELLA_PH); setRondasAula((r) => r + 1); }
         guardarRegistroLocal('QUIEN_HISTORICO', {
             titulo: '¿Quién es quién? histórico', aciertos: estrellas, intentos: 3,
             porcentaje: Math.round((estrellas / 3) * 100), via: 'juego',
@@ -171,7 +196,11 @@ export default function QuienEsQuienHistorico({ onExit, onBack }) {
         }
     };
 
-    const rendirse = () => { setResultado('rendido'); setFase('FIN'); };
+    const rendirse = () => {
+        setResultado('rendido');
+        setFase('FIN');
+        if (aula) setRondasAula((r) => r + 1);
+    };
 
     /* ---------------- SETUP ---------------- */
     if (fase === 'SETUP') {
@@ -182,7 +211,7 @@ export default function QuienEsQuienHistorico({ onExit, onBack }) {
             { id: 'CREAR', emoji: '✏️', t: 'Crear personaje', d: 'Inventa un personaje y sus pistas.' },
         ];
         return (
-            <Wrap salir={salir} t={t}>
+            <Wrap salir={salir} t={t} aula={aula}>
                 <div style={S.panel}>
                     <h2 style={{ marginTop: 0, color: COL.oscuro }}>🧐 {t('Elige el reto')}</h2>
                     <p style={{ color: '#555' }}>{t('Adivina el personaje histórico secreto usando las pistas y tus conocimientos.')}</p>
@@ -290,11 +319,11 @@ export default function QuienEsQuienHistorico({ onExit, onBack }) {
 
     /* ---------------- FIN ---------------- */
     if (fase === 'FIN') {
-        const estrellas = nPistas <= 2 ? 3 : nPistas <= 4 ? 2 : 1;
+        const estrellas = estrellasDe(nPistas);
         const meta = [secret.campo, secret.pais, secret.nac != null ? `${anioTexto(secret.nac)}${secret.fall != null ? '–' + anioTexto(secret.fall) : ''}` : '']
             .filter(Boolean).map((x) => t(x)).join(' · ');
         return (
-            <Wrap salir={salir} t={t}>
+            <Wrap salir={salir} t={t} aula={aula}>
                 <div style={{ ...S.panel, textAlign: 'center' }}>
                     {resultado === 'gano' ? (
                         <>
@@ -319,8 +348,22 @@ export default function QuienEsQuienHistorico({ onExit, onBack }) {
                     <div style={{ textAlign: 'left', maxWidth: 320, margin: '0 auto 10px', color: '#444', fontSize: '0.9rem' }}>
                         {(secret.datos || []).map((d, i) => <div key={i}>💡 {t(d)}</div>)}
                     </div>
-                    <button style={{ ...S.btn(COL.azul), marginTop: 8 }} onClick={empezar}>🔁 {t('Otra vez')}</button>
-                    <button style={{ ...S.btn('#94a3b8'), marginTop: 8, marginLeft: 8 }} onClick={() => setFase('SETUP')}>⚙️ {t('Cambiar reto')}</button>
+                    {aula ? (
+                        <>
+                            <div style={{ fontWeight: 800, color: COL.azul, margin: '6px 0' }}>
+                                🏫 +{resultado === 'gano' ? estrellas * PUNTOS_POR_ESTRELLA_PH : 0} · {t('Total')}: {puntosAula} {t('puntos')}
+                                {aula.rondasMax > 0 && ` · ${rondasAula}/${aula.rondasMax}`}
+                            </div>
+                            {limiteAula
+                                ? <button style={{ ...S.btn(COL.verde), marginTop: 8 }} onClick={() => aula.onTerminar?.()}>🏁 {t('Terminar')}</button>
+                                : <button style={{ ...S.btn(COL.azul), marginTop: 8 }} onClick={empezar}>➡️ {t('Siguiente personaje')}</button>}
+                        </>
+                    ) : (
+                        <>
+                            <button style={{ ...S.btn(COL.azul), marginTop: 8 }} onClick={empezar}>🔁 {t('Otra vez')}</button>
+                            <button style={{ ...S.btn('#94a3b8'), marginTop: 8, marginLeft: 8 }} onClick={() => setFase('SETUP')}>⚙️ {t('Cambiar reto')}</button>
+                        </>
+                    )}
                 </div>
             </Wrap>
         );
@@ -328,12 +371,17 @@ export default function QuienEsQuienHistorico({ onExit, onBack }) {
 
     /* ---------------- JUGANDO ---------------- */
     return (
-        <Wrap salir={salir} t={t}>
+        <Wrap salir={salir} t={t} aula={aula}>
             <div style={{ maxWidth: 1000, margin: '0 auto', padding: '0 12px' }}>
                 {/* Panel de pistas */}
                 <div style={{ background: '#fff', borderRadius: 18, padding: 16, boxShadow: '0 8px 24px rgba(0,0,0,0.2)', marginBottom: 14 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                         <h3 style={{ margin: 0, color: COL.oscuro }}>🕵️ {t('Pistas')} ({nPistas}/{pistas.length})</h3>
+                        {aula && (
+                            <span style={{ fontSize: '0.82rem', fontWeight: 800, color: COL.azul }}>
+                                🏫 {aula.rondasMax > 0 ? `${rondasAula + 1}/${aula.rondasMax} · ` : ''}{puntosAula} {t('puntos')}
+                            </span>
+                        )}
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                             <button style={{ ...S.btn(COL.amarillo), color: COL.oscuro, padding: '8px 14px' }} disabled={nPistas >= pistas.length} onClick={otraPista}>➕ {t('Otra pista')}</button>
                             {playMode === 'BOARD' && (
@@ -400,11 +448,11 @@ export default function QuienEsQuienHistorico({ onExit, onBack }) {
 }
 
 /* ---- Marco común (fondo + cabecera + selector de idioma) ---- */
-function Wrap({ children, salir, t }) {
+function Wrap({ children, salir, t, aula }) {
     return (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, overflowY: 'auto', background: `linear-gradient(135deg, ${COL.bg1}, ${COL.bg2})`, fontFamily: "'Comic Sans MS','Segoe UI',sans-serif", padding: '0 0 50px' }}>
+        <div style={{ position: aula ? 'absolute' : 'fixed', inset: 0, zIndex: aula ? 1 : 9999, overflowY: 'auto', background: `linear-gradient(135deg, ${COL.bg1}, ${COL.bg2})`, fontFamily: "'Comic Sans MS','Segoe UI',sans-serif", padding: '0 0 50px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', position: 'sticky', top: 0, zIndex: 20, background: 'rgba(26,26,46,0.25)', backdropFilter: 'blur(6px)' }}>
-                <button onClick={salir} style={{ background: '#fff', border: 'none', borderRadius: 12, padding: '8px 14px', cursor: 'pointer', fontWeight: 800, boxShadow: '0 3px 0 rgba(0,0,0,0.2)' }}>← {t ? t('Salir') : 'Salir'}</button>
+                {!aula && <button onClick={salir} style={{ background: '#fff', border: 'none', borderRadius: 12, padding: '8px 14px', cursor: 'pointer', fontWeight: 800, boxShadow: '0 3px 0 rgba(0,0,0,0.2)' }}>← {t ? t('Salir') : 'Salir'}</button>}
                 <h1 style={{ color: '#fff', margin: 0, fontSize: '1.3rem', textShadow: '0 2px 4px rgba(0,0,0,0.35)', flex: 1 }}>🧐 {t ? t('¿Quién es quién? histórico') : '¿Quién es quién? histórico'}</h1>
             </div>
             <div style={{ maxWidth: 1000, margin: '20px auto', padding: '0 12px' }}>{children}</div>

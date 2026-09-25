@@ -10,6 +10,9 @@ import { bibliotecaGeometria } from './BibliotecaGeometria';
 import PerimetroArea from './PerimetroArea';
 import Visor3dPoliedrosEuler from './Visor3dPoliedrosEuler';
 import SalaGeometria3D from './SalaGeometria3D';
+import ModalCompartirReto from './components/ModalCompartirReto';
+import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
+import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
 
 // --- AUDIOS Y AVATARES (Estética MathLive) ---
 import correctSoundFile from './assets/correct-choice-43861.mp3';
@@ -569,7 +572,7 @@ function ModalEnviarGeo({ datos, usuario, onClose }) {
                     nombre: nombre.trim(), curso: curso.trim(),
                     aciertos: datos.aciertos, total: datos.total, intentos: datos.total,
                     puntos: datos.puntos, porcentaje: pct,
-                    modo: datos.modo, ...(datos.configDesc ? { configuracion: datos.configDesc } : {}),
+                    modo: datos.modo, reto: datos.reto || null, ...(datos.configDesc ? { configuracion: datos.configDesc } : {}),
                 }],
             });
             guardarRegistroLocal('GEOMETRIX_COMPUESTO', {
@@ -649,6 +652,119 @@ const generarUnico = (modoRegla, bag, cfg, usedSet, maxIntentos = 20) => {
     return p;
 };
 
+// ── Helpers de UI de configuración (nivel de módulo: se reutilizan desde
+//    ConfigGeometrixModal, que a su vez usan las competiciones/retos) ──
+const SeccionConfig = ({ label, children }) => (
+    <div style={sLive.section}><div style={sLive.label}>{label}</div>{children}</div>
+);
+
+// ChipToggle: no usa callback-pattern — recibe valor directo
+const ChipToggle = ({ active, onClick, children, color = '#e74c3c', disabled }) => (
+    <button onClick={disabled ? undefined : onClick} style={{
+        ...sLive.chip,
+        background: active ? color : '#eee',
+        color: active ? 'white' : (disabled ? '#bbb' : '#555'),
+        opacity: disabled ? 0.5 : 1,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        border: disabled ? '1px dashed #ccc' : 'none',
+    }}>{children}</button>
+);
+
+// TiposFigurasConfig: usa cfg prop directamente, NO callback-pattern
+const renderConfigFiguras = (cfg, onChangeCfg) => {
+    const toggle = (key, subKey) => {
+        const newVal = !cfg[key][subKey];
+        const updated = { ...cfg, [key]: { ...cfg[key], [subKey]: newVal } };
+        // Garantizar al menos 1 figura y 1 tipo válido
+        const anyFig = Object.values(updated.figuras).some(Boolean);
+        const anyTipo = Object.values(updated.tipos).some(Boolean);
+        if (!anyFig || !anyTipo) return;
+        onChangeCfg(updated);
+    };
+    const toggleModoRegla = (val) => {
+        onChangeCfg({ ...cfg, modoRegla: val });
+    };
+    const solo3D = cfg.figuras.cuerpos3D && !cfg.figuras.planas2D;
+    const solo2D = cfg.figuras.planas2D && !cfg.figuras.cuerpos3D;
+    return (<>
+        <SeccionConfig label="📐 Modo de juego">
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+                <ChipToggle active={!cfg.modoRegla} onClick={() => toggleModoRegla(false)} color="#3498db">🔢 Fórmulas</ChipToggle>
+                <ChipToggle active={cfg.modoRegla} onClick={() => toggleModoRegla(true)} color="#f39c12">📏 Regla</ChipToggle>
+            </div>
+            {cfg.modoRegla && <p style={{ color: '#e67e22', fontSize: '0.8rem', textAlign: 'center', margin: '6px 0 0' }}>📏 Modo regla: el prisma siempre tendrá base cuadrada (un solo lado a medir)</p>}
+        </SeccionConfig>
+        <SeccionConfig label="🔵 Tipo de figuras">
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+                <ChipToggle active={cfg.figuras.planas2D} onClick={() => toggle('figuras', 'planas2D')} color="#2ecc71">⬡ 2D Planas</ChipToggle>
+                <ChipToggle active={cfg.figuras.cuerpos3D} onClick={() => toggle('figuras', 'cuerpos3D')} color="#9b59b6">🧊 3D Cuerpos</ChipToggle>
+            </div>
+            <p style={{ fontSize: '0.76rem', color: '#888', textAlign: 'center', margin: '5px 0 0' }}>
+                2D: cuadrado, rectángulo, triángulo, círculo, rombo, trapecio<br/>
+                3D: cilindro, cono, esfera, prisma rectangular
+            </p>
+        </SeccionConfig>
+        <SeccionConfig label="📊 Tipos de ejercicios">
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+                <ChipToggle active={cfg.tipos.area} onClick={() => toggle('tipos', 'area')} color="#e74c3c">📐 Área</ChipToggle>
+                <ChipToggle active={cfg.tipos.perimetro} onClick={() => toggle('tipos', 'perimetro')} color="#3498db" disabled={solo3D}>📏 Perímetro</ChipToggle>
+                <ChipToggle active={cfg.tipos.volumen} onClick={() => toggle('tipos', 'volumen')} color="#8e44ad" disabled={solo2D}>🧊 Volumen</ChipToggle>
+            </div>
+            {solo3D && <p style={{ color: '#e74c3c', fontSize: '0.76rem', textAlign: 'center', margin: '4px 0 0' }}>Perímetro no disponible para 3D</p>}
+            {solo2D && <p style={{ color: '#e74c3c', fontSize: '0.76rem', textAlign: 'center', margin: '4px 0 0' }}>Volumen no disponible para 2D</p>}
+        </SeccionConfig>
+    </>);
+};
+
+// Ruta pública del juego: base de los enlaces de reto (pikt.es/geometrix?reto=…)
+export const RUTA_GEOMETRIX = '/geometrix';
+
+// Resumen en chips de una configuración (reto y competiciones)
+export const resumenConfigGeo = (config) => {
+    const cfg = { ...DEFAULT_GAME_CONFIG, ...(config || {}) };
+    const tipos = [cfg.tipos?.area && 'área', cfg.tipos?.perimetro && 'perímetro', cfg.tipos?.volumen && 'volumen'].filter(Boolean).join(', ');
+    const figs  = [cfg.figuras?.planas2D && '2D', cfg.figuras?.cuerpos3D && '3D'].filter(Boolean).join(' y ');
+    return [
+        cfg.modoRegla ? '📏 Modo regla' : '🔢 Modo fórmulas',
+        figs && `🔵 figuras ${figs}`,
+        tipos && `📊 ${tipos}`,
+        `🔢 ${cfg.numEjercicios} ejercicios`,
+    ].filter(Boolean);
+};
+
+/**
+ * Modal de configuración de Geometrix. Lo usa el propio juego (Modo Configurado)
+ * y también las competiciones/retos, donde solo sirve para fijar los ajustes.
+ */
+export const ConfigGeometrixModal = ({ config, onAceptar, onClose, titulo = '⚙️ Modo Configurado', textoAceptar = '▶ Comenzar' }) => {
+    const [cfg, setCfg] = useState({ ...DEFAULT_GAME_CONFIG, ...(config || {}) });
+    const nums = [5, 8, 10, 15];
+    const otro = !nums.includes(cfg.numEjercicios);
+    return (
+        <div style={sLive.overlay}>
+            <div style={sLive.modal}>
+                <h2 style={{ margin: '0 0 16px', color: '#2c3e50', fontSize: '1.25rem', textAlign: 'center' }}>{titulo}</h2>
+                {renderConfigFiguras(cfg, setCfg)}
+                <SeccionConfig label="🔢 Número de ejercicios">
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
+                        {nums.map(n => (
+                            <ChipToggle key={n} active={cfg.numEjercicios === n} onClick={() => setCfg(c => ({ ...c, numEjercicios: n }))} color="#009688">{n}</ChipToggle>
+                        ))}
+                        <input type="number" min="1" max="50" placeholder="···"
+                            value={otro ? cfg.numEjercicios : ''}
+                            onChange={e => { const v = parseInt(e.target.value); if (v > 0) setCfg(c => ({ ...c, numEjercicios: v })); }}
+                            style={{ width: 52, padding: '6px 8px', borderRadius: 20, border: `2px solid ${otro ? '#009688' : '#ccc'}`, textAlign: 'center', fontSize: '0.9rem', outline: 'none', fontWeight: 'bold', color: '#333' }} />
+                    </div>
+                </SeccionConfig>
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 18 }}>
+                    <button onClick={onClose} style={sLive.btnSec}>Cancelar</button>
+                    <button onClick={() => onAceptar(cfg)} style={{ ...sLive.btnPri, background: '#009688' }}>{textoAceptar}</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // ─── ROUTER PRINCIPAL INTELIGENTE ─────────────────────────────────────────────
 export default function GeometriaGame({ usuario, onExit, isHost, codigoSala }) {
     // Estados internos para gestionar las salas sin depender del Landing
@@ -703,7 +819,14 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
 
     // Modo 3 config
     const [showGameConfig, setShowGameConfig] = useState(false);
-    const [gameConfig, setGameConfig] = useState({ ...DEFAULT_GAME_CONFIG });
+    const [gameConfig, setGameConfig] = useState(() => { const r = leerRetoUrl(); return { ...DEFAULT_GAME_CONFIG, ...(r?.config || {}) }; });
+    // Reto compartido por enlace: configuración fija e igual para todos
+    const [reto, setReto] = useState(() => leerRetoUrl());
+    const [compartirReto, setCompartirReto] = useState(false);
+    const [showConfigReto, setShowConfigReto] = useState(false);
+    // Reto lanzado desde una prueba de competición: el resultado va solo a esa prueba
+    const esRetoCompeticion = !!(reto && reto.compId && reto.catId);
+    const [configParaReto, setConfigParaReto] = useState(null);
 
     // Live config (modo 4)
     const [joinCode, setJoinCode] = useState('');
@@ -806,15 +929,16 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
     };
 
     const compartir = () => {
-        const url = 'pikt.es/geometrix';
+        // Con un reto activo se comparte la URL completa (lleva la configuración dentro)
+        const url = reto ? window.location.href : window.location.origin + RUTA_GEOMETRIX;
         if (navigator.share) {
-            navigator.share({ 
-                title: 'Geometrix', 
-                text: 'Juega aquí', 
-                url: window.location.href 
+            navigator.share({
+                title: reto ? (reto.titulo || 'Reto de Geometrix') : 'Geometrix',
+                text: 'Juega aquí',
+                url,
             }).catch(() => {});
         } else {
-            navigator.clipboard.writeText(url).then(() => alert('✅ Enlace copiado'));
+            navigator.clipboard.writeText(url).then(() => alert('✅ Enlace copiado')).catch(() => window.prompt('Copia el enlace:', url));
         }
     };
 
@@ -852,68 +976,6 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
         onClientJoin(joinCode.toUpperCase());
     };
 
-    // ── Helpers de UI (definidos fuera del render para evitar re-renders) ──
-    const SeccionConfig = ({ label, children }) => (
-        <div style={sLive.section}><div style={sLive.label}>{label}</div>{children}</div>
-    );
-
-    // ChipToggle: no usa callback-pattern — recibe valor directo
-    const ChipToggle = ({ active, onClick, children, color = '#e74c3c', disabled }) => (
-        <button onClick={disabled ? undefined : onClick} style={{
-            ...sLive.chip,
-            background: active ? color : '#eee',
-            color: active ? 'white' : (disabled ? '#bbb' : '#555'),
-            opacity: disabled ? 0.5 : 1,
-            cursor: disabled ? 'not-allowed' : 'pointer',
-            border: disabled ? '1px dashed #ccc' : 'none',
-        }}>{children}</button>
-    );
-
-    // TiposFigurasConfig: usa cfg prop directamente, NO callback-pattern
-    const renderConfigFiguras = (cfg, onChangeCfg) => {
-        const toggle = (key, subKey) => {
-            const newVal = !cfg[key][subKey];
-            const updated = { ...cfg, [key]: { ...cfg[key], [subKey]: newVal } };
-            // Garantizar al menos 1 figura y 1 tipo válido
-            const anyFig = Object.values(updated.figuras).some(Boolean);
-            const anyTipo = Object.values(updated.tipos).some(Boolean);
-            if (!anyFig || !anyTipo) return;
-            onChangeCfg(updated);
-        };
-        const toggleModoRegla = (val) => {
-            onChangeCfg({ ...cfg, modoRegla: val });
-        };
-        const solo3D = cfg.figuras.cuerpos3D && !cfg.figuras.planas2D;
-        const solo2D = cfg.figuras.planas2D && !cfg.figuras.cuerpos3D;
-        return (<>
-            <SeccionConfig label="📐 Modo de juego">
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
-                    <ChipToggle active={!cfg.modoRegla} onClick={() => toggleModoRegla(false)} color="#3498db">🔢 Fórmulas</ChipToggle>
-                    <ChipToggle active={cfg.modoRegla} onClick={() => toggleModoRegla(true)} color="#f39c12">📏 Regla</ChipToggle>
-                </div>
-                {cfg.modoRegla && <p style={{ color: '#e67e22', fontSize: '0.8rem', textAlign: 'center', margin: '6px 0 0' }}>📏 Modo regla: el prisma siempre tendrá base cuadrada (un solo lado a medir)</p>}
-            </SeccionConfig>
-            <SeccionConfig label="🔵 Tipo de figuras">
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-                    <ChipToggle active={cfg.figuras.planas2D} onClick={() => toggle('figuras', 'planas2D')} color="#2ecc71">⬡ 2D Planas</ChipToggle>
-                    <ChipToggle active={cfg.figuras.cuerpos3D} onClick={() => toggle('figuras', 'cuerpos3D')} color="#9b59b6">🧊 3D Cuerpos</ChipToggle>
-                </div>
-                <p style={{ fontSize: '0.76rem', color: '#888', textAlign: 'center', margin: '5px 0 0' }}>
-                    2D: cuadrado, rectángulo, triángulo, círculo, rombo, trapecio<br/>
-                    3D: cilindro, cono, esfera, prisma rectangular
-                </p>
-            </SeccionConfig>
-            <SeccionConfig label="📊 Tipos de ejercicios">
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-                    <ChipToggle active={cfg.tipos.area} onClick={() => toggle('tipos', 'area')} color="#e74c3c">📐 Área</ChipToggle>
-                    <ChipToggle active={cfg.tipos.perimetro} onClick={() => toggle('tipos', 'perimetro')} color="#3498db" disabled={solo3D}>📏 Perímetro</ChipToggle>
-                    <ChipToggle active={cfg.tipos.volumen} onClick={() => toggle('tipos', 'volumen')} color="#8e44ad" disabled={solo2D}>🧊 Volumen</ChipToggle>
-                </div>
-                {solo3D && <p style={{ color: '#e74c3c', fontSize: '0.76rem', textAlign: 'center', margin: '4px 0 0' }}>Perímetro no disponible para 3D</p>}
-                {solo2D && <p style={{ color: '#e74c3c', fontSize: '0.76rem', textAlign: 'center', margin: '4px 0 0' }}>Volumen no disponible para 2D</p>}
-            </SeccionConfig>
-        </>);
-    };
 
     if (herramienta === 'sala3d') {
         return <SalaGeometria3D onExit={() => setHerramienta(null)} />;
@@ -937,29 +999,28 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
                 <ModalFigurasCompuestas usuario={usuario} onClose={() => setShowFigurasCompuestas(false)} />
             )}
 
+            {/* ── CREAR UN RETO: configurar y generar el enlace ── */}
+            {showConfigReto && (
+                <ConfigGeometrixModal
+                    config={gameConfig}
+                    titulo="🔗 Crear un reto"
+                    textoAceptar="✔ Usar esta configuración"
+                    onClose={() => setShowConfigReto(false)}
+                    onAceptar={(cfg) => { setConfigParaReto(cfg); setShowConfigReto(false); setCompartirReto(true); }}
+                />
+            )}
+            {compartirReto && configParaReto && (
+                <ModalCompartirReto ruta={RUTA_GEOMETRIX} config={configParaReto} resumen={resumenConfigGeo(configParaReto)}
+                    nombreJuego="Geometrix" onClose={() => setCompartirReto(false)} />
+            )}
+
             {/* ── MODAL CONFIG MODO 3 ── */}
             {showGameConfig && (
-                <div style={sLive.overlay}>
-                    <div style={sLive.modal}>
-                        <h2 style={{ margin: '0 0 16px', color: '#2c3e50', fontSize: '1.25rem', textAlign: 'center' }}>⚙️ Modo Configurado</h2>
-                        {renderConfigFiguras(gameConfig, setGameConfig)}
-                        <SeccionConfig label="🔢 Número de ejercicios">
-                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
-                                {[5, 8, 10, 15].map(n => (
-                                    <ChipToggle key={n} active={gameConfig.numEjercicios === n} onClick={() => setGameConfig(c => ({ ...c, numEjercicios: n }))} color="#009688">{n}</ChipToggle>
-                                ))}
-                                <input type="number" min="1" max="50" placeholder="···"
-                                    value={![5,8,10,15].includes(gameConfig.numEjercicios) ? gameConfig.numEjercicios : ''}
-                                    onChange={e => { const v = parseInt(e.target.value); if (v > 0) setGameConfig(c => ({ ...c, numEjercicios: v })); }}
-                                    style={{ width: 52, padding: '6px 8px', borderRadius: 20, border: `2px solid ${![5,8,10,15].includes(gameConfig.numEjercicios) ? '#009688' : '#ccc'}`, textAlign: 'center', fontSize: '0.9rem', outline: 'none', fontWeight: 'bold', color: '#333' }} />
-                            </div>
-                        </SeccionConfig>
-                        <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 18 }}>
-                            <button onClick={() => setShowGameConfig(false)} style={sLive.btnSec}>Cancelar</button>
-                            <button onClick={() => { setShowGameConfig(false); setModoJuego('Configurado'); startGame(gameConfig.modoRegla, gameConfig); }} style={sLive.btnPri}>▶ Comenzar</button>
-                        </div>
-                    </div>
-                </div>
+                <ConfigGeometrixModal
+                    config={gameConfig}
+                    onClose={() => setShowGameConfig(false)}
+                    onAceptar={(cfg) => { setGameConfig(cfg); setShowGameConfig(false); setModoJuego('Configurado'); startGame(cfg.modoRegla, cfg); }}
+                />
             )}
 
             {/* ── MODAL CONFIG EN VIVO ── */}
@@ -1023,7 +1084,43 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
                 )}
             </div>
 
-            {gameState === 'START' && (
+            {/* ── INICIO: RETO COMPARTIDO (misma configuración para todos) ── */}
+            {gameState === 'START' && reto && (
+                <div style={sLocal.centerCard}>
+                    <div style={{ fontSize: '2.6rem', marginBottom: 2 }}>🎯</div>
+                    <h1 style={{ color: '#2c3e50', fontSize: isMobile ? '1.5rem' : '1.9rem', margin: '4px 0 2px' }}>
+                        {reto.titulo || 'Reto de Geometrix'}
+                    </h1>
+                    <p style={{ color: '#888', fontSize: '0.88rem', margin: '0 0 18px' }}>
+                        Todos los participantes juegan con esta misma configuración
+                    </p>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, justifyContent: 'center', marginBottom: 22 }}>
+                        {resumenConfigGeo(gameConfig).map((r, i) => (
+                            <span key={i} style={{ background: '#e0f2f1', color: '#00796b', borderRadius: 20, padding: '6px 14px', fontSize: '0.84rem', fontWeight: 700 }}>{r}</span>
+                        ))}
+                    </div>
+                    {esRetoCompeticion && (
+                        <div style={{ background: "#fff8e1", color: "#8a6d00", borderRadius: 10, padding: "8px 12px", fontSize: "0.82rem", fontWeight: 600, marginBottom: 16 }}>
+                            🏆 Prueba de competición · al terminar envía tu puntuación con tu alias y tu contraseña
+                        </div>
+                    )}
+                    <button onClick={() => { setModoJuego('Reto'); startGame(gameConfig.modoRegla, gameConfig); }}
+                        style={{ ...sLocal.btnPrimary, background: '#009688', width: '100%', justifyContent: 'center' }}>
+                        ▶ Empezar el reto
+                    </button>
+                    <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 14, flexWrap: 'wrap' }}>
+                        <button onClick={compartir} style={{ background: 'none', border: 'none', color: '#1565C0', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem', fontFamily: 'inherit' }}>
+                            🔗 Compartir este reto
+                        </button>
+                        <button onClick={() => { limpiarRetoUrl(); setReto(null); setGameConfig({ ...DEFAULT_GAME_CONFIG }); }}
+                            style={{ background: 'none', border: 'none', color: '#999', cursor: 'pointer', fontSize: '0.85rem', fontFamily: 'inherit' }}>
+                            Jugar en modo libre
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {gameState === 'START' && !reto && (
                 <div ref={cardRef} style={sLocal.centerCard}>
                     <Calculator size={55} color="#009688" style={{ marginBottom: 8 }} />
                     <h1 style={{ color: '#2c3e50', fontSize: isMobile ? '1.8rem' : '2.4rem', margin: '8px 0' }}>Geometrix</h1>
@@ -1046,6 +1143,12 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
                         {/* Figuras Compuestas */}
                         <button onClick={() => setShowFigurasCompuestas(true)} style={{ ...sLocal.btnPrimary, background: '#e74c3c' }}>
                             🏗️ Figuras Compuestas <span style={{ fontSize: '0.8rem', opacity: 0.85 }}>(área y volumen)</span>
+                        </button>
+
+                        {/* Crear un reto: enlace con una configuración fija para todos */}
+                        <button onClick={() => setShowConfigReto(true)}
+                            style={{ ...sLocal.btnPrimary, background: '#eef4fb', color: '#1565C0', border: '1.5px dashed #1565C0', boxShadow: 'none' }}>
+                            🔗 Crear un reto con enlace <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>(misma configuración para todos)</span>
                         </button>
 
                         <div style={{ width: '100%', maxWidth: 320, height: 2, background: '#eee', margin: '6px 0' }} />
@@ -1141,18 +1244,32 @@ function GeometriaGameLocal({ usuario, onExit, onHostStart, onClientJoin }) {
                         {modoJuego && <span style={{ color: '#888', fontWeight: 500 }}> · {modoJuego}</span>}
                     </p>
                     <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
-                        <button onClick={() => setMostrarEnvioFin(true)} style={{ ...sLocal.btnPrimary, background: 'linear-gradient(135deg,#27ae60,#2ecc71)' }}>📤 Enviar al profesor</button>
+                        {/* Si el reto viene de una prueba de competición, el resultado va SOLO allí */}
+                        <button onClick={() => setMostrarEnvioFin(true)}
+                            style={{ ...sLocal.btnPrimary, background: esRetoCompeticion ? 'linear-gradient(135deg,#f39c12,#e67e22)' : 'linear-gradient(135deg,#27ae60,#2ecc71)' }}>
+                            {esRetoCompeticion ? '🏆 Enviar a la competición' : '📤 Enviar al profesor'}
+                        </button>
                         <button onClick={handleExit} style={{ ...sLocal.btnPrimary, background: '#009688' }}>Salir al Menú</button>
                     </div>
-                    {mostrarEnvioFin && (
+                    {mostrarEnvioFin && esRetoCompeticion && (
+                        <ModalEnviarCompeticion
+                            compId={reto.compId} catId={reto.catId}
+                            puntos={score}
+                            detalle={{ aciertos: Math.round(score / 10), total: gameConfig.numEjercicios }}
+                            nombreJuego="Geometrix" tituloReto={reto.titulo || ''}
+                            onClose={() => setMostrarEnvioFin(false)}
+                        />
+                    )}
+                    {mostrarEnvioFin && !esRetoCompeticion && (
                         <ModalEnviarGeo
                             usuario={usuario}
                             datos={{
                                 aciertos: Math.round(score / 10),
                                 total: gameConfig.numEjercicios,
                                 puntos: score,
-                                modo: modoJuego || 'Geometrix',
-                                configDesc: modoJuego === 'Configurado' ? describirConfig(gameConfig) : '',
+                                modo: reto ? ('Reto' + (reto.titulo ? ': ' + reto.titulo : '')) : (modoJuego || 'Geometrix'),
+                                reto: reto ? (reto.titulo || 'Reto compartido') : null,
+                                configDesc: (reto || modoJuego === 'Configurado') ? describirConfig(gameConfig) : '',
                             }}
                             onClose={() => setMostrarEnvioFin(false)}
                         />

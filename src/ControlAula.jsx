@@ -16,12 +16,13 @@ import React, { useEffect, useMemo, useRef, useState, lazy, Suspense } from 'rea
 import { db, auth } from './firebase';
 import {
     doc, setDoc, updateDoc, onSnapshot, collection, getDoc, getDocs,
-    query, where, serverTimestamp, deleteField,
+    query, where, serverTimestamp, deleteField, deleteDoc,
 } from 'firebase/firestore';
 import { onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { Radio, Rocket, Bell, Link as LinkIcon, LogIn, Trophy, Gamepad2 } from 'lucide-react';
-import usePresenceRoom, { ESTADO } from './hooks/usePresenceRoom';
+import usePresenceRoom, { ESTADO, getDeviceId } from './hooks/usePresenceRoom';
 import { EditorEscrituraAlumno, FormEscritura, PanelEscrituraProfesor } from './EditorEscritura';
+import { FormAppAula, AppAulaRunner, APPS_AULA } from './AppsAula';
 
 // Juegos puntuables cargados bajo demanda (comparten el contrato modoOlimpico).
 const PasapalabraGame  = lazy(() => import('./PasapalabraGame'));
@@ -86,7 +87,13 @@ const CODIGO_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const generarCodigo = (n = 5) =>
     Array.from({ length: n }, () => CODIGO_CHARS[Math.floor(Math.random() * CODIGO_CHARS.length)]).join('');
 
-const DESCONEXION_MS = 15000;
+// Sin latido recibido en este tiempo → desconectado. Las pestañas ocultas tienen los temporizadores
+// frenados por el navegador (hasta 1/min), así que a un alumno desenfocado se le da más margen.
+const DESCONEXION_MS = 20000;
+const DESCONEXION_OCULTO_MS = 90000;
+
+// Nombre normalizado para detectar al mismo alumno que vuelve a entrar ("Lucía " = "lucia").
+const normNombre = (s = '') => s.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ');
 
 const absoluteUrl = (url) => {
     if (/^https?:\/\//i.test(url)) return url;
@@ -149,6 +156,9 @@ export function TeacherControlPanel() {
     const [tiempoSel, setTiempoSel] = useState(60);
 
     const prevFocusCounts = useRef({});
+    // Cuándo recibió ESTE panel el último latido de cada alumno (reloj del profe). No se compara la
+    // hora del dispositivo del alumno con la del profe: un reloj desfasado lo daba por desconectado.
+    const vistoRef = useRef({}); // id → { marca, at }
     const primeraCargaAlumnos = useRef(true);
 
     const roomRef = useMemo(() => doc(db, 'control_rooms', codigo), [codigo]);
@@ -193,7 +203,21 @@ export function TeacherControlPanel() {
         });
 
         const unsubAlumnos = onSnapshot(collection(db, 'control_rooms', codigo, 'students'), (snap) => {
-            const lista = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+            const ahora = Date.now();
+            const lista = snap.docs.map((d) => {
+                const a = { id: d.id, ...d.data() };
+                const marca = a.lastSeenMs ?? null;
+                const prev = vistoRef.current[a.id];
+                if (!prev) {
+                    // Primera vez que lo vemos: edad según la hora del servidor (lastSeen).
+                    const srv = a.lastSeen?.toMillis?.();
+                    vistoRef.current[a.id] = { marca, at: srv ? Math.min(ahora, srv) : 0 };
+                } else if (prev.marca !== marca) {
+                    vistoRef.current[a.id] = { marca, at: ahora };
+                }
+                a._vistoAt = vistoRef.current[a.id].at;
+                return a;
+            });
             if (!primeraCargaAlumnos.current) {
                 lista.forEach((a) => {
                     const prev = prevFocusCounts.current[a.id] ?? 0;
@@ -253,9 +277,16 @@ export function TeacherControlPanel() {
     };
 
     const estadoEfectivo = (a) => {
-        const stale = a.lastSeenMs && (Date.now() - a.lastSeenMs > DESCONEXION_MS);
+        const limite = a.estado === ESTADO.DESENFOCADO ? DESCONEXION_OCULTO_MS : DESCONEXION_MS;
+        const stale = Date.now() - (a._vistoAt || 0) > limite;
         if (a.estado === ESTADO.DESCONECTADO || stale) return ESTADO.DESCONECTADO;
         return a.estado || ESTADO.ACTIVO;
+    };
+
+    // Quitar de la lista a un alumno desconectado (p. ej. una entrada antigua con otro nombre).
+    const quitarAlumno = async (a) => {
+        if (!window.confirm(`¿Quitar a ${a.name || 'este alumno'} de la sala? Si vuelve a entrar aparecerá de nuevo.`)) return;
+        try { await deleteDoc(doc(db, 'control_rooms', codigo, 'students', a.id)); } catch (e) { console.error(e); }
     };
 
     // Al elegir un recurso, preselecciona el primer modo y hoja disponibles.
@@ -288,9 +319,29 @@ export function TeacherControlPanel() {
         } catch (e) { console.error(e); }
     };
 
+    // App de idiomas (AppsAula.jsx) con la configuración del profe; comparte marcador y ranking con las partidas.
+    const lanzarApp = async ({ app, config, rondasMax, titulo, detalle }) => {
+        if (escritura && !window.confirm('Hay un trabajo de escritura abierto. ¿Cerrarlo y lanzar la app? (Descarga antes los textos)')) return;
+        try {
+            await updateDoc(roomRef, {
+                currentRoute: null, currentLabel: null,
+                escritura: deleteField(),
+                game: {
+                    launchId: `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                    app, config, rondasMax,
+                    recursoTitulo: titulo,
+                    modo: detalle,
+                    state: 'PLAYING',
+                    startedAt: Date.now(),
+                    ranking: null,
+                },
+            });
+        } catch (e) { console.error(e); }
+    };
+
     const rankingActual = () => (alumnos || [])
         .filter((a) => a.lastScore && game && a.lastScore.launchId === game.launchId)
-        .map((a) => ({ name: a.name || 'Alumno', puntuacion: a.lastScore.puntuacion || 0 }))
+        .map((a) => ({ name: a.name || 'Alumno', puntuacion: a.lastScore.puntuacion || 0, ...(game.app ? { rondas: a.lastScore.rondas || 0 } : {}) }))
         .sort((x, y) => y.puntuacion - x.puntuacion);
 
     const terminarPartida = async () => {
@@ -346,7 +397,9 @@ export function TeacherControlPanel() {
     const totalIncidencias = alumnos.reduce((s, a) => s + (a.focusLostCount || 0), 0);
     const conectados = alumnos.filter((a) => estadoEfectivo(a) !== ESTADO.DESCONECTADO);
     const jugando = game && game.state === 'PLAYING';
-    const jugadoresPartida = game ? alumnos.filter((a) => a.lastScore?.launchId === game.launchId) : [];
+    // En las apps de idiomas lastScore se va actualizando durante la partida: solo cuenta como terminado con `terminado`.
+    const jugadoresPartida = game ? alumnos.filter((a) => a.lastScore?.launchId === game.launchId && (!game.app || a.lastScore.terminado)) : [];
+    const unidadRonda = game?.app ? APPS_AULA[game.app]?.ronda || 'rondas' : '';
 
     const modosDisponibles = recursoSel ? (MODOS_POR_TIPO[recursoSel.tipoJuego] || []) : [];
 
@@ -457,7 +510,7 @@ export function TeacherControlPanel() {
                             <h3 style={{ margin: '0 0 12px', color: '#5b21b6', display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <Trophy size={22} color="#f59e0b" /> Ranking — {game.recursoTitulo}
                             </h3>
-                            <RankingList ranking={game.ranking || []} />
+                            <RankingList ranking={game.ranking || []} unidad={unidadRonda} />
                             <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
                                 <button onClick={elegirOtroJuego} style={btnStyle('#7c3aed')}>🎮 Elegir otro juego</button>
                             </div>
@@ -467,6 +520,7 @@ export function TeacherControlPanel() {
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
                                 <h3 style={{ margin: 0, color: '#5b21b6', display: 'flex', alignItems: 'center', gap: 8 }}>
                                     <Gamepad2 size={22} /> Partida en curso: {game.recursoTitulo}
+                                    {game.app && <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#6d28d9' }}>· {game.modo}{game.rondasMax > 0 ? ` · ${game.rondasMax} ${unidadRonda}` : ''}</span>}
                                 </h3>
                                 <span style={{ fontSize: '0.85rem', color: '#6d28d9', fontWeight: 700 }}>
                                     {jugadoresPartida.length}/{conectados.length} han terminado
@@ -475,11 +529,16 @@ export function TeacherControlPanel() {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
                                 {conectados.length === 0 && <div style={{ color: '#94a3b8', fontSize: '0.9rem' }}>No hay alumnos conectados.</div>}
                                 {conectados.map((a) => {
-                                    const s = a.lastScore?.launchId === game.launchId ? a.lastScore.puntuacion : null;
+                                    const ls = a.lastScore?.launchId === game.launchId ? a.lastScore : null;
+                                    const s = ls ? ls.puntuacion : null;
+                                    let txt = s == null ? '⏳ jugando…' : `${s} pts`;
+                                    if (game.app && ls) {
+                                        txt = `${ls.terminado ? '✅ ' : '▶️ '}${s} pts · ${ls.rondas || 0}${game.rondasMax > 0 ? '/' + game.rondasMax : ''} ${unidadRonda}`;
+                                    }
                                     return (
                                         <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', background: 'white', borderRadius: 8, padding: '7px 12px', fontSize: '0.9rem' }}>
                                             <span style={{ fontWeight: 600, color: '#334155' }}>{a.name || 'Alumno'}</span>
-                                            <span style={{ fontWeight: 800, color: s == null ? '#94a3b8' : '#16a34a' }}>{s == null ? '⏳ jugando…' : `${s} pts`}</span>
+                                            <span style={{ fontWeight: 800, color: s == null ? '#94a3b8' : '#16a34a' }}>{txt}</span>
                                         </div>
                                     );
                                 })}
@@ -542,6 +601,7 @@ export function TeacherControlPanel() {
                         </>
                     )}
                 </div>
+                <FormAppAula onLanzar={lanzarApp} numConectados={conectados.length} />
                 <FormEscritura onLanzar={lanzarEscritura} numConectados={conectados.length} codigoProfesor={codigoProfesor} />
                 </>
             )}
@@ -566,7 +626,13 @@ export function TeacherControlPanel() {
                                                 <span title="Veces que ha perdido el foco" style={{ background: '#fee2e2', color: '#b91c1c', borderRadius: 20, padding: '1px 8px', fontSize: '0.72rem', fontWeight: 800 }}>×{a.focusLostCount}</span>
                                             )}
                                         </div>
-                                        {badge(est)}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            {badge(est)}
+                                            {est === ESTADO.DESCONECTADO && (
+                                                <button onClick={() => quitarAlumno(a)} title="Quitar de la sala"
+                                                    style={{ background: 'none', border: '1px solid #e2e8f0', borderRadius: 8, cursor: 'pointer', padding: '2px 7px', color: '#94a3b8' }}>✕</button>
+                                            )}
+                                        </div>
                                     </div>
                                 );
                             })}
@@ -641,7 +707,7 @@ function ResumenCard({ color, label, valor, icon }) {
     );
 }
 
-function RankingList({ ranking, miNombre }) {
+function RankingList({ ranking, miNombre, unidad = 'rondas' }) {
     const medalla = (i) => ['🥇', '🥈', '🥉'][i] || `${i + 1}.`;
     if (!ranking.length) return <div style={{ color: '#94a3b8', padding: '10px 0' }}>Nadie ha enviado puntuación.</div>;
     return (
@@ -653,7 +719,9 @@ function RankingList({ ranking, miNombre }) {
                         <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontWeight: 700, color: '#1e293b' }}>
                             <span style={{ fontSize: '1.1rem', minWidth: 26 }}>{medalla(i)}</span> {r.name}{yo ? ' (tú)' : ''}
                         </span>
-                        <span style={{ fontWeight: 800, color: '#7c3aed' }}>{r.puntuacion} pts</span>
+                        <span style={{ fontWeight: 800, color: '#7c3aed' }}>
+                            {r.puntuacion} pts{r.rondas != null && <span style={{ fontWeight: 600, color: '#64748b', fontSize: '0.8rem' }}> · {r.rondas} {unidad}</span>}
+                        </span>
                     </div>
                 );
             })}
@@ -674,16 +742,16 @@ export function StudentJoinView({ codigoInicial = '', onExit }) {
     const [recursoData, setRecursoData] = useState(null);   // recurso del juego lanzado
     const [finishedLaunch, setFinishedLaunch] = useState(null); // launchId ya jugado por mí
 
-    const studentId = useRef(
-        localStorage.getItem('control_aula_sid') ||
-        (() => { const id = 'stu_' + Math.random().toString(36).slice(2, 10); localStorage.setItem('control_aula_sid', id); return id; })()
-    ).current;
+    // Id del alumno EN ESTA SALA. Se decide al entrar (resolverStudentId): si ya hay alguien con su
+    // nombre se reutiliza su documento → al reconectar (o cambiar de navegador) no se duplica.
+    const [studentId, setStudentId] = useState(null);
+    const [dudaNombre, setDudaNombre] = useState(null); // { code, id } otro dispositivo conectado con ese nombre
 
     const { estado, focusLostCount, room, connected } = usePresenceRoom({
         roomCode: entrado ? codigo : null,
         studentId,
         name: nombre,
-        enabled: entrado,
+        enabled: entrado && !!studentId,
     });
 
     const game = room?.game || null;
@@ -698,6 +766,46 @@ export function StudentJoinView({ codigoInicial = '', onExit }) {
         return () => { vivo = false; };
     }, [game?.recursoId, game?.launchId]);
 
+    // Apps de idiomas: lo ya guardado en esta partida (por si el alumno recarga a mitad) se suma a lo nuevo.
+    const [baseApp, setBaseApp] = useState(null); // { launchId, puntos, rondas }
+    const ultimoProgreso = useRef(null);
+    useEffect(() => {
+        ultimoProgreso.current = null;
+        if (!game?.app || !entrado) { setBaseApp(null); return; }
+        let vivo = true;
+        getDoc(doc(db, 'control_rooms', codigo, 'students', studentId))
+            .then((snap) => {
+                const ls = snap.data()?.lastScore;
+                const mia = ls && ls.launchId === game.launchId;
+                if (!vivo) return;
+                setBaseApp({ launchId: game.launchId, puntos: mia ? ls.puntuacion || 0 : 0, rondas: mia ? ls.rondas || 0 : 0 });
+                if (mia && (ls.terminado || (game.rondasMax > 0 && (ls.rondas || 0) >= game.rondasMax))) setFinishedLaunch(game.launchId);
+            })
+            .catch(() => { if (vivo) setBaseApp({ launchId: game.launchId, puntos: 0, rondas: 0 }); });
+        return () => { vivo = false; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [game?.app, game?.launchId, entrado]);
+
+    const guardarLastScoreApp = async (total, terminado) => {
+        try {
+            await setDoc(doc(db, 'control_rooms', codigo, 'students', studentId),
+                { lastScore: { launchId: game.launchId, ...total, terminado, at: Date.now() } },
+                { merge: true });
+        } catch (e) { console.error(e); }
+    };
+    // El juego informa de lo acumulado en su sesión; se suma a la base guardada.
+    const enviarProgresoApp = ({ puntos = 0, rondas = 0 }) => {
+        if (!game?.app || !baseApp) return;
+        const total = { puntuacion: baseApp.puntos + (Number(puntos) || 0), rondas: baseApp.rondas + rondas };
+        ultimoProgreso.current = total;
+        guardarLastScoreApp(total, false);
+    };
+    const terminarApp = () => {
+        if (!game?.app) return;
+        setFinishedLaunch(game.launchId);
+        guardarLastScoreApp(ultimoProgreso.current || { puntuacion: baseApp?.puntos || 0, rondas: baseApp?.rondas || 0 }, true);
+    };
+
     const enviarPuntuacion = async (puntuacion) => {
         if (!game) return;
         setFinishedLaunch(game.launchId);
@@ -708,21 +816,81 @@ export function StudentJoinView({ codigoInicial = '', onExit }) {
         } catch (e) { console.error(e); }
     };
 
+    const lsSesion = (code) => `control_aula_sesion_${code}`;
+    const nuevoId = () => 'stu_' + Math.random().toString(36).slice(2, 10);
+
+    // Busca en la sala un alumno con el mismo nombre para reutilizar su documento.
+    //  - mismo dispositivo, o el otro lleva rato sin latir → se reutiliza sin preguntar;
+    //  - otro dispositivo que sigue conectado → se pregunta si es él (o es otro alumno con el mismo nombre).
+    const resolverStudentId = async (code, nom) => {
+        const clave = normNombre(nom);
+        let guardada = null;
+        try { guardada = JSON.parse(localStorage.getItem(lsSesion(code))); } catch { /* nada */ }
+        let docs = [];
+        try { docs = (await getDocs(collection(db, 'control_rooms', code, 'students'))).docs; } catch {
+            // Sin red: la sesión guardada en este dispositivo (si es el mismo nombre) o uno nuevo.
+            return { id: guardada && normNombre(guardada.nombre) === clave ? guardada.id : nuevoId() };
+        }
+        const mismos = docs.filter((d) => normNombre(d.data().name) === clave);
+        if (!mismos.length) return { id: nuevoId() };
+        const miDisp = getDeviceId();
+        const propio = mismos.find((d) => d.id === guardada?.id) || mismos.find((d) => d.data().deviceId === miDisp);
+        if (propio) return { id: propio.id };
+        // El de otro dispositivo: ¿sigue vivo? (hora del servidor; margen amplio por si el reloj va desfasado)
+        const vivo = mismos.find((d) => {
+            const x = d.data();
+            const srv = x.lastSeen?.toMillis?.() || 0;
+            return x.estado !== ESTADO.DESCONECTADO && Math.abs(Date.now() - srv) < 60000;
+        });
+        if (vivo) return { id: vivo.id, duda: true };
+        return { id: mismos[0].id };
+    };
+
+    const confirmarEntrada = (code, id) => {
+        try { localStorage.setItem(lsSesion(code), JSON.stringify({ id, nombre: nombre.trim() })); } catch { /* nada */ }
+        setStudentId(id);
+        setDudaNombre(null);
+        setEntrado(true);
+    };
+
     const entrar = async () => {
         setError('');
         if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
         if (!codigo.trim()) { setError('Escribe el código de la sala.'); return; }
         setComprobando(true);
         try {
-            const snap = await getDoc(doc(db, 'control_rooms', codigo.trim().toUpperCase()));
+            const code = codigo.trim().toUpperCase();
+            const snap = await getDoc(doc(db, 'control_rooms', code));
             if (!snap.exists() || snap.data().active === false) {
                 setError('La sala no existe o está cerrada.'); setComprobando(false); return;
             }
             localStorage.setItem('control_aula_nombre', nombre.trim());
-            setCodigo(codigo.trim().toUpperCase());
-            setEntrado(true);
+            setCodigo(code);
+            const r = await resolverStudentId(code, nombre);
+            if (r.duda) setDudaNombre({ code, id: r.id });
+            else confirmarEntrada(code, r.id);
         } catch (e) { setError('Error de conexión. Inténtalo de nuevo.'); }
         setComprobando(false);
+    };
+
+    // Recargar la página con ?aula=CODE → vuelve a entrar solo con la sesión guardada (mismo documento).
+    const autoEntrada = useRef(false);
+    useEffect(() => {
+        if (autoEntrada.current || entrado || !codigoInicial) return;
+        autoEntrada.current = true;
+        try {
+            const s = JSON.parse(localStorage.getItem(lsSesion(codigoInicial.toUpperCase())));
+            if (s?.id && s.nombre && normNombre(s.nombre) === normNombre(nombre)) entrar();
+        } catch { /* nada */ }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    const salirDeSala = () => {
+        try { localStorage.removeItem(lsSesion(codigo)); } catch { /* nada */ }
+        if (studentId) setDoc(doc(db, 'control_rooms', codigo, 'students', studentId), { estado: ESTADO.DESCONECTADO }, { merge: true }).catch(() => {});
+        setEntrado(false);
+        setStudentId(null);
+        onExit?.();
     };
 
     // ── Formulario de entrada ──
@@ -743,6 +911,17 @@ export function StudentJoinView({ codigoInicial = '', onExit }) {
                         onKeyDown={(e) => e.key === 'Enter' && entrar()}
                         style={{ width: '100%', padding: '11px 12px', borderRadius: 10, border: '1px solid #cbd5e1', margin: '5px 0 14px', boxSizing: 'border-box', fontSize: '1.3rem', letterSpacing: 4, textAlign: 'center', fontWeight: 800 }} />
                     {error && <div style={{ color: '#dc2626', fontSize: '0.85rem', marginBottom: 10 }}>{error}</div>}
+                    {dudaNombre && (
+                        <div style={{ background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 12, padding: 12, marginBottom: 12, fontSize: '0.88rem', color: '#78350f' }}>
+                            Ya hay alguien conectado como <b>{nombre.trim()}</b> desde otro dispositivo. ¿Eres tú?
+                            <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                                <button onClick={() => confirmarEntrada(dudaNombre.code, dudaNombre.id)}
+                                    style={{ flex: 1, padding: '8px', borderRadius: 8, border: 'none', background: '#16a34a', color: 'white', fontWeight: 700, cursor: 'pointer' }}>Sí, soy yo</button>
+                                <button onClick={() => { setDudaNombre(null); setError('Escribe tu nombre completo o añade tu inicial (ej: Lucía M.).'); }}
+                                    style={{ flex: 1, padding: '8px', borderRadius: 8, border: '1px solid #d97706', background: 'white', color: '#92400e', fontWeight: 700, cursor: 'pointer' }}>No, soy otra persona</button>
+                            </div>
+                        </div>
+                    )}
                     <button onClick={entrar} disabled={comprobando}
                         style={{ width: '100%', padding: '13px', borderRadius: 12, border: 'none', background: '#4f46e5', color: 'white', fontWeight: 800, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                         <LogIn size={18} /> {comprobando ? 'Entrando…' : 'Entrar'}
@@ -757,6 +936,7 @@ export function StudentJoinView({ codigoInicial = '', onExit }) {
     const desenfocado = estado === ESTADO.DESENFOCADO;
     const jugandoAhora = game && game.state === 'PLAYING' && finishedLaunch !== game.launchId;
     const recursoListo = recursoData && game && recursoData.id === game.recursoId;
+    const appLista = game?.app && baseApp?.launchId === game.launchId;
 
     return (
         <div style={{ minHeight: '100vh', background: '#0f172a', display: 'flex', flexDirection: 'column', fontFamily: "'Segoe UI', sans-serif" }}>
@@ -768,7 +948,7 @@ export function StudentJoinView({ codigoInicial = '', onExit }) {
                     <span style={{ width: 10, height: 10, borderRadius: '50%', background: connected ? '#22c55e' : '#f59e0b', display: 'inline-block' }} title={connected ? 'Conectado' : 'Conectando…'} />
                     {focusLostCount > 0 && <span style={{ fontSize: '0.75rem', color: '#fca5a5' }}>Salidas: {focusLostCount}</span>}
                 </div>
-                <button onClick={() => { setEntrado(false); onExit?.(); }} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', borderRadius: 8, padding: '5px 12px', cursor: 'pointer', fontSize: '0.82rem' }}>Salir</button>
+                <button onClick={salirDeSala} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', borderRadius: 8, padding: '5px 12px', cursor: 'pointer', fontSize: '0.82rem' }}>Salir</button>
             </div>
 
             {/* Contenido */}
@@ -777,6 +957,22 @@ export function StudentJoinView({ codigoInicial = '', onExit }) {
                 {room?.escritura ? (
                     <EditorEscrituraAlumno key={room.escritura.taskId} tarea={room.escritura} codigo={codigo} studentId={studentId} nombre={nombre} focusLostCount={focusLostCount} />
                 /* 1) Partida puntuable en curso y aún no la he terminado → jugar */
+                /* 1b) App de idiomas con la configuración del profe */
+                ) : jugandoAhora && game.app ? (
+                    appLista ? (
+                        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
+                            <AppAulaRunner
+                                key={game.launchId}
+                                game={game}
+                                usuario={{ displayName: nombre, uid: studentId }}
+                                rondasMax={game.rondasMax > 0 ? Math.max(1, game.rondasMax - baseApp.rondas) : 0}
+                                onProgreso={enviarProgresoApp}
+                                onTerminar={terminarApp}
+                            />
+                        </div>
+                    ) : (
+                        <CentroMsg emoji="🎮" titulo="Preparando el juego…" sub={game.recursoTitulo} />
+                    )
                 ) : jugandoAhora ? (
                     recursoListo ? (
                         <div style={{ position: 'absolute', inset: 0, overflow: 'auto' }}>
@@ -801,7 +997,7 @@ export function StudentJoinView({ codigoInicial = '', onExit }) {
                             <Trophy color="#f59e0b" /> Ranking — {game.recursoTitulo}
                         </h2>
                         <div style={{ maxWidth: 460, margin: '16px auto' }}>
-                            <RankingList ranking={game.ranking || []} miNombre={nombre} />
+                            <RankingList ranking={game.ranking || []} miNombre={nombre} unidad={APPS_AULA[game.app]?.ronda} />
                         </div>
                         <p style={{ textAlign: 'center', opacity: 0.7 }}>Espera a que tu profe elija el siguiente juego…</p>
                     </div>

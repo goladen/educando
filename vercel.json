@@ -2,17 +2,33 @@
   "headers": [
     {
       "source": "/kartinged/Build/(.*).wasm",
-      "headers": [{ "key": "Content-Type", "value": "application/wasm" }]
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/wasm"
+        }
+      ]
     },
     {
       "source": "/kartinged/Build/(.*).js",
-      "headers": [{ "key": "Content-Type", "value": "application/javascript" }]
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/javascript"
+        }
+      ]
     }
   ],
   "rewrites": [
     {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/instagram?action=sync",
+      "schedule": "0 5 * * *"
     }
   ]
 }

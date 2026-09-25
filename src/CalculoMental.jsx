@@ -8,9 +8,12 @@ import Confetti from 'react-confetti';
 import OcaMatematica from './OcaMatematica';
 import DominoMatematico from './dominofracciones';
 import AscensorEnteros from './AscensorEnteros';
+import ModalCompartirReto from './components/ModalCompartirReto';
+import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
+import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
 
 // ─── Configuración por defecto ────────────────────────────────────────────────
-const DEFAULT_CONFIG = {
+export const DEFAULT_CONFIG = {
     minNum: 1,
     maxNum: 50,
     tiempo: 120,
@@ -49,6 +52,29 @@ const MODOS_PRESET = [
         cfg: null // abre el modal
     },
 ];
+
+// Ruta pública del juego: es la base de los enlaces de reto (pikt.es/calculo?reto=…)
+export const RUTA_CALCULO = '/calculo';
+
+// Resumen legible de una configuración (chips del reto y del modal de compartir)
+export const resumenConfig = (cfg) => {
+    const c = { ...DEFAULT_CONFIG, ...(cfg || {}) };
+    const ops = [
+        c.operaciones?.suma && '+', c.operaciones?.resta && '−',
+        c.operaciones?.multiplicacion && '×', c.operaciones?.division && '÷',
+    ].filter(Boolean).join(' ');
+    const tipos = [
+        c.tipos?.positivos && 'positivos', c.tipos?.negativos && 'negativos',
+        c.tipos?.decimales && 'decimales', c.tipos?.fracciones && 'fracciones',
+    ].filter(Boolean).join(', ');
+    return [
+        c.numEjercicios ? `🔢 ${c.numEjercicios} ejercicios` : `⏱ ${c.tiempo < 60 ? `${c.tiempo} s` : `${c.tiempo / 60} min`}`,
+        `📏 ${c.minNum}–${c.maxNum}`,
+        ops && `➗ ${ops}`,
+        tipos && `🔣 ${tipos}`,
+        c.dual && '🪟 dual (2 tableros)',
+    ].filter(Boolean);
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const rInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
@@ -176,9 +202,13 @@ const generarProblema = (cfg) => {
 };
 
 // ─── Componente Modal de Configuración (estilo Geometrix) ────────────────────
-const ConfigModal = ({ config, onChange, onStart, onClose }) => {
+// Modal de configuración. Se reutiliza fuera del juego (competiciones, retos):
+// `textoAceptar` cambia la etiqueta del botón y `ocultarCompartir` esconde el
+// botón de enlace cuando quien llama ya genera el suyo.
+export const ConfigModal = ({ config, onChange, onStart, onClose, textoAceptar = '▶ Empezar', ocultarCompartir = false }) => {
     const [local, setLocal] = useState({ ...DEFAULT_CONFIG, ...config });
     const [modoConteo, setModoConteo] = useState(config.numEjercicios ? 'ejercicios' : 'tiempo');
+    const [compartir, setCompartir] = useState(false);
 
     const setField = (key, val) => setLocal(prev => ({ ...prev, [key]: val }));
     const toggleTipo = (k) => {
@@ -209,13 +239,16 @@ const ConfigModal = ({ config, onChange, onStart, onClose }) => {
         </div>
     );
 
+    // Config tal y como se jugará (también es la que viaja en el enlace del reto)
+    const configReto = (base) => ({
+        ...base,
+        numEjercicios: modoConteo === 'ejercicios' ? (base.numEjercicios || 10) : null,
+        dual: base.dual ?? false,
+    });
+
     const handleStart = () => {
-        const finalCfg = {
-            ...local,
-            numEjercicios: modoConteo === 'ejercicios' ? (local.numEjercicios || 10) : null,
-            dual: local.dual ?? false,
-        };
-        onChange(finalCfg);
+        const finalCfg = configReto(local);
+        onChange && onChange(finalCfg);
         onStart(finalCfg);
     };
 
@@ -290,12 +323,22 @@ const ConfigModal = ({ config, onChange, onStart, onClose }) => {
                     </Chip>
                 </Section>
 
-                <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 20 }}>
+                <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 20, flexWrap: 'wrap' }}>
                     <button onClick={onClose} style={{ padding: '12px 24px', background: '#f0f0f0', color: '#555', border: 'none', borderRadius: 30, fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer' }}>Cancelar</button>
+                    {!ocultarCompartir && (
+                        <button onClick={() => setCompartir(true)} style={{ padding: '12px 22px', background: 'white', color: '#1565C0', border: '2px solid #1565C0', borderRadius: 30, fontSize: '0.95rem', fontWeight: 'bold', cursor: 'pointer' }}>
+                            🔗 Compartir reto
+                        </button>
+                    )}
                     <button onClick={handleStart} style={{ padding: '12px 28px', background: '#9b59b6', color: 'white', border: 'none', borderRadius: 30, fontSize: '1.05rem', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 12px #9b59b655' }}>
-                        ▶ Empezar
+                        {textoAceptar}
                     </button>
                 </div>
+
+                {compartir && (
+                    <ModalCompartirReto ruta={RUTA_CALCULO} config={configReto(local)} resumen={resumenConfig(local)}
+                        nombreJuego="Cálculo Mental" onClose={() => setCompartir(false)} />
+                )}
             </div>
         </div>
     );
@@ -331,6 +374,7 @@ function ModalEnviarProfe({ datos, onClose }) {
                     puntos: datos.puntos,
                     skips: datos.skips,
                     porcentaje: Math.round((datos.aciertos / Math.max(1, intentos)) * 100),
+                    reto: datos.reto || null,
                     config: {
                         operaciones: datos.config.operaciones,
                         tipos: datos.config.tipos,
@@ -397,7 +441,9 @@ export default function CalculoMentalGame({ usuario, onExit }) {
     const [showDomino, setShowDomino] = useState(false);
     const [showAscensor, setShowAscensor] = useState(false);
     const [mostrarEnvio, setMostrarEnvio] = useState(false);
-    const [config, setConfig] = useState(DEFAULT_CONFIG);
+    // Reto compartido: si la URL trae ?reto=…, la configuración es fija para todos
+    const [reto, setReto] = useState(() => leerRetoUrl());
+    const [config, setConfig] = useState(() => { const r = leerRetoUrl(); return r ? { ...DEFAULT_CONFIG, ...r.config } : DEFAULT_CONFIG; });
     const [showConfig, setShowConfig] = useState(false);
     const [timeLeft, setTimeLeft] = useState(DEFAULT_CONFIG.tiempo);
     const [score, setScore] = useState(0);
@@ -432,6 +478,8 @@ export default function CalculoMentalGame({ usuario, onExit }) {
     const isMobile = typeof window !== 'undefined' && window.innerWidth <= 600;
 
     const modoEjercicios = !!config.numEjercicios;
+    // Reto lanzado desde una prueba de competición: el resultado va solo a esa prueba
+    const esRetoCompeticion = !!(reto && reto.compId && reto.catId);
 
     // Sonido de fin de partida
     useEffect(() => { if (gameState === 'END') sonidoFinal(); }, [gameState]);
@@ -610,17 +658,21 @@ export default function CalculoMentalGame({ usuario, onExit }) {
     };
 
     const compartir = () => {
-        const url = 'pikt.es/calculo';
+        // Con un reto activo se comparte la URL completa (lleva la configuración dentro)
+        const url = reto ? window.location.href : `${window.location.origin}${RUTA_CALCULO}`;
         if (navigator.share) {
-            navigator.share({ 
-                title: 'Cálculo Mental', 
-                text: 'Juega aquí', 
-                url: window.location.href 
+            navigator.share({
+                title: reto ? (reto.titulo || 'Reto de Cálculo Mental') : 'Cálculo Mental',
+                text: 'Juega aquí',
+                url,
             }).catch(() => {});
         } else {
-            navigator.clipboard.writeText(url).then(() => alert('✅ Enlace copiado'));
+            navigator.clipboard.writeText(url).then(() => alert('✅ Enlace copiado')).catch(() => window.prompt('Copia el enlace:', url));
         }
     };
+
+    // Salir del reto y volver al menú normal (modo libre)
+    const salirDelReto = () => { limpiarRetoUrl(); setReto(null); setConfig(DEFAULT_CONFIG); };
 
     // Botones de ajuste dinámicos según tipo de problema (modo single)
     const getBotones = () => {
@@ -696,8 +748,46 @@ export default function CalculoMentalGame({ usuario, onExit }) {
                 )}
             </div>
 
+            {/* INICIO — RETO COMPARTIDO (configuración fija para todos) */}
+            {gameState === 'START' && reto && (
+                <div style={{ ...st.centerCard, maxWidth: 520 }}>
+                    <div style={{ fontSize: '2.6rem', marginBottom: 4 }}>🎯</div>
+                    <h1 style={{ color: '#2c3e50', fontSize: isMobile ? '1.5rem' : '1.9rem', margin: '4px 0 2px' }}>
+                        {reto.titulo || 'Reto de Cálculo Mental'}
+                    </h1>
+                    <p style={{ color: '#999', marginBottom: 18, fontSize: '0.88rem' }}>
+                        Todos los participantes juegan con esta misma configuración
+                    </p>
+
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, justifyContent: 'center', marginBottom: 22 }}>
+                        {resumenConfig(config).map((r, i) => (
+                            <span key={i} style={{ background: '#fce4ec', color: '#E91E63', borderRadius: 20, padding: '6px 14px', fontSize: '0.84rem', fontWeight: 700 }}>{r}</span>
+                        ))}
+                    </div>
+
+                    {esRetoCompeticion && (
+                        <div style={{ background: "#fff8e1", color: "#8a6d00", borderRadius: 10, padding: "8px 12px", fontSize: "0.82rem", fontWeight: 600, marginBottom: 16 }}>
+                            🏆 Prueba de competición · al terminar envía tu puntuación con tu alias y tu contraseña
+                        </div>
+                    )}
+                    <button onClick={() => startGame(config)}
+                        style={{ width: '100%', padding: '15px', background: 'linear-gradient(135deg,#E91E63,#c2185b)', color: 'white', border: 'none', borderRadius: 16, fontSize: '1.1rem', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 6px 18px #E91E6355' }}>
+                        ▶ Empezar el reto
+                    </button>
+
+                    <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 14, flexWrap: 'wrap' }}>
+                        <button onClick={compartir} style={{ background: 'none', border: 'none', color: '#1565C0', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem', fontFamily: 'inherit' }}>
+                            🔗 Compartir este reto
+                        </button>
+                        <button onClick={salirDelReto} style={{ background: 'none', border: 'none', color: '#999', cursor: 'pointer', fontSize: '0.85rem', fontFamily: 'inherit' }}>
+                            Jugar en modo libre
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* INICIO */}
-            {gameState === 'START' && (
+            {gameState === 'START' && !reto && (
                 <div style={{ ...st.centerCard, maxWidth: 560 }}>
                     <Brain size={52} color="#E91E63" style={{ marginBottom: 10 }} />
                     <h1 style={{ color: '#2c3e50', fontSize: isMobile ? '1.8rem' : '2.3rem', margin: '6px 0 4px' }}>Cálculo Mental</h1>
@@ -733,6 +823,14 @@ export default function CalculoMentalGame({ usuario, onExit }) {
                                 <span style={{ color: m.color, fontSize: '1.3rem', flexShrink: 0 }}>›</span>
                             </button>
                         ))}
+
+                        {/* Crear un reto: enlace con una configuración fija para todos */}
+                        <button onClick={() => setShowConfig(true)}
+                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 14px',
+                                background: '#eef4fb', border: '1.5px dashed #1565C0', borderRadius: 14, color: '#1565C0',
+                                fontWeight: 700, fontSize: '0.86rem', cursor: 'pointer', fontFamily: 'inherit', width: '100%' }}>
+                            🔗 Crear un reto con enlace <span style={{ fontWeight: 500, color: '#5b7ba6' }}>· misma configuración para todos</span>
+                        </button>
 
                         {/* Separador */}
                         <div style={{ display:'flex', alignItems:'center', gap:10, margin:'2px 0' }}>
@@ -955,22 +1053,39 @@ export default function CalculoMentalGame({ usuario, onExit }) {
                         <button onClick={() => startGame(config)} style={{ ...st.btnPrimary, background: '#E91E63' }}>
                             <RotateCcw size={16} /> Repetir
                         </button>
-                        <button onClick={() => { setShowConfig(true); setGameState('START'); }} style={{ ...st.btnPrimary, background: '#7f8c8d' }}>
-                            <Settings size={16} /> Configurar
-                        </button>
+                        {!reto && (
+                            <button onClick={() => { setShowConfig(true); setGameState('START'); }} style={{ ...st.btnPrimary, background: '#7f8c8d' }}>
+                                <Settings size={16} /> Configurar
+                            </button>
+                        )}
                         <button onClick={() => setGameState('START')} style={st.btnVolver}>Menú</button>
-                        <button onClick={() => setMostrarEnvio(true)} style={{ ...st.btnPrimary, background: 'linear-gradient(135deg,#27ae60,#2ecc71)' }}>
-                            📤 Enviar al profesor
-                        </button>
+                        {/* Si el reto viene de una prueba de competición, el resultado va SOLO allí */}
+                        {esRetoCompeticion ? (
+                            <button onClick={() => setMostrarEnvio(true)} style={{ ...st.btnPrimary, background: 'linear-gradient(135deg,#f39c12,#e67e22)' }}>
+                                🏆 Enviar a la competición
+                            </button>
+                        ) : (
+                            <button onClick={() => setMostrarEnvio(true)} style={{ ...st.btnPrimary, background: 'linear-gradient(135deg,#27ae60,#2ecc71)' }}>
+                                📤 Enviar al profesor
+                            </button>
+                        )}
                     </div>
                 </div>
             )}
-            {mostrarEnvio && (
-                <ModalEnviarProfe
-                    datos={{ aciertos, fallos, puntos: config.dual ? score1 + score2 : score, skips, config }}
+            {mostrarEnvio && (esRetoCompeticion ? (
+                <ModalEnviarCompeticion
+                    compId={reto.compId} catId={reto.catId}
+                    puntos={config.dual ? score1 + score2 : score}
+                    detalle={{ aciertos, fallos, skips }}
+                    nombreJuego="Cálculo Mental" tituloReto={reto.titulo || ''}
                     onClose={() => setMostrarEnvio(false)}
                 />
-            )}
+            ) : (
+                <ModalEnviarProfe
+                    datos={{ aciertos, fallos, puntos: config.dual ? score1 + score2 : score, skips, config, reto: reto ? (reto.titulo || 'Reto compartido') : null }}
+                    onClose={() => setMostrarEnvio(false)}
+                />
+            ))}
         </div>
     );
 }

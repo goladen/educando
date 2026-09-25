@@ -7,6 +7,7 @@
 // épocas, categorías, países, campos y datos curiosos de personajesHistoricos.js).
 
 const EN = {
+    'Total': 'Total', 'puntos': 'points', 'Terminar': 'Finish', 'Siguiente personaje': 'Next character',
     // — UI —
     'Salir': 'Exit',
     '¿Quién es quién? histórico': 'Guess Who? — Historical',
@@ -367,6 +368,7 @@ const EN = {
 };
 
 const CA = {
+    'Total': 'Total', 'puntos': 'punts', 'Terminar': 'Acabar', 'Siguiente personaje': 'Següent personatge',
     'Salir': 'Surt', '¿Quién es quién? histórico': 'Qui és qui? — Històric', 'Elige el reto': 'Tria el repte',
     'Adivina el personaje histórico secreto usando las pistas y tus conocimientos.': 'Endevina el personatge històric secret fent servir les pistes i els teus coneixements.',
     'Idioma del juego': 'Idioma del joc', 'Modo': 'Mode', 'Al azar': 'A l’atzar', 'Elegir personaje': 'Triar personatge',
@@ -676,6 +678,7 @@ const CA = {
 };
 
 const FR = {
+    'Total': 'Total', 'puntos': 'points', 'Terminar': 'Terminer', 'Siguiente personaje': 'Personnage suivant',
     'Salir': 'Quitter', '¿Quién es quién? histórico': 'Qui est-ce ? — Historique', 'Elige el reto': 'Choisis le défi',
     'Adivina el personaje histórico secreto usando las pistas y tus conocimientos.': 'Devine le personnage historique secret à l’aide des indices et de tes connaissances.',
     'Idioma del juego': 'Langue du jeu', 'Modo': 'Mode', 'Al azar': 'Au hasard', 'Elegir personaje': 'Choisir le personnage',

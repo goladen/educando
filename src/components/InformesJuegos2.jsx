@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import GruposTab, { AgrupacionesTab } from './GruposTab';
 import MapaAula from './MapaAula';
 import { QuienEsQuienPanel } from '../QuienEsQuien';
-import { PreguntasTexto } from '../EditorEscritura';
+import { PreguntasTexto, ChipsClave } from '../EditorEscritura';
 import ModalAgregarAGrupo from './ModalAgregarAGrupo';
 import { db } from '../firebase';
 import {
@@ -54,8 +54,8 @@ const ConfigBadge = ({ icon, label }) => (
         {icon} {label}
     </span>
 );
-const TIPO_LABEL  = { ESCRITURA:'✍️ Trabajo de escritura', MINIAPP:'⚡ Mini-app', OCA:'🦆 Oca Matemática', CAZABURBUJAS:'🔵 Cazaburbujas', PIKATRON:'⚡ Pikatron', SOPA:'🔤 Sopa de Letras', WORDLE:'🟩 Wordle', AHORCADO:'🪢 Ahorcado', MATHLE:'🔢 Mathle', PASAPALABRA:'🔠 Pasapalabra', FUNCIONES:'∫ Funciones', FUNCIONES_ANALISIS:'📈 Análisis de Funciones', APAREJADOS:'🃏 Aparejados', STORYCUBES:'🎲 Story Cubes', IRREGULAR_VERBS:'🇬🇧 Verbos Irregulares', THINKHOOT:'🦉 PiLive', MATHLIVE:'🧮 MathLive', OLYMPICLIVE:'🏅 OlympicLive', ALGEBRA:'✖️ Álgebra', DOMINO:'🁣 Dominó', ESTADISTICA:'📊 Estadística', MUSIC_COMPASS:'🎵 Entrenamiento Auditivo', MUSIC_GAMES:'🎼 Juegos Musicales', GEOGRAFIA:'🌍 Test de Geografía', BIOLOGIA:'🔬 Test de Biología', FUTBOLQUIZZ:'⚽ Fútbol Quizz', BUNKER:'🎯 Bunker Quiz', CALAMAR:'🦑 Luz roja · Luz verde', GEOMETRIX:'📐 Geometrix', GEOMETRIX_COMPUESTO:'🏗️ Geometrix · Compuestas', PERIMETRO_AREA:'📏 Perímetro y Área' };
-const TIPO_ICON   = { ESCRITURA:'✍️', MINIAPP:'⚡', OCA:'🦆', CAZABURBUJAS:'🔵', PIKATRON:'⚡', SOPA:'🔤', WORDLE:'🟩', AHORCADO:'🪢', MATHLE:'🔢', PASAPALABRA:'🔠', FUNCIONES:'∫', FUNCIONES_ANALISIS:'📈', APAREJADOS:'🃏', STORYCUBES:'🎲', IRREGULAR_VERBS:'🇬🇧', THINKHOOT:'🦉', MATHLIVE:'🧮', OLYMPICLIVE:'🏅', ALGEBRA:'✖️', DOMINO:'🁣', ESTADISTICA:'📊', MUSIC_COMPASS:'🎵', MUSIC_GAMES:'🎼', GEOGRAFIA:'🌍', BIOLOGIA:'🔬', FUTBOLQUIZZ:'⚽', BUNKER:'🎯', CALAMAR:'🦑', GEOMETRIX:'📐', GEOMETRIX_COMPUESTO:'🏗️', PERIMETRO_AREA:'📏' };
+const TIPO_LABEL  = { ESCRITURA:'✍️ Trabajo de escritura', MINIAPP:'⚡ Mini-app', OCA:'🦆 Oca Matemática', CAZABURBUJAS:'🔵 Cazaburbujas', PIKATRON:'⚡ Pikatron', SOPA:'🔤 Sopa de Letras', WORDLE:'🟩 Wordle', AHORCADO:'🪢 Ahorcado', MATHLE:'🔢 Mathle', PASAPALABRA:'🔠 Pasapalabra', FUNCIONES:'∫ Funciones', FUNCIONES_ANALISIS:'📈 Análisis de Funciones', APAREJADOS:'🃏 Aparejados', STORYCUBES:'🎲 Story Cubes', IRREGULAR_VERBS:'🇬🇧 Verbos Irregulares', THINKHOOT:'🦉 PiLive', MATHLIVE:'🧮 MathLive', OLYMPICLIVE:'🏅 OlympicLive', ALGEBRA:'✖️ Álgebra', DOMINO:'🁣 Dominó', ESTADISTICA:'📊 Estadística', MUSIC_COMPASS:'🎵 Entrenamiento Auditivo', MUSIC_GAMES:'🎼 Juegos Musicales', GEOGRAFIA:'🌍 Test de Geografía', BIOLOGIA:'🔬 Test de Biología', FUTBOLQUIZZ:'⚽ Fútbol Quizz', BUNKER:'🎯 Bunker Quiz', CALAMAR:'🦑 Luz roja · Luz verde', JEOPARDY:'💰 Money Board', GEOMETRIX:'📐 Geometrix', GEOMETRIX_COMPUESTO:'🏗️ Geometrix · Compuestas', PERIMETRO_AREA:'📏 Perímetro y Área' };
+const TIPO_ICON   = { ESCRITURA:'✍️', MINIAPP:'⚡', OCA:'🦆', CAZABURBUJAS:'🔵', PIKATRON:'⚡', SOPA:'🔤', WORDLE:'🟩', AHORCADO:'🪢', MATHLE:'🔢', PASAPALABRA:'🔠', FUNCIONES:'∫', FUNCIONES_ANALISIS:'📈', APAREJADOS:'🃏', STORYCUBES:'🎲', IRREGULAR_VERBS:'🇬🇧', THINKHOOT:'🦉', MATHLIVE:'🧮', OLYMPICLIVE:'🏅', ALGEBRA:'✖️', DOMINO:'🁣', ESTADISTICA:'📊', MUSIC_COMPASS:'🎵', MUSIC_GAMES:'🎼', GEOGRAFIA:'🌍', BIOLOGIA:'🔬', FUTBOLQUIZZ:'⚽', BUNKER:'🎯', CALAMAR:'🦑', JEOPARDY:'💰', GEOMETRIX:'📐', GEOMETRIX_COMPUESTO:'🏗️', PERIMETRO_AREA:'📏' };
 const TIPO_LIVE = new Set(['THINKHOOT', 'MATHLIVE', 'OLYMPICLIVE']);
 const tipoLabel   = (t) => TIPO_LABEL[t] || ('🎮 ' + (t||'Juego'));
 const tipoIcon    = (t) => TIPO_ICON[t]  || '🎮';
@@ -690,6 +690,18 @@ export default function InformesJuegos({ usuario, googleToken }) {
                                         onBuscarJugador={setBusquedaJugador}
                                     />
                                 );
+                                if (tipo === 'JEOPARDY') return (
+                                    <MoneyBoardCard
+                                        key={inf.id} inf={inf}
+                                        onBorrar={()=>borrar(inf.id)}
+                                        borrando={borrando===inf.id}
+                                        borradoOk={borrandoOk===inf.id}
+                                        modoSeleccion={modoSeleccion}
+                                        seleccionado={selec}
+                                        onSeleccionar={()=>toggleSeleccion(inf.id)}
+                                        onBuscarJugador={setBusquedaJugador}
+                                    />
+                                );
                                 if (tipo === 'CALAMAR') return (
                                     <CalamarCard
                                         key={inf.id} inf={inf}
@@ -1046,6 +1058,7 @@ const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, 
                         if ((j0.aciertos != null) && (j0.total != null)) filas.push(['✅ Resueltas', `${j0.aciertos} / ${j0.total}`]);
                         const modo = inf.modoJuego || j0.modo;
                         if (modo) filas.push(['🎮 Modo', modo]);
+                        if (j0.reto) filas.push(['🎯 Reto', j0.reto]);
                         const conf = inf.configuracion || j0.configuracion;
                         if (conf) filas.push(['⚙️ Configuración', conf]);
                         if (tipo === 'GEOMETRIX_COMPUESTO') {
@@ -1314,6 +1327,80 @@ const OAOACard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccion
 // ─── Tarjeta especial para Línea del Tiempo ──────────────────────────────────
 // ─── Tarjeta especial para Bunker Quiz ───────────────────────────────────────
 // === LUZ ROJA · LUZ VERDE (juego del calamar) ===
+// Money Board: concurso de tablero por equipos. El informe trae la clasificación.
+const MoneyBoardCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccionado, onSeleccionar, onBuscarJugador }) => {
+    const [confirmar, setConfirmar] = useState(false);
+    const [abierto, setAbierto] = useState(false);
+    const equipos = [...(inf.jugadores || [])].sort((a, b) => (b.puntos ?? 0) - (a.puntos ?? 0));
+    const ganador = equipos[0] || {};
+    const medallas = ['🥇', '🥈', '🥉'];
+    const pctColor = p => p >= 80 ? '#27ae60' : p >= 50 ? '#e67e22' : '#e74c3c';
+    const curso = equipos.find(e => e.curso)?.curso || '';
+
+    return (
+        <div style={{ background:'white', borderRadius:13, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', overflow:'hidden', border: seleccionado ? '2px solid #1565C0' : '1.5px solid #e8e8e8' }}>
+            <div onClick={modoSeleccion ? onSeleccionar : undefined} style={{ padding:'11px 15px', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', cursor: modoSeleccion ? 'pointer' : 'default', background: seleccionado ? '#f0f4ff' : 'white' }}>
+                {modoSeleccion && (
+                    <input type="checkbox" checked={seleccionado} onChange={e=>{e.stopPropagation();onSeleccionar();}} onClick={e=>e.stopPropagation()} style={{ width:17, height:17, cursor:'pointer', accentColor:'#1565C0', flexShrink:0 }}/>
+                )}
+                <span style={{ fontSize:'1.4rem' }}>💰</span>
+                <div style={{ flex:1, minWidth:120 }}>
+                    <div style={{ fontWeight:700, color:'#2c3e50', fontSize:'0.92rem' }}>
+                        {inf.recursoTitulo || 'Money Board'}
+                        <span style={{ marginLeft:8, fontWeight:400, color:'#7f8c8d', fontSize:'0.78rem' }}>{equipos.length} equipos</span>
+                    </div>
+                    <div style={{ fontSize:'0.74rem', color:'#95a5a6', marginTop:1 }}>
+                        {fmtFecha(inf.fecha)}
+                        {ganador.nombre && <> · 🏆 <span onClick={e=>{e.stopPropagation();onBuscarJugador?.(ganador.nombre);}} style={{ cursor:'pointer', borderBottom:'1px dotted #aaa', fontWeight:600, color:'#2c3e50' }}>{ganador.nombre}</span></>}
+                        {curso && <span style={{ marginLeft:5, color:'#aaa' }}>({curso})</span>}
+                    </div>
+                    {Array.isArray(inf.categorias) && inf.categorias.length > 0 && (
+                        <div style={{ fontSize:'0.72rem', color:'#b0b8bf', marginTop:2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                            {inf.categorias.join(' · ')}
+                        </div>
+                    )}
+                </div>
+                <span style={{ padding:'2px 8px', borderRadius:20, background:'#fff8e1', fontWeight:800, fontSize:'0.8rem', color:'#b8860b' }}>
+                    ${ganador.puntos ?? 0}
+                </span>
+                {!modoSeleccion && (
+                    <button onClick={e=>{e.stopPropagation();setAbierto(a=>!a);}} style={{ padding:'4px 7px', borderRadius:7, border:'1px solid #ddd', background:'white', cursor:'pointer', color:'#7f8c8d', flexShrink:0 }} title="Ver clasificación">
+                        {abierto ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
+                    </button>
+                )}
+                {!modoSeleccion && (
+                    <button onClick={e=>{e.stopPropagation();setConfirmar(true);}} style={{ padding:'4px 7px', borderRadius:7, border:'1px solid #fdd', background:'#fdecea', color:'#e74c3c', cursor:'pointer', flexShrink:0 }} title="Eliminar informe">
+                        <Trash2 size={13}/>
+                    </button>
+                )}
+            </div>
+            {abierto && (
+                <div style={{ borderTop:'1px solid #eee', padding:'11px 15px', background:'#fafafa' }}>
+                    {equipos.map((e, i) => (
+                        <div key={i} style={{ display:'flex', alignItems:'center', gap:9, padding:'6px 9px', marginBottom:4, background: i===0 ? '#fff8e1' : 'white', borderRadius:7, border:'1px solid #eee' }}>
+                            <span style={{ width:24, fontSize:'0.95rem' }}>{medallas[i] || `#${i+1}`}</span>
+                            <span style={{ flex:1, fontWeight:600, color:'#2c3e50', fontSize:'0.85rem' }}>{e.nombre}</span>
+                            <span style={{ padding:'1px 7px', borderRadius:20, background:'#e8f5e9', fontWeight:700, fontSize:'0.75rem', color:'#27ae60' }}>✓ {e.aciertos ?? 0}</span>
+                            <span style={{ padding:'1px 7px', borderRadius:20, background:'#fdecea', fontWeight:700, fontSize:'0.75rem', color:'#e74c3c' }}>✗ {e.fallos ?? 0}</span>
+                            <span style={{ padding:'1px 7px', borderRadius:20, background:'#f3f4f6', fontWeight:700, fontSize:'0.75rem', color:pctColor(e.porcentaje ?? 0) }}>{e.porcentaje ?? 0}%</span>
+                            <b style={{ minWidth:52, textAlign:'right', color:'#b8860b', fontSize:'0.85rem' }}>${e.puntos ?? 0}</b>
+                        </div>
+                    ))}
+                </div>
+            )}
+            {confirmar && (
+                <div style={{ background:'#fdecea', borderTop:'1px solid #fdd', padding:'10px 15px', display:'flex', alignItems:'center', gap:10, fontSize:'0.83rem' }}>
+                    <AlertTriangle size={14} color="#e74c3c"/>
+                    <span style={{ flex:1, color:'#c0392b' }}>¿Eliminar este informe?</span>
+                    <button onClick={()=>{setConfirmar(false);onBorrar();}} disabled={borrando} style={{ padding:'4px 12px', borderRadius:7, border:'none', background:'#e74c3c', color:'white', cursor:'pointer', fontWeight:700, fontSize:'0.8rem' }}>{borrando?'Borrando…':'Eliminar'}</button>
+                    <button onClick={()=>setConfirmar(false)} style={{ padding:'4px 10px', borderRadius:7, border:'1px solid #ddd', background:'white', cursor:'pointer', fontSize:'0.8rem' }}>Cancelar</button>
+                </div>
+            )}
+            {borradoOk && <div style={{ background:'#e8f5e9', padding:'8px 15px', fontSize:'0.8rem', color:'#27ae60', display:'flex', alignItems:'center', gap:6 }}><CheckCircle size={13}/>Eliminado</div>}
+        </div>
+    );
+};
+
 const CalamarCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccionado, onSeleccionar, onBuscarJugador }) => {
     const [confirmar, setConfirmar] = useState(false);
     const [abierto, setAbierto] = useState(false);
@@ -1603,6 +1690,7 @@ const CalculoCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, selecc
                 <div style={{ flex:1, minWidth:100 }}>
                     <div style={{ fontWeight:700, color:'#2c3e50', fontSize:'0.92rem' }}>
                         Cálculo Mental
+                        {j.reto && <span style={{ marginLeft:8, padding:'1px 8px', borderRadius:20, background:'#eef4fb', color:'#1565C0', fontSize:'0.72rem', fontWeight:700 }}>🎯 {j.reto}</span>}
                         {puntos > 0 && <span style={{ marginLeft:8, fontWeight:400, color:'#E91E63', fontSize:'0.8rem' }}>🏆 {puntos} pts</span>}
                     </div>
                     <div style={{ fontSize:'0.74rem', color:'#95a5a6', marginTop:1 }}>
@@ -1915,6 +2003,8 @@ const EscrituraCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, sele
     const colorPal = (inf.maxPalabras > 0 && palabras > inf.maxPalabras) ? '#dc2626'
         : (inf.minPalabras > 0 && palabras < inf.minPalabras) ? '#d97706' : '#16a34a';
     const numPreguntas = (inf.preguntas || []).length;
+    const claves = inf.palabrasClave || [];
+    const faltanClave = inf.palabrasClaveFaltan || [];
 
     return (
         <div style={{ background:'white', borderRadius:13, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', border: seleccionado?'2px solid #1565C0':'1.5px solid #e8e8e8' }}>
@@ -1931,6 +2021,7 @@ const EscrituraCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, sele
                 </div>
                 <span style={{ padding:'2px 8px', borderRadius:20, background:'#f3f4f6', fontWeight:700, fontSize:'0.78rem', color:colorPal }}>{palabras} palabras</span>
                 <span style={{ padding:'2px 8px', borderRadius:20, background:'#ecfeff', fontWeight:700, fontSize:'0.78rem', color:'#0e7490' }}>❓ {numPreguntas}</span>
+                {claves.length > 0 && <span title={faltanClave.length ? `Faltan: ${faltanClave.join(', ')}` : 'Contiene todas las palabras clave'} style={{ padding:'2px 8px', borderRadius:20, background: faltanClave.length ? '#fef3c7' : '#dcfce7', fontWeight:700, fontSize:'0.78rem', color: faltanClave.length ? '#b45309' : '#166534' }}>🔑 {claves.length - faltanClave.length}/{claves.length}</span>}
                 {inf.pegadosBloqueados > 0 && <span title="Intentos de pegar bloqueados" style={{ padding:'2px 8px', borderRadius:20, background:'#fee2e2', fontWeight:700, fontSize:'0.78rem', color:'#b91c1c' }}>🚫 {inf.pegadosBloqueados}</span>}
                 {inf.salidasPestana > 0 && <span title="Salidas de la pestaña" style={{ padding:'2px 8px', borderRadius:20, background:'#fef3c7', fontWeight:700, fontSize:'0.78rem', color:'#b45309' }}>👀 {inf.salidasPestana}</span>}
                 {!modoSeleccion && (abierto ? <ChevronUp size={16} color="#95a5a6"/> : <ChevronDown size={16} color="#95a5a6"/>)}
@@ -1939,6 +2030,7 @@ const EscrituraCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, sele
             {abierto && !modoSeleccion && (
                 <div style={{ borderTop:'1px solid #f0f0f0', padding:'12px 15px', display:'flex', flexDirection:'column', gap:12 }}>
                     {inf.consigna && <div style={{ fontSize:'0.82rem', color:'#475569', background:'#f0fdfa', borderLeft:'4px solid #14b8a6', borderRadius:8, padding:'7px 10px', whiteSpace:'pre-wrap' }}>{inf.consigna}</div>}
+                    {claves.length > 0 && <ChipsClave claves={claves} faltan={faltanClave} />}
                     <div style={{ whiteSpace:'pre-wrap', fontFamily:"Georgia, 'Times New Roman', serif", fontSize:'1rem', lineHeight:1.7, color:'#1e293b', maxHeight:420, overflowY:'auto' }}>
                         {inf.texto || <span style={{ color:'#94a3b8' }}>(vacío)</span>}
                     </div>
@@ -2025,6 +2117,8 @@ const EnigmicCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, selecc
                 {j.modo && <span style={{ fontSize:'0.72rem', background:'#ecfeff', color:'#0e7490', borderRadius:20, padding:'2px 9px', fontWeight:600 }}>{j.modo === 'Solo escucha' ? '🎧' : '📖'} {j.modo}</span>}
                 {j.tiempoTotal ? <span style={{ fontSize:'0.72rem', background:'#f3f4f6', color:'#475569', borderRadius:20, padding:'2px 9px', fontWeight:600 }}>⏱️ {mmss(j.tiempoTotal)}</span> : null}
                 {j.ayudas ? <span style={{ fontSize:'0.72rem', background:'#fee2e2', color:'#b91c1c', borderRadius:20, padding:'2px 9px', fontWeight:600 }}>💡 {j.ayudas} ayudas</span> : null}
+                {j.pistasCasilla ? <span style={{ fontSize:'0.72rem', background:'#fff7ed', color:'#c2410c', borderRadius:20, padding:'2px 9px', fontWeight:600 }}>🔍 {j.pistasCasilla} pistas de casilla</span> : null}
+                {j.puntos != null ? <span style={{ fontSize:'0.72rem', background:'#fef9c3', color:'#a16207', borderRadius:20, padding:'2px 9px', fontWeight:700 }}>⭐ {j.puntos} puntos</span> : null}
                 {Array.isArray(j.categorias) && j.categorias.map(c => (
                     <span key={c} style={{ fontSize:'0.72rem', background:'#f1f5f9', color:'#475569', borderRadius:20, padding:'2px 9px' }}>{c}</span>
                 ))}

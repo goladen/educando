@@ -5,6 +5,8 @@ import { CheckCircle, XCircle, RotateCcw, Play, Trophy, PaintBucket, ArrowRight,
          BookOpen, ChevronRight, Search, Key, ChevronDown, ChevronUp, Clock,
          Users, AlertTriangle, Volume2, Send } from 'lucide-react';
 import { CATEGORIAS, NIVELES, FRASES } from './BibliotecaFrases';
+import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
+import { leerRetoUrl } from './utils/retoLink';
 import { CATEGORIAS_FR, NIVELES_FR, FRASES_FR } from './BibliotecaFrances';
 import { CATEGORIAS_CA, NIVELLS_CA, FRASES_CA } from './BibliotecaCatalana';
 import { CompeticionCuerda } from './components/TironCuerdaEscena';
@@ -163,6 +165,8 @@ function PantallaPresentacionSintaxis({ presentacion, onEmpezar, onExit }) {
 
 export default function SintaxisGame({ onExit, isHost, codigoSala, usuario, recurso }) {
     const [idioma, setIdioma] = useState(null);
+    // Reto por enlace: contrarreloj con nivel, idioma y tiempo fijos para todos
+    const [reto] = useState(() => leerRetoUrl());
     const [presentacionVista, setPresentacionVista] = useState(() => !recurso?.presentacion?.titulo);
     if (isHost) return <SintaxisLiveHost codigoSala={codigoSala} usuario={usuario} onExit={onExit} />;
     if (codigoSala) return <SintaxisLiveClient codigoSala={codigoSala} usuario={usuario} onExit={onExit} />;
@@ -173,6 +177,13 @@ export default function SintaxisGame({ onExit, isHost, codigoSala, usuario, recu
             onExit={onExit}
         />
     );
+    if (reto) {
+        const cfg = reto.config || {};
+        const props = { nivel: cfg.nivel ?? null, duracion: Number(cfg.duracion) || 180, reto, onBack: () => (typeof onExit === 'function' ? onExit() : window.location.assign('/')) };
+        if (cfg.idioma === 'CA') return <ModoContrarrelojCA {...props} />;
+        if (cfg.idioma === 'FR') return <ModoContrarrelojFR {...props} />;
+        return <ModoContrarreloj {...props} recurso={null} />;
+    }
     if (!idioma) return <PantallaIdioma onEspanol={()=>setIdioma('ES')} onFrances={()=>setIdioma('FR')} onCatala={()=>setIdioma('CA')} onExit={onExit}/>;
     if (idioma === 'FR') return <SintaxisAppFR onExit={()=>setIdioma(null)}/>;
     if (idioma === 'CA') return <SintaxisAppCA onExit={()=>setIdioma(null)}/>;
@@ -553,8 +564,9 @@ function ModoLocalCA({ nivel, onBack }) {
     );
 }
 
-function ModoContrarrelojCA({ nivel, onBack }) {
-    const DURACION=180;const pool=FRASES_CA.filter(f=>!nivel||f.nivel===nivel);
+function ModoContrarrelojCA({ nivel, onBack, duracion = 180, reto = null }) {
+    const esRetoCompeticion = !!(reto && reto.compId && reto.catId);
+    const DURACION=duracion;const pool=FRASES_CA.filter(f=>!nivel||f.nivel===nivel);
     const bagRef=useRef(createBag(pool));
     const [fase,setFase]=useState('INTRO');const [frase,setFrase]=useState(null);
     const [answers,setAnswers]=useState({});const [results,setResults]=useState(null);
@@ -571,7 +583,7 @@ function ModoContrarrelojCA({ nivel, onBack }) {
     const pct=total>0?Math.round(aciertos/total*100):0;
     const nivLabel=NIVELLS_CA.find(n=>n.id===nivel)?.label||'Tots';
     if(fase==='INTRO')return(<div style={g.container}><div style={g.header}><button onClick={onBack} style={g.btnBack}><RotateCcw size={16}/> Tornar</button><span style={g.titulo}>⏱️ Contrarellotge · CA</span><div style={{width:60}}/></div><div style={g.centerBox}><div style={{...g.card,maxWidth:420}}><div style={{fontSize:'3rem',marginBottom:8}}>⏱️</div><h2 style={g.cardTitle}>Contrarellotge</h2><p style={{color:'#555',marginBottom:20}}>Tens <strong>3 minuts</strong> per analitzar el màxim de frases.</p><button onClick={empezar} style={{...g.btnPrimary,width:'100%',justifyContent:'center'}}><Play size={18}/> Comença</button></div></div></div>);
-    if(fase==='FIN')return(<div style={g.container}><div style={g.header}><button onClick={onBack} style={g.btnBack}><RotateCcw size={16}/> Tornar</button><span style={g.titulo}>⏱️ Resultats</span><div style={{width:60}}/></div><div style={g.centerBox}><div style={{...g.card,maxWidth:420,textAlign:'center'}}><Trophy size={64} color="#f1c40f"/><h2 style={{...g.cardTitle,marginTop:12}}>Fet!</h2><div style={{fontSize:'2.5rem',fontWeight:900,color:'#e74c3c',margin:'8px 0'}}>{score}</div><p style={{color:'#666'}}>{frasesDone+(results?1:0)} frases analitzades</p><div style={{display:'flex',gap:9,marginTop:16,justifyContent:'center'}}><button onClick={()=>setMostrarEnvio(true)} style={{...g.btnPrimary,fontSize:'0.9rem'}}><Send size={14}/> Enviar al profe</button><button onClick={onBack} style={{...g.btnGray,fontSize:'0.9rem'}}><RotateCcw size={16}/> Tornar</button></div></div></div>{mostrarEnvio&&<ModalEnviarProfe datos={{puntos:score,aciertos,total,porcentaje:pct,nivel:nivLabel,idioma:'CA',modalidad:'Contrarellotge'}} onClose={()=>setMostrarEnvio(false)}/>}</div>);
+    if(fase==='FIN')return(<div style={g.container}><div style={g.header}><button onClick={onBack} style={g.btnBack}><RotateCcw size={16}/> Tornar</button><span style={g.titulo}>⏱️ Resultats</span><div style={{width:60}}/></div><div style={g.centerBox}><div style={{...g.card,maxWidth:420,textAlign:'center'}}><Trophy size={64} color="#f1c40f"/><h2 style={{...g.cardTitle,marginTop:12}}>Fet!</h2><div style={{fontSize:'2.5rem',fontWeight:900,color:'#e74c3c',margin:'8px 0'}}>{score}</div><p style={{color:'#666'}}>{frasesDone+(results?1:0)} frases analitzades</p><div style={{display:'flex',gap:9,marginTop:16,justifyContent:'center'}}><button onClick={()=>setMostrarEnvio(true)} style={{...g.btnPrimary,fontSize:'0.9rem'}}><Send size={14}/> Enviar al profe</button><button onClick={onBack} style={{...g.btnGray,fontSize:'0.9rem'}}><RotateCcw size={16}/> Tornar</button></div></div></div>{mostrarEnvio&&esRetoCompeticion&&<ModalEnviarCompeticion compId={reto.compId} catId={reto.catId} puntos={score} detalle={{aciertos,total}} nombreJuego="Sintaxi" tituloReto={reto.titulo||''} onClose={()=>setMostrarEnvio(false)}/>}{mostrarEnvio&&!esRetoCompeticion&&<ModalEnviarProfe datos={{puntos:score,aciertos,total,porcentaje:pct,nivel:nivLabel,idioma:'CA',modalidad:'Contrarellotge'}} onClose={()=>setMostrarEnvio(false)}/>}</div>);
     return(<div style={g.container}><div style={g.header}><button onClick={onBack} style={g.btnBack}><RotateCcw size={16}/> Tornar</button><span style={g.titulo}>⏱️ Contrarellotge · CA</span><div style={{...g.scoreboard}}><Clock size={14}/> {fmtTime(tiempo)} · 🏆 {score}</div></div><div style={{padding:'16px 12px',maxWidth:700,margin:'0 auto'}}>{frase&&<><PaletaCA catSel={catSel} setCatSel={setCatSel}/><FraseTokensCA tokens={frase.tokens} answers={answers} onClickWord={handleClickWord} results={results}/>{!results?(<button onClick={comprobar} style={{...g.btnPrimary,width:'100%',marginTop:16,justifyContent:'center'}}><CheckCircle size={18}/> Comprova</button>):(<><ResultatCA tokens={frase.tokens} results={results}/><button onClick={siguiente} style={{...g.btnSuccess,width:'100%',marginTop:12,justifyContent:'center'}}><ArrowRight size={18}/> Frase següent</button></>)}</>}</div></div>);
 }
 
@@ -905,8 +917,9 @@ function ModoLocalFR({ nivel, onBack }) {
 // ─────────────────────────────────────────────────────────────────────
 // MODO CONTRARRELOJ FR
 // ─────────────────────────────────────────────────────────────────────
-function ModoContrarrelojFR({ nivel, onBack }) {
-    const DURACION = 180;
+function ModoContrarrelojFR({ nivel, onBack, duracion = 180, reto = null }) {
+    const esRetoCompeticion = !!(reto && reto.compId && reto.catId);
+    const DURACION = duracion;
     const pool = FRASES_FR.filter(f => !nivel || f.nivel === nivel);
     const bagRef = useRef(createBag(pool));
     const [fase, setFase]       = useState('INTRO');
@@ -988,7 +1001,7 @@ function ModoContrarrelojFR({ nivel, onBack }) {
                     <button onClick={onBack} style={{...g.btnGray,fontSize:'0.9rem'}}><RotateCcw size={16}/> Rejouer</button>
                 </div>
             </div></div>
-            {mostrarEnvio && <ModalEnviarProfe datos={{puntos:score,aciertos,total,porcentaje:total>0?Math.round(aciertos/total*100):0,nivel:NIVELES_FR.find(n=>n.id===nivel)?.label||'Tous',idioma:'FR',modalidad:'Contre-la-montre'}} onClose={()=>setMostrarEnvio(false)}/>}
+            {mostrarEnvio && esRetoCompeticion && <ModalEnviarCompeticion compId={reto.compId} catId={reto.catId} puntos={score} detalle={{aciertos,total}} nombreJuego="Syntaxe" tituloReto={reto.titulo||''} onClose={()=>setMostrarEnvio(false)}/>}{mostrarEnvio && !esRetoCompeticion && <ModalEnviarProfe datos={{puntos:score,aciertos,total,porcentaje:total>0?Math.round(aciertos/total*100):0,nivel:NIVELES_FR.find(n=>n.id===nivel)?.label||'Tous',idioma:'FR',modalidad:'Contre-la-montre'}} onClose={()=>setMostrarEnvio(false)}/>}
         </div>
     );
     return (
@@ -1751,7 +1764,7 @@ function ModoLocal({ nivel, recurso, onBack }) {
                         <Desglose tokens={frase.tokens} results={results}/>
                         <div style={{display:'flex',gap:10,justifyContent:'center',marginTop:16,flexWrap:'wrap'}}>
                             <button onClick={siguiente} style={g.btnPrimary}><ChevronRight size={17}/> Siguiente Frase</button>
-                            <button onClick={()=>setMostrarEnvio(true)} style={g.btnPrimary}><Send size={15}/> Enviar al profesor</button>
+                            <button onClick={()=>setMostrarEnvio(true)} style={{...g.btnPrimary, ...(esRetoCompeticion ? {background:'linear-gradient(135deg,#f39c12,#e67e22)'} : {})}}><Send size={15}/> {esRetoCompeticion ? 'Enviar a la competición' : 'Enviar al profesor'}</button>
                             <button onClick={onBack} style={g.btnGray}><BookOpen size={15}/> Cambiar Nivel</button>
                         </div>
                       </>
@@ -1846,8 +1859,9 @@ function ModoCompeticion({ nivel, recurso, onBack }) {
 // ─────────────────────────────────────────────────────────────────────
 // MODO CONTRARRELOJ 180s
 // ─────────────────────────────────────────────────────────────────────
-function ModoContrarreloj({ nivel, recurso, onBack }) {
-    const DURACION = 180;
+function ModoContrarreloj({ nivel, recurso, onBack, duracion = 180, reto = null }) {
+    const DURACION = duracion;
+    const esRetoCompeticion = !!(reto && reto.compId && reto.catId);
     const pool = getPool(nivel, recurso);
     const bagRef = useRef(createBag(pool));
 
@@ -1926,7 +1940,7 @@ function ModoContrarreloj({ nivel, recurso, onBack }) {
                         <div style={{fontSize:'3rem',marginBottom:8}}>⏱️</div>
                         <h1 style={g.cardTitle}>Contrarreloj</h1>
                         <p style={{color:'#666',marginBottom:22,lineHeight:1.6}}>
-                            Tienes <strong>3 minutos</strong> para analizar el máximo de frases posible.<br/>
+                            Tienes <strong>{Math.round(DURACION/60)} minutos</strong> para analizar el máximo de frases posible.<br/>
                             Cada respuesta correcta suma puntos. ¡A toda velocidad!
                         </p>
                         <button onClick={start} style={{...g.btnPrimary,justifyContent:'center',width:'100%'}}><Play size={18}/> ¡Empezar!</button>
@@ -1975,7 +1989,8 @@ function ModoContrarreloj({ nivel, recurso, onBack }) {
                     </div>
                 </div>
             )}
-            {mostrarEnvio && <ModalEnviarProfe datos={{puntos:score,aciertos,total,porcentaje:total>0?Math.round(aciertos/total*100):0,nivel:NIVELES.find(n=>n.id===nivel)?.label||'Todos',idioma:'ES',modalidad:'Contrarreloj'}} onClose={()=>setMostrarEnvio(false)}/>}
+            {mostrarEnvio && esRetoCompeticion && <ModalEnviarCompeticion compId={reto.compId} catId={reto.catId} puntos={score} detalle={{aciertos,total,frases:frasesDone}} nombreJuego="Sintaxis" tituloReto={reto.titulo||''} onClose={()=>setMostrarEnvio(false)}/>}
+            {mostrarEnvio && !esRetoCompeticion && <ModalEnviarProfe datos={{puntos:score,aciertos,total,porcentaje:total>0?Math.round(aciertos/total*100):0,nivel:NIVELES.find(n=>n.id===nivel)?.label||'Todos',idioma:'ES',modalidad:'Contrarreloj'}} onClose={()=>setMostrarEnvio(false)}/>}
         </div>
     );
 }

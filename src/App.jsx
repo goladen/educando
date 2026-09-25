@@ -17,8 +17,10 @@ import QuienEsQuien from './QuienEsQuien';
 import QuienEsQuienHistorico from './QuienEsQuienHistorico';
 import BunkerDisparo from './BunkerDisparo';
 import JuegoCalamar from './JuegoCalamar';
+import MoneyBoard from './MoneyBoard';
 import EnigmicLogic from './EnigmicLogic';
 import Visor3D from './Visor3D';
+import VideosInstagram from './components/VideosInstagram';
 import { PizarraApp } from './GestionAula';
 import PiTutorial from './components/PiTutorial';
 import Retos from './Retos';
@@ -124,7 +126,8 @@ function App() {
           || slug === 'partes_planta' || slug === 'etiquetame' || slug === 'karting_track'
           || slug === 'arkade' || slug === 'imperios' || slug === 'whoknows'
           || slug === 'quienesquien' || slug === 'quienhistorico' || slug === 'pizarra' || slug === 'bunker'
-          || slug === 'enigmic' || slug === 'calamar' || slug === 'visor3d') {
+          || slug === 'enigmic' || slug === 'calamar' || slug === 'visor3d' || slug === 'piktboard'
+          || slug === 'moneyboard' || slug === 'videos') {
         setRutaPublica(slug);
         return;
       }
@@ -151,7 +154,7 @@ function App() {
         'irregular_verbs','sistema_solar',
         'retos','conectapuntos','sudoku',
         'imperios','geografia','quienesquien','quienhistorico','pizarra','bunker','enigmic','calamar',
-        'visor3d',
+        'visor3d','piktboard','moneyboard','videos',
         'comunidades','comunidad','competicion',
         'fisica',
         'math_world','primaria','feria',
@@ -319,6 +322,8 @@ function App() {
     if (rutaPublica === 'enigmic') return <><EnigmicLogic onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'bunker') return <><BunkerDisparo onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'visor3d') return <><Visor3D onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
+    if (rutaPublica === 'videos') return <VideosInstagram onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
+    if (rutaPublica === 'piktboard' || rutaPublica === 'moneyboard') return <><MoneyBoard onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'calamar') return <><JuegoCalamar onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'pizarra') return <><div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#f1f5f9', overflow: 'auto', padding: '54px 12px 20px' }}><button onClick={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} style={{ position: 'fixed', top: 12, left: 12, zIndex: 10000, padding: '8px 14px', borderRadius: 10, border: 'none', background: '#fff', color: '#334155', fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}>← Volver</button><PizarraApp /></div>{anotadorUI}</>;
     if (rutaPublica === 'retos') return <><Retos onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;

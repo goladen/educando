@@ -5,10 +5,11 @@ import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import {
     Users, ArrowLeft, ChevronLeft, Share2, Globe, ExternalLink,
     RefreshCw, GraduationCap, Calendar, Lock, LayoutGrid, FileText,
-    UserPlus, Check, Clock, LogIn
+    UserPlus, Check, Clock, LogIn, Trophy
 } from 'lucide-react';
 import { Calendario, EscaparateMiembros, HorarioView, FichaProfesor } from './ComunidadesTab';
 import { fondoUrl } from '../utils/fondos';
+import { CompeticionResumenPublico } from './CompeticionPublica';
 
 const AZUL = '#1565C0';
 
@@ -45,7 +46,7 @@ function parsePath() {
         const comId = parts[1];
         if (parts[2] === 'curso') return { comId, tab: 'calendarios', cursoId: parts[3] || null, unirse: false };
         if (parts[2] === 'unirse') return { comId, tab: 'recursos', cursoId: null, unirse: true };
-        const tab = ['recursos', 'paginas', 'calendarios', 'profesores'].includes(parts[2]) ? parts[2] : 'recursos';
+        const tab = ['recursos', 'paginas', 'calendarios', 'profesores', 'competiciones'].includes(parts[2]) ? parts[2] : 'recursos';
         return { comId, tab, cursoId: null, unirse: false };
     }
     return { comId: null, tab: 'recursos', cursoId: null, unirse: false };
@@ -120,6 +121,7 @@ const TABS = [
     { id: 'paginas',     label: 'Páginas',     icon: FileText },
     { id: 'calendarios', label: 'Calendarios', icon: Calendar },
     { id: 'profesores',  label: 'Profesorado', icon: Users },
+    { id: 'competiciones', label: 'Competiciones', icon: Trophy },
 ];
 
 // ─── Vista de un centro/comunidad ─────────────────────────────────────────────
@@ -127,6 +129,7 @@ function CentroPublico({ comunidadId, tab, cursoFoco, unirse, onTab, onCurso, on
     const [comunidad, setComunidad] = useState(null);
     const [cursos, setCursos]       = useState([]);
     const [profes, setProfes]       = useState([]);
+    const [comps, setComps]         = useState([]);
     const [cargando, setCargando]   = useState(true);
     const [error, setError]         = useState('');
 
@@ -146,6 +149,13 @@ function CentroPublico({ comunidadId, tab, cursoFoco, unirse, onTab, onCurso, on
                     const pd = ps.docs.map(d => ({ id: d.id, ...d.data() }));
                     pd.sort((a, b) => (a.apellidos || '').localeCompare(b.apellidos || '', 'es'));
                     setProfes(pd);
+                } catch (_) {}
+                // Competiciones abiertas de la comunidad (clasificaciones por alias)
+                try {
+                    const cps = await getDocs(query(collection(db, 'competiciones'), where('comunidadId', '==', comunidadId)));
+                    const cd = cps.docs.map(d => ({ id: d.id, ...d.data() })).filter(c => c.abierta !== false);
+                    cd.sort((a, b) => (b.fechaCreacion?.seconds || 0) - (a.fechaCreacion?.seconds || 0));
+                    setComps(cd);
                 } catch (_) {}
             } catch (e) { setError('No se pudo cargar: ' + e.message); }
             setCargando(false);
@@ -210,6 +220,20 @@ function CentroPublico({ comunidadId, tab, cursoFoco, unirse, onTab, onCurso, on
                             {profes.map(p => <FichaProfesor key={p.id} p={p} />)}
                         </div>
                     )}
+                </div>
+            )}
+
+            {tab === 'competiciones' && (
+                <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
+                        <h2 style={{ ...st.h2, margin: 0 }}><Trophy size={20} color="#f39c12" /> Competiciones abiertas</h2>
+                        <div style={{ marginLeft: 'auto' }}>
+                            <BtnCompartir titulo={`Competiciones de ${comunidad.nombre}`} url={`${origin}/comunidad/${comunidad.id}/competiciones`} />
+                        </div>
+                    </div>
+                    {comps.length === 0
+                        ? <div style={st.vacio}>Ahora mismo no hay ninguna competición abierta en este centro.</div>
+                        : comps.map(c => <CompeticionResumenPublico key={c.id} comp={c} />)}
                 </div>
             )}
 

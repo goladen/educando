@@ -20,6 +20,7 @@ import QuestionSenderClient from '../QuestionSenderClient';
 import PikatronRun from '../PikatronRun';
 import BunkerDisparo from '../BunkerDisparo';
 import JuegoCalamar from '../JuegoCalamar';
+import MoneyBoard from '../MoneyBoard';
 import EnigmicLogic from '../EnigmicLogic';
 import Visor3D from '../Visor3D';
 import TextWordleGame from '../TextWordleGame';
@@ -528,6 +529,16 @@ export const APPS = [
         shareUrl: `${window.location.origin}/enigmic`
     },
     {
+        id: 'MONEYBOARD',
+        name: 'Money Board',
+        desc: 'Tablero de categorías por equipos, estilo concurso.',
+        color: '#2563eb',
+        emoji: '💰',
+        isSpecial: true,
+        shareable: true,
+        shareUrl: `${window.location.origin}/moneyboard`
+    },
+    {
         id: 'CALAMAR',
         name: 'Calamar',
         desc: 'Luz roja · luz verde: avanza acertando preguntas.',
@@ -774,6 +785,14 @@ export const GAME_INFO = {
         biblioteca: 'Biblioteca propia de vocabulario (7 categorías × 6 elementos) en español, inglés, francés y catalán. Dos modos: leer las pistas o solo escucharlas (comprensión oral, sin texto ni traducción). Tablero de 5 o 6 casillas y de 2 a 5 categorías. No necesita recurso del profesor.',
         multiplayer: 'Individual. También se puede proyectar y resolver en gran grupo.',
         materias: ['Inglés', 'Francés', 'Catalán', 'Lengua y Literatura', 'Matemáticas'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
+    MONEYBOARD: {
+        descripcion: 'Tablero de concurso por equipos al estilo Jeopardy: 6 categorías en columnas y casillas de 100 a 500 puntos. El equipo de turno elige casilla, se proyecta la pregunta y el profesor puntúa con ✓/✗ (o el juego corrige solo). Incluye casilla “Pikt Doble” que vale el doble, temporizador, deshacer puntuación, clasificación y una pregunta final con apuestas. Desde el propio juego se puede crear un tablero nuevo escribiendo las preguntas de cada categoría (se guarda como recurso normal y sirve también para el resto de juegos).',
+        tipoPreguntas: 'Cualquier recurso con 2 o más hojas: cada hoja es una categoría. Admite opción múltiple, respuesta corta, rellenar hueco y ordenar.',
+        biblioteca: 'Buscador de todos los recursos públicos con varias hojas + editor propio de tableros.',
+        multiplayer: 'De 2 a 6 equipos en la misma pantalla (pizarra digital o proyector).',
+        materias: ['Universal'],
         etapas: ['Primaria', 'ESO', 'Bachillerato'],
     },
     CALAMAR: {
@@ -1565,6 +1584,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                 if (juegoParam.toLowerCase() === 'quienhistorico') { setQuienHistoricoApp(true); return; }
                 if (juegoParam.toLowerCase() === 'pizarra')        { setPizarraApp(true);     return; }
                 if (juegoParam.toLowerCase() === 'biologia')       { setBiologiaApp(true);    return; }
+                if (juegoParam.toLowerCase() === 'sintaxis')       { setJuegoActivo({ tipoJuego: 'SINTAXIS' }); return; }
                 if (juegoParam.toLowerCase() === 'vistas_didricas') { setVistasDidricas(true); return; }
                 if (juegoParam.toLowerCase() === 'situaciones_aprendizaje') { setSituacionesAprendizaje(true); return; }
                 if (juegoParam.toLowerCase() === 'linea_tiempo')    { setJuegoActivo({ tipoJuego: 'LINEA_TIEMPO' }); return; }
@@ -1646,6 +1666,8 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                 setJuegoActivo({ tipoJuego: 'ARKADE' });
             } else if (path === 'visor3d') {
                 setVisor3dApp(true);
+            } else if (path === 'moneyboard' || path === 'piktboard') {
+                setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'MONEYBOARD' });
             } else if (path === 'calamar') {
                 setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'CALAMAR' });
             } else if (path === '' || path === 'inicio') {
@@ -1672,7 +1694,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
         }
         // No pisar una entrada explícita por URL.
         const params = new URLSearchParams(window.location.search);
-        if (params.get('sala') || params.get('live') || params.get('juego') || params.get('sopa') || params.get('gestion') || params.get('pizarra')) return;
+        if (params.get('sala') || params.get('live') || params.get('juego') || params.get('sopa') || params.get('gestion') || params.get('pizarra') || params.get('reto')) return;
 
         getDoc(doc(db, 'live_games', s.sala)).then(snap => {
             if (!snap.exists()) { try { localStorage.removeItem('pikt_live_session'); } catch (e) {} return; }
@@ -1761,7 +1783,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
     useEffect(() => { if (!quienHistoricoApp) refrescarRegistros(); }, [quienHistoricoApp]);
     const totalRegistros = resumenRegistros.reduce((s, g) => s + g.count, 0);
     // Mapeo id-de-tarjeta → tipo-de-registro cuando no coinciden.
-    const REGISTRO_TIPO_DE = { GEOMETRIX: 'GEOMETRIX_COMPUESTO', POLINOMIOS: 'ALGEBRA', MATES_OAOA: 'OAOA' };
+    const REGISTRO_TIPO_DE = { GEOMETRIX: 'GEOMETRIX_COMPUESTO', POLINOMIOS: 'ALGEBRA', MATES_OAOA: 'OAOA', MONEYBOARD: 'JEOPARDY' };
     // Tipos de registro que pertenecen a Math World (para el recuento agregado del portal).
     const MATH_WORLD_TIPOS = ['CALCULO','DINERO','FRACCIONES','DIVISIBILIDAD','ALGEBRA','OCA','OAOA','ECUACIONES','FUNCIONES','FUNCIONES_ANALISIS','GEOMETRIX_COMPUESTO','MATHLE'];
 
@@ -2027,6 +2049,12 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
         if (appId === 'BUNKER') {
             window.history.pushState({}, '', '/bunker');
             setJuegoActivo({ tipoJuego: 'BUNKER' });
+            return;
+        }
+
+        if (appId === 'MONEYBOARD') {
+            window.history.pushState({}, '', '/moneyboard');
+            setJuegoActivo({ tipoJuego: 'MONEYBOARD' });
             return;
         }
 
@@ -2575,6 +2603,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
         if (juegoActivo.tipoJuego === 'MANSION_PITAGORICA') return <MansionPitagoricaGame alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'ENIGMIC') return <EnigmicLogic usuario={usuario} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'BUNKER') return <BunkerDisparo usuario={usuario} recurso={juegoActivo.recurso || null} autoStart={!!juegoActivo.recurso} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
+        if (juegoActivo.tipoJuego === 'MONEYBOARD') return <MoneyBoard usuario={usuario} recurso={juegoActivo.recurso || null} autoStart={!!juegoActivo.recurso} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'CALAMAR') return <JuegoCalamar usuario={usuario} recurso={juegoActivo.recurso || null} autoStart={!!juegoActivo.recurso} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'TRIVIAL') {
             const salirTrivial = () => {

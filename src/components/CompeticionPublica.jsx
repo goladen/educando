@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { doc, getDoc, collection, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, getDocs, collection, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 import {
-    Trophy, ArrowLeft, X, RefreshCw, Medal, UserPlus, Gamepad2, Video, ExternalLink, Share2
+    Trophy, ArrowLeft, X, RefreshCw, Medal, UserPlus, Gamepad2, Video, ExternalLink, Share2, Wrench
 } from 'lucide-react';
+import { enlaceAbsoluto } from '../utils/retoLink';
 
 const AZUL = '#1565C0';
 const MEDALLAS = ['🥇', '🥈', '🥉'];
+// En público cada participante se identifica por su alias, nunca por su nombre real.
+export const aliasDe = (p) => (p?.alias || '').trim() || 'Sin alias';
 
 function RankingLista({ filas }) {
     if (filas.length === 0) return <div style={s.vacio}>Sin participantes todavía.</div>;
@@ -25,6 +28,8 @@ function RankingLista({ filas }) {
 
 function ModalInscripcion({ comp, compId, onClose }) {
     const [nombre, setNombre] = useState('');
+    const [alias, setAlias]   = useState('');
+    const [clave, setClave]   = useState('');
     const [email, setEmail]   = useState('');
     const [extra, setExtra]   = useState('');
     const [estado, setEstado] = useState('form'); // form | enviando | ok
@@ -32,12 +37,25 @@ function ModalInscripcion({ comp, compId, onClose }) {
 
     const enviar = async () => {
         if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
+        if (!alias.trim())  { setError('Escribe un alias: es el nombre con el que aparecerás en la clasificación pública.'); return; }
+        const cl = clave.trim();
+        if (cl.length < 4 || cl.length > 8) { setError('La contraseña debe tener entre 4 y 8 caracteres.'); return; }
         setEstado('enviando'); setError('');
         try {
-            await addDoc(collection(db, 'competiciones', compId, 'participantes'), {
-                nombre: nombre.trim(), email: email.trim(), extra: extra.trim(),
+            // El alias identifica al participante al enviar resultados: no puede repetirse
+            const ya = await getDocs(collection(db, 'competiciones', compId, 'participantes'));
+            const norm = (x) => (x || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+            if (ya.docs.some(d => norm(d.data().alias) === norm(alias))) {
+                setError('Ese alias ya está cogido en esta competición. Elige otro.'); setEstado('form'); return;
+            }
+            const ref = await addDoc(collection(db, 'competiciones', compId, 'participantes'), {
+                nombre: nombre.trim(), alias: alias.trim(), email: email.trim(), extra: extra.trim(),
                 estado: comp.inscripcion === 'auto' ? 'aceptada' : 'pendiente',
                 origen: 'inscripcion', fecha: serverTimestamp(),
+            });
+            // La clave va en una colección aparte: nadie puede leerla salvo el organizador
+            await setDoc(doc(db, 'competiciones', compId, 'claves', ref.id), {
+                clave: cl, alias: alias.trim(), fecha: serverTimestamp(),
             });
             setEstado('ok');
         } catch (e) { setError('No se pudo enviar: ' + e.message); setEstado('form'); }
@@ -60,6 +78,16 @@ function ModalInscripcion({ comp, compId, onClose }) {
                         </div>
                         <div style={s.label}>Nombre</div>
                         <input autoFocus value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Nombre y apellidos" style={s.input} />
+                        <div style={s.label}>Alias público</div>
+                        <input value={alias} onChange={e => setAlias(e.target.value)} placeholder="Ej: Águila 27" style={s.input} />
+                        <div style={{ fontSize: '0.78rem', color: '#95a5a6', marginTop: -6, marginBottom: 10 }}>
+                            En la clasificación pública solo se muestra tu alias; tu nombre lo ve únicamente el organizador.
+                        </div>
+                        <div style={s.label}>Contraseña (4-8 caracteres)</div>
+                        <input type="text" value={clave} maxLength={8} onChange={e => setClave(e.target.value)} placeholder="Ej: pi2024" style={s.input} />
+                        <div style={{ fontSize: '0.78rem', color: '#95a5a6', marginTop: -6, marginBottom: 10 }}>
+                            La necesitarás para enviar tus puntuaciones de las pruebas. Apúntala: el organizador puede consultarla si la olvidas.
+                        </div>
                         <div style={s.label}>Correo (opcional)</div>
                         <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="correo@ejemplo.com" style={s.input} />
                         <div style={s.label}>Información adicional (opcional)</div>
@@ -76,11 +104,59 @@ function ModalInscripcion({ comp, compId, onClose }) {
     );
 }
 
+// ─── Bloque reutilizable: resultados de una competición (página de comunidad) ──
+export function CompeticionResumenPublico({ comp, limite = 10 }) {
+    const [parts, setParts] = useState([]);
+    const [tab, setTab] = useState('general');
+
+    useEffect(() => onSnapshot(collection(db, 'competiciones', comp.id, 'participantes'),
+        sn => setParts(sn.docs.map(d => ({ id: d.id, ...d.data() }))), () => {}), [comp.id]);
+
+    const categorias = comp.categorias || [];
+    const puntos = comp.puntos || {};
+    const aceptados = parts.filter(p => p.estado !== 'pendiente');
+    const total = (pid) => categorias.reduce((a, c) => a + (Number(puntos[`${pid}_${c.id}`]) || 0), 0);
+    const filas = [...aceptados]
+        .map(p => ({ id: p.id, nombre: aliasDe(p), valor: tab === 'general' ? total(p.id) : (Number(puntos[`${p.id}_${tab}`]) || 0) }))
+        .sort((a, b) => b.valor - a.valor)
+        .slice(0, limite);
+
+    return (
+        <div style={{ background: 'white', borderRadius: 14, padding: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+                <Trophy size={20} color="#f39c12" />
+                <h3 style={{ margin: 0, color: '#2c3e50', flex: 1, minWidth: 140 }}>{comp.nombre}</h3>
+                <a href={`/competicion/${comp.id}`} target="_blank" rel="noreferrer" style={s.chipLink}>Ver competición <ExternalLink size={11} /></a>
+            </div>
+            {categorias.length > 0 && (
+                <div style={{ display: 'flex', gap: 6, marginBottom: 12, overflowX: 'auto', paddingBottom: 4 }}>
+                    <button onClick={() => setTab('general')} style={chipTab(tab === 'general')}>🏆 General</button>
+                    {categorias.map(c => <button key={c.id} onClick={() => setTab(c.id)} style={chipTab(tab === c.id)}>{c.titulo}</button>)}
+                </div>
+            )}
+            {(() => {
+                const cat = categorias.find(c => c.id === tab);
+                return cat?.herramientaId ? (
+                    <a href={enlaceAbsoluto(cat.herramientaRuta)} target="_blank" rel="noreferrer" style={{ ...s.chipLink, background: '#fce4ec', color: '#E91E63', marginBottom: 10 }}>
+                        <Wrench size={14} /> Jugar: {cat.herramientaTitulo} <ExternalLink size={11} />
+                    </a>
+                ) : null;
+            })()}
+            <div style={{ fontSize: '0.78rem', color: '#95a5a6', marginBottom: 8 }}>Cada participante aparece con su alias.</div>
+            <RankingLista filas={filas} />
+            {aceptados.length > limite && <div style={{ fontSize: '0.78rem', color: '#95a5a6', marginTop: 8, textAlign: 'center' }}>y {aceptados.length - limite} participantes más…</div>}
+        </div>
+    );
+}
+
 export default function CompeticionPublica({ compId, onExit }) {
     const [comp, setComp] = useState(undefined);
     const [parts, setParts] = useState([]);
     const [tab, setTab] = useState('general');
     const [inscribir, setInscribir] = useState(false);
+    // Enlace directo de inscripción (?inscribir=1): sirve aunque el organizador
+    // haya ocultado el botón de la página pública
+    const conEnlaceInscripcion = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('inscribir') === '1';
 
     useEffect(() => {
         getDoc(doc(db, 'competiciones', compId))
@@ -89,6 +165,10 @@ export default function CompeticionPublica({ compId, onExit }) {
     }, [compId]);
     useEffect(() => onSnapshot(collection(db, 'competiciones', compId, 'participantes'),
         sn => setParts(sn.docs.map(d => ({ id: d.id, ...d.data() }))), () => {}), [compId]);
+    // Con el enlace de inscripción se abre el formulario directamente
+    useEffect(() => {
+        if (conEnlaceInscripcion && comp && (comp.inscripcion === 'auto' || comp.inscripcion === 'aprobacion')) setInscribir(true);
+    }, [comp]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const compartir = async () => {
         const url = window.location.href;
@@ -111,11 +191,14 @@ export default function CompeticionPublica({ compId, onExit }) {
                             const puntos = comp.puntos || {};
                             const aceptados = parts.filter(p => p.estado !== 'pendiente');
                             const total = (pid) => categorias.reduce((a, c) => a + (Number(puntos[`${pid}_${c.id}`]) || 0), 0);
-                            const puedeInscribir = comp.inscripcion === 'auto' || comp.inscripcion === 'aprobacion';
+                            // La inscripción está abierta, pero el organizador puede ocultar el
+                            // botón de la página pública: entonces solo se ve con ?inscribir=1
+                            const inscripcionAbierta = comp.inscripcion === 'auto' || comp.inscripcion === 'aprobacion';
+                            const puedeInscribir = inscripcionAbierta && (comp.mostrarInscripcion !== false || conEnlaceInscripcion);
                             const catActiva = categorias.find(c => c.id === tab);
                             let filas;
-                            if (tab === 'general') filas = [...aceptados].map(p => ({ id: p.id, nombre: p.nombre, valor: total(p.id) })).sort((a, b) => b.valor - a.valor);
-                            else filas = [...aceptados].map(p => ({ id: p.id, nombre: p.nombre, valor: Number(puntos[`${p.id}_${tab}`]) || 0 })).sort((a, b) => b.valor - a.valor);
+                            if (tab === 'general') filas = [...aceptados].map(p => ({ id: p.id, nombre: aliasDe(p), valor: total(p.id) })).sort((a, b) => b.valor - a.valor);
+                            else filas = [...aceptados].map(p => ({ id: p.id, nombre: aliasDe(p), valor: Number(puntos[`${p.id}_${tab}`]) || 0 })).sort((a, b) => b.valor - a.valor);
                             const yt = catActiva && (catActiva.videoUrl || '').match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([\w-]{11})/);
 
                             return (
@@ -142,11 +225,18 @@ export default function CompeticionPublica({ compId, onExit }) {
                                             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                                                 {catActiva.videoUrl && !yt && <a href={catActiva.videoUrl} target="_blank" rel="noreferrer" style={s.chipLink}><Video size={14} /> Ver vídeo <ExternalLink size={11} /></a>}
                                                 {catActiva.recursoId && <a href={`/?r=${catActiva.recursoId}`} target="_blank" rel="noreferrer" style={s.chipLink}><Gamepad2 size={14} /> {catActiva.recursoTitulo || 'Jugar'} <ExternalLink size={11} /></a>}
+                                                {catActiva.herramientaId && <a href={enlaceAbsoluto(catActiva.herramientaRuta)} target="_blank" rel="noreferrer" style={{ ...s.chipLink, background: '#fce4ec', color: '#E91E63' }}><Wrench size={14} /> Jugar: {catActiva.herramientaTitulo} <ExternalLink size={11} /></a>}
                                             </div>
+                                            {catActiva.herramientaId && (catActiva.herramientaResumen || []).length > 0 && (
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 8 }}>
+                                                    {catActiva.herramientaResumen.map((r, i) => <span key={i} style={{ background: '#f4f6f8', color: '#7f8c8d', borderRadius: 20, padding: '3px 10px', fontSize: '0.76rem', fontWeight: 600 }}>{r}</span>)}
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 
                                     <h2 style={{ color: '#2c3e50', fontSize: '1.05rem', margin: '0 0 10px', display: 'flex', alignItems: 'center', gap: 8 }}><Medal size={18} color="#f39c12" /> {tab === 'general' ? 'Clasificación general' : 'Clasificación de la prueba'}</h2>
+                                    <div style={{ fontSize: '0.78rem', color: '#95a5a6', margin: '-4px 0 10px' }}>Cada participante aparece con su alias.</div>
                                     <RankingLista filas={filas} />
 
                                     {inscribir && <ModalInscripcion comp={comp} compId={compId} onClose={() => setInscribir(false)} />}

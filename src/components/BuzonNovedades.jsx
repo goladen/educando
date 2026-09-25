@@ -2,18 +2,20 @@ import { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import {
     collection, collectionGroup, query, where, orderBy, limit, onSnapshot,
-    addDoc, doc, updateDoc, arrayUnion, getDoc, deleteDoc
+    addDoc, doc, setDoc, updateDoc, arrayUnion, getDoc, deleteDoc
 } from 'firebase/firestore';
-import { Users, Check, X as XIcon, MessageSquare, UserPlus } from 'lucide-react';
+import { Users, Check, X as XIcon, MessageSquare, UserPlus, Settings } from 'lucide-react';
+import useNotificacionesProfesor, { INTERESES } from '../hooks/useNotificacionesProfesor';
 
 const ADMIN_EMAIL = 'goladen@gmail.com';
 
-export default function BuzonNovedades({ usuario }) {
+export default function BuzonNovedades({ usuario, onIr }) {
     const [open, setOpen]           = useState(false);
     const [novedades, setNovedades] = useState([]);
     const [leidas, setLeidas]       = useState([]);
     const [redactando, setRedactando] = useState(false);
-    const [nueva, setNueva]         = useState({ titulo: '', cuerpo: '' });
+    const [nueva, setNueva]         = useState({ titulo: '', cuerpo: '', tipo: 'aviso', categorias: [] });
+    const [editIntereses, setEditIntereses] = useState(false);
     const [enviando, setEnviando]   = useState(false);
     const [confirmDel, setConfirmDel] = useState(null); // id de novedad a borrar
     const [invitaciones, setInvitaciones] = useState([]);
@@ -24,13 +26,29 @@ export default function BuzonNovedades({ usuario }) {
     const [procSol, setProcSol]     = useState(null);
 
     const esAdmin = usuario?.email === ADMIN_EMAIL;
+
+    // Notificaciones agregadas: resultados nuevos, preguntas del trivial y apps nuevas
+    const { grupos, total: totalGrupos, marcarVisto, intereses } = useNotificacionesProfesor(usuario);
+
+    const toggleInteres = async (id) => {
+        if (!usuario?.uid) return;
+        const next = intereses.includes(id) ? intereses.filter(x => x !== id) : [...intereses, id];
+        try { await setDoc(doc(db, 'users', usuario.uid), { intereses: next }, { merge: true }); } catch (_) {}
+    };
+
+    // Destino de cada grupo dentro del panel del profesor
+    const irAGrupo = (g) => {
+        marcarVisto(g.clave);
+        if (g.clave === 'resultados' && onIr) { onIr('INFORMES'); setOpen(false); }
+        if (g.clave === 'preguntas'  && onIr) { onIr('TRIVIAL_RECURSOS'); setOpen(false); }
+    };
     const comsConMensajes = misComunidades.filter(c =>
         c.ultimoMensajeAt && c.ultimoMensajePor !== usuario?.uid &&
         c.ultimoMensajeAt > (comunidadesLeidas[c.id] || 0)
     );
     const nombreCom = (id) => misComunidades.find(c => c.id === id)?.nombre || 'tu comunidad';
     const noLeidas = novedades.filter(n => !leidas.includes(n.id)).length
-        + invitaciones.length + comsConMensajes.length + solicitudesPend.length;
+        + invitaciones.length + comsConMensajes.length + solicitudesPend.length + totalGrupos;
 
     // Comunidades a las que pertenezco (para detectar mensajes nuevos)
     useEffect(() => {
@@ -134,10 +152,12 @@ export default function BuzonNovedades({ usuario }) {
             await addDoc(collection(db, 'novedades'), {
                 titulo: nueva.titulo.trim(),
                 cuerpo: nueva.cuerpo.trim(),
+                tipo: nueva.tipo,               // 'aviso' | 'app' | 'actualizacion'
+                categorias: nueva.categorias,   // vacío = para todos los intereses
                 fecha: new Date(),
                 autor: usuario.displayName || usuario.email,
             });
-            setNueva({ titulo: '', cuerpo: '' });
+            setNueva({ titulo: '', cuerpo: '', tipo: 'aviso', categorias: [] });
             setRedactando(false);
         } catch (e) { alert('Error al publicar: ' + e.message); }
         setEnviando(false);
@@ -191,6 +211,10 @@ export default function BuzonNovedades({ usuario }) {
                                 )}
                             </h3>
                             <div style={{ display: 'flex', gap: 8 }}>
+                                <button onClick={() => setEditIntereses(v => !v)} title="Mis intereses"
+                                    style={{ background: editIntereses ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.22)', border: 'none', color: 'white', borderRadius: 9, padding: '6px 11px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                                    <Settings size={16} />
+                                </button>
                                 {esAdmin && (
                                     <button onClick={() => setRedactando(p => !p)} style={{ background: redactando ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.22)', border: 'none', color: 'white', borderRadius: 9, padding: '6px 14px', cursor: 'pointer', fontWeight: 700, fontSize: '0.82rem' }}>
                                         {redactando ? '✕ Cancelar' : '+ Nueva'}
@@ -216,6 +240,39 @@ export default function BuzonNovedades({ usuario }) {
                                     rows={4}
                                     style={{ width: '100%', padding: '9px 12px', borderRadius: 9, border: '1.5px solid #f39c12', fontSize: '0.88rem', boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical', outline: 'none' }}
                                 />
+                                {/* Tipo de novedad */}
+                                <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                                    {[
+                                        { id: 'aviso',        label: '📢 Aviso' },
+                                        { id: 'app',          label: '🆕 App nueva' },
+                                        { id: 'actualizacion', label: '⬆️ Actualización' },
+                                    ].map(t => (
+                                        <button key={t.id} onClick={() => setNueva(p => ({ ...p, tipo: t.id }))}
+                                            style={{ background: nueva.tipo === t.id ? '#e67e22' : 'white', color: nueva.tipo === t.id ? 'white' : '#8a6b3f', border: '1.5px solid #f39c12', borderRadius: 8, padding: '5px 10px', cursor: 'pointer', fontWeight: 700, fontSize: '0.76rem' }}>
+                                            {t.label}
+                                        </button>
+                                    ))}
+                                </div>
+                                {/* Categorías: a qué intereses afecta (vacío = a todos) */}
+                                {nueva.tipo !== 'aviso' && (
+                                    <div style={{ marginTop: 8 }}>
+                                        <div style={{ fontSize: '0.74rem', color: '#8a6b3f', marginBottom: 5 }}>
+                                            Intereses a los que avisar (ninguno = a todos):
+                                        </div>
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                                            {INTERESES.map(i => {
+                                                const on = nueva.categorias.includes(i.id);
+                                                return (
+                                                    <button key={i.id}
+                                                        onClick={() => setNueva(p => ({ ...p, categorias: on ? p.categorias.filter(x => x !== i.id) : [...p.categorias, i.id] }))}
+                                                        style={{ background: on ? '#fde4c3' : 'white', border: `1.5px solid ${on ? '#e67e22' : '#eadfce'}`, borderRadius: 20, padding: '3px 10px', cursor: 'pointer', fontSize: '0.74rem', fontWeight: 600, color: '#7a5a2e' }}>
+                                                        {i.emoji} {i.label}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
                                 <button
                                     onClick={publicar}
                                     disabled={enviando || !nueva.titulo.trim() || !nueva.cuerpo.trim()}
@@ -226,8 +283,59 @@ export default function BuzonNovedades({ usuario }) {
                             </div>
                         )}
 
+                        {/* Mis intereses (para filtrar las apps nuevas) */}
+                        {editIntereses && (
+                            <div style={{ padding: '12px 20px', background: '#f7f9fc', borderBottom: '1px solid #e9eef5', flexShrink: 0 }}>
+                                <div style={{ fontSize: '0.78rem', color: '#546e7a', marginBottom: 7 }}>
+                                    Elige tus intereses: solo te avisaremos de apps nuevas de estas áreas.
+                                </div>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                                    {INTERESES.map(i => {
+                                        const on = intereses.includes(i.id);
+                                        return (
+                                            <button key={i.id} onClick={() => toggleInteres(i.id)}
+                                                style={{ background: on ? '#1565C0' : 'white', color: on ? 'white' : '#546e7a', border: `1.5px solid ${on ? '#1565C0' : '#d9e2ec'}`, borderRadius: 20, padding: '4px 11px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}>
+                                                {i.emoji} {i.label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                {intereses.length === 0 && (
+                                    <div style={{ fontSize: '0.72rem', color: '#90a4ae', marginTop: 7 }}>
+                                        Sin intereses marcados recibirás todas las novedades.
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         {/* Lista */}
                         <div style={{ overflowY: 'auto', flex: 1 }}>
+                            {/* Resumen agregado: resultados, preguntas del trivial y apps nuevas */}
+                            {grupos.map(g => (
+                                <div key={g.clave} style={{ padding: '14px 20px', borderBottom: '1px solid #f3f3f3', background: '#f4f8ff' }}>
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                                        <span style={{ fontSize: '1.4rem', lineHeight: 1, flexShrink: 0 }}>{g.emoji}</span>
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ fontWeight: 800, color: '#1565C0', fontSize: '0.95rem' }}>{g.titulo}</div>
+                                            {g.detalle && (
+                                                <p style={{ margin: '3px 0 8px', color: '#555', fontSize: '0.84rem' }}>{g.detalle}</p>
+                                            )}
+                                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                                {g.clave !== 'apps' && (
+                                                    <button onClick={() => irAGrupo(g)}
+                                                        style={{ background: '#1565C0', color: 'white', border: 'none', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontWeight: 700, fontSize: '0.82rem' }}>
+                                                        {g.clave === 'resultados' ? 'Ver informes' : 'Revisar preguntas'}
+                                                    </button>
+                                                )}
+                                                <button onClick={() => marcarVisto(g.clave)}
+                                                    style={{ background: 'white', color: '#1565C0', border: '1.5px solid #cfe0f5', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontWeight: 600, fontSize: '0.82rem' }}>
+                                                    Marcar como visto
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
                             {/* Invitaciones a comunidades */}
                             {invitaciones.map(inv => (
                                 <div key={inv.id} style={{ padding: '14px 20px', borderBottom: '1px solid #f3f3f3', background: '#eef4ff' }}>
@@ -288,7 +396,7 @@ export default function BuzonNovedades({ usuario }) {
                                     </div>
                                 </div>
                             ))}
-                            {novedades.length === 0 && invitaciones.length === 0 && comsConMensajes.length === 0 && solicitudesPend.length === 0 ? (
+                            {novedades.length === 0 && invitaciones.length === 0 && comsConMensajes.length === 0 && solicitudesPend.length === 0 && grupos.length === 0 ? (
                                 <div style={{ padding: '48px 20px', textAlign: 'center', color: '#bbb' }}>
                                     <div style={{ fontSize: '2.5rem', marginBottom: 10 }}>🔔</div>
                                     <div style={{ fontSize: '0.92rem' }}>No hay novedades todavía.</div>

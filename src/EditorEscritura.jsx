@@ -52,6 +52,59 @@ const colorPalabras = (n, min, max) => {
     return '#16a34a';
 };
 
+// ── Palabras clave que debe contener el texto ──
+// Comparación sin mayúsculas ni tildes (la ñ se conserva) y por palabras completas;
+// una clave puede ser una expresión de varias palabras ("sin embargo").
+const normalizarClave = (s = '') => s.normalize('NFC').toLowerCase()
+    .replace(/ñ/g, '\u0001').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\u0001/g, 'ñ');
+const tokens = (s = '') => normalizarClave(s).match(/[\p{L}\p{N}]+(?:['’\-][\p{L}\p{N}]+)*/gu) || [];
+
+export const parsearPalabrasClave = (s = '') => {
+    const vistas = new Set();
+    return s.split(/[,;\n]+/).map((p) => p.trim()).filter((p) => {
+        const k = tokens(p).join(' ');
+        if (!k || vistas.has(k)) return false;
+        vistas.add(k);
+        return true;
+    });
+};
+
+// Devuelve las palabras clave que NO aparecen en el texto.
+export const palabrasClaveFaltan = (texto = '', claves = []) => {
+    if (!claves?.length) return [];
+    const t = tokens(texto);
+    return claves.filter((clave) => {
+        const c = tokens(clave);
+        if (!c.length) return false;
+        for (let i = 0; i + c.length <= t.length; i++) {
+            if (c.every((w, j) => t[i + j] === w)) return false;
+        }
+        return true;
+    });
+};
+
+// Lista de palabras clave: verde si aparece en el texto, ámbar si falta.
+export function ChipsClave({ claves = [], faltan = [] }) {
+    const setFaltan = new Set(faltan);
+    return (
+        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569' }}>🔑 Palabras clave:</span>
+            {claves.map((c) => {
+                const falta = setFaltan.has(c);
+                return (
+                    <span key={c} title={falta ? 'No aparece en el texto' : 'Aparece en el texto'} style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4, borderRadius: 20, padding: '3px 10px', fontSize: '0.8rem', fontWeight: 700,
+                        background: falta ? '#fef3c7' : '#dcfce7', color: falta ? '#92400e' : '#166534',
+                        border: `1px solid ${falta ? '#fcd34d' : '#86efac'}`,
+                    }}>
+                        {falta ? '○' : '✓'} {c}
+                    </span>
+                );
+            })}
+        </div>
+    );
+}
+
 // Id determinista del informe: uno por alumno y trabajo (reentregar lo actualiza sin perder las preguntas).
 export const idInformeEscritura = (taskId, studentId) => `ESCRITURA_${taskId}_${studentId}`;
 
@@ -133,6 +186,8 @@ export function FormEscritura({ onLanzar, numConectados = 0, codigoProfesor = nu
     const [maxPalabras, setMaxPalabras] = useState(0);
     const [tiempo, setTiempo] = useState(0);
     const [bloquearPegar, setBloquearPegar] = useState(true);
+    const [clavesTxt, setClavesTxt] = useState('');
+    const claves = useMemo(() => parsearPalabrasClave(clavesTxt), [clavesTxt]);
 
     const lanzar = () => {
         const min = Math.max(0, Number(minPalabras) || 0);
@@ -145,6 +200,7 @@ export function FormEscritura({ onLanzar, numConectados = 0, codigoProfesor = nu
             maxPalabras: max,
             tiempo: Number(tiempo) || 0,
             bloquearPegar,
+            palabrasClave: claves,
         });
     };
 
@@ -183,6 +239,18 @@ export function FormEscritura({ onLanzar, numConectados = 0, codigoProfesor = nu
                 </div>
             </div>
             <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: 4 }}>0 = sin mínimo / sin máximo.</div>
+
+            <label style={lblTop}>🔑 Palabras clave obligatorias (opcional)</label>
+            <input value={clavesTxt} onChange={(e) => setClavesTxt(e.target.value)}
+                placeholder="Separadas por comas. Ej: paisaje, montaña, sin embargo" style={inp} />
+            {claves.length > 0 && (
+                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 6 }}>
+                    {claves.map((c) => <span key={c} style={{ ...chip, background: '#fef3c7', color: '#92400e' }}>🔑 {c}</span>)}
+                </div>
+            )}
+            <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: 4 }}>
+                Al entregar se comprueba que aparezcan (sin distinguir mayúsculas ni tildes) y, si falta alguna, se avisa al alumno para que revise su texto.
+            </div>
 
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, fontSize: '0.88rem', color: '#334155', fontWeight: 600, cursor: 'pointer' }}>
                 <input type="checkbox" checked={bloquearPegar} onChange={(e) => setBloquearPegar(e.target.checked)} />
@@ -241,13 +309,15 @@ export function PanelEscrituraProfesor({ tarea, alumnos, codigo, roomRef, esCone
             conectado: esConectado(a),
             focusLostCount: a.focusLostCount || 0,
             texto: e?.texto || '',
+            faltanClave: palabrasClaveFaltan(e?.texto || '', tarea.palabrasClave),
             palabras: e?.palabras || 0,
             caracteres: e?.caracteres || 0,
             pegados: e?.pegadosBloqueados || 0,
             entregado: !!e?.entregado,
             empezado: !!e,
         };
-    }), [alumnos, tarea.taskId, esConectado]);
+    }), [alumnos, tarea.taskId, tarea.palabrasClave, esConectado]);
+    const numClaves = tarea.palabrasClave?.length || 0;
 
     const entregados = filas.filter((f) => f.entregado).length;
     const verIdx = filas.findIndex((f) => f.id === verId);
@@ -269,13 +339,16 @@ export function PanelEscrituraProfesor({ tarea, alumnos, codigo, roomRef, esCone
             tarea.consigna ? `Consigna: ${tarea.consigna}` : '',
             `Sala ${codigo} · ${fecha}`,
             tarea.minPalabras || tarea.maxPalabras ? `Palabras: mín. ${tarea.minPalabras || '—'} · máx. ${tarea.maxPalabras || '—'}` : '',
+            numClaves ? `Palabras clave: ${tarea.palabrasClave.join(', ')}` : '',
             '='.repeat(60),
         ].filter(Boolean);
         filas.filter((f) => f.empezado).forEach((f) => {
             partes.push(
                 '',
                 `${f.name} — ${f.palabras} palabras — ${f.entregado ? 'entregado' : 'NO entregado'}` +
-                ` — pegados bloqueados: ${f.pegados} — salidas de pestaña: ${f.focusLostCount}`,
+                ` — pegados bloqueados: ${f.pegados} — salidas de pestaña: ${f.focusLostCount}` +
+                (numClaves ? ` — palabras clave: ${numClaves - f.faltanClave.length}/${numClaves}` +
+                    (f.faltanClave.length ? ` (faltan: ${f.faltanClave.join(', ')})` : '') : ''),
                 '-'.repeat(60),
                 f.texto || '(vacío)',
                 '',
@@ -310,6 +383,7 @@ export function PanelEscrituraProfesor({ tarea, alumnos, codigo, roomRef, esCone
                         )}
                         {tarea.bloquearPegar && <span style={chip}>🚫 Pegar bloqueado</span>}
                         <span style={chip}>🔕 Sin corrector</span>
+                        {numClaves > 0 && <span title={tarea.palabrasClave.join(', ')} style={{ ...chip, background: '#fef3c7', color: '#92400e' }}>🔑 {tarea.palabrasClave.join(', ')}</span>}
                     </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
@@ -350,6 +424,12 @@ export function PanelEscrituraProfesor({ tarea, alumnos, codigo, roomRef, esCone
                                 )}
                             </div>
                             <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                                {numClaves > 0 && f.empezado && (
+                                    <span title={f.faltanClave.length ? `Faltan: ${f.faltanClave.join(', ')}` : 'Contiene todas las palabras clave'}
+                                        style={{ ...alerta, background: f.faltanClave.length ? '#fef3c7' : '#dcfce7', color: f.faltanClave.length ? '#b45309' : '#166534' }}>
+                                        🔑 {numClaves - f.faltanClave.length}/{numClaves}
+                                    </span>
+                                )}
                                 {f.pegados > 0 && <span title="Intentos de pegar/arrastrar texto bloqueados" style={{ ...alerta, background: '#fee2e2', color: '#b91c1c' }}>🚫 ×{f.pegados}</span>}
                                 {f.focusLostCount > 0 && <span title="Veces que ha salido de la pestaña" style={{ ...alerta, background: '#fef3c7', color: '#b45309' }}>👀 ×{f.focusLostCount}</span>}
                             </div>
@@ -393,6 +473,7 @@ export function PanelEscrituraProfesor({ tarea, alumnos, codigo, roomRef, esCone
                             </div>
                         </div>
                         <div style={{ padding: '18px 22px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                            {numClaves > 0 && <ChipsClave claves={tarea.palabrasClave} faltan={ver.faltanClave} />}
                             <div style={{ whiteSpace: 'pre-wrap', fontFamily: "Georgia, 'Times New Roman', serif", fontSize: '1.08rem', lineHeight: 1.7, color: '#1e293b' }}>
                                 {ver.texto || <span style={{ color: '#94a3b8' }}>(vacío)</span>}
                             </div>
@@ -435,6 +516,7 @@ export function EditorEscrituraAlumno({ tarea, codigo, studentId, nombre = '', f
     const [aviso, setAviso] = useState('');
     const [verConsigna, setVerConsigna] = useState(true);
     const [ahora, setAhora] = useState(Date.now());
+    const [avisoClave, setAvisoClave] = useState(null); // palabras clave que faltan al intentar entregar
 
     const textareaRef = useRef(null);
     const timerGuardar = useRef(null);
@@ -448,6 +530,8 @@ export function EditorEscrituraAlumno({ tarea, codigo, studentId, nombre = '', f
     const agotado = restanteMs != null && restanteMs <= 0;
     const bloqueado = !listo || entregado || fin || agotado;
     const palabras = contarPalabras(texto);
+    const claves = tarea.palabrasClave || [];
+    const faltanClave = useMemo(() => palabrasClaveFaltan(texto, claves), [texto, claves]);
 
     // Cada entrega queda en Informes (informes_juegos) con id determinista: reentregar actualiza el
     // texto con merge y conserva las preguntas que el profesor haya añadido sobre él.
@@ -467,6 +551,8 @@ export function EditorEscrituraAlumno({ tarea, codigo, studentId, nombre = '', f
                 consigna: tarea.consigna || '',
                 minPalabras: tarea.minPalabras || 0,
                 maxPalabras: tarea.maxPalabras || 0,
+                palabrasClave: tarea.palabrasClave || [],
+                palabrasClaveFaltan: palabrasClaveFaltan(p.texto, tarea.palabrasClave),
                 texto: p.texto,
                 palabras: p.palabras,
                 caracteres: p.caracteres,
@@ -604,10 +690,13 @@ export function EditorEscrituraAlumno({ tarea, codigo, studentId, nombre = '', f
         programarGuardado();
     };
 
-    const entregar = () => {
+    // Si faltan palabras clave se avisa primero; "Entregar igualmente" vuelve aquí con ignorarClaves.
+    const entregar = (ignorarClaves = false) => {
+        if (!ignorarClaves && faltanClave.length) { setAvisoClave(faltanClave); return; }
+        setAvisoClave(null);
         if (tarea.minPalabras > 0 && palabras < tarea.minPalabras &&
             !window.confirm(`Llevas ${palabras} palabras y el mínimo es ${tarea.minPalabras}. ¿Entregar igualmente?`)) return;
-        if (!window.confirm('¿Entregar el texto? Ya no podrás editarlo.')) return;
+        if (!ignorarClaves && !window.confirm('¿Entregar el texto? Ya no podrás editarlo.')) return;
         clearTimeout(timerGuardar.current);
         timerGuardar.current = null;
         setEntregado(true);
@@ -648,10 +737,20 @@ export function EditorEscrituraAlumno({ tarea, codigo, studentId, nombre = '', f
                             </span>
                         )}
                         {tarea.bloquearPegar && <span style={chip}>🚫 Pegar desactivado</span>}
+                        {claves.length > 0 && (
+                            <span style={{ ...chip, background: faltanClave.length ? '#fef3c7' : '#dcfce7', color: faltanClave.length ? '#92400e' : '#166534' }}>
+                                🔑 {claves.length - faltanClave.length}/{claves.length} palabras clave
+                            </span>
+                        )}
                         <span style={{ fontSize: '0.78rem', color: guardado === 'error' ? '#dc2626' : '#64748b', marginLeft: 'auto' }}>
                             {!listo ? 'Cargando…' : guardado === 'pendiente' ? 'Guardando…' : guardado === 'error' ? '⚠️ Sin conexión (guardado en este dispositivo)' : '✓ Guardado'}
                         </span>
                     </div>
+                    {claves.length > 0 && (
+                        <div style={{ marginTop: 10 }}>
+                            <ChipsClave claves={claves} faltan={faltanClave} />
+                        </div>
+                    )}
                 </div>
 
                 {(entregado || fin || agotado) && listo && (
@@ -690,7 +789,32 @@ export function EditorEscrituraAlumno({ tarea, codigo, studentId, nombre = '', f
 
                 {!bloqueado && (
                     <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                        <button onClick={entregar} style={btn('#0f766e')}>📤 Entregar</button>
+                        <button onClick={() => entregar()} style={btn('#0f766e')}>📤 Entregar</button>
+                    </div>
+                )}
+
+                {/* Aviso: faltan palabras clave al entregar */}
+                {avisoClave && !bloqueado && (
+                    <div onClick={() => setAvisoClave(null)} style={{ position: 'fixed', inset: 0, zIndex: 10003, background: 'rgba(15,23,42,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                        <div onClick={(e) => e.stopPropagation()} style={{ background: 'white', borderRadius: 16, width: '100%', maxWidth: 460, padding: '20px 22px', boxShadow: '0 20px 50px rgba(0,0,0,0.3)' }}>
+                            <div style={{ fontSize: '2rem', textAlign: 'center' }}>🔑</div>
+                            <h3 style={{ margin: '4px 0 8px', color: '#92400e', textAlign: 'center' }}>
+                                {avisoClave.length === 1 ? 'Te falta una palabra clave' : `Te faltan ${avisoClave.length} palabras clave`}
+                            </h3>
+                            <p style={{ margin: '0 0 10px', color: '#475569', fontSize: '0.92rem', textAlign: 'center' }}>
+                                Tu texto debería incluir {avisoClave.length === 1 ? 'esta palabra' : 'estas palabras'}:
+                            </p>
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center', marginBottom: 14 }}>
+                                {avisoClave.map((c) => (
+                                    <span key={c} style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #fcd34d', borderRadius: 20, padding: '4px 12px', fontWeight: 800 }}>{c}</span>
+                                ))}
+                            </div>
+                            <p style={{ margin: '0 0 16px', color: '#1e293b', fontWeight: 700, textAlign: 'center' }}>¿Quieres revisar tu texto antes de entregarlo?</p>
+                            <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+                                <button onClick={() => { setAvisoClave(null); setTimeout(() => textareaRef.current?.focus(), 0); }} style={btn('#0f766e')}>✏️ Sí, revisar</button>
+                                <button onClick={() => entregar(true)} style={btn('#94a3b8')}>📤 Entregar igualmente</button>
+                            </div>
+                        </div>
                     </div>
                 )}
             </div>

@@ -742,7 +742,7 @@ function PantallaConfig({ conf, setConf, onJugar }) {
 }
 
 // ---------------------------------------------------------------- tablero
-function Tablero({ enigma, lang, grid, notas, onCelda, revelado, marcarErrores }) {
+function Tablero({ enigma, lang, grid, notas, onCelda, revelado, marcarErrores, fijas }) {
     const { N, cats } = enigma;
     const solDe = (c, p) => enigma.pos[c].indexOf(p);
     const cellBase = {
@@ -781,14 +781,18 @@ function Tablero({ enigma, lang, grid, notas, onCelda, revelado, marcarErrores }
                             const malo = marcarErrores && !revelado && idx != null && idx !== solDe(c, p);
                             const bueno = marcarErrores && !revelado && idx != null && idx === solDe(c, p);
                             const desc = [...(notas[`${c}-${p}`] || [])];
+                            const fija = !revelado && fijas?.has(`${c}-${p}`);
                             return (
-                                <div key={p} onClick={() => onCelda(c, p)} style={{
+                                <div key={p} onClick={() => !fija && onCelda(c, p)} title={fija ? 'Casilla desvelada con pista' : undefined} style={{
                                     ...cellBase,
-                                    border: item ? `2px solid ${malo ? COL.mal : bueno ? COL.ok : COL.acento}` : cellBase.border,
+                                    position: 'relative',
+                                    cursor: fija ? 'default' : 'pointer',
+                                    border: item ? `2px solid ${fija ? COL.oro : malo ? COL.mal : bueno ? COL.ok : COL.acento}` : cellBase.border,
                                     background: item
-                                        ? (malo ? 'rgba(231,76,60,0.16)' : bueno ? 'rgba(46,204,113,0.16)' : 'rgba(124,58,237,0.16)')
+                                        ? (fija ? 'rgba(241,196,15,0.14)' : malo ? 'rgba(231,76,60,0.16)' : bueno ? 'rgba(46,204,113,0.16)' : 'rgba(124,58,237,0.16)')
                                         : cellBase.background,
                                 }}>
+                                    {fija && <span style={{ position: 'absolute', top: 2, right: 4, fontSize: '0.7rem' }}>🔍</span>}
                                     {item ? (
                                         <>
                                             <span style={{ fontSize: '1.5rem', lineHeight: 1 }}>{item.emoji}</span>
@@ -810,7 +814,7 @@ function Tablero({ enigma, lang, grid, notas, onCelda, revelado, marcarErrores }
 }
 
 // ---------------------------------------------------------------- selector de elemento
-function Picker({ cat, lang, N, grid, fila, casilla, notas, onElegir, onNota, onQuitar, onClose }) {
+function Picker({ cat, lang, N, grid, fila, casilla, notas, fijas, onElegir, onNota, onQuitar, onClose }) {
     const puestos = {};
     grid[fila].forEach((it, p) => { if (it != null) puestos[it] = p; });
     const desc = notas[`${fila}-${casilla}`] || new Set();
@@ -833,23 +837,24 @@ function Picker({ cat, lang, N, grid, fila, casilla, notas, onElegir, onNota, on
                     {cat.items.map((it, i) => {
                         const en = puestos[i];
                         const tachado = desc.has(i);
+                        const bloqueado = en != null && en !== casilla && fijas?.has(`${fila}-${en}`);
                         return (
                             <div key={it.id} style={{
                                 display: 'flex', alignItems: 'center', gap: 6, padding: '8px 9px', borderRadius: 11,
                                 border: `1.5px solid ${tachado ? 'rgba(231,76,60,0.5)' : COL.borde}`,
                                 background: tachado ? 'rgba(231,76,60,0.08)' : 'rgba(255,255,255,0.05)',
-                                opacity: tachado ? 0.55 : 1,
+                                opacity: tachado || bloqueado ? 0.55 : 1,
                             }}>
-                                <button onClick={() => onElegir(i)} style={{
+                                <button onClick={() => onElegir(i)} disabled={bloqueado} title={bloqueado ? 'Fijado por una pista' : undefined} style={{
                                     flex: 1, display: 'flex', alignItems: 'center', gap: 7, background: 'none',
-                                    border: 'none', color: COL.texto, cursor: 'pointer', fontFamily: 'inherit',
+                                    border: 'none', color: COL.texto, cursor: bloqueado ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
                                     fontSize: '0.85rem', fontWeight: 700, textAlign: 'left', padding: 0,
                                     textDecoration: tachado ? 'line-through' : 'none',
                                 }}>
                                     <span style={{ fontSize: '1.3rem' }}>{it.emoji}</span>
                                     <span>{it[lang].lbl}</span>
                                     {en != null && en !== casilla && (
-                                        <span style={{ fontSize: '0.68rem', color: COL.suave }}>({en + 1})</span>
+                                        <span style={{ fontSize: '0.68rem', color: COL.suave }}>({en + 1}){bloqueado ? ' 🔒' : ''}</span>
                                     )}
                                 </button>
                                 <button title="Descartar en esta casilla" onClick={() => onNota(i)} style={{
@@ -909,6 +914,8 @@ function ModalEnviarProfe({ datos, onClose }) {
                     categorias: datos.categorias,
                     tiempoTotal: datos.tiempoTotal,
                     ayudas: datos.ayudas,
+                    pistasCasilla: datos.pistasCasilla,
+                    puntos: datos.puntos,
                 }],
             });
             guardarRegistroLocal('ENIGMIC', {
@@ -939,7 +946,7 @@ function ModalEnviarProfe({ datos, onClose }) {
                     <div style={{ textAlign: 'center', padding: '20px 0' }}>
                         <div style={{ fontSize: '3rem' }}>✅</div>
                         <div style={{ color: '#2ecc71', fontWeight: 700 }}>¡Informe enviado!</div>
-                        <div style={{ color: '#aaa', fontSize: '0.88rem', marginTop: 8 }}>{datos.aciertos}/{datos.intentos} enigmas resueltos</div>
+                        <div style={{ color: '#aaa', fontSize: '0.88rem', marginTop: 8 }}>{datos.aciertos}/{datos.intentos} enigmas resueltos · ⭐ {datos.puntos} puntos</div>
                         <button onClick={onClose} style={{ marginTop: 16, padding: '9px 22px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer', color: 'white' }}>Cerrar</button>
                     </div>
                 ) : (
@@ -968,11 +975,14 @@ function ModalEnviarProfe({ datos, onClose }) {
    6. COMPONENTE PRINCIPAL
    ═══════════════════════════════════════════════════════════════ */
 
-export default function EnigmicLogic({ usuario, onExit, onBack }) {
+// `aula` (opcional, Control de Aula · AppsAula.jsx): { config, rondasMax, onProgreso, onTerminar }.
+// Con él se juega con la configuración del profesor (sin pantalla de ajustes) y se informa de la
+// puntuación acumulada tras cada caso; rondasMax > 0 limita el número de casos.
+export default function EnigmicLogic({ usuario, onExit, onBack, aula = null }) {
     const salir = onExit || onBack || (() => { window.history.pushState({}, '', '/'); window.location.reload(); });
 
-    const [pantalla, setPantalla] = useState('CONFIG');
-    const [conf, setConf] = useState({ lang: 'en', N: 5, nivel: 'MEDIO', modo: 'LEER', catIds: ['PROFESIONES', 'VERBOS', 'OBJETOS'] });
+    const [pantalla, setPantalla] = useState(aula ? 'JUEGO' : 'CONFIG');
+    const [conf, setConf] = useState(() => ({ lang: 'en', N: 5, nivel: 'MEDIO', modo: 'LEER', catIds: ['PROFESIONES', 'VERBOS', 'OBJETOS'], ...(aula?.config || {}) }));
     const [enigma, setEnigma] = useState(null);
     const [grid, setGrid] = useState([]);
     const [notas, setNotas] = useState({});
@@ -985,12 +995,33 @@ export default function EnigmicLogic({ usuario, onExit, onBack }) {
     const [ayuda, setAyuda] = useState(false);
     const [segundos, setSegundos] = useState(0);
     const [mostrarEnvio, setMostrarEnvio] = useState(false);
+    const [fijas, setFijas] = useState(new Set()); // casillas "c-p" desveladas con pista
+    const [puntosCaso, setPuntosCaso] = useState(0);
 
     // estadísticas de sesión
     const [resueltos, setResueltos] = useState(0);
     const [intentos, setIntentos] = useState(0);
     const [ayudasUsadas, setAyudas] = useState(0);
     const [tiempoTotal, setTiempoTotal] = useState(0);
+    const [pistasCasillaTotal, setPistasCasillaTotal] = useState(0);
+    const [puntosTotal, setPuntosTotal] = useState(0);
+    const [casosAula, setCasosAula] = useState(0); // casos terminados (resueltos o revelados) en Control de Aula
+    const limiteAula = !!aula && aula.rondasMax > 0 && casosAula >= aula.rondasMax;
+
+    // Puntuación del caso: 10 por casilla del tablero − 5 por minuto − 5 por pista (mínimo 0).
+    const puntosPosibles = enigma
+        ? Math.max(0, 10 * enigma.N * enigma.K - 5 * Math.floor(segundos / 60) - 5 * fijas.size)
+        : 0;
+
+    // Control de Aula: primer caso con la configuración del profe + progreso tras cada caso.
+    useEffect(() => {
+        if (aula) nuevoEnigma(conf);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+    useEffect(() => {
+        if (casosAula > 0) aula?.onProgreso?.({ puntos: puntosTotal, rondas: casosAula, resueltos, pistas: pistasCasillaTotal });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [casosAula]);
 
     const timerRef = useRef(null);
     useEffect(() => {
@@ -1005,6 +1036,8 @@ export default function EnigmicLogic({ usuario, onExit, onBack }) {
         setGrid(Array.from({ length: e.K }, () => new Array(e.N).fill(null)));
         setNotas({});
         setUsadas(new Set());
+        setFijas(new Set());
+        setPuntosCaso(0);
         setRevelado(false);
         setMarcarErrores(false);
         setVictoria(false);
@@ -1024,6 +1057,24 @@ export default function EnigmicLogic({ usuario, onExit, onBack }) {
         setGrid(g => g.map((fila, fc) => fc !== c ? fila : fila.map((v, fp) => (fp === p ? null : v))));
         setPicker(null);
     };
+    // Pista: desvela una casilla vacía o incorrecta con su valor correcto y la deja fija.
+    const pedirPista = () => {
+        if (!enigma || revelado || victoria) return;
+        const candidatas = [];
+        for (let c = 0; c < enigma.K; c++) for (let p = 0; p < enigma.N; p++) {
+            if (grid[c][p] !== enigma.pos[c].indexOf(p)) candidatas.push([c, p]);
+        }
+        if (!candidatas.length) { setAviso('Todas las casillas están bien: pulsa ✅ Comprobar.'); return; }
+        const [c, p] = candidatas[Math.floor(Math.random() * candidatas.length)];
+        const i = enigma.pos[c].indexOf(p);
+        setGrid(g => g.map((fila, fc) => fc !== c ? fila : fila.map((v, fp) => (fp === p ? i : (v === i ? null : v)))));
+        setNotas(n => { const k = `${c}-${p}`; if (!n[k]) return n; const m = { ...n }; delete m[k]; return m; });
+        setFijas(s => new Set(s).add(`${c}-${p}`));
+        setPistasCasillaTotal(n => n + 1);
+        setMarcarErrores(false);
+        setAviso(`🔍 Pista: ${enigma.cats[c].items[i][conf.lang].lbl} va en la casilla ${p + 1} (−5 puntos).`);
+    };
+
     const toggleNota = (i) => {
         const { c, p } = picker;
         const k = `${c}-${p}`;
@@ -1048,6 +1099,9 @@ export default function EnigmicLogic({ usuario, onExit, onBack }) {
             setVictoria(true);
             setResueltos(n => n + 1);
             setTiempoTotal(t => t + segundos);
+            setPuntosCaso(puntosPosibles);
+            setPuntosTotal(t => t + puntosPosibles);
+            setCasosAula(n => n + 1);
             setAviso('');
             guardarRegistroLocal('ENIGMIC', {
                 titulo: `Enigmic ${enigma.N}×${enigma.K} · ${IDIOMAS[conf.lang].nom} · ${NIVELES[conf.nivel].nombre}`,
@@ -1062,6 +1116,7 @@ export default function EnigmicLogic({ usuario, onExit, onBack }) {
 
     const resolver = () => {
         setRevelado(true);
+        if (aula && !victoria) setCasosAula(n => n + 1);
         setAyudas(a => a + 1);
         setIntentos(n => n + 1);
         setAviso('Solución revelada: este enigma no cuenta como resuelto.');
@@ -1104,12 +1159,20 @@ export default function EnigmicLogic({ usuario, onExit, onBack }) {
                     <span style={{ background: COL.panel2, borderRadius: 10, padding: '6px 11px', fontSize: '0.8rem', fontWeight: 700 }}>
                         🏆 {resueltos}/{intentos}
                     </span>
+                    <span title="10 por casilla − 5 por minuto − 5 por pista" style={{ background: COL.panel2, borderRadius: 10, padding: '6px 11px', fontSize: '0.8rem', fontWeight: 700, color: COL.oro }}>
+                        ⭐ {victoria || revelado ? puntosCaso : puntosPosibles} pts · total {puntosTotal}
+                    </span>
                     <span style={{ background: COL.panel2, borderRadius: 10, padding: '6px 11px', fontSize: '0.8rem' }}>
                         {IDIOMAS[lang].flag} {enigma.N}×{enigma.K} · {NIVELES[enigma.nivel].nombre} · {soloAudio ? '🎧 solo escucha' : '📖 lectura'}
                     </span>
+                    {aula && (
+                        <span style={{ background: 'rgba(124,58,237,0.25)', borderRadius: 10, padding: '6px 11px', fontSize: '0.8rem', fontWeight: 700 }}>
+                            🏫 Caso {Math.min(casosAula + (victoria || revelado ? 0 : 1), aula.rondasMax || Infinity)}{aula.rondasMax > 0 ? `/${aula.rondasMax}` : ''}
+                        </span>
+                    )}
                     <div style={{ flex: 1 }} />
                     <button onClick={() => setAyuda(a => !a)} style={bloqueBtn('rgba(255,255,255,0.1)')}>📖 Vocabulario</button>
-                    <button onClick={() => setPantalla('CONFIG')} style={bloqueBtn('rgba(255,255,255,0.1)')}>⚙️ Ajustes</button>
+                    {!aula && <button onClick={() => setPantalla('CONFIG')} style={bloqueBtn('rgba(255,255,255,0.1)')}>⚙️ Ajustes</button>}
                 </div>
 
                 {ayuda && (
@@ -1142,14 +1205,21 @@ export default function EnigmicLogic({ usuario, onExit, onBack }) {
                     <div style={{ background: COL.panel, border: `1px solid ${COL.borde}`, borderRadius: 16, padding: '14px 14px 10px' }}>
                         <Tablero
                             enigma={enigma} lang={lang} grid={grid} notas={notas}
-                            revelado={revelado} marcarErrores={marcarErrores}
+                            revelado={revelado} marcarErrores={marcarErrores} fijas={fijas}
                             onCelda={(c, p) => !revelado && setPicker({ c, p })}
                         />
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
                             <button onClick={comprobar} disabled={revelado} style={bloqueBtn(revelado ? '#555' : `linear-gradient(135deg,${COL.ok},#27ae60)`)}>✅ Comprobar</button>
-                            <button onClick={() => nuevoEnigma()} style={bloqueBtn(`linear-gradient(135deg,${COL.acento},#5b21b6)`)}>🔄 Nuevo caso</button>
+                            {/* En el aula no se puede saltar un caso sin terminarlo (resolverlo o revelarlo). */}
+                            {(!aula || ((victoria || revelado) && !limiteAula)) && (
+                                <button onClick={() => nuevoEnigma()} style={bloqueBtn(`linear-gradient(135deg,${COL.acento},#5b21b6)`)}>🔄 Nuevo caso</button>
+                            )}
+                            {limiteAula && (
+                                <button onClick={() => aula.onTerminar?.()} style={bloqueBtn(`linear-gradient(135deg,${COL.ok},#27ae60)`)}>🏁 Terminar</button>
+                            )}
+                            <button onClick={pedirPista} disabled={revelado || victoria} title="Desvela una casilla (−5 puntos)" style={bloqueBtn(revelado || victoria ? '#555' : 'rgba(241,196,15,0.18)', { border: `1px solid ${COL.oro}` })}>🔍 Pista (−5)</button>
                             <button onClick={resolver} disabled={revelado} style={bloqueBtn('rgba(255,255,255,0.1)')}>💡 Resolver</button>
-                            <button onClick={() => setMostrarEnvio(true)} style={bloqueBtn(`linear-gradient(135deg,${COL.oro},#e67e22)`, { color: '#1b2330' })}>📤 Enviar al profesor</button>
+                            {!aula && <button onClick={() => setMostrarEnvio(true)} style={bloqueBtn(`linear-gradient(135deg,${COL.oro},#e67e22)`, { color: '#1b2330' })}>📤 Enviar al profesor</button>}
                         </div>
                         {aviso && (
                             <div style={{ marginTop: 10, fontSize: '0.85rem', color: victoria ? COL.ok : COL.oro }}>⚠ {aviso}</div>
@@ -1229,20 +1299,20 @@ export default function EnigmicLogic({ usuario, onExit, onBack }) {
 
     return (
         <div style={{
-            position: 'fixed', inset: 0, zIndex: 9999, background: COL.fondo, color: COL.texto,
-            overflowY: 'auto', fontFamily: "'Segoe UI', system-ui, sans-serif", padding: '58px 12px 20px',
+            position: aula ? 'absolute' : 'fixed', inset: 0, zIndex: aula ? 1 : 9999, background: COL.fondo, color: COL.texto,
+            overflowY: 'auto', fontFamily: "'Segoe UI', system-ui, sans-serif", padding: aula ? '14px 12px 20px' : '58px 12px 20px',
         }}>
-            <button onClick={salir} style={{
+            {!aula && <button onClick={salir} style={{
                 position: 'fixed', top: 12, left: 12, zIndex: 10000, padding: '8px 14px', borderRadius: 10,
                 border: `1px solid ${COL.borde}`, background: COL.panel2, color: COL.texto, fontWeight: 700, cursor: 'pointer',
-            }}>← Volver</button>
+            }}>← Volver</button>}
 
             {cuerpo}
 
             {picker && enigma && (
                 <Picker
                     cat={enigma.cats[picker.c]} lang={conf.lang} N={enigma.N} grid={grid}
-                    fila={picker.c} casilla={picker.p} notas={notas}
+                    fila={picker.c} casilla={picker.p} notas={notas} fijas={fijas}
                     onElegir={ponerEnCelda} onNota={toggleNota} onQuitar={vaciarCelda} onClose={() => setPicker(null)}
                 />
             )}
@@ -1255,9 +1325,17 @@ export default function EnigmicLogic({ usuario, onExit, onBack }) {
                         <p style={{ color: COL.suave, fontSize: '0.9rem', margin: '0 0 16px' }}>
                             Tiempo: {fmtTiempo(segundos)} · Enigmas resueltos: {resueltos}/{intentos}
                         </p>
+                        <div style={{ fontSize: '2rem', fontWeight: 900, color: COL.oro }}>⭐ {puntosCaso} puntos</div>
+                        <p style={{ color: COL.suave, fontSize: '0.78rem', margin: '4px 0 16px' }}>
+                            {10 * enigma.N * enigma.K} por {enigma.N * enigma.K} casillas − {5 * Math.floor(segundos / 60)} por tiempo − {5 * fijas.size} por pistas · Total sesión: {puntosTotal}
+                        </p>
                         <div style={{ display: 'flex', gap: 8, flexDirection: 'column' }}>
-                            <button onClick={() => nuevoEnigma()} style={bloqueBtn(`linear-gradient(135deg,${COL.acento},#5b21b6)`, { padding: '12px' })}>🔄 Otro caso</button>
-                            <button onClick={() => setMostrarEnvio(true)} style={bloqueBtn(`linear-gradient(135deg,${COL.oro},#e67e22)`, { padding: '12px', color: '#1b2330' })}>📤 Enviar al profesor</button>
+                            {limiteAula ? (
+                                <button onClick={() => aula.onTerminar?.()} style={bloqueBtn(`linear-gradient(135deg,${COL.ok},#27ae60)`, { padding: '12px' })}>🏁 Terminar · {puntosTotal} puntos</button>
+                            ) : (
+                                <button onClick={() => nuevoEnigma()} style={bloqueBtn(`linear-gradient(135deg,${COL.acento},#5b21b6)`, { padding: '12px' })}>🔄 Otro caso</button>
+                            )}
+                            {!aula && <button onClick={() => setMostrarEnvio(true)} style={bloqueBtn(`linear-gradient(135deg,${COL.oro},#e67e22)`, { padding: '12px', color: '#1b2330' })}>📤 Enviar al profesor</button>}
                             <button onClick={() => setVictoria(false)} style={bloqueBtn('rgba(255,255,255,0.1)', { padding: '12px' })}>Ver el tablero</button>
                         </div>
                     </div>
@@ -1273,6 +1351,7 @@ export default function EnigmicLogic({ usuario, onExit, onBack }) {
                         modo: conf.modo === 'ESCUCHAR' ? 'Solo escucha' : 'Lectura',
                         categorias: conf.catIds.map(id => CAT_POR_ID[id].nombre.es),
                         tiempoTotal, ayudas: ayudasUsadas,
+                        pistasCasilla: pistasCasillaTotal, puntos: puntosTotal,
                     }}
                     onClose={() => setMostrarEnvio(false)}
                 />

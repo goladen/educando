@@ -7,6 +7,9 @@ import {
 } from 'firebase/firestore';
 import { guardarRegistroLocal } from './utils/registrosLocales';
 import QRSalaBoton from './components/QRSalaBoton';
+import {
+    limpiar, barajar, normalizarPregunta, preguntasDeRecurso, esRespuestaCorrecta,
+} from './utils/normalizarPreguntas';
 
 /* =====================================================================
  *  LUZ ROJA · LUZ VERDE  (juego del calamar educativo)
@@ -32,71 +35,16 @@ const COLOR_CHANDAL = 0x149e7a;   // verde azulado del chándal
 const COLOR_FONDO = 0x8ed2f0;   // cielo pintado del pabellón
 
 const rnd = (a, b) => a + Math.random() * (b - a);
-const barajar = (arr) => {
-    const a = [...arr];
-    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
-    return a;
-};
-const limpiar = (s) => String(s ?? '').toLowerCase().normalize('NFD')
-    .replace(/[̀-ͯ]/g, '').replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, ' ').trim();
 
 const claveJugador = (nombre) => limpiar(nombre).replace(/\s+/g, '_').slice(0, 40) || 'jugador';
 
 // =====================================================================
 //  NORMALIZACIÓN DE PREGUNTAS (cualquier recurso del profesor)
+//  La lógica vive en utils/normalizarPreguntas.js (compartida con Money Board).
+//  Se re-exporta aquí para no romper importaciones existentes.
 // =====================================================================
-export function normalizarPreguntaCalamar(p) {
-    if (!p) return null;
-    const tipoOrig = String(p.tipo || '').toUpperCase();
-    if (tipoOrig === 'PRESENTATION' || tipoOrig === 'DIBUJO') return null;
-
-    const enunciado = String(p.pregunta || p.q || p.enunciado || '').trim();
-    const bloques = Array.isArray(p.bloques) ? p.bloques.map(b => String(b ?? '').trim()) : [];
-
-    // --- Ordenar ---
-    if (tipoOrig === 'ORDENAR') {
-        const bs = bloques.filter(Boolean);
-        if (bs.length < 2) return null;
-        return { tipo: 'ORDENAR', enunciado: enunciado || 'Ordena los bloques', bloques: bs, correcta: bs.join(' ') };
-    }
-
-    // --- Rellenar hueco ---
-    if (tipoOrig === 'RELLENAR') {
-        const hueco = bloques[1] || '';
-        if (!hueco) return null;
-        return {
-            tipo: 'RELLENAR',
-            enunciado: enunciado || 'Completa la frase',
-            bloques: [bloques[0] || '', hueco, bloques[2] || ''],
-            correcta: hueco,
-        };
-    }
-
-    // --- Opción múltiple / respuesta corta ---
-    const correcta = String(p.correcta ?? p.respuesta ?? p.ok ?? p.a ?? '').trim();
-    if (!enunciado || !correcta) return null;
-
-    let mal = p.incorrectas || p.mal || p.distractores || [];
-    if (!Array.isArray(mal)) mal = [];
-    mal = [...new Set(mal.map(x => String(x ?? '').trim()).filter(x => x && limpiar(x) !== limpiar(correcta)))].slice(0, 3);
-
-    if (tipoOrig === 'SIMPLE' || mal.length === 0) return { tipo: 'CORTA', enunciado, correcta };
-    return { tipo: 'MULTIPLE', enunciado, correcta, opciones: barajar([correcta, ...mal]) };
-}
-
-export function preguntasDeRecurso(recurso) {
-    if (!recurso) return [];
-    const crudas = Array.isArray(recurso.hojas) && recurso.hojas.length
-        ? recurso.hojas.flatMap(h => h.preguntas || [])
-        : (recurso.preguntas || []);
-    return crudas.map(normalizarPreguntaCalamar).filter(Boolean);
-}
-
-export function esRespuestaCorrecta(pregunta, dada) {
-    if (!pregunta) return false;
-    if (pregunta.tipo === 'ORDENAR') return limpiar(dada) === limpiar(pregunta.bloques.join(' '));
-    return limpiar(dada) === limpiar(pregunta.correcta);
-}
+export const normalizarPreguntaCalamar = normalizarPregunta;
+export { preguntasDeRecurso, esRespuestaCorrecta };
 
 // =====================================================================
 //  BANCO LIBRE (para jugar sin recurso del profesor)

@@ -6,6 +6,8 @@ import correctSoundFile from '../assets/correct-choice-43861.mp3';
 import wrongSoundFile   from '../assets/negative_beeps-6008.mp3';
 import ANATOMIA         from '../anatomia_avanzada_dataset.json';
 import { CompeticionCuerda } from './TironCuerdaEscena';
+import ModalEnviarCompeticion from './ModalEnviarCompeticion';
+import { leerRetoUrl } from '../utils/retoLink';
 
 const N_PREGUNTAS = 10;
 const TIEMPO      = 20;
@@ -192,11 +194,11 @@ const SYSTEM_COLOR = {
   cuerpo:'#d97706', musculos:'#dc2626', huesos:'#64748b',
   circulatorio:'#b91c1c', digestivo:'#b45309', respiratorio:'#0284c7',
 };
-const SYSTEM_LABEL = {
+export const SYSTEM_LABEL = {
   cuerpo:'Partes del Cuerpo', musculos:'Músculos', huesos:'Huesos',
   circulatorio:'Sistema Circulatorio', digestivo:'Sistema Digestivo', respiratorio:'Sistema Respiratorio',
 };
-const SYSTEM_EMOJI = {
+export const SYSTEM_EMOJI = {
   cuerpo:'🧍', musculos:'💪', huesos:'🦴', circulatorio:'🫀', digestivo:'🍽️', respiratorio:'🫁',
 };
 const SYSTEM_QUESTION = {
@@ -477,13 +479,16 @@ function PanelBioCompeticion({ aplicar, bloqueado, equipo, tipo = 'mix', ambito 
 }
 
 function BiologiaAppInner({ onBack, onCreateLive, onJoinLive }) {
+  // Reto por enlace: configuración fija (y, si viene de una competición, envío allí)
+  const [reto] = useState(() => leerRetoUrl());
+  const esRetoCompeticion = !!(reto && reto.compId && reto.catId);
   const [pantalla,    setPantalla]    = useState('intro');
   const [tipoComp,    setTipoComp]    = useState('mix'); // tipo de pregunta en competición
   const [ambitoBio,   setAmbitoBio]   = useState('todos'); // sistema elegido en competición
   const [formatoBio,  setFormatoBio]  = useState('texto'); // texto | esquema | foto
-  const [modoJuego,   setModoJuego]   = useState('cuerpo');
-  const [nivel,       setNivel]       = useState('basico');
-  const [modo,        setModo]        = useState('seleccionar');
+  const [modoJuego,   setModoJuego]   = useState(reto?.config?.modoJuego || 'cuerpo');
+  const [nivel,       setNivel]       = useState(reto?.config?.nivel || 'basico');
+  const [modo,        setModo]        = useState(reto?.config?.modo || 'seleccionar');
   const [preguntas,   setPreguntas]   = useState([]);
   const [idx,         setIdx]         = useState(0);
   const [opciones,    setOpciones]    = useState([]);
@@ -554,10 +559,11 @@ function BiologiaAppInner({ onBack, onCreateLive, onJoinLive }) {
     }, 1600);
   }, [idx, preguntas]);
 
+  const nPreguntasReto = Number(reto?.config?.nPreguntas) || N_PREGUNTAS;
   const iniciarTest = () => {
     const p = getPool(modoJuego, nivel);
     if (p.length < 2) return;
-    setPreguntas(shuffle(p).slice(0, Math.min(N_PREGUNTAS, p.length)));
+    setPreguntas(shuffle(p).slice(0, Math.min(nPreguntasReto, p.length)));
     setIdx(0); setRespuestas([]); setFase('jugando');
     setTiempo(TIEMPO); setInput(''); setPantalla('quiz');
   };
@@ -701,6 +707,37 @@ function BiologiaAppInner({ onBack, onCreateLive, onJoinLive }) {
   // ══════════════════════════════════════════════════════════════════════════════
   // INTRO
   // ══════════════════════════════════════════════════════════════════════════════
+  // ── Reto por enlace: configuración fija, sin menú de opciones ──
+  if (pantalla === 'intro' && reto) {
+    const hasLevel = modoJuego === 'musculos' || modoJuego === 'huesos';
+    const chips = [
+      `${SYSTEM_EMOJI[modoJuego] || '🔬'} ${SYSTEM_LABEL[modoJuego] || modoJuego}`,
+      hasLevel && `⭐ ${({ basico: 'Básico', medio: 'Medio', pro: 'Avanzado' })[nivel] || nivel}`,
+      modo === 'escribir' ? '✏️ Escribir el nombre' : '🖱️ Elegir opción',
+      `🔢 ${nPreguntasReto} preguntas`,
+    ].filter(Boolean);
+    return (
+      <div style={{ minHeight:'100vh', background:bg, color:'#f1f5f9', padding:'20px 16px', fontFamily:'sans-serif', display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <div style={{ ...card, maxWidth:420, width:'100%', textAlign:'center' }}>
+          <div style={{ fontSize:'2.6rem' }}>🎯</div>
+          <h1 style={{ margin:'6px 0 2px', fontSize:'1.4rem' }}>{reto.titulo || 'Reto de Biología'}</h1>
+          <p style={{ color:'#94a3b8', fontSize:'0.86rem', margin:'0 0 16px' }}>Todos los participantes responden con esta misma configuración</p>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:7, justifyContent:'center', marginBottom:18 }}>
+            {chips.map((c, i) => <span key={i} style={{ background:'rgba(255,255,255,0.08)', borderRadius:20, padding:'6px 13px', fontSize:'0.82rem', fontWeight:700 }}>{c}</span>)}
+          </div>
+          {esRetoCompeticion && (
+            <div style={{ background:'rgba(245,158,11,0.15)', color:'#fbbf24', borderRadius:10, padding:'8px 12px', fontSize:'0.8rem', fontWeight:600, marginBottom:16 }}>
+              🏆 Prueba de competición · al terminar envía tu puntuación con tu alias y tu contraseña
+            </div>
+          )}
+          <button onClick={iniciarTest} style={{ width:'100%', background:color, border:'none', color:'#fff', borderRadius:12, padding:'14px', cursor:'pointer', fontWeight:800, fontSize:'1rem' }}>
+            ▶ Empezar el reto
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (pantalla === 'intro') {
     const hasLevel = modoJuego === 'musculos' || modoJuego === 'huesos';
     return (
@@ -1004,8 +1041,9 @@ function BiologiaAppInner({ onBack, onCreateLive, onJoinLive }) {
 
           {/* Actions */}
           <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-            <button onClick={() => setModalEnviar(true)} style={{ background:color, border:'none', color:'#fff', borderRadius:12, padding:'14px', cursor:'pointer', fontWeight:700, fontSize:'1rem' }}>
-              📤 Enviar al Profesor
+            <button onClick={() => setModalEnviar(true)}
+              style={{ background: esRetoCompeticion ? 'linear-gradient(135deg,#f39c12,#e67e22)' : color, border:'none', color:'#fff', borderRadius:12, padding:'14px', cursor:'pointer', fontWeight:700, fontSize:'1rem' }}>
+              {esRetoCompeticion ? '🏆 Enviar a la competición' : '📤 Enviar al Profesor'}
             </button>
             <button onClick={iniciarTest} style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.15)', color:'#f1f5f9', borderRadius:12, padding:'14px', cursor:'pointer', fontWeight:600, fontSize:'0.95rem' }}>
               🔄 Repetir
@@ -1016,8 +1054,18 @@ function BiologiaAppInner({ onBack, onCreateLive, onJoinLive }) {
           </div>
         </div>
 
+        {/* Reto de competición: el resultado va solo a esa prueba, no a informes */}
+        {modalEnviar && esRetoCompeticion && (
+          <ModalEnviarCompeticion
+            compId={reto.compId} catId={reto.catId}
+            puntos={aciertos} detalle={{ aciertos, total, porcentaje: pct }}
+            nombreJuego="Biología" tituloReto={reto.titulo || ''}
+            onClose={() => setModalEnviar(false)}
+          />
+        )}
+
         {/* Modal */}
-        {modalEnviar && (
+        {modalEnviar && !esRetoCompeticion && (
           <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:100, padding:20 }}>
             <div style={{ background:'#1e293b', borderRadius:16, padding:24, width:'100%', maxWidth:380, border:'1px solid rgba(255,255,255,0.1)' }}>
               <h3 style={{ margin:'0 0 16px', fontSize:'1.1rem' }}>📤 Enviar resultado al profesor</h3>

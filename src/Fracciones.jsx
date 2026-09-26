@@ -6,6 +6,9 @@ import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
 import { RotateCcw, CheckCircle, Trophy, Clock, Delete, Settings, SkipForward, Share2, PieChart, Volume2, VolumeX } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { CompeticionCuerda } from './components/TironCuerdaEscena';
+import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
+import PantallaReto, { textoBotonEnvio } from './components/retos/PantallaReto';
+import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  FRACCIONES — Laboratorio visual + base de ejercicios + tirón de cuerda
@@ -769,6 +772,7 @@ function ModalEnviarProfe({ datos, onClose }) {
                     porcentaje: Math.round((datos.aciertos / Math.max(1, intentos)) * 100),
                     config: { tipos: datos.config.tipos, nivel: datos.config.nivel, tiempo: datos.config.tiempo, numEjercicios: datos.config.numEjercicios },
                     detalle: datos.detalle || [],
+                    ...(datos.reto ? { reto: datos.reto } : {}),
                 }],
             });
             guardarRegistroLocal('FRACCIONES', {
@@ -824,11 +828,22 @@ function ModalEnviarProfe({ datos, onClose }) {
 // ═════════════════════════════════════════════════════════════════════════════
 //  MODAL DE CONFIGURACIÓN
 // ═════════════════════════════════════════════════════════════════════════════
-const DEFAULT_CONFIG = {
+export const DEFAULT_CONFIG = {
     tipos: ['identificar', 'simplificar', 'equivalente', 'suma', 'resta'],
     nivel: 1,
     tiempo: 120,
     numEjercicios: null,
+};
+
+// Retos por enlace (ver utils/retoLink.js y components/retos/)
+export const RUTA_FRACCIONES = '/fracciones';
+export const resumenFracciones = (c) => {
+    const cfg = { ...DEFAULT_CONFIG, ...(c || {}) };
+    return [
+        ...cfg.tipos.map(t => TIPOS_EJERCICIO[t]?.label).filter(Boolean),
+        ['', '👶 Fácil', '🤓 Medio', '🔥 Difícil'][cfg.nivel] || '',
+        cfg.numEjercicios ? `🔢 ${cfg.numEjercicios} ejercicios` : `⏱ ${cfg.tiempo < 60 ? `${cfg.tiempo} s` : `${cfg.tiempo / 60} min`}`,
+    ].filter(Boolean);
 };
 
 const MODOS_PRESET = [
@@ -844,7 +859,7 @@ const MODOS_PRESET = [
     { id: 'CUSTOM', icon: '⚙️', label: 'Configurado', desc: 'Elige tipos, nivel y tiempo', color: '#9b59b6', chips: null, cfg: null },
 ];
 
-const ConfigModal = ({ config, onStart, onClose }) => {
+export const ConfigModal = ({ config, onStart, onClose, titulo = '⚙️ Modo Configurado', textoAceptar = '▶ Empezar' }) => {
     const [local, setLocal] = useState({ ...DEFAULT_CONFIG, ...config });
     const [modoConteo, setModoConteo] = useState(config.numEjercicios ? 'ejercicios' : 'tiempo');
 
@@ -867,7 +882,7 @@ const ConfigModal = ({ config, onStart, onClose }) => {
     return (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
             <div style={{ background: 'white', borderRadius: 22, padding: '28px 24px', maxWidth: 520, width: '100%', maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 25px 70px rgba(0,0,0,0.3)' }}>
-                <h2 style={{ textAlign: 'center', color: '#2c3e50', fontSize: '1.3rem', marginTop: 0, marginBottom: 22 }}>⚙️ Modo Configurado</h2>
+                <h2 style={{ textAlign: 'center', color: '#2c3e50', fontSize: '1.3rem', marginTop: 0, marginBottom: 22 }}>{titulo}</h2>
 
                 <Section label="🍰 Tipos de ejercicio">
                     {Object.entries(TIPOS_EJERCICIO).map(([k, v]) => (
@@ -903,7 +918,7 @@ const ConfigModal = ({ config, onStart, onClose }) => {
                 <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 20 }}>
                     <button onClick={onClose} style={{ padding: '12px 24px', background: '#f0f0f0', color: '#555', border: 'none', borderRadius: 30, fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer' }}>Cancelar</button>
                     <button onClick={() => onStart({ ...local, numEjercicios: modoConteo === 'ejercicios' ? (local.numEjercicios || 10) : null })}
-                        style={{ padding: '12px 28px', background: '#9b59b6', color: 'white', border: 'none', borderRadius: 30, fontSize: '1.05rem', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 12px #9b59b655' }}>▶ Empezar</button>
+                        style={{ padding: '12px 28px', background: '#9b59b6', color: 'white', border: 'none', borderRadius: 30, fontSize: '1.05rem', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 12px #9b59b655' }}>{textoAceptar}</button>
                 </div>
             </div>
         </div>
@@ -959,8 +974,11 @@ const PanelCuerdaFracciones = ({ equipo, aplicar, bloqueado, tipos, nivel, isMob
 //  COMPONENTE PRINCIPAL
 // ═════════════════════════════════════════════════════════════════════════════
 export default function Fracciones({ usuario, onExit }) {
+    // Reto por enlace: configuración fija del profesor (y envío a competición si procede)
+    const [reto, setReto] = useState(() => leerRetoUrl());
+    const esRetoCompeticion = !!(reto?.compId && reto?.catId);
     const [gameState, setGameState] = useState('START'); // START | LAB | PLAYING | COMPETICION | END
-    const [config, setConfig] = useState(DEFAULT_CONFIG);
+    const [config, setConfig] = useState(() => ({ ...DEFAULT_CONFIG, ...(reto?.config || {}) }));
     const [showConfig, setShowConfig] = useState(false);
     const [mostrarEnvio, setMostrarEnvio] = useState(false);
     const [guardado, setGuardado] = useState(false);
@@ -1111,8 +1129,16 @@ export default function Fracciones({ usuario, onExit }) {
                 )}
             </div>
 
+            {/* ── RETO POR ENLACE ── */}
+            {gameState === 'START' && reto && (
+                <PantallaReto reto={reto} nombreJuego="Fracciones" emoji="🍰" color="#7b1fa2"
+                    chips={resumenFracciones(config)}
+                    onEmpezar={() => startGame(config)}
+                    onLibre={() => { limpiarRetoUrl(); setReto(null); setConfig(DEFAULT_CONFIG); }} />
+            )}
+
             {/* ── INICIO ── */}
-            {gameState === 'START' && (
+            {gameState === 'START' && !reto && (
                 <div style={{ ...st.centerCard, maxWidth: 560 }}>
                     <PieChart size={52} color="#7b1fa2" style={{ marginBottom: 10 }} />
                     <h1 style={{ color: '#2c3e50', fontSize: isMobile ? '1.8rem' : '2.3rem', margin: '6px 0 4px' }}>Fracciones</h1>
@@ -1274,18 +1300,23 @@ export default function Fracciones({ usuario, onExit }) {
                     </div>
                     <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
                         <button onClick={() => startGame(config)} style={{ ...st.btnPrimary, background: '#7b1fa2' }}><RotateCcw size={16} /> Repetir</button>
-                        <button onClick={() => { setShowConfig(true); setGameState('START'); }} style={{ ...st.btnPrimary, background: '#7f8c8d' }}><Settings size={16} /> Configurar</button>
+                        {!reto && <button onClick={() => { setShowConfig(true); setGameState('START'); }} style={{ ...st.btnPrimary, background: '#7f8c8d' }}><Settings size={16} /> Configurar</button>}
                         <button onClick={() => setGameState('START')} style={st.btnVolver}>Menú</button>
                         <button onClick={guardarLocal} disabled={guardado} style={{ ...st.btnPrimary, background: guardado ? '#bdc3c7' : 'linear-gradient(135deg,#2980b9,#3498db)' }}>
                             {guardado ? '✔ Guardado' : '💾 Guardar en mis registros'}
                         </button>
-                        <button onClick={() => setMostrarEnvio(true)} style={{ ...st.btnPrimary, background: 'linear-gradient(135deg,#27ae60,#2ecc71)' }}>📤 Enviar al profesor</button>
+                        <button onClick={() => setMostrarEnvio(true)} style={{ ...st.btnPrimary, background: esRetoCompeticion ? 'linear-gradient(135deg,#f39c12,#e67e22)' : 'linear-gradient(135deg,#27ae60,#2ecc71)' }}>{textoBotonEnvio(reto)}</button>
                     </div>
                 </div>
             )}
 
-            {mostrarEnvio && (
-                <ModalEnviarProfe datos={{ aciertos, fallos, puntos: score, skips, config, detalle }} onClose={() => setMostrarEnvio(false)} />
+            {mostrarEnvio && esRetoCompeticion && (
+                <ModalEnviarCompeticion compId={reto.compId} catId={reto.catId} puntos={score}
+                    detalle={{ aciertos, fallos, skips }} nombreJuego="Fracciones" tituloReto={reto.titulo || ''}
+                    onClose={() => setMostrarEnvio(false)} />
+            )}
+            {mostrarEnvio && !esRetoCompeticion && (
+                <ModalEnviarProfe datos={{ aciertos, fallos, puntos: score, skips, config, detalle, reto: reto ? (reto.titulo || 'Reto') : null }} onClose={() => setMostrarEnvio(false)} />
             )}
         </div>
     );

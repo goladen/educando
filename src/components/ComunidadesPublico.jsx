@@ -7,7 +7,7 @@ import {
     RefreshCw, GraduationCap, Calendar, Lock, LayoutGrid, FileText,
     UserPlus, Check, Clock, LogIn, Trophy
 } from 'lucide-react';
-import { Calendario, EscaparateMiembros, HorarioView, FichaProfesor } from './ComunidadesTab';
+import { Calendario, EscaparateMiembros, HorarioView, FichaProfesor, gruposDe } from './ComunidadesTab';
 import { fondoUrl } from '../utils/fondos';
 import { CompeticionResumenPublico } from './CompeticionPublica';
 
@@ -130,6 +130,7 @@ function CentroPublico({ comunidadId, tab, cursoFoco, unirse, onTab, onCurso, on
     const [cursos, setCursos]       = useState([]);
     const [profes, setProfes]       = useState([]);
     const [comps, setComps]         = useState([]);
+    const [ordenProf, setOrdenProf] = useState('departamento');
     const [cargando, setCargando]   = useState(true);
     const [error, setError]         = useState('');
 
@@ -214,12 +215,59 @@ function CentroPublico({ comunidadId, tab, cursoFoco, unirse, onTab, onCurso, on
 
             {tab === 'profesores' && (
                 <div>
-                    <h2 style={{ ...st.h2 }}><Users size={20} /> Profesorado</h2>
-                    {profes.length === 0 ? <div style={st.vacio}>Este centro no ha publicado el profesorado.</div> : (
-                        <div style={{ display: 'grid', gap: 10, gridTemplateColumns: `repeat(auto-fill, minmax(${isMobile ? 200 : 240}px, 1fr))` }}>
-                            {profes.map(p => <FichaProfesor key={p.id} p={p} />)}
-                        </div>
-                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+                        <h2 style={{ ...st.h2, margin: 0 }}><Users size={20} /> Profesorado</h2>
+                        {profes.length > 0 && (
+                            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', color: '#7f8c8d' }}>
+                                <span>Ordenar por:</span>
+                                {[['departamento', 'Departamento'], ['grupo', 'Grupo']].map(([v, l]) => (
+                                    <button key={v} onClick={() => setOrdenProf(v)}
+                                        style={{ padding: '5px 12px', borderRadius: 20, border: `1.5px solid ${ordenProf === v ? AZUL : '#dfe6f2'}`, background: ordenProf === v ? AZUL : 'white', color: ordenProf === v ? 'white' : '#7f8c8d', cursor: 'pointer', fontWeight: ordenProf === v ? 700 : 500, fontSize: '0.82rem' }}>
+                                        {l}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                    {profes.length === 0 ? <div style={st.vacio}>Este centro no ha publicado el profesorado.</div> : (() => {
+                        const gridCols = `repeat(auto-fill, minmax(${isMobile ? 200 : 240}px, 1fr))`;
+                        let grupos;
+                        if (ordenProf === 'grupo') {
+                            // Grupos ordenados: primero los cursos publicados, luego otros que aparezcan en los profes
+                            const orden = cursos.map(c => c.nombre).filter(Boolean);
+                            const setGrupos = new Set(orden);
+                            profes.forEach(p => {
+                                gruposDe(p).forEach(g => setGrupos.add(g));
+                                if (p.grupoTutor) setGrupos.add(p.grupoTutor);
+                            });
+                            const nombres = [...orden, ...[...setGrupos].filter(g => !orden.includes(g)).sort((a, b) => a.localeCompare(b, 'es'))];
+                            grupos = nombres.map(nombre => ({
+                                titulo: nombre,
+                                lista: profes.filter(p => gruposDe(p).includes(nombre) || p.grupoTutor === nombre),
+                            })).filter(g => g.lista.length > 0);
+                            const sinGrupo = profes.filter(p => gruposDe(p).length === 0 && !p.grupoTutor);
+                            if (sinGrupo.length) grupos.push({ titulo: 'Sin grupo asignado', lista: sinGrupo });
+                        } else {
+                            const mapa = {};
+                            profes.forEach(p => {
+                                const d = (p.departamento || '').trim() || 'Sin departamento';
+                                (mapa[d] = mapa[d] || []).push(p);
+                            });
+                            grupos = Object.keys(mapa).sort((a, b) => {
+                                if (a === 'Sin departamento') return 1;
+                                if (b === 'Sin departamento') return -1;
+                                return a.localeCompare(b, 'es');
+                            }).map(d => ({ titulo: d, lista: mapa[d] }));
+                        }
+                        return grupos.map(g => (
+                            <div key={g.titulo} style={{ marginBottom: 22 }}>
+                                <h3 style={{ margin: '0 0 10px', fontSize: '1rem', color: AZUL, borderBottom: '2px solid #eef2f9', paddingBottom: 6 }}>{g.titulo} <span style={{ color: '#b0bac9', fontWeight: 500, fontSize: '0.85rem' }}>({g.lista.length})</span></h3>
+                                <div style={{ display: 'grid', gap: 10, gridTemplateColumns: gridCols }}>
+                                    {g.lista.map(p => <FichaProfesor key={p.id} p={p} />)}
+                                </div>
+                            </div>
+                        ));
+                    })()}
                 </div>
             )}
 

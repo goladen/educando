@@ -1981,12 +1981,55 @@ function PanelCalendarios({ usuario, comunidad }) {
 
 // ═══ PROFESORES (directorio + guardias) ═══════════════════════════════════════
 const CARGOS_COMUNES = ['Director/a', 'Jefe/a de estudios', 'Secretario/a', 'Jefe/a de departamento', 'Coordinador/a TIC', 'Coordinador/a de bienestar'];
+const DEPARTAMENTOS = ['Matemáticas', 'Lengua', 'Inglés', 'Geografía e Historia', 'Biología y Geología', 'Física y Química', 'Tecnología', 'Educación Física', 'Orientación', 'Plástica', 'Francés', 'Música'];
 const nombreProfe = (p) => `${p.nombre || ''} ${p.apellidos || ''}`.trim() || 'Profesor/a';
+const sumarMin = (hhmm, min) => {
+    const m = String(hhmm).match(/(\d{1,2}):(\d{2})/); if (!m) return '';
+    let t = (+m[1]) * 60 + (+m[2]) + (min || 0);
+    t = ((t % 1440) + 1440) % 1440;
+    return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+};
 
-function ModalProfesor({ profe, onClose, onGuardar }) {
-    const [p, setP] = useState(profe || { nombre: '', apellidos: '', departamento: '', gruposClase: '', atencionProf: '', esTutor: false, grupoTutor: '', atencionTutor: '', cargos: [], publico: false });
+// Selector de atención a familias: día (Lun-Vie) + hora; la hora fin = inicio + duración (config. del dispositivo)
+function SelectorAtencion({ value, onChange, dur }) {
+    const md = String(value || '').match(/(Lunes|Martes|Mi[eé]rcoles|Jueves|Viernes)/i);
+    const mh = String(value || '').match(/(\d{1,2}):(\d{2})/);
+    const [dia, setDia] = useState(md ? DIAS_SEM.find(d => d.toLowerCase() === md[1].toLowerCase()) || md[1] : '');
+    const [hora, setHora] = useState(mh ? `${mh[1].padStart(2, '0')}:${mh[2]}` : '');
+    useEffect(() => {
+        const fin = hora ? sumarMin(hora, dur) : '';
+        const txt = `${dia}${dia && hora ? ' ' : ''}${hora}${hora && fin ? '-' + fin : ''}`.trim();
+        onChange(txt);
+    }, [dia, hora, dur]);
+    return (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
+            <select value={dia} onChange={e => setDia(e.target.value)} style={{ ...st.input, width: 'auto', marginBottom: 0, background: 'white' }}>
+                <option value="">— Día —</option>
+                {DIAS_SEM.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+            <input type="time" value={hora} onChange={e => setHora(e.target.value)} style={{ ...st.input, width: 'auto', marginBottom: 0 }} />
+            {hora && <span style={{ fontSize: '0.82rem', color: '#7f8c8d' }}>→ {sumarMin(hora, dur)} <span style={{ color: '#b0bac9' }}>({dur} min)</span></span>}
+        </div>
+    );
+}
+export const gruposDe = (p) => Array.isArray(p.gruposClase) ? p.gruposClase : (p.gruposClase ? String(p.gruposClase).split(',').map(x => x.trim()).filter(Boolean) : []);
+
+function ModalProfesor({ profe, cursos = [], miembros = [], onClose, onGuardar }) {
+    const [p, setP] = useState(() => {
+        const base = profe || { nombre: '', apellidos: '', departamento: '', gruposClase: [], atencionProf: '', esTutor: false, grupoTutor: '', atencionTutor: '', cargos: [], miembroUid: '', publico: false };
+        return { ...base, gruposClase: gruposDe(base) };
+    });
+    const [otroDep, setOtroDep] = useState(!!(profe?.departamento && !DEPARTAMENTOS.includes(profe.departamento)));
+    const [nuevoCargo, setNuevoCargo] = useState('');
+    const [dur, setDur] = useState(() => { try { return parseInt(localStorage.getItem('pikt_duracion_clase')) || 50; } catch (_) { return 50; } });
+    const cambiarDur = (v) => { const n = Math.max(5, Math.min(180, parseInt(v) || 50)); setDur(n); try { localStorage.setItem('pikt_duracion_clase', String(n)); } catch (_) {} };
     const set = (k, v) => setP(prev => ({ ...prev, [k]: v }));
     const toggleCargo = (c) => setP(prev => ({ ...prev, cargos: (prev.cargos || []).includes(c) ? prev.cargos.filter(x => x !== c) : [...(prev.cargos || []), c] }));
+    const addCargo = () => { const c = nuevoCargo.trim(); if (!c) return; setP(prev => ({ ...prev, cargos: (prev.cargos || []).includes(c) ? prev.cargos : [...(prev.cargos || []), c] })); setNuevoCargo(''); };
+    const toggleGrupo = (g) => setP(prev => ({ ...prev, gruposClase: (prev.gruposClase || []).includes(g) ? prev.gruposClase.filter(x => x !== g) : [...(prev.gruposClase || []), g] }));
+    const nombresCursos = cursos.map(c => c.nombre).filter(Boolean);
+    const cargosExtra = (p.cargos || []).filter(c => !CARGOS_COMUNES.includes(c));
+    const vincularMiembro = (uid) => setP(prev => ({ ...prev, miembroUid: uid, miembroNombre: (miembros.find(m => m.uid === uid) || {}).nombre || '' }));
     return (
         <div style={st.overlay} onClick={onClose}>
             <div style={{ ...st.panel, maxWidth: 520 }} onClick={e => e.stopPropagation()}>
@@ -1996,33 +2039,123 @@ function ModalProfesor({ profe, onClose, onGuardar }) {
                     <div style={{ flex: 1, minWidth: 160 }}><div style={st.label}>Apellidos</div><input value={p.apellidos} onChange={e => set('apellidos', e.target.value)} style={st.input} /></div>
                 </div>
                 <div style={st.label}>Departamento</div>
-                <input value={p.departamento} onChange={e => set('departamento', e.target.value)} placeholder="Ej: Matemáticas" style={st.input} />
+                <select value={otroDep ? 'Otro' : (p.departamento || '')} onChange={e => { if (e.target.value === 'Otro') { setOtroDep(true); set('departamento', ''); } else { setOtroDep(false); set('departamento', e.target.value); } }} style={{ ...st.input, background: 'white' }}>
+                    <option value="">— Elegir —</option>
+                    {DEPARTAMENTOS.map(d => <option key={d} value={d}>{d}</option>)}
+                    <option value="Otro">Otro…</option>
+                </select>
+                {otroDep && <input autoFocus value={p.departamento} onChange={e => set('departamento', e.target.value)} placeholder="Escribe el departamento" style={st.input} />}
                 <div style={st.label}>Grupos en los que da clase</div>
-                <input value={p.gruposClase} onChange={e => set('gruposClase', e.target.value)} placeholder="Ej: 1ºA, 2ºB, 3ºC" style={st.input} />
+                {nombresCursos.length > 0 ? (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                        {nombresCursos.map(g => { const on = (p.gruposClase || []).includes(g); return <button key={g} onClick={() => toggleGrupo(g)} style={{ padding: '5px 10px', borderRadius: 16, border: `1.5px solid ${on ? AZUL : '#e0e4f0'}`, background: on ? AZUL : 'white', color: on ? 'white' : '#555', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600 }}>{g}</button>; })}
+                    </div>
+                ) : (
+                    <input value={(p.gruposClase || []).join(', ')} onChange={e => set('gruposClase', e.target.value.split(',').map(x => x.trim()).filter(Boolean))} placeholder="Ej: 1ºA, 2ºB (crea cursos para elegirlos)" style={st.input} />
+                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontSize: '0.78rem', color: '#7f8c8d' }}>Duración de cada hora (este dispositivo):</span>
+                    <input type="number" min={5} max={180} value={dur} onChange={e => cambiarDur(e.target.value)} style={{ ...st.input, width: 66, marginBottom: 0, padding: '4px 6px' }} />
+                    <span style={{ fontSize: '0.78rem', color: '#b0bac9' }}>min</span>
+                </div>
                 <div style={st.label}>Atención a familias (profesor)</div>
-                <input value={p.atencionProf} onChange={e => set('atencionProf', e.target.value)} placeholder="Ej: Martes 9:25-10:15" style={st.input} />
+                <SelectorAtencion value={p.atencionProf} onChange={v => set('atencionProf', v)} dur={dur} />
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', margin: '4px 0 10px' }}>
                     <input type="checkbox" checked={!!p.esTutor} onChange={e => set('esTutor', e.target.checked)} /> Es tutor/a
                 </label>
                 {p.esTutor && (
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        <div style={{ flex: 1, minWidth: 150 }}><div style={st.label}>Grupo del que es tutor/a</div><input value={p.grupoTutor} onChange={e => set('grupoTutor', e.target.value)} placeholder="Ej: 1ºA" style={st.input} /></div>
-                        <div style={{ flex: 1, minWidth: 150 }}><div style={st.label}>Atención a familias (tutoría)</div><input value={p.atencionTutor} onChange={e => set('atencionTutor', e.target.value)} placeholder="Ej: Lunes 12:35" style={st.input} /></div>
+                        <div style={{ flex: 1, minWidth: 150 }}><div style={st.label}>Grupo del que es tutor/a</div>
+                            {nombresCursos.length > 0
+                                ? <select value={p.grupoTutor || ''} onChange={e => set('grupoTutor', e.target.value)} style={{ ...st.input, background: 'white' }}><option value="">— Elegir —</option>{nombresCursos.map(g => <option key={g} value={g}>{g}</option>)}</select>
+                                : <input value={p.grupoTutor} onChange={e => set('grupoTutor', e.target.value)} placeholder="Ej: 1ºA" style={st.input} />}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 150 }}><div style={st.label}>Atención a familias (tutoría)</div><SelectorAtencion value={p.atencionTutor} onChange={v => set('atencionTutor', v)} dur={dur} /></div>
                     </div>
                 )}
                 <div style={st.label}>Cargos</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
                     {CARGOS_COMUNES.map(c => {
                         const on = (p.cargos || []).includes(c);
                         return <button key={c} onClick={() => toggleCargo(c)} style={{ padding: '5px 10px', borderRadius: 16, border: `1.5px solid ${on ? AZUL : '#e0e4f0'}`, background: on ? AZUL : 'white', color: on ? 'white' : '#555', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600 }}>{c}</button>;
                     })}
+                    {cargosExtra.map(c => (
+                        <button key={c} onClick={() => toggleCargo(c)} style={{ padding: '5px 10px', borderRadius: 16, border: `1.5px solid ${AZUL}`, background: AZUL, color: 'white', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>{c} <X size={12} /></button>
+                    ))}
                 </div>
+                <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                    <input value={nuevoCargo} onChange={e => setNuevoCargo(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCargo(); } }} placeholder="Otro cargo…" style={{ ...st.input, flex: 1, marginBottom: 0 }} />
+                    <button onClick={addCargo} disabled={!nuevoCargo.trim()} style={{ ...st.btnSec, whiteSpace: 'nowrap' }}><Plus size={14} /> Añadir</button>
+                </div>
+                <div style={st.label}>Vincular a un miembro de la comunidad</div>
+                {miembros.length > 0 ? (
+                    <select value={p.miembroUid || ''} onChange={e => vincularMiembro(e.target.value)} style={{ ...st.input, background: 'white' }}>
+                        <option value="">— Sin vincular —</option>
+                        {miembros.map(m => <option key={m.uid} value={m.uid}>{m.nombre}{m.esCreador ? ' (creador/a)' : ''}</option>)}
+                    </select>
+                ) : <div style={{ fontSize: '0.76rem', color: '#95a5a6', marginBottom: 10 }}>Cargando miembros…</div>}
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 4 }}>
                     <input type="checkbox" checked={!!p.publico} onChange={e => set('publico', e.target.checked)} /> <Globe size={14} /> Mostrar en la parte pública
                 </label>
                 <div style={st.btnRow}>
                     <button onClick={onClose} style={st.btnSec}>Cancelar</button>
                     <button onClick={() => { if ((p.nombre + p.apellidos).trim()) onGuardar(p); }} disabled={!(p.nombre + p.apellidos).trim()} style={st.btnPrimary}>Guardar</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// Parsea una lista pegada de profesores. Un profesor por línea.
+// Campos separados por tabulador, ; o , en este orden: Nombre, Apellidos, Departamento, Grupos (separados por / o -)
+function parsearListaProfes(texto, departamentosValidos = []) {
+    const depSet = departamentosValidos.map(d => d.toLowerCase());
+    return String(texto || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean).map(linea => {
+        let campos = linea.split(/\t|;/).map(x => x.trim()).filter(x => x !== '');
+        if (campos.length === 1 && linea.includes(',')) campos = linea.split(',').map(x => x.trim()).filter(x => x !== '');
+        let nombre = '', apellidos = '', departamento = '', gruposClase = [];
+        if (campos.length >= 2) {
+            [nombre, apellidos, departamento] = [campos[0], campos[1], campos[2] || ''];
+            if (campos[3]) gruposClase = campos[3].split(/[\/\-,]/).map(x => x.trim()).filter(Boolean);
+        } else {
+            const t = (campos[0] || linea).split(/\s+/);
+            nombre = t[0] || ''; apellidos = t.slice(1).join(' ');
+        }
+        // Normaliza el departamento si coincide (ignorando mayúsculas/acentos aproximados)
+        if (departamento) { const hit = departamentosValidos.find(d => d.toLowerCase() === departamento.toLowerCase()); if (hit) departamento = hit; }
+        return { nombre, apellidos, departamento, gruposClase, esTutor: false, grupoTutor: '', atencionProf: '', atencionTutor: '', cargos: [], publico: false };
+    }).filter(p => (p.nombre + p.apellidos).trim());
+}
+
+function ModalPegarProfes({ onClose, onGuardar }) {
+    const [texto, setTexto] = useState('');
+    const [guardando, setGuardando] = useState(false);
+    const previa = parsearListaProfes(texto, DEPARTAMENTOS);
+    const guardar = async () => { if (!previa.length) return; setGuardando(true); await onGuardar(previa); setGuardando(false); };
+    return (
+        <div style={st.overlay} onClick={onClose}>
+            <div style={{ ...st.panel, maxWidth: 560 }} onClick={e => e.stopPropagation()}>
+                <div style={st.header}><div style={st.hTitle}><Users size={19} color={AZUL} /> Pegar lista de profesores</div><button onClick={onClose} style={st.closeBtn}><X size={18} /></button></div>
+                <div style={{ fontSize: '0.8rem', color: '#7f8c8d', marginBottom: 8 }}>
+                    Un profesor por línea. Puedes pegar solo nombres, o separar campos con <strong>tabulador</strong>, <strong>;</strong> o <strong>,</strong> en este orden:<br />
+                    <code style={{ background: '#f1f3f7', padding: '1px 5px', borderRadius: 4 }}>Nombre ; Apellidos ; Departamento ; Grupos (separados por /)</code>
+                </div>
+                <textarea autoFocus value={texto} onChange={e => setTexto(e.target.value)} rows={9}
+                    placeholder={'Ana ; García López ; Matemáticas ; 1ºA/2ºB\nLuis Pérez Ruiz\nMarta ; Sanz ; Física y Química'}
+                    style={{ ...st.input, fontFamily: 'monospace', fontSize: '0.82rem', resize: 'vertical' }} />
+                {previa.length > 0 && (
+                    <div style={{ marginTop: 6, marginBottom: 4, maxHeight: 160, overflowY: 'auto', border: '1px solid #eef2f9', borderRadius: 8, padding: 8 }}>
+                        <div style={{ fontSize: '0.76rem', color: AZUL, fontWeight: 700, marginBottom: 4 }}>Se crearán {previa.length} profesor{previa.length === 1 ? '' : 'es'}:</div>
+                        {previa.map((p, i) => (
+                            <div key={i} style={{ fontSize: '0.78rem', color: '#2c3e50', padding: '2px 0' }}>
+                                {nombreProfe(p)}{p.departamento && <span style={{ color: '#7f8c8d' }}> · {p.departamento}</span>}{p.gruposClase.length > 0 && <span style={{ color: '#95a5a6' }}> · {p.gruposClase.join(', ')}</span>}
+                            </div>
+                        ))}
+                    </div>
+                )}
+                <div style={st.btnRow}>
+                    <button onClick={onClose} style={st.btnSec}>Cancelar</button>
+                    <button onClick={guardar} disabled={!previa.length || guardando} style={st.btnPrimary}>{guardando ? 'Creando…' : `Crear ${previa.length || ''} profesor${previa.length === 1 ? '' : 'es'}`}</button>
                 </div>
             </div>
         </div>
@@ -2039,18 +2172,42 @@ export function FichaProfesor({ p }) {
             </div>
             {p.departamento && <div style={{ fontSize: '0.8rem', color: '#7f8c8d' }}>Dpto: {p.departamento}</div>}
             {(p.cargos || []).length > 0 && <div style={{ fontSize: '0.78rem', color: '#8e44ad', fontWeight: 600 }}>{p.cargos.join(' · ')}</div>}
-            {p.gruposClase && <div style={{ fontSize: '0.78rem', color: '#555' }}>Da clase en: {p.gruposClase}</div>}
+            {gruposDe(p).length > 0 && <div style={{ fontSize: '0.78rem', color: '#555' }}>Da clase en: {gruposDe(p).join(', ')}</div>}
             {p.atencionProf && <div style={{ fontSize: '0.76rem', color: '#95a5a6' }}>Atención familias: {p.atencionProf}</div>}
             {p.esTutor && p.atencionTutor && <div style={{ fontSize: '0.76rem', color: '#95a5a6' }}>Atención tutoría: {p.atencionTutor}</div>}
+            {p.miembroNombre && <div style={{ fontSize: '0.72rem', color: '#2980b9', display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}><ShieldCheck size={12} /> Miembro: {p.miembroNombre}</div>}
         </div>
     );
 }
 
 function ProfesoradoLista({ usuario, comunidad }) {
     const [profes, setProfes]   = useState([]);
+    const [cursos, setCursos]   = useState([]);
+    const [miembros, setMiembros] = useState([]);
     const [cargando, setCargando] = useState(true);
     const [editar, setEditar]   = useState(null);
     const [borrar, setBorrar]   = useState(null);
+    const [pegar, setPegar]     = useState(false);
+
+    useEffect(() => {
+        let vivo = true;
+        (async () => {
+            const res = [];
+            await Promise.all((comunidad.miembros || []).map(async u => {
+                try { const s = await getDoc(doc(db, 'users', u)); res.push({ uid: u, nombre: (s.exists() && (s.data().displayName || s.data().nombre)) || 'Profesor/a', esCreador: u === comunidad.creadorUid }); }
+                catch (_) { res.push({ uid: u, nombre: 'Profesor/a', esCreador: u === comunidad.creadorUid }); }
+            }));
+            res.sort((a, b) => (b.esCreador ? 1 : 0) - (a.esCreador ? 1 : 0) || a.nombre.localeCompare(b.nombre, 'es'));
+            if (vivo) setMiembros(res);
+        })();
+        return () => { vivo = false; };
+    }, [comunidad.miembros, comunidad.creadorUid]);
+
+    useEffect(() => onSnapshot(collection(db, 'comunidades', comunidad.id, 'cursos'), snap => {
+        const d = snap.docs.map(x => ({ id: x.id, ...x.data() }));
+        d.sort((a, b) => (a.orden ?? 9999) - (b.orden ?? 9999) || (a.nombre || '').localeCompare(b.nombre || '', 'es'));
+        setCursos(d);
+    }, () => {}), [comunidad.id]);
 
     useEffect(() => onSnapshot(collection(db, 'comunidades', comunidad.id, 'profesores'), snap => {
         const d = snap.docs.map(x => ({ id: x.id, ...x.data() }));
@@ -2066,12 +2223,19 @@ function ProfesoradoLista({ usuario, comunidad }) {
         } catch (e) { alert('No se pudo guardar: ' + e.message); }
     };
     const eliminar = async (id) => { try { await deleteDoc(doc(db, 'comunidades', comunidad.id, 'profesores', id)); } catch (e) { alert('Error: ' + e.message); } setBorrar(null); };
+    const guardarVarios = async (lista) => {
+        try { await Promise.all(lista.map(p => addDoc(collection(db, 'comunidades', comunidad.id, 'profesores'), { ...p, fecha: serverTimestamp() }))); setPegar(false); }
+        catch (e) { alert('No se pudieron crear: ' + e.message); }
+    };
 
     return (
         <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
                 <div style={{ fontSize: '0.8rem', color: '#7f8c8d' }}>{profes.length} profesores · los marcados como públicos se ven fuera</div>
-                <button onClick={() => setEditar({})} style={st.btnPrimary}><Plus size={15} /> Añadir profesor</button>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <button onClick={() => setPegar(true)} style={st.btnSec}><ClipboardList size={15} /> Pegar lista</button>
+                    <button onClick={() => setEditar({})} style={st.btnPrimary}><Plus size={15} /> Añadir profesor</button>
+                </div>
             </div>
             {cargando ? <div style={st.loader}><RefreshCw size={22} style={{ animation: 'spin 1s linear infinite' }} /></div>
                 : profes.length === 0 ? <div style={st.vacio}>Aún no hay profesores. Añade el primero.</div>
@@ -2091,7 +2255,8 @@ function ProfesoradoLista({ usuario, comunidad }) {
                         ))}
                     </div>
                 )}
-            {editar && <ModalProfesor profe={editar.id ? editar : null} onClose={() => setEditar(null)} onGuardar={guardar} />}
+            {editar && <ModalProfesor profe={editar.id ? editar : null} cursos={cursos} miembros={miembros} onClose={() => setEditar(null)} onGuardar={guardar} />}
+            {pegar && <ModalPegarProfes onClose={() => setPegar(false)} onGuardar={guardarVarios} />}
         </div>
     );
 }

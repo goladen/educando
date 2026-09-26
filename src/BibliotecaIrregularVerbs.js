@@ -77,5 +77,4 @@ export const bibliotecaIrregularVerbs = [
   { baseForm: 'wake', pastSimple: 'woke', pastParticiple: 'woken', translation: 'despertar', level: 'dificil' },
   { baseForm: 'wear', pastSimple: 'wore', pastParticiple: 'worn', translation: 'llevar puesto', level: 'dificil' },
   { baseForm: 'win', pastSimple: 'won', pastParticiple: 'won', translation: 'ganar', level: 'dificil' },
-  { baseForm: 'write', pastSimple: 'wrote', pastParticiple: 'written', translation: 'escribir', level: 'dificil' },
 ];

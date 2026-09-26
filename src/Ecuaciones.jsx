@@ -3,6 +3,9 @@ import { RotateCcw, CheckCircle, XCircle, Trophy, Clock, Calculator, Settings, S
 import Confetti from 'react-confetti';
 import { db } from './firebase';
 import { guardarRegistroLocal } from './utils/registrosLocales';
+import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
+import PantallaReto, { textoBotonEnvio } from './components/retos/PantallaReto';
+import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import { doc, setDoc, updateDoc, onSnapshot, increment, collection, addDoc, getDoc } from 'firebase/firestore';
 import piHappy from './assets/Pi-contento.png';
 import piAngry from './assets/Pi-enfadado.png';
@@ -80,7 +83,7 @@ const ENUNCIADOS = [
 ];
 
 // ─── Configuración por defecto ────────────────────────────────────────────────
-const DEFAULT_CONFIG = {
+export const DEFAULT_CONFIG = {
     tiempo: 180,
     minNum: 1,
     maxNum: 10,
@@ -131,6 +134,23 @@ const MODOS_PRESET = [
         cfg: null
     },
 ];
+
+// ─── Retos por enlace (utils/retoLink.js) ─────────────────────────────────────
+export const RUTA_ECUACIONES = '/ecuaciones';
+export const resumenEcuaciones = (c) => {
+    const cfg = { ...DEFAULT_CONFIG, ...(c || {}) };
+    const preset = MODOS_PRESET.find(m => m.cfg && m.id === cfg.presetId);
+    return [
+        preset ? `${preset.icon} ${preset.label}` : null,
+        !preset && cfg.primerGrado && '1.er grado',
+        !preset && cfg.segundoGrado && '2.º grado',
+        !preset && cfg.conParentesis && '( ) Paréntesis',
+        !preset && cfg.conDenominadores && '¹⁄ₓ Denominadores',
+        !preset && cfg.conEnunciados && '🗣️ Enunciados',
+        !preset && `🔢 ${cfg.minNum}–${cfg.maxNum}`,
+        `⏱ ${cfg.tiempo < 60 ? `${cfg.tiempo} s` : `${cfg.tiempo / 60} min`}`,
+    ].filter(Boolean);
+};
 
 // ─── Generador de ecuaciones ──────────────────────────────────────────────────
 const generarEcuacion = (cfg, enunciadosBag = null) => {
@@ -304,15 +324,31 @@ const serializarPregunta = (eq, tiempo, puntosMax, puntosMin) => ({
 });
 
 // ─── Modal de configuración ───────────────────────────────────────────────────
-const ConfigModal = ({ config, onStart, onClose }) => {
+export const ConfigModal = ({ config, onStart, onClose, titulo = '⚙️ Configurar Partida', textoAceptar = '▶ Empezar', modoReto = false }) => {
     const [local, setLocal] = useState(config);
-    const set = (k, v) => setLocal(p => ({ ...p, [k]: v }));
+    // Cualquier cambio manual deja de ser un modo predefinido
+    const set = (k, v) => setLocal(p => ({ ...p, [k]: v, presetId: null, soloBasico: false, forceExperto: false }));
     const TIEMPOS = [60, 120, 180, 300, 600];
 
     return (
         <div style={mSt.overlay}>
             <div style={mSt.modal}>
-                <h2 style={mSt.title}>⚙️ Configurar Partida</h2>
+                <h2 style={mSt.title}>{titulo}</h2>
+
+                {/* Reto: partir de un modo predefinido */}
+                {modoReto && (
+                    <div style={mSt.section}>
+                        <div style={mSt.sTitle}>Modo predefinido (opcional)</div>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+                            {MODOS_PRESET.filter(m => m.cfg).map(m => (
+                                <button key={m.id} onClick={() => setLocal(p => ({ ...DEFAULT_CONFIG, ...m.cfg, tiempo: p.tiempo, presetId: m.id }))}
+                                    style={{ ...mSt.chip, background: local.presetId === m.id ? m.color : '#f0f0f0', color: local.presetId === m.id ? 'white' : '#555' }}>
+                                    {m.icon} {m.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {/* Tiempo */}
                 <div style={mSt.section}>
@@ -390,7 +426,8 @@ const ConfigModal = ({ config, onStart, onClose }) => {
                     </div>
                 </div>
 
-                {/* Pantallas / Jugadores */}
+                {/* Pantallas / Jugadores (no en retos: cada alumno en su dispositivo) */}
+                {!modoReto && (<>
                 <div style={mSt.section}>
                     <div style={mSt.sTitle}>Número de pantallas</div>
                     <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
@@ -435,9 +472,11 @@ const ConfigModal = ({ config, onStart, onClose }) => {
                     )}
                 </div>
 
+                </>)}
+
                 <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 24 }}>
                     <button onClick={onClose} style={mSt.btnSec}>Cancelar</button>
-                    <button onClick={() => onStart(local)} style={mSt.btnPri}>▶ Empezar</button>
+                    <button onClick={() => onStart(modoReto ? { ...local, numPantallas: 1, numAlumnos: 1 } : local)} style={mSt.btnPri}>{textoAceptar}</button>
                 </div>
             </div>
         </div>
@@ -446,8 +485,12 @@ const ConfigModal = ({ config, onStart, onClose }) => {
 
 // ─── Componente local ─────────────────────────────────────────────────────────
 function EcuacionesGameLocal({ onExit }) {
+    // Reto por enlace: configuración fija del profesor
+    const [reto, setReto] = useState(() => leerRetoUrl());
+    const esRetoCompeticion = !!(reto?.compId && reto?.catId);
+    const [mostrarEnvio, setMostrarEnvio] = useState(false);
     const [gameState, setGameState] = useState('START');
-    const [config, setConfig] = useState(DEFAULT_CONFIG);
+    const [config, setConfig] = useState(() => reto ? { ...DEFAULT_CONFIG, ...reto.config, numPantallas: 1, numAlumnos: 1 } : DEFAULT_CONFIG);
     const [showConfig, setShowConfig] = useState(false);
     const [timeLeft, setTimeLeft] = useState(DEFAULT_CONFIG.tiempo);
     const [score, setScore] = useState(0);
@@ -822,8 +865,16 @@ function EcuacionesGameLocal({ onExit }) {
 
             </div>
 
+            {/* RETO POR ENLACE */}
+            {gameState === 'START' && reto && (
+                <PantallaReto reto={reto} nombreJuego="Ecuaciones" emoji="🧮" color="#3498db"
+                    chips={resumenEcuaciones(config)}
+                    onEmpezar={() => startGame(config)}
+                    onLibre={() => { limpiarRetoUrl(); setReto(null); setConfig(DEFAULT_CONFIG); }} />
+            )}
+
             {/* INICIO */}
-            {gameState === 'START' && (
+            {gameState === 'START' && !reto && (
                 <div style={{ ...st.centerCard, maxWidth: 600 }}>
                     <Calculator size={55} color="#3498db" style={{ marginBottom: 12 }} />
                     <h1 style={{ color: '#2c3e50', fontSize: isMobile ? '1.8rem' : '2.4rem', margin: '8px 0' }}>Maestro de Ecuaciones</h1>
@@ -1011,12 +1062,24 @@ function EcuacionesGameLocal({ onExit }) {
                         <button onClick={() => startGame(config)} style={{ ...st.btnPrimary, background: '#3498db' }}>
                             <RotateCcw size={16} /> Repetir
                         </button>
-                        <button onClick={() => { setShowConfig(true); setGameState('START'); }} style={{ ...st.btnPrimary, background: '#7f8c8d' }}>
+                        {!reto && <button onClick={() => { setShowConfig(true); setGameState('START'); }} style={{ ...st.btnPrimary, background: '#7f8c8d' }}>
                             <Settings size={16} /> Configurar
-                        </button>
+                        </button>}
                         <button onClick={() => setGameState('START')} style={st.btnVolver}>Menú</button>
+                        <button onClick={() => setMostrarEnvio(true)} style={{ ...st.btnPrimary, background: esRetoCompeticion ? 'linear-gradient(135deg,#f39c12,#e67e22)' : 'linear-gradient(135deg,#27ae60,#2ecc71)' }}>
+                            {textoBotonEnvio(reto)}
+                        </button>
                     </div>
                 </div>
+            )}
+            {mostrarEnvio && esRetoCompeticion && (
+                <ModalEnviarCompeticion compId={reto.compId} catId={reto.catId} puntos={score}
+                    detalle={{ aciertos, skips }} nombreJuego="Ecuaciones" tituloReto={reto.titulo || ''}
+                    onClose={() => setMostrarEnvio(false)} />
+            )}
+            {mostrarEnvio && !esRetoCompeticion && (
+                <ModalEnviarProfeEcu datos={{ puntos: score, aciertos, skips, reto: reto ? (reto.titulo || 'Reto') : null, configuracion: resumenEcuaciones(config).join(' · ') }}
+                    onClose={() => setMostrarEnvio(false)} />
             )}
             </>)}
         </div>
@@ -1050,7 +1113,14 @@ function ModalEnviarProfeEcu({ datos, onClose }) {
             const codigoDoc = await getDoc(doc(db, 'codigos_profesor', code));
             if (!codigoDoc.exists()) { setError('Código de profesor no encontrado.'); setEnviando(false); return; }
             const jugadoresInforme = esLive ? datos.jugadores
-                : [{ nombre: nombre.trim(), curso: curso.trim(), puntos: datos.puntos||0, correcto: datos.correcto, porcentaje: datos.correcto?100:0 }];
+                : [datos.aciertos != null
+                    // Partida individual (modo local / reto)
+                    ? { nombre: nombre.trim(), curso: curso.trim(), puntos: datos.puntos || 0, aciertos: datos.aciertos, skips: datos.skips || 0,
+                        intentos: datos.aciertos + (datos.skips || 0),
+                        porcentaje: Math.round((datos.aciertos / Math.max(1, datos.aciertos + (datos.skips || 0))) * 100),
+                        ...(datos.configuracion ? { configuracion: datos.configuracion } : {}),
+                        ...(datos.reto ? { reto: datos.reto } : {}) }
+                    : { nombre: nombre.trim(), curso: curso.trim(), puntos: datos.puntos||0, correcto: datos.correcto, porcentaje: datos.correcto?100:0 }];
             await addDoc(collection(db, 'informes_juegos'), {
                 tipo: 'ECUACIONES', modalidad: esLive ? 'Online' : 'Individual',
                 fecha: new Date(), codigoProfesor: code, jugadores: jugadoresInforme,

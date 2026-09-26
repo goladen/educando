@@ -124,7 +124,7 @@ function ModalEnviarProfe({ datos, onClose }) {
     );
 }
 
-export default function RuletaGame({ recurso, usuario, alTerminar }) {
+export default function RuletaGame({ recurso, usuario, alTerminar, hojaInicial = null }) {
     // ESTADOS
     const [fase, setFase] = useState('SETUP');
     const [jugadores, setJugadores] = useState([]);
@@ -582,7 +582,7 @@ export default function RuletaGame({ recurso, usuario, alTerminar }) {
 
     // --- RENDERIZADO ---
 
-    if (fase === 'SETUP') return <SetupScreen recurso={recurso} onStart={iniciar} onExit={alTerminar} usuario={usuario} esInvitado={esInvitado} />;
+    if (fase === 'SETUP') return <SetupScreen recurso={recurso} hojaInicial={hojaInicial} onStart={iniciar} onExit={alTerminar} usuario={usuario} esInvitado={esInvitado} />;
 
     if (fase === 'COUNTDOWN') {
         return (
@@ -841,12 +841,13 @@ const PantallaCuentaAtras = ({ profesor, instrucciones, onFinished }) => {
 };
 
 // --- SUBCOMPONENTES ---
-const SetupScreen = ({ recurso, onStart, onExit, usuario, esInvitado }) => {
+const SetupScreen = ({ recurso, hojaInicial, onStart, onExit, usuario, esInvitado }) => {
     const [nombres, setNombres] = useState(['Jugador 1', 'Jugador 2', 'Jugador 3']);
     const [num, setNum] = useState(1);
-    const [hoja, setHoja] = useState('General'); // Selección de hoja
-
     const hojasDisponibles = recurso.hojas ? recurso.hojas.map(h => h.nombreHoja) : [];
+    // Hoja fijada por el enlace del profesor (?h=…): no se deja cambiar
+    const hojaFija = hojaInicial && hojasDisponibles.includes(hojaInicial) ? hojaInicial : null;
+    const [hoja, setHoja] = useState(hojaFija || 'General'); // Selección de hoja
     const nombreJugador1 = esInvitado ? "Invitado" : (usuario.displayName || "Jugador 1");
 
     const arrancar = () => onStart(num === 1 ? [nombreJugador1] : nombres.slice(0, num), hoja);
@@ -858,7 +859,7 @@ const SetupScreen = ({ recurso, onStart, onExit, usuario, esInvitado }) => {
                 <p>{recurso.titulo}</p>
 
                 {/* SELECTOR DE HOJA (NUEVO) */}
-                {hojasDisponibles.length > 0 && (
+                {hojasDisponibles.length > 0 && !hojaFija && (
                     <div style={{ marginBottom: '20px', textAlign: 'left' }}>
                         <label style={{ display: 'block', marginBottom: '5px', color: '#666', fontSize: '0.9rem', fontWeight: 'bold' }}>Tema del Panel:</label>
                         <select value={hoja} onChange={e => setHoja(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ccc' }}>

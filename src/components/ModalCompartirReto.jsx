@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { QrCode, X, Copy, Check, ExternalLink, Share2 } from 'lucide-react';
-import { crearEnlaceReto } from '../utils/retoLink';
+import { QrCode, X, Copy, Check, ExternalLink, Share2, Settings } from 'lucide-react';
+import { crearEnlaceReto, enlaceAbsoluto } from '../utils/retoLink';
 
 const qrUrl = (url, size = 420) =>
     `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(url)}&bgcolor=ffffff&color=1a1a2e&margin=8`;
@@ -12,12 +12,13 @@ const qrUrl = (url, size = 420) =>
  *  <ModalCompartirReto ruta="/calculo" config={cfg} resumen={['120 s', '1–50', '+ −']}
  *                      nombreJuego="Cálculo Mental" onClose={…} />
  */
-export default function ModalCompartirReto({ ruta, config, resumen = [], nombreJuego = 'el juego', onClose }) {
+export default function ModalCompartirReto({ ruta, config, urlFija = null, resumen = [], nombreJuego = 'el juego', onEditar, onClose }) {
     const [titulo, setTitulo] = useState('');
     const [copiado, setCopiado] = useState(false);
     const [verQR, setVerQR]     = useState(false);
 
-    const url = crearEnlaceReto(ruta, config, { titulo });
+    // urlFija: enlace ya construido (p. ej. /?r=ID de un recurso); si no, reto ?reto=…
+    const url = urlFija ? enlaceAbsoluto(urlFija) : crearEnlaceReto(ruta, config, { titulo });
 
     const copiar = async () => {
         try { await navigator.clipboard.writeText(url); setCopiado(true); setTimeout(() => setCopiado(false), 1800); }
@@ -47,7 +48,7 @@ export default function ModalCompartirReto({ ruta, config, resumen = [], nombreJ
                     </div>
                 )}
 
-                <div style={st.label}>Nombre del reto (opcional)</div>
+                <div style={st.label}>{urlFija ? 'Título para el mensaje (opcional)' : 'Nombre del reto (opcional)'}</div>
                 <input value={titulo} onChange={e => setTitulo(e.target.value)} placeholder="Ej: Reto de cálculo de 2ºB" style={st.input} />
 
                 <div style={st.label}>Enlace</div>
@@ -62,6 +63,13 @@ export default function ModalCompartirReto({ ruta, config, resumen = [], nombreJ
                     <button onClick={() => setVerQR(v => !v)} style={{ ...st.btn, ...st.btnSec }}><QrCode size={15} /> {verQR ? 'Ocultar QR' : 'Ver QR'}</button>
                     <button onClick={compartirNativo} style={{ ...st.btn, ...st.btnSec }}><Share2 size={15} /> Compartir</button>
                     <a href={url} target="_blank" rel="noreferrer" style={{ ...st.btn, ...st.btnSec, textDecoration: 'none' }}><ExternalLink size={15} /> Probar</a>
+                    {onEditar && <button onClick={onEditar} style={{ ...st.btn, ...st.btnSec }}><Settings size={15} /> Cambiar configuración</button>}
+                </div>
+
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+                    <button onClick={() => window.open(`https://classroom.google.com/share?url=${encodeURIComponent(url)}`, '_blank')} style={{ ...st.btn, background: '#e3f2fd', color: '#1565C0' }}>🎓 Classroom</button>
+                    <button onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`${titulo || nombreJuego}\n${url}`)}`, '_blank')} style={{ ...st.btn, background: '#e8f8ee', color: '#1e9e50' }}>💬 WhatsApp</button>
+                    <button onClick={() => window.open(`mailto:?subject=${encodeURIComponent(titulo || nombreJuego)}&body=${encodeURIComponent(url)}`, '_blank')} style={{ ...st.btn, background: '#fdecea', color: '#c0392b' }}>📧 Correo</button>
                 </div>
 
                 {verQR && (

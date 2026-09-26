@@ -3,6 +3,7 @@ import { ArrowLeft, RefreshCw, CheckCircle, Send, Eye } from 'lucide-react';
 import { db } from './firebase';
 import { guardarRegistroLocal } from './utils/registrosLocales';
 import { collection, addDoc, getDoc, doc } from 'firebase/firestore';
+import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 
 // ─── CANVAS CONSTANTS ────────────────────────────────────────────────────────
 const CS = 360;
@@ -518,6 +519,12 @@ function ModalEnviarProfe({ porcentaje, tipoFuncion, onClose }) {
     const [enviando, setEnviando] = useState(false);
     const [enviado, setEnviado] = useState(false);
     const [error, setError] = useState('');
+    const retoCtx = React.useContext(RetoElemCtx);
+    // Reto de competición: el resultado va a la prueba, no a informes
+    if (retoCtx?.compId && retoCtx?.catId) return (
+        <ModalEnviarCompeticion compId={retoCtx.compId} catId={retoCtx.catId} puntos={porcentaje}
+            detalle={{ porcentaje, tipoEjercicio: tipoFuncion }} nombreJuego="Funciones" tituloReto={retoCtx.titulo || ''} onClose={onClose} />
+    );
 
     const enviar = async () => {
         if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
@@ -530,7 +537,7 @@ function ModalEnviarProfe({ porcentaje, tipoFuncion, onClose }) {
             await addDoc(collection(db, 'informes_juegos'), {
                 tipo: 'FUNCIONES', modalidad: tipoFuncion || 'Elementales', fecha: new Date(),
                 codigoProfesor: code,
-                jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), correcto: porcentaje >= 70, porcentaje, tipoEjercicio: tipoFuncion, puntos: porcentaje }],
+                jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), correcto: porcentaje >= 70, porcentaje, tipoEjercicio: tipoFuncion, puntos: porcentaje, ...(retoCtx ? { reto: retoCtx.titulo || 'Reto' } : {}) }],
             });
             guardarRegistroLocal('FUNCIONES', {
                 titulo: 'Funciones', aciertos: porcentaje, intentos: 100, porcentaje,
@@ -654,7 +661,7 @@ function ActionRow({ allDone, onComprobar, onNuevo, onVolver, onEnviar, pct }) {
                     <Send size={14} /> Enviar al profe ({pct}%)
                 </button>
             )}
-            <button onClick={onNuevo} style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid #ddd', background: 'white', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.85rem' }}><RefreshCw size={14} /></button>
+            {onNuevo && <button onClick={onNuevo} style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid #ddd', background: 'white', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.85rem' }}><RefreshCw size={14} /></button>}
             <button onClick={onVolver} style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid #ddd', background: 'white', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.85rem' }}><ArrowLeft size={14} /></button>
         </div>
     );
@@ -1155,6 +1162,102 @@ function SelectorTipoElemental({ onSelect, onBack }) {
 }
 
 // ─── MAIN EXPORT ─────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// RETOS POR ENLACE: una función elemental concreta fijada por el profesor
+// ══════════════════════════════════════════════════════════════════════════════
+// Config del reto (en Funciones.jsx): { modo: 'ELEMENTALES', tipo, p: { números } }
+export const RetoElemCtx = React.createContext(null);
+
+export const TIPOS_ELEM = [
+    { id: 'LINEAL',      label: 'Lineal',                   emoji: '📏', campos: ['m', 'n'] },
+    { id: 'CUADRATICA',  label: 'Cuadrática',               emoji: '⌒', campos: ['a', 'b', 'c'] },
+    { id: 'INVERSA',     label: 'Proporcionalidad inversa', emoji: '〽️', campos: ['a', 'b', 'c'] },
+    { id: 'EXPONENCIAL', label: 'Exponencial',              emoji: '🚀', campos: ['k', 'base', 'c'] },
+    { id: 'LOGARITMICA', label: 'Logarítmica',              emoji: '🪵', campos: ['k', 'base', 'c'] },
+];
+export const BASES_ELEM = { EXPONENCIAL: [2, 3, 4, 5, 10, 0.5, 1 / 3, 0.25], LOGARITMICA: [2, 3, 4, 5, 10] };
+export const ETIQUETA_CAMPO_ELEM = { m: 'pendiente m', n: 'ordenada n', a: 'a', b: 'b', c: 'c', k: 'k' };
+
+const GENS_ELEM = () => ({ LINEAL: genLineal, CUADRATICA: genCuadratica, INVERSA: genInversa, EXPONENCIAL: genExponencial, LOGARITMICA: genLogaritmica });
+
+export const paramsAleatoriosElem = (tipo) => {
+    const eq = GENS_ELEM()[tipo]();
+    const def = TIPOS_ELEM.find(t => t.id === tipo);
+    return Object.fromEntries(def.campos.map(k => [k, eq[k]]));
+};
+
+/** Reconstruye la función con los números del profesor ({ error } si no es válida). */
+export const construirElemental = (tipo, p = {}) => {
+    const v = (k) => Number(p[k]);
+    const def = TIPOS_ELEM.find(t => t.id === tipo);
+    if (!def) return { error: 'Tipo de función desconocido.' };
+    if (def.campos.some(k => p[k] === '' || p[k] == null || Number.isNaN(v(k)))) return { error: 'Faltan números por rellenar.' };
+    switch (tipo) {
+        case 'LINEAL': return { tipo, m: v('m'), n: v('n') };
+        case 'CUADRATICA': {
+            const [a, b, c] = ['a', 'b', 'c'].map(v);
+            if (a === 0) return { error: 'a no puede ser 0 (no sería una parábola).' };
+            const vx = -b / (2 * a), vy = c - (b * b) / (4 * a), disc = b * b - 4 * a * c;
+            let x1 = null, x2 = null;
+            if (disc >= 0) {
+                x1 = (-b - Math.sqrt(disc)) / (2 * a);
+                x2 = (-b + Math.sqrt(disc)) / (2 * a);
+                if (Math.abs(x1 - x2) < 0.01) x2 = null;
+            }
+            return { tipo, a, b, c, vx, vy, disc, x1, x2, yn: c };
+        }
+        case 'INVERSA': {
+            const [a, b, c] = ['a', 'b', 'c'].map(v);
+            if (a === 0) return { error: 'a no puede ser 0.' };
+            return { tipo, a, b, c };
+        }
+        case 'EXPONENCIAL': {
+            const [k, base, c] = ['k', 'base', 'c'].map(v);
+            if (k === 0) return { error: 'k no puede ser 0.' };
+            if (base <= 0 || base === 1) return { error: 'La base debe ser positiva y distinta de 1.' };
+            return { tipo, k, base, c };
+        }
+        case 'LOGARITMICA': {
+            const [k, base, c] = ['k', 'base', 'c'].map(v);
+            if (k === 0) return { error: 'k no puede ser 0.' };
+            if (base <= 1) return { error: 'La base debe ser mayor que 1.' };
+            return { tipo, k, base, c };
+        }
+        default: return { error: 'Tipo de función desconocido.' };
+    }
+};
+
+const fmtN = (x) => Number.isInteger(x) ? String(x) : (Math.abs(1 / x - Math.round(1 / x)) < 1e-9 ? `1/${Math.round(1 / x)}` : String(Math.round(x * 100) / 100));
+const masC = (c) => c === 0 ? '' : ` ${c < 0 ? '−' : '+'} ${fmtN(Math.abs(c))}`;
+const coefK = (k) => k === 1 ? '' : k === -1 ? '−' : `${fmtN(k)}·`;
+
+/** Fórmula en texto plano (para chips y vista previa). */
+export const describirElemental = (eq) => {
+    if (!eq || eq.error) return eq?.error || '';
+    switch (eq.tipo) {
+        case 'LINEAL':      return `y = ${fmtN(eq.m)}x${masC(eq.n)}`;
+        case 'CUADRATICA':  return `y = ${fmtN(eq.a)}x²${eq.b ? ` ${eq.b < 0 ? '−' : '+'} ${fmtN(Math.abs(eq.b))}x` : ''}${masC(eq.c)}`;
+        case 'INVERSA':     return `y = ${fmtN(eq.a)} / (x${eq.b ? ` ${eq.b > 0 ? '−' : '+'} ${fmtN(Math.abs(eq.b))}` : ''})${masC(eq.c)}`;
+        case 'EXPONENCIAL': return `y = ${coefK(eq.k)}(${fmtN(eq.base)})ˣ${masC(eq.c)}`;
+        case 'LOGARITMICA': return `y = ${coefK(eq.k)}log${eq.base}(x)${masC(eq.c)}`;
+        default: return '';
+    }
+};
+
+/** Ejercicio de representación con la función ya fijada (sin «Nuevo»). */
+export function EjercicioElementalReto({ fnData, onVolver }) {
+    const props = { fnData, onNuevo: null, onVolver };
+    return (
+        <div style={{ minHeight: '100vh', background: '#f0f3fb', padding: '16px 10px', fontFamily: "'Segoe UI', sans-serif" }}>
+            {fnData.tipo === 'LINEAL'      && <EjercicioLinealWrapper {...props} />}
+            {fnData.tipo === 'CUADRATICA'  && <EjercicioCuadratica {...props} />}
+            {fnData.tipo === 'INVERSA'     && <EjercicioInversa {...props} />}
+            {fnData.tipo === 'EXPONENCIAL' && <EjercicioExponencial {...props} />}
+            {fnData.tipo === 'LOGARITMICA' && <EjercicioLogaritmica {...props} />}
+        </div>
+    );
+}
+
 export default function RepresentacionElementales({ onExit }) {
     const [seccion, setSeccion] = useState(null);
     const [fnData, setFnData] = useState(null);

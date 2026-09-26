@@ -125,10 +125,31 @@ import ThinkHootGame from './ThinkHootGame';
 import RuletaGame from './RuletaGame';
 import KartingedGame from './KartingedGame';
 import IrregularVerbsTest from './IrregularVerbsTest';
+import TextWordleGame from './TextWordleGame';
+import SopaDeLetrasGame from './SopaDeLetrasGame';
+import Ahorcado from './Ahorcado';
+import JuegoCalamar from './JuegoCalamar';
+import MoneyBoard from './MoneyBoard';
+import BunkerDisparo from './BunkerDisparo';
+
+// Los recursos de palabras (Wordle/Sopa) se pueden jugar en cualquiera de los tres
+const MODOS_PALABRA = ['WORDLE', 'SOPA', 'AHORCADO'];
 
 export default function GamePlayer({ recurso, usuario, alTerminar, autoStart = false, hojaInicial = null, modoInicial = null }) {
     const tienePresentacion = !!(recurso.presentacion?.titulo);
     const [presentacionVista, setPresentacionVista] = useState(!tienePresentacion);
+
+    // Juegos de palabras: tienen su propia presentación y botón de salir
+    const modoPalabra = MODOS_PALABRA.includes(modoInicial) ? modoInicial
+        : (!modoInicial && MODOS_PALABRA.includes(recurso.tipoJuego) ? recurso.tipoJuego : null);
+    if (modoPalabra === 'WORDLE')   return <TextWordleGame recurso={recurso} usuario={usuario} onExit={alTerminar} />;
+    if (modoPalabra === 'SOPA')     return <SopaDeLetrasGame recurso={recurso} usuario={usuario} onExit={alTerminar} />;
+    if (modoPalabra === 'AHORCADO') return <Ahorcado recurso={recurso} usuario={usuario} onExit={alTerminar} />;
+
+    // Juegos que aceptan cualquier recurso con preguntas (enlace ?r=ID&m=MODO)
+    if (modoInicial === 'CALAMAR')    return <JuegoCalamar recurso={recurso} usuario={usuario} onExit={alTerminar} autoStart />;
+    if (modoInicial === 'MONEYBOARD') return <MoneyBoard recurso={recurso} usuario={usuario} onExit={alTerminar} autoStart />;
+    if (modoInicial === 'BUNKER')     return <BunkerDisparo recurso={recurso} usuario={usuario} onExit={alTerminar} autoStart />;
 
     // Botón de Salir al Inicio (Cierra el juego actual)
     const BotonCasa = () => (
@@ -179,11 +200,11 @@ export default function GamePlayer({ recurso, usuario, alTerminar, autoStart = f
             })()}
 
             {recurso.tipoJuego === 'APAREJADOS' && (
-                <AparejadosGame recurso={recurso} usuario={usuario} alTerminar={alTerminar} />
+                <AparejadosGame recurso={recurso} usuario={usuario} alTerminar={alTerminar} autoStart={autoStart} hojaInicial={hojaInicial} />
             )}
 
             {recurso.tipoJuego === 'RULETA' && (
-                <RuletaGame recurso={recurso} usuario={usuario} alTerminar={alTerminar} />
+                <RuletaGame recurso={recurso} usuario={usuario} alTerminar={alTerminar} hojaInicial={hojaInicial} />
             )}
 
             {recurso.tipoJuego === 'THINKHOOT' && (

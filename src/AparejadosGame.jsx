@@ -10,7 +10,7 @@ import startSoundFile from './assets/inicio-juego.mp3';
 import correctSoundFile from './assets/correct-choice-43861.mp3';
 import winSoundFile from './assets/applause-small-audience-97257.mp3';
 
-export default function AparejadosGame({ recurso, usuario, alTerminar, modoOlimpico = false, tiempoOlimpico = null, onOlimpicoFinish = null}) {
+export default function AparejadosGame({ recurso, usuario, alTerminar, modoOlimpico = false, tiempoOlimpico = null, onOlimpicoFinish = null, autoStart = false, hojaInicial = null }) {
     const [fase, setFase] = useState('SETUP');
     const [hojaSeleccionada, setHojaSeleccionada] = useState('General');
     const [modoDuelo, setModoDuelo] = useState(false);
@@ -36,6 +36,16 @@ export default function AparejadosGame({ recurso, usuario, alTerminar, modoOlimp
             iniciar(false, 'General'); // Inicia 1 Jugador automáticamente
         }
     }, [modoOlimpico, recurso, fase]);
+
+    // --- AUTO-START POR ENLACE (?r=…&h=…): una sola vez, con la hoja del enlace ---
+    const autoStartHecho = useRef(false);
+    useEffect(() => {
+        if (autoStart && !modoOlimpico && recurso && fase === 'SETUP' && !autoStartHecho.current) {
+            autoStartHecho.current = true;
+            const existe = hojaInicial && recurso.hojas?.some(h => h.nombreHoja === hojaInicial);
+            iniciar(false, existe ? hojaInicial : 'General');
+        }
+    }, [autoStart, modoOlimpico, recurso, fase]);
 
     // --- INTERCEPTOR FINAL MODO OLÍMPICO ---
     useEffect(() => {

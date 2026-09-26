@@ -6,12 +6,15 @@ import { guardarRegistroLocal } from './utils/registrosLocales';
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from 'firebase/auth';
 import { collection, addDoc, getDoc, doc } from 'firebase/firestore';
 import { FUNCIONES_DB } from './BibliotecaFunciones';
-import RepresentacionElementales from './RepresentacionElementales';
+import RepresentacionElementales, { RetoElemCtx, EjercicioElementalReto, construirElemental, describirElemental, TIPOS_ELEM } from './RepresentacionElementales';
+import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
+import PantallaReto, { textoBotonEnvio } from './components/retos/PantallaReto';
+import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 
 const auth = getAuth();
 
 // ─── RENDER LATEX ─────────────────────────────────────────────────────────────
-function renderLatex(str) {
+export function renderLatex(str) {
     if (!str) return str;
     const nodes = []; let i = 0, key = 0;
     while (i < str.length) {
@@ -116,7 +119,7 @@ function parsePeriod(str) {
 }
 
 // ─── PLOTTER ──────────────────────────────────────────────────────────────────
-function FunctionPlotter({ fn, range = 7, highlights = [], caracteristicas = {} }) {
+export function FunctionPlotter({ fn, range = 7, highlights = [], caracteristicas = {} }) {
     const canvasRef = useRef(null);
     const CS = 400, SCALE = CS/(range*2), OX = CS/2, OY = CS/2;
     const cx_ = mx => OX + mx * SCALE;
@@ -355,7 +358,7 @@ function ModalEnviarProfe({ datos, onClose }) {
                 fecha: new Date(),
                 codigoProfesor: code,
                 config: { tipoFuncion: datos.tipoFuncion, idFuncion: datos.idFuncion },
-                jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), porcentaje: datos.porcentaje, tipoEjercicio: datos.tipoFuncion, idFuncion: datos.idFuncion, puntos: datos.porcentaje }],
+                jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), porcentaje: datos.porcentaje, tipoEjercicio: datos.tipoFuncion, idFuncion: datos.idFuncion, puntos: datos.porcentaje, ...(datos.reto ? { reto: datos.reto } : {}) }],
             });
             guardarRegistroLocal('FUNCIONES_ANALISIS', {
                 titulo: 'Análisis de Funciones', aciertos: datos.porcentaje, intentos: 100, porcentaje: datos.porcentaje,
@@ -571,11 +574,13 @@ const extractMax = s => { const parts=s.split(/(?=M[íi]n)/); const seg=parts[0]
 const extractMin = s => { const m=s.match(/M[íi]n[^M]*/g); return m?m.join(' ').trim():'No tiene'; };
 
 // ─── EJERCICIO ────────────────────────────────────────────────────────────────
-function AnalisisFuncion({ modoEscritura, tipoSeleccionado, idInicial, onVolver }) {
+function AnalisisFuncion({ modoEscritura, tipoSeleccionado, idInicial, onVolver, reto = null }) {
+    const esRetoCompeticion = !!(reto?.compId && reto?.catId);
     const dbFiltrada = tipoSeleccionado === 'Todas' ? FUNCIONES_DB : FUNCIONES_DB.filter(f => f.tipo === tipoSeleccionado);
     const [lista] = useState(() => {
         if (idInicial) {
             const fn = FUNCIONES_DB.find(f => f.id === idInicial);
+            if (reto && fn) return [fn]; // reto: solo el ejercicio fijado por el profesor
             const resto = [...dbFiltrada.filter(f=>f.id!==idInicial)].sort(()=>Math.random()-0.5);
             return fn ? [fn, ...resto] : [...dbFiltrada].sort(()=>Math.random()-0.5);
         }
@@ -823,7 +828,7 @@ function AnalisisFuncion({ modoEscritura, tipoSeleccionado, idInicial, onVolver 
                             <div style={{display:'flex',gap:8,flexWrap:'wrap',justifyContent:'center',marginTop:2}}>
                                 <button onClick={()=>setMostrarEnvio(true)}
                                     style={{padding:'9px 16px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#3498db,#2980b9)',color:'white',fontWeight:700,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:7,fontSize:'0.85rem'}}>
-                                    <Send size={14}/> Enviar al Profe
+                                    {reto ? textoBotonEnvio(reto) : <><Send size={14}/> Enviar al Profe</>}
                                 </button>
                                 <button onClick={()=>setMostrarRevision(true)}
                                     style={{padding:'9px 16px',borderRadius:10,border:'1.5px solid #e67e22',background:'white',color:'#e67e22',fontWeight:700,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:7,fontSize:'0.85rem'}}>
@@ -861,22 +866,43 @@ function AnalisisFuncion({ modoEscritura, tipoSeleccionado, idInicial, onVolver 
                     ) : (
                         <div style={{display:'flex',alignItems:'center',gap:14}}>
                             <div style={{fontSize:'1.4rem',fontWeight:'bold',color:nota>=70?'#27ae60':nota>=40?'#e67e22':'#e74c3c'}}>{nota}%</div>
-                            <button onClick={siguiente} style={{padding:'10px 22px',borderRadius:8,border:'none',background:'#3498db',color:'white',cursor:'pointer',fontWeight:'bold',fontSize:'0.95rem',fontFamily:'inherit',display:'flex',alignItems:'center',gap:6}}>
+                            {!reto && <button onClick={siguiente} style={{padding:'10px 22px',borderRadius:8,border:'none',background:'#3498db',color:'white',cursor:'pointer',fontWeight:'bold',fontSize:'0.95rem',fontFamily:'inherit',display:'flex',alignItems:'center',gap:6}}>
                                 Siguiente <RefreshCw size={16}/>
-                            </button>
+                            </button>}
                         </div>
                     )}
                 </div>
             </div>
 
-            {mostrarEnvio && <ModalEnviarProfe datos={{porcentaje:nota, tipoFuncion:fnData.tipo, idFuncion:fnData.id}} onClose={()=>setMostrarEnvio(false)}/>}
+            {mostrarEnvio && esRetoCompeticion && (
+                <ModalEnviarCompeticion compId={reto.compId} catId={reto.catId} puntos={nota}
+                    detalle={{ porcentaje: nota, idFuncion: fnData.id }} nombreJuego="Funciones" tituloReto={reto.titulo || ''}
+                    onClose={()=>setMostrarEnvio(false)} />
+            )}
+            {mostrarEnvio && !esRetoCompeticion && <ModalEnviarProfe datos={{porcentaje:nota, tipoFuncion:fnData.tipo, idFuncion:fnData.id, reto: reto ? (reto.titulo || 'Reto') : null}} onClose={()=>setMostrarEnvio(false)}/>}
             {mostrarRevision && <ModalRevision idFuncion={fnData.id} tipoFuncion={fnData.tipo} onClose={()=>setMostrarRevision(false)}/>}
         </div>
     );
 }
 
 // ─── PANTALLA PRINCIPAL ───────────────────────────────────────────────────────
+// ─── Retos por enlace (utils/retoLink.js): una función concreta de la biblioteca ─
+export const RUTA_FUNCIONES = '/funciones';
+export const DEFAULT_RETO_FUN = { idFuncion: FUNCIONES_DB[0]?.id || 1, escritura: false };
+// Dos modos: 'CARACTERISTICAS' { idFuncion, escritura } · 'ELEMENTALES' { tipo, p }
+export const resumenFunciones = (c) => {
+    const cfg = { ...DEFAULT_RETO_FUN, ...(c || {}) };
+    if (cfg.modo === 'ELEMENTALES') {
+        const def = TIPOS_ELEM.find(t => t.id === cfg.tipo);
+        return ['✍️ Representar la función', def ? `${def.emoji} ${def.label}` : null, describirElemental(construirElemental(cfg.tipo, cfg.p))].filter(Boolean);
+    }
+    const fn = FUNCIONES_DB.find(f => f.id === Number(cfg.idFuncion));
+    return [`📈 Función #${cfg.idFuncion}${fn ? ` · ${fn.tipo}` : ''}`, cfg.escritura ? '✏️ Escribir respuesta' : '🖱️ Elegir opciones'];
+};
+
 export default function Funciones({ onExit }) {
+    const [reto, setReto] = useState(() => leerRetoUrl());
+    const [retoJugando, setRetoJugando] = useState(false);
     const handleCompartir = async () => {
         const url = `${window.location.origin}/funciones`;
         if (navigator.share) {
@@ -907,6 +933,37 @@ export default function Funciones({ onExit }) {
         setTipo('Todas');
         setSeccion('CARACTERISTICAS');
     };
+
+    // Reto por enlace: directamente la función que eligió el profesor
+    if (reto) {
+        const cfg = { ...DEFAULT_RETO_FUN, ...(reto.config || {}) };
+        const libre = () => { limpiarRetoUrl(); setReto(null); };
+        const esElemental = cfg.modo === 'ELEMENTALES';
+        const fnElem = esElemental ? construirElemental(cfg.tipo, cfg.p) : null;
+        if (fnElem?.error) return (
+            <div style={{minHeight:'100vh',background:'linear-gradient(135deg,#1a1a2e,#16213e)',color:'white',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:30,textAlign:'center'}}>
+                ⚠️ Este enlace de reto no es válido: {fnElem.error}
+                <button onClick={libre} style={{marginTop:14,padding:'10px 18px',borderRadius:10,border:'none',cursor:'pointer',fontWeight:700}}>Jugar en modo libre</button>
+            </div>
+        );
+        if (!retoJugando) return (
+            <div style={{minHeight:'100vh',background:'linear-gradient(135deg,#1a1a2e,#16213e)',display:'flex',alignItems:'center'}}>
+                <PantallaReto reto={reto} nombreJuego="Funciones" emoji="📐" color="#3498db" oscuro
+                    chips={esElemental ? resumenFunciones(cfg) : [...resumenFunciones(cfg), 'Dominio, recorrido, simetría, monotonía, extremos…']}
+                    onEmpezar={() => setRetoJugando(true)} onLibre={libre} onSalir={onExit} />
+            </div>
+        );
+        if (esElemental) return (
+            <RetoElemCtx.Provider value={reto}>
+                <EjercicioElementalReto fnData={fnElem} onVolver={() => setRetoJugando(false)} />
+            </RetoElemCtx.Provider>
+        );
+        return (
+            <div style={{minHeight:'100vh',background:'#f0f3fb',padding:'20px 12px'}}>
+                <AnalisisFuncion reto={reto} modoEscritura={!!cfg.escritura} tipoSeleccionado="Todas" idInicial={Number(cfg.idFuncion)} onVolver={() => setRetoJugando(false)} />
+            </div>
+        );
+    }
 
     if (seccion === 'ELEMENTALES') return (
         <RepresentacionElementales onExit={() => setSeccion(null)} />

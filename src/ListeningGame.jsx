@@ -10,6 +10,9 @@ import {
 } from 'lucide-react';
 import { IDIOMAS_LISTENING, getIdioma, getItems, getItem, IDIOMA_POR_DEFECTO } from './listeningIdiomas';
 import QRSalaBoton from './components/QRSalaBoton';
+import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
+import PantallaReto, { textoBotonEnvio } from './components/retos/PantallaReto';
+import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 const AUDIO_DURACION_EST = 62; // segundos estimados por audio (~1 min)
@@ -90,7 +93,8 @@ function ModalEnviarProfe({ datos, onClose }) {
             const jugs = esLive ? datos.jugadores
                 : [{ nombre: nombre.trim(), curso: curso.trim(),
                      aciertos: datos.aciertos, total: datos.total,
-                     porcentaje: datos.porcentaje, tema: datos.tema, modo: datos.modo }];
+                     porcentaje: datos.porcentaje, tema: datos.tema, modo: datos.modo,
+                     ...(datos.reto ? { reto: datos.reto } : {}) }];
             await addDoc(collection(db, 'informes_juegos'), {
                 tipo: 'LISTENING', modalidad: datos.modalidad || 'Individual',
                 tema: datos.tema || '', fecha: new Date(),
@@ -714,7 +718,8 @@ function PantallaModo({ item, onModo, onBack }) {
 }
 
 // ─── Juego individual ──────────────────────────────────────────────────────────
-function JuegoIndividual({ item, modo, idioma, onBack }) {
+function JuegoIndividual({ item, modo, idioma, onBack, reto = null }) {
+    const esRetoCompeticion = !!(reto?.compId && reto?.catId);
     const segmentos = parsearTranscript(item.gappedTranscript, item.gaps);
     const frases = dividirEnFrases(segmentos);
     const tiempos = estimarTiemposFrases(frases);
@@ -796,20 +801,25 @@ function JuegoIndividual({ item, modo, idioma, onBack }) {
                         </button>
                     ) : (
                         <>
-                            <button onClick={onBack} style={{ flex:1, padding:'13px', borderRadius:12, border:'1.5px solid rgba(255,255,255,0.2)', background:'transparent', color:'white', fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+                            {!reto && <button onClick={onBack} style={{ flex:1, padding:'13px', borderRadius:12, border:'1.5px solid rgba(255,255,255,0.2)', background:'transparent', color:'white', fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
                                 ← New Topic
-                            </button>
+                            </button>}
                             <button onClick={() => setMostrarEnvio(true)}
-                                style={{ flex:1, padding:'13px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#27ae60,#2ecc71)', color:'white', fontWeight:700, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
-                                <Send size={16}/> Send to Teacher
+                                style={{ flex:1, padding:'13px', borderRadius:12, border:'none', background: esRetoCompeticion ? 'linear-gradient(135deg,#f39c12,#e67e22)' : 'linear-gradient(135deg,#27ae60,#2ecc71)', color:'white', fontWeight:700, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+                                {reto ? textoBotonEnvio(reto) : <><Send size={16}/> Send to Teacher</>}
                             </button>
                         </>
                     )}
                 </div>
             </div>
-            {mostrarEnvio && (
+            {mostrarEnvio && esRetoCompeticion && (
+                <ModalEnviarCompeticion compId={reto.compId} catId={reto.catId} puntos={aciertos}
+                    detalle={{ aciertos, total: gaps.length, porcentaje: pct, tema: item.titulo }} nombreJuego="Listening" tituloReto={reto.titulo || ''}
+                    onClose={() => setMostrarEnvio(false)} />
+            )}
+            {mostrarEnvio && !esRetoCompeticion && (
                 <ModalEnviarProfe
-                    datos={{ aciertos, total: gaps.length, porcentaje: pct, tema: item.titulo, modo, modalidad: 'Individual' }}
+                    datos={{ aciertos, total: gaps.length, porcentaje: pct, tema: item.titulo, modo, modalidad: 'Individual', reto: reto ? (reto.titulo || 'Reto') : null }}
                     onClose={() => setMostrarEnvio(false)}
                 />
             )}
@@ -1233,7 +1243,19 @@ async function crearSalaListening(idioma = IDIOMA_POR_DEFECTO) {
 }
 
 // ─── Export principal ─────────────────────────────────────────────────────────
+// ─── Retos por enlace (utils/retoLink.js): idioma + audio + modo fijos ─────────
+export const RUTA_LISTENING = '/?juego=listening';
+export const DEFAULT_RETO_LIS = { idioma: IDIOMA_POR_DEFECTO, itemId: getItems(IDIOMA_POR_DEFECTO)[0]?.id, modo: 'multiple' };
+export const resumenListening = (c) => {
+    const cfg = { ...DEFAULT_RETO_LIS, ...(c || {}) };
+    const id = getIdioma(cfg.idioma);
+    const item = getItem(cfg.idioma, cfg.itemId);
+    return [`${id.flag} ${id.label}`, item ? `🎧 ${item.titulo}` : null, cfg.modo === 'write' ? '✍️ Escribir las palabras' : '🔘 Elegir entre 4 opciones'].filter(Boolean);
+};
+
 export default function ListeningGame({ onExit, isHost, codigoSala: codigoExterno, usuario }) {
+    const [reto, setReto]                 = useState(() => leerRetoUrl());
+    const [retoJugando, setRetoJugando]   = useState(false);
     const [pantalla, setPantalla]         = useState('IDIOMA');
     const [idioma, setIdioma]             = useState(IDIOMA_POR_DEFECTO);
     const [itemSel, setItemSel]           = useState(null);
@@ -1245,6 +1267,26 @@ export default function ListeningGame({ onExit, isHost, codigoSala: codigoExtern
     // Modo externo (desde LandingGames)
     if (isHost && codigoExterno) return <ListeningLiveHost codigoSala={codigoExterno} onExit={onExit || (()=>{})} />;
     if (codigoExterno) return <ListeningLiveClient codigoSala={codigoExterno} onExit={onExit || (()=>{})} usuario={usuario} initialNombre={usuario?.displayName || ''}/>;
+
+    // Reto por enlace: directamente el audio y el modo que eligió el profesor
+    if (reto) {
+        const cfg = { ...DEFAULT_RETO_LIS, ...(reto.config || {}) };
+        const item = getItem(cfg.idioma, cfg.itemId);
+        const libre = () => { limpiarRetoUrl(); setReto(null); };
+        if (!item) return (
+            <div style={{ minHeight:'100vh', background:'linear-gradient(135deg,#1a1a2e,#16213e)', color:'white', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:30, textAlign:'center' }}>
+                ⚠️ No se encuentra el audio de este reto.
+                <button onClick={libre} style={{ marginTop:14, padding:'10px 18px', borderRadius:10, border:'none', cursor:'pointer', fontWeight:700 }}>Jugar en modo libre</button>
+            </div>
+        );
+        if (!retoJugando) return (
+            <div style={{ minHeight:'100vh', background:'linear-gradient(135deg,#1a1a2e,#16213e)', display:'flex', alignItems:'center' }}>
+                <PantallaReto reto={reto} nombreJuego="Listening" emoji="🎧" color="#8E44AD" oscuro
+                    chips={resumenListening(cfg)} onEmpezar={() => setRetoJugando(true)} onLibre={libre} onSalir={onExit} />
+            </div>
+        );
+        return <JuegoIndividual item={item} modo={cfg.modo === 'write' ? 'write' : 'multiple'} idioma={cfg.idioma} reto={reto} onBack={() => setRetoJugando(false)} />;
+    }
 
     // Modo interno
     if (internalHost) return <ListeningLiveHost codigoSala={internalHost} onExit={() => setInternalHost(null)}/>;

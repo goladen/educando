@@ -17,6 +17,50 @@ export const HERRAMIENTAS_RETO = [
         desc: 'Áreas, perímetros y volúmenes · figuras 2D y 3D, modo fórmulas o regla, nº de ejercicios',
     },
     {
+        id: 'FRACCIONES', label: 'Fracciones', emoji: '🍰', color: '#7b1fa2', ruta: '/fracciones',
+        desc: 'Identificar, simplificar, operar, potencias y raíces · nivel y tiempo o nº de ejercicios',
+    },
+    {
+        id: 'ECUACIONES', label: 'Ecuaciones', emoji: '🧮', color: '#3498db', ruta: '/ecuaciones',
+        desc: 'Primer y segundo grado, paréntesis, denominadores y enunciados · rango y tiempo',
+    },
+    {
+        id: 'POTENCIAS_RAICES', label: 'Potencias y Raíces', emoji: '⚡', color: '#0ea5e9', ruta: '/potencias_raices',
+        desc: 'Ficha de potencias, propiedades, raíces y notación científica · tipos y nº de ejercicios',
+    },
+    {
+        id: 'ECUACION_SISTEMAS', label: 'Sistemas de ecuaciones', emoji: '🚀', color: '#6c5ce7', ruta: '/ecuacion_sistemas',
+        desc: '2x2, fracciones, Gauss 3x3, método gráfico o problemas · método, dificultad y nº de ejercicios',
+    },
+    {
+        id: 'POLINOMIOS', label: 'Álgebra', emoji: '✖️', color: '#9b59b6', ruta: '/polinomios',
+        desc: 'Monomios, polinomios, Ruffini, identidades notables y factorización · módulos y nº de ejercicios',
+    },
+    {
+        id: 'DINERO', label: 'Cálculo con dinero', emoji: '💶', color: '#16a085', ruta: '/dinero',
+        desc: 'Pagar, la vuelta, precio total y por unidad, IVA, rebajas y lista de la compra',
+    },
+    {
+        id: 'ESTADISTICA', label: 'Estadística', emoji: '📊', color: '#3498db', ruta: '/estadistica',
+        desc: 'Un estudio estadístico en 3 fases: conceptos, tabla de frecuencias y gráfico',
+    },
+    {
+        id: 'FUNCIONES', label: 'Funciones', emoji: '📐', color: '#3498db', ruta: '/funciones',
+        desc: 'Un ejercicio concreto: características desde la gráfica o representar una función elemental',
+    },
+    {
+        id: 'GEOMETRÍA_ANALÍTICA', label: 'Geometría analítica', emoji: '∫', color: '#3498db', ruta: '/geometria_analitica',
+        desc: 'Un ejercicio concreto de rectas, vectores o parábolas con los números que elijas',
+    },
+    {
+        id: 'LISTENING', label: 'Listening', emoji: '🎧', color: '#8E44AD', ruta: '/?juego=listening',
+        desc: 'Un audio concreto en inglés o francés · elegir entre opciones o escribir las palabras',
+    },
+    {
+        id: 'IRREGULAR_VERBS', label: 'Irregular Verbs', emoji: '📝', color: '#0369a1', ruta: '/irregular_verbs',
+        desc: 'Test de verbos irregulares · nivel o verbos concretos, columnas y tiempo',
+    },
+    {
         id: 'SINTAXIS', label: 'Sintaxis', emoji: '🖍️', color: '#3498db', ruta: '/?juego=sintaxis',
         desc: 'Analizar frases a contrarreloj · español, català o français, por nivel y tiempo',
     },
@@ -33,6 +77,17 @@ export const HERRAMIENTAS_RETO = [
 const EDITORES = {
     CALCULO: lazy(() => import('./retos/ConfigCalculoReto')),
     GEOMETRIX: lazy(() => import('./retos/ConfigGeometrixReto')),
+    FRACCIONES: lazy(() => import('./retos/ConfigFraccionesReto')),
+    ECUACIONES: lazy(() => import('./retos/ConfigEcuacionesReto')),
+    POTENCIAS_RAICES: lazy(() => import('./retos/ConfigPotenciasReto')),
+    ECUACION_SISTEMAS: lazy(() => import('./retos/ConfigSistemasReto')),
+    POLINOMIOS: lazy(() => import('./retos/ConfigAlgebraReto')),
+    DINERO: lazy(() => import('./retos/ConfigDineroReto')),
+    ESTADISTICA: lazy(() => import('./retos/ConfigEstadisticaReto')),
+    FUNCIONES: lazy(() => import('./retos/ConfigFuncionesReto')),
+    GEOMETRÍA_ANALÍTICA: lazy(() => import('./retos/ConfigGeoAnaliticaReto')),
+    LISTENING: lazy(() => import('./retos/ConfigListeningReto')),
+    IRREGULAR_VERBS: lazy(() => import('./retos/ConfigVerbosReto')),
     SINTAXIS: lazy(() => import('./retos/ConfigSintaxisReto')),
     BIOLOGIA: lazy(() => import('./retos/ConfigBiologiaReto')),
     GEOGRAFIA: lazy(() => import('./retos/ConfigGeografiaReto')),

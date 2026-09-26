@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
 import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
+import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
+import PantallaReto, { textoBotonEnvio } from './components/retos/PantallaReto';
+import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import correctSoundFile from './assets/correct-choice-43861.mp3';
 import wrongSoundFile from './assets/negative_beeps-6008.mp3';
 import pikaSprite from './assets/pikatron-sprite2.png';
@@ -812,7 +815,7 @@ function CompeticionPot({ isMobile, onSalir }) {
 }
 
 // ─── Modal "Enviar al profesor" ────────────────────────────────────────────────
-function ModalEnviarProfe({ stats, isMobile, onClose }) {
+function ModalEnviarProfe({ stats, isMobile, onClose, reto = null }) {
   const [codigo, setCodigo] = useState('');
   const [nombre, setNombre] = useState('');
   const [curso, setCurso] = useState('');
@@ -842,7 +845,7 @@ function ModalEnviarProfe({ stats, isMobile, onClose }) {
         modalidad: 'Individual',
         fecha: new Date(),
         codigoProfesor: code,
-        jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), aciertos: totalAc, intentos: totalInt, porcentaje: pct, porTipo }],
+        jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), aciertos: totalAc, intentos: totalInt, porcentaje: pct, porTipo, ...(reto ? { reto } : {}) }],
       });
       setEnviado(true);
     } catch (e) { setError('Error al enviar: ' + e.message); }
@@ -905,7 +908,110 @@ function ModalEnviarProfe({ stats, isMobile, onClose }) {
 }
 
 // ─── Componente principal ──────────────────────────────────────────────────────
+// ─── Retos por enlace (utils/retoLink.js) ─────────────────────────────────────
+// El reto es una ficha única que mezcla los tipos elegidos por el profesor; se
+// corrige una sola vez y se envía el resultado.
+export const RUTA_POTENCIAS = '/potencias_raices';
+export const TIPOS_POT = MODES.filter((m) => m.gen).map((m) => ({ id: m.id, label: m.label }));
+export const DEFAULT_RETO_POT = { tipos: ['calcular', 'propiedades'], n: 4 };
+export const resumenPotencias = (c) => {
+  const cfg = { ...DEFAULT_RETO_POT, ...(c || {}) };
+  return [...cfg.tipos.map((t) => MODES.find((m) => m.id === t)?.label).filter(Boolean), `🔢 ${cfg.n * cfg.tipos.length} ejercicios`];
+};
+
+function FichaRetoPot({ reto, isMobile, onLibre, onExit }) {
+  const cfg = { ...DEFAULT_RETO_POT, ...(reto.config || {}) };
+  const esCompeticion = !!(reto.compId && reto.catId);
+  const [fase, setFase] = useState('intro'); // intro | ficha | fin
+  const [items, setItems] = useState([]);
+  const [answers, setAnswers] = useState({});
+  const [results, setResults] = useState({});
+  const [stats, setStats] = useState({});
+  const [mostrarEnvio, setMostrarEnvio] = useState(false);
+
+  const empezar = () => {
+    const lista = cfg.tipos.flatMap((t) => {
+      const modo = MODES.find((m) => m.id === t);
+      return modo?.gen ? modo.gen(cfg.n).map((it) => ({ ...it, id: `${t}-${it.id}`, modo: t })) : [];
+    });
+    setItems(lista); setAnswers({}); setResults({}); setStats({}); setFase('ficha');
+  };
+
+  const corregir = () => {
+    const res = {}; const st = {};
+    items.forEach((it) => {
+      const ok = checkAns(it, answers[it.id] || {});
+      res[it.id] = ok ? 'correct' : 'incorrect';
+      const cur = st[it.modo] || { intentos: 0, aciertos: 0 };
+      st[it.modo] = { intentos: cur.intentos + 1, aciertos: cur.aciertos + (ok ? 1 : 0) };
+    });
+    setResults(res); setStats(st); setFase('fin');
+    const ok = Object.values(res).filter((r) => r === 'correct').length;
+    playSound(ok / Math.max(1, items.length) >= 0.75 ? 'correct' : 'incorrect');
+  };
+
+  const aciertos = Object.values(results).filter((r) => r === 'correct').length;
+  const pct = items.length ? Math.round((aciertos / items.length) * 100) : 0;
+
+  if (fase === 'intro') return (
+    <div style={{ minHeight: '100vh', background: '#eef2f5', display: 'flex', alignItems: 'center' }}>
+      <PantallaReto reto={reto} nombreJuego="Potencias y Raíces" emoji="⚡" color="#0ea5e9" chips={resumenPotencias(cfg)}
+        onEmpezar={empezar} onLibre={onLibre} onSalir={typeof onExit === 'function' ? onExit : undefined} />
+    </div>
+  );
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#eef2f5', padding: isMobile ? 10 : 24, boxSizing: 'border-box', fontFamily: '"Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}>
+      <div style={{ maxWidth: 900, margin: '0 auto', background: 'white', borderRadius: 16, padding: isMobile ? 16 : 28, boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
+        <div style={{ color: '#0ea5e9', fontWeight: 800, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: 1 }}>🎯 Reto · Potencias y Raíces</div>
+        <h1 style={{ color: '#0f172a', margin: '4px 0 6px', fontSize: isMobile ? '1.4rem' : '1.8rem' }}>{reto.titulo || 'Reto de potencias y raíces'}</h1>
+        <p style={{ color: '#64748b', margin: '0 0 18px' }}>{fase === 'ficha' ? 'Resuelve todos los ejercicios y pulsa «Corregir y terminar». Solo se corrige una vez.' : 'Ficha corregida.'}</p>
+
+        {fase === 'fin' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginBottom: 22, padding: '14px 18px', borderRadius: 12, background: pct >= 75 ? '#ecfdf5' : '#fef2f2', border: `2px solid ${pct >= 75 ? '#10b981' : '#ef4444'}` }}>
+            <span style={{ fontSize: '2rem', fontWeight: 900, color: pct >= 75 ? '#10b981' : '#ef4444' }}>{pct}%</span>
+            <div style={{ flex: 1, minWidth: 160, fontWeight: 700, color: '#0f172a' }}>{aciertos} de {items.length} correctos</div>
+            <button onClick={() => setMostrarEnvio(true)} style={{ padding: '12px 22px', background: esCompeticion ? 'linear-gradient(135deg,#f39c12,#e67e22)' : 'linear-gradient(135deg,#27ae60,#2ecc71)', color: 'white', border: 'none', borderRadius: 10, cursor: 'pointer', fontSize: '1rem', fontWeight: 'bold' }}>{textoBotonEnvio(reto)}</button>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, pointerEvents: fase === 'fin' ? 'none' : 'auto' }}>
+          {items.map((item, i) => (
+            <div key={item.id} style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'center', gap: isMobile ? 10 : 22, padding: 16, backgroundColor: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0' }}>
+              <span style={{ fontWeight: 800, color: '#94a3b8', minWidth: 28 }}>{i + 1}.</span>
+              <div style={{ flex: 1, display: 'flex', justifyContent: isMobile ? 'center' : 'flex-end', color: '#1e293b' }}>{renderMath(item.q, isMobile)}</div>
+              <span style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#94a3b8', display: isMobile ? 'none' : 'block' }}>=</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <AnswerInputs item={item} u={answers[item.id] || {}} onChange={(f, v) => setAnswers((p) => ({ ...p, [item.id]: { ...(p[item.id] || {}), [f]: v } }))} isMobile={isMobile} />
+                {results[item.id] === 'correct' && <span style={{ color: '#10b981', fontSize: '1.6rem', fontWeight: 'bold' }}>✓</span>}
+                {results[item.id] === 'incorrect' && <span style={{ color: '#ef4444', fontSize: '1.6rem', fontWeight: 'bold' }}>✗</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {fase === 'ficha' && (
+          <div style={{ textAlign: 'center', marginTop: 22 }}>
+            <button onClick={() => { if (window.confirm('¿Corregir y terminar? Ya no podrás cambiar las respuestas.')) corregir(); }}
+              style={{ padding: '14px 30px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: 10, cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold' }}>✅ Corregir y terminar</button>
+          </div>
+        )}
+      </div>
+
+      {mostrarEnvio && esCompeticion && (
+        <ModalEnviarCompeticion compId={reto.compId} catId={reto.catId} puntos={aciertos}
+          detalle={{ aciertos, total: items.length, porcentaje: pct }} nombreJuego="Potencias y Raíces" tituloReto={reto.titulo || ''}
+          onClose={() => setMostrarEnvio(false)} />
+      )}
+      {mostrarEnvio && !esCompeticion && (
+        <ModalEnviarProfe stats={stats} isMobile={isMobile} reto={reto.titulo || 'Reto'} onClose={() => setMostrarEnvio(false)} />
+      )}
+    </div>
+  );
+}
+
 export default function PotenciasRaices({ onExit }) {
+  const [reto, setReto] = useState(() => leerRetoUrl());
   const [isMobile, setIsMobile] = useState(false);
   const [activeTab, setActiveTab] = useState('theory');
   const [items, setItems] = useState([]);
@@ -958,6 +1064,12 @@ export default function PotenciasRaices({ onExit }) {
       return { ...prev, [activeTab]: { intentos: cur.intentos + total, aciertos: cur.aciertos + ok } };
     });
   };
+
+  // Reto por enlace: ficha fija, sin menú de tipos
+  if (reto) return (
+    <FichaRetoPot reto={reto} isMobile={isMobile} onExit={onExit}
+      onLibre={() => { limpiarRetoUrl(); setReto(null); }} />
+  );
 
   const tabStyle = (active) => ({
     padding: '12px 16px', cursor: 'pointer', backgroundColor: active ? '#334155' : 'transparent', borderRadius: '8px',

@@ -4,6 +4,9 @@ import { guardarRegistroLocal } from './utils/registrosLocales';
 import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
 import { RotateCcw, CheckCircle, Trophy, Clock, Delete, Settings, SkipForward, Share2, Coins } from 'lucide-react';
 import Confetti from 'react-confetti';
+import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
+import PantallaReto, { textoBotonEnvio } from './components/retos/PantallaReto';
+import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import sndAcierto from './assets/correct.mp3';
 import sndFallo from './assets/sonidomonedamal.mp3';
 
@@ -82,7 +85,7 @@ const PRODUCTOS = [
 ];
 
 // ─── Configuración por defecto ────────────────────────────────────────────────
-const DEFAULT_CONFIG = {
+export const DEFAULT_CONFIG = {
     maxPrecio: 50,          // euros
     conCentimos: true,
     tiempo: 180,
@@ -274,7 +277,28 @@ const PiezaDinero = ({ d, size, onClick, badge }) => {
 };
 
 // ─── Modal de configuración ────────────────────────────────────────────────────
-const ConfigModal = ({ config, onStart, onClose }) => {
+// ─── Retos por enlace (utils/retoLink.js) ─────────────────────────────────────
+export const RUTA_DINERO = '/dinero';
+export const TIPOS_DINERO = [
+    ['pagar', '👛 Pagar exacto', '#2ecc71'],
+    ['devolver', '💸 La vuelta', '#3498db'],
+    ['multiplicar', '✖️ Precio total', '#f39c12'],
+    ['unidad', '➗ Precio por uno', '#16a085'],
+    ['iva', '📈 IVA', '#e74c3c'],
+    ['rebaja', '🏷️ Rebajas', '#9b59b6'],
+    ['compra', '🛒 Lista de la compra', '#16a085'],
+];
+export const resumenDinero = (c) => {
+    const cfg = { ...DEFAULT_CONFIG, ...(c || {}) };
+    return [
+        ...TIPOS_DINERO.filter(([k]) => cfg.tipos?.[k]).map(([, l]) => l),
+        `💶 hasta ${cfg.maxPrecio} €`,
+        cfg.conCentimos ? '🪙 Con céntimos' : '🪙 Sin céntimos',
+        cfg.numEjercicios ? `🔢 ${cfg.numEjercicios} ejercicios` : `⏱ ${cfg.tiempo < 60 ? `${cfg.tiempo} s` : `${cfg.tiempo / 60} min`}`,
+    ];
+};
+
+export const ConfigModal = ({ config, onStart, onClose, titulo = '⚙️ Configurar cálculo con dinero', textoAceptar = '▶ Empezar' }) => {
     const [local, setLocal] = useState({ ...DEFAULT_CONFIG, ...config });
     const [modoConteo, setModoConteo] = useState(config.numEjercicios ? 'ejercicios' : 'tiempo');
 
@@ -317,7 +341,7 @@ const ConfigModal = ({ config, onStart, onClose }) => {
     return (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
             <div style={{ background: 'white', borderRadius: 22, padding: '28px 24px', maxWidth: 480, width: '100%', maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 25px 70px rgba(0,0,0,0.3)' }}>
-                <h2 style={{ textAlign: 'center', color: '#2c3e50', fontSize: '1.3rem', marginTop: 0, marginBottom: 22 }}>⚙️ Configurar cálculo con dinero</h2>
+                <h2 style={{ textAlign: 'center', color: '#2c3e50', fontSize: '1.3rem', marginTop: 0, marginBottom: 22 }}>{titulo}</h2>
 
                 <Section label="🧮 Qué practicar">
                     {TIPOS.map(([k, lab, col]) => (
@@ -357,7 +381,7 @@ const ConfigModal = ({ config, onStart, onClose }) => {
 
                 <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 20 }}>
                     <button onClick={onClose} style={{ padding: '12px 24px', background: '#f0f0f0', color: '#555', border: 'none', borderRadius: 30, fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer' }}>Cancelar</button>
-                    <button onClick={handleStart} style={{ padding: '12px 28px', background: '#9b59b6', color: 'white', border: 'none', borderRadius: 30, fontSize: '1.05rem', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 12px #9b59b655' }}>▶ Empezar</button>
+                    <button onClick={handleStart} style={{ padding: '12px 28px', background: '#9b59b6', color: 'white', border: 'none', borderRadius: 30, fontSize: '1.05rem', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 12px #9b59b655' }}>{textoAceptar}</button>
                 </div>
             </div>
         </div>
@@ -391,6 +415,7 @@ function ModalEnviarProfe({ datos, onClose }) {
                     puntos: datos.puntos, skips: datos.skips,
                     porcentaje: Math.round((datos.aciertos / Math.max(1, intentos)) * 100),
                     config: { tipos: datos.config.tipos, maxPrecio: datos.config.maxPrecio, conCentimos: datos.config.conCentimos, tiempo: datos.config.tiempo, numEjercicios: datos.config.numEjercicios },
+                    ...(datos.reto ? { reto: datos.reto } : {}),
                 }],
             });
             guardarRegistroLocal('DINERO', { titulo: 'Cálculo con Dinero', aciertos: datos.aciertos, intentos, nombre: nombre.trim(), curso: curso.trim(), via: 'profesor' });
@@ -657,8 +682,11 @@ function TableroDual({ idx, accent, isMobile }) {
 
 // ─── Componente principal ──────────────────────────────────────────────────────
 export default function CalculoDineroGame({ usuario, onExit }) {
+    // Reto por enlace: configuración fija del profesor
+    const [reto, setReto] = useState(() => leerRetoUrl());
+    const esRetoCompeticion = !!(reto?.compId && reto?.catId);
     const [gameState, setGameState] = useState('START');
-    const [config, setConfig] = useState(DEFAULT_CONFIG);
+    const [config, setConfig] = useState(() => ({ ...DEFAULT_CONFIG, ...(reto?.config || {}), tipos: { ...DEFAULT_CONFIG.tipos, ...(reto?.config?.tipos || {}) } }));
     const [showConfig, setShowConfig] = useState(false);
     const [mostrarEnvio, setMostrarEnvio] = useState(false);
     const [dual, setDual] = useState(false);
@@ -824,8 +852,16 @@ export default function CalculoDineroGame({ usuario, onExit }) {
                 )}
             </div>
 
+            {/* RETO POR ENLACE */}
+            {gameState === 'START' && reto && (
+                <PantallaReto reto={reto} nombreJuego="Cálculo con dinero" emoji="💶" color="#16a085"
+                    chips={resumenDinero(config)}
+                    onEmpezar={() => startGame(config)}
+                    onLibre={() => { limpiarRetoUrl(); setReto(null); setConfig(DEFAULT_CONFIG); }} />
+            )}
+
             {/* INICIO */}
-            {gameState === 'START' && (
+            {gameState === 'START' && !reto && (
                 <div style={{ ...st.centerCard, maxWidth: 560 }}>
                     <Coins size={50} color="#16a085" style={{ marginBottom: 8 }} />
                     <h1 style={{ color: '#2c3e50', fontSize: isMobile ? '1.8rem' : '2.3rem', margin: '6px 0 4px' }}>Cálculo con Dinero</h1>
@@ -902,14 +938,19 @@ export default function CalculoDineroGame({ usuario, onExit }) {
                     </div>
                     <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
                         <button onClick={() => startGame(config)} style={{ ...st.btnPrimary, background: '#16a085' }}><RotateCcw size={16} /> Repetir</button>
-                        <button onClick={() => { setShowConfig(true); setGameState('START'); }} style={{ ...st.btnPrimary, background: '#7f8c8d' }}><Settings size={16} /> Configurar</button>
+                        {!reto && <button onClick={() => { setShowConfig(true); setGameState('START'); }} style={{ ...st.btnPrimary, background: '#7f8c8d' }}><Settings size={16} /> Configurar</button>}
                         <button onClick={() => setGameState('START')} style={st.btnVolver}>Menú</button>
-                        <button onClick={() => setMostrarEnvio(true)} style={{ ...st.btnPrimary, background: 'linear-gradient(135deg,#27ae60,#2ecc71)' }}>📤 Enviar al profesor</button>
+                        <button onClick={() => setMostrarEnvio(true)} style={{ ...st.btnPrimary, background: esRetoCompeticion ? 'linear-gradient(135deg,#f39c12,#e67e22)' : 'linear-gradient(135deg,#27ae60,#2ecc71)' }}>{textoBotonEnvio(reto)}</button>
                     </div>
                 </div>
             )}
-            {mostrarEnvio && (
-                <ModalEnviarProfe datos={{ aciertos, fallos, puntos: score, skips, config }} onClose={() => setMostrarEnvio(false)} />
+            {mostrarEnvio && esRetoCompeticion && (
+                <ModalEnviarCompeticion compId={reto.compId} catId={reto.catId} puntos={score}
+                    detalle={{ aciertos, fallos, skips }} nombreJuego="Cálculo con dinero" tituloReto={reto.titulo || ''}
+                    onClose={() => setMostrarEnvio(false)} />
+            )}
+            {mostrarEnvio && !esRetoCompeticion && (
+                <ModalEnviarProfe datos={{ aciertos, fallos, puntos: score, skips, config, reto: reto ? (reto.titulo || 'Reto') : null }} onClose={() => setMostrarEnvio(false)} />
             )}
         </div>
     );

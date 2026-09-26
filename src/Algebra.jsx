@@ -4,6 +4,9 @@ import { db } from './firebase';
 import { guardarRegistroLocal } from './utils/registrosLocales';
 import { addDoc, collection, doc, getDoc } from 'firebase/firestore';
 import { CheckCircle, XCircle, RefreshCw, Send, Share2, ChevronDown, ChevronUp, Maximize2, Minimize2 } from 'lucide-react';
+import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
+import PantallaReto, { textoBotonEnvio } from './components/retos/PantallaReto';
+import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 
 // ─── Math utilities ───────────────────────────────────────────────────────────
 const SUP = { 0:'', 1:'', 2:'²', 3:'³', 4:'⁴', 5:'⁵' };
@@ -776,8 +779,26 @@ function M7_Factorizacion({ onScore }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN — AlgebraApp
 // ═══════════════════════════════════════════════════════════════════════════════
+// ─── Retos por enlace (utils/retoLink.js) ─────────────────────────────────────
+export const RUTA_ALGEBRA = '/polinomios';
+export const MODULOS_ALGEBRA = MODULES;
+export const DEFAULT_RETO_ALG = { modulos: ['monomios', 'polinomios'], n: 10 };
+export const resumenAlgebra = (c) => {
+    const cfg = { ...DEFAULT_RETO_ALG, ...(c || {}) };
+    return [...cfg.modulos.map(id => MODULES.find(m => m.id === id)?.label.replace(/^\d+\.\s*/, '')).filter(Boolean), `🎯 ${cfg.n} ejercicios`];
+};
+
 export default function AlgebraApp({ onExit, usuario }) {
-    const [modIdx, setModIdx] = useState(0);
+    // Reto por enlace: módulos fijos y objetivo de ejercicios
+    const [reto, setReto] = useState(() => leerRetoUrl());
+    const cfgReto = reto ? { ...DEFAULT_RETO_ALG, ...(reto.config || {}) } : null;
+    const esRetoCompeticion = !!(reto?.compId && reto?.catId);
+    const [retoIniciado, setRetoIniciado] = useState(false);
+    const [showComp, setShowComp] = useState(false);
+    const [modIdx, setModIdx] = useState(() => {
+        const i = cfgReto ? MODULES.findIndex(m => cfgReto.modulos.includes(m.id)) : 0;
+        return i >= 0 ? i : 0;
+    });
     const [totals, setTotals] = useState(Array(7).fill(null).map(()=>({ok:0,total:0})));
     const [showEnviar, setShowEnviar] = useState(false);
     const [enviado,   setEnviado]   = useState(false);
@@ -833,6 +854,7 @@ export default function AlgebraApp({ onExit, usuario }) {
                     aciertos:   totalOk,
                     intentos:   totalTotal,
                     porcentaje: totalTotal>0 ? Math.round(totalOk/totalTotal*100) : 0,
+                    ...(reto ? { reto: reto.titulo || 'Reto' } : {}),
                     modulos: modulosPracticados.map(t=>({
                         nombre:     t.label,
                         aciertos:   t.ok,
@@ -855,6 +877,19 @@ export default function AlgebraApp({ onExit, usuario }) {
         if(navigator.share) navigator.share({title:'Álgebra - PiKT', text:'Practica álgebra', url}).catch(()=>{});
         else navigator.clipboard.writeText(url).then(()=>alert('✅ Enlace copiado'));
     };
+
+    const retoCompleto = !!cfgReto && totalTotal >= cfgReto.n;
+    const modulosVisibles = MODULES.map((m, i) => ({ m, i })).filter(({ m }) => !cfgReto || cfgReto.modulos.includes(m.id));
+
+    if (reto && !retoIniciado) return (
+        <div style={{ minHeight: '100vh', background: '#0d1117', display: 'flex', alignItems: 'center' }}>
+            <PantallaReto reto={reto} nombreJuego="Álgebra" emoji="✖️" color="#9b59b6" oscuro
+                chips={resumenAlgebra(cfgReto)}
+                onEmpezar={() => setRetoIniciado(true)}
+                onLibre={() => { limpiarRetoUrl(); setReto(null); }}
+                onSalir={onExit} />
+        </div>
+    );
 
     const color = MOD_COLORS[modIdx];
 
@@ -884,16 +919,20 @@ export default function AlgebraApp({ onExit, usuario }) {
                     <button onClick={toggleFullscreen} title={isFullscreen?'Salir de pantalla completa':'Pantalla completa'} style={{background:'transparent',border:'1px solid #30363d',color:'#8b949e',padding:'6px 10px',borderRadius:7,cursor:'pointer',display:'flex',alignItems:'center',gap:5}}>
                         {isFullscreen ? <Minimize2 size={14}/> : <Maximize2 size={14}/>}
                     </button>
-                    <button onClick={()=>{ if(modulosPracticados.length===0){alert('Aún no has resuelto ningún ejercicio.');return;} setShowEnviar(true); }}
-                        style={{...BTN(enviado?'#27ae60':totalTotal===0?'#21262d':'#3498db'),display:'flex',alignItems:'center',gap:6,opacity:totalTotal===0?0.5:1}}>
-                        <Send size={14}/>{enviado?'Enviado ✓':'Enviar al profesor'}
+                    <button onClick={()=>{
+                            if(modulosPracticados.length===0){alert('Aún no has resuelto ningún ejercicio.');return;}
+                            if(cfgReto && !retoCompleto){alert(`Completa el reto: ${totalTotal}/${cfgReto.n} ejercicios.`);return;}
+                            if(esRetoCompeticion){ setShowComp(true); return; }
+                            setShowEnviar(true); }}
+                        style={{...BTN(enviado?'#27ae60':(totalTotal===0||(cfgReto&&!retoCompleto))?'#21262d':'#3498db'),display:'flex',alignItems:'center',gap:6,opacity:(totalTotal===0||(cfgReto&&!retoCompleto))?0.5:1}}>
+                        <Send size={14}/>{enviado?'Enviado ✓':(reto ? textoBotonEnvio(reto).replace(/^\S+\s/, '') : 'Enviar al profesor')}
                     </button>
                 </div>
             </div>
 
             {/* Module tabs */}
             <div style={{display:'flex',overflowX:'auto',background:'#161b22',borderBottom:'1px solid #30363d',padding:'0 8px'}}>
-                {MODULES.map((m,i)=>(
+                {modulosVisibles.map(({ m, i })=>(
                     <button key={m.id} onClick={()=>setModIdx(i)}
                         style={{padding:'10px 14px',border:'none',borderBottom:modIdx===i?`3px solid ${MOD_COLORS[i]}`:'3px solid transparent',background:'transparent',color:modIdx===i?MOD_COLORS[i]:'#8b949e',cursor:'pointer',whiteSpace:'nowrap',fontWeight:modIdx===i?700:400,fontSize:'0.82rem',transition:'color 0.2s'}}>
                         {m.short} {m.label.split('. ')[1]}
@@ -904,6 +943,12 @@ export default function AlgebraApp({ onExit, usuario }) {
 
             {/* Content */}
             <div style={{flex:1,padding:20,maxWidth:740,width:'100%',margin:'0 auto',boxSizing:'border-box'}}>
+                {cfgReto && (
+                    <div style={{...CARD,marginBottom:16,borderColor:retoCompleto?'#2ecc71':'#9b59b6',display:'flex',alignItems:'center',gap:12,flexWrap:'wrap',justifyContent:'space-between'}}>
+                        <span style={{fontWeight:700,color:retoCompleto?'#2ecc71':'#c39bd3'}}>🎯 {reto.titulo || 'Reto'} · {Math.min(totalTotal, cfgReto.n)}/{cfgReto.n} ejercicios · ✅ {totalOk}</span>
+                        {retoCompleto && <button onClick={()=>esRetoCompeticion ? setShowComp(true) : setShowEnviar(true)} style={BTN(esRetoCompeticion?'#e67e22':'#27ae60')}>{textoBotonEnvio(reto)}</button>}
+                    </div>
+                )}
                 <div style={{...CARD,borderColor:color+'44',marginBottom:16}}>
                     <div style={{fontWeight:700,fontSize:'1rem',color:color,marginBottom:4}}>{MODULES[modIdx].label}</div>
                     <div style={{fontSize:'0.8rem',color:'#8b949e'}}>
@@ -918,6 +963,12 @@ export default function AlgebraApp({ onExit, usuario }) {
                 </div>
                 {MODS_JSX[modIdx]}
             </div>
+
+            {showComp && esRetoCompeticion && (
+                <ModalEnviarCompeticion compId={reto.compId} catId={reto.catId} puntos={totalOk}
+                    detalle={{ aciertos: totalOk, total: totalTotal }} nombreJuego="Álgebra" tituloReto={reto.titulo || ''}
+                    onClose={() => setShowComp(false)} />
+            )}
 
             {/* Modal: enviar al profesor con código */}
             {showEnviar && (

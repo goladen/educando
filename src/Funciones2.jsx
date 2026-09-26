@@ -6,6 +6,9 @@ import { doc, setDoc, updateDoc, onSnapshot, increment, collection, addDoc, getD
 import piHappy from './assets/Pi-contento.png';
 import piAngry from './assets/Pi-enfadado.png';
 import piNeutral from './assets/Pi-neutro.png';
+import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
+import PantallaReto from './components/retos/PantallaReto';
+import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 
 // ─── CONSTANTES DEL CANVAS ────────────────────────────────────────────────────
 const CS = 420;            // tamaño canvas px
@@ -371,6 +374,14 @@ function ModalEnviarProfe({ datos, onClose }) {
     const [error,    setError]    = useState('');
 
     const esLive = !!datos.jugadores;
+    const retoCtx = React.useContext(RetoGeoCtx);
+    // Reto de competición: el resultado va a la prueba, no a informes
+    if (retoCtx?.compId && retoCtx?.catId && !esLive) {
+        const pct = datos.porcentaje ?? (datos.correcto ? 100 : 0);
+        return <ModalEnviarCompeticion compId={retoCtx.compId} catId={retoCtx.catId} puntos={pct}
+            detalle={{ porcentaje: pct, tipoEjercicio: datos.tipoEjercicio }} nombreJuego="Geometría analítica"
+            tituloReto={retoCtx.titulo || ''} onClose={onClose} />;
+    }
 
     const enviar = async () => {
         const code = codigo.trim().toUpperCase();
@@ -388,6 +399,7 @@ function ModalEnviarProfe({ datos, onClose }) {
                      correcto: tienePct ? datos.porcentaje === 100 : datos.correcto,
                      porcentaje: tienePct ? datos.porcentaje : (datos.correcto ? 100 : 0),
                      tipoEjercicio: datos.tipoEjercicio,
+                     ...(retoCtx ? { reto: retoCtx.titulo || 'Reto' } : {}),
                      puntos: tienePct ? datos.porcentaje : (datos.correcto ? 1 : 0) }];
 
             await addDoc(collection(db, 'informes_juegos'), {
@@ -639,7 +651,7 @@ function Ejercicio({ eq, onNuevo, onVolver, onLiveEnviar = null, silentCheckTrig
                     )}
 
                     {!liveMode && <div style={{ display:'flex', gap:8, marginTop:'auto' }}>
-                        <button onClick={handleNuevo} style={st.btnNuevo}><RefreshCw size={15} /> Nuevo</button>
+                        {onNuevo && <button onClick={handleNuevo} style={st.btnNuevo}><RefreshCw size={15} /> Nuevo</button>}
                         <button onClick={onVolver} style={st.btnVolver}><ArrowLeft size={15} /> Volver</button>
                         {resultado && <button onClick={()=>setMostrarEnvio(true)} style={{ ...st.btnNuevo, background:'#2980b9', color:'white', border:'none' }}><Send size={13}/> Profe</button>}
                     </div>}
@@ -897,7 +909,7 @@ function EjercicioVector({ eq, onNuevo, onVolver, onLiveEnviar = null, silentChe
                         </div>
                     )}
                     {!liveMode && <div style={{display:'flex',gap:8,marginTop:'auto'}}>
-                        <button onClick={()=>{reset();onNuevo();}} style={st.btnNuevo}><RefreshCw size={15}/> Nuevo</button>
+                        {onNuevo && <button onClick={()=>{reset();onNuevo();}} style={st.btnNuevo}><RefreshCw size={15}/> Nuevo</button>}
                         <button onClick={onVolver} style={st.btnVolver}><ArrowLeft size={15}/> Volver</button>
                         {resultado && <button onClick={()=>setMostrarEnvio(true)} style={{...st.btnVolver,background:'#2980b9',color:'white',border:'none'}}>📤 Profe</button>}
                     </div>}
@@ -1177,7 +1189,7 @@ function EjercicioGeneral({ eq, onNuevo, onVolver, onLiveEnviar = null, silentCh
                         </div>
                     )}
                     <div style={{display:'flex',gap:8,marginTop:'auto',flexWrap:'wrap'}}>
-                        <button onClick={()=>{reset();onNuevo();}} style={st.btnNuevo}><RefreshCw size={15}/> Nuevo</button>
+                        {onNuevo && <button onClick={()=>{reset();onNuevo();}} style={st.btnNuevo}><RefreshCw size={15}/> Nuevo</button>}
                         <button onClick={onVolver} style={st.btnVolver}><ArrowLeft size={15}/> Volver</button>
                         {resultado && !liveMode && <button onClick={()=>setMostrarEnvio(true)} style={{...st.btnVolver,background:'#2980b9',color:'white',border:'none'}}>📤 Profe</button>}
                     </div>
@@ -1770,7 +1782,7 @@ function EjercicioAnalisis({ eq, onNuevo, onVolver, onLiveEnviar = null, silentC
                         </div>
                     )}
                     {!liveMode && <div style={{ display:'flex', gap:8 }}>
-                        <button onClick={() => { reset(); onNuevo(); }} style={st.btnNuevo}><RefreshCw size={14} /> Nuevo</button>
+                        {onNuevo && <button onClick={() => { reset(); onNuevo(); }} style={st.btnNuevo}><RefreshCw size={14} /> Nuevo</button>}
                         <button onClick={onVolver} style={st.btnVolver}><ArrowLeft size={14} /> Volver</button>
                     </div>}
                     {liveMode && resultado && <div style={{ color:'rgba(255,255,255,0.5)', fontSize:'0.82rem', textAlign:'center', marginTop:8 }}>Esperando al resto...</div>}
@@ -1897,7 +1909,7 @@ function EjercicioTresPuntos({ eq, onNuevo, onVolver, onLiveEnviar = null, silen
                         </div>
                     )}
                     <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-                        <button onClick={() => { reset(); onNuevo(); }} style={st.btnNuevo}><RefreshCw size={14} /> Nuevo</button>
+                        {onNuevo && <button onClick={() => { reset(); onNuevo(); }} style={st.btnNuevo}><RefreshCw size={14} /> Nuevo</button>}
                         <button onClick={onVolver} style={st.btnVolver}><ArrowLeft size={14} /> Volver</button>
                         {resultado && <button onClick={()=>setMostrarEnvio(true)} style={{...st.btnVolver,background:'#2980b9',color:'white',border:'none'}}>📤 Profe</button>}
                     </div>
@@ -2693,6 +2705,134 @@ const sCli = {
 };
 
 // ─── PANTALLA PRINCIPAL ───────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// RETOS POR ENLACE (utils/retoLink.js): un ejercicio concreto fijado por el profe
+// ══════════════════════════════════════════════════════════════════════════════
+// La configuración es { tipo, p: { números } }: el ejercicio se reconstruye aquí
+// con esos números, así que el enlace es corto y todos resuelven el mismo.
+export const RUTA_GEO_ANALITICA = '/geometria_analitica';
+const RetoGeoCtx = React.createContext(null);
+
+export const TIPOS_RETO_GEO = [
+    { id: 'DOS_PUNTOS',    label: 'Recta por dos puntos',       emoji: '📍', campos: ['ax', 'ay', 'bx', 'by'] },
+    { id: 'PARALELA',      label: 'Recta paralela',             emoji: '⫸', campos: ['m', 'n', 'px', 'py'] },
+    { id: 'PERPENDICULAR', label: 'Recta perpendicular',        emoji: '⊥', campos: ['m', 'n', 'px', 'py'] },
+    { id: 'GRAFICA',       label: 'Recta por su gráfica',       emoji: '📈', campos: ['m', 'n'] },
+    { id: 'VECTOR',        label: 'Vector entre dos puntos',    emoji: '➡️', campos: ['ax', 'ay', 'bx', 'by'] },
+    { id: 'GENERAL',       label: 'Forma general · relaciones', emoji: '✕', campos: ['m1', 'n1', 'm2', 'n2'] },
+    { id: 'ANALISIS',      label: 'Analizar una parábola',      emoji: '🔍', campos: ['a', 'b', 'c'] },
+    { id: 'TRES_PUNTOS',   label: 'Parábola por 3 puntos',      emoji: '⌒', campos: ['a', 'b', 'c', 'x1', 'x2'] },
+];
+export const ETIQUETA_CAMPO = {
+    ax: 'A · x', ay: 'A · y', bx: 'B · x', by: 'B · y', m: 'pendiente m', n: 'ordenada n', px: 'P · x', py: 'P · y',
+    m1: 'recta 1 · m', n1: 'recta 1 · n', m2: 'recta 2 · m', n2: 'recta 2 · n', a: 'a', b: 'b', c: 'c', x1: 'x del 2.º punto', x2: 'x del 3.er punto',
+};
+
+const GENS_RETO = () => ({
+    DOS_PUNTOS: genDosPuntos, PARALELA: genParalela, PERPENDICULAR: genPerpendicular, GRAFICA: genGrafica,
+    VECTOR: genVector, GENERAL: genGeneral, ANALISIS: genAnalisis, TRES_PUNTOS: genTresPuntos,
+});
+
+/** Números de un ejercicio aleatorio del tipo (para partir de él en el editor). */
+export const paramsAleatorios = (tipo) => {
+    const eq = GENS_RETO()[tipo]();
+    if (tipo === 'TRES_PUNTOS') return { a: eq.a, b: eq.b, c: eq.c, x1: eq.pts[1].x, x2: eq.pts[2].x };
+    const def = TIPOS_RETO_GEO.find(t => t.id === tipo);
+    return Object.fromEntries(def.campos.map(k => [k, eq[k]]));
+};
+
+const r2 = (v) => Math.round(v * 100) / 100;
+
+/** Reconstruye el ejercicio con los números del profesor. Devuelve { error } si no es válido. */
+export const construirEjercicio = (tipo, p = {}) => {
+    const v = (k) => Number(p[k]);
+    const def = TIPOS_RETO_GEO.find(t => t.id === tipo);
+    if (!def) return { error: 'Tipo de ejercicio desconocido.' };
+    if (def.campos.some(k => p[k] === '' || p[k] == null || Number.isNaN(v(k)))) return { error: 'Faltan números por rellenar.' };
+    switch (tipo) {
+        case 'DOS_PUNTOS': {
+            const [ax, ay, bx, by] = ['ax', 'ay', 'bx', 'by'].map(v);
+            if (ax === bx) return { error: 'A y B deben tener distinta x (si no, la recta es vertical).' };
+            const m = (by - ay) / (bx - ax);
+            return { tipo, ax, ay, bx, by, m, n: ay - m * ax };
+        }
+        case 'PARALELA': {
+            const [m, n, px, py] = ['m', 'n', 'px', 'py'].map(v);
+            return { tipo, m, n, px, py, mp: m, np: py - m * px };
+        }
+        case 'PERPENDICULAR': {
+            const [m, n, px, py] = ['m', 'n', 'px', 'py'].map(v);
+            if (m === 0) return { error: 'Con m = 0 la perpendicular es vertical: usa otra pendiente.' };
+            const mp = -1 / m;
+            return { tipo, m, n, px, py, mp, np: py - mp * px };
+        }
+        case 'GRAFICA':
+            return { tipo, m: v('m'), n: v('n') };
+        case 'VECTOR': {
+            const [ax, ay, bx, by] = ['ax', 'ay', 'bx', 'by'].map(v);
+            if (ax === bx && ay === by) return { error: 'A y B no pueden ser el mismo punto.' };
+            const vx = bx - ax, vy = by - ay;
+            return { tipo, ax, ay, bx, by, vx, vy, modulo: Math.sqrt(vx * vx + vy * vy), angulo: Math.round(Math.atan2(vy, vx) * 1800 / Math.PI) / 10 };
+        }
+        case 'GENERAL': {
+            const [m1, n1, m2, n2] = ['m1', 'n1', 'm2', 'n2'].map(v);
+            if (m1 === m2 && n1 === n2) return { error: 'Las dos rectas son la misma.' };
+            const subtipo = m1 === m2 ? 'PARALELAS' : Math.abs(m1 * m2 + 1) < 1e-9 ? 'PERPENDICULARES' : 'INTERSECCION';
+            let ix = null, iy = null;
+            if (m1 !== m2) { ix = r2((n2 - n1) / (m1 - m2)); iy = r2(m1 * ix + n1); }
+            return { tipo, m1, n1, m2, n2, g1: toGeneralForm(m1, n1), g2: toGeneralForm(m2, n2), subtipo,
+                paralelas: subtipo === 'PARALELAS', perpendiculares: subtipo === 'PERPENDICULARES', ix, iy };
+        }
+        case 'ANALISIS': {
+            const [a, b, c] = ['a', 'b', 'c'].map(v);
+            if (a === 0) return { error: 'a no puede ser 0 (no sería una parábola).' };
+            return { tipo, a, b, c, disc: b * b - 4 * a * c };
+        }
+        case 'TRES_PUNTOS': {
+            const [a, b, c, x1, x2] = ['a', 'b', 'c', 'x1', 'x2'].map(v);
+            if (a === 0) return { error: 'a no puede ser 0 (no sería una parábola).' };
+            if (x1 === 0 || x2 === 0 || x1 === x2) return { error: 'Las x de los puntos 2.º y 3.º deben ser distintas entre sí y distintas de 0.' };
+            const f = (x) => a * x * x + b * x + c;
+            return { tipo, a, b, c, pts: [{ x: 0, y: c }, { x: x1, y: f(x1) }, { x: x2, y: f(x2) }] };
+        }
+        default: return { error: 'Tipo de ejercicio desconocido.' };
+    }
+};
+
+const recta = (m, n) => `y = ${r2(m)}x ${n < 0 ? '−' : '+'} ${Math.abs(r2(n))}`;
+const parabola = (a, b, c) => `y = ${a}x² ${b < 0 ? '−' : '+'} ${Math.abs(b)}x ${c < 0 ? '−' : '+'} ${Math.abs(c)}`;
+
+/** Texto del ejercicio. `profe` = true añade la solución (solo para el editor). */
+export const describirEjercicio = (eq, profe = false) => {
+    if (!eq || eq.error) return eq?.error || '';
+    switch (eq.tipo) {
+        case 'DOS_PUNTOS':    return `Recta por A(${eq.ax}, ${eq.ay}) y B(${eq.bx}, ${eq.by})${profe ? ` → ${recta(eq.m, eq.n)}` : ''}`;
+        case 'PARALELA':      return `Paralela a ${recta(eq.m, eq.n)} por P(${eq.px}, ${eq.py})${profe ? ` → ${recta(eq.mp, eq.np)}` : ''}`;
+        case 'PERPENDICULAR': return `Perpendicular a ${recta(eq.m, eq.n)} por P(${eq.px}, ${eq.py})${profe ? ` → ${recta(eq.mp, eq.np)}` : ''}`;
+        case 'GRAFICA':       return profe ? `Recta dibujada: ${recta(eq.m, eq.n)}` : 'Recta dibujada en la gráfica';
+        case 'VECTOR':        return `Vector de A(${eq.ax}, ${eq.ay}) a B(${eq.bx}, ${eq.by})${profe ? ` → (${eq.vx}, ${eq.vy}), |v| = ${r2(eq.modulo)}` : ''}`;
+        case 'GENERAL':       return `${fmtGeneral(eq.g1)}  ·  ${fmtGeneral(eq.g2)}${profe ? ` → ${eq.subtipo.toLowerCase()}${eq.ix != null ? ` (${eq.ix}, ${eq.iy})` : ''}` : ''}`;
+        case 'ANALISIS':      return `Parábola ${parabola(eq.a, eq.b, eq.c)}`;
+        case 'TRES_PUNTOS':   return `Parábola por ${eq.pts.map(q => `(${q.x}, ${r2(q.y)})`).join(', ')}${profe ? ` → ${parabola(eq.a, eq.b, eq.c)}` : ''}`;
+        default: return '';
+    }
+};
+
+export const resumenGeoAnalitica = (c, profe = true) => {
+    const def = TIPOS_RETO_GEO.find(t => t.id === c?.tipo);
+    const eq = construirEjercicio(c?.tipo, c?.p);
+    return [def ? `${def.emoji} ${def.label}` : 'Ejercicio', describirEjercicio(eq, profe)].filter(Boolean);
+};
+
+function EjercicioDeReto({ eq, onVolver }) {
+    const props = { eq, onNuevo: null, onVolver };
+    if (eq.tipo === 'VECTOR')      return <EjercicioVector {...props} />;
+    if (eq.tipo === 'GENERAL')     return <EjercicioGeneral {...props} />;
+    if (eq.tipo === 'ANALISIS')    return <EjercicioAnalisis {...props} />;
+    if (eq.tipo === 'TRES_PUNTOS') return <EjercicioTresPuntos {...props} />;
+    return <Ejercicio {...props} />;
+}
+
 export default function Funciones({ isHost = false, codigoSala: codigoExterno = null, onHostStart = null, onClientJoin = null, usuario = null, onExit = null }) {
     const [seccion, setSeccion]         = useState(null);
     const [showLiveConfig, setShowLiveConfig] = useState(false);
@@ -2701,6 +2841,8 @@ export default function Funciones({ isHost = false, codigoSala: codigoExterno = 
     const [internalHost, setInternalHost]   = useState(null);
     const [internalClient, setInternalClient] = useState(null);
     const [internalClientUser, setInternalClientUser] = useState(null);
+    const [reto, setReto] = useState(() => leerRetoUrl());
+    const [retoJugando, setRetoJugando] = useState(false);
 
     // Props desde LandingGames (modo externo)
     if (isHost && codigoExterno)   return <FuncionesLiveHost   codigoSala={codigoExterno} onExit={onExit || (() => {})} />;
@@ -2709,6 +2851,26 @@ export default function Funciones({ isHost = false, codigoSala: codigoExterno = 
     // Modo interno (desde la propia pantalla de Funciones)
     if (internalHost)   return <FuncionesLiveHost   codigoSala={internalHost}   onExit={() => setInternalHost(null)} />;
     if (internalClient) return <FuncionesLiveClient codigoSala={internalClient} usuario={internalClientUser||usuario} onExit={() => { setInternalClient(null); setInternalClientUser(null); }} />;
+
+    // Reto por enlace: directamente el ejercicio que configuró el profesor
+    if (reto && !codigoExterno) {
+        const eq = construirEjercicio(reto.config?.tipo, reto.config?.p);
+        const libre = () => { limpiarRetoUrl(); setReto(null); };
+        if (eq.error || !retoJugando) return (
+            <div style={{ ...st.pagina, justifyContent: 'center' }}>
+                {eq.error
+                    ? <div style={{ color: 'white', textAlign: 'center', padding: 30 }}>⚠️ Este enlace de reto no es válido: {eq.error}<br /><button onClick={libre} style={{ marginTop: 14, padding: '10px 18px', borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 700 }}>Jugar en modo libre</button></div>
+                    : <PantallaReto reto={reto} nombreJuego="Geometría analítica" emoji="∫" color="#3498db" oscuro
+                        chips={resumenGeoAnalitica(reto.config, false)}
+                        onEmpezar={() => setRetoJugando(true)} onLibre={libre} onSalir={onExit || undefined} />}
+            </div>
+        );
+        return (
+            <RetoGeoCtx.Provider value={reto}>
+                <EjercicioDeReto eq={eq} onVolver={() => setRetoJugando(false)} />
+            </RetoGeoCtx.Provider>
+        );
+    }
 
     if (seccion === 'RECTAS')    return <PantallaRectas    onVolver={() => setSeccion(null)} />;
     if (seccion === 'PARABOLAS') return <PantallaParabolas onVolver={() => setSeccion(null)} />;

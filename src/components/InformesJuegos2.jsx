@@ -851,10 +851,12 @@ const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, 
                         {tipoLabel(tipo)}
                         {(inf.recursoTitulo || inf.titulo) && <span style={{ marginLeft:6, fontWeight:600, color:'#34495e' }}>· {inf.recursoTitulo || inf.titulo}</span>}
                         {inf.modalidad && <span style={{ marginLeft:8, fontWeight:400, color:'#7f8c8d', fontSize:'0.8rem' }}>{inf.modalidad}</span>}
+                        <ChipReto reto={inf.jugadores?.[0]?.reto} />
                     </div>
                     <div style={{ fontSize:'0.74rem', color:'#95a5a6', marginTop:1, display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
                         <span style={{ display:'flex', alignItems:'center', gap:4 }}><Clock size={10}/>{fmtFecha(inf.fecha)}</span>
                         {inf.hoja && <span>📄 {inf.hoja}</span>}
+                        {inf.jugadores?.[0]?.configuracion && !['GEOMETRIX', 'GEOMETRIX_COMPUESTO', 'PERIMETRO_AREA'].includes(tipo) && <span>⚙️ {inf.jugadores[0].configuracion}</span>}
                     </div>
                 </div>
                 <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
@@ -1759,6 +1761,9 @@ const TIPOS_FRAC_LABEL = {
 };
 const NIVEL_FRAC_LABEL = { 1: '👶 Fácil', 2: '🤓 Medio', 3: '🔥 Difícil' };
 
+// Chip de "reto por enlace" (jugadores[0].reto = título del reto)
+const ChipReto = ({ reto }) => reto ? <span style={{ marginLeft:8, padding:'1px 8px', borderRadius:20, background:'#eef4fb', color:'#1565C0', fontSize:'0.72rem', fontWeight:700 }}>🎯 {reto}</span> : null;
+
 const FraccionesCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccionado, onSeleccionar, onBuscarJugador }) => {
     const [confirmar, setConfirmar] = useState(false);
     const [expandido, setExpandido] = useState(false);
@@ -1788,6 +1793,7 @@ const FraccionesCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, sel
                     <div style={{ fontWeight:700, color:'#2c3e50', fontSize:'0.92rem' }}>
                         Fracciones
                         {puntos > 0 && <span style={{ marginLeft:8, fontWeight:400, color:'#7b1fa2', fontSize:'0.8rem' }}>🏆 {puntos} pts</span>}
+                        <ChipReto reto={j.reto} />
                     </div>
                     <div style={{ fontSize:'0.74rem', color:'#95a5a6', marginTop:1 }}>
                         {fmtFecha(inf.fecha)}

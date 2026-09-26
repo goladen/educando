@@ -7,6 +7,9 @@ import winSoundFile from './assets/applause-small-audience-97257.mp3';
 import pikaSprite from './assets/pikatron-sprite2.png';
 import problemasData from './data/problemasSistemas.json';
 import { guardarRegistroLocal } from './utils/registrosLocales';
+import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
+import PantallaReto, { textoBotonEnvio } from './components/retos/PantallaReto';
+import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 
 // ─── Progreso local (localStorage) del modo Problemas ─────────────────────────
 const PROG_KEY = 'pikt_sistemas_problemas_v1';
@@ -327,6 +330,23 @@ const TIPO_LABEL = {
   problemas: 'Problemas de enunciado',
 };
 const DIF_LABEL = { facil: 'Fácil', medio: 'Medio', dificil: 'Difícil' };
+
+// ─── Retos por enlace (utils/retoLink.js) ─────────────────────────────────────
+export const RUTA_SISTEMAS = '/ecuacion_sistemas';
+export const MODOS_SISTEMAS = MODES;
+export const DIFICULTADES_SISTEMAS = DIFICULTADES;
+export const MODOS_CON_DIFICULTAD = ['2x2'];
+export const MODOS_CON_METODO = ['2x2', '2x2c'];
+export const DEFAULT_RETO_SIS = { modo: '2x2', subMode: 'reduccion', dificultad: 'facil', n: 5 };
+export const resumenSistemas = (c) => {
+  const cfg = { ...DEFAULT_RETO_SIS, ...(c || {}) };
+  return [
+    MODES.find((m) => m.id === cfg.modo)?.label,
+    MODOS_CON_METODO.includes(cfg.modo) && (cfg.subMode === 'sustitucion' ? '💎 Sustitución' : '⚡ Reducción'),
+    MODOS_CON_DIFICULTAD.includes(cfg.modo) && DIFICULTADES.find((d) => d.id === cfg.dificultad)?.label,
+    `🔢 ${cfg.n} ejercicios`,
+  ].filter(Boolean);
+};
 
 // ─── Estilos compartidos ──────────────────────────────────────────────────────
 const makeStyles = (isMobile, isCanvasOpen) => ({
@@ -1521,7 +1541,7 @@ const resumirEjercicios = (ejercicios) => {
 };
 
 // ─── Modal "Enviar al profesor" ───────────────────────────────────────────────
-function ModalEnviarProfe({ ejercicios, onClose }) {
+function ModalEnviarProfe({ ejercicios, onClose, reto = null }) {
   const [codigo, setCodigo] = useState('');
   const [nombre, setNombre] = useState('');
   const [curso, setCurso] = useState('');
@@ -1556,6 +1576,7 @@ function ModalEnviarProfe({ ejercicios, onClose }) {
           porTipo: r.porTipo,
           porDificultad: r.porDificultad,
           problemasResueltos: r.problemasResueltos,
+          ...(reto ? { reto } : {}),
         }],
       });
       setEnviado(true);
@@ -1639,13 +1660,18 @@ function ModalEnviarProfe({ ejercicios, onClose }) {
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function EcuacionSistemas({ onExit }) {
-  const [activeMode, setActiveMode] = useState('visual');
-  const [subMode, setSubMode] = useState('reduccion');
+  // Reto por enlace: tipo, método y dificultad fijos + nº de ejercicios
+  const [reto, setReto] = useState(() => leerRetoUrl());
+  const cfgReto = reto ? { ...DEFAULT_RETO_SIS, ...(reto.config || {}) } : null;
+  const esRetoCompeticion = !!(reto?.compId && reto?.catId);
+  const [retoIniciado, setRetoIniciado] = useState(false);
+  const [activeMode, setActiveMode] = useState(() => cfgReto?.modo || 'visual');
+  const [subMode, setSubMode] = useState(() => cfgReto?.subMode || 'reduccion');
   const [isMobile, setIsMobile] = useState(false);
   const [isCanvasOpen, setIsCanvasOpen] = useState(false);
   const [dualMode, setDualMode] = useState(false);
   const [competicion, setCompeticion] = useState(false);
-  const [difficulty, setDifficulty] = useState('facil');
+  const [difficulty, setDifficulty] = useState(() => cfgReto?.dificultad || 'facil');
 
   // Registro de ejercicios de la sesión para el informe al profesor
   const [ejercicios, setEjercicios] = useState([]); // [{ modo, dificultad, resultado, problemaId }]
@@ -1667,6 +1693,21 @@ export default function EcuacionSistemas({ onExit }) {
   const styles = makeStyles(isMobile, isCanvasOpen && !dualMode);
   const hasSubTabs = activeMode === '2x2' || activeMode === '2x2c';
 
+  // En el reto solo cuentan los N primeros ejercicios
+  const ejerciciosEnvio = cfgReto ? ejercicios.slice(0, cfgReto.n) : ejercicios;
+  const retoCompleto = !!cfgReto && ejercicios.length >= cfgReto.n;
+  const aciertosReto = ejerciciosEnvio.filter((e) => e.resultado === 'acierto').length;
+
+  if (reto && !retoIniciado) return (
+    <div style={{ ...styles.container, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <PantallaReto reto={reto} nombreJuego="Sistemas de ecuaciones" emoji="🚀" color="#6c5ce7"
+        chips={resumenSistemas(cfgReto)}
+        onEmpezar={() => { setEjercicios([]); setRetoIniciado(true); }}
+        onLibre={() => { limpiarRetoUrl(); setReto(null); }}
+        onSalir={typeof onExit === 'function' ? onExit : undefined} />
+    </div>
+  );
+
   return (
     <div style={styles.container}>
       {/* Header */}
@@ -1677,20 +1718,36 @@ export default function EcuacionSistemas({ onExit }) {
             ← Volver
           </button>
         )}
-        <button onClick={() => setMostrarEnvio(true)}
+        {(!reto || retoCompleto) && <button onClick={() => setMostrarEnvio(true)}
           style={{ position: 'absolute', top: '14px', right: '14px', background: 'linear-gradient(135deg,#f1c40f,#e67e22)', border: 'none', color: 'white', padding: '8px 14px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px', boxShadow: '0 3px 8px rgba(230,126,34,0.35)' }}>
-          📤 Enviar al profesor{ejercicios.length > 0 ? ` (${ejercicios.length})` : ''}
-        </button>
+          {reto ? textoBotonEnvio(reto) : `📤 Enviar al profesor${ejercicios.length > 0 ? ` (${ejercicios.length})` : ''}`}
+        </button>}
         <h1 style={styles.title}>🚀 Gamemath: Sistema de Ecuaciones</h1>
         <p style={styles.subtitle}>Supera los niveles deduciendo y calculando incógnitas</p>
       </div>
 
-      {mostrarEnvio && (
-        <ModalEnviarProfe ejercicios={ejercicios} onClose={() => setMostrarEnvio(false)} />
+      {mostrarEnvio && esRetoCompeticion && (
+        <ModalEnviarCompeticion compId={reto.compId} catId={reto.catId} puntos={aciertosReto}
+          detalle={{ aciertos: aciertosReto, total: ejerciciosEnvio.length }} nombreJuego="Sistemas de ecuaciones" tituloReto={reto.titulo || ''}
+          onClose={() => setMostrarEnvio(false)} />
+      )}
+      {mostrarEnvio && !esRetoCompeticion && (
+        <ModalEnviarProfe ejercicios={ejerciciosEnvio} reto={reto ? (reto.titulo || 'Reto') : null} onClose={() => setMostrarEnvio(false)} />
+      )}
+
+      {/* Progreso del reto */}
+      {cfgReto && (
+        <div style={{ maxWidth: 700, margin: '0 auto 18px', padding: '12px 18px', borderRadius: 14, background: retoCompleto ? '#ecfdf5' : '#f3f0ff', border: `2px solid ${retoCompleto ? '#10b981' : '#6c5ce7'}`, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+          <span style={{ fontWeight: 800, color: retoCompleto ? '#059669' : '#6c5ce7' }}>🎯 {reto.titulo || 'Reto'} · {Math.min(ejercicios.length, cfgReto.n)}/{cfgReto.n} ejercicios</span>
+          {retoCompleto && <>
+            <span style={{ fontWeight: 700, color: '#0f172a' }}>✅ {aciertosReto} correctos</span>
+            <button onClick={() => setMostrarEnvio(true)} style={{ padding: '9px 18px', borderRadius: 10, border: 'none', background: esRetoCompeticion ? 'linear-gradient(135deg,#f39c12,#e67e22)' : 'linear-gradient(135deg,#27ae60,#2ecc71)', color: 'white', fontWeight: 800, cursor: 'pointer' }}>{textoBotonEnvio(reto)}</button>
+          </>}
+        </div>
       )}
 
       {/* Selector de modo (oculto en dual: cada jugador elige el suyo) */}
-      {!dualMode && (
+      {!dualMode && !reto && (
         <div style={styles.navTabs}>
           {MODES.map((m) => (
             <button key={m.id} style={styles.tabButton(activeMode === m.id)} onClick={() => setActiveMode(m.id)}>
@@ -1701,7 +1758,7 @@ export default function EcuacionSistemas({ onExit }) {
       )}
 
       {/* Toggles modo dual y competición (solo escritorio) */}
-      {!isMobile && (
+      {!isMobile && !reto && (
         <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginBottom: '18px', flexWrap: 'wrap' }}>
           <button
             onClick={() => setDualMode((d) => !d)}
@@ -1725,12 +1782,12 @@ export default function EcuacionSistemas({ onExit }) {
       )}
 
       {/* Selector de dificultad para modos aleatorios (modo simple) */}
-      {!dualMode && GENERADORES[activeMode] && (
+      {!dualMode && !reto && GENERADORES[activeMode] && (
         <DificultadSelector value={difficulty} onChange={setDifficulty} />
       )}
 
       {/* Submodo para 2x2 y 2x2c (modo simple) */}
-      {!dualMode && hasSubTabs && (
+      {!dualMode && !reto && hasSubTabs && (
         <div style={styles.subNavTabs}>
           <button style={styles.subTabButton(subMode === 'reduccion')} onClick={() => setSubMode('reduccion')}>
             ⚡ Reducción

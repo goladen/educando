@@ -3,6 +3,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { db } from './firebase';
 import { addDoc, collection, doc, getDoc } from 'firebase/firestore';
 import { BarChart2, CheckCircle, Send, ArrowRight, RefreshCw, Maximize2, Minimize2 } from 'lucide-react';
+import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
+import PantallaReto, { textoBotonEnvio } from './components/retos/PantallaReto';
+import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 
 const D = {
     bg:'#0d1117', card:'#161b22', border:'#30363d',
@@ -117,7 +120,20 @@ function computeCorrect(datos, estudio) {
 }
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
+// ─── Retos por enlace (utils/retoLink.js): el profesor fija el estudio ────────
+export const RUTA_ESTADISTICA = '/estadistica';
+export const ESTUDIOS_RETO = ESTUDIOS.map(e => ({ id: e.id, titulo: e.titulo, enunciado: e.enunciado }));
+export const DEFAULT_RETO_EST = { estudio: ESTUDIOS[0].id };
+export const resumenEstadistica = (c) => {
+    const est = ESTUDIOS.find(e => e.id === (c?.estudio || DEFAULT_RETO_EST.estudio));
+    return [`📊 ${est?.titulo || 'Estudio'}`, '1. Conceptos · 2. Tabla · 3. Gráfico'];
+};
+
 export default function EstadisticaApp({ onExit, usuario }) {
+    const [reto,setReto]=useState(()=>leerRetoUrl());
+    const estudioReto = reto ? (ESTUDIOS.find(e => e.id === reto.config?.estudio) || ESTUDIOS[0]) : null;
+    const esRetoCompeticion = !!(reto?.compId && reto?.catId);
+    const [showComp,setShowComp]=useState(false);
     const [fase,setFase]=useState(0);
     const [estudio,setEstudio]=useState(null);
     const [datos,setDatos]=useState([]);
@@ -156,6 +172,7 @@ export default function EstadisticaApp({ onExit, usuario }) {
                 aciertos:totalOk, total:totalT,
                 jugadores:[{ nombre, aciertos:totalOk, intentos:totalT,
                     porcentaje:totalT>0?Math.round(totalOk/totalT*100):0,
+                    ...(reto ? { reto: reto.titulo || 'Reto' } : {}),
                     modulos:[
                         {nombre:'Conceptos básicos',  aciertos:scores.f1, intentos:scores.f1t, porcentaje:Math.round(scores.f1/scores.f1t*100)},
                         {nombre:'Tabla y parámetros', aciertos:scores.f2, intentos:scores.f2t, porcentaje:scores.f2t>0?Math.round(scores.f2/scores.f2t*100):0},
@@ -178,7 +195,7 @@ export default function EstadisticaApp({ onExit, usuario }) {
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:8}}>
                     {fase>0 && <span style={{fontSize:'0.82rem',color:D.muted}}>{totalOk}/{totalT}</span>}
-                    {fase===4 && <button onClick={()=>setShowEnviar(true)} style={BTN(D.accent)}><Send size={14}/>Enviar al profesor</button>}
+                    {fase===4 && <button onClick={()=>esRetoCompeticion ? setShowComp(true) : setShowEnviar(true)} style={BTN(esRetoCompeticion ? D.gold : D.accent)}>{reto ? textoBotonEnvio(reto) : <><Send size={14}/>Enviar al profesor</>}</button>}
                     <button onClick={toggleFS} style={{background:'transparent',border:`1px solid ${D.border}`,color:D.muted,padding:'6px 10px',borderRadius:7,cursor:'pointer',display:'flex',alignItems:'center'}}>
                         {isFullscreen?<Minimize2 size={14}/>:<Maximize2 size={14}/>}
                     </button>
@@ -187,8 +204,22 @@ export default function EstadisticaApp({ onExit, usuario }) {
 
             <div style={{flex:1,padding:20,maxWidth:920,width:'100%',margin:'0 auto',boxSizing:'border-box'}}>
 
+                {/* Reto por enlace: estudio fijado por el profesor */}
+                {fase===0 && reto && (
+                    <PantallaReto reto={reto} nombreJuego="Estadística" emoji="📊" color="#3498db" oscuro
+                        chips={resumenEstadistica(reto.config)}
+                        onEmpezar={()=>iniciar(estudioReto)}
+                        onLibre={()=>{ limpiarRetoUrl(); setReto(null); }}
+                        onSalir={onExit} />
+                )}
+                {showComp && esRetoCompeticion && (
+                    <ModalEnviarCompeticion compId={reto.compId} catId={reto.catId} puntos={totalOk}
+                        detalle={{ aciertos: totalOk, total: totalT }} nombreJuego="Estadística" tituloReto={reto.titulo || ''}
+                        onClose={()=>setShowComp(false)} />
+                )}
+
                 {/* Fase 0 */}
-                {fase===0 && (
+                {fase===0 && !reto && (
                     <div>
                         <div style={{textAlign:'center',marginBottom:28}}>
                             <BarChart2 size={48} color={D.accent} style={{marginBottom:8}}/>
@@ -259,7 +290,7 @@ export default function EstadisticaApp({ onExit, usuario }) {
                         </div>
                         <div style={{display:'flex',gap:10,justifyContent:'center',flexWrap:'wrap'}}>
                             <button onClick={()=>{setFase(0);setEnviado(false);setScores({f1:0,f1t:3,f2:0,f2t:0,f3:0,f3t:4});}} style={BTN('#30363d')}><RefreshCw size={14}/>Nuevo estudio</button>
-                            <button onClick={()=>setShowEnviar(true)} style={BTN(D.accent)}><Send size={14}/>Enviar al profesor</button>
+                            <button onClick={()=>esRetoCompeticion ? setShowComp(true) : setShowEnviar(true)} style={BTN(esRetoCompeticion ? D.gold : D.accent)}>{reto ? textoBotonEnvio(reto) : <><Send size={14}/>Enviar al profesor</>}</button>
                         </div>
                     </div>
                 )}

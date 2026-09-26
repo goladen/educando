@@ -84,6 +84,9 @@ import GayLusac from '../Simuladores física/GayLusac';
 import SimuladorEclipse from '../Simuladores física/SimuladorEclipse';
 import SimuladorSistemaSolar from '../Simuladores física/SimuladorSistemaSolar';
 import RetosApp from '../Retos';
+import ModalElegirHerramienta, { herramientaPorId } from './ModalElegirHerramienta';
+import ModalCompartirReto from './ModalCompartirReto';
+import ModalRetoRecurso, { JUEGOS_RECURSO } from './ModalRetoRecurso';
 import SimuladorDados from '../Probabilidad';
 import TrivialGame from '../Trivial';
 import ExpresionArtEscri from '../ExpresionArtEscri';
@@ -1484,8 +1487,34 @@ const cleanText = (str) => {
 };
 
 // ─── Modal de opciones para compartir ────────────────────────────────────────
-function ShareModal({ url, titulo, onClose }) {
+// Compartir una tarjeta. Dos opciones:
+//  · Enlace normal: abre el juego y cada uno lo configura.
+//  · Con configuración: el profe fija los ajustes y el enlace (?reto=…) abre el
+//    juego listo para jugar y enviar el resultado (juegos de HERRAMIENTAS_RETO).
+function ShareModal({ url, titulo, juegoId, onClose }) {
     const [copiado, setCopiado] = React.useState(false);
+    const [modo, setModo] = React.useState('normal'); // 'normal' | 'editor' | 'reto'
+    const [reto, setReto] = React.useState(null);     // { config, resumen }
+    const herramienta = juegoId ? herramientaPorId(juegoId) : null;
+    const conRecurso = !herramienta && !!(juegoId && JUEGOS_RECURSO[juegoId]);
+    const configurable = !!herramienta || conRecurso;
+
+    if (modo === 'editor' && conRecurso) return (
+        <ModalRetoRecurso juegoId={juegoId} onVolver={() => setModo('normal')} onClose={onClose} />
+    );
+
+    if (modo === 'editor' && herramienta) return (
+        <ModalElegirHerramienta
+            herramientaInicial={herramienta.id}
+            configInicial={reto?.config || null}
+            onElegir={(r) => { setReto({ config: r.herramientaConfig, resumen: r.herramientaResumen }); setModo('reto'); }}
+            onClose={() => setModo(reto ? 'reto' : 'normal')}
+        />
+    );
+    if (modo === 'reto' && herramienta && reto) return (
+        <ModalCompartirReto ruta={herramienta.ruta} config={reto.config} resumen={reto.resumen}
+            nombreJuego={herramienta.label} onEditar={() => setModo('editor')} onClose={onClose} />
+    );
 
     const copiar = () => {
         navigator.clipboard.writeText(url).catch(() => {});
@@ -1509,6 +1538,16 @@ function ShareModal({ url, titulo, onClose }) {
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
                     <h3 style={{ margin:0, color:'#2c3e50', fontSize:'1.05rem' }}>Compartir</h3>
                     <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', color:'#95a5a6', fontSize:'1.2rem', padding:4 }}>✕</button>
+                </div>
+                <div style={{ display:'flex', gap:6, background:'#f1f5f9', borderRadius:12, padding:4, marginBottom:14 }}>
+                    <button style={{ flex:1, padding:'8px 6px', borderRadius:9, border:'none', background:'white', boxShadow:'0 1px 4px rgba(0,0,0,0.12)', fontWeight:700, fontSize:'0.8rem', color:'#2c3e50', cursor:'default' }}>🔗 Enlace normal</button>
+                    <button
+                        onClick={() => configurable && setModo('editor')}
+                        disabled={!configurable}
+                        title={configurable ? 'Fija la configuración: el alumno solo juega y envía el resultado' : 'Próximamente para este juego'}
+                        style={{ flex:1, padding:'8px 6px', borderRadius:9, border:'none', background:'transparent', fontWeight:700, fontSize:'0.8rem', color: configurable ? '#1565C0' : '#b0b8c4', cursor: configurable ? 'pointer' : 'not-allowed' }}>
+                        ⚙️ Con configuración{!configurable && <span style={{ display:'block', fontSize:'0.66rem', fontWeight:600 }}>próximamente</span>}
+                    </button>
                 </div>
                 <div style={{ background:'#f4f6f8', borderRadius:10, padding:'8px 12px', fontSize:'0.75rem', color:'#7f8c8d', wordBreak:'break-all', marginBottom:16 }}>{url}</div>
                 <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
@@ -1656,6 +1695,14 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                 setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'ESTADISTICA' });
             } else if (path === 'probabilidad') {
                 setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'PROBABILIDAD' });
+            } else if (path === 'potencias_raices' || path === 'potencias') {
+                setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'POTENCIAS_RAICES' });
+            } else if (path === 'ecuacion_sistemas' || path === 'sistemas') {
+                setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'ECUACION_SISTEMAS' });
+            } else if (path === 'polinomios') {
+                setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'POLINOMIOS' });
+            } else if (path === 'dinero') {
+                setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'DINERO' });
             } else if (path === 'oca') {
                 setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'OCA' });
             } else if (path === 'domino') {
@@ -2457,7 +2504,7 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
                         </button>
                     </div>
                     {Comp && <Comp />}
-                    {shareModal && <ShareModal url={shareModal.url} titulo={shareModal.titulo} onClose={() => setShareModal(null)} />}
+                    {shareModal && <ShareModal url={shareModal.url} titulo={shareModal.titulo} juegoId={shareModal.juegoId} onClose={() => setShareModal(null)} />}
                 </div>
             );
         }
@@ -2501,7 +2548,7 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
                         })}
                     </div>
                 </div>
-                {shareModal && <ShareModal url={shareModal.url} titulo={shareModal.titulo} onClose={() => setShareModal(null)} />}
+                {shareModal && <ShareModal url={shareModal.url} titulo={shareModal.titulo} juegoId={shareModal.juegoId} onClose={() => setShareModal(null)} />}
             </div>
         );
     }
@@ -2789,6 +2836,11 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                                 boxShadow: '0 8px 20px rgba(0,0,0,0.1)', border: `3px solid ${app.color}`,
                                 display: 'flex', flexDirection: 'column', gap: 10,
                             }}>
+                                <button
+                                    onClick={() => setShareModal({ url: `${window.location.origin}/calculo`, titulo: 'Cálculo Mental', juegoId: 'CALCULO' })}
+                                    title="Compartir"
+                                    style={{ position:'absolute', top:8, right:8, background:'rgba(255,255,255,0.8)', border:'none', borderRadius:6, padding:'3px 5px', cursor:'pointer', display:'flex', alignItems:'center', color: app.color }}
+                                ><Share2 size={13}/></button>
                                 {GAME_INFO[app.id] && (
                                     <button
                                         onClick={() => setInfoModal({ info: GAME_INFO[app.id], name: app.name, color: app.color, emoji: '🧠' })}
@@ -2834,6 +2886,18 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                                     opacity: app.comingSoon ? 0.7 : 1, border: `3px solid ${app.comingSoon ? '#ddd' : app.color}`
                                 }}
                             >
+                                {app.shareable && !app.comingSoon && (
+                                    <button
+                                        onClick={e => {
+                                            e.stopPropagation();
+                                            const ruta = herramientaPorId(app.id)?.ruta;
+                                            const url = app.shareUrl || (ruta ? `${window.location.origin}${ruta}` : `${window.location.origin}/?juego=${app.id.toLowerCase()}`);
+                                            setShareModal({ url, titulo: app.name, juegoId: app.id });
+                                        }}
+                                        title="Compartir"
+                                        style={{ position:'absolute', top:8, right:8, background:'rgba(255,255,255,0.8)', border:'none', borderRadius:6, padding:'3px 5px', cursor:'pointer', display:'flex', alignItems:'center', color: app.color }}
+                                    ><Share2 size={13}/></button>
+                                )}
                                 {GAME_INFO[app.id] && (
                                     <button
                                         onClick={e => { e.stopPropagation(); setInfoModal({ info: GAME_INFO[app.id], name: app.name, color: app.color, emoji: app.emoji }); }}
@@ -2873,6 +2937,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                         </span>
                     </div>
                 </div>
+                {shareModal && <ShareModal url={shareModal.url} titulo={shareModal.titulo} juegoId={shareModal.juegoId} onClose={() => setShareModal(null)} />}
             </div>
         );
     }
@@ -2978,7 +3043,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                 />
             )}
 
-            {shareModal && <ShareModal url={shareModal.url} titulo={shareModal.titulo} onClose={() => setShareModal(null)} />}
+            {shareModal && <ShareModal url={shareModal.url} titulo={shareModal.titulo} juegoId={shareModal.juegoId} onClose={() => setShareModal(null)} />}
             {infoModal && <InfoModal info={infoModal.info} name={infoModal.name} color={infoModal.color} emoji={infoModal.emoji} img={infoModal.img} onClose={() => setInfoModal(null)} />}
 
             {/* MIS REGISTROS — historial local de partidas en el dispositivo */}
@@ -3450,7 +3515,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                                 onClick={e => {
                                     e.stopPropagation();
                                     const url = app.shareUrl || `${window.location.origin}${window.location.pathname}?juego=${app.id.toLowerCase()}`;
-                                    setShareModal({ url, titulo: app.name });
+                                    setShareModal({ url, titulo: app.name, juegoId: app.id });
                                 }}
                                 title="Compartir"
                                 style={{ position:'absolute', top:6, right:6, background:'rgba(255,255,255,0.8)', border:'none', borderRadius:6, padding:'3px 5px', cursor:'pointer', display:'flex', alignItems:'center', color: app.color }}
@@ -3519,7 +3584,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                                 onClick={e => {
                                     e.stopPropagation();
                                     const url = tool.shareUrl || `${window.location.origin}${window.location.pathname}?juego=${tool.id.toLowerCase()}`;
-                                    setShareModal({ url, titulo: tool.label });
+                                    setShareModal({ url, titulo: tool.label, juegoId: tool.id });
                                 }}
                                 title="Compartir"
                                 style={{ position:'absolute', top:6, right:6, background:'rgba(255,255,255,0.8)', border:'none', borderRadius:6, padding:'3px 5px', cursor:'pointer', display:'flex', alignItems:'center', color: tool.color }}
@@ -4138,8 +4203,8 @@ if (appData.id === 'PIKATRON_2') return <Plataformas usuario={usuario} onExit={o
         if (appData.id === 'PIKATRON' || juegoActivo.modoEspecial === 'PIKATRON') return <PikatronRun recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
         if (appData.id === 'RULETA') return <RuletaGame recurso={juegoActivo} usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
         // --- AÑADIDO: Distinguir Wordle y Sopa ---
-        if (appData.id === 'WORDLE' || juegoActivo.modoEspecial === 'WORDLE' || (juegoActivo.tipoJuego === 'WORDLE' && !juegoActivo.modoEspecial)) return <TextWordleGame recursoInicial={juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} />;
-        if (appData.id === 'SOPA' || juegoActivo.modoEspecial === 'SOPA' || (juegoActivo.tipoJuego === 'SOPA' && !juegoActivo.modoEspecial)) return <SopaDeLetrasGame recursoInicial={juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} />;
+        if (appData.id === 'WORDLE' || juegoActivo.modoEspecial === 'WORDLE' || (juegoActivo.tipoJuego === 'WORDLE' && !juegoActivo.modoEspecial)) return <TextWordleGame recurso={juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} />;
+        if (appData.id === 'SOPA' || juegoActivo.modoEspecial === 'SOPA' || (juegoActivo.tipoJuego === 'SOPA' && !juegoActivo.modoEspecial)) return <SopaDeLetrasGame recurso={juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (appData.id === 'AHORCADO' || juegoActivo.modoEspecial === 'AHORCADO' || juegoActivo.tipoJuego === 'AHORCADO') return <Ahorcado recurso={juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (appData.id === 'ETIQUETAS' || juegoActivo.tipoJuego === 'ETIQUETAS')     return <EtiquetaMe recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.modoEspecial === 'PILIVE_SOLO') return <PiLiveSolo recurso={juegoActivo} usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;

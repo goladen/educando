@@ -4,9 +4,30 @@ import { db } from './firebase';
 import { guardarRegistroLocal } from './utils/registrosLocales';
 import { collection, addDoc, doc, getDoc } from 'firebase/firestore';
 import { Share2, Send } from 'lucide-react';
+import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
+import PantallaReto, { textoBotonEnvio } from './components/retos/PantallaReto';
+import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
+
+// ─── Retos por enlace (utils/retoLink.js) ─────────────────────────────────────
+// Config: { level, numVerbs, timeLimit, columnsMode, verbos? } — si `verbos`
+// (lista de baseForm) tiene elementos, el test usa exactamente esos verbos.
+export const RUTA_VERBOS = '/irregular_verbs';
+export const VERBOS_IRREGULARES = verbosData;
+export const DEFAULT_CONFIG_VERBOS = { level: 'sencillo', numVerbs: 10, timeLimit: 60, columnsMode: 'all', verbos: [] };
+export const NIVELES_VERBOS = [['sencillo', 'Sencillo'], ['medio', 'Medio'], ['dificil', 'Difícil']];
+export const COLUMNAS_VERBOS = [['all', 'Las 4 columnas'], ['no_translation', 'Sin traducción'], ['base_past', 'Base y Past Simple']];
+export const resumenVerbos = (c) => {
+  const cfg = { ...DEFAULT_CONFIG_VERBOS, ...(c || {}) };
+  const fijos = Array.isArray(cfg.verbos) && cfg.verbos.length > 0;
+  return [
+    fijos ? `📌 ${cfg.verbos.length} verbos elegidos` : `⭐ ${(NIVELES_VERBOS.find(n => n[0] === cfg.level) || [])[1] || cfg.level} · ${cfg.numVerbs} verbos`,
+    `🧩 ${(COLUMNAS_VERBOS.find(n => n[0] === cfg.columnsMode) || [])[1] || cfg.columnsMode}`,
+    `⏱ ${cfg.timeLimit < 60 ? `${cfg.timeLimit} s` : `${Math.round(cfg.timeLimit / 6) / 10} min`}`,
+  ];
+};
 
 // Modal para enviar al profesor
-function ModalEnviarProfe({ onClose, score, config }) {
+function ModalEnviarProfe({ onClose, score, config, reto = null }) {
   const [codigo, setCodigo] = useState('');
   const [nombre, setNombre] = useState('');
   const [curso, setCurso] = useState('');
@@ -27,7 +48,8 @@ function ModalEnviarProfe({ onClose, score, config }) {
         recursoId: 'irregular-verbs-test', recursoTitulo: 'Test de Verbos Irregulares',
         codigoProfesor: code,
         config: { nivel: config?.level, numVerbos: config?.numVerbs, modo: config?.columnsMode },
-        jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), aciertos: score.points, intentos: score.maxPoints }],
+        jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), aciertos: score.points, intentos: score.maxPoints,
+          porcentaje: Math.round(score.points / Math.max(1, score.maxPoints) * 100), ...(reto ? { reto } : {}) }],
       });
       guardarRegistroLocal('IRREGULAR_VERBS', {
         titulo: 'Test de Verbos Irregulares', aciertos: score.points, intentos: score.maxPoints,
@@ -78,14 +100,16 @@ function ModalEnviarProfe({ onClose, score, config }) {
   );
 }
 
-export default function IrregularVerbsTest() {
-  const [step, setStep] = useState('home'); // 'home', 'config', 'test', 'results'
-  const [config, setConfig] = useState({
-    level: 'sencillo',
-    numVerbs: 10,
-    timeLimit: 60, // en segundos
-    columnsMode: 'all', // 'all', 'base_past', 'no_translation'
-  });
+export default function IrregularVerbsTest({ initialConfig = null }) {
+  // Reto por enlace: configuración fija del profesor (y envío a competición si procede)
+  const [reto, setReto] = useState(() => leerRetoUrl());
+  const esRetoCompeticion = !!(reto?.compId && reto?.catId);
+  const [step, setStep] = useState(() => (reto ? 'reto' : 'home')); // 'reto', 'home', 'config', 'test', 'results'
+  const [config, setConfig] = useState(() => ({
+    ...DEFAULT_CONFIG_VERBOS, // level, numVerbs, timeLimit (s), columnsMode ('all' | 'base_past' | 'no_translation')
+    ...(initialConfig || {}),
+    ...(reto?.config || {}),
+  }));
 
   const [testData, setTestData] = useState([]);
   const [userAnswers, setUserAnswers] = useState({});
@@ -150,9 +174,11 @@ export default function IrregularVerbsTest() {
 
     const filteredVerbs = verbosData.filter(v => allowedLevels.includes(v.level));
 
-    // 2. Seleccionar aleatoriamente
-    const shuffled = [...filteredVerbs].sort(() => 0.5 - Math.random());
-    const selectedVerbs = shuffled.slice(0, config.numVerbs);
+    // 2. Seleccionar aleatoriamente (o los verbos concretos elegidos por el profesor)
+    const fijos = Array.isArray(config.verbos) && config.verbos.length > 0
+      ? verbosData.filter(v => config.verbos.includes(v.baseForm)) : null;
+    const shuffled = [...(fijos || filteredVerbs)].sort(() => 0.5 - Math.random());
+    const selectedVerbs = fijos ? shuffled : shuffled.slice(0, config.numVerbs);
 
     // 3. Preparar los datos del test (elegir qué columna dar como pista)
     const activeCols = getActiveColumns(config.columnsMode);
@@ -229,6 +255,14 @@ export default function IrregularVerbsTest() {
   };
 
   // RENDERIZADOS CONDICIONALES
+  if (step === 'reto' && reto) {
+    return (
+      <PantallaReto reto={reto} nombreJuego="Irregular Verbs" emoji="📝" color="#0369a1"
+        chips={resumenVerbos(config)} onEmpezar={handleStartTest}
+        onLibre={() => { limpiarRetoUrl(); setReto(null); setConfig({ ...DEFAULT_CONFIG_VERBOS, ...(initialConfig || {}) }); setStep('home'); }} />
+    );
+  }
+
   if (step === 'home') {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh' }}>
@@ -316,7 +350,12 @@ export default function IrregularVerbsTest() {
 
   return (
     <>
-      {showModalEnviar && <ModalEnviarProfe onClose={() => setShowModalEnviar(false)} score={score} config={config} />}
+      {showModalEnviar && esRetoCompeticion && (
+        <ModalEnviarCompeticion compId={reto.compId} catId={reto.catId} puntos={score.points}
+          detalle={{ aciertos: score.points, total: score.maxPoints }} nombreJuego="Irregular Verbs" tituloReto={reto.titulo || ''}
+          onClose={() => setShowModalEnviar(false)} />
+      )}
+      {showModalEnviar && !esRetoCompeticion && <ModalEnviarProfe onClose={() => setShowModalEnviar(false)} score={score} config={config} reto={reto ? (reto.titulo || 'Reto') : null} />}
       <div style={{ maxWidth: '56rem', margin: '0 auto', marginTop: '40px', padding: '16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <h2 style={{ fontSize: '24px', fontWeight: 'bold' }}>Test de Verbos Irregulares</h2>
@@ -394,14 +433,14 @@ export default function IrregularVerbsTest() {
               Puntuación: <span style={{ color: score.points === score.maxPoints ? '#15803d' : '#2563eb' }}>{score.points}</span> / {score.maxPoints}
             </div>
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
-              <button 
+              {!reto && <button 
                 onClick={() => setStep('config')}
                 style={{ backgroundColor: '#1f2937', color: 'white', fontWeight: 'bold', padding: '12px 32px', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', transition: 'all 0.2s', border: 'none', cursor: 'pointer' }}
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#111827'}
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1f2937'}
               >
                 Volver a configurar
-              </button>
+              </button>}
               <button 
                 onClick={compartir}
                 style={{ backgroundColor: '#7c3aed', color: 'white', fontWeight: 'bold', padding: '12px 16px', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', transition: 'all 0.2s', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
@@ -419,8 +458,7 @@ export default function IrregularVerbsTest() {
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ea580c'}
                 title="Enviar al profesor"
               >
-                <Send size={16} />
-                Enviar al profesor
+                {reto ? textoBotonEnvio(reto) : <><Send size={16} />Enviar al profesor</>}
               </button>
             </div>
           </div>

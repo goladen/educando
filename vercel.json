@@ -27,7 +27,7 @@
   ],
   "crons": [
     {
-      "path": "/api/instagram?action=sync",
+      "path": "/api/instagram",
       "schedule": "0 5 * * *"
     }
   ]

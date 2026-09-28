@@ -12,6 +12,8 @@ import piAngry  from './assets/Pi-enfadado.png';
 import piNeutral from './assets/Pi-neutro.png';
 import correctSoundFile from './assets/correct-choice-43861.mp3';
 import wrongSoundFile   from './assets/wrong.mp3';
+import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
+import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 
 const _mkAudio = src => { let a; return { get currentTime(){ return a?.currentTime??0; }, set currentTime(v){ (a??=new Audio(src)).currentTime=v; }, play(){ return (a??=new Audio(src)).play(); } }; };
 const audioCorrect = _mkAudio(correctSoundFile);
@@ -386,7 +388,15 @@ function ExRenderer({ ex, ans, setAns, checked }) {
 }
 
 // ─── Modal enviar al profesor ─────────────────────────────────────────────────
-function ModalEnviarVQ({ recurso, resultados, onClose }) {
+// Enlace de competición (&comp=…&cat=…): la puntuación va a esa prueba, no al profesor
+function ModalEnviarVQ(p) {
+    const comp = leerCompeticionUrl();
+    if (comp) return <ModalEnviarCompeticion compId={comp.compId} catId={comp.catId} puntos={Number((() => { const r = p.resultados || []; const c = r.reduce((s, x) => s + x.c, 0), t = r.reduce((s, x) => s + x.t, 0); return t ? Math.round(c / t * 100) : 0; })()) || 0}
+        detalle={{ recursoTitulo: p.recurso?.titulo || '' }} nombreJuego="VideoQuizz" tituloReto={comp.titulo} onClose={p.onClose} />;
+    return <ModalEnviarVQBase {...p} />;
+}
+
+function ModalEnviarVQBase({ recurso, resultados, onClose }) {
   const [nombre,   setNombre]   = useState('');
   const [curso,    setCurso]    = useState('');
   const [codigo,   setCodigo]   = useState('');

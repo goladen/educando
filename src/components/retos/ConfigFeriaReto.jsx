@@ -5,8 +5,9 @@ import { Chip, Seccion, MarcoConfig } from './ConfigChips';
 const NARANJA_F = '#e67e22';
 
 // Reto de la Feria del Cálculo: modo de juego + tipo de números, operaciones y tiempo
-export default function ConfigFeriaReto({ config, onAceptar, onClose }) {
-    const [cfg, setCfg] = useState({ ...DEFAULT_RETO_FERIA, ...(config || {}) });
+// enCompeticion: solo el modo globos puntúa (dual y tirón son de 2 jugadores)
+export default function ConfigFeriaReto({ config, onAceptar, onClose, enCompeticion = false }) {
+    const [cfg, setCfg] = useState(() => ({ ...DEFAULT_RETO_FERIA, ...(config || {}), ...(enCompeticion ? { modo: 'globos' } : {}) }));
     const set = (k, v) => setCfg(c => ({ ...c, [k]: v }));
     const toggleOp = (op) => setCfg(c => {
         const tiposOp = c.tiposOp.includes(op) ? c.tiposOp.filter(o => o !== op) : [...c.tiposOp, op];
@@ -17,7 +18,7 @@ export default function ConfigFeriaReto({ config, onAceptar, onClose }) {
         <MarcoConfig titulo="🎡 Feria del Cálculo — configuración del reto" color={NARANJA_F}
             onClose={onClose} onAceptar={() => onAceptar(cfg, resumenFeria(cfg))}>
             <Seccion label="Modo de juego">
-                {MODOS_FERIA.map(([v, l]) => <Chip key={v} active={cfg.modo === v} onClick={() => set('modo', v)} color={NARANJA_F}>{l}</Chip>)}
+                {MODOS_FERIA.filter(([v]) => !enCompeticion || v === 'globos').map(([v, l]) => <Chip key={v} active={cfg.modo === v} onClick={() => set('modo', v)} color={NARANJA_F}>{l}</Chip>)}
             </Seccion>
             {cfg.modo !== 'tiron' ? (<>
                 <Seccion label="Tipo de números">

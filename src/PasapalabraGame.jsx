@@ -8,6 +8,8 @@ import { guardarRegistroLocal } from './utils/registrosLocales';
 import correctSoundFile from './assets/correct-choice-43861.mp3';
 import wrongSoundFile from './assets/negative_beeps-6008.mp3';
 import winSoundFile from './assets/applause-small-audience-97257.mp3';
+import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
+import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import startSoundFile from './assets/inicio-juego.mp3'; // NUEVO
 
 // URL externa para el reloj (Tic-Tac)
@@ -159,7 +161,15 @@ const STYLES = `
 `;
 
 // ─── Modal Enviar al Profesor ─────────────────────────────────────────────────
-function ModalEnviarProfe({ datos, onClose }) {
+// Enlace de competición (&comp=…&cat=…): la puntuación va a esa prueba, no al profesor
+function ModalEnviarProfe(p) {
+    const comp = leerCompeticionUrl();
+    if (comp) return <ModalEnviarCompeticion compId={comp.compId} catId={comp.catId} puntos={Number(p.datos?.aciertos) || 0}
+        detalle={soloPrimitivos(p.datos)} nombreJuego="Pasapalabra" tituloReto={comp.titulo} onClose={p.onClose} />;
+    return <ModalEnviarProfeBase {...p} />;
+}
+
+function ModalEnviarProfeBase({ datos, onClose }) {
     const [codigo, setCodigo]   = useState('');
     const [nombre, setNombre]   = useState('');
     const [curso,  setCurso]    = useState('');

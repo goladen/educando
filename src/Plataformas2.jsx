@@ -13,6 +13,8 @@ import bg4Src from './assets/pantalla4.jpeg';
 import jumpSoundSrc    from './assets/jump.mp3';
 import correctSoundSrc from './assets/sonidorespcorrecta.mp3';
 import wrongSoundSrc   from './assets/wrong.mp3';
+import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
+import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 
 const sa = src => { try { return new Audio(src); } catch(e){ return {play:()=>Promise.resolve(),currentTime:0}; } };
 const SFX = { jump:sa(jumpSoundSrc), correct:sa(correctSoundSrc), wrong:sa(wrongSoundSrc) };
@@ -873,7 +875,15 @@ function PantallaIntro({ materia, nivel, total, hasEnemigos, onStart, onBack }) 
   );
 }
 
-function ModalEnviarProfe({ datos, onClose }) {
+// Enlace de competición (&comp=…&cat=…): la puntuación va a esa prueba, no al profesor
+function ModalEnviarProfe(p) {
+    const comp = leerCompeticionUrl();
+    if (comp) return <ModalEnviarCompeticion compId={comp.compId} catId={comp.catId} puntos={Number(p.datos?.aciertos) || 0}
+        detalle={soloPrimitivos(p.datos)} nombreJuego="Plataformas" tituloReto={comp.titulo} onClose={p.onClose} />;
+    return <ModalEnviarProfeBase {...p} />;
+}
+
+function ModalEnviarProfeBase({ datos, onClose }) {
   const [codigo, setCodigo] = useState('');
   const [nombre, setNombre] = useState('');
   const [curso,  setCurso]  = useState('');

@@ -5,6 +5,8 @@ import { X, Settings, Trophy, Search, BookOpen, Globe, ArrowLeft, Share2, Check 
 import { guardarRegistroLocal } from './utils/registrosLocales';
 
 import Confetti from 'react-confetti';
+import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
+import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import SopaDeLetras from './SopaDeLetras'; // <--- Importamos el motor de la sopa que ya creamos
 
 // --- DICCIONARIOS (Igual que Wordle) ---
@@ -18,7 +20,15 @@ const LANGUAGES = {
 
 const PALABRAS_PREVIEW = ['SUMA', 'RESTA', 'MULTIPLICACION', 'DIVISION'];
 
-function ModalEnviarProfe({ datos, onClose }) {
+// Enlace de competición (&comp=…&cat=…): la puntuación va a esa prueba, no al profesor
+function ModalEnviarProfe(p) {
+    const comp = leerCompeticionUrl();
+    if (comp) return <ModalEnviarCompeticion compId={comp.compId} catId={comp.catId} puntos={Number(p.datos?.palabras) || 0}
+        detalle={soloPrimitivos(p.datos)} nombreJuego="Sopa de letras" tituloReto={comp.titulo} onClose={p.onClose} />;
+    return <ModalEnviarProfeBase {...p} />;
+}
+
+function ModalEnviarProfeBase({ datos, onClose }) {
     const [codigo, setCodigo]   = useState('');
     const [nombre, setNombre]   = useState('');
     const [curso,  setCurso]    = useState('');

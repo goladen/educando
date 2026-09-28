@@ -4,6 +4,8 @@ import { collection, addDoc, query, where, limit, getDocs, doc, getDoc } from 'f
 import { X, Trophy, Search, BookOpen, Globe, ArrowLeft, Zap, Clock, Share2 } from 'lucide-react';
 import { guardarRegistroLocal } from './utils/registrosLocales';
 import Confetti from 'react-confetti';
+import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
+import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 
 // --- CONFIGURACIÓN DE IDIOMAS (igual que Wordle / Sopa) ---
 const LANGUAGES = {
@@ -35,7 +37,15 @@ const T_LETRA_PVP = 10;    // segundos por letra en duelo
 const T_PALABRA_PVP = 20;  // segundos para escribir la palabra en duelo
 
 // ─── Modal Enviar al Profesor ────────────────────────────────────────────────
-function ModalEnviarProfe({ datos, onClose }) {
+// Enlace de competición (&comp=…&cat=…): la puntuación va a esa prueba, no al profesor
+function ModalEnviarProfe(p) {
+    const comp = leerCompeticionUrl();
+    if (comp) return <ModalEnviarCompeticion compId={comp.compId} catId={comp.catId} puntos={Number(p.datos?.palabras) || 0}
+        detalle={soloPrimitivos(p.datos)} nombreJuego="Ahorcado" tituloReto={comp.titulo} onClose={p.onClose} />;
+    return <ModalEnviarProfeBase {...p} />;
+}
+
+function ModalEnviarProfeBase({ datos, onClose }) {
     const [codigo, setCodigo] = useState('');
     const [nombre, setNombre] = useState('');
     const [curso, setCurso] = useState('');

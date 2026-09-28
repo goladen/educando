@@ -1,6 +1,7 @@
 import React, { useState, Suspense, lazy } from 'react';
 import { X, RefreshCw, Wrench } from 'lucide-react';
 import { crearRutaReto } from '../utils/retoLink';
+import ModalRetoRecurso, { JUEGOS_RECURSO } from './ModalRetoRecurso';
 
 const AZUL = '#1565C0';
 
@@ -77,7 +78,7 @@ export const HERRAMIENTAS_RETO = [
         desc: 'Conecta los puntos, Sudoku o El juego de las luces · juego y nivel concretos',
     },
     {
-        id: 'ARKADE', label: 'Arkade', emoji: '🕹️', color: '#8e44ad', ruta: '/arkade',
+        id: 'ARKADE', label: 'Arkade', emoji: '🕹️', color: '#8e44ad', ruta: '/arkade', sinPuntuacion: true,
         desc: 'Un minijuego concreto (Tetris, Buscaminas, Pong, Cyber Break, Bomberman) y su modo',
     },
     {
@@ -145,6 +146,16 @@ const EDITORES = {
 
 export const herramientaPorId = (id) => HERRAMIENTAS_RETO.find(h => h.id === id) || null;
 
+// Añade el contexto de competición a un enlace ya hecho (p. ej. /?r=ID&m=…)
+const conCompeticion = (ruta, { titulo, compId, catId }) => {
+    const p = new URLSearchParams();
+    if (titulo && titulo.trim()) p.set('t', titulo.trim());
+    if (compId) p.set('comp', compId);
+    if (catId) p.set('cat', catId);
+    const q = p.toString();
+    return q ? `${ruta}${ruta.includes('?') ? '&' : '?'}${q}` : ruta;
+};
+
 /**
  * Elegir una herramienta y configurarla. Devuelve por `onElegir` los campos que
  * hay que guardar: la ruta ya lleva la configuración dentro (?reto=…), así que
@@ -152,6 +163,21 @@ export const herramientaPorId = (id) => HERRAMIENTAS_RETO.find(h => h.id === id)
  */
 export default function ModalElegirHerramienta({ tituloReto = '', configInicial = null, herramientaInicial = null, compId = null, catId = null, onElegir, onClose }) {
     const [sel, setSel] = useState(herramientaInicial ? herramientaPorId(herramientaInicial) : null);
+    // Juego con recurso (Pasapalabra, Burbujas…): solo en competiciones
+    const [selRecurso, setSelRecurso] = useState(() => (herramientaInicial && !herramientaPorId(herramientaInicial) && JUEGOS_RECURSO[herramientaInicial] ? herramientaInicial : null));
+    const enCompeticion = !!compId;
+
+    if (selRecurso) return (
+        <ModalRetoRecurso juegoId={selRecurso} onClose={onClose}
+            onVolver={() => (herramientaInicial ? onClose() : setSelRecurso(null))}
+            onElegido={({ ruta, resumen }) => onElegir({
+                herramientaId: selRecurso,
+                herramientaTitulo: JUEGOS_RECURSO[selRecurso].label,
+                herramientaRuta: conCompeticion(ruta, { titulo: tituloReto, compId, catId }),
+                herramientaResumen: resumen || [],
+                herramientaConfig: { ruta },
+            })} />
+    );
 
     if (sel) {
         const Editor = EDITORES[sel.id];
@@ -164,7 +190,7 @@ export default function ModalElegirHerramienta({ tituloReto = '', configInicial 
         });
         return (
             <Suspense fallback={<div style={st.overlay}><div style={{ ...st.panel, textAlign: 'center' }}><RefreshCw size={24} style={{ animation: 'spin 1s linear infinite', color: AZUL }} /><div style={{ marginTop: 10, color: '#7f8c8d' }}>Cargando {sel.label}…</div><style>{`@keyframes spin{100%{transform:rotate(360deg)}}`}</style></div></div>}>
-                <Editor config={configInicial} onAceptar={aceptar} onClose={() => (herramientaInicial ? onClose() : setSel(null))} />
+                <Editor config={configInicial} enCompeticion={enCompeticion} onAceptar={aceptar} onClose={() => (herramientaInicial ? onClose() : setSel(null))} />
             </Suspense>
         );
     }
@@ -183,7 +209,7 @@ export default function ModalElegirHerramienta({ tituloReto = '', configInicial 
                     Todos los participantes la abrirán con <strong>esa misma configuración</strong>.
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {HERRAMIENTAS_RETO.map(h => (
+                    {HERRAMIENTAS_RETO.filter(h => !enCompeticion || !h.sinPuntuacion).map(h => (
                         <button key={h.id} onClick={() => setSel(h)}
                             style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '13px 16px', background: 'white', border: `2px solid ${h.color}`, borderRadius: 14, cursor: 'pointer', textAlign: 'left', width: '100%', fontFamily: 'inherit' }}>
                             <div style={{ background: h.color, borderRadius: 12, width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', flexShrink: 0 }}>{h.emoji}</div>
@@ -195,9 +221,18 @@ export default function ModalElegirHerramienta({ tituloReto = '', configInicial 
                         </button>
                     ))}
                 </div>
-                <div style={{ marginTop: 14, fontSize: '0.78rem', color: '#95a5a6' }}>
-                    Poco a poco se irán añadiendo aquí el resto de herramientas de Math World.
-                </div>
+                {enCompeticion && (<>
+                    <div style={{ fontWeight: 800, color: '#2c3e50', fontSize: '0.95rem', margin: '18px 0 4px' }}>🎮 Juegos con recurso</div>
+                    <div style={{ color: '#7f8c8d', fontSize: '0.8rem', marginBottom: 10 }}>Elige el juego y después el recurso (y la hoja o el modo). La puntuación llega sola a la prueba.</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
+                        {Object.entries(JUEGOS_RECURSO).filter(([, j]) => !j.sinCompeticion).map(([id, j]) => (
+                            <button key={id} onClick={() => setSelRecurso(id)}
+                                style={{ padding: '10px 12px', background: 'white', border: '1.5px solid #cdd6ea', borderRadius: 12, cursor: 'pointer', fontWeight: 700, color: '#2c3e50', fontSize: '0.85rem', fontFamily: 'inherit', textAlign: 'left' }}>
+                                🎮 {j.label}
+                            </button>
+                        ))}
+                    </div>
+                </>)}
             </div>
         </div>
     );

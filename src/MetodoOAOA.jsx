@@ -1546,6 +1546,51 @@ export default function MetodoOAOA({ onExit }) {
             maxWidth: '480px',
             paddingBottom: '16px'
           }}>
+            {/* Recursos para el profesorado: carpeta de Drive con materiales de 1º a 6º */}
+            <a
+              href="https://drive.google.com/drive/folders/1bS4F4rTpXSpFTzLes4TwImCgElMci1ZJ?usp=drive_link"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                marginBottom: '4px',
+                display: 'block',
+                textDecoration: 'none',
+                backgroundColor: '#FFFFFF',
+                border: '2px dashed #A5B4FC',
+                borderRadius: '16px',
+                padding: '12px 14px',
+                color: '#0F172A',
+                boxShadow: '0 4px 12px rgba(79,70,229,0.08)',
+                touchAction: 'manipulation'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '44px', height: '44px', flexShrink: 0, borderRadius: '12px',
+                  background: 'linear-gradient(135deg, #FDE68A 0%, #F59E0B 100%)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem'
+                }}>📂</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '0.68rem', fontWeight: '900', color: '#4F46E5', letterSpacing: '0.05em' }}>RECURSOS OAOA · GOOGLE DRIVE</div>
+                  <h3 style={{ margin: '1px 0 2px 0', fontSize: '1.02rem', fontWeight: '900' }}>Materiales de 1º a 6º de Primaria</h3>
+                  <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748B', fontWeight: '600', lineHeight: 1.3 }}>
+                    Fichas y contenidos organizados por curso
+                  </p>
+                </div>
+                <span style={{ fontSize: '1.1rem', color: '#4F46E5', fontWeight: '900', flexShrink: 0 }}>↗</span>
+              </div>
+              <div style={{ display: 'flex', gap: '5px', marginTop: '10px', flexWrap: 'wrap' }}>
+                {['1º', '2º', '3º', '4º', '5º', '6º'].map((c, i) => (
+                  <span key={c} style={{
+                    flex: '1 1 0', minWidth: '38px', textAlign: 'center',
+                    padding: '4px 0', borderRadius: '8px', fontSize: '0.78rem', fontWeight: '900',
+                    color: '#FFFFFF',
+                    background: ['#14B8A6', '#6366F1', '#0EA5E9', '#10B981', '#EC4899', '#F59E0B'][i]
+                  }}>{c}</span>
+                ))}
+              </div>
+            </a>
+
             {[
               { id: 'bloques', icon: '🧮', title: 'Bloques D y U', desc: 'Sumas y restas con decenas y unidades + contrarreloj', bg: 'linear-gradient(135deg, #14B8A6 0%, #0D9488 100%)' },
               { id: 'factory', icon: '👾', title: 'Monstruo Arcade', desc: '¡Alimenta al monstruo con descomposiciones exactas!', bg: 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)' },

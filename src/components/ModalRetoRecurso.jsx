@@ -19,6 +19,7 @@ const AZUL = '#1565C0';
 //   coleccion / campoAutor / soloPublica: recursos fuera de 'resources' (Trivial)
 //   enlace(r): enlace propio del juego en vez de /?r=… (VideoQuizz, Trivial); null = /?r=…
 //   biblioteca(): recursos que vienen por defecto en el juego (pestaña «Por defecto»)
+//   sinCompeticion: juego de equipos / varios jugadores → no se ofrece en las competiciones
 const MODOS_BURBUJAS = [
     { id: 'BURBUJAS', label: '🔵 Cazaburbujas' },
     { id: 'TEST', label: '📝 Test' },
@@ -41,16 +42,16 @@ export const JUEGOS_RECURSO = {
     SOPA:         { label: 'Sopa de letras', tipos: ['WORDLE', 'SOPA'], modos: MODOS_PALABRA, modo: 'SOPA', sinHoja: true },
     AHORCADO:     { label: 'Ahorcado', tipos: ['WORDLE', 'SOPA'], modos: MODOS_PALABRA, modo: 'AHORCADO', sinHoja: true },
     CALAMAR:      { label: 'Luz roja · Luz verde', tipos: null, valido: (r) => preguntasDeRecurso(r).length > 0, modo: 'CALAMAR', modoFijo: true, sinHoja: true },
-    MONEYBOARD:   { label: 'Money Board', tipos: null, valido: (r) => categoriasDeRecurso(r).length >= 2, modo: 'MONEYBOARD', modoFijo: true, sinHoja: true },
+    MONEYBOARD:   { label: 'Money Board', sinCompeticion: true, tipos: null, valido: (r) => categoriasDeRecurso(r).length >= 2, modo: 'MONEYBOARD', modoFijo: true, sinHoja: true },
     BUNKER:       { label: 'Bunker', tipos: ['CAZABURBUJAS'], modo: 'BUNKER', modoFijo: true, sinHoja: true },
     PIKATRON_2:   { label: 'Plataformas', tipos: ['CAZABURBUJAS', 'PIKATRON'], modo: 'PLATAFORMAS', modoFijo: true },
     ETIQUETAS:    { label: 'EtiquetaMe', tipos: ['ETIQUETAS'], modo: 'ETIQUETAS', modoFijo: true, sinHoja: true },
     LINEA_TIEMPO: { label: 'Línea del tiempo', tipos: ['LINEA_TIEMPO'], modo: 'LINEA_TIEMPO', modoFijo: true, sinHoja: true,
         biblioteca: () => BIBLIOTECA_LINEAS_TIEMPO,
         enlace: (r) => (r.esBiblioteca ? `/?juego=linea_tiempo&linea=${encodeURIComponent(r.id)}` : null) },
-    DUELO_PIRATAS_RECURSO: { label: 'Duelo Piratas', tipos: null, valido: (r) => preguntasDeRecurso(r).length > 0, modo: 'DUELO_PIRATAS', modoFijo: true, sinHoja: true },
+    DUELO_PIRATAS_RECURSO: { label: 'Duelo Piratas', sinCompeticion: true, tipos: null, valido: (r) => preguntasDeRecurso(r).length > 0, modo: 'DUELO_PIRATAS', modoFijo: true, sinHoja: true },
     VIDEOQUIZZ:   { label: 'VideoQuizz', tipos: ['VIDEOQUIZZ'], sinHoja: true, enlace: (r) => `/?vq=${r.id}` },
-    TRIVIAL:      { label: 'Trivial', tipos: null, coleccion: 'trivial_recursos', campoAutor: 'creadorUid', soloPublica: true, sinHoja: true, enlace: (r) => `/?trivial=${r.id}` },
+    TRIVIAL:      { label: 'Trivial', sinCompeticion: true, tipos: null, coleccion: 'trivial_recursos', campoAutor: 'creadorUid', soloPublica: true, sinHoja: true, enlace: (r) => `/?trivial=${r.id}` },
 };
 
 const limpiar = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -67,7 +68,8 @@ export const rutaRecurso = (recursoId, { hoja, modo } = {}) => {
  * Compartir un juego con un recurso concreto ya elegido (hoja + modo).
  * Pasos: buscar recurso → ajustes → enlace (ModalCompartirReto con url fija).
  */
-export default function ModalRetoRecurso({ juegoId, onVolver, onClose }) {
+// onElegido({ ruta, resumen }): en vez de compartir, devuelve el enlace elegido (competiciones)
+export default function ModalRetoRecurso({ juegoId, onVolver, onClose, onElegido = null }) {
     const juego = JUEGOS_RECURSO[juegoId];
     const uid = auth.currentUser?.uid || null;
 
@@ -139,11 +141,14 @@ export default function ModalRetoRecurso({ juegoId, onVolver, onClose }) {
     const hojas = (recurso?.hojas || []).map(h => h.nombreHoja).filter(Boolean);
     const modoLabel = juego.modos?.find(m => m.id === modo)?.label;
 
+    const rutaFinal = recurso ? ((juego.enlace && juego.enlace(recurso)) || rutaRecurso(recurso.id, { hoja: juego.sinHoja ? null : hoja, modo })) : null;
+    const resumenFinal = recurso ? [`📚 ${recurso.titulo}`, ...(!juego.sinHoja && hojas.length > 0 ? [`📄 ${hoja === 'General' ? 'Todas las hojas' : hoja}`] : []), ...(modoLabel ? [modoLabel] : [])] : [];
+
     if (paso === 'ENLACE' && recurso) return (
         <ModalCompartirReto
-            urlFija={(juego.enlace && juego.enlace(recurso)) || rutaRecurso(recurso.id, { hoja: juego.sinHoja ? null : hoja, modo })}
+            urlFija={rutaFinal}
             nombreJuego={modoLabel && !juego.modoFijo ? modoLabel.replace(/^\S+\s/, '') : juego.label}
-            resumen={[`📚 ${recurso.titulo}`, ...(!juego.sinHoja && hojas.length > 0 ? [`📄 ${hoja === 'General' ? 'Todas las hojas' : hoja}`] : []), ...(modoLabel ? [modoLabel] : [])]}
+            resumen={resumenFinal}
             onEditar={() => setPaso('AJUSTES')}
             onClose={onClose}
         />
@@ -224,7 +229,7 @@ export default function ModalRetoRecurso({ juegoId, onVolver, onClose }) {
                         </div>
                     </>)}
 
-                    <button onClick={() => setPaso('ENLACE')} style={{ ...st.btnPrim, width: '100%', padding: '12px' }}>🔗 Crear enlace</button>
+                    <button onClick={() => (onElegido ? onElegido({ ruta: rutaFinal, resumen: resumenFinal }) : setPaso('ENLACE'))} style={{ ...st.btnPrim, width: '100%', padding: '12px' }}>{onElegido ? '✔ Usar este recurso' : '🔗 Crear enlace'}</button>
                 </>)}
                 <style>{`@keyframes spinRR{100%{transform:rotate(360deg)}}`}</style>
             </div>

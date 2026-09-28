@@ -82,3 +82,19 @@ export const limpiarRetoUrl = () => {
     const q = p.toString();
     window.history.replaceState({}, '', window.location.pathname + (q ? `?${q}` : ''));
 };
+
+/**
+ * Contexto de competición en CUALQUIER enlace (también en los de recurso /?r=…):
+ * &comp=<compId>&cat=<catId>[&t=<título>] → { compId, catId, titulo } o null.
+ */
+export const leerCompeticionUrl = () => {
+    if (typeof window === 'undefined') return null;
+    const p = new URLSearchParams(window.location.search);
+    const compId = p.get('comp'), catId = p.get('cat');
+    return compId && catId ? { compId, catId, titulo: (p.get('t') || '').trim() } : null;
+};
+
+/** Copia de un objeto solo con valores simples (para guardar un «detalle» en Firestore). */
+export const soloPrimitivos = (obj) => Object.fromEntries(
+    Object.entries(obj || {}).filter(([, v]) => v == null || typeof v !== 'object')
+);

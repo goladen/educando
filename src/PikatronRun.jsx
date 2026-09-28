@@ -27,6 +27,8 @@ import looseLifeSoundFile from './assets/wrong.mp3';
 import gameOverSoundFile from './assets/gameover.mp3';
 import respCorrecta from './assets/sonidorespcorrecta.mp3';
 import monedaIncorrecta from './assets/sonidomonedamal.mp3';
+import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
+import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 const _mkAudio = src => { let a; return { get currentTime(){ return a?.currentTime??0; }, set currentTime(v){ (a??=new Audio(src)).currentTime=v; }, play(){ return (a??=new Audio(src)).play(); } }; };
 const audioJump             = _mkAudio(jumpSoundFile);
 const audioCorrect          = _mkAudio(correctSoundFile);
@@ -1096,7 +1098,15 @@ function PantallaRanking({ recurso, onBack }) {
 
 
 // COMPONENTE SETUP
-function ModalEnviarProfe({ datos, onClose }) {
+// Enlace de competición (&comp=…&cat=…): la puntuación va a esa prueba, no al profesor
+function ModalEnviarProfe(p) {
+    const comp = leerCompeticionUrl();
+    if (comp) return <ModalEnviarCompeticion compId={comp.compId} catId={comp.catId} puntos={Number(p.datos?.aciertos) || 0}
+        detalle={soloPrimitivos(p.datos)} nombreJuego="Pikatron" tituloReto={comp.titulo} onClose={p.onClose} />;
+    return <ModalEnviarProfeBase {...p} />;
+}
+
+function ModalEnviarProfeBase({ datos, onClose }) {
     const [codigo, setCodigo]   = useState('');
     const [nombre, setNombre]   = useState('');
     const [curso,  setCurso]    = useState('');

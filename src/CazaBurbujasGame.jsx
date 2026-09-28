@@ -15,6 +15,8 @@ import bg1 from './assets/pantalla5.jpeg';
 import bg2 from './assets/pantalla2.jpeg';
 import bg3 from './assets/pantalla3.jpeg';
 import bg4 from './assets/pantalla4.jpeg';
+import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
+import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 
 const BACKGROUNDS = [bg1, bg2, bg3, bg4]; // Array para elegir al azar
 const TICK_SOUND_URL = 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_73686360b7.mp3?filename=clock-ticking-2-106637.mp3';
@@ -377,7 +379,15 @@ export default function CazaBurbujasGame({ recurso, usuario, alTerminar, modoOli
 
 // --- PANTALLAS AUXILIARES ---
 
-function ModalEnviarProfe({ datos, onClose }) {
+// Enlace de competición (&comp=…&cat=…): la puntuación va a esa prueba, no al profesor
+function ModalEnviarProfe(p) {
+    const comp = leerCompeticionUrl();
+    if (comp) return <ModalEnviarCompeticion compId={comp.compId} catId={comp.catId} puntos={Number(p.datos?.aciertos) || 0}
+        detalle={soloPrimitivos(p.datos)} nombreJuego="Burbujas" tituloReto={comp.titulo} onClose={p.onClose} />;
+    return <ModalEnviarProfeBase {...p} />;
+}
+
+function ModalEnviarProfeBase({ datos, onClose }) {
     const [codigo, setCodigo]   = useState('');
     const [nombre, setNombre]   = useState('');
     const [curso,  setCurso]    = useState('');

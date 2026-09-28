@@ -25,16 +25,49 @@ En la app de Instagram: **Configuración → Tipo de cuenta → Cambiar a cuenta
 
 ## 2. App en Meta for Developers
 
-1. Entra en <https://developers.facebook.com/apps> → **Crear app**.
-2. Caso de uso: **Otro** → tipo **Empresa** (o directamente el caso de uso de Instagram si te lo ofrece).
-3. En el panel de la app: **Añadir producto → Instagram → Configurar**.
-4. Dentro de Instagram, pestaña **Configuración de la API con inicio de sesión de Instagram**.
-5. En **Generación de tokens** pulsa **Añadir cuenta** y conecta `@pikt314`.
-6. Pulsa **Generar token** y **cópialo**. Ese es un token de larga duración (60 días);
-   a partir de ahí nuestra función lo renueva sola.
+El sitio es <https://developers.facebook.com>. **No hay un "portal de Instagram" aparte**:
+la API de Instagram vive dentro de una app de Facebook, como un producto más.
 
+1. Arriba a la derecha → **Mis apps** (`My Apps`) → botón verde **Crear app**.
+2. Pantalla *Detalles de la app*: nombre (p. ej. `PiKT Web`) y tu correo → **Siguiente**.
+3. Pantalla *Casos de uso* (`Use cases`): si aparece **"Administrar mensajería y contenido
+   en Instagram"**, elígelo. Si no lo ves, elige **Otro** (`Other`) → **Siguiente** →
+   tipo de app **Empresa** (`Business`) → **Crear app**.
+   ⚠️ No elijas *Consumidor*: ese tipo no ofrece el producto de Instagram.
+4. Ya en el panel de la app, menú izquierdo → **Agregar producto** (o la lista
+   *Añade productos a tu app*) → busca la tarjeta **Instagram** → **Configurar**.
+5. Ahora aparece **Instagram** en el menú izquierdo. Despliégalo y entra en
+   **Configuración de la API con inicio de sesión de Instagram**
+   (`API setup with Instagram login`).
+6. Verás bloques numerados. En **"1. Añade los permisos de mensajes necesarios"** pulsa
+   **Add all required permissions**. El que de verdad necesitamos es `instagram_business_basic`
+   (leer `/me/media`); los otros dos son inofensivos sobre tu propia cuenta.
+7. Despliega **"2. Genera identificadores de acceso"** (*identificador de acceso* = access token)
+   → **Añadir cuenta** → ventana de Instagram → inicia sesión con `@pikt314` y acepta.
+8. La cuenta queda listada con el botón para **generar el identificador de acceso**. Púlsalo y
+   **copia el token en ese momento**: no se puede volver a ver. Es un token de larga duración
+   (60 días); a partir de ahí nuestra función lo renueva sola.
+   Los webhooks y el bloque 3 no hacen falta.
+
+> El **identificador de la aplicación** es público y nuestro código no lo usa. La **clave secreta
+> de la aplicación** tampoco hace falta para este flujo: no la pegues en ningún sitio.
+
+> Si solo encuentras **Instagram Basic Display**, es la API antigua: está cerrada desde
+> diciembre de 2024 y no sirve. La buena es la que pone *con inicio de sesión de Instagram*.
+>
 > No hace falta pasar la revisión de la app ni sacarla de modo desarrollo:
 > los permisos `instagram_business_basic` sobre **tu propia cuenta** funcionan sin revisión.
+>
+> Si el botón *Agregar cuenta* no deja conectar `@pikt314`, es que la cuenta sigue siendo
+> personal: repasa el paso 1 de esta guía.
+
+**Comprobar que el token va bien** (pégalo en el navegador):
+
+```
+https://graph.instagram.com/me?fields=id,username&access_token=EL_TOKEN
+```
+
+Debe responder `{"id":"...","username":"pikt314"}`.
 
 ## 3. Cuenta de servicio de Firebase
 

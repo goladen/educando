@@ -12,6 +12,8 @@ import wrongSoundFile from './assets/negative_beeps-6008.mp3';
 import winSoundFile from './assets/applause-small-audience-97257.mp3';
 
 import SPIN from './assets/girala.mp3';
+import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
+import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 // --- AUDIOS EXTERNOS RULETA ---
 const SOUNDS = {
     INTRO: 'https://www.myinstants.com/media/sounds/ruleta-de-la-suerte-entrada.mp3',
@@ -47,7 +49,15 @@ const clean = (t) => t ? t.toString().toLowerCase().normalize("NFD").replace(/[\
 const esVocal = (letra) => "aeiouáéíóú".includes(letra.toLowerCase());
 
 // ─── Modal Enviar al Profesor ─────────────────────────────────────────────────
-function ModalEnviarProfe({ datos, onClose }) {
+// Enlace de competición (&comp=…&cat=…): la puntuación va a esa prueba, no al profesor
+function ModalEnviarProfe(p) {
+    const comp = leerCompeticionUrl();
+    if (comp) return <ModalEnviarCompeticion compId={comp.compId} catId={comp.catId} puntos={Number(p.datos?.jugadores?.[0]?.puntos) || 0}
+        detalle={soloPrimitivos(p.datos)} nombreJuego="Ruleta" tituloReto={comp.titulo} onClose={p.onClose} />;
+    return <ModalEnviarProfeBase {...p} />;
+}
+
+function ModalEnviarProfeBase({ datos, onClose }) {
     const [codigo,   setCodigo]   = useState('');
     const [nombre,   setNombre]   = useState('');
     const [curso,    setCurso]    = useState('');

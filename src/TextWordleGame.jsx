@@ -5,6 +5,8 @@ import { collection, addDoc, query, where, orderBy, limit, getDocs, doc, getDoc 
 import { guardarRegistroLocal } from './utils/registrosLocales';
 import { X, Settings, Trophy, Search, BookOpen, Globe, ArrowLeft, Zap, Clock } from 'lucide-react';
 import Confetti from 'react-confetti';
+import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
+import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 
 // --- CONFIGURACIÓN DE IDIOMAS ---
 const LANGUAGES = {
@@ -30,7 +32,15 @@ const LANGUAGES = {
     }
 };
 
-function ModalEnviarProfe({ datos, onClose }) {
+// Enlace de competición (&comp=…&cat=…): la puntuación va a esa prueba, no al profesor
+function ModalEnviarProfe(p) {
+    const comp = leerCompeticionUrl();
+    if (comp) return <ModalEnviarCompeticion compId={comp.compId} catId={comp.catId} puntos={Number(p.datos?.score) || 0}
+        detalle={soloPrimitivos(p.datos)} nombreJuego="Wordle" tituloReto={comp.titulo} onClose={p.onClose} />;
+    return <ModalEnviarProfeBase {...p} />;
+}
+
+function ModalEnviarProfeBase({ datos, onClose }) {
     const [codigo, setCodigo]   = useState('');
     const [nombre, setNombre]   = useState('');
     const [curso,  setCurso]    = useState('');

@@ -7,6 +7,8 @@ import {
 } from 'firebase/firestore';
 import { guardarRegistroLocal } from './utils/registrosLocales';
 import QRSalaBoton from './components/QRSalaBoton';
+import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
+import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import {
     limpiar, barajar, normalizarPregunta, preguntasDeRecurso, esRespuestaCorrecta,
 } from './utils/normalizarPreguntas';
@@ -1332,7 +1334,15 @@ function PantallaFinal({ victoria, datos, onReintentar, onSalir, onEnviar, onGua
 // =====================================================================
 //  MODAL ENVIAR AL PROFESOR
 // =====================================================================
-function ModalEnviarProfe({ datos, nombreSugerido, onClose }) {
+// Enlace de competición (&comp=…&cat=…): la puntuación va a esa prueba, no al profesor
+function ModalEnviarProfe(p) {
+    const comp = leerCompeticionUrl();
+    if (comp) return <ModalEnviarCompeticion compId={comp.compId} catId={comp.catId} puntos={Number(p.datos?.aciertos) || 0}
+        detalle={soloPrimitivos(p.datos)} nombreJuego="Luz roja · Luz verde" tituloReto={comp.titulo} onClose={p.onClose} />;
+    return <ModalEnviarProfeBase {...p} />;
+}
+
+function ModalEnviarProfeBase({ datos, nombreSugerido, onClose }) {
     const [codigo, setCodigo] = useState('');
     const [nombre, setNombre] = useState(nombreSugerido || '');
     const [curso, setCurso] = useState('');

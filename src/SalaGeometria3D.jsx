@@ -5,6 +5,9 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
+import { crearDesarrollo } from './utils/desarrolloPlano';
+import { crearExperimentoGrifo, ALTURA_MESA, X_CONO, X_CIL } from './utils/experimentoGrifo';
+import { POLIEDROS, IDS_POLIEDROS, crearPoliedroEuler } from './utils/poliedrosEuler';
 
 /* ═══════════════════ DEFINICIÓN DE SÓLIDOS ═══════════════════ */
 
@@ -145,10 +148,26 @@ const PANEL_W = 900, PANEL_H = 620;
 
 function botonesPanel(st) {
     const bs = [];
+    const MODOS = [['CONSTRUIR', '🏗️'], ['REGLA', '📏'], ['MOVER', '✋'], ['GRIFO', '🚰'], ['POLIEDROS', '🔷']];
+    MODOS.forEach(([m, l], i) =>
+        bs.push({ id: 'modo:' + m, label: l, x: 20 + i * 171, y: 375, w: 164, h: 62, on: st.modo === m }));
+
+    if (st.modo === 'POLIEDROS') {
+        IDS_POLIEDROS.forEach((pid, i) => bs.push({
+            id: 'poli:' + pid, label: POLIEDROS[pid].emoji, x: 20 + i * 171, y: 60, w: 164, h: 62,
+            on: st.poliId === pid,
+        }));
+        bs.push({ id: 'policaras', label: st.poliCaras ? '👁️ Caras ON' : '👁️ Caras OFF', x: 20, y: 455, w: 283, h: 60 });
+        bs.push({ id: 'poligirar', label: st.poliGirar ? '🌀 Girando' : '🌀 Girar', x: 313, y: 455, w: 283, h: 60 });
+        bs.push({ id: 'polireset', label: '🔄 Reiniciar', x: 606, y: 455, w: 274, h: 60 });
+        bs.push({ id: 'polimarcar', label: '✅ Marcar todo', x: 20, y: 530, w: 576, h: 60 });
+        return bs;
+    }
+
     TIPOS.forEach((t, i) => bs.push({
         id: 'tipo:' + t.id, label: `${t.emoji} ${t.nombre}`,
         x: 20 + (i % 3) * 293, y: 60 + Math.floor(i / 3) * 70, w: 283, h: 60,
-        on: st.tipo === t.id,
+        on: st.tipo === t.id, off: st.modo === 'GRIFO',
     }));
     const poli = TIPO(st.tipo).poligonal;
     LADOS.forEach((n, i) => bs.push({
@@ -159,14 +178,36 @@ function botonesPanel(st) {
     bs.push({ id: 'r+', label: '+', x: 370, y: 295, w: 70, h: 58 });
     bs.push({ id: 'h-', label: '−', x: 460, y: 295, w: 70, h: 58, off: !TIPO(st.tipo).alturaLibre });
     bs.push({ id: 'h+', label: '+', x: 810, y: 295, w: 70, h: 58, off: !TIPO(st.tipo).alturaLibre });
-    [['CONSTRUIR', '🏗️ Construir'], ['REGLA', '📏 Regla'], ['MOVER', '✋ Mover']].forEach(([m, l], i) =>
-        bs.push({ id: 'modo:' + m, label: l, x: 20 + i * 293, y: 375, w: 283, h: 62, on: st.modo === m }));
-    bs.push({ id: 'deshacer', label: '↩️ Deshacer', x: 20,  y: 455, w: 283, h: 60 });
-    bs.push({ id: 'limpiar',  label: '🗑️ Vaciar',   x: 313, y: 455, w: 283, h: 60 });
-    bs.push({ id: 'etiquetas', label: st.etiquetas ? '🏷️ Datos ON' : '🏷️ Datos OFF', x: 606, y: 455, w: 274, h: 60 });
-    bs.push({ id: 'ggb', label: '📊 Enviar a GeoGebra', x: 20, y: 530, w: 576, h: 60 });
-    bs.push({ id: 'medidas', label: '🧹 Borrar medidas', x: 606, y: 530, w: 274, h: 60 });
+
+    if (st.modo === 'GRIFO') {
+        bs.push({ id: 'expforma', label: st.expPoligonal ? '🔺 Pirámide/Prisma' : '🍦 Cono/Cilindro', x: 20, y: 455, w: 425, h: 60 });
+        bs.push({ id: 'expauto', label: st.expAuto ? '⏸️ Auto ON' : '▶️ Automático', x: 455, y: 455, w: 425, h: 60 });
+        bs.push({ id: 'expaccion', label: st.expEtiqueta, x: 20, y: 530, w: 576, h: 60 });
+        bs.push({ id: 'expreset', label: '🔄 Reiniciar', x: 606, y: 530, w: 274, h: 60 });
+        return bs;
+    }
+
+    bs.push({ id: 'deshacer',   label: '↩️ Deshacer', x: 20,  y: 455, w: 206, h: 60 });
+    bs.push({ id: 'limpiar',    label: '🗑️ Vaciar',   x: 233, y: 455, w: 206, h: 60 });
+    bs.push({ id: 'etiquetas',  label: st.etiquetas ? '🏷️ Datos' : '🏷️ Sin datos', x: 446, y: 455, w: 206, h: 60 });
+    bs.push({ id: 'desarrollo', label: st.desarrollo ? '📦 Plegar' : '📐 Desplegar', x: 659, y: 455, w: 206, h: 60, off: !st.seleccionado });
+    bs.push({ id: 'ggb',     label: '📊 Enviar a GeoGebra', x: 20,  y: 530, w: 576, h: 60 });
+    bs.push({ id: 'medidas', label: '🧹 Borrar medidas',    x: 606, y: 530, w: 274, h: 60 });
     return bs;
+}
+
+/** Texto del botón principal del experimento según la fase. */
+function etiquetaAccionGrifo(fase) {
+    switch (fase) {
+        case 'VACIO':     return '🚰 Abrir el grifo';
+        case 'LLENANDO':  return '⏹️ Cerrar el grifo';
+        case 'LLENO':     return '🫗 Verter en el cilindro';
+        case 'MOVIENDO':
+        case 'VERTIENDO':
+        case 'VOLVIENDO': return '⏳ Vertiendo…';
+        case 'FIN':       return '🔄 Repetir el experimento';
+        default:          return '🚰 Abrir el grifo';
+    }
 }
 
 function dibujarPanel(ctx, st, botones, hover) {
@@ -180,7 +221,7 @@ function dibujarPanel(ctx, st, botones, hover) {
     ctx.fillText('📐 Sala de Geometría 3D', 20, 32);
     ctx.textAlign = 'right';
     ctx.fillStyle = '#9fb3c8'; ctx.font = '24px system-ui, sans-serif';
-    ctx.fillText(`${st.numSolidos} cuerpos · ${st.numMedidas} medidas`, PANEL_W - 20, 32);
+    ctx.fillText(st.resumen, PANEL_W - 20, 32);
 
     botones.forEach(b => {
         const act = b.on, hov = hover === b.id && !b.off;
@@ -204,8 +245,15 @@ function dibujarPanel(ctx, st, botones, hover) {
     });
 
     ctx.fillStyle = '#ffffff'; ctx.font = 'bold 26px system-ui, sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText(`radio ${redondear(st.r)} m`, 230, 324);
-    ctx.fillText(TIPO(st.tipo).alturaLibre ? `altura ${redondear(st.h)} m` : '—', 670, 324);
+    if (st.modo === 'POLIEDROS') {
+        ctx.fillText(st.poliTexto || '', PANEL_W / 2, 200);
+        ctx.font = 'bold 30px system-ui, sans-serif';
+        ctx.fillStyle = st.poliCompleto ? '#8bf5c0' : '#ffd54f';
+        ctx.fillText(st.poliCuenta || '', PANEL_W / 2, 300);
+    } else {
+        ctx.fillText(`radio ${redondear(st.r)} m`, 230, 324);
+        ctx.fillText(TIPO(st.tipo).alturaLibre ? `altura ${redondear(st.h)} m` : '—', 670, 324);
+    }
 }
 
 /* ═══════════════════ GEOGEBRA ═══════════════════ */
@@ -288,7 +336,7 @@ export default function SalaGeometria3D({ onExit }) {
     const ggbDivRef = useRef(null);
     const ggbRef = useRef(null);
 
-    const [modo, setModo] = useState('CONSTRUIR');       // CONSTRUIR | REGLA | MOVER
+    const [modo, setModo] = useState('CONSTRUIR');       // CONSTRUIR | REGLA | MOVER | GRIFO
     const [tipo, setTipo] = useState('PRISMA');
     const [n, setN] = useState(6);
     const [r, setR] = useState(0.4);
@@ -303,6 +351,30 @@ export default function SalaGeometria3D({ onExit }) {
     const [ggbEstado, setGgbEstado] = useState('');
     const [aviso, setAviso] = useState('');
     const [ayuda, setAyuda] = useState(false);
+
+    // experimento del grifo (¿cuántos conos caben en el cilindro?)
+    const [expPoligonal, setExpPoligonal] = useState(false);
+    const [expLados, setExpLados] = useState(6);
+    const [expR, setExpR] = useState(0.3);
+    const [expH, setExpH] = useState(0.6);
+    const [expFase, setExpFase] = useState('VACIO');
+    const [expVertidos, setExpVertidos] = useState(0);
+    const [expAuto, setExpAuto] = useState(false);
+    const [expLitros, setExpLitros] = useState({ cono: 0, cil: 0 });
+
+    // desarrollo plano (red) del cuerpo seleccionado
+    const [desarrolloId, setDesarrolloId] = useState(null);
+    const [desT, setDesT] = useState(0);
+    const [desPlay, setDesPlay] = useState(false);
+    const [desInfo, setDesInfo] = useState(null);
+    const [desPestanas, setDesPestanas] = useState(true);
+    const [desVertical, setDesVertical] = useState(true);
+
+    // poliedros de Euler: contar vértices, aristas y caras
+    const [poliId, setPoliId] = useState('cubo');
+    const [poliMarcas, setPoliMarcas] = useState(() => new Set());
+    const [poliCaras, setPoliCaras] = useState(true);
+    const [poliGirar, setPoliGirar] = useState(false);
 
     // refs de three
     const escenaRef = useRef(null);
@@ -322,6 +394,12 @@ export default function SalaGeometria3D({ onExit }) {
     const arrastreRef = useRef(null);
     const estRef = useRef({});
     const accionesRef = useRef({});
+    const grupoExpRef = useRef(null);
+    const grupoDesRef = useRef(null);
+    const expRef = useRef(null);
+    const desRef = useRef(null);
+    const grupoPoliRef = useRef(null);
+    const poliRef = useRef(null);
 
     const [esperandoB, setEsperandoB] = useState(false);
 
@@ -520,6 +598,7 @@ export default function SalaGeometria3D({ onExit }) {
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.setSize(cont.clientWidth, cont.clientHeight);
         renderer.outputColorSpace = THREE.SRGBColorSpace;
+        renderer.localClippingEnabled = true;     // lo usa el agua del experimento del grifo
         renderer.xr.enabled = true;
         cont.appendChild(renderer.domElement);
         rendererRef.current = renderer;
@@ -567,6 +646,22 @@ export default function SalaGeometria3D({ onExit }) {
         fantasma.visible = false;
         escena.add(fantasma);
         fantasmaRef.current = fantasma;
+
+        // contenedores del experimento del grifo y del desarrollo plano
+        const grupoExp = new THREE.Group();
+        grupoExp.visible = false;
+        escena.add(grupoExp);
+        grupoExpRef.current = grupoExp;
+
+        const grupoDes = new THREE.Group();
+        grupoDes.visible = false;
+        escena.add(grupoDes);
+        grupoDesRef.current = grupoDes;
+
+        const grupoPoli = new THREE.Group();
+        grupoPoli.visible = false;
+        escena.add(grupoPoli);
+        grupoPoliRef.current = grupoPoli;
 
         // marcador del primer punto de una medición
         const marcadorA = new THREE.Mesh(
@@ -654,7 +749,7 @@ export default function SalaGeometria3D({ onExit }) {
         const reloj = new THREE.Clock();
         const UP = new THREE.Vector3(0, 1, 0);
 
-        const objetivosSolidos = () => [...mallasRef.current.values()];
+        const objetivosSolidos = () => [...mallasRef.current.values(), ...(poliRef.current?.piezas || [])];
 
         function rayoDeMando(m) {
             const mat = new THREE.Matrix4().identity().extractRotation(m.ctrl.matrixWorld);
@@ -738,8 +833,88 @@ export default function SalaGeometria3D({ onExit }) {
             });
         }
 
+        /* ---- experimento del grifo: máquina de estados por fotograma ---- */
+        const posCono = new THREE.Vector3();
+        function tickExperimento(dt) {
+            const E = expRef.current;
+            if (!E?.api) return;
+            const med = E.api.medidas;
+            const VC = med.vConoTotal;
+            let cambio = false;
+
+            switch (E.fase) {
+                case 'LLENANDO':
+                    E.vCono = Math.min(VC, E.vCono + (VC / 2.6) * dt);
+                    if (E.vCono >= VC - 1e-9) { E.vCono = VC; E.fase = 'LLENO'; E.espera = 0.5; cambio = true; }
+                    break;
+                case 'LLENO':
+                    if (E.auto) { E.espera -= dt; if (E.espera <= 0) { E.fase = 'MOVIENDO'; cambio = true; } }
+                    break;
+                case 'MOVIENDO':
+                    if (E.tMov === 0) E.lleno = E.vCono >= VC - 1e-6;   // ¿se vierte el recipiente lleno?
+                    E.tMov = Math.min(1, E.tMov + dt / 0.9);
+                    if (E.tMov >= 1) { E.fase = 'VERTIENDO'; cambio = true; }
+                    break;
+                case 'VERTIENDO': {
+                    const d = Math.min(E.vCono, (VC / 1.8) * dt);
+                    E.vCono -= d;
+                    E.vCil = Math.min(med.vCilTotal, E.vCil + d);
+                    if (E.vCono <= 1e-9) {
+                        E.vCono = 0;
+                        if (E.lleno) E.vertidos += 1;
+                        else E.exacto = false;             // un vertido a medias rompe la cuenta exacta
+                        if (E.exacto) E.vCil = E.vertidos * VC;   // ajuste exacto: sin deriva numérica
+                        E.fase = 'VOLVIENDO'; cambio = true;
+                    }
+                    break;
+                }
+                case 'VOLVIENDO':
+                    E.tMov = Math.max(0, E.tMov - dt / 0.9);
+                    if (E.tMov <= 0) {
+                        if (E.vertidos >= 3) { E.fase = 'FIN'; E.auto = false; }
+                        else E.fase = E.auto ? 'LLENANDO' : 'VACIO';
+                        cambio = true;
+                    }
+                    break;
+                default: break;
+            }
+
+            posCono.set(
+                THREE.MathUtils.lerp(X_CONO, X_CIL, E.tMov),
+                med.alturaMesa + THREE.MathUtils.lerp(0, med.h + 0.28, E.tMov),
+                0
+            );
+            E.api.actualizar({
+                vCono: E.vCono, vCil: E.vCil, posCono,
+                grifoAbierto: E.fase === 'LLENANDO',
+                vertiendo: E.fase === 'VERTIENDO',
+            });
+
+            E.acum = (E.acum || 0) + dt;
+            if (cambio || E.acum > 0.12) {
+                E.acum = 0;
+                setExpLitros({ cono: E.vCono * 1000, cil: E.vCil * 1000 });
+                if (cambio) { setExpFase(E.fase); setExpVertidos(E.vertidos); setExpAuto(!!E.auto); }
+            }
+        }
+
+        /* ---- desarrollo plano: animación del desplegado ---- */
+        function tickDesarrollo(dt) {
+            const D = desRef.current;
+            if (!D?.api || !D.play) return;
+            D.t = Math.min(1, D.t + dt / 2.6);
+            D.api.aplicar(D.t);
+            D.acum = (D.acum || 0) + dt;
+            if (D.t >= 1) { D.play = false; setDesPlay(false); setDesT(1); }
+            else if (D.acum > 0.1) { D.acum = 0; setDesT(D.t); }
+        }
+
         renderer.setAnimationLoop(() => {
             const dt = Math.min(reloj.getDelta(), 0.05);
+            tickExperimento(dt);
+            tickDesarrollo(dt);
+            const P = poliRef.current;
+            if (P?.girando) P.giratorio.rotation.y += dt * 0.35;
             if (renderer.xr.isPresenting) {
                 moverJugador(dt);
                 actualizarPunteros();
@@ -842,6 +1017,8 @@ export default function SalaGeometria3D({ onExit }) {
             }
             m.position.set(s.pos.x, s.pos.y, s.pos.z);
             m.rotation.y = s.rotY || 0;
+            // se esconde mientras se muestra su desarrollo plano o una escena aparte
+            m.visible = modo !== 'GRIFO' && modo !== 'POLIEDROS' && s.id !== desarrolloId;
             m.material.opacity = transparente ? 0.72 : 1;
             m.material.transparent = transparente;
             m.material.emissive.setHex(seleccionado === s.id ? 0x334455 : 0x000000);
@@ -886,7 +1063,7 @@ export default function SalaGeometria3D({ onExit }) {
             pts.push(new THREE.Vector3(s.pos.x, s.pos.y + alturaVis, s.pos.z));
         });
         snapRef.current = pts;
-    }, [solidos, seleccionado, etiquetas, transparente]);
+    }, [solidos, seleccionado, etiquetas, transparente, modo, desarrolloId]);
 
     /* ---------- sincronizar medidas ---------- */
 
@@ -925,7 +1102,8 @@ export default function SalaGeometria3D({ onExit }) {
             escena.add(g);
             mapa.set(md.id, g);
         });
-    }, [medidas]);
+        mapa.forEach(g => { g.visible = modo !== 'GRIFO' && modo !== 'POLIEDROS'; });
+    }, [medidas, modo]);
 
     /* ---------- fantasma de previsualización ---------- */
 
@@ -938,6 +1116,218 @@ export default function SalaGeometria3D({ onExit }) {
         f.geometry = crearGeometria(s);
         f.material.color.setHex(t.color);
     }, [tipo, n, r, h]);
+
+    /* ---------- experimento del grifo: montaje y acciones ---------- */
+
+    useEffect(() => {
+        const cont = grupoExpRef.current;
+        if (!cont) return;
+        if (modo !== 'GRIFO') { cont.visible = false; return; }
+        const api = crearExperimentoGrifo({ poligonal: expPoligonal, n: expLados, r: expR, h: expH });
+        cont.add(api.grupo);
+        cont.visible = true;
+        expRef.current = { api, fase: 'VACIO', vCono: 0, vCil: 0, vertidos: 0, tMov: 0, auto: false, espera: 0, exacto: true, lleno: true };
+        setExpFase('VACIO'); setExpVertidos(0); setExpAuto(false); setExpLitros({ cono: 0, cil: 0 });
+        return () => { cont.remove(api.grupo); api.dispose(); expRef.current = null; };
+    }, [modo, expPoligonal, expLados, expR, expH]);
+
+    // al entrar en el modo grifo, colocarse frente a la mesa
+    useEffect(() => {
+        if (modo !== 'GRIFO') return;
+        const rnd = rendererRef.current, cam = camaraRef.current, ctr = controlesRef.current;
+        if (rnd?.xr?.isPresenting) {
+            const jug = jugadorRef.current;
+            if (jug) { jug.position.set(0, 0, 1.7); jug.rotation.y = 0; }
+        } else if (cam && ctr) {
+            cam.position.set(0, 1.5, 2.3);
+            ctr.target.set(0, ALTURA_MESA + expH * 0.6, 0);
+            ctr.update();
+        }
+    }, [modo, expH]);
+
+    const accionExperimento = useCallback(() => {
+        const E = expRef.current;
+        if (!E) return;
+        if (E.fase === 'VACIO') { E.fase = 'LLENANDO'; setExpFase('LLENANDO'); }
+        else if (E.fase === 'LLENANDO') { E.fase = 'LLENO'; setExpFase('LLENO'); }   // cerrar el grifo
+        else if (E.fase === 'LLENO') { E.fase = 'MOVIENDO'; setExpFase('MOVIENDO'); }
+        else if (E.fase === 'FIN') accionesRef.current.reiniciarExp?.();
+    }, []);
+
+    const reiniciarExperimento = useCallback(() => {
+        const E = expRef.current;
+        if (!E) return;
+        Object.assign(E, { fase: 'VACIO', vCono: 0, vCil: 0, vertidos: 0, tMov: 0, auto: false, espera: 0, exacto: true, lleno: true });
+        setExpFase('VACIO'); setExpVertidos(0); setExpAuto(false); setExpLitros({ cono: 0, cil: 0 });
+    }, []);
+
+    const alternarAutoExp = useCallback(() => {
+        const E = expRef.current;
+        if (!E) return;
+        E.auto = !E.auto;
+        if (E.auto && (E.fase === 'VACIO' || E.fase === 'FIN')) {
+            if (E.fase === 'FIN') Object.assign(E, { vCono: 0, vCil: 0, vertidos: 0, tMov: 0 });
+            E.fase = 'LLENANDO';
+            setExpFase('LLENANDO'); setExpVertidos(0);
+        }
+        setExpAuto(E.auto);
+    }, []);
+
+    accionesRef.current.accionExp = accionExperimento;
+    accionesRef.current.reiniciarExp = reiniciarExperimento;
+
+    /* ---------- poliedros de Euler: contar V, A y C ---------- */
+
+    useEffect(() => {
+        const cont = grupoPoliRef.current;
+        if (!cont) return;
+        if (modo !== 'POLIEDROS') { cont.visible = false; poliRef.current = null; return; }
+
+        const api = crearPoliedroEuler(poliId, 0.45);
+        api.grupo.position.set(0, 1.25, 0);
+        cont.add(api.grupo);
+        cont.visible = true;
+        api.girando = poliGirar;
+        poliRef.current = api;
+        setPoliMarcas(new Set());
+
+        // peana para que no quede flotando
+        const peana = new THREE.Group();
+        const matP = new THREE.MeshStandardMaterial({ color: 0x24394d, roughness: 0.8 });
+        const col = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 0.82, 20), matP);
+        col.position.y = 0.41;
+        const pie = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.27, 0.05, 28), matP);
+        pie.position.y = 0.025;
+        peana.add(col, pie);
+        cont.add(peana);
+
+        return () => {
+            cont.remove(api.grupo, peana);
+            api.dispose();
+            peana.traverse(o => { o.geometry?.dispose?.(); });
+            matP.dispose();
+            poliRef.current = null;
+        };
+    }, [modo, poliId]);
+
+    useEffect(() => { poliRef.current?.aplicarMarcas(poliMarcas); }, [poliMarcas]);
+    useEffect(() => { poliRef.current?.setCaras(poliCaras); }, [poliCaras, poliId, modo]);
+    useEffect(() => { if (poliRef.current) poliRef.current.girando = poliGirar; }, [poliGirar, poliId, modo]);
+
+    // al entrar en el modo, colocarse frente al poliedro
+    useEffect(() => {
+        if (modo !== 'POLIEDROS') return;
+        const rnd = rendererRef.current, cam = camaraRef.current, ctr = controlesRef.current;
+        if (rnd?.xr?.isPresenting) {
+            const jug = jugadorRef.current;
+            if (jug) { jug.position.set(0, 0, 1.2); jug.rotation.y = 0; }
+        } else if (cam && ctr) {
+            cam.position.set(0, 1.5, 1.85);
+            ctr.target.set(0, 1.25, 0);
+            ctr.update();
+        }
+    }, [modo]);
+
+    const marcarPieza = useCallback((obj) => {
+        const clave = obj?.userData?.clave;
+        if (!clave) return;
+        setPoliMarcas(prev => {
+            const s = new Set(prev);
+            if (s.has(clave)) s.delete(clave); else s.add(clave);
+            return s;
+        });
+    }, []);
+    accionesRef.current.marcarPieza = marcarPieza;
+
+    const marcarTodo = useCallback((on) => {
+        const api = poliRef.current;
+        if (!api) return;
+        setPoliMarcas(on ? new Set(api.piezas.map(p => p.userData.clave)) : new Set());
+    }, []);
+
+    const cuentaPoli = { V: 0, A: 0, C: 0 };
+    poliMarcas.forEach(k => { if (cuentaPoli[k[0]] !== undefined) cuentaPoli[k[0]]++; });
+    const statsPoli = POLIEDROS[poliId].stats;
+    const totalesPoli = { V: statsPoli.vertices, A: statsPoli.aristas, C: statsPoli.caras };
+    const poliCompleto = cuentaPoli.V === totalesPoli.V && cuentaPoli.A === totalesPoli.A && cuentaPoli.C === totalesPoli.C;
+
+    /* ---------- desarrollo plano (red) del cuerpo seleccionado ---------- */
+
+    useEffect(() => {
+        const cont = grupoDesRef.current;
+        if (!cont) return;
+        const s = solidos.find(x => x.id === desarrolloId);
+        if (!s) { cont.visible = false; desRef.current = null; setDesInfo(null); return; }
+        const api = crearDesarrollo({ tipo: s.tipo, n: s.n, r: s.r, h: s.h, color: s.color });
+        if (!api) {
+            desRef.current = null;
+            cont.visible = false;
+            setDesInfo({ desarrollable: false });
+            return;
+        }
+        cont.position.set(s.pos.x, s.pos.y, s.pos.z);
+        cont.rotation.y = s.rotY || 0;
+        cont.add(api.grupo);
+        cont.visible = true;
+        desRef.current = { api, t: 0, play: true };     // se despliega solo al abrirlo
+        api.setPestanas(desPestanas);
+        api.setVertical(desVertical);
+        api.aplicar(0);
+        setDesT(0); setDesPlay(true); setDesInfo(api.info);
+        accionesRef.current.encuadrarDes?.();
+        return () => { cont.remove(api.grupo); api.dispose(); desRef.current = null; };
+    }, [desarrolloId, solidos]);
+
+    /** Coloca la cámara de escritorio para ver la lámina entera, no de canto. */
+    const encuadrarDesarrollo = useCallback(() => {
+        const D = desRef.current, cont = grupoDesRef.current;
+        const cam = camaraRef.current, ctr = controlesRef.current, rnd = rendererRef.current;
+        if (!D?.api || !cont || !cam || !ctr || rnd?.xr?.isPresenting) return;
+        const { centro, radio, vertical } = D.api.encuadre();
+        cont.updateMatrixWorld(true);
+        const c = cont.localToWorld(centro.clone());
+        const d = Math.max(1.1, radio * 2.3);
+        if (vertical) cam.position.set(c.x, c.y + radio * 0.15, c.z + d);
+        else cam.position.set(c.x, c.y + d * 0.95, c.z + d * 0.5);
+        ctr.target.copy(c);
+        ctr.update();
+    }, []);
+    accionesRef.current.encuadrarDes = encuadrarDesarrollo;
+
+    useEffect(() => {
+        const D = desRef.current;
+        if (!D?.api) return;
+        D.api.setVertical(desVertical);
+        encuadrarDesarrollo();
+    }, [desVertical, encuadrarDesarrollo]);
+
+    useEffect(() => {
+        const D = desRef.current;
+        if (!D?.api) return;
+        D.api.setPestanas(desPestanas);
+        D.api.aplicar(D.t);
+    }, [desPestanas]);
+
+    const fijarDesT = useCallback((v) => {
+        const D = desRef.current;
+        setDesT(v);
+        if (!D?.api) return;
+        D.t = v; D.play = false;
+        D.api.aplicar(v);
+        setDesPlay(false);
+    }, []);
+
+    const alternarDesarrollo = useCallback((id) => {
+        setDesarrolloId(prev => (prev === id ? null : id));
+    }, []);
+
+    const reproducirDesarrollo = useCallback(() => {
+        const D = desRef.current;
+        if (!D?.api) return;
+        if (D.t >= 1) { D.t = 0; D.api.aplicar(0); setDesT(0); }
+        D.play = true;
+        setDesPlay(true);
+    }, []);
 
     /* ---------- interacción de escritorio (ratón) ---------- */
 
@@ -1009,6 +1399,12 @@ export default function SalaGeometria3D({ onExit }) {
             alSoltar();
             if (!rapido) return;
             const st = estRef.current;
+            if (st.modo === 'GRIFO') { accionesRef.current.accionExp?.(); return; }
+            if (st.modo === 'POLIEDROS') {
+                const golpe = rayo(ev).intersectObjects(poliRef.current?.piezas || [], false)[0];
+                if (golpe) accionesRef.current.marcarPieza?.(golpe.object);
+                return;
+            }
             const r0 = rayo(ev);
             const objetos = [sueloRef.current, ...mallasRef.current.values()];
             const hit = r0.intersectObjects(objetos, false)[0];
@@ -1047,10 +1443,23 @@ export default function SalaGeometria3D({ onExit }) {
         const repintarPanel = () => {
             const panel = panelRef.current;
             if (!panel) return;
+            const enGrifo = modo === 'GRIFO';
             const st = {
-                modo, tipo, n, r, h, etiquetas,
-                numSolidos: estRef.current.solidos.length,
-                numMedidas: estRef.current.medidas.length,
+                modo, etiquetas,
+                tipo: enGrifo ? (expPoligonal ? 'PIRAMIDE' : 'CONO') : tipo,
+                n: enGrifo ? expLados : n,
+                r: enGrifo ? expR : r,
+                h: enGrifo ? expH : h,
+                expPoligonal, expAuto, expEtiqueta: etiquetaAccionGrifo(expFase),
+                seleccionado: !!estRef.current.seleccionado,
+                desarrollo: !!desarrolloId,
+                poliId, poliCaras, poliGirar,
+                poliTexto: POLIEDROS[poliId].name,
+                poliCuenta: `V ${cuentaPoli.V}/${totalesPoli.V}   ·   A ${cuentaPoli.A}/${totalesPoli.A}   ·   C ${cuentaPoli.C}/${totalesPoli.C}`,
+                poliCompleto,
+                resumen: modo === 'POLIEDROS'
+                    ? (poliCompleto ? 'V − A + C = 2 ✓' : 'señala y cuenta')
+                    : `${estRef.current.solidos.length} cuerpos · ${estRef.current.medidas.length} medidas`,
             };
             panel.userData.botones = botonesPanel(st);
             dibujarPanel(panel.userData.canvas.getContext('2d'), st, panel.userData.botones, panel.userData.hover);
@@ -1061,14 +1470,33 @@ export default function SalaGeometria3D({ onExit }) {
 
         const pulsarBoton = (id) => {
             const [clave, valor] = id.split(':');
+            const enGrifo = estRef.current.modo === 'GRIFO';
             switch (clave) {
                 case 'tipo':  setTipo(valor); break;
-                case 'lados': setN(parseInt(valor, 10)); break;
+                case 'lados': enGrifo ? setExpLados(parseInt(valor, 10)) : setN(parseInt(valor, 10)); break;
                 case 'modo':  setModo(valor); fijarPuntoA(null); break;
-                case 'r-': setR(v => clamp(redondear(v - PASO, 2), R_MIN, R_MAX)); break;
-                case 'r+': setR(v => clamp(redondear(v + PASO, 2), R_MIN, R_MAX)); break;
-                case 'h-': setH(v => clamp(redondear(v - PASO, 2), H_MIN, H_MAX)); break;
-                case 'h+': setH(v => clamp(redondear(v + PASO, 2), H_MIN, H_MAX)); break;
+                case 'r-': enGrifo ? setExpR(v => clamp(redondear(v - PASO, 2), 0.15, 0.5))
+                                   : setR(v => clamp(redondear(v - PASO, 2), R_MIN, R_MAX)); break;
+                case 'r+': enGrifo ? setExpR(v => clamp(redondear(v + PASO, 2), 0.15, 0.5))
+                                   : setR(v => clamp(redondear(v + PASO, 2), R_MIN, R_MAX)); break;
+                case 'h-': enGrifo ? setExpH(v => clamp(redondear(v - PASO, 2), 0.3, 0.95))
+                                   : setH(v => clamp(redondear(v - PASO, 2), H_MIN, H_MAX)); break;
+                case 'h+': enGrifo ? setExpH(v => clamp(redondear(v + PASO, 2), 0.3, 0.95))
+                                   : setH(v => clamp(redondear(v + PASO, 2), H_MIN, H_MAX)); break;
+                case 'expforma':  setExpPoligonal(v => !v); break;
+                case 'expauto':   alternarAutoExp(); break;
+                case 'expaccion': accionExperimento(); break;
+                case 'expreset':  reiniciarExperimento(); break;
+                case 'desarrollo': {
+                    const sel = estRef.current.seleccionado;
+                    if (sel) alternarDesarrollo(sel);
+                    break;
+                }
+                case 'poli':       setPoliId(valor); break;
+                case 'policaras':  setPoliCaras(v => !v); break;
+                case 'poligirar':  setPoliGirar(v => !v); break;
+                case 'polireset':  setPoliMarcas(new Set()); break;
+                case 'polimarcar': marcarTodo(true); break;
                 case 'deshacer':  deshacer(); break;
                 case 'limpiar':   vaciar(); break;
                 case 'etiquetas': setEtiquetas(v => !v); break;
@@ -1081,9 +1509,15 @@ export default function SalaGeometria3D({ onExit }) {
         accionesRef.current.gatillo = (m, abajo) => {
             if (!abajo) { accionesRef.current.finArrastre?.(m); return; }
             if (m.sobrePanel) { pulsarBoton(m.sobrePanel.id); return; }
+            const st = estRef.current;
+            // en el experimento, apuntar a la escena y disparar avanza el paso
+            if (st.modo === 'GRIFO') { accionExperimento(); return; }
             const hit = m.ultimoHit;
             if (!hit) return;
-            const st = estRef.current;
+            if (st.modo === 'POLIEDROS') {
+                if (hit.object.userData?.clave) marcarPieza(hit.object);
+                return;
+            }
             if (st.modo === 'CONSTRUIR') {
                 if (hit.object === sueloRef.current) anadirSolido(hit.point);
                 else setSeleccionado(hit.object.userData?.id || null);
@@ -1149,10 +1583,13 @@ export default function SalaGeometria3D({ onExit }) {
         };
 
         return () => { accionesRef.current.repintarPanel = null; };
-    }, [modo, tipo, n, r, h, etiquetas, anadirSolido, anadirMedida, deshacer, vaciar, exportarAGeoGebra, fijarPuntoA]);
+    }, [modo, tipo, n, r, h, etiquetas, anadirSolido, anadirMedida, deshacer, vaciar, exportarAGeoGebra, fijarPuntoA,
+        expPoligonal, expAuto, expFase, expR, expH, expLados, desarrolloId,
+        accionExperimento, reiniciarExperimento, alternarAutoExp, alternarDesarrollo,
+        poliId, poliCaras, poliGirar, poliMarcas, marcarPieza, marcarTodo]);
 
     // refrescar cabecera del panel cuando cambian los recuentos
-    useEffect(() => { accionesRef.current.repintarPanel?.(); }, [solidos.length, medidas.length, seleccionado]);
+    useEffect(() => { accionesRef.current.repintarPanel?.(); }, [solidos.length, medidas.length, seleccionado, expFase, expVertidos]);
 
     /* ---------- guardar / cargar ---------- */
 
@@ -1178,6 +1615,14 @@ export default function SalaGeometria3D({ onExit }) {
         const mt = metricas(s);
         return { V: acc.V + mt.V, A: acc.A + mt.AT };
     }, { V: 0, A: 0 });
+
+    // datos del experimento del grifo
+    const expAB = expPoligonal
+        ? (expLados / 2) * expR * expR * Math.sin((2 * Math.PI) / expLados)
+        : Math.PI * expR * expR;
+    const expVCil = expAB * expH;
+    const expVCono = expVCil / 3;
+    const enMovimientoExp = ['MOVIENDO', 'VERTIENDO', 'VOLVIENDO'].includes(expFase);
 
     const solSel = solidos.find(s => s.id === seleccionado) || null;
     const mtSel = solSel ? metricas(solSel) : null;
@@ -1227,10 +1672,128 @@ export default function SalaGeometria3D({ onExit }) {
                 <div style={est.lateral}>
                     <div style={est.seccion}>Modo</div>
                     <div style={est.fila}>
-                        {[['CONSTRUIR', '🏗️ Construir'], ['REGLA', '📏 Regla'], ['MOVER', '✋ Mover']].map(([m, l]) => (
+                        {[['CONSTRUIR', '🏗️ Construir'], ['REGLA', '📏 Regla'], ['MOVER', '✋ Mover'],
+                          ['GRIFO', '🚰 Grifo'], ['POLIEDROS', '🔷 Poliedros']].map(([m, l]) => (
                             <button key={m} onClick={() => { setModo(m); fijarPuntoA(null); }} style={est.btn(modo === m)}>{l}</button>
                         ))}
                     </div>
+
+                    {modo === 'GRIFO' ? (<>
+                        <div style={est.seccion}>¿Cuántas veces cabe?</div>
+                        <div style={{ ...est.tarjeta, borderColor: '#00897b' }}>
+                            Llena el recipiente <b>{expPoligonal ? 'piramidal' : 'cónico'}</b> con el grifo y viértelo en
+                            el <b>{expPoligonal ? 'prisma' : 'cilindro'}</b> de <b>igual base y altura</b>.
+                            ¿Cuántos harán falta?
+                        </div>
+
+                        <div style={est.seccion}>Pareja de recipientes</div>
+                        <div style={est.fila}>
+                            <button onClick={() => setExpPoligonal(false)} style={est.btn(!expPoligonal)}>🍦 Cono → Cilindro</button>
+                            <button onClick={() => setExpPoligonal(true)} style={est.btn(expPoligonal)}>🔺 Pirámide → Prisma</button>
+                        </div>
+                        {expPoligonal && (
+                            <div style={{ ...est.fila, marginTop: 6 }}>
+                                {LADOS.map(k => (
+                                    <button key={k} onClick={() => setExpLados(k)} style={est.chip(expLados === k)}>{k}</button>
+                                ))}
+                            </div>
+                        )}
+
+                        <div style={est.seccion}>Radio de la base · {redondear(expR)} m</div>
+                        <input type="range" min={0.15} max={0.5} step={0.05} value={expR}
+                            onChange={e => setExpR(parseFloat(e.target.value))} style={{ width: '100%' }} />
+                        <div style={est.seccion}>Altura · {redondear(expH)} m</div>
+                        <input type="range" min={0.3} max={0.95} step={0.05} value={expH}
+                            onChange={e => setExpH(parseFloat(e.target.value))} style={{ width: '100%' }} />
+
+                        <div style={est.seccion}>Experimento</div>
+                        <button onClick={accionExperimento} disabled={enMovimientoExp}
+                            style={{ ...est.btn(!enMovimientoExp, '#0288d1'), width: '100%', padding: 12, fontSize: '0.95rem', opacity: enMovimientoExp ? 0.6 : 1 }}>
+                            {etiquetaAccionGrifo(expFase)}
+                        </button>
+                        <div style={{ ...est.fila, marginTop: 6 }}>
+                            <button onClick={alternarAutoExp} style={est.btn(expAuto, '#6a1b9a')}>{expAuto ? '⏸️ Auto ON' : '▶️ Automático'}</button>
+                            <button onClick={reiniciarExperimento} style={est.btn(false)}>🔄 Reiniciar</button>
+                        </div>
+
+                        <div style={{ ...est.tarjeta, marginTop: 10, textAlign: 'center' }}>
+                            <div style={{ fontSize: '1.6rem', fontWeight: 900, color: expVertidos >= 3 ? '#66bb6a' : '#ffd54f' }}>
+                                {expVertidos} / 3
+                            </div>
+                            <div style={{ color: '#a9c1d4', fontSize: '0.75rem' }}>vertidos completos</div>
+                        </div>
+
+                        <div style={{ ...est.tarjeta, marginTop: 6 }}>
+                            <div>🍦 {expPoligonal ? 'Pirámide' : 'Cono'}: <b>{redondear(expLitros.cono, 1)}</b> L</div>
+                            <div>🥫 {expPoligonal ? 'Prisma' : 'Cilindro'}: <b>{redondear(expLitros.cil, 1)}</b> L</div>
+                            <div style={{ marginTop: 6, borderTop: '1px solid #234863', paddingTop: 6, color: '#a9c1d4', fontSize: '0.75rem' }}>
+                                A_base = {redondear(expAB, 4)} m²<br />
+                                V del {expPoligonal ? 'prisma' : 'cilindro'} = A_base·h = <b>{redondear(expVCil, 4)}</b> m³ = {redondear(expVCil * 1000, 1)} L<br />
+                                V de la {expPoligonal ? 'pirámide' : 'cono'} = (A_base·h)/3 = <b>{redondear(expVCono, 4)}</b> m³ = {redondear(expVCono * 1000, 1)} L
+                            </div>
+                        </div>
+
+                        {expVertidos >= 3 && (
+                            <div style={{ ...est.tarjeta, marginTop: 8, background: '#0d3a33', borderColor: '#00897b' }}>
+                                🎉 <b>¡Exactamente 3 veces!</b><br />
+                                El {expPoligonal ? 'prisma' : 'cilindro'} se ha llenado justo con 3 recipientes.
+                                Por eso el volumen de una pirámide o un cono es
+                                <b> la tercera parte</b> del prisma o cilindro de la misma base y la misma altura:
+                                <div style={{ marginTop: 6, textAlign: 'center', fontSize: '0.95rem', color: '#7fe6d8' }}>
+                                    V = (A_base · h) / 3
+                                </div>
+                            </div>
+                        )}
+                    </>) : modo === 'POLIEDROS' ? (<>
+                        <div style={est.seccion}>Poliedros regulares</div>
+                        <div style={{ ...est.fila, display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+                            {IDS_POLIEDROS.map(pid => (
+                                <button key={pid} onClick={() => setPoliId(pid)} style={est.btn(poliId === pid)}>
+                                    {POLIEDROS[pid].emoji} {POLIEDROS[pid].name}
+                                </button>
+                            ))}
+                        </div>
+
+                        <div style={{ ...est.tarjeta, marginTop: 10 }}>
+                            Señala con el ratón (o con el mando) cada <b>vértice</b>, <b>arista</b> y <b>cara</b> para
+                            irlos contando. Vuelve a señalarlos para desmarcarlos.
+                        </div>
+
+                        <div style={est.seccion}>Recuento</div>
+                        {[['V', 'Vértices', '#ffd54f'], ['A', 'Aristas', '#ffd54f'], ['C', 'Caras', '#66bb6a']].map(([k, etq, col]) => (
+                            <div key={k} style={{ ...est.tarjeta, marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span>{etq}</span>
+                                <b style={{ color: cuentaPoli[k] === totalesPoli[k] ? col : '#a9c1d4', fontSize: '1.05rem' }}>
+                                    {cuentaPoli[k]} / {totalesPoli[k]}
+                                </b>
+                            </div>
+                        ))}
+
+                        <div style={{
+                            ...est.tarjeta, textAlign: 'center', fontSize: '1rem',
+                            background: poliCompleto ? '#0d3a33' : '#12263a',
+                            borderColor: poliCompleto ? '#00897b' : '#234863',
+                        }}>
+                            <div style={{ color: '#7fa7c4', fontSize: '0.72rem', marginBottom: 4 }}>FÓRMULA DE EULER</div>
+                            <b style={{ color: poliCompleto ? '#8bf5c0' : '#d7e6f2' }}>
+                                {cuentaPoli.V} − {cuentaPoli.A} + {cuentaPoli.C} = {cuentaPoli.V - cuentaPoli.A + cuentaPoli.C}
+                            </b>
+                            {poliCompleto && <div style={{ marginTop: 6, fontSize: '0.82rem' }}>🎉 ¡V − A + C = 2 en todos los poliedros!</div>}
+                        </div>
+
+                        <div style={{ ...est.fila, marginTop: 10 }}>
+                            <button onClick={() => setPoliCaras(v => !v)} style={est.btn(poliCaras)}>👁️ Caras</button>
+                            <button onClick={() => setPoliGirar(v => !v)} style={est.btn(poliGirar)}>🌀 Girar</button>
+                        </div>
+                        <div style={{ ...est.fila, marginTop: 6 }}>
+                            <button onClick={() => marcarTodo(true)} style={est.btn(false)}>✅ Marcar todo</button>
+                            <button onClick={() => marcarTodo(false)} style={est.btn(false)}>🔄 Reiniciar</button>
+                        </div>
+
+                        <div style={{ ...est.tarjeta, marginTop: 10 }}>
+                            💡 {POLIEDROS[poliId].fact}
+                        </div>
+                    </>) : (<>
 
                     <div style={est.seccion}>Cuerpo geométrico</div>
                     <div style={{ ...est.fila, display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
@@ -1298,6 +1861,58 @@ export default function SalaGeometria3D({ onExit }) {
                             </div>
                             <button onClick={() => borrarSolido(solSel.id)} style={{ ...est.btn(false, '#c62828'), marginTop: 8, width: '100%' }}>🗑️ Borrar este cuerpo</button>
                         </div>
+
+                        <div style={est.seccion}>Desarrollo plano</div>
+                        <button onClick={() => alternarDesarrollo(solSel.id)}
+                            style={{ ...est.btn(desarrolloId === solSel.id, '#ef6c00'), width: '100%', padding: 10 }}>
+                            {desarrolloId === solSel.id ? '📦 Volver a montar' : '📐 Ver desarrollo plano'}
+                        </button>
+
+                        {desarrolloId === solSel.id && desInfo && desInfo.desarrollable === false && (
+                            <div style={{ ...est.tarjeta, marginTop: 8 }}>
+                                ⚠️ La <b>esfera no es desarrollable</b>: no existe ninguna forma de extenderla sobre un
+                                plano sin deformarla. Por eso los mapas del mundo siempre distorsionan algo.
+                            </div>
+                        )}
+
+                        {desarrolloId === solSel.id && desInfo?.desarrollable && (<>
+                            <div style={{ ...est.fila, marginTop: 8, alignItems: 'center' }}>
+                                <button onClick={reproducirDesarrollo} style={est.btn(desPlay, '#ef6c00')}>
+                                    {desPlay ? '⏳ Desplegando…' : '▶️ Animar'}
+                                </button>
+                                <button onClick={() => fijarDesT(desT > 0.5 ? 0 : 1)} style={est.btn(false)}>
+                                    {desT > 0.5 ? '📦 Plegar' : '📐 Abrir'}
+                                </button>
+                            </div>
+                            <input type="range" min={0} max={1} step={0.01} value={desT}
+                                onChange={e => fijarDesT(parseFloat(e.target.value))}
+                                style={{ width: '100%', marginTop: 8 }} />
+                            <div style={{ textAlign: 'center', fontSize: '0.72rem', color: '#7fa7c4' }}>
+                                {Math.round(desT * 100)}% desplegado
+                            </div>
+                            <div style={{ ...est.fila, marginTop: 6 }}>
+                                <button onClick={() => setDesVertical(true)} style={est.btn(desVertical, '#ef6c00')}>🖼️ De frente</button>
+                                <button onClick={() => setDesVertical(false)} style={est.btn(!desVertical, '#ef6c00')}>🛏️ En la mesa</button>
+                            </div>
+                            <div style={{ ...est.fila, marginTop: 6 }}>
+                                <button onClick={() => setDesPestanas(v => !v)} style={est.btn(desPestanas, '#ef6c00')}>🩹 Pestañas</button>
+                                <button onClick={encuadrarDesarrollo} style={est.btn(false)}>🎥 Encuadrar</button>
+                            </div>
+
+                            <div style={{ ...est.tarjeta, marginTop: 8 }}>
+                                <div style={{ fontWeight: 800, color: '#ffb74d', marginBottom: 6 }}>Cómo se recorta</div>
+                                <div style={{ marginBottom: 8, color: '#d7e6f2' }}>{desInfo.reparto}</div>
+                                <div style={{ fontWeight: 800, color: '#ffb74d', marginBottom: 6 }}>Piezas de la red</div>
+                                {desInfo.piezas.map((p, i) => <div key={i} style={{ marginBottom: 3 }}>• {p}</div>)}
+                                <div style={{ marginTop: 6, borderTop: '1px solid #234863', paddingTop: 6, color: '#a9c1d4', fontSize: '0.74rem' }}>
+                                    {desInfo.formula}
+                                </div>
+                                <div style={{ marginTop: 6, color: '#7fe6d8' }}>
+                                    A total = <b>{redondear(desInfo.areaTotal, 4)}</b> m²
+                                    &nbsp;(bases {redondear(desInfo.areaBase, 3)} + lateral {redondear(desInfo.areaLateral, 3)})
+                                </div>
+                            </div>
+                        </>)}
                     </>)}
 
                     <div style={est.seccion}>Cuerpos ({solidos.length})</div>
@@ -1328,6 +1943,7 @@ export default function SalaGeometria3D({ onExit }) {
                                 style={{ background: 'none', border: 'none', color: '#ef5350', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
                         </div>
                     ))}
+                    </>)}
                 </div>
 
                 {/* ── LIENZO 3D ── */}
@@ -1337,7 +1953,11 @@ export default function SalaGeometria3D({ onExit }) {
                         {modo === 'CONSTRUIR' && '🏗️ Clic en el suelo para colocar el cuerpo. Clic en un cuerpo para seleccionarlo.'}
                         {modo === 'REGLA' && `📏 Clic en dos puntos para medir. ${esperandoB ? 'Marca el punto B.' : 'Marca el punto A.'}`}
                         {modo === 'MOVER' && '✋ Arrastra un cuerpo por el suelo para moverlo.'}
-                        <div style={{ color: '#7fa7c4', marginTop: 4 }}>Rejilla: 1 casilla = 1 m (subdivisión 10 cm)</div>
+                        {modo === 'GRIFO' && `🚰 ${etiquetaAccionGrifo(expFase)} — haz clic en la escena o usa el botón del panel.`}
+                        {modo === 'POLIEDROS' && `🔷 ${POLIEDROS[poliId].name}: señala vértices, aristas y caras para contarlos.`}
+                        {modo !== 'GRIFO' && modo !== 'POLIEDROS' && <div style={{ color: '#7fa7c4', marginTop: 4 }}>Rejilla: 1 casilla = 1 m (subdivisión 10 cm)</div>}
+                        {modo === 'POLIEDROS' && <div style={{ color: '#7fa7c4', marginTop: 4 }}>V {cuentaPoli.V}/{totalesPoli.V} · A {cuentaPoli.A}/{totalesPoli.A} · C {cuentaPoli.C}/{totalesPoli.C}</div>}
+                        {modo === 'GRIFO' && <div style={{ color: '#7fa7c4', marginTop: 4 }}>Las marcas amarillas del cilindro señalan los tercios de su altura.</div>}
                     </div>
                     {aviso && (
                         <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', background: '#00897b', padding: '8px 16px', borderRadius: 20, fontWeight: 700, fontSize: '0.85rem', zIndex: 15 }}>
@@ -1386,6 +2006,34 @@ export default function SalaGeometria3D({ onExit }) {
 
                         <h3 style={{ color: '#ffd54f', marginBottom: 4 }}>📏 Regla virtual</h3>
                         <p style={{ margin: '0 0 12px' }}>En modo <b>Regla</b>, marca dos puntos del espacio: se dibuja el segmento y su longitud real (cm o m). Los puntos se <b>imantan a los vértices y aristas</b> de los cuerpos cuando estás a menos de 14 cm, para medir aristas, diagonales, alturas o distancias entre cuerpos con precisión.</p>
+
+                        <h3 style={{ color: '#ffd54f', marginBottom: 4 }}>🚰 Experimento del grifo</h3>
+                        <p style={{ margin: '0 0 12px' }}>
+                            En el modo <b>Grifo</b> aparece una mesa con dos recipientes de <b>la misma base y la misma
+                            altura</b>: uno cónico (o piramidal) y otro cilíndrico (o prismático). Abre el grifo, llena el
+                            primero y viértelo en el segundo. Hacen falta <b>exactamente 3 vertidos</b> para llenarlo, y cada
+                            uno llega justo a una de las marcas amarillas de los tercios: es la demostración de que
+                            <b> V = (A_base · h) / 3</b>. El nivel del agua se calcula con el volumen real, no por altura,
+                            así que en el cono sube despacio al principio y deprisa al final.
+                        </p>
+
+                        <h3 style={{ color: '#ffd54f', marginBottom: 4 }}>🔷 Poliedros de Euler</h3>
+                        <p style={{ margin: '0 0 12px' }}>
+                            Los cinco sólidos platónicos (los mismos del visor de Geometrix) a tamaño real sobre una
+                            peana. Señala cada <b>vértice</b>, <b>arista</b> y <b>cara</b> con el ratón o con el mando
+                            para contarlos: se quedan marcados y el panel lleva la cuenta. Al terminar comprobarás que
+                            siempre se cumple <b>V − A + C = 2</b>. Puedes ocultar las caras para ver el esqueleto de
+                            aristas y ponerlo a girar.
+                        </p>
+
+                        <h3 style={{ color: '#ffd54f', marginBottom: 4 }}>📐 Desarrollo plano</h3>
+                        <p style={{ margin: '0 0 12px' }}>
+                            Selecciona un cuerpo y pulsa <b>Ver desarrollo plano</b>: sus caras se despliegan con bisagras
+                            reales hasta quedar tumbadas en el suelo. Puedes animarlo o moverlo a mano con el deslizador para
+                            pararlo a medio plegar. El panel muestra cada pieza de la red (bases, rectángulos, triángulos, o
+                            el sector circular del cono) y cómo suman el área total. La esfera avisa de que no es
+                            desarrollable.
+                        </p>
 
                         <h3 style={{ color: '#ffd54f', marginBottom: 4 }}>📊 GeoGebra</h3>
                         <ul style={{ margin: '0 0 12px', paddingLeft: 20 }}>

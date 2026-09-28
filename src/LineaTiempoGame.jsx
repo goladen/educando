@@ -4,6 +4,8 @@ import { guardarRegistroLocal } from './utils/registrosLocales';
 import { collection, doc, getDoc, getDocs, addDoc, query, where, orderBy, limit } from 'firebase/firestore';
 import { Clock, ArrowLeft, Search, CheckCircle, RotateCcw, Info, X, Calendar } from 'lucide-react';
 import { BIBLIOTECA_LINEAS_TIEMPO } from './BibliotecaLineasTiempo';
+import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
+import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 
 // ── Helpers de fecha (mismos criterios que el editor) ────────
 const MESES = ['', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -550,7 +552,15 @@ function ModalEvento({ ev, onClose }) {
 }
 
 // ── Modal enviar al profesor ────────────────────────────────
-function ModalEnviarProfe({ datos, onClose }) {
+// Enlace de competición (&comp=…&cat=…): la puntuación va a esa prueba, no al profesor
+function ModalEnviarProfe(p) {
+    const comp = leerCompeticionUrl();
+    if (comp) return <ModalEnviarCompeticion compId={comp.compId} catId={comp.catId} puntos={Number(Math.round((p.datos?.nota || 0) * 100)) || 0}
+        detalle={soloPrimitivos(p.datos)} nombreJuego="Línea del tiempo" tituloReto={comp.titulo} onClose={p.onClose} />;
+    return <ModalEnviarProfeBase {...p} />;
+}
+
+function ModalEnviarProfeBase({ datos, onClose }) {
     const [codigo, setCodigo] = useState('');
     const [nombre, setNombre] = useState('');
     const [curso, setCurso] = useState('');

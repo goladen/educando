@@ -6,6 +6,8 @@ import sndGameOver from './assets/gameover.mp3';
 import { db } from './firebase';
 import { guardarRegistroLocal } from './utils/registrosLocales';
 import { collection, query, where, getDocs, addDoc, orderBy, limit, doc, getDoc } from 'firebase/firestore';
+import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
+import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 
 // =====================================================================
 //  BANCOS DE PREGUNTAS INTEGRADOS (modo libre, sin recurso de profesor)
@@ -1981,7 +1983,15 @@ function PantallaRanking({ fuente, onBack }) {
 // =====================================================================
 //  MODAL ENVIAR AL PROFESOR
 // =====================================================================
-function ModalEnviarProfe({ datos, onClose }) {
+// Enlace de competición (&comp=…&cat=…): la puntuación va a esa prueba, no al profesor
+function ModalEnviarProfe(p) {
+    const comp = leerCompeticionUrl();
+    if (comp) return <ModalEnviarCompeticion compId={comp.compId} catId={comp.catId} puntos={Number((p.datos?.puntuacion ?? p.datos?.acertadas)) || 0}
+        detalle={soloPrimitivos(p.datos)} nombreJuego="Bunker" tituloReto={comp.titulo} onClose={p.onClose} />;
+    return <ModalEnviarProfeBase {...p} />;
+}
+
+function ModalEnviarProfeBase({ datos, onClose }) {
     const [codigo, setCodigo] = useState('');
     const [nombre, setNombre] = useState('');
     const [curso, setCurso] = useState('');

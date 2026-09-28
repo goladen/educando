@@ -300,7 +300,7 @@ function ModalCategoria({ usuario, categoria, compId, onClose, onGuardar }) {
 
                 <div style={s.label}>Herramienta configurada (opcional)</div>
                 <div style={{ fontSize: '0.76rem', color: '#95a5a6', marginBottom: 8 }}>
-                    Cálculo Mental y demás herramientas de Math World, con una configuración fija igual para todos los participantes.
+                    Cualquier herramienta o juego con puntuación (Math World, idiomas, lógica, Primaria, Pasapalabra, Burbujas…) con una configuración fija igual para todos. La puntuación llega sola a la hoja.
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6, flexWrap: 'wrap' }}>
                     <button onClick={() => setModalHerr(true)} style={s.btnSec}><Wrench size={14} /> {c.herramientaId ? 'Cambiar configuración' : 'Añadir herramienta'}</button>

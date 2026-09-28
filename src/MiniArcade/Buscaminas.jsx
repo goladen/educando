@@ -52,8 +52,8 @@ function floodFill(board, rows, cols, r, c) {
     }
 }
 
-export default function Buscaminas({ onExit, contained = false, containerWidth }) {
-    const [levelKey, setLevelKey] = useState('Fácil');
+export default function Buscaminas({ onExit, contained = false, containerWidth, dificultadInicial = null }) {
+    const [levelKey, setLevelKey] = useState(() => (dificultadInicial && LEVELS[dificultadInicial] ? dificultadInicial : 'Fácil'));
     const { rows, cols, mines } = LEVELS[levelKey];
 
     const [board, setBoard] = useState(() => makeEmpty(rows, cols));

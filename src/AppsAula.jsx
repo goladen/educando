@@ -32,14 +32,18 @@ const RONDAS = [0, 1, 3, 5, 10];
 // ═════════════════════════════════════════════════════════════════════════════
 // PROFESOR: elegir app + configuración
 // ═════════════════════════════════════════════════════════════════════════════
-export function FormAppAula({ onLanzar, numConectados = 0 }) {
-    const [app, setApp] = useState(null);
+// También sirve de editor de «retos por enlace» (components/retos/Config*AulaReto.jsx):
+//   appFija → sin selector de app · inicial → { app, config, rondasMax } para editar
+//   textoBoton → texto del botón final · sinLimite=false → quita «Sin límite» de las rondas
+export function FormAppAula({ onLanzar, numConectados = 0, appFija = null, inicial = null, textoBoton = null, sinLimite = true }) {
+    const [app, setApp] = useState(appFija);
+    const ini = (id) => (inicial?.app === id ? inicial.config || {} : {});
 
     // Enigmic
-    const [en, setEn] = useState({ lang: 'en', modo: 'LEER', N: 5, nivel: 'MEDIO', catIds: ['PROFESIONES', 'VERBOS', 'OBJETOS'] });
+    const [en, setEn] = useState(() => ({ lang: 'en', modo: 'LEER', N: 5, nivel: 'MEDIO', catIds: ['PROFESIONES', 'VERBOS', 'OBJETOS'], ...ini('ENIGMIC') }));
     // ¿Quién es quién? histórico
-    const [qh, setQh] = useState({ idioma: 'en', modo: 'AZAR', cat: '__MEZCLA__', dif: 16, sinNombres: false, elegidoId: '', customNombre: '', customWiki: '', customPistas: ['', '', ''] });
-    const [rondas, setRondas] = useState(3);
+    const [qh, setQh] = useState(() => ({ idioma: 'en', modo: 'AZAR', cat: '__MEZCLA__', dif: 16, sinNombres: false, elegidoId: '', customNombre: '', customWiki: '', customPistas: ['', '', ''], ...ini('QUIEN_HISTORICO') }));
+    const [rondas, setRondas] = useState(() => Math.max(sinLimite ? 0 : 1, Number(inicial?.rondasMax) || 3));
 
     const poolQh = useMemo(() => (qh.cat === '__MEZCLA__' ? PERSONAJES_HISTORICOS : personajesPorCategoria(qh.cat)), [qh.cat]);
     const rondaUnica = app === 'QUIEN_HISTORICO' && qh.modo !== 'AZAR'; // mismo personaje para todos → 1 ronda
@@ -76,12 +80,14 @@ export function FormAppAula({ onLanzar, numConectados = 0 }) {
 
     return (
         <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 14, padding: 16, marginBottom: 18 }}>
+            {!appFija && <>
             <h3 style={{ margin: '0 0 4px', color: '#1e293b' }}>🗣️ Apps de idiomas con puntuación</h3>
             <p style={{ margin: '0 0 12px', color: '#64748b', fontSize: '0.85rem' }}>
                 Configúralas a tu gusto: todos los alumnos juegan con esa configuración y ves sus puntos en directo y el ranking al terminar.
             </p>
+            </>}
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 10 }}>
+            {!appFija && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 10 }}>
                 {Object.entries(APPS_AULA).map(([id, a]) => (
                     <button key={id} onClick={() => setApp(app === id ? null : id)}
                         style={{ ...chip, ...(app === id ? chipOn : {}), flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', padding: '10px 12px' }}>
@@ -89,7 +95,7 @@ export function FormAppAula({ onLanzar, numConectados = 0 }) {
                         <span style={{ fontSize: '0.75rem', fontWeight: 500, opacity: 0.85 }}>{a.desc}</span>
                     </button>
                 ))}
-            </div>
+            </div>}
 
             {app === 'ENIGMIC' && (
                 <>
@@ -169,10 +175,10 @@ export function FormAppAula({ onLanzar, numConectados = 0 }) {
                     {rondaUnica ? (
                         <div style={{ fontSize: '0.85rem', color: '#475569' }}>1 (todos adivinan el mismo personaje).</div>
                     ) : (
-                        <Opciones valor={rondas} onChange={setRondas} opciones={RONDAS.map((r) => [r, r === 0 ? 'Sin límite (acabo yo)' : String(r)])} />
+                        <Opciones valor={rondas} onChange={setRondas} opciones={RONDAS.filter((r) => sinLimite || r > 0).map((r) => [r, r === 0 ? 'Sin límite (acabo yo)' : String(r)])} />
                     )}
                     <button onClick={lanzar} style={{ ...btn('#7c3aed'), marginTop: 14 }}>
-                        🚀 Lanzar a los {numConectados} dispositivos
+                        {textoBoton || `🚀 Lanzar a los ${numConectados} dispositivos`}
                     </button>
                 </>
             )}

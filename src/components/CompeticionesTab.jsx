@@ -750,7 +750,7 @@ export default function CompeticionesTab({ usuario }) {
 // ─── Panel de competiciones dentro de una comunidad ───────────────────────────
 // Cualquier miembro ve las competiciones de la comunidad y puede crear la suya.
 // Las abiertas se muestran en la página pública de la comunidad (por alias).
-export function CompeticionesComunidadPanel({ usuario, comunidad }) {
+export function CompeticionesComunidadPanel({ usuario, comunidad, soloLectura }) {
     const [comps, setComps] = useState([]);
     const [cargando, setCargando] = useState(true);
     const [abierta, setAbierta] = useState(null);
@@ -797,10 +797,12 @@ export function CompeticionesComunidadPanel({ usuario, comunidad }) {
             <div style={{ fontSize: '0.8rem', color: '#7f8c8d', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Trophy size={14} color="#f39c12" /> Las competiciones <strong>abiertas</strong> aparecen en la página pública de la comunidad; en ella cada participante se muestra por su <strong>alias</strong>.
             </div>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-                <input value={nueva} onChange={e => setNueva(e.target.value)} onKeyDown={e => e.key === 'Enter' && crear()} placeholder="Nombre de la competición (ej: Olimpiadas del centro)" style={{ ...s.input, marginBottom: 0, flex: 1, minWidth: 200 }} />
-                <button onClick={crear} disabled={creando || !nueva.trim()} style={s.btnPrimary}><Plus size={16} /> Crear</button>
-            </div>
+            {!soloLectura && (
+                <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+                    <input value={nueva} onChange={e => setNueva(e.target.value)} onKeyDown={e => e.key === 'Enter' && crear()} placeholder="Nombre de la competición (ej: Olimpiadas del centro)" style={{ ...s.input, marginBottom: 0, flex: 1, minWidth: 200 }} />
+                    <button onClick={crear} disabled={creando || !nueva.trim()} style={s.btnPrimary}><Plus size={16} /> Crear</button>
+                </div>
+            )}
             {aviso && <div style={{ color: '#e74c3c', fontSize: '0.84rem', marginBottom: 10 }}>{aviso}</div>}
 
             {cargando ? <div style={s.loader}><RefreshCw size={24} style={{ animation: 'spin 1s linear infinite' }} /></div>
@@ -808,7 +810,7 @@ export function CompeticionesComunidadPanel({ usuario, comunidad }) {
                 : (
                     <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
                         {comps.map(c => {
-                            const mia = c.profesorUid === usuario.uid;
+                            const mia = c.profesorUid === usuario.uid && !soloLectura;
                             return (
                                 <div key={c.id} style={s.card}>
                                     <div style={{ fontWeight: 700, color: '#2c3e50', display: 'flex', alignItems: 'center', gap: 6 }}><Trophy size={17} color="#f39c12" /> {c.nombre}</div>

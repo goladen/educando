@@ -7,6 +7,8 @@
 //  - Disponible en es/en/fr/ca con traducción EMPAQUETADA (trPH, sin llamar a Gemini).
 
 import React, { useState, useEffect } from 'react';
+import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
+import RetoConRondas from './components/retos/RetoConRondas';
 import {
     PERSONAJES_HISTORICOS, personajesPorCategoria, CATEGORIAS_PH,
     fotoDeWiki, avatarIniciales, anioTexto,
@@ -63,7 +65,19 @@ const estrellasDe = (nPistas) => (nPistas <= 2 ? 3 : nPistas <= 4 ? 2 : 1);
 // `aula` (opcional, Control de Aula · AppsAula.jsx): { config, rondasMax, onProgreso, onTerminar }.
 // config = { idioma, modo, cat, dif, sinNombres, elegidoId, customNombre, customWiki, customPistas }.
 // Con él se salta el SETUP, se juega con la configuración del profe y se informa de los puntos tras cada personaje.
-export default function QuienEsQuienHistorico({ onExit, onBack, aula = null }) {
+// Reto por enlace (?reto=… con { app:'QUIEN_HISTORICO', config, rondasMax, detalle }): se juega
+// en «modo aula» con RetoConRondas; si no, el juego normal.
+export default function QuienEsQuienHistorico(props) {
+    const [reto, setReto] = useState(() => (props.aula ? null : leerRetoUrl()));
+    if (reto && reto.config?.app === 'QUIEN_HISTORICO') return (
+        <RetoConRondas reto={reto} tipo="QUIEN_HISTORICO" nombreJuego="¿Quién es quién? histórico" emoji="🧐" color="#8e44ad"
+            render={(aula) => <QuienEsQuienHistoricoBase {...props} aula={aula} />}
+            onLibre={() => { limpiarRetoUrl(); setReto(null); }} onSalir={props.onExit || props.onBack} />
+    );
+    return <QuienEsQuienHistoricoBase {...props} />;
+}
+
+function QuienEsQuienHistoricoBase({ onExit, onBack, aula = null }) {
     const lang = useLanguage();
     const { setIdioma, idiomas } = lang;
     const idioma = aula?.config?.idioma || lang.idioma; // en el aula manda el idioma del profe (sin tocar el global)

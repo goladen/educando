@@ -45,11 +45,11 @@ function parsePath() {
     if (parts[0] === 'comunidad' && parts[1]) {
         const comId = parts[1];
         if (parts[2] === 'curso') return { comId, tab: 'calendarios', cursoId: parts[3] || null, unirse: false };
-        if (parts[2] === 'unirse') return { comId, tab: 'recursos', cursoId: null, unirse: true };
-        const tab = ['recursos', 'paginas', 'calendarios', 'profesores', 'competiciones'].includes(parts[2]) ? parts[2] : 'recursos';
+        if (parts[2] === 'unirse') return { comId, tab: 'calendarios', cursoId: null, unirse: true };
+        const tab = ['recursos', 'paginas', 'calendarios', 'profesores', 'competiciones'].includes(parts[2]) ? parts[2] : 'calendarios';
         return { comId, tab, cursoId: null, unirse: false };
     }
-    return { comId: null, tab: 'recursos', cursoId: null, unirse: false };
+    return { comId: null, tab: 'calendarios', cursoId: null, unirse: false };
 }
 
 // ─── Sección: solicitar unirse (con login si hace falta) ──────────────────────
@@ -116,11 +116,15 @@ function SolicitarUnirse({ comunidad, destacado }) {
     );
 }
 
+// Pone primero los elementos que cumplen `cond`, manteniendo el orden del resto
+const primeroSi = (lista, cond) => [...lista.filter(cond), ...lista.filter(p => !cond(p))];
+const esJefeDpto = (p) => (p.cargos || []).some(c => /jef[ea]|jefatura/i.test(c) && /dep(artamento|to)/i.test(c));
+
 const TABS = [
-    { id: 'recursos',    label: 'Recursos',    icon: LayoutGrid },
-    { id: 'paginas',     label: 'Páginas',     icon: FileText },
     { id: 'calendarios', label: 'Calendarios', icon: Calendar },
     { id: 'profesores',  label: 'Profesorado', icon: Users },
+    { id: 'recursos',    label: 'Recursos',    icon: LayoutGrid },
+    { id: 'paginas',     label: 'Páginas',     icon: FileText },
     { id: 'competiciones', label: 'Competiciones', icon: Trophy },
 ];
 
@@ -228,6 +232,9 @@ function CentroPublico({ comunidadId, tab, cursoFoco, unirse, onTab, onCurso, on
                                 ))}
                             </div>
                         )}
+                        <div style={{ marginLeft: profes.length > 0 ? 0 : 'auto' }}>
+                            <BtnCompartir titulo={`Profesorado de ${comunidad.nombre}`} url={`${origin}/comunidad/${comunidad.id}/profesores`} />
+                        </div>
                     </div>
                     {profes.length === 0 ? <div style={st.vacio}>Este centro no ha publicado el profesorado.</div> : (() => {
                         const gridCols = `repeat(auto-fill, minmax(${isMobile ? 200 : 240}px, 1fr))`;
@@ -243,7 +250,8 @@ function CentroPublico({ comunidadId, tab, cursoFoco, unirse, onTab, onCurso, on
                             const nombres = [...orden, ...[...setGrupos].filter(g => !orden.includes(g)).sort((a, b) => a.localeCompare(b, 'es'))];
                             grupos = nombres.map(nombre => ({
                                 titulo: nombre,
-                                lista: profes.filter(p => gruposDe(p).includes(nombre) || p.grupoTutor === nombre),
+                                // El tutor/a del grupo, primero
+                                lista: primeroSi(profes.filter(p => gruposDe(p).includes(nombre) || p.grupoTutor === nombre), p => p.grupoTutor === nombre),
                             })).filter(g => g.lista.length > 0);
                             const sinGrupo = profes.filter(p => gruposDe(p).length === 0 && !p.grupoTutor);
                             if (sinGrupo.length) grupos.push({ titulo: 'Sin grupo asignado', lista: sinGrupo });
@@ -257,7 +265,7 @@ function CentroPublico({ comunidadId, tab, cursoFoco, unirse, onTab, onCurso, on
                                 if (a === 'Sin departamento') return 1;
                                 if (b === 'Sin departamento') return -1;
                                 return a.localeCompare(b, 'es');
-                            }).map(d => ({ titulo: d, lista: mapa[d] }));
+                            }).map(d => ({ titulo: d, lista: primeroSi(mapa[d], esJefeDpto) })); // jefe/a de dpto., primero
                         }
                         return grupos.map(g => (
                             <div key={g.titulo} style={{ marginBottom: 22 }}>
@@ -394,10 +402,10 @@ export default function ComunidadesPublico({ onExit }) {
         return () => window.removeEventListener('popstate', onPop);
     }, []);
 
-    const abrir       = (id) => { setEstado({ comId: id, tab: 'recursos', cursoId: null }); window.history.pushState({}, '', `/comunidad/${id}`); };
+    const abrir       = (id) => { setEstado({ comId: id, tab: 'calendarios', cursoId: null }); window.history.pushState({}, '', `/comunidad/${id}`); };
     const cambiarTab  = (t)  => { setEstado(e => ({ ...e, tab: t, cursoId: null })); window.history.pushState({}, '', `/comunidad/${estado.comId}/${t}`); };
     const verCurso    = (cid)=> { setEstado(e => ({ ...e, tab: 'calendarios', cursoId: cid })); window.history.pushState({}, '', `/comunidad/${estado.comId}/curso/${cid}`); };
-    const volverLista = ()   => { setEstado({ comId: null, tab: 'recursos', cursoId: null }); window.history.pushState({}, '', '/comunidades'); };
+    const volverLista = ()   => { setEstado({ comId: null, tab: 'calendarios', cursoId: null }); window.history.pushState({}, '', '/comunidades'); };
 
     return (
         <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg,#eaf1fb,#f5f8fc)', paddingTop: 60 }}>

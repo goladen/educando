@@ -10,7 +10,7 @@ const BALL_R = 10;
 const PADDLE_OFFSET = 30;
 const WIN_SCORE = 7;
 
-export default function Pong({ onExit, contained = false, panelId = null, containerWidth }) {
+export default function Pong({ onExit, contained = false, panelId = null, containerWidth, modoInicial = null }) {
     const containerRef = useRef(null);
     const requestRef = useRef(null);
     const p1Move = useRef(0);
@@ -160,6 +160,9 @@ export default function Pong({ onExit, contained = false, panelId = null, contai
         cancelAnimationFrame(requestRef.current);
         requestRef.current = requestAnimationFrame(update);
     };
+
+    // Enlace compartido con modo fijo ('pve' | 'pvp'): empieza directamente
+    useEffect(() => { if (modoInicial === 'pve' || modoInicial === 'pvp') startGame(modoInicial); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handlePointerMove = (e) => {
         const st = stateRef.current;

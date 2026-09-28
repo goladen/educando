@@ -1491,7 +1491,65 @@ const cleanText = (str) => {
 //  · Enlace normal: abre el juego y cada uno lo configura.
 //  · Con configuración: el profe fija los ajustes y el enlace (?reto=…) abre el
 //    juego listo para jugar y enviar el resultado (juegos de HERRAMIENTAS_RETO).
-function ShareModal({ url, titulo, juegoId, onClose }) {
+// Apps que se pueden compartir desde la tarjeta Math World (sin entrar en ella)
+const appsMathWorldCompartir = () => {
+    const o = typeof window !== 'undefined' ? window.location.origin : '';
+    const ruta = (a) => herramientaPorId(a.id)?.ruta || (a.shareUrl ? a.shareUrl.replace(o, '') : `/?juego=${a.id.toLowerCase()}`);
+    const mates = APPS.filter(a => a.isMath && !a.comingSoon)
+        .map(a => ({ id: a.id, label: a.name.replace(/_/g, ' '), emoji: a.emoji || '🧮', ruta: ruta(a) }));
+    const primaria = [
+        { id: 'MATES_OAOA', label: 'Método OAOA', emoji: '🧮', ruta: '/primaria/oaoa' },
+        { id: 'FERIA_MATES', label: 'Feria del Cálculo', emoji: '🎡', ruta: '/primaria/feria' },
+        { id: 'DIVISIBILIDAD', label: 'Divisibilidad', emoji: '🔢', ruta: '/primaria/divisibilidad' },
+        { id: 'GEO_PERIMETRO_AREA', label: 'Perímetros y Áreas', emoji: '🟩', ruta: '/primaria/geometria/perimetro-area' },
+        { id: 'GEO_VISOR_POLIEDROS', label: 'Poliedros 3D', emoji: '🔷', ruta: '/primaria/geometria/poliedros' },
+        { id: 'DUELO_PIRATAS', label: 'Duelo de Piratas', emoji: '🏴‍☠️', ruta: '/duelo-piratas' },
+    ];
+    return { mates, primaria };
+};
+const esConfigurable = (id) => !!(herramientaPorId(id) || JUEGOS_RECURSO[id]);
+
+function SelectorAppMates({ onElegir, onPortal, onClose }) {
+    const { mates, primaria } = appsMathWorldCompartir();
+    const Boton = ({ a }) => (
+        <button onClick={() => onElegir({ id: a.id, url: `${window.location.origin}${a.ruta}`, titulo: a.label })}
+            style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 10px', borderRadius:12, border:'1.5px solid #e2e8f0', background:'white', cursor:'pointer', textAlign:'left', fontFamily:'inherit' }}>
+            <span style={{ fontSize:'1.3rem' }}>{a.emoji}</span>
+            <span style={{ flex:1, fontWeight:700, fontSize:'0.84rem', color:'#2c3e50' }}>{a.label}</span>
+            {esConfigurable(a.id) && <span title="Se puede compartir con configuración" style={{ fontSize:'0.72rem', background:'#e3f2fd', color:'#1565C0', borderRadius:10, padding:'1px 6px', fontWeight:800 }}>⚙️</span>}
+        </button>
+    );
+    const titulo = (t) => <div style={{ fontSize:'0.74rem', fontWeight:800, color:'#64748b', textTransform:'uppercase', letterSpacing:.5, margin:'14px 0 8px' }}>{t}</div>;
+    return (
+        <div style={{ position:'fixed', inset:0, zIndex:9000, background:'rgba(0,0,0,0.55)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }} onClick={onClose}>
+            <div style={{ background:'white', borderRadius:20, width:'100%', maxWidth:520, padding:22, boxShadow:'0 20px 50px rgba(0,0,0,0.3)', maxHeight:'90vh', overflowY:'auto', fontFamily:"'Segoe UI', sans-serif" }} onClick={e => e.stopPropagation()}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                    <h3 style={{ margin:0, color:'#2c3e50', fontSize:'1.05rem' }}>🌍 Compartir de Math World</h3>
+                    <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', color:'#95a5a6', fontSize:'1.2rem', padding:4 }}>✕</button>
+                </div>
+                <p style={{ color:'#7f8c8d', fontSize:'0.84rem', margin:'6px 0 0', lineHeight:1.5 }}>Elige la app que quieres enlazar. Las marcadas con ⚙️ se pueden compartir con una configuración fija.</p>
+                <button onClick={onPortal} style={{ width:'100%', marginTop:12, padding:'10px 12px', borderRadius:12, border:'2px solid #009688', background:'#E0F2F1', color:'#00695c', fontWeight:800, cursor:'pointer', fontFamily:'inherit' }}>🌍 Toda la zona Math World</button>
+                {titulo('Math World')}
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(150px, 1fr))', gap:8 }}>{mates.map(a => <Boton key={a.id} a={a} />)}</div>
+                {titulo('Primaria')}
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(150px, 1fr))', gap:8 }}>{primaria.map(a => <Boton key={a.id} a={a} />)}</div>
+            </div>
+        </div>
+    );
+}
+
+// La tarjeta Math World abre primero el selector de apps; el resto, el modal directo.
+function ShareModal(props) {
+    const [sel, setSel] = React.useState(null); // { id, url, titulo }
+    if (props.juegoId === 'MATH_WORLD_PORTAL' && !sel) return (
+        <SelectorAppMates onElegir={setSel} onClose={props.onClose}
+            onPortal={() => setSel({ id: null, url: props.url, titulo: props.titulo })} />
+    );
+    if (sel) return <ShareModalJuego key={sel.id || 'portal'} url={sel.url} titulo={sel.titulo} juegoId={sel.id} onClose={props.onClose} onVolver={() => setSel(null)} />;
+    return <ShareModalJuego {...props} />;
+}
+
+function ShareModalJuego({ url, titulo, juegoId, onClose, onVolver = null }) {
     const [copiado, setCopiado] = React.useState(false);
     const [modo, setModo] = React.useState('normal'); // 'normal' | 'editor' | 'reto'
     const [reto, setReto] = React.useState(null);     // { config, resumen }
@@ -1536,7 +1594,10 @@ function ShareModal({ url, titulo, juegoId, onClose }) {
         <div style={{ position:'fixed', inset:0, zIndex:9000, background:'rgba(0,0,0,0.55)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }} onClick={onClose}>
             <div style={{ background:'white', borderRadius:20, width:'100%', maxWidth:360, padding:24, boxShadow:'0 20px 50px rgba(0,0,0,0.3)' }} onClick={e => e.stopPropagation()}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
-                    <h3 style={{ margin:0, color:'#2c3e50', fontSize:'1.05rem' }}>Compartir</h3>
+                    <h3 style={{ margin:0, color:'#2c3e50', fontSize:'1.05rem' }}>
+                        {onVolver && <button onClick={onVolver} title="Elegir otra app" style={{ background:'none', border:'none', cursor:'pointer', color:'#64748b', fontSize:'0.85rem', padding:'0 8px 0 0', fontWeight:700 }}>← Otra app</button>}
+                        Compartir{titulo ? `: ${titulo}` : ''}
+                    </h3>
                     <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', color:'#95a5a6', fontSize:'1.2rem', padding:4 }}>✕</button>
                 </div>
                 <div style={{ display:'flex', gap:6, background:'#f1f5f9', borderRadius:12, padding:4, marginBottom:14 }}>
@@ -1695,6 +1756,8 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                 setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'ESTADISTICA' });
             } else if (path === 'probabilidad') {
                 setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'PROBABILIDAD' });
+            } else if (path === 'duelo-piratas') {
+                setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'DUELO_PIRATAS' });
             } else if (path === 'potencias_raices' || path === 'potencias') {
                 setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'POTENCIAS_RAICES' });
             } else if (path === 'ecuacion_sistemas' || path === 'sistemas') {
@@ -1770,6 +1833,15 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
 
     const [juegoActivo, setJuegoActivo] = useState(null);
     const [shareModal, setShareModal] = useState(null); // { url, titulo }
+    // Botón compartir de las tarjetas de Primaria (en el flujo, arriba a la derecha)
+    const btnCompartirPrimaria = (juegoId, ruta, titulo, color) => (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '-18px -8px 0 0', height: 0 }}>
+            <button onClick={e => { e.stopPropagation(); setShareModal({ url: `${window.location.origin}${ruta}`, titulo, juegoId }); }}
+                title="Compartir" style={{ background: 'rgba(255,255,255,0.85)', border: 'none', borderRadius: 6, padding: '3px 5px', cursor: 'pointer', display: 'flex', alignItems: 'center', color, height: 22 }}>
+                <Share2 size={13} />
+            </button>
+        </div>
+    );
     const [infoModal, setInfoModal] = useState(null); // { info, name, color, emoji, img }
     const [tabPrincipal, setTabPrincipal] = useState('TODAS'); // 'TODAS' | 'MATERIA'
     const [materiaActiva, setMateriaActiva] = useState('MATEMATICAS');
@@ -2684,6 +2756,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
         if (subzonaMath === 'PRIMARIA') {
             return (
                 <div style={{ width: '100%', marginTop: '20px' }}>
+                    {shareModal && <ShareModal url={shareModal.url} titulo={shareModal.titulo} juegoId={shareModal.juegoId} onClose={() => setShareModal(null)} />}
                     <button onClick={() => { setSubzonaMath(null); window.history.pushState({}, '', '/math_world'); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#333', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '20px', fontWeight: 'bold' }}>
                         <Home size={20} /> Volver a Math World
                     </button>
@@ -2699,6 +2772,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                             onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
                             onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
                         >
+                            {btnCompartirPrimaria('MATES_OAOA', '/primaria/oaoa', 'Método OAOA', '#009688')}
                             <div style={{ fontSize: '50px', marginBottom: '15px' }}>🧮</div>
                             <h3 style={{ margin: '0 0 10px 0', color: '#009688', fontSize: '1.4rem' }}>Método OAOA</h3>
                             <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>Bloques de decenas y unidades, monstruo comenúmeros, regletas y restas, geoplano y caminos flexibles.</p>
@@ -2710,6 +2784,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                             onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
                             onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
                         >
+                            {btnCompartirPrimaria('FERIA_MATES', '/primaria/feria', 'Feria del Cálculo', '#e67e22')}
                             <div style={{ fontSize: '50px', marginBottom: '15px' }}>🎡</div>
                             <h3 style={{ margin: '0 0 10px 0', color: '#e67e22', fontSize: '1.4rem' }}>Feria del Cálculo</h3>
                             <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>¡Supera operaciones al estilo OAOA antes de que se acabe el tiempo!</p>
@@ -2720,6 +2795,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                             onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
                             onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
                         >
+                            {btnCompartirPrimaria('DINERO', '/primaria/dinero', 'Dinero', '#16a085')}
                             <div style={{ fontSize: '50px', marginBottom: '15px' }}>💶</div>
                             <h3 style={{ margin: '0 0 10px 0', color: '#16a085', fontSize: '1.4rem' }}>Dinero</h3>
                             <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>Paga con billetes y monedas, la vuelta, la lista de la compra, IVA y rebajas.</p>
@@ -2731,6 +2807,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                             onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
                             onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
                         >
+                            {btnCompartirPrimaria('FRACCIONES', '/primaria/fracciones', 'Fracciones', '#7b1fa2')}
                             <div style={{ fontSize: '50px', marginBottom: '15px' }}>🍰</div>
                             <h3 style={{ margin: '0 0 10px 0', color: '#7b1fa2', fontSize: '1.4rem' }}>Fracciones</h3>
                             <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>Laboratorio visual con rectángulos, ejercicios y tirón de cuerda por equipos.</p>
@@ -2742,6 +2819,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                             onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
                             onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
                         >
+                            {btnCompartirPrimaria('DIVISIBILIDAD', '/primaria/divisibilidad', 'Divisibilidad', '#7B1FA2')}
                             <div style={{ fontSize: '50px', marginBottom: '15px' }}>🔢</div>
                             <h3 style={{ margin: '0 0 10px 0', color: '#7B1FA2', fontSize: '1.4rem' }}>Divisibilidad</h3>
                             <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>Primos, múltiplos, divisores y la criba de Eratóstenes.</p>
@@ -2764,6 +2842,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
         if (subzonaMath === 'GEOMETRIA') {
             return (
                 <div style={{ width: '100%', marginTop: '20px' }}>
+                    {shareModal && <ShareModal url={shareModal.url} titulo={shareModal.titulo} juegoId={shareModal.juegoId} onClose={() => setShareModal(null)} />}
                     <button onClick={() => { setSubzonaMath('PRIMARIA'); window.history.pushState({}, '', '/primaria'); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#333', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '20px', fontWeight: 'bold' }}>
                         <Home size={20} /> Volver a Primaria
                     </button>
@@ -2779,6 +2858,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                             onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
                             onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
                         >
+                            {btnCompartirPrimaria('GEO_PERIMETRO_AREA', '/primaria/geometria/perimetro-area', 'Perímetros y Áreas', '#2E7D32')}
                             <div style={{ fontSize: '50px', marginBottom: '15px' }}>🟩</div>
                             <h3 style={{ margin: '0 0 10px 0', color: '#2E7D32', fontSize: '1.4rem' }}>Perímetros y Áreas</h3>
                             <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>Construye figuras en la cuadrícula y descubre perímetro y área con retos.</p>
@@ -2789,6 +2869,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                             onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'}
                             onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
                         >
+                            {btnCompartirPrimaria('GEO_VISOR_POLIEDROS', '/primaria/geometria/poliedros', 'Poliedros 3D', '#5E35B1')}
                             <div style={{ fontSize: '50px', marginBottom: '15px' }}>🔷</div>
                             <h3 style={{ margin: '0 0 10px 0', color: '#5E35B1', fontSize: '1.4rem' }}>Poliedros 3D · Euler</h3>
                             <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>Gira poliedros en 3D y comprueba la fórmula de Euler: V − A + C = 2.</p>

@@ -7,7 +7,7 @@ import React from 'react';
 //
 //   <PantallaReto reto={reto} nombreJuego="Fracciones" emoji="🍰" color="#7b1fa2"
 //                 chips={resumen(config)} onEmpezar={…} onLibre={…} onSalir={…} />
-export default function PantallaReto({ reto, nombreJuego, emoji = '🎯', color = '#1565C0', chips = [], onEmpezar, onLibre, onSalir, oscuro = false }) {
+export default function PantallaReto({ reto, nombreJuego, emoji = '🎯', color = '#1565C0', chips = [], onEmpezar, onLibre, onSalir, oscuro = false, descripcion = null }) {
     const esCompeticion = !!(reto?.compId && reto?.catId);
     const c = oscuro
         ? { fondo: 'rgba(255,255,255,0.06)', borde: '1px solid rgba(255,255,255,0.12)', texto: '#f1f5f9', suave: '#94a3b8', chip: 'rgba(255,255,255,0.1)', chipTxt: '#f1f5f9' }
@@ -20,7 +20,7 @@ export default function PantallaReto({ reto, nombreJuego, emoji = '🎯', color 
                 <div style={{ color, fontWeight: 800, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: 1, marginTop: 10 }}>🎯 Reto · {nombreJuego}</div>
                 <h1 style={{ margin: '6px 0 4px', fontSize: '1.45rem', color: c.texto }}>{reto?.titulo || `Reto de ${nombreJuego}`}</h1>
                 <p style={{ color: c.suave, fontSize: '0.86rem', margin: '0 0 16px', lineHeight: 1.5 }}>
-                    Tu profesor ya ha preparado la configuración. Solo tienes que jugar y, al terminar, enviar tu resultado.
+                    {descripcion || 'Tu profesor ya ha preparado la configuración. Solo tienes que jugar y, al terminar, enviar tu resultado.'}
                 </p>
 
                 {chips.length > 0 && (

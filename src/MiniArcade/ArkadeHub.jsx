@@ -5,6 +5,8 @@ import Pong from './Pong';
 import Arkanoid from './Arkanoid';
 import Bomberman from './Bomberman';
 import { getScoresMonthly, getScoresAllTime, fmtScore, fmtDate } from './ranking';
+import { leerRetoUrl, limpiarRetoUrl } from '../utils/retoLink';
+import PantallaReto from '../components/retos/PantallaReto';
 
 const MINI_GAMES = [
     {
@@ -49,6 +51,23 @@ const MINI_GAMES = [
 ];
 
 const COMPONENTS = { TETRIS: Tetris, BUSCAMINAS: Buscaminas, PONG: Pong, ARKANOID: Arkanoid, BOMBERMAN: Bomberman };
+
+// ─── Enlace compartido (?reto=…): un minijuego concreto y su modo ─────────────
+export const RUTA_ARKADE = '/arkade';
+export const JUEGOS_ARKADE = MINI_GAMES.map(g => ({
+    id: g.id, label: `${g.emoji} ${g.name}`, color: g.color,
+    modos: g.id === 'BUSCAMINAS' ? [['Fácil', 'Fácil'], ['Medio', 'Medio'], ['Difícil', 'Difícil']]
+         : g.id === 'PONG' ? [['pve', '1 jugador vs CPU'], ['pvp', '2 jugadores']]
+         : null,
+}));
+export const DEFAULT_RETO_ARKADE = { juego: 'TETRIS', modo: null };
+export const resumenArkade = (c) => {
+    const cfg = { ...DEFAULT_RETO_ARKADE, ...(c || {}) };
+    const j = JUEGOS_ARKADE.find(x => x.id === cfg.juego) || JUEGOS_ARKADE[0];
+    const m = j.modos?.find(([v]) => v === cfg.modo);
+    return [j.label, m ? m[1] : null].filter(Boolean);
+};
+const propsModo = (id, modo) => (!modo ? {} : id === 'BUSCAMINAS' ? { dificultadInicial: modo } : id === 'PONG' ? { modoInicial: modo } : {});
 
 // ─── Tabla de ranking ─────────────────────────────────────────────────────────
 function RankingTable({ rankKey, scores, color }) {
@@ -239,7 +258,9 @@ function GamePanel({ panelId, focused, onFocus, panelWidth }) {
 
 // ─── Hub principal ────────────────────────────────────────────────────────────
 export default function ArkadeHub({ onExit }) {
+    const [reto, setReto] = useState(() => leerRetoUrl());
     const [active, setActive] = useState(null);
+    const [modoActivo, setModoActivo] = useState(null);
     const [rankingGame, setRankingGame] = useState(null);
     const [splitMode, setSplitMode] = useState(false);
     const [focusedPanel, setFocusedPanel] = useState('left');
@@ -252,10 +273,24 @@ export default function ArkadeHub({ onExit }) {
         return () => { window.__arkadePanel = null; };
     }, [splitMode, focusedPanel]);
 
+    // ── Enlace compartido: pantalla previa con el juego y el modo elegidos ──
+    if (reto && !active) {
+        const cfg = { ...DEFAULT_RETO_ARKADE, ...(reto.config || {}) };
+        const j = JUEGOS_ARKADE.find(x => x.id === cfg.juego) || JUEGOS_ARKADE[0];
+        return (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'linear-gradient(135deg, #0a0a1a 0%, #0d0d2b 60%, #0a0a1a 100%)', display: 'flex', alignItems: 'center', overflowY: 'auto' }}>
+                <PantallaReto reto={reto} nombreJuego="Arkade" emoji="🕹️" color={j.color || '#bf5af2'} oscuro
+                    descripcion="Te han compartido este minijuego. ¡Pulsa empezar y a jugar!"
+                    chips={resumenArkade(cfg)} onEmpezar={() => { setModoActivo(cfg.modo || null); setActive(j.id); }}
+                    onLibre={() => { limpiarRetoUrl(); setReto(null); }} onSalir={onExit} />
+            </div>
+        );
+    }
+
     // ── Modo juego individual ──
     if (active) {
         const Game = COMPONENTS[active];
-        return <Game onExit={() => setActive(null)} />;
+        return <Game onExit={() => { setActive(null); setModoActivo(null); }} {...propsModo(active, modoActivo)} />;
     }
 
     // ── Modo split-screen ──

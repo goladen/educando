@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 
-export default function SwitchOn({ onVolver, completados = [], onLevelComplete }) {
+// nivelInicial + soloNivel: reto por enlace (un nivel fijo, sin selector)
+export default function SwitchOn({ onVolver, completados = [], onLevelComplete, nivelInicial = null, soloNivel = false }) {
   // ─── Sonidos (Web Audio API) ───────────────────────────────────────────────
   const audioCtxRef = useRef(null);
   const getCtx = useCallback(() => {
@@ -98,7 +99,7 @@ export default function SwitchOn({ onVolver, completados = [], onLevelComplete }
     ];
   }, []);
 
-  const [currentLevel, setCurrentLevel] = useState(1);
+  const [currentLevel, setCurrentLevel] = useState(() => Number(nivelInicial) || 1);
   const [board, setBoard] = useState([]);
   const [moves, setMoves] = useState(0);
   const [time, setTime] = useState(0);
@@ -227,7 +228,7 @@ export default function SwitchOn({ onVolver, completados = [], onLevelComplete }
 
       <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', marginBottom: '30px', alignItems: 'center' }}>
         <span style={{ fontWeight: 'bold', fontSize: '20px', color: '#475569' }}>Nivel:</span>
-        {levelsData.map(lvl => (
+        {levelsData.filter(lvl => !soloNivel || lvl.id === currentLevel).map(lvl => (
           <button key={lvl.id} onClick={() => setCurrentLevel(lvl.id)} style={{
             position: 'relative',
             width: '44px', height: '44px', borderRadius: '50%',

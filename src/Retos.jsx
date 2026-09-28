@@ -4,6 +4,9 @@ import Confetti from 'react-confetti';
 import SwitchOn from './SwitchOn';
 import { getProgreso, marcarNivelCompletado, cargarProgresoFirebase, guardarProgresoFirebase } from './utils/retosProgreso';
 import { guardarRegistroLocal } from './utils/registrosLocales';
+import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
+import PantallaReto from './components/retos/PantallaReto';
+import FinReto from './components/retos/FinReto';
 
 // ─── NIVELES DEL JUEGO (Tableros) ─────────────────────────────────────────────
 const LEVELS = [
@@ -649,7 +652,7 @@ const generateSudoku = (difficulty) => {
 const fmtTime = (s) => `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
 
 // ─── COMPONENTE SUDOKU ────────────────────────────────────────────────────────
-function JuegoSudoku({ onVolver, onComplete }) {
+function JuegoSudoku({ onVolver, onComplete, dificultadInicial = null }) {
     const [difficulty, setDifficulty] = useState(null);
     const [board, setBoard] = useState([]);
     const [initialBoard, setInitialBoard] = useState([]);
@@ -673,6 +676,9 @@ function JuegoSudoku({ onVolver, onComplete }) {
         setDifficulty(diff); setIsWon(false);
         setSelected({ r: 0, c: 0 }); setSeconds(0); setNotesMode(false);
     };
+
+    // Reto por enlace: arranca directamente con la dificultad fijada
+    useEffect(() => { if (dificultadInicial) initGame(dificultadInicial); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const checkWin = (b) => {
         for (let r = 0; r < 9; r++)
@@ -847,8 +853,26 @@ function BtnCompartir({ path, title = 'pikt.es · Sala de Retos' }) {
     );
 }
 
+// ─── Retos por enlace (utils/retoLink.js): un juego y un nivel concretos ───────
+export const RUTA_RETOS_LOGICA = '/retos';
+export const JUEGOS_LOGICA = [
+    { id: 'CONECTA', label: '🔗 Conecta los puntos', niveles: LEVELS.map(l => [l.id, `Nivel ${l.id}`]) },
+    { id: 'SUDOKU', label: '🔢 Sudoku', niveles: [['FÁCIL', 'Sencillo'], ['MEDIO', 'Medio'], ['DIFÍCIL', 'Difícil']] },
+    { id: 'SWITCHON', label: '💡 El juego de las luces', niveles: [1, 2, 3, 4, 5, 6].map(n => [n, `Nivel ${n}`]) },
+];
+export const DEFAULT_RETO_LOGICA = { juego: 'SUDOKU', nivel: 'FÁCIL' };
+export const resumenLogica = (c) => {
+    const cfg = { ...DEFAULT_RETO_LOGICA, ...(c || {}) };
+    const j = JUEGOS_LOGICA.find(x => x.id === cfg.juego) || JUEGOS_LOGICA[0];
+    const n = j.niveles.find(([v]) => String(v) === String(cfg.nivel));
+    return [j.label, n ? n[1] : `Nivel ${cfg.nivel}`];
+};
+
 // ─── MENÚ PRINCIPAL DE RETOS ──────────────────────────────────────────────────
 export default function Retos({ onExit, initialGame = null, usuario = null }) {
+    const [reto, setReto] = useState(() => leerRetoUrl());
+    const [retoFase, setRetoFase] = useState('intro'); // intro | jugar | fin
+    const [retoTiempo, setRetoTiempo] = useState(0);
     const [activeGame, setActiveGame] = useState(initialGame); // 'CONECTA' | 'SUDOKU' | 'SWITCHON' | null
     const [currentLevelIdx, setCurrentLevelIdx] = useState(0);
     const [progreso, setProgreso] = useState(() => getProgreso());
@@ -885,6 +909,44 @@ export default function Retos({ onExit, initialGame = null, usuario = null }) {
             setCurrentLevelIdx(prev => prev + 1);
         }
     };
+
+    // ── Reto por enlace: directamente el juego y nivel que eligió el profesor ──
+    if (reto) {
+        const cfg = { ...DEFAULT_RETO_LOGICA, ...(reto.config || {}) };
+        const volverIntro = () => setRetoFase('intro');
+        // Se deja ver un momento la celebración del juego antes de la pantalla final
+        const terminar = () => { const seg = Math.round((Date.now() - retoTiempo) / 1000); setTimeout(() => { setRetoTiempo(seg); setRetoFase('fin'); }, 1800); };
+        if (retoFase === 'intro') return (
+            <div style={{ ...st.container, justifyContent: 'center' }}>
+                <PantallaReto reto={reto} nombreJuego="Sala de Retos" emoji="🧠" color="#f39c12" oscuro
+                    chips={resumenLogica(cfg)} onEmpezar={() => { setRetoTiempo(Date.now()); setRetoFase('jugar'); }}
+                    onLibre={() => { limpiarRetoUrl(); setReto(null); }} onSalir={onExit} />
+            </div>
+        );
+        if (retoFase === 'fin') return (
+            <FinReto reto={reto} tipo="RETOS" nombreJuego="Sala de Retos" titulo="¡Reto superado!" valor="✓"
+                detalle={`${resumenLogica(cfg).join(' · ')} · ${Math.floor(retoTiempo / 60)}:${String(retoTiempo % 60).padStart(2, '0')}`}
+                datos={{ aciertos: 1, intentos: 1, puntos: Math.max(10, 1000 - retoTiempo), tiempo: retoTiempo }}
+                onRepetir={volverIntro} onSalir={onExit} />
+        );
+        if (cfg.juego === 'CONECTA') {
+            const level = LEVELS.find(l => String(l.id) === String(cfg.nivel)) || LEVELS[0];
+            const GameComp = level.type === 'free' ? ConectaLibre : ConectaPuntos;
+            return (
+                <div style={st.containerGame}>
+                    <GameComp levelData={level} onWin={() => {}} onVolver={volverIntro} isLastLevel onComplete={terminar} />
+                </div>
+            );
+        }
+        if (cfg.juego === 'SWITCHON') return (
+            <SwitchOn onVolver={volverIntro} nivelInicial={Number(cfg.nivel) || 1} soloNivel onLevelComplete={terminar} />
+        );
+        return (
+            <div style={st.containerGame}>
+                <JuegoSudoku dificultadInicial={cfg.nivel || 'FÁCIL'} onVolver={volverIntro} onComplete={terminar} />
+            </div>
+        );
+    }
 
     if (activeGame === 'CONECTA') {
         const level = LEVELS[currentLevelIdx];

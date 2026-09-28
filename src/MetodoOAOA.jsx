@@ -3,9 +3,30 @@ import SimuladorOAOA from './MatesOAOA';
 import { db } from './firebase';
 import { guardarRegistroLocal } from './utils/registrosLocales';
 import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
+import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
+import PantallaReto from './components/retos/PantallaReto';
+import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
+
+// ─── Retos por enlace (utils/retoLink.js): una actividad concreta y su modo ───
+export const RUTA_OAOA = '/primaria/oaoa';
+export const ACTIVIDADES_OAOA = [
+  { id: 'bloques',    label: '🧮 Bloques D y U' },
+  { id: 'factory',    label: '👾 Monstruo Arcade', campo: 'factoryOp', modos: [['suma', '➕ Suma'], ['multi', '✖️ Multiplicación']] },
+  { id: 'sandbox',    label: '🧱 Regletas y Restas', campo: 'sandboxMode', modos: [['free', '🧱 Libre'], ['challenge', '🎯 Retos'], ['subtraction', '➖ Resta']] },
+  { id: 'geoplano',   label: '📐 Geoplano', campo: 'geoGrupo', modos: [['figuras', '📐 Figuras'], ['perimetro', '📏 Perímetro'], ['area', '🟩 Área']] },
+  { id: 'estimacion', label: '📏 Estimaciones', campo: 'estModo', modos: [['tamano', '📏 Tamaños'], ['precio', '🛒 Precios']] },
+  { id: 'paths',      label: '💡 Caminos Flexibles' },
+];
+export const DEFAULT_RETO_OAOA = { actividad: 'bloques', modo: null };
+export const resumenOAOA = (c) => {
+  const cfg = { ...DEFAULT_RETO_OAOA, ...(c || {}) };
+  const a = ACTIVIDADES_OAOA.find(x => x.id === cfg.actividad) || ACTIVIDADES_OAOA[0];
+  const m = a.modos?.find(([v]) => v === cfg.modo);
+  return [a.label, m ? m[1] : null].filter(Boolean);
+};
 
 // ── Modal Enviar al profesor: recopilatorio de TODAS las actividades ─────────
-function ModalEnviarProfeOAOA({ resumen, onClose }) {
+function ModalEnviarProfeOAOA({ resumen, onClose, reto = null }) {
   const [codigo,   setCodigo]   = useState('');
   const [nombre,   setNombre]   = useState('');
   const [curso,    setCurso]    = useState('');
@@ -29,6 +50,12 @@ function ModalEnviarProfeOAOA({ resumen, onClose }) {
     + monstruo.combinaciones.length + retos.superados + restas.intentos + geoplano.intentos
     + estimaciones.length + precios.length * 2;
 
+  // Reto de competición: se envían los aciertos totales a la prueba
+  if (reto?.compId && reto?.catId) return (
+    <ModalEnviarCompeticion compId={reto.compId} catId={reto.catId} puntos={totalAciertos}
+      detalle={{ aciertos: totalAciertos, intentos: totalIntentos }} nombreJuego="Método OAOA" tituloReto={reto.titulo || ''} onClose={onClose} />
+  );
+
   const enviar = async () => {
     const code = codigo.trim().toUpperCase();
     if (!nombre.trim()) { setError('Escribe tu nombre.'); return; }
@@ -51,6 +78,7 @@ function ModalEnviarProfeOAOA({ resumen, onClose }) {
           aciertos: totalAciertos,
           intentos: totalIntentos,
           porcentaje: Math.round((totalAciertos / Math.max(1, totalIntentos)) * 100),
+          ...(reto ? { reto: reto.titulo || 'Reto' } : {}),
           // Compatibilidad con la tarjeta de informes existente
           sumas:  { aciertos: bloques.aciertosSumas,  intentos: bloques.intentosSumas  },
           restas: { aciertos: bloques.aciertosRestas, intentos: bloques.intentosRestas },
@@ -733,7 +761,10 @@ export default function MetodoOAOA({ onExit }) {
     return false;
   };
 
-  const [view, setView] = useState('menu');
+  const [reto, setReto] = useState(() => leerRetoUrl());
+  const cfgReto = reto ? { ...DEFAULT_RETO_OAOA, ...(reto.config || {}) } : null;
+  const modoReto = (campo, porDefecto) => (cfgReto && ACTIVIDADES_OAOA.find(a => a.id === cfgReto.actividad)?.campo === campo && cfgReto.modo) || porDefecto;
+  const [view, setView] = useState(() => (reto ? 'reto' : 'menu'));
   const [metrics, setMetrics] = useState({
     sandboxInteractions: 0,
     challengesSolved: 0,
@@ -776,7 +807,7 @@ export default function MetodoOAOA({ onExit }) {
     intentosRestas: bloquesBase.intentosRestas + bloquesActual.intentosRestas,
   };
 
-  const [sandboxMode, setSandboxMode] = useState('free');
+  const [sandboxMode, setSandboxMode] = useState(() => modoReto('sandboxMode', 'free'));
   const [board, setBoard] = useState([]);
   const [sandboxChallengeIdx, setSandboxChallengeIdx] = useState(0);
   const [subtractionIdx, setSubtractionIdx] = useState(0);
@@ -784,11 +815,11 @@ export default function MetodoOAOA({ onExit }) {
   const [subtractionSolved, setSubtractionSolved] = useState(false);
 
   const [factoryIdx, setFactoryIdx] = useState(0);
-  const [factoryOp, setFactoryOp] = useState('suma'); // 'suma' | 'multi'
+  const [factoryOp, setFactoryOp] = useState(() => modoReto('factoryOp', 'suma')); // 'suma' | 'multi'
   const [factoryHistory, setFactoryHistory] = useState([]);
   const [monsterEating, setMonsterEating] = useState(false);
 
-  const [estModo, setEstModo] = useState('tamano'); // 'tamano' | 'precio'
+  const [estModo, setEstModo] = useState(() => modoReto('estModo', 'tamano')); // 'tamano' | 'precio'
   const [estIdx,  setEstIdx]  = useState(0);
   const [estTam,  setEstTam]  = useState(EST_REF_PX);
   const [estNota, setEstNota] = useState(null); // null mientras no se ha comprobado
@@ -885,7 +916,7 @@ export default function MetodoOAOA({ onExit }) {
     ]
   }), []);
 
-  const [geoGrupo, setGeoGrupo] = useState('figuras');
+  const [geoGrupo, setGeoGrupo] = useState(() => modoReto('geoGrupo', 'figuras'));
   const geoChallenges = geoGroups[geoGrupo];
 
   // Niveles de multiplicación: números con varias descomposiciones en factores 1-10
@@ -1355,7 +1386,7 @@ export default function MetodoOAOA({ onExit }) {
       zIndex: 10
     }}>
       <button
-        onClick={() => { setView('menu'); setBoard([]); setUserDiffRod(null); }}
+        onClick={() => { if (reto) { setMostrarEnvio(true); return; } setView('menu'); setBoard([]); setUserDiffRod(null); }}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -1370,7 +1401,7 @@ export default function MetodoOAOA({ onExit }) {
           cursor: 'pointer'
         }}
       >
-        <span>◀</span> Menú
+        {reto ? <span>📤 {reto.compId ? 'Competición' : 'Enviar'}</span> : <><span>◀</span> Menú</>}
       </button>
       <h2 style={{ margin: 0, fontSize: '1rem', color: '#0F172A', fontWeight: '900', textAlign: 'center', flex: 1, padding: '0 8px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
         {title}
@@ -1438,6 +1469,21 @@ export default function MetodoOAOA({ onExit }) {
       userSelect: 'none',
       boxSizing: 'border-box'
     }}>
+      {view === 'reto' && reto && (
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', background: 'linear-gradient(135deg,#0f766e,#134e4a)', overflowY: 'auto' }}>
+          <PantallaReto reto={reto} nombreJuego="Método OAOA" emoji="🧮" color="#0d9488"
+            descripcion="Tu profesor ha elegido esta actividad. Cuando termines, pulsa «📤 Enviar» arriba a la izquierda."
+            chips={resumenOAOA(cfgReto)}
+            onEmpezar={() => {
+              const id = cfgReto.actividad;
+              setView(id); setBoard([]); setUserDiffRod(null); setSubtractionSolved(false); clearGeoplano();
+              if (id === 'paths') irAProblema(pathsIdx);
+              if (id === 'estimacion') { setEstTam(EST_REF_PX); setEstNota(null); }
+            }}
+            onLibre={() => { limpiarRetoUrl(); setReto(null); setView('menu'); }} onSalir={onExit} />
+        </div>
+      )}
+
       {view === 'menu' && (
         <div style={{
           flex: 1,
@@ -2663,7 +2709,7 @@ export default function MetodoOAOA({ onExit }) {
       )}
 
       {mostrarEnvio && (
-        <ModalEnviarProfeOAOA resumen={resumenEnvio} onClose={() => setMostrarEnvio(false)} />
+        <ModalEnviarProfeOAOA resumen={resumenEnvio} reto={reto} onClose={() => setMostrarEnvio(false)} />
       )}
     </div>
   );

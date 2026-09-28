@@ -42,7 +42,16 @@ const clean = (s) => (s || '').toString().toLowerCase().normalize('NFD').replace
 // ──────────────────────────────────────────────────────────
 // COMPONENTE RAÍZ
 // ──────────────────────────────────────────────────────────
-export default function LineaTiempoGame({ onExit, recurso: recursoInicial = null }) {
+// Enlace a una línea de la biblioteca por defecto: /?juego=linea_tiempo&linea=bib_…
+const lineaDeUrl = () => {
+    try {
+        const id = new URLSearchParams(window.location.search).get('linea');
+        return id ? BIBLIOTECA_LINEAS_TIEMPO.find(t => t.id === id) || null : null;
+    } catch (_) { return null; }
+};
+
+export default function LineaTiempoGame({ onExit, recurso: recursoProp = null }) {
+    const [recursoInicial] = useState(() => (recursoProp?.hojas?.length ? recursoProp : lineaDeUrl()));
     const tieneHojas = recursoInicial?.hojas?.length;
     const [pantalla, setPantalla] = useState(() => {
         if (!tieneHojas) return 'BUSQUEDA';

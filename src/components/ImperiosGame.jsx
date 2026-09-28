@@ -5,6 +5,18 @@ import correctSoundFile from '../assets/correct-choice-43861.mp3';
 import wrongSoundFile   from '../assets/negative_beeps-6008.mp3';
 import imperiosData from './imperios_historicos-v3.json';
 import { guardarRegistroLocal } from '../utils/registrosLocales';
+import { leerRetoUrl, limpiarRetoUrl } from '../utils/retoLink';
+import PantallaReto, { textoBotonEnvio } from './retos/PantallaReto';
+import ModalEnviarCompeticion from './ModalEnviarCompeticion';
+
+// ─── Retos por enlace (utils/retoLink.js): un imperio concreto o al azar ───────
+export const RUTA_IMPERIOS = '/imperios';
+export const IMPERIOS_RETO = imperiosData.map(i => ({ id: i.id, nombre: i.nombre }));
+export const DEFAULT_RETO_IMPERIOS = { imperioId: 'AZAR' };
+export const resumenImperios = (c) => {
+  const imp = imperiosData.find(i => i.id === c?.imperioId);
+  return [imp ? `🏛️ ${imp.nombre}` : '🎲 Imperio al azar', '1️⃣ Mapa · 2️⃣ Preguntas'];
+};
 
 const WORLD_URL = 'https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson';
 let _worldCache = null;
@@ -198,7 +210,7 @@ const ctrlBtn  = { width: 42, height: 42, borderRadius: 11, border: '1px solid r
 const arrowBtn = { width: 36, height: 36, borderRadius: 9, border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(0,0,0,0.5)', color: 'white', fontSize: '0.95rem', fontWeight: 900, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, userSelect: 'none', touchAction: 'manipulation' };
 
 // ── Modal Enviar al profesor ───────────────────────────────────────────────────
-function ModalEnviarProfe({ datos, onClose }) {
+function ModalEnviarProfe({ datos, onClose, reto = null }) {
   const [codigo, setCodigo]     = useState('');
   const [nombre, setNombre]     = useState('');
   const [curso,  setCurso]      = useState('');
@@ -236,6 +248,7 @@ function ModalEnviarProfe({ datos, onClose }) {
           intentos,
           fallos:     intentos - aciertos,
           porcentaje,
+          ...(reto ? { reto } : {}),
         }],
       });
       // Copia local en el dispositivo (Mis registros)
@@ -312,6 +325,8 @@ function ModalInfo({ onClose }) {
 
 // ── Componente principal ───────────────────────────────────────────────────────
 export default function ImperiosGame({ onBack }) {
+  const [reto,        setReto]        = useState(() => leerRetoUrl());
+  const esRetoCompeticion = !!(reto?.compId && reto?.catId);
   const [pantalla,    setPantalla]    = useState('intro');   // intro | mapa | quiz | resultado
   const [worldFeats,  setWorldFeats]  = useState(_worldCache);
   const [cargando,    setCargando]    = useState(false);
@@ -587,6 +602,21 @@ export default function ImperiosGame({ onBack }) {
   };
 
   // ── INTRO ──────────────────────────────────────────────────────────────────
+  // ── Reto por enlace: el imperio lo fija el profesor ──
+  if (pantalla === 'intro' && reto) {
+    const impReto = imperiosData.find(i => i.id === reto.config?.imperioId);
+    return (
+      <div style={{ minHeight: '100vh', background: BG, display: 'flex', alignItems: 'center' }}>
+        {!worldFeats
+          ? <p style={{ color: '#fcd34d', margin: '0 auto', fontFamily: 'sans-serif' }}>🌍 Cargando mapa del mundo…</p>
+          : <PantallaReto reto={reto} nombreJuego="Imperios" emoji="🏛️" color="#b45309" oscuro
+              chips={resumenImperios(reto.config)}
+              onEmpezar={() => empezarImperio(impReto || imperiosData[Math.floor(Math.random() * imperiosData.length)])}
+              onLibre={() => { limpiarRetoUrl(); setReto(null); }} onSalir={onBack} />}
+      </div>
+    );
+  }
+
   if (pantalla === 'intro') {
     return (
       <div style={{ minHeight: '100vh', background: BG, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 16px 40px', fontFamily: 'sans-serif' }}>
@@ -783,16 +813,22 @@ export default function ImperiosGame({ onBack }) {
         </button>
         <button onClick={() => setModalEnviar(true)}
           style={{ width: '100%', padding: '13px', borderRadius: 14, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#f1c40f,#e67e22)', color: 'white', fontWeight: 800, fontSize: '0.95rem', marginBottom: 10 }}>
-          📤 Enviar al profesor
+          {textoBotonEnvio(reto)}
         </button>
         <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={() => setPantalla('intro')} style={{ flex: 1, padding: '12px', borderRadius: 12, border: '2px solid rgba(255,255,255,0.25)', background: 'transparent', color: 'white', fontWeight: 700, cursor: 'pointer' }}>🔄 Otro imperio</button>
+          <button onClick={() => setPantalla('intro')} style={{ flex: 1, padding: '12px', borderRadius: 12, border: '2px solid rgba(255,255,255,0.25)', background: 'transparent', color: 'white', fontWeight: 700, cursor: 'pointer' }}>{reto ? '🔄 Repetir el reto' : '🔄 Otro imperio'}</button>
           <button onClick={onBack} style={{ flex: 1, padding: '12px', borderRadius: 12, border: 'none', background: 'rgba(255,255,255,0.12)', color: 'white', fontWeight: 700, cursor: 'pointer' }}>Salir</button>
         </div>
       </div>
 
-      {modalEnviar && (
+      {modalEnviar && esRetoCompeticion && (
+        <ModalEnviarCompeticion compId={reto.compId} catId={reto.catId} puntos={fase1Score + fase2Score}
+          detalle={{ imperio: imperio?.nombre, fase1Aciertos: fase1Score, fase2Aciertos: fase2Score }}
+          nombreJuego="Imperios" tituloReto={reto.titulo || ''} onClose={() => setModalEnviar(false)} />
+      )}
+      {modalEnviar && !esRetoCompeticion && (
         <ModalEnviarProfe
+          reto={reto ? (reto.titulo || 'Reto') : null}
           datos={{
             imperio: imperio?.nombre,
             paisesTotal: targetFeats.length,

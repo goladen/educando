@@ -4,6 +4,18 @@ import { collection, addDoc, query, where, orderBy, limit, getDocs, doc, getDoc 
 import { Trophy, X, Delete } from 'lucide-react';
 import { guardarRegistroLocal } from './utils/registrosLocales';
 import Confetti from 'react-confetti';
+import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
+import PantallaReto, { textoBotonEnvio } from './components/retos/PantallaReto';
+import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
+
+// ─── Retos por enlace (utils/retoLink.js): operación y cifras fijas ───────────
+export const RUTA_MATHLE = '/?juego=mathle';
+export const OPERACIONES_MATHLE = [['SUMA', '➕ Suma'], ['RESTA', '➖ Resta'], ['MULTI', '✖ Multiplicación']];
+export const DEFAULT_RETO_MATHLE = { operacion: 'SUMA', cifras: 3 };
+export const resumenMathle = (c) => {
+    const cfg = { ...DEFAULT_RETO_MATHLE, ...(c || {}) };
+    return [(OPERACIONES_MATHLE.find(o => o[0] === cfg.operacion) || [])[1] || cfg.operacion, `🔢 ${cfg.cifras} cifras por número`, '6 intentos'];
+};
 
 function ModalEnviarProfe({ datos, onClose }) {
     const [codigo, setCodigo]   = useState('');
@@ -25,7 +37,7 @@ function ModalEnviarProfe({ datos, onClose }) {
                 tipo: 'MATHLE', modalidad: 'Individual', fecha: new Date(),
                 codigoProfesor: code,
                 config: { operacion: datos.operacion, cifras: datos.cifras },
-                jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), tiempo: datos.tiempo, intentos: datos.intentos }],
+                jugadores: [{ nombre: nombre.trim(), curso: curso.trim(), tiempo: datos.tiempo, intentos: datos.intentos, ...(datos.reto ? { reto: datos.reto } : {}) }],
             });
             guardarRegistroLocal('MATHLE', {
                 titulo: `${datos.operacion || 'MathLe'} (${datos.cifras} cif) · ${datos.intentos} intentos`,
@@ -76,10 +88,14 @@ function ModalEnviarProfe({ datos, onClose }) {
 }
 
 export default function MathWordleGame({ usuario, onExit }) {
+    // Reto por enlace: operación y cifras fijadas por el profesor
+    const [reto, setReto] = useState(() => leerRetoUrl());
+    const cfgReto = reto ? { ...DEFAULT_RETO_MATHLE, ...(reto.config || {}) } : null;
+    const esRetoCompeticion = !!(reto?.compId && reto?.catId);
     // --- ESTADOS DE PANTALLA ---
-    const [screen, setScreen] = useState('MAIN'); // MAIN, CONFIG, GAME, VICTORY, RANKING_VIEW
-    const [gameMode, setGameMode] = useState('SUMA'); // SUMA, RESTA, MULTI
-    const [digits, setDigits] = useState(3); // Cifras por número (2, 3, 4)
+    const [screen, setScreen] = useState(() => (reto ? 'RETO' : 'MAIN')); // RETO, MAIN, CONFIG, GAME, VICTORY, RANKING_VIEW
+    const [gameMode, setGameMode] = useState(() => cfgReto?.operacion || 'SUMA'); // SUMA, RESTA, MULTI
+    const [digits, setDigits] = useState(() => Number(cfgReto?.cifras) || 3); // Cifras por número (2, 3, 4)
 
     // --- ESTADOS DE JUEGO ---
     const [targetNum, setTargetNum] = useState(0); // El resultado objetivo
@@ -227,7 +243,7 @@ export default function MathWordleGame({ usuario, onExit }) {
             const sol1 = solutionStr.substring(0, digits);
             const sol2 = solutionStr.substring(digits);
             alert(`Fin del juego. La solución era: ${sol1} ${opSymbol} ${sol2}`);
-            setScreen('CONFIG');
+            setScreen(reto ? 'RETO' : 'CONFIG');
         }
     };
 
@@ -355,6 +371,14 @@ export default function MathWordleGame({ usuario, onExit }) {
     // ==========================================
 
     // --- 1. MENÚ PRINCIPAL ---
+    if (screen === 'RETO' && reto) return (
+        <div style={styles.screen}>
+            <PantallaReto reto={reto} nombreJuego="MathLe" emoji="🧮" color="#538d4e" oscuro
+                chips={resumenMathle(cfgReto)} onEmpezar={iniciarPartida}
+                onLibre={() => { limpiarRetoUrl(); setReto(null); setScreen('MAIN'); }} onSalir={onExit} />
+        </div>
+    );
+
     if (screen === 'MAIN') return (
         <div style={styles.screen}>
             <h1 style={styles.h1}>MATH WORDLE</h1>
@@ -435,9 +459,16 @@ export default function MathWordleGame({ usuario, onExit }) {
                 {usuario && <p style={{ color: '#b59f3b', marginBottom: '10px' }}>Jugador: <b>{usuario.displayName}</b></p>}
                 <button style={{ ...styles.btn, ...styles.btnPrimary }} onClick={guardarPuntuacion}>Guardar Resultado</button>
             </div>
-            <button style={{ ...styles.btn, background: 'linear-gradient(135deg,#27ae60,#2ecc71)', color: 'white' }} onClick={() => setMostrarEnvio(true)}>📤 Enviar al profesor</button>
-            <button style={{ ...styles.btn, ...styles.btnSecondary }} onClick={() => setScreen('CONFIG')}>Jugar de Nuevo</button>
-            {mostrarEnvio && <ModalEnviarProfe datos={{ tiempo: elapsedTime, operacion: gameMode, cifras: digits, intentos: guesses.length }} onClose={() => setMostrarEnvio(false)} />}
+            <button style={{ ...styles.btn, background: esRetoCompeticion ? 'linear-gradient(135deg,#f39c12,#e67e22)' : 'linear-gradient(135deg,#27ae60,#2ecc71)', color: 'white' }} onClick={() => setMostrarEnvio(true)}>{textoBotonEnvio(reto)}</button>
+            <button style={{ ...styles.btn, ...styles.btnSecondary }} onClick={() => setScreen(reto ? 'RETO' : 'CONFIG')}>Jugar de Nuevo</button>
+            {mostrarEnvio && esRetoCompeticion && (
+                // Menos intentos y menos tiempo = más puntos
+                <ModalEnviarCompeticion compId={reto.compId} catId={reto.catId}
+                    puntos={Math.max(1, (7 - guesses.length) * 100 + Math.max(0, 99 - elapsedTime))}
+                    detalle={{ intentos: guesses.length, tiempo: elapsedTime }} nombreJuego="MathLe" tituloReto={reto.titulo || ''}
+                    onClose={() => setMostrarEnvio(false)} />
+            )}
+            {mostrarEnvio && !esRetoCompeticion && <ModalEnviarProfe datos={{ tiempo: elapsedTime, operacion: gameMode, cifras: digits, intentos: guesses.length, reto: reto ? (reto.titulo || 'Reto') : null }} onClose={() => setMostrarEnvio(false)} />}
         </div>
     );
 
@@ -450,7 +481,7 @@ export default function MathWordleGame({ usuario, onExit }) {
                     <span style={{ fontSize: '0.8rem', color: '#818384' }}>OBJETIVO</span>
                     <span style={styles.targetNum}>{targetNum}</span>
                 </div>
-                <div style={{ width: '40px', textAlign: 'right', cursor: 'pointer' }} onClick={() => setScreen('CONFIG')}><X color="white" /></div>
+                <div style={{ width: '40px', textAlign: 'right', cursor: 'pointer' }} onClick={() => setScreen(reto ? 'RETO' : 'CONFIG')}><X color="white" /></div>
             </div>
 
             <div style={styles.gridScroll}>

@@ -6,9 +6,25 @@ import { db } from './firebase';
 import { guardarRegistroLocal } from './utils/registrosLocales';
 import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
 import DescubreMates from './DescubreMates';
+import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
+import PantallaReto from './components/retos/PantallaReto';
+import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
+
+// ─── Retos por enlace (utils/retoLink.js): un minijuego concreto ──────────────
+export const RUTA_DIVISIBILIDAD = '/primaria/divisibilidad';
+export const JUEGOS_DIVISIBILIDAD = [
+  ['criba', '🧮 Criba de Eratóstenes'],
+  ['primes', '⏱️ Encuentra los primos'],
+  ['multiples', '🔢 Juego de múltiplos'],
+  ['divisors', '🔍 Juego de divisores'],
+  ['era_div', '🗂️ Tabla de los 100: divisores'],
+  ['descubre', '🔍 Descubre primos, cuadrados y pares'],
+];
+export const DEFAULT_RETO_DIVIS = { juego: 'primes' };
+export const resumenDivisibilidad = (c) => [(JUEGOS_DIVISIBILIDAD.find(j => j[0] === (c?.juego || 'primes')) || [])[1] || 'Divisibilidad'];
 
 // ── Modal Enviar al Profesor ──────────────────────────────────────────────────
-function ModalEnviarProfe({ datos, onClose }) {
+function ModalEnviarProfe({ datos, onClose, reto = null }) {
   const [codigo,   setCodigo]   = useState('');
   const [nombre,   setNombre]   = useState('');
   const [curso,    setCurso]    = useState('');
@@ -40,6 +56,7 @@ function ModalEnviarProfe({ datos, onClose }) {
           primos:    { aciertos: datos.aciertosPrimos, intentos: datos.intentosPrimos },
           multiplos: { aciertos: datos.aciertosMult,   intentos: datos.intentosMult   },
           divisores: { aciertos: datos.aciertosDiv,    intentos: datos.intentosDiv    },
+          ...(reto ? { reto: reto.titulo || 'Reto' } : {}),
         }],
       });
       guardarRegistroLocal('DIVISIBILIDAD', {
@@ -108,7 +125,8 @@ function ModalEnviarProfe({ datos, onClose }) {
 }
 
 function App() {
-  const [view, setView] = useState('menu');
+  const [reto, setReto] = useState(() => leerRetoUrl());
+  const [view, setView] = useState(() => (reto ? 'reto' : 'menu'));
   const [countdown, setCountdown] = useState(null); // 3, 2, 1, '¡YA!', null
 
   // --- ESTADOS: CRIBA DE ERATÓSTENES ---
@@ -601,8 +619,21 @@ function App() {
     textShadow: '2px 2px 4px rgba(0,0,0,0.1)'
   };
 
+  // En un reto, «volver al menú» vuelve a la pantalla del reto
+  const irMenu = () => setView(reto ? 'reto' : 'menu');
+  const empezarReto = () => {
+    const j = reto?.config?.juego || 'primes';
+    if (j === 'criba') startCriba(); else if (j === 'multiples') startMultiples(); else if (j === 'divisors') startDivisors();
+    else if (j === 'era_div') startEraDivisores(); else if (j === 'descubre') setView('descubre'); else startPrimes();
+  };
+
   return (
     <div style={mainContainerStyle}>
+      {view === 'reto' && reto && (
+        <PantallaReto reto={reto} nombreJuego="Divisibilidad" emoji="🔢" color="#7B1FA2"
+          chips={resumenDivisibilidad(reto.config)} onEmpezar={empezarReto}
+          onLibre={() => { limpiarRetoUrl(); setReto(null); setView('menu'); }} />
+      )}
       {view === 'menu' && (
         <>
           <h1 style={headerStyle}>🏫 Pizarra Digital Interactiva: Matemáticas</h1>
@@ -644,7 +675,7 @@ function App() {
       {/* --- CRIBA DE ERATÓSTENES --- */}
       {view === 'criba' && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-          <button style={backButtonStyle} onClick={() => setView('menu')}>⬅️ Volver al Menú</button>
+          <button style={backButtonStyle} onClick={irMenu}>⬅️ Volver al Menú</button>
           <h2 style={{ ...headerStyle, fontSize: '28px' }}>🧮 Herramienta: Criba de Eratóstenes</h2>
           
           <div style={{ display: 'flex', gap: '15px', marginBottom: '25px' }}>
@@ -697,7 +728,7 @@ function App() {
       {/* --- ENCUENTRA LOS PRIMOS --- */}
       {view === 'primes' && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-          <button style={backButtonStyle} onClick={() => setView('menu')}>⬅️ Volver al Menú</button>
+          <button style={backButtonStyle} onClick={irMenu}>⬅️ Volver al Menú</button>
           <h2 style={{ ...headerStyle, fontSize: '28px' }}>⏱️ Juego: Encuentra los Primos</h2>
           
           <div style={infoPanelStyle}>
@@ -744,7 +775,7 @@ function App() {
       {/* --- MÚLTIPLOS --- */}
       {view === 'multiples' && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-          <button style={backButtonStyle} onClick={() => setView('menu')}>⬅️ Volver al Menú</button>
+          <button style={backButtonStyle} onClick={irMenu}>⬅️ Volver al Menú</button>
           <h2 style={{ ...headerStyle, fontSize: '28px' }}>🔢 Juego de Múltiplos</h2>
           
           <div style={infoPanelStyle}>
@@ -790,7 +821,7 @@ function App() {
       {/* --- DIVISORES --- */}
       {view === 'divisors' && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-          <button style={backButtonStyle} onClick={() => setView('menu')}>⬅️ Volver al Menú</button>
+          <button style={backButtonStyle} onClick={irMenu}>⬅️ Volver al Menú</button>
           <h2 style={{ ...headerStyle, fontSize: '28px' }}>🔍 Juego de Divisores</h2>
           
           <div style={infoPanelStyle}>
@@ -830,7 +861,7 @@ function App() {
       )}
       {/* --- DESCUBRE PRIMOS, CUADRADOS Y PARES --- */}
       {view === 'descubre' && (
-        <DescubreMates onBack={() => setView('menu')} />
+        <DescubreMates onBack={irMenu} />
       )}
 
       {/* --- TABLA DE DIVISORES (era_div) --- */}
@@ -915,7 +946,7 @@ function App() {
               </div>
               <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', justifyContent: 'center' }}>
                 <button style={{ ...backButtonStyle, backgroundColor: '#c05621', marginBottom: 0 }} onClick={startEraDivisores}>🔄 Jugar de nuevo</button>
-                <button style={{ ...backButtonStyle, marginBottom: 0 }} onClick={() => setView('menu')}>⬅️ Menú</button>
+                <button style={{ ...backButtonStyle, marginBottom: 0 }} onClick={irMenu}>⬅️ Menú</button>
               </div>
             </div>
           );
@@ -925,7 +956,7 @@ function App() {
         return (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
             <style>{`@keyframes pulseTarget { 0%,100%{box-shadow:0 0 0 4px rgba(192,86,33,0.4)} 50%{box-shadow:0 0 0 8px rgba(192,86,33,0.15)} }`}</style>
-            <button style={backButtonStyle} onClick={() => setView('menu')}>⬅️ Volver al Menú</button>
+            <button style={backButtonStyle} onClick={irMenu}>⬅️ Volver al Menú</button>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 30, marginBottom: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
               <div style={{ fontSize: '1.1rem', color: '#718096', fontWeight: 700 }}>Ronda {eraDivRound + 1} / 5</div>
@@ -1019,9 +1050,16 @@ function App() {
         );
       })()}
 
-      {mostrarEnvio && (
+      {mostrarEnvio && reto?.compId && reto?.catId && (
+        <ModalEnviarCompeticion compId={reto.compId} catId={reto.catId}
+          puntos={aciertosPrimos + aciertosMult + aciertosDiv}
+          detalle={{ aciertos: aciertosPrimos + aciertosMult + aciertosDiv, intentos: intentosPrimos + intentosMult + intentosDiv }}
+          nombreJuego="Divisibilidad" tituloReto={reto.titulo || ''} onClose={() => setMostrarEnvio(false)} />
+      )}
+      {mostrarEnvio && !(reto?.compId && reto?.catId) && (
         <ModalEnviarProfe
           datos={{ aciertosPrimos, intentosPrimos, aciertosMult, intentosMult, aciertosDiv, intentosDiv }}
+          reto={reto}
           onClose={() => setMostrarEnvio(false)}
         />
       )}

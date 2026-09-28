@@ -27,6 +27,8 @@ const fmtFecha = (ts) => {
     const d = ts.toDate ? ts.toDate() : new Date(ts);
     return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
 };
+// Miembro de solo lectura: ve la parte interna pero no puede hacer cambios (lo decide el creador)
+const esLector = (comunidad, uid) => uid !== comunidad.creadorUid && (comunidad.lectores || []).includes(uid);
 
 // Borra una comunidad y TODAS sus subcolecciones (Firestore no lo hace en cascada).
 // El doc padre se borra el último para que las reglas (que hacen get(padre)) sigan válidas.
@@ -582,7 +584,14 @@ function PanelMiembros({ usuario, comunidad, onCambio }) {
     };
     const expulsar = async (uid) => {
         setProc(uid);
-        try { await updateDoc(doc(db, 'comunidades', comunidad.id), { miembros: arrayRemove(uid) }); onCambio(); }
+        try { await updateDoc(doc(db, 'comunidades', comunidad.id), { miembros: arrayRemove(uid), lectores: arrayRemove(uid) }); onCambio(); }
+        catch (e) { alert('Error: ' + e.message); }
+        setProc(null);
+    };
+    // Solo lectura: el miembro ve la parte interna pero no puede hacer cambios
+    const cambiarLectura = async (uid, lector) => {
+        setProc(uid);
+        try { await updateDoc(doc(db, 'comunidades', comunidad.id), { lectores: lector ? arrayUnion(uid) : arrayRemove(uid) }); onCambio(); }
         catch (e) { alert('Error: ' + e.message); }
         setProc(null);
     };
@@ -666,16 +675,25 @@ function PanelMiembros({ usuario, comunidad, onCambio }) {
             {(comunidad.miembros || []).map(uid => {
                 const d = info[uid] || {};
                 const esC = uid === comunidad.creadorUid;
+                const lector = esLector(comunidad, uid);
                 return (
                     <div key={uid} style={st.filaMiembro}>
                         <div style={{ flex: 1 }}>
-                            <div style={{ fontWeight: 600, color: '#2c3e50', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <div style={{ fontWeight: 600, color: '#2c3e50', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                                 {d.displayName || d.nombre || 'Profesor/a'}
                                 {esC && <span style={st.chipMine}><ShieldCheck size={11} /> Creador</span>}
+                                {lector && !esCreador && <span style={{ fontSize: '0.66rem', background: '#f1f3f7', color: '#7f8c8d', padding: '1px 7px', borderRadius: 8, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 3 }}><Eye size={11} /> Solo lectura</span>}
                                 {uid === usuario.uid && <span style={{ fontSize: '0.7rem', color: '#95a5a6' }}>(tú)</span>}
                             </div>
                             {d.email && <div style={{ fontSize: '0.78rem', color: '#7f8c8d', display: 'flex', alignItems: 'center', gap: 4 }}><Mail size={11} /> {d.email}</div>}
                         </div>
+                        {esCreador && !esC && (
+                            <label title="Puede ver la parte interna, pero no hacer cambios"
+                                style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.76rem', color: lector ? AZUL : '#7f8c8d', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', opacity: proc === uid ? 0.5 : 1 }}>
+                                <input type="checkbox" checked={lector} disabled={proc === uid} onChange={e => cambiarLectura(uid, e.target.checked)} />
+                                <Eye size={13} /> Solo lectura
+                            </label>
+                        )}
                         {esCreador && !esC && (
                             <button onClick={() => expulsar(uid)} disabled={proc === uid} title="Expulsar"
                                 style={{ ...st.miniBtn, color: '#e74c3c', borderColor: '#f3c9c4' }}><LogOut size={13} /></button>
@@ -1579,7 +1597,7 @@ function GeneradorSubgrupos({ alumnos, nombre }) {
 }
 
 // ─── Detalle de un curso (miembro) ────────────────────────────────────────────
-function CursoDetalle({ usuario, comunidad, curso, onBack }) {
+function CursoDetalle({ usuario, comunidad, curso, onBack, soloLectura }) {
     const [sub, setSub]       = useState('listado');
     const [priv, setPriv]     = useState(null); // { listado, plano }
     const [modalListado, setModalListado] = useState(false);
@@ -1674,37 +1692,44 @@ function CursoDetalle({ usuario, comunidad, curso, onBack }) {
                                         {copiadoListado ? <><CheckCircle size={15} /> Copiado</> : <><Copy size={15} /> Copiar a mi zona</>}
                                     </button>
                                 )}
-                                <button onClick={() => setModalListado(true)} style={st.btnPrimary}><ClipboardList size={15} /> Definir listado</button>
+                                {!soloLectura && <button onClick={() => setModalListado(true)} style={st.btnPrimary}><ClipboardList size={15} /> Definir listado</button>}
                             </div>
                         </div>
-                        {(!priv.listado || priv.listado.length === 0) ? <div style={st.vacio}>Sin listado. Pulsa «Definir listado» o añade alumnos uno a uno abajo.</div> : (
+                        {(!priv.listado || priv.listado.length === 0) ? <div style={st.vacio}>{soloLectura ? 'Sin listado.' : 'Sin listado. Pulsa «Definir listado» o añade alumnos uno a uno abajo.'}</div> : (
                             <div style={{ border: '1px solid #e0e4f0', borderRadius: 10, overflow: 'hidden' }}>
                                 {priv.listado.map((a, i) => (
                                     <div key={a.id || i} style={{ padding: '5px 10px', borderBottom: '1px solid #f3f3f3', background: i % 2 ? '#fafafa' : 'white', display: 'flex', gap: 8, alignItems: 'center' }}>
                                         <span style={{ color: '#bdc3c7', fontSize: '0.8rem', width: 22, flexShrink: 0 }}>{i + 1}</span>
-                                        <input defaultValue={a.nombre}
+                                        <input defaultValue={a.nombre} readOnly={soloLectura}
                                             onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                                             onBlur={e => { const v = e.target.value.trim(); if (v && v !== a.nombre) renombrarAlumno(a.id, v); else if (!v) e.target.value = a.nombre; }}
                                             style={{ flex: 1, minWidth: 0, border: '1px solid transparent', borderRadius: 6, padding: '5px 6px', fontSize: '0.86rem', color: '#2c3e50', fontFamily: 'inherit', outline: 'none', background: 'transparent' }}
-                                            onFocus={e => { e.target.style.background = '#fff'; e.target.style.borderColor = '#cdd6ea'; }} />
+                                            onFocus={e => { if (soloLectura) return; e.target.style.background = '#fff'; e.target.style.borderColor = '#cdd6ea'; }} />
                                         {a.grupo && <span style={{ fontSize: '0.72rem', color: '#95a5a6', flexShrink: 0 }}>{a.grupo}</span>}
-                                        <button onClick={() => eliminarAlumno(a.id)} title="Eliminar alumno" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#e74c3c', padding: 2, flexShrink: 0 }}><Trash2 size={14} /></button>
+                                        {!soloLectura && <button onClick={() => eliminarAlumno(a.id)} title="Eliminar alumno" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#e74c3c', padding: 2, flexShrink: 0 }}><Trash2 size={14} /></button>}
                                     </div>
                                 ))}
                             </div>
                         )}
 
                         {/* Añadir un alumno */}
-                        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                            <input value={nuevoAlumno} onChange={e => setNuevoAlumno(e.target.value)} onKeyDown={e => e.key === 'Enter' && añadirAlumno()}
-                                placeholder="Añadir un alumno…" style={{ ...st.input, marginBottom: 0, flex: 1 }} />
-                            <button onClick={añadirAlumno} disabled={!nuevoAlumno.trim()} style={st.btnPrimary}><Plus size={15} /> Añadir</button>
-                        </div>
-                        <div style={{ fontSize: '0.72rem', color: '#bdc3c7', marginTop: 6 }}>Toca un nombre para reescribirlo (se guarda al salir del campo).</div>
+                        {!soloLectura && <>
+                            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                                <input value={nuevoAlumno} onChange={e => setNuevoAlumno(e.target.value)} onKeyDown={e => e.key === 'Enter' && añadirAlumno()}
+                                    placeholder="Añadir un alumno…" style={{ ...st.input, marginBottom: 0, flex: 1 }} />
+                                <button onClick={añadirAlumno} disabled={!nuevoAlumno.trim()} style={st.btnPrimary}><Plus size={15} /> Añadir</button>
+                            </div>
+                            <div style={{ fontSize: '0.72rem', color: '#bdc3c7', marginTop: 6 }}>Toca un nombre para reescribirlo (se guarda al salir del campo).</div>
+                        </>}
                     </div>
                 )}
                 {sub === 'subgrupos' && <GeneradorSubgrupos alumnos={priv.listado} nombre={`Subgrupos ${curso.nombre}`} />}
-                {sub === 'horario' && (
+                {sub === 'horario' && soloLectura && (
+                    (curso.horario || priv.horario)
+                        ? <HorarioView horario={curso.horario || priv.horario} fondo={fondoUrl(curso.fondoHorario)} />
+                        : <div style={st.vacio}>Este curso aún no tiene horario.</div>
+                )}
+                {sub === 'horario' && !soloLectura && (
                     <div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', marginBottom: 12, padding: '10px 12px', background: '#f8f9fb', borderRadius: 10, fontSize: '0.82rem', color: '#555' }}>
                             <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
@@ -1733,19 +1758,23 @@ function CursoDetalle({ usuario, comunidad, curso, onBack }) {
                     <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
                             <div style={{ fontSize: '0.8rem', color: '#7f8c8d' }}>{planos.length} plano{planos.length === 1 ? '' : 's'} · uno por materia si quieres · solo visible para miembros</div>
-                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                                <button onClick={() => setPlanoEdit({ id: null, data: null })} style={st.btnPrimary}><Plus size={15} /> Nuevo plano</button>
-                                <button onClick={() => setModalPlano(true)} style={st.btnSec}>Importar de mis planos</button>
-                            </div>
+                            {!soloLectura && (
+                                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                    <button onClick={() => setPlanoEdit({ id: null, data: null })} style={st.btnPrimary}><Plus size={15} /> Nuevo plano</button>
+                                    <button onClick={() => setModalPlano(true)} style={st.btnSec}>Importar de mis planos</button>
+                                </div>
+                            )}
                         </div>
-                        {planos.length === 0 ? <div style={st.vacio}>Sin planos. Crea uno desde cero (usa el listado del curso) o impórtalo. Puedes tener varios, p. ej. uno por asignatura.</div> : (
+                        {planos.length === 0 ? <div style={st.vacio}>{soloLectura ? 'Sin planos.' : 'Sin planos. Crea uno desde cero (usa el listado del curso) o impórtalo. Puedes tener varios, p. ej. uno por asignatura.'}</div> : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                                 {planos.map(p => (
                                     <div key={p.id} style={{ border: '1px solid #e0e4f0', borderRadius: 12, padding: 12 }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
                                             <div style={{ fontWeight: 700, color: '#2c3e50', flex: 1 }}>🪑 {p.nombre || 'Plano'}</div>
-                                            <button onClick={() => setPlanoEdit({ id: p.id, data: p })} style={st.miniBtn}><Pencil size={13} /> Editar</button>
-                                            <button onClick={() => borrarPlanoItem(p.id)} style={{ ...st.miniBtn, color: '#e74c3c', borderColor: '#f3c9c4' }}><Trash2 size={13} /></button>
+                                            {!soloLectura && <>
+                                                <button onClick={() => setPlanoEdit({ id: p.id, data: p })} style={st.miniBtn}><Pencil size={13} /> Editar</button>
+                                                <button onClick={() => borrarPlanoItem(p.id)} style={{ ...st.miniBtn, color: '#e74c3c', borderColor: '#f3c9c4' }}><Trash2 size={13} /></button>
+                                            </>}
                                         </div>
                                         <PlanoView plano={p} nombre={`${curso.nombre} ${p.nombre || ''}`} exportable />
                                     </div>
@@ -1756,7 +1785,7 @@ function CursoDetalle({ usuario, comunidad, curso, onBack }) {
                 ))}
                 {sub === 'calendario' && (
                     <div>
-                        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12, padding: '10px 12px', background: '#f8f9fb', borderRadius: 10, fontSize: '0.82rem', color: '#555' }}>
+                        {!soloLectura && <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12, padding: '10px 12px', background: '#f8f9fb', borderRadius: 10, fontSize: '0.82rem', color: '#555' }}>
                             <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                 🎨 Color <input type="color" value={curso.color || '#1565C0'} onChange={e => actualizarCurso({ color: e.target.value })} style={{ width: 34, height: 24, border: 'none', background: 'none', cursor: 'pointer', padding: 0 }} />
                             </label>
@@ -1769,8 +1798,8 @@ function CursoDetalle({ usuario, comunidad, curso, onBack }) {
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                                 🖼️ Fondo <SelectorFondo value={curso.fondoCalendario} onChange={id => actualizarCurso({ fondoCalendario: id })} />
                             </div>
-                        </div>
-                        <Calendario usuario={usuario} comunidad={comunidad} cursoId={curso.id} cursoNombre={curso.nombre} puedeEditar sinFinde={!!curso.sinFinde} acento={curso.color} fondo={fondoUrl(curso.fondoCalendario)} />
+                        </div>}
+                        <Calendario usuario={usuario} comunidad={comunidad} cursoId={curso.id} cursoNombre={curso.nombre} puedeEditar={!soloLectura} sinFinde={!!curso.sinFinde} acento={curso.color} fondo={fondoUrl(curso.fondoCalendario)} />
                     </div>
                 )}
             </>}
@@ -1812,7 +1841,7 @@ function CursoDetalle({ usuario, comunidad, curso, onBack }) {
 }
 
 // ─── Panel de cursos (dentro del detalle de comunidad) ────────────────────────
-function CursosPanel({ usuario, comunidad }) {
+function CursosPanel({ usuario, comunidad, soloLectura }) {
     const [cursos, setCursos]   = useState([]);
     const [cargando, setCargando] = useState(true);
     const [nuevo, setNuevo]     = useState('');
@@ -1880,17 +1909,19 @@ function CursosPanel({ usuario, comunidad }) {
 
     if (abierto) {
         const viva = cursos.find(c => c.id === abierto.id) || abierto;
-        return <CursoDetalle usuario={usuario} comunidad={comunidad} curso={viva} onBack={() => setAbierto(null)} />;
+        return <CursoDetalle usuario={usuario} comunidad={comunidad} curso={viva} onBack={() => setAbierto(null)} soloLectura={soloLectura} />;
     }
 
     return (
         <div>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-                <input value={nuevo} onChange={e => setNuevo(e.target.value)} onKeyDown={e => e.key === 'Enter' && crear()} placeholder="Nombre del curso (ej: 1º ESO A)" style={{ ...st.input, marginBottom: 0, flex: 1 }} />
-                <button onClick={crear} disabled={creando || !nuevo.trim()} style={st.btnPrimary}><Plus size={16} /> Curso</button>
-            </div>
+            {!soloLectura && (
+                <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                    <input value={nuevo} onChange={e => setNuevo(e.target.value)} onKeyDown={e => e.key === 'Enter' && crear()} placeholder="Nombre del curso (ej: 1º ESO A)" style={{ ...st.input, marginBottom: 0, flex: 1 }} />
+                    <button onClick={crear} disabled={creando || !nuevo.trim()} style={st.btnPrimary}><Plus size={16} /> Curso</button>
+                </div>
+            )}
             {cargando ? <div style={st.loader}><RefreshCw size={22} style={{ animation: 'spin 1s linear infinite' }} /></div>
-                : cursos.length === 0 ? <div style={st.vacio}>Aún no hay cursos. Crea el primero arriba.</div>
+                : cursos.length === 0 ? <div style={st.vacio}>{soloLectura ? 'Aún no hay cursos.' : 'Aún no hay cursos. Crea el primero arriba.'}</div>
                 : (
                     <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
                         {cursos.map((c, idx) => (
@@ -1901,6 +1932,7 @@ function CursosPanel({ usuario, comunidad }) {
                                 </div>
                                 <div style={{ fontSize: '0.72rem', color: '#95a5a6' }}>{conteos[c.id] ?? 0} alumnos</div>
                                 <div style={{ display: 'flex', gap: 6, marginTop: 'auto', alignItems: 'center' }}>
+                                    {soloLectura ? <button onClick={() => setAbierto(c)} style={{ ...st.miniBtn, color: AZUL, borderColor: '#cdd6ea' }}><Eye size={13} /> Abrir</button> : <>
                                     <button onClick={() => mover(idx, -1)} disabled={idx === 0} title="Subir" style={{ ...st.miniBtn, padding: '5px 7px', opacity: idx === 0 ? 0.4 : 1 }}>↑</button>
                                     <button onClick={() => mover(idx, 1)} disabled={idx === cursos.length - 1} title="Bajar" style={{ ...st.miniBtn, padding: '5px 7px', opacity: idx === cursos.length - 1 ? 0.4 : 1 }}>↓</button>
                                     <button onClick={() => setAbierto(c)} style={{ ...st.miniBtn, color: AZUL, borderColor: '#cdd6ea' }}><Eye size={13} /> Abrir</button>
@@ -1910,6 +1942,7 @@ function CursosPanel({ usuario, comunidad }) {
                                             <button onClick={() => setConfirmarBorrar(null)} style={st.miniBtn}>No</button>
                                         </>
                                     ) : <button onClick={() => setConfirmarBorrar(c.id)} style={{ ...st.miniBtn, color: '#e74c3c', borderColor: '#f3c9c4' }}><Trash2 size={13} /></button>}
+                                    </>}
                                 </div>
                             </div>
                         ))}
@@ -1920,7 +1953,7 @@ function CursosPanel({ usuario, comunidad }) {
 }
 
 // ─── Panel: todos los calendarios con selector ────────────────────────────────
-function PanelCalendarios({ usuario, comunidad }) {
+function PanelCalendarios({ usuario, comunidad, soloLectura }) {
     const [cursos, setCursos]   = useState([]);
     const [sel, setSel]         = useState('todos');
     const [cargando, setCargando] = useState(true);
@@ -1955,10 +1988,10 @@ function PanelCalendarios({ usuario, comunidad }) {
             {cargando ? <div style={st.loader}><RefreshCw size={22} style={{ animation: 'spin 1s linear infinite' }} /></div>
                 : cursos.length === 0 ? <div style={st.vacio}>No hay cursos con calendario. Créalos en la pestaña «Cursos».</div>
                 : sel === 'todos'
-                    ? <Calendario usuario={usuario} comunidad={comunidad} puedeEditar />
+                    ? <Calendario usuario={usuario} comunidad={comunidad} puedeEditar={!soloLectura} />
                     : cursoSel && (
                         <div>
-                            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12, padding: '10px 12px', background: '#f8f9fb', borderRadius: 10, fontSize: '0.82rem', color: '#555' }}>
+                            {!soloLectura && <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12, padding: '10px 12px', background: '#f8f9fb', borderRadius: 10, fontSize: '0.82rem', color: '#555' }}>
                                 <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                     🎨 Color <input type="color" value={cursoSel.color || '#1565C0'} onChange={e => actualizarCurso({ color: e.target.value })} style={{ width: 34, height: 24, border: 'none', background: 'none', cursor: 'pointer', padding: 0 }} />
                                 </label>
@@ -1971,8 +2004,8 @@ function PanelCalendarios({ usuario, comunidad }) {
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                                     🖼️ Fondo <SelectorFondo value={cursoSel.fondoCalendario} onChange={id => actualizarCurso({ fondoCalendario: id })} />
                                 </div>
-                            </div>
-                            <Calendario usuario={usuario} comunidad={comunidad} cursoId={cursoSel.id} cursoNombre={cursoSel.nombre} acento={cursoSel.color} sinFinde={!!cursoSel.sinFinde} puedeEditar fondo={fondoUrl(cursoSel.fondoCalendario)} />
+                            </div>}
+                            <Calendario usuario={usuario} comunidad={comunidad} cursoId={cursoSel.id} cursoNombre={cursoSel.nombre} acento={cursoSel.color} sinFinde={!!cursoSel.sinFinde} puedeEditar={!soloLectura} fondo={fondoUrl(cursoSel.fondoCalendario)} />
                         </div>
                     )}
         </div>
@@ -2180,7 +2213,7 @@ export function FichaProfesor({ p }) {
     );
 }
 
-function ProfesoradoLista({ usuario, comunidad }) {
+function ProfesoradoLista({ usuario, comunidad, soloLectura }) {
     const [profes, setProfes]   = useState([]);
     const [cursos, setCursos]   = useState([]);
     const [miembros, setMiembros] = useState([]);
@@ -2232,10 +2265,12 @@ function ProfesoradoLista({ usuario, comunidad }) {
         <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
                 <div style={{ fontSize: '0.8rem', color: '#7f8c8d' }}>{profes.length} profesores · los marcados como públicos se ven fuera</div>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    <button onClick={() => setPegar(true)} style={st.btnSec}><ClipboardList size={15} /> Pegar lista</button>
-                    <button onClick={() => setEditar({})} style={st.btnPrimary}><Plus size={15} /> Añadir profesor</button>
-                </div>
+                {!soloLectura && (
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        <button onClick={() => setPegar(true)} style={st.btnSec}><ClipboardList size={15} /> Pegar lista</button>
+                        <button onClick={() => setEditar({})} style={st.btnPrimary}><Plus size={15} /> Añadir profesor</button>
+                    </div>
+                )}
             </div>
             {cargando ? <div style={st.loader}><RefreshCw size={22} style={{ animation: 'spin 1s linear infinite' }} /></div>
                 : profes.length === 0 ? <div style={st.vacio}>Aún no hay profesores. Añade el primero.</div>
@@ -2246,10 +2281,12 @@ function ProfesoradoLista({ usuario, comunidad }) {
                                 <FichaProfesor p={p} />
                                 <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center' }}>
                                     {p.publico && <span style={{ ...st.chipPub, fontSize: '0.64rem' }}><Globe size={11} /> Público</span>}
+                                    {!soloLectura && <>
                                     <button onClick={() => setEditar(p)} style={{ ...st.miniBtn, marginLeft: 'auto' }}><Pencil size={13} /> Editar</button>
                                     {borrar === p.id ? (
                                         <><button onClick={() => eliminar(p.id)} style={{ ...st.miniBtn, color: 'white', background: '#e74c3c', borderColor: '#e74c3c' }}>Sí</button><button onClick={() => setBorrar(null)} style={st.miniBtn}>No</button></>
                                     ) : <button onClick={() => setBorrar(p.id)} style={{ ...st.miniBtn, color: '#e74c3c', borderColor: '#f3c9c4' }}><Trash2 size={13} /></button>}
+                                    </>}
                                 </div>
                             </div>
                         ))}
@@ -2384,7 +2421,7 @@ export function GuardiasEditor({ usuario, comunidad, soloLectura }) {
     );
 }
 
-function ProfesoresPanel({ usuario, comunidad }) {
+function ProfesoresPanel({ usuario, comunidad, soloLectura }) {
     const [sub, setSub] = useState('lista');
     return (
         <div>
@@ -2393,8 +2430,8 @@ function ProfesoresPanel({ usuario, comunidad }) {
                     <button key={id} onClick={() => setSub(id)} style={{ ...st.tabBtn, color: sub === id ? AZUL : '#7f8c8d', borderBottom: sub === id ? `3px solid ${AZUL}` : '3px solid transparent', fontWeight: sub === id ? 700 : 500 }}>{lbl}</button>
                 ))}
             </div>
-            {sub === 'lista' && <ProfesoradoLista usuario={usuario} comunidad={comunidad} />}
-            {sub === 'guardias' && <GuardiasEditor usuario={usuario} comunidad={comunidad} />}
+            {sub === 'lista' && <ProfesoradoLista usuario={usuario} comunidad={comunidad} soloLectura={soloLectura} />}
+            {sub === 'guardias' && <GuardiasEditor usuario={usuario} comunidad={comunidad} soloLectura={soloLectura} />}
         </div>
     );
 }
@@ -2413,6 +2450,7 @@ function DetalleComunidad({ usuario, comunidad, onBack, onSalir, onCambio }) {
     const [confirmarBorrarCom, setConfirmarBorrarCom] = useState(false);
     const [borrandoCom, setBorrandoCom] = useState(false);
     const esCreador = comunidad.creadorUid === usuario.uid;
+    const soloLectura = esLector(comunidad, usuario.uid);
 
     const eliminarComunidad = async () => {
         setBorrandoCom(true); setAviso('');
@@ -2493,6 +2531,12 @@ function DetalleComunidad({ usuario, comunidad, onBack, onSalir, onCambio }) {
             </div>
 
             {aviso && <div style={{ ...st.error, marginBottom: 12 }}>{aviso}</div>}
+            {soloLectura && tab !== 'mensajes' && tab !== 'miembros' && (
+                <div style={{ ...st.aviso, marginBottom: 12 }}>
+                    <Eye size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+                    Tienes acceso de <strong>&nbsp;solo lectura&nbsp;</strong>: puedes verlo todo, pero no hacer cambios.
+                </div>
+            )}
 
             {tab === 'grupos' && (
                 <div>
@@ -2525,10 +2569,10 @@ function DetalleComunidad({ usuario, comunidad, onBack, onSalir, onCambio }) {
                 </div>
             )}
 
-            {tab === 'cursos' && <CursosPanel usuario={usuario} comunidad={comunidad} />}
-            {tab === 'profesores' && <ProfesoresPanel usuario={usuario} comunidad={comunidad} />}
-            {tab === 'calendario' && <PanelCalendarios usuario={usuario} comunidad={comunidad} />}
-            {tab === 'competiciones' && <CompeticionesComunidadPanel usuario={usuario} comunidad={comunidad} />}
+            {tab === 'cursos' && <CursosPanel usuario={usuario} comunidad={comunidad} soloLectura={soloLectura} />}
+            {tab === 'profesores' && <ProfesoresPanel usuario={usuario} comunidad={comunidad} soloLectura={soloLectura} />}
+            {tab === 'calendario' && <PanelCalendarios usuario={usuario} comunidad={comunidad} soloLectura={soloLectura} />}
+            {tab === 'competiciones' && <CompeticionesComunidadPanel usuario={usuario} comunidad={comunidad} soloLectura={soloLectura} />}
             {tab === 'mensajes' && <PanelMensajes usuario={usuario} comunidad={comunidad} />}
             {tab === 'miembros' && <PanelMiembros usuario={usuario} comunidad={comunidad} onCambio={onCambio} />}
 

@@ -4,6 +4,7 @@ import { collection, getDocs, limit, query, where } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import ModalCompartirReto from './ModalCompartirReto';
 import { preguntasDeRecurso, categoriasDeRecurso } from '../utils/normalizarPreguntas';
+import { BIBLIOTECA_LINEAS_TIEMPO } from '../BibliotecaLineasTiempo';
 
 const AZUL = '#1565C0';
 
@@ -15,6 +16,9 @@ const AZUL = '#1565C0';
 //   sinHoja: el juego no usa la hoja del enlace
 //   valido(r): filtro extra (juegos que aceptan recursos de cualquier tipo)
 //   modoFijo: el modo (m=…) identifica al juego, no se elige
+//   coleccion / campoAutor / soloPublica: recursos fuera de 'resources' (Trivial)
+//   enlace(r): enlace propio del juego en vez de /?r=… (VideoQuizz, Trivial); null = /?r=…
+//   biblioteca(): recursos que vienen por defecto en el juego (pestaña «Por defecto»)
 const MODOS_BURBUJAS = [
     { id: 'BURBUJAS', label: '🔵 Cazaburbujas' },
     { id: 'TEST', label: '📝 Test' },
@@ -39,6 +43,14 @@ export const JUEGOS_RECURSO = {
     CALAMAR:      { label: 'Luz roja · Luz verde', tipos: null, valido: (r) => preguntasDeRecurso(r).length > 0, modo: 'CALAMAR', modoFijo: true, sinHoja: true },
     MONEYBOARD:   { label: 'Money Board', tipos: null, valido: (r) => categoriasDeRecurso(r).length >= 2, modo: 'MONEYBOARD', modoFijo: true, sinHoja: true },
     BUNKER:       { label: 'Bunker', tipos: ['CAZABURBUJAS'], modo: 'BUNKER', modoFijo: true, sinHoja: true },
+    PIKATRON_2:   { label: 'Plataformas', tipos: ['CAZABURBUJAS', 'PIKATRON'], modo: 'PLATAFORMAS', modoFijo: true },
+    ETIQUETAS:    { label: 'EtiquetaMe', tipos: ['ETIQUETAS'], modo: 'ETIQUETAS', modoFijo: true, sinHoja: true },
+    LINEA_TIEMPO: { label: 'Línea del tiempo', tipos: ['LINEA_TIEMPO'], modo: 'LINEA_TIEMPO', modoFijo: true, sinHoja: true,
+        biblioteca: () => BIBLIOTECA_LINEAS_TIEMPO,
+        enlace: (r) => (r.esBiblioteca ? `/?juego=linea_tiempo&linea=${encodeURIComponent(r.id)}` : null) },
+    DUELO_PIRATAS_RECURSO: { label: 'Duelo Piratas', tipos: null, valido: (r) => preguntasDeRecurso(r).length > 0, modo: 'DUELO_PIRATAS', modoFijo: true, sinHoja: true },
+    VIDEOQUIZZ:   { label: 'VideoQuizz', tipos: ['VIDEOQUIZZ'], sinHoja: true, enlace: (r) => `/?vq=${r.id}` },
+    TRIVIAL:      { label: 'Trivial', tipos: null, coleccion: 'trivial_recursos', campoAutor: 'creadorUid', soloPublica: true, sinHoja: true, enlace: (r) => `/?trivial=${r.id}` },
 };
 
 const limpiar = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -59,7 +71,7 @@ export default function ModalRetoRecurso({ juegoId, onVolver, onClose }) {
     const juego = JUEGOS_RECURSO[juegoId];
     const uid = auth.currentUser?.uid || null;
 
-    const [pestana, setPestana] = useState(uid ? 'MIOS' : 'PUBLICOS');
+    const [pestana, setPestana] = useState(juego?.biblioteca ? 'BIBLIOTECA' : (uid ? 'MIOS' : 'PUBLICOS'));
     const [cargando, setCargando] = useState(false);
     const [mios, setMios] = useState(null);
     const [publicos, setPublicos] = useState(null);
@@ -73,21 +85,24 @@ export default function ModalRetoRecurso({ juegoId, onVolver, onClose }) {
     const [paso, setPaso] = useState('BUSCAR'); // BUSCAR | AJUSTES | ENLACE
 
     const sirve = (r) => (!juego.tipos || juego.tipos.includes(r.tipoJuego)) && (!juego.valido || juego.valido(r));
+    const coleccion = juego?.coleccion || 'resources';
 
     useEffect(() => {
         if (!juego) return;
         if (pestana === 'MIOS' && uid && mios === null) {
             setCargando(true);
-            getDocs(query(collection(db, 'resources'), where('profesorUid', '==', uid)))
+            getDocs(query(collection(db, coleccion), where(juego.campoAutor || 'profesorUid', '==', uid)))
                 .then(snap => setMios(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(sirve)))
                 .catch(() => setMios([]))
                 .finally(() => setCargando(false));
         }
         if (pestana === 'PUBLICOS' && publicos === null) {
             setCargando(true);
-            getDocs(juego.tipos
-                ? query(collection(db, 'resources'), where('tipoJuego', 'in', juego.tipos), limit(300))
-                : query(collection(db, 'resources'), where('isPrivate', '==', false), limit(400)))
+            getDocs(juego.soloPublica
+                ? query(collection(db, coleccion), where('publica', '==', true), limit(300))
+                : juego.tipos
+                ? query(collection(db, coleccion), where('tipoJuego', 'in', juego.tipos), limit(300))
+                : query(collection(db, coleccion), where('isPrivate', '==', false), limit(400)))
                 .then(snap => setPublicos(snap.docs.map(d => ({ id: d.id, ...d.data() }))
                     .filter(r => r.isPrivate !== true && !(r.isFinished === false && r.config?.isFinished !== true) && sirve(r))))
                 .catch(() => setPublicos([]))
@@ -96,9 +111,9 @@ export default function ModalRetoRecurso({ juegoId, onVolver, onClose }) {
     }, [pestana, uid]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const lista = useMemo(() => {
-        const base = (pestana === 'MIOS' ? mios : publicos) || [];
+        const base = (pestana === 'BIBLIOTECA' ? juego.biblioteca() : pestana === 'MIOS' ? mios : publicos) || [];
         const q = limpiar(texto.trim());
-        const filtrada = q ? base.filter(r => limpiar(`${r.titulo} ${r.temas} ${r.profesorNombre}`).includes(q)) : base;
+        const filtrada = q ? base.filter(r => limpiar(`${r.titulo} ${r.temas} ${r.profesorNombre} ${r.creadorNombre || ''}`).includes(q)) : base;
         return [...filtrada].sort((a, b) => (b.playCount || 0) - (a.playCount || 0)).slice(0, 80);
     }, [pestana, mios, publicos, texto]);
 
@@ -126,7 +141,7 @@ export default function ModalRetoRecurso({ juegoId, onVolver, onClose }) {
 
     if (paso === 'ENLACE' && recurso) return (
         <ModalCompartirReto
-            urlFija={rutaRecurso(recurso.id, { hoja: juego.sinHoja ? null : hoja, modo })}
+            urlFija={(juego.enlace && juego.enlace(recurso)) || rutaRecurso(recurso.id, { hoja: juego.sinHoja ? null : hoja, modo })}
             nombreJuego={modoLabel && !juego.modoFijo ? modoLabel.replace(/^\S+\s/, '') : juego.label}
             resumen={[`📚 ${recurso.titulo}`, ...(!juego.sinHoja && hojas.length > 0 ? [`📄 ${hoja === 'General' ? 'Todas las hojas' : hoja}`] : []), ...(modoLabel ? [modoLabel] : [])]}
             onEditar={() => setPaso('AJUSTES')}
@@ -151,9 +166,10 @@ export default function ModalRetoRecurso({ juegoId, onVolver, onClose }) {
                     <p style={st.ayuda}>Elige el recurso. El alumno abrirá el enlace y jugará directamente, sin buscar ni configurar nada, y al terminar enviará el resultado al profesor.</p>
 
                     <div style={{ display: 'flex', gap: 6, background: '#f1f5f9', borderRadius: 12, padding: 4, marginBottom: 12 }}>
+                        {juego.biblioteca && <button onClick={() => setPestana('BIBLIOTECA')} style={st.tab(pestana === 'BIBLIOTECA')}>📚 Por defecto</button>}
                         {uid && <button onClick={() => setPestana('MIOS')} style={st.tab(pestana === 'MIOS')}>Mis recursos</button>}
                         <button onClick={() => setPestana('PUBLICOS')} style={st.tab(pestana === 'PUBLICOS')}>Públicos</button>
-                        <button onClick={() => setPestana('CODIGO')} style={st.tab(pestana === 'CODIGO')}><Key size={13} /> Código</button>
+                        {coleccion === 'resources' && <button onClick={() => setPestana('CODIGO')} style={st.tab(pestana === 'CODIGO')}><Key size={13} /> Código</button>}
                     </div>
 
                     {pestana === 'CODIGO' ? (
@@ -180,7 +196,7 @@ export default function ModalRetoRecurso({ juegoId, onVolver, onClose }) {
                                     <div style={{ flex: 1, minWidth: 0 }}>
                                         <div style={{ fontWeight: 700, color: '#2c3e50', fontSize: '0.92rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.titulo || 'Sin título'}</div>
                                         <div style={{ color: '#888', fontSize: '0.76rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                            {[r.temas, r.profesorNombre, (r.hojas?.length > 1 ? `${r.hojas.length} hojas` : null)].filter(Boolean).join(' · ')}
+                                            {[r.temas, r.profesorNombre || r.creadorNombre, (r.hojas?.length > 1 ? `${r.hojas.length} hojas` : null)].filter(Boolean).join(' · ')}
                                         </div>
                                     </div>
                                     <span style={{ color: AZUL, fontSize: '1.3rem' }}>›</span>

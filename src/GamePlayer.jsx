@@ -131,6 +131,9 @@ import Ahorcado from './Ahorcado';
 import JuegoCalamar from './JuegoCalamar';
 import MoneyBoard from './MoneyBoard';
 import BunkerDisparo from './BunkerDisparo';
+import EtiquetaMe from './EtiquetaMe';
+import LineaTiempoGame from './LineaTiempoGame';
+import DueloPiratasRecurso from './DueloPiratasRecurso';
 
 // Los recursos de palabras (Wordle/Sopa) se pueden jugar en cualquiera de los tres
 const MODOS_PALABRA = ['WORDLE', 'SOPA', 'AHORCADO'];
@@ -150,6 +153,10 @@ export default function GamePlayer({ recurso, usuario, alTerminar, autoStart = f
     if (modoInicial === 'CALAMAR')    return <JuegoCalamar recurso={recurso} usuario={usuario} onExit={alTerminar} autoStart />;
     if (modoInicial === 'MONEYBOARD') return <MoneyBoard recurso={recurso} usuario={usuario} onExit={alTerminar} autoStart />;
     if (modoInicial === 'BUNKER')     return <BunkerDisparo recurso={recurso} usuario={usuario} onExit={alTerminar} autoStart />;
+    if (modoInicial === 'DUELO_PIRATAS') return <DueloPiratasRecurso recursoInicial={recurso} onExit={alTerminar} />;
+    // Recursos con juego propio (también sin m=, por su tipo)
+    if (modoInicial === 'ETIQUETAS' || (!modoInicial && recurso.tipoJuego === 'ETIQUETAS')) return <EtiquetaMe recurso={recurso} onExit={alTerminar} />;
+    if (modoInicial === 'LINEA_TIEMPO' || (!modoInicial && recurso.tipoJuego === 'LINEA_TIEMPO')) return <LineaTiempoGame recurso={recurso} onExit={alTerminar} />;
 
     // Botón de Salir al Inicio (Cierra el juego actual)
     const BotonCasa = () => (

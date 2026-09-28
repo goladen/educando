@@ -4,6 +4,9 @@ import sonidoFallo    from './assets/negative_beeps-6008.mp3';
 import fondoImg       from './assets/pantalla5.jpeg';
 import TironCuerdaJuego from './TironCuerda';
 import DueloPiratas from './DueloPiratas';
+import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
+import PantallaReto, { textoBotonEnvio } from './components/retos/PantallaReto';
+import ModalEnviarResultado from './components/retos/ModalEnviarResultado';
 
 const COLORS = [
   '#FF6B6B','#4ECDC4','#45B7D1','#96CEB4','#FFEAA7',
@@ -241,13 +244,32 @@ const TIPO_INFO = {
 };
 
 // ── COMPONENTE PRINCIPAL ──────────────────────────────────────────────────────
+// ─── Retos por enlace (utils/retoLink.js): modo + operaciones fijas ───────────
+export const RUTA_FERIA = '/primaria/feria';
+export const MODOS_FERIA = [['globos', '🎈 Globos (individual)'], ['dual', '👥 Dual (2 jugadores)'], ['tiron', '🪢 Tirón de cuerda']];
+export const OPS_FERIA = [['suma', '➕ Sumas'], ['resta', '➖ Restas'], ['multi', '✖️ Multiplicaciones'], ['div', '➗ Divisiones']];
+export const TIPOS_NUM_FERIA = Object.entries(TIPO_INFO).map(([k, v]) => [k, `${v.emoji} ${v.label}`]);
+export const DEFAULT_RETO_FERIA = { modo: 'globos', tipoNum: 'naturales', tiposOp: OPS_NATURALES, tiempoPregunta: 14 };
+export const resumenFeria = (c) => {
+  const cfg = { ...DEFAULT_RETO_FERIA, ...(c || {}) };
+  const modo = (MODOS_FERIA.find(m => m[0] === cfg.modo) || [])[1];
+  if (cfg.modo === 'tiron') return [modo];
+  return [modo, TIPO_INFO[cfg.tipoNum] ? `${TIPO_INFO[cfg.tipoNum].emoji} ${TIPO_INFO[cfg.tipoNum].label}` : null,
+    cfg.tiposOp.map(o => (OPS_FERIA.find(x => x[0] === o) || [])[1]).filter(Boolean).join(' '), `⏱ ${cfg.tiempoPregunta} s por pregunta`].filter(Boolean);
+};
+
 export default function JuegoFeriaOAOA({ primaria = false }) {
-  const [pantalla,   setPantalla]   = useState(primaria ? 'selector' : 'menu');
+  const [reto, setReto] = useState(() => leerRetoUrl());
+  const cfgReto = reto ? { ...DEFAULT_RETO_FERIA, ...(reto.config || {}) } : null;
+  const [envioReto, setEnvioReto] = useState(false);
+  const [pantalla,   setPantalla]   = useState(() => (reto ? 'reto' : (primaria ? 'selector' : 'menu')));
   const [modo,       setModo]       = useState('');
   const [segundos,   setSegundos]   = useState(120);
   const [cortina,    setCortina]    = useState(false);
   const [mostrarCfg, setMostrarCfg] = useState(false);
-  const [config,     setConfig]     = useState({ tipoNum:'naturales', tiempoPregunta:14, tiposOp: OPS_NATURALES });
+  const [config,     setConfig]     = useState(() => (cfgReto
+    ? { tipoNum: cfgReto.tipoNum, tiempoPregunta: Number(cfgReto.tiempoPregunta) || 14, tiposOp: cfgReto.tiposOp?.length ? cfgReto.tiposOp : OPS_NATURALES }
+    : { tipoNum:'naturales', tiempoPregunta:14, tiposOp: OPS_NATURALES }));
   const [gearHover,  setGearHover]  = useState(false);
   const [verDuelo,   setVerDuelo]   = useState(false);
 
@@ -531,6 +553,15 @@ export default function JuegoFeriaOAOA({ primaria = false }) {
 
       <div style={{ position:'relative', zIndex:1 }}>
 
+        {/* ── RETO POR ENLACE ─────────────────────────────────────── */}
+        {pantalla === 'reto' && reto && (
+          <PantallaReto reto={reto} nombreJuego="Feria del Cálculo" emoji="🎡" color="#e67e22" oscuro
+            descripcion={cfgReto.modo === 'globos' ? null : 'Tu profesor ya ha preparado la configuración. ¡A jugar!'}
+            chips={resumenFeria(cfgReto)}
+            onEmpezar={() => lanzarConCortina(cfgReto.modo === 'dual' ? iniciarDual : cfgReto.modo === 'tiron' ? () => setPantalla('tiron') : iniciarGlobos)}
+            onLibre={() => { limpiarRetoUrl(); setReto(null); setPantalla(primaria ? 'selector' : 'menu'); }} />
+        )}
+
         {/* ── SELECTOR DE OPERACIONES (solo primaria) ─────────────── */}
         {pantalla === 'selector' && (
           <div style={{ maxWidth:500, margin:'0 auto', textAlign:'center' }}>
@@ -713,7 +744,7 @@ export default function JuegoFeriaOAOA({ primaria = false }) {
         {/* ── TIRÓN DE CUERDA ──────────────────────────────────────── */}
         {pantalla === 'tiron' && (
           <div style={{ position:'fixed', inset:0, zIndex:100 }}>
-            <button onClick={()=>setPantalla('menu')} style={{
+            <button onClick={()=>setPantalla(reto ? 'reto' : 'menu')} style={{
               position:'fixed', top:12, left:12, zIndex:200,
               background:'rgba(0,0,0,0.55)', border:'1px solid rgba(255,255,255,0.2)',
               color:'white', borderRadius:10, padding:'6px 14px', cursor:'pointer',
@@ -845,11 +876,21 @@ export default function JuegoFeriaOAOA({ primaria = false }) {
                 style={{ ...btnBase, padding:'14px 34px', fontSize:'1rem',
                   background:'linear-gradient(135deg,#f093fb,#f5576c)', color:'white',
                   boxShadow:'0 6px 18px rgba(245,87,108,0.35)' }}>🔄 Jugar de nuevo</button>
-              <button onClick={()=>setPantalla(primaria ? 'selector' : 'menu')}
+              <button onClick={()=>setPantalla(reto ? 'reto' : (primaria ? 'selector' : 'menu'))}
                 style={{ ...btnBase, padding:'14px 28px', fontSize:'0.95rem',
                   background:'transparent', color:'rgba(255,255,255,0.7)',
                   border:'2px solid rgba(255,255,255,0.2)' }}>← Menú</button>
+              {reto && modo === 'globos' && (
+                <button onClick={()=>setEnvioReto(true)}
+                  style={{ ...btnBase, padding:'14px 28px', fontSize:'0.95rem', color:'white',
+                    background: reto.compId ? 'linear-gradient(135deg,#f39c12,#e67e22)' : 'linear-gradient(135deg,#27ae60,#2ecc71)' }}>{textoBotonEnvio(reto)}</button>
+              )}
             </div>
+            {envioReto && (
+              <ModalEnviarResultado tipo="FERIA_MATES" nombreJuego="Feria del Cálculo" reto={reto}
+                datos={{ puntos: puntosG, aciertos: puntosG / 10, configuracion: resumenFeria(cfgReto).join(' · ') }}
+                onClose={()=>setEnvioReto(false)} />
+            )}
           </div>
         )}
 

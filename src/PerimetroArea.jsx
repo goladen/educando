@@ -2,6 +2,9 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { db } from './firebase';
 import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
 import { guardarRegistroLocal } from './utils/registrosLocales';
+import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
+import PantallaReto, { textoBotonEnvio } from './components/retos/PantallaReto';
+import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 
 const MISIONES_PA = [
   { id: 1, title: '1. El Granjero' },
@@ -10,6 +13,15 @@ const MISIONES_PA = [
   { id: 4, title: '4. El Perfeccionista' },
   { id: 5, title: '5. El Maestro Geómetra' },
 ];
+
+// ─── Retos por enlace (utils/retoLink.js): una misión concreta ─────────────────
+export const RUTA_PERIMETRO_AREA = '/primaria/geometria/perimetro-area';
+export const MISIONES_RETO_PA = [
+  [1, '1. El Granjero · perímetro'], [2, '2. El Albañil · área'], [3, '3. El Arquitecto · área + perímetro'],
+  [4, '4. El Perfeccionista · cuadrados'], [5, '5. El Maestro Geómetra · diagonales'],
+];
+export const DEFAULT_RETO_PA = { mision: 1 };
+export const resumenPerimetroArea = (c) => [(MISIONES_RETO_PA.find(m => m[0] === Number(c?.mision || 1)) || [])[1] || 'Misión', '5 niveles'];
 
 // Modal "Enviar al profesor" para Perímetro y Área.
 function ModalEnviarPA({ datos, onClose }) {
@@ -37,6 +49,7 @@ function ModalEnviarPA({ datos, onClose }) {
           nombre: nombre.trim(), curso: curso.trim(),
           aciertos: datos.aciertos, total: datos.total, intentos: datos.total,
           porcentaje: pct, modo: 'Desafíos', configuracion: datos.configDesc || null,
+          ...(datos.reto ? { reto: datos.reto } : {}),
         }],
       });
       guardarRegistroLocal('PERIMETRO_AREA', {
@@ -91,6 +104,8 @@ function ModalEnviarPA({ datos, onClose }) {
 }
 
 const PerimetroArea = () => {
+  const [reto, setReto] = useState(() => leerRetoUrl());
+  const misionReto = reto ? Number(reto.config?.mision) || 1 : null;
   const [mission, setMission] = useState(0);
   const [currentLevel, setCurrentLevel] = useState(0);
   const [completedMissions, setCompletedMissions] = useState([]);
@@ -360,6 +375,37 @@ const PerimetroArea = () => {
     { id: 'tl', angle: 225 }, { id: 'tr', angle: 315 },
     { id: 'br', angle: 45 }, { id: 'bl', angle: 135 }
   ];
+
+  // ── Reto por enlace: una sola misión; al completarla, el envío ──
+  if (mission === 0 && reto) {
+    const hecha = completedMissions.includes(misionReto);
+    const esComp = !!(reto.compId && reto.catId);
+    return (
+      <div style={{ backgroundColor: '#f0f4f8', minHeight: '100vh', display: 'flex', alignItems: 'center' }}>
+        {!hecha ? (
+          <PantallaReto reto={reto} nombreJuego="Perímetros y Áreas" emoji="📏" color="#2E7D32"
+            chips={resumenPerimetroArea(reto.config)} onEmpezar={() => selectMission(misionReto)}
+            onLibre={() => { limpiarRetoUrl(); setReto(null); }} />
+        ) : (
+          <div style={{ margin: '0 auto', background: 'white', borderRadius: 22, padding: '28px 24px', maxWidth: 420, width: '90%', textAlign: 'center', boxShadow: '0 12px 34px rgba(0,0,0,0.12)', fontFamily: 'sans-serif' }}>
+            <div style={{ fontSize: '3rem' }}>⭐</div>
+            <h2 style={{ color: '#2c3e50', margin: '8px 0' }}>¡Misión completada!</h2>
+            <p style={{ color: '#7f8c8d' }}>{resumenPerimetroArea(reto.config)[0]}</p>
+            <button onClick={() => setMostrarEnvio(true)} style={{ width: '100%', padding: 14, borderRadius: 14, border: 'none', cursor: 'pointer', fontWeight: 800, color: 'white', fontSize: '1rem', background: esComp ? 'linear-gradient(135deg,#f39c12,#e67e22)' : 'linear-gradient(135deg,#27ae60,#2ecc71)' }}>{textoBotonEnvio(reto)}</button>
+          </div>
+        )}
+        {mostrarEnvio && esComp && (
+          <ModalEnviarCompeticion compId={reto.compId} catId={reto.catId} puntos={100}
+            detalle={{ mision: misionReto, completada: true }} nombreJuego="Perímetros y Áreas" tituloReto={reto.titulo || ''}
+            onClose={() => setMostrarEnvio(false)} />
+        )}
+        {mostrarEnvio && !esComp && (
+          <ModalEnviarPA datos={{ aciertos: 1, total: 1, configDesc: `Completada: ${resumenPerimetroArea(reto.config)[0]}`, reto: reto.titulo || 'Reto' }}
+            onClose={() => setMostrarEnvio(false)} />
+        )}
+      </div>
+    );
+  }
 
   if (mission === 0) {
     return (

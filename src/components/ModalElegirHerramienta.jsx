@@ -61,6 +61,46 @@ export const HERRAMIENTAS_RETO = [
         desc: 'Test de verbos irregulares · nivel o verbos concretos, columnas y tiempo',
     },
     {
+        id: 'ENIGMIC', label: 'Enigmic', emoji: '🕵️', color: '#7c3aed', ruta: '/enigmic',
+        desc: 'Acertijos de lógica en otro idioma · idioma, nivel, tablero, categorías y nº de casos',
+    },
+    {
+        id: 'QUIEN_HISTORICO', label: '¿Quién es quién? histórico', emoji: '🧐', color: '#8e44ad', ruta: '/quienhistorico',
+        desc: 'Adivinar el personaje histórico · idioma, categoría, dificultad o personaje elegido',
+    },
+    {
+        id: 'MATHLE', label: 'MathLe', emoji: '🧮', color: '#538d4e', ruta: '/?juego=mathle',
+        desc: 'Adivina la operación oculta · suma, resta o multiplicación y nº de cifras',
+    },
+    {
+        id: 'RETOS', label: 'Juegos de lógica', emoji: '🧠', color: '#f39c12', ruta: '/retos',
+        desc: 'Conecta los puntos, Sudoku o El juego de las luces · juego y nivel concretos',
+    },
+    {
+        id: 'ARKADE', label: 'Arkade', emoji: '🕹️', color: '#8e44ad', ruta: '/arkade',
+        desc: 'Un minijuego concreto (Tetris, Buscaminas, Pong, Cyber Break, Bomberman) y su modo',
+    },
+    {
+        id: 'FERIA_MATES', label: 'Feria del Cálculo', emoji: '🎡', color: '#e67e22', ruta: '/primaria/feria',
+        desc: 'Globos, dual o tirón de cuerda · tipo de números, operaciones y tiempo por pregunta',
+    },
+    {
+        id: 'MATES_OAOA', label: 'Método OAOA', emoji: '🧮', color: '#0d9488', ruta: '/primaria/oaoa',
+        desc: 'Una actividad concreta: bloques, monstruo, regletas, geoplano, estimaciones o caminos',
+    },
+    {
+        id: 'DIVISIBILIDAD', label: 'Divisibilidad', emoji: '🔢', color: '#7B1FA2', ruta: '/primaria/divisibilidad',
+        desc: 'Criba, primos, múltiplos, divisores, tabla de los 100 o Descubre',
+    },
+    {
+        id: 'GEO_PERIMETRO_AREA', label: 'Perímetros y Áreas', emoji: '📏', color: '#2E7D32', ruta: '/primaria/geometria/perimetro-area',
+        desc: 'Una misión concreta de perímetros y áreas (5 niveles)',
+    },
+    {
+        id: 'IMPERIOS', label: 'Imperios', emoji: '🏛️', color: '#b45309', ruta: '/imperios',
+        desc: 'Un imperio concreto o al azar · mapa de países y preguntas de historia',
+    },
+    {
         id: 'SINTAXIS', label: 'Sintaxis', emoji: '🖍️', color: '#3498db', ruta: '/?juego=sintaxis',
         desc: 'Analizar frases a contrarreloj · español, català o français, por nivel y tiempo',
     },
@@ -88,6 +128,16 @@ const EDITORES = {
     GEOMETRÍA_ANALÍTICA: lazy(() => import('./retos/ConfigGeoAnaliticaReto')),
     LISTENING: lazy(() => import('./retos/ConfigListeningReto')),
     IRREGULAR_VERBS: lazy(() => import('./retos/ConfigVerbosReto')),
+    ENIGMIC: lazy(() => import('./retos/ConfigEnigmicReto')),
+    QUIEN_HISTORICO: lazy(() => import('./retos/ConfigQuienHistoricoReto')),
+    MATHLE: lazy(() => import('./retos/ConfigMathleReto')),
+    RETOS: lazy(() => import('./retos/ConfigLogicaReto')),
+    ARKADE: lazy(() => import('./retos/ConfigArkadeReto')),
+    FERIA_MATES: lazy(() => import('./retos/ConfigFeriaReto')),
+    MATES_OAOA: lazy(() => import('./retos/ConfigOAOAReto')),
+    DIVISIBILIDAD: lazy(() => import('./retos/ConfigDivisibilidadReto')),
+    GEO_PERIMETRO_AREA: lazy(() => import('./retos/ConfigPerimetroAreaReto')),
+    IMPERIOS: lazy(() => import('./retos/ConfigImperiosReto')),
     SINTAXIS: lazy(() => import('./retos/ConfigSintaxisReto')),
     BIOLOGIA: lazy(() => import('./retos/ConfigBiologiaReto')),
     GEOGRAFIA: lazy(() => import('./retos/ConfigGeografiaReto')),

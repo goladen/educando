@@ -8,6 +8,8 @@
 // mínimo de pistas que garantiza SOLUCIÓN ÚNICA (solver con propagación + DFS).
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
+import RetoConRondas from './components/retos/RetoConRondas';
 import { db } from './firebase';
 import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
 import { guardarRegistroLocal } from './utils/registrosLocales';
@@ -978,7 +980,19 @@ function ModalEnviarProfe({ datos, onClose }) {
 // `aula` (opcional, Control de Aula · AppsAula.jsx): { config, rondasMax, onProgreso, onTerminar }.
 // Con él se juega con la configuración del profesor (sin pantalla de ajustes) y se informa de la
 // puntuación acumulada tras cada caso; rondasMax > 0 limita el número de casos.
-export default function EnigmicLogic({ usuario, onExit, onBack, aula = null }) {
+// Reto por enlace (?reto=… con { app:'ENIGMIC', config, rondasMax, detalle }): se juega en
+// «modo aula» con RetoConRondas; si no, el juego normal.
+export default function EnigmicLogic(props) {
+    const [reto, setReto] = useState(() => (props.aula ? null : leerRetoUrl()));
+    if (reto && reto.config?.app === 'ENIGMIC') return (
+        <RetoConRondas reto={reto} tipo="ENIGMIC" nombreJuego="Enigmic" emoji="🕵️" color="#7c3aed"
+            render={(aula) => <EnigmicLogicBase {...props} aula={aula} />}
+            onLibre={() => { limpiarRetoUrl(); setReto(null); }} onSalir={props.onExit || props.onBack} />
+    );
+    return <EnigmicLogicBase {...props} />;
+}
+
+function EnigmicLogicBase({ usuario, onExit, onBack, aula = null }) {
     const salir = onExit || onBack || (() => { window.history.pushState({}, '', '/'); window.location.reload(); });
 
     const [pantalla, setPantalla] = useState(aula ? 'JUEGO' : 'CONFIG');

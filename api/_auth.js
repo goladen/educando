@@ -5,6 +5,11 @@ export const ADMIN_EMAIL = 'goladen@gmail.com';
 
 /** Valida el idToken de Firebase contra Google y devuelve el email verificado. */
 export async function emailDelToken(idToken) {
+    return (await usuarioDelToken(idToken))?.email || null;
+}
+
+/** Igual que emailDelToken pero devuelve { email, uid } (o null si el token no vale). */
+export async function usuarioDelToken(idToken) {
     const key = process.env.VITE_FIREBASE_API_KEY || process.env.FIREBASE_WEB_API_KEY;
     if (!key) throw new Error('Falta VITE_FIREBASE_API_KEY en el servidor');
 
@@ -15,7 +20,7 @@ export async function emailDelToken(idToken) {
     });
     const data = await r.json();
     if (!r.ok || !data.users?.length) return null;
-    return data.users[0].email || null;
+    return { email: data.users[0].email || null, uid: data.users[0].localId };
 }
 
 /**

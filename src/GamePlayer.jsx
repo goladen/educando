@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+﻿import { useState, lazy, Suspense } from 'react';
 import { Home, Play } from 'lucide-react';
 
 // ─── PANTALLA DE PRESENTACIÓN PREVIA ─────────────────────────────────────────
@@ -133,6 +133,7 @@ import MoneyBoard from './MoneyBoard';
 import BunkerDisparo from './BunkerDisparo';
 import EtiquetaMe from './EtiquetaMe';
 import LineaTiempoGame from './LineaTiempoGame';
+const ListeningRecursoGame = lazy(() => import('./ListeningRecursoGame'));
 import DueloPiratasRecurso from './DueloPiratasRecurso';
 
 // Los recursos de palabras (Wordle/Sopa) se pueden jugar en cualquiera de los tres
@@ -157,6 +158,7 @@ export default function GamePlayer({ recurso, usuario, alTerminar, autoStart = f
     // Recursos con juego propio (también sin m=, por su tipo)
     if (modoInicial === 'ETIQUETAS' || (!modoInicial && recurso.tipoJuego === 'ETIQUETAS')) return <EtiquetaMe recurso={recurso} onExit={alTerminar} />;
     if (modoInicial === 'LINEA_TIEMPO' || (!modoInicial && recurso.tipoJuego === 'LINEA_TIEMPO')) return <LineaTiempoGame recurso={recurso} onExit={alTerminar} />;
+    if (recurso.tipoJuego === 'LISTENING_RECURSO') return <Suspense fallback={null}><ListeningRecursoGame recurso={recurso} usuario={usuario} onExit={alTerminar} /></Suspense>;
 
     // Botón de Salir al Inicio (Cierra el juego actual)
     const BotonCasa = () => (

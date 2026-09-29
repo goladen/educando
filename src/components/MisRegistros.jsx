@@ -7,6 +7,10 @@ import {
     borrarTodo,
     metaDe,
 } from '../utils/registrosLocales';
+import useAvatarLocal from '../hooks/useAvatarLocal';
+import { borrarAvatarLocal } from '../utils/avatarLocal';
+import AvatarSVG from './avatar/AvatarSVG';
+import AvatarEditor from './avatar/AvatarEditor';
 
 const fmtFecha = (iso) => {
     try {
@@ -105,11 +109,44 @@ function FilaRegistro({ r, onBorrar }) {
     );
 }
 
+// ─── Tarjeta "Mi avatar" ─────────────────────────────────────────────────────
+function TarjetaAvatar({ avatar, onEditar }) {
+    const [confirmar, setConfirmar] = useState(false);
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, background: 'linear-gradient(135deg, rgba(241,196,15,0.14), rgba(108,92,231,0.18))', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 16, padding: '12px 14px', marginBottom: 18 }}>
+            {avatar
+                ? <AvatarSVG config={avatar} size={62} style={{ borderRadius: '50%', border: '2px solid rgba(255,255,255,0.8)' }} />
+                : <div style={{ width: 62, height: 62, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', flexShrink: 0 }}>👤</div>}
+            <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>Mi avatar</div>
+                <div style={{ fontSize: '0.74rem', color: '#9aa4ad' }}>
+                    {avatar ? 'Guardado en este dispositivo' : 'Crea el personaje con el que aparecerás en los juegos'}
+                </div>
+            </div>
+            {confirmar ? (
+                <span style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={() => { borrarAvatarLocal(); setConfirmar(false); }} style={{ padding: '6px 10px', borderRadius: 8, border: 'none', background: '#e74c3c', color: 'white', cursor: 'pointer', fontWeight: 700, fontSize: '0.78rem' }}>Borrar</button>
+                    <button onClick={() => setConfirmar(false)} style={{ padding: '6px 9px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.25)', background: 'transparent', color: 'white', cursor: 'pointer', fontSize: '0.78rem' }}>✕</button>
+                </span>
+            ) : (
+                <span style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={onEditar} style={{ padding: '8px 12px', borderRadius: 10, border: 'none', background: '#f1c40f', color: '#1e272e', cursor: 'pointer', fontWeight: 800, fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                        {avatar ? '✏️ Editar' : '✨ Crear'}
+                    </button>
+                    {avatar && <button onClick={() => setConfirmar(true)} title="Borrar avatar" style={{ padding: '6px 9px', borderRadius: 9, border: 'none', background: 'rgba(231,76,60,0.15)', color: '#e74c3c', cursor: 'pointer' }}>🗑</button>}
+                </span>
+            )}
+        </div>
+    );
+}
+
 // ─── Componente principal ────────────────────────────────────────────────────
 export default function MisRegistros({ onClose, tipoInicial = null }) {
     const [resumen, setResumen] = useState(() => getResumenRegistros());
     const [tipoActivo, setTipoActivo] = useState(tipoInicial);
     const [confirmarTodo, setConfirmarTodo] = useState(false);
+    const [avatar, setAvatar] = useAvatarLocal();
+    const [editandoAvatar, setEditandoAvatar] = useState(false);
 
     // Refrescar el resumen tras cualquier borrado.
     const refrescar = () => setResumen(getResumenRegistros());
@@ -128,10 +165,18 @@ export default function MisRegistros({ onClose, tipoInicial = null }) {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.78)', zIndex: 10001, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 16 }} onClick={onClose}>
             <div onClick={(e) => e.stopPropagation()} style={{ background: '#1e272e', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, width: '100%', maxWidth: 480, padding: '24px 26px', color: 'white', fontFamily: "'Segoe UI',sans-serif", boxShadow: '0 20px 60px rgba(0,0,0,0.6)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-                    <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#f1c40f' }}>📋 Mis registros</h3>
+                    <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#f1c40f' }}>{editandoAvatar ? '🎭 Mi avatar' : '📋 Mis registros'}</h3>
                     <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#aaa', fontSize: '1.3rem' }}>✕</button>
                 </div>
 
+                {editandoAvatar ? (
+                    <AvatarEditor
+                        inicial={avatar}
+                        onGuardar={(cfg) => { setAvatar(cfg); setEditandoAvatar(false); }}
+                        onCancelar={() => setEditandoAvatar(false)}
+                    />
+                ) : <>
+                {!tipoActivo && <TarjetaAvatar avatar={avatar} onEditar={() => setEditandoAvatar(true)} />}
                 {resumen.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '34px 0', color: '#8c97a1' }}>
                         <div style={{ fontSize: '2.6rem', marginBottom: 8 }}>🗒️</div>
@@ -175,6 +220,7 @@ export default function MisRegistros({ onClose, tipoInicial = null }) {
                         )}
                     </>
                 )}
+                </>}
             </div>
         </div>
     );

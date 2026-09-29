@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { db } from './firebase';
 import { guardarRegistroLocal } from './utils/registrosLocales';
 import {
@@ -14,8 +14,11 @@ import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
 import PantallaReto, { textoBotonEnvio } from './components/retos/PantallaReto';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 
+// Listenings creados por profesores (carga diferida: importa piezas de este archivo)
+const ListeningRecursoGame = lazy(() => import('./ListeningRecursoGame'));
+
 // ─── Constantes ───────────────────────────────────────────────────────────────
-const AUDIO_DURACION_EST = 62; // segundos estimados por audio (~1 min)
+export const AUDIO_DURACION_EST = 62; // segundos estimados por audio (~1 min)
 
 // Velocidades de reproducción disponibles en el reproductor de listening
 const VELOCIDADES = [0.5, 0.75, 1, 1.25, 1.5];
@@ -23,12 +26,12 @@ const VELOCIDADES = [0.5, 0.75, 1, 1.25, 1.5];
 const generarCodigo = () =>
     Array.from({ length: 6 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
 
-const cleanText = (s) =>
+export const cleanText = (s) =>
     String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 
 // ─── Parsear gapped transcript en segmentos ───────────────────────────────────
 // Devuelve: [ {type:'text', text}, {type:'gap', gapNum, answer, opciones} ]
-const parsearTranscript = (gapped, gaps) => {
+export const parsearTranscript = (gapped, gaps) => {
     const parts = gapped.split(/(\[___\d+___\])/);
     const gapMap = {};
     gaps.forEach(g => { gapMap[g.gap_number] = g; });
@@ -44,7 +47,7 @@ const parsearTranscript = (gapped, gaps) => {
 };
 
 // Dividir segmentos en frases (split en puntos/signos de puntuación)
-const dividirEnFrases = (segmentos) => {
+export const dividirEnFrases = (segmentos) => {
     const frases = [];
     let actual = [];
     segmentos.forEach(seg => {
@@ -73,7 +76,7 @@ const estimarTiemposFrases = (frases, duracion = AUDIO_DURACION_EST) => {
 };
 
 // ─── Modal Enviar al Profesor ─────────────────────────────────────────────────
-function ModalEnviarProfe({ datos, onClose }) {
+export function ModalEnviarProfe({ datos, onClose }) {
     const [codigo, setCodigo]     = useState('');
     const [nombre, setNombre]     = useState('');
     const [curso,  setCurso]      = useState('');
@@ -389,7 +392,7 @@ function TTSPlayer({ texto, lang = 'en-GB', onTimeUpdate, onEnded, small = false
 }
 
 // ─── Reproductor del listening: mp3 si existe, voz del navegador si no ────────
-function ListeningPlayer({ item, lang, onTimeUpdate, onEnded, controlRef, small = false }) {
+export function ListeningPlayer({ item, lang, onTimeUpdate, onEnded, controlRef, small = false }) {
     const [sinAudio, setSinAudio] = useState(!item?.audioUrl);
 
     useEffect(() => { setSinAudio(!item?.audioUrl); }, [item?.id]);
@@ -459,10 +462,10 @@ function Hueco({ gap, modo, respuesta, onRespuesta, revealed, comprobado, hostVi
 }
 
 // ─── Vista del transcript con huecos ──────────────────────────────────────────
-function TranscriptView({ segmentos, modo, respuestas, onRespuesta, frasesReveladas, comprobado, totalFrases, hostView=false }) {
+export function TranscriptView({ segmentos, modo, respuestas, onRespuesta, frasesReveladas, comprobado, totalFrases, hostView=false }) {
     const frases = dividirEnFrases(segmentos);
     return (
-        <div style={{ lineHeight: 2.2, fontSize:'1.05rem', color:'white' }}>
+        <div style={{ lineHeight: 2.2, fontSize:'1.05rem', color:'white', whiteSpace:'pre-line' }}>
             {frases.map((frase, fi) => {
                 const visible = fi < frasesReveladas;
                 return (
@@ -487,7 +490,7 @@ function TranscriptView({ segmentos, modo, respuestas, onRespuesta, frasesRevela
 }
 
 // ─── Pantalla selección de idioma ─────────────────────────────────────────────
-function PantallaIdioma({ onIdioma, onBack }) {
+function PantallaIdioma({ onIdioma, onBack, onProfes }) {
     return (
         <div style={{ minHeight:'100vh', background:'linear-gradient(135deg,#1a1a2e,#16213e)', fontFamily:"'Segoe UI',sans-serif", display:'flex', flexDirection:'column' }}>
             <div style={{ background:'rgba(255,255,255,0.05)', padding:'20px 24px', display:'flex', alignItems:'center', gap:12 }}>
@@ -513,6 +516,17 @@ function PantallaIdioma({ onIdioma, onBack }) {
                             <div style={{ fontSize:'0.72rem', color:'rgba(255,255,255,0.3)', marginTop:6 }}>{idi.items.length} temas</div>
                         </button>
                     ))}
+                    {onProfes && (
+                        <button onClick={onProfes}
+                            style={{ width:220, padding:'32px 24px', borderRadius:24, border:'2px solid rgba(187,143,206,0.5)', background:'rgba(142,68,173,0.15)', cursor:'pointer', color:'white', fontFamily:'inherit', textAlign:'center', transition:'all 0.2s' }}
+                            onMouseEnter={e=>{e.currentTarget.style.background='rgba(142,68,173,0.3)';e.currentTarget.style.borderColor='#bb8fce';}}
+                            onMouseLeave={e=>{e.currentTarget.style.background='rgba(142,68,173,0.15)';e.currentTarget.style.borderColor='rgba(187,143,206,0.5)';}}>
+                            <div style={{ fontSize:'3rem', marginBottom:12 }}>🧑‍🏫</div>
+                            <div style={{ fontWeight:800, fontSize:'1.3rem', marginBottom:6 }}>De profesores</div>
+                            <div style={{ fontSize:'0.8rem', color:'rgba(255,255,255,0.5)' }}>Listenings con preguntas creados por docentes</div>
+                            <div style={{ fontSize:'0.72rem', color:'rgba(255,255,255,0.3)', marginTop:6 }}>Buscar · código · ✏️ crear el tuyo</div>
+                        </button>
+                    )}
                 </div>
             </div>
         </div>
@@ -1263,6 +1277,7 @@ export default function ListeningGame({ onExit, isHost, codigoSala: codigoExtern
     const [internalHost, setInternalHost] = useState(null);
     const [internalClient, setInternalClient] = useState(null);
     const [clientNombre, setClientNombre] = useState('');
+    const [deProfes, setDeProfes]         = useState(false);
 
     // Modo externo (desde LandingGames)
     if (isHost && codigoExterno) return <ListeningLiveHost codigoSala={codigoExterno} onExit={onExit || (()=>{})} />;
@@ -1316,5 +1331,10 @@ export default function ListeningGame({ onExit, isHost, codigoSala: codigoExtern
             onCrearSala={async () => { const c = await crearSalaListening(idioma); setInternalHost(c); }}
             onUnirse={() => setPantalla('UNIRSE')}/>;
     }
-    return <PantallaIdioma onBack={onExit} onIdioma={id => { setIdioma(id); setPantalla('HUB'); }}/>;
+    if (deProfes) return (
+        <Suspense fallback={<div style={{ minHeight:'100vh', background:'#1a1a2e' }}/>}>
+            <ListeningRecursoGame usuario={usuario} onExit={() => setDeProfes(false)}/>
+        </Suspense>
+    );
+    return <PantallaIdioma onBack={onExit} onProfes={() => setDeProfes(true)} onIdioma={id => { setIdioma(id); setPantalla('HUB'); }}/>;
 }

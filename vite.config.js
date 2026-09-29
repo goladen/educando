@@ -127,6 +127,7 @@ export default defineConfig({
     geminiDevPlugin(),
     apiDevPlugin('/api/cloudinary', './api/cloudinary.js'),
     apiDevPlugin('/api/sketchfab', './api/sketchfab.js'),
+    apiDevPlugin('/api/listening-tts', './api/listening-tts.js'),
     react(),
     VitePWA({
       registerType: 'autoUpdate',

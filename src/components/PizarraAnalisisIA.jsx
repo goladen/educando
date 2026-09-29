@@ -68,7 +68,7 @@ function parsearRespuesta(txt) {
  * Props:
  *  - imagenDataURL: PNG de la región seleccionada
  *  - onClose()
- *  - onAccion(accion, interpretacion) — accion: 'sustituir' | 'insertar' | 'resultado' | 'pasos' | 'grafica' | 'forma'
+ *  - onAccion(accion, interpretacion) — se puede llamar varias veces (el panel no se cierra); accion: 'sustituir' | 'insertar' | 'resultado' | 'pasos' | 'grafica' | 'forma'
  */
 export default function PizarraAnalisisIA({ imagenDataURL, onClose, onAccion }) {
     const [estado, setEstado] = useState('cargando'); // cargando | ok | error
@@ -103,21 +103,31 @@ export default function PizarraAnalisisIA({ imagenDataURL, onClose, onAccion }) 
         return () => { cancelado = true; };
     }, [imagenDataURL, intento]);
 
-    const Btn = ({ onClick, children, bg = '#334155' }) => (
-        <button onClick={onClick}
-            style={{ padding: '5px 11px', background: bg, color: 'white', border: 'none', borderRadius: 7, cursor: 'pointer', fontWeight: 'bold', fontSize: '0.78rem' }}>
-            {children}
-        </button>
-    );
+    // Acciones ya aplicadas (clave `${indice}-${accion}`) para marcarlas con ✓
+    const [hechos, setHechos] = useState({});
+    const accion = (k, tipo, it) => {
+        onAccion(tipo, it);
+        setHechos(h => ({ ...h, [`${k}-${tipo}`]: (h[`${k}-${tipo}`] || 0) + 1 }));
+    };
 
+    const Btn = ({ k, tipo, it, children, bg = '#334155' }) => {
+        const n = hechos[`${k}-${tipo}`];
+        return (
+            <button onClick={() => accion(k, tipo, it)}
+                style={{ padding: '5px 11px', background: bg, color: 'white', border: 'none', borderRadius: 7, cursor: 'pointer', fontWeight: 'bold', fontSize: '0.78rem', outline: n ? '2px solid #22c55e' : 'none', outlineOffset: 1 }}>
+                {children}{n ? ` ✓${n > 1 ? `×${n}` : ''}` : ''}
+            </button>
+        );
+    };
+
+    // Panel lateral sin fondo bloqueante: se ve el lienzo mientras se inserta y solo se cierra con ✕
     return (
-        <div onClick={onClose}
-            style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-            <div onClick={e => e.stopPropagation()}
-                style={{ background: 'white', borderRadius: 14, width: 'min(620px, 100%)', maxHeight: '88vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 50px rgba(0,0,0,0.35)', overflow: 'hidden' }}>
+        <div style={{ position: 'fixed', top: 70, right: 16, zIndex: 10000, width: 'min(460px, calc(100vw - 32px))', maxHeight: 'calc(100vh - 90px)', display: 'flex' }}>
+            <div
+                style={{ background: 'white', borderRadius: 14, width: '100%', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 50px rgba(0,0,0,0.35)', overflow: 'hidden', border: '1px solid #c7d2fe' }}>
                 <div style={{ background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', color: 'white', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
                     <span style={{ fontWeight: 800, fontSize: '1rem', flex: 1 }}>🤖 Analizar trazo con IA</span>
-                    <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.2)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', padding: '2px 9px', fontWeight: 'bold' }}>✕</button>
+                    <button onClick={onClose} title="Cerrar" style={{ background: 'rgba(255,255,255,0.2)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', padding: '2px 9px', fontWeight: 'bold' }}>✕</button>
                 </div>
 
                 <div style={{ padding: 12, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -131,7 +141,7 @@ export default function PizarraAnalisisIA({ imagenDataURL, onClose, onAccion }) 
                     {estado === 'error' && (
                         <div style={{ textAlign: 'center', padding: 12 }}>
                             <p style={{ color: '#dc2626', fontFamily: 'monospace', fontSize: '0.8rem', whiteSpace: 'pre-wrap' }}>⚠ {error}</p>
-                            <Btn bg="#4f46e5" onClick={() => setIntento(n => n + 1)}>🔄 Reintentar</Btn>
+                            <button onClick={() => setIntento(n => n + 1)} style={{ padding: '5px 11px', background: '#4f46e5', color: 'white', border: 'none', borderRadius: 7, cursor: 'pointer', fontWeight: 'bold', fontSize: '0.78rem' }}>🔄 Reintentar</button>
                         </div>
                     )}
                     {estado === 'ok' && items.map((it, k) => {
@@ -155,12 +165,12 @@ export default function PizarraAnalisisIA({ imagenDataURL, onClose, onAccion }) 
                                 )}
                                 {it.funcStr && <div style={{ fontSize: '0.75rem', color: '#9a3412', fontFamily: 'monospace' }}>f(x) = {it.funcStr}</div>}
                                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                                    {it.contenido && <Btn bg="#0ea5e9" onClick={() => onAccion('sustituir', it)}>✨ Sustituir trazo por texto</Btn>}
-                                    {it.contenido && <Btn bg="#64748b" onClick={() => onAccion('insertar', it)}>➕ Insertar debajo</Btn>}
-                                    {it.resultado && <Btn bg="#10b981" onClick={() => onAccion('resultado', it)}>🎯 Insertar resultado</Btn>}
-                                    {it.pasos.length > 0 && <Btn bg="#6366f1" onClick={() => onAccion('pasos', it)}>📝 Insertar pasos</Btn>}
-                                    {it.funcStr && <Btn bg="#f97316" onClick={() => onAccion('grafica', it)}>📈 Representar gráfica</Btn>}
-                                    {it.forma && <Btn bg="#14b8a6" onClick={() => onAccion('forma', it)}>🔷 Sustituir por forma limpia</Btn>}
+                                    {it.contenido && <Btn bg="#0ea5e9" k={k} tipo="sustituir" it={it}>✨ Sustituir trazo por texto</Btn>}
+                                    {it.contenido && <Btn bg="#64748b" k={k} tipo="insertar" it={it}>➕ Insertar debajo</Btn>}
+                                    {it.resultado && <Btn bg="#10b981" k={k} tipo="resultado" it={it}>🎯 Insertar resultado</Btn>}
+                                    {it.pasos.length > 0 && <Btn bg="#6366f1" k={k} tipo="pasos" it={it}>📝 Insertar pasos</Btn>}
+                                    {it.funcStr && <Btn bg="#f97316" k={k} tipo="grafica" it={it}>📈 Representar gráfica</Btn>}
+                                    {it.forma && <Btn bg="#14b8a6" k={k} tipo="forma" it={it}>🔷 Sustituir por forma limpia</Btn>}
                                 </div>
                             </div>
                         );

@@ -870,7 +870,7 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
 
     // Análisis con IA del trazo seleccionado (solo admin)
     const [esAdminIA,  setEsAdminIA]  = useState(auth.currentUser?.email === ADMIN_EMAIL_IA);
-    const [iaAnalisis, setIaAnalisis] = useState(null); // { src, rect, sel }
+    const [iaAnalisis, setIaAnalisis] = useState(null); // { src, rect, selObjs, trazo, sustId, cursores… }
     useEffect(() => onAuthStateChanged(auth, u => setEsAdminIA(u?.email === ADMIN_EMAIL_IA)), []);
 
     // Text tool
@@ -2375,39 +2375,56 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
         const rect = bbs.length
             ? { x1: Math.min(...bbs.map(b => b.x1)), y1: Math.min(...bbs.map(b => b.y1)), x2: Math.max(...bbs.map(b => b.x2)), y2: Math.max(...bbs.map(b => b.y2)) }
             : { ...lassoRect };
-        setIaAnalisis({ src: region.src, rect, sel: [...selIdxs] });
+        const trazo = selIdxs.map(i => elementos[i]).find(e => e?.t === 'draw');
+        // El modal queda abierto: cursores para que las inserciones sucesivas no se solapen
+        setIaAnalisis({
+            src: region.src, rect, selObjs: selIdxs.map(i => elementos[i]),
+            trazo: trazo ? { color: trazo.color, grosor: trazo.grosor, pts: trazo.pts } : null,
+            sustId: null, yBajo: rect.y2, yDerecha: 0, xGrafica: rect.x2 + 290, cambios: 0,
+        });
+    };
+
+    const cerrarAnalisisIA = () => {
+        // Si se sustituyó o insertó algo, los índices de la selección ya no son fiables
+        if (iaAnalisis?.cambios) { setLassoRect(null); setSelIdxs([]); }
+        setIaAnalisis(null);
     };
 
     const aplicarAccionIA = (accion, it) => {
         if (!iaAnalisis) return;
-        const { rect, sel } = iaAnalisis;
-        const trazo = sel.map(i => elementos[i]).find(e => e?.t === 'draw');
+        const { rect, selObjs, trazo, sustId } = iaAnalisis;
         const col = trazo?.color || color;
         const h = Math.max(10, rect.y2 - rect.y1), w = Math.max(10, rect.x2 - rect.x1);
-        const lineasTexto = (lineas, x, y, fs) => lineas.map((txt, k) => tagElem({ t: 'text', txt, x, y: y + k * fs * 1.3, color: col, grosor, fontSize: Math.round(fs) }));
-        const sinSeleccion = (prev) => prev.filter((item, i) => {
-            if (!sel.includes(i)) return true;
+        const lineasTexto = (lineas, x, y, fs, extra = {}) => lineas.map((txt, k) => tagElem({ t: 'text', txt, x, y: y + k * fs * 1.3, color: col, grosor, fontSize: Math.round(fs), ...extra }));
+        // Sustituir: quita el trazo original (o la sustitución anterior de este análisis)
+        const nuevoSustId = `ia_${Date.now()}`;
+        const sinOriginal = (prev) => prev.filter(item => {
+            if (!(selObjs.includes(item) || (sustId && item.iaSust === sustId))) return true;
             return modoRef.current === 'editar' && item.autorId && item.autorId !== miIdRef.current;
         });
-        const cerrar = () => { setIaAnalisis(null); setLassoRect(null); setSelIdxs([]); };
+        const cambios = { cambios: iaAnalisis.cambios + 1 };
 
-        if (accion === 'grafica') {
-            setGraficaConfig({ funcStr: it.funcStr, scale: 40 });
-            setHerramienta('graph');
-            cerrar(); return;
-        }
         if (accion === 'sustituir') {
             const lineas = it.contenido.split('\n').filter(l => l.trim());
             const fs = Math.max(16, Math.min(80, (h / lineas.length) * 0.75));
-            setElementos(prev => [...sinSeleccion(prev), ...lineasTexto(lineas, rect.x1, rect.y1 + fs, fs)]);
-        } else if (accion === 'insertar') {
-            const lineas = it.contenido.split('\n').filter(l => l.trim());
-            setElementos(prev => [...prev, ...lineasTexto(lineas, rect.x1, rect.y2 + 38, 28)]);
+            setElementos(prev => [...sinOriginal(prev), ...lineasTexto(lineas, rect.x1, rect.y1 + fs, fs, { iaSust: nuevoSustId })]);
+            Object.assign(cambios, { selObjs: [], sustId: nuevoSustId });
+            setSelIdxs([]);
+        } else if (accion === 'insertar' || accion === 'pasos') {
+            const lineas = accion === 'pasos'
+                ? it.pasos.map((p, k) => `${k + 1}. ${p}`)
+                : it.contenido.split('\n').filter(l => l.trim());
+            const fs = accion === 'pasos' ? 22 : 28;
+            setElementos(prev => [...prev, ...lineasTexto(lineas, rect.x1, iaAnalisis.yBajo + fs + 10, fs)]);
+            cambios.yBajo = iaAnalisis.yBajo + 10 + lineas.length * fs * 1.3;
         } else if (accion === 'resultado') {
             const fs = Math.max(18, Math.min(56, h * 0.5));
-            setElementos(prev => [...prev, ...lineasTexto([`➜ ${it.resultado}`], rect.x2 + 24, (rect.y1 + rect.y2) / 2 + fs / 3, fs)]);
-        } else if (accion === 'pasos') {
-            setElementos(prev => [...prev, ...lineasTexto(it.pasos.map((p, k) => `${k + 1}. ${p}`), rect.x1, rect.y2 + 34, 22)]);
+            setElementos(prev => [...prev, ...lineasTexto([`➜ ${it.resultado}`], rect.x2 + 24, (rect.y1 + rect.y2) / 2 + fs / 3 + iaAnalisis.yDerecha, fs)]);
+            cambios.yDerecha = iaAnalisis.yDerecha + fs * 1.4;
+        } else if (accion === 'grafica') {
+            // Se coloca directamente a la derecha de la selección (el modal sigue abierto)
+            setElementos(prev => [...prev, tagElem({ t: 'graph', funcStr: it.funcStr, scale: 40, cx: iaAnalisis.xGrafica, cy: (rect.y1 + rect.y2) / 2, color: col, grosor: 2 })]);
+            cambios.xGrafica = iaAnalisis.xGrafica + 560;
         } else if (accion === 'forma') {
             const g = trazo?.grosor || grosor;
             let forma;
@@ -2424,9 +2441,11 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
             } else {
                 forma = { t: it.forma, x1: rect.x1, y1: rect.y1, x2: rect.x2, y2: rect.y2 };
             }
-            setElementos(prev => [...sinSeleccion(prev), tagElem({ ...forma, color: col, grosor: g })]);
+            setElementos(prev => [...sinOriginal(prev), tagElem({ ...forma, color: col, grosor: g, iaSust: nuevoSustId })]);
+            Object.assign(cambios, { selObjs: [], sustId: nuevoSustId });
+            setSelIdxs([]);
         }
-        cerrar();
+        setIaAnalisis(prev => prev && { ...prev, ...cambios });
     };
 
     const ERASER_SVG = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='22'%3E%3Crect x='1' y='1' width='34' height='20' rx='3' fill='%23fde8e8' stroke='%23e74c3c' stroke-width='1.5'/%3E%3Crect x='23' y='1' width='12' height='20' rx='0 3 3 0' fill='%23e74c3c' opacity='0.7'/%3E%3Cline x1='23' y1='1' x2='23' y2='21' stroke='%23e74c3c' stroke-width='1.5'/%3E%3C/svg%3E") 1 20, cell`;
@@ -2982,7 +3001,7 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
             {calcVisible && <CalculadoraFlotante onClose={() => setCalcVisible(false)} onCopiar={res => { setTextoPegar(res); setHerramienta('paste'); setCalcVisible(false); }} />}
             {grafVisible  && <GraficadoraFlotante onClose={() => setGrafVisible(false)} onInsertar={cfg => { setGraficaConfig(cfg); setHerramienta('graph'); setGrafVisible(false); }} />}
             {showMusicStaff && <MusicStaffPanel onInsert={handleInsertMusicStaff} onClose={() => setShowMusicStaff(false)} />}
-            {iaAnalisis && esAdminIA && <PizarraAnalisisIA imagenDataURL={iaAnalisis.src} onClose={() => setIaAnalisis(null)} onAccion={aplicarAccionIA} />}
+            {iaAnalisis && esAdminIA && <PizarraAnalisisIA imagenDataURL={iaAnalisis.src} onClose={cerrarAnalisisIA} onAccion={aplicarAccionIA} />}
             {/* ── Banco de imágenes ──────────────────────────────────────── */}
             {bancoOpen && (
                 <div onClick={() => setBancoOpen(false)}

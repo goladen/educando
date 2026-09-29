@@ -190,9 +190,10 @@ export default function QuienEsQuien({ usuario, onExit }) {
     // Deep-link desde el QR: ?code=CODIGO&test=ID → abre el formulario directo.
     const [dl] = useState(() => {
         const p = new URLSearchParams(window.location.search);
-        return { code: p.get('code'), test: p.get('test') };
+        // &modo=jugar → abre el juego directo (con &grupo=X opcional fijado por el profesor).
+        return { code: p.get('code'), test: p.get('test'), jugar: p.get('modo') === 'jugar', grupo: p.get('grupo') };
     });
-    const [vista, setVista] = useState(dl.code ? 'FORM' : 'MENU'); // MENU | FORM | PLAY | PROFE
+    const [vista, setVista] = useState(dl.code ? (dl.jugar ? 'PLAY' : 'FORM') : 'MENU'); // MENU | FORM | PLAY | PROFE
 
     return (
         <div style={S.wrap}>
@@ -204,8 +205,8 @@ export default function QuienEsQuien({ usuario, onExit }) {
             </div>
 
             {vista === 'MENU' && <Menu setVista={setVista} />}
-            {vista === 'FORM' && <Formulario initCode={dl.code} initTestId={dl.test} />}
-            {vista === 'PLAY' && <Juego />}
+            {vista === 'FORM' && <Formulario initCode={dl.jugar ? null : dl.code} initTestId={dl.jugar ? null : dl.test} />}
+            {vista === 'PLAY' && <Juego initCode={dl.jugar ? dl.code : null} initTestId={dl.jugar ? dl.test : null} initGrupo={dl.jugar ? dl.grupo : null} />}
             {vista === 'PROFE' && <PanelProfesor usuario={usuario} />}
         </div>
     );
@@ -513,9 +514,11 @@ function Formulario({ initCode, initTestId } = {}) {
 
 /* ============================ FASE 2: JUEGO ============================ */
 
-function Juego() {
+function Juego({ initCode, initTestId, initGrupo } = {}) {
     const [fase, setFase] = useState('SETUP'); // SETUP | IDENT | JUGANDO | FIN
-    const [codigo, setCodigo] = useState('');
+    const [codigo, setCodigo] = useState(initCode ? upper(initCode) : '');
+    // Grupo fijado por el enlace del profesor (p.ej. "Profesorado"): no se elige.
+    const grupoFijo = initGrupo || '';
     const [grupos, setGrupos] = useState([]);
     const [grupoSel, setGrupoSel] = useState('');
     const [alumnos, setAlumnos] = useState([]);
@@ -532,8 +535,8 @@ function Juego() {
     const [nombreJugador, setNombreJugador] = useState('');
     const [enviado, setEnviado] = useState(null); // null | 'ok' | 'error'
 
-    const cargar = async () => {
-        const cod = upper(codigo);
+    const cargar = async (codArg) => {
+        const cod = upper(typeof codArg === 'string' ? codArg : codigo);
         if (!cod) { setError('Introduce el código del profesor.'); return; }
         setCargando(true); setError('');
         try {
@@ -547,10 +550,11 @@ function Juego() {
             setTests(ts);
             // Test por defecto: el primero que tenga alumnos, o 'default'.
             const conAlumnos = ts.find((t) => lista.some((a) => testIdDe(a) === t.id));
-            setTestSel((conAlumnos || ts[0]).id);
+            const pre = initTestId && ts.find((t) => t.id === initTestId);
+            setTestSel((pre || conAlumnos || ts[0]).id);
             // Grupos disponibles: los del profesor o, si no hay, los deducidos de los alumnos.
             const dispo = gs.length ? gs : [...new Set(lista.map((a) => a.grupo).filter(Boolean))];
-            setGrupoSel(dispo[0] || '');
+            setGrupoSel(grupoFijo || dispo[0] || '');
             setFase('IDENT');
         } catch {
             setError('No se pudieron cargar los alumnos.');
@@ -559,6 +563,12 @@ function Juego() {
         }
     };
 
+    // Deep-link del profesor: carga directa sin teclear el código.
+    useEffect(() => {
+        if (initCode) cargar(initCode);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     const testActivo = tests.find((t) => t.id === testSel) || TEST_DEFAULT;
     const gruposDisponibles = grupos.length ? grupos : [...new Set(alumnos.map((a) => a.grupo).filter(Boolean))];
     const filtrados = alumnos.filter((a) => a.grupo === grupoSel && testIdDe(a) === testSel);
@@ -566,7 +576,7 @@ function Juego() {
     const empezar = () => {
         if (!nombreJugador.trim()) { setError('Escribe tu nombre.'); return; }
         if (!grupoSel) { setError('Elige tu grupo.'); return; }
-        if (filtrados.length < 2) { setError('Se necesitan al menos 2 alumnos en este test y grupo para jugar.'); return; }
+        if (filtrados.length < 2) { setError(grupoFijo ? `Aún no hay al menos 2 personas de "${grupoFijo}" que hayan rellenado este test.` : 'Se necesitan al menos 2 alumnos en este test y grupo para jugar.'); return; }
         const activas = testActivo.preguntas.filter((p) => filtrados.some((a) => String(valorResp(a, p.id) ?? '').trim() !== ''));
         if (activas.length === 0) { setError('Este grupo no tiene datos suficientes para jugar.'); return; }
         setError('');
@@ -617,6 +627,9 @@ function Juego() {
     };
 
     /* ---- SETUP ---- */
+    if (fase === 'SETUP' && initCode && !error) {
+        return <div style={{ ...S.panel, textAlign: 'center' }}>Cargando juego…</div>;
+    }
     if (fase === 'SETUP') {
         return (
             <div style={S.panel}>
@@ -640,7 +653,7 @@ function Juego() {
                 <h2 style={{ marginTop: 0, color: COL.azul }}>🙋 ¿Quién juega?</h2>
                 <p>Escribe tu <b>nombre</b> y elige tu <b>grupo</b>. Al terminar, tu resultado se enviará a tu profesor.</p>
 
-                {tests.length > 1 && (
+                {tests.length > 1 && !initTestId && (
                     <>
                         <label style={S.label}>Test</label>
                         <select style={S.input} value={testSel} onChange={(e) => setTestSel(e.target.value)}>
@@ -655,8 +668,10 @@ function Juego() {
                 <input style={S.input} value={nombreJugador} onChange={(e) => setNombreJugador(e.target.value)}
                     placeholder="Ej: Ana García" />
 
-                <label style={S.label}>Tu grupo</label>
-                {gruposDisponibles.length > 0 ? (
+                {grupoFijo ? (
+                    <p style={{ margin: '14px 0 0', fontWeight: 700 }}>🕵️ Vas a adivinar a: <span style={{ color: COL.azul }}>{grupoFijo}</span></p>
+                ) : <label style={S.label}>Tu grupo</label>}
+                {grupoFijo ? null : gruposDisponibles.length > 0 ? (
                     <select style={S.input} value={grupoSel} onChange={(e) => setGrupoSel(e.target.value)}>
                         {gruposDisponibles.map((g) => (
                             <option key={g} value={g}>{g} ({alumnos.filter((a) => a.grupo === g).length} alumnos)</option>
@@ -667,7 +682,7 @@ function Juego() {
                 )}
 
                 <p style={{ marginTop: 16, color: '#555' }}>
-                    Jugadores en este grupo: <b>{filtrados.length}</b>
+                    {grupoFijo ? 'Personas a adivinar' : 'Jugadores en este grupo'}: <b>{filtrados.length}</b>
                 </p>
                 {error && <p style={{ color: COL.rojo, fontWeight: 700 }}>{error}</p>}
                 <button style={{ ...S.btn(COL.verde), marginTop: 8, width: '100%' }} onClick={empezar}>▶️ ¡Empezar!</button>
@@ -1389,7 +1404,7 @@ function PanelProfesor({ usuario }) {
     return (
         <div style={{ ...S.panel, maxWidth: 1100, position: 'relative' }}>
             {ayudaUI}
-            {qrTest && <QrModal test={qrTest} codigo={codigo} onClose={() => setQrTest(null)} />}
+            {qrTest && <QrModal test={qrTest} codigo={codigo} grupos={grupos} grupoInicial={filtroGrupo !== '__TODOS__' ? filtroGrupo : ''} onClose={() => setQrTest(null)} />}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 10, paddingRight: 40 }}>
                 <h2 style={{ margin: 0, color: COL.azul }}>👨‍🏫 Panel — código {upper(codigo)}</h2>
                 {user && (
@@ -1451,7 +1466,7 @@ function PanelProfesor({ usuario }) {
                         {grupos.map((g) => <option key={g} value={g}>{g}</option>)}
                     </select>
                     <div style={{ flex: 1 }} />
-                    <button style={{ ...S.btn('#0f766e'), padding: '10px 14px' }} onClick={() => setQrTest(testActivo)} title="QR de acceso directo para rezagados">📱 QR del test</button>
+                    <button style={{ ...S.btn('#0f766e'), padding: '10px 14px' }} onClick={() => setQrTest(testActivo)} title="QR / enlace directo al test o al juego">📱 QR / enlace</button>
                     {seccion === 'DATOS' ? (
                         <>
                             <button style={{ ...S.btn(COL.verde), padding: '10px 16px' }} onClick={crearGrupoNotas} title="Crea un grupo en la Tabla de notas con estos alumnos">📊 Crear grupo de notas</button>
@@ -1703,9 +1718,13 @@ function EditorTest({ test, setTest, onGuardar, onCancelar, error }) {
 }
 
 /* ---------------------- QR DE ACCESO DIRECTO A UN TEST ---------------------- */
-function QrModal({ test, codigo, onClose }) {
+function QrModal({ test, codigo, grupos = [], grupoInicial = '', onClose }) {
     const [copiado, setCopiado] = useState(false);
-    const url = `${window.location.origin}/quienesquien?code=${encodeURIComponent(upper(codigo))}&test=${encodeURIComponent(test.id)}`;
+    const [modo, setModo] = useState('RELLENAR'); // RELLENAR | JUGAR
+    const [grupoJuego, setGrupoJuego] = useState(grupoInicial); // '' = el jugador elige su grupo
+    const jugar = modo === 'JUGAR';
+    const url = `${window.location.origin}/quienesquien?code=${encodeURIComponent(upper(codigo))}&test=${encodeURIComponent(test.id)}`
+        + (jugar ? `&modo=jugar${grupoJuego ? `&grupo=${encodeURIComponent(grupoJuego)}` : ''}` : '');
     const qrSrc = (size) => `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(url)}&bgcolor=ffffff&color=073b4c&margin=8`;
 
     const copiar = async () => {
@@ -1717,7 +1736,7 @@ function QrModal({ test, codigo, onClose }) {
         if (!w) return;
         w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>QR · ${test.titulo}</title>
 <style>body{font-family:Arial,sans-serif;text-align:center;padding:40px;color:#073b4c}h1{margin:0 0 6px}p{color:#555}img{margin:20px auto;display:block}.cod{font-size:1.4rem;font-weight:800;letter-spacing:2px}</style></head>
-<body><h1>${test.titulo}</h1><p>Escanea para rellenar el test directamente</p>
+<body><h1>${test.titulo}${jugar && grupoJuego ? ` · ${grupoJuego}` : ''}</h1><p>${jugar ? 'Escanea para jugar a ¿Quién es quién?' : 'Escanea para rellenar el test directamente'}</p>
 <img src="${qrSrc(300)}" width="300" height="300" alt="QR"/>
 <p>o entra en <b>${window.location.host}/quienesquien</b><br>con el código <span class="cod">${upper(codigo)}</span></p>
 <script>window.onload=function(){setTimeout(function(){window.print()},400)}<\/script></body></html>`);
@@ -1731,7 +1750,25 @@ function QrModal({ test, codigo, onClose }) {
                     <h2 style={{ margin: 0, color: COL.azul, fontSize: '1.2rem' }}>📱 {test.titulo}</h2>
                     <button onClick={onClose} style={{ ...S.btn('#94a3b8'), padding: '6px 12px' }}>✕</button>
                 </div>
-                <p style={{ color: '#555', margin: '8px 0' }}>Los alumnos escanean este QR y entran <b>directamente al test</b>, sin poner el código.</p>
+                <div style={{ display: 'flex', gap: 6, justifyContent: 'center', margin: '10px 0 4px' }}>
+                    {[['RELLENAR', '✍️ Rellenar test'], ['JUGAR', '🎮 Jugar']].map(([m, l]) => (
+                        <button key={m} onClick={() => setModo(m)} style={{ ...S.btn(modo === m ? COL.azul : '#cbd5e1'), padding: '8px 14px', color: modo === m ? '#fff' : '#334155' }}>{l}</button>
+                    ))}
+                </div>
+                {jugar && (
+                    <div style={{ textAlign: 'left', margin: '8px 0' }}>
+                        <label style={S.label}>¿A quién hay que adivinar?</label>
+                        <select style={S.input} value={grupoJuego} onChange={(e) => setGrupoJuego(e.target.value)}>
+                            <option value="">Cada jugador elige su grupo</option>
+                            {grupos.map((g) => <option key={g} value={g}>{g}</option>)}
+                        </select>
+                    </div>
+                )}
+                <p style={{ color: '#555', margin: '8px 0' }}>
+                    {jugar
+                        ? <>Abre <b>directamente el juego</b>{grupoJuego ? <> para adivinar a <b>{grupoJuego}</b></> : ''}, sin poner el código. Ideal p.ej. con un grupo «Profesorado» para que los alumnos conozcan a sus profes.</>
+                        : <>Los alumnos escanean este QR y entran <b>directamente al test</b>, sin poner el código.</>}
+                </p>
                 <img src={qrSrc(220)} width={220} height={220} alt="QR del test" style={{ borderRadius: 12, border: '1px solid #e2e8f0', background: '#fff' }} />
                 <div style={{ wordBreak: 'break-all', fontSize: '0.75rem', color: '#777', margin: '10px 0' }}>{url}</div>
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>

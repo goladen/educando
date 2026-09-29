@@ -1,10 +1,12 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, setDoc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { Search, Key, Filter, Zap, Play, Home, ChevronDown, ChevronUp, Mail, Link2, Share2 } from 'lucide-react';
 import GamePlayer from '../GamePlayer';
 import MisRegistros from './MisRegistros';
 import { getResumenRegistros } from '../utils/registrosLocales';
+import useAvatarLocal from '../hooks/useAvatarLocal';
+import AvatarSVG from './avatar/AvatarSVG';
 import { useT } from '../i18n/LanguageContext';
 import LanguageSelector from '../i18n/LanguageSelector';
 import FullscreenBtn from '../MiniArcade/FullscreenBtn';
@@ -51,6 +53,7 @@ import ArkadeHub from '../MiniArcade/ArkadeHub';
 
 import EtiquetaMe from '../EtiquetaMe';
 import LineaTiempoGame from '../LineaTiempoGame';
+const ListeningRecursoGame = lazy(() => import('../ListeningRecursoGame'));
 import OmninteractiveApp from '../OmninteractiveApp';
 import OcaMatematicaDirect from '../OcaMatematica';
 import DominoMatematicoDirect from '../dominofracciones';
@@ -1010,7 +1013,7 @@ export const GAME_INFO = {
     LISTENING: {
         descripcion: 'Comprensión oral en inglés y francés. El alumno escucha un audio de un minuto y completa los huecos del texto, que va apareciendo al ritmo de la grabación. La velocidad de reproducción se puede bajar (x0.5) para los que necesitan más tiempo.',
         tipoPreguntas: 'Huecos en la transcripción: escribir la palabra u opción múltiple (4 opciones). 7 huecos por tema.',
-        biblioteca: 'Biblioteca propia: 95 temas en inglés (Listen a Minute) y temas en francés por nivel (A1-A2, B1).',
+        biblioteca: 'Biblioteca propia: 95 temas en inglés (Listen a Minute) y temas en francés por nivel (A1-A2, B1). Además, «De profesores»: listenings creados por docentes en 7 idiomas, con preguntas de comprensión y huecos. El profesor genera el texto con su IA (prompt incluido), lo pega y la web graba el audio con voces neuronales.',
         multiplayer: 'Individual o sala en vivo: el profesor proyecta el audio, los alumnos responden desde su dispositivo y pueden entrar escaneando un QR.',
         materias: ['Inglés', 'Francés', 'Lengua Extranjera'],
         etapas: ['ESO', 'Bachillerato'],
@@ -1901,6 +1904,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
     useEffect(() => { if (!quienEsQuienApp) refrescarRegistros(); }, [quienEsQuienApp]);
     useEffect(() => { if (!quienHistoricoApp) refrescarRegistros(); }, [quienHistoricoApp]);
     const totalRegistros = resumenRegistros.reduce((s, g) => s + g.count, 0);
+    const [miAvatar] = useAvatarLocal();
     // Mapeo id-de-tarjeta → tipo-de-registro cuando no coinciden.
     const REGISTRO_TIPO_DE = { GEOMETRIX: 'GEOMETRIX_COMPUESTO', POLINOMIOS: 'ALGEBRA', MATES_OAOA: 'OAOA', MONEYBOARD: 'JEOPARDY' };
     // Tipos de registro que pertenecen a Math World (para el recuento agregado del portal).
@@ -2645,6 +2649,7 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
 
         if (juegoActivo.tipoJuego === 'ETIQUETAS') return <EtiquetaMe recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'LINEA_TIEMPO') return <LineaTiempoGame recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'LISTENING_RECURSO') return <Suspense fallback={null}><ListeningRecursoGame recurso={juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} /></Suspense>;
 
         if (juegoActivo.tipoJuego === 'GEOMETRIX') return <Geometrix usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'CALCULO') return <CalculoMental usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
@@ -3128,17 +3133,18 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
             {infoModal && <InfoModal info={infoModal.info} name={infoModal.name} color={infoModal.color} emoji={infoModal.emoji} img={infoModal.img} onClose={() => setInfoModal(null)} />}
 
             {/* MIS REGISTROS — historial local de partidas en el dispositivo */}
-            {totalRegistros > 0 && (
-                <button onClick={() => { setRegistrosTipo(null); setMostrarRegistros(true); }} style={{
-                    display:'flex', alignItems:'center', gap:8, margin:'0 0 16px', padding:'9px 16px',
-                    background:'rgba(255,255,255,0.15)', backdropFilter:'blur(8px)',
-                    border:'1px solid rgba(255,255,255,0.25)', borderRadius:14, color:'white',
-                    fontWeight:700, fontSize:'0.88rem', cursor:'pointer'
-                }}>
-                    📋 {t('Mis registros')}
-                    <span style={{ background:'#f1c40f', color:'#1e272e', borderRadius:20, padding:'1px 9px', fontSize:'0.78rem', fontWeight:800 }}>{totalRegistros}</span>
-                </button>
-            )}
+            {/* Siempre visible: desde aquí también se crea el avatar del dispositivo. */}
+            <button onClick={() => { setRegistrosTipo(null); setMostrarRegistros(true); }} style={{
+                display:'flex', alignItems:'center', gap:8, margin:'0 0 16px', padding: miAvatar ? '5px 16px 5px 6px' : '9px 16px',
+                background:'rgba(255,255,255,0.15)', backdropFilter:'blur(8px)',
+                border:'1px solid rgba(255,255,255,0.25)', borderRadius:14, color:'white',
+                fontWeight:700, fontSize:'0.88rem', cursor:'pointer'
+            }}>
+                {miAvatar
+                    ? <AvatarSVG config={miAvatar} size={30} style={{ borderRadius:'50%', border:'2px solid rgba(255,255,255,0.7)' }} />
+                    : '📋'} {t('Mis registros')}
+                {totalRegistros > 0 && <span style={{ background:'#f1c40f', color:'#1e272e', borderRadius:20, padding:'1px 9px', fontSize:'0.78rem', fontWeight:800 }}>{totalRegistros}</span>}
+            </button>
             {mostrarRegistros && (
                 <MisRegistros tipoInicial={registrosTipo} onClose={() => { setMostrarRegistros(false); setRegistrosTipo(null); refrescarRegistros(); }} />
             )}

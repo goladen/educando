@@ -17,7 +17,9 @@ import { FONDOS, fondoUrl } from './utils/fondos';
 import MusicStaffPanel from './components/MusicStaffPanel';
 const MiniAppCreator = lazy(() => import('./components/MiniAppCreator'));
 const RecortesExtrem = lazy(() => import('./components/RecortesExtrem'));
-import { db } from './firebase';
+import { db, auth } from './firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import PizarraAnalisisIA, { ADMIN_EMAIL_IA } from './components/PizarraAnalisisIA';
 import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { BANCO_IMAGENES } from './pizarraBancoImagenes';
 import { SONIDOS, reproducirSonido } from './pizarraSonidos';
@@ -29,17 +31,20 @@ const NUM_CAPAS = 5;
 // ─── UTILIDADES MATEMÁTICAS ───────────────────────────────────────────────────
 // Formatea una expresión amigable a código evaluable por JS
 const prepareMathExpr = (expr) => {
-    let s = expr.replace(/×/g, '*').replace(/÷/g, '/').replace(/\^/g, '**');
-    // Inversas trigonométricas
-    s = s.replace(/asin\(/g, 'Math.asin(').replace(/acos\(/g, 'Math.acos(').replace(/atan\(/g, 'Math.atan(');
-    // Trigonométricas normales
-    s = s.replace(/sin\(/g, 'Math.sin(').replace(/cos\(/g, 'Math.cos(').replace(/tan\(/g, 'Math.tan(');
-    // Logaritmos y raíces
-    s = s.replace(/sqrt\(/g, 'Math.sqrt(').replace(/ln\(/g, 'Math.log(').replace(/log\(/g, 'Math.log10(').replace(/exp\(/g, 'Math.exp(');
+    let s = String(expr).replace(/×/g, '*').replace(/÷/g, '/').replace(/·/g, '*').replace(/−/g, '-').replace(/\^/g, '**').replace(/π/g, 'pi');
+    // Multiplicación implícita: 2x, 2(x+1), 2sin(x), (x+1)(x-1), x(x+1)
+    s = s.replace(/(\d)\s*(?=[a-zA-Z(])/g, '$1*').replace(/\)\s*(?=[\w(])/g, ')*').replace(/(?<![a-zA-Z])x\s*(?=\()/g, 'x*');
+    // Funciones (con límite de palabra para que asin no acabe en aMath.sin)
+    s = s.replace(/\blog\s*\(/g, 'Math.log10(').replace(/\bln\s*\(/g, 'Math.log(');
+    s = s.replace(/(?<![\w.])(asin|acos|atan|sin|cos|tan|sqrt|exp|abs)\s*\(/g, 'Math.$1(');
+    // Menos unario con potencias (JS no admite -x**2 ni 2**-x)
+    s = s.replace(/\*\*\s*-\s*([\w.]+(?:\([^()]*\))?)/g, '**(-$1)').replace(/(^|[(*/+\-,])\s*-/g, '$1(-1)*');
     // Constantes
-    s = s.replace(/π/g, 'Math.PI').replace(/e/g, 'Math.E').replace(/pi/gi, 'Math.PI');
+    s = s.replace(/\bpi\b/gi, 'Math.PI').replace(/(?<![\w.])e(?![\w(])/g, 'Math.E');
     return s;
 };
+// Sustituye la variable x sin tocar la x de Math.exp, etc.
+const sustituirX = (s, x) => s.replace(/(?<![a-zA-Z.])x(?![a-zA-Z])/g, `(${x})`);
 
 // ══════════════════════════════════════════════════════════════════════════════
 // 1. RULETA DE ALUMNOS
@@ -276,7 +281,7 @@ function GraficadoraFlotante({ onClose, onInsertar }) {
             const x = (px - cx) / scale;
             try {
                 // eslint-disable-next-line no-eval
-                const y = eval(prepareMathExpr(expr).replace(/x/g, `(${x})`));
+                const y = eval(sustituirX(prepareMathExpr(expr), x));
                 if (!Number.isFinite(y)) { first = true; continue; }
                 const py = cy - y * scale;
                 if (py < -H || py > 2 * H) { first = true; continue; }
@@ -862,6 +867,11 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
     const [lassoRect,      setLassoRect]      = useState(null);
     const [clipboardRegion, setClipboardRegion] = useState(null); // { src, w, h }
     const selHandleRef = useRef(null);
+
+    // Análisis con IA del trazo seleccionado (solo admin)
+    const [esAdminIA,  setEsAdminIA]  = useState(auth.currentUser?.email === ADMIN_EMAIL_IA);
+    const [iaAnalisis, setIaAnalisis] = useState(null); // { src, rect, sel }
+    useEffect(() => onAuthStateChanged(auth, u => setEsAdminIA(u?.email === ADMIN_EMAIL_IA)), []);
 
     // Text tool
     const [textoInput,       setTextoInput]       = useState('');
@@ -1902,7 +1912,7 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
         for(let px = -anchoEje; px <= anchoEje; px++) {
             let x = px / scale;
             try {
-                let toEval = prepareMathExpr(funcStr).replace(/x/g, `(${x})`);
+                let toEval = sustituirX(prepareMathExpr(funcStr), x);
                 // eslint-disable-next-line no-eval
                 let y = eval(toEval);
                 if(Number.isFinite(y)) {
@@ -2355,6 +2365,68 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
         if (!clipboardRegion) return;
         setPendingInsert({ type: 'image', src: clipboardRegion.src, w: clipboardRegion.w, h: clipboardRegion.h });
         setHerramienta('geo_place');
+    };
+
+    // ── Análisis con IA del trazo (solo admin) ──────────────────────────────
+    const abrirAnalisisIA = () => {
+        const region = _extractRegionDataURL();
+        if (!region) return;
+        const bbs = selIdxs.map(i => getBbox(elementos[i]));
+        const rect = bbs.length
+            ? { x1: Math.min(...bbs.map(b => b.x1)), y1: Math.min(...bbs.map(b => b.y1)), x2: Math.max(...bbs.map(b => b.x2)), y2: Math.max(...bbs.map(b => b.y2)) }
+            : { ...lassoRect };
+        setIaAnalisis({ src: region.src, rect, sel: [...selIdxs] });
+    };
+
+    const aplicarAccionIA = (accion, it) => {
+        if (!iaAnalisis) return;
+        const { rect, sel } = iaAnalisis;
+        const trazo = sel.map(i => elementos[i]).find(e => e?.t === 'draw');
+        const col = trazo?.color || color;
+        const h = Math.max(10, rect.y2 - rect.y1), w = Math.max(10, rect.x2 - rect.x1);
+        const lineasTexto = (lineas, x, y, fs) => lineas.map((txt, k) => tagElem({ t: 'text', txt, x, y: y + k * fs * 1.3, color: col, grosor, fontSize: Math.round(fs) }));
+        const sinSeleccion = (prev) => prev.filter((item, i) => {
+            if (!sel.includes(i)) return true;
+            return modoRef.current === 'editar' && item.autorId && item.autorId !== miIdRef.current;
+        });
+        const cerrar = () => { setIaAnalisis(null); setLassoRect(null); setSelIdxs([]); };
+
+        if (accion === 'grafica') {
+            setGraficaConfig({ funcStr: it.funcStr, scale: 40 });
+            setHerramienta('graph');
+            cerrar(); return;
+        }
+        if (accion === 'sustituir') {
+            const lineas = it.contenido.split('\n').filter(l => l.trim());
+            const fs = Math.max(16, Math.min(80, (h / lineas.length) * 0.75));
+            setElementos(prev => [...sinSeleccion(prev), ...lineasTexto(lineas, rect.x1, rect.y1 + fs, fs)]);
+        } else if (accion === 'insertar') {
+            const lineas = it.contenido.split('\n').filter(l => l.trim());
+            setElementos(prev => [...prev, ...lineasTexto(lineas, rect.x1, rect.y2 + 38, 28)]);
+        } else if (accion === 'resultado') {
+            const fs = Math.max(18, Math.min(56, h * 0.5));
+            setElementos(prev => [...prev, ...lineasTexto([`➜ ${it.resultado}`], rect.x2 + 24, (rect.y1 + rect.y2) / 2 + fs / 3, fs)]);
+        } else if (accion === 'pasos') {
+            setElementos(prev => [...prev, ...lineasTexto(it.pasos.map((p, k) => `${k + 1}. ${p}`), rect.x1, rect.y2 + 34, 22)]);
+        } else if (accion === 'forma') {
+            const g = trazo?.grosor || grosor;
+            let forma;
+            if (it.forma === 'circle') {
+                const cx = (rect.x1 + rect.x2) / 2, cy = (rect.y1 + rect.y2) / 2;
+                forma = { t: 'circle', x1: cx, y1: cy, x2: cx + Math.max(w, h) / 2, y2: cy };
+            } else if (it.forma === 'line' && trazo?.pts?.length > 1) {
+                const a = trazo.pts[0], b = trazo.pts[trazo.pts.length - 1];
+                forma = { t: 'line', x1: a.x, y1: a.y, x2: b.x, y2: b.y };
+            } else if (['triangle', 'pentagon', 'hexagon'].includes(it.forma)) {
+                // Los polígonos regulares se inscriben en el cuadrado menor del bbox
+                const s = Math.max(w, h), cx = (rect.x1 + rect.x2) / 2, cy = (rect.y1 + rect.y2) / 2;
+                forma = { t: it.forma, x1: cx - s / 2, y1: cy - s / 2, x2: cx + s / 2, y2: cy + s / 2 };
+            } else {
+                forma = { t: it.forma, x1: rect.x1, y1: rect.y1, x2: rect.x2, y2: rect.y2 };
+            }
+            setElementos(prev => [...sinSeleccion(prev), tagElem({ ...forma, color: col, grosor: g })]);
+        }
+        cerrar();
     };
 
     const ERASER_SVG = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='22'%3E%3Crect x='1' y='1' width='34' height='20' rx='3' fill='%23fde8e8' stroke='%23e74c3c' stroke-width='1.5'/%3E%3Crect x='23' y='1' width='12' height='20' rx='0 3 3 0' fill='%23e74c3c' opacity='0.7'/%3E%3Cline x1='23' y1='1' x2='23' y2='21' stroke='%23e74c3c' stroke-width='1.5'/%3E%3C/svg%3E") 1 20, cell`;
@@ -2845,6 +2917,7 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
                             <button onClick={cortarRegion}  style={{ padding:'2px 12px', background:'#e74c3c', color:'white', border:'none', borderRadius:6, cursor:'pointer', fontWeight:'bold', fontSize:'0.82rem' }}>✂️ Cortar</button>
                             <button onClick={copiarRegion}  style={{ padding:'2px 12px', background:'rgba(255,255,255,0.22)', color:'white', border:'1px solid rgba(255,255,255,0.45)', borderRadius:6, cursor:'pointer', fontWeight:'bold', fontSize:'0.82rem' }}>📋 Copiar</button>
                             {clipboardRegion && <button onClick={pegarRegion} style={{ padding:'2px 12px', background:'#f39c12', color:'white', border:'none', borderRadius:6, cursor:'pointer', fontWeight:'bold', fontSize:'0.82rem' }}>📌 Pegar</button>}
+                            {esAdminIA && <button onClick={abrirAnalisisIA} title="Reconocer el trazo con IA (texto, ecuación, función…)" style={{ padding:'2px 12px', background:'linear-gradient(135deg,#4f46e5,#7c3aed)', color:'white', border:'none', borderRadius:6, cursor:'pointer', fontWeight:'bold', fontSize:'0.82rem' }}>🤖 Analizar con IA</button>}
                             <button onClick={() => { setLassoRect(null); setSelIdxs([]); }} style={{ padding:'2px 8px', background:'rgba(255,255,255,0.12)', color:'white', border:'1px solid rgba(255,255,255,0.3)', borderRadius:6, cursor:'pointer', fontSize:'0.82rem' }}>✕</button>
                         </>
                     ) : (
@@ -2909,6 +2982,7 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
             {calcVisible && <CalculadoraFlotante onClose={() => setCalcVisible(false)} onCopiar={res => { setTextoPegar(res); setHerramienta('paste'); setCalcVisible(false); }} />}
             {grafVisible  && <GraficadoraFlotante onClose={() => setGrafVisible(false)} onInsertar={cfg => { setGraficaConfig(cfg); setHerramienta('graph'); setGrafVisible(false); }} />}
             {showMusicStaff && <MusicStaffPanel onInsert={handleInsertMusicStaff} onClose={() => setShowMusicStaff(false)} />}
+            {iaAnalisis && esAdminIA && <PizarraAnalisisIA imagenDataURL={iaAnalisis.src} onClose={() => setIaAnalisis(null)} onAccion={aplicarAccionIA} />}
             {/* ── Banco de imágenes ──────────────────────────────────────── */}
             {bancoOpen && (
                 <div onClick={() => setBancoOpen(false)}

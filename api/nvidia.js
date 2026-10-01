@@ -56,5 +56,6 @@ export default async function handler(req, res) {
         }
     }
 
-    return res.status(502).json({ error: `Fallaron todos los modelos de NVIDIA.\n${fallos.join('\n') || 'No quedan modelos por probar.'}` });
+    // 500 y no 502: Cloudflare sustituye el cuerpo de los 502 por su propia página
+    return res.status(500).json({ error: `Fallaron todos los modelos de NVIDIA.\n${fallos.join('\n') || 'No quedan modelos por probar.'}` });
 }

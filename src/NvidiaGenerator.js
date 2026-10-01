@@ -14,8 +14,14 @@ async function llamarNvidia(messages, opciones = {}) {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ messages, ...opciones }),
     });
-    const data = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(data.error?.message || data.error || data.detail || `Error ${r.status}`);
+    const crudo = await r.text();
+    let data = {};
+    try { data = JSON.parse(crudo); } catch { /* respuesta no JSON (Cloudflare/Vercel) */ }
+    if (!r.ok) {
+        const motivo = data.error?.message || data.error || data.detail
+            || crudo.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300);
+        throw new Error(`Error ${r.status}${motivo ? `: ${motivo}` : ''}`);
+    }
     const texto = data.choices?.[0]?.message?.content;
     if (!texto) throw new Error('La IA no devolvió contenido.');
     return { texto, modelo: data.model };

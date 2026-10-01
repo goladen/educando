@@ -64,7 +64,7 @@ export default function GeneradorPasapalabraNvidia({ onGenerado }) {
             <input type="range" min={15} max={25} value={num} onChange={e => setNum(Number(e.target.value))}
                 style={{ width: '100%' }} disabled={cargando} />
 
-            {error && <div style={{ color: '#c0392b', fontSize: 13, marginTop: 8 }}>{error}</div>}
+            {error && <div style={{ color: '#c0392b', fontSize: 13, marginTop: 8, whiteSpace: 'pre-line', wordBreak: 'break-word' }}>{error}</div>}
 
             <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
                 <button onClick={() => setAbierto(false)} style={{ ...s.btn, background: '#95a5a6' }} disabled={cargando}>Cancelar</button>

@@ -1,9 +1,6 @@
 // Generación de contenido con la API de NVIDIA (proxy api/nvidia.js, solo admin).
 import { auth } from './firebase';
-
-const ABC = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-
-const sinTildes = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '');
+import { mensajesPasapalabra, extraerArrayJSON, validarRosco } from './nvidiaPasapalabra';
 
 async function llamarNvidia(messages, opciones = {}) {
     const token = await auth.currentUser?.getIdToken();
@@ -14,52 +11,52 @@ async function llamarNvidia(messages, opciones = {}) {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ messages, ...opciones }),
     });
-    const crudo = await r.text();
-    let data = {};
-    try { data = JSON.parse(crudo); } catch { /* respuesta no JSON (Cloudflare/Vercel) */ }
     if (!r.ok) {
+        const crudo = await r.text();
+        let data = {};
+        try { data = JSON.parse(crudo); } catch { /* respuesta no JSON (Cloudflare/Vercel) */ }
         const motivo = data.error?.message || data.error || data.detail
             || crudo.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300);
-        throw new Error(`Error ${r.status}${motivo ? `: ${motivo}` : ''}`);
+        const err = new Error(`${data.model ? `${data.model}: ` : `Error ${r.status}: `}${motivo}`);
+        err.modelo = data.model;
+        err.quedan = data.quedan ?? 0;
+        throw err;
     }
-    const texto = data.choices?.[0]?.message?.content;
-    if (!texto) throw new Error('La IA no devolvió contenido.');
-    return { texto, modelo: data.model };
-}
 
-// Extrae el array de preguntas aunque el modelo añada razonamiento (<think>),
-// markdown, texto alrededor, comas finales o corte la respuesta a medias.
-function extraerArrayJSON(texto) {
-    const limpio = texto
-        .replace(/<think>[\s\S]*?<\/think>/gi, '')
-        .replace(/```(?:json)?/gi, '')
-        .trim();
-
-    const intentar = (s) => {
-        try {
-            const v = JSON.parse(s.replace(/,\s*([\]}])/g, '$1'));
-            if (Array.isArray(v)) return v;
-            const arr = v && Object.values(v).find(Array.isArray); // {"preguntas":[...]}
-            return arr || null;
-        } catch { return null; }
-    };
-
-    const ini = limpio.search(/\[\s*\{/);
-    if (ini !== -1) {
-        const fin = limpio.lastIndexOf(']');
-        const completo = fin > ini && intentar(limpio.slice(ini, fin + 1));
-        if (completo) return completo;
-        // Respuesta cortada: quedarse hasta el último objeto cerrado
-        const ultimo = limpio.lastIndexOf('}');
-        const cortado = ultimo > ini && intentar(limpio.slice(ini, ultimo + 1) + ']');
-        if (cortado) return cortado;
+    // Streaming SSE de OpenAI: "data: {choices:[{delta:{content}}]}" ... "data: [DONE]"
+    const modelo = r.headers.get('X-Modelo');
+    const quedan = Number(r.headers.get('X-Quedan') || 0);
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let texto = '';
+    let errorStream = null;
+    for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lineas = buffer.split('\n');
+        buffer = lineas.pop();
+        for (const linea of lineas) {
+            const l = linea.trim();
+            if (!l.startsWith('data:')) continue;
+            const payload = l.slice(5).trim();
+            if (!payload || payload === '[DONE]') continue;
+            try {
+                const ev = JSON.parse(payload);
+                if (ev.error) errorStream = typeof ev.error === 'string' ? ev.error : JSON.stringify(ev.error);
+                texto += ev.choices?.[0]?.delta?.content || '';
+            } catch { /* fragmento incompleto */ }
+        }
     }
-    const obj = limpio.indexOf('{');
-    const envuelto = obj !== -1 && intentar(limpio.slice(obj, limpio.lastIndexOf('}') + 1));
-    if (envuelto) return envuelto;
 
-    console.warn('NVIDIA: respuesta no interpretable:\n', texto);
-    throw new Error(`JSON no válido (empieza por: "${limpio.slice(0, 80).replace(/\s+/g, ' ')}…")`);
+    if (!texto.trim() || (errorStream && !texto.includes(']'))) {
+        const err = new Error(`${modelo}: ${errorStream || 'respuesta vacía'}`);
+        err.modelo = modelo;
+        err.quedan = quedan;
+        throw err;
+    }
+    return { texto, modelo, quedan };
 }
 
 /**
@@ -69,36 +66,23 @@ function extraerArrayJSON(texto) {
 export async function generarPasapalabraNvidia({ tema, idioma, nivel, numPreguntas }) {
     const n = Math.min(25, Math.max(15, Number(numPreguntas) || 20));
 
-    const system = 'Eres un profesor experto que crea roscos de Pasapalabra educativos. Respondes ÚNICAMENTE con JSON válido, sin markdown ni comentarios.';
-    const user = `Crea un rosco de Pasapalabra con EXACTAMENTE ${n} preguntas.
-- Temática: ${tema}
-- Idioma de preguntas y respuestas: ${idioma}
-- Nivel del alumnado: ${nivel}
-
-Reglas:
-1. Cada pregunta usa una letra DISTINTA del alfabeto A-Z (sin Ñ), en orden alfabético.
-2. Prioriza que la respuesta EMPIECE por la letra. La definición debe empezar por "Empieza por la X:" (traducido al idioma pedido).
-3. Solo si para una letra no hay palabra razonable que empiece por ella, usa una que la CONTENGA y la definición debe empezar por "Contiene la X:" (traducido al idioma pedido).
-4. La respuesta es una sola palabra (o término muy corto), adecuada al nivel, sin ambigüedad y sin que aparezca en la definición.
-5. Definiciones claras y breves, adaptadas al nivel.
-
-Formato exacto:
-[{"letra":"A","pregunta":"Empieza por la A: ...","respuesta":"..."}]`;
-
-    const mensajes = [{ role: 'system', content: system }, { role: 'user', content: user }];
+    const mensajes = mensajesPasapalabra({ tema, idioma, nivel, n });
     const minimo = Math.ceil(n * 0.6); // por debajo de esto se considera un fallo del modelo
     const excluir = [];
     const errores = []; // motivos de los modelos descartados en el navegador
     let mejor = [];
 
-    // Si un modelo devuelve JSON roto o muy pocas preguntas válidas, se pide al siguiente.
-    for (let intento = 0; intento < 10; intento++) {
+    // Cada petición usa un modelo. Si falla (error, vacío, JSON roto o muy pocas
+    // preguntas válidas) se excluye y se pide al siguiente de la lista del servidor.
+    for (let intento = 0; intento < 12; intento++) {
         let respuesta;
         try {
             respuesta = await llamarNvidia(mensajes, { temperature: 0.6, max_tokens: 4096, excluir });
         } catch (e) {
             errores.push(e.message);
-            break; // el servidor ya ha probado todos los modelos que quedaban
+            if (!e.modelo || !e.quedan) break; // no quedan modelos por probar
+            excluir.push(e.modelo);
+            continue;
         }
         try {
             const preguntas = validarRosco(extraerArrayJSON(respuesta.texto));
@@ -109,26 +93,10 @@ Formato exacto:
         } catch (e) {
             errores.push(`${respuesta.modelo}: ${e.message}`);
         }
-        if (!respuesta.modelo) break;
+        if (!respuesta.modelo || !respuesta.quedan) break;
         excluir.push(respuesta.modelo);
     }
 
     if (!mejor.length) throw new Error(errores.join('\n') ||'La IA no generó preguntas válidas. Prueba de nuevo.');
-    return [{ nombreHoja: tema.slice(0, 40), preguntas: mejor }];
-}
-
-function validarRosco(crudo) {
-    const usadas = new Set();
-    const preguntas = [];
-    for (const q of crudo) {
-        const pregunta = String(q?.pregunta || '').trim();
-        const respuesta = String(q?.respuesta || '').trim();
-        const letra = sinTildes(String(q?.letra || respuesta.charAt(0) || '')).toUpperCase().charAt(0);
-        if (!pregunta || !respuesta || !ABC.includes(letra) || usadas.has(letra)) continue;
-        // La letra tiene que estar en la respuesta (al inicio o contenida)
-        if (!sinTildes(respuesta).toUpperCase().includes(letra)) continue;
-        usadas.add(letra);
-        preguntas.push({ letra, pregunta, respuesta, correcta: '', incorrectas: ['', '', ''] });
-    }
-    return preguntas.sort((a, b) => a.letra.localeCompare(b.letra));
+    return [{ nombreHoja: tema.slice(0, 40), preguntas: mejor.slice(0, n) }];
 }

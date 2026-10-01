@@ -69,7 +69,7 @@ export default function GeneradorPasapalabraNvidia({ onGenerado }) {
             <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
                 <button onClick={() => setAbierto(false)} style={{ ...s.btn, background: '#95a5a6' }} disabled={cargando}>Cancelar</button>
                 <button onClick={generar} style={{ ...s.btn, flex: 1, background: '#76b900' }} disabled={cargando}>
-                    {cargando ? 'Generando… (puede tardar ~30 s)' : 'Generar'}
+                    {cargando ? 'Generando… (puede tardar 1-2 min)' : 'Generar'}
                 </button>
             </div>
         </div>

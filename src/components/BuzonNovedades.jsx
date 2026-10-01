@@ -6,8 +6,11 @@ import {
 } from 'firebase/firestore';
 import { Users, Check, X as XIcon, MessageSquare, UserPlus, Settings } from 'lucide-react';
 import useNotificacionesProfesor, { INTERESES } from '../hooks/useNotificacionesProfesor';
+import AdminUsuariosPanel from './AdminUsuariosPanel';
 
 const ADMIN_EMAIL = 'goladen@gmail.com';
+
+const fechaMs = (f) => !f ? 0 : f.toMillis ? f.toMillis() : f.seconds ? f.seconds * 1000 : new Date(f).getTime() || 0;
 
 export default function BuzonNovedades({ usuario, onIr }) {
     const [open, setOpen]           = useState(false);
@@ -24,6 +27,11 @@ export default function BuzonNovedades({ usuario, onIr }) {
     const [misComunidades, setMisComunidades] = useState([]);
     const [solicitudesPend, setSolicitudesPend] = useState([]);
     const [procSol, setProcSol]     = useState(null);
+    // Admin: lista de usuarios y mensajes personales (colección mensajes_admin)
+    const [verUsuarios, setVerUsuarios] = useState(false);
+    const [seleccion, setSeleccion] = useState({});   // { uid: nombre }
+    const [destino, setDestino]     = useState('todos'); // 'todos' | 'seleccion'
+    const [mensajes, setMensajes]   = useState([]);
 
     const esAdmin = usuario?.email === ADMIN_EMAIL;
 
@@ -47,7 +55,10 @@ export default function BuzonNovedades({ usuario, onIr }) {
         c.ultimoMensajeAt > (comunidadesLeidas[c.id] || 0)
     );
     const nombreCom = (id) => misComunidades.find(c => c.id === id)?.nombre || 'tu comunidad';
-    const noLeidas = novedades.filter(n => !leidas.includes(n.id)).length
+    // Novedades generales + mensajes personales, de más reciente a más antiguo
+    const entradas = [...novedades, ...mensajes]
+        .sort((a, b) => fechaMs(b.fecha) - fechaMs(a.fecha));
+    const noLeidas = entradas.filter(n => !leidas.includes(n.id) && n.autorUid !== usuario?.uid).length
         + invitaciones.length + comsConMensajes.length + solicitudesPend.length + totalGrupos;
 
     // Comunidades a las que pertenezco (para detectar mensajes nuevos)
@@ -120,6 +131,17 @@ export default function BuzonNovedades({ usuario, onIr }) {
         );
     }, []);
 
+    // Mensajes personales: el admin ve todos los enviados; el resto, los suyos.
+    // Sin orderBy para no necesitar índice compuesto (se ordena en cliente).
+    useEffect(() => {
+        if (!usuario?.uid) return;
+        const ref = collection(db, 'mensajes_admin');
+        const q = esAdmin ? ref : query(ref, where('paraUids', 'array-contains', usuario.uid));
+        return onSnapshot(q,
+            snap => setMensajes(snap.docs.map(d => ({ id: d.id, ...d.data(), _col: 'mensajes_admin' }))),
+            () => setMensajes([]));
+    }, [usuario?.uid, esAdmin]);
+
     // Perfil del usuario en tiempo real (novedades leídas + comunidades leídas)
     useEffect(() => {
         if (!usuario?.uid) return;
@@ -130,8 +152,8 @@ export default function BuzonNovedades({ usuario, onIr }) {
     }, [usuario?.uid]);
 
     const marcarLeidas = async () => {
-        if (!usuario?.uid || novedades.length === 0) return;
-        const ids = novedades.map(n => n.id);
+        if (!usuario?.uid || entradas.length === 0) return;
+        const ids = entradas.map(n => n.id);
         setLeidas(ids);
         try {
             await updateDoc(doc(db, 'users', usuario.uid), {
@@ -149,6 +171,27 @@ export default function BuzonNovedades({ usuario, onIr }) {
         if (!nueva.titulo.trim() || !nueva.cuerpo.trim()) return;
         setEnviando(true);
         try {
+            if (destino === 'seleccion') {
+                const paraUids = Object.keys(seleccion);
+                if (!paraUids.length) { setEnviando(false); return; }
+                await addDoc(collection(db, 'mensajes_admin'), {
+                    titulo: nueva.titulo.trim(),
+                    cuerpo: nueva.cuerpo.trim(),
+                    tipo: 'mensaje',
+                    paraUids,
+                    paraNombres: paraUids.map(u => seleccion[u]),
+                    fecha: new Date(),
+                    autor: usuario.displayName || usuario.email,
+                    autorUid: usuario.uid,
+                });
+                setNueva({ titulo: '', cuerpo: '', tipo: 'aviso', categorias: [] });
+                setSeleccion({});
+                setDestino('todos');
+                setRedactando(false);
+                setVerUsuarios(false);
+                setEnviando(false);
+                return;
+            }
             await addDoc(collection(db, 'novedades'), {
                 titulo: nueva.titulo.trim(),
                 cuerpo: nueva.cuerpo.trim(),
@@ -156,6 +199,7 @@ export default function BuzonNovedades({ usuario, onIr }) {
                 categorias: nueva.categorias,   // vacío = para todos los intereses
                 fecha: new Date(),
                 autor: usuario.displayName || usuario.email,
+                autorUid: usuario.uid,
             });
             setNueva({ titulo: '', cuerpo: '', tipo: 'aviso', categorias: [] });
             setRedactando(false);
@@ -163,10 +207,18 @@ export default function BuzonNovedades({ usuario, onIr }) {
         setEnviando(false);
     };
 
-    const borrar = async (id) => {
-        try { await deleteDoc(doc(db, 'novedades', id)); } catch (_) {}
+    const borrar = async (n) => {
+        try { await deleteDoc(doc(db, n._col || 'novedades', n.id)); } catch (_) {}
         setConfirmDel(null);
     };
+
+    // Desde el panel de usuarios: abrir el formulario dirigido a la selección
+    const escribirASeleccion = () => {
+        setDestino('seleccion');
+        setRedactando(true);
+    };
+    const nSel = Object.keys(seleccion).length;
+    const resumenNombres = (l = []) => l.length <= 3 ? l.join(', ') : `${l.slice(0, 3).join(', ')} y ${l.length - 3} más`;
 
     const fmtFecha = (ts) => {
         if (!ts) return '';
@@ -197,16 +249,16 @@ export default function BuzonNovedades({ usuario, onIr }) {
                     onClick={() => setOpen(false)}
                 >
                     <div
-                        style={{ background: 'white', borderRadius: 18, width: '100%', maxWidth: 500, maxHeight: '82vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 70px rgba(0,0,0,0.32)', overflow: 'hidden' }}
+                        style={{ background: 'white', borderRadius: 18, width: '100%', maxWidth: verUsuarios ? 680 : 500, maxHeight: verUsuarios ? '92vh' : '82vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 70px rgba(0,0,0,0.32)', overflow: 'hidden' }}
                         onClick={e => e.stopPropagation()}
                     >
                         {/* Cabecera */}
                         <div style={{ padding: '16px 20px', background: 'linear-gradient(135deg,#e67e22,#f39c12)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
                             <h3 style={{ margin: 0, color: 'white', fontWeight: 800, fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: 8 }}>
                                 🔔 Novedades
-                                {novedades.length > 0 && (
+                                {entradas.length > 0 && (
                                     <span style={{ background: 'rgba(255,255,255,0.25)', borderRadius: 20, padding: '2px 10px', fontSize: '0.78rem', fontWeight: 700 }}>
-                                        {novedades.length}
+                                        {entradas.length}
                                     </span>
                                 )}
                             </h3>
@@ -216,7 +268,13 @@ export default function BuzonNovedades({ usuario, onIr }) {
                                     <Settings size={16} />
                                 </button>
                                 {esAdmin && (
-                                    <button onClick={() => setRedactando(p => !p)} style={{ background: redactando ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.22)', border: 'none', color: 'white', borderRadius: 9, padding: '6px 14px', cursor: 'pointer', fontWeight: 700, fontSize: '0.82rem' }}>
+                                    <button onClick={() => setVerUsuarios(v => !v)} title="Usuarios y mensajes personales"
+                                        style={{ background: verUsuarios ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.22)', border: 'none', color: 'white', borderRadius: 9, padding: '6px 11px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontWeight: 700, fontSize: '0.8rem' }}>
+                                        <Users size={16} />{nSel > 0 && nSel}
+                                    </button>
+                                )}
+                                {esAdmin && (
+                                    <button onClick={() => { setRedactando(p => !p); if (redactando) setDestino('todos'); }} style={{ background: redactando ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.22)', border: 'none', color: 'white', borderRadius: 9, padding: '6px 14px', cursor: 'pointer', fontWeight: 700, fontSize: '0.82rem' }}>
                                         {redactando ? '✕ Cancelar' : '+ Nueva'}
                                     </button>
                                 )}
@@ -224,9 +282,31 @@ export default function BuzonNovedades({ usuario, onIr }) {
                             </div>
                         </div>
 
+                        {/* Panel de usuarios (admin) */}
+                        {esAdmin && verUsuarios && (
+                            <AdminUsuariosPanel seleccion={seleccion} setSeleccion={setSeleccion} onEscribir={escribirASeleccion} />
+                        )}
+
                         {/* Formulario admin */}
                         {esAdmin && redactando && (
                             <div style={{ padding: '14px 20px 10px', borderBottom: '2px dashed #f39c12', background: '#fffbf2', flexShrink: 0 }}>
+                                {/* Destinatarios */}
+                                <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '0.76rem', color: '#8a6b3f', fontWeight: 700 }}>Para:</span>
+                                    <button onClick={() => setDestino('todos')}
+                                        style={{ background: destino === 'todos' ? '#e67e22' : 'white', color: destino === 'todos' ? 'white' : '#8a6b3f', border: '1.5px solid #f39c12', borderRadius: 8, padding: '5px 10px', cursor: 'pointer', fontWeight: 700, fontSize: '0.76rem' }}>
+                                        🌐 Todos / por intereses
+                                    </button>
+                                    <button onClick={() => { if (nSel) setDestino('seleccion'); else setVerUsuarios(true); }}
+                                        style={{ background: destino === 'seleccion' ? '#1565C0' : 'white', color: destino === 'seleccion' ? 'white' : '#1565C0', border: '1.5px solid #1565C0', borderRadius: 8, padding: '5px 10px', cursor: 'pointer', fontWeight: 700, fontSize: '0.76rem' }}>
+                                        👤 {nSel ? `${nSel} seleccionado${nSel === 1 ? '' : 's'}` : 'Elegir usuarios…'}
+                                    </button>
+                                </div>
+                                {destino === 'seleccion' && (
+                                    <div style={{ fontSize: '0.76rem', color: '#1565C0', background: '#eef5ff', borderRadius: 8, padding: '6px 10px', marginBottom: 8 }}>
+                                        Mensaje personal: solo lo verán {resumenNombres(Object.values(seleccion))}.
+                                    </div>
+                                )}
                                 <input
                                     value={nueva.titulo}
                                     onChange={e => setNueva(p => ({ ...p, titulo: e.target.value }))}
@@ -240,8 +320,8 @@ export default function BuzonNovedades({ usuario, onIr }) {
                                     rows={4}
                                     style={{ width: '100%', padding: '9px 12px', borderRadius: 9, border: '1.5px solid #f39c12', fontSize: '0.88rem', boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical', outline: 'none' }}
                                 />
-                                {/* Tipo de novedad */}
-                                <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                                {/* Tipo de novedad (no aplica a los mensajes personales) */}
+                                {destino === 'todos' && <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
                                     {[
                                         { id: 'aviso',        label: '📢 Aviso' },
                                         { id: 'app',          label: '🆕 App nueva' },
@@ -252,9 +332,9 @@ export default function BuzonNovedades({ usuario, onIr }) {
                                             {t.label}
                                         </button>
                                     ))}
-                                </div>
+                                </div>}
                                 {/* Categorías: a qué intereses afecta (vacío = a todos) */}
-                                {nueva.tipo !== 'aviso' && (
+                                {destino === 'todos' && nueva.tipo !== 'aviso' && (
                                     <div style={{ marginTop: 8 }}>
                                         <div style={{ fontSize: '0.74rem', color: '#8a6b3f', marginBottom: 5 }}>
                                             Intereses a los que avisar (ninguno = a todos):
@@ -275,10 +355,10 @@ export default function BuzonNovedades({ usuario, onIr }) {
                                 )}
                                 <button
                                     onClick={publicar}
-                                    disabled={enviando || !nueva.titulo.trim() || !nueva.cuerpo.trim()}
+                                    disabled={enviando || !nueva.titulo.trim() || !nueva.cuerpo.trim() || (destino === 'seleccion' && !nSel)}
                                     style={{ marginTop: 8, background: enviando ? '#ccc' : '#e67e22', color: 'white', border: 'none', borderRadius: 9, padding: '9px 20px', cursor: enviando ? 'default' : 'pointer', fontWeight: 700, fontSize: '0.88rem' }}
                                 >
-                                    {enviando ? 'Publicando…' : '📢 Publicar'}
+                                    {enviando ? 'Enviando…' : destino === 'seleccion' ? `✉️ Enviar a ${nSel}` : '📢 Publicar'}
                                 </button>
                             </div>
                         )}
@@ -310,6 +390,21 @@ export default function BuzonNovedades({ usuario, onIr }) {
 
                         {/* Lista */}
                         <div style={{ overflowY: 'auto', flex: 1 }}>
+                            {/* Profe sin intereses: invitarle a elegirlos (si no, el admin solo puede deducirlos) */}
+                            {!esAdmin && usuario?.uid && intereses.length === 0 && !editIntereses && (
+                                <div style={{ padding: '14px 20px', borderBottom: '1px solid #f3f3f3', background: '#f7f9fc' }}>
+                                    <div style={{ fontWeight: 800, color: '#1565C0', fontSize: '0.92rem', marginBottom: 4 }}>🎯 ¿Qué áreas te interesan?</div>
+                                    <div style={{ fontSize: '0.8rem', color: '#546e7a', marginBottom: 8 }}>Márcalas y te avisaremos solo de las novedades de tus materias.</div>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                                        {INTERESES.map(i => (
+                                            <button key={i.id} onClick={() => toggleInteres(i.id)}
+                                                style={{ background: 'white', color: '#546e7a', border: '1.5px solid #d9e2ec', borderRadius: 20, padding: '4px 11px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}>
+                                                {i.emoji} {i.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                             {/* Resumen agregado: resultados, preguntas del trivial y apps nuevas */}
                             {grupos.map(g => (
                                 <div key={g.clave} style={{ padding: '14px 20px', borderBottom: '1px solid #f3f3f3', background: '#f4f8ff' }}>
@@ -396,16 +491,22 @@ export default function BuzonNovedades({ usuario, onIr }) {
                                     </div>
                                 </div>
                             ))}
-                            {novedades.length === 0 && invitaciones.length === 0 && comsConMensajes.length === 0 && solicitudesPend.length === 0 && grupos.length === 0 ? (
+                            {entradas.length === 0 && invitaciones.length === 0 && comsConMensajes.length === 0 && solicitudesPend.length === 0 && grupos.length === 0 ? (
                                 <div style={{ padding: '48px 20px', textAlign: 'center', color: '#bbb' }}>
                                     <div style={{ fontSize: '2.5rem', marginBottom: 10 }}>🔔</div>
                                     <div style={{ fontSize: '0.92rem' }}>No hay novedades todavía.</div>
                                 </div>
                             ) : (
-                                novedades.map(n => {
-                                    const esNueva = !leidas.includes(n.id);
+                                entradas.map(n => {
+                                    const esNueva = !leidas.includes(n.id) && n.autorUid !== usuario?.uid;
+                                    const personal = n._col === 'mensajes_admin';
                                     return (
-                                        <div key={n.id} style={{ padding: '14px 20px', borderBottom: '1px solid #f3f3f3', background: esNueva ? '#fff9f2' : 'white', position: 'relative' }}>
+                                        <div key={n.id} style={{ padding: '14px 20px', borderBottom: '1px solid #f3f3f3', background: esNueva ? (personal ? '#eef5ff' : '#fff9f2') : 'white', position: 'relative' }}>
+                                            {personal && (
+                                                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1565C0', marginBottom: 4 }}>
+                                                    {esAdmin ? `✉️ Enviado a ${resumenNombres(n.paraNombres)}` : '✉️ Mensaje personal'}
+                                                </div>
+                                            )}
                                             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
                                                 {esNueva && (
                                                     <span style={{ marginTop: 6, width: 8, height: 8, borderRadius: '50%', background: '#e67e22', flexShrink: 0, display: 'inline-block' }} />
@@ -424,7 +525,7 @@ export default function BuzonNovedades({ usuario, onIr }) {
                                                 confirmDel === n.id ? (
                                                     <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
                                                         <span style={{ fontSize: '0.78rem', color: '#e74c3c' }}>¿Borrar?</span>
-                                                        <button onClick={() => borrar(n.id)} style={{ background: '#e74c3c', color: 'white', border: 'none', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 700 }}>Sí</button>
+                                                        <button onClick={() => borrar(n)} style={{ background: '#e74c3c', color: 'white', border: 'none', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 700 }}>Sí</button>
                                                         <button onClick={() => setConfirmDel(null)} style={{ background: '#eee', color: '#555', border: 'none', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontSize: '0.78rem' }}>No</button>
                                                     </div>
                                                 ) : (

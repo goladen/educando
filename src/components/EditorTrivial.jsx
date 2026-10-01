@@ -64,7 +64,7 @@ function genCode(len = 8) {
     return out;
 }
 
-export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
+export default function EditorTrivial({ recurso, usuario, onClose, onSaved, abrirPendientes = false }) {
     const esNuevo   = !recurso?.id;
     const esCreador = esNuevo || recurso?.creadorUid === usuario?.uid;
 
@@ -129,6 +129,7 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
 
     // ── Collaboration ──────────────────────────────────────────────────────────
     const [panelColab,    setPanelColab]    = useState(false);
+    const [modalPendientes, setModalPendientes] = useState(abrirPendientes);
     const [emailNuevo,    setEmailNuevo]    = useState('');
     const [agregandoColab,setAgregandoColab]= useState(false);
     const [errorColab,    setErrorColab]    = useState('');
@@ -820,6 +821,78 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
     const totalPreguntas = Object.values(preguntas).reduce((s, arr) => s + arr.length, 0);
     const totalPendientes = Object.values(pendientes).reduce((s, arr) => s + arr.length, 0);
 
+    // Tarjetas de preguntas pendientes (se usan en la columna y en el modal de la cabecera)
+    const tarjetasPendientes = todasPendientes.map(pend => (
+            <div key={pend.id} style={{ background: '#0f172a', borderRadius: 10, padding: '13px 16px', border: '1px solid #f59e0b30' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ color: '#94a3b8', fontSize: '0.72rem', marginBottom: 5 }}>
+                            ✉ <strong style={{ color: '#f59e0b' }}>{pend.enviadoPor?.nombre}</strong>
+                            {pend.enviadoPor?.curso && <span> · {pend.enviadoPor.curso}</span>}
+                        </div>
+                        {(() => {
+                            const tipo = pend.tipo || 'SELECCION';
+                            const tipoBadge = { SELECCION: '🔘 Selección', CORTA: '✏️ Corta', RELLENAR: '🔲 Rellenar', ORDENAR: '🔀 Ordenar' }[tipo] || tipo;
+                            return (<>
+                                <div style={{ color: '#f59e0b', fontSize: '0.7rem', fontWeight: 700, marginBottom: 4 }}>{tipoBadge}</div>
+                                <div style={{ color: '#f1f5f9', fontSize: '0.92rem', fontWeight: 600, marginBottom: 8, lineHeight: 1.4 }}>{pend.q}</div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                    {tipo === 'SELECCION' && (<>
+                                        <span style={{ color: '#4ade80', fontSize: '0.82rem' }}>✓ {pend.a}</span>
+                                        {pend.w?.map((w, i) => <span key={i} style={{ color: '#64748b', fontSize: '0.82rem' }}>✗ {w}</span>)}
+                                    </>)}
+                                    {tipo === 'CORTA' && <span style={{ color: '#4ade80', fontSize: '0.82rem' }}>✓ {pend.a}</span>}
+                                    {tipo === 'RELLENAR' && (<>
+                                        {pend.bloques?.[0] && <span style={{ color: '#94a3b8', fontSize: '0.82rem' }}>📝 {pend.bloques[0]} <span style={{ color: '#4ade80', background: '#0d2b1b', borderRadius: 3, padding: '0 5px' }}>{pend.bloques[1]}</span>{pend.bloques[2] ? ' ' + pend.bloques[2] : ''}</span>}
+                                        {pend.alternativas?.length > 0 && <span style={{ color: '#64748b', fontSize: '0.78rem' }}>alt: {pend.alternativas.join(', ')}</span>}
+                                    </>)}
+                                    {tipo === 'ORDENAR' && pend.bloques?.map((b, i) => (
+                                        <span key={i} style={{ color: '#94a3b8', fontSize: '0.82rem' }}>{i + 1}. {b}</span>
+                                    ))}
+                                </div>
+                            </>);
+                        })()}
+                    </div>
+                    <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                        <div style={{ color: '#64748b', fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>Categoría</div>
+                        <select
+                            value={pend.categoria}
+                            onChange={e => cambiarCategoriaPendiente(pend, e.target.value)}
+                            title="Cambiar la categoría de esta pregunta"
+                            style={{ background: '#0f172a', border: `1px solid ${CAT_HEX[pend.categoria] || '#334155'}`, color: CAT_HEX[pend.categoria] || '#f1f5f9', borderRadius: 7, padding: '4px 6px', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer', outline: 'none', maxWidth: 130 }}
+                        >
+                            {CAT_IDS.map(id => (
+                                <option key={id} value={id}>{categorias[id].emoji} {categorias[id].nombre}</option>
+                            ))}
+                        </select>
+                        <div style={{ marginTop: 6 }}>
+                            <button
+                                onClick={() => cambiarDificultadPendiente(pend, pend.dificultad === 'dificil' ? 'normal' : 'dificil')}
+                                title="Cambiar dificultad"
+                                style={{ background: pend.dificultad === 'dificil' ? '#7c2d12' : '#0f172a', border: `1px solid ${pend.dificultad === 'dificil' ? '#f97316' : '#334155'}`, color: pend.dificultad === 'dificil' ? '#fdba74' : '#94a3b8', borderRadius: 7, padding: '4px 8px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
+                            >
+                                {pend.dificultad === 'dificil' ? '🔥 Difícil' : '🟢 Normal'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                    <button
+                        onClick={() => rechazarPendiente(pend)}
+                        style={{ background: '#7f1d1d30', border: '1px solid #ef444430', color: '#f87171', padding: '6px 14px', borderRadius: 7, cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}
+                    >
+                        ✕ Rechazar
+                    </button>
+                    <button
+                        onClick={() => aceptarPendiente(pend)}
+                        style={{ background: '#14532d', border: '1px solid #4ade8060', color: '#4ade80', padding: '6px 18px', borderRadius: 7, cursor: 'pointer', fontSize: '0.82rem', fontWeight: 700 }}
+                    >
+                        ✓ Aceptar
+                    </button>
+                </div>
+            </div>
+    ));
+
     // ─────────────────────────────────────────────────────────────────────────
     return (
         <div style={{ position: 'fixed', inset: 0, background: '#0f172a', zIndex: 2000, display: 'flex', flexDirection: 'column', fontFamily: "'Segoe UI', sans-serif" }}>
@@ -1324,6 +1397,28 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                 );
             })()}
 
+            {/* ─── MODAL PREGUNTAS PENDIENTES (desde la cabecera) ─── */}
+            {modalPendientes && (
+                <div onClick={() => setModalPendientes(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                    <div onClick={e => e.stopPropagation()} style={{ background: '#1c1a07', border: '1.5px solid #f59e0b60', borderRadius: 14, width: '100%', maxWidth: 720, maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                        <div style={{ background: '#f59e0b18', borderBottom: '1px solid #f59e0b30', padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                            <span style={{ fontSize: '1rem' }}>🕐</span>
+                            <span style={{ color: '#f59e0b', fontWeight: 700, fontSize: '0.92rem', flex: 1 }}>
+                                Pendientes de revisión — {todasPendientes.length} pregunta{todasPendientes.length !== 1 ? 's' : ''}
+                            </span>
+                            <button onClick={() => setModalPendientes(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1.2rem', lineHeight: 1 }}>✕</button>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '14px 18px', overflowY: 'auto' }}>
+                            {!pendientesCargados ? (
+                                <div style={{ color: '#94a3b8', fontSize: '0.88rem', textAlign: 'center', padding: 20 }}>Cargando…</div>
+                            ) : todasPendientes.length > 0 ? tarjetasPendientes : (
+                                <div style={{ color: '#94a3b8', fontSize: '0.88rem', textAlign: 'center', padding: 20 }}>✓ No quedan preguntas pendientes.</div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* ─── HEADER ─── */}
             <div style={{ background: '#1e293b', borderBottom: '1px solid #334155', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
                 <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1.3rem', padding: '2px 8px', lineHeight: 1, borderRadius: 6 }}>←</button>
@@ -1335,9 +1430,9 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                 />
                 {totalPreguntas > 0 && <span style={{ color: '#64748b', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>{totalPreguntas} preguntas</span>}
                 {totalPendientes > 0 && (
-                    <span style={{ background: '#f59e0b', color: '#0f172a', borderRadius: 10, padding: '2px 10px', fontSize: '0.78rem', fontWeight: 800, whiteSpace: 'nowrap' }}>
+                    <button onClick={() => setModalPendientes(true)} title="Ver y revisar las preguntas pendientes" style={{ background: '#f59e0b', color: '#0f172a', border: 'none', borderRadius: 10, padding: '3px 10px', fontSize: '0.78rem', fontWeight: 800, whiteSpace: 'nowrap', cursor: 'pointer' }}>
                         🕐 {totalPendientes} pendiente{totalPendientes !== 1 ? 's' : ''}
-                    </span>
+                    </button>
                 )}
                 <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                     {esCreador && (
@@ -1406,76 +1501,7 @@ export default function EditorTrivial({ recurso, usuario, onClose, onSaved }) {
                                 </span>
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '14px 18px' }}>
-                                {todasPendientes.map(pend => (
-                                    <div key={pend.id} style={{ background: '#0f172a', borderRadius: 10, padding: '13px 16px', border: '1px solid #f59e0b30' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
-                                            <div style={{ flex: 1, minWidth: 0 }}>
-                                                <div style={{ color: '#94a3b8', fontSize: '0.72rem', marginBottom: 5 }}>
-                                                    ✉ <strong style={{ color: '#f59e0b' }}>{pend.enviadoPor?.nombre}</strong>
-                                                    {pend.enviadoPor?.curso && <span> · {pend.enviadoPor.curso}</span>}
-                                                </div>
-                                                {(() => {
-                                                    const tipo = pend.tipo || 'SELECCION';
-                                                    const tipoBadge = { SELECCION: '🔘 Selección', CORTA: '✏️ Corta', RELLENAR: '🔲 Rellenar', ORDENAR: '🔀 Ordenar' }[tipo] || tipo;
-                                                    return (<>
-                                                        <div style={{ color: '#f59e0b', fontSize: '0.7rem', fontWeight: 700, marginBottom: 4 }}>{tipoBadge}</div>
-                                                        <div style={{ color: '#f1f5f9', fontSize: '0.92rem', fontWeight: 600, marginBottom: 8, lineHeight: 1.4 }}>{pend.q}</div>
-                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                                                            {tipo === 'SELECCION' && (<>
-                                                                <span style={{ color: '#4ade80', fontSize: '0.82rem' }}>✓ {pend.a}</span>
-                                                                {pend.w?.map((w, i) => <span key={i} style={{ color: '#64748b', fontSize: '0.82rem' }}>✗ {w}</span>)}
-                                                            </>)}
-                                                            {tipo === 'CORTA' && <span style={{ color: '#4ade80', fontSize: '0.82rem' }}>✓ {pend.a}</span>}
-                                                            {tipo === 'RELLENAR' && (<>
-                                                                {pend.bloques?.[0] && <span style={{ color: '#94a3b8', fontSize: '0.82rem' }}>📝 {pend.bloques[0]} <span style={{ color: '#4ade80', background: '#0d2b1b', borderRadius: 3, padding: '0 5px' }}>{pend.bloques[1]}</span>{pend.bloques[2] ? ' ' + pend.bloques[2] : ''}</span>}
-                                                                {pend.alternativas?.length > 0 && <span style={{ color: '#64748b', fontSize: '0.78rem' }}>alt: {pend.alternativas.join(', ')}</span>}
-                                                            </>)}
-                                                            {tipo === 'ORDENAR' && pend.bloques?.map((b, i) => (
-                                                                <span key={i} style={{ color: '#94a3b8', fontSize: '0.82rem' }}>{i + 1}. {b}</span>
-                                                            ))}
-                                                        </div>
-                                                    </>);
-                                                })()}
-                                            </div>
-                                            <div style={{ flexShrink: 0, textAlign: 'right' }}>
-                                                <div style={{ color: '#64748b', fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>Categoría</div>
-                                                <select
-                                                    value={pend.categoria}
-                                                    onChange={e => cambiarCategoriaPendiente(pend, e.target.value)}
-                                                    title="Cambiar la categoría de esta pregunta"
-                                                    style={{ background: '#0f172a', border: `1px solid ${CAT_HEX[pend.categoria] || '#334155'}`, color: CAT_HEX[pend.categoria] || '#f1f5f9', borderRadius: 7, padding: '4px 6px', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer', outline: 'none', maxWidth: 130 }}
-                                                >
-                                                    {CAT_IDS.map(id => (
-                                                        <option key={id} value={id}>{categorias[id].emoji} {categorias[id].nombre}</option>
-                                                    ))}
-                                                </select>
-                                                <div style={{ marginTop: 6 }}>
-                                                    <button
-                                                        onClick={() => cambiarDificultadPendiente(pend, pend.dificultad === 'dificil' ? 'normal' : 'dificil')}
-                                                        title="Cambiar dificultad"
-                                                        style={{ background: pend.dificultad === 'dificil' ? '#7c2d12' : '#0f172a', border: `1px solid ${pend.dificultad === 'dificil' ? '#f97316' : '#334155'}`, color: pend.dificultad === 'dificil' ? '#fdba74' : '#94a3b8', borderRadius: 7, padding: '4px 8px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
-                                                    >
-                                                        {pend.dificultad === 'dificil' ? '🔥 Difícil' : '🟢 Normal'}
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                                            <button
-                                                onClick={() => rechazarPendiente(pend)}
-                                                style={{ background: '#7f1d1d30', border: '1px solid #ef444430', color: '#f87171', padding: '6px 14px', borderRadius: 7, cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}
-                                            >
-                                                ✕ Rechazar
-                                            </button>
-                                            <button
-                                                onClick={() => aceptarPendiente(pend)}
-                                                style={{ background: '#14532d', border: '1px solid #4ade8060', color: '#4ade80', padding: '6px 18px', borderRadius: 7, cursor: 'pointer', fontSize: '0.82rem', fontWeight: 700 }}
-                                            >
-                                                ✓ Aceptar
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
+                                {tarjetasPendientes}
                             </div>
                         </div>
                     )}

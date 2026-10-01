@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import {
     collection, doc, getDocs, getDoc, deleteDoc,
-    query, where, orderBy, arrayUnion, updateDoc
+    query, where, orderBy, arrayUnion, updateDoc, getCountFromServer
 } from 'firebase/firestore';
 import EditorTrivial from './EditorTrivial';
 
@@ -24,6 +24,7 @@ export default function TrivialRecursosManager({ usuario }) {
     // Editor state
     const [recursoEditando, setRecursoEditando] = useState(null); // null = cerrado, {} = nuevo, {id,...} = editar
     const [editorAbierto, setEditorAbierto] = useState(false);
+    const [abrirConPendientes, setAbrirConPendientes] = useState(false);
 
     // Join with code
     const [codigoUnirse, setCodigoUnirse] = useState('');
@@ -46,7 +47,16 @@ export default function TrivialRecursosManager({ usuario }) {
                     orderBy('fechaModificacion', 'desc')
                 )
             );
-            setPropios(snapPropios.docs.map(d => ({ id: d.id, ...d.data() })));
+            const lista = snapPropios.docs.map(d => ({ id: d.id, ...d.data() }));
+            setPropios(lista);
+            // Nº de preguntas enviadas por alumnos pendientes de revisión en cada trivial propio
+            Promise.all(lista.map(r =>
+                getCountFromServer(collection(db, 'trivial_recursos', r.id, 'preguntas_pendientes'))
+                    .then(c => [r.id, c.data().count]).catch(() => [r.id, 0])
+            )).then(pares => {
+                const m = Object.fromEntries(pares);
+                setPropios(prev => prev.map(r => ({ ...r, pendientesCount: m[r.id] || 0 })));
+            });
 
             // Shared (colaborador) — query by uid only
             const snapComp2 = await getDocs(
@@ -133,7 +143,8 @@ export default function TrivialRecursosManager({ usuario }) {
         }
     };
 
-    const abrirEditor = (recurso) => {
+    const abrirEditor = (recurso, conPendientes = false) => {
+        setAbrirConPendientes(conPendientes);
         setRecursoEditando(recurso || {});
         setEditorAbierto(true);
     };
@@ -151,6 +162,7 @@ export default function TrivialRecursosManager({ usuario }) {
                 usuario={usuario}
                 onClose={cerrarEditor}
                 onSaved={() => {}}
+                abrirPendientes={abrirConPendientes}
             />
         );
     }
@@ -286,6 +298,7 @@ function Section({ titulo, emoji, recursos, usuario, esPropio, onEditar, onElimi
                         recurso={r}
                         esPropio={esPropio}
                         onEditar={() => onEditar(r)}
+                        onVerPendientes={() => onEditar(r, true)}
                         onEliminar={onEliminar ? () => onEliminar(r.id) : null}
                     />
                 ))}
@@ -294,7 +307,7 @@ function Section({ titulo, emoji, recursos, usuario, esPropio, onEditar, onElimi
     );
 }
 
-function RecursoCard({ recurso: r, esPropio, onEditar, onEliminar }) {
+function RecursoCard({ recurso: r, esPropio, onEditar, onVerPendientes, onEliminar }) {
     const totalPreguntas = r.totalPreguntas || '—';
     const fecha = r.fechaModificacion?.toDate?.()?.toLocaleDateString('es-ES', {
         day: '2-digit', month: 'short', year: 'numeric'
@@ -318,6 +331,14 @@ function RecursoCard({ recurso: r, esPropio, onEditar, onEliminar }) {
                     }}>
                         {r.publica ? '🌐 Pública' : '🔒 Privada'}
                     </span>
+                    {r.pendientesCount > 0 && (
+                        <button onClick={onVerPendientes} title="Ver las preguntas enviadas pendientes de revisión" style={{
+                            background: '#f59e0b', color: '#0f172a', border: 'none', cursor: 'pointer',
+                            borderRadius: 8, padding: '2px 9px', fontSize: '0.72rem', fontWeight: 800,
+                        }}>
+                            🕐 {r.pendientesCount} pendiente{r.pendientesCount !== 1 ? 's' : ''} de revisar
+                        </button>
+                    )}
                 </div>
                 {r.descripcion && (
                     <div style={{ color: '#64748b', fontSize: '0.83rem', marginTop: 3 }}>{r.descripcion}</div>

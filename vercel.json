@@ -1,6 +1,7 @@
 {
   "functions": {
-    "api/listening-tts.js": { "maxDuration": 60 }
+    "api/listening-tts.js": { "maxDuration": 60 },
+    "api/nvidia.js": { "maxDuration": 60 }
   },
   "headers": [
     {

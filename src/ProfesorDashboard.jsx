@@ -5,6 +5,7 @@ import { Trash2, Plus, FileSpreadsheet, Bot, BarChart2, Save, X, Pencil, Key, Ga
 import useDrivePicker from 'react-google-drive-picker';
 import { procesarArchivoExcel } from './ExcelParser';
 import { generarPreguntasGemini } from './GeminiGenerator';
+import GeneradorPasapalabraNvidia from './components/GeneradorPasapalabraNvidia';
 import GamePlayer from './GamePlayer';
 import ThinkHootGame from './ThinkHootGame';
 import ExpresionArtEscri from './ExpresionArtEscri';
@@ -1546,6 +1547,14 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                             </>
                         )}
                     </div>
+
+                    {juegoSeleccionado === 'PASAPALABRA' && usuario?.email === 'goladen@gmail.com' && (
+                        <GeneradorPasapalabraNvidia onGenerado={(hojas, { tema }) => {
+                            setDatosEditor(p => ({ ...p, hojas, titulo: p.titulo || tema, temas: p.temas || tema }));
+                            setMostrandoCrear(false);
+                            setMostrandoEditorManual(true);
+                        }} />
+                    )}
                 </ModalOverlay>
             )}
 

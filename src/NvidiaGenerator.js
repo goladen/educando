@@ -15,11 +15,10 @@ async function llamarNvidia(messages, opciones = {}) {
         body: JSON.stringify({ messages, ...opciones }),
     });
     const data = await r.json().catch(() => ({}));
-    if (r.status === 429) throw new Error('La IA de NVIDIA está saturada (429). Espera un minuto y vuelve a probar.');
     if (!r.ok) throw new Error(data.error?.message || data.error || data.detail || `Error ${r.status}`);
     const texto = data.choices?.[0]?.message?.content;
     if (!texto) throw new Error('La IA no devolvió contenido.');
-    return texto;
+    return { texto, modelo: data.model };
 }
 
 function extraerArrayJSON(texto) {
@@ -53,12 +52,39 @@ Reglas:
 Formato exacto:
 [{"letra":"A","pregunta":"Empieza por la A: ...","respuesta":"..."}]`;
 
-    const texto = await llamarNvidia(
-        [{ role: 'system', content: system }, { role: 'user', content: user }],
-        { temperature: 0.6, max_tokens: 4096 },
-    );
+    const mensajes = [{ role: 'system', content: system }, { role: 'user', content: user }];
+    const minimo = Math.ceil(n * 0.6); // por debajo de esto se considera un fallo del modelo
+    const excluir = [];
+    let mejor = [];
+    let ultimoError = null;
 
-    const crudo = extraerArrayJSON(texto);
+    // Si un modelo devuelve JSON roto o muy pocas preguntas válidas, se pide al siguiente.
+    for (let intento = 0; intento < 5; intento++) {
+        let respuesta;
+        try {
+            respuesta = await llamarNvidia(mensajes, { temperature: 0.6, max_tokens: 4096, excluir });
+        } catch (e) {
+            ultimoError = e;
+            break; // el servidor ya ha probado todos los modelos que quedaban
+        }
+        try {
+            const preguntas = validarRosco(extraerArrayJSON(respuesta.texto));
+            if (preguntas.length > mejor.length) mejor = preguntas;
+            if (preguntas.length >= minimo) break;
+            ultimoError = new Error(`${respuesta.modelo}: solo ${preguntas.length} preguntas válidas`);
+        } catch (e) {
+            ultimoError = new Error(`${respuesta.modelo}: ${e.message}`);
+        }
+        console.warn('NVIDIA: se pasa al siguiente modelo →', ultimoError.message);
+        if (!respuesta.modelo) break;
+        excluir.push(respuesta.modelo);
+    }
+
+    if (!mejor.length) throw ultimoError || new Error('La IA no generó preguntas válidas. Prueba de nuevo.');
+    return [{ nombreHoja: tema.slice(0, 40), preguntas: mejor }];
+}
+
+function validarRosco(crudo) {
     const usadas = new Set();
     const preguntas = [];
     for (const q of crudo) {
@@ -71,8 +97,5 @@ Formato exacto:
         usadas.add(letra);
         preguntas.push({ letra, pregunta, respuesta, correcta: '', incorrectas: ['', '', ''] });
     }
-    if (!preguntas.length) throw new Error('La IA no generó preguntas válidas. Prueba de nuevo.');
-
-    preguntas.sort((a, b) => a.letra.localeCompare(b.letra));
-    return [{ nombreHoja: tema.slice(0, 40), preguntas }];
+    return preguntas.sort((a, b) => a.letra.localeCompare(b.letra));
 }

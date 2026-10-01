@@ -4,8 +4,8 @@ import { collection, query, where, getDocs, deleteDoc, doc, addDoc, updateDoc, g
 import { Trash2, Plus, FileSpreadsheet, Bot, BarChart2, Save, X, Pencil, Key, Gamepad2, Edit3, Globe, Search, Copy, Eye, Users, RotateCcw, Send, Zap, UserCircle, LogOut, Menu, Shield, Info, FileText, Calculator, Medal, Crosshair } from 'lucide-react';
 import useDrivePicker from 'react-google-drive-picker';
 import { procesarArchivoExcel } from './ExcelParser';
-import { generarPreguntasGemini } from './GeminiGenerator';
-import GeneradorPasapalabraNvidia from './components/GeneradorPasapalabraNvidia';
+import ModalCrearIA from './components/ModalCrearIA';
+import { JUEGOS_IA } from './iaRecursos';
 import GamePlayer from './GamePlayer';
 import ThinkHootGame from './ThinkHootGame';
 import ExpresionArtEscri from './ExpresionArtEscri';
@@ -126,6 +126,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
     const [cargando, setCargando] = useState(false);
     const [perfilProfesor, setPerfilProfesor] = useState(null);
     const [mostrandoCrear, setMostrandoCrear] = useState(false);
+    const [mostrandoCrearIA, setMostrandoCrearIA] = useState(false);
     const [mostrandoEditorManual, setMostrandoEditorManual] = useState(false);
     const [mostrandoEditorPro, setMostrandoEditorPro] = useState(false);
     const [mostrandoEditorMathLive, setMostrandoEditorMathLive] = useState(false);
@@ -607,7 +608,7 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
         }
     };
     const handleFileUpload = async (e) => { const f = e.target.files[0]; if (f) { try { const h = await procesarArchivoExcel(f, juegoSeleccionado); setDatosEditor(p => ({ ...p, hojas: h, titulo: f.name.split('.')[0] })); setMostrandoCrear(false); setMostrandoEditorManual(true); } catch (err) { alert(err.message); } } };
-    const procesarCreacionIA = async () => { const t = prompt("Tema:"); if (t) { try { alert("Generando..."); const h = await generarPreguntasGemini(null, t, juegoSeleccionado); setDatosEditor(p => ({ ...p, hojas: h, titulo: t })); setMostrandoCrear(false); setMostrandoEditorManual(true); } catch (e) { alert(e.message); } } };
+    const procesarCreacionIA = () => { setMostrandoCrear(false); setMostrandoCrearIA(true); };
 
 
     // --- NUEVA FUNCIÓN PARA LEER EL ARCHIVO DE DRIVE ---
@@ -1535,9 +1536,11 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                         
                         {juegoSeleccionado !== 'QUESTION_SENDER' && juegoSeleccionado !== 'SINTAXIS' && juegoSeleccionado !== 'ETIQUETAS' && (
                             <>
-                                <button onClick={procesarCreacionIA} style={{ ...actionBtnStyle('#673AB7'), flex: 1 }}>
-                                    <Bot /> IA
-                                </button>
+                                {JUEGOS_IA[juegoSeleccionado] && (
+                                    <button onClick={procesarCreacionIA} style={{ ...actionBtnStyle('#673AB7'), flex: 1 }}>
+                                        <Bot /> IA
+                                    </button>
+                                )}
 
                                 {/* --- AQUÍ ESTABA EL BOTÓN DE EXCEL QUE HAS BORRADO --- */}
 
@@ -1548,16 +1551,20 @@ export default function ProfesorDashboard({ usuario, googleToken }) {
                         )}
                     </div>
 
-                    {juegoSeleccionado === 'PASAPALABRA' && usuario?.email === 'goladen@gmail.com' && (
-                        <GeneradorPasapalabraNvidia onGenerado={(hojas, { tema }) => {
-                            setDatosEditor(p => ({ ...p, hojas, titulo: p.titulo || tema, temas: p.temas || tema }));
-                            setMostrandoCrear(false);
-                            setMostrandoEditorManual(true);
-                        }} />
-                    )}
                 </ModalOverlay>
             )}
 
+            {mostrandoCrearIA && JUEGOS_IA[juegoSeleccionado] && (
+                <ModalCrearIA
+                    tipo={juegoSeleccionado}
+                    onClose={() => setMostrandoCrearIA(false)}
+                    onGenerado={(hojas, { tema }) => {
+                        setDatosEditor(p => ({ ...p, hojas, titulo: p.titulo || tema, temas: p.temas || tema }));
+                        setMostrandoCrearIA(false);
+                        setMostrandoEditorManual(true);
+                    }}
+                />
+            )}
 
             {mostrandoEditorManual && (
                 juegoSeleccionado === 'QUESTION_SENDER' ? (

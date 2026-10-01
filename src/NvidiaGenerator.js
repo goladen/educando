@@ -27,12 +27,39 @@ async function llamarNvidia(messages, opciones = {}) {
     return { texto, modelo: data.model };
 }
 
+// Extrae el array de preguntas aunque el modelo añada razonamiento (<think>),
+// markdown, texto alrededor, comas finales o corte la respuesta a medias.
 function extraerArrayJSON(texto) {
-    const limpio = texto.replace(/```json/gi, '').replace(/```/g, '').trim();
-    const ini = limpio.indexOf('[');
-    const fin = limpio.lastIndexOf(']');
-    if (ini === -1 || fin <= ini) throw new Error('La respuesta de la IA no contiene un JSON válido.');
-    return JSON.parse(limpio.slice(ini, fin + 1));
+    const limpio = texto
+        .replace(/<think>[\s\S]*?<\/think>/gi, '')
+        .replace(/```(?:json)?/gi, '')
+        .trim();
+
+    const intentar = (s) => {
+        try {
+            const v = JSON.parse(s.replace(/,\s*([\]}])/g, '$1'));
+            if (Array.isArray(v)) return v;
+            const arr = v && Object.values(v).find(Array.isArray); // {"preguntas":[...]}
+            return arr || null;
+        } catch { return null; }
+    };
+
+    const ini = limpio.search(/\[\s*\{/);
+    if (ini !== -1) {
+        const fin = limpio.lastIndexOf(']');
+        const completo = fin > ini && intentar(limpio.slice(ini, fin + 1));
+        if (completo) return completo;
+        // Respuesta cortada: quedarse hasta el último objeto cerrado
+        const ultimo = limpio.lastIndexOf('}');
+        const cortado = ultimo > ini && intentar(limpio.slice(ini, ultimo + 1) + ']');
+        if (cortado) return cortado;
+    }
+    const obj = limpio.indexOf('{');
+    const envuelto = obj !== -1 && intentar(limpio.slice(obj, limpio.lastIndexOf('}') + 1));
+    if (envuelto) return envuelto;
+
+    console.warn('NVIDIA: respuesta no interpretable:\n', texto);
+    throw new Error(`JSON no válido (empieza por: "${limpio.slice(0, 80).replace(/\s+/g, ' ')}…")`);
 }
 
 /**
@@ -61,32 +88,32 @@ Formato exacto:
     const mensajes = [{ role: 'system', content: system }, { role: 'user', content: user }];
     const minimo = Math.ceil(n * 0.6); // por debajo de esto se considera un fallo del modelo
     const excluir = [];
+    const errores = []; // motivos de los modelos descartados en el navegador
     let mejor = [];
-    let ultimoError = null;
 
     // Si un modelo devuelve JSON roto o muy pocas preguntas válidas, se pide al siguiente.
-    for (let intento = 0; intento < 5; intento++) {
+    for (let intento = 0; intento < 10; intento++) {
         let respuesta;
         try {
             respuesta = await llamarNvidia(mensajes, { temperature: 0.6, max_tokens: 4096, excluir });
         } catch (e) {
-            ultimoError = e;
+            errores.push(e.message);
             break; // el servidor ya ha probado todos los modelos que quedaban
         }
         try {
             const preguntas = validarRosco(extraerArrayJSON(respuesta.texto));
             if (preguntas.length > mejor.length) mejor = preguntas;
             if (preguntas.length >= minimo) break;
-            ultimoError = new Error(`${respuesta.modelo}: solo ${preguntas.length} preguntas válidas`);
+            console.warn(`NVIDIA ${respuesta.modelo}: respuesta con pocas preguntas válidas:\n`, respuesta.texto);
+            errores.push(`${respuesta.modelo}: solo ${preguntas.length} preguntas válidas de ${n}`);
         } catch (e) {
-            ultimoError = new Error(`${respuesta.modelo}: ${e.message}`);
+            errores.push(`${respuesta.modelo}: ${e.message}`);
         }
-        console.warn('NVIDIA: se pasa al siguiente modelo →', ultimoError.message);
         if (!respuesta.modelo) break;
         excluir.push(respuesta.modelo);
     }
 
-    if (!mejor.length) throw ultimoError || new Error('La IA no generó preguntas válidas. Prueba de nuevo.');
+    if (!mejor.length) throw new Error(errores.join('\n') ||'La IA no generó preguntas válidas. Prueba de nuevo.');
     return [{ nombreHoja: tema.slice(0, 40), preguntas: mejor }];
 }
 

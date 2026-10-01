@@ -10,12 +10,15 @@ import { exigirAdmin } from './_auth.js';
 const MODELOS = [
     process.env.NVIDIA_MODEL,
     'google/gemma-4-31b-it',
-    'mistralai/mistral-large-2-instruct',
+    'nvidia/nemotron-3-super-120b-a12b',
+    'nvidia/nemotron-3.5-lightning-30b-a3b',
+    'openai/gpt-oss-20b',
+    'google/gemma-3-12b-it',
+    'nv-mistralai/mistral-nemo-12b-instruct',
     'deepseek-ai/deepseek-v4.1-flash',
-    'moonshotai/kimi-k2.6',
 ].filter(Boolean);
 
-const TIMEOUT_MODELO_MS = 45000;
+const TIMEOUT_MODELO_MS = 40000;
 
 export default async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });

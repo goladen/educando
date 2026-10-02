@@ -2437,8 +2437,8 @@ function ProfesoresPanel({ usuario, comunidad, soloLectura }) {
 }
 
 // ─── Detalle de una comunidad (soy miembro) ───────────────────────────────────
-function DetalleComunidad({ usuario, comunidad, onBack, onSalir, onCambio }) {
-    const [tab, setTab] = useState('cursos'); // cursos | calendario | mensajes | miembros
+function DetalleComunidad({ usuario, comunidad, onBack, onSalir, onCambio, tabInicial = 'cursos', textoVolver = 'Comunidades', accionExtra = null }) {
+    const [tab, setTab] = useState(tabInicial); // cursos | calendario | mensajes | miembros
     const [compartidos, setCompartidos] = useState([]);
     const [cargando, setCargando]       = useState(true);
     const [modalCompartir, setModalCompartir] = useState(false);
@@ -2496,7 +2496,10 @@ function DetalleComunidad({ usuario, comunidad, onBack, onSalir, onCambio }) {
 
     return (
         <div>
-            <button onClick={onBack} style={st.backBtn}><ChevronLeft size={16} /> Comunidades</button>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                <button onClick={onBack} style={st.backBtn}><ChevronLeft size={16} /> {textoVolver}</button>
+                {accionExtra}
+            </div>
             <div style={{ background: 'white', borderRadius: 14, padding: '16px 20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
                     {comunidad.imagenUrl && <img src={comunidad.imagenUrl} alt="" onError={e => { e.currentTarget.style.display = 'none'; }} style={{ width: 56, height: 56, borderRadius: 12, objectFit: 'cover' }} />}
@@ -2581,6 +2584,31 @@ function DetalleComunidad({ usuario, comunidad, onBack, onSalir, onCambio }) {
             <style>{spin}</style>
         </div>
     );
+}
+
+// ─── Vista de edición para miembros que entran por el enlace público ──────────
+// Escucha la comunidad en vivo; si el usuario deja de ser miembro, llama a onNoMiembro.
+export function DetalleComunidadMiembro({ usuario, comunidadId, tabInicial, onBack, onNoMiembro, accionExtra }) {
+    const [comunidad, setComunidad] = useState(null);
+    const [error, setError]         = useState('');
+
+    useEffect(() => onSnapshot(doc(db, 'comunidades', comunidadId),
+        s => setComunidad(s.exists() ? { id: s.id, ...s.data() } : false),
+        e => setError('No se pudo cargar la comunidad: ' + e.message)
+    ), [comunidadId]);
+
+    const esMiembro = comunidad && (comunidad.miembros || []).includes(usuario.uid);
+    useEffect(() => { if (comunidad !== null && !esMiembro) onNoMiembro && onNoMiembro(); }, [comunidad, esMiembro]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const salir = async () => {
+        try { await updateDoc(doc(db, 'comunidades', comunidadId), { miembros: arrayRemove(usuario.uid) }); }
+        catch (e) { setError('No se pudo salir: ' + e.message); }
+    };
+
+    if (error) return <div style={st.error}>{error}</div>;
+    if (!esMiembro) return <div style={st.loader}><RefreshCw size={26} style={{ animation: 'spin 1s linear infinite' }} /><style>{spin}</style></div>;
+    return <DetalleComunidad usuario={usuario} comunidad={comunidad} tabInicial={tabInicial} textoVolver="Todas las comunidades"
+        accionExtra={accionExtra} onBack={onBack} onSalir={salir} onCambio={() => {}} />;
 }
 
 // ─── Componente principal ─────────────────────────────────────────────────────

@@ -1,13 +1,14 @@
 import React, { useState, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
 import { db } from './firebase';
 import { collection, getDocs, query, where, limit } from 'firebase/firestore';
-import { ArrowLeft, Headphones, Search, CheckCircle, XCircle, Send, ChevronRight, Pencil, Plus } from 'lucide-react';
+import { ArrowLeft, Headphones, Search, CheckCircle, XCircle, Send, ChevronRight, Pencil, Plus, FileDown } from 'lucide-react';
 import {
     ListeningPlayer, TranscriptView, ModalEnviarProfe, parsearTranscript, dividirEnFrases, cleanText, AUDIO_DURACION_EST,
 } from './ListeningGame';
 import { TIPO_LISTENING_RECURSO, IDIOMAS_CREAR, getIdiomaCrear, construirItem, contarPalabras } from './listeningCrear';
 
 const EditorListening = lazy(() => import('./components/EditorListening'));
+const ModalPdfListening = lazy(() => import('./components/ModalPdfListening'));
 
 // ─── Listening creado por un profesor (tipoJuego LISTENING_RECURSO) ──────────
 // Sin `recurso` abre el buscador (código / tema / mis listenings).
@@ -41,6 +42,7 @@ function PantallaBuscar({ usuario, onElegir, onEditar, onCrear, onExit }) {
     const [resultados, setResultados] = useState(null);
     const [buscando, setBuscando] = useState(false);
     const [error, setError] = useState('');
+    const [pdf, setPdf] = useState(null);      // recurso del que sacar la ficha
 
     const buscar = async (modo = pestana) => {
         setBuscando(true); setError(''); setResultados(null);
@@ -121,12 +123,14 @@ function PantallaBuscar({ usuario, onElegir, onEditar, onCrear, onExit }) {
                                 <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
                                     <button onClick={() => onElegir(r)} style={{ ...btnPrincipal, padding: '8px', fontSize: '0.82rem' }}>▶ Jugar</button>
                                     {pestana === 'MIOS' && <button onClick={() => onEditar(r)} style={{ ...btnVolver, padding: '8px 12px' }}><Pencil size={14} /> Editar</button>}
+                                    {pestana === 'MIOS' && <button onClick={() => setPdf(r)} title="Ficha PDF para imprimir" style={{ ...btnVolver, padding: '8px 10px' }}><FileDown size={14} /></button>}
                                 </div>
                             </div>
                         );
                     })}
                 </div>
             </div>
+            {pdf && <Suspense fallback={null}><ModalPdfListening recurso={pdf} onClose={() => setPdf(null)} /></Suspense>}
         </div>
     );
 }
@@ -163,7 +167,7 @@ function PartePreguntas({ preguntas, respuestas, setRespuestas, comprobado }) {
 }
 
 // ─── Juego ────────────────────────────────────────────────────────────────────
-function JugarListening({ recurso, onBack }) {
+function JugarListening({ recurso, onBack, usuario = null }) {
     const item = useMemo(() => construirItem(recurso), [recurso]);
     const idi = getIdiomaCrear(recurso.idioma);
     const preguntas = (recurso.preguntas || []).filter(p => p.enunciado && p.opciones?.length >= 2);
@@ -178,6 +182,7 @@ function JugarListening({ recurso, onBack }) {
     const [comprobados, setComprobados] = useState({}); // { HUECOS: true, PREGUNTAS: true }
     const [frasesReveladas, setFrasesReveladas] = useState(1);
     const [mostrarEnvio, setMostrarEnvio] = useState(false);
+    const [mostrarPdf, setMostrarPdf] = useState(false);
     const audioRef = useRef(null);
 
     const segmentos = useMemo(() => parsearTranscript(item.gappedTranscript, item.gaps), [item]);
@@ -235,7 +240,12 @@ function JugarListening({ recurso, onBack }) {
                     </>
                 )}
                 <button onClick={() => setFase(0)} style={{ ...btnPrincipal, marginTop: 8 }}>Empezar <ChevronRight size={18} /></button>
+                <button onClick={() => setMostrarPdf(true)} style={{ ...btnPrincipal, background: 'transparent', border: '1.5px solid rgba(255,255,255,0.25)' }}>
+                    <FileDown size={17} /> Ficha PDF para imprimir
+                </button>
             </div>
+            {/* Soluciones solo con sesión iniciada: así un alumno no se descarga las respuestas */}
+            {mostrarPdf && <Suspense fallback={null}><ModalPdfListening recurso={recurso} conSoluciones={!!usuario?.uid} onClose={() => setMostrarPdf(false)} /></Suspense>}
         </div>
     );
 
@@ -326,7 +336,7 @@ export default function ListeningRecursoGame({ recurso: recursoInicial = null, u
             <EditorListening datos={editando} setDatos={setEditando} usuario={usuario} onClose={() => setEditando(null)} />
         </Suspense>
     );
-    if (recurso) return <JugarListening key={recurso.id} recurso={recurso} onBack={volver} />;
+    if (recurso) return <JugarListening key={recurso.id} recurso={recurso} usuario={usuario} onBack={volver} />;
     return (
         <PantallaBuscar usuario={usuario} onExit={onExit}
             onElegir={setRecurso}

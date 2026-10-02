@@ -11,6 +11,10 @@ import AscensorEnteros from './AscensorEnteros';
 import ModalCompartirReto from './components/ModalCompartirReto';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
+import ProblemasNumeros from './ProblemasNumeros';
+
+// Fichas imprimibles (editor + PDF + pizarra + enlace público): se cargan solo al abrirlas
+const FichasCalculo = React.lazy(() => import('./FichasCalculo'));
 
 // ─── Configuración por defecto ────────────────────────────────────────────────
 export const DEFAULT_CONFIG = {
@@ -19,7 +23,11 @@ export const DEFAULT_CONFIG = {
     tiempo: 120,
     numEjercicios: null, // null = modo tiempo libre; número = modo ejercicios fijos
     tipos: { positivos: true, negativos: false, decimales: false, fracciones: false },
-    operaciones: { suma: true, resta: true, multiplicacion: false, division: false },
+    operaciones: { suma: true, resta: true, multiplicacion: false, division: false, combinadas: false },
+    // Operaciones combinadas: hasta cuántos números, con paréntesis y con divisiones exactas
+    combMax: 4,
+    combParentesis: true,
+    combDivision: true,
     dual: false,
 };
 
@@ -47,6 +55,14 @@ const MODOS_PRESET = [
                operaciones: { suma: true, resta: true, multiplicacion: true, division: true } }
     },
     {
+        id: 'COMB', icon: '🧮', label: 'Operaciones combinadas', desc: 'Hasta 6 números, paréntesis y divisiones exactas', color: '#00897b',
+        ops: ['( )', '× ÷', '+ −'],
+        cfg: { minNum: 1, maxNum: 20, tiempo: 180, numEjercicios: null,
+               tipos: { positivos: true, negativos: false, decimales: false, fracciones: false },
+               operaciones: { suma: false, resta: false, multiplicacion: false, division: false, combinadas: true },
+               combMax: 5, combParentesis: true, combDivision: true }
+    },
+    {
         id: 'CUSTOM', icon: '⚙️', label: 'Configurado', desc: 'Elige operaciones, rango y tiempo', color: '#9b59b6',
         ops: null,
         cfg: null // abre el modal
@@ -62,6 +78,7 @@ export const resumenConfig = (cfg) => {
     const ops = [
         c.operaciones?.suma && '+', c.operaciones?.resta && '−',
         c.operaciones?.multiplicacion && '×', c.operaciones?.division && '÷',
+        c.operaciones?.combinadas && `🧮 combinadas (hasta ${c.combMax || 4} nº${c.combParentesis !== false ? ', ( )' : ''}${c.combDivision !== false ? ', ÷' : ''})`,
     ].filter(Boolean).join(' ');
     const tipos = [
         c.tipos?.positivos && 'positivos', c.tipos?.negativos && 'negativos',
@@ -83,8 +100,160 @@ const rFloat1 = (min, max) => parseFloat((Math.random() * (max - min) + min).toF
 const rFloat2 = (min, max) => parseFloat((Math.random() * (max - min) + min).toFixed(2));
 const gcd = (a, b) => b === 0 ? a : gcd(b, a % b);
 
+// ─── Operaciones combinadas con enteros ──────────────────────────────────────
+// Árbol: { t:'n', v } | { t:'op', op: '+'|'−'|'×'|'÷', a, b }. Los paréntesis
+// se deducen de la estructura (no se guardan).
+const PREC_C = { '+': 1, '−': 1, '×': 2, '÷': 2 };
+const evalC = (n) => {
+    if (n.t === 'n') return n.v;
+    const a = evalC(n.a), b = evalC(n.b);
+    if (n.op === '+') return a + b;
+    if (n.op === '−') return a - b;
+    if (n.op === '×') return a * b;
+    return b === 0 ? NaN : a / b;
+};
+const parenC = (hijo, padre, der) => hijo.t === 'op' && (PREC_C[hijo.op] < PREC_C[padre.op]
+    || (der && PREC_C[hijo.op] === PREC_C[padre.op] && (padre.op === '−' || padre.op === '÷')));
+const textoC = (n) => {
+    if (n.t === 'n') return n.v < 0 ? `(−${-n.v})` : `${n.v}`;
+    const a = textoC(n.a), b = textoC(n.b);
+    return `${parenC(n.a, n, false) ? `(${a})` : a} ${n.op} ${parenC(n.b, n, true) ? `(${b})` : b}`;
+};
+const nodosC = (n, acc = []) => { acc.push(n); if (n.t === 'op') { nodosC(n.a, acc); nodosC(n.b, acc); } return acc; };
+
+// Un paso: primero lo de dentro de los paréntesis (los más interiores),
+// después × ÷ y luego + −, siempre de izquierda a derecha.
+const reducirC = (raiz) => {
+    let mejor = null, orden = 0;
+    const visitar = (n, ruta, prof) => {
+        if (n.t !== 'op') return;
+        visitar(n.a, [...ruta, 'a'], prof + (parenC(n.a, n, false) ? 1 : 0));
+        if (n.a.t === 'n' && n.b.t === 'n') {
+            const prio = prof * 10 + PREC_C[n.op];
+            if (!mejor || prio > mejor.prio) mejor = { ruta, prio, orden };
+        }
+        orden++;
+        visitar(n.b, [...ruta, 'b'], prof + (parenC(n.b, n, true) ? 1 : 0));
+    };
+    visitar(raiz, [], 0);
+    const sustituir = (n, ruta) => (ruta.length ? { ...n, [ruta[0]]: sustituir(n[ruta[0]], ruta.slice(1)) } : { t: 'n', v: evalC(n) });
+    return sustituir(raiz, mejor.ruta);
+};
+const pasosC = (arbol) => {
+    const out = [textoC(arbol)];
+    for (let cur = arbol, i = 0; cur.t === 'op' && i < 12; i++) {
+        cur = reducirC(cur);
+        out.push(cur.t === 'n' ? `${cur.v}`.replace('-', '−') : textoC(cur)); // el resultado, sin paréntesis
+    }
+    return out;
+};
+
+// Con paréntesis: árbol aleatorio; las divisiones se construyen exactas
+const genArbolC = (k, c) => {
+    const ops = c.div ? ['+', '−', '×', '÷'] : ['+', '−', '×'];
+    const hoja = () => ({ t: 'n', v: rInt(1, c.maxS) });
+    const build = (k) => {
+        if (k === 1) return hoja();
+        const op = rItem(ops), kl = rInt(1, k - 1), kr = k - kl;
+        if (op === '÷') {
+            let r = null;
+            for (let i = 0; i < 30 && !r; i++) { const x = build(kr), v = evalC(x); if (Number.isInteger(v) && v >= 2 && v <= 12) r = x; }
+            if (!r) r = { t: 'n', v: rInt(2, 9) };
+            const d = evalC(r);
+            let l = null;
+            if (kl > 1) for (let i = 0; i < 40 && !l; i++) { const x = build(kl), v = evalC(x); if (Number.isInteger(v) && v > 0 && v % d === 0) l = x; }
+            if (!l) l = { t: 'n', v: d * rInt(1, 10) };
+            return { t: 'op', op, a: l, b: r };
+        }
+        let a = build(kl), b = build(kr);
+        if (op === '−' && !c.neg && evalC(a) < evalC(b)) [a, b] = [b, a];
+        return { t: 'op', op, a, b };
+    };
+    return normalizarC(build(k));
+};
+
+// «a + (b − c)» se escribe «a + b − c»: se reordena el árbol para que el paso
+// a paso vaya de izquierda a derecha, como se lee (mismo valor).
+const normalizarC = (n) => {
+    if (n.t !== 'op') return n;
+    let nodo = { ...n, a: normalizarC(n.a), b: normalizarC(n.b) };
+    while ((nodo.op === '+' || nodo.op === '×') && nodo.b.t === 'op' && PREC_C[nodo.b.op] === PREC_C[nodo.op]) {
+        nodo = { t: 'op', op: nodo.b.op, a: normalizarC({ t: 'op', op: nodo.op, a: nodo.a, b: nodo.b.a }), b: nodo.b.b };
+    }
+    return nodo;
+};
+
+// Sin paréntesis: términos (cadenas de × y ÷) unidos por + y −
+const genPlanoC = (k, c) => {
+    const tams = [];
+    for (let resto = k; resto > 0;) { const t = Math.min(resto, rItem([1, 1, 2, 2, 3])); tams.push(t); resto -= t; }
+    const termino = (tam) => {
+        let nodo;
+        let i = 1;
+        if (tam >= 2 && c.div && Math.random() < 0.55) {
+            const d = rInt(2, 9);
+            nodo = { t: 'op', op: '÷', a: { t: 'n', v: d * rInt(2, 10) }, b: { t: 'n', v: d } };
+            i = 2;
+        } else nodo = { t: 'n', v: rInt(tam > 1 ? 2 : 1, tam > 1 ? 12 : c.maxS) };
+        for (; i < tam; i++) {
+            const val = evalC(nodo);
+            const divs = c.div ? [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].filter(d => d < val && val % d === 0) : [];
+            nodo = divs.length && Math.random() < 0.5
+                ? { t: 'op', op: '÷', a: nodo, b: { t: 'n', v: rItem(divs) } }
+                : { t: 'op', op: '×', a: nodo, b: { t: 'n', v: rInt(2, 9) } };
+        }
+        return nodo;
+    };
+    let arbol = termino(tams[0]);
+    for (const tam of tams.slice(1)) {
+        const t = termino(tam);
+        const op = !c.neg && evalC(arbol) < evalC(t) ? '+' : rItem(['+', '−']);
+        arbol = { t: 'op', op, a: arbol, b: t };
+    }
+    return arbol;
+};
+
+const validoC = (arbol, c, conParentesis, quiereDiv) => {
+    const nodos = nodosC(arbol);
+    const ops = nodos.filter(n => n.t === 'op');
+    if (!ops.some(n => PREC_C[n.op] === 1) || !ops.some(n => PREC_C[n.op] === 2)) return false; // mezcla de jerarquías
+    if (quiereDiv && !ops.some(n => n.op === '÷')) return false;
+    if (conParentesis && !ops.some(n => parenC(n.a, n, false) || parenC(n.b, n, true))) return false;
+    for (const n of nodos) {
+        const v = evalC(n);
+        if (!Number.isInteger(v) || Math.abs(v) > 400 || (!c.neg && v < 0)) return false;
+        if (n.t !== 'op') continue;
+        if (v === 0) return false; // evita «20 − 20» y «0 × …»
+        const a = evalC(n.a), b = evalC(n.b);
+        if (n.op === '×' && (Math.abs(a) === 1 || Math.abs(b) === 1)) return false; // evita «× 1»
+        if (n.op === '×' && (Math.min(Math.abs(a), Math.abs(b)) > 12 || Math.abs(a * b) > 300)) return false;
+        if (n.op === '÷' && (b === 0 || Math.abs(b) === 1)) return false;
+    }
+    return Math.abs(evalC(arbol)) <= 300;
+};
+
+const generarCombinadaEnteros = (cfg) => {
+    const c = {
+        neg: !!cfg.tipos?.negativos,
+        div: cfg.combDivision !== false,
+        maxS: Math.max(5, Math.min(cfg.maxNum || 20, 30)),
+    };
+    const maxN = Math.max(3, Math.min(6, cfg.combMax || 4));
+    const conParentesis = cfg.combParentesis !== false;
+    const quiereDiv = c.div && Math.random() < 0.6;
+    let arbol = null;
+    for (let i = 0; i < 600 && !arbol; i++) {
+        const k = rInt(3, maxN);
+        const cand = conParentesis ? genArbolC(k, c) : genPlanoC(k, c);
+        if (validoC(cand, c, conParentesis, i < 400 && quiereDiv)) arbol = cand;
+    }
+    if (!arbol) arbol = { t: 'op', op: '×', a: { t: 'op', op: '÷', a: { t: 'op', op: '+', a: { t: 'n', v: 8 }, b: { t: 'n', v: 4 } }, b: { t: 'n', v: 3 } }, b: { t: 'n', v: 2 } };
+    const answer = evalC(arbol);
+    return { text: textoC(arbol), answer, hasDecimals: false, displayAnswer: `${answer}`, combinada: true, pasos: pasosC(arbol) };
+};
+
 // ─── Motor generador ──────────────────────────────────────────────────────────
-const generarProblema = (cfg) => {
+export const generarProblema = (cfg) => {
     const { minNum, maxNum, tipos, operaciones } = cfg;
     const opsActivas = Object.entries(operaciones).filter(([, v]) => v).map(([k]) => k);
     const tiposActivos = Object.entries(tipos).filter(([, v]) => v).map(([k]) => k);
@@ -93,6 +262,7 @@ const generarProblema = (cfg) => {
         return { text: '¡Selecciona al menos una operación y un tipo!', answer: 0, hasDecimals: false, displayAnswer: '0' };
 
     const op = rItem(opsActivas);
+    if (op === 'combinadas') return generarCombinadaEnteros(cfg);
     const tipo = rItem(tiposActivos);
 
     let text = '', answer = 0, hasDecimals = false;
@@ -263,7 +433,22 @@ export const ConfigModal = ({ config, onChange, onStart, onClose, textoAceptar =
                     <Chip active={local.operaciones.resta} onClick={() => toggleOp('resta')} color="#e74c3c">➖ Resta</Chip>
                     <Chip active={local.operaciones.multiplicacion} onClick={() => toggleOp('multiplicacion')} color="#f39c12">✖️ Multiplicación</Chip>
                     <Chip active={local.operaciones.division} onClick={() => toggleOp('division')} color="#9b59b6">➗ División</Chip>
+                    <Chip active={!!local.operaciones.combinadas} onClick={() => toggleOp('combinadas')} color="#00897b">🧮 Combinadas</Chip>
                 </Section>
+
+                {/* Opciones de las operaciones combinadas */}
+                {local.operaciones.combinadas && (
+                    <Section label="🧮 Operaciones combinadas">
+                        <span style={{ fontWeight: 700, color: '#555', fontSize: '0.85rem' }}>Hasta</span>
+                        {[3, 4, 5, 6].map(n => (
+                            <Chip key={n} active={(local.combMax || 4) === n} onClick={() => setField('combMax', n)} color="#00897b">{n}</Chip>
+                        ))}
+                        <span style={{ fontWeight: 700, color: '#555', fontSize: '0.85rem' }}>números</span>
+                        <div style={{ width: '100%' }} />
+                        <Chip active={local.combParentesis !== false} onClick={() => setField('combParentesis', local.combParentesis === false)} color="#00897b">( ) Paréntesis</Chip>
+                        <Chip active={local.combDivision !== false} onClick={() => setField('combDivision', local.combDivision === false)} color="#00897b">÷ Divisiones exactas</Chip>
+                    </Section>
+                )}
 
                 {/* Tipos de números */}
                 <Section label="🔵 Tipos de números">
@@ -435,7 +620,10 @@ function ModalEnviarProfe({ datos, onClose }) {
 }
 
 export default function CalculoMentalGame({ usuario, onExit }) {
-    const [gameState, setGameState] = useState('START');
+    // Ficha imprimible compartida por enlace: /calculo?ficha=ID abre directamente su vista pública
+    const [fichaPublicaId, setFichaPublicaId] = useState(() => (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('ficha') : null));
+    const [gameState, setGameState] = useState(() => (fichaPublicaId ? 'FICHAS' : 'START')); // START | PLAYING | END | PROBLEMAS | FICHAS
+    const [datosEnvio, setDatosEnvio] = useState(null); // envío al profesor desde el modo Problemas
     const [sonido, setSonido] = useState(() => sonidoActivo());
     const [showOca, setShowOca] = useState(false);
     const [showDomino, setShowDomino] = useState(false);
@@ -643,15 +831,23 @@ export default function CalculoMentalGame({ usuario, onExit }) {
             setFeedback(null);
             if (modoEjercicios) avanzarEjercicio(config);
             else { setCurrentAnswer(0); setCurrentProblem(generarProblema(config)); setShowSolution(false); }
-        }, 2000);
+        }, currentProblem.combinada ? 5000 : 2000); // en combinadas, tiempo para leer el paso a paso
     };
 
     if (showOca) return <OcaMatematica onExit={() => setShowOca(false)} />;
     if (showDomino) return <DominoMatematico onExit={() => setShowDomino(false)} />;
     if (showAscensor) return <AscensorEnteros onExit={() => setShowAscensor(false)} />;
 
+    const quitarFichaDeUrl = () => {
+        if (!fichaPublicaId) return;
+        const u = new URL(window.location.href); u.searchParams.delete('ficha');
+        window.history.replaceState({}, '', u.pathname + u.search);
+        setFichaPublicaId(null);
+    };
+
     const handleExit = () => {
         clearInterval(timerRef.current);
+        quitarFichaDeUrl();
         if (gameState !== 'START') setGameState('START');
         else if (typeof onExit === 'function') onExit();
         else window.location.href = '/';
@@ -835,6 +1031,39 @@ export default function CalculoMentalGame({ usuario, onExit }) {
                         {/* Separador */}
                         <div style={{ display:'flex', alignItems:'center', gap:10, margin:'2px 0' }}>
                             <div style={{ flex:1, height:1, background:'#eee' }} />
+                            <span style={{ color:'#bbb', fontSize:'0.75rem' }}>problemas y fichas</span>
+                            <div style={{ flex:1, height:1, background:'#eee' }} />
+                        </div>
+
+                        {/* Problemas de números */}
+                        <button onClick={() => setGameState('PROBLEMAS')}
+                            style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 18px', background:'white', border:'2px solid #2980b9', borderRadius:16, cursor:'pointer', textAlign:'left', transition:'transform 0.15s, box-shadow 0.15s', boxShadow:'0 3px 10px rgba(0,0,0,0.07)', width:'100%' }}
+                            onMouseEnter={e => { e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 8px 20px #2980b933'; }}
+                            onMouseLeave={e => { e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow='0 3px 10px rgba(0,0,0,0.07)'; }}>
+                            <div style={{ background:'#2980b9', borderRadius:12, width:46, height:46, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.5rem', flexShrink:0 }}>📖</div>
+                            <div style={{ flex:1 }}>
+                                <div style={{ fontWeight:'bold', color:'#2c3e50', fontSize:'1rem', marginBottom:3 }}>Problemas de números</div>
+                                <div style={{ color:'#888', fontSize:'0.82rem' }}>Naturales, enteros (+ y −) y decimales con precios · guiados paso a paso</div>
+                            </div>
+                            <span style={{ color:'#2980b9', fontSize:'1.3rem' }}>›</span>
+                        </button>
+
+                        {/* Fichas imprimibles */}
+                        <button onClick={() => setGameState('FICHAS')}
+                            style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 18px', background:'white', border:'2px solid #c0392b', borderRadius:16, cursor:'pointer', textAlign:'left', transition:'transform 0.15s, box-shadow 0.15s', boxShadow:'0 3px 10px rgba(0,0,0,0.07)', width:'100%' }}
+                            onMouseEnter={e => { e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 8px 20px #c0392b33'; }}
+                            onMouseLeave={e => { e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow='0 3px 10px rgba(0,0,0,0.07)'; }}>
+                            <div style={{ background:'#c0392b', borderRadius:12, width:46, height:46, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.5rem', flexShrink:0 }}>🖨️</div>
+                            <div style={{ flex:1 }}>
+                                <div style={{ fontWeight:'bold', color:'#2c3e50', fontSize:'1rem', marginBottom:3 }}>Fichas para imprimir</div>
+                                <div style={{ color:'#888', fontSize:'0.82rem' }}>Crea una ficha en PDF con operaciones y problemas, guárdala y corrígela en el monitor</div>
+                            </div>
+                            <span style={{ color:'#c0392b', fontSize:'1.3rem' }}>›</span>
+                        </button>
+
+                        {/* Separador */}
+                        <div style={{ display:'flex', alignItems:'center', gap:10, margin:'2px 0' }}>
+                            <div style={{ flex:1, height:1, background:'#eee' }} />
                             <span style={{ color:'#bbb', fontSize:'0.75rem' }}>números enteros</span>
                             <div style={{ flex:1, height:1, background:'#eee' }} />
                         </div>
@@ -900,6 +1129,20 @@ export default function CalculoMentalGame({ usuario, onExit }) {
                 </div>
             )}
 
+            {/* PROBLEMAS DE NÚMEROS */}
+            {gameState === 'PROBLEMAS' && (
+                <ProblemasNumeros isMobile={isMobile} usuario={usuario} onSalir={() => setGameState('START')}
+                    onEnviar={(d) => { setDatosEnvio(d); setMostrarEnvio(true); }} />
+            )}
+
+            {/* FICHAS IMPRIMIBLES */}
+            {gameState === 'FICHAS' && (
+                <React.Suspense fallback={<div style={{ textAlign: 'center', color: '#E91E63', fontWeight: 800, padding: 40 }}>Cargando fichas…</div>}>
+                    <FichasCalculo isMobile={isMobile} fichaPublicaId={fichaPublicaId}
+                        onSalir={() => { quitarFichaDeUrl(); setGameState('START'); }} />
+                </React.Suspense>
+            )}
+
             {/* JUEGO */}
             {gameState === 'PLAYING' && currentProblem && (
                 <div style={{ ...st.centerCard, maxWidth: config.dual ? 780 : 520, border: `4px solid ${borderColor}`, transition: 'border-color 0.2s, transform 0.2s', transform: feedback === 'CORRECT' ? 'scale(1.03)' : 'none' }}>
@@ -930,7 +1173,7 @@ export default function CalculoMentalGame({ usuario, onExit }) {
                                             <span style={{ display:'flex', alignItems:'center', gap:3, fontWeight:700, color:'#e74c3c', fontSize:'0.88rem' }}>❌ {pfa}</span>
                                         </div>
                                         {/* Operación */}
-                                        <div style={{ fontSize: isMobile ? '1.3rem' : '1.7rem', fontWeight: 'bold', color: '#2c3e50', textAlign: 'center', minHeight: 40, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <div style={{ fontSize: problem?.combinada ? (isMobile ? '1.05rem' : '1.3rem') : (isMobile ? '1.3rem' : '1.7rem'), fontWeight: 'bold', color: '#2c3e50', textAlign: 'center', minHeight: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
                                             {problem?.text} = ?
                                         </div>
                                         {/* Respuesta */}
@@ -986,7 +1229,7 @@ export default function CalculoMentalGame({ usuario, onExit }) {
                     ) : (
                         /* ── MODO SINGLE: tablero único ── */
                         <>
-                            <div style={{ fontSize: isMobile ? '2rem' : '3rem', fontWeight: 'bold', color: '#2c3e50', marginBottom: 16, minHeight: 60, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <div style={{ fontSize: currentProblem.combinada ? (isMobile ? '1.45rem' : '2.1rem') : (isMobile ? '2rem' : '3rem'), fontWeight: 'bold', color: '#2c3e50', marginBottom: 16, minHeight: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', wordSpacing: '0.08em' }}>
                                 {currentProblem.text} = ?
                             </div>
                             <div style={{ background: '#f8f9fa', borderRadius: 14, padding: '12px 16px', marginBottom: 16, border: '2px solid #e0e0e0', position: 'relative' }}>
@@ -996,6 +1239,15 @@ export default function CalculoMentalGame({ usuario, onExit }) {
                                 <div style={{ fontSize: isMobile ? '2.5rem' : '3rem', fontWeight: 'bold', color: showSolution ? '#27ae60' : '#E91E63', textAlign: 'center' }}>
                                     {showSolution ? currentProblem.displayAnswer : currentAnswer}
                                 </div>
+                                {showSolution && currentProblem.combinada && currentProblem.pasos && (
+                                    <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px dashed #c8e6c9', display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+                                        {currentProblem.pasos.map((p, i) => (
+                                            <div key={i} style={{ fontSize: isMobile ? '0.95rem' : '1.1rem', fontWeight: 700, color: i === currentProblem.pasos.length - 1 ? '#27ae60' : '#2c3e50' }}>
+                                                {i === 0 ? '' : '= '}{p}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                                 {!showSolution && (
                                     <button onClick={resetAnswer} style={{ position: 'absolute', top: 10, right: 12, background: 'transparent', border: 'none', color: '#95a5a6', cursor: 'pointer', padding: 4 }}>
                                         <Delete size={22} />
@@ -1082,8 +1334,8 @@ export default function CalculoMentalGame({ usuario, onExit }) {
                 />
             ) : (
                 <ModalEnviarProfe
-                    datos={{ aciertos, fallos, puntos: config.dual ? score1 + score2 : score, skips, config, reto: reto ? (reto.titulo || 'Reto compartido') : null }}
-                    onClose={() => setMostrarEnvio(false)}
+                    datos={datosEnvio || { aciertos, fallos, puntos: config.dual ? score1 + score2 : score, skips, config, reto: reto ? (reto.titulo || 'Reto compartido') : null }}
+                    onClose={() => { setMostrarEnvio(false); setDatosEnvio(null); }}
                 />
             ))}
         </div>

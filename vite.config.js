@@ -48,19 +48,20 @@ function geminiDevPlugin() {
 
 // Emula en desarrollo los endpoints de /api que son funciones de Vercel,
 // reutilizando el mismo handler para no duplicar lógica.
-function apiDevPlugin(ruta, modulo) {
+function apiDevPlugin(ruta, modulo, metodos = ['POST']) {
   return {
     name: `dev-api${ruta.replace(/\//g, '-')}`,
     configureServer(server) {
       server.middlewares.use(ruta, async (req, res) => {
         if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
-        if (req.method !== 'POST') { res.writeHead(405); res.end('Method not allowed'); return; }
+        if (!metodos.includes(req.method)) { res.writeHead(405); res.end('Method not allowed'); return; }
         let body = '';
         req.on('data', chunk => { body += chunk; });
         req.on('end', async () => {
           try {
             const { default: handler } = await import(modulo);
             req.body = body ? JSON.parse(body) : {};
+            req.query = Object.fromEntries(new URL(req.url, 'http://localhost').searchParams);
             // Adaptador mínimo del objeto `res` de Vercel sobre el de Node.
             const shim = {
               setHeader: (k, v) => res.setHeader(k, v),
@@ -69,6 +70,7 @@ function apiDevPlugin(ruta, modulo) {
                 return {
                   json: (data) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(data)); },
                   end:  () => { res.writeHead(code); res.end(); },
+                  send: (data) => { res.writeHead(code); res.end(data); },
                 };
               },
             };
@@ -128,6 +130,7 @@ export default defineConfig({
     apiDevPlugin('/api/cloudinary', './api/cloudinary.js'),
     apiDevPlugin('/api/sketchfab', './api/sketchfab.js'),
     apiDevPlugin('/api/listening-tts', './api/listening-tts.js'),
+    apiDevPlugin('/api/proxy-recorte', './api/proxy-recorte.js', ['GET']),
     react(),
     VitePWA({
       registerType: 'autoUpdate',

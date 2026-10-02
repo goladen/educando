@@ -714,6 +714,18 @@ export default function InformesJuegos({ usuario, googleToken }) {
                                         onBuscarJugador={setBusquedaJugador}
                                     />
                                 );
+                                if (tipo === 'ESCULPIR_3D') return (
+                                    <EsculpirCard
+                                        key={inf.id} inf={inf}
+                                        onBorrar={()=>borrar(inf.id)}
+                                        borrando={borrando===inf.id}
+                                        borradoOk={borrandoOk===inf.id}
+                                        modoSeleccion={modoSeleccion}
+                                        seleccionado={selec}
+                                        onSeleccionar={()=>toggleSeleccion(inf.id)}
+                                        onBuscarJugador={setBusquedaJugador}
+                                    />
+                                );
                                 if (tipo === 'VISOR_3D') return (
                                     <Visor3DCard
                                         key={inf.id} inf={inf}
@@ -1528,6 +1540,50 @@ const Visor3DCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, selecc
     );
 };
 
+const EsculpirCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccionado, onSeleccionar, onBuscarJugador }) => {
+    const [confirmar, setConfirmar] = useState(false);
+    const j = (inf.jugadores || [])[0] || {};
+    const objetivo = j.objetivo || inf.objetivo || '';
+    const material = j.material || inf.material || '';
+    const pct = j.porcentaje ?? 0;
+    const pctColor = p => p >= 80 ? '#27ae60' : p >= 50 ? '#e67e22' : '#e74c3c';
+    const t = j.tiempo || 0;
+
+    return (
+        <div style={{ background:'white', borderRadius:13, boxShadow:'0 2px 8px rgba(0,0,0,0.06)', border: seleccionado?'2px solid #1565C0':'1.5px solid #e8e8e8' }}>
+            <div onClick={modoSeleccion?onSeleccionar:undefined} style={{ padding:'11px 15px', display:'flex', alignItems:'center', gap:10, flexWrap:'wrap', cursor:modoSeleccion?'pointer':'default' }}>
+                {modoSeleccion && <input type="checkbox" checked={seleccionado} onChange={e=>{e.stopPropagation();onSeleccionar();}} onClick={e=>e.stopPropagation()} style={{ width:17,height:17,cursor:'pointer',accentColor:'#1565C0' }}/>}
+                <span style={{ fontSize:'1.4rem' }}>🗿</span>
+                <div style={{ flex:1, minWidth:150 }}>
+                    <div style={{ fontWeight:700, color:'#2c3e50', fontSize:'0.92rem' }}>
+                        Taller de escultura{objetivo && <span style={{ color:'#b45309', fontWeight:600 }}> · {objetivo}</span>}
+                        {material && <span style={{ marginLeft:6, fontWeight:400, color:'#7f8c8d', fontSize:'0.8rem' }}>({material})</span>}
+                    </div>
+                    <div style={{ fontSize:'0.74rem', color:'#95a5a6' }}>
+                        {fmtFecha(inf.fecha)}
+                        {j.nombre && <> · <span onClick={e=>{e.stopPropagation();onBuscarJugador?.(j.nombre);}} style={{ cursor:'pointer', borderBottom:'1px dotted #aaa', fontWeight:600, color:'#2c3e50' }}>{j.nombre}</span></>}
+                        {j.curso && <span style={{ marginLeft:5, color:'#aaa' }}>({j.curso})</span>}
+                        {t > 0 && <span style={{ marginLeft:5 }}>· ⏱ {Math.floor(t / 60)}:{String(t % 60).padStart(2, '0')}</span>}
+                    </div>
+                </div>
+                <span title="Parecido con la forma objetivo" style={{ padding:'2px 8px', borderRadius:20, background:'#f3f4f6', fontWeight:700, fontSize:'0.78rem', color:pctColor(pct) }}>{pct}%</span>
+                {j.sobranteCm3 != null && <span title="Material que sobra" style={{ padding:'2px 8px', borderRadius:20, background:'#fff7ed', fontWeight:700, fontSize:'0.74rem', color:'#b45309' }}>+{j.sobranteCm3} cm³</span>}
+                {j.faltaCm3 != null && <span title="Material quitado de más" style={{ padding:'2px 8px', borderRadius:20, background:'#fdecea', fontWeight:700, fontSize:'0.74rem', color:'#e74c3c' }}>−{j.faltaCm3} cm³</span>}
+                {!modoSeleccion && <button onClick={e=>{e.stopPropagation();setConfirmar(true);}} style={{ padding:'4px 7px', borderRadius:7, border:'1px solid #fdd', background:'#fdecea', color:'#e74c3c', cursor:'pointer' }}><Trash2 size={13}/></button>}
+            </div>
+            {confirmar && (
+                <div style={{ background:'#fdecea', borderTop:'1px solid #fdd', padding:'10px 15px', display:'flex', alignItems:'center', gap:10, fontSize:'0.83rem' }}>
+                    <AlertTriangle size={14} color="#e74c3c"/>
+                    <span style={{ flex:1, color:'#c0392b' }}>¿Eliminar este informe?</span>
+                    <button onClick={()=>{setConfirmar(false);onBorrar();}} disabled={borrando} style={{ padding:'4px 12px', borderRadius:7, border:'none', background:'#e74c3c', color:'white', cursor:'pointer', fontWeight:700, fontSize:'0.8rem' }}>{borrando?'Borrando…':'Eliminar'}</button>
+                    <button onClick={()=>setConfirmar(false)} style={{ padding:'4px 10px', borderRadius:7, border:'1px solid #ddd', background:'white', cursor:'pointer', fontSize:'0.8rem' }}>Cancelar</button>
+                </div>
+            )}
+            {borradoOk && <div style={{ background:'#e8f5e9', padding:'8px 15px', fontSize:'0.8rem', color:'#27ae60', display:'flex', alignItems:'center', gap:6 }}><CheckCircle size={13}/>Eliminado</div>}
+        </div>
+    );
+};
+
 const BunkerCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, seleccionado, onSeleccionar, onBuscarJugador }) => {
     const [confirmar, setConfirmar] = useState(false);
     const j = (inf.jugadores || [])[0] || {};
@@ -1669,11 +1725,11 @@ const CalculoCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, selecc
 
     const opsActivas = cfg.operaciones
         ? Object.entries(cfg.operaciones).filter(([,v]) => v).map(([k]) =>
-            ({ suma: '➕', resta: '➖', multiplicacion: '✖️', division: '➗' }[k] || k))
+            ({ suma: '➕', resta: '➖', multiplicacion: '✖️', division: '➗', combinadas: '🧮 combinadas', problemas: '📖 problemas' }[k] || k))
         : [];
     const tiposActivos = cfg.tipos
         ? Object.entries(cfg.tipos).filter(([,v]) => v).map(([k]) =>
-            ({ positivos: 'Positivos', negativos: 'Negativos', decimales: 'Decimales', fracciones: 'Fracciones' }[k] || k))
+            ({ positivos: 'Positivos', negativos: 'Negativos', decimales: 'Decimales', fracciones: 'Fracciones', naturales: 'Problemas de naturales', enteros: 'Problemas de enteros' }[k] || k))
         : [];
     const modoTexto = cfg.numEjercicios
         ? `${cfg.numEjercicios} ejercicios`
@@ -1757,7 +1813,7 @@ const CalculoCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, selecc
 const TIPOS_FRAC_LABEL = {
     identificar: '👁 Identificar', equivalente: '≡ Equivalentes', simplificar: '✂️ Simplificar',
     suma: '➕ Suma', resta: '➖ Resta', mult: '✖️ Multiplicar', div: '➗ Dividir',
-    pot: 'xⁿ Potencia', raiz: '√ Raíz',
+    pot: 'xⁿ Potencia', raiz: '√ Raíz', combinadas: '🧮 Combinadas', problemas: '📖 Problemas',
 };
 const NIVEL_FRAC_LABEL = { 1: '👶 Fácil', 2: '🤓 Medio', 3: '🔥 Difícil' };
 

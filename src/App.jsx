@@ -20,6 +20,7 @@ import JuegoCalamar from './JuegoCalamar';
 import MoneyBoard from './MoneyBoard';
 import EnigmicLogic from './EnigmicLogic';
 import Visor3D from './Visor3D';
+import Esculpir3D from './Esculpir3D';
 import VideosInstagram from './components/VideosInstagram';
 import { PizarraApp } from './GestionAula';
 import PiTutorial from './components/PiTutorial';
@@ -126,7 +127,7 @@ function App() {
           || slug === 'partes_planta' || slug === 'etiquetame' || slug === 'karting_track'
           || slug === 'arkade' || slug === 'imperios' || slug === 'whoknows'
           || slug === 'quienesquien' || slug === 'quienhistorico' || slug === 'pizarra' || slug === 'bunker'
-          || slug === 'enigmic' || slug === 'calamar' || slug === 'visor3d' || slug === 'piktboard'
+          || slug === 'enigmic' || slug === 'calamar' || slug === 'visor3d' || slug === 'esculpir' || slug === 'piktboard'
           || slug === 'moneyboard' || slug === 'videos') {
         setRutaPublica(slug);
         return;
@@ -154,7 +155,7 @@ function App() {
         'irregular_verbs','sistema_solar',
         'retos','conectapuntos','sudoku',
         'imperios','geografia','quienesquien','quienhistorico','pizarra','bunker','enigmic','calamar',
-        'visor3d','piktboard','moneyboard','videos',
+        'visor3d','esculpir','piktboard','moneyboard','videos',
         'comunidades','comunidad','competicion',
         'fisica',
         'math_world','primaria','feria',
@@ -321,6 +322,7 @@ function App() {
     if (rutaPublica === 'quienhistorico') return <><QuienEsQuienHistorico onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'enigmic') return <><EnigmicLogic onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'bunker') return <><BunkerDisparo onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
+    if (rutaPublica === 'esculpir') return <><Esculpir3D onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'visor3d') return <><Visor3D onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'videos') return <VideosInstagram onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
     if (rutaPublica === 'piktboard' || rutaPublica === 'moneyboard') return <><MoneyBoard onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;

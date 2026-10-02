@@ -3,9 +3,10 @@ import { db, auth } from '../firebase';
 import { collection, doc, setDoc, getDocs, query, where } from 'firebase/firestore';
 import {
     Save, X, Settings, Plus, Trash2, RefreshCw, CheckCircle, Headphones,
-    Copy, Wand2, Mic, AlertCircle, ExternalLink, Shuffle
+    Copy, Wand2, Mic, AlertCircle, ExternalLink, Shuffle, FileDown
 } from 'lucide-react';
 import PublicarModal from './PublicarModal';
+import ModalPdfListening from './ModalPdfListening';
 import {
     TIPO_LISTENING_RECURSO, IDIOMAS_CREAR, NIVELES_MCER, VELOCIDADES_VOZ, TIPOS_TEXTO,
     getIdiomaCrear, nuevoId, contarPalabras, minutosEstimados, construirPrompt,
@@ -44,6 +45,7 @@ export default function EditorListening({ datos, setDatos, onClose, usuario }) {
     const [guardadoOk, setGuardadoOk] = useState(false);
     const [modalPublicar, setModalPublicar] = useState(null);
     const [mostrandoConfig, setMostrandoConfig] = useState(false);
+    const [mostrandoPdf, setMostrandoPdf] = useState(false);
 
     const set = (campos) => setDatos(prev => ({ ...prev, ...campos }));
 
@@ -107,6 +109,7 @@ export default function EditorListening({ datos, setDatos, onClose, usuario }) {
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
                         {guardadoOk && <span style={{ color: '#e9d7ff', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: 4 }}><CheckCircle size={14} /> Guardado</span>}
                         {datos.accessCode && <span style={st.codigo} title="Código para los alumnos">🔑 {datos.accessCode}</span>}
+                        <button onClick={() => setMostrandoPdf(true)} disabled={!datos.texto?.trim()} style={{ ...st.iconBtn, opacity: datos.texto?.trim() ? 1 : 0.5 }} title="Ficha PDF para imprimir"><FileDown size={20} /></button>
                         <button onClick={() => setMostrandoConfig(true)} style={st.iconBtn} title="Configuración"><Settings size={20} /></button>
                         <button onClick={() => datos.isFinished ? guardar() : setModalPublicar('guardar')} disabled={guardando} style={st.saveBtn}>
                             {guardando ? <RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={16} />}
@@ -150,6 +153,7 @@ export default function EditorListening({ datos, setDatos, onClose, usuario }) {
                     />
                 )}
                 {mostrandoConfig && <ConfigModal datos={datos} set={set} onClose={() => setMostrandoConfig(false)} />}
+                {mostrandoPdf && <ModalPdfListening recurso={datos} onClose={() => setMostrandoPdf(false)} />}
             </div>
             <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
         </div>

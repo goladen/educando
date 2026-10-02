@@ -56,6 +56,7 @@ export const JUEGOS_REGISTRO_META = {
     ENIGMIC:             { nombre: 'Enigmic',             emoji: '🕵️', color: '#7c3aed' },
     CALAMAR:             { nombre: 'Luz roja · Luz verde', emoji: '🦑', color: '#e6317f' },
     VISOR_3D:            { nombre: 'Visor 3D',            emoji: '🧊', color: '#0d9488' },
+    ESCULPIR_3D:         { nombre: 'Taller de escultura', emoji: '🗿', color: '#b45309' },
     JEOPARDY:            { nombre: 'Money Board',         emoji: '💰', color: '#2563eb' },
 };
 

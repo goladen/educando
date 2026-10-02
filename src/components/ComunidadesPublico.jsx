@@ -5,9 +5,9 @@ import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import {
     Users, ArrowLeft, ChevronLeft, Share2, Globe, ExternalLink,
     RefreshCw, GraduationCap, Calendar, Lock, LayoutGrid, FileText,
-    UserPlus, Check, Clock, LogIn, Trophy
+    UserPlus, Check, Clock, LogIn, Trophy, Pencil, Eye
 } from 'lucide-react';
-import { Calendario, EscaparateMiembros, HorarioView, FichaProfesor, gruposDe } from './ComunidadesTab';
+import { Calendario, EscaparateMiembros, HorarioView, FichaProfesor, gruposDe, DetalleComunidadMiembro } from './ComunidadesTab';
 import { fondoUrl } from '../utils/fondos';
 import { CompeticionResumenPublico } from './CompeticionPublica';
 
@@ -53,7 +53,7 @@ function parsePath() {
 }
 
 // ─── Sección: solicitar unirse (con login si hace falta) ──────────────────────
-function SolicitarUnirse({ comunidad, destacado }) {
+function SolicitarUnirse({ comunidad, destacado, onVistaEdicion }) {
     const [user, setUser]   = useState(auth.currentUser);
     const [estado, setEstado] = useState('idle'); // idle | enviando | enviada
     const [error, setError] = useState('');
@@ -89,7 +89,8 @@ function SolicitarUnirse({ comunidad, destacado }) {
 
     if (yaMiembro) return (
         <div style={{ ...st.joinBox, background: '#e8f5e9', borderColor: '#b6e2c1' }}>
-            <Check size={18} color="#27ae60" /> <span style={{ color: '#1e8449', fontWeight: 600 }}>Ya eres miembro de esta comunidad.</span>
+            <Check size={18} color="#27ae60" /> <span style={{ color: '#1e8449', fontWeight: 600, flex: 1 }}>Ya eres miembro de esta comunidad.</span>
+            {onVistaEdicion && <button onClick={onVistaEdicion} style={{ ...st.btnPrimary, background: '#27ae60' }}><Pencil size={14} /> Vista de edición</button>}
         </div>
     );
 
@@ -129,7 +130,7 @@ const TABS = [
 ];
 
 // ─── Vista de un centro/comunidad ─────────────────────────────────────────────
-function CentroPublico({ comunidadId, tab, cursoFoco, unirse, onTab, onCurso, onVolver, origin, isMobile }) {
+function CentroPublico({ comunidadId, tab, cursoFoco, unirse, onTab, onCurso, onVolver, onVistaEdicion, origin, isMobile }) {
     const [comunidad, setComunidad] = useState(null);
     const [cursos, setCursos]       = useState([]);
     const [profes, setProfes]       = useState([]);
@@ -195,7 +196,7 @@ function CentroPublico({ comunidadId, tab, cursoFoco, unirse, onTab, onCurso, on
 
             {/* Solicitar unirse (enlace de invitación) */}
             <div style={{ marginBottom: 16 }}>
-                <SolicitarUnirse comunidad={comunidad} destacado={unirse} />
+                <SolicitarUnirse comunidad={comunidad} destacado={unirse} onVistaEdicion={onVistaEdicion} />
             </div>
 
             {/* Menú de pestañas */}
@@ -389,11 +390,19 @@ function ListaComunidades({ onAbrir, origin, isMobile }) {
     );
 }
 
+// Pestaña pública → pestaña equivalente de la vista de edición (DetalleComunidad)
+const TAB_EDICION = { calendarios: 'calendario', profesores: 'profesores', competiciones: 'competiciones' };
+
 // ─── Componente público principal ─────────────────────────────────────────────
 export default function ComunidadesPublico({ onExit }) {
     const origin = window.location.origin;
     const isMobile = useIsMobile();
     const [estado, setEstado] = useState(parsePath); // { comId, tab, cursoId }
+    const [user, setUser]     = useState(undefined); // undefined = comprobando sesión
+    const [forzarPublica, setForzarPublica] = useState({}); // { [comId]: true } → vista pública aunque sea miembro
+
+    useEffect(() => auth.onAuthStateChanged(u => setUser(u || null)), []);
+    const verPublica = (id, si) => setForzarPublica(f => ({ ...f, [id]: si }));
 
     // Sincroniza con navegación atrás/adelante del navegador
     useEffect(() => {
@@ -416,8 +425,18 @@ export default function ComunidadesPublico({ onExit }) {
                 <div style={{ fontWeight: 800, color: '#2c3e50', display: 'flex', alignItems: 'center', gap: 8 }}><Users size={20} color={AZUL} /> Comunidades</div>
             </div>
             <div style={{ padding: isMobile ? '12px 6px' : '16px 12px' }}>
-                {estado.comId
-                    ? <CentroPublico comunidadId={estado.comId} tab={estado.tab} cursoFoco={estado.cursoId} unirse={estado.unirse} onTab={cambiarTab} onCurso={verCurso} onVolver={volverLista} origin={origin} isMobile={isMobile} />
+                {estado.comId && user === undefined
+                    ? <div style={st.loader}><RefreshCw size={26} style={{ animation: 'spin 1s linear infinite' }} /><style>{spin}</style></div>
+                    : estado.comId && user && !forzarPublica[estado.comId]
+                    ? <div style={{ maxWidth: 1000, margin: '0 auto', padding: isMobile ? '0 2px 40px' : '0 4px 40px' }}>
+                        <DetalleComunidadMiembro key={estado.comId} usuario={user} comunidadId={estado.comId}
+                            tabInicial={TAB_EDICION[estado.cursoId ? 'calendarios' : estado.tab] || 'cursos'}
+                            onBack={volverLista}
+                            onNoMiembro={() => verPublica(estado.comId, true)}
+                            accionExtra={<button onClick={() => verPublica(estado.comId, true)} style={{ ...st.btnSec, marginBottom: 14 }}><Eye size={14} /> Ver vista pública</button>} />
+                      </div>
+                    : estado.comId
+                    ? <CentroPublico onVistaEdicion={user ? () => verPublica(estado.comId, false) : null} comunidadId={estado.comId} tab={estado.tab} cursoFoco={estado.cursoId} unirse={estado.unirse} onTab={cambiarTab} onCurso={verCurso} onVolver={volverLista} origin={origin} isMobile={isMobile} />
                     : <ListaComunidades onAbrir={abrir} origin={origin} isMobile={isMobile} />}
             </div>
         </div>
@@ -430,6 +449,7 @@ const st = {
     aviso:      { fontSize: '0.85rem', color: '#7f8c8d', background: '#eef4fb', borderRadius: 10, padding: '12px 16px', display: 'flex', gap: 8 },
     vacio:      { textAlign: 'center', padding: 30, color: '#bdc3c7', fontSize: '0.9rem', background: 'white', borderRadius: 12, marginBottom: 16 },
     backBtn:    { display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', color: AZUL, cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem', margin: '4px 0 14px', padding: 0 },
+    btnSec:     { display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 9, border: '1.5px solid #cdd6ea', background: 'white', color: AZUL, fontWeight: 600, cursor: 'pointer', fontSize: '0.82rem' },
     btnPrimary: { display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 9, border: 'none', background: AZUL, color: 'white', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' },
     h2:         { color: '#2c3e50', fontSize: '1.15rem', margin: '10px 0 12px', display: 'flex', alignItems: 'center', gap: 8 },
     joinBox:    { display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', borderRadius: 12, border: '1.5px solid #e0e4f0', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' },

@@ -25,6 +25,7 @@ import JuegoCalamar from '../JuegoCalamar';
 import MoneyBoard from '../MoneyBoard';
 import EnigmicLogic from '../EnigmicLogic';
 import Visor3D from '../Visor3D';
+import Esculpir3D from '../Esculpir3D';
 import TextWordleGame from '../TextWordleGame';
 import MathWordleGame from '../MathWordleGame';
 import SopaDeLetrasGame from '../SopaDeLetrasGame';
@@ -662,6 +663,17 @@ export const APPS = [
         shareUrl: `${typeof window !== 'undefined' ? window.location.origin : ''}/visor3d`
     },
     {
+        id: 'ESCULPIR_3D',
+        name: 'Esculpir_3D',
+        desc: 'Taller de escultura 3D: talla madera, mármol o arcilla con gubia, cincel, taladro y torno, también con gafas VR.',
+        color: '#b45309',
+        emoji: '🗿',
+        isSpecial: false,
+        isHerramienta: true,
+        shareable: true,
+        shareUrl: `${typeof window !== 'undefined' ? window.location.origin : ''}/esculpir`
+    },
+    {
         id: 'MATH_WORLD_PORTAL',
         name: 'Math World',
         desc: 'Entra a la zona exclusiva de aplicaciones matemáticas.',
@@ -761,6 +773,14 @@ export const APPS = [
 
 // --- CATÁLOGO DE INFORMACIÓN POR JUEGO/HERRAMIENTA ---
 export const GAME_INFO = {
+    ESCULPIR_3D: {
+        descripcion: 'Taller de escultura en 3D. El alumno elige una pieza (bloque, tronco, esfera o una bola de arcilla) y un material (madera con anillos, mármol con vetas, arcilla o jabón, cada uno con su dureza) y la talla con gubia, cincel, taladro, cepillo o lija, o le añade arcilla. Tiene torno para hacer cuerpos de revolución, deshacer, medida del volumen en vivo y exportación a STL para imprimir la pieza en 3D. Se usa con ratón o dedo, y con gafas de realidad virtual (Quest y similares) se esculpe con los mandos: la herramienta va en la mano, el mando vibra al tocar el material y la otra mano gira la pieza.',
+        tipoPreguntas: 'Retos de forma: aparece la silueta de un cubo, cilindro, cono, pirámide, esfera o peón de ajedrez dentro del bloque y hay que tallar hasta igualarla. Al terminar se calcula el parecido (volumen común entre volumen total), cuánto material sobra y cuánto se quitó de más, junto a la fórmula del volumen de la figura. El resultado se puede enviar al profesor.',
+        biblioteca: 'No necesita recursos: los retos y materiales vienen incluidos.',
+        multiplayer: 'Individual. En clase se pueden pasar las gafas por turnos y proyectar la pieza.',
+        materias: ['Plástica', 'Tecnología', 'Matemáticas'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
     VISOR_3D: {
         descripcion: 'Visor de modelos 3D para clase. El alumno gira, acerca y examina piezas reales (un cráneo, una máquina, un templo) arrastrando con el ratón o el dedo, y puede ver la malla de triángulos o reproducir las animaciones que traiga el modelo. Con unas gafas de realidad virtual (Quest y similares) se entra en modo inmersivo: el modelo aparece flotando delante y se agarra, se gira y se agranda con los mandos. El profesor añade modelos descargados de Sketchfab subiéndolos a Cloudinary o pegando su URL, y comparte cada uno con un enlace que funciona sin registrarse.',
         tipoPreguntas: 'Dos modos. En "etiquetas" el profesor marca puntos sobre el modelo (un músculo, una pieza) con su nombre y una explicación, y el alumno los pincha para leerla. En "modo reto" se ocultan los nombres y el alumno debe localizar la pieza que se le pide pinchando el marcador correcto; al terminar puede enviar el resultado al profesor.',
@@ -1779,6 +1799,8 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                 setJuegoActivo({ tipoJuego: 'ARKADE' });
             } else if (path === 'visor3d') {
                 setVisor3dApp(true);
+            } else if (path === 'esculpir') {
+                setEsculpirApp(true);
             } else if (path === 'moneyboard' || path === 'piktboard') {
                 setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'MONEYBOARD' });
             } else if (path === 'calamar') {
@@ -1869,6 +1891,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
     const [pizarraApp,          setPizarraApp]          = useState(false);
     const [biologiaApp,         setBiologiaApp]         = useState(false);
     const [visor3dApp,          setVisor3dApp]          = useState(false);
+    const [esculpirApp,         setEsculpirApp]         = useState(false);
     const [gestionAula,         setGestionAula]         = useState(() => { const p = new URLSearchParams(window.location.search); return !!(p.get('gestion') || p.get('pizarra')); });
     const [vistasDidricas,      setVistasDidricas]      = useState(false);
     const [situacionesAprendizaje, setSituacionesAprendizaje] = useState(false);
@@ -1903,6 +1926,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
     // ¿Quién es quién? usa su propio estado (quienEsQuienApp): refrescar al cerrarlo.
     useEffect(() => { if (!quienEsQuienApp) refrescarRegistros(); }, [quienEsQuienApp]);
     useEffect(() => { if (!quienHistoricoApp) refrescarRegistros(); }, [quienHistoricoApp]);
+    useEffect(() => { if (!esculpirApp) refrescarRegistros(); }, [esculpirApp]);
     const totalRegistros = resumenRegistros.reduce((s, g) => s + g.count, 0);
     const [miAvatar] = useAvatarLocal();
     // Mapeo id-de-tarjeta → tipo-de-registro cuando no coinciden.
@@ -2160,6 +2184,12 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
         if (appId === 'VISOR_3D') {
             window.history.pushState({}, '', '/visor3d');
             setVisor3dApp(true);
+            return;
+        }
+
+        if (appId === 'ESCULPIR_3D') {
+            window.history.pushState({}, '', '/esculpir');
+            setEsculpirApp(true);
             return;
         }
 
@@ -2463,6 +2493,10 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
 
     if (visor3dApp) return (
         <Visor3D usuario={usuario} onExit={() => { setVisor3dApp(false); window.history.pushState({}, '', '/'); }} />
+    );
+
+    if (esculpirApp) return (
+        <Esculpir3D onExit={() => { setEsculpirApp(false); window.history.pushState({}, '', '/'); }} />
     );
 
     if (comunidadesApp) return (
@@ -3662,6 +3696,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                     { id: 'ROBOTICA_BLOQUES', label: 'Programación y robótica', emoji: '🤖', color: '#0EA5E9', action: () => setJuegoActivo({ tipoJuego: 'ROBOTICA_BLOQUES' }), shareable: true, shareUrl: `${window.location.origin}${window.location.pathname}?juego=robotica_bloques` },
                     { id: 'SITUACIONES_APRENDIZAJE', label: 'Situaciones de Aprendizaje', emoji: '🌱', color: '#15803d', action: () => setSituacionesAprendizaje(true), shareable: true, shareUrl: `${window.location.origin}${window.location.pathname}?juego=situaciones_aprendizaje` },
                     { id: 'VISOR_3D', label: 'Visor 3D', emoji: '🧊', color: '#0d9488', action: () => { setVisor3dApp(true); window.history.pushState({}, '', '/visor3d'); }, shareable: true, shareUrl: `${window.location.origin}/visor3d` },
+                    { id: 'ESCULPIR_3D', label: 'Taller de escultura', emoji: '🗿', color: '#b45309', action: () => { setEsculpirApp(true); window.history.pushState({}, '', '/esculpir'); }, shareable: true, shareUrl: `${window.location.origin}/esculpir` },
                 ].map(tool => (
                     <div key={tool.id} onClick={tool.action} style={{ background: '#ffffbf', borderRadius: '15px', padding: '15px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transition: 'transform 0.2s', border: `2px solid ${tool.color}20`, position: 'relative' }}
                         onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-3px)'}

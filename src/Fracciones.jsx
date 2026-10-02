@@ -9,6 +9,10 @@ import { CompeticionCuerda } from './components/TironCuerdaEscena';
 import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
 import PantallaReto, { textoBotonEnvio } from './components/retos/PantallaReto';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
+import { PROBLEMAS_FRACCIONES, PDF_EJERCICIOS_FRACCIONES } from './fraccionesProblemas';
+
+// Fichas imprimibles (editor + PDF + modo pizarra): se carga solo al abrirlas
+const FichasFracciones = React.lazy(() => import('./FichasFracciones'));
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  FRACCIONES — Laboratorio visual + base de ejercicios + tirón de cuerda
@@ -49,8 +53,8 @@ const opera = (a, b, op, extra = 2) => {
     }
 };
 
-const SIGNO_OP = { suma: '+', resta: '−', mult: '×', div: '÷' };
-const COLORES = { A: '#7b1fa2', B: '#00897b', RES: '#E91E63' };
+const SIGNO_OP = { suma: '+', resta: '−', mult: '·', div: ':' };
+export const COLORES = { A: '#7b1fa2', B: '#00897b', C: '#1e88e5', RES: '#E91E63' };
 
 // ─── Presentación de una fracción (n sobre d) ────────────────────────────────
 export const FracTexto = ({ n, d, size = '1.6rem', color = '#2c3e50' }) => {
@@ -67,6 +71,22 @@ export const FracTexto = ({ n, d, size = '1.6rem', color = '#2c3e50' }) => {
         </span>
     );
 };
+
+// ─── Raíz cuadrada que abarca TODA la fracción ───────────────────────────────
+// El signo √ se dibuja en SVG estirado a la altura del contenido y la barra
+// superior (vínculo) cubre numerador y denominador.
+export const RaizFrac = ({ children, size = '1.6rem', color = '#2c3e50' }) => (
+    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle', paddingLeft: `calc(${size} * 0.55)` }}>
+        <svg viewBox="0 0 20 40" preserveAspectRatio="none" aria-hidden="true"
+            style={{ position: 'absolute', left: 0, top: 0, width: `calc(${size} * 0.6)`, height: '100%', overflow: 'visible' }}>
+            <polyline points="0,25 5,21.5 11,39 20,1.2" fill="none" stroke={color} strokeWidth="3"
+                vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
+        </svg>
+        <span style={{ borderTop: `3px solid ${color}`, padding: '4px 4px 0 3px', display: 'inline-flex', alignItems: 'center' }}>
+            {children}
+        </span>
+    </span>
+);
 
 // ─── Líneas de división superpuestas ─────────────────────────────────────────
 // Se pintan ENCIMA del color con halo blanco para que se vean siempre, tanto
@@ -298,6 +318,224 @@ const Stepper = ({ label, valor: v, onChange, color, min = 0, max = 24, disabled
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
+//  OPERACIONES COMBINADAS — árbol de expresión + jerarquía + paso a paso
+//  Nodo: { t:'f', v:[n,d], color? } | { t:'op', op, a, b } | { t:'pot', x, e } | { t:'raiz', x }
+//  Los paréntesis no se guardan: se deducen de la estructura del árbol.
+// ═════════════════════════════════════════════════════════════════════════════
+const PREC = { suma: 1, resta: 1, mult: 2, div: 2 };
+const MOTIVO_OP = { suma: 'suma', resta: 'resta', mult: 'multiplicación', div: 'división' };
+const hoja = (n, d, color) => ({ t: 'f', v: [n, d], ...(color ? { color } : {}) });
+const nodoOp = (op, a, b) => ({ t: 'op', op, a, b });
+
+// Valor de un nodo ([n, d] simplificado) o null si no se puede (÷0, raíz no exacta)
+const evalExpr = (nodo) => {
+    if (nodo.t === 'f') return simplificar(nodo.v[0], nodo.v[1]);
+    if (nodo.t === 'pot') {
+        const x = evalExpr(nodo.x);
+        return x && simplificar(Math.pow(x[0], nodo.e), Math.pow(x[1], nodo.e));
+    }
+    if (nodo.t === 'raiz') {
+        const x = evalExpr(nodo.x);
+        if (!x || x[0] < 0) return null;
+        const rn = Math.sqrt(x[0]), rd = Math.sqrt(x[1]);
+        return Number.isInteger(rn) && Number.isInteger(rd) ? simplificar(rn, rd) : null;
+    }
+    const a = evalExpr(nodo.a), b = evalExpr(nodo.b);
+    if (!a || !b) return null;
+    if (nodo.op === 'div' && b[0] === 0) return null;
+    return opera(a, b, nodo.op);
+};
+
+// ¿Hace falta paréntesis alrededor de «hijo» dentro de «padre»?
+const necesitaParen = (hijo, padre, derecha) => {
+    if (hijo.t === 'f') return derecha && hijo.v[0] < 0; // 1/2 + (−1/3)
+    if (hijo.t !== 'op') return false;
+    if (PREC[hijo.op] < PREC[padre.op]) return true;
+    return derecha && PREC[hijo.op] === PREC[padre.op] && (padre.op === 'resta' || padre.op === 'div');
+};
+
+const fracTxt = ([n, d]) => (d === 1 ? `${n}` : `${n}/${d}`);
+export const exprTexto = (nodo) => {
+    if (nodo.t === 'f') return fracTxt(nodo.v);
+    if (nodo.t === 'pot') return `(${exprTexto(nodo.x)})^${nodo.e}`;
+    if (nodo.t === 'raiz') return `√(${exprTexto(nodo.x)})`;
+    const ta = exprTexto(nodo.a), tb = exprTexto(nodo.b);
+    return `${necesitaParen(nodo.a, nodo, false) ? `(${ta})` : ta} ${SIGNO_OP[nodo.op]} ${necesitaParen(nodo.b, nodo, true) ? `(${tb})` : tb}`;
+};
+
+const nodoEn = (nodo, ruta) => ruta.reduce((n, k) => n[k], nodo);
+const reemplazar = (nodo, ruta, nuevo) => {
+    if (!ruta.length) return nuevo;
+    const [k, ...resto] = ruta;
+    return { ...nodo, [k]: reemplazar(nodo[k], resto, nuevo) };
+};
+
+// Siguiente operación a resolver según la jerarquía: primero lo que está dentro
+// de los paréntesis (los más interiores antes) y, a igual profundidad,
+// potencias y raíces → × ÷ → + −, de izquierda a derecha.
+const siguienteOperacion = (raiz) => {
+    const cands = [];
+    let orden = 0;
+    const visitar = (n, ruta, enParen, prof) => {
+        if (n.t === 'f') return;
+        const p = prof + (enParen ? 1 : 0);
+        if (n.t === 'op') visitar(n.a, [...ruta, 'a'], necesitaParen(n.a, n, false), p);
+        else visitar(n.x, [...ruta, 'x'], n.t === 'pot' && n.x.t !== 'f', p);
+        const listo = n.t === 'op' ? (n.a.t === 'f' && n.b.t === 'f') : n.x.t === 'f';
+        if (listo) {
+            const prioridad = p * 10 + (n.t !== 'op' ? 3 : PREC[n.op]);
+            cands.push({ ruta, nodo: n, prioridad, orden: orden++, enParen, prof: p });
+        }
+        if (n.t === 'op') visitar(n.b, [...ruta, 'b'], necesitaParen(n.b, n, true), p);
+    };
+    visitar(raiz, [], false, 0);
+    cands.sort((x, y) => y.prioridad - x.prioridad || x.orden - y.orden);
+    return cands[0] || null;
+};
+
+// Lista de pasos: [{ expr, marca, motivo, error? }] — el último es el resultado
+export const pasosExpr = (arbol) => {
+    const pasos = [];
+    let actual = arbol;
+    for (let i = 0; i < 20 && actual.t !== 'f'; i++) {
+        const sig = siguienteOperacion(actual);
+        if (!sig) break;
+        const n = sig.nodo;
+        const base = n.t === 'pot' ? 'potencia' : n.t === 'raiz' ? 'raíz' : MOTIVO_OP[n.op];
+        const motivo = sig.enParen ? `paréntesis: ${base}` : sig.prof > 0 ? `${base} (dentro del paréntesis)` : base;
+        const val = evalExpr(n);
+        if (!val) {
+            pasos.push({ expr: actual, marca: sig.ruta, motivo,
+                error: n.t === 'raiz' ? 'La raíz no es exacta' : 'No se puede dividir entre 0' });
+            return pasos;
+        }
+        pasos.push({ expr: actual, marca: sig.ruta, motivo });
+        actual = reemplazar(actual, sig.ruta, hoja(val[0], val[1], COLORES.RES));
+    }
+    pasos.push({ expr: actual, marca: null });
+    return pasos;
+};
+
+// Error típico: operar de izquierda a derecha sin respetar la jerarquía ni los paréntesis
+const evalSinJerarquia = (arbol) => {
+    const tokens = [];
+    const aplanar = (n) => {
+        if (n.t === 'op') { aplanar(n.a); tokens.push(n.op); aplanar(n.b); }
+        else tokens.push(evalExpr(n));
+    };
+    aplanar(arbol);
+    let acc = tokens[0];
+    for (let i = 1; i < tokens.length; i += 2) {
+        const b = tokens[i + 1];
+        if (!acc || !b || (tokens[i] === 'div' && b[0] === 0)) return null;
+        acc = opera(acc, b, tokens[i]);
+    }
+    return acc;
+};
+
+// Genera una expresión combinada con resultado positivo y «tecleable»
+const generarCombinada = (nivel) => {
+    const dens = nivel === 1 ? [2, 3, 4, 6] : nivel === 2 ? [2, 3, 4, 5, 6, 8] : [2, 3, 4, 5, 6, 8, 9, 10];
+    const ops = nivel === 1 ? ['suma', 'resta', 'mult'] : ['suma', 'resta', 'mult', 'div'];
+    const fr = () => {
+        const d = rItem(dens);
+        const libres = Array.from({ length: d - 1 }, (_, i) => i + 1).filter(n => esIrreducible(n, d));
+        return hoja(rItem(libres), d);
+    };
+    const especial = () => {
+        if (Math.random() < 0.5) { const d = rItem([2, 3, 4]); return { t: 'pot', x: hoja(rInt(1, d - 1), d), e: 2 }; }
+        const d = rItem([4, 9, 16, 25, 36]);
+        return { t: 'raiz', x: hoja(rItem([1, 4, 9, 16, 25].filter(x => x < d)), d) };
+    };
+    const hojaAl = () => (nivel === 3 && Math.random() < 0.35 ? especial() : fr());
+    const construir = (k) => {
+        if (k === 1) return hojaAl();
+        const izq = rInt(1, k - 1);
+        return nodoOp(rItem(ops), construir(izq), construir(k - izq));
+    };
+    const recorrer = (n, acc = []) => {
+        acc.push(n);
+        if (n.t === 'op') { recorrer(n.a, acc); recorrer(n.b, acc); }
+        else if (n.t !== 'f') recorrer(n.x, acc);
+        return acc;
+    };
+    const topeN = nivel === 1 ? 30 : 60, topeD = nivel === 1 ? 36 : 72;
+    for (let i = 0; i < 400; i++) {
+        const nHojas = nivel === 1 ? 3 : rItem(nivel === 2 ? [3, 3, 4] : [3, 4, 4]);
+        const arbol = construir(nHojas);
+        const nodos = recorrer(arbol);
+        const precs = nodos.filter(n => n.t === 'op').map(n => PREC[n.op]);
+        // Que haya mezcla de jerarquías (si no, no es «combinada»)
+        if (!precs.includes(1) || !precs.includes(2)) continue;
+        if (nivel === 3 && !nodos.some(n => n.t === 'pot' || n.t === 'raiz')) continue;
+        const valores = nodos.map(evalExpr);
+        if (valores.some(v => !v || v[0] < 0 || v[1] > 144)) continue;
+        const res = valores[0];
+        if (res[0] === 0 || res[0] > topeN || res[1] > topeD) continue;
+        return arbol;
+    }
+    return nodoOp('suma', hoja(1, 2), nodoOp('mult', hoja(1, 3), hoja(3, 4)));
+};
+
+// ─── Expresión combinada en formato matemático ───────────────────────────────
+export const ExprMat = ({ nodo, size = '1.6rem', marca = null, ruta = [] }) => {
+    const esMarca = !!marca && marca.length === ruta.length && marca.every((k, i) => k === ruta[i]);
+    const signo = (s) => <span style={{ fontSize: size, fontWeight: 900, color: '#2c3e50', lineHeight: 1 }}>{s}</span>;
+    let cont;
+    if (nodo.t === 'f') {
+        cont = <FracTexto n={nodo.v[0]} d={nodo.v[1]} size={size} color={nodo.color || COLORES.A} />;
+    } else if (nodo.t === 'pot') {
+        cont = (<>
+            {signo('(')}<ExprMat nodo={nodo.x} size={size} marca={marca} ruta={[...ruta, 'x']} />{signo(')')}
+            <span style={{ fontSize: `calc(${size} * 0.6)`, fontWeight: 900, color: '#16a085', alignSelf: 'flex-start' }}>{nodo.e}</span>
+        </>);
+    } else if (nodo.t === 'raiz') {
+        cont = <RaizFrac size={size}><ExprMat nodo={nodo.x} size={size} marca={marca} ruta={[...ruta, 'x']} /></RaizFrac>;
+    } else {
+        const pa = necesitaParen(nodo.a, nodo, false), pb = necesitaParen(nodo.b, nodo, true);
+        cont = (<>
+            {pa && signo('(')}<ExprMat nodo={nodo.a} size={size} marca={marca} ruta={[...ruta, 'a']} />{pa && signo(')')}
+            {signo(SIGNO_OP[nodo.op])}
+            {pb && signo('(')}<ExprMat nodo={nodo.b} size={size} marca={marca} ruta={[...ruta, 'b']} />{pb && signo(')')}
+        </>);
+    }
+    return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, verticalAlign: 'middle', borderRadius: 8,
+            ...(esMarca ? { background: '#fff3b0', boxShadow: '0 0 0 2px #f1c40f', padding: '2px 4px' } : {}) }}>
+            {cont}
+        </span>
+    );
+};
+
+// Recordatorio de la jerarquía de operaciones
+const JerarquiaGuia = ({ compacto = false }) => (
+    <div style={{ display: 'flex', gap: compacto ? 4 : 6, justifyContent: 'center', flexWrap: 'wrap' }}>
+        {[['1º', '( )', '#8e44ad'], ['2º', 'xⁿ  √', '#16a085'], ['3º', '·  :', '#f39c12'], ['4º', '+  −', '#2ecc71']].map(([n, s, c]) => (
+            <span key={n} style={{ background: c + '1f', border: `2px solid ${c}`, color: c, borderRadius: 10, padding: compacto ? '1px 7px' : '3px 10px', fontWeight: 900, fontSize: compacto ? '0.72rem' : '0.85rem', whiteSpace: 'pre' }}>
+                {n} {s}
+            </span>
+        ))}
+    </div>
+);
+
+// Resolución paso a paso (se resalta la operación que toca en cada línea)
+export const PasosCombinada = ({ arbol, size = '1.3rem' }) => {
+    const pasos = pasosExpr(arbol);
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
+            {pasos.map((p, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'center', maxWidth: '100%' }}>
+                    <span style={{ fontSize: size, fontWeight: 900, color: '#95a5a6', minWidth: 16 }}>{i === 0 ? '' : '='}</span>
+                    <span style={{ maxWidth: '100%', overflowX: 'auto' }}><ExprMat nodo={p.expr} marca={p.marca} size={size} /></span>
+                    {p.marca && !p.error && <span style={{ fontSize: '0.74rem', color: '#b9770f', fontWeight: 800 }}>← {p.motivo}</span>}
+                    {p.error && <span style={{ fontSize: '0.8rem', color: '#e74c3c', fontWeight: 800 }}>⚠️ {p.error}</span>}
+                </div>
+            ))}
+        </div>
+    );
+};
+
+// ═════════════════════════════════════════════════════════════════════════════
 //  1) LABORATORIO / TEORÍA
 // ═════════════════════════════════════════════════════════════════════════════
 const OPERACIONES_LAB = [
@@ -308,17 +546,47 @@ const OPERACIONES_LAB = [
     { id: 'div',   label: '➗ Dividir',      color: '#9b59b6' },
     { id: 'pot',   label: 'xⁿ Potencia',     color: '#16a085' },
     { id: 'raiz',  label: '√ Raíz',          color: '#e67e22' },
+    { id: 'comb',  label: '🧮 Combinadas',   color: '#8e44ad' },
+];
+
+// Plantillas del laboratorio de operaciones combinadas (A, B, C = hojas)
+const potDe = (x) => ({ t: 'pot', x, e: 2 });
+const raizDe = (x) => ({ t: 'raiz', x });
+const PLANTILLAS_COMB = [
+    { id: 'a+bc',    label: 'A + B · C',   build: (A, B, C) => nodoOp('suma', A, nodoOp('mult', B, C)) },
+    { id: '(a+b)c',  label: '(A + B) · C', build: (A, B, C) => nodoOp('mult', nodoOp('suma', A, B), C) },
+    { id: 'ab-c',    label: 'A · B − C',   build: (A, B, C) => nodoOp('resta', nodoOp('mult', A, B), C) },
+    { id: 'a-b:c',   label: 'A − B : C',   build: (A, B, C) => nodoOp('resta', A, nodoOp('div', B, C)) },
+    { id: '(a-b):c', label: '(A − B) : C', build: (A, B, C) => nodoOp('div', nodoOp('resta', A, B), C) },
+    { id: 'a:(b+c)', label: 'A : (B + C)', build: (A, B, C) => nodoOp('div', A, nodoOp('suma', B, C)) },
+    { id: 'a2+bc',   label: 'A² + B · C',  build: (A, B, C) => nodoOp('suma', potDe(A), nodoOp('mult', B, C)) },
+    { id: 'ra-bc',   label: '√A − B : C',  build: (A, B, C) => nodoOp('resta', raizDe(A), nodoOp('div', B, C)) },
 ];
 
 function Laboratorio({ onSalir, isMobile }) {
     const [a, setA] = useState([1, 2]);
     const [b, setB] = useState([1, 3]);
+    const [c, setC] = useState([3, 4]);
+    const [plantilla, setPlantilla] = useState(PLANTILLAS_COMB[0].id);
     const [op, setOp] = useState('suma');
     const [exp, setExp] = useState(2);
     const [factor, setFactor] = useState(2);
     const [vista, setVista] = useState('combi'); // 'v' | 'h' | 'combi' (solo suma/resta)
 
     const usaB = ['suma', 'resta', 'mult', 'div'].includes(op);
+    const esComb = op === 'comb';
+    const arbolComb = esComb
+        ? (PLANTILLAS_COMB.find(p => p.id === plantilla) || PLANTILLAS_COMB[0]).build(hoja(a[0], a[1], COLORES.A), hoja(b[0], b[1], COLORES.B), hoja(c[0], c[1], COLORES.C))
+        : null;
+    const pasosComb = esComb ? pasosExpr(arbolComb) : [];
+    const finComb = pasosComb[pasosComb.length - 1];
+    const errorComb = pasosComb.find(p => p.error);
+    const aleatorioComb = () => {
+        const f = () => { const d = rInt(2, 8); return [rInt(1, d - 1), d]; };
+        if (plantilla === 'ra-bc') { const d = rItem([4, 9, 16, 25, 36]); setA([rItem([1, 4, 9, 16, 25].filter(x => x < d)), d]); }
+        else setA(f());
+        setB(f()); setC(f());
+    };
     const [an, ad] = a, [bn, bd] = b;
 
     // Para la raíz exacta usamos cuadrados perfectos del numerador/denominador
@@ -351,7 +619,8 @@ function Laboratorio({ onSalir, isMobile }) {
         <div style={{ maxWidth: 980, margin: '0 auto', width: '100%' }}>
             <div style={{ display: 'flex', gap: 14, flexDirection: isMobile ? 'column' : 'row', marginBottom: 14 }}>
                 <Tarjeta titulo="Fracción A" frac={a} setFrac={setA} color={COLORES.A} />
-                {usaB && <Tarjeta titulo="Fracción B" frac={b} setFrac={setB} color={COLORES.B} />}
+                {(usaB || esComb) && <Tarjeta titulo="Fracción B" frac={b} setFrac={setB} color={COLORES.B} />}
+                {esComb && <Tarjeta titulo="Fracción C" frac={c} setFrac={setC} color={COLORES.C} />}
             </div>
 
             {/* Selector de operación */}
@@ -381,6 +650,20 @@ function Laboratorio({ onSalir, isMobile }) {
                     ))}
                 </div>
             )}
+            {esComb && (
+                <div style={{ display: 'flex', gap: 6, justifyContent: 'center', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap' }}>
+                    {PLANTILLAS_COMB.map(p => (
+                        <button key={p.id} onClick={() => setPlantilla(p.id)}
+                            style={{ padding: '7px 13px', borderRadius: 20, border: '2px solid #8e44ad', background: plantilla === p.id ? '#8e44ad' : 'white', color: plantilla === p.id ? 'white' : '#8e44ad', fontWeight: 900, fontSize: isMobile ? '0.78rem' : '0.86rem', cursor: 'pointer', touchAction: 'manipulation' }}>
+                            {p.label}
+                        </button>
+                    ))}
+                    <button onClick={aleatorioComb} title="Fracciones al azar"
+                        style={{ padding: '7px 13px', borderRadius: 20, border: '2px dashed #8e44ad', background: '#f5eefa', color: '#8e44ad', fontWeight: 900, fontSize: isMobile ? '0.78rem' : '0.86rem', cursor: 'pointer', touchAction: 'manipulation' }}>
+                        🎲 Al azar
+                    </button>
+                </div>
+            )}
             {op === 'raiz' && !raizExacta && (
                 <div style={{ textAlign: 'center', background: '#fff8e1', border: '2px solid #f39c12', borderRadius: 14, padding: '10px 14px', color: '#b9770f', fontWeight: 700, fontSize: '0.86rem', marginBottom: 14 }}>
                     ⚠️ La raíz solo es exacta si el numerador y el denominador son cuadrados perfectos (1, 4, 9, 16, 25…). Prueba por ejemplo con <b>4/9</b> o <b>9/16</b>.
@@ -389,19 +672,41 @@ function Laboratorio({ onSalir, isMobile }) {
 
             {/* Resultado + explicación visual */}
             <div style={{ background: 'white', borderRadius: 20, padding: isMobile ? '16px 12px' : '22px 20px', boxShadow: '0 10px 28px rgba(0,0,0,0.09)', border: `3px solid ${opColor}33` }}>
+                {/* Operaciones combinadas: expresión + jerarquía + paso a paso */}
+                {esComb && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, flexWrap: 'wrap' }}>
+                            <span style={{ maxWidth: '100%', overflowX: 'auto' }}><ExprMat nodo={arbolComb} size={isMobile ? '1.6rem' : '2rem'} /></span>
+                            <span style={{ fontSize: isMobile ? '1.6rem' : '2rem', fontWeight: 900, color: '#2c3e50' }}>=</span>
+                            {errorComb
+                                ? <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#95a5a6' }}>{errorComb.error.toLowerCase()}</span>
+                                : <FracTexto n={finComb.expr.v[0]} d={finComb.expr.v[1]} size={isMobile ? '2rem' : '2.4rem'} color={COLORES.RES} />}
+                        </div>
+                        <div style={{ textAlign: 'center' }}>
+                            <div style={{ fontSize: '0.8rem', color: '#7f8c8d', fontWeight: 800, marginBottom: 6 }}>Orden de las operaciones (jerarquía)</div>
+                            <JerarquiaGuia />
+                        </div>
+                        <div style={{ background: '#faf6fd', borderRadius: 14, padding: isMobile ? '12px 6px' : '14px 12px', border: '2px dashed #d7bde2' }}>
+                            <div style={{ fontSize: '0.8rem', color: '#8e44ad', fontWeight: 900, marginBottom: 10, textAlign: 'center' }}>🪜 Paso a paso (en amarillo, la operación que toca)</div>
+                            <PasosCombinada arbol={arbolComb} size={isMobile ? '1.15rem' : '1.4rem'} />
+                        </div>
+                    </div>
+                )}
+
                 {/* Expresión */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
-                    {op === 'raiz' && <span style={{ fontSize: isMobile ? '2rem' : '2.4rem', fontWeight: 900, color: '#2c3e50' }}>√</span>}
-                    <FracTexto n={an} d={ad} size={isMobile ? '1.9rem' : '2.3rem'} color={COLORES.A} />
+                {!esComb && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
+                    {op === 'raiz'
+                        ? <RaizFrac size={isMobile ? '1.9rem' : '2.3rem'}><FracTexto n={an} d={ad} size={isMobile ? '1.9rem' : '2.3rem'} color={COLORES.A} /></RaizFrac>
+                        : <FracTexto n={an} d={ad} size={isMobile ? '1.9rem' : '2.3rem'} color={COLORES.A} />}
                     {op === 'pot' && <span style={{ fontSize: isMobile ? '1.3rem' : '1.6rem', fontWeight: 900, color: '#16a085', alignSelf: 'flex-start' }}>{exp}</span>}
-                    {op === 'equiv' && <span style={{ fontSize: isMobile ? '1.4rem' : '1.8rem', fontWeight: 900, color: '#3498db' }}>× {factor}/{factor}</span>}
+                    {op === 'equiv' && <span style={{ fontSize: isMobile ? '1.4rem' : '1.8rem', fontWeight: 900, color: '#3498db' }}>· {factor}/{factor}</span>}
                     {usaB && <><span style={{ fontSize: isMobile ? '1.6rem' : '2rem', fontWeight: 900, color: '#2c3e50' }}>{SIGNO_OP[op]}</span><FracTexto n={bn} d={bd} size={isMobile ? '1.9rem' : '2.3rem'} color={COLORES.B} /></>}
                     <span style={{ fontSize: isMobile ? '1.6rem' : '2rem', fontWeight: 900, color: '#2c3e50' }}>=</span>
                     {resultado
                         ? <FracTexto n={resultado[0]} d={resultado[1]} size={isMobile ? '2.1rem' : '2.6rem'} color={COLORES.RES} />
                         : <span style={{ fontSize: '1.4rem', fontWeight: 800, color: '#95a5a6' }}>no exacta</span>}
                     {resultado && <span style={{ fontSize: '0.9rem', color: '#95a5a6', fontWeight: 700 }}>= {(resultado[0] / resultado[1]).toFixed(3).replace(/0+$/, '').replace(/\.$/, '')}</span>}
-                </div>
+                </div>}
 
                 {/* Explicación visual por operación */}
                 {op === 'equiv' && (
@@ -457,7 +762,7 @@ function Laboratorio({ onSalir, isMobile }) {
                         </div>
                         <RejillaProducto a={a} b={b} alto={isMobile ? 120 : 160} />
                         <div style={{ textAlign: 'center', marginTop: 10, fontWeight: 800, color: COLORES.RES }}>
-                            {an}×{bn} = {an * bn} partes de {ad}×{bd} = {ad * bd}
+                            {an}·{bn} = {an * bn} partes de {ad}·{bd} = {ad * bd}
                         </div>
                     </div>
                 )}
@@ -465,7 +770,7 @@ function Laboratorio({ onSalir, isMobile }) {
                 {op === 'div' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                         <div style={{ fontSize: '0.8rem', color: '#7f8c8d', fontWeight: 800, textAlign: 'center' }}>
-                            Dividir es multiplicar por la inversa: {an}/{ad} × {bd}/{bn}
+                            Dividir es multiplicar por la inversa: {an}/{ad} · {bd}/{bn}
                         </div>
                         <BarraDivision a={a} b={b} alto={isMobile ? 40 : 48} />
                         <BarraFraccion n={resultado[0]} d={resultado[1]} color={COLORES.RES} alto={isMobile ? 42 : 52} etiqueta={`Resultado: ${resultado[0]}/${resultado[1]}`} />
@@ -498,8 +803,10 @@ function Laboratorio({ onSalir, isMobile }) {
                             El cuadrado tiene {ad} casillas ({Math.sqrt(ad)}×{Math.sqrt(ad)}) y hay {an} pintadas ({Math.sqrt(an)}×{Math.sqrt(an)}). El <b>lado</b> pintado es la raíz.
                         </div>
                         <CuadradoRaiz n={an} d={ad} lado={isMobile ? 130 : 170} />
-                        <div style={{ textAlign: 'center', marginTop: 10, fontWeight: 800, color: COLORES.RES }}>
-                            √({an}/{ad}) = {Math.sqrt(an)}/{Math.sqrt(ad)}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 10, fontWeight: 800, color: COLORES.RES }}>
+                            <RaizFrac size="1.3rem" color={COLORES.RES}><FracTexto n={an} d={ad} size="1.3rem" color={COLORES.RES} /></RaizFrac>
+                            <span>=</span>
+                            <FracTexto n={Math.sqrt(an)} d={Math.sqrt(ad)} size="1.3rem" color={COLORES.RES} />
                         </div>
                     </div>
                 )}
@@ -525,6 +832,7 @@ export const TIPOS_EJERCICIO = {
     div:         { label: '➗ Dividir',      color: '#9b59b6' },
     pot:         { label: 'xⁿ Potencia',     color: '#1abc9c' },
     raiz:        { label: '√ Raíz',          color: '#e67e22' },
+    combinadas:  { label: '🧮 Combinadas',   color: '#8e44ad' },
 };
 
 const DENOMS_FACIL = [2, 3, 4, 5, 6, 8, 10];
@@ -560,6 +868,14 @@ export const generarEjercicio = (tiposActivos, nivel = 1) => {
         return { tipo, enunciado: `Simplifica ${n * k}/${d * k} hasta la fracción irreducible`,
                  visual: { modo: 'barra', n: n * k, d: d * k, color: COLORES.A },
                  respuesta: simplificar(n * k, d * k), exigirIrreducible: true, solucion: `${simplificar(n * k, d * k).join('/')}` };
+    }
+
+    if (tipo === 'combinadas') {
+        const arbol = generarCombinada(nivel);
+        const res = evalExpr(arbol);
+        return { tipo, enunciado: `Calcula ${exprTexto(arbol)}`, visual: { modo: 'comb', arbol },
+                 respuesta: res, exigirIrreducible: true, solucion: res.join('/'),
+                 distractores: [evalSinJerarquia(arbol)] };
     }
 
     if (tipo === 'pot') {
@@ -620,6 +936,7 @@ const opcionesDe = (ej) => {
         if (cand.some(c => c[0] === s[0] && c[1] === s[1])) return;
         cand.push(s);
     };
+    (ej.distractores || []).forEach(f => f && push(f[0], f[1]));
     if (ej.visual?.modo === 'dos') {
         const [[an, ad], [bn, bd]] = [ej.visual.a, ej.visual.b];
         push(an + bn, ad + bd);          // error clásico: sumar en cruz
@@ -660,12 +977,19 @@ const VisualEjercicio = ({ ej, isMobile, compacto = false }) => {
         ? <RejillaProducto a={[v.n, v.d]} b={[v.n, v.d]} alto={compacto ? 90 : isMobile ? 120 : 150} />
         : <BarraFraccion n={v.n} d={v.d} color={COLORES.A} alto={alto} />;
     if (v.modo === 'raiz') return <CuadradoRaiz n={v.n} d={v.d} lado={compacto ? 100 : isMobile ? 120 : 150} />;
+    if (v.modo === 'comb') return <JerarquiaGuia compacto={compacto} />;
     return null;
 };
 
 // ─── Enunciado en formato matemático ─────────────────────────────────────────
-const EnunciadoMat = ({ ej, size = '2rem' }) => {
+export const EnunciadoMat = ({ ej, size = '2rem' }) => {
     const v = ej.visual || {};
+    if (v.modo === 'comb') return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, maxWidth: '100%', overflowX: 'auto', padding: '4px 2px' }}>
+            <ExprMat nodo={v.arbol} size={`calc(${size} * 0.8)`} />
+            <span style={{ fontSize: size, fontWeight: 900, color: '#2c3e50' }}>=</span>
+        </span>
+    );
     if (v.modo === 'dos') return (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
             <FracTexto n={v.a[0]} d={v.a[1]} size={size} color={COLORES.A} />
@@ -685,8 +1009,7 @@ const EnunciadoMat = ({ ej, size = '2rem' }) => {
     );
     if (v.modo === 'raiz') return (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: size, fontWeight: 900, color: '#2c3e50' }}>√</span>
-            <FracTexto n={v.n} d={v.d} size={size} color={COLORES.A} />
+            <RaizFrac size={size}><FracTexto n={v.n} d={v.d} size={size} color={COLORES.A} /></RaizFrac>
             <span style={{ fontSize: size, fontWeight: 900, color: '#2c3e50' }}>=</span>
         </span>
     );
@@ -856,6 +1179,9 @@ const MODOS_PRESET = [
     { id: 'HARD', icon: '🔥', label: 'Difícil', desc: 'Todo, con potencias y raíces', color: '#e74c3c',
       chips: ['✖️', '➗', 'xⁿ', '√'],
       cfg: { tipos: Object.keys(TIPOS_EJERCICIO), nivel: 3, tiempo: 120, numEjercicios: null } },
+    { id: 'COMB', icon: '🧮', label: 'Operaciones combinadas', desc: 'Paréntesis, potencias y raíces, · : y + − en el orden correcto', color: '#8e44ad',
+      chips: ['( )', 'xⁿ √', '· :', '+ −'],
+      cfg: { tipos: ['combinadas'], nivel: 2, tiempo: 180, numEjercicios: null } },
     { id: 'CUSTOM', icon: '⚙️', label: 'Configurado', desc: 'Elige tipos, nivel y tiempo', color: '#9b59b6', chips: null, cfg: null },
 ];
 
@@ -971,13 +1297,345 @@ const PanelCuerdaFracciones = ({ equipo, aplicar, bloqueado, tipos, nivel, isMob
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
+//  4) PROBLEMAS — fracción de una cantidad (datos en fraccionesProblemas.js)
+// ═════════════════════════════════════════════════════════════════════════════
+const CATS_PROBLEMAS = {
+    todos:     { label: '📚 Todos',                         color: '#7b1fa2' },
+    total:     { label: '🔢 Se conoce el total',            color: '#00897b' },
+    averiguar: { label: '🔍 Hay que averiguar el total',    color: '#e67e22' },
+};
+
+// Acepta «1500», «1.500», «1 500», «12,5» o «12.5»
+const leerNumero = (txt) => {
+    let t = String(txt || '').trim().replace(/\s/g, '').replace(/[€a-zA-Z²]/g, '');
+    if (!t) return NaN;
+    if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.');
+    else if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, '');
+    return Number(t);
+};
+export const textoRespuesta = (q) => (q.tipo === 'frac' ? `${q.r[0]}/${q.r[1]}` : q.tipo === 'num' ? `${q.r}${q.unidad ? ` ${q.unidad}` : ''}` : q.r);
+
+// Barra del total partida en trozos iguales con el valor de cada trozo
+export const BarraCantidad = ({ barra, mostrarValores = true, isMobile }) => {
+    const { d, total, unidad = '', tramos } = barra;
+    const trozo = total / d;
+    const colores = [];
+    tramos.forEach(t => { for (let i = 0; i < t.n; i++) colores.push(t.color); });
+    const verTrozo = mostrarValores && d <= (isMobile ? 10 : 15);
+    return (
+        <div>
+            <div style={{ textAlign: 'center', fontWeight: 900, color: '#2c3e50', fontSize: '0.85rem', marginBottom: 4 }}>
+                Total: {mostrarValores ? `${total} ${unidad}` : '?'} · {d} partes iguales{mostrarValores ? ` de ${trozo} ${unidad}` : ''}
+            </div>
+            <div style={{ display: 'flex', height: isMobile ? 38 : 44, borderRadius: 10, overflow: 'hidden', border: '3px solid #2c3e50' }}>
+                {colores.map((c, i) => (
+                    <div key={i} style={{ flex: 1, background: c, borderLeft: i ? '2px solid white' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: c === '#cfd8dc' ? '#455a64' : 'white', fontWeight: 900, fontSize: isMobile ? '0.62rem' : '0.75rem', minWidth: 0 }}>
+                        {verTrozo ? trozo : ''}
+                    </div>
+                ))}
+            </div>
+            <div style={{ display: 'flex', marginTop: 4 }}>
+                {tramos.map((t, i) => (
+                    <div key={i} style={{ flex: t.n, textAlign: 'center', fontSize: isMobile ? '0.68rem' : '0.78rem', fontWeight: 800, color: t.color === '#cfd8dc' ? '#607d8b' : t.color, borderTop: `3px solid ${t.color}`, paddingTop: 2, margin: '0 1px', minWidth: 0 }}>
+                        {t.n}/{d} {t.etiqueta}{mostrarValores ? ` = ${+(t.n * trozo).toFixed(2)} ${unidad}` : ''}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+const BtnPdfEjercicios = ({ compacto = false }) => (
+    <a href={PDF_EJERCICIOS_FRACCIONES} target="_blank" rel="noopener noreferrer"
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: compacto ? '7px 14px' : '10px 18px', borderRadius: 24, background: '#c0392b', color: 'white', fontWeight: 800, fontSize: compacto ? '0.8rem' : '0.9rem', textDecoration: 'none', boxShadow: '0 3px 0 #922b21' }}>
+        📄 Descargar PDF de ejercicios y cálculos
+    </a>
+);
+
+function ProblemasFracciones({ isMobile, onSalir, usuario }) {
+    const [fase, setFase] = useState('ELEGIR'); // ELEGIR | JUGANDO | FIN
+    const [filtro, setFiltro] = useState('todos');
+    const [aleatorio, setAleatorio] = useState(false);
+    const [lista, setLista] = useState([]);
+    const [idx, setIdx] = useState(0);
+    const [estados, setEstados] = useState([]); // por pregunta: { estado: null|'ok'|'visto', fallado, dada }
+    const [entrada, setEntrada] = useState({ num: '', fn: '', fd: '' });
+    const [feedback, setFeedback] = useState(null);
+    const [verPista, setVerPista] = useState(false);
+    const [stats, setStats] = useState({ aciertos: 0, fallos: 0, skips: 0, puntos: 0 });
+    const [detalle, setDetalle] = useState([]);
+    const [mostrarEnvio, setMostrarEnvio] = useState(false);
+    const [guardado, setGuardado] = useState(false);
+
+    const disponibles = PROBLEMAS_FRACCIONES.filter(p => filtro === 'todos' || p.cat === filtro);
+    const prob = lista[idx];
+    const qi = estados.findIndex(e => !e.estado);
+    const q = prob && qi >= 0 ? prob.preguntas[qi] : null;
+    const terminado = !!prob && qi === -1;
+
+    const prepararProblema = (p) => {
+        setEstados(p.preguntas.map(() => ({ estado: null, fallado: false, dada: '' })));
+        setEntrada({ num: '', fn: '', fd: '' });
+        setFeedback(null); setVerPista(false);
+    };
+
+    const empezar = (soloUno = null) => {
+        despertarAudio();
+        const l = soloUno ? [soloUno] : (aleatorio ? mezclar(disponibles) : disponibles);
+        setLista(l); setIdx(0);
+        setStats({ aciertos: 0, fallos: 0, skips: 0, puntos: 0 });
+        setDetalle([]); setGuardado(false);
+        prepararProblema(l[0]);
+        setFase('JUGANDO');
+    };
+
+    const registrar = (pregunta, ok, saltado, dada) => {
+        setDetalle(d => [...d.slice(-79), { tipo: 'problemas', enunciado: pregunta.p, solucion: textoRespuesta(pregunta), respuesta: dada, ok, saltado }]);
+    };
+
+    const resolver = (estado, dada) => setEstados(es => es.map((e, i) => (i === qi ? { ...e, estado, dada } : e)));
+
+    const comprobar = (opcion = null) => {
+        if (!q || feedback) return;
+        let ok = false, dada = '';
+        if (q.tipo === 'num') {
+            const v = leerNumero(entrada.num);
+            if (Number.isNaN(v)) return;
+            ok = Math.abs(v - q.r) < 0.01; dada = entrada.num;
+        } else if (q.tipo === 'frac') {
+            const n = leerNumero(entrada.fn), d = leerNumero(entrada.fd);
+            if (Number.isNaN(n) || Number.isNaN(d) || d === 0) return;
+            ok = Math.abs(n / d - q.r[0] / q.r[1]) < 1e-9; dada = `${n}/${d}`;
+        } else {
+            ok = opcion === q.r; dada = opcion;
+        }
+        const yaFallada = estados[qi]?.fallado;
+        if (ok) {
+            sonidoCorrecto();
+            setStats(s => ({ ...s, aciertos: s.aciertos + (yaFallada ? 0 : 1), puntos: s.puntos + (yaFallada ? 5 : 10) }));
+            if (!yaFallada) registrar(q, true, false, dada);
+            resolver('ok', dada);
+            setEntrada({ num: '', fn: '', fd: '' });
+            setFeedback('CORRECT');
+            setTimeout(() => setFeedback(null), 600);
+        } else {
+            sonidoIncorrecto();
+            if (!yaFallada) {
+                setStats(s => ({ ...s, fallos: s.fallos + 1 }));
+                registrar(q, false, false, dada);
+                setEstados(es => es.map((e, i) => (i === qi ? { ...e, fallado: true } : e)));
+            }
+            setFeedback('INCORRECT');
+            setTimeout(() => setFeedback(null), 800);
+        }
+    };
+
+    const verSolucion = () => {
+        if (!q) return;
+        sonidoPasar();
+        if (!estados[qi]?.fallado) { setStats(s => ({ ...s, fallos: s.fallos + 1, skips: s.skips + 1 })); registrar(q, false, true, '—'); }
+        else setStats(s => ({ ...s, skips: s.skips + 1 }));
+        resolver('visto', textoRespuesta(q));
+        setEntrada({ num: '', fn: '', fd: '' });
+    };
+
+    const siguiente = () => {
+        if (idx + 1 >= lista.length) { sonidoFinal(); setFase('FIN'); return; }
+        setIdx(i => i + 1);
+        prepararProblema(lista[idx + 1]);
+    };
+
+    const guardarLocal = () => {
+        const intentos = stats.aciertos + stats.fallos;
+        guardarRegistroLocal('FRACCIONES', {
+            titulo: 'Fracciones · Problemas', aciertos: stats.aciertos, intentos,
+            porcentaje: Math.round((stats.aciertos / Math.max(1, intentos)) * 100),
+            nombre: usuario?.nombre || usuario?.displayName || '', curso: '', via: 'local',
+        });
+        setGuardado(true);
+    };
+
+    const inputSt = { padding: '10px 12px', borderRadius: 12, border: '2px solid #b39ddb', fontSize: '1.3rem', fontWeight: 800, textAlign: 'center', outline: 'none', color: '#2c3e50', boxSizing: 'border-box' };
+    const onEnter = (e) => { if (e.key === 'Enter') comprobar(); };
+
+    // ── Elegir problemas ──
+    if (fase === 'ELEGIR') return (
+        <div style={{ ...st.centerCard, maxWidth: 680 }}>
+            <h2 style={{ color: '#7b1fa2', margin: '0 0 6px', fontSize: isMobile ? '1.3rem' : '1.6rem' }}>📖 Problemas con fracciones</h2>
+            <p style={{ color: '#888', fontSize: '0.88rem', margin: '0 0 12px' }}>Fracción de una cantidad: a veces se conoce el total y otras hay que averiguarlo.</p>
+            <div style={{ marginBottom: 14 }}><BtnPdfEjercicios /></div>
+            <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
+                {Object.entries(CATS_PROBLEMAS).map(([k, c]) => (
+                    <button key={k} onClick={() => setFiltro(k)}
+                        style={{ padding: '7px 13px', borderRadius: 20, border: `2px solid ${c.color}`, background: filtro === k ? c.color : 'white', color: filtro === k ? 'white' : c.color, fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer' }}>
+                        {c.label}
+                    </button>
+                ))}
+            </div>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', color: '#555', fontWeight: 700, marginBottom: 12, cursor: 'pointer' }}>
+                <input type="checkbox" checked={aleatorio} onChange={e => setAleatorio(e.target.checked)} /> Orden aleatorio
+            </label>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+                <button onClick={() => empezar()} style={{ ...st.btnPrimary, background: '#7b1fa2' }}>▶ Empezar ({disponibles.length} problemas)</button>
+            </div>
+            <div style={{ fontSize: '0.78rem', color: '#999', fontWeight: 700, marginBottom: 6 }}>…o elige uno concreto:</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, textAlign: 'left' }}>
+                {disponibles.map((p, i) => (
+                    <button key={p.id} onClick={() => empezar(p)}
+                        style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '9px 12px', borderRadius: 12, border: '1px solid #e1d5ee', background: '#fbf8fd', cursor: 'pointer', textAlign: 'left' }}>
+                        <span style={{ fontSize: '1.3rem' }}>{p.emoji}</span>
+                        <span style={{ flex: 1, minWidth: 0, fontSize: '0.82rem', color: '#444', lineHeight: 1.35 }}>
+                            <b style={{ color: CATS_PROBLEMAS[p.cat].color }}>{i + 1}.</b> {p.texto.length > 120 ? p.texto.slice(0, 120) + '…' : p.texto}
+                        </span>
+                    </button>
+                ))}
+            </div>
+            <div style={{ marginTop: 16 }}>
+                <button onClick={onSalir} style={{ padding: '11px 24px', borderRadius: 30, border: '2px solid #bdc3c7', background: 'white', color: '#7f8c8d', fontWeight: 800, cursor: 'pointer' }}>← Menú</button>
+            </div>
+        </div>
+    );
+
+    // ── Resultados ──
+    if (fase === 'FIN') {
+        const intentos = stats.aciertos + stats.fallos;
+        return (
+            <div style={{ ...st.centerCard, maxWidth: 480 }}>
+                {mostrarEnvio && (
+                    <ModalEnviarProfe onClose={() => setMostrarEnvio(false)}
+                        datos={{ ...stats, detalle, config: { tipos: ['problemas'], nivel: null, tiempo: null, numEjercicios: lista.length } }} />
+                )}
+                <Trophy size={64} color="#f1c40f" style={{ marginBottom: 10 }} />
+                <h2 style={{ color: '#2c3e50', margin: '0 0 6px' }}>¡Problemas terminados!</h2>
+                <div style={{ color: '#7f8c8d', marginBottom: 14 }}>{lista.length} problema{lista.length === 1 ? '' : 's'} · {stats.puntos} puntos</div>
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginBottom: 18, flexWrap: 'wrap' }}>
+                    <div style={{ ...st.scoreBoard, color: '#27ae60' }}>✅ {stats.aciertos} a la primera</div>
+                    <div style={{ ...st.scoreBoard, color: '#e74c3c' }}>❌ {stats.fallos}</div>
+                    <div style={{ ...st.scoreBoard, color: '#7b1fa2' }}>{Math.round((stats.aciertos / Math.max(1, intentos)) * 100)} %</div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
+                    <button onClick={() => setFase('ELEGIR')} style={{ ...st.btnPrimary, background: '#7b1fa2' }}>🔁 Más problemas</button>
+                    <button onClick={guardarLocal} disabled={guardado} style={{ ...st.btnPrimary, background: guardado ? '#95a5a6' : '#16a085' }}>{guardado ? '✅ Guardado' : '💾 Guardar en mis registros'}</button>
+                    <button onClick={() => setMostrarEnvio(true)} style={{ ...st.btnPrimary, background: '#3498db' }}>📤 Enviar al profesor</button>
+                    <button onClick={onSalir} style={{ padding: '10px 22px', borderRadius: 30, border: '2px solid #bdc3c7', background: 'white', color: '#7f8c8d', fontWeight: 800, cursor: 'pointer' }}>← Menú</button>
+                </div>
+            </div>
+        );
+    }
+
+    // ── Resolviendo un problema ──
+    const cat = CATS_PROBLEMAS[prob.cat];
+    const borde = feedback === 'CORRECT' ? '#2ecc71' : feedback === 'INCORRECT' ? '#e74c3c' : 'transparent';
+    return (
+        <div style={{ ...st.centerCard, maxWidth: 640, textAlign: 'left', border: `4px solid ${borde}`, transition: 'border-color 0.2s' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+                <span style={{ padding: '3px 12px', borderRadius: 20, background: cat.color + '22', color: cat.color, fontWeight: 800, fontSize: '0.78rem' }}>{cat.label}</span>
+                <span style={{ fontWeight: 800, color: '#7b1fa2', fontSize: '0.85rem' }}>Problema {idx + 1}/{lista.length} · 🏆 {stats.puntos}</span>
+            </div>
+            <div style={{ display: 'flex', gap: 10, background: '#faf6fd', border: '2px solid #e1d5ee', borderRadius: 14, padding: '12px 14px', marginBottom: 14 }}>
+                <span style={{ fontSize: '1.8rem' }}>{prob.emoji}</span>
+                <p style={{ margin: 0, color: '#2c3e50', fontSize: isMobile ? '0.95rem' : '1.05rem', lineHeight: 1.5, fontWeight: 600 }}>{prob.texto}</p>
+            </div>
+
+            {/* Preguntas guiadas */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {prob.preguntas.map((pq, i) => {
+                    const e = estados[i] || {};
+                    if (i > qi && qi !== -1) return null;
+                    const actual = i === qi;
+                    return (
+                        <div key={i} style={{ borderRadius: 12, padding: '10px 12px', border: `2px solid ${actual ? '#b39ddb' : e.estado === 'ok' ? '#a5d6a7' : '#ffe0b2'}`, background: actual ? 'white' : e.estado === 'ok' ? '#f1f8e9' : '#fff8e1' }}>
+                            <div style={{ fontWeight: 800, color: '#2c3e50', fontSize: '0.92rem', marginBottom: actual ? 8 : 2 }}>{i + 1}) {pq.p}</div>
+                            {!actual && (
+                                <div style={{ fontWeight: 900, color: e.estado === 'ok' ? '#27ae60' : '#e67e22', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    {e.estado === 'ok' ? '✅' : '👀'}
+                                    {pq.tipo === 'frac' ? <FracTexto n={pq.r[0]} d={pq.r[1]} size="1.2rem" color={e.estado === 'ok' ? '#27ae60' : '#e67e22'} /> : textoRespuesta(pq)}
+                                </div>
+                            )}
+                            {actual && (
+                                <>
+                                    {pq.tipo === 'num' && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                            <input value={entrada.num} onChange={ev => setEntrada(s => ({ ...s, num: ev.target.value }))} onKeyDown={onEnter}
+                                                inputMode="decimal" placeholder="?" autoFocus style={{ ...inputSt, width: 150 }} />
+                                            {pq.unidad && <span style={{ fontWeight: 800, color: '#7f8c8d' }}>{pq.unidad}</span>}
+                                        </div>
+                                    )}
+                                    {pq.tipo === 'frac' && (
+                                        <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                                            <input value={entrada.fn} onChange={ev => setEntrada(s => ({ ...s, fn: ev.target.value }))} onKeyDown={onEnter}
+                                                inputMode="numeric" placeholder="num" autoFocus style={{ ...inputSt, width: 90, padding: '6px 8px' }} />
+                                            <div style={{ width: 100, height: 3, background: '#2c3e50', borderRadius: 2 }} />
+                                            <input value={entrada.fd} onChange={ev => setEntrada(s => ({ ...s, fd: ev.target.value }))} onKeyDown={onEnter}
+                                                inputMode="numeric" placeholder="den" style={{ ...inputSt, width: 90, padding: '6px 8px' }} />
+                                        </div>
+                                    )}
+                                    {pq.tipo === 'opcion' && (
+                                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                            {pq.opciones.map(o => (
+                                                <button key={o} onClick={() => comprobar(o)} disabled={!!feedback}
+                                                    style={{ padding: '10px 22px', borderRadius: 12, border: '2px solid #7b1fa2', background: 'white', color: '#7b1fa2', fontWeight: 900, fontSize: '1.1rem', cursor: 'pointer' }}>{o}</button>
+                                            ))}
+                                        </div>
+                                    )}
+                                    <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                                        {pq.tipo !== 'opcion' && (
+                                            <button onClick={() => comprobar()} style={{ ...st.btnSuccess, padding: '10px 18px', fontSize: '1rem' }}><CheckCircle size={18} /> Comprobar</button>
+                                        )}
+                                        {prob.barra && !verPista && (
+                                            <button onClick={() => setVerPista(true)} style={{ padding: '10px 14px', borderRadius: 14, border: '2px solid #3498db', background: 'white', color: '#3498db', fontWeight: 800, cursor: 'pointer' }}>💡 Pista</button>
+                                        )}
+                                        <button onClick={verSolucion} style={{ padding: '10px 14px', borderRadius: 14, border: '2px solid #f39c12', background: 'white', color: '#e67e22', fontWeight: 800, cursor: 'pointer' }}>👀 Ver solución</button>
+                                    </div>
+                                    {feedback === 'INCORRECT' && <div style={{ marginTop: 8, color: '#e74c3c', fontWeight: 800 }}>❌ No es correcto, revísalo</div>}
+                                </>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+
+            {/* Pista: la barra sin valores */}
+            {prob.barra && verPista && !terminado && (
+                <div style={{ marginTop: 14, background: '#eef6fd', borderRadius: 12, padding: '10px 12px', border: '2px dashed #90caf9' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#1e88e5', fontWeight: 900, marginBottom: 6 }}>💡 Dibuja el total como una barra partida en partes iguales</div>
+                    <BarraCantidad barra={prob.barra} mostrarValores={false} isMobile={isMobile} />
+                </div>
+            )}
+
+            {/* Resolución completa */}
+            {terminado && (
+                <div style={{ marginTop: 14, background: '#e8f5e9', borderRadius: 14, padding: '12px 14px', border: '2px solid #a5d6a7' }}>
+                    <div style={{ fontWeight: 900, color: '#27ae60', marginBottom: 8 }}>🪜 Resolución</div>
+                    {prob.barra && <div style={{ marginBottom: 12 }}><BarraCantidad barra={prob.barra} isMobile={isMobile} /></div>}
+                    <ol style={{ margin: 0, paddingLeft: 20, color: '#2c3e50', fontWeight: 600, fontSize: '0.92rem', lineHeight: 1.6 }}>
+                        {prob.explicacion.map((t, i) => <li key={i}>{t}</li>)}
+                    </ol>
+                    <div style={{ display: 'flex', justifyContent: 'center', marginTop: 14 }}>
+                        <button onClick={siguiente} style={{ ...st.btnSuccess, padding: '12px 26px' }}>
+                            {idx + 1 >= lista.length ? '🏁 Ver resultados' : 'Siguiente problema ›'}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            <div style={{ textAlign: 'center', marginTop: 14 }}>
+                <button onClick={() => setFase('ELEGIR')} style={{ padding: '9px 20px', borderRadius: 30, border: '2px solid #bdc3c7', background: 'white', color: '#7f8c8d', fontWeight: 800, cursor: 'pointer', fontSize: '0.85rem' }}>← Lista de problemas</button>
+            </div>
+        </div>
+    );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
 //  COMPONENTE PRINCIPAL
 // ═════════════════════════════════════════════════════════════════════════════
 export default function Fracciones({ usuario, onExit }) {
     // Reto por enlace: configuración fija del profesor (y envío a competición si procede)
     const [reto, setReto] = useState(() => leerRetoUrl());
     const esRetoCompeticion = !!(reto?.compId && reto?.catId);
-    const [gameState, setGameState] = useState('START'); // START | LAB | PLAYING | COMPETICION | END
+    // Ficha imprimible compartida por enlace: /fracciones?ficha=ID abre directamente su vista pública
+    const [fichaPublicaId, setFichaPublicaId] = useState(() => (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('ficha') : null));
+    const [gameState, setGameState] = useState(() => (fichaPublicaId ? 'FICHAS' : 'START')); // START | LAB | PLAYING | COMPETICION | PROBLEMAS | FICHAS | END
     const [config, setConfig] = useState(() => ({ ...DEFAULT_CONFIG, ...(reto?.config || {}) }));
     const [showConfig, setShowConfig] = useState(false);
     const [mostrarEnvio, setMostrarEnvio] = useState(false);
@@ -1074,7 +1732,8 @@ export default function Fracciones({ usuario, onExit }) {
         sonidoPasar();
         setSkips(s => s + 1); setFallos(f => f + 1); setScore(s => Math.max(0, s - 2));
         setShowSolution(true); setFeedback('SKIP'); registrar(false, true);
-        setTimeout(() => { setFeedback(null); avanzar(); }, 2200);
+        // En combinadas se deja más tiempo para leer la resolución paso a paso
+        setTimeout(() => { setFeedback(null); avanzar(); }, ej.tipo === 'combinadas' ? 6000 : 2200);
     };
 
     const guardarLocal = () => {
@@ -1089,6 +1748,11 @@ export default function Fracciones({ usuario, onExit }) {
 
     const salir = () => {
         clearInterval(timerRef.current);
+        if (fichaPublicaId) { // sale de una ficha abierta por enlace: quita ?ficha= de la URL
+            const u = new URL(window.location.href); u.searchParams.delete('ficha');
+            window.history.replaceState({}, '', u.pathname + u.search);
+            setFichaPublicaId(null);
+        }
         if (gameState !== 'START') { setGameState('START'); return; }
         if (typeof onExit === 'function') onExit();
         else window.location.href = '/';
@@ -1180,6 +1844,35 @@ export default function Fracciones({ usuario, onExit }) {
                             </button>
                         ))}
 
+                        <div style={st.separador}><div style={st.sepLinea} /><span style={st.sepTxt}>problemas</span><div style={st.sepLinea} /></div>
+
+                        {/* Problemas de fracción de una cantidad */}
+                        <button onClick={() => setGameState('PROBLEMAS')} style={{ ...st.modoBtn, border: '2px solid #00897b' }}
+                            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 20px #00897b33'; }}
+                            onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 3px 10px rgba(0,0,0,0.07)'; }}>
+                            <div style={{ ...st.modoIcon, background: '#00897b' }}>📖</div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={st.modoLabel}>Problemas: fracción de una cantidad</div>
+                                <div style={st.modoDesc}>{PROBLEMAS_FRACCIONES.length} problemas guiados · se conoce el total o hay que averiguarlo</div>
+                            </div>
+                            <span style={{ color: '#00897b', fontSize: '1.3rem' }}>›</span>
+                        </button>
+                        <div style={{ textAlign: 'center' }}><BtnPdfEjercicios compacto /></div>
+
+                        <div style={st.separador}><div style={st.sepLinea} /><span style={st.sepTxt}>para el profesor</span><div style={st.sepLinea} /></div>
+
+                        {/* Fichas imprimibles */}
+                        <button onClick={() => setGameState('FICHAS')} style={{ ...st.modoBtn, border: '2px solid #c0392b' }}
+                            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 20px #c0392b33'; }}
+                            onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 3px 10px rgba(0,0,0,0.07)'; }}>
+                            <div style={{ ...st.modoIcon, background: '#c0392b' }}>🖨️</div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={st.modoLabel}>Fichas para imprimir</div>
+                                <div style={st.modoDesc}>Crea una ficha en PDF con los ejercicios que quieras y corrígela en el monitor</div>
+                            </div>
+                            <span style={{ color: '#c0392b', fontSize: '1.3rem' }}>›</span>
+                        </button>
+
                         <div style={st.separador}><div style={st.sepLinea} /><span style={st.sepTxt}>por equipos</span><div style={st.sepLinea} /></div>
 
                         {/* Tirón de cuerda */}
@@ -1195,6 +1888,26 @@ export default function Fracciones({ usuario, onExit }) {
                         </button>
                     </div>
                 </div>
+            )}
+
+            {/* ── PROBLEMAS ── */}
+            {gameState === 'PROBLEMAS' && (
+                <ProblemasFracciones isMobile={isMobile} usuario={usuario} onSalir={() => setGameState('START')} />
+            )}
+
+            {/* ── FICHAS IMPRIMIBLES ── */}
+            {gameState === 'FICHAS' && (
+                <React.Suspense fallback={<div style={{ textAlign: 'center', color: '#7b1fa2', fontWeight: 800, padding: 40 }}>Cargando fichas…</div>}>
+                    <FichasFracciones isMobile={isMobile} fichaPublicaId={fichaPublicaId}
+                        onSalir={() => {
+                            if (fichaPublicaId) {
+                                const u = new URL(window.location.href); u.searchParams.delete('ficha');
+                                window.history.replaceState({}, '', u.pathname + u.search);
+                                setFichaPublicaId(null);
+                            }
+                            setGameState('START');
+                        }} />
+                </React.Suspense>
             )}
 
             {/* ── LABORATORIO ── */}
@@ -1224,6 +1937,11 @@ export default function Fracciones({ usuario, onExit }) {
                         <div style={{ background: '#e8f5e9', border: '2px solid #27ae60', borderRadius: 14, padding: '14px 12px', marginBottom: 14 }}>
                             <div style={{ fontSize: '0.85rem', color: '#27ae60', fontWeight: 800, marginBottom: 6 }}>✅ Solución</div>
                             <FracTexto n={ej.respuesta[0]} d={ej.respuesta[1]} size={isMobile ? '2.2rem' : '2.6rem'} color="#27ae60" />
+                            {ej.visual?.modo === 'comb' && (
+                                <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px dashed #a5d6a7' }}>
+                                    <PasosCombinada arbol={ej.visual.arbol} size={isMobile ? '1rem' : '1.15rem'} />
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <PanelRespuesta ej={ej} num={num} den={den} setNum={setNum} setDen={setDen} bloqueado={!!feedback} isMobile={isMobile} />

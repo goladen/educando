@@ -26,6 +26,7 @@ export default function RecortesExtrem() {
     const [pdfPage, setPdfPage] = useState(1);
     const [pdfPages, setPdfPages] = useState(0);
     const [urlInput, setUrlInput] = useState('');
+    const [candidatos, setCandidatos] = useState(null); // { url, imagenes, pdfs } cuando la URL es una página web
 
     const containerRef = useRef(null);
     const imgRef       = useRef(null);
@@ -61,35 +62,84 @@ export default function RecortesExtrem() {
         }
     };
 
-    // Carga una imagen o PDF desde una URL de la web
-    const handleLoadUrl = async () => {
-        const url = urlInput.trim();
+    // Carga una imagen o PDF desde una URL de la web.
+    // 1º intenta directo desde el navegador; si el servidor bloquea CORS (o la URL es
+    // una página web), pasa por nuestro proxy /api/proxy-recorte.
+    const handleLoadUrl = () => cargarDesdeUrl(urlInput.trim());
+
+    const cargarDesdeUrl = async (url) => {
         if (!url) return;
+        if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
         resetAll();
+        setCandidatos(null);
         setPdfDoc(null); setPdfPages(0); setPdfPage(1);
-        const esPdf = /\.pdf(\?|#|$)/i.test(url);
         setLoading(true);
         try {
-            if (esPdf) {
-                const pdf = await pdfjsLib.getDocument({ url }).promise;
-                setPdfDoc(pdf);
-                setPdfPages(pdf.numPages);
-                await renderPdfPage(pdf, 1);
+            if (await intentarDirecto(url)) return;
+            await cargarViaProxy(url);
+        } catch (err) {
+            alert('No se pudo cargar desde la web: ' + err.message + '\nSi persiste, descarga el archivo y súbelo desde el ordenador.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const abrirPdf = async (fuente) => {
+        const pdf = await pdfjsLib.getDocument(fuente).promise;
+        setPdfDoc(pdf);
+        setPdfPages(pdf.numPages);
+        await renderPdfPage(pdf, 1);
+    };
+
+    // Devuelve true si se pudo cargar sin proxy
+    const intentarDirecto = async (url) => {
+        try {
+            if (/\.pdf(\?|#|$)/i.test(url)) {
+                await abrirPdf({ url });
             } else {
-                // Para que el canvas no quede "contaminado" al recortar, intentamos CORS
+                // crossOrigin para que el canvas no quede "contaminado" al recortar
                 const img = new Image();
                 img.crossOrigin = 'anonymous';
                 await new Promise((res, rej) => {
                     img.onload = res;
-                    img.onerror = () => rej(new Error('No se pudo cargar la imagen (¿bloqueo CORS del servidor?).'));
+                    img.onerror = rej;
                     img.src = url;
                 });
                 setImageSrc(url);
             }
-        } catch (err) {
-            alert('No se pudo cargar desde la web: ' + err.message + '\nDescarga el archivo y súbelo desde el ordenador.');
-        } finally {
-            setLoading(false);
+            return true;
+        } catch {
+            return false;
+        }
+    };
+
+    const cargarViaProxy = async (url) => {
+        const r = await fetch('/api/proxy-recorte?url=' + encodeURIComponent(url));
+        const tipo = r.headers.get('content-type') || '';
+        if (tipo.includes('application/json')) {
+            const data = await r.json();
+            if (!r.ok) throw new Error(data.error || `Error ${r.status}`);
+            if (data.tipo === 'html') {
+                if (!data.imagenes?.length && !data.pdfs?.length) throw new Error('La página no contiene imágenes ni PDFs que se puedan recortar.');
+                setCandidatos(data);
+                return;
+            }
+        }
+        if (!r.ok) throw new Error(`Error ${r.status} del proxy`);
+        const blob = await r.blob();
+        if (!blob.type.startsWith('image/') && !blob.type.includes('pdf')) {
+            throw new Error('El proxy de descarga no está disponible (reinicia el servidor de desarrollo o despliega).');
+        }
+        if (blob.type.includes('pdf')) {
+            await abrirPdf({ data: new Uint8Array(await blob.arrayBuffer()) });
+        } else {
+            const dataURL = await new Promise((res, rej) => {
+                const fr = new FileReader();
+                fr.onload = () => res(fr.result);
+                fr.onerror = rej;
+                fr.readAsDataURL(blob);
+            });
+            setImageSrc(dataURL);
         }
     };
 
@@ -346,7 +396,7 @@ export default function RecortesExtrem() {
                         value={urlInput}
                         onChange={(e) => setUrlInput(e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter') handleLoadUrl(); }}
-                        placeholder="…o pega una URL (imagen/PDF de la web)"
+                        placeholder="…o pega una URL (imagen, PDF o página web)"
                         style={{ padding: '8px 10px', border: '1px solid #ccc', borderRadius: 8, fontSize: 13, width: 240 }}
                     />
                     <button onClick={handleLoadUrl} style={btn('#16a085')}>🌐 Cargar</button>
@@ -389,7 +439,36 @@ export default function RecortesExtrem() {
                 {loading && <span style={{ color: '#7f8c8d' }}>Procesando…</span>}
             </div>
 
-            {!imageSrc && !loading && (
+            {candidatos && !imageSrc && (
+                <div style={{ border: '1px solid #dfe6e9', borderRadius: 12, padding: 14, marginBottom: 16, background: '#fafafa' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 8 }}>
+                        <b>🌐 Elige qué recortar de la página</b>
+                        <button onClick={() => setCandidatos(null)} style={{ ...btn('#7f8c8d'), padding: '4px 10px' }}>✕</button>
+                    </div>
+                    {candidatos.pdfs?.length > 0 && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                            {candidatos.pdfs.map(u => (
+                                <button key={u} onClick={() => cargarDesdeUrl(u)} title={u}
+                                    style={{ ...btn('#c0392b'), padding: '5px 10px', fontSize: 12, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    📄 {u.split('/').pop().split(/[?#]/)[0] || 'PDF'}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 8 }}>
+                        {candidatos.imagenes?.map(u => (
+                            <button key={u} onClick={() => cargarDesdeUrl(u)} title={u}
+                                style={{ border: '1px solid #ccc', borderRadius: 8, padding: 4, background: '#fff', cursor: 'pointer', height: 110, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <img src={u} alt="" referrerPolicy="no-referrer" loading="lazy"
+                                    onError={(e) => { e.currentTarget.parentElement.style.display = 'none'; }}
+                                    style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {!imageSrc && !loading && !candidatos && (
                 <div style={{ border: '2px dashed #bdc3c7', borderRadius: 14, padding: 50, textAlign: 'center', color: '#95a5a6', background: '#fafafa' }}>
                     <div style={{ fontSize: 46, marginBottom: 10 }}>✂️</div>
                     <p style={{ margin: 0, fontSize: 16 }}>Carga una <b>imagen</b> o un <b>PDF</b> y arrastra para dibujar varios recortes a la vez.</p>

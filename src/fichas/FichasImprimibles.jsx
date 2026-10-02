@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { db, auth } from '../firebase';
-import { collection, doc, setDoc, getDoc, getDocs, deleteDoc, query, where } from 'firebase/firestore';
+import { collection, doc, setDoc, getDoc, getDocs, deleteDoc, query, where, limit } from 'firebase/firestore';
 import { GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from 'firebase/auth';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -385,10 +385,42 @@ function FichasApp({ motor, isMobile, onSalir, fichaPublicaId = null }) {
             const lista = snap.docs.map(d => ({ id: d.id, ...d.data() }))
                 .sort((a, b) => (b.actualizada?.toMillis?.() || 0) - (a.actualizada?.toMillis?.() || 0));
             setFichas(lista);
+            // Fichas guardadas antes de existir la galería: se publican (por defecto son públicas)
+            const sinCampo = lista.filter(f => f.publica === undefined);
+            if (sinCampo.length) {
+                await Promise.all(sinCampo.map(f => setDoc(doc(db, COLECCION, f.id), { publica: true }, { merge: true }).catch(() => {})));
+                cargarGaleria();
+            }
         } catch (e) { setAviso('No se pudieron cargar tus fichas: ' + e.message); }
         setCargando(false);
     };
     useEffect(() => { cargarFichas(user); }, [user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Galería pública: fichas de todos los profesores marcadas como públicas (sin sesión)
+    const [galeria, setGaleria] = useState([]);
+    const [cargandoGaleria, setCargandoGaleria] = useState(true);
+    const [buscar, setBuscar] = useState('');
+    const [desdeGaleria, setDesdeGaleria] = useState(false);
+    const cargarGaleria = async () => {
+        setCargandoGaleria(true);
+        try {
+            const snap = await getDocs(query(collection(db, COLECCION), where('publica', '==', true), limit(300)));
+            setGaleria(snap.docs.map(d => ({ id: d.id, ...d.data() }))
+                .sort((a, b) => (b.actualizada?.toMillis?.() || 0) - (a.actualizada?.toMillis?.() || 0)));
+        } catch (e) { setGaleria([]); console.warn('Galería de fichas:', e.message); }
+        setCargandoGaleria(false);
+    };
+    useEffect(() => { cargarGaleria(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Abre una ficha de la galería en su vista pública (PDF, pizarra, copia…)
+    const abrirPublica = (f) => {
+        try {
+            setFicha({ ...JSON.parse(f.datos), id: f.id });
+            setMeta({ uid: f.uid, autor: f.autor, actualizada: f.actualizada });
+            setDesdeGaleria(true);
+            setVista('PUBLICA');
+        } catch { setAviso('La ficha está dañada.'); }
+    };
 
     // Ficha abierta desde un enlace público (?ficha=ID): no hace falta sesión
     useEffect(() => {
@@ -418,6 +450,7 @@ function FichasApp({ motor, isMobile, onSalir, fichaPublicaId = null }) {
                 // El documento se puede leer con el enlace público: no se guarda el correo
                 uid: user.uid, autor: user.displayName || 'Profesor/a', titulo: ficha.titulo || motor.tituloFicha,
                 solucionesPublicas: ficha.solucionesPublicas !== false,
+                publica: ficha.publica !== false, // aparece en la galería pública de fichas
                 nEjercicios: ficha.ejercicios.length,
                 nApartados: ficha.ejercicios.reduce((s, e) => s + e.apartados.length, 0),
                 datos: JSON.stringify(datos), actualizada: new Date(),
@@ -426,14 +459,14 @@ function FichasApp({ motor, isMobile, onSalir, fichaPublicaId = null }) {
             setFicha(datos);
             avisar('✅ Ficha guardada en tu cuenta');
             if (!ficha.id) setEnlace({ id, titulo: datos.titulo, conSoluciones: datos.solucionesPublicas !== false }); // 1ª vez: ya tiene enlace público
-            cargarFichas();
+            cargarFichas(); cargarGaleria();
         } catch (e) { setAviso('❌ No se pudo guardar: ' + e.message); }
         setGuardando(false);
     };
 
     const borrar = async (f) => {
         if (!window.confirm(`¿Eliminar la ficha «${f.titulo}»?`)) return;
-        try { await deleteDoc(doc(db, COLECCION, f.id)); cargarFichas(); } catch (e) { setAviso('❌ ' + e.message); }
+        try { await deleteDoc(doc(db, COLECCION, f.id)); cargarFichas(); cargarGaleria(); } catch (e) { setAviso('❌ ' + e.message); }
     };
 
     const abrir = (f, destino = 'EDITOR') => {
@@ -463,12 +496,13 @@ function FichasApp({ motor, isMobile, onSalir, fichaPublicaId = null }) {
         setGuardando(true);
         try {
             const id = doc(collection(db, COLECCION)).id;
-            const datos = { ...ficha, id, titulo: ficha.titulo };
+            const datos = { ...ficha, id, titulo: ficha.titulo, publica: false }; // la copia no sale en la galería hasta que su dueño lo decida
             await setDoc(doc(db, COLECCION, id), {
                 uid: user.uid, autor: user.displayName || 'Profesor/a', titulo: datos.titulo,
                 nEjercicios: datos.ejercicios.length,
                 nApartados: datos.ejercicios.reduce((s, e) => s + e.apartados.length, 0),
-                datos: JSON.stringify(datos), creada: new Date(), actualizada: new Date(),
+                datos: JSON.stringify(datos), publica: false,
+                creada: new Date(), actualizada: new Date(),
             });
             setFicha(datos);
             setMeta({ uid: user.uid, autor: user.displayName });
@@ -506,7 +540,11 @@ function FichasApp({ motor, isMobile, onSalir, fichaPublicaId = null }) {
 
     // ── Ficha pública (abierta con el enlace) ──
     if (vista === 'PUBLICA') {
-        const salirPublica = () => { setVista('LISTA'); onSalir(); };
+        // Desde la galería se vuelve a la lista; desde un enlace, al menú de la herramienta
+        const salirPublica = () => {
+            setVista('LISTA');
+            if (desdeGaleria) { setDesdeGaleria(false); setFicha(null); } else onSalir();
+        };
         if (!ficha) return (
             <div style={{ maxWidth: 520, margin: '40px auto', background: 'white', borderRadius: 20, padding: 24, textAlign: 'center' }}>
                 {meta?.error
@@ -601,6 +639,19 @@ function FichasApp({ motor, isMobile, onSalir, fichaPublicaId = null }) {
                         {ficha.id ? ' Guarda para aplicar el cambio.' : ''}
                     </span>
                 </div>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 10, flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: 800, fontSize: '0.82rem', color: '#555' }}>Galería pública:</span>
+                    {[[true, '🌍 Visible para todos'], [false, '🔗 Solo con el enlace']].map(([v, l]) => {
+                        const activo = (ficha.publica !== false) === v;
+                        return (
+                            <button key={l} onClick={() => setFicha(f => ({ ...f, publica: v }))}
+                                style={{ padding: '5px 12px', borderRadius: 18, border: '2px solid #2980b9', background: activo ? '#2980b9' : 'white', color: activo ? 'white' : '#2980b9', fontWeight: 800, fontSize: '0.78rem', cursor: 'pointer' }}>{l}</button>
+                        );
+                    })}
+                    <span style={{ fontSize: '0.74rem', color: '#999' }}>
+                        {ficha.publica !== false ? 'Aparece en la lista de fichas compartidas, también sin iniciar sesión.' : 'No aparece en la lista: solo la abre quien tenga el enlace.'}
+                    </span>
+                </div>
             </div>
 
             {/* Acciones */}
@@ -671,6 +722,36 @@ function FichasApp({ motor, isMobile, onSalir, fichaPublicaId = null }) {
                     ))}
                 </div>
             </div>
+            {/* Galería pública: visible para todos, con o sin sesión */}
+            <div style={{ background: 'white', borderRadius: 20, padding: '18px 16px', boxShadow: '0 10px 28px rgba(0,0,0,0.08)', marginTop: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
+                    <h3 style={{ margin: 0, color: '#2980b9', flex: 1, minWidth: 180 }}>🌍 Fichas compartidas</h3>
+                    <input value={buscar} onChange={e => setBuscar(e.target.value)} placeholder="🔍 Buscar por título o autor"
+                        style={{ padding: '8px 12px', borderRadius: 20, border: '2px solid #d6eaf8', fontSize: '0.88rem', minWidth: 0, flex: 1, maxWidth: 260 }} />
+                </div>
+                <p style={{ margin: '0 0 12px', color: '#888', fontSize: '0.84rem' }}>Fichas que han compartido otros profesores. Ábrelas para ver el PDF, descargarlo o corregirlas en la pizarra.</p>
+                {(() => {
+                    const t = buscar.trim().toLowerCase();
+                    const lista = galeria.filter(f => !t || `${f.titulo} ${f.autor || ''}`.toLowerCase().includes(t));
+                    if (cargandoGaleria) return <div style={{ color: '#999', textAlign: 'center' }}>Cargando…</div>;
+                    if (!lista.length) return <div style={{ color: '#999', fontSize: '0.88rem', textAlign: 'center' }}>{galeria.length ? 'Ninguna ficha coincide con la búsqueda.' : 'Todavía no hay fichas compartidas.'}</div>;
+                    return (
+                        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
+                            {lista.map(f => (
+                                <button key={f.id} onClick={() => abrirPublica(f)}
+                                    style={{ textAlign: 'left', padding: '12px 14px', borderRadius: 14, border: '1px solid #d6eaf8', background: '#f7fbfe', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                    <span style={{ fontWeight: 900, color: '#2c3e50' }}>{motor.emoji} {f.titulo}</span>
+                                    <span style={{ fontSize: '0.75rem', color: '#888' }}>{f.nEjercicios} ejercicios · {f.nApartados} apartados</span>
+                                    <span style={{ fontSize: '0.72rem', color: '#aaa' }}>
+                                        {f.autor || 'Profesor/a'}{f.actualizada?.toDate ? ` · ${f.actualizada.toDate().toLocaleDateString('es-ES')}` : ''}{f.solucionesPublicas === false ? ' · 🔒 sin soluciones' : ''}
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    );
+                })()}
+            </div>
+
             <div style={{ textAlign: 'center', marginTop: 14 }}>
                 <button onClick={onSalir} style={btn('#7f8c8d', false)}>← Menú</button>
             </div>

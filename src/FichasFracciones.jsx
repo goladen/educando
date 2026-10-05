@@ -1,9 +1,9 @@
 import React from 'react';
-import FichasImprimibles from './fichas/FichasImprimibles';
-import { motorFracciones } from './fichas/motorFracciones';
+import FichasMathWorld from './FichasMathWorld';
 
-// Fichas imprimibles de Fracciones: motor común (fichas/FichasImprimibles.jsx)
-// con el motor de fracciones. Se carga en diferido desde Fracciones.jsx.
+// Fichas de Fracciones: abre el centro de fichas de Math World con el tema
+// «fracciones» preseleccionado. Las fichas antiguas de esta herramienta se leen
+// igualmente (y se trasladan a la colección común al abrir «Mis fichas»).
 export default function FichasFracciones(props) {
-    return <FichasImprimibles motor={motorFracciones} {...props} />;
+    return <FichasMathWorld tema="fracciones" {...props} />;
 }

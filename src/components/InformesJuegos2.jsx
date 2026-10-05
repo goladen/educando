@@ -54,8 +54,8 @@ const ConfigBadge = ({ icon, label }) => (
         {icon} {label}
     </span>
 );
-const TIPO_LABEL  = { ESCRITURA:'✍️ Trabajo de escritura', MINIAPP:'⚡ Mini-app', OCA:'🦆 Oca Matemática', CAZABURBUJAS:'🔵 Cazaburbujas', PIKATRON:'⚡ Pikatron', SOPA:'🔤 Sopa de Letras', WORDLE:'🟩 Wordle', AHORCADO:'🪢 Ahorcado', MATHLE:'🔢 Mathle', PASAPALABRA:'🔠 Pasapalabra', FUNCIONES:'∫ Funciones', FUNCIONES_ANALISIS:'📈 Análisis de Funciones', APAREJADOS:'🃏 Aparejados', STORYCUBES:'🎲 Story Cubes', IRREGULAR_VERBS:'🇬🇧 Verbos Irregulares', THINKHOOT:'🦉 PiLive', MATHLIVE:'🧮 MathLive', OLYMPICLIVE:'🏅 OlympicLive', ALGEBRA:'✖️ Álgebra', DOMINO:'🁣 Dominó', ESTADISTICA:'📊 Estadística', MUSIC_COMPASS:'🎵 Entrenamiento Auditivo', MUSIC_GAMES:'🎼 Juegos Musicales', GEOGRAFIA:'🌍 Test de Geografía', BIOLOGIA:'🔬 Test de Biología', FUTBOLQUIZZ:'⚽ Fútbol Quizz', BUNKER:'🎯 Bunker Quiz', CALAMAR:'🦑 Luz roja · Luz verde', JEOPARDY:'💰 Money Board', GEOMETRIX:'📐 Geometrix', GEOMETRIX_COMPUESTO:'🏗️ Geometrix · Compuestas', PERIMETRO_AREA:'📏 Perímetro y Área', QUIEN_HISTORICO:'🧐 ¿Quién es quién? histórico' };
-const TIPO_ICON   = { ESCRITURA:'✍️', MINIAPP:'⚡', OCA:'🦆', CAZABURBUJAS:'🔵', PIKATRON:'⚡', SOPA:'🔤', WORDLE:'🟩', AHORCADO:'🪢', MATHLE:'🔢', PASAPALABRA:'🔠', FUNCIONES:'∫', FUNCIONES_ANALISIS:'📈', APAREJADOS:'🃏', STORYCUBES:'🎲', IRREGULAR_VERBS:'🇬🇧', THINKHOOT:'🦉', MATHLIVE:'🧮', OLYMPICLIVE:'🏅', ALGEBRA:'✖️', DOMINO:'🁣', ESTADISTICA:'📊', MUSIC_COMPASS:'🎵', MUSIC_GAMES:'🎼', GEOGRAFIA:'🌍', BIOLOGIA:'🔬', FUTBOLQUIZZ:'⚽', BUNKER:'🎯', CALAMAR:'🦑', JEOPARDY:'💰', GEOMETRIX:'📐', GEOMETRIX_COMPUESTO:'🏗️', PERIMETRO_AREA:'📏', QUIEN_HISTORICO:'🧐' };
+const TIPO_LABEL  = { LENGUA:'📖 Lengua', ESCRITURA:'✍️ Trabajo de escritura', MINIAPP:'⚡ Mini-app', OCA:'🦆 Oca Matemática', CAZABURBUJAS:'🔵 Cazaburbujas', PIKATRON:'⚡ Pikatron', SOPA:'🔤 Sopa de Letras', WORDLE:'🟩 Wordle', AHORCADO:'🪢 Ahorcado', MATHLE:'🔢 Mathle', PASAPALABRA:'🔠 Pasapalabra', FUNCIONES:'∫ Funciones', FUNCIONES_ANALISIS:'📈 Análisis de Funciones', APAREJADOS:'🃏 Aparejados', STORYCUBES:'🎲 Story Cubes', IRREGULAR_VERBS:'🇬🇧 Verbos Irregulares', THINKHOOT:'🦉 PiLive', MATHLIVE:'🧮 MathLive', OLYMPICLIVE:'🏅 OlympicLive', ALGEBRA:'✖️ Álgebra', DOMINO:'🁣 Dominó', ESTADISTICA:'📊 Estadística', MUSIC_COMPASS:'🎵 Entrenamiento Auditivo', MUSIC_GAMES:'🎼 Juegos Musicales', GEOGRAFIA:'🌍 Test de Geografía', BIOLOGIA:'🔬 Test de Biología', FUTBOLQUIZZ:'⚽ Fútbol Quizz', BUNKER:'🎯 Bunker Quiz', CALAMAR:'🦑 Luz roja · Luz verde', JEOPARDY:'💰 Money Board', GEOMETRIX:'📐 Geometrix', GEOMETRIX_COMPUESTO:'🏗️ Geometrix · Compuestas', PERIMETRO_AREA:'📏 Perímetro y Área', QUIEN_HISTORICO:'🧐 ¿Quién es quién? histórico' };
+const TIPO_ICON   = { LENGUA:'📖', ESCRITURA:'✍️', MINIAPP:'⚡', OCA:'🦆', CAZABURBUJAS:'🔵', PIKATRON:'⚡', SOPA:'🔤', WORDLE:'🟩', AHORCADO:'🪢', MATHLE:'🔢', PASAPALABRA:'🔠', FUNCIONES:'∫', FUNCIONES_ANALISIS:'📈', APAREJADOS:'🃏', STORYCUBES:'🎲', IRREGULAR_VERBS:'🇬🇧', THINKHOOT:'🦉', MATHLIVE:'🧮', OLYMPICLIVE:'🏅', ALGEBRA:'✖️', DOMINO:'🁣', ESTADISTICA:'📊', MUSIC_COMPASS:'🎵', MUSIC_GAMES:'🎼', GEOGRAFIA:'🌍', BIOLOGIA:'🔬', FUTBOLQUIZZ:'⚽', BUNKER:'🎯', CALAMAR:'🦑', JEOPARDY:'💰', GEOMETRIX:'📐', GEOMETRIX_COMPUESTO:'🏗️', PERIMETRO_AREA:'📏', QUIEN_HISTORICO:'🧐' };
 const TIPO_LIVE = new Set(['THINKHOOT', 'MATHLIVE', 'OLYMPICLIVE']);
 const tipoLabel   = (t) => TIPO_LABEL[t] || ('🎮 ' + (t||'Juego'));
 const tipoIcon    = (t) => TIPO_ICON[t]  || '🎮';
@@ -971,6 +971,11 @@ const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, 
                             if (modo) badges.push(<ConfigBadge key="modo" icon="🎮" label={modo}/>);
                             if (conf) badges.push(<ConfigBadge key="conf" icon="⚙️" label={conf}/>);
                             if (inf.figuraNombre) badges.push(<ConfigBadge key="fig" icon="🏗️" label={inf.figuraNombre}/>);
+                        } else if (tipo === 'LENGUA') {
+                            if (cfg.tema)      badges.push(<ConfigBadge key="tema" icon="📖" label={cfg.tema}/>);
+                            if (cfg.ejercicio) badges.push(<ConfigBadge key="ej" icon="✏️" label={cfg.ejercicio}/>);
+                            if (cfg.modo)      badges.push(<ConfigBadge key="modo" icon="🎮" label={cfg.modo}/>);
+                            if (cfg.ajustes)   badges.push(<ConfigBadge key="aj" icon="⚙️" label={cfg.ajustes}/>);
                         } else if (tipo === 'PERIMETRO_AREA') {
                             const modo = inf.modoJuego || jugador0.modo;
                             const conf = inf.configuracion || jugador0.configuracion;

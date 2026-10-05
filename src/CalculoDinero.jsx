@@ -9,6 +9,10 @@ import PantallaReto, { textoBotonEnvio } from './components/retos/PantallaReto';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import sndAcierto from './assets/correct.mp3';
 import sndFallo from './assets/sonidomonedamal.mp3';
+import { leerNumeroEs } from './generadorProblemasNumeros';
+
+// Fichas imprimibles (editor + PDF + pizarra + enlace público): se cargan solo al abrirlas
+const FichasDinero = React.lazy(() => import('./FichasDinero'));
 
 // Reproduce un sonido corto sin bloquear (cada toque crea su propia instancia)
 const playSound = (src) => { try { const a = new Audio(src); a.volume = 0.6; a.play().catch(() => {}); } catch { /* noop */ } };
@@ -90,7 +94,12 @@ export const DEFAULT_CONFIG = {
     conCentimos: true,
     tiempo: 180,
     numEjercicios: null,    // null = por tiempo
-    tipos: { pagar: true, devolver: true, multiplicar: true, unidad: false, iva: false, rebaja: false, compra: false },
+    tipos: {
+        pagar: true, devolver: true, multiplicar: true, unidad: false, iva: false, rebaja: false, compra: false,
+        // Porcentajes
+        pctCantidad: false, aumento: false, sucesivos: false, equivalente: false, porcentajeAplicado: false, original: false,
+    },
+    escribir: false,        // true = se responde escribiendo el resultado en vez de con billetes y monedas
 };
 
 const MODOS_PRESET = [
@@ -111,6 +120,13 @@ const MODOS_PRESET = [
         tags: ['IVA', 'Rebajas', 'Todo'],
         cfg: { maxPrecio: 100, conCentimos: true, tiempo: 180, numEjercicios: null,
                tipos: { pagar: true, devolver: true, multiplicar: true, unidad: true, iva: true, rebaja: true } }
+    },
+    {
+        id: 'PCT', icon: '📊', label: 'Porcentajes', desc: 'Aumentos, descuentos, IVA y porcentajes sucesivos · se responde escribiendo', color: '#c0392b',
+        tags: ['% de', 'Aumentos', 'Rebajas', 'IVA', 'Sucesivos', 'Precio original'],
+        cfg: { maxPrecio: 100, conCentimos: true, tiempo: 300, numEjercicios: null, escribir: true,
+               tipos: { pagar: false, devolver: false, multiplicar: false, unidad: false, iva: true, rebaja: true, compra: false,
+                        pctCantidad: true, aumento: true, sucesivos: true, equivalente: true, porcentajeAplicado: true, original: true } }
     },
     {
         id: 'COMPRA', icon: '🛒', label: 'Lista de la compra', desc: 'Elige productos para que te sobre la cantidad justa', color: '#16a085',
@@ -144,13 +160,192 @@ const randCents = (cfg, minE, maxE) => {
     return c;
 };
 
+// ─── Motor de PORCENTAJES (aumentos, descuentos, IVA y porcentajes sucesivos) ──
+// Todo en céntimos. `cadena` aplica variaciones sucesivas (+p % / −p %) y solo
+// acepta bases con las que cada paso da céntimos exactos, para que el resultado
+// se pueda pagar con monedas y no haya redondeos.
+const PCT_ITEMS = [
+    ['una chaqueta', '🧥'], ['un par de zapatillas', '👟'], ['una bicicleta', '🚲'], ['un móvil', '📱'],
+    ['una tablet', '💻'], ['un abrigo', '🧥'], ['una consola', '🎮'], ['un par de auriculares', '🎧'],
+    ['un patinete', '🛴'], ['una mochila', '🎒'], ['un reloj', '⌚'], ['una gorra', '🧢'],
+];
+const fmtDec = (x) => String(Math.round(x * 10000) / 10000).replace('.', ',');
+const fmtPct = (x) => `${fmtDec(x)} %`;
+const indice = (p) => fmtDec((100 + p) / 100); // índice de variación: −20 % → 0,8 · +21 % → 1,21
+const cadena = (base, pcts) => {
+    const out = [base];
+    let c = base;
+    for (const p of pcts) { const x = c * (100 + p); if (x % 100) return null; c = x / 100; out.push(c); }
+    return out;
+};
+const baseExacta = (cfg, pcts) => {
+    const lo = Math.max(10, Math.round(cfg.maxPrecio * 0.2)), hi = Math.max(30, cfg.maxPrecio);
+    for (let i = 0; i < 400; i++) {
+        const b = cfg.conCentimos && Math.random() < 0.4 ? rInt(lo * 20, hi * 20) * 5 : rInt(lo, hi) * 100;
+        const c = cadena(b, pcts);
+        if (c && c.every(v => v > 0)) return c;
+    }
+    // Sin base exacta en el rango: se redondea al céntimo en cada paso
+    const out = [rInt(lo, hi) * 100];
+    pcts.forEach(p => out.push(Math.round(out[out.length - 1] * (100 + p) / 100)));
+    return out;
+};
+const conItem = () => { const [nombre, emoji] = rItem(PCT_ITEMS); return { nombre, Nombre: cap(nombre), emoji }; };
+const resPct = (tipo, emoji, enunciado, num, pasos) => ({
+    tipo, emoji, modo: 'NUMERO', unidad: '%', answerNum: num, answerCents: null,
+    displayAnswer: fmtPct(num), enunciado, pasos, pista: pasos.join(' → '),
+});
+const resEur = (tipo, emoji, enunciado, cents, pasos) => ({
+    tipo, emoji, answerCents: cents, displayAnswer: fmt(cents), enunciado, pasos, pista: pasos.join(' → '),
+});
+
+const PCT_GEN = {
+    // El p % de una cantidad
+    pctCantidad: (cfg) => {
+        const p = rItem([5, 10, 15, 20, 25, 30, 40, 50, 75]);
+        const [b, r] = baseExacta(cfg, [p - 100]);
+        const it = conItem();
+        const enun = rItem([
+            `¿Cuánto es el ${p} % de ${fmt(b)}?`,
+            `${it.Nombre} cuesta ${fmt(b)}. Para reservar, pagas ahora el ${p} % del precio. ¿Cuánto pagas?`,
+        ]);
+        return resEur('pctCantidad', '💯', enun, r, [`${p} % de ${fmt(b)} = ${fmt(b)} · ${p} : 100 = ${fmt(r)}`, `(o ${fmt(b)} · ${fmtDec(p / 100)} = ${fmt(r)})`]);
+    },
+    // Aumento porcentual
+    aumento: (cfg) => {
+        const p = rItem([5, 10, 12, 15, 20, 25, 30]);
+        const [b, r] = baseExacta(cfg, [p]);
+        const it = conItem();
+        const enun = rItem([
+            `${it.Nombre} costaba ${fmt(b)} y su precio ha subido un ${p} %. ¿Cuánto cuesta ahora?`,
+            `Una factura de ${fmt(b)} tiene un recargo del ${p} % por pagarla tarde. ¿Cuánto hay que pagar?`,
+        ]);
+        return resEur('aumento', '📈', enun, r, [`Aumento: ${p} % de ${fmt(b)} = ${fmt(r - b)}`, `${fmt(b)} + ${fmt(r - b)} = ${fmt(r)}`, `Con el índice: ${fmt(b)} · ${indice(p)} = ${fmt(r)}`]);
+    },
+    // Porcentajes sucesivos: el resultado final
+    sucesivos: (cfg) => {
+        const it = conItem();
+        const variante = rItem(['dobleDescuento', 'descuentoIva', 'subeBaja', 'triple']);
+        if (variante === 'dobleDescuento') {
+            const p1 = rItem([10, 20, 25, 30, 40, 50]), p2 = rItem([5, 10, 15, 20]);
+            const [b, c1, c2] = baseExacta(cfg, [-p1, -p2]);
+            const eq = 100 - (100 - p1) * (100 - p2) / 100;
+            return resEur('sucesivos', '🏷️', `${it.Nombre} cuesta ${fmt(b)}. En rebajas tiene un ${p1} % de descuento y en caja te hacen otro ${p2} % sobre el precio ya rebajado. ¿Cuánto pagas?`, c2, [
+                `1.er descuento: ${fmt(b)} − ${p1} % = ${fmt(c1)}`,
+                `2.º descuento: ${fmt(c1)} − ${p2} % = ${fmt(c2)}`,
+                `Con índices: ${fmt(b)} · ${indice(-p1)} · ${indice(-p2)} = ${fmt(c2)}`,
+                `¡Ojo! No es un ${p1 + p2} % de descuento, sino un ${fmtPct(eq)}`,
+            ]);
+        }
+        if (variante === 'descuentoIva') {
+            const p1 = rItem([10, 15, 20, 25, 30]);
+            const [b, c1, c2] = baseExacta(cfg, [-p1, 21]);
+            return resEur('sucesivos', '🧾', `${it.Nombre} cuesta ${fmt(b)} sin IVA. Tiene un descuento del ${p1} % y después se le aplica el IVA del 21 %. ¿Cuál es el precio final?`, c2, [
+                `Descuento: ${fmt(b)} − ${p1} % = ${fmt(c1)}`,
+                `IVA: ${fmt(c1)} + 21 % = ${fmt(c2)}`,
+                `Con índices: ${fmt(b)} · ${indice(-p1)} · 1,21 = ${fmt(c2)}`,
+            ]);
+        }
+        if (variante === 'subeBaja') {
+            const p = rItem([10, 20, 25, 50]);
+            const [b, c1, c2] = baseExacta(cfg, [p, -p]);
+            return resEur('sucesivos', '🎢', `El precio de ${it.nombre} era ${fmt(b)}. Primero sube un ${p} % y después baja un ${p} %. ¿Cuál es el precio final?`, c2, [
+                `Sube: ${fmt(b)} + ${p} % = ${fmt(c1)}`,
+                `Baja: ${fmt(c1)} − ${p} % = ${fmt(c2)}`,
+                `Con índices: ${fmt(b)} · ${indice(p)} · ${indice(-p)} = ${fmt(c2)}`,
+                `No vuelve al precio inicial: ha bajado un ${fmtPct(p * p / 100)} en total`,
+            ]);
+        }
+        const p1 = rItem([5, 10, 20]), p2 = rItem([5, 10, 20, 25]), p3 = rItem([5, 10, 20]);
+        const [b, c1, c2, c3] = baseExacta(cfg, [p1, -p2, p3]);
+        return resEur('sucesivos', '📅', `${it.Nombre} costaba ${fmt(b)}. En enero su precio sube un ${p1} %, en febrero baja un ${p2} % y en marzo sube un ${p3} %. ¿Cuánto cuesta en marzo?`, c3, [
+            `Enero: ${fmt(b)} + ${p1} % = ${fmt(c1)}`,
+            `Febrero: ${fmt(c1)} − ${p2} % = ${fmt(c2)}`,
+            `Marzo: ${fmt(c2)} + ${p3} % = ${fmt(c3)}`,
+            `Con índices: ${fmt(b)} · ${indice(p1)} · ${indice(-p2)} · ${indice(p3)} = ${fmt(c3)}`,
+        ]);
+    },
+    // Porcentaje único equivalente a dos variaciones sucesivas
+    equivalente: () => {
+        const variante = rItem(['descuentos', 'subeBaja', 'subidas']);
+        if (variante === 'descuentos') {
+            const p1 = rItem([10, 20, 25, 30, 40, 50]), p2 = rItem([10, 20, 25, 50]);
+            const eq = 100 - (100 - p1) * (100 - p2) / 100;
+            return resPct('equivalente', '🏷️', `Una tienda aplica un descuento del ${p1} % y después otro del ${p2} % sobre el precio rebajado. ¿A qué descuento único equivalen los dos?`, eq, [
+                `Índices: ${indice(-p1)} · ${indice(-p2)} = ${fmtDec((100 - eq) / 100)}`,
+                `Pagas el ${fmtPct(100 - eq)} del precio → descuento del ${fmtPct(eq)}`,
+                `(no es ${p1} + ${p2} = ${p1 + p2} %)`,
+            ]);
+        }
+        if (variante === 'subeBaja') {
+            const p = rItem([10, 15, 20, 25, 30, 50]);
+            return resPct('equivalente', '🎢', `Un precio sube un ${p} % y después baja un ${p} %. ¿Qué porcentaje ha bajado en total respecto al precio inicial?`, p * p / 100, [
+                `Índices: ${indice(p)} · ${indice(-p)} = ${fmtDec((100 + p) * (100 - p) / 10000)}`,
+                `Queda el ${fmtPct((100 + p) * (100 - p) / 100)} del precio → ha bajado un ${fmtPct(p * p / 100)}`,
+            ]);
+        }
+        const p1 = rItem([10, 20, 25, 50]), p2 = rItem([10, 20, 30, 50]);
+        const eq = (100 + p1) * (100 + p2) / 100 - 100;
+        return resPct('equivalente', '📈', `El alquiler de un piso sube un ${p1} % un año y un ${p2} % al año siguiente. ¿Qué porcentaje ha subido en total?`, eq, [
+            `Índices: ${indice(p1)} · ${indice(p2)} = ${fmtDec((100 + eq) / 100)}`,
+            `Ha subido un ${fmtPct(eq)} (no ${p1 + p2} %)`,
+        ]);
+    },
+    // ¿Qué porcentaje se ha aplicado?
+    porcentajeAplicado: (cfg) => {
+        const it = conItem();
+        const sube = Math.random() < 0.4;
+        const p = sube ? rItem([5, 10, 15, 20, 25, 50]) : rItem([10, 15, 20, 25, 30, 40, 50, 60]);
+        const [b, f] = baseExacta(cfg, [sube ? p : -p]);
+        const dif = Math.abs(f - b);
+        return resPct('porcentajeAplicado', sube ? '📈' : '🏷️', sube
+            ? `${it.Nombre} costaba ${fmt(b)} y ahora cuesta ${fmt(f)}. ¿Qué porcentaje ha subido?`
+            : `${it.Nombre} costaba ${fmt(b)} y en rebajas cuesta ${fmt(f)}. ¿Qué porcentaje de descuento te hacen?`, p, [
+            `${sube ? 'Subida' : 'Descuento'}: ${fmt(Math.max(b, f))} − ${fmt(Math.min(b, f))} = ${fmt(dif)}`,
+            `${fmt(dif)} : ${fmt(b)} = ${fmtDec(p / 100)} → ${p} %`,
+        ]);
+    },
+    // Precio original a partir del final
+    original: (cfg) => {
+        const it = conItem();
+        if (Math.random() < 0.5) {
+            const p = rItem([10, 20, 25, 30, 40, 50]);
+            const [b, f] = baseExacta(cfg, [-p]);
+            return resEur('original', '🔙', `Después de un descuento del ${p} %, ${it.nombre} cuesta ${fmt(f)}. ¿Cuánto costaba antes del descuento?`, b, [
+                `Pagas el ${100 - p} % del precio → índice ${indice(-p)}`,
+                `Precio original: ${fmt(f)} : ${indice(-p)} = ${fmt(b)}`,
+            ]);
+        }
+        const [b, f] = baseExacta(cfg, [21]);
+        return resEur('original', '🧾', `${it.Nombre} cuesta ${fmt(f)} con el IVA del 21 % incluido. ¿Cuál es su precio sin IVA?`, b, [
+            `Con IVA se paga el 121 % → índice 1,21`,
+            `Sin IVA: ${fmt(f)} : 1,21 = ${fmt(b)}`,
+        ]);
+    },
+};
+
 // ─── Motor generador ──────────────────────────────────────────────────────────
-const generarProblema = (cfg) => {
+// `escrito`: se responde escribiendo (porcentajes, o si el profesor lo elige)
+export const generarProblema = (cfg) => {
+    const p = generarProblemaBase(cfg);
+    return { ...p, escrito: p.modo === 'NUMERO' || (!!cfg.escribir && p.modo !== 'PRODUCTOS') };
+};
+
+// Comprueba una respuesta escrita: «12,50», «28», «28 %»…
+export const comprobarEscrito = (problem, texto) => {
+    const v = leerNumeroEs(String(texto || '').replace('%', ''));
+    if (Number.isNaN(v)) return false;
+    if (problem.unidad === '%') return Math.abs(v - problem.answerNum) < 0.01;
+    return Math.round(v * 100) === problem.answerCents;
+};
+
+const generarProblemaBase = (cfg) => {
     const activos = Object.entries(cfg.tipos).filter(([, v]) => v).map(([k]) => k);
     if (activos.length === 0)
         return { tipo: 'pagar', enunciado: '¡Selecciona al menos un tipo de ejercicio!', emoji: '⚠️', answerCents: 0, displayAnswer: '0 €', pista: '' };
 
     const tipo = rItem(activos);
+    if (PCT_GEN[tipo]) return PCT_GEN[tipo](cfg);
 
     if (tipo === 'pagar') {
         const item = rItem(ITEMS);
@@ -284,9 +479,16 @@ export const TIPOS_DINERO = [
     ['devolver', '💸 La vuelta', '#3498db'],
     ['multiplicar', '✖️ Precio total', '#f39c12'],
     ['unidad', '➗ Precio por uno', '#16a085'],
-    ['iva', '📈 IVA', '#e74c3c'],
-    ['rebaja', '🏷️ Rebajas', '#9b59b6'],
     ['compra', '🛒 Lista de la compra', '#16a085'],
+    // Porcentajes
+    ['pctCantidad', '💯 % de una cantidad', '#c0392b', 'pct'],
+    ['iva', '🧾 IVA', '#e74c3c', 'pct'],
+    ['rebaja', '🏷️ Rebajas', '#9b59b6', 'pct'],
+    ['aumento', '📈 Aumentos', '#d35400', 'pct'],
+    ['sucesivos', '🎢 % sucesivos', '#8e44ad', 'pct'],
+    ['equivalente', '🟰 % único equivalente', '#6c3483', 'pct'],
+    ['porcentajeAplicado', '❓ ¿Qué % se aplicó?', '#b03a2e', 'pct'],
+    ['original', '🔙 Precio original', '#1f618d', 'pct'],
 ];
 export const resumenDinero = (c) => {
     const cfg = { ...DEFAULT_CONFIG, ...(c || {}) };
@@ -294,6 +496,7 @@ export const resumenDinero = (c) => {
         ...TIPOS_DINERO.filter(([k]) => cfg.tipos?.[k]).map(([, l]) => l),
         `💶 hasta ${cfg.maxPrecio} €`,
         cfg.conCentimos ? '🪙 Con céntimos' : '🪙 Sin céntimos',
+        ...(cfg.escribir ? ['✍️ Respuesta escrita'] : []),
         cfg.numEjercicios ? `🔢 ${cfg.numEjercicios} ejercicios` : `⏱ ${cfg.tiempo < 60 ? `${cfg.tiempo} s` : `${cfg.tiempo / 60} min`}`,
     ];
 };
@@ -328,15 +531,6 @@ export const ConfigModal = ({ config, onStart, onClose, titulo = '⚙️ Configu
         onStart({ ...local, numEjercicios: modoConteo === 'ejercicios' ? (local.numEjercicios || 10) : null });
     };
 
-    const TIPOS = [
-        ['pagar', '👛 Pagar exacto', '#2ecc71'],
-        ['devolver', '💸 La vuelta', '#3498db'],
-        ['multiplicar', '✖️ Precio total', '#f39c12'],
-        ['unidad', '➗ Precio por uno', '#16a085'],
-        ['iva', '📈 IVA', '#e74c3c'],
-        ['rebaja', '🏷️ Rebajas', '#9b59b6'],
-        ['compra', '🛒 Lista de la compra', '#16a085'],
-    ];
 
     return (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
@@ -344,9 +538,21 @@ export const ConfigModal = ({ config, onStart, onClose, titulo = '⚙️ Configu
                 <h2 style={{ textAlign: 'center', color: '#2c3e50', fontSize: '1.3rem', marginTop: 0, marginBottom: 22 }}>{titulo}</h2>
 
                 <Section label="🧮 Qué practicar">
-                    {TIPOS.map(([k, lab, col]) => (
-                        <Chip key={k} active={local.tipos[k]} onClick={() => toggleTipo(k)} color={col}>{lab}</Chip>
+                    {TIPOS_DINERO.filter(t => !t[3]).map(([k, lab, col]) => (
+                        <Chip key={k} active={!!local.tipos[k]} onClick={() => toggleTipo(k)} color={col}>{lab}</Chip>
                     ))}
+                </Section>
+
+                <Section label="📊 Porcentajes">
+                    {TIPOS_DINERO.filter(t => t[3] === 'pct').map(([k, lab, col]) => (
+                        <Chip key={k} active={!!local.tipos[k]} onClick={() => toggleTipo(k)} color={col}>{lab}</Chip>
+                    ))}
+                </Section>
+
+                <Section label="✍️ Cómo se responde">
+                    <Chip active={!local.escribir} onClick={() => setField('escribir', false)} color="#16a085">💶 Con billetes y monedas</Chip>
+                    <Chip active={!!local.escribir} onClick={() => setField('escribir', true)} color="#c0392b">✍️ Escribiendo el resultado</Chip>
+                    <div style={{ width: '100%', fontSize: '0.75rem', color: '#999' }}>Las preguntas cuya respuesta es un % siempre se responden escribiendo.</div>
                 </Section>
 
                 <Section label="🪙 Céntimos">
@@ -467,7 +673,7 @@ function ModalEnviarProfe({ datos, onClose }) {
 // ─── Zona jugable reutilizable (enunciado + respuesta + acciones) ──────────────
 // No incluye tarjeta exterior: el contenedor (single o dual) la aporta.
 function BoardPlay({ problem, seleccion, cesta, showSolution, isMobile, pieceSize, visibles,
-                     addPieza, quitarPieza, addProducto, quitarProducto, limpiar, comprobar, pasar }) {
+                     addPieza, quitarPieza, addProducto, quitarProducto, limpiar, comprobar, pasar, entrada = '', setEntrada }) {
     if (!problem) return null;
     const esCompra = problem.modo === 'PRODUCTOS';
     const totalSel = Object.entries(seleccion).reduce((s, [v, n]) => s + Number(v) * n, 0);
@@ -481,7 +687,24 @@ function BoardPlay({ problem, seleccion, cesta, showSolution, isMobile, pieceSiz
                 <span style={{ fontSize: isMobile ? '1.05rem' : '1.25rem', fontWeight: 700, color: '#2c3e50', textAlign: 'left', maxWidth: 460 }}>{problem.enunciado}</span>
             </div>
 
-            {esCompra ? (
+            {problem.escrito ? (
+                <>
+                    {/* Respuesta escrita (porcentajes o modo «escribiendo») */}
+                    <div style={{ background: '#f8f9fa', borderRadius: 14, padding: '12px 16px', marginBottom: 16, border: '2px solid #e0e0e0' }}>
+                        <span style={{ fontSize: '0.85rem', color: '#7f8c8d', display: 'block', marginBottom: 6 }}>{showSolution ? '✅ Solución:' : 'Escribe el resultado:'}</span>
+                        {showSolution ? (
+                            <div style={{ fontSize: isMobile ? '2rem' : '2.6rem', fontWeight: 'bold', color: '#27ae60' }}>{problem.displayAnswer}</div>
+                        ) : (
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                                <input value={entrada} onChange={e => setEntrada(e.target.value)} onKeyDown={e => e.key === 'Enter' && comprobar()}
+                                    inputMode="decimal" placeholder={problem.unidad === '%' ? '28' : '12,50'} autoFocus
+                                    style={{ width: isMobile ? 150 : 190, padding: '10px 12px', borderRadius: 12, border: '2px solid #16a085', fontSize: isMobile ? '1.6rem' : '2rem', fontWeight: 800, textAlign: 'center', color: '#2c3e50', outline: 'none' }} />
+                                <span style={{ fontSize: isMobile ? '1.5rem' : '1.9rem', fontWeight: 800, color: '#16a085' }}>{problem.unidad === '%' ? '%' : '€'}</span>
+                            </div>
+                        )}
+                    </div>
+                </>
+            ) : esCompra ? (
                 <>
                     {/* Marcador gastado / te sobra */}
                     <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginBottom: 14, flexWrap: 'wrap' }}>
@@ -575,8 +798,10 @@ function BoardPlay({ problem, seleccion, cesta, showSolution, isMobile, pieceSiz
 
             {/* Solución (al pasar) */}
             {showSolution && (
-                <div style={{ background: '#fff8e1', border: '2px solid #ffe082', borderRadius: 12, padding: '10px 14px', marginBottom: 16, color: '#8d6e00', fontWeight: 600, fontSize: '0.95rem' }}>
-                    👁 {problem.pista}
+                <div style={{ background: '#fff8e1', border: '2px solid #ffe082', borderRadius: 12, padding: '10px 14px', marginBottom: 16, color: '#8d6e00', fontWeight: 600, fontSize: '0.95rem', textAlign: problem.pasos ? 'left' : 'center' }}>
+                    {problem.pasos
+                        ? problem.pasos.map((p, i) => <div key={i}>{i === 0 ? '👁 ' : '· '}{p}</div>)
+                        : <>👁 {problem.pista}</>}
                 </div>
             )}
 
@@ -598,6 +823,7 @@ function TableroDual({ idx, accent, isMobile }) {
     const [problem, setProblem] = useState(null);
     const [seleccion, setSeleccion] = useState({});
     const [cesta, setCesta] = useState({});
+    const [entrada, setEntrada] = useState('');
     const [feedback, setFeedback] = useState(null);
     const [showSolution, setShowSolution] = useState(false);
     const [score, setScore] = useState(0);
@@ -607,7 +833,7 @@ function TableroDual({ idx, accent, isMobile }) {
     const pieceSize = isMobile ? 34 : 40;
     const visibles = config ? DENOMINACIONES.filter(d => d.val <= Math.max(200, Math.round(config.maxPrecio * 100))) : [];
 
-    const nuevo = (cfg) => { setProblem(generarProblema(cfg)); setSeleccion({}); setCesta({}); setShowSolution(false); };
+    const nuevo = (cfg) => { setProblem(generarProblema(cfg)); setSeleccion({}); setCesta({}); setEntrada(''); setShowSolution(false); };
     const empezar = (cfg) => { setConfig(cfg); setScore(0); setAciertos(0); setFallos(0); setFeedback(null); nuevo(cfg); setEstado('PLAY'); };
 
     const esCompra = problem?.modo === 'PRODUCTOS';
@@ -623,7 +849,7 @@ function TableroDual({ idx, accent, isMobile }) {
 
     const comprobar = () => {
         if (!problem || showSolution || feedback) return;
-        if (totalActual === problem.answerCents) {
+        if (problem.escrito ? comprobarEscrito(problem, entrada) : totalActual === problem.answerCents) {
             playSound(sndAcierto);
             setScore(s => s + 10); setAciertos(a => a + 1); setFeedback('CORRECT');
             setTimeout(() => { setFeedback(null); nuevo(config); }, 700);
@@ -674,7 +900,7 @@ function TableroDual({ idx, accent, isMobile }) {
                 <BoardPlay problem={problem} seleccion={seleccion} cesta={cesta} showSolution={showSolution}
                     isMobile={isMobile} pieceSize={pieceSize} visibles={visibles}
                     addPieza={addPieza} quitarPieza={quitarPieza} addProducto={addProducto} quitarProducto={quitarProducto}
-                    limpiar={limpiar} comprobar={comprobar} pasar={pasar} />
+                    limpiar={limpiar} comprobar={comprobar} pasar={pasar} entrada={entrada} setEntrada={setEntrada} />
             )}
         </div>
     );
@@ -685,7 +911,9 @@ export default function CalculoDineroGame({ usuario, onExit }) {
     // Reto por enlace: configuración fija del profesor
     const [reto, setReto] = useState(() => leerRetoUrl());
     const esRetoCompeticion = !!(reto?.compId && reto?.catId);
-    const [gameState, setGameState] = useState('START');
+    // Ficha imprimible compartida por enlace: /dinero?ficha=ID abre directamente su vista pública
+    const [fichaPublicaId, setFichaPublicaId] = useState(() => (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('ficha') : null));
+    const [gameState, setGameState] = useState(() => (fichaPublicaId ? 'FICHAS' : 'START')); // START | PLAYING | END | FICHAS
     const [config, setConfig] = useState(() => ({ ...DEFAULT_CONFIG, ...(reto?.config || {}), tipos: { ...DEFAULT_CONFIG.tipos, ...(reto?.config?.tipos || {}) } }));
     const [showConfig, setShowConfig] = useState(false);
     const [mostrarEnvio, setMostrarEnvio] = useState(false);
@@ -701,6 +929,7 @@ export default function CalculoDineroGame({ usuario, onExit }) {
     const [problem, setProblem] = useState(null);
     const [seleccion, setSeleccion] = useState({});   // {val: count} de billetes/monedas
     const [cesta, setCesta] = useState({});           // {idxProducto: count} en modo lista de la compra
+    const [entrada, setEntrada] = useState('');       // respuesta escrita (porcentajes / modo «escribiendo»)
     const [feedback, setFeedback] = useState(null);    // 'CORRECT' | 'INCORRECT' | 'SKIP'
     const [showSolution, setShowSolution] = useState(false);
 
@@ -724,6 +953,7 @@ export default function CalculoDineroGame({ usuario, onExit }) {
         setProblem(generarProblema(cfg));
         setSeleccion({});
         setCesta({});
+        setEntrada('');
         setShowSolution(false);
     };
 
@@ -767,7 +997,7 @@ export default function CalculoDineroGame({ usuario, onExit }) {
         if (n <= 0) delete next[idx]; else next[idx] = n;
         return next;
     });
-    const limpiar = () => { setSeleccion({}); setCesta({}); };
+    const limpiar = () => { setSeleccion({}); setCesta({}); setEntrada(''); };
 
     const acierto = () => {
         playSound(sndAcierto);
@@ -782,18 +1012,26 @@ export default function CalculoDineroGame({ usuario, onExit }) {
 
     const comprobar = () => {
         if (!problem || showSolution || feedback) return;
-        if (totalActual === problem.answerCents) acierto(); else fallo();
+        if (problem.escrito ? comprobarEscrito(problem, entrada) : totalActual === problem.answerCents) acierto(); else fallo();
     };
 
     const pasar = () => {
         if (!problem || showSolution || feedback) return;
         setSkips(s => s + 1); setFallos(f => f + 1); setScore(s => Math.max(0, s - 2));
         setShowSolution(true); setFeedback('SKIP');
-        setTimeout(() => { setFeedback(null); avanzar(); }, 2200);
+        setTimeout(() => { setFeedback(null); avanzar(); }, problem.pasos?.length > 2 ? 5000 : 2200); // más tiempo si hay varios pasos
+    };
+
+    const quitarFichaDeUrl = () => {
+        if (!fichaPublicaId) return;
+        const u = new URL(window.location.href); u.searchParams.delete('ficha');
+        window.history.replaceState({}, '', u.pathname + u.search);
+        setFichaPublicaId(null);
     };
 
     const handleExit = () => {
         clearInterval(timerRef.current);
+        quitarFichaDeUrl();
         if (gameState !== 'START') setGameState('START');
         else if (typeof onExit === 'function') onExit();
         else window.location.href = '/';
@@ -893,6 +1131,27 @@ export default function CalculoDineroGame({ usuario, onExit }) {
                         {/* Separador */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '2px 0' }}>
                             <div style={{ flex: 1, height: 1, background: '#eee' }} />
+                            <span style={{ color: '#bbb', fontSize: '0.75rem' }}>para el profesor</span>
+                            <div style={{ flex: 1, height: 1, background: '#eee' }} />
+                        </div>
+
+                        {/* Fichas imprimibles */}
+                        <button onClick={() => setGameState('FICHAS')}
+                            style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', background: 'white', border: '2px solid #c0392b', borderRadius: 16, cursor: 'pointer', textAlign: 'left', boxShadow: '0 3px 10px rgba(0,0,0,0.07)', width: '100%' }}
+                            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 20px #c0392b33'; }}
+                            onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 3px 10px rgba(0,0,0,0.07)'; }}
+                        >
+                            <div style={{ background: '#c0392b', borderRadius: 12, width: 46, height: 46, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', flexShrink: 0 }}>🖨️</div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontWeight: 'bold', color: '#2c3e50', fontSize: '1rem', marginBottom: 3 }}>Fichas para imprimir</div>
+                                <div style={{ color: '#888', fontSize: '0.82rem' }}>Crea una ficha en PDF (dinero, porcentajes, problemas de precios), guárdala y corrígela en el monitor</div>
+                            </div>
+                            <span style={{ color: '#c0392b', fontSize: '1.3rem', flexShrink: 0 }}>›</span>
+                        </button>
+
+                        {/* Separador */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '2px 0' }}>
+                            <div style={{ flex: 1, height: 1, background: '#eee' }} />
                             <span style={{ color: '#bbb', fontSize: '0.75rem' }}>2 jugadores</span>
                             <div style={{ flex: 1, height: 1, background: '#eee' }} />
                         </div>
@@ -914,13 +1173,21 @@ export default function CalculoDineroGame({ usuario, onExit }) {
                 </div>
             )}
 
+            {/* FICHAS IMPRIMIBLES */}
+            {gameState === 'FICHAS' && (
+                <React.Suspense fallback={<div style={{ textAlign: 'center', color: '#16a085', fontWeight: 800, padding: 40 }}>Cargando fichas…</div>}>
+                    <FichasDinero isMobile={isMobile} fichaPublicaId={fichaPublicaId}
+                        onSalir={() => { quitarFichaDeUrl(); setGameState('START'); }} />
+                </React.Suspense>
+            )}
+
             {/* JUEGO */}
             {gameState === 'PLAYING' && problem && (
                 <div style={{ ...st.centerCard, maxWidth: 640, border: `4px solid ${borderColor}`, transition: 'border-color 0.2s, transform 0.2s', transform: feedback === 'CORRECT' ? 'scale(1.02)' : 'none' }}>
                     <BoardPlay problem={problem} seleccion={seleccion} cesta={cesta} showSolution={showSolution}
                         isMobile={isMobile} pieceSize={pieceSize} visibles={visibles}
                         addPieza={addPieza} quitarPieza={quitarPieza} addProducto={addProducto} quitarProducto={quitarProducto}
-                        limpiar={limpiar} comprobar={comprobar} pasar={pasar} />
+                        limpiar={limpiar} comprobar={comprobar} pasar={pasar} entrada={entrada} setEntrada={setEntrada} />
                 </div>
             )}
 

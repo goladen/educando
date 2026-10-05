@@ -1,0 +1,80 @@
+// ─────────────────────────────────────────────────────────────────────────────
+//  COLECCIONES LISTAS PARA USAR (fichas de Math World)
+//  Fichas recomendadas por etapa, curso y tema. Al abrirlas se generan números
+//  nuevos; el profesor puede proyectarlas, descargar el PDF o personalizarlas.
+//  ej: [fuente, tipo, nivel, nº de apartados]
+// ─────────────────────────────────────────────────────────────────────────────
+
+const C = (id, titulo, etapa, cursos, desc, ejs) => ({
+    id, titulo, etapa, cursos, desc,
+    temas: [...new Set(ejs.map(e => e[0]))],
+    ejercicios: ejs.map(([fuente, tipo, nivel, n]) => ({ fuente, tipo, nivel, n })),
+});
+
+export const CATALOGO_MATES = [
+    // ── PRIMARIA ─────────────────────────────────────────────────────────────
+    C('p-sumas', 'Sumas y restas', 'primaria', ['1.º', '2.º', '3.º'], 'Cálculo con números hasta el 100 y problemas sencillos',
+        [['calculo', 'suma', 1, 9], ['calculo', 'resta', 1, 9], ['calculo', 'probNaturales', 1, 2]]),
+    C('p-multdiv', 'Multiplicar y dividir', 'primaria', ['3.º', '4.º'], 'Tablas, divisiones exactas y problemas',
+        [['calculo', 'mult', 1, 9], ['calculo', 'div', 1, 9], ['calculo', 'probNaturales', 1, 3]]),
+    C('p-numeros', 'Números: valor posicional y redondeo', 'primaria', ['3.º', '4.º', '5.º'], 'Valor de las cifras, descomposición, redondeo y comparación',
+        [['numeros', 'valorPosicional', 1, 6], ['numeros', 'descomponer', 1, 4], ['numeros', 'redondear', 1, 6], ['numeros', 'comparar', 1, 6]]),
+    C('p-romanos', 'Números romanos', 'primaria', ['4.º', '5.º', '6.º'], 'Pasar de cifras a números romanos y al revés',
+        [['numeros', 'romanos', 2, 12]]),
+    C('p-fracciones', 'Fracciones', 'primaria', ['5.º', '6.º'], 'Identificar, equivalentes, simplificar, sumar, restar y problemas',
+        [['fracciones', 'identificar', 1, 3], ['fracciones', 'equivalente', 1, 4], ['fracciones', 'simplificar', 1, 4], ['fracciones', 'suma', 1, 4], ['fracciones', 'resta', 1, 4], ['fracciones', 'problemas', 1, 2]]),
+    C('p-decimales', 'Decimales y dinero', 'primaria', ['5.º', '6.º'], 'Operaciones con decimales, vueltas, precios y problemas de compras',
+        [['calculo', 'decimales', 1, 9], ['dinero', 'devolver', 1, 4], ['dinero', 'multiplicar', 1, 4], ['calculo', 'probDecimales', 1, 2]]),
+    C('p-porcentajes', 'Porcentajes básicos', 'primaria', ['6.º'], 'Calcular porcentajes, rebajas e IVA',
+        [['dinero', 'pctCantidad', 1, 6], ['dinero', 'rebaja', 1, 4], ['dinero', 'iva', 1, 4]]),
+    C('p-medidas', 'Medidas', 'primaria', ['4.º', '5.º', '6.º'], 'Longitud, masa, capacidad y tiempo',
+        [['medidas', 'longitud', 1, 6], ['medidas', 'masa', 1, 6], ['medidas', 'capacidad', 1, 6], ['medidas', 'tiempo', 1, 4]]),
+    C('p-divisibilidad', 'Múltiplos, divisores y primos', 'primaria', ['5.º', '6.º'], 'Múltiplos, divisores, primos y m.c.d./m.c.m.',
+        [['divisibilidad', 'multiplos', 1, 4], ['divisibilidad', 'divisores', 1, 4], ['divisibilidad', 'primos', 1, 9], ['divisibilidad', 'mcdMcm', 1, 4]]),
+    C('p-geometria', 'Perímetros y áreas', 'primaria', ['5.º', '6.º'], 'Rectángulos, cuadrados, triángulos y circunferencias',
+        [['geometria', 'perimetro', 1, 4], ['geometria', 'area', 1, 6]]),
+    C('p-estadistica', 'Estadística y probabilidad', 'primaria', ['5.º', '6.º'], 'Media, mediana, moda y probabilidad con dados',
+        [['estadistica', 'media', 1, 4], ['estadistica', 'mediana', 1, 4], ['estadistica', 'moda', 1, 4], ['probabilidad', 'dado', 1, 4]]),
+    C('p-potencias', 'Potencias y raíces cuadradas', 'primaria', ['6.º'], 'Calcular potencias y raíces exactas',
+        [['potencias', 'calcular', 1, 9], ['potencias', 'raices', 1, 6]]),
+    C('p-combinadas', 'Operaciones combinadas', 'primaria', ['5.º', '6.º'], 'Jerarquía de las operaciones con y sin paréntesis',
+        [['calculo', 'combinadas', 1, 6], ['calculo', 'combinadas', 2, 4]]),
+
+    // ── ESO ──────────────────────────────────────────────────────────────────
+    C('e-enteros', 'Números enteros', 'eso', ['1.º'], 'Operaciones, combinadas con enteros y problemas',
+        [['calculo', 'enteros', 1, 12], ['calculo', 'combEnteros', 1, 4], ['calculo', 'probEnteros', 1, 3]]),
+    C('e-divisibilidad', 'Divisibilidad: m.c.d. y m.c.m.', 'eso', ['1.º'], 'Descomposición factorial, m.c.d., m.c.m. y problemas',
+        [['divisibilidad', 'factorizar', 1, 6], ['divisibilidad', 'mcdMcm', 2, 4], ['divisibilidad', 'problemas', 1, 3]]),
+    C('e-fracciones', 'Operaciones con fracciones', 'eso', ['1.º', '2.º'], 'Las cuatro operaciones, combinadas y problemas',
+        [['fracciones', 'suma', 2, 4], ['fracciones', 'resta', 2, 4], ['fracciones', 'mult', 2, 4], ['fracciones', 'div', 2, 4], ['fracciones', 'combinadas', 1, 3], ['fracciones', 'problemas', 1, 3]]),
+    C('e-potencias', 'Potencias y raíces', 'eso', ['1.º', '2.º'], 'Potencias de enteros, propiedades y raíces',
+        [['potencias', 'calcular', 2, 9], ['potencias', 'propiedades', 1, 9], ['potencias', 'raices', 2, 6]]),
+    C('e-porcentajes', 'Proporcionalidad y porcentajes', 'eso', ['1.º', '2.º'], 'Porcentajes, aumentos, descuentos y porcentaje aplicado',
+        [['dinero', 'pctCantidad', 2, 6], ['dinero', 'aumento', 2, 3], ['dinero', 'rebaja', 2, 3], ['dinero', 'porcentajeAplicado', 2, 3]]),
+    C('e-combinadas', 'Operaciones combinadas', 'eso', ['1.º', '2.º'], 'Combinadas con enteros y con fracciones',
+        [['calculo', 'combinadas', 2, 4], ['calculo', 'combinadas', 3, 2], ['fracciones', 'combinadas', 2, 4]]),
+    C('e-ecuaciones1', 'Ecuaciones de primer grado', 'eso', ['1.º', '2.º'], 'Simples, con paréntesis, con denominadores y problemas',
+        [['ecuaciones', 'primerGrado', 2, 6], ['ecuaciones', 'parentesis', 2, 4], ['ecuaciones', 'denominadores', 1, 4], ['ecuaciones', 'problemas', 1, 3]]),
+    C('e-polinomios', 'Polinomios', 'eso', ['2.º', '3.º'], 'Valor numérico, operaciones e identidades notables',
+        [['polinomios', 'valorNumerico', 2, 4], ['polinomios', 'sumaResta', 2, 4], ['polinomios', 'producto', 1, 4], ['polinomios', 'identidades', 1, 6]]),
+    C('e-sistemas', 'Sistemas de ecuaciones', 'eso', ['2.º', '3.º'], 'Sistemas 2×2 y problemas',
+        [['sistemas', 'sistema2x2', 1, 4], ['sistemas', 'problemas', 1, 3]]),
+    C('e-geometria', 'Pitágoras, áreas y volúmenes', 'eso', ['2.º', '3.º'], 'Teorema de Pitágoras, áreas, volúmenes y poliedros',
+        [['geometria', 'pitagoras', 1, 4], ['geometria', 'area', 2, 4], ['geometria', 'volumen', 2, 4], ['geometria', 'poliedros', 1, 4]]),
+    C('e-ecuaciones2', 'Ecuaciones de segundo grado', 'eso', ['3.º', '4.º'], 'Incompletas y completas',
+        [['ecuaciones', 'segundoGrado', 1, 4], ['ecuaciones', 'segundoGrado', 2, 6]]),
+    C('e-funciones', 'Funciones', 'eso', ['3.º', '4.º'], 'Imágenes, recta por dos puntos, cortes con los ejes y vértice',
+        [['funciones', 'evaluar', 2, 4], ['funciones', 'pendiente', 1, 3], ['funciones', 'cortes', 1, 4], ['funciones', 'vertice', 1, 3]]),
+    C('e-sucesivos', 'Porcentajes sucesivos', 'eso', ['3.º', '4.º'], 'Descuentos encadenados, % equivalente y precio original',
+        [['dinero', 'sucesivos', 2, 4], ['dinero', 'equivalente', 2, 4], ['dinero', 'original', 2, 3]]),
+    C('e-radicales', 'Notación científica y radicales', 'eso', ['3.º', '4.º'], 'Notación científica, extraer factores y sumar radicales',
+        [['potencias', 'cientifica', 1, 6], ['potencias', 'extraer', 1, 6], ['potencias', 'sumaRadicales', 1, 4]]),
+    C('e-estadistica', 'Estadística y probabilidad', 'eso', ['3.º', '4.º'], 'Parámetros estadísticos y regla de Laplace',
+        [['estadistica', 'completo', 2, 2], ['probabilidad', 'urna', 1, 3], ['probabilidad', 'monedas', 1, 3], ['probabilidad', 'cartas', 1, 3]]),
+    C('e-analitica', 'Geometría analítica', 'eso', ['4.º'], 'Distancia, punto medio, vectores y rectas',
+        [['geoAnalitica', 'distancia', 1, 3], ['geoAnalitica', 'puntoMedio', 1, 3], ['geoAnalitica', 'vector', 1, 3], ['geoAnalitica', 'recta', 1, 3]]),
+    C('e-algebra4', 'Repaso de álgebra', 'eso', ['4.º'], 'Productos, factor común, segundo grado y sistemas',
+        [['polinomios', 'producto', 3, 4], ['polinomios', 'factorComun', 1, 4], ['ecuaciones', 'segundoGrado', 3, 4], ['sistemas', 'sistema2x2', 2, 3]]),
+    C('b-analitica', 'Geometría analítica', 'bach', ['1.º'], 'Repaso de vectores y rectas en el plano',
+        [['geoAnalitica', 'vector', 1, 4], ['geoAnalitica', 'distancia', 1, 3], ['geoAnalitica', 'recta', 1, 4]]),
+];

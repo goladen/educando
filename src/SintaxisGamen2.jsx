@@ -7,6 +7,7 @@ import { CheckCircle, XCircle, RotateCcw, Play, Trophy, PaintBucket, ArrowRight,
 import { CATEGORIAS, NIVELES, FRASES } from './BibliotecaFrases';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import { leerRetoUrl } from './utils/retoLink';
+import BotonFichas from './components/BotonFichas';
 import { CATEGORIAS_FR, NIVELES_FR, FRASES_FR } from './BibliotecaFrances';
 import { CATEGORIAS_CA, NIVELLS_CA, FRASES_CA } from './BibliotecaCatalana';
 import { CompeticionCuerda } from './components/TironCuerdaEscena';
@@ -1259,6 +1260,9 @@ function PantallaNivel({ nivelSel, setNivelSel, recurso, setRecurso, joinCode, s
                         }}>
                         <ChevronRight size={20}/> Continuar
                     </button>
+
+                    {/* Fichas imprimibles de Sintaxis (para el profesor) */}
+                    <div style={{marginTop:14}}><BotonFichas materia="sintaxis" color="#3498db" texto="Fichas de Sintaxis para imprimir" /></div>
                 </div>
             </div>
         </div>

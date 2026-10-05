@@ -3,6 +3,7 @@ import { PASOS, NOTAS, NOTAS_STAFF, INSTRUMENTOS_SEQ, playTone } from './musicUt
 import CreadorRitmosColab from './CreadorRitmosColab';
 import EarTrainingGame from './MusicCompass';
 import MusicaInstrumentos from './MusicaInstrumentos';
+import BotonFichas from './components/BotonFichas';
 const PizarraMusical = lazy(() => import('./GestionAula').then(m => ({ default: m.PizarraApp })));
 import { db } from './firebase';
 import { guardarRegistroLocal } from './utils/registrosLocales';
@@ -112,6 +113,9 @@ export default function MusicApp({ onBack, usuario = null }) {
                             </div>
                         </button>
                     ))}
+
+                    {/* Fichas imprimibles de Música (para el profesor) */}
+                    <BotonFichas materia="musica" color="#5E35B1" texto="Fichas de Música para imprimir" />
                 </div>
 
                 {/* ── Sesión acumulada ─────────────────────────────────── */}

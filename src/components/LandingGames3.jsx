@@ -24,6 +24,7 @@ import BunkerDisparo from '../BunkerDisparo';
 import JuegoCalamar from '../JuegoCalamar';
 import MoneyBoard from '../MoneyBoard';
 import EnigmicLogic from '../EnigmicLogic';
+import SixSeven from '../SixSeven';
 import Visor3D from '../Visor3D';
 import Esculpir3D from '../Esculpir3D';
 import TextWordleGame from '../TextWordleGame';
@@ -31,6 +32,7 @@ import MathWordleGame from '../MathWordleGame';
 import SopaDeLetrasGame from '../SopaDeLetrasGame';
 import Ahorcado from '../Ahorcado';
 import SintaxisGame from '../SintaxisGamen2';
+import LenguaApp from '../lengua/LenguaApp';
 import Listening from '../ListeningGame'
 import Geometrix from '../Geometrix';
 import CalculoMental from '../CalculoMental';
@@ -55,6 +57,19 @@ import ArkadeHub from '../MiniArcade/ArkadeHub';
 import EtiquetaMe from '../EtiquetaMe';
 import LineaTiempoGame from '../LineaTiempoGame';
 const ListeningRecursoGame = lazy(() => import('../ListeningRecursoGame'));
+// Centro de fichas imprimibles de Math World (ruta /fichas)
+const FichasMathWorld = lazy(() => import('../FichasMathWorld'));
+// Centros de fichas de materias (rutas /fichas/biologia, /fichas/geografia, /fichas/sintaxis, /fichas/musica)
+const FichasMaterias = lazy(() => import('../FichasMaterias'));
+// Materia de la vista por materias → centro de fichas (MATEMATICAS abre el de Math World)
+const FICHAS_DE_MATERIA = {
+    MATEMATICAS: { materia: null, titulo: 'Fichas de matemáticas', color: '#7b1fa2', emoji: '📚' },
+    LENGUA: { materia: 'sintaxis', titulo: 'Fichas de sintaxis', color: '#3498db', emoji: '🖍️' },
+    GEO_HISTORIA: { materia: 'geografia', titulo: 'Fichas de geografía', color: '#0d9488', emoji: '🌍' },
+    BIOLOGIA: { materia: 'biologia', titulo: 'Fichas de biología', color: '#2E7D32', emoji: '🔬' },
+    MUSICA: { materia: 'musica', titulo: 'Fichas de música', color: '#5E35B1', emoji: '🎵' },
+};
+const MATERIA_DE_FICHAS = { sintaxis: 'LENGUA', geografia: 'GEO_HISTORIA', biologia: 'BIOLOGIA', musica: 'MUSICA' };
 import OmninteractiveApp from '../OmninteractiveApp';
 import OcaMatematicaDirect from '../OcaMatematica';
 import DominoMatematicoDirect from '../dominofracciones';
@@ -556,6 +571,18 @@ export const APPS = [
         shareUrl: `${window.location.origin}/calamar`
     },
     {
+        // Sale en la cuadrícula de juegos y también en Math World (alsoMath)
+        id: 'SIXSEVEN',
+        name: 'Six Seven',
+        desc: 'Cálculo mental neón alrededor del 67: Speed Run, Target 67 y Neon Grid.',
+        color: '#FF007F',
+        emoji: '🔢',
+        isSpecial: true,
+        alsoMath: true,
+        shareable: true,
+        shareUrl: `${window.location.origin}/sixseven`
+    },
+    {
         id: 'BUNKER',
         name: 'Bunker',
         desc: 'Shooter 3D: dispara a las respuestas incorrectas.',
@@ -623,10 +650,10 @@ export const APPS = [
     },
     {
         id: 'SINTAXIS',
-        name: 'Sintaxis',
-        desc: 'Analiza frases de distintos niveles.',
+        name: 'Lengua',
+        desc: 'Sintaxis, ortografía, morfología y léxico.',
         color: '#3498db',
-        emoji: '🖍️',
+        emoji: '📖',
         isSpecial: false,
         isHerramienta: true,
         shareable: true
@@ -829,6 +856,14 @@ export const GAME_INFO = {
         materias: ['Universal'],
         etapas: ['Primaria', 'ESO', 'Bachillerato'],
     },
+    SIXSEVEN: {
+        descripcion: 'Minijuegos de cálculo mental con estética neón donde el protagonista es el número 67. Cada acierto hace que salgan flotando seises y sietes, como los corazones de un directo.',
+        tipoPreguntas: 'Tres modos. Speed Run: 6 rondas de operaciones con el 67 (sumas y restas, multiplicaciones y combinadas), con 13 s por ronda o sin tiempo. Target 67: con 6 números y las cuatro operaciones hay que llegar exactamente a 67 (siempre hay solución y se puede consultar). Neon Grid: deslizar sobre 3 casillas que formen una operación correcta (A + B = C, resta, multiplicación o división) o tocar los múltiplos de 6 y de 7, con combos y tiempo de 67 s, 130 s o libre.',
+        biblioteca: 'No necesita recursos: las operaciones se generan al azar.',
+        multiplayer: 'Individual. También se puede proyectar y jugar en gran grupo.',
+        materias: ['Matemáticas'],
+        etapas: ['Primaria', 'ESO'],
+    },
     BUNKER: {
         descripcion: 'Shooter 3D en primera persona: cada pregunta hace aparecer soldados, cada uno con una respuesta sobre la cabeza. Dispara a las respuestas incorrectas y deja en pie la correcta para pasar a la siguiente pregunta. Cuidado: si disparas a la correcta pierdes vida y los enemigos avanzan hacia ti.',
         tipoPreguntas: 'Opción múltiple (1 correcta + hasta 3 incorrectas). Usa los mismos recursos que Burbujas/Pikatron. También se puede jugar sin recurso, con 4 materias integradas (Matemáticas, Geografía, Inglés y Ciencias).',
@@ -1015,12 +1050,12 @@ export const GAME_INFO = {
     },
     // Herramientas
     SINTAXIS: {
-        descripcion: 'Analizador sintáctico interactivo de Lengua. El alumno puede marcar el sujeto, predicado, núcleos y complementos de frases seleccionadas, con corrección automática.',
-        tipoPreguntas: 'Análisis sintáctico de frases. Incluye frases propias y permite al profesor añadir las suyas.',
-        biblioteca: 'Sí, incluye biblioteca de frases clasificadas por dificultad y nivel educativo.',
-        multiplayer: 'Individual.',
+        descripcion: 'Herramienta de Lengua con cuatro bloques: SINTAXIS (marcar sujeto, predicado y complementos, en español, francés y catalán), ORTOGRAFÍA (agudas/llanas/esdrújulas, sílaba tónica, ¿lleva tilde?, letras dudosas b/v, g/j, h, ll/y, c/cc, c/z, m/n, r/rr), MORFOLOGÍA (frases generadas al infinito para cazar sustantivos, verbos, adjetivos, determinantes, pronombres, preposiciones, conjunciones y adverbios, y clasificar sus tipos) y SEMÁNTICA Y LÉXICO (sinónimos, antónimos, emparejar a contrarreloj, campos semánticos, familias de palabras, refranes y frases hechas, ruleta de campos para toda la clase).',
+        tipoPreguntas: 'Opción múltiple, completar el hueco, tocar palabras en una frase, emparejar y análisis sintáctico. Cada pregunta corregida muestra la regla o la explicación.',
+        biblioteca: 'Sí: bancos propios de palabras, refranes y campos semánticos, generador automático de frases etiquetadas y biblioteca de frases de sintaxis (el profesor puede añadir las suyas).',
+        multiplayer: 'Práctica individual (con envío al profesor), contrarreloj y competición por equipos con tirón de cuerda. Sintaxis tiene además modo en vivo.',
         materias: ['Lengua y Literatura'],
-        etapas: ['ESO', 'Bachillerato'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
     },
     MATH_WORLD_PORTAL: {
         descripcion: 'Portal de acceso a todas las herramientas matemáticas avanzadas: Geometrix, Ecuaciones, Funciones, Geometría Analítica, Álgebra, Estadística y Probabilidad.',
@@ -1215,6 +1250,14 @@ export const GAME_INFO = {
         materias: ['Matemáticas'],
         etapas: ['Primaria', 'ESO'],
     },
+    FICHAS_MW: {
+        descripcion: 'Centro de fichas imprimibles de Math World. El profesor elige una colección lista (por etapa, curso y tema) o crea la suya mezclando ejercicios de todas las herramientas: cálculo, números, fracciones, dinero y porcentajes, divisibilidad, potencias, medidas, geometría, estadística, probabilidad, ecuaciones, sistemas, polinomios, funciones y geometría analítica. Descarga el PDF para repartir en papel y corrige en clase con el modo pizarra, paso a paso.',
+        tipoPreguntas: 'Ejercicios generados automáticamente con solución y pasos: operaciones, problemas, ecuaciones, áreas, probabilidad… Cada ejercicio tiene los apartados que quiera el profesor.',
+        biblioteca: 'Sí: más de 30 colecciones listas para usar y una galería con las fichas que comparten otros profesores. Se guardan con la cuenta de Google y se comparten con un enlace.',
+        multiplayer: 'Para dirigir la clase: ficha en papel + corrección interactiva en el monitor (revelar pasos y comprobar respuestas).',
+        materias: ['Matemáticas'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
     FRACCIONES: {
         descripcion: 'Fracciones de forma visual con rectángulos divididos. Laboratorio para manipular numerador y denominador en tiempo real (equivalencia, suma, resta, multiplicación, división, potencia y raíz cuadrada), base de ejercicios generados automáticamente y modo «tirón de cuerda» por equipos.',
         tipoPreguntas: 'Identificar la fracción pintada, fracciones equivalentes, simplificar y operaciones (suma, resta, multiplicación, división, potencia y raíz). Se generan automáticamente por niveles.',
@@ -1394,7 +1437,7 @@ const MATERIA_SLUGS = {
     idiomas: 'IDIOMAS', ingles: 'IDIOMAS',
 };
 
-const MATH_ONLY_IDS = new Set(['MATHLIVE']);
+const MATH_ONLY_IDS = new Set(['MATHLIVE', 'SIXSEVEN']);
 const GESTION_IDS = ['GESTION_AULA', 'QUESTION_SENDER', 'OMNINTERACTIVE', 'VIDEOQUIZZ', 'FUNCIONES_EJECUTIVAS'];
 // Herramientas con IA, siempre disponibles en todas las materias (separadas de la gestión de aula)
 const IA_IDS = ['MINIAPP_CREATOR'];
@@ -1518,7 +1561,7 @@ const cleanText = (str) => {
 const appsMathWorldCompartir = () => {
     const o = typeof window !== 'undefined' ? window.location.origin : '';
     const ruta = (a) => herramientaPorId(a.id)?.ruta || (a.shareUrl ? a.shareUrl.replace(o, '') : `/?juego=${a.id.toLowerCase()}`);
-    const mates = APPS.filter(a => a.isMath && !a.comingSoon)
+    const mates = APPS.filter(a => (a.isMath || a.alsoMath) && !a.comingSoon)
         .map(a => ({ id: a.id, label: a.name.replace(/_/g, ' '), emoji: a.emoji || '🧮', ruta: ruta(a) }));
     const primaria = [
         { id: 'MATES_OAOA', label: 'Método OAOA', emoji: '🧮', ruta: '/primaria/oaoa' },
@@ -1707,7 +1750,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                 if (juegoParam.toLowerCase() === 'quienhistorico') { setQuienHistoricoApp(true); return; }
                 if (juegoParam.toLowerCase() === 'pizarra')        { setPizarraApp(true);     return; }
                 if (juegoParam.toLowerCase() === 'biologia')       { setBiologiaApp(true);    return; }
-                if (juegoParam.toLowerCase() === 'sintaxis')       { setJuegoActivo({ tipoJuego: 'SINTAXIS' }); return; }
+                if (juegoParam.toLowerCase() === 'sintaxis' || juegoParam.toLowerCase() === 'lengua') { setJuegoActivo({ tipoJuego: 'SINTAXIS' }); return; }
                 if (juegoParam.toLowerCase() === 'vistas_didricas') { setVistasDidricas(true); return; }
                 if (juegoParam.toLowerCase() === 'situaciones_aprendizaje') { setSituacionesAprendizaje(true); return; }
                 if (juegoParam.toLowerCase() === 'linea_tiempo')    { setJuegoActivo({ tipoJuego: 'LINEA_TIEMPO' }); return; }
@@ -1787,6 +1830,10 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                 setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'ECUACION_SISTEMAS' });
             } else if (path === 'polinomios') {
                 setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'POLINOMIOS' });
+            } else if (path.startsWith('fichas/') && MATERIA_DE_FICHAS[path.slice(7)]) {
+                setJuegoActivo({ tipoJuego: 'FICHAS_MATERIA', materia: path.slice(7) });
+            } else if (path === 'fichas' || path === 'primaria/fichas') {
+                setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'FICHAS_MW', primaria: path.startsWith('primaria') });
             } else if (path === 'dinero') {
                 setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'DINERO' });
             } else if (path === 'oca') {
@@ -1803,6 +1850,8 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                 setEsculpirApp(true);
             } else if (path === 'moneyboard' || path === 'piktboard') {
                 setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'MONEYBOARD' });
+            } else if (path === 'sixseven') {
+                setJuegoActivo({ tipoJuego: 'SIXSEVEN' });
             } else if (path === 'calamar') {
                 setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'CALAMAR' });
             } else if (path === '' || path === 'inicio') {
@@ -1930,7 +1979,7 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
     const totalRegistros = resumenRegistros.reduce((s, g) => s + g.count, 0);
     const [miAvatar] = useAvatarLocal();
     // Mapeo id-de-tarjeta → tipo-de-registro cuando no coinciden.
-    const REGISTRO_TIPO_DE = { GEOMETRIX: 'GEOMETRIX_COMPUESTO', POLINOMIOS: 'ALGEBRA', MATES_OAOA: 'OAOA', MONEYBOARD: 'JEOPARDY' };
+    const REGISTRO_TIPO_DE = { SINTAXIS: 'LENGUA', GEOMETRIX: 'GEOMETRIX_COMPUESTO', POLINOMIOS: 'ALGEBRA', MATES_OAOA: 'OAOA', MONEYBOARD: 'JEOPARDY' };
     // Tipos de registro que pertenecen a Math World (para el recuento agregado del portal).
     const MATH_WORLD_TIPOS = ['CALCULO','DINERO','FRACCIONES','DIVISIBILIDAD','ALGEBRA','OCA','OAOA','ECUACIONES','FUNCIONES','FUNCIONES_ANALISIS','GEOMETRIX_COMPUESTO','MATHLE'];
 
@@ -2199,6 +2248,12 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
             return;
         }
 
+        if (appId === 'SIXSEVEN') {
+            window.history.pushState({}, '', '/sixseven');
+            setJuegoActivo({ tipoJuego: 'SIXSEVEN', desdeMath: zonaActiva === 'MATH' });
+            return;
+        }
+
         if (appId === 'BUNKER') {
             window.history.pushState({}, '', '/bunker');
             setJuegoActivo({ tipoJuego: 'BUNKER' });
@@ -2275,6 +2330,9 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
             setJuegoActivo({ tipoJuego: appId, juegoLibre: true });
             return;
         }
+
+        // Lengua (id histórico SINTAXIS): «/lengua» es la vista por materia, así que se abre aquí.
+        if (appId === 'SINTAXIS') { setJuegoActivo({ tipoJuego: 'SINTAXIS' }); return; }
 
         const appInfo = APPS.find(a => a.id === appId);
 
@@ -2685,6 +2743,29 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
         if (juegoActivo.tipoJuego === 'LINEA_TIEMPO') return <LineaTiempoGame recurso={juegoActivo} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'LISTENING_RECURSO') return <Suspense fallback={null}><ListeningRecursoGame recurso={juegoActivo} usuario={usuario} onExit={() => setJuegoActivo(null)} /></Suspense>;
 
+        if (juegoActivo.tipoJuego === 'FICHAS_MATERIA') return (
+            <div style={{ minHeight: '100vh', background: '#eef2f7', padding: 15, boxSizing: 'border-box', fontFamily: "'Segoe UI', Tahoma, sans-serif" }}>
+                <Suspense fallback={<div style={{ textAlign: 'center', color: '#7b1fa2', fontWeight: 800, padding: 40 }}>Cargando fichas…</div>}>
+                    <FichasMaterias materia={juegoActivo.materia} isMobile={typeof window !== 'undefined' && window.innerWidth <= 700}
+                        fichaPublicaId={new URLSearchParams(window.location.search).get('ficha')}
+                        onSalir={() => {
+                            const mat = MATERIA_DE_FICHAS[juegoActivo.materia];
+                            window.history.pushState({}, '', `/${MATERIA_ROUTE[mat] || ''}`);
+                            if (mat) { setMateriaActiva(mat); setTabPrincipal('MATERIA'); }
+                            setJuegoActivo(null);
+                        }} />
+                </Suspense>
+            </div>
+        );
+        if (juegoActivo.tipoJuego === 'FICHAS_MW') return (
+            <div style={{ minHeight: '100vh', background: '#f3e5f5', padding: 15, boxSizing: 'border-box', fontFamily: "'Segoe UI', Tahoma, sans-serif" }}>
+                <Suspense fallback={<div style={{ textAlign: 'center', color: '#7b1fa2', fontWeight: 800, padding: 40 }}>Cargando fichas…</div>}>
+                    <FichasMathWorld isMobile={typeof window !== 'undefined' && window.innerWidth <= 700}
+                        fichaPublicaId={new URLSearchParams(window.location.search).get('ficha')}
+                        onSalir={() => { const destino = juegoActivo.primaria ? '/primaria' : '/math_world'; window.history.pushState({}, '', destino); setJuegoActivo(null); }} />
+                </Suspense>
+            </div>
+        );
         if (juegoActivo.tipoJuego === 'GEOMETRIX') return <Geometrix usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'CALCULO') return <CalculoMental usuario={usuario} onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'DINERO') return <CalculoDinero usuario={usuario} onExit={() => { const destino = juegoActivo.primaria ? '/primaria' : '/math_world'; window.history.pushState({}, '', destino); setJuegoActivo(null); }} />;
@@ -2741,7 +2822,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
             return <ProgramacionRobotica usuario={usuario} onLoginRequest={onLoginRequest} onExit={() => setJuegoActivo(null)} />;
         }
         if (juegoActivo.tipoJuego === 'LENGUA_SIGNOS') return <LenguaSignos onExit={() => setJuegoActivo(null)} />;
-        if (juegoActivo.tipoJuego === 'SINTAXIS')    return <SintaxisGame  usuario={usuario} onExit={() => setJuegoActivo(null)} />;
+        if (juegoActivo.tipoJuego === 'SINTAXIS')    return <LenguaApp     usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'LISTENING')   return <Listening     usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'STORYCUBES')  return <StoryCubes    usuario={usuario} onExit={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'PUZZLE_IMAGENES') return <PuzzleImagenes onExit={() => setJuegoActivo(null)} />;
@@ -2760,6 +2841,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
         if (juegoActivo.tipoJuego === 'RACING3D') return <RacingGame3D usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'MANSION_PITAGORICA') return <MansionPitagoricaGame alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'ENIGMIC') return <EnigmicLogic usuario={usuario} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
+        if (juegoActivo.tipoJuego === 'SIXSEVEN') return <SixSeven onExit={() => { window.history.pushState({}, '', juegoActivo.desdeMath ? '/math_world' : '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'BUNKER') return <BunkerDisparo usuario={usuario} recurso={juegoActivo.recurso || null} autoStart={!!juegoActivo.recurso} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'MONEYBOARD') return <MoneyBoard usuario={usuario} recurso={juegoActivo.recurso || null} autoStart={!!juegoActivo.recurso} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'CALAMAR') return <JuegoCalamar usuario={usuario} recurso={juegoActivo.recurso || null} autoStart={!!juegoActivo.recurso} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
@@ -2790,6 +2872,27 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
     }
 
     // --- PANTALLA EXCLUSIVA MATH WORLD ---
+    // Acceso destacado al centro de fichas imprimibles (Math World y Primaria)
+    const bannerFichas = (primaria) => (
+        <div onClick={() => { window.history.pushState({}, '', primaria ? '/primaria/fichas' : '/fichas'); setJuegoActivo({ tipoJuego: 'FICHAS_MW', primaria }); }}
+            style={{ position: 'relative', maxWidth: primaria ? '860px' : '900px', margin: '0 auto 28px', display: 'flex', alignItems: 'center', gap: 18, padding: '18px 22px', borderRadius: 20, cursor: 'pointer', background: 'linear-gradient(135deg, #7b1fa2, #c0392b)', color: 'white', boxShadow: '0 10px 26px rgba(123,31,162,0.35)', flexWrap: 'wrap', transition: 'transform 0.2s' }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; }}>
+            <div style={{ fontSize: 46 }}>📚</div>
+            <div style={{ flex: 1, minWidth: 220, textAlign: 'left' }}>
+                <div style={{ fontWeight: 900, fontSize: '1.35rem' }}>Fichas para imprimir y corregir en la pizarra</div>
+                <div style={{ opacity: 0.92, fontSize: '0.95rem', marginTop: 4 }}>Colecciones listas por curso y tema, o crea la tuya con ejercicios de todas las herramientas. Reparte el PDF y dirige la clase desde el monitor.</div>
+            </div>
+            <div style={{ background: 'white', color: '#7b1fa2', fontWeight: 900, borderRadius: 24, padding: '10px 18px' }}>Abrir ›</div>
+            {GAME_INFO.FICHAS_MW && (
+                <button onClick={e => { e.stopPropagation(); setShareModal({ url: `${window.location.origin}/fichas`, titulo: 'Fichas de Math World', juegoId: 'FICHAS_MW' }); }}
+                    title="Compartir" style={{ position: 'absolute', top: 10, right: 12, background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '50%', width: 32, height: 32, color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Share2 size={16} />
+                </button>
+            )}
+        </div>
+    );
+
     if (zonaActiva === 'MATH') {
         // Subvista: Primaria
         if (subzonaMath === 'PRIMARIA') {
@@ -2804,6 +2907,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                         <h1 style={{ color: '#009688', fontSize: '3rem', margin: 0, textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>Primaria</h1>
                         <p style={{ color: '#666', fontSize: '1.2rem', marginTop: '10px' }}>Juegos de cálculo para primaria</p>
                     </div>
+                    {bannerFichas(true)}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '25px', maxWidth: '860px', margin: '0 auto', paddingBottom: '40px' }}>
                         <div
                             onClick={() => { window.history.pushState({}, '', '/primaria/oaoa'); setJuegoActivo({ tipoJuego: 'MATES_OAOA' }); }}
@@ -2935,6 +3039,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                     <h1 style={{ color: '#009688', fontSize: '3rem', margin: 0, textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>Math World</h1>
                     <p style={{ color: '#666', fontSize: '1.2rem', marginTop: '10px' }}>Tu ecosistema de herramientas matemáticas</p>
                 </div>
+                {bannerFichas(false)}
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '25px', maxWidth: '900px', margin: '0 auto', paddingBottom: '40px' }}>
                     {/* Tarjeta Primaria */}
@@ -2949,7 +3054,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                         <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>Juegos de cálculo: Método OAOA y Feria del Cálculo.</p>
                     </div>
 
-                    {APPS.filter(app => app.isMath).map(app => {
+                    {APPS.filter(app => app.isMath || app.alsoMath).map(app => {
                         if (app.id === 'CALCULO') return (
                             <div key={app.id} style={{ position: 'relative',
                                 background: '#E0F2F1', borderRadius: '20px', padding: '22px 18px',
@@ -3527,6 +3632,25 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                             ))}
                         </div>
 
+                        {/* Acceso a las fichas imprimibles de la materia */}
+                        {FICHAS_DE_MATERIA[materiaActiva] && (() => {
+                            const fm = FICHAS_DE_MATERIA[materiaActiva];
+                            return (
+                                <div onClick={() => {
+                                    if (fm.materia) { window.history.pushState({}, '', `/fichas/${fm.materia}`); setJuegoActivo({ tipoJuego: 'FICHAS_MATERIA', materia: fm.materia }); }
+                                    else { window.history.pushState({}, '', '/fichas'); setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'FICHAS_MW' }); }
+                                }}
+                                    style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', borderRadius: 18, cursor: 'pointer', marginBottom: 24, background: `linear-gradient(135deg, ${fm.color}, #c0392b)`, color: 'white', boxShadow: `0 8px 22px ${fm.color}55`, flexWrap: 'wrap' }}>
+                                    <span style={{ fontSize: 36 }}>{fm.emoji}</span>
+                                    <span style={{ flex: 1, minWidth: 200 }}>
+                                        <span style={{ display: 'block', fontWeight: 900, fontSize: '1.15rem' }}>{fm.titulo} para imprimir y corregir en la pizarra</span>
+                                        <span style={{ fontSize: '0.88rem', opacity: 0.92 }}>Colecciones listas por curso, crea las tuyas, reparte el PDF y corrige en clase paso a paso.</span>
+                                    </span>
+                                    <span style={{ background: 'white', color: fm.color, fontWeight: 900, borderRadius: 20, padding: '8px 16px' }}>Abrir ›</span>
+                                </div>
+                            );
+                        })()}
+
                         {/* Herramientas específicas */}
                         {specificApps.length > 0 && (<>
                             <h3 style={{ color: materia.color, textShadow: '0 1px 3px rgba(0,0,0,0.4)', marginBottom: 14, marginTop: 0, fontSize: '1.1rem' }}>
@@ -3670,7 +3794,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
             <div style={{ display: 'grid', gridTemplateColumns: esMovilVista ? '1fr 1fr' : 'repeat(auto-fit, minmax(140px, 1fr))', gap: '15px', marginBottom: '40px', maxWidth: '900px', margin: '0 auto 40px auto' }}>
                 {[
 { id: 'LENGUA_SIGNOS',   label: 'Lengua Signos',   emoji: '🤟',  color: '#2563EB', action: () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }), shareable: true },
-                    { id: 'SINTAXIS',        label: 'Sintaxis',        emoji: '🖍️',  color: '#3498db', action: () => setJuegoActivo({ tipoJuego: 'SINTAXIS' }), shareable: true },
+                    { id: 'SINTAXIS',        label: 'Lengua',          emoji: '📖',  color: '#3498db', action: () => setJuegoActivo({ tipoJuego: 'SINTAXIS' }), shareable: true, shareUrl: `${window.location.origin}/?juego=lengua` },
                     { id: 'MATH_WORLD_PORTAL', label: 'Math World',    emoji: '🌍',  color: '#009688', action: () => abrirJuego('MATH_WORLD_PORTAL'), shareable: true, shareUrl: `${window.location.origin}/math_world` },
                     { id: 'LISTENING',       label: 'Listening',       emoji: '🙉',  color: '#8E44AD', action: () => setJuegoActivo({ tipoJuego: 'LISTENING' }), shareable: true },
                     { id: 'ETIQUETAS',       label: 'EtiquetaMe',      img: imgEtiquetas, color: '#e74c3c', action: () => abrirJuego('ETIQUETAS'), shareable: true },
@@ -4151,7 +4275,7 @@ const [entrando, setEntrando] = useState(false);
     // --------
 
 
-    if (appData.id === 'SINTAXIS') return <SintaxisGame usuario={usuario} onExit={onHome} />;
+    if (appData.id === 'SINTAXIS') return <LenguaApp usuario={usuario} onExit={onHome} />;
 if (appData.id === 'LISTENING') return <Listening usuario={usuario} onExit={onHome} />;
     if (appData.id === 'ROBOTICA_BLOQUES') return <ProgramacionRobotica usuario={usuario} onLoginRequest={onLoginRequest} onExit={onHome} />;
 

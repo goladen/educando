@@ -8,6 +8,7 @@ import ANATOMIA         from '../anatomia_avanzada_dataset.json';
 import { CompeticionCuerda } from './TironCuerdaEscena';
 import ModalEnviarCompeticion from './ModalEnviarCompeticion';
 import { leerRetoUrl } from '../utils/retoLink';
+import BotonFichas from './BotonFichas';
 
 const N_PREGUNTAS = 10;
 const TIEMPO      = 20;
@@ -787,6 +788,9 @@ function BiologiaAppInner({ onBack, onCreateLive, onJoinLive }) {
             <span style={{ display:'block', fontSize:'0.8rem', opacity:0.9, marginTop:2 }}>Tirón de cuerda 2 equipos · ¿a qué sistema pertenece cada parte?</span>
           </span>
         </button>
+
+        {/* Fichas imprimibles de Biología (para el profesor) */}
+        <div style={{ marginBottom:14 }}><BotonFichas materia="biologia" color="#2E7D32" texto="Fichas de Biología para imprimir" /></div>
 
         {/* System selector */}
         <div style={{ fontSize:'0.72rem', color:'#64748b', margin:'0 2px 8px', textTransform:'uppercase', letterSpacing:'0.05em' }}>O practica con la silueta</div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, createContext, useContext } from 'r
 import { db, auth } from '../firebase';
 import { collection, doc, setDoc, getDoc, getDocs, deleteDoc, query, where, limit } from 'firebase/firestore';
 import { GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from 'firebase/auth';
+import { sonidoCorrecto, sonidoIncorrecto, despertarAudio } from '../utils/sonidosFeedback';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  FICHAS IMPRIMIBLES (motor común) — el profesor compone una ficha con
@@ -13,7 +14,7 @@ import { GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from 'firebas
 //  motor = { coleccion, ruta, nombre, tituloFicha, emoji, volver, tipos, titulos,
 //            ejercicioInicial, ejercicioNuevo, layout(ej), generarApartados(ej, n, existentes),
 //            maxApartados(ej), usaNivel(tipo), categorias?(tipo), esTexto(ap), sizeHoja?(ap),
-//            Enunciado, Solucion, pasosMax(ap), marcaEnunciado?(ap, vis), RespuestaInline?, Revelado? }
+//            Enunciado, Solucion, pasosMax(ap), marcaEnunciado?(ap, vis), RespuestaInline?, Revelado?, respuestas?(ap) }
 // ─────────────────────────────────────────────────────────────────────────────
 
 const LETRAS = 'abcdefghijklmnopqrstuvwxyz';
@@ -29,10 +30,14 @@ export const barajar = (arr) => {
     return a;
 };
 const nuevaClave = () => Math.random().toString(36).slice(2, 9);
-const catPorDefecto = (motor, tipo) => motor.categorias?.(tipo)?.[0]?.[0] || 'todos';
+// Motores con varios temas (motor.fuentes): cada ejercicio lleva `fuente`
+export const tiposDe = (motor, ej) => (motor.fuentes ? motor.fuentes[ej?.fuente]?.tipos || {} : motor.tipos);
+const tituloDe = (motor, fuente, tipo) => (motor.fuentes ? motor.fuentes[fuente]?.titulos?.[tipo] : motor.titulos[tipo]) || '';
+const catPorDefecto = (motor, tipo, ej) => motor.categorias?.(tipo, ej)?.[0]?.[0] || 'todos';
 
-const nuevoEjercicio = (motor, { tipo, nivel = 1, n = 3 }) => {
-    const ej = { key: nuevaClave(), tipo, nivel, n, titulo: motor.titulos[tipo] || '', tituloAuto: true, catProb: catPorDefecto(motor, tipo), apartados: [] };
+const nuevoEjercicio = (motor, { fuente, tipo, nivel = 1, n = 3 }) => {
+    const base = { key: nuevaClave(), ...(fuente ? { fuente } : {}), tipo, nivel, n };
+    const ej = { ...base, titulo: tituloDe(motor, fuente, tipo), tituloAuto: true, catProb: catPorDefecto(motor, tipo, base), apartados: [] };
     ej.n = Math.min(n, motor.maxApartados(ej));
     ej.apartados = motor.generarApartados(ej, ej.n);
     return ej;
@@ -110,7 +115,7 @@ const generarPdf = async (nodo, nombre) => {
     const W = 210, H = 297, M = 12, ancho = W - 2 * M;
     let y = M;
     for (const b of nodo.querySelectorAll('[data-bloque]')) {
-        const canvas = await html2canvas(b, { scale: 2, backgroundColor: '#ffffff', logging: false });
+        const canvas = await html2canvas(b, { scale: 2, backgroundColor: '#ffffff', logging: false, useCORS: true }) // useCORS: imágenes de otras webs (banderas);
         const h = (canvas.height * ancho) / canvas.width;
         if (y + h > H - M && y > M) { pdf.addPage(); y = M; }
         pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', M, y, ancho, h);
@@ -180,6 +185,72 @@ const VisorPdf = ({ url, archivo, onClose }) => (
 // ═════════════════════════════════════════════════════════════════════════════
 //  MODO PIZARRA — corrección en el monitor interactivo
 // ═════════════════════════════════════════════════════════════════════════════
+
+// «✏️ Responder»: escribir el resultado en la pizarra y comprobarlo.
+// motor.respuestas(ap) → [{ etiqueta?, tipo: 'num'|'frac'|'opcion', unidad?, opciones?, comprobar(valor) → { ok, nota? } | null }]
+function ZonaRespuesta({ ap, zoom }) {
+    const motor = useMotor();
+    const [abierta, setAbierta] = useState(false);
+    const [textos, setTextos] = useState({});
+    const [res, setRes] = useState({}); // índice de la pregunta → { ok, nota }
+    if (!motor.respuestas) return null;
+    const items = motor.respuestas(ap);
+    if (!items.length) return null; // p. ej. «pagar con billetes» no tiene un número que escribir
+
+    const comprobar = (i, valor) => {
+        const r = items[i].comprobar(valor ?? textos[i] ?? '');
+        if (!r) { setRes(s => ({ ...s, [i]: { ok: false, nota: 'Escribe un número' + (items[i].tipo === 'frac' ? ' o una fracción (3/4)' : '') } })); return; }
+        (r.ok ? sonidoCorrecto : sonidoIncorrecto)();
+        setRes(s => ({ ...s, [i]: r }));
+    };
+
+    if (!abierta) return (
+        <button onClick={() => { despertarAudio(); setAbierta(true); }}
+            style={{ marginTop: 10, padding: '7px 14px', borderRadius: 20, border: '2px dashed #7b1fa2', background: '#faf6fd', color: '#7b1fa2', fontWeight: 800, cursor: 'pointer', fontSize: '0.85rem' }}>
+            ✏️ Responder
+        </button>
+    );
+
+    const fs = `${1.25 * zoom}rem`;
+    return (
+        <div style={{ marginTop: 12, background: '#f8f5fc', border: '2px solid #e1d5ee', borderRadius: 14, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {items.map((it, i) => {
+                const r = res[i];
+                return (
+                    <div key={i}>
+                        {it.etiqueta && <div style={{ fontWeight: 700, color: '#2c3e50', fontSize: `${0.95 * zoom}rem`, marginBottom: 4 }}>{i + 1}) {it.etiqueta}</div>}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            {it.tipo === 'opcion' ? (
+                                it.opciones.map(o => (
+                                    <button key={o} onClick={() => comprobar(i, o)}
+                                        style={{ padding: '8px 20px', borderRadius: 12, border: '2px solid #7b1fa2', background: 'white', color: '#7b1fa2', fontWeight: 900, fontSize: fs, cursor: 'pointer' }}>{o}</button>
+                                ))
+                            ) : (
+                                <>
+                                    <input value={textos[i] || ''} onChange={e => { const v = e.target.value; setTextos(s => ({ ...s, [i]: v })); setRes(s => ({ ...s, [i]: undefined })); }}
+                                        onKeyDown={e => e.key === 'Enter' && comprobar(i)}
+                                        placeholder={it.placeholder || (it.tipo === 'frac' ? '3/4' : '?')} inputMode={it.tipo === 'frac' ? 'text' : 'decimal'}
+                                        style={{ width: `${7 * zoom}em`, maxWidth: '100%', padding: '8px 10px', borderRadius: 12, border: `2px solid ${r ? (r.ok ? '#27ae60' : '#e74c3c') : '#b39ddb'}`, fontSize: fs, fontWeight: 800, textAlign: 'center', color: '#2c3e50', outline: 'none' }} />
+                                    {it.unidad && <span style={{ fontWeight: 800, color: '#7f8c8d' }}>{it.unidad}</span>}
+                                    <button onClick={() => comprobar(i)} style={{ padding: '9px 16px', borderRadius: 12, border: 'none', background: '#27ae60', color: 'white', fontWeight: 800, cursor: 'pointer', boxShadow: '0 3px 0 #1e8449' }}>✔ Comprobar</button>
+                                </>
+                            )}
+                            {r && (
+                                <span style={{ fontWeight: 900, fontSize: `${1.05 * zoom}rem`, color: r.ok ? '#27ae60' : r.nota ? '#e67e22' : '#e74c3c' }}>
+                                    {r.ok ? '✅ ¡Correcto!' : r.nota ? `⚠️ ${r.nota}` : '❌ No es correcto'}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                );
+            })}
+            <div>
+                <button onClick={() => { setAbierta(false); setTextos({}); setRes({}); }} style={{ padding: '5px 12px', borderRadius: 16, border: '1px solid #ccc', background: 'white', color: '#888', fontWeight: 700, cursor: 'pointer', fontSize: '0.78rem' }}>✕ Cerrar</button>
+            </div>
+        </div>
+    );
+}
+
 function Pizarra({ ficha, onSalir }) {
     const motor = useMotor();
     const [ei, setEi] = useState(0);
@@ -250,6 +321,9 @@ function Pizarra({ ficha, onSalir }) {
                                 {max > 1 && vis < max && <button onClick={() => fijar(ai, max)} style={btn('#27ae60')}>⏩ Todo</button>}
                                 {vis > 0 && <button onClick={() => fijar(ai, 0)} style={btn('#95a5a6')}>↺</button>}
                             </div>
+
+                            {/* Escribir el resultado y comprobarlo */}
+                            <ZonaRespuesta key={`${ei}-${ai}`} ap={ap} zoom={zoom} />
                         </div>
                     );
                 })}
@@ -263,16 +337,19 @@ function Pizarra({ ficha, onSalir }) {
 // ═════════════════════════════════════════════════════════════════════════════
 function EditorEjercicio({ ej, i, total, onChange, onMover, onBorrar, isMobile }) {
     const motor = useMotor();
-    const tipos = motor.tipos;
-    const color = tipos[ej.tipo]?.color || '#7b1fa2';
+    const tipos = tiposDe(motor, ej);
+    const fuenteAct = motor.fuentes?.[ej.fuente];
+    const color = tipos[ej.tipo]?.color || fuenteAct?.color || '#7b1fa2';
     const maxN = motor.maxApartados(ej);
-    const cats = motor.categorias ? motor.categorias(ej.tipo) : null;
+    const cats = motor.categorias ? motor.categorias(ej.tipo, ej) : null;
+    const [verTemas, setVerTemas] = useState(false);
 
     const cambiar = (cambios, regenerar = false) => {
         const nuevo = { ...ej, ...cambios };
-        if (cambios.tipo) {
-            if (ej.tituloAuto) nuevo.titulo = motor.titulos[cambios.tipo] || '';
-            nuevo.catProb = catPorDefecto(motor, cambios.tipo);
+        if (cambios.fuente && !cambios.tipo) nuevo.tipo = Object.keys(motor.fuentes[cambios.fuente].tipos)[0];
+        if (cambios.tipo || cambios.fuente) {
+            if (ej.tituloAuto) nuevo.titulo = tituloDe(motor, nuevo.fuente, nuevo.tipo);
+            nuevo.catProb = catPorDefecto(motor, nuevo.tipo, nuevo);
         }
         nuevo.n = Math.max(1, Math.min(nuevo.n, motor.maxApartados(nuevo)));
         if (regenerar) nuevo.apartados = motor.generarApartados(nuevo, nuevo.n);
@@ -304,6 +381,24 @@ function EditorEjercicio({ ej, i, total, onChange, onMover, onBorrar, isMobile }
                 <button onClick={onBorrar} style={{ ...mini, color: '#e74c3c' }} title="Eliminar ejercicio">✕</button>
             </div>
 
+            {/* Tema (solo en motores con varios temas) */}
+            {motor.fuentes && Object.keys(motor.fuentes).length > 1 && (
+                <div style={{ marginBottom: 10 }}>
+                    <button onClick={() => setVerTemas(v => !v)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '7px 14px', borderRadius: 14, border: `2px solid ${fuenteAct?.color || '#7b1fa2'}`, background: (fuenteAct?.color || '#7b1fa2') + '14', color: '#2c3e50', fontWeight: 900, cursor: 'pointer', fontSize: '0.92rem' }}>
+                        {fuenteAct?.emoji} {fuenteAct?.nombre || 'Elige un tema'} <span style={{ color: '#888', fontWeight: 700, fontSize: '0.78rem' }}>{verTemas ? '▲ cerrar' : '▼ cambiar tema'}</span>
+                    </button>
+                    {verTemas && (
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8, padding: 8, background: '#faf8fc', borderRadius: 12 }}>
+                            {Object.values(motor.fuentes).map(f => (
+                                <button key={f.id} onClick={() => { if (f.id !== ej.fuente) cambiar({ fuente: f.id }, true); setVerTemas(false); }}
+                                    title={f.desc} style={{ ...chip(f.id === ej.fuente, f.color), fontSize: '0.8rem' }}>{f.emoji} {f.nombre}</button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
             <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 10 }}>
                 {Object.entries(tipos).map(([k, v]) => (
                     <button key={k} onClick={() => k !== ej.tipo && cambiar({ tipo: k }, true)} style={chip(ej.tipo === k, v.color)}>{v.label}</button>
@@ -317,7 +412,7 @@ function EditorEjercicio({ ej, i, total, onChange, onMover, onBorrar, isMobile }
                     <span style={{ fontWeight: 900, fontSize: '1.1rem', minWidth: 24, textAlign: 'center' }}>{ej.n}</span>
                     <button onClick={() => cambiarN(ej.n + 1)} disabled={ej.n >= maxN} style={{ ...mini, opacity: ej.n >= maxN ? 0.35 : 1 }}>+</button>
                 </div>
-                {motor.usaNivel(ej.tipo) && (
+                {motor.usaNivel(ej.tipo, ej) && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                         <span style={{ fontWeight: 800, fontSize: '0.82rem', color: '#555' }}>Nivel:</span>
                         {[[1, '👶'], [2, '🤓'], [3, '🔥']].map(([n, e]) => (
@@ -377,10 +472,41 @@ function FichasApp({ motor, isMobile, onSalir, fichaPublicaId = null }) {
 
     useEffect(() => onAuthStateChanged(auth, u => setUser(u)), []);
 
+    // Fichas antiguas de una sola herramienta (motor.legacy): se les añade la fuente
+    const conFuente = (datos, fuente) => (!fuente ? datos : {
+        ...datos,
+        ejercicios: (datos.ejercicios || []).map(e => ({
+            ...e, fuente: e.fuente || fuente,
+            apartados: (e.apartados || []).map(a => ({ ...a, fuente: a.fuente || fuente })),
+        })),
+    });
+    const metadatos = (f) => ({
+        etapa: f.etapa || null, curso: f.curso || null,
+        temas: [...new Set((f.ejercicios || []).map(e => e.fuente).filter(Boolean))],
+    });
+    // Traslada las fichas antiguas del profesor a la colección común (mismo id, así los enlaces siguen valiendo)
+    const migrarLegacy = async (u) => {
+        let movidas = 0;
+        for (const { coleccion, fuente } of motor.legacy || []) {
+            try {
+                const snap = await getDocs(query(collection(db, coleccion), where('uid', '==', u.uid)));
+                for (const d of snap.docs) {
+                    const viejo = d.data();
+                    const datos = conFuente({ ...JSON.parse(viejo.datos), id: d.id }, fuente);
+                    await setDoc(doc(db, COLECCION, d.id), { ...viejo, ...metadatos(datos), datos: JSON.stringify(datos), publica: viejo.publica !== false });
+                    await deleteDoc(doc(db, coleccion, d.id)).catch(() => {});
+                    movidas++;
+                }
+            } catch { /* colección sin permisos o vacía: se ignora */ }
+        }
+        return movidas;
+    };
+
     const cargarFichas = async (u = user) => {
         if (!u) { setFichas([]); return; }
         setCargando(true);
         try {
+            if (motor.legacy && await migrarLegacy(u)) cargarGaleria();
             const snap = await getDocs(query(collection(db, COLECCION), where('uid', '==', u.uid)));
             const lista = snap.docs.map(d => ({ id: d.id, ...d.data() }))
                 .sort((a, b) => (b.actualizada?.toMillis?.() || 0) - (a.actualizada?.toMillis?.() || 0));
@@ -400,6 +526,9 @@ function FichasApp({ motor, isMobile, onSalir, fichaPublicaId = null }) {
     const [galeria, setGaleria] = useState([]);
     const [cargandoGaleria, setCargandoGaleria] = useState(true);
     const [buscar, setBuscar] = useState('');
+    const [filtroEtapa, setFiltroEtapa] = useState('');
+    const [filtroCurso, setFiltroCurso] = useState('');
+    const [filtroTema, setFiltroTema] = useState(motor.temaInicial || '');
     const [desdeGaleria, setDesdeGaleria] = useState(false);
     const cargarGaleria = async () => {
         setCargandoGaleria(true);
@@ -422,16 +551,38 @@ function FichasApp({ motor, isMobile, onSalir, fichaPublicaId = null }) {
         } catch { setAviso('La ficha está dañada.'); }
     };
 
-    // Ficha abierta desde un enlace público (?ficha=ID): no hace falta sesión
+    // Colección lista para usar (catálogo): se genera con números nuevos
+    const abrirCatalogo = (c) => {
+        setFicha({
+            id: null, titulo: c.titulo,
+            subtitulo: `${motor.etapas?.[c.etapa]?.replace(/^\S+\s/, '') || ''} · ${c.cursos.join(', ')}`,
+            espacio: 'normal', solucionesPublicas: true, publica: true, etapa: c.etapa, curso: c.cursos[0],
+            ejercicios: c.ejercicios.map(e => nuevoEjercicio(motor, e)),
+        });
+        setMeta({ catalogo: true, autor: 'Pikt' });
+        setDesdeGaleria(true);
+        setVista('PUBLICA');
+    };
+
+    // Ficha abierta desde un enlace público (?ficha=ID): no hace falta sesión.
+    // Si no está en la colección común, se busca en las antiguas (motor.legacy).
     useEffect(() => {
         if (!fichaPublicaId) return;
-        getDoc(doc(db, COLECCION, fichaPublicaId)).then(snap => {
-            if (!snap.exists()) { setMeta({ error: 'Esta ficha no existe o ha sido eliminada.' }); return; }
-            const d = snap.data();
-            setFicha({ ...JSON.parse(d.datos), id: snap.id });
-            setMeta({ uid: d.uid, autor: d.autor, actualizada: d.actualizada });
-        }).catch(e => setMeta({ error: 'No se pudo abrir la ficha: ' + e.message }));
-    }, [fichaPublicaId]);
+        (async () => {
+            try {
+                const fuentes = [{ coleccion: COLECCION, fuente: null }, ...(motor.legacy || [])];
+                for (const { coleccion, fuente } of fuentes) {
+                    const snap = await getDoc(doc(db, coleccion, fichaPublicaId)).catch(() => null);
+                    if (!snap?.exists()) continue;
+                    const d = snap.data();
+                    setFicha(conFuente({ ...JSON.parse(d.datos), id: snap.id }, fuente));
+                    setMeta({ uid: d.uid, autor: d.autor, actualizada: d.actualizada });
+                    return;
+                }
+                setMeta({ error: 'Esta ficha no existe o ha sido eliminada.' });
+            } catch (e) { setMeta({ error: 'No se pudo abrir la ficha: ' + e.message }); }
+        })();
+    }, [fichaPublicaId]); // eslint-disable-line react-hooks/exhaustive-deps
     useEffect(() => () => { if (visor) URL.revokeObjectURL(visor.url); }, [visor]);
 
     const login = async () => {
@@ -451,6 +602,7 @@ function FichasApp({ motor, isMobile, onSalir, fichaPublicaId = null }) {
                 uid: user.uid, autor: user.displayName || 'Profesor/a', titulo: ficha.titulo || motor.tituloFicha,
                 solucionesPublicas: ficha.solucionesPublicas !== false,
                 publica: ficha.publica !== false, // aparece en la galería pública de fichas
+                ...(motor.fuentes ? metadatos(ficha) : {}), // etapa, curso y temas para los filtros
                 nEjercicios: ficha.ejercicios.length,
                 nApartados: ficha.ejercicios.reduce((s, e) => s + e.apartados.length, 0),
                 datos: JSON.stringify(datos), actualizada: new Date(),
@@ -499,6 +651,7 @@ function FichasApp({ motor, isMobile, onSalir, fichaPublicaId = null }) {
             const datos = { ...ficha, id, titulo: ficha.titulo, publica: false }; // la copia no sale en la galería hasta que su dueño lo decida
             await setDoc(doc(db, COLECCION, id), {
                 uid: user.uid, autor: user.displayName || 'Profesor/a', titulo: datos.titulo,
+                ...(motor.fuentes ? metadatos(datos) : {}),
                 nEjercicios: datos.ejercicios.length,
                 nApartados: datos.ejercicios.reduce((s, e) => s + e.apartados.length, 0),
                 datos: JSON.stringify(datos), publica: false,
@@ -554,9 +707,14 @@ function FichasApp({ motor, isMobile, onSalir, fichaPublicaId = null }) {
             </div>
         );
         const esMia = user && meta?.uid === user.uid;
+        const esCatalogo = !!meta?.catalogo;
         // Sin soluciones: se ocultan PDF de soluciones, pizarra y copia (el dueño lo ve todo)
         const conSol = esMia || ficha.solucionesPublicas !== false;
-        const tiposF = motor.tipos;
+        const infoTipo = (ej) => {
+            const t = tiposDe(motor, ej)[ej.tipo] || {};
+            const f = motor.fuentes?.[ej.fuente];
+            return { color: t.color || f?.color || '#7b1fa2', label: `${f ? f.emoji + ' ' : ''}${t.label || ''}` };
+        };
         return (
             <div style={{ maxWidth: 760, margin: '0 auto' }}>
                 {barraAviso}
@@ -565,15 +723,17 @@ function FichasApp({ motor, isMobile, onSalir, fichaPublicaId = null }) {
                     <h2 style={{ margin: '0 0 4px', color: '#4a148c', fontSize: isMobile ? '1.4rem' : '1.8rem' }}>{ficha.titulo}</h2>
                     {ficha.subtitulo && <div style={{ color: '#666', marginBottom: 4 }}>{ficha.subtitulo}</div>}
                     <div style={{ fontSize: '0.8rem', color: '#999', marginBottom: 16 }}>
-                        Creada por {meta?.autor || 'un profesor/a'}{meta?.actualizada?.toDate ? ` · ${meta.actualizada.toDate().toLocaleDateString('es-ES')}` : ''}
+                        {esCatalogo
+                            ? '🚀 Colección lista para usar · los números cambian cada vez que la abres'
+                            : <>Creada por {meta?.autor || 'un profesor/a'}{meta?.actualizada?.toDate ? ` · ${meta.actualizada.toDate().toLocaleDateString('es-ES')}` : ''}</>}
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 18 }}>
                         {ficha.ejercicios.map((ej, i) => (
-                            <div key={ej.key || i} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 12px', borderRadius: 12, background: '#faf6fd', borderLeft: `5px solid ${tiposF[ej.tipo]?.color || '#7b1fa2'}` }}>
+                            <div key={ej.key || i} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '8px 12px', borderRadius: 12, background: '#faf6fd', borderLeft: `5px solid ${infoTipo(ej).color}` }}>
                                 <b style={{ color: '#7b1fa2' }}>{i + 1}.</b>
                                 <span style={{ flex: 1, fontSize: '0.88rem', color: '#2c3e50', fontWeight: 600 }}>{ej.titulo}</span>
-                                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: tiposF[ej.tipo]?.color || '#7b1fa2', whiteSpace: 'nowrap' }}>{tiposF[ej.tipo]?.label} · {ej.apartados.length}</span>
+                                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: infoTipo(ej).color, whiteSpace: 'nowrap' }}>{infoTipo(ej).label} · {ej.apartados.length}</span>
                             </div>
                         ))}
                     </div>
@@ -583,15 +743,22 @@ function FichasApp({ motor, isMobile, onSalir, fichaPublicaId = null }) {
                         <button onClick={() => descargar('alumno', 'descargar')} disabled={!!pdf} style={btn('#c0392b', false)}>⬇️ Descargar PDF</button>
                         {conSol && <button onClick={() => descargar('soluciones')} disabled={!!pdf} style={btn('#8e44ad', false)}>{pdf === 'soluciones' ? 'Generando…' : '📄 PDF soluciones'}</button>}
                         {conSol && <button onClick={() => { setVolverA('PUBLICA'); setVista('PIZARRA'); }} style={btn('#3498db')}>🖥️ Modo pizarra</button>}
-                        <button onClick={() => setEnlace({ id: ficha.id, titulo: ficha.titulo, conSoluciones: ficha.solucionesPublicas !== false })} style={btn('#7b1fa2', false)}>🔗 Enlace / QR</button>
+                        {ficha.id && <button onClick={() => setEnlace({ id: ficha.id, titulo: ficha.titulo, conSoluciones: ficha.solucionesPublicas !== false })} style={btn('#7b1fa2', false)}>🔗 Enlace / QR</button>}
+                        {esCatalogo && <button onClick={regenerarTodo} style={btn('#7b1fa2', false)}>🎲 Otros números</button>}
                     </div>
+                    {esCatalogo && (
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginTop: 12, paddingTop: 12, borderTop: '1px solid #eee' }}>
+                            <button onClick={() => { setMeta(null); setVolverA('LISTA'); setVista('EDITOR'); }} style={btn('#27ae60')}>✏️ Personalizar y guardar</button>
+                            <span style={{ width: '100%', textAlign: 'center', fontSize: '0.78rem', color: '#999' }}>Añade o quita ejercicios y apartados, cambia el título y guárdala en tu cuenta para compartirla.</span>
+                        </div>
+                    )}
                     {!conSol && (
                         <div style={{ textAlign: 'center', marginTop: 10, fontSize: '0.8rem', color: '#999', fontWeight: 700 }}>🔒 El autor ha compartido esta ficha sin soluciones.</div>
                     )}
                     {esMia && ficha.solucionesPublicas === false && (
                         <div style={{ textAlign: 'center', marginTop: 10, fontSize: '0.8rem', color: '#c0392b', fontWeight: 700 }}>🔒 Compartida sin soluciones: tú las ves porque es tu ficha.</div>
                     )}
-                    {(esMia || conSol) && (
+                    {!esCatalogo && (esMia || conSol) && (
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginTop: 12, paddingTop: 12, borderTop: '1px solid #eee' }}>
                             {esMia
                                 ? <button onClick={() => setVista('EDITOR')} style={btn('#27ae60')}>✏️ Editar mi ficha</button>
@@ -618,6 +785,25 @@ function FichasApp({ motor, isMobile, onSalir, fichaPublicaId = null }) {
                     <input value={ficha.subtitulo} onChange={e => setFicha(f => ({ ...f, subtitulo: e.target.value }))} placeholder="Subtítulo (curso, tema…)"
                         style={{ flex: 1, minWidth: 160, padding: '10px 12px', borderRadius: 10, border: '2px solid #e1d5ee', fontSize: '0.95rem' }} />
                 </div>
+                {/* Etapa y curso: sirven para encontrar la ficha en la galería */}
+                {motor.etapas && (
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 10, flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 800, fontSize: '0.82rem', color: '#555' }}>Etapa:</span>
+                        {Object.entries(motor.etapas).map(([k, l]) => (
+                            <button key={k} onClick={() => setFicha(f => ({ ...f, etapa: k, curso: motor.cursos?.[k]?.includes(f.curso) ? f.curso : '' }))}
+                                style={{ padding: '5px 12px', borderRadius: 18, border: '2px solid #7b1fa2', background: ficha.etapa === k ? '#7b1fa2' : 'white', color: ficha.etapa === k ? 'white' : '#7b1fa2', fontWeight: 800, fontSize: '0.78rem', cursor: 'pointer' }}>{l}</button>
+                        ))}
+                        {ficha.etapa && motor.cursos?.[ficha.etapa] && (
+                            <>
+                                <span style={{ fontWeight: 800, fontSize: '0.82rem', color: '#555', marginLeft: 8 }}>Curso:</span>
+                                {motor.cursos[ficha.etapa].map(c => (
+                                    <button key={c} onClick={() => setFicha(f => ({ ...f, curso: c }))}
+                                        style={{ padding: '5px 10px', borderRadius: 18, border: '2px solid #2980b9', background: ficha.curso === c ? '#2980b9' : 'white', color: ficha.curso === c ? 'white' : '#2980b9', fontWeight: 800, fontSize: '0.78rem', cursor: 'pointer' }}>{c}</button>
+                                ))}
+                            </>
+                        )}
+                    </div>
+                )}
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 10, flexWrap: 'wrap' }}>
                     <span style={{ fontWeight: 800, fontSize: '0.82rem', color: '#555' }}>Espacio para operar en la hoja:</span>
                     {[['compacto', 'Compacto'], ['normal', 'Normal'], ['amplio', 'Amplio']].map(([k, l]) => (
@@ -680,36 +866,57 @@ function FichasApp({ motor, isMobile, onSalir, fichaPublicaId = null }) {
         </div>
     );
 
-    // ── Lista de fichas ──
-    return (
-        <div style={{ maxWidth: 720, margin: '0 auto' }}>
-            {barraAviso}
-            <div style={{ background: 'white', borderRadius: 20, padding: '20px 18px', boxShadow: '0 10px 28px rgba(0,0,0,0.08)', textAlign: 'center' }}>
-                <h2 style={{ color: '#7b1fa2', margin: '0 0 6px' }}>🖨️ {motor.nombre}</h2>
-                <p style={{ color: '#777', fontSize: '0.9rem', margin: '0 0 14px' }}>
-                    Elige ejercicios de distintos tipos y cuántos apartados tiene cada uno. Descarga el PDF para imprimir y corrígelo en el monitor con el modo pizarra.
-                </p>
-                <button onClick={() => { setFicha(fichaVacia(motor)); setVolverA('LISTA'); setVista('EDITOR'); }} style={{ ...btn('#7b1fa2'), fontSize: '1rem', padding: '12px 22px' }}>➕ Nueva ficha</button>
+    // ── Lista de fichas (centro de fichas: filtros, colecciones listas, galería y mis fichas) ──
+    const T = buscar.trim().toLowerCase();
+    const encaja = (etapa, cursos, temas, texto) =>
+        (!filtroEtapa || etapa === filtroEtapa)
+        && (!filtroCurso || (cursos || []).includes(filtroCurso))
+        && (!filtroTema || (temas || []).includes(filtroTema))
+        && (!T || texto.toLowerCase().includes(T));
+    const catalogo = (motor.catalogo || []).filter(c => encaja(c.etapa, c.cursos, c.temas, `${c.titulo} ${c.desc}`));
+    const compartidas = galeria.filter(f => (motor.fuentes
+        ? encaja(f.etapa, f.curso ? [f.curso] : [], f.temas, `${f.titulo} ${f.autor || ''}`)
+        : !T || `${f.titulo} ${f.autor || ''}`.toLowerCase().includes(T)));
+    const temasVisibles = motor.fuentes && Object.keys(motor.fuentes).length > 1 ? Object.values(motor.fuentes).filter(f => !filtroEtapa || (f.etapas || []).includes(filtroEtapa)) : [];
+    const chipF = (activo, c) => ({ padding: '6px 12px', borderRadius: 18, border: `2px solid ${c}`, background: activo ? c : 'white', color: activo ? 'white' : c, fontWeight: 800, fontSize: '0.8rem', cursor: 'pointer' });
+    const tarjeta = { background: 'white', borderRadius: 20, padding: '18px 16px', boxShadow: '0 10px 28px rgba(0,0,0,0.08)', marginTop: 14 };
+    const emojisTemas = (temas) => (temas || []).map(t => motor.fuentes?.[t]?.emoji).filter(Boolean).join(' ');
 
-                <div style={{ marginTop: 18, borderTop: '1px solid #eee', paddingTop: 14 }}>
-                    {user ? (
-                        <div style={{ fontSize: '0.82rem', color: '#27ae60', fontWeight: 700, marginBottom: 10 }}>🔐 Conectado como {user.email}</div>
+    return (
+        <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+            {barraAviso}
+
+            {/* Cabecera */}
+            <div style={{ ...tarjeta, marginTop: 0, textAlign: 'center' }}>
+                <h2 style={{ color: '#7b1fa2', margin: '0 0 6px' }}>{motor.fuentes ? '📚' : '🖨️'} {motor.nombre}</h2>
+                <p style={{ color: '#777', fontSize: '0.9rem', margin: '0 auto 14px', maxWidth: 640 }}>
+                    {motor.fuentes
+                        ? <>1️⃣ Elige una colección lista o crea la tuya · 2️⃣ Imprime el PDF y repártelo · 3️⃣ Corrígelo en clase con el <b>modo pizarra</b>, paso a paso.</>
+                        : 'Elige ejercicios de distintos tipos y cuántos apartados tiene cada uno. Descarga el PDF para imprimir y corrígelo en el monitor con el modo pizarra.'}
+                </p>
+                <button onClick={() => { setFicha({ ...fichaVacia(motor), ...(filtroEtapa ? { etapa: filtroEtapa } : {}), ...(filtroCurso ? { curso: filtroCurso } : {}) }); setVolverA('LISTA'); setVista('EDITOR'); }}
+                    style={{ ...btn('#7b1fa2'), fontSize: '1rem', padding: '12px 22px' }}>➕ Crear una ficha nueva</button>
+                <div style={{ marginTop: 12, fontSize: '0.82rem' }}>
+                    {user
+                        ? <span style={{ color: '#27ae60', fontWeight: 700 }}>🔐 {user.email}</span>
+                        : <button onClick={login} style={{ ...btn('#4285f4', false), padding: '6px 14px', fontSize: '0.8rem' }}>🔐 Entrar con Google para guardar tus fichas</button>}
+                </div>
+            </div>
+
+            {/* Mis fichas */}
+            {user && (
+                <div style={tarjeta}>
+                    <h3 style={{ margin: '0 0 10px', color: '#7b1fa2' }}>📁 Mis fichas</h3>
+                    {cargando ? <div style={{ color: '#999' }}>Cargando…</div> : fichas.length === 0 ? (
+                        <div style={{ color: '#999', fontSize: '0.88rem' }}>Todavía no has guardado ninguna ficha. Abre una colección y pulsa «Personalizar y guardar», o crea una nueva.</div>
                     ) : (
-                        <div style={{ marginBottom: 10 }}>
-                            <div style={{ fontSize: '0.85rem', color: '#777', marginBottom: 8 }}>Inicia sesión con tu cuenta de Google para guardar tus fichas.</div>
-                            <button onClick={login} style={btn('#4285f4')}>🔐 Entrar con Google</button>
-                        </div>
-                    )}
-                    {user && (cargando ? <div style={{ color: '#999' }}>Cargando…</div> : fichas.length === 0 ? (
-                        <div style={{ color: '#999', fontSize: '0.88rem' }}>Todavía no has guardado ninguna ficha.</div>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, textAlign: 'left' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                             {fichas.map(f => (
                                 <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 14, border: '1px solid #e1d5ee', background: '#fbf8fd', flexWrap: 'wrap' }}>
                                     <div style={{ flex: 1, minWidth: 160 }}>
-                                        <div style={{ fontWeight: 900, color: '#2c3e50' }}>{f.titulo}</div>
+                                        <div style={{ fontWeight: 900, color: '#2c3e50' }}>{emojisTemas(f.temas)} {f.titulo}</div>
                                         <div style={{ fontSize: '0.75rem', color: '#999' }}>
-                                            {f.nEjercicios} ejercicios · {f.nApartados} apartados · {f.actualizada?.toDate ? f.actualizada.toDate().toLocaleDateString('es-ES') : ''}
+                                            {f.etapa ? `${motor.etapas?.[f.etapa] || f.etapa}${f.curso ? ' ' + f.curso : ''} · ` : ''}{f.nEjercicios} ejercicios · {f.nApartados} apartados · {f.actualizada?.toDate ? f.actualizada.toDate().toLocaleDateString('es-ES') : ''}{f.publica === false ? ' · 🔗 solo enlace' : ''}
                                         </div>
                                     </div>
                                     <button onClick={() => abrir(f, 'EDITOR')} style={btn('#7b1fa2', false)}>✏️ Abrir</button>
@@ -719,41 +926,85 @@ function FichasApp({ motor, isMobile, onSalir, fichaPublicaId = null }) {
                                 </div>
                             ))}
                         </div>
-                    ))}
+                    )}
                 </div>
+            )}
+
+            {/* Filtros */}
+            <div style={{ ...tarjeta, position: 'sticky', top: 6, zIndex: 4 }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <input value={buscar} onChange={e => setBuscar(e.target.value)} placeholder="🔍 Buscar (título, tema, autor…)"
+                        style={{ padding: '9px 14px', borderRadius: 20, border: '2px solid #e1d5ee', fontSize: '0.9rem', flex: 1, minWidth: 180 }} />
+                    {motor.etapas && (
+                        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                            <button onClick={() => { setFiltroEtapa(''); setFiltroCurso(''); }} style={chipF(!filtroEtapa, '#7b1fa2')}>Todas</button>
+                            {Object.entries(motor.etapas).map(([k, l]) => (
+                                <button key={k} onClick={() => { setFiltroEtapa(k); setFiltroCurso(''); if (filtroTema && !motor.fuentes[filtroTema]?.etapas?.includes(k)) setFiltroTema(''); }} style={chipF(filtroEtapa === k, '#7b1fa2')}>{l}</button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+                {filtroEtapa && motor.cursos?.[filtroEtapa] && (
+                    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 8, alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#555' }}>Curso:</span>
+                        <button onClick={() => setFiltroCurso('')} style={chipF(!filtroCurso, '#2980b9')}>Todos</button>
+                        {motor.cursos[filtroEtapa].map(c => <button key={c} onClick={() => setFiltroCurso(c)} style={chipF(filtroCurso === c, '#2980b9')}>{c}</button>)}
+                    </div>
+                )}
+                {temasVisibles.length > 0 && (
+                    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 8, alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#555' }}>Tema:</span>
+                        <button onClick={() => setFiltroTema('')} style={chipF(!filtroTema, '#16a085')}>Todos</button>
+                        {temasVisibles.map(f => <button key={f.id} onClick={() => setFiltroTema(f.id === filtroTema ? '' : f.id)} title={f.desc} style={chipF(filtroTema === f.id, f.color)}>{f.emoji} {f.nombre}</button>)}
+                    </div>
+                )}
             </div>
-            {/* Galería pública: visible para todos, con o sin sesión */}
-            <div style={{ background: 'white', borderRadius: 20, padding: '18px 16px', boxShadow: '0 10px 28px rgba(0,0,0,0.08)', marginTop: 14 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
-                    <h3 style={{ margin: 0, color: '#2980b9', flex: 1, minWidth: 180 }}>🌍 Fichas compartidas</h3>
-                    <input value={buscar} onChange={e => setBuscar(e.target.value)} placeholder="🔍 Buscar por título o autor"
-                        style={{ padding: '8px 12px', borderRadius: 20, border: '2px solid #d6eaf8', fontSize: '0.88rem', minWidth: 0, flex: 1, maxWidth: 260 }} />
+
+            {/* Colecciones listas para usar */}
+            {motor.catalogo && (
+                <div style={tarjeta}>
+                    <h3 style={{ margin: '0 0 4px', color: '#e67e22' }}>🚀 Colecciones listas para usar</h3>
+                    <p style={{ margin: '0 0 12px', color: '#888', fontSize: '0.84rem' }}>Ábrelas, proyecta la pizarra o descarga el PDF. Los números cambian cada vez; puedes personalizarlas y guardarlas.</p>
+                    {catalogo.length === 0 ? <div style={{ color: '#999', fontSize: '0.88rem', textAlign: 'center' }}>No hay colecciones con estos filtros. Prueba con otro curso o tema, o crea una ficha nueva.</div> : (
+                        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(230px, 1fr))', gap: 10 }}>
+                            {catalogo.map(c => (
+                                <button key={c.id} onClick={() => abrirCatalogo(c)}
+                                    style={{ textAlign: 'left', padding: '12px 14px', borderRadius: 14, border: '2px solid #fde3c8', background: '#fffaf4', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                    <span style={{ fontSize: '1.2rem' }}>{emojisTemas(c.temas)}</span>
+                                    <span style={{ fontWeight: 900, color: '#2c3e50' }}>{c.titulo}</span>
+                                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#e67e22' }}>{motor.etapas?.[c.etapa]} · {c.cursos.join(', ')}</span>
+                                    <span style={{ fontSize: '0.76rem', color: '#888' }}>{c.desc}</span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </div>
-                <p style={{ margin: '0 0 12px', color: '#888', fontSize: '0.84rem' }}>Fichas que han compartido otros profesores. Ábrelas para ver el PDF, descargarlo o corregirlas en la pizarra.</p>
-                {(() => {
-                    const t = buscar.trim().toLowerCase();
-                    const lista = galeria.filter(f => !t || `${f.titulo} ${f.autor || ''}`.toLowerCase().includes(t));
-                    if (cargandoGaleria) return <div style={{ color: '#999', textAlign: 'center' }}>Cargando…</div>;
-                    if (!lista.length) return <div style={{ color: '#999', fontSize: '0.88rem', textAlign: 'center' }}>{galeria.length ? 'Ninguna ficha coincide con la búsqueda.' : 'Todavía no hay fichas compartidas.'}</div>;
-                    return (
+            )}
+
+            {/* Galería pública: visible para todos, con o sin sesión */}
+            <div style={tarjeta}>
+                <h3 style={{ margin: '0 0 4px', color: '#2980b9' }}>🌍 Fichas compartidas por profesores</h3>
+                <p style={{ margin: '0 0 12px', color: '#888', fontSize: '0.84rem' }}>Ábrelas para ver el PDF, descargarlo o corregirlas en la pizarra.</p>
+                {cargandoGaleria ? <div style={{ color: '#999', textAlign: 'center' }}>Cargando…</div>
+                    : !compartidas.length ? <div style={{ color: '#999', fontSize: '0.88rem', textAlign: 'center' }}>{galeria.length ? 'Ninguna ficha compartida coincide con los filtros.' : 'Todavía no hay fichas compartidas. ¡Sé el primero en compartir una!'}</div>
+                    : (
                         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
-                            {lista.map(f => (
+                            {compartidas.map(f => (
                                 <button key={f.id} onClick={() => abrirPublica(f)}
                                     style={{ textAlign: 'left', padding: '12px 14px', borderRadius: 14, border: '1px solid #d6eaf8', background: '#f7fbfe', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                    <span style={{ fontWeight: 900, color: '#2c3e50' }}>{motor.emoji} {f.titulo}</span>
-                                    <span style={{ fontSize: '0.75rem', color: '#888' }}>{f.nEjercicios} ejercicios · {f.nApartados} apartados</span>
+                                    <span style={{ fontWeight: 900, color: '#2c3e50' }}>{emojisTemas(f.temas) || motor.emoji} {f.titulo}</span>
+                                    <span style={{ fontSize: '0.75rem', color: '#888' }}>{f.etapa ? `${motor.etapas?.[f.etapa] || ''}${f.curso ? ' ' + f.curso : ''} · ` : ''}{f.nEjercicios} ejercicios · {f.nApartados} apartados</span>
                                     <span style={{ fontSize: '0.72rem', color: '#aaa' }}>
                                         {f.autor || 'Profesor/a'}{f.actualizada?.toDate ? ` · ${f.actualizada.toDate().toLocaleDateString('es-ES')}` : ''}{f.solucionesPublicas === false ? ' · 🔒 sin soluciones' : ''}
                                     </span>
                                 </button>
                             ))}
                         </div>
-                    );
-                })()}
+                    )}
             </div>
 
             <div style={{ textAlign: 'center', marginTop: 14 }}>
-                <button onClick={onSalir} style={btn('#7f8c8d', false)}>← Menú</button>
+                <button onClick={onSalir} style={btn('#7f8c8d', false)}>← {motor.volver || 'Menú'}</button>
             </div>
         </div>
     );

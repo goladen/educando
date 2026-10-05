@@ -15,7 +15,7 @@ import React, { useState, useEffect, useRef, useLayoutEffect, useCallback } from
 import { db, auth } from './firebase';
 import { GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'firebase/auth';
 import {
-    collection, addDoc, getDocs, deleteDoc, doc, setDoc, getDoc,
+    collection, addDoc, getDocs, deleteDoc, doc, setDoc, getDoc, updateDoc,
     onSnapshot, query, where, serverTimestamp,
 } from 'firebase/firestore';
 import { guardarRegistroLocal } from './utils/registrosLocales';
@@ -1298,6 +1298,42 @@ function PanelProfesor({ usuario }) {
         if (!window.confirm('¿Borrar este alumno?')) return;
         await deleteDoc(doc(db, 'clase_alumnos', id));
     };
+
+    // Edición de una fila de la tabla de datos (corregir respuestas mal puestas).
+    const [edit, setEdit] = useState(null); // { id, nombre, apellidos, grupo, resp:{[pid]:valor} }
+    const [guardandoEdit, setGuardandoEdit] = useState(false);
+    const empezarEdicion = (a) => {
+        const resp = {};
+        testActivo.preguntas.forEach((p) => { if (p.tipo !== 'dibujo') resp[p.id] = String(valorResp(a, p.id) ?? ''); });
+        setEdit({ id: a.id, nombre: a.nombre || '', apellidos: a.apellidos || '', grupo: a.grupo || '', resp });
+    };
+    const guardarEdicion = async () => {
+        const a = alumnos.find((x) => x.id === edit.id);
+        if (!a || !edit.nombre.trim()) return;
+        // Partimos de las respuestas existentes (incluye dibujos y campos antiguos sueltos).
+        const respuestas = {};
+        testActivo.preguntas.forEach((p) => { const v = valorResp(a, p.id); if (v !== undefined) respuestas[p.id] = v; });
+        for (const p of testActivo.preguntas) {
+            if (p.tipo === 'dibujo') continue;
+            const v = (edit.resp[p.id] ?? '').trim();
+            respuestas[p.id] = p.tipo === 'numerica' && v !== '' && !isNaN(Number(v)) ? Number(v) : v;
+        }
+        setGuardandoEdit(true);
+        try {
+            await updateDoc(doc(db, 'clase_alumnos', edit.id), {
+                nombre: edit.nombre.trim(),
+                apellidos: edit.apellidos.trim(),
+                grupo: edit.grupo.trim(),
+                respuestas: { ...(a.respuestas || {}), ...respuestas },
+                testId: testIdDe(a),
+            });
+            setEdit(null);
+        } catch {
+            window.alert('No se pudieron guardar los cambios.');
+        } finally {
+            setGuardandoEdit(false);
+        }
+    };
     const borrarTodos = async () => {
         const lista = filtrados;
         if (lista.length === 0) return;
@@ -1500,7 +1536,38 @@ function PanelProfesor({ usuario }) {
                             {filtrados.length === 0 && (
                                 <tr><td colSpan={testActivo.preguntas.length + 4} style={{ padding: 20, textAlign: 'center', color: '#888' }}>Todavía no hay alumnos en este test. Comparte tu código para que rellenen el formulario.</td></tr>
                             )}
-                            {filtrados.map((a, i) => (
+                            {filtrados.map((a, i) => edit?.id === a.id ? (
+                                <tr key={a.id} style={{ background: '#fff7d6' }}>
+                                    <td style={tdS}><input style={inEdS} value={edit.nombre} onChange={(e) => setEdit({ ...edit, nombre: e.target.value })} /></td>
+                                    <td style={tdS}><input style={inEdS} value={edit.apellidos} onChange={(e) => setEdit({ ...edit, apellidos: e.target.value })} /></td>
+                                    <td style={tdS}>
+                                        <input style={{ ...inEdS, width: 80 }} value={edit.grupo} list="qeq-grupos-edit" onChange={(e) => setEdit({ ...edit, grupo: e.target.value })} />
+                                        <datalist id="qeq-grupos-edit">{grupos.map((g) => <option key={g} value={g} />)}</datalist>
+                                    </td>
+                                    {testActivo.preguntas.map((p) => {
+                                        if (p.tipo === 'dibujo') {
+                                            const v = valorResp(a, p.id);
+                                            return <td key={p.id} style={tdS}>{typeof v === 'string' && v.startsWith('data:') ? <img src={v} alt="dibujo" style={{ width: 70, height: 52, objectFit: 'cover', borderRadius: 6, border: '1px solid #ddd' }} /> : ''}</td>;
+                                        }
+                                        const lid = `qeq-op-${p.id}`;
+                                        return (
+                                            <td key={p.id} style={tdS}>
+                                                <input style={inEdS} type={p.tipo === 'numerica' ? 'number' : 'text'} value={edit.resp[p.id] ?? ''}
+                                                    list={p.tipo === 'cerrada' ? lid : undefined}
+                                                    onChange={(e) => setEdit({ ...edit, resp: { ...edit.resp, [p.id]: e.target.value } })}
+                                                    onKeyDown={(e) => { if (e.key === 'Enter') guardarEdicion(); if (e.key === 'Escape') setEdit(null); }} />
+                                                {p.tipo === 'cerrada' && <datalist id={lid}>{(p.opciones || []).map((o) => <option key={o} value={o} />)}</datalist>}
+                                            </td>
+                                        );
+                                    })}
+                                    <td style={{ ...tdS, whiteSpace: 'nowrap' }}>
+                                        <button onClick={guardarEdicion} disabled={guardandoEdit} title="Guardar cambios"
+                                            style={{ background: COL.verde, color: '#fff', border: 'none', borderRadius: 8, padding: '4px 8px', cursor: 'pointer', fontWeight: 800, marginRight: 4 }}>{guardandoEdit ? '…' : '✓'}</button>
+                                        <button onClick={() => setEdit(null)} title="Cancelar"
+                                            style={{ background: '#94a3b8', color: '#fff', border: 'none', borderRadius: 8, padding: '4px 8px', cursor: 'pointer', fontWeight: 800 }}>↩</button>
+                                    </td>
+                                </tr>
+                            ) : (
                                 <tr key={a.id} style={{ background: i % 2 ? '#f8fafc' : '#fff' }}>
                                     <td style={tdS}><b>{a.nombre}</b></td>
                                     <td style={tdS}>{a.apellidos || ''}</td>
@@ -1515,7 +1582,9 @@ function PanelProfesor({ usuario }) {
                                             </td>
                                         );
                                     })}
-                                    <td style={tdS}>
+                                    <td style={{ ...tdS, whiteSpace: 'nowrap' }}>
+                                        <button onClick={() => empezarEdicion(a)} title="Editar respuestas"
+                                            style={{ background: COL.azul, color: '#fff', border: 'none', borderRadius: 8, padding: '4px 8px', cursor: 'pointer', fontWeight: 800, marginRight: 4 }}>✏️</button>
                                         <button onClick={() => borrarAlumno(a.id)} title="Borrar alumno"
                                             style={{ background: COL.rojo, color: '#fff', border: 'none', borderRadius: 8, padding: '4px 8px', cursor: 'pointer', fontWeight: 800 }}>×</button>
                                     </td>
@@ -1599,6 +1668,7 @@ function PanelProfesor({ usuario }) {
 
 const tdS = { padding: '8px', borderBottom: '1px solid #eef2f7', verticalAlign: 'top' };
 const thS = { padding: '10px 8px', textAlign: 'left', whiteSpace: 'nowrap' };
+const inEdS = { width: '100%', minWidth: 90, padding: '5px 7px', borderRadius: 6, border: '1.5px solid #cbd5e1', fontSize: '0.85rem', boxSizing: 'border-box' };
 
 /* ---------------------- VISTA PREVIA DEL TEST (interactiva, sin guardar) ---------------------- */
 function VistaPreviaTest({ test, onClose }) {

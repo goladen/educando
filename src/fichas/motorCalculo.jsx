@@ -1,6 +1,6 @@
 import React from 'react';
 import { generarProblema } from '../CalculoMental';
-import { generarProblemasNumeros, textoRespuestaNum } from '../generadorProblemasNumeros';
+import { generarProblemasNumeros, textoRespuestaNum, leerNumeroEs } from '../generadorProblemasNumeros';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Motor de CÁLCULO MENTAL para las fichas imprimibles (ver FichasImprimibles.jsx)
@@ -151,6 +151,21 @@ const Revelado = ({ ap, vis, size, zoom }) => {
     );
 };
 
+// ─── Comprobación de respuestas en la pizarra («✏️ Responder») ───────────────
+const comprobarNumero = (r) => (txt) => {
+    const v = leerNumeroEs(txt);
+    return Number.isNaN(v) ? null : { ok: Math.abs(v - r) < 0.005 };
+};
+const respuestas = (ap) => {
+    if (esProblema(ap.tipo)) {
+        return (ap.problema?.preguntas || []).map(q => ({
+            etiqueta: q.p, tipo: q.tipo, unidad: q.unidad, opciones: q.opciones,
+            comprobar: q.tipo === 'opcion' ? (o) => ({ ok: o === q.r }) : comprobarNumero(q.r),
+        }));
+    }
+    return [{ tipo: 'num', comprobar: comprobarNumero(ap.answer) }];
+};
+
 export const motorCalculo = {
     coleccion: 'fichas_calculo',
     ruta: '/calculo',
@@ -172,5 +187,5 @@ export const motorCalculo = {
     usaNivel: () => true,
     esTexto: (ap) => esProblema(ap.tipo),
     sizeHoja: () => '1.3rem',
-    Enunciado, Solucion, pasosMax, RespuestaInline, Revelado,
+    Enunciado, Solucion, pasosMax, RespuestaInline, Revelado, respuestas,
 };

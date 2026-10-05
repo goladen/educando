@@ -6,6 +6,7 @@ import wrongSoundFile   from '../assets/negative_beeps-6008.mp3';
 import { CompeticionCuerda } from './TironCuerdaEscena';
 import ModalEnviarCompeticion from './ModalEnviarCompeticion';
 import { leerRetoUrl } from '../utils/retoLink';
+import BotonFichas from './BotonFichas';
 
 const WORLD_URL    = 'https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson';
 const ESP_PROV_URL = 'https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/spain-provinces.geojson';
@@ -104,7 +105,7 @@ const PAISES = [
 ];
 
 // ── Countries with flags & capitals ──────────────────────────────────────────
-const PAISES_BANDERAS = [
+export const PAISES_BANDERAS = [ // también lo usan las fichas de Geografía
   // Europa
   { nombre:'España',          capital:'Madrid',             iso2:'es', continente:'Europa'  },
   { nombre:'Francia',         capital:'París',              iso2:'fr', continente:'Europa'  },
@@ -253,7 +254,7 @@ const PROVINCIAS = [
 ];
 
 // ── Physical geography elements ───────────────────────────────────────────────
-const ELEMENTOS_GEO = [
+export const ELEMENTOS_GEO = [ // también lo usan las fichas de Geografía
   { nombre:'Ebro',             tipo:'rio', ambito:'España',  lon:-0.9,   lat:41.6,  lon_inicio:-4.1,  lat_inicio:43.0,  lon_fin:0.8,    lat_fin:40.7  },
   { nombre:'Tajo',             tipo:'rio', ambito:'España',  lon:-4.0,   lat:39.9,  lon_inicio:-1.5,  lat_inicio:40.4,  lon_fin:-9.0,   lat_fin:38.7  },
   { nombre:'Duero',            tipo:'rio', ambito:'España',  lon:-4.5,   lat:41.5,  lon_inicio:-2.8,  lat_inicio:41.9,  lon_fin:-8.7,   lat_fin:41.1  },
@@ -1225,6 +1226,9 @@ function GeografiaAppInner({ onBack, onCreateLive, onJoinLive }) {
             style={{ width:'100%', marginTop:10, padding:'13px 0', borderRadius:14, border:'none', background:'linear-gradient(135deg,#f39c12,#e67e22)', color:'white', fontSize:'1rem', fontWeight:900, cursor:'pointer' }}>
             🪢 Competición por equipos (tirón de cuerda)
           </button>
+
+          {/* Fichas imprimibles de Geografía (para el profesor) */}
+          <div style={{ marginTop:10 }}><BotonFichas materia="geografia" color="#0d9488" texto="Fichas de Geografía para imprimir" /></div>
 
           {/* Live mode */}
           <div style={{ marginTop:16, borderTop:'1px solid rgba(255,255,255,0.1)', paddingTop:16 }}>

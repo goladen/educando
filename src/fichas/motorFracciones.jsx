@@ -5,6 +5,7 @@ import {
 } from '../Fracciones';
 import { PROBLEMAS_FRACCIONES } from '../fraccionesProblemas';
 import { barajar } from './FichasImprimibles';
+import { leerNumeroEs } from '../generadorProblemasNumeros';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Motor de FRACCIONES para las fichas imprimibles (ver FichasImprimibles.jsx)
@@ -55,12 +56,14 @@ const generarApartados = (ej, n, existentes = []) => {
         const libres = barajar(problemasDe(ej.catProb).filter(p => !usados.has(p.id)));
         return libres.slice(0, n).map(p => ({ tipo: 'problemas', probId: p.id }));
     }
-    const vistos = new Set(existentes.map(a => a.enunciado));
+    // Clave: enunciado + dibujo («¿Qué fracción está pintada?» se repite con barras distintas)
+    const clave = (a) => `${a.enunciado}|${JSON.stringify(a.visual || {})}`;
+    const vistos = new Set(existentes.map(clave));
     const out = [];
     for (let i = 0; out.length < n && i < n * 40; i++) {
         const { distractores, ...e } = generarEjercicio([ej.tipo], ej.nivel); // eslint-disable-line no-unused-vars
-        if (vistos.has(e.enunciado)) continue;
-        vistos.add(e.enunciado);
+        if (vistos.has(clave(e))) continue;
+        vistos.add(clave(e));
         out.push(e);
     }
     return out;
@@ -162,6 +165,40 @@ const Revelado = ({ ap, vis, size, zoom }) => {
     );
 };
 
+// ─── Comprobación de respuestas en la pizarra («✏️ Responder») ───────────────
+const mcd = (a, b) => (b ? mcd(b, a % b) : Math.abs(a));
+// «3/4», «-3/4», «2» o «3:4» → [n, d]
+const leerFraccion = (txt) => {
+    const t = String(txt || '').trim().replace(/\s/g, '').replace(/[−–]/g, '-').replace(':', '/');
+    const m = t.match(/^(-?\d+)(?:\/(-?\d+))?$/);
+    if (!m) return null;
+    const n = Number(m[1]), d = m[2] === undefined ? 1 : Number(m[2]);
+    return d === 0 ? null : [n, d];
+};
+const comprobarFraccion = (r, { irreducible = false, lockDen = null } = {}) => (txt) => {
+    const f = leerFraccion(txt);
+    if (!f) return null;
+    if (Math.abs(f[0] / f[1] - r[0] / r[1]) > 1e-9) return { ok: false };
+    if (lockDen && f[1] !== lockDen) return { ok: false, nota: `Es equivalente, pero el denominador debe ser ${lockDen}` };
+    if (irreducible && mcd(f[0], f[1]) !== 1) return { ok: false, nota: 'Es equivalente, pero hay que simplificar' };
+    return { ok: true };
+};
+const comprobarNumero = (r) => (txt) => {
+    const v = leerNumeroEs(txt);
+    return Number.isNaN(v) ? null : { ok: Math.abs(v - r) < 0.01 };
+};
+
+const respuestas = (ap) => {
+    if (ap.tipo === 'problemas') {
+        const p = probPorId(ap.probId);
+        return (p?.preguntas || []).map(q => ({
+            etiqueta: q.p, tipo: q.tipo, unidad: q.unidad, opciones: q.opciones,
+            comprobar: q.tipo === 'frac' ? comprobarFraccion(q.r) : q.tipo === 'num' ? comprobarNumero(q.r) : (o) => ({ ok: o === q.r }),
+        }));
+    }
+    return [{ tipo: 'frac', comprobar: comprobarFraccion(ap.respuesta, { irreducible: !!ap.exigirIrreducible, lockDen: ap.lockDen || null }) }];
+};
+
 export const motorFracciones = {
     coleccion: 'fichas_fracciones',
     ruta: '/fracciones',
@@ -180,5 +217,5 @@ export const motorFracciones = {
     categorias: (tipo) => (tipo === 'problemas' ? [['todos', 'Todos'], ['total', 'Se conoce el total'], ['averiguar', 'Averiguar el total']] : null),
     esTexto: (ap) => ap.tipo === 'problemas',
     sizeHoja: (ap) => (ap.tipo === 'combinadas' ? '1.2rem' : '1.3rem'),
-    Enunciado, Solucion, pasosMax, marcaEnunciado, RespuestaInline, Revelado,
+    Enunciado, Solucion, pasosMax, marcaEnunciado, RespuestaInline, Revelado, respuestas,
 };

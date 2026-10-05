@@ -54,10 +54,12 @@ export const JUEGOS_REGISTRO_META = {
     QUIEN_HISTORICO:     { nombre: '¿Quién es quién? histórico', emoji: '🧐', color: '#8e44ad' },
     BUNKER:              { nombre: 'Bunker',              emoji: '🎯', color: '#27ae60' },
     ENIGMIC:             { nombre: 'Enigmic',             emoji: '🕵️', color: '#7c3aed' },
+    SIXSEVEN:            { nombre: 'Six Seven',           emoji: '🔢', color: '#FF007F' },
     CALAMAR:             { nombre: 'Luz roja · Luz verde', emoji: '🦑', color: '#e6317f' },
     VISOR_3D:            { nombre: 'Visor 3D',            emoji: '🧊', color: '#0d9488' },
     ESCULPIR_3D:         { nombre: 'Taller de escultura', emoji: '🗿', color: '#b45309' },
     JEOPARDY:            { nombre: 'Money Board',         emoji: '💰', color: '#2563eb' },
+    LENGUA:              { nombre: 'Lengua',              emoji: '📖', color: '#3498db' },
 };
 
 export const metaDe = (tipo) => JUEGOS_REGISTRO_META[tipo] || { nombre: tipo, emoji: '🎮', color: '#718093' };

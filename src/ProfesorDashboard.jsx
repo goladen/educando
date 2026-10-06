@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect, lazy, Suspense } from 'react';
+import CargandoChunk from './components/CargandoChunk';
 import { db } from './firebase';
 import { collection, query, where, getDocs, deleteDoc, doc, addDoc, updateDoc, getDoc, setDoc, orderBy } from 'firebase/firestore';
 import { Trash2, Plus, FileSpreadsheet, Bot, BarChart2, Save, X, Pencil, Key, Gamepad2, Edit3, Globe, Search, Copy, Eye, Users, RotateCcw, Send, Zap, UserCircle, LogOut, Menu, Shield, Info, FileText, Calculator, Medal, Crosshair } from 'lucide-react';
@@ -6,33 +7,32 @@ import useDrivePicker from 'react-google-drive-picker';
 import { procesarArchivoExcel } from './ExcelParser';
 import ModalCrearIA from './components/ModalCrearIA';
 import { JUEGOS_IA } from './iaRecursos';
-import GamePlayer from './GamePlayer';
-import ThinkHootGame from './ThinkHootGame';
-import ExpresionArtEscri from './ExpresionArtEscri';
-import EditorManual from './components/EditorManual';
-import EditorPro from './components/EditorPro';
-import RuletaGame from './RuletaGame';
+const GamePlayer = lazy(() => import('./GamePlayer'));
+const ThinkHootGame = lazy(() => import('./ThinkHootGame'));
+const ExpresionArtEscri = lazy(() => import('./ExpresionArtEscri'));
+const EditorManual = lazy(() => import('./components/EditorManual'));
+const EditorPro = lazy(() => import('./components/EditorPro'));
 import UserProfile from './components/UserProfile';
 import LandingGames from './components/LandingGames3';
 import GlobalSearch from './components/GlobalSearch';
-import TeacherTools from './components/TeacherTools';
+const TeacherTools = lazy(() => import('./components/TeacherTools'));
 const MiniAppAdmin = lazy(() => import('./components/MiniAppAdmin'));
-import EditorMathLive from './components/EditorMathLive';
-import MathLive from './MathLive';
-import OlympicLive from './OlympicLive';
-import CazaBurbujasGame from './CazaBurbujasGame';
-import PikatronRun from './PikatronRun';
-import SopaDeLetrasGame from './SopaDeLetrasGame';
-import TextWordleGame from './TextWordleGame';
-import SintaxisGame from './SintaxisGamen2';
+const EditorMathLive = lazy(() => import('./components/EditorMathLive'));
+const MathLive = lazy(() => import('./MathLive'));
+const OlympicLive = lazy(() => import('./OlympicLive'));
+const CazaBurbujasGame = lazy(() => import('./CazaBurbujasGame'));
+const PikatronRun = lazy(() => import('./PikatronRun'));
+const SopaDeLetrasGame = lazy(() => import('./SopaDeLetrasGame'));
+const TextWordleGame = lazy(() => import('./TextWordleGame'));
+const SintaxisGame = lazy(() => import('./SintaxisGamen2'));
 
 
 import { MousePointer2, Rocket, Search as SearchIcon, Car, Clock, Headphones } from 'lucide-react';
-import InformesJuegos from './components/InformesJuegos2';
-import ComunidadesTab from './components/ComunidadesTab';
-import CompeticionesTab from './components/CompeticionesTab';
-import TrivialPartidasView from './components/TrivialPartidasView';
-import TrivialRecursosManager from './components/TrivialRecursosManager';
+const InformesJuegos = lazy(() => import('./components/InformesJuegos2'));
+const ComunidadesTab = lazy(() => import('./components/ComunidadesTab'));
+const CompeticionesTab = lazy(() => import('./components/CompeticionesTab'));
+const TrivialPartidasView = lazy(() => import('./components/TrivialPartidasView'));
+const TrivialRecursosManager = lazy(() => import('./components/TrivialRecursosManager'));
 import PiTutorial from './components/PiTutorial';
 
 const TUTORIAL_PROFESOR = [
@@ -40,27 +40,27 @@ const TUTORIAL_PROFESOR = [
     { texto: 'Desde la sección de informes puedes consultar y gestionar los resultados de tus alumnos en los distintos juegos.' },
     { texto: '"Herramientas para el profesor" dispone de utilidades adicionales: generador con IA, importación desde Excel, Google Drive y más. ¡Mucho éxito!' },
 ];
-import EditorProBurbujasPikatron from './components/EditorProBurbujasPikatron';
-import EditorQuestionSender from './components/EditorQuestionSender';
-import ModalMigrarQsender from './components/ModalMigrarQsender';
-import MathWordleGame from './MathWordleGame';
-import EditorWordle from './components/EditorWordle';
-import EditorOlympic from './components/EditorOlympic';
-import EditorSintaxis from './components/EditorSintaxis';
-import EditorEtiquetas from './components/EditorEtiquetas';
-import EditorLineaTiempo from './components/EditorLineaTiempo';
+const EditorProBurbujasPikatron = lazy(() => import('./components/EditorProBurbujasPikatron'));
+const EditorQuestionSender = lazy(() => import('./components/EditorQuestionSender'));
+const ModalMigrarQsender = lazy(() => import('./components/ModalMigrarQsender'));
+const MathWordleGame = lazy(() => import('./MathWordleGame'));
+const EditorWordle = lazy(() => import('./components/EditorWordle'));
+const EditorOlympic = lazy(() => import('./components/EditorOlympic'));
+const EditorSintaxis = lazy(() => import('./components/EditorSintaxis'));
+const EditorEtiquetas = lazy(() => import('./components/EditorEtiquetas'));
+const EditorLineaTiempo = lazy(() => import('./components/EditorLineaTiempo'));
 import EditorListening, { recursoListeningVacio } from './components/EditorListening';
-import EditorOmni from './components/EditorOmni';
-import EditorPaginaProfesor from './components/EditorPaginaProfesor';
-import PaginaProfesor from './components/PaginaProfesor';
-import EditorVideoQuizz from './components/EditorVideoQuizz';
-import VideoTimelineEditor from './VideoTimelineEditor';
-import EditorSolarSystem from './components/EditorSolarSystem';
-import OmninteractiveApp from './OmninteractiveApp';
-import VideoQuizzApp from './VideoQuizzApp';
+const EditorOmni = lazy(() => import('./components/EditorOmni'));
+const EditorPaginaProfesor = lazy(() => import('./components/EditorPaginaProfesor'));
+const PaginaProfesor = lazy(() => import('./components/PaginaProfesor'));
+const EditorVideoQuizz = lazy(() => import('./components/EditorVideoQuizz'));
+const VideoTimelineEditor = lazy(() => import('./VideoTimelineEditor'));
+const EditorSolarSystem = lazy(() => import('./components/EditorSolarSystem'));
+const OmninteractiveApp = lazy(() => import('./OmninteractiveApp'));
+const VideoQuizzApp = lazy(() => import('./VideoQuizzApp'));
 import BuzonNovedades from './components/BuzonNovedades';
-import PresentationEditor from './components/PresentationEditor';
-import PresentationList from './components/PresentationList';
+const PresentationEditor = lazy(() => import('./components/PresentationEditor'));
+const PresentationList = lazy(() => import('./components/PresentationList'));
 import * as XLSX from 'xlsx'; // <--- IMPORTANTE
 // ==============================================================================
 //  ZONA DE CLAVES (SEGURA)
@@ -116,7 +116,7 @@ const INSTRUCCIONES_CREACION = {
 
 };
 
-export default function ProfesorDashboard({ usuario, googleToken }) {
+function ProfesorDashboardInterno({ usuario, googleToken }) {
     const [juegoSeleccionado, setJuegoSeleccionado] = useState('PASAPALABRA');
     const [vista, setVista] = useState('MIS_RECURSOS'); // 'MIS_RECURSOS', 'BIBLIOTECA'
     const [recursos, setRecursos] = useState([]);
@@ -1926,3 +1926,8 @@ const ResponsiveStyles = () => (
 );
 // Botón "volver" de las vistas de Trivial (dentro de Recursos PRO)
 const estiloVolverTrivial = { marginBottom: 20, padding: '7px 14px', borderRadius: 8, border: '1px solid #dde', background: 'white', cursor: 'pointer', fontSize: '0.85rem', color: '#555', display: 'block' };
+
+// Editores y juegos se cargan con lazy(): límite de Suspense propio del panel.
+export default function ProfesorDashboard(props) {
+    return <Suspense fallback={<CargandoChunk />}><ProfesorDashboardInterno {...props} /></Suspense>;
+}

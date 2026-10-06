@@ -1,8 +1,9 @@
 ﻿import React, { useState, useEffect, lazy, Suspense } from 'react';
+import CargandoChunk from './CargandoChunk';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, setDoc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { Search, Key, Filter, Zap, Play, Home, ChevronDown, ChevronUp, Mail, Link2, Share2 } from 'lucide-react';
-import GamePlayer from '../GamePlayer';
+const GamePlayer = lazy(() => import('../GamePlayer'));
 import MisRegistros from './MisRegistros';
 import { getResumenRegistros } from '../utils/registrosLocales';
 import useAvatarLocal from '../hooks/useAvatarLocal';
@@ -10,52 +11,51 @@ import AvatarSVG from './avatar/AvatarSVG';
 import { useT } from '../i18n/LanguageContext';
 import LanguageSelector from '../i18n/LanguageSelector';
 import FullscreenBtn from '../MiniArcade/FullscreenBtn';
-import KartingTrack from '../KartingTrack';
-import KartingedMultiGame from '../KartingedMultiGame';
-import RacingGame3D from '../RacingGame3D';
-import ThinkHootGame from '../ThinkHootGame';
-import PiLiveSolo from '../PiLiveSolo';
-import RuletaGame from '../RuletaGame';
-import MathLive from '../MathLive';
-import OlympicLive from '../OlympicLive';
-import QuestionSenderClient from '../QuestionSenderClient';
-import PikatronRun from '../PikatronRun';
-import BunkerDisparo from '../BunkerDisparo';
-import JuegoCalamar from '../JuegoCalamar';
-import MoneyBoard from '../MoneyBoard';
-import EnigmicLogic from '../EnigmicLogic';
-import SixSeven from '../SixSeven';
-import Visor3D from '../Visor3D';
-import Esculpir3D from '../Esculpir3D';
-import TextWordleGame from '../TextWordleGame';
-import MathWordleGame from '../MathWordleGame';
-import SopaDeLetrasGame from '../SopaDeLetrasGame';
-import Ahorcado from '../Ahorcado';
-import SintaxisGame from '../SintaxisGamen2';
-import LenguaApp from '../lengua/LenguaApp';
-import Listening from '../ListeningGame'
-import Geometrix from '../Geometrix';
-import CalculoMental from '../CalculoMental';
-import CalculoDinero from '../CalculoDinero';
-import Fracciones from '../Fracciones';
-import Ecuaciones from '../Ecuaciones';
-import EcuacionSistemas from '../EcuacionSistemas';
-import PotenciasRaices from '../PotenciasRaices';
-import Funciones from '../Funciones';
-import GeometriaAnalitica from '../Funciones2'
-import PerimetroArea from '../PerimetroArea';
-import Visor3dPoliedrosEuler from '../Visor3dPoliedrosEuler';
-import GranjaInteractiva from '../GranjaInteractiva';
-import Plataformas from '../Plataformas2';
-import StoryCubes from '../StoryCubes';
-import FutbolQuizz from '../FutbolQuizz';
-import PuzzleImagenes from '../PuzzleImagenes';
+const KartingTrack = lazy(() => import('../KartingTrack'));
+const KartingedMultiGame = lazy(() => import('../KartingedMultiGame'));
+const RacingGame3D = lazy(() => import('../RacingGame3D'));
+const ThinkHootGame = lazy(() => import('../ThinkHootGame'));
+const PiLiveSolo = lazy(() => import('../PiLiveSolo'));
+const RuletaGame = lazy(() => import('../RuletaGame'));
+const MathLive = lazy(() => import('../MathLive'));
+const OlympicLive = lazy(() => import('../OlympicLive'));
+const QuestionSenderClient = lazy(() => import('../QuestionSenderClient'));
+const PikatronRun = lazy(() => import('../PikatronRun'));
+const BunkerDisparo = lazy(() => import('../BunkerDisparo'));
+const JuegoCalamar = lazy(() => import('../JuegoCalamar'));
+const MoneyBoard = lazy(() => import('../MoneyBoard'));
+const EnigmicLogic = lazy(() => import('../EnigmicLogic'));
+const SixSeven = lazy(() => import('../SixSeven'));
+const Visor3D = lazy(() => import('../Visor3D'));
+const Esculpir3D = lazy(() => import('../Esculpir3D'));
+const TextWordleGame = lazy(() => import('../TextWordleGame'));
+const MathWordleGame = lazy(() => import('../MathWordleGame'));
+const SopaDeLetrasGame = lazy(() => import('../SopaDeLetrasGame'));
+const Ahorcado = lazy(() => import('../Ahorcado'));
+const LenguaApp = lazy(() => import('../lengua/LenguaApp'));
+const Listening = lazy(() => import('../ListeningGame'));
+const Geometrix = lazy(() => import('../Geometrix'));
+const CalculoMental = lazy(() => import('../CalculoMental'));
+const CalculoDinero = lazy(() => import('../CalculoDinero'));
+const Fracciones = lazy(() => import('../Fracciones'));
+const Ecuaciones = lazy(() => import('../Ecuaciones'));
+const EcuacionSistemas = lazy(() => import('../EcuacionSistemas'));
+const PotenciasRaices = lazy(() => import('../PotenciasRaices'));
+const Funciones = lazy(() => import('../Funciones'));
+const GeometriaAnalitica = lazy(() => import('../Funciones2'));
+const PerimetroArea = lazy(() => import('../PerimetroArea'));
+const Visor3dPoliedrosEuler = lazy(() => import('../Visor3dPoliedrosEuler'));
+const GranjaInteractiva = lazy(() => import('../GranjaInteractiva'));
+const Plataformas = lazy(() => import('../Plataformas2'));
+const StoryCubes = lazy(() => import('../StoryCubes'));
+const FutbolQuizz = lazy(() => import('../FutbolQuizz'));
+const PuzzleImagenes = lazy(() => import('../PuzzleImagenes'));
 import UserProfile from './UserProfile';
-import MansionPitagoricaGame from '../MansionPitagoricaGame';
-import ArkadeHub from '../MiniArcade/ArkadeHub';
+const MansionPitagoricaGame = lazy(() => import('../MansionPitagoricaGame'));
+const ArkadeHub = lazy(() => import('../MiniArcade/ArkadeHub'));
 
-import EtiquetaMe from '../EtiquetaMe';
-import LineaTiempoGame from '../LineaTiempoGame';
+const EtiquetaMe = lazy(() => import('../EtiquetaMe'));
+const LineaTiempoGame = lazy(() => import('../LineaTiempoGame'));
 const ListeningRecursoGame = lazy(() => import('../ListeningRecursoGame'));
 // Centro de fichas imprimibles de Math World (ruta /fichas)
 const FichasMathWorld = lazy(() => import('../FichasMathWorld'));
@@ -72,52 +72,53 @@ const FICHAS_DE_MATERIA = {
 const MATERIA_DE_FICHAS = { sintaxis: 'LENGUA', geografia: 'GEO_HISTORIA', biologia: 'BIOLOGIA', musica: 'MUSICA' };
 // /fichas/lengua es el centro de Lengua (clave interna «sintaxis»)
 const ALIAS_FICHAS = { lengua: 'sintaxis' };
-import OmninteractiveApp from '../OmninteractiveApp';
-import OcaMatematicaDirect from '../OcaMatematica';
-import DominoMatematicoDirect from '../dominofracciones';
-import VideoQuizzApp from '../VideoQuizzApp';
-import FuncionesEjecutivas from '../FuncionesEjecutivas';
-import IrregularVerbsTest from '../IrregularVerbsTest';
-import LenguaSignos from '../LenguaSignos';
-import MusicApp from '../MusicApp';
-import GeografiaApp from './GeografiaApp';
-import ImperiosGame from './ImperiosGame';
-import ComunidadesPublico from './ComunidadesPublico';
-import QuienEsQuien from '../QuienEsQuien';
-import QuienEsQuienHistorico from '../QuienEsQuienHistorico';
-import BiologiaApp  from './BiologiaApp';
-import HerramientasClase, { PizarraApp } from '../GestionAula';
-import AlgebraApp from '../Algebra';
-import VistasDidricas from '../VistasDidricas';
-import MiniAppCreator from './MiniAppCreator';
-import EstadisticaApp from '../Estadistica';
-import SimuladorColisiones from '../Simuladores física/SimuladorColisiones';
-import SimuladorPlanoInclinado from '../Simuladores física/SimuladorPlanoInclinado';
-import SimuladorTiroParabolico from '../Simuladores física/SimuladorTiroParabolico';
-import SimuladorCaidaLibre from '../Simuladores física/SimuladorCaidaLibre';
-import SimuladorPendulo from '../Simuladores física/SimuladorPendulo';
-import SimuladorLeyDeOhm from '../Simuladores física/SimuladorLeyDeOhm';
-import EnlaceMoleculas from '../Simuladores física/EnlaceMoleculas';
-import AjustesReacciones from '../Simuladores física/AjustesReacciones';
-import CaidaEscalada from '../Simuladores física/CaidaEscalada';
-import SimuladorAtomos from '../Simuladores física/SimuladorAtomos';
-import GayLusac from '../Simuladores física/GayLusac';
-import SimuladorEclipse from '../Simuladores física/SimuladorEclipse';
-import SimuladorSistemaSolar from '../Simuladores física/SimuladorSistemaSolar';
-import RetosApp from '../Retos';
+const OmninteractiveApp = lazy(() => import('../OmninteractiveApp'));
+const OcaMatematicaDirect = lazy(() => import('../OcaMatematica'));
+const DominoMatematicoDirect = lazy(() => import('../dominofracciones'));
+const VideoQuizzApp = lazy(() => import('../VideoQuizzApp'));
+const FuncionesEjecutivas = lazy(() => import('../FuncionesEjecutivas'));
+const IrregularVerbsTest = lazy(() => import('../IrregularVerbsTest'));
+const LenguaSignos = lazy(() => import('../LenguaSignos'));
+const MusicApp = lazy(() => import('../MusicApp'));
+const GeografiaApp = lazy(() => import('./GeografiaApp'));
+const ImperiosGame = lazy(() => import('./ImperiosGame'));
+const ComunidadesPublico = lazy(() => import('./ComunidadesPublico'));
+const QuienEsQuien = lazy(() => import('../QuienEsQuien'));
+const QuienEsQuienHistorico = lazy(() => import('../QuienEsQuienHistorico'));
+const BiologiaApp = lazy(() => import('./BiologiaApp'));
+const HerramientasClase = lazy(() => import('../GestionAula'));
+const PizarraApp = lazy(() => import('../GestionAula').then(m => ({ default: m.PizarraApp })));
+const AlgebraApp = lazy(() => import('../Algebra'));
+const VistasDidricas = lazy(() => import('../VistasDidricas'));
+const MiniAppCreator = lazy(() => import('./MiniAppCreator'));
+const EstadisticaApp = lazy(() => import('../Estadistica'));
+const SimuladorColisiones = lazy(() => import('../Simuladores física/SimuladorColisiones'));
+const SimuladorPlanoInclinado = lazy(() => import('../Simuladores física/SimuladorPlanoInclinado'));
+const SimuladorTiroParabolico = lazy(() => import('../Simuladores física/SimuladorTiroParabolico'));
+const SimuladorCaidaLibre = lazy(() => import('../Simuladores física/SimuladorCaidaLibre'));
+const SimuladorPendulo = lazy(() => import('../Simuladores física/SimuladorPendulo'));
+const SimuladorLeyDeOhm = lazy(() => import('../Simuladores física/SimuladorLeyDeOhm'));
+const EnlaceMoleculas = lazy(() => import('../Simuladores física/EnlaceMoleculas'));
+const AjustesReacciones = lazy(() => import('../Simuladores física/AjustesReacciones'));
+const CaidaEscalada = lazy(() => import('../Simuladores física/CaidaEscalada'));
+const SimuladorAtomos = lazy(() => import('../Simuladores física/SimuladorAtomos'));
+const GayLusac = lazy(() => import('../Simuladores física/GayLusac'));
+const SimuladorEclipse = lazy(() => import('../Simuladores física/SimuladorEclipse'));
+const SimuladorSistemaSolar = lazy(() => import('../Simuladores física/SimuladorSistemaSolar'));
+const RetosApp = lazy(() => import('../Retos'));
 import ModalElegirHerramienta, { herramientaPorId } from './ModalElegirHerramienta';
 import ModalCompartirReto from './ModalCompartirReto';
 import ModalRetoRecurso, { JUEGOS_RECURSO } from './ModalRetoRecurso';
-import SimuladorDados from '../Probabilidad';
-import TrivialGame from '../Trivial';
-import ExpresionArtEscri from '../ExpresionArtEscri';
-import MetodoOAOA from '../MetodoOAOA';
-import JuegoFeriaOAOA from '../FeriaMates';
-import JuegoDivisibilidad from '../Divisibilidad';
-import DueloPiratas from '../DueloPiratas';
-import DueloPiratasRecurso from '../DueloPiratasRecurso';
-import BlocklyEditor from '../BlocklyEditor';
-import ProgramacionRobotica from '../ProgramacionRobotica';
+const SimuladorDados = lazy(() => import('../Probabilidad'));
+const TrivialGame = lazy(() => import('../Trivial'));
+const ExpresionArtEscri = lazy(() => import('../ExpresionArtEscri'));
+const MetodoOAOA = lazy(() => import('../MetodoOAOA'));
+const JuegoFeriaOAOA = lazy(() => import('../FeriaMates'));
+const JuegoDivisibilidad = lazy(() => import('../Divisibilidad'));
+const DueloPiratas = lazy(() => import('../DueloPiratas'));
+const DueloPiratasRecurso = lazy(() => import('../DueloPiratasRecurso'));
+const BlocklyEditor = lazy(() => import('../BlocklyEditor'));
+const ProgramacionRobotica = lazy(() => import('../ProgramacionRobotica'));
 import imgPiContento from '../assets/Pi-contento.png';
 import imgPasapalabra from '../assets/icono_pasapal.png'; // Revisa si es .png o .jpg
 import imgBurbujas from '../assets/icono_burbujas.png';
@@ -1693,7 +1694,7 @@ function ShareModalJuego({ url, titulo, juegoId, onClose, onVolver = null }) {
     );
 }
 
-export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usuario = null }) {
+function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = null }) {
     const t = useT();
     // --- AÑADE ESTA LÍNEA AQUÍ ---
     const [zonaActiva, setZonaActiva] = useState('MAIN');
@@ -4211,7 +4212,7 @@ const QuestionSenderWrapper = ({ onHome, initialJuegoActivo, usuario = null }) =
 
 
 // PÁGINA ESPECÍFICA DEL JUEGO
-export const SpecificGamePage = ({ appData, onHome, onLoginRequest, usuario = null }) => {
+const SpecificGamePageInterno = ({ appData, onHome, onLoginRequest, usuario = null }) => {
     const t = useT();
     const [tab, setTab] = useState(appData.isLive ? 'LIVE' : 'SEARCH');
     const [filtros, setFiltros] = useState({ tema: '', ciclo: '', pais: '', region: '', poblacion: '', autor: '' });
@@ -4969,3 +4970,11 @@ function PictoTabuModal({ usuario, onClose, onEnterRoom, initialCode = '' }) {
 const styles = {
     input: { padding: '12px',width:'100%', borderRadius: '8px', border: '1px solid #ccc', outline: 'none', flex: 1, fontSize: '0.95rem' }
 };
+// Todos los juegos se cargan con lazy() (antes se descargaban enteros en la primera visita):
+// límites de Suspense propios para que al abrir un juego solo se vea el indicador de carga aquí.
+export default function LandingGames(props) {
+    return <Suspense fallback={<CargandoChunk />}><LandingGamesInterno {...props} /></Suspense>;
+}
+export const SpecificGamePage = (props) => (
+    <Suspense fallback={<CargandoChunk />}><SpecificGamePageInterno {...props} /></Suspense>
+);

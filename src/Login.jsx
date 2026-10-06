@@ -1,7 +1,7 @@
 ﻿//import LandingGames from './components/LandingGames3';
-import MathWordleGame from './MathWordleGame';
-import TextWordleGame from './TextWordleGame'; // <--- IMPORTA TU NUEVO COMPONENTE
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
+const MathWordleGame = lazy(() => import('./MathWordleGame'));
+const TextWordleGame = lazy(() => import('./TextWordleGame'));
 import { auth } from './firebase';
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { Menu, X } from 'lucide-react';
@@ -9,10 +9,9 @@ import logoPikt from './assets/icono2.png';
 import LandingGames, { APPS, SpecificGamePage, ResourceCard } from './components/LandingGames3';
 import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from './firebase';
-import SopaDeLetrasGame from './SopaDeLetrasGame';
 import BuscadorPaginas from './components/BuscadorPaginas';
-import ComunidadesPublico from './components/ComunidadesPublico';
-import PaginaProfesor from './components/PaginaProfesor';
+const ComunidadesPublico = lazy(() => import('./components/ComunidadesPublico'));
+const PaginaProfesor = lazy(() => import('./components/PaginaProfesor'));
 import ContadorVisitantes from './components/ContadorVisitantes';
 import PiTutorial from './components/PiTutorial';
 

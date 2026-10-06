@@ -5,6 +5,7 @@ import {
     setDoc, updateDoc, deleteDoc, serverTimestamp
 } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
+import InformeNotasPDF from './InformeNotasPDF';
 import {
     Users, Plus, Trash2, Edit2, Upload, Save, X,
     ChevronLeft, ChevronRight, Eye, EyeOff, CheckCircle, RefreshCw, Link
@@ -623,6 +624,8 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
     const [editHojaNombre,    setEditHojaNombre]    = useState(null);
     const [tempNombreHoja,    setTempNombreHoja]    = useState('');
     const [modalAgrupacion,   setModalAgrupacion]   = useState(false);
+    const [modalInforme,      setModalInforme]      = useState(false);
+    const [obsInforme,        setObsInforme]        = useState(grupo.observacionesInforme || {});
 
     const hoja     = hojas[hojaIdx] || hojas[0];
     const columnas = hoja?.columnas || [];
@@ -1128,6 +1131,9 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
                     <button onClick={() => setModalAgrupacion(true)} style={bt.secondary}>
                         🗂 Agrupaciones
                     </button>
+                    <button onClick={() => setModalInforme(true)} style={bt.secondary} title="Crear un informe PDF filtrando alumnos por nota">
+                        📄 Informe PDF
+                    </button>
                     <button onClick={añadirColumna} style={bt.primary}>
                         <Plus size={14}/> Columna
                     </button>
@@ -1313,6 +1319,25 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
             </div>
 
             <style>{`@keyframes spin { 100%{ transform:rotate(360deg); } }`}</style>
+
+            {modalInforme && (
+                <InformeNotasPDF
+                    grupo={grupo}
+                    hojas={hojas}
+                    hojaIdx={hojaIdx}
+                    alumnos={alumnos}
+                    valorDe={(h, alumnoId, col, conRecup) => conRecup
+                        ? valorConRecup(h, alumnoId, col)
+                        : aNum(col.esFormula ? evaluarFormula(col.formula || '', alumnoId) : getCeldaEnHoja(h, alumnoId, col.id))}
+                    notaFinalEnHoja={notaFinalEnHoja}
+                    observacionesIniciales={obsInforme}
+                    onGuardarObservaciones={async (obs) => {
+                        setObsInforme(obs);
+                        await updateDoc(doc(db, 'grupos_profesor', grupo.id), { observacionesInforme: obs });
+                    }}
+                    onClose={() => setModalInforme(false)}
+                />
+            )}
 
             {modalAgrupacion && (
                 <ModalCrearAgrupacion

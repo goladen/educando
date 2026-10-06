@@ -1,4 +1,5 @@
 ﻿import { useState, lazy, Suspense } from 'react';
+import CargandoChunk from './components/CargandoChunk';
 import { Home, Play } from 'lucide-react';
 
 // ─── PANTALLA DE PRESENTACIÓN PREVIA ─────────────────────────────────────────
@@ -116,30 +117,30 @@ function PantallaPresentacion({ presentacion, onEmpezar }) {
         </div>
     );
 }
-import PasapalabraGame from './PasapalabraGame';
-import CazaBurbujasGame from './CazaBurbujasGame';
-import PikatronRun from './PikatronRun';
-import Plataformas from './Plataformas2';
-import AparejadosGame from './AparejadosGame';
-import ThinkHootGame from './ThinkHootGame';
-import RuletaGame from './RuletaGame';
-import KartingedGame from './KartingedGame';
-import IrregularVerbsTest from './IrregularVerbsTest';
-import TextWordleGame from './TextWordleGame';
-import SopaDeLetrasGame from './SopaDeLetrasGame';
-import Ahorcado from './Ahorcado';
-import JuegoCalamar from './JuegoCalamar';
-import MoneyBoard from './MoneyBoard';
-import BunkerDisparo from './BunkerDisparo';
-import EtiquetaMe from './EtiquetaMe';
-import LineaTiempoGame from './LineaTiempoGame';
+const PasapalabraGame = lazy(() => import('./PasapalabraGame'));
+const CazaBurbujasGame = lazy(() => import('./CazaBurbujasGame'));
+const PikatronRun = lazy(() => import('./PikatronRun'));
+const Plataformas = lazy(() => import('./Plataformas2'));
+const AparejadosGame = lazy(() => import('./AparejadosGame'));
+const ThinkHootGame = lazy(() => import('./ThinkHootGame'));
+const RuletaGame = lazy(() => import('./RuletaGame'));
+const KartingedGame = lazy(() => import('./KartingedGame'));
+const IrregularVerbsTest = lazy(() => import('./IrregularVerbsTest'));
+const TextWordleGame = lazy(() => import('./TextWordleGame'));
+const SopaDeLetrasGame = lazy(() => import('./SopaDeLetrasGame'));
+const Ahorcado = lazy(() => import('./Ahorcado'));
+const JuegoCalamar = lazy(() => import('./JuegoCalamar'));
+const MoneyBoard = lazy(() => import('./MoneyBoard'));
+const BunkerDisparo = lazy(() => import('./BunkerDisparo'));
+const EtiquetaMe = lazy(() => import('./EtiquetaMe'));
+const LineaTiempoGame = lazy(() => import('./LineaTiempoGame'));
 const ListeningRecursoGame = lazy(() => import('./ListeningRecursoGame'));
-import DueloPiratasRecurso from './DueloPiratasRecurso';
+const DueloPiratasRecurso = lazy(() => import('./DueloPiratasRecurso'));
 
 // Los recursos de palabras (Wordle/Sopa) se pueden jugar en cualquiera de los tres
 const MODOS_PALABRA = ['WORDLE', 'SOPA', 'AHORCADO'];
 
-export default function GamePlayer({ recurso, usuario, alTerminar, autoStart = false, hojaInicial = null, modoInicial = null }) {
+function GamePlayerInterno({ recurso, usuario, alTerminar, autoStart = false, hojaInicial = null, modoInicial = null }) {
     const tienePresentacion = !!(recurso.presentacion?.titulo);
     const [presentacionVista, setPresentacionVista] = useState(!tienePresentacion);
 
@@ -234,4 +235,8 @@ export default function GamePlayer({ recurso, usuario, alTerminar, autoStart = f
             )}
         </>
     );
+}
+// Los juegos se cargan con lazy(): el límite de Suspense queda aquí para no ocultar la pantalla que abre el juego.
+export default function GamePlayer(props) {
+    return <Suspense fallback={<CargandoChunk />}><GamePlayerInterno {...props} /></Suspense>;
 }

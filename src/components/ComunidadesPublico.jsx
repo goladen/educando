@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
-import { collection, getDocs, getDoc, doc, setDoc, serverTimestamp, query, where } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc, setDoc, serverTimestamp, query, where, onSnapshot } from 'firebase/firestore';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import {
     Users, ArrowLeft, ChevronLeft, Share2, Globe, ExternalLink,
@@ -52,11 +52,22 @@ function parsePath() {
     return { comId: null, tab: 'calendarios', cursoId: null, unirse: false };
 }
 
+// Si el login con Google acaba recargando la app (móvil / navegadores integrados),
+// App.jsx lee esta marca y vuelve a la comunidad en vez de abrir el dashboard.
+const CLAVE_VOLVER = 'pikt_volver_comunidad';
+function marcarVolverAComunidad() {
+    try { localStorage.setItem(CLAVE_VOLVER, JSON.stringify({ ruta: window.location.pathname, t: Date.now() })); } catch (_) {}
+}
+function limpiarVolverAComunidad() {
+    try { localStorage.removeItem(CLAVE_VOLVER); } catch (_) {}
+}
+
 // ─── Sección: solicitar unirse (con login si hace falta) ──────────────────────
 function SolicitarUnirse({ comunidad, destacado, onVistaEdicion }) {
     const [user, setUser]   = useState(auth.currentUser);
     const [estado, setEstado] = useState('idle'); // idle | enviando | enviada
     const [error, setError] = useState('');
+    const [avisoEnviada, setAvisoEnviada] = useState(false);
 
     useEffect(() => auth.onAuthStateChanged(setUser), []);
 
@@ -73,19 +84,43 @@ function SolicitarUnirse({ comunidad, destacado, onVistaEdicion }) {
         setError(''); setEstado('enviando');
         let u = auth.currentUser;
         if (!u) {
+            // Por si el login acaba recargando la app en otra ruta: App.jsx nos devuelve aquí
+            marcarVolverAComunidad();
             try { const r = await signInWithPopup(auth, new GoogleAuthProvider()); u = r.user; }
             catch { setEstado('idle'); return; }
         }
         try {
-            await setDoc(doc(db, 'comunidades', comunidad.id, 'solicitudes', u.uid), {
-                uid: u.uid,
-                nombre: u.displayName || 'Profesor/a',
-                email: u.email || '',
-                fecha: serverTimestamp(),
-            });
+            // Ya era miembro (p. ej. acaba de iniciar sesión): no se envía solicitud;
+            // ComunidadesPublico pasa sola a la vista interna al detectar la sesión.
+            const fresca = await getDoc(doc(db, 'comunidades', comunidad.id));
+            if ((fresca.data()?.miembros || []).includes(u.uid)) { setEstado('idle'); return; }
+            const ref = doc(db, 'comunidades', comunidad.id, 'solicitudes', u.uid);
+            const previa = await getDoc(ref).catch(() => null);
+            if (!previa?.exists()) {
+                await setDoc(ref, {
+                    uid: u.uid,
+                    nombre: u.displayName || 'Profesor/a',
+                    email: u.email || '',
+                    fecha: serverTimestamp(),
+                });
+            }
             setEstado('enviada');
+            setAvisoEnviada(true);
         } catch (e) { setError('No se pudo enviar: ' + e.message); setEstado('idle'); }
     };
+
+    // Tras enviar la solicitud: aviso y, al cerrarlo, a la parte interna (panel de comunidades)
+    const modalEnviada = avisoEnviada && (
+        <div style={st.overlay}>
+            <div style={st.modal}>
+                <div style={{ fontWeight: 800, color: AZUL, fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: 8 }}><Clock size={20} /> Solicitud enviada</div>
+                <p style={{ margin: 0, color: '#2c3e50', lineHeight: 1.5 }}>
+                    Recuerda al admin de la comunidad <strong>{comunidad.nombre}</strong> que acepte tu solicitud para poder hacer uso de todas las herramientas de la comunidad.
+                </p>
+                <button onClick={() => { limpiarVolverAComunidad(); window.location.href = '/?panel=comunidades'; }} style={{ ...st.btnPrimary, justifyContent: 'center' }}>Entendido</button>
+            </div>
+        </div>
+    );
 
     if (yaMiembro) return (
         <div style={{ ...st.joinBox, background: '#e8f5e9', borderColor: '#b6e2c1' }}>
@@ -97,6 +132,7 @@ function SolicitarUnirse({ comunidad, destacado, onVistaEdicion }) {
     if (estado === 'enviada') return (
         <div style={{ ...st.joinBox, background: '#fff8e1', borderColor: '#ffe082' }}>
             <Clock size={18} color="#b8860b" /> <span style={{ color: '#8a6d00', fontWeight: 600 }}>Solicitud enviada. El creador de la comunidad la revisará.</span>
+            {modalEnviada}
         </div>
     );
 
@@ -401,8 +437,24 @@ export default function ComunidadesPublico({ onExit }) {
     const [user, setUser]     = useState(undefined); // undefined = comprobando sesión
     const [forzarPublica, setForzarPublica] = useState({}); // { [comId]: true } → vista pública aunque sea miembro
 
-    useEffect(() => auth.onAuthStateChanged(u => setUser(u || null)), []);
+    useEffect(() => auth.onAuthStateChanged(u => {
+        setUser(u || null);
+        if (u) limpiarVolverAComunidad(); // ya estamos de vuelta en la comunidad con sesión
+    }), []);
     const verPublica = (id, si) => setForzarPublica(f => ({ ...f, [id]: si }));
+
+    // ¿El usuario es miembro de la comunidad abierta? (en vivo). Se guarda junto a su comId para que,
+    // al iniciar sesión desde la vista pública, esta siga montada hasta saberlo (no se pierde el aviso).
+    const [miembro, setMiembro] = useState(null); // { comId, val }
+    useEffect(() => {
+        const comId = estado.comId;
+        if (!comId || user === undefined) return;
+        if (!user) { setMiembro({ comId, val: false }); return; }
+        return onSnapshot(doc(db, 'comunidades', comId),
+            s => setMiembro({ comId, val: (s.data()?.miembros || []).includes(user.uid) }),
+            () => setMiembro({ comId, val: false }));
+    }, [estado.comId, user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
+    const esMiembro = miembro?.comId === estado.comId ? miembro.val : null; // null = comprobando
 
     // Sincroniza con navegación atrás/adelante del navegador
     useEffect(() => {
@@ -425,14 +477,13 @@ export default function ComunidadesPublico({ onExit }) {
                 <div style={{ fontWeight: 800, color: '#2c3e50', display: 'flex', alignItems: 'center', gap: 8 }}><Users size={20} color={AZUL} /> Comunidades</div>
             </div>
             <div style={{ padding: isMobile ? '12px 6px' : '16px 12px' }}>
-                {estado.comId && user === undefined
+                {estado.comId && esMiembro === null
                     ? <div style={st.loader}><RefreshCw size={26} style={{ animation: 'spin 1s linear infinite' }} /><style>{spin}</style></div>
-                    : estado.comId && user && !forzarPublica[estado.comId]
+                    : estado.comId && user && esMiembro && !forzarPublica[estado.comId]
                     ? <div style={{ maxWidth: 1000, margin: '0 auto', padding: isMobile ? '0 2px 40px' : '0 4px 40px' }}>
                         <DetalleComunidadMiembro key={estado.comId} usuario={user} comunidadId={estado.comId}
                             tabInicial={TAB_EDICION[estado.cursoId ? 'calendarios' : estado.tab] || 'cursos'}
                             onBack={volverLista}
-                            onNoMiembro={() => verPublica(estado.comId, true)}
                             accionExtra={<button onClick={() => verPublica(estado.comId, true)} style={{ ...st.btnSec, marginBottom: 14 }}><Eye size={14} /> Ver vista pública</button>} />
                       </div>
                     : estado.comId
@@ -449,6 +500,8 @@ const st = {
     aviso:      { fontSize: '0.85rem', color: '#7f8c8d', background: '#eef4fb', borderRadius: 10, padding: '12px 16px', display: 'flex', gap: 8 },
     vacio:      { textAlign: 'center', padding: 30, color: '#bdc3c7', fontSize: '0.9rem', background: 'white', borderRadius: 12, marginBottom: 16 },
     backBtn:    { display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', color: AZUL, cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem', margin: '4px 0 14px', padding: 0 },
+    overlay:    { position: 'fixed', inset: 0, zIndex: 4000, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 },
+    modal:      { background: 'white', borderRadius: 18, padding: 24, maxWidth: 420, width: '100%', boxShadow: '0 20px 50px rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column', gap: 14 },
     btnSec:     { display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 9, border: '1.5px solid #cdd6ea', background: 'white', color: AZUL, fontWeight: 600, cursor: 'pointer', fontSize: '0.82rem' },
     btnPrimary: { display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 9, border: 'none', background: AZUL, color: 'white', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' },
     h2:         { color: '#2c3e50', fontSize: '1.15rem', margin: '10px 0 12px', display: 'flex', alignItems: 'center', gap: 8 },

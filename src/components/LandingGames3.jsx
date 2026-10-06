@@ -64,12 +64,14 @@ const FichasMaterias = lazy(() => import('../FichasMaterias'));
 // Materia de la vista por materias → centro de fichas (MATEMATICAS abre el de Math World)
 const FICHAS_DE_MATERIA = {
     MATEMATICAS: { materia: null, titulo: 'Fichas de matemáticas', color: '#7b1fa2', emoji: '📚' },
-    LENGUA: { materia: 'sintaxis', titulo: 'Fichas de sintaxis', color: '#3498db', emoji: '🖍️' },
+    LENGUA: { materia: 'sintaxis', ruta: 'lengua', titulo: 'Fichas de lengua', color: '#7B1FA2', emoji: '📖' }, // sintaxis, ortografía, morfología y léxico
     GEO_HISTORIA: { materia: 'geografia', titulo: 'Fichas de geografía', color: '#0d9488', emoji: '🌍' },
     BIOLOGIA: { materia: 'biologia', titulo: 'Fichas de biología', color: '#2E7D32', emoji: '🔬' },
     MUSICA: { materia: 'musica', titulo: 'Fichas de música', color: '#5E35B1', emoji: '🎵' },
 };
 const MATERIA_DE_FICHAS = { sintaxis: 'LENGUA', geografia: 'GEO_HISTORIA', biologia: 'BIOLOGIA', musica: 'MUSICA' };
+// /fichas/lengua es el centro de Lengua (clave interna «sintaxis»)
+const ALIAS_FICHAS = { lengua: 'sintaxis' };
 import OmninteractiveApp from '../OmninteractiveApp';
 import OcaMatematicaDirect from '../OcaMatematica';
 import DominoMatematicoDirect from '../dominofracciones';
@@ -1830,8 +1832,8 @@ export default function LandingGames({ onLoginRequest, onOpenQuestionSender, usu
                 setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'ECUACION_SISTEMAS' });
             } else if (path === 'polinomios') {
                 setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'POLINOMIOS' });
-            } else if (path.startsWith('fichas/') && MATERIA_DE_FICHAS[path.slice(7)]) {
-                setJuegoActivo({ tipoJuego: 'FICHAS_MATERIA', materia: path.slice(7) });
+            } else if (path.startsWith('fichas/') && MATERIA_DE_FICHAS[ALIAS_FICHAS[path.slice(7)] || path.slice(7)]) {
+                setJuegoActivo({ tipoJuego: 'FICHAS_MATERIA', materia: ALIAS_FICHAS[path.slice(7)] || path.slice(7) });
             } else if (path === 'fichas' || path === 'primaria/fichas') {
                 setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'FICHAS_MW', primaria: path.startsWith('primaria') });
             } else if (path === 'dinero') {
@@ -3637,7 +3639,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                             const fm = FICHAS_DE_MATERIA[materiaActiva];
                             return (
                                 <div onClick={() => {
-                                    if (fm.materia) { window.history.pushState({}, '', `/fichas/${fm.materia}`); setJuegoActivo({ tipoJuego: 'FICHAS_MATERIA', materia: fm.materia }); }
+                                    if (fm.materia) { window.history.pushState({}, '', `/fichas/${fm.ruta || fm.materia}`); setJuegoActivo({ tipoJuego: 'FICHAS_MATERIA', materia: fm.materia }); }
                                     else { window.history.pushState({}, '', '/fichas'); setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'FICHAS_MW' }); }
                                 }}
                                     style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', borderRadius: 18, cursor: 'pointer', marginBottom: 24, background: `linear-gradient(135deg, ${fm.color}, #c0392b)`, color: 'white', boxShadow: `0 8px 22px ${fm.color}55`, flexWrap: 'wrap' }}>

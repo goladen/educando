@@ -1262,7 +1262,7 @@ function PantallaNivel({ nivelSel, setNivelSel, recurso, setRecurso, joinCode, s
                     </button>
 
                     {/* Fichas imprimibles de Sintaxis (para el profesor) */}
-                    <div style={{marginTop:14}}><BotonFichas materia="sintaxis" color="#3498db" texto="Fichas de Sintaxis para imprimir" /></div>
+                    <div style={{marginTop:14}}><BotonFichas materia="sintaxis" color="#3498db" texto="Fichas de Lengua para imprimir" /></div>
                 </div>
             </div>
         </div>

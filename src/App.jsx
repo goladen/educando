@@ -123,6 +123,18 @@ function App() {
       if (uid) { setPaginaTarget({ uid }); return; }
       const slug = window.location.pathname.replace(/^\//, '').replace(/\/$/, '').trim().toLowerCase();
       if (slug === 'join') { setAulaCode(''); return; }
+      // Vuelta a la comunidad tras «Entrar con Google y solicitar unirme» si el login recargó la app en /
+      if (!slug && !window.location.search) {
+        try {
+          const v = JSON.parse(localStorage.getItem('pikt_volver_comunidad') || 'null');
+          localStorage.removeItem('pikt_volver_comunidad');
+          if (v?.ruta?.startsWith('/comunidad') && Date.now() - v.t < 10 * 60 * 1000) {
+            window.history.replaceState({}, '', v.ruta);
+            setRutaPublica('comunidades');
+            return;
+          }
+        } catch (_) {}
+      }
       if (slug === 'funcionesejecutivas' || slug === 'irregular_verbs' || slug === 'sistema_solar'
           || slug === 'retos' || slug === 'conectapuntos' || slug === 'sudoku'
           || slug === 'partes_planta' || slug === 'etiquetame' || slug === 'karting_track'

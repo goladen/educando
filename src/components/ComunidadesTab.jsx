@@ -2509,7 +2509,7 @@ function DetalleComunidad({ usuario, comunidad, onBack, onSalir, onCambio, tabIn
                         <div style={{ marginTop: 6, fontSize: '0.76rem', color: '#95a5a6' }}>{comunidad.miembros?.length || 1} miembros{comunidad.webUrl && <> · <a href={comunidad.webUrl} target="_blank" rel="noreferrer" style={{ color: AZUL }}>web</a></>}</div>
                     </div>
                     {!esCreador ? (
-                        <button onClick={onSalir} style={{ ...st.btnSec, color: '#e74c3c', borderColor: '#f3c9c4' }}><LogOut size={15} /> Salir</button>
+                        <button onClick={() => { if (window.confirm(`¿Seguro que quieres abandonar la comunidad «${comunidad.nombre}»? Para volver tendrás que pedir acceso de nuevo.`)) onSalir(); }} style={{ ...st.btnSec, color: '#e74c3c', borderColor: '#f3c9c4' }}><LogOut size={15} /> Abandonar la comunidad</button>
                     ) : confirmarBorrarCom ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
                             <span style={{ fontSize: '0.76rem', color: '#e74c3c', fontWeight: 600 }}>¿Eliminar toda la comunidad?</span>

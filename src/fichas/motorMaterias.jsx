@@ -3,20 +3,26 @@ import { crearMotorMultitema, conTema } from './motorMultitema';
 import { BIOLOGIA } from './fuentes/biologia';
 import { GEOGRAFIA } from './fuentes/geografia';
 import { SINTAXIS } from './fuentes/sintaxis';
+import { ORTOGRAFIA, MORFOLOGIA, LEXICO } from './fuentes/lengua';
 import { MUSICA } from './fuentes/musica';
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Motores de fichas de MATERIAS: Biología, Geografía, Sintaxis (Lengua) y
-//  Música. Mismo centro de fichas que Math World (catálogo, filtros, galería,
-//  PDF, pizarra, enlace público), cada uno con su colección.
-//  Rutas públicas: /fichas/biologia · /fichas/geografia · /fichas/sintaxis · /fichas/musica
+//  Motores de fichas de MATERIAS: Biología, Geografía, Lengua (sintaxis,
+//  ortografía, morfología, léxico) y Música. Mismo centro de fichas que Math
+//  World (catálogo, filtros, galería, PDF, pizarra, enlace público), cada uno
+//  con su colección. La materia de Lengua conserva la clave 'sintaxis' (y la
+//  colección fichas_sintaxis) para que sigan valiendo los enlaces ya creados.
+//  Rutas públicas: /fichas/biologia · /fichas/geografia · /fichas/lengua (= /fichas/sintaxis) · /fichas/musica
 // ─────────────────────────────────────────────────────────────────────────────
 
-// [id, título, etapa, cursos, descripción, [[tipo, nivel, n]…]]
-const catalogo = (fuente, items) => items.map(([id, titulo, etapa, cursos, desc, ejs]) => ({
-    id, titulo, etapa, cursos, desc, temas: [fuente],
-    ejercicios: ejs.map(([tipo, nivel, n]) => ({ fuente, tipo, nivel, n })),
-}));
+// [id, título, etapa, cursos, descripción, [[tipo, nivel, n] | [fuente, tipo, nivel, n]…]]
+// (sin fuente explícita se usa la principal de la materia)
+const catalogo = (fuente, items) => items.map(([id, titulo, etapa, cursos, desc, ejs]) => {
+    const ejercicios = ejs.map(e => (e.length === 4
+        ? { fuente: e[0], tipo: e[1], nivel: e[2], n: e[3] }
+        : { fuente, tipo: e[0], nivel: e[1], n: e[2] }));
+    return { id, titulo, etapa, cursos, desc, temas: [...new Set(ejercicios.map(e => e.fuente))], ejercicios };
+});
 
 const P = ['1.º', '2.º', '3.º', '4.º', '5.º', '6.º'];
 
@@ -49,8 +55,20 @@ export const MATERIAS_FICHAS = {
     },
     sintaxis: {
         fuente: SINTAXIS,
-        opts: { coleccion: 'fichas_sintaxis', ruta: '/fichas/sintaxis', nombre: 'Fichas de Sintaxis', tituloFicha: 'Ficha de Sintaxis', emoji: '🖍️', volver: 'Lengua' },
+        otrasFuentes: [ORTOGRAFIA, MORFOLOGIA, LEXICO],
+        opts: { coleccion: 'fichas_sintaxis', ruta: '/fichas/lengua', nombre: 'Fichas de Lengua', tituloFicha: 'Ficha de Lengua', emoji: '📖', volver: 'Lengua' },
         catalogo: [
+            // Ortografía
+            ['len-p-acentuacion', 'Agudas, llanas y esdrújulas', 'primaria', ['4.º', '5.º', '6.º'], 'Clasificar palabras, sílaba tónica y tilde', [['ortografia', 'acento', 1, 8], ['ortografia', 'tonica', 1, 6], ['ortografia', 'tilde', 1, 6]]],
+            ['len-p-letras', 'Letras dudosas', 'primaria', ['3.º', '4.º', '5.º', '6.º'], 'b/v, g/j, h y ll/y', [['ortografia', 'letras', 1, 15]]],
+            ['len-e-ortografia', 'Ortografía', 'eso', ['1.º', '2.º'], 'Acentuación y todas las letras dudosas', [['ortografia', 'acento', 2, 6], ['ortografia', 'tilde', 2, 6], ['ortografia', 'letras', 2, 12]]],
+            // Morfología
+            ['len-p-clases', 'Clases de palabras', 'primaria', ['3.º', '4.º', '5.º', '6.º'], 'Sustantivos, verbos, adjetivos y determinantes', [['morfologia', 'cazar', 1, 5], ['morfologia', 'clase', 1, 6]]],
+            ['len-e-morfologia', 'Las clases de palabras', 'eso', ['1.º', '2.º'], 'Las ocho clases de palabras y sus tipos', [['morfologia', 'clase', 2, 8], ['morfologia', 'cazar', 2, 4], ['morfologia', 'tiposPalabra', 1, 6]]],
+            // Léxico
+            ['len-p-lexico', 'Sinónimos y antónimos', 'primaria', ['2.º', '3.º', '4.º', '5.º', '6.º'], 'Sinónimos, antónimos y campos semánticos', [['lexico', 'sinonimos', 1, 6], ['lexico', 'antonimos', 1, 6], ['lexico', 'emparejarSin', 1, 1], ['lexico', 'campos', 1, 4]]],
+            ['len-e-lexico', 'Semántica y léxico', 'eso', ['1.º', '2.º', '3.º'], 'Sinónimos, antónimos, familias de palabras, refranes y frases hechas', [['lexico', 'sinonimos', 2, 4], ['lexico', 'antonimos', 2, 4], ['lexico', 'familias', 1, 4], ['lexico', 'refranes', 1, 4]]],
+            // Sintaxis
             ['sin-p-sujeto', 'Sujeto y predicado', 'primaria', ['4.º', '5.º', '6.º'], 'Separar sujeto y predicado en oraciones sencillas', [['sujetoPredicado', 1, 8]]],
             ['sin-p-funciones', 'Primeros complementos', 'primaria', ['5.º', '6.º'], 'Complemento directo y circunstancial', [['buscarComplemento', 1, 6], ['funcion', 1, 6]]],
             ['sin-e-analisis', 'Análisis de la oración simple', 'eso', ['1.º', '2.º'], 'Análisis completo de oraciones simples', [['sujetoPredicado', 2, 4], ['analisis', 2, 6]]],
@@ -79,9 +97,11 @@ export const motorMateria = (materia) => {
     if (!m) return null;
     if (!MOTORES[materia]) {
         const fuente = crearFuente(m.fuente);
-        MOTORES[materia] = conTema(crearMotorMultitema({ [fuente.id]: fuente }, { ...m.opts, catalogo: catalogo(fuente.id, m.catalogo) }), fuente.id);
+        const fuentes = { [fuente.id]: fuente };
+        (m.otrasFuentes || []).forEach(def => { fuentes[def.id] = crearFuente(def); });
+        MOTORES[materia] = conTema(crearMotorMultitema(fuentes, { ...m.opts, catalogo: catalogo(fuente.id, m.catalogo) }), fuente.id);
         MOTORES[materia].volver = m.opts.volver;
-        MOTORES[materia].temaInicial = null; // con un solo tema no hace falta filtrar
+        MOTORES[materia].temaInicial = null; // en el centro se ven todos los temas
     }
     return MOTORES[materia];
 };

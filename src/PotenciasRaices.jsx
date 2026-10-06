@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
 import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
 import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
+import { datosSimplificar, problemasCientifica, datosRadPotencia, datosPotRadical, datosExtraer, datosIntroducir, datosSimpRaiz, datosSumar, datosIndiceComun, datosComparar, datosRaizRaiz, datosRacionalizar } from './utils/potenciasRadicales';
 import PantallaReto, { textoBotonEnvio } from './components/retos/PantallaReto';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import correctSoundFile from './assets/correct-choice-43861.mp3';
@@ -22,7 +23,6 @@ const playSound = (type) => {
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 const rInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 const pick = (arr) => arr[rInt(0, arr.length - 1)];
-const SQFREE = [2, 3, 5, 6, 7, 10, 11, 13, 14, 15];
 const gcd = (a, b) => { a = Math.abs(a); b = Math.abs(b); while (b) { [a, b] = [b, a % b]; } return a || 1; };
 const fracStr = (nn, dd) => { let n = nn, d = dd; if (d < 0) { n = -n; d = -d; } const g = gcd(n, d); n /= g; d /= g; return d === 1 ? `${n}` : `${n}/${d}`; };
 // Convierte dígitos significativos + posición del primer dígito en el número decimal "plano"
@@ -34,6 +34,16 @@ const toPlain = (D, E, neg) => {
   else s = '0.' + '0'.repeat(-E - 1) + D;
   return (neg ? '-' : '') + s;
 };
+// Radical en la notación del render: índice 2 → SQRT, resto → ROOT(n, x)
+const rad = (n, x) => (n === 2 ? `SQRT(${x})` : `ROOT(${n},${x})`);
+const potStr = (a, m) => (m === 1 ? `${a}` : `${a}^{${m}}`);
+// Evalúa la respuesta del alumno: enteros, a/b, decimales con coma y expresiones con ^ y · (p. ej. 5^3·7^2)
+const evalNum = (s) => {
+  const t = String(s ?? '').trim().replace(/\s+/g, '').replace(/,/g, '.').replace(/[·×]/g, '*').replace(/[{}]/g, '');
+  if (!t || !/^[\d.+\-*/^()]+$/.test(t)) return NaN;
+  try { return Function(`"use strict";return (${t.replace(/\^/g, '**')});`)(); } catch (e) { return NaN; }
+};
+const casiIgual = (a, b) => Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(b));
 
 // ─── Teoría ────────────────────────────────────────────────────────────────────
 const TEORIA_POTENCIAS = [
@@ -46,13 +56,25 @@ const TEORIA_POTENCIAS = [
   { f: 'a^{-n} = FRAC(1,a^n)', k: 'expneg' },
   { f: '(-1)^{par} = 1', k: 'paridad' },
   { f: '(-1)^{impar} = -1', k: 'paridad' },
+  { f: 'FRAC(6^{2} * 4^{3},12^{2}) = 2^{4}', k: 'descomponer' },
 ];
 const TEORIA_RAICES = [
   { f: 'ROOT(n,a^m) = a^{FRAC(m,n)}', k: 'raiz_exponente' },
   { f: 'SQRT(a^2 * b) = a SQRT(b)', k: 'raiz_extraer' },
+  { f: 'a ROOT(n,b) = ROOT(n,a^n * b)', k: 'raiz_introducir' },
+  { f: 'ROOT(n·p,a^{m·p}) = ROOT(n,a^m)', k: 'raiz_simplificar' },
   { f: 'c SQRT(r) + d SQRT(r) = (c+d) SQRT(r)', k: 'raiz_suma' },
   { f: 'SQRT(a * b) = SQRT(a) * SQRT(b)', k: 'raiz_producto' },
   { f: 'SQRT(FRAC(a,b)) = FRAC(SQRT(a),SQRT(b))', k: 'raiz_cociente' },
+  { f: 'SQRT(a) * ROOT(3,b) = ROOT(6,a^3 * b^2)', k: 'raiz_indice' },
+  { f: 'ROOT(n,ROOT(m,a)) = ROOT(n·m,a)', k: 'raiz_raiz' },
+  { f: 'FRAC(c,ROOT(n,a^m)) = FRAC(c ROOT(n,a^{n-m}),a)', k: 'racionalizar' },
+  { f: 'FRAC(c,SQRT(a)-SQRT(b)) = FRAC(c(SQRT(a)+SQRT(b)),a-b)', k: 'racionalizar_conj' },
+];
+const TEORIA_CIENTIFICA = [
+  { f: 'a·10^{n}   con  1 ≤ a < 10', k: 'sci_forma' },
+  { f: '(a·10^{m}) * (b·10^{n}) = (a·b)·10^{m+n}', k: 'sci_producto' },
+  { f: 'FRAC(a·10^{m},b·10^{n}) = FRAC(a,b)·10^{m-n}', k: 'sci_cociente' },
 ];
 
 // Guiones de las explicaciones visuales (mini-vídeo paso a paso)
@@ -190,6 +212,112 @@ const EXPLICACIONES = {
       { math: 'SQRT(FRAC(a,b)) = FRAC(SQRT(a),SQRT(b))', nota: 'Regla general.' },
     ],
   },
+  descomponer: {
+    titulo: 'Bases distintas: descompón en factores primos',
+    formula: 'FRAC(6^{2} * 4^{3},12^{2}) = 2^{4}',
+    frames: [
+      { math: 'FRAC(6^{2} * 4^{3},12^{2})', nota: 'Las bases son distintas: así no podemos sumar ni restar exponentes.' },
+      { math: '6 = 2·3   4 = 2^{2}   12 = 2^{2}·3', nota: 'Descomponemos cada base en factores primos.' },
+      { math: 'FRAC(2^{2}·3^{2} * 2^{6},2^{4}·3^{2})', nota: 'Cada factor se eleva al exponente: (2·3)² = 2²·3²,  (2²)³ = 2⁶,  (2²·3)² = 2⁴·3².' },
+      { math: '2^{2+6-4} · 3^{2-2}', nota: 'Ahora sí: misma base ⇒ sumamos arriba y restamos lo de abajo.' },
+      { math: '2^{4} · 3^{0} = 16', nota: '3⁰ = 1. Resultado: 2⁴ = 16.' },
+      { math: '(FRAC(2,3))^{-2} = (FRAC(3,2))^{2}', nota: '🔑 Si aparece una fracción con exponente negativo, dale la vuelta y el exponente pasa a positivo.' },
+    ],
+  },
+  raiz_introducir: {
+    titulo: 'Introducir un factor dentro de la raíz',
+    formula: 'a ROOT(n,b) = ROOT(n,a^n * b)',
+    frames: [
+      { math: '3 SQRT(5)', nota: 'Queremos meter el 3 dentro de la raíz.' },
+      { math: '3 = SQRT(3^{2})', nota: 'Para entrar, el 3 se eleva al índice de la raíz (aquí 2).' },
+      { math: 'SQRT(3^{2} * 5) = SQRT(45)', nota: 'Multiplicamos dentro: 9·5 = 45.' },
+      { math: '2 ROOT(3,5) = ROOT(3,2^{3} * 5) = ROOT(3,40)', nota: 'En una raíz cúbica, el factor entra elevado al cubo.' },
+      { math: 'a ROOT(n,b) = ROOT(n,a^n * b)', nota: 'Regla general: es el camino inverso de extraer factores.' },
+    ],
+  },
+  raiz_simplificar: {
+    titulo: 'Simplificar un radical',
+    formula: 'ROOT(n·p,a^{m·p}) = ROOT(n,a^m)',
+    frames: [
+      { math: 'ROOT(6,2^{4})', nota: 'Índice 6 y exponente 4: los dos se pueden dividir entre 2.' },
+      { math: 'ROOT(6,2^{4}) = 2^{FRAC(4,6)}', nota: 'Lo pasamos a potencia de exponente fraccionario.' },
+      { math: '2^{FRAC(4,6)} = 2^{FRAC(2,3)}', nota: 'Simplificamos la fracción del exponente.' },
+      { math: '2^{FRAC(2,3)} = ROOT(3,2^{2}) = ROOT(3,4)', nota: 'Volvemos a raíz: índice 3, exponente 2.' },
+      { math: 'ROOT(n·p,a^{m·p}) = ROOT(n,a^m)', nota: 'Regla general: divide índice y exponente por su m.c.d.' },
+    ],
+  },
+  raiz_indice: {
+    titulo: 'Multiplicar raíces de distinto índice',
+    formula: 'SQRT(a) * ROOT(3,b) = ROOT(6,a^3 * b^2)',
+    frames: [
+      { math: 'SQRT(5) * ROOT(3,7)', nota: 'Índices 2 y 3: así no se pueden juntar.' },
+      { math: 'mcm(2, 3) = 6', nota: 'Buscamos un índice común: el mínimo común múltiplo.' },
+      { math: 'SQRT(5) = ROOT(6,5^{3})    ROOT(3,7) = ROOT(6,7^{2})', nota: 'Índice ×3 ⇒ exponente ×3;  índice ×2 ⇒ exponente ×2.' },
+      { math: 'ROOT(6,5^{3} * 7^{2}) = ROOT(6,6125)', nota: 'Con el mismo índice, multiplicamos los radicandos.' },
+      { math: 'FRAC(ROOT(3,a^{2}),SQRT(a)) = ROOT(6,FRAC(a^{4},a^{3})) = ROOT(6,a)', nota: 'Para dividir se hace igual y luego se restan exponentes.' },
+    ],
+  },
+  raiz_raiz: {
+    titulo: 'Raíz de una raíz: se MULTIPLICAN los índices',
+    formula: 'ROOT(n,ROOT(m,a)) = ROOT(n·m,a)',
+    frames: [
+      { math: 'SQRT(ROOT(3,5))', nota: 'Una raíz cuadrada de una raíz cúbica.' },
+      { math: '(5^{FRAC(1,3)})^{FRAC(1,2)}', nota: 'En forma de potencia: potencia de una potencia.' },
+      { math: '5^{FRAC(1,6)} = ROOT(6,5)', nota: 'Se multiplican los exponentes: 1/3 · 1/2 = 1/6.' },
+      { math: 'SQRT(2 SQRT(2)) = SQRT(SQRT(2^{2} * 2)) = ROOT(4,8)', nota: 'Si hay un número delante, primero lo metemos dentro de la raíz interior.' },
+      { math: 'ROOT(n,ROOT(m,a)) = ROOT(n·m,a)', nota: 'Regla general.' },
+    ],
+  },
+  racionalizar: {
+    titulo: 'Racionalizar: quitar la raíz del denominador',
+    formula: 'FRAC(c,ROOT(n,a^m)) = FRAC(c ROOT(n,a^{n-m}),a)',
+    frames: [
+      { math: 'FRAC(3,SQRT(5))', nota: 'No queremos raíces abajo.' },
+      { math: 'FRAC(3 * SQRT(5),SQRT(5) * SQRT(5))', nota: 'Multiplicamos arriba y abajo por √5 (no cambia el valor).' },
+      { math: 'FRAC(3 SQRT(5),5)', nota: '√5·√5 = 5: ¡el denominador ya es un número entero!' },
+      { math: 'FRAC(4,ROOT(5,7^{3})) = FRAC(4 ROOT(5,7^{2}),ROOT(5,7^{5}))', nota: 'Con raíz quinta de 7³ multiplicamos por ⁵√7² para llegar a 7⁵.' },
+      { math: 'FRAC(4 ROOT(5,49),7)', nota: '⁵√7⁵ = 7. Regla: multiplica por ⁿ√aⁿ⁻ᵐ.' },
+    ],
+  },
+  racionalizar_conj: {
+    titulo: 'Racionalizar con el conjugado',
+    formula: 'FRAC(c,SQRT(a)-SQRT(b)) = FRAC(c(SQRT(a)+SQRT(b)),a-b)',
+    frames: [
+      { math: 'FRAC(3,SQRT(5) - SQRT(3))', nota: 'El denominador es una resta de raíces.' },
+      { math: '(x - y)(x + y) = x^{2} - y^{2}', nota: 'Suma por diferencia = diferencia de cuadrados: los cuadrados se comen las raíces.' },
+      { math: 'FRAC(3(SQRT(5) + SQRT(3)),(SQRT(5) - SQRT(3))(SQRT(5) + SQRT(3)))', nota: 'Multiplicamos arriba y abajo por el CONJUGADO (cambiamos el signo del medio).' },
+      { math: 'FRAC(3(SQRT(5) + SQRT(3)),5 - 3) = FRAC(3(SQRT(5) + SQRT(3)),2)', nota: 'Abajo queda 5 − 3 = 2.' },
+    ],
+  },
+  sci_forma: {
+    titulo: 'Notación científica',
+    formula: 'a·10^{n}   con  1 ≤ a < 10',
+    frames: [
+      { math: '150 000 000 = 1,5·10^{8}', nota: 'La coma se mueve 8 lugares a la izquierda ⇒ exponente +8.' },
+      { math: '0,000 000 053 = 5,3·10^{-8}', nota: 'Números muy pequeños (átomos): la coma va a la derecha ⇒ exponente negativo.' },
+      { math: 'a·10^{n}   con  1 ≤ a < 10', nota: 'Delante de la coma siempre UNA cifra distinta de 0.' },
+    ],
+  },
+  sci_producto: {
+    titulo: 'Multiplicar en notación científica',
+    formula: '(a·10^{m}) * (b·10^{n}) = (a·b)·10^{m+n}',
+    frames: [
+      { math: '(3·10^{5}) * (2·10^{4})', nota: 'Multiplicamos números por un lado y potencias de 10 por otro.' },
+      { math: '(3·2)·10^{5+4} = 6·10^{9}', nota: 'Las potencias de 10 tienen la misma base: se suman los exponentes.' },
+      { math: '(5·10^{3}) * (4·10^{6}) = 20·10^{9}', nota: 'Si el número sale ≥ 10, hay que ajustarlo…' },
+      { math: '20·10^{9} = 2·10^{10}', nota: '…20 = 2·10, así que el exponente sube uno.' },
+    ],
+  },
+  sci_cociente: {
+    titulo: 'Dividir en notación científica',
+    formula: 'FRAC(a·10^{m},b·10^{n}) = FRAC(a,b)·10^{m-n}',
+    frames: [
+      { math: 'FRAC(6·10^{8},2·10^{3})', nota: 'Dividimos los números y restamos los exponentes.' },
+      { math: '3·10^{8-3} = 3·10^{5}', nota: '6 : 2 = 3  y  8 − 3 = 5.' },
+      { math: 'FRAC(2·10^{-3},4·10^{5}) = 0,5·10^{-8}', nota: 'Si el número sale < 1, hay que ajustarlo…' },
+      { math: '0,5·10^{-8} = 5·10^{-9}', nota: '…0,5 = 5·10⁻¹, así que el exponente baja uno.' },
+    ],
+  },
 };
 
 // ─── Generadores de ejercicios ─────────────────────────────────────────────────
@@ -287,40 +415,129 @@ function genCientifica(n = 6) {
   return items;
 }
 
+// ─── Generadores de utils/potenciasRadicales.js (datos) → notación del render ──
+// Ej. 8 y 10 (4.º ESO): bases distintas, exponentes negativos, fracciones y potencia de potencia
+const terminoQ = (t) => {
+  if (t.tipo === 'negbase') return `(-${t.b})^{${t.e}}`;
+  if (t.tipo === 'powpow') return `(${t.b}^{${t.m}})^{${t.e}}`;
+  if (t.tipo === 'frac') return `(FRAC(${t.p},${t.q}))^{${t.e}}`;
+  return potStr(t.b, t.e);
+};
+function genSimplificar(n = 6) {
+  return Array.from({ length: n }, (_, i) => {
+    const d = datosSimplificar();
+    const num = d.num.map(terminoQ).join(' * '), den = d.den.map(terminoQ).join(' * ');
+    return { id: `sp${i}`, q: den ? `FRAC(${num},${den})` : num, format: 'number', sign: d.neg ? '-' : '+', ans: { val: fracStr(d.N, d.D) } };
+  });
+}
+
+// Problemas de notación científica: el universo y el mundo atómico
+function genCientificaProb(n = 5) {
+  return problemasCientifica(n).map((p, i) => ({ id: `pb${i}`, emoji: p.emoji, enun: p.enun, format: 'sci', ans: { mant: String(p.mant), exp: String(p.exp), tol: 0.011 } }));
+}
+
+// Ej. 6: radical → potencia de exponente fraccionario
+function genRadPotencia(n = 6) {
+  return Array.from({ length: n }, (_, i) => {
+    const d = datosRadPotencia(), r = rad(d.idx, potStr(d.a, d.m));
+    return { id: `rp${i}`, q: d.inv ? `FRAC(1,${r})` : r, format: 'powfrac', ans: { base: String(d.a), exp: d.exp } };
+  });
+}
+// Ej. 7: potencia de exponente fraccionario → radical
+function genPotRadical(n = 6) {
+  return Array.from({ length: n }, (_, i) => {
+    const d = datosPotRadical();
+    return { id: `pr${i}`, q: `${d.a}^{FRAC(${d.m},${d.idx})}`, format: 'radn', askIdx: true, ans: { idx: d.idx, rad: d.rad } };
+  });
+}
+// Ej. 8: extraer factores (raíces cuadradas, cúbicas y cuartas)
 function genExtraer(n = 6) {
-  const items = [];
-  for (let i = 0; i < n; i++) {
-    const f = rInt(2, 6), r = pick(SQFREE);
-    items.push({ id: `e${i}`, q: `SQRT(${f * f * r})`, format: 'radical', ans: { coef: String(f), rad: String(r) } });
-  }
-  return items;
+  return Array.from({ length: n }, (_, i) => {
+    const d = datosExtraer();
+    return { id: `e${i}`, q: rad(d.idx, d.radicando), format: 'radn', ans: { coef: d.f, idx: d.idx, rad: d.r } };
+  });
 }
-
+// Ej. 9: introducir factores dentro del radical
+function genIntroducir(n = 6) {
+  return Array.from({ length: n }, (_, i) => {
+    const d = datosIntroducir();
+    return { id: `in${i}`, q: `${d.c}${rad(d.idx, d.r)}`, format: 'radn', ans: { idx: d.idx, rad: d.rad } };
+  });
+}
+// Ej. 10: simplificar el radical (índice y exponente entre su m.c.d.)
+function genSimpRaiz(n = 6) {
+  return Array.from({ length: n }, (_, i) => {
+    const d = datosSimpRaiz();
+    return { id: `sr${i}`, q: rad(d.idx * d.k, `${d.a}^{${d.m * d.k}}`), format: 'radn', askIdx: true, ans: { idx: d.idx, rad: d.rad } };
+  });
+}
+// Ej. 15: sumar radicales semejantes (cuadrados y cúbicos)
 function genSumar(n = 6) {
-  const items = [];
-  for (let i = 0; i < n; i++) {
-    const r = pick(SQFREE);
-    const f1 = rInt(1, 4), f2 = rInt(1, 4), c1 = rInt(1, 3), c2 = rInt(1, 3);
-    const t1 = c1 * f1, t2 = c2 * f2;
-    let minus = Math.random() < 0.4 && t1 > t2;
-    const total = minus ? t1 - t2 : t1 + t2;
-    const d1 = `${c1 === 1 ? '' : c1}SQRT(${f1 * f1 * r})`;
-    const d2 = `${c2 === 1 ? '' : c2}SQRT(${f2 * f2 * r})`;
-    items.push({ id: `s${i}`, q: `${d1} ${minus ? '-' : '+'} ${d2}`, format: 'radical', ans: { coef: String(total), rad: String(r) } });
-  }
-  return items;
+  return Array.from({ length: n }, (_, i) => {
+    const d = datosSumar();
+    const t1 = `${d.c1 === 1 ? '' : d.c1}${rad(d.idx, d.f1 ** d.idx * d.r)}`;
+    const t2 = `${d.c2 === 1 ? '' : d.c2}${rad(d.idx, d.f2 ** d.idx * d.r)}`;
+    return { id: `s${i}`, q: `${t1} ${d.minus ? '-' : '+'} ${t2}`, format: 'radn', ans: { coef: d.total, idx: d.idx, rad: d.r } };
+  });
+}
+// Ej. 11 y 14: reducir a índice común y multiplicar/dividir → un único radical
+function genIndiceComun(n = 6) {
+  return Array.from({ length: n }, (_, i) => {
+    const d = datosIndiceComun();
+    const q = d.tipo === 'prod'
+      ? `${rad(d.n1, d.a)} * ${rad(d.n2, d.b)}`
+      : `FRAC(${rad(d.n1, potStr(d.a, d.p1))},${rad(d.n2, potStr(d.a, d.p2))})`;
+    return { id: `ic${i}`, q, format: 'radn', askIdx: true, ans: d.ans };
+  });
+}
+// Ej. 12: comparar radicales de distinto índice (reduciendo a índice común)
+function genComparar(n = 6) {
+  return Array.from({ length: n }, (_, i) => {
+    const d = datosComparar(), r1 = rad(d.n1, d.a), r2 = rad(d.n2, d.b);
+    return { id: `cm${i}`, q: `${r1}   ?   ${r2}`, format: 'mayor', opciones: [r1, r2], ans: { choice: d.mayor } };
+  });
+}
+// Ej. 16: raíz de una raíz → un único radical
+function genRaizRaiz(n = 6) {
+  return Array.from({ length: n }, (_, i) => {
+    const d = datosRaizRaiz();
+    const q = d.tipo === 'simple' ? rad(d.k1, rad(d.k2, d.a))
+      : d.tipo === 'coef' ? rad(d.k1, `${d.c}${rad(d.k2, d.b)}`)
+        : `SQRT(${d.a}SQRT(${d.a}SQRT(${d.a})))`;
+    return { id: `rr${i}`, q, format: 'radn', askIdx: true, ans: d.ans };
+  });
+}
+// Ej. 17: racionalizar (raíz n-ésima en el denominador o binomio con conjugado)
+function genRacionalizar(n = 6) {
+  return Array.from({ length: n }, (_, i) => {
+    const d = datosRacionalizar();
+    return d.tipo === 'mono'
+      ? { id: `ra${i}`, q: `FRAC(${d.c},${rad(d.idx, potStr(d.a, d.m))})`, format: 'racMono', ans: { idx: d.idx, valor: d.valor } }
+      : { id: `ra${i}`, q: `FRAC(${d.c},SQRT(${d.a}) ${d.mas ? '+' : '-'} SQRT(${d.b}))`, format: 'racConj', ans: { valor: d.valor } };
+  });
 }
 
+const GRUPOS = ['Potencias', 'Notación científica', 'Raíces y radicales'];
 const MODES = [
   { id: 'theory', label: '📚 Teoría' },
-  { id: 'calcular', label: '🔢 Calcular potencias', gen: genCalcular, desc: 'Calcula el valor. Elige el signo (+/−) y escribe el número (usa a/b para fracciones).' },
-  { id: 'fraccion', label: '½ Base fraccionaria', gen: genFraccionaria, desc: 'Potencias de base fraccionaria; deja el resultado como fracción a/b (signo + fracción).' },
-  { id: 'base', label: '🔟 Potencia de base entera', gen: genPotenciaBase, desc: 'Escribe el número como potencia de base entera lo más simple posible (base y exponente).' },
-  { id: 'propiedades', label: '✖️ Propiedades', gen: genPropiedad, desc: 'Simplifica a UNA sola potencia: escribe la base (entera o a/b) y el exponente.' },
-  { id: 'factor', label: '➕ Factor común', gen: genFactorComun, desc: 'Saca factor común la MENOR potencia. Resultado: coeficiente · base^exponente.' },
-  { id: 'extraer', label: '√ Extraer factor', gen: genExtraer, desc: 'Saca factores fuera de la raíz:  √n = c·√r. Escribe el coeficiente y el radicando.' },
-  { id: 'sumar', label: '➕√ Sumar raíces', gen: genSumar, desc: 'Simplifica cada raíz y suma/resta las equivalentes:  c·√r.' },
-  { id: 'cientifica', label: '🔬 Notación científica', gen: genCientifica, desc: 'Escribe el número en notación científica a × 10ⁿ (con 1 ≤ a < 10).' },
+  { id: 'calcular', grupo: 'Potencias', label: '🔢 Calcular potencias', gen: genCalcular, desc: 'Calcula el valor. Elige el signo (+/−) y escribe el número (usa a/b para fracciones).' },
+  { id: 'fraccion', grupo: 'Potencias', label: '½ Base fraccionaria', gen: genFraccionaria, desc: 'Potencias de base fraccionaria; deja el resultado como fracción a/b (signo + fracción).' },
+  { id: 'base', grupo: 'Potencias', label: '🔟 Potencia de base entera', gen: genPotenciaBase, desc: 'Escribe el número como potencia de base entera lo más simple posible (base y exponente).' },
+  { id: 'propiedades', grupo: 'Potencias', label: '✖️ Propiedades', gen: genPropiedad, desc: 'Simplifica a UNA sola potencia: escribe la base (entera o a/b) y el exponente.' },
+  { id: 'simplificar', grupo: 'Potencias', label: '🧮 Simplificar (bases distintas)', gen: genSimplificar, desc: 'Descompón cada base en factores primos (6 = 2·3, 12 = 2²·3…), aplica las propiedades y simplifica. Resultado: signo y número entero o fracción a/b.' },
+  { id: 'factor', grupo: 'Potencias', label: '➕ Factor común', gen: genFactorComun, desc: 'Saca factor común la MENOR potencia. Resultado: coeficiente · base^exponente.' },
+  { id: 'cientifica', grupo: 'Notación científica', label: '🔬 Notación científica', gen: genCientifica, desc: 'Escribe el número en notación científica a × 10ⁿ (con 1 ≤ a < 10).' },
+  { id: 'cientificaProb', grupo: 'Notación científica', label: '🌌 Problemas: universo y átomos', gen: genCientificaProb, desc: 'Resuelve el problema y da el resultado en notación científica a × 10ⁿ, con a redondeado a 2 decimales.' },
+  { id: 'radPotencia', grupo: 'Raíces y radicales', label: 'ⁿ√ → Potencia', gen: genRadPotencia, desc: 'Escribe el radical como potencia de exponente fraccionario: base y exponente (m/n).' },
+  { id: 'potRadical', grupo: 'Raíces y radicales', label: 'aᵐ⁄ⁿ → Radical', gen: genPotRadical, desc: 'Escribe la potencia en forma de radical: índice y radicando (puedes escribirlo como 5^3).' },
+  { id: 'extraer', grupo: 'Raíces y radicales', label: '√ Extraer factores', gen: genExtraer, desc: 'Saca todos los factores posibles fuera de la raíz: c·ⁿ√r. Escribe el coeficiente y el radicando.' },
+  { id: 'introducir', grupo: 'Raíces y radicales', label: '↘√ Introducir factores', gen: genIntroducir, desc: 'Mete el factor dentro de la raíz (elevado al índice) y escribe el radicando resultante.' },
+  { id: 'simpRaiz', grupo: 'Raíces y radicales', label: '✂️√ Simplificar radicales', gen: genSimpRaiz, desc: 'Divide el índice y el exponente por su m.c.d. Escribe el nuevo índice y el radicando.' },
+  { id: 'sumar', grupo: 'Raíces y radicales', label: '➕√ Sumar radicales', gen: genSumar, desc: 'Extrae factores de cada raíz y suma/resta los radicales semejantes: c·ⁿ√r.' },
+  { id: 'indiceComun', grupo: 'Raíces y radicales', label: '✖️√ Producto y cociente', gen: genIndiceComun, desc: 'Reduce a índice común (m.c.m.) y da el resultado con un único radical: índice y radicando (admite 5^3·7^2).' },
+  { id: 'comparar', grupo: 'Raíces y radicales', label: '⚖️ Comparar radicales', gen: genComparar, desc: 'Sin calculadora: reduce a índice común y elige el radical MAYOR.' },
+  { id: 'raizRaiz', grupo: 'Raíces y radicales', label: '√√ Raíz de una raíz', gen: genRaizRaiz, desc: 'Escribe la expresión como un único radical: se multiplican los índices (mete antes los factores que haya delante).' },
+  { id: 'racionalizar', grupo: 'Raíces y radicales', label: '➗√ Racionalizar', gen: genRacionalizar, desc: 'Quita la raíz del denominador (multiplica por la raíz que falta o por el conjugado) y simplifica.' },
 ];
 
 // ─── Render matemático (FRAC, ^, SQRT) con parser recursivo ────────────────────
@@ -509,9 +726,33 @@ function checkAns(item, u = {}) {
   if (item.format === 'power') return normAns(u.sign) === normAns(item.sign) && normAns(u.base) === normAns(item.ans.base) && normAns(u.exp) === normAns(item.ans.exp);
   if (item.format === 'radical') return normAns(u.coef) === normAns(item.ans.coef) && normAns(u.rad) === normAns(item.ans.rad);
   if (item.format === 'coefpow') return normAns(u.coef) === normAns(item.ans.coef) && normAns(u.base) === normAns(item.ans.base) && normAns(u.exp) === normAns(item.ans.exp);
-  if (item.format === 'sci') { const m = parseFloat((u.mant || '').toString().replace(',', '.')); return !isNaN(m) && Math.abs(m - parseFloat(item.ans.mant)) < 1e-6 && normAns(u.exp) === normAns(item.ans.exp); }
+  if (item.format === 'sci') { const m = parseFloat((u.mant || '').toString().replace(',', '.')); return !isNaN(m) && Math.abs(m - parseFloat(item.ans.mant)) < (item.ans.tol || 1e-6) && normAns(u.exp) === normAns(item.ans.exp); }
+  if (item.format === 'mayor') return u.choice === item.ans.choice;
+  if (item.format === 'powfrac') return normAns(u.base) === normAns(item.ans.base) && casiIgual(evalNum(u.exp), item.ans.exp);
+  // Coeficiente vacío = 1 (p. ej. √5 en vez de 1·√5)
+  const coefU = normAns(u.coef) === '' ? 1 : evalNum(u.coef);
+  if (item.format === 'radn') {
+    const okCoef = item.ans.coef == null || casiIgual(coefU, item.ans.coef);
+    const okIdx = !item.askIdx || Number(normAns(u.idx)) === item.ans.idx;
+    return okCoef && okIdx && casiIgual(evalNum(u.rad), item.ans.rad);
+  }
+  // Racionalizar: se acepta cualquier forma equivalente siempre que el denominador sea entero
+  // y los radicandos enteros (así no vale dejar la raíz abajo)
+  const den = normAns(u.den) === '' ? 1 : evalNum(u.den);
+  if (!Number.isInteger(den) || den === 0) return false;
+  if (item.format === 'racMono') {
+    const r = evalNum(u.rad);
+    return Number.isInteger(r) && r > 1 && casiIgual((coefU * r ** (1 / item.ans.idx)) / den, item.ans.valor);
+  }
+  if (item.format === 'racConj') {
+    const a = evalNum(u.a), b = evalNum(u.b);
+    if (!Number.isInteger(a) || !Number.isInteger(b) || a < 0 || b < 0 || !u.sign) return false;
+    return casiIgual((coefU * (Math.sqrt(a) + (u.sign === '-' ? -1 : 1) * Math.sqrt(b))) / den, item.ans.valor);
+  }
   return false;
 }
+// Ejercicios sin «=» delante de la respuesta (problemas con enunciado y comparar)
+const sinIgual = (item) => !!item.enun || item.format === 'mayor';
 const inpStyleFor = (type, isMobile) => {
   const base = { textAlign: 'center', outline: 'none', border: '2px solid #cbd5e1', borderRadius: '8px', color: '#0f172a', backgroundColor: '#fff' };
   if (type === 'sign') return { ...base, width: isMobile ? '44px' : '52px', height: '44px', fontSize: '1.3rem', cursor: 'pointer' };
@@ -521,10 +762,114 @@ const inpStyleFor = (type, isMobile) => {
   if (type === 'coef') return { ...base, width: isMobile ? '52px' : '64px', height: '44px', fontSize: '1.15rem' };
   if (type === 'rad') return { ...base, width: isMobile ? '58px' : '72px', height: '38px', fontSize: '1.1rem' };
   if (type === 'mant') return { ...base, width: isMobile ? '72px' : '90px', height: '44px', fontSize: '1.15rem' };
+  if (type === 'expf') return { ...base, width: isMobile ? '56px' : '66px', height: '34px', fontSize: '1rem', transform: 'translateY(-14px)' };
+  if (type === 'idx') return { ...base, width: '30px', height: '24px', fontSize: '0.85rem', padding: 0, borderWidth: 1.5 };
+  if (type === 'radS') return { ...base, width: isMobile ? '46px' : '54px', height: '36px', fontSize: '1.05rem' };
   return base;
 };
+// Signo radical para las respuestas; `indice` puede ser un número o un <input>
+const RadSign = ({ indice, children }) => (
+  <span style={{ position: 'relative', display: 'inline-block', paddingLeft: indice != null ? 28 : 16, paddingTop: indice != null ? 8 : 0, color: '#0f172a' }}>
+    {indice != null && <span style={{ position: 'absolute', left: 0, top: -6, fontSize: '0.85rem', fontWeight: 800, lineHeight: 1 }}>{indice}</span>}
+    <span style={{ position: 'absolute', left: indice != null ? 12 : 0, top: indice != null ? 8 : 0, bottom: 0, width: 15 }}>
+      <svg viewBox="0 0 16 100" preserveAspectRatio="none" width="100%" height="100%" style={{ overflow: 'visible', display: 'block' }} aria-hidden="true">
+        <path d="M0,64 L5,54 L9,95 L16,3" fill="none" stroke="currentColor" strokeWidth="1.7" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
+      </svg>
+    </span>
+    <span style={{ display: 'flex', alignItems: 'center', borderTop: '2px solid #0f172a', paddingTop: 4, paddingLeft: 3 }}>{children}</span>
+  </span>
+);
+const FracBox = ({ top, bottom }) => (
+  <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+    <span style={{ display: 'flex', alignItems: 'center', gap: 4, paddingBottom: 4 }}>{top}</span>
+    <span style={{ alignSelf: 'stretch', height: 2, background: '#0f172a', borderRadius: 1 }} />
+    <span style={{ display: 'flex', justifyContent: 'center' }}>{bottom}</span>
+  </span>
+);
+// Enunciado: expresión matemática o problema de texto (10^{n} se pinta como superíndice)
+function renderEnunciado(item, isMobile) {
+  if (!item.enun) return renderMath(item.q, isMobile);
+  return (
+    <div style={{ textAlign: 'left', fontSize: isMobile ? '0.98rem' : '1.08rem', lineHeight: 1.6, color: '#1e293b', maxWidth: 640, whiteSpace: 'normal' }}>
+      {item.emoji && <span style={{ marginRight: 6, fontSize: '1.2em' }}>{item.emoji}</span>}
+      {item.enun.split(/(10\^\{-?\d+\})/g).map((p, i) => {
+        const m = p.match(/^10\^\{(-?\d+)\}$/);
+        return m ? <span key={i} style={{ whiteSpace: 'nowrap' }}>10<sup>{m[1].replace('-', '−')}</sup></span> : <span key={i}>{p}</span>;
+      })}
+    </div>
+  );
+}
 function AnswerInputs({ item, u, onChange, isMobile }) {
   const S = (t) => inpStyleFor(t, isMobile);
+  const signoSel = (field) => (
+    <select value={u[field] || ''} onChange={(e) => onChange(field, e.target.value)} style={S('sign')}>
+      <option value="" disabled>?</option>
+      <option value="+">+</option>
+      <option value="-">−</option>
+    </select>
+  );
+  if (item.format === 'mayor') {
+    return (
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+        {item.opciones.map((op, i) => {
+          const val = i === 0 ? 'A' : 'B', sel = u.choice === val;
+          return (
+            <button key={val} type="button" onClick={() => onChange('choice', val)}
+              style={{ padding: '6px 14px', borderRadius: 10, cursor: 'pointer', border: `2px solid ${sel ? '#6366f1' : '#cbd5e1'}`, background: sel ? '#eef2ff' : 'white', color: '#0f172a', display: 'flex', alignItems: 'center', gap: 6 }}>
+              {renderMath(op, isMobile)} <span style={{ fontSize: '0.8rem', fontWeight: 800, color: sel ? '#4f46e5' : '#64748b' }}>es mayor</span>
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+  if (item.format === 'powfrac') {
+    return (
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '3px' }}>
+        <input type="text" placeholder="Base" value={u.base || ''} onChange={(e) => onChange('base', e.target.value)} style={S('base')} />
+        <input type="text" placeholder="m/n" value={u.exp || ''} onChange={(e) => onChange('exp', e.target.value)} style={S('expf')} />
+      </div>
+    );
+  }
+  if (item.format === 'radn') {
+    const indice = item.askIdx
+      ? <input type="text" placeholder="n" value={u.idx || ''} onChange={(e) => onChange('idx', e.target.value)} style={S('idx')} />
+      : (item.ans.idx > 2 ? item.ans.idx : null);
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        {item.ans.coef != null && <input type="text" placeholder="c" value={u.coef || ''} onChange={(e) => onChange('coef', e.target.value)} style={S('coef')} />}
+        <RadSign indice={indice}>
+          <input type="text" placeholder="r" value={u.rad || ''} onChange={(e) => onChange('rad', e.target.value)} style={S('rad')} />
+        </RadSign>
+      </div>
+    );
+  }
+  if (item.format === 'racMono') {
+    return (
+      <FracBox
+        top={<>
+          <input type="text" placeholder="c" value={u.coef || ''} onChange={(e) => onChange('coef', e.target.value)} style={S('coef')} />
+          <RadSign indice={item.ans.idx > 2 ? item.ans.idx : null}>
+            <input type="text" placeholder="r" value={u.rad || ''} onChange={(e) => onChange('rad', e.target.value)} style={S('rad')} />
+          </RadSign>
+        </>}
+        bottom={<input type="text" placeholder="d" value={u.den || ''} onChange={(e) => onChange('den', e.target.value)} style={S('coef')} />} />
+    );
+  }
+  if (item.format === 'racConj') {
+    return (
+      <FracBox
+        top={<>
+          <input type="text" placeholder="c" value={u.coef || ''} onChange={(e) => onChange('coef', e.target.value)} style={S('coef')} />
+          <span style={{ fontSize: '1.6rem', color: '#64748b' }}>(</span>
+          <RadSign><input type="text" placeholder="a" value={u.a || ''} onChange={(e) => onChange('a', e.target.value)} style={S('radS')} /></RadSign>
+          {signoSel('sign')}
+          <RadSign><input type="text" placeholder="b" value={u.b || ''} onChange={(e) => onChange('b', e.target.value)} style={S('radS')} /></RadSign>
+          <span style={{ fontSize: '1.6rem', color: '#64748b' }}>)</span>
+        </>}
+        bottom={<input type="text" placeholder="d" value={u.den || ''} onChange={(e) => onChange('den', e.target.value)} style={S('coef')} />} />
+    );
+  }
   if (item.format === 'coefpow') {
     return (
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '4px' }}>
@@ -621,12 +966,16 @@ function TableroPot({ isMobile, initialMode, fixedMode, panelLabel, panelColor, 
       {!fixedMode && (
         <select value={mode} onChange={(e) => setMode(e.target.value)}
           style={{ padding: '8px 10px', fontSize: '13px', fontWeight: 'bold', color: '#0f172a', border: `2px solid ${panelColor}`, borderRadius: 10, background: 'white', cursor: 'pointer', outline: 'none' }}>
-          {MODOS_JUEGO.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+          {GRUPOS.map((g) => (
+            <optgroup key={g} label={g}>
+              {MODOS_JUEGO.filter((m) => m.grupo === g).map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+            </optgroup>
+          ))}
         </select>
       )}
 
       <div style={{ background: '#f8fafc', borderRadius: 12, padding: '14px 8px', minHeight: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
-        {item ? renderMath(item.q, isMobile) : '—'}
+        {item ? renderEnunciado(item, isMobile) : '—'}
       </div>
 
       {item && (
@@ -772,7 +1121,11 @@ function CompeticionPot({ isMobile, onSalir }) {
         <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center' }}>
           <span>Tipo:</span>
           <select value={tipo} onChange={(e) => cambiar(() => setTipo(e.target.value))} style={{ padding: '6px 10px', borderRadius: 10, border: '2px solid #f39c12', fontWeight: 700, background: 'white', cursor: 'pointer' }}>
-            {MODOS_JUEGO.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+            {GRUPOS.map((g) => (
+            <optgroup key={g} label={g}>
+              {MODOS_JUEGO.filter((m) => m.grupo === g).map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+            </optgroup>
+          ))}
           </select>
           <span style={{ marginLeft: 8 }}>Meta:</span>
           {METAS_POT.map((m) => (
@@ -979,8 +1332,8 @@ function FichaRetoPot({ reto, isMobile, onLibre, onExit }) {
           {items.map((item, i) => (
             <div key={item.id} style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'center', gap: isMobile ? 10 : 22, padding: 16, backgroundColor: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0' }}>
               <span style={{ fontWeight: 800, color: '#94a3b8', minWidth: 28 }}>{i + 1}.</span>
-              <div style={{ flex: 1, display: 'flex', justifyContent: isMobile ? 'center' : 'flex-end', color: '#1e293b' }}>{renderMath(item.q, isMobile)}</div>
-              <span style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#94a3b8', display: isMobile ? 'none' : 'block' }}>=</span>
+              <div style={{ flex: 1, display: 'flex', justifyContent: (isMobile || item.enun) ? 'center' : 'flex-end', color: '#1e293b' }}>{renderEnunciado(item, isMobile)}</div>
+              <span style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#94a3b8', display: (isMobile || sinIgual(item)) ? 'none' : 'block' }}>=</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <AnswerInputs item={item} u={answers[item.id] || {}} onChange={(f, v) => setAnswers((p) => ({ ...p, [item.id]: { ...(p[item.id] || {}), [f]: v } }))} isMobile={isMobile} />
                 {results[item.id] === 'correct' && <span style={{ color: '#10b981', fontSize: '1.6rem', fontWeight: 'bold' }}>✓</span>}
@@ -1087,8 +1440,13 @@ export default function PotenciasRaices({ onExit }) {
           )}
         </div>
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: isMobile ? 'row' : 'column', gap: '8px', overflowX: isMobile ? 'auto' : 'visible' }}>
-          {MODES.map((m) => (
-            <li key={m.id} style={tabStyle(activeTab === m.id)} onClick={() => setActiveTab(m.id)}>{m.label}</li>
+          {MODES.map((m, i) => (
+            <React.Fragment key={m.id}>
+              {!isMobile && m.grupo && m.grupo !== MODES[i - 1]?.grupo && (
+                <li style={{ marginTop: 10, padding: '0 6px', fontSize: 11, fontWeight: 800, letterSpacing: 0.6, textTransform: 'uppercase', color: '#64748b' }}>{m.grupo}</li>
+              )}
+              <li style={tabStyle(activeTab === m.id)} onClick={() => setActiveTab(m.id)}>{m.label}</li>
+            </React.Fragment>
           ))}
         </ul>
 
@@ -1160,6 +1518,18 @@ export default function PotenciasRaices({ onExit }) {
                 );
               })}
             </div>
+            <h3 style={{ color: '#8b5cf6', marginTop: 28 }}>Notación científica <span style={{ fontSize: '0.8rem', fontWeight: 400, color: '#64748b' }}>— pulsa una tarjeta para ver <b>por qué</b> 🎬</span></h3>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fit, minmax(${isMobile ? '220px' : '300px'}, 1fr))`, gap: '16px' }}>
+              {TEORIA_CIENTIFICA.map((t, i) => (
+                <div key={i} onClick={() => setExplica(t.k)}
+                  style={{ position: 'relative', padding: '18px', backgroundColor: '#f5f3ff', borderLeft: '5px solid #8b5cf6', borderRadius: '0 12px 12px 0', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'transform 0.12s, box-shadow 0.12s' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(139,92,246,0.18)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}>
+                  {renderMath(t.f, isMobile)}
+                  <span style={{ position: 'absolute', top: 6, right: 8, fontSize: '0.68rem', fontWeight: 700, color: '#8b5cf6', background: '#ede9fe', borderRadius: 20, padding: '2px 8px' }}>🎬 ¿Por qué?</span>
+                </div>
+              ))}
+            </div>
           </div>
         ) : (
           <div>
@@ -1191,10 +1561,10 @@ export default function PotenciasRaices({ onExit }) {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '18px' }}>
               {items.map((item) => (
                 <div key={item.id} style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'center', justifyContent: 'center', gap: isMobile ? '10px' : '24px', padding: '18px', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', width: '100%', boxSizing: 'border-box' }}>
-                  <div style={{ flex: 1, display: 'flex', justifyContent: isMobile ? 'center' : 'flex-end', color: '#1e293b', width: '100%' }}>
-                    {renderMath(item.q, isMobile)}
+                  <div style={{ flex: 1, display: 'flex', justifyContent: (isMobile || item.enun) ? 'center' : 'flex-end', color: '#1e293b', width: '100%' }}>
+                    {renderEnunciado(item, isMobile)}
                   </div>
-                  <span style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#94a3b8', display: isMobile ? 'none' : 'block' }}>=</span>
+                  <span style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#94a3b8', display: (isMobile || sinIgual(item)) ? 'none' : 'block' }}>=</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <AnswerInputs item={item} u={answers[item.id] || {}} onChange={(f, v) => updateAnswer(item.id, f, v)} isMobile={isMobile} />
                     {results[item.id] === 'correct' && <span style={{ color: '#10b981', fontSize: '1.6rem', fontWeight: 'bold' }}>✓</span>}

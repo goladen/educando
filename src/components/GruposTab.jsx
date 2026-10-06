@@ -603,6 +603,9 @@ const normalizarGrupo = (grupo) => {
     };
 };
 
+// ─── Números con coma o punto decimal ("7,5" o "7.5") ──────────────────────────
+const aNum = (v) => parseFloat(String(v ?? '').trim().replace(',', '.'));
+
 // ─── TablaGrupo ───────────────────────────────────────────────────────────────
 function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
     const gNorm = normalizarGrupo(grupo);
@@ -652,7 +655,7 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
         if (depth > 5 || !formula.trim()) return '';
         const match = formula.trim().match(/^(PROMEDIO|MAX|MIN)\((.+)\)$/i);
         if (!match) {
-            const n = parseFloat(formula);
+            const n = aNum(formula);
             return isNaN(n) ? '' : String(n);
         }
         const fn = match[1].toUpperCase();
@@ -664,7 +667,7 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
             const raw = col.esFormula
                 ? evaluarFormula(col.formula || '', alumnoId, depth + 1)
                 : getCeldaEnHoja(h, alumnoId, col.id);
-            return parseFloat(raw);
+            return aNum(raw);
         }).filter(v => !isNaN(v));
         if (!vals.length) return '';
         if (fn === 'PROMEDIO') return (vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(2);
@@ -677,26 +680,69 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
     const getValor = (alumnoId, col) =>
         col.esFormula ? evaluarFormula(col.formula || '', alumnoId) : getCelda(alumnoId, col.id);
 
-    // ── Nota Final ponderada (hoja activa) ────────────────────────────────────
-    const notaFinal = (alumnoId) => {
-        const colsConPct = columnas.filter(c => c.porcentaje != null && Number(c.porcentaje) > 0);
+    // ── Recuperaciones: una columna con recuperaDe = id del examen que recupera ──
+    // En la nota final, el examen cuenta con la nota más alta entre él y sus recuperaciones.
+    const recupsDe = (h, colId) => (h?.columnas || []).filter(c => c.recuperaDe === colId);
+
+    const valorConRecup = (h, alumnoId, col) => {
+        const vals = [col, ...recupsDe(h, col.id)]
+            .map(c => aNum(c.esFormula ? evaluarFormula(c.formula || '', alumnoId) : getCeldaEnHoja(h, alumnoId, c.id)))
+            .filter(v => !isNaN(v));
+        return vals.length ? Math.max(...vals) : NaN;
+    };
+
+    // ── Nota Final ponderada ──────────────────────────────────────────────────
+    const notaFinalEnHoja = (h, alumnoId) => {
+        const colsConPct = (h?.columnas || []).filter(c => !c.recuperaDe && c.porcentaje != null && Number(c.porcentaje) > 0);
         if (!colsConPct.length) return '';
         let total = 0;
         colsConPct.forEach(c => {
-            const v = parseFloat(getValor(alumnoId, c));
+            const v = valorConRecup(h, alumnoId, c);
             if (!isNaN(v)) total += v * (Number(c.porcentaje) / 100);
         });
         return total.toFixed(2);
     };
+    const notaFinal = (alumnoId) => notaFinalEnHoja(hoja, alumnoId);
+
+    // ¿La recuperación mejora la nota del examen? (para resaltarla)
+    const recupMejora = (alumnoId, recCol) => {
+        const exam = columnas.find(c => c.id === recCol.recuperaDe);
+        if (!exam) return false;
+        const r = aNum(getCelda(alumnoId, recCol.id));
+        const e = aNum(getValor(alumnoId, exam));
+        return !isNaN(r) && (isNaN(e) || r > e);
+    };
 
     const mediaCol = (col) => {
-        const vals = alumnos.map(a => parseFloat(getValor(a.id, col))).filter(v => !isNaN(v));
+        const vals = alumnos.map(a => aNum(getValor(a.id, col))).filter(v => !isNaN(v));
         if (!vals.length) return '';
         return (vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(2);
     };
 
+    // ── Convertir una columna a nota sobre 10 ─────────────────────────────────
+    const convertirSobre10 = (col) => {
+        const resp = window.prompt(`¿Sobre cuánto están puntuadas las notas de "${col.header}"?\nSe convertirán todas a nota sobre 10.`, '');
+        if (resp == null) return;
+        const max = aNum(resp);
+        if (isNaN(max) || max <= 0) { alert('Introduce un número mayor que 0.'); return; }
+        setHojas(prev => prev.map((h, i) => {
+            if (i !== hojaIdx) return h;
+            const celdas = { ...h.celdas };
+            alumnos.forEach(a => {
+                const k = celdaKey(a.id, col.id);
+                const raw = celdas[k];
+                const v = aNum(raw);
+                if (isNaN(v)) return;
+                const conv = String(Math.round((v * 10 / max) * 100) / 100);
+                celdas[k] = String(raw).includes(',') ? conv.replace('.', ',') : conv;
+            });
+            return { ...h, celdas };
+        }));
+        setIsDirty(true);
+    };
+
     const notaFinalMedia = () => {
-        const vals = alumnos.map(a => parseFloat(notaFinal(a.id))).filter(v => !isNaN(v));
+        const vals = alumnos.map(a => aNum(notaFinal(a.id))).filter(v => !isNaN(v));
         if (!vals.length) return '';
         return (vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(2);
     };
@@ -737,7 +783,8 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
     const eliminarColumna = (id) => {
         setHojas(prev => prev.map((h, i) => i !== hojaIdx ? h : {
             ...h,
-            columnas: h.columnas.filter(c => c.id !== id),
+            columnas: h.columnas.filter(c => c.id !== id)
+                .map(c => c.recuperaDe === id ? { ...c, recuperaDe: '' } : c),
             celdas: Object.fromEntries(Object.entries(h.celdas || {}).filter(([k]) => !k.endsWith(`__${id}`)))
         }));
         setIsDirty(true);
@@ -837,9 +884,15 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
                 ...h.columnas.map(c => c.esFormula
                     ? evaluarFormula(c.formula || '', a.id)
                     : getCeldaEnHoja(h, a.id, c.id)),
-                notaFinal(a.id)
+                notaFinalEnHoja(h, a.id)
             ]);
-            const media = ['Media', '', ...h.columnas.map(c => mediaCol(c)), notaFinalMedia()];
+            const mediaH = (vals) => {
+                const v = vals.map(aNum).filter(x => !isNaN(x));
+                return v.length ? (v.reduce((s, x) => s + x, 0) / v.length).toFixed(2) : '';
+            };
+            const media = ['Media', '',
+                ...h.columnas.map(c => mediaH(alumnos.map(a => c.esFormula ? evaluarFormula(c.formula || '', a.id) : getCeldaEnHoja(h, a.id, c.id)))),
+                mediaH(alumnos.map(a => notaFinalEnHoja(h, a.id)))];
             const ws = XLSX.utils.aoa_to_sheet([cab, ...filas, [], media]);
             XLSX.utils.book_append_sheet(wb, ws, h.nombre.slice(0, 31));
         });
@@ -897,6 +950,20 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
                         title="Fórmulas: PROMEDIO(1,2), MAX(1,5), MIN(2,7) — número de columna global"
                         style={tt.formulaInput}
                     />
+                ) : col.recuperaDe !== undefined && col.recuperaDe !== null ? (
+                    <div style={{ marginBottom:4 }}>
+                        <div style={{ fontSize:'0.6rem', opacity:0.8, marginBottom:2 }}>♻ Recupera:</div>
+                        <select
+                            value={col.recuperaDe}
+                            onChange={e => actualizarColumna(col.id, { recuperaDe: e.target.value })}
+                            title="En la nota final, el examen cuenta con la nota más alta entre el examen y esta recuperación"
+                            style={tt.recupSelect}>
+                            <option value="" style={{ color:'#000' }}>— elige examen —</option>
+                            {columnas.filter(c => c.id !== col.id && !c.recuperaDe).map(c => (
+                                <option key={c.id} value={c.id} style={{ color:'#000' }}>#{c.num} {c.header}</option>
+                            ))}
+                        </select>
+                    </div>
                 ) : (
                     <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:3, marginBottom:4 }}>
                         <span style={{ fontSize:'0.62rem', opacity:0.75 }}>%</span>
@@ -931,6 +998,23 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
                         style={{ ...tt.thBtn, background: col.esFormula ? 'rgba(243,156,18,0.55)' : 'rgba(255,255,255,0.15)', fontSize:'0.75rem', fontWeight:700 }}>
                         ƒ
                     </button>
+                    {!col.esFormula && (
+                        <button
+                            onClick={() => actualizarColumna(col.id, col.recuperaDe != null
+                                ? { recuperaDe: null }
+                                : { recuperaDe: '', porcentaje: null })}
+                            title={col.recuperaDe != null ? 'Quitar modo recuperación' : 'Convertir en recuperación de un examen (cuenta la nota más alta)'}
+                            style={{ ...tt.thBtn, background: col.recuperaDe != null ? 'rgba(46,204,113,0.6)' : 'rgba(255,255,255,0.15)', fontSize:'0.7rem', fontWeight:700 }}>
+                            ♻
+                        </button>
+                    )}
+                    {!col.esFormula && (
+                        <button onClick={() => convertirSobre10(col)}
+                            title="Convertir las notas de esta columna a nota sobre 10"
+                            style={{ ...tt.thBtn, fontSize:'0.62rem', fontWeight:700, width:'auto', padding:'0 4px' }}>
+                            /10
+                        </button>
+                    )}
                     <button onClick={() => actualizarColumna(col.id, { oculta: true })} title="Ocultar" style={tt.thBtn}>
                         <EyeOff size={10}/>
                     </button>
@@ -1139,12 +1223,15 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
                                                 </td>
                                             );
                                         }
+                                        const mejora = col.recuperaDe && recupMejora(a.id, col);
                                         return (
                                             <td key={col.id} style={tt.tdEdit}>
                                                 <input
                                                     value={getCelda(a.id, col.id)}
                                                     onChange={e => setCelda(a.id, col.id, e.target.value)}
-                                                    style={tt.cellInput}
+                                                    inputMode="decimal"
+                                                    title={mejora ? 'Esta recuperación mejora la nota del examen: es la que cuenta' : undefined}
+                                                    style={mejora ? { ...tt.cellInput, background:'#e8f5e9', color:'#2e7d32', fontWeight:700 } : tt.cellInput}
                                                 />
                                             </td>
                                         );
@@ -1208,6 +1295,8 @@ function TablaGrupo({ grupo, profesorUid, onSaved, onDirtyChange }) {
             <div style={{ marginTop:10, fontSize:'0.72rem', color:'#95a5a6' }}>
                 Fórmulas (número de columna): <code>PROMEDIO(1,2)</code> · <code>MAX(1,5)</code> · <code>MIN(2,7)</code>
                 {' · referencias cruzadas entre hojas'}
+                <br/>
+                Notas con coma o punto (7,5 o 7.5) · <strong>/10</strong> convierte una columna a nota sobre 10 · <strong>♻</strong> marca una columna como recuperación de un examen: en la nota final cuenta la más alta de las dos
                 {todasLasColumnas.length > 0 && (
                     <details style={{ marginTop:4 }}>
                         <summary style={{ cursor:'pointer', color:'#7f8c8d' }}>Ver columnas disponibles ({todasLasColumnas.length})</summary>
@@ -1468,6 +1557,7 @@ const tt = {
     thDin:       { padding:'8px 6px', textAlign:'center', color:'white', fontWeight:700, fontSize:'0.8rem', background:'#1976D2', position:'sticky', top:0, verticalAlign:'middle' },
     thMedia:     { padding:'10px 8px', textAlign:'center', color:'white', fontWeight:700, fontSize:'0.8rem', background:'#0d47a1', position:'sticky', top:0, minWidth:90 },
     thBtn:       { display:'inline-flex', alignItems:'center', justifyContent:'center', padding:'2px 5px', borderRadius:4, border:'none', cursor:'pointer', color:'white', background:'rgba(255,255,255,0.2)', minWidth:20 },
+    recupSelect: { width:'95%', fontSize:'0.66rem', padding:'2px', borderRadius:4, border:'1px solid rgba(46,204,113,0.7)', background:'rgba(0,0,0,0.25)', color:'white', outline:'none' },
     pctInput:    { width:40, fontSize:'0.72rem', padding:'2px 3px', borderRadius:4, border:'1px solid rgba(255,255,255,0.4)', background:'rgba(0,0,0,0.2)', color:'white', outline:'none', textAlign:'center' },
     formulaInput:{ width:'90%', fontSize:'0.68rem', padding:'3px 5px', borderRadius:4, border:'1px solid rgba(243,156,18,0.7)', background:'rgba(0,0,0,0.25)', color:'white', outline:'none', textAlign:'center', marginBottom:2, display:'block', margin:'0 auto 4px' },
     tdFijo:      { padding:'7px 12px', borderBottom:'1px solid #f0f0f0', color:'#2c3e50', fontWeight:500, whiteSpace:'nowrap' },

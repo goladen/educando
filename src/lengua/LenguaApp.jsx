@@ -14,6 +14,7 @@ import { CompeticionCuerda } from '../components/TironCuerdaEscena';
 import { guardarRegistroLocal } from '../utils/registrosLocales';
 import { sonidoCorrecto, sonidoIncorrecto, sonidoFinal, despertarAudio, sonidoActivo, setSonidoActivo } from '../utils/sonidosFeedback';
 import { TEMAS, temaPorId, configPorDefecto, resumenConfig, barajar, CAMPOS } from './ejercicios';
+import BotonFichas from '../components/BotonFichas';
 
 const PRACTICA_N = 10;
 const PRACTICA_N_EMPAREJAR = 4;
@@ -90,6 +91,11 @@ function PantallaInicio({ onElegir, onSalir }) {
                             {t.ejercicios && <div style={{ fontSize: '0.75rem', color: '#a09682', fontWeight: 700 }}>{t.ejercicios.length} ejercicios</div>}
                         </button>
                     ))}
+                </div>
+
+                {/* Fichas imprimibles de Lengua (para el profesor) */}
+                <div style={{ marginTop: 18, maxWidth: 520, marginLeft: 'auto', marginRight: 'auto' }}>
+                    <BotonFichas materia="sintaxis" color="#7B1FA2" texto="Fichas de Lengua para imprimir" subtexto="Sintaxis, ortografía, morfología y léxico · PDF y corrección en la pizarra" />
                 </div>
             </div>
         </div>

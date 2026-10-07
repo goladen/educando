@@ -26,6 +26,7 @@ const JuegoCalamar = lazy(() => import('../JuegoCalamar'));
 const MoneyBoard = lazy(() => import('../MoneyBoard'));
 const EnigmicLogic = lazy(() => import('../EnigmicLogic'));
 const SixSeven = lazy(() => import('../SixSeven'));
+const VaniLa = lazy(() => import('../vanila/VaniLa'));
 const Visor3D = lazy(() => import('../Visor3D'));
 const Esculpir3D = lazy(() => import('../Esculpir3D'));
 const TextWordleGame = lazy(() => import('../TextWordleGame'));
@@ -586,6 +587,16 @@ export const APPS = [
         shareUrl: `${window.location.origin}/sixseven`
     },
     {
+        id: 'VANILA',
+        name: 'VaniLa',
+        desc: 'Forma palabras con 9 letras, ¡con su tilde! Solo, en duelo escalando la montaña o en tablero con amigos. ES · CA · EN · FR.',
+        color: '#A78BFA',
+        emoji: '🔤',
+        isSpecial: true,
+        shareable: true,
+        shareUrl: `${window.location.origin}/vanila`
+    },
+    {
         id: 'BUNKER',
         name: 'Bunker',
         desc: 'Shooter 3D: dispara a las respuestas incorrectas.',
@@ -859,11 +870,19 @@ export const GAME_INFO = {
         materias: ['Universal'],
         etapas: ['Primaria', 'ESO', 'Bachillerato'],
     },
+    VANILA: {
+        descripcion: 'Juego de palabras al estilo de los concursos de letras, en español, catalán, inglés y francés: salen 9 letras y hay que formar todas las palabras posibles escribiendo bien la tilde (y la ç o la l·l en catalán): tocando una letra de la palabra se le pone. Las palabras se comprueban con los diccionarios ortográficos de LibreOffice (cientos de miles de formas, con plurales y conjugaciones). Al acabar cada ronda se muestran la palabra más larga posible y las tildes a repasar. Desde el menú se puede saltar al Wordle, que usa el mismo diccionario.',
+        tipoPreguntas: 'Tres modos. Solo: 1, 3 o 5 rondas de 30 s a 2 min, con sorteo automático o pidiendo «vocal / consonante». Duelo: dos jugadores en la misma pantalla con las mismas letras, que cambian cada 20-90 s; cada punto sube a su escalador por la montaña y gana quien llega antes a la cumbre (50-200 puntos). Tablero: tipo Scrabble, de 2 a 6 jugadores por turnos con 9 letras cada uno, cruzando las palabras en un tablero de 15×15 con casillas de premio; se juega en el mismo dispositivo (cada uno destapa sus letras en su turno y lo pasa, como el dominó) u online, cada uno en el suyo.',
+        biblioteca: 'No necesita recursos: las letras se sortean y se comprueban con el diccionario integrado de cada idioma.',
+        multiplayer: 'Individual (con envío al profesor), duelo de 2 jugadores en el mismo dispositivo y tablero de 2 a 6 jugadores en el mismo dispositivo o la pizarra (pasándolo por turnos) u online con sala, código y QR (el profesor puede proyectar el tablero).',
+        materias: ['Lengua y Literatura', 'Inglés', 'Francés', 'Catalán'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
     SIXSEVEN: {
         descripcion: 'Minijuegos de cálculo mental con estética neón donde el protagonista es el número 67. Cada acierto hace que salgan flotando seises y sietes, como los corazones de un directo.',
-        tipoPreguntas: 'Tres modos. Speed Run: 6 rondas de operaciones con el 67 (sumas y restas, multiplicaciones y combinadas), con 13 s por ronda o sin tiempo. Target 67: con 6 números y las cuatro operaciones hay que llegar exactamente a 67 (siempre hay solución y se puede consultar). Neon Grid: deslizar sobre 3 casillas que formen una operación correcta (A + B = C, resta, multiplicación o división) o tocar los múltiplos de 6 y de 7, con combos y tiempo de 67 s, 130 s o libre.',
+        tipoPreguntas: 'Tres modos. Speed Run: 6 rondas de operaciones con el 67 (sumas y restas, multiplicaciones y combinadas), con 13 s por ronda o sin tiempo; en nivel Hard las cuatro opciones acaban en la misma cifra, así que hay que hacer la cuenta. Target 67: con 6 números y las cuatro operaciones hay que llegar exactamente a 67 (siempre hay solución y se puede consultar); en nivel Hard no basta con sumar y restar y hay que usar 5 o 6 números con multiplicaciones o divisiones. Neon Grid: deslizar sobre 3 casillas que formen una operación correcta (A + B = C, resta, multiplicación o división), con al menos 5 jugadas siempre disponibles, o tocar los múltiplos de 6 y de 7, con combos y tiempo de 67 s, 130 s o libre.',
         biblioteca: 'No necesita recursos: las operaciones se generan al azar.',
-        multiplayer: 'Individual. También se puede proyectar y jugar en gran grupo.',
+        multiplayer: 'Individual, con ranking online en Speed Run (puntos según la rapidez de cada respuesta) y Neon Grid (por modo y tiempo); en caso de empate gana quien lo consiguió antes. También se puede proyectar y jugar en gran grupo.',
         materias: ['Matemáticas'],
         etapas: ['Primaria', 'ESO'],
     },
@@ -1376,7 +1395,7 @@ export const MATERIAS_CONFIG = [
     {
         id: 'LENGUA', label: 'Lengua', emoji: '📖', color: '#7B1FA2',
         keywords: ['lengua', 'castellano', 'español', 'literatura', 'gramatica', 'sintaxis', 'vocabulario', 'comprension', 'escritura', 'lectura', 'texto', 'ortografia'],
-        specificIds: ['SINTAXIS', 'STORYCUBES', 'LENGUA_SIGNOS', 'LINEA_TIEMPO'],
+        specificIds: ['SINTAXIS', 'STORYCUBES', 'LENGUA_SIGNOS', 'LINEA_TIEMPO', 'VANILA'],
     },
     {
         id: 'GEO_HISTORIA', label: 'Geo e Historia', emoji: '🌍', color: '#F57C00',
@@ -1411,7 +1430,7 @@ export const MATERIAS_CONFIG = [
     {
         id: 'IDIOMAS', label: 'Idiomas', emoji: '🌐', color: '#1565C0',
         keywords: ['ingles', 'english', 'frances', 'french', 'aleman', 'german', 'idioma', 'lengua extranjera', 'irregular', 'verbo', 'listening', 'speaking', 'grammar'],
-        specificIds: ['IRREGULAR_VERBS', 'LISTENING', 'QUIEN_HISTORICO', 'ENIGMIC'],
+        specificIds: ['IRREGULAR_VERBS', 'LISTENING', 'QUIEN_HISTORICO', 'ENIGMIC', 'VANILA'],
     },
 ];
 
@@ -1853,6 +1872,8 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
                 setEsculpirApp(true);
             } else if (path === 'moneyboard' || path === 'piktboard') {
                 setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'MONEYBOARD' });
+            } else if (path === 'vanila') {
+                setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'VANILA' });
             } else if (path === 'sixseven') {
                 setJuegoActivo({ tipoJuego: 'SIXSEVEN' });
             } else if (path === 'calamar') {
@@ -2248,6 +2269,12 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
         if (appId === 'ENIGMIC') {
             window.history.pushState({}, '', '/enigmic');
             setJuegoActivo({ tipoJuego: 'ENIGMIC' });
+            return;
+        }
+
+        if (appId === 'VANILA') {
+            window.history.pushState({}, '', '/vanila');
+            setJuegoActivo({ tipoJuego: 'VANILA' });
             return;
         }
 
@@ -2844,7 +2871,8 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
         if (juegoActivo.tipoJuego === 'RACING3D') return <RacingGame3D usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'MANSION_PITAGORICA') return <MansionPitagoricaGame alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'ENIGMIC') return <EnigmicLogic usuario={usuario} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
-        if (juegoActivo.tipoJuego === 'SIXSEVEN') return <SixSeven onExit={() => { window.history.pushState({}, '', juegoActivo.desdeMath ? '/math_world' : '/'); setJuegoActivo(null); }} />;
+        if (juegoActivo.tipoJuego === 'VANILA') return <VaniLa onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
+        if (juegoActivo.tipoJuego === 'SIXSEVEN') return <SixSeven usuario={usuario} onExit={() => { window.history.pushState({}, '', juegoActivo.desdeMath ? '/math_world' : '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'BUNKER') return <BunkerDisparo usuario={usuario} recurso={juegoActivo.recurso || null} autoStart={!!juegoActivo.recurso} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'MONEYBOARD') return <MoneyBoard usuario={usuario} recurso={juegoActivo.recurso || null} autoStart={!!juegoActivo.recurso} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'CALAMAR') return <JuegoCalamar usuario={usuario} recurso={juegoActivo.recurso || null} autoStart={!!juegoActivo.recurso} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;

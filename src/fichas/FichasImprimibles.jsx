@@ -14,7 +14,9 @@ import { sonidoCorrecto, sonidoIncorrecto, despertarAudio } from '../utils/sonid
 //  motor = { coleccion, ruta, nombre, tituloFicha, emoji, volver, tipos, titulos,
 //            ejercicioInicial, ejercicioNuevo, layout(ej), generarApartados(ej, n, existentes),
 //            maxApartados(ej), usaNivel(tipo), categorias?(tipo), esTexto(ap), sizeHoja?(ap),
-//            Enunciado, Solucion, pasosMax(ap), marcaEnunciado?(ap, vis), RespuestaInline?, Revelado?, respuestas?(ap) }
+//            Enunciado, Solucion, pasosMax(ap), marcaEnunciado?(ap, vis), RespuestaInline?, Revelado?, respuestas?(ap),
+//            PizarraApartado?({ ap, size, zoom, vis, max, fijar }) → si existe, sustituye a todo el
+//            contenido del apartado en el modo pizarra (el motor pinta su propia actividad) }
 // ─────────────────────────────────────────────────────────────────────────────
 
 const LETRAS = 'abcdefghijklmnopqrstuvwxyz';
@@ -301,6 +303,15 @@ function Pizarra({ ficha, onSalir }) {
                     const max = motor.pasosMax(ap), vis = k(ai);
                     return (
                         <div key={ai} style={{ background: 'white', borderRadius: 18, padding: '16px 18px', boxShadow: '0 6px 18px rgba(0,0,0,0.08)', border: `3px solid ${vis >= max ? '#a5d6a7' : '#ede7f6'}` }}>
+                            {/* Motores que llevan su propia pizarra (p. ej. Enigmic: el enigma jugable) */}
+                            {motor.PizarraApartado ? (
+                                <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                                    {ej.apartados.length > 1 && <b style={{ fontSize: size, color: '#7b1fa2' }}>{LETRAS[ai]})</b>}
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <motor.PizarraApartado ap={ap} size={size} zoom={zoom} vis={vis} max={max} fijar={(v) => fijar(ai, v)} />
+                                    </div>
+                                </div>
+                            ) : (<>
                             <div style={{ display: 'flex', gap: 10, alignItems: motor.esTexto(ap) ? 'flex-start' : 'center', flexWrap: 'wrap' }}>
                                 <b style={{ fontSize: size, color: '#7b1fa2' }}>{LETRAS[ai]})</b>
                                 <div style={{ flex: 1, minWidth: 0, overflowX: 'auto' }}>
@@ -324,6 +335,7 @@ function Pizarra({ ficha, onSalir }) {
 
                             {/* Escribir el resultado y comprobarlo */}
                             <ZonaRespuesta key={`${ei}-${ai}`} ap={ap} zoom={zoom} />
+                            </>)}
                         </div>
                     );
                 })}

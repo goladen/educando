@@ -24,6 +24,8 @@
   <url><loc>https://www.pikt.es/geometrix</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://www.pikt.es/calculo</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://www.pikt.es/ecuaciones</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://www.pikt.es/sixseven</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://www.pikt.es/vanila</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
 
   <url><loc>https://www.pikt.es/pilive</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
   <url><loc>https://www.pikt.es/mathlive</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>

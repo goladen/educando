@@ -98,6 +98,20 @@ export const GAMES = [
     nivel: 'Secundaria', materia: 'Matemáticas',
   },
   {
+    slug: 'sixseven', emoji: '🔢', color: '#FF007F',
+    h1: 'Six Seven: cálculo mental con el 67',
+    title: 'Six Seven: juego de cálculo mental con el 67 | PiKT',
+    desc: 'Juego de cálculo mental con el 67: operaciones contrarreloj, llega a 67 con seis números y busca múltiplos de 6 y 7. Gratis, sin registro y para proyectar.',
+    nivel: 'Primaria y Secundaria', materia: 'Matemáticas',
+  },
+  {
+    slug: 'vanila', emoji: '🔤', color: '#A78BFA',
+    h1: 'VaniLa: forma palabras con 9 letras',
+    title: 'VaniLa: juego de palabras con tildes (ES, CA, EN, FR) | PiKT',
+    desc: 'Forma palabras con 9 letras contrarreloj escribiendo bien la tilde, en español, catalán, inglés y francés. Solo, duelo o tablero tipo Scrabble con amigos. Gratis y sin registro.',
+    nivel: 'Primaria y Secundaria', materia: 'Lengua',
+  },
+  {
     slug: 'pilive', emoji: '📱', color: '#9C27B0',
     h1: 'Pi Live',
     title: 'Pi Live: preguntas en vivo para clase | PiKT',

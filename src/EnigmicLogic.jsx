@@ -13,6 +13,7 @@ import RetoConRondas from './components/retos/RetoConRondas';
 import { db } from './firebase';
 import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
 import { guardarRegistroLocal } from './utils/registrosLocales';
+import BotonFichas from './components/BotonFichas';
 
 /* ═══════════════════════════════════════════════════════════════
    1. VOCABULARIO  (es / en / fr)
@@ -259,6 +260,10 @@ const T = {
 };
 
 // Preposiciones y estructuras que aparecen en las pistas (panel de ayuda).
+// Etiqueta de las columnas por idioma ("Casilla 1" / "Position 1"…), que usan
+// también las fichas imprimibles (fichas/motorEnigmic.jsx).
+export const ETIQUETA_CASILLA = Object.fromEntries(Object.entries(T).map(([k, v]) => [k, v.casilla]));
+
 // Preposiciones y estructuras que aparecen en las pistas, con un esquema visual
 // del tablero que explica su significado SIN traducir (🟪 = sujeto, 🟦/🟩 = el otro).
 export const PREPOSICIONES = {
@@ -739,6 +744,11 @@ function PantallaConfig({ conf, setConf, onJugar }) {
                 background: `linear-gradient(135deg, ${COL.oro}, #e67e22)`, color: '#1b2330',
                 fontWeight: 800, fontSize: '1.1rem', fontFamily: 'inherit',
             }}>🔍 Resolver el caso</button>
+
+            <div style={{ marginTop: 14 }}>
+                <BotonFichas app="enigmic" color="#7c3aed"
+                    subtexto="PDF con las pistas, el tablero y las tarjetas para recortar" />
+            </div>
         </div>
     );
 }
@@ -881,6 +891,115 @@ function Picker({ cat, lang, N, grid, fila, casilla, notas, fijas, onElegir, onN
     );
 }
 
+/* ─── Enigma jugable suelto (monitor / modo pizarra de las fichas) ───────────
+   Mismo tablero y mismo selector que el juego, con las pistas arriba y los
+   botones de comprobar / limpiar / solución. Lo usa fichas/motorEnigmic.jsx
+   para que, mientras los alumnos trabajan con la ficha en papel, el profesor
+   resuelva el enigma en la pantalla con la clase.
+   `solucion` lo controlan los botones «👁 Todas / 🙈 Ocultar» de la pizarra. */
+export function EnigmaPizarra({ enigma, lang = 'en', size = '1.2rem', solucion = false }) {
+    const [grid, setGrid] = useState(() => Array.from({ length: enigma.K }, () => new Array(enigma.N).fill(null)));
+    const [notas, setNotas] = useState({});
+    const [picker, setPicker] = useState(null);
+    const [usadas, setUsadas] = useState(new Set());
+    const [marcarErrores, setMarcarErrores] = useState(false);
+    const [revelado, setRevelado] = useState(solucion);
+    const [aviso, setAviso] = useState('');
+
+    // Enigma nuevo (otro apartado o 🎲): se vacía todo
+    useEffect(() => {
+        setGrid(Array.from({ length: enigma.K }, () => new Array(enigma.N).fill(null)));
+        setNotas({}); setUsadas(new Set()); setMarcarErrores(false); setAviso(''); setPicker(null);
+    }, [enigma]);
+    useEffect(() => { setRevelado(solucion); if (solucion) setPicker(null); }, [solucion]);
+
+    const ponerEnCelda = (i) => {
+        const { c, p } = picker;
+        setGrid(g => g.map((fila, fc) => fc !== c ? fila : fila.map((v, fp) => (fp === p ? i : (v === i ? null : v)))));
+        setMarcarErrores(false);
+        setPicker(null);
+    };
+    const vaciarCelda = () => {
+        const { c, p } = picker;
+        setGrid(g => g.map((fila, fc) => fc !== c ? fila : fila.map((v, fp) => (fp === p ? null : v))));
+        setPicker(null);
+    };
+    const toggleNota = (i) => {
+        const { c, p } = picker;
+        const k = `${c}-${p}`;
+        setNotas(n => { const s = new Set(n[k] || []); s.has(i) ? s.delete(i) : s.add(i); return { ...n, [k]: s }; });
+    };
+    const limpiar = () => {
+        setGrid(Array.from({ length: enigma.K }, () => new Array(enigma.N).fill(null)));
+        setNotas({}); setMarcarErrores(false); setRevelado(false); setAviso('');
+    };
+    const comprobar = () => {
+        let mal = 0, sin = 0;
+        for (let c = 0; c < enigma.K; c++) for (let p = 0; p < enigma.N; p++) {
+            const v = grid[c][p];
+            if (v == null) sin++;
+            else if (v !== enigma.pos[c].indexOf(p)) mal++;
+        }
+        setMarcarErrores(true);
+        if (sin) setAviso(`Faltan ${sin} casilla${sin === 1 ? '' : 's'}${mal ? ` y hay ${mal} mal colocada${mal === 1 ? '' : 's'}` : ''}.`);
+        else if (mal) setAviso(`${mal} casilla${mal === 1 ? '' : 's'} mal colocada${mal === 1 ? '' : 's'} (en rojo).`);
+        else setAviso('¡Resuelto! Todas las casillas son correctas. 🎉');
+    };
+
+    const btn = (bg, extra = {}) => ({
+        padding: '10px 15px', borderRadius: 12, border: 'none', cursor: 'pointer',
+        background: bg, color: 'white', fontWeight: 700, fontSize: `calc(${size} * 0.52)`,
+        fontFamily: 'inherit', ...extra,
+    });
+    const ok = grid.every((f, c) => f.every((v, p) => v === enigma.pos[c].indexOf(p)));
+
+    return (
+        <div style={{ background: COL.fondo, borderRadius: 16, padding: '14px 16px', color: COL.texto, fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
+            <ol style={{ margin: `0 0 12px`, paddingLeft: `calc(${size} * 1.2)`, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                {enigma.clues.map((cl, i) => {
+                    const texto = textoPista(cl, enigma.cats, lang);
+                    const tach = usadas.has(i);
+                    return (
+                        <li key={i} style={{ color: tach ? COL.suave : COL.texto }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span onClick={() => setUsadas(s => { const n = new Set(s); n.has(i) ? n.delete(i) : n.add(i); return n; })}
+                                    style={{ flex: 1, cursor: 'pointer', fontSize: `calc(${size} * 0.6)`, lineHeight: 1.4, textDecoration: tach ? 'line-through' : 'none' }}>
+                                    {texto}
+                                </span>
+                                <button onClick={() => hablar(texto, lang)}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: COL.suave, fontSize: `calc(${size} * 0.6)` }}>🔊</button>
+                            </div>
+                        </li>
+                    );
+                })}
+            </ol>
+
+            <Tablero enigma={enigma} lang={lang} grid={grid} notas={notas} fijas={new Set()}
+                revelado={revelado} marcarErrores={marcarErrores}
+                onCelda={(c, p) => !revelado && setPicker({ c, p })} />
+
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+                <button onClick={comprobar} disabled={revelado} style={btn(revelado ? '#555' : `linear-gradient(135deg,${COL.ok},#27ae60)`)}>✅ Comprobar</button>
+                <button onClick={limpiar} style={btn('rgba(255,255,255,0.12)')}>🧹 Limpiar</button>
+                <button onClick={() => { setRevelado(r => !r); setAviso(''); }} style={btn(revelado ? 'rgba(255,255,255,0.12)' : `linear-gradient(135deg,${COL.acento},#5b21b6)`)}>
+                    {revelado ? '🙈 Ocultar solución' : '💡 Ver solución'}
+                </button>
+            </div>
+            {aviso && (
+                <div style={{ marginTop: 10, fontSize: `calc(${size} * 0.55)`, fontWeight: 700, color: ok && !aviso.startsWith('Faltan') ? COL.ok : COL.oro }}>
+                    {aviso}
+                </div>
+            )}
+
+            {picker && (
+                <Picker cat={enigma.cats[picker.c]} lang={lang} N={enigma.N} grid={grid}
+                    fila={picker.c} casilla={picker.p} notas={notas} fijas={new Set()}
+                    onElegir={ponerEnCelda} onNota={toggleNota} onQuitar={vaciarCelda} onClose={() => setPicker(null)} />
+            )}
+        </div>
+    );
+}
+
 // ---------------------------------------------------------------- enviar al profesor
 function ModalEnviarProfe({ datos, onClose }) {
     const [codigo, setCodigo] = useState('');
@@ -994,6 +1113,16 @@ export default function EnigmicLogic(props) {
 
 function EnigmicLogicBase({ usuario, onExit, onBack, aula = null }) {
     const salir = onExit || onBack || (() => { window.history.pushState({}, '', '/'); window.location.reload(); });
+
+    // Ficha imprimible compartida por enlace: /enigmic?ficha=ID abre su vista pública
+    const [fichaLink, setFichaLink] = useState(() => (typeof window !== 'undefined' && !aula
+        ? new URLSearchParams(window.location.search).get('ficha') : null));
+    const cerrarFicha = () => {
+        setFichaLink(null);
+        const u = new URL(window.location.href);
+        u.searchParams.delete('ficha');
+        window.history.replaceState({}, '', u.pathname + u.search);
+    };
 
     const [pantalla, setPantalla] = useState(aula ? 'JUEGO' : 'CONFIG');
     const [conf, setConf] = useState(() => ({ lang: 'en', N: 5, nivel: 'MEDIO', modo: 'LEER', catIds: ['PROFESIONES', 'VERBOS', 'OBJETOS'], ...(aula?.config || {}) }));
@@ -1310,6 +1439,9 @@ function EnigmicLogicBase({ usuario, onExit, onBack, aula = null }) {
             </div>
         );
     })();
+
+    // Enlace a una ficha guardada: se abre el centro de fichas directamente
+    if (fichaLink) return <BotonFichas app="enigmic" abiertoInicial fichaPublicaId={fichaLink} onCerrar={cerrarFicha} />;
 
     return (
         <div style={{

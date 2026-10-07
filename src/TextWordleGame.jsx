@@ -1,33 +1,31 @@
 ﻿
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { db } from './firebase';
 import { collection, addDoc, query, where, orderBy, limit, getDocs, doc, getDoc } from 'firebase/firestore';
 import { guardarRegistroLocal } from './utils/registrosLocales';
-import { X, Settings, Trophy, Search, BookOpen, Globe, ArrowLeft, Zap, Clock } from 'lucide-react';
-import Confetti from 'react-confetti';
+import { Search } from 'lucide-react';
 import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
+import { cargarPalabrasWordle } from './utils/diccionarios';
+import { despertarAudio, sonidoCorrecto, sonidoIncorrecto } from './utils/sonidosFeedback';
+import { T, FUENTE, ESTILOS_CSS, CapaLetras, lanzarLetras, sonidoFicha, sonidoPalabra, sonidoTic, Boton, Opciones, Reloj, BotonSonido, Pantalla, Cabecera, Tarjeta, useWindowSize } from './vanila/comun';
 
 // --- CONFIGURACIÓN DE IDIOMAS ---
 const LANGUAGES = {
     ES: {
         label: 'Español',
-        url: 'https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/es/es_50k.txt',
         keyboard: [['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'], ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'Ñ'], ['Z', 'X', 'C', 'V', 'B', 'N', 'M']]
     },
     CA: {
         label: 'Català',
-        url: 'https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/ca/ca_50k.txt',
         keyboard: [['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'], ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'], ['Z', 'X', 'C', 'V', 'B', 'N', 'M']]
     },
     EN: {
         label: 'English',
-        url: 'https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/en/en_50k.txt',
         keyboard: [['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'], ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'], ['Z', 'X', 'C', 'V', 'B', 'N', 'M']]
     },
     FR: {
         label: 'Français',
-        url: 'https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/fr/fr_50k.txt',
         keyboard: [['A', 'Z', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'], ['Q', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'M'], ['W', 'X', 'C', 'V', 'B', 'N']]
     }
 };
@@ -167,6 +165,9 @@ export default function TextWordleGame({ usuario, onExit, recurso, modoOlimpico 
     const [currentGuess, setCurrentGuess] = useState("");
     const [shakeRow, setShakeRow] = useState(false);
     const [message, setMessage] = useState(null);
+    const [esperando, setEsperando] = useState(false);   // mientras gira la fila evaluada
+    const { w: anchoVentana } = useWindowSize();
+    const tiempoInicialRef = useRef(0);
 
     // --- TIMER CLÁSICO (Cuenta hacia adelante) ---
     const [elapsedTime, setElapsedTime] = useState(0);
@@ -200,8 +201,10 @@ export default function TextWordleGame({ usuario, onExit, recurso, modoOlimpico 
 
         // Si es Contrarreloj (Local u Olímpico), cuenta atrás
         if (modoOlimpico || gameMode === 'TIME_ATTACK') {
+            setTiempoRestante(prev => { if (prev > tiempoInicialRef.current) tiempoInicialRef.current = prev; return prev; });
             const t = setInterval(() => {
                 setTiempoRestante(prev => {
+                    if (prev <= 11 && prev > 1) sonidoTic(prev <= 6);
                     if (prev <= 1) {
                         clearInterval(t);
                         setScreen('TIMEOUT'); // Fin por tiempo
@@ -280,15 +283,9 @@ export default function TextWordleGame({ usuario, onExit, recurso, modoOlimpico 
         const idioma = idiomaForzado || config.lang;
 
         try {
-            const langData = LANGUAGES[idioma] || LANGUAGES['ES'];
-            const response = await fetch(langData.url);
-            if (!response.ok) throw new Error("Error diccionario");
-            const text = await response.text();
-
-            const allWords = text.split('\n').map(line => {
-                const [word] = line.split(' ');
-                return word ? normalizeWord(word) : '';
-            });
+            // Diccionario común de juegos de palabras (Hunspell de LibreOffice + frecuencias),
+            // el mismo que VaniLa. Aquí se usa sin tildes: todo en MAYÚSCULAS normalizado.
+            const { validas, conocidas } = await cargarPalabrasWordle((LANGUAGES[idioma] ? idioma : 'ES').toLowerCase());
 
             let pool = [];
             let targetLen = config.length;
@@ -310,25 +307,16 @@ export default function TextWordleGame({ usuario, onExit, recurso, modoOlimpico 
             }
             // CASO 2: Diccionario Aleatorio
             else {
-                // Filtramos las 2000 más comunes de esa longitud
-                pool = allWords.filter(w => w.length === config.length && /^[A-ZÑ]+$/.test(w)).slice(0, 2000);
+                // Las 2000 más usadas de esa longitud
+                pool = conocidas.filter(w => w.length === config.length && /^[A-Z]+$/.test(w)).slice(0, 2000);
                 pool.sort(() => Math.random() - 0.5);
                 setIsCustomGame(false);
             }
 
             if (pool.length === 0) throw new Error("No hay palabras válidas");
 
-            // --- CORRECCIÓN AQUÍ ---
-            // Creamos un diccionario de validación "generoso".
-            // Aceptamos cualquier palabra común (top 40.000) que tenga entre 4 y 9 letras.
-            // Esto permite que el alumno escriba cualquier palabra válida del idioma, 
-            // no solo las que están en el recurso del profesor.
-            const validSet = new Set(
-                allWords.filter(w =>
-                    /^[A-ZÑ]+$/.test(w) &&
-                    w.length >= 4 && w.length <= 9 // Aceptamos rango amplio para evitar errores de longitud
-                ).slice(0, 40000) // Ampliamos el diccionario general
-            );
+            // Validación: CUALQUIER forma del diccionario (plurales, conjugaciones…) de 4 a 9 letras.
+            const validSet = new Set([...validas].filter(w => w.length >= 4 && w.length <= 9));
 
             // IMPORTANTE: Aseguramos que las palabras del recurso (que pueden ser raras) estén sí o sí
             pool.forEach(p => validSet.add(p));
@@ -373,6 +361,7 @@ export default function TextWordleGame({ usuario, onExit, recurso, modoOlimpico 
         setGuesses([]);
         setCurrentGuess("");
         setShakeRow(false);
+        setEsperando(false);
         setScreen('GAME');
     };
 
@@ -382,30 +371,32 @@ export default function TextWordleGame({ usuario, onExit, recurso, modoOlimpico 
         setGuesses(newGuesses);
         setCurrentGuess("");
 
+        const giro = solution.length * 130 + 450;   // lo que tarda en girar la fila
         if (currentGuess === solution) {
             // --- ACIERTO ---
+            setEsperando(true);
+            setTimeout(() => {
+                sonidoCorrecto(); sonidoPalabra(solution.length);
+                lanzarLetras(window.innerWidth / 2, window.innerHeight * 0.4, solution, '#22c55e');
+            }, giro);
             if (gameMode === 'TIME_ATTACK') {
                 setScore(s => s + 1);
-                showMessage("¡Bien! +1 Pts 🚀");
-                setTimeout(() => {
-                    siguientePalabra(null);
-                }, 1000);
+                setTimeout(() => showMessage("¡Bien! +1 🚀"), giro);
+                setTimeout(() => siguientePalabra(null), giro + 900);
             } else {
-                setScreen('VICTORY');
-                showMessage("¡Correcto! 🏆");
+                setTimeout(() => setScreen('VICTORY'), giro + 900);
             }
         }
         else if (newGuesses.length >= 6) {
             // --- FALLO ---
+            setEsperando(true);
+            setTimeout(() => sonidoIncorrecto(), giro);
             if (gameMode === 'TIME_ATTACK') {
-                showMessage(`Era: ${solution}`);
+                setTimeout(() => showMessage(`Era: ${solution}`), giro);
                 // En contrarreloj, si fallas, pasas a la siguiente sin sumar punto
-                setTimeout(() => {
-                    siguientePalabra(null);
-                }, 1500);
+                setTimeout(() => siguientePalabra(null), giro + 1500);
             } else {
-                alert(`La palabra era: ${solution}`);
-                setScreen('CONFIG');
+                setTimeout(() => setScreen('DERROTA'), giro + 300);
             }
         }
     };
@@ -502,9 +493,10 @@ export default function TextWordleGame({ usuario, onExit, recurso, modoOlimpico 
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [screen, currentGuess]);
+    }, [screen, currentGuess, esperando]);
 
     const handleKey = (key) => {
+        if (esperando) return;
         const targetLen = solution.length;
         if (key === 'ENTER') {
             if (currentGuess.length !== targetLen) { showMessage("Faltan letras"); triggerShake(); return; }
@@ -512,11 +504,11 @@ export default function TextWordleGame({ usuario, onExit, recurso, modoOlimpico 
             validarIntento();
         }
         else if (key === 'DEL') setCurrentGuess(prev => prev.slice(0, -1));
-        else if (currentGuess.length < targetLen) setCurrentGuess(prev => prev + key);
+        else if (currentGuess.length < targetLen) { sonidoFicha(currentGuess.length); setCurrentGuess(prev => prev + key); }
     };
 
-    const getCellColor = (char, index, guessStr) => {
-        if (!guessStr) return styles.absent;
+    // 'correcta' | 'presente' | 'ausente' (respeta letras repetidas)
+    const estadoCelda = (index, guessStr) => {
         const solArr = solution.split('');
         const guessArr = guessStr.split('');
         const solFreq = {};
@@ -524,14 +516,22 @@ export default function TextWordleGame({ usuario, onExit, recurso, modoOlimpico 
         const statusArr = new Array(solution.length).fill('absent');
         guessArr.forEach((c, i) => { if (c === solArr[i]) { statusArr[i] = 'correct'; solFreq[c]--; } });
         guessArr.forEach((c, i) => { if (statusArr[i] === 'correct') return; if (solFreq[c] > 0) { statusArr[i] = 'present'; solFreq[c]--; } });
-        const status = statusArr[index];
-        if (status === 'correct') return styles.correct;
-        if (status === 'present') return styles.present;
-        return styles.absent;
+        return { correct: 'correcta', present: 'presente', absent: 'ausente' }[statusArr[index]];
     };
+    // Mejor estado conocido de cada letra para colorear el teclado
+    const estadoTeclas = useMemo(() => {
+        const rango = { ausente: 1, presente: 2, correcta: 3 };
+        const m = {};
+        guesses.forEach(g => g.split('').forEach((ch, i) => {
+            const e = estadoCelda(i, g);
+            if (!m[ch] || rango[e] > rango[m[ch]]) m[ch] = e;
+        }));
+        return m;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [guesses, solution]);
 
     const showMessage = (msg) => { setMessage(msg); setTimeout(() => setMessage(null), 2000); };
-    const triggerShake = () => { setShakeRow(true); setTimeout(() => setShakeRow(false), 500); };
+    const triggerShake = () => { setShakeRow(true); sonidoIncorrecto(); setTimeout(() => setShakeRow(false), 500); };
     const formatTime = (s) => `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
 
     // Lógica Ranking (Simplificada)
@@ -540,10 +540,22 @@ export default function TextWordleGame({ usuario, onExit, recurso, modoOlimpico 
 
 
     // =========================================================
-    // VISTAS
+    // VISTAS (estética neón compartida con VaniLa: src/vanila/comun.jsx)
     // =========================================================
 
-    if (!presentacionVista) return (
+    const contrarreloj = modoOlimpico || gameMode === 'TIME_ATTACK';
+    const nLetras = solution.length || config.length;
+    const tamCelda = Math.max(34, Math.min(60, Math.floor((anchoVentana - 40 - (nLetras - 1) * 6) / nLetras)));
+    const tamTecla = Math.max(26, Math.min(46, Math.floor((anchoVentana - 24 - 9 * 5) / 10)));
+    const marco = (contenido) => (
+        <>
+            <style>{ESTILOS_CSS + WORDLE_CSS}</style>
+            {contenido}
+            <CapaLetras />
+        </>
+    );
+
+    if (!presentacionVista) return marco(
         <PantallaPresentacionWordle
             presentacion={recurso.presentacion}
             onEmpezar={() => setPresentacionVista(true)}
@@ -551,219 +563,261 @@ export default function TextWordleGame({ usuario, onExit, recurso, modoOlimpico 
         />
     );
 
-    if (screen === 'LOADING') return <div style={styles.screen}><div className="spin" style={{ border: '4px solid white', borderTop: '4px solid #333', borderRadius: '50%', width: '40px', height: '40px' }}></div></div>;
-
-    // --- NUEVA PANTALLA: SELECCIÓN DE MODO ---
-    if (screen === 'MODE_SELECT') return (
-        <div style={styles.screen}>
-            <button onClick={() => setScreen('CONFIG')} style={styles.backBtn}><ArrowLeft size={20} /> Volver</button>
-            <h1 style={{ ...styles.h1, color: '#f1c40f' }}>Elige Modo</h1>
-
-            <div style={styles.card}>
-                <p style={{ marginBottom: '20px', color: '#555' }}>¿Cómo quieres jugar?</p>
-
-                <button onClick={() => { setGameMode('CLASSIC'); siguientePalabra(null); }} style={{ ...styles.btn, background: '#3498db', marginBottom: '15px' }}>
-                    <Search size={24} style={{ marginBottom: '5px' }} />
-                    <div>Modo Clásico</div>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 'normal', opacity: 0.9 }}>Adivina 1 palabra en 6 intentos</div>
-                </button>
-
-                <button onClick={() => { setGameMode('TIME_ATTACK'); setTiempoRestante(300); siguientePalabra(null); }} style={{ ...styles.btn, background: '#e74c3c' }}>
-                    <Zap size={24} style={{ marginBottom: '5px' }} />
-                    <div>Contrarreloj (5 min)</div>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 'normal', opacity: 0.9 }}>
-                        {isCustomGame ? 'Completa todas las palabras' : '¡Infinitas palabras!'}
-                    </div>
-                </button>
-            </div>
-        </div>
+    if (screen === 'LOADING') return marco(
+        <Pantalla zIndex={Z_WORDLE}>
+            <TituloWordle tam={Math.min(56, (anchoVentana - 60) / 7)} />
+            <div style={{ color: T.suave, marginTop: 24, fontWeight: 700, animation: 'nlParpadeo 1.2s infinite' }}>Cargando diccionario…</div>
+        </Pantalla>
     );
 
-    // --- PANTALLA DE JUEGO (Adaptada) ---
-    if (screen === 'GAME') return (
-        <div style={{ ...styles.screen, justifyContent: 'flex-start', background: (modoOlimpico || gameMode === 'TIME_ATTACK') ? '#7e7b5280' : '#7e7b5280' }}>
-            <div style={styles.header}>
-                <div style={{ ...styles.timer, background: (modoOlimpico || gameMode === 'TIME_ATTACK') ? '#e74c3c' : 'white', color: (modoOlimpico || gameMode === 'TIME_ATTACK') ? 'white' : 'black' }}>
-                    {/* Reloj dinámico */}
-                    {(modoOlimpico || gameMode === 'TIME_ATTACK') ?
-                        <><Clock size={14} style={{ verticalAlign: 'middle' }} /> {formatTime(tiempoRestante)}</> :
-                        formatTime(elapsedTime)
-                    }
-                </div>
-
-                <div style={{ textAlign: 'center' }}>
-                    <h2 style={{ margin: 0, fontSize: '1.2rem', letterSpacing: '1px', color: 'white' }}>WORDLE</h2>
-                    {(modoOlimpico || gameMode === 'TIME_ATTACK') &&
-                        <span style={{ background: '#f1c40f', color: 'black', padding: '2px 8px', borderRadius: '10px', fontSize: '0.8rem', fontWeight: 'bold', display: 'inline-block', marginTop: '4px' }}>
-                            ⭐ {score} pts
-                        </span>
-                    }
-                </div>
-
-                {!modoOlimpico && <div style={{ width: '40px', textAlign: 'right', cursor: 'pointer' }} onClick={() => setScreen('CONFIG')}><Settings color="white" /></div>}
+    // --- SELECCIÓN DE MODO ---
+    if (screen === 'MODE_SELECT') return marco(
+        <Pantalla zIndex={Z_WORDLE}>
+            <div style={{ position: 'fixed', top: 14, left: 14, zIndex: 2 }}><Boton onClick={() => setScreen('CONFIG')} color={T.suave}>← Volver</Boton></div>
+            <TituloWordle tam={Math.min(56, (anchoVentana - 60) / 7)} />
+            <div style={{ color: T.suave, fontWeight: 800, letterSpacing: 2, margin: '22px 0 18px' }}>¿CÓMO QUIERES JUGAR?</div>
+            <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', justifyContent: 'center' }}>
+                {[
+                    ['CLASSIC', '🔍', 'Clásico', 'Adivina una palabra en 6 intentos.', W.correcta],
+                    ['TIME_ATTACK', '⚡', 'Contrarreloj · 5 min', isCustomGame ? 'Completa todas las palabras del reto.' : '¡Palabras infinitas! ¿Cuántas sacas?', T.rosa],
+                ].map(([modo, emo, nom, desc, c]) => (
+                    <button key={modo} className="nl-btn" onClick={() => {
+                        despertarAudio();
+                        setGameMode(modo);
+                        if (modo === 'TIME_ATTACK') setTiempoRestante(300);
+                        siguientePalabra(null);
+                    }} style={{
+                        width: 260, padding: '24px 22px', borderRadius: 22, cursor: 'pointer', textAlign: 'left', fontFamily: FUENTE,
+                        background: `linear-gradient(160deg, ${c}22, rgba(20,18,45,0.9))`, border: `2px solid ${c}`, color: T.texto, boxShadow: `0 0 28px ${c}33`,
+                    }}>
+                        <div style={{ fontSize: '2.3rem' }}>{emo}</div>
+                        <div style={{ fontSize: '1.3rem', fontWeight: 900, color: c, margin: '6px 0' }}>{nom}</div>
+                        <div style={{ color: T.suave, fontSize: '0.9rem', lineHeight: 1.45 }}>{desc}</div>
+                    </button>
+                ))}
             </div>
+        </Pantalla>
+    );
 
-            <div style={styles.gridScroll}>
-                <div style={styles.gridContainer}>
-                    {guesses.map((g, i) => (
-                        <div key={i} style={styles.row}>
-                            {g.split('').map((char, j) => (
-                                <div key={j} style={{ ...styles.cell, ...getCellColor(char, j, g) }}>{char}</div>
-                            ))}
-                        </div>
-                    ))}
-                    <div style={{ ...styles.row, animation: shakeRow ? 'shake 0.4s' : 'none' }}>
-                        {Array.from({ length: solution.length }).map((_, j) => (
-                            <div key={j} style={{ ...styles.cell, borderColor: currentGuess[j] ? '#888' : '#333' }}>{currentGuess[j] || ''}</div>
-                        ))}
+    // --- PANTALLA DE JUEGO ---
+    if (screen === 'GAME') return marco(
+        <Pantalla zIndex={Z_WORDLE} centrar={false}>
+            <Cabecera
+                izquierda={!modoOlimpico ? <Boton onClick={() => setScreen('CONFIG')} color={T.suave}>← Menú</Boton> : <span />}
+                centro={
+                    <div>
+                        <div style={{ fontWeight: 900, letterSpacing: 3, fontSize: '0.95rem', color: W.correcta, textShadow: `0 0 12px ${W.correcta}` }}>WORDLE</div>
+                        {contrarreloj && <div style={{ fontWeight: 900, color: T.ambar, fontSize: '1.1rem', textShadow: `0 0 10px ${T.ambar}` }}>⭐ {score}</div>}
                     </div>
-                    {Array.from({ length: Math.max(0, 5 - guesses.length) }).map((_, i) => (
-                        <div key={`empty-${i}`} style={styles.row}>
-                            {Array.from({ length: solution.length }).map((_, j) => <div key={j} style={styles.cell}></div>)}
+                }
+                derecha={contrarreloj
+                    ? <Reloj restante={tiempoRestante} total={tiempoInicialRef.current || 300} tam={52} />
+                    : <span style={{ fontFamily: 'monospace', fontWeight: 800, padding: '6px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: `1px solid ${T.borde}` }}>{formatTime(elapsedTime)}</span>}
+            />
+
+            {/* Cuadrícula */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: '8px 0 14px', perspective: 800 }}>
+                {Array.from({ length: 6 }).map((_, fila) => {
+                    const evaluada = guesses[fila];
+                    const actual = fila === guesses.length;
+                    const texto = evaluada || (actual ? currentGuess : '');
+                    return (
+                        <div key={fila + '-' + solution} className="nl-anim" style={{ display: 'flex', gap: 6, justifyContent: 'center', animation: actual && shakeRow ? 'nlShake .4s' : undefined }}>
+                            {Array.from({ length: nLetras }).map((_, j) => {
+                                const ch = texto[j] || '';
+                                const est = evaluada ? estadoCelda(j, evaluada) : null;
+                                const c = est ? W[est] : null;
+                                return (
+                                    <div key={j + (evaluada ? '-e' : ch ? '-' + ch : '')} className="nl-anim" style={{
+                                        width: tamCelda, height: tamCelda, borderRadius: Math.max(8, tamCelda * 0.18), boxSizing: 'border-box',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        fontFamily: FUENTE, fontWeight: 900, fontSize: tamCelda * 0.5, color: '#fff',
+                                        border: est ? `2px solid ${c}` : ch ? `2px solid ${T.lila}` : '2px dashed rgba(255,255,255,0.12)',
+                                        background: est ? `linear-gradient(160deg, ${c}, ${c}aa)` : ch ? `${T.lila}22` : 'rgba(255,255,255,0.02)',
+                                        boxShadow: est && est !== 'ausente' ? `0 0 16px ${c}88` : ch && !est ? `0 0 10px ${T.lila}55` : 'none',
+                                        textShadow: est ? '0 1px 2px rgba(0,0,0,0.4)' : `0 0 8px ${T.lila}`,
+                                        animation: est ? `wlGira .55s ease ${j * 0.13}s both` : ch ? 'nlPop .18s ease-out' : undefined,
+                                    }}>{ch}</div>
+                                );
+                            })}
                         </div>
-                    ))}
-                </div>
+                    );
+                })}
             </div>
 
-            <div style={{ ...styles.toast, opacity: message ? 1 : 0 }}>{message}</div>
+            <div style={{ minHeight: 34 }}>
+                {message && <span key={message} className="nl-anim" style={{ display: 'inline-block', padding: '6px 16px', borderRadius: 20, fontWeight: 800, background: T.ambar, color: '#0A0918', boxShadow: `0 0 20px ${T.ambar}88`, animation: 'nlPop .25s ease-out' }}>{message}</span>}
+            </div>
 
-            <div style={styles.keyboard}>
+            {/* Teclado: cada tecla toma el color de lo que ya se sabe de esa letra */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center', width: '100%', maxWidth: 560, marginTop: 6 }}>
                 {(LANGUAGES[config.lang] || LANGUAGES['ES']).keyboard.map((row, i) => (
-                    <div key={i} style={{ display: 'flex', gap: '4px', width: '100%', justifyContent: 'center' }}>
-                        {row.map(char => (
-                            <button key={char} onClick={() => handleKey(char)} style={{ ...styles.key, backgroundColor: '#818384' }}>{char}</button>
-                        ))}
+                    <div key={i} style={{ display: 'flex', gap: 5, justifyContent: 'center', width: '100%' }}>
+                        {i === 2 && <Tecla onClick={() => handleKey('ENTER')} ancho={tamTecla * 1.6} color={W.correcta} relleno>↵</Tecla>}
+                        {row.map(char => {
+                            const est = estadoTeclas[char];
+                            return <Tecla key={char} onClick={() => handleKey(char)} ancho={tamTecla} color={est ? W[est] : null} relleno={!!est}>{char}</Tecla>;
+                        })}
+                        {i === 2 && <Tecla onClick={() => handleKey('DEL')} ancho={tamTecla * 1.6} color={T.rojo}>⌫</Tecla>}
                     </div>
                 ))}
-                <div style={{ display: 'flex', gap: '5px', width: '100%', justifyContent: 'center', marginTop: '5px' }}>
-                    <button onClick={() => handleKey('ENTER')} style={{ ...styles.key, width: '65px', fontSize: '0.8rem', background: '#538d4e' }}>ENTER</button>
-                    <button onClick={() => handleKey('DEL')} style={{ ...styles.key, width: '65px', background: '#b04848' }}>⌫</button>
-                </div>
             </div>
-            <style>{`@keyframes shake { 0%,100%{transform:translateX(0);} 25%{transform:translateX(-5px);} 75%{transform:translateX(5px);} }`}</style>
-        </div>
+        </Pantalla>
     );
 
-    // --- PANTALLA DE RESULTADOS ---
-    if (screen === 'VICTORY' || screen === 'TIMEOUT') return (
-        <div style={{ ...styles.screen, backgroundColor: screen === 'TIMEOUT' ? '#e74c3c' : '#27ae60' }}>
-            {screen === 'VICTORY' && <Confetti recycle={false} />}
-            <h1 style={{ ...styles.h1, color: 'white' }}>{screen === 'VICTORY' ? '¡COMPLETADO! 🥳' : '¡TIEMPO AGOTADO! ⏳'}</h1>
-
-            {gameMode === 'TIME_ATTACK' ? (
-                <div style={{ textAlign: 'center' }}>
-                    <p style={{ color: 'white', fontSize: '1.2rem' }}>Has conseguido:</p>
-                    <div style={{ fontSize: '4rem', color: '#f1c40f', fontWeight: 'bold', textShadow: '2px 2px 0 black' }}>{score}</div>
-                    <p style={{ color: 'white' }}>Palabras</p>
-                </div>
-            ) : (
-                    <p style={{ color: 'white', fontSize: '1.2rem' }}>Palabra: <b style={{ color: '#f1c40f' }}>{solution}</b></p>
-                )}
-
-            {!modoOlimpico ? (
-                <div style={{ margin: '20px 0', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    {!usuario && <input value={playerName} onChange={(e) => setPlayerName(e.target.value)} placeholder="Tu Nombre" maxLength={12} style={styles.inputName} />}
-                    {usuario && <p style={{ color: '#f1c40f', marginBottom: '10px' }}>Jugador: <b>{usuario.displayName}</b></p>}
-                    <button style={{ ...styles.btn, ...styles.btnPrimary }} onClick={guardarPuntuacion}>Guardar Resultado</button>
-                    <button style={{ ...styles.btn, background: 'linear-gradient(135deg,#27ae60,#2ecc71)', color: 'white' }} onClick={() => setMostrarEnvio(true)}>📤 Enviar al profesor</button>
-                    <button style={{ ...styles.btn, ...styles.btnSecondary }} onClick={() => setScreen('CONFIG')}>Menú Principal</button>
-                </div>
-            ) : (
-                    <div style={{ color: '#f1c40f', fontWeight: 'bold', marginTop: '30px', fontSize: '1.5rem', animation: 'pulse 1.5s infinite' }}>
-                        Enviando {score} puntos al profesor... 🚀
-                </div>
-                )}
-            {mostrarEnvio && <ModalEnviarProfe datos={{ recursoId: recurso?.id, recursoTitulo: recurso?.titulo, score, idioma: config.lang, longitud: config.length, modo: gameMode, tiempo: elapsedTime, intentos: guesses.length }} onClose={() => setMostrarEnvio(false)} />}
-        </div>
-    );
+    // --- RESULTADOS ---
+    if (screen === 'VICTORY' || screen === 'TIMEOUT' || screen === 'DERROTA') {
+        const gano = screen === 'VICTORY';
+        const c = gano ? W.correcta : screen === 'TIMEOUT' ? T.ambar : T.rojo;
+        return marco(
+            <Pantalla zIndex={Z_WORDLE}>
+                <Tarjeta style={{ maxWidth: 480, width: '100%', boxSizing: 'border-box', textAlign: 'center', border: `2px solid ${c}`, boxShadow: `0 0 50px ${c}44`, animation: 'nlPop .4s ease-out' }}>
+                    <div style={{ fontSize: '3rem' }}>{gano ? '🏆' : screen === 'TIMEOUT' ? '⏳' : '😅'}</div>
+                    <div style={{ fontSize: '1.6rem', fontWeight: 900, color: c, textShadow: `0 0 18px ${c}` }}>
+                        {gano ? '¡COMPLETADO!' : screen === 'TIMEOUT' ? '¡TIEMPO AGOTADO!' : '¡Casi!'}
+                    </div>
+                    {gameMode === 'TIME_ATTACK' ? (
+                        <div style={{ margin: '14px 0' }}>
+                            <div style={{ fontSize: '4rem', fontWeight: 900, color: T.ambar, textShadow: `0 0 24px ${T.ambar}`, lineHeight: 1 }}>{score}</div>
+                            <div style={{ color: T.suave, fontWeight: 800, letterSpacing: 2, fontSize: '0.8rem' }}>PALABRAS</div>
+                        </div>
+                    ) : (
+                        <div style={{ margin: '18px 0' }}>
+                            <div style={{ color: T.suave, fontSize: '0.85rem', marginBottom: 8 }}>{gano ? `En ${guesses.length} intento${guesses.length === 1 ? '' : 's'} · ${formatTime(elapsedTime)}` : 'La palabra era'}</div>
+                            <div style={{ display: 'flex', gap: 5, justifyContent: 'center' }}>
+                                {solution.split('').map((ch, i) => (
+                                    <div key={i} className="nl-anim" style={{ width: 40, height: 40, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '1.2rem', background: W.correcta, boxShadow: `0 0 12px ${W.correcta}88`, animation: `wlGira .5s ease ${i * 0.1}s both` }}>{ch}</div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    {!modoOlimpico ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center', marginTop: 8 }}>
+                            {gameMode !== 'TIME_ATTACK' && poolPalabras.length > 0 && <Boton onClick={() => siguientePalabra(null)} color={W.correcta} relleno grande>🔁 Otra palabra</Boton>}
+                            {screen !== 'DERROTA' && !usuario && <input value={playerName} onChange={(e) => setPlayerName(e.target.value)} placeholder="Tu nombre" maxLength={12} style={{ padding: '10px 12px', borderRadius: 10, border: `1.5px solid ${T.borde}`, background: 'rgba(255,255,255,0.06)', color: 'white', fontSize: '1rem', fontFamily: FUENTE, textAlign: 'center', outline: 'none', width: 220 }} />}
+                            {screen !== 'DERROTA' && usuario && <div style={{ color: T.ambar }}>Jugador: <b>{usuario.displayName}</b></div>}
+                            {screen !== 'DERROTA' && <Boton onClick={guardarPuntuacion} color={W.correcta} relleno>💾 Guardar resultado</Boton>}
+                            <Boton onClick={() => setMostrarEnvio(true)} color={T.ambar} relleno>📤 Enviar al profesor</Boton>
+                            <Boton onClick={() => setScreen('CONFIG')} color={T.suave}>Menú principal</Boton>
+                        </div>
+                    ) : (
+                        <div style={{ color: T.ambar, fontWeight: 800, marginTop: 20, fontSize: '1.2rem', animation: 'nlParpadeo 1.4s infinite' }}>
+                            Enviando {score} puntos al profesor… 🚀
+                        </div>
+                    )}
+                </Tarjeta>
+                {mostrarEnvio && <ModalEnviarProfe datos={{ recursoId: recurso?.id, recursoTitulo: recurso?.titulo, score, idioma: config.lang, longitud: config.length, modo: gameMode, tiempo: elapsedTime, intentos: guesses.length }} onClose={() => setMostrarEnvio(false)} />}
+            </Pantalla>
+        );
+    }
 
     // --- PANTALLA INICIAL (CONFIG) ---
-    return (<div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: '#2c3e50', zIndex: 5000 }}>
-        <div style={styles.screen}>
-            <button onClick={onExit} style={styles.backBtn}><ArrowLeft size={20} /> Volver</button>
-            <h1 style={styles.h1}>WORDLE</h1>
+    const etq = { color: T.suave, fontWeight: 800, fontSize: '0.75rem', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8, textAlign: 'center' };
+    return marco(
+        <Pantalla zIndex={Z_WORDLE} centrar={false}>
+            <div style={{ position: 'fixed', top: 14, left: 14, right: 14, display: 'flex', justifyContent: 'space-between', zIndex: 2, pointerEvents: 'none' }}>
+                <span style={{ pointerEvents: 'auto' }}>{onExit ? <Boton onClick={onExit} color={T.suave}>← Volver</Boton> : null}</span>
+                <span style={{ pointerEvents: 'auto' }}><BotonSonido /></span>
+            </div>
+            <div style={{ marginTop: 64 }}><TituloWordle tam={Math.min(64, (anchoVentana - 60) / 7)} /></div>
+            <p style={{ color: T.suave, textAlign: 'center', maxWidth: 480, lineHeight: 1.5, margin: '18px 0 20px' }}>
+                Adivina la palabra secreta en 6 intentos. <span style={{ color: W.correcta, fontWeight: 800 }}>Verde</span>: letra en su sitio · <span style={{ color: W.presente, fontWeight: 800 }}>amarillo</span>: está en otro sitio.
+            </p>
 
-            {/* ZONA 1: JUEGO ALEATORIO */}
-            <div style={styles.card}>
-                <div style={{ marginBottom: '20px' }}>
-                    <label style={styles.label}><Globe size={16} style={{ verticalAlign: 'middle' }} /> Idioma</label>
-                    <div style={{ display: 'flex', gap: '5px', justifyContent: 'center' }}>
-                        {Object.keys(LANGUAGES).map(k => (
-                            <button key={k} onClick={() => setConfig({ ...config, lang: k })} style={{ ...styles.optionBtn, background: config.lang === k ? '#3F51B5' : '#eee', color: config.lang === k ? 'white' : '#333' }}>{LANGUAGES[k].label}</button>
-                        ))}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', maxWidth: 520, alignItems: 'stretch' }}>
+                {/* JUEGO ALEATORIO */}
+                <Tarjeta style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                    <div>
+                        <div style={etq}>🌐 Idioma</div>
+                        <Opciones color={W.correcta} valor={config.lang} onChange={k => setConfig({ ...config, lang: k })} opciones={Object.keys(LANGUAGES).map(k => [k, LANGUAGES[k].label])} />
                     </div>
-                </div>
-                <div style={{ marginBottom: '20px' }}>
-                    <label style={styles.label}>Longitud: {config.length} Letras</label>
-                    <input type="range" min="4" max="8" step="1" value={config.length} onChange={(e) => setConfig({ ...config, length: parseInt(e.target.value) })} style={{ width: '100%', cursor: 'pointer' }} />
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#666' }}><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span></div>
-                </div>
-                {/* BOTÓN JUGAR: AHORA LLEVA A ELEGIR MODO */}
-                <button style={{ ...styles.btn, ...styles.btnPrimary }} onClick={() => cargarDiccionarioYJugar(null, null, false)}>JUGAR</button>
-            </div>
-
-            {/* ZONA 2: CÓDIGO DE PROFE */}
-            <div style={{ ...styles.card, marginTop: '15px', background: '#e3f2fd', border: '1px solid #90caf9' }}>
-                <label style={{ ...styles.label, color: '#1565c0' }}><BookOpen size={16} style={{ verticalAlign: 'middle' }} /> Jugar Desafío</label>
-                <div style={{ display: 'flex', gap: '5px' }}>
-                    <input value={customCode} onChange={e => setCustomCode(e.target.value.toUpperCase())} placeholder="CÓDIGO..." style={styles.inputCode} maxLength={6} />
-                    <button onClick={cargarNivelPersonalizado} style={styles.btnSearch}><Search size={20} /></button>
-                </div>
-            </div>
-
-            {/* ZONA 3: BUSCADOR */}
-            <div style={{ ...styles.card, marginTop: '15px', background: '#e8f5e9', border: '1px solid #81c784' }}>
-                <h3 style={{ color: '#2e7d32', display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'center' }}><Search size={20} /> Explorar</h3>
-                <button onClick={buscarRecursosPublicos} style={{ ...styles.button, borderRadius: '10px', width: '100%', background: '#2e7d32', color: 'white', border: 'none', padding: '10px', fontWeight: 'bold', cursor: 'pointer' }}>
-                    {buscando ? 'Buscando...' : '🔍 Buscar Wordles Públicos'}
-                </button>
-                {/* (Aquí iría tu lista de resultados horizontal si quieres mantenerla) */}
-                {bibliotecaWordle.length > 0 && (
-                    <div style={{ marginTop: '15px', display: 'flex', overflowX: 'auto', gap: '10px', paddingBottom: '10px' }}>
-                        {bibliotecaWordle.map(r => (
-                            <div key={r.id} onClick={() => procesarRecurso(r)} style={{ minWidth: '150px', background: 'white', padding: '10px', borderRadius: '10px', fontSize: '0.8rem', cursor: 'pointer', border: '1px solid #ccc' }}>
-                                <b>{r.titulo}</b>
-                            </div>
-                        ))}
+                    <div>
+                        <div style={etq}>Letras</div>
+                        <Opciones color={W.correcta} valor={config.length} onChange={n => setConfig({ ...config, length: n })} opciones={[4, 5, 6, 7, 8].map(n => [n, String(n)])} />
                     </div>
-                )}
+                    <Boton onClick={() => { despertarAudio(); cargarDiccionarioYJugar(null, null, false); }} color={W.correcta} relleno grande>▶ JUGAR</Boton>
+                    {message && <div style={{ color: T.rojo, textAlign: 'center', fontWeight: 700 }}>⚠ {message}</div>}
+                </Tarjeta>
+
+                {/* CÓDIGO DE PROFE */}
+                <Tarjeta style={{ border: `1px solid ${T.cian}55` }}>
+                    <div style={{ ...etq, color: T.cian }}>📘 Jugar desafío del profe</div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <input value={customCode} onChange={e => setCustomCode(e.target.value.toUpperCase())} placeholder="CÓDIGO" maxLength={6}
+                            style={{ flex: 1, minWidth: 0, padding: '12px', fontSize: '1.2rem', letterSpacing: 4, textAlign: 'center', borderRadius: 12, border: `1.5px solid ${T.cian}66`, background: 'rgba(255,255,255,0.06)', color: 'white', fontWeight: 800, fontFamily: FUENTE, outline: 'none' }} />
+                        <Boton onClick={cargarNivelPersonalizado} color={T.cian} relleno><Search size={20} /></Boton>
+                    </div>
+                </Tarjeta>
+
+                {/* BUSCADOR */}
+                <Tarjeta style={{ border: `1px solid ${T.lila}55` }}>
+                    <Boton onClick={buscarRecursosPublicos} color={T.lila} style={{ width: '100%' }}>{buscando ? 'Buscando…' : '🔍 Explorar Wordles públicos'}</Boton>
+                    {bibliotecaWordle.length > 0 && (
+                        <div style={{ marginTop: 14, display: 'flex', overflowX: 'auto', gap: 10, paddingBottom: 6 }}>
+                            {bibliotecaWordle.map(r => (
+                                <button key={r.id} className="nl-btn" onClick={() => procesarRecurso(r)} style={{ minWidth: 150, padding: '12px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', fontFamily: FUENTE, fontSize: '0.85rem', fontWeight: 700, color: T.texto, background: `${T.lila}18`, border: `1px solid ${T.lila}66` }}>
+                                    {r.titulo}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </Tarjeta>
+
+                {/* ENLACE A VANILA (mismo diccionario, con tildes) */}
+                <a href={`/vanila?idioma=${(config.lang || 'ES').toLowerCase()}`} className="nl-btn" style={{
+                    display: 'flex', alignItems: 'center', gap: 14, textDecoration: 'none', padding: '16px 20px', borderRadius: 22,
+                    background: `linear-gradient(135deg, ${T.lila}33, rgba(20,18,45,0.9))`, border: `2px solid ${T.lila}`, color: T.texto, boxShadow: `0 0 24px ${T.lila}33`,
+                }}>
+                    <span style={{ display: 'flex', gap: 3 }}>{['V', 'A', 'N'].map((l, i) => <span key={l} style={{ width: 22, height: 24, borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '0.8rem', border: `1.5px solid ${i === 1 ? T.cian : T.lila}`, background: `${i === 1 ? T.cian : T.lila}33` }}>{l}</span>)}</span>
+                    <span style={{ flex: 1 }}>
+                        <b style={{ color: T.lila, fontSize: '1.05rem' }}>¿Te gusta? Prueba VaniLa</b><br />
+                        <span style={{ fontSize: '0.85rem', color: T.suave }}>9 letras contrarreloj, con tildes. Solo, duelo o tablero con amigos.</span>
+                    </span>
+                    <span style={{ fontSize: '1.4rem' }}>›</span>
+                </a>
             </div>
-        </div>
-    </div>
+        </Pantalla>
     );
 }
 
-// ESTILOS
-const styles = {
-    screen: { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: '#2c3e50', zIndex: 5000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', fontFamily: "'Roboto', sans-serif", overflowY: 'auto', padding: '20px 0', WebkitOverflowScrolling: 'touch' },
-    backBtn: { position: 'absolute', top: '10px', left: '10px', background: 'white', border: 'none', borderRadius: '20px', padding: '5px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 'bold', zIndex: 6000 },
-    card: { background: '#fffacb', padding: '2rem', borderRadius: '20px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', maxWidth: '500px', width: '80%', textAlign: 'center', marginBottom: '20px' },
-    h1: { fontSize: '1.8rem', textTransform: 'uppercase', letterSpacing: '2px', margin: '10px 0', color: '#f1c40f' },
-    label: { display: 'block', fontWeight: 'bold', marginBottom: '10px', color: '#555', fontSize: '0.9rem' },
-    optionBtn: { padding: '8px 12px', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' },
-    btn: { padding: '15px', fontSize: '1.1rem', borderRadius: '5px', margin: '8px 0', border: 'none', cursor: 'pointer', fontWeight: 'bold', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' },
-    btnPrimary: { backgroundColor: '#538d4e', color: 'white' },
-    btnSecondary: { backgroundColor: '#818384', color: 'white' },
-    btnOutline: { background: 'transparent', border: '2px solid #3a3a3c', color: '#fff', padding: '10px 20px', borderRadius: '5px', cursor: 'pointer' },
-    inputCode: { flex: 1, padding: '12px', fontSize: '1.2rem', textAlign: 'center', borderRadius: '5px', border: '1px solid #90caf9', outline: 'none' },
-    btnSearch: { background: '#1565c0', color: 'white', border: 'none', borderRadius: '5px', padding: '0 15px', cursor: 'pointer' },
+// ─── Estética ────────────────────────────────────────────────────────────────
+const Z_WORDLE = 5000;
+// Colores de las casillas (claves = estados de estadoCelda)
+// «ausente» en rojo apagado: se distingue bien del fondo oscuro y de las casillas vacías
+const W = { correcta: '#22c55e', presente: '#eab308', ausente: '#b4383d' };
+const GRIS_TITULO = '#334155';
+const WORDLE_CSS = `
+@keyframes wlGira { 0% { transform: rotateX(90deg); filter: brightness(1.6) } 60% { transform: rotateX(-12deg) } 100% { transform: rotateX(0); filter: none } }
+`;
 
-    // Grid Wordle
-    header: { padding: '10px', width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-    timer: { fontFamily: "'Roboto Mono', monospace", background: 'white', padding: '5px 10px', borderRadius: '4px', fontWeight: 'bold' },
-    gridScroll: { flexGrow: 1, overflowY: 'auto', width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', paddingTop: '10px' },
-    gridContainer: { display: 'flex', flexDirection: 'column', gap: '5px' },
-    row: { display: 'flex', gap: '5px', marginBottom: '5px', justifyContent: 'center' },
-    cell: { width: '45px', height: '45px', border: '2px solid #3a3a3c', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '22px', fontWeight: 'bold', textTransform: 'uppercase', color: 'white' },
-    correct: { backgroundColor: '#538d4e', borderColor: '#538d4e' },
-    present: { backgroundColor: '#b59f3b', borderColor: '#b59f3b' },
-    absent: { backgroundColor: '#3a3a3c', borderColor: '#3a3a3c' },
-    keyboard: { display: 'flex', flexDirection: 'column', gap: '6px', width: '95%', maxWidth: '500px', padding: '10px', paddingBottom: '30px' },
-    key: { color: 'white', padding: '15px 0', border: 'none', borderRadius: '4px', fontSize: '1.1rem', fontWeight: 'bold', cursor: 'pointer', flex: 1, minWidth: '25px' },
-    toast: { position: 'absolute', top: '15%', background: 'white', color: 'black', padding: '10px 20px', borderRadius: '20px', fontWeight: 'bold', transition: 'opacity 0.3s', pointerEvents: 'none', zIndex: 6000 },
+// Título W-O-R-D-L-E con fichas de colores animadas
+function TituloWordle({ tam = 56 }) {
+    const colores = [W.correcta, W.presente, GRIS_TITULO, W.correcta, W.presente, W.correcta];
+    return (
+        <div style={{ display: 'flex', gap: tam * 0.12, justifyContent: 'center' }}>
+            {[...'WORDLE'].map((l, i) => {
+                const c = colores[i];
+                return (
+                    <div key={i} className="nl-anim" style={{
+                        width: tam, height: tam, borderRadius: tam * 0.2, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontWeight: 900, fontSize: tam * 0.56, color: '#fff', fontFamily: FUENTE, textShadow: '0 1px 3px rgba(0,0,0,0.4)',
+                        background: `linear-gradient(160deg, ${c}, ${c}99)`, boxShadow: c === GRIS_TITULO ? 'none' : `0 0 18px ${c}77`,
+                        border: `2px solid ${c}`, '--r': `${(i % 2 ? 1 : -1) * 3}deg`,
+                        animation: `wlGira .6s ease ${i * 0.1}s both, nlFlota 2.6s ease-in-out ${1 + i * 0.12}s infinite`,
+                    }}>{l}</div>
+                );
+            })}
+        </div>
+    );
+}
 
-    inputName: { padding: '10px', width: '200px', textAlign: 'center', borderRadius: '5px', border: 'none', marginBottom: '10px', fontSize: '1rem' },
-    miniInputFilter: { background: '#fffacb', padding: '8px', borderRadius: '6px', border: '1px solid #ccc', fontSize: '13px', width: '100%', boxSizing: 'border-box' },
-
-
-};
+const Tecla = ({ children, onClick, ancho, color, relleno }) => (
+    <button className="nl-btn" onClick={onClick} style={{
+        width: ancho, height: Math.max(44, ancho * 1.25), padding: 0, borderRadius: 10, cursor: 'pointer', flexShrink: 1, minWidth: 0,
+        fontFamily: FUENTE, fontWeight: 900, fontSize: Math.max(13, ancho * 0.42), color: '#fff',
+        border: `1.5px solid ${color || 'rgba(255,255,255,0.14)'}`,
+        background: relleno && color ? `linear-gradient(160deg, ${color}, ${color}bb)` : 'rgba(255,255,255,0.07)',
+        boxShadow: relleno && color && color !== W.ausente ? `0 0 12px ${color}66` : 'none',
+        opacity: relleno && color === W.ausente ? 0.8 : 1,
+    }}>{children}</button>
+);

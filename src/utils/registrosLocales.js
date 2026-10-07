@@ -55,6 +55,7 @@ export const JUEGOS_REGISTRO_META = {
     BUNKER:              { nombre: 'Bunker',              emoji: '🎯', color: '#27ae60' },
     ENIGMIC:             { nombre: 'Enigmic',             emoji: '🕵️', color: '#7c3aed' },
     SIXSEVEN:            { nombre: 'Six Seven',           emoji: '🔢', color: '#FF007F' },
+    VANILA:              { nombre: 'VaniLa',              emoji: '🔤', color: '#A78BFA' },
     CALAMAR:             { nombre: 'Luz roja · Luz verde', emoji: '🦑', color: '#e6317f' },
     VISOR_3D:            { nombre: 'Visor 3D',            emoji: '🧊', color: '#0d9488' },
     ESCULPIR_3D:         { nombre: 'Taller de escultura', emoji: '🗿', color: '#b45309' },

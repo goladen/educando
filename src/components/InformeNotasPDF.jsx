@@ -191,6 +191,87 @@ export default function InformeNotasPDF({
         setGenerando(false);
     };
 
+    // ── Copiar para correo (HTML con estilos en línea + texto plano) ──────────
+    const [copiado, setCopiado] = useState(false);
+
+    const textoCriterio = () => activos.length
+        ? 'Criterio: ' + activos.map(c => `${c.label}${hojas.length > 1 ? ` (${c.hoja.nombre})` : ''} < ${String(criterios[c.key]).replace('.', ',')}`)
+            .join(modo === 'todos' ? ' y ' : ' o ')
+          + (conRecup ? ' (teniendo en cuenta la recuperación)' : '')
+        : '';
+
+    const celdaInforme = (c, alumnoId) => {
+        const v = valorCriterio(c, alumnoId);
+        const u = aNum(criterios[c.key]);
+        const bajo = !isNaN(v) && (!isNaN(u) ? v < u : v < 5);
+        let txt = fmt(v);
+        if (conRecup && c.col && c.tieneRecup) {
+            const orig = valorDe(c.hoja, alumnoId, c.col, false);
+            if (!isNaN(orig) && orig !== v) txt += ` (ex. ${fmt(orig)})`;
+        }
+        return { txt, bajo, vacio: isNaN(v) };
+    };
+
+    const copiarCorreo = async () => {
+        if (!seleccionados.length) { alert('No hay alumnos seleccionados.'); return; }
+        const esc = (t) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+        const etiqueta = (c) => `${c.label}${hojas.length > 1 ? ` (${c.hoja.nombre})` : ''}`;
+        const td = 'padding:6px 10px;border:1px solid #d0d7e2;font-family:Arial,sans-serif;font-size:13px;';
+        const nCols = 1 + columnasInforme.length;
+        const fecha = new Date().toLocaleDateString('es-ES');
+
+        const filasHtml = seleccionados.map((a, i) => {
+            const bg = i % 2 ? '#f5f7fa' : '#ffffff';
+            const celdas = columnasInforme.map(c => {
+                const { txt, bajo, vacio } = celdaInforme(c, a.id);
+                const color = vacio ? '#999999' : bajo ? '#c62828' : '#2e7d32';
+                return `<td style="${td}text-align:center;color:${color};${bajo ? 'font-weight:bold;' : ''}">${esc(txt)}</td>`;
+            }).join('');
+            const o = (obs[a.id] || '').trim();
+            return `<tr style="background:${bg};"><td style="${td}">${esc(a.nombre)}</td>${celdas}</tr>`
+                + (o ? `<tr style="background:${bg};"><td colspan="${nCols}" style="${td}font-style:italic;color:#5a4614;">Observaciones: ${esc(o)}</td></tr>` : '');
+        }).join('');
+
+        const html = `<div style="font-family:Arial,sans-serif;">`
+            + `<h2 style="color:#1565C0;font-size:18px;margin:0 0 4px;">${esc(titulo)}</h2>`
+            + `<p style="color:#666;font-size:12px;margin:0 0 6px;">Grupo: ${esc(grupo.nombre)} · Fecha: ${fecha} · Alumnos: ${seleccionados.length} de ${alumnos.length}</p>`
+            + (textoCriterio() ? `<p style="color:#777;font-size:12px;margin:0 0 8px;">${esc(textoCriterio())}</p>` : '')
+            + (obsGeneral.trim() ? `<p style="font-size:13px;margin:0 0 10px;">${esc(obsGeneral.trim())}</p>` : '')
+            + `<table style="border-collapse:collapse;"><thead><tr>`
+            + `<th style="${td}background:#1565C0;color:#ffffff;text-align:left;">Alumno/a</th>`
+            + columnasInforme.map(c => `<th style="${td}background:#1565C0;color:#ffffff;text-align:center;">${esc(etiqueta(c))}</th>`).join('')
+            + `</tr></thead><tbody>${filasHtml}</tbody></table></div>`;
+
+        const texto = [
+            titulo,
+            `Grupo: ${grupo.nombre} · Fecha: ${fecha} · Alumnos: ${seleccionados.length} de ${alumnos.length}`,
+            textoCriterio(),
+            obsGeneral.trim(),
+            '',
+            ...seleccionados.flatMap(a => {
+                const notas = columnasInforme.map(c => `${etiqueta(c)}: ${celdaInforme(c, a.id).txt}`).join(' · ');
+                const o = (obs[a.id] || '').trim();
+                return [`- ${a.nombre}${notas ? ` — ${notas}` : ''}`, ...(o ? [`    Observaciones: ${o}`] : [])];
+            }),
+        ].filter((l, i) => l !== '' || i === 4).join('\n');
+
+        try {
+            if (window.ClipboardItem && navigator.clipboard?.write) {
+                await navigator.clipboard.write([new ClipboardItem({
+                    'text/html':  new Blob([html],  { type: 'text/html' }),
+                    'text/plain': new Blob([texto], { type: 'text/plain' }),
+                })]);
+            } else {
+                await navigator.clipboard.writeText(texto);
+            }
+            setCopiado(true);
+            setTimeout(() => setCopiado(false), 2500);
+            if (onGuardarObservaciones) onGuardarObservaciones(obs).catch(e => console.error('Error guardando observaciones:', e));
+        } catch (e) {
+            alert('No se pudo copiar al portapapeles: ' + e.message);
+        }
+    };
+
     // ── UI ────────────────────────────────────────────────────────────────────
     const hojasVisibles = hojaFiltro === 'TODAS' ? hojas : hojas.filter(h => h.id === hojaFiltro);
 
@@ -323,6 +404,11 @@ export default function InformeNotasPDF({
 
                 <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                     <button onClick={onClose} style={s.btnSec}>Cancelar</button>
+                    <button onClick={copiarCorreo} disabled={!seleccionados.length}
+                        title="Copia el informe como tabla para pegarlo en un correo (Gmail, Outlook…)"
+                        style={{ ...s.btnSec, borderColor: copiado ? '#27ae60' : '#d0d7e2', color: copiado ? '#27ae60' : '#2c3e50', opacity: !seleccionados.length ? 0.6 : 1 }}>
+                        {copiado ? '✓ Copiado, pégalo en el correo' : '✉ Copiar para correo'}
+                    </button>
                     <button onClick={generarPDF} disabled={generando || !seleccionados.length}
                         style={{ ...s.btnPri, opacity: generando || !seleccionados.length ? 0.6 : 1 }}>
                         <FileText size={15}/> {generando ? 'Generando…' : 'Descargar PDF'}

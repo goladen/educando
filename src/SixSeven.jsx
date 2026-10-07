@@ -2,6 +2,8 @@
 // Efecto propio: «6» y «7» que suben flotando como los corazones de un directo (lanzar67).
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { guardarRegistroLocal } from './utils/registrosLocales';
+import { db } from './firebase';
+import { collection, query, where, getDocs, addDoc, orderBy, limit } from 'firebase/firestore';
 
 // ─── Partículas 6/7 ──────────────────────────────────────────────────────────
 const emisor67 = new Set();
@@ -339,7 +341,7 @@ const InfoModal = ({ isOpen, onClose, title, content }) => {
   );
 };
 
-const WinScreen = ({ score, onMenu, onRestart, message = "GOD TIER", color = theme.neonGreen }) => {
+const WinScreen = ({ score, onMenu, onRestart, message = "GOD TIER", color = theme.neonGreen, children }) => {
   useChorro67(160, 2, true);
   return (
   <div style={{ textAlign: 'center', padding: '20px 0', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 10 }}>
@@ -378,6 +380,7 @@ const WinScreen = ({ score, onMenu, onRestart, message = "GOD TIER", color = the
         textShadow: `0 0 30px ${theme.neonCyan}`, animation: 'dance7 0.6s infinite cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.1s'
       }}>7</div>
     </div>
+    {children}
     <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', justifyContent: 'center' }}>
        <button style={{...styles.btnPrimary, width: 'auto', padding: '15px 30px', background: color, color: '#000'}} onClick={onRestart}>
          PLAY AGAIN
@@ -390,7 +393,211 @@ const WinScreen = ({ score, onMenu, onRestart, message = "GOD TIER", color = the
   );
 };
 
-const ArcadeGame = ({ onBack, timeLimit }) => {
+// Pantalla para elegir nivel (Speed Run y Target 67)
+const SelectorNivel = ({ titulo, normal, dificil, onElegir, onBack }) => (
+  <div style={styles.wrapper}>
+    <div style={styles.glassCard}>
+      <h2 style={{...styles.glitchTitle, fontSize: 'clamp(2rem, 6vw, 4rem)', marginBottom: '30px', marginTop: '10px'}}>{titulo}</h2>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', width: '100%', maxWidth: '400px' }}>
+        <button style={{...styles.btnPrimary, background: `linear-gradient(90deg, #0072FF, ${theme.neonCyan})`, boxShadow: `0 0 20px rgba(0,240,255,0.4)`}} onClick={() => { audioManager.init(); onElegir('normal'); }}>
+          <span>Normal</span>
+          <span style={{ fontSize: '0.9rem', color: 'rgba(0,0,0,0.6)', letterSpacing: '1px', fontWeight: 'bold', textTransform: 'none' }}>{normal}</span>
+        </button>
+        <button style={styles.btnPrimary} onClick={() => { audioManager.init(); onElegir('hard'); }}>
+          <span>Hard</span>
+          <span style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.75)', letterSpacing: '1px', fontWeight: 'normal', textTransform: 'none' }}>{dificil}</span>
+        </button>
+      </div>
+      <button style={{...styles.btnSecondary, marginTop: '30px'}} onClick={onBack}>← MAIN MENU</button>
+    </div>
+  </div>
+);
+
+// ─── Ranking (colección compartida `ranking`, tipoJuego SIXSEVEN) ────────────
+// Un ranking por variante: recursoId = 'sixseven-<juego>-<opciones>'. Empate → gana el más antiguo.
+const RANKING_VARIANTES = {
+  arcade: {
+    titulo: 'Speed Run',
+    dims: [
+      { key: 'nivel', ops: [['normal', 'Normal'], ['hard', 'Hard']] },
+      { key: 'tiempo', ops: [['13', '13 s'], ['inf', 'Sin tiempo']] },
+    ],
+  },
+  matrix: {
+    titulo: 'Neon Grid',
+    dims: [
+      { key: 'modo', ops: [['add', '+'], ['sub', '−'], ['mul', '×'], ['div', '÷'], ['multiples', 'Múltiplos']] },
+      { key: 'tiempo', ops: [['67', '67 s'], ['130', '130 s']] },
+    ],
+  },
+};
+const claveRanking = (juego, sel) => `sixseven-${juego}-${RANKING_VARIANTES[juego].dims.map(d => sel[d.key]).join('-')}`;
+const tituloRanking = (juego, sel) => `Six Seven · ${RANKING_VARIANTES[juego].titulo} · ${RANKING_VARIANTES[juego].dims.map(d => (d.ops.find(o => o[0] === sel[d.key]) || [])[1]).join(' · ')}`;
+const msFecha = (f) => (f?.toMillis ? f.toMillis() : f instanceof Date ? f.getTime() : (f?.seconds || 0) * 1000);
+const KEY_NOMBRE = 'pikt_sixseven_nombre';
+
+const cargarRanking = async (clave) => {
+  let docs;
+  try {
+    const snap = await getDocs(query(collection(db, 'ranking'), where('recursoId', '==', clave), where('tipoJuego', '==', 'SIXSEVEN'), orderBy('aciertos', 'desc'), limit(100)));
+    docs = snap.docs;
+  } catch (e) {
+    // Sin índice compuesto: se ordena en el cliente (el aviso trae el enlace para crear el índice)
+    console.warn('[SixSeven] Ranking sin índice, ordenando en el cliente:', e?.message);
+    const snap = await getDocs(query(collection(db, 'ranking'), where('recursoId', '==', clave), where('tipoJuego', '==', 'SIXSEVEN'), limit(500)));
+    docs = snap.docs;
+  }
+  return docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (b.aciertos - a.aciertos) || (msFecha(a.fecha) - msFecha(b.fecha)))
+    .slice(0, 10);
+};
+
+// Panel de ranking. Con `jugada` ({ juego, sel, puntos }) permite guardar esa puntuación.
+const RankingSixSeven = ({ juegoInicial = 'arcade', selInicial = null, jugada = null, usuario = null, onClose }) => {
+  const [juego, setJuego] = useState(jugada?.juego || juegoInicial);
+  const selPorDefecto = (j) => Object.fromEntries(RANKING_VARIANTES[j].dims.map(d => [d.key, d.ops[0][0]]));
+  const [sel, setSel] = useState(jugada?.sel || selInicial || selPorDefecto(juegoInicial));
+  const [filas, setFilas] = useState([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState('');
+  const [nombre, setNombre] = useState(() => { try { return localStorage.getItem(KEY_NOMBRE) || ''; } catch { return ''; } });
+  const [guardando, setGuardando] = useState(false);
+  const [miId, setMiId] = useState(null);
+  const conSesion = !!usuario?.email;
+  const clave = claveRanking(juego, sel);
+  const puedeGuardar = jugada && jugada.puntos > 0 && claveRanking(jugada.juego, jugada.sel) === clave && !miId;
+
+  useEffect(() => {
+    let vivo = true;
+    setCargando(true); setError('');
+    cargarRanking(clave)
+      .then(f => { if (vivo) setFilas(f); })
+      .catch(() => { if (vivo) setError('No se pudo cargar el ranking.'); })
+      .finally(() => { if (vivo) setCargando(false); });
+    return () => { vivo = false; };
+  }, [clave, miId]);
+
+  const guardar = async () => {
+    const jugador = conSesion ? (usuario.displayName || usuario.email.split('@')[0]) : nombre.trim().slice(0, 24);
+    if (!jugador) { setError('Escribe tu nombre para el ranking.'); return; }
+    setGuardando(true); setError('');
+    try {
+      if (!conSesion) { try { localStorage.setItem(KEY_NOMBRE, jugador); } catch { /* ignorar */ } }
+      const ref = await addDoc(collection(db, 'ranking'), {
+        recursoId: clave,
+        recursoTitulo: tituloRanking(juego, sel),
+        tipoJuego: 'SIXSEVEN',
+        juego: 'Six Seven',
+        jugador,
+        email: conSesion ? usuario.email : 'invitado',
+        aciertos: jugada.puntos,
+        fecha: new Date(),
+        categoria: clave.replace('sixseven-', ''),
+      });
+      setMiId(ref.id);
+      lanzar67(undefined, undefined, 12);
+    } catch { setError('Error al guardar. Inténtalo de nuevo.'); }
+    setGuardando(false);
+  };
+
+  const chip = (activo, color) => ({
+    padding: '8px 14px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.95rem',
+    background: activo ? color : 'transparent', color: activo ? '#000' : theme.text,
+    border: `2px solid ${activo ? color : 'rgba(255,255,255,0.2)'}`, transition: 'all 0.2s',
+  });
+  const posicionMia = miId ? filas.findIndex(f => f.id === miId) : -1;
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 250, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', overflowY: 'auto' }}>
+      <div style={{ ...styles.glassCard, maxWidth: '520px', border: `2px solid ${theme.neonPurple}`, boxShadow: `0 0 30px ${theme.neonPurple}`, padding: 'clamp(18px, 4vw, 30px)' }}>
+        <h2 style={{ color: theme.neonCyan, margin: '0 0 14px', fontSize: 'clamp(1.5rem, 5vw, 2rem)', textTransform: 'uppercase', textShadow: `0 0 12px ${theme.neonCyan}` }}>🏆 Ranking</h2>
+
+        {!jugada && (
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+            {Object.keys(RANKING_VARIANTES).map(j => (
+              <button key={j} style={chip(juego === j, theme.neonPink)} onClick={() => { setJuego(j); setSel(selPorDefecto(j)); }}>{RANKING_VARIANTES[j].titulo}</button>
+            ))}
+          </div>
+        )}
+        {RANKING_VARIANTES[juego].dims.map(d => (
+          <div key={d.key} style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '10px' }}>
+            {d.ops.map(([v, label]) => (
+              <button key={v} style={chip(sel[d.key] === v, theme.neonCyan)} onClick={() => setSel(s => ({ ...s, [d.key]: v }))}>{label}</button>
+            ))}
+          </div>
+        ))}
+
+        <div style={{ width: '100%', background: 'rgba(0,0,0,0.35)', borderRadius: '14px', padding: '8px 12px', margin: '6px 0 14px', minHeight: '120px', boxShadow: 'inset 0 0 20px rgba(0,0,0,0.6)' }}>
+          {cargando ? <div style={{ color: theme.muted, padding: '16px', textAlign: 'center' }}>LOADING...</div>
+            : filas.length === 0 ? <div style={{ color: theme.muted, padding: '16px', textAlign: 'center' }}>Sin puntuaciones todavía. ¡Sé el primero!</div>
+            : filas.map((f, i) => {
+              const mia = f.id === miId;
+              const color = i === 0 ? '#FFD700' : i === 1 ? '#C0C0C0' : i === 2 ? '#CD7F32' : theme.muted;
+              return (
+                <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 4px', borderBottom: '1px solid rgba(255,255,255,0.07)', background: mia ? 'rgba(57,255,20,0.12)' : 'transparent', borderRadius: mia ? '8px' : 0 }}>
+                  <span style={{ width: '34px', fontWeight: 900, color }}>#{i + 1}</span>
+                  <span style={{ flex: 1, textAlign: 'left', fontWeight: mia ? 900 : 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.jugador}</span>
+                  <span style={{ color: theme.muted, fontSize: '0.8rem' }}>{msFecha(f.fecha) ? new Date(msFecha(f.fecha)).toLocaleDateString() : ''}</span>
+                  <span style={{ fontWeight: 900, color: theme.neonCyan, minWidth: '64px', textAlign: 'right' }}>{f.aciertos}</span>
+                </div>
+              );
+            })}
+        </div>
+
+        {miId && (
+          <div style={{ color: theme.neonGreen, fontWeight: 'bold', marginBottom: '12px', textAlign: 'center' }}>
+            ¡Guardado! {posicionMia >= 0 ? `Estás en el puesto #${posicionMia + 1}` : 'Todavía fuera del top 10'}
+          </div>
+        )}
+        {puedeGuardar && (
+          <div style={{ display: 'flex', gap: '8px', width: '100%', marginBottom: '12px', flexWrap: 'wrap' }}>
+            {!conSesion && (
+              <input value={nombre} maxLength={24} placeholder="Tu nombre" onChange={e => setNombre(e.target.value)}
+                style={{ flex: '1 1 160px', padding: '12px', borderRadius: '12px', border: `2px solid ${theme.neonCyan}`, background: 'rgba(0,0,0,0.4)', color: '#fff', fontSize: '1rem', outline: 'none' }} />
+            )}
+            <button disabled={guardando} onClick={guardar} style={{ ...styles.btnPrimary, flex: '1 1 160px', width: 'auto', padding: '12px', fontSize: '1rem', background: theme.neonGreen, color: '#000', opacity: guardando ? 0.6 : 1 }}>
+              {guardando ? 'GUARDANDO...' : `GUARDAR ${jugada.puntos} PTS`}
+            </button>
+          </div>
+        )}
+        {error && <div style={{ color: theme.neonPink, marginBottom: '10px' }}>{error}</div>}
+        <button style={styles.btnSecondary} onClick={onClose}>CERRAR</button>
+      </div>
+    </div>
+  );
+};
+
+// Speed Run: puntos por respuesta según lo rápido que se acierte (referencia: 13 s)
+const puntosPorTiempo = (seg) => 100 + Math.round(900 * Math.max(0, 1 - seg / 13));
+const etiquetaVelocidad = (seg) =>
+  seg < 2.5 ? { texto: '⚡ ¡RAYO!', color: theme.neonGreen }
+  : seg < 5 ? { texto: '🔥 RÁPIDO', color: theme.neonCyan }
+  : seg < 9 ? { texto: '👍 BIEN', color: '#FF9500' }
+  : { texto: '🐢 LENTO', color: theme.neonPink };
+
+// Distractores: en «hard» acaban en la misma cifra que la respuesta (no basta con mirar las unidades)
+const opcionesArcade = (ans, nivel) => {
+  const opts = new Set([ans]);
+  let guard = 0;
+  while (opts.size < 4 && guard++ < 200) {
+    let cand;
+    if (nivel === 'hard') {
+      const k = Math.floor(Math.random() * 3) + 1;
+      const paso = ans >= 150 && Math.random() < 0.3 ? 100 : 10;
+      cand = ans + (Math.random() > 0.5 ? k : -k) * paso;
+    } else {
+      const offset = Math.floor(Math.random() * 15) + 1;
+      cand = ans + (Math.random() > 0.5 ? offset : -offset);
+    }
+    if (cand >= 0) opts.add(cand);
+  }
+  for (let k = 1; opts.size < 4; k++) opts.add(ans + k * 10);
+  return Array.from(opts).sort(() => Math.random() - 0.5);
+};
+
+const ArcadeGame = ({ onBack, timeLimit, nivel = 'normal', usuario }) => {
+  const hard = nivel === 'hard';
   const [round, setRound] = useState(1);
   const maxTime = timeLimit === 'inf' ? null : timeLimit * 1000;
   const [time, setTime] = useState(maxTime);
@@ -398,6 +605,18 @@ const ArcadeGame = ({ onBack, timeLimit }) => {
   const [question, setQuestion] = useState(null);
   const [flash, setFlash] = useState(null);
   const [showInfo, setShowInfo] = useState(false);
+  const [score, setScore] = useState(0);
+  const [ultimo, setUltimo] = useState(null); // { pts, texto, color, seg, id } de la última respuesta
+  const [verRanking, setVerRanking] = useState(false);
+  const inicioPregunta = useRef(performance.now());
+  const pausaDesde = useRef(null);
+  const rankingSel = { nivel, tiempo: String(timeLimit) };
+
+  // El tiempo con la ayuda abierta no cuenta
+  useEffect(() => {
+    if (showInfo) pausaDesde.current = performance.now();
+    else if (pausaDesde.current != null) { inicioPregunta.current += performance.now() - pausaDesde.current; pausaDesde.current = null; }
+  }, [showInfo]);
 
   const generateQuestion = useCallback((currentRound) => {
     let q = '';
@@ -405,22 +624,25 @@ const ArcadeGame = ({ onBack, timeLimit }) => {
     const is67First = Math.random() > 0.5;
 
     if (currentRound <= 2) {
-      const b = Math.floor(Math.random() * 30) + 1;
+      const b = Math.floor(Math.random() * (hard ? 89 : 30)) + (hard ? 11 : 1);
       const isAdd = Math.random() > 0.5;
       if (isAdd) {
         q = is67First ? `67 + ${b}` : `${b} + 67`;
         ans = 67 + b;
+      } else if (is67First && b > 67) {
+        q = `${b} - 67`;
+        ans = b - 67;
       } else {
         q = is67First ? `67 - ${b}` : `${b + 67} - 67`;
         ans = is67First ? 67 - b : b;
       }
     } else if (currentRound <= 4) {
-      const b = Math.floor(Math.random() * 9) + 2;
+      const b = Math.floor(Math.random() * (hard ? 18 : 9)) + 2;
       q = is67First ? `67 × ${b}` : `${b} × 67`;
       ans = 67 * b;
     } else {
-      const b = Math.floor(Math.random() * 5) + 2;
-      const c = Math.floor(Math.random() * 20) + 1;
+      const b = Math.floor(Math.random() * (hard ? 8 : 5)) + 2;
+      const c = Math.floor(Math.random() * (hard ? 90 : 20)) + (hard ? 10 : 1);
       const isAdd = Math.random() > 0.5;
       if (isAdd) {
         q = is67First ? `67 × ${b} + ${c}` : `${c} + 67 × ${b}`;
@@ -431,16 +653,10 @@ const ArcadeGame = ({ onBack, timeLimit }) => {
       }
     }
     
-    let opts = new Set([ans]);
-    while (opts.size < 4) {
-        let offset = Math.floor(Math.random() * 15) + 1;
-        const cand = ans + (Math.random() > 0.5 ? offset : -offset);
-        if (cand >= 0) opts.add(cand);
-    }
-    
-    setQuestion({ q, ans, options: Array.from(opts).sort(() => Math.random() - 0.5) });
+    setQuestion({ q, ans, options: opcionesArcade(ans, nivel) });
     setTime(maxTime);
-  }, [maxTime]);
+    inicioPregunta.current = performance.now();
+  }, [maxTime, hard, nivel]);
 
   useEffect(() => generateQuestion(1), [generateQuestion]);
 
@@ -464,13 +680,20 @@ const ArcadeGame = ({ onBack, timeLimit }) => {
   useEffect(() => {
     if (status !== 'won' && status !== 'lost') return;
     const aciertos = status === 'won' ? 6 : round - 1;
-    guardarRegistroLocal('SIXSEVEN', { titulo: 'Six Seven · Speed Run', aciertos, intentos: status === 'won' ? 6 : round, via: 'juego' });
+    guardarRegistroLocal('SIXSEVEN', { titulo: `Six Seven · Speed Run${hard ? ' (hard)' : ''}`, aciertos, intentos: status === 'won' ? 6 : round, via: 'juego' });
   }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const reiniciar = () => { setRound(1); setScore(0); setUltimo(null); setVerRanking(false); setStatus('playing'); generateQuestion(1); setFlash(null); };
 
   const handleAnswer = (opt, e) => {
     if (status !== 'playing') return;
     if (opt === question.ans) {
-      lanzar67(e?.clientX, e?.clientY, round === 6 ? 14 : 4 + round);
+      const seg = (performance.now() - inicioPregunta.current) / 1000;
+      const pts = puntosPorTiempo(seg);
+      const et = etiquetaVelocidad(seg);
+      setScore(s => s + pts);
+      setUltimo({ pts, seg, ...et, id: Date.now() });
+      lanzar67(e?.clientX, e?.clientY, round === 6 ? 14 : seg < 2.5 ? 10 : seg < 5 ? 7 : 4);
       if (round === 6) {
         audioManager.play('win');
         setFlash(theme.neonGreen);
@@ -501,24 +724,54 @@ const ArcadeGame = ({ onBack, timeLimit }) => {
               <li style={{marginBottom: '10px'}}>Resuelve <strong>6 rondas</strong> de cálculo mental.</li>
               <li style={{marginBottom: '10px'}}>Atención: ¡El número <strong>67</strong> siempre forma parte de la operación!</li>
               <li style={{marginBottom: '10px'}}>{timeLimit !== 'inf' ? `Tienes ${timeLimit} segundos por ronda.` : 'No hay límite de tiempo.'}</li>
+              <li style={{marginBottom: '10px'}}>Cuanto más rápido aciertes, más puntos: de <strong>1000</strong> (al instante) a <strong>100</strong> (13 s o más). ⚡ Rayo &lt; 2,5 s · 🔥 Rápido &lt; 5 s · 👍 Bien &lt; 9 s · 🐢 Lento.</li>
+              {hard && <li style={{marginBottom: '10px'}}>Modo <strong>HARD</strong>: todas las opciones acaban en la misma cifra, ¡no basta con mirar las unidades!</li>}
               <li>¡Llega hasta el final para ver la celebración secreta!</li>
             </ul>
           } 
         />
 
+        {verRanking && (
+          <RankingSixSeven
+            jugada={status !== 'playing' ? { juego: 'arcade', sel: rankingSel, puntos: score } : null}
+            juegoInicial="arcade" selInicial={rankingSel} usuario={usuario}
+            onClose={() => setVerRanking(false)}
+          />
+        )}
+
         {status === 'won' ? (
-          <WinScreen message="¡SIX SEVEN SUPERADO!" color={theme.neonCyan} onMenu={onBack} onRestart={() => { setRound(1); setStatus('playing'); generateQuestion(1); setFlash(null); }} />
+          <WinScreen message="¡SIX SEVEN SUPERADO!" score={score} color={theme.neonCyan} onMenu={onBack} onRestart={reiniciar}>
+            <button style={{...styles.btnPrimary, width: 'auto', padding: '15px 30px', marginBottom: '20px', background: `linear-gradient(90deg, ${theme.neonPurple}, ${theme.neonPink})`}} onClick={() => setVerRanking(true)}>
+              🏆 GUARDAR EN RANKING
+            </button>
+          </WinScreen>
         ) : (
           <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', marginBottom: '30px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', marginBottom: '30px', gap: '10px', flexWrap: 'wrap' }}>
               <button style={styles.btnSecondary} onClick={onBack}>← ABORT</button>
               <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                <div style={{ color: theme.neonCyan, fontWeight: '900', fontSize: 'clamp(1.5rem, 4vw, 2.5rem)', letterSpacing: '2px' }}>
-                  LVL {round}/6
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ color: theme.neonCyan, fontWeight: '900', fontSize: 'clamp(1.5rem, 4vw, 2.5rem)', letterSpacing: '2px', lineHeight: 1.1 }}>
+                    {hard ? 'HARD · ' : ''}LVL {round}/6
+                  </div>
+                  <div style={{ color: theme.neonPink, fontWeight: '900', fontSize: 'clamp(1rem, 2.5vw, 1.4rem)', textShadow: `0 0 10px ${theme.neonPink}` }}>{score} PTS</div>
                 </div>
                 <button style={styles.btnInfo} onClick={() => { audioManager.init(); setShowInfo(true); }}>?</button>
               </div>
             </div>
+
+            {ultimo && status === 'playing' && (
+              <div key={ultimo.id} style={{ height: 0, overflow: 'visible', width: '100%', position: 'relative' }}>
+                <style>{`@keyframes popPts67 { 0% { transform: translate(-50%, 0) scale(0.6); opacity: 0; } 15% { transform: translate(-50%, -10px) scale(1.15); opacity: 1; } 75% { opacity: 1; } 100% { transform: translate(-50%, -40px) scale(1); opacity: 0; } }`}</style>
+                <div style={{
+                  position: 'absolute', left: '50%', top: '-24px', whiteSpace: 'nowrap', pointerEvents: 'none',
+                  fontWeight: 900, fontSize: 'clamp(1.1rem, 3vw, 1.6rem)', color: ultimo.color, textShadow: `0 0 12px ${ultimo.color}`,
+                  animation: 'popPts67 1.3s ease-out forwards',
+                }}>
+                  {ultimo.texto} +{ultimo.pts} <span style={{ opacity: 0.7, fontSize: '0.75em' }}>({ultimo.seg.toFixed(1)} s)</span>
+                </div>
+              </div>
+            )}
 
             {status === 'playing' && question && (
               <>
@@ -589,9 +842,19 @@ const ArcadeGame = ({ onBack, timeLimit }) => {
                     {question.ans}
                   </span>
                 </div>
-                <button style={{...styles.btnPrimary, background: theme.neonPink, color: '#000', maxWidth: '300px', margin: '0 auto'}} onClick={() => { setRound(1); setStatus('playing'); generateQuestion(1); setFlash(null); }}>
-                  RETRY
-                </button>
+                <div style={{ fontSize: 'clamp(1.3rem, 3vw, 2rem)', color: '#fff', marginBottom: '25px' }}>
+                  SCORE: <span style={{ color: theme.neonCyan, fontWeight: 900 }}>{score}</span>
+                </div>
+                <div style={{ display: 'flex', gap: '15px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                  <button style={{...styles.btnPrimary, background: theme.neonPink, color: '#000', maxWidth: '300px'}} onClick={reiniciar}>
+                    RETRY
+                  </button>
+                  {score > 0 && (
+                    <button style={{...styles.btnPrimary, maxWidth: '300px', background: `linear-gradient(90deg, ${theme.neonPurple}, ${theme.neonPink})`}} onClick={() => setVerRanking(true)}>
+                      🏆 RANKING
+                    </button>
+                  )}
+                </div>
               </div>
             )}
           </>
@@ -601,7 +864,80 @@ const ArcadeGame = ({ onBack, timeLimit }) => {
   );
 };
 
-const TargetGame = ({ onBack }) => {
+// Analiza todas las formas de llegar a `target` con subconjuntos de `nums` (programación dinámica por máscaras).
+// Devuelve el mínimo de números necesarios, si existe una vía solo con sumas/restas y una solución (preferiblemente con ÷).
+const LIMITE_TARGET = 2000;
+const analizarTablero = (nums, target) => {
+  const n = nums.length, FULL = (1 << n) - 1;
+  const reach = new Array(FULL + 1);
+  const bits = (m) => { let c = 0; while (m) { c += m & 1; m >>= 1; } return c; };
+  let minK = Infinity, soloSumas = false, mejor = null, mejorDiv = null;
+  for (let mask = 1; mask <= FULL; mask++) {
+    const m = new Map();
+    if (bits(mask) === 1) {
+      const v = nums[Math.log2(mask)];
+      m.set(v, { e: String(v), s: true, d: false });
+    } else {
+      const put = (v, e, s, d) => {
+        if (v < 1 || v > LIMITE_TARGET) return;
+        const old = m.get(v);
+        if (!old || (s && !old.s)) m.set(v, { e, s, d });
+      };
+      for (let a = (mask - 1) & mask; a > 0; a = (a - 1) & mask) {
+        const b = mask ^ a;
+        if (a < b) continue;
+        for (const [x, ex] of reach[a]) for (const [y, ey] of reach[b]) {
+          const s = ex.s && ey.s, d = ex.d || ey.d;
+          put(x + y, `(${ex.e} + ${ey.e})`, s, d);
+          if (x !== y) {
+            const [h, eh, l, el] = x > y ? [x, ex, y, ey] : [y, ey, x, ex];
+            put(h - l, `(${eh.e} - ${el.e})`, s, d);
+            if (l > 1 && h % l === 0) put(h / l, `(${eh.e} ÷ ${el.e})`, false, true);
+          }
+          if (x > 1 && y > 1) put(x * y, `(${ex.e} × ${ey.e})`, false, d);
+        }
+      }
+    }
+    reach[mask] = m;
+    const t = m.get(target);
+    if (t) {
+      const k = bits(mask);
+      if (t.s) soloSumas = true;
+      if (k < minK) { minK = k; mejor = t.e; }
+      if (t.d && !mejorDiv) mejorDiv = t.e;
+    }
+  }
+  const limpiar = (e) => e && e.startsWith('(') && e.endsWith(')') ? e.slice(1, -1) : e;
+  return { minK, soloSumas, solucion: limpiar(mejor), solucionDiv: limpiar(mejorDiv) };
+};
+
+const azar = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+
+const tableroTargetNormal = () => {
+  let b, s;
+  while (!s) {
+    b = [azar(1, 10), azar(1, 10), azar(1, 10), azar(1, 10), [25, 50, 75, 100][azar(0, 3)], [25, 50, 75, 100][azar(0, 3)]];
+    s = solveCountdown(b, 67);
+  }
+  return { numeros: b, solucion: s };
+};
+
+// Hard: sin vía solo de sumas/restas y sin solución con 4 números o menos (si tarda, se acepta 4) → hay que usar 5 o 6 números con × o ÷.
+const tableroTargetDificil = () => {
+  let reserva = null;
+  for (let intento = 0; intento < 80; intento++) {
+    const b = [azar(2, 10), azar(2, 10), azar(2, 10), azar(2, 10), azar(2, 10), [12, 15, 25, 50, 75, 100][azar(0, 5)]];
+    const r = analizarTablero(b, 67);
+    if (r.minK === Infinity || r.soloSumas) continue;
+    const res = { numeros: b, solucion: r.solucionDiv || r.solucion };
+    if (r.minK >= 5) return res;
+    if (r.minK >= 4 && !reserva) reserva = res;
+  }
+  return reserva || tableroTargetNormal();
+};
+
+const TargetGame = ({ onBack, nivel = 'normal' }) => {
+  const hard = nivel === 'hard';
   const [originalNums, setOriginalNums] = useState([]);
   const [nums, setNums] = useState([]);
   const [activeNum, setActiveNum] = useState(null);
@@ -612,24 +948,19 @@ const TargetGame = ({ onBack }) => {
   const [showSolutionModal, setShowSolutionModal] = useState(false);
 
   const generateNewBoard = useCallback(() => {
-    let b, s;
-    while (!s) {
-      b = [
-        Math.floor(Math.random() * 10) + 1, Math.floor(Math.random() * 10) + 1,
-        Math.floor(Math.random() * 10) + 1, Math.floor(Math.random() * 10) + 1,
-        [25, 50, 75, 100][Math.floor(Math.random() * 4)],
-        [25, 50, 75, 100][Math.floor(Math.random() * 4)]
-      ];
-      s = solveCountdown(b, 67);
-    }
-    setOriginalNums(b);
-    setNums(b);
-    setSolution(s);
-    setActiveNum(null);
-    setActiveOp(null);
-    setStatus('playing');
-    setShowSolutionModal(false);
-  }, []);
+    setStatus('loading');
+    // setTimeout: deja pintar «LOADING» mientras se busca un tablero difícil (~0,1 s cada uno)
+    setTimeout(() => {
+      const { numeros: b, solucion: s } = hard ? tableroTargetDificil() : tableroTargetNormal();
+      setOriginalNums(b);
+      setNums(b);
+      setSolution(s);
+      setActiveNum(null);
+      setActiveOp(null);
+      setStatus('playing');
+      setShowSolutionModal(false);
+    }, 30);
+  }, [hard]);
 
   useEffect(() => {
     generateNewBoard();
@@ -637,7 +968,7 @@ const TargetGame = ({ onBack }) => {
 
   useEffect(() => {
     if (status !== 'won' && status !== 'lost') return;
-    guardarRegistroLocal('SIXSEVEN', { titulo: 'Six Seven · Target 67', aciertos: status === 'won' ? 1 : 0, intentos: 1, via: 'juego' });
+    guardarRegistroLocal('SIXSEVEN', { titulo: `Six Seven · Target 67${hard ? ' (hard)' : ''}`, aciertos: status === 'won' ? 1 : 0, intentos: 1, via: 'juego' });
   }, [status]);
 
   const handleNumClick = (idx, e) => {
@@ -695,6 +1026,7 @@ const TargetGame = ({ onBack }) => {
             <ul>
               <li style={{marginBottom: '10px'}}>Tu objetivo es llegar exactamente al número <strong>67</strong>.</li>
               <li style={{marginBottom: '10px'}}>Toca un número, luego un operador matemático (+, -, ×, ÷), y luego otro número para operarlos.</li>
+              {hard && <li style={{marginBottom: '10px'}}>Modo <strong>HARD</strong>: no se puede llegar solo sumando y restando, ni con pocos números. Necesitas multiplicar o dividir y usar casi todos los números.</li>}
               <li>Si te quedas sin números y no llegas al 67, pierdes. (¡Todos los tableros tienen solución exacta garantizada!)</li>
             </ul>
           } 
@@ -731,7 +1063,7 @@ const TargetGame = ({ onBack }) => {
             </div>
 
             <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-              <div style={{ color: theme.muted, textTransform: 'uppercase', letterSpacing: '3px', fontSize: 'clamp(0.9rem, 2vw, 1.2rem)' }}>Target Acquired</div>
+              <div style={{ color: theme.muted, textTransform: 'uppercase', letterSpacing: '3px', fontSize: 'clamp(0.9rem, 2vw, 1.2rem)' }}>{hard ? 'Hard · Target Acquired' : 'Target Acquired'}</div>
               <div style={{ fontSize: 'clamp(5rem, 15vw, 9rem)', fontWeight: '900', color: theme.neonCyan, textShadow: `0 0 30px ${theme.neonCyan}`, lineHeight: 1 }}>
                 67
               </div>
@@ -820,7 +1152,99 @@ const TargetGame = ({ onBack }) => {
   );
 };
 
-const MatrixGame = ({ onBack, timeLimit }) => {
+// ─── Neon Grid: jugadas disponibles ──────────────────────────────────────────
+// Una jugada = camino de 3 casillas contiguas (A→B→C, como al deslizar) que cumple la operación del modo.
+const GRID_COLS = 6, GRID_ROWS = 7, GRID_N = GRID_COLS * GRID_ROWS;
+const VECINOS = Array.from({ length: GRID_N }, (_, i) => {
+  const r = Math.floor(i / GRID_COLS), c = i % GRID_COLS, out = [];
+  for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+    if (!dr && !dc) continue;
+    const rr = r + dr, cc = c + dc;
+    if (rr >= 0 && rr < GRID_ROWS && cc >= 0 && cc < GRID_COLS) out.push(rr * GRID_COLS + cc);
+  }
+  return out;
+});
+const MAX_VALOR_GRID = 99;
+const JUGADAS_MIN = 5;
+
+const esTrioValido = (modo, a, b, c) => {
+  if (modo === 'add') return a + b === c;
+  if (modo === 'sub') return Math.abs(a - b) === c;
+  if (modo === 'mul') return a * b === c;
+  if (modo === 'div') return (b !== 0 && a / b === c) || (a !== 0 && b / a === c);
+  return false;
+};
+
+// Número de jugadas distintas (mismas 3 casillas = 1 jugada)
+const contarJugadas = (grid, modo) => {
+  const vistas = new Set();
+  for (let i1 = 0; i1 < GRID_N; i1++) {
+    if (grid[i1] == null) continue;
+    for (const i2 of VECINOS[i1]) {
+      if (grid[i2] == null) continue;
+      for (const i3 of VECINOS[i2]) {
+        if (i3 === i1 || grid[i3] == null) continue;
+        if (esTrioValido(modo, grid[i1], grid[i2], grid[i3])) vistas.add([i1, i2, i3].sort((x, y) => x - y).join(','));
+      }
+    }
+  }
+  return vistas.size;
+};
+
+// Valores que, puestos en `cell`, crean al menos una jugada (como resultado C o como primer número A)
+const valoresQueCompletan = (grid, modo, cell) => {
+  const cands = [];
+  for (const i2 of VECINOS[cell]) {
+    const b = grid[i2];
+    if (b == null) continue;
+    for (const io of VECINOS[i2]) {
+      if (io === cell || grid[io] == null) continue;
+      const o = grid[io];
+      // cell como resultado: o (op) b = cell
+      if (modo === 'add') cands.push(o + b);
+      if (modo === 'sub') cands.push(Math.abs(o - b));
+      if (modo === 'mul') cands.push(o * b);
+      if (modo === 'div') { if (o % b === 0) cands.push(o / b); if (b % o === 0) cands.push(b / o); }
+      // cell como primer número: cell (op) b = o
+      if (modo === 'add') cands.push(o - b);
+      if (modo === 'sub') { cands.push(b + o); cands.push(b - o); }
+      if (modo === 'mul' && o % b === 0) cands.push(o / b);
+      if (modo === 'div') { cands.push(b * o); if (b % o === 0) cands.push(b / o); }
+    }
+  }
+  const min = modo === 'mul' || modo === 'div' ? 2 : 1;
+  return cands.filter(v => Number.isInteger(v) && v >= min && v <= MAX_VALOR_GRID);
+};
+
+const elegir = (arr) => arr[Math.floor(Math.random() * arr.length)];
+const barajar = (arr) => arr.map(v => [Math.random(), v]).sort((a, b) => a[0] - b[0]).map(p => p[1]);
+
+// Garantiza al menos `objetivo` jugadas. Las casillas nuevas solo completan jugada a veces (probNatural);
+// si aun así faltan, se retocan primero casillas nuevas y, en último caso, alguna antigua.
+const asegurarJugadas = (grid, modo, nuevos, objetivo = JUGADAS_MIN, probNatural = 0.3) => {
+  const g = [...grid];
+  nuevos.forEach(i => {
+    if (Math.random() < probNatural) {
+      const c = valoresQueCompletan(g, modo, i);
+      if (c.length) g[i] = elegir(c);
+    }
+  });
+  const enNuevos = new Set(nuevos);
+  const orden = [...barajar(nuevos), ...barajar(Array.from({ length: GRID_N }, (_, i) => i).filter(i => !enNuevos.has(i)))];
+  for (let k = 0; k < orden.length && contarJugadas(g, modo) < objetivo; k++) {
+    const i = orden[k];
+    const antes = g[i];
+    const c = valoresQueCompletan(g, modo, i);
+    if (!c.length) continue;
+    g[i] = elegir(c);
+    // Si el retoque rompe más jugadas de las que crea, se deshace
+    if (contarJugadas(g, modo) < contarJugadas([...g.slice(0, i), antes, ...g.slice(i + 1)], modo)) g[i] = antes;
+  }
+  return g;
+};
+
+const MatrixGame = ({ onBack, timeLimit, usuario }) => {
+  const [verRanking, setVerRanking] = useState(false);
   const [subMode, setSubMode] = useState(null);
   const [grid, setGrid] = useState([]);
   const [selected, setSelected] = useState([]);
@@ -830,6 +1254,10 @@ const MatrixGame = ({ onBack, timeLimit }) => {
   const [status, setStatus] = useState('menu');
   const [showInfo, setShowInfo] = useState(false);
   const isDragging = useRef(false);
+  const jugadasDisponibles = React.useMemo(
+    () => (subMode && subMode !== 'multiples' && grid.length === GRID_N ? contarJugadas(grid, subMode) : 0),
+    [grid, subMode]
+  );
   const stats = useRef({ aciertos: 0, intentos: 0 });
 
   const MODOS_NOMBRE = { add: 'Suma', sub: 'Resta', mul: 'Multiplicación', div: 'División', multiples: 'Múltiplos' };
@@ -860,7 +1288,10 @@ const MatrixGame = ({ onBack, timeLimit }) => {
 
   useEffect(() => {
     if (subMode) {
-      setGrid(Array.from({ length: 42 }, () => generateNumber()));
+      const inicial = Array.from({ length: GRID_N }, () => generateNumber());
+      setGrid(subMode === 'multiples'
+        ? inicial
+        : asegurarJugadas(inicial, subMode, [], JUGADAS_MIN + (Math.random() < 0.5 ? 1 : 0), 0));
       setScore(0);
       setCombo(0);
       setTimeLeft(timeLimit);
@@ -921,13 +1352,17 @@ const MatrixGame = ({ onBack, timeLimit }) => {
 
   const applyGravity = (currentGrid) => {
     let newGrid = [...currentGrid];
+    const nuevos = [];
     for (let c = 0; c < 6; c++) {
       let colVals = [];
       for (let r = 0; r < 7; r++) if (newGrid[r * 6 + c] !== null) colVals.push(newGrid[r * 6 + c]);
+      const faltan = 7 - colVals.length;
       while (colVals.length < 7) colVals.unshift(generateNumber());
       for (let r = 0; r < 7; r++) newGrid[r * 6 + c] = colVals[r];
+      for (let r = 0; r < faltan; r++) nuevos.push(r * 6 + c);
     }
-    return newGrid;
+    if (subMode === 'multiples') return newGrid;
+    return asegurarJugadas(newGrid, subMode, nuevos);
   };
 
   const handleMultipleTap = (idx, e) => {
@@ -1029,8 +1464,20 @@ const MatrixGame = ({ onBack, timeLimit }) => {
     return (
       <div style={styles.wrapper}>
         <div style={styles.glassCard}>
-           <WinScreen score={score} message={timeLimit === 'inf' ? 'SESSION ENDED' : 'TIME UP!'} color={theme.neonPink} onMenu={onBack} onRestart={() => { setSubMode(null); setStatus('menu'); }} />
+           <WinScreen score={score} message={timeLimit === 'inf' ? 'SESSION ENDED' : 'TIME UP!'} color={theme.neonPink} onMenu={onBack} onRestart={() => { setSubMode(null); setVerRanking(false); setStatus('menu'); }}>
+             {timeLimit !== 'inf' && (
+               <button style={{...styles.btnPrimary, width: 'auto', padding: '15px 30px', marginBottom: '20px'}} onClick={() => setVerRanking(true)}>
+                 🏆 {score > 0 ? 'GUARDAR EN RANKING' : 'VER RANKING'}
+               </button>
+             )}
+           </WinScreen>
         </div>
+        {verRanking && (
+          <RankingSixSeven
+            jugada={{ juego: 'matrix', sel: { modo: subMode, tiempo: String(timeLimit) }, puntos: score }}
+            usuario={usuario} onClose={() => setVerRanking(false)}
+          />
+        )}
       </div>
     );
   }
@@ -1069,7 +1516,7 @@ const MatrixGame = ({ onBack, timeLimit }) => {
 
         {subMode !== 'multiples' && (
            <div style={{ textAlign: 'center', color: theme.muted, marginBottom: '10px', fontSize: '0.9rem', letterSpacing: '1px' }}>
-             SWIPE 3 BLOCKS: A {subMode === 'add' ? '+' : subMode === 'sub' ? '-' : subMode === 'mul' ? '×' : '÷'} B = C
+             SWIPE 3 BLOCKS: A {subMode === 'add' ? '+' : subMode === 'sub' ? '-' : subMode === 'mul' ? '×' : '÷'} B = C · <span style={{ color: theme.neonGreen }}>{jugadasDisponibles} JUGADAS</span>
            </div>
         )}
 
@@ -1161,7 +1608,8 @@ const SettingsScreen = ({ settings, updateSettings, onBack }) => (
   </div>
 );
 
-const MainMenu = ({ setMode, onExit }) => {
+const MainMenu = ({ setMode, onExit, usuario }) => {
+  const [verRanking, setVerRanking] = useState(false);
   useChorro67(900, 1);
 
   const handlePointerDownInit = (e, nextMode) => {
@@ -1205,24 +1653,35 @@ const MainMenu = ({ setMode, onExit }) => {
           <span style={{color: '#000'}}>Neon Grid</span>
           <span style={{ fontSize: '0.9rem', color: 'rgba(0,0,0,0.6)', letterSpacing: '1px', fontWeight: 'bold' }}>Multiple Modes</span>
         </button>
+
+        <button style={{...styles.btnSecondary, marginTop: '10px', padding: '14px 20px', borderColor: theme.neonPurple, color: theme.neonPurple, boxShadow: `0 0 12px rgba(176,38,255,0.35)`}} onClick={() => setVerRanking(true)}>
+          🏆 RANKINGS
+        </button>
       </div>
+      {verRanking && <RankingSixSeven usuario={usuario} onClose={() => setVerRanking(false)} />}
     </div>
   );
 };
 
-export default function SixSeven({ onExit }) {
+export default function SixSeven({ onExit, usuario = null }) {
   const [mode, setMode] = useState('menu');
   const [settings, setSettings] = useState({ arcadeTime: 13, matrixTime: 67 });
   useWindowSize();
 
+  const [nivel, setNivel] = useState(null); // 'normal' | 'hard' para Speed Run y Target 67
   useEffect(() => () => { try { window.speechSynthesis?.cancel(); } catch { /* ignorar */ } }, []);
+
+  const alMenu = () => { setNivel(null); setMode('menu'); };
 
   let pantalla;
   if (mode === 'settings') pantalla = <SettingsScreen settings={settings} updateSettings={(k, v) => setSettings(s => ({...s, [k]: v}))} onBack={() => setMode('menu')} />;
-  else if (mode === 'arcade') pantalla = <ArcadeGame timeLimit={settings.arcadeTime} onBack={() => setMode('menu')} />;
-  else if (mode === 'target') pantalla = <TargetGame onBack={() => setMode('menu')} />;
-  else if (mode === 'matrix') pantalla = <MatrixGame timeLimit={settings.matrixTime} onBack={() => setMode('menu')} />;
-  else pantalla = <MainMenu setMode={setMode} onExit={onExit} />;
+  else if ((mode === 'arcade' || mode === 'target') && !nivel) pantalla = mode === 'arcade'
+    ? <SelectorNivel titulo="SPEED RUN" normal="Como siempre: opciones cercanas a la respuesta" dificil="Todas las opciones acaban en la misma cifra" onElegir={setNivel} onBack={alMenu} />
+    : <SelectorNivel titulo="TARGET 67" normal="Como siempre: sumas y restas suelen bastar" dificil="Necesitas × o ÷ y usar casi todos los números" onElegir={setNivel} onBack={alMenu} />;
+  else if (mode === 'arcade') pantalla = <ArcadeGame key={nivel} nivel={nivel} usuario={usuario} timeLimit={settings.arcadeTime} onBack={alMenu} />;
+  else if (mode === 'target') pantalla = <TargetGame key={nivel} nivel={nivel} onBack={alMenu} />;
+  else if (mode === 'matrix') pantalla = <MatrixGame usuario={usuario} timeLimit={settings.matrixTime} onBack={() => setMode('menu')} />;
+  else pantalla = <MainMenu setMode={setMode} onExit={onExit} usuario={usuario} />;
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: theme.bg, overflowY: 'auto', overflowX: 'hidden' }}>

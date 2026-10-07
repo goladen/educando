@@ -20,6 +20,7 @@ const JuegoCalamar = lazy(() => import('./JuegoCalamar'));
 const MoneyBoard = lazy(() => import('./MoneyBoard'));
 const EnigmicLogic = lazy(() => import('./EnigmicLogic'));
 const SixSeven = lazy(() => import('./SixSeven'));
+const VaniLa = lazy(() => import('./vanila/VaniLa'));
 const Visor3D = lazy(() => import('./Visor3D'));
 const Esculpir3D = lazy(() => import('./Esculpir3D'));
 const VideosInstagram = lazy(() => import('./components/VideosInstagram'));
@@ -141,7 +142,7 @@ function App() {
           || slug === 'arkade' || slug === 'imperios' || slug === 'whoknows'
           || slug === 'quienesquien' || slug === 'quienhistorico' || slug === 'pizarra' || slug === 'bunker'
           || slug === 'enigmic' || slug === 'calamar' || slug === 'visor3d' || slug === 'esculpir' || slug === 'piktboard'
-          || slug === 'moneyboard' || slug === 'videos' || slug === 'sixseven') {
+          || slug === 'moneyboard' || slug === 'videos' || slug === 'sixseven' || slug === 'vanila') {
         setRutaPublica(slug);
         return;
       }
@@ -168,7 +169,7 @@ function App() {
         'irregular_verbs','sistema_solar',
         'retos','conectapuntos','sudoku',
         'imperios','geografia','quienesquien','quienhistorico','pizarra','bunker','enigmic','calamar',
-        'visor3d','esculpir','piktboard','moneyboard','videos','sixseven',
+        'visor3d','esculpir','piktboard','moneyboard','videos','sixseven','vanila',
         'comunidades','comunidad','competicion',
         'fisica',
         'math_world','primaria','feria',
@@ -334,6 +335,7 @@ function App() {
     if (rutaPublica === 'quienesquien') return <><QuienEsQuien onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'quienhistorico') return <><QuienEsQuienHistorico onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'enigmic') return <><EnigmicLogic onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
+    if (rutaPublica === 'vanila') return <><VaniLa onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'sixseven') return <><SixSeven onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'bunker') return <><BunkerDisparo onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'esculpir') return <><Esculpir3D onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;

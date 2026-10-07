@@ -9,6 +9,7 @@
 //     personaje (1º personaje = voz, 2º = voz2, y se alternan si hay más).
 //     El nombre del personaje no se locuta.
 //   · anterior: public_id del audio previo; se borra si es del mismo usuario.
+//   · destino: 'tour' → carpeta tour-solar/<uid> (voces del tour del Sistema Solar).
 // → { url, publicId, bytes, duracion }
 //
 // Exige sesión de Firebase (cualquier usuario, no solo el admin): la
@@ -102,7 +103,7 @@ export default async function handler(req, res) {
     const { cloud, apiKey, secret } = creds;
 
     // ── parámetros ──────────────────────────────────────────────────────────
-    const { texto = '', voz = 'en-GB-SoniaNeural', voz2 = null, dialogo = false, rate = '-10%', anterior = null } = req.body || {};
+    const { texto = '', voz = 'en-GB-SoniaNeural', voz2 = null, dialogo = false, rate = '-10%', anterior = null, destino = null } = req.body || {};
     const limpio = String(texto).replace(/[ \t]+/g, ' ').trim();
     if (!limpio) return res.status(400).json({ error: 'El texto está vacío.' });
     if (limpio.length > MAX_CARACTERES) return res.status(400).json({ error: `El texto es demasiado largo (máx. ${MAX_CARACTERES} caracteres).` });
@@ -132,7 +133,8 @@ export default async function handler(req, res) {
     if (audio.length < 2048) return res.status(502).json({ error: 'El servicio de voz devolvió un audio vacío.' });
 
     // ── subida firmada a Cloudinary (el mp3 va como resource_type "video") ───
-    const carpeta = `listening/${usuario.uid}`;
+    // destino "tour": narraciones del tour del Sistema Solar (SimuladorSistemaSolar)
+    const carpeta = `${destino === 'tour' ? 'tour-solar' : 'listening'}/${usuario.uid}`;
     const timestamp = Math.round(Date.now() / 1000);
     const form = new FormData();
     form.append('file', new Blob([audio], { type: 'audio/mpeg' }), 'listening.mp3');

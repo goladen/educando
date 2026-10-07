@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Save, X, Globe } from 'lucide-react';
+import { paradasDeConfig, grabarVocesTour, cargarVocesDefault, audioValido, textosALocutar } from '../Simuladores física/sistemaSolarTour';
 
 const PLANETAS_DEFAULT = [
     { nombre: 'Sol',      emoji: '☀️', texto: 'El Sol es la estrella central de nuestro sistema solar. Su diámetro es 109 veces el de la Tierra y contiene el 99,8 % de toda la masa del sistema. En su núcleo, la fusión nuclear convierte hidrógeno en helio a 15 millones de grados, liberando la energía que hace posible la vida en la Tierra.' },
@@ -54,6 +55,10 @@ export default function EditorSolarSystem({ datos, setDatos, onClose, onSave, us
     const [compActiva, setCompActiva]     = useState(true);
     const [compTexto, setCompTexto]       = useState('');
     const [compDuracion, setCompDuracion] = useState(14);
+    // Narración grabada (Edge TTS → Cloudinary, como los listening)
+    const [audios, setAudios]       = useState(datos?.tourConfig?.audios || {});
+    const [conVoz, setConVoz]       = useState(true);
+    const [grabando, setGrabando]   = useState(null);
 
     useEffect(() => {
         const tc = datos?.tourConfig;
@@ -91,7 +96,8 @@ export default function EditorSolarSystem({ datos, setDatos, onClose, onSave, us
         setPlanetas(prev => prev.map((p, i) => i === idx ? { ...p, texto: txt } : p));
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
+        if (grabando) return;
         if (!titulo.trim()) return alert('Añade un título al recurso.');
         const activos = planetas.filter(p => p.activo);
         if (activos.length < 1) return alert('Selecciona al menos un planeta.');
@@ -102,6 +108,28 @@ export default function EditorSolarSystem({ datos, setDatos, onClose, onSave, us
             duracionEscena: duracion,
             comparativa: { activa: compActiva, texto: compTexto.trim(), duracion: compDuracion },
         };
+
+        if (conVoz) {
+            try {
+                setGrabando('Preparando la voz…');
+                const tour = paradasDeConfig(tourConfig);
+                // reutiliza los audios ya grabados (propios o del tour por defecto) si el texto no ha cambiado
+                const defecto = await cargarVocesDefault();
+                const previos = {};
+                for (const x of textosALocutar(tour)) {
+                    if (audioValido(audios, x.clave, x.texto)) previos[x.clave] = audios[x.clave];
+                    else if (audioValido(defecto, x.clave, x.texto)) previos[x.clave] = defecto[x.clave];
+                    else if (audios[x.clave]) previos[x.clave] = audios[x.clave];   // se sustituye (y borra) al regrabar
+                }
+                const nuevos = await grabarVocesTour(tour, previos, (h, n) => setGrabando(n ? `🎙️ Grabando voz ${Math.min(h + 1, n)}/${n}…` : 'Guardando…'));
+                tourConfig.audios = nuevos;
+                setAudios(nuevos);
+            } catch (e) {
+                setGrabando(null);
+                if (!window.confirm('No se pudo grabar la voz: ' + e.message + '\n\n¿Guardar igualmente? (se usará la voz del navegador)')) return;
+            }
+            setGrabando(null);
+        }
 
         setDatos(prev => ({
             ...prev,
@@ -178,6 +206,10 @@ export default function EditorSolarSystem({ datos, setDatos, onClose, onSave, us
                                 <input type="range" min={4} max={30} value={duracion} onChange={e => setDuracion(+e.target.value)} style={s.slider} />
                             </div>
                         </div>
+                        <label style={{ ...s.toggle, marginTop:12, fontSize:13, color:'#444' }}>
+                            <input type="checkbox" checked={conVoz} onChange={e => setConVoz(e.target.checked)} style={{ width:16, height:16 }} />
+                            🎙️ Grabar la narración con voz natural al guardar (se aloja en Cloudinary; si no, se usa la voz del navegador)
+                        </label>
                     </div>
 
                     {/* ── Planetas ── */}
@@ -235,8 +267,9 @@ export default function EditorSolarSystem({ datos, setDatos, onClose, onSave, us
                 </div>
 
                 <div style={s.footer}>
+                    {grabando && <span style={{ alignSelf:'center', fontSize:13, color:'#302b63', fontWeight:600, marginRight:'auto' }}>{grabando}</span>}
                     <button style={s.btnCancel} onClick={onClose}><X size={15}/> Cancelar</button>
-                    <button style={s.btnSave} onClick={handleSave}><Save size={15}/> Guardar recurso</button>
+                    <button style={{ ...s.btnSave, opacity: grabando ? 0.6 : 1 }} disabled={!!grabando} onClick={handleSave}><Save size={15}/> {grabando ? 'Grabando…' : 'Guardar recurso'}</button>
                 </div>
             </div>
         </div>

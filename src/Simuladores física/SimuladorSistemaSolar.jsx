@@ -1,19 +1,25 @@
 // Simulador del Sistema Solar — pikt.es
-// Cuatro vistas 3D (escala real · comparar tamaños · órbitas · galaxia) +
-// panel informativo por cuerpo + test de 30 preguntas.
-import { useState, useEffect, useRef } from 'react';
+// Vistas 3D (órbitas · tour guiado · escala real · comparar tamaños · galaxia) +
+// panel informativo por cuerpo + leyes de Newton + tests.
+// Los astros usan las texturas y el borde Fresnel del proyecto Unity
+// (sistemaSolarVisual.js); el tour guiado con voz y música vive en
+// sistemaSolarTour.js. También lo usa la tarjeta "Sistema Solar" de la landing
+// (props vistaInicial="tour", tourConfig, autoTour, onExit).
+import { useState, useEffect, useRef, useMemo } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import mercuryUrl from '../assets/solar/mercury.png';
-import venusUrl from '../assets/solar/venus.png';
-import earthUrl from '../assets/solar/earth.png';
-import marsUrl from '../assets/solar/mars.png';
-import jupiterUrl from '../assets/solar/jupiter.png';
-import saturnUrl from '../assets/solar/saturn.png';
-import uranusUrl from '../assets/solar/uranus.png';
-import neptuneUrl from '../assets/solar/neptune.png';
-import moonUrl from '../assets/solar/moon.png';
-import milkywayUrl from '../assets/solar/milkyway.png';
+import mercuryUrl from '../assets/solar/mercury.jpg';
+import venusUrl from '../assets/solar/venus.jpg';
+import earthUrl from '../assets/solar/earth.jpg';
+import marsUrl from '../assets/solar/mars.jpg';
+import jupiterUrl from '../assets/solar/jupiter.jpg';
+import saturnUrl from '../assets/solar/saturn.jpg';
+import uranusUrl from '../assets/solar/uranus.jpg';
+import neptuneUrl from '../assets/solar/neptune.jpg';
+import moonUrl from '../assets/solar/moon.jpg';
+import { materialPlaneta, materialSol, haloSol, anilloSaturno as anilloVisual, fondoViaLactea } from './sistemaSolarVisual';
+import { paradasDeConfig, configTourDefault, nombreParada, audioValido, grabarVocesTour, cargarVocesDefault, guardarVocesDefault, textosALocutar, Narrador, Musica, ADMIN_EMAIL } from './sistemaSolarTour';
+import { auth } from '../firebase';
 
 const TEX = {
   Mercurio: mercuryUrl, Venus: venusUrl, Tierra: earthUrl, Marte: marsUrl,
@@ -299,40 +305,28 @@ const Escena = ({ vista, movil, onSelect, ctrlRef }) => {
       const geo = track(new THREE.SphereGeometry(radio, segw, Math.max(24, segw / 2)));
       let mat;
       if (cuerpo.tipo === 'estrella') {
-        mat = track(new THREE.MeshBasicMaterial({ color: 0xfff2c4 }));
+        mat = materialSol(track);
+        updaters.push((dt) => { mat.uniforms.uT.value += dt; });
       } else {
-        const t = cuerpo.tex ? track(loader.load(cuerpo.tex)) : null;
-        if (t) t.colorSpace = THREE.SRGBColorSpace;
-        mat = track(new THREE.MeshStandardMaterial({ map: t, color: t ? 0xffffff : new THREE.Color(cuerpo.color), roughness: 1, metalness: 0 }));
+        mat = materialPlaneta(cuerpo, loader, track);
       }
       const mesh = new THREE.Mesh(geo, mat);
       mesh.userData.cuerpo = cuerpo;
+      mesh.userData.radio = radio;
       mesh.rotation.z = THREE.MathUtils.degToRad(cuerpo.inclAxial > 90 ? cuerpo.inclAxial - 180 : cuerpo.inclAxial);
       return mesh;
     };
-    const anilloSaturno = (radio) => {
-      const geo = track(new THREE.RingGeometry(radio * 1.35, radio * 2.3, 96));
-      // uv radial para degradado
-      const pos = geo.attributes.position; const uv = geo.attributes.uv;
-      const v3 = new THREE.Vector3();
-      for (let i = 0; i < pos.count; i++) { v3.fromBufferAttribute(pos, i); const rr = v3.length(); uv.setXY(i, (rr - radio * 1.35) / (radio * 0.95), 0.5); }
-      // textura de anillo (bandas)
-      const rc = document.createElement('canvas'); rc.width = 128; rc.height = 4; const rx = rc.getContext('2d');
-      for (let i = 0; i < 128; i++) { const a = 0.15 + 0.6 * Math.abs(Math.sin(i * 0.6)) * (i / 128); rx.fillStyle = `rgba(220,205,170,${a.toFixed(3)})`; rx.fillRect(i, 0, 1, 4); }
-      const rt = track(new THREE.CanvasTexture(rc));
-      const mat = track(new THREE.MeshBasicMaterial({ map: rt, side: THREE.DoubleSide, transparent: true, opacity: 0.9 }));
-      const ring = new THREE.Mesh(geo, mat);
-      ring.rotation.x = Math.PI / 2.1;
-      return ring;
-    };
+    const anilloSaturno = (radio) => anilloVisual(radio, loader, track);
 
     // ======================================================= VISTA: ÓRBITAS
-    if (vista === 'orbitas') {
+    if (vista === 'orbitas' || vista === 'tour') {
+      fondoViaLactea(scene, loader, track);
+      const sis = new THREE.Group(); scene.add(sis);   // todo el sistema (se oculta en la comparativa)
+      const porId = {};
       const sol = CUERPOS[0];
-      const sunLight = new THREE.PointLight(0xffffff, 3, 0, 0); scene.add(sunLight);
-      const solMesh = hazEsfera(sol, sol.visR); scene.add(solMesh); clickables.push(solMesh);
-      const solGlow = new THREE.Sprite(track(new THREE.SpriteMaterial({ map: glowTex, blending: THREE.AdditiveBlending, depthWrite: false })));
-      solGlow.scale.setScalar(sol.visR * 5); scene.add(solGlow);
+      const sunLight = new THREE.PointLight(0xffffff, 3, 0, 0); sis.add(sunLight);
+      const solMesh = hazEsfera(sol, sol.visR, 64); sis.add(solMesh); clickables.push(solMesh); porId.Sol = solMesh;
+      sis.add(haloSol(sol.visR, track));
       updaters.push((dt, sp) => { solMesh.rotation.y += dt * 0.1 * sp; });
 
       let earthPivot = null;
@@ -340,9 +334,9 @@ const Escena = ({ vista, movil, onSelect, ctrlRef }) => {
         // órbita
         const pts = []; for (let i = 0; i <= 128; i++) { const a = i / 128 * 6.283; pts.push(new THREE.Vector3(Math.cos(a) * p.orbR, 0, Math.sin(a) * p.orbR)); }
         const line = new THREE.LineLoop(track(new THREE.BufferGeometry().setFromPoints(pts)), track(new THREE.LineBasicMaterial({ color: 0x2a3550, transparent: true, opacity: 0.6 })));
-        scene.add(line);
-        const pivot = new THREE.Group(); pivot.rotation.y = Math.random() * 6.283; scene.add(pivot);
-        const mesh = hazEsfera(p, p.visR); mesh.position.x = p.orbR; pivot.add(mesh); clickables.push(mesh);
+        sis.add(line);
+        const pivot = new THREE.Group(); pivot.rotation.y = Math.random() * 6.283; sis.add(pivot);
+        const mesh = hazEsfera(p, p.visR, 64); mesh.position.x = p.orbR; pivot.add(mesh); clickables.push(mesh); porId[p.id] = mesh;
         if (p.anillos) mesh.add(anilloSaturno(p.visR));
         const w = (365.25 / p.orbitaDias) * 0.35;   // velocidad orbital (Tierra ~1)
         updaters.push((dt, sp) => { pivot.rotation.y += dt * w * sp; mesh.rotation.y += dt * 0.6 * sp; });
@@ -352,15 +346,146 @@ const Escena = ({ vista, movil, onSelect, ctrlRef }) => {
       if (earthPivot) {
         const luna = CUERPOS.find(c => c.id === 'Luna');
         const lunaPivot = new THREE.Group(); earthPivot.add(lunaPivot);
-        const lm = hazEsfera(luna, luna.visR, 32); lm.position.x = luna.orbR; lunaPivot.add(lm); clickables.push(lm);
+        const lm = hazEsfera(luna, luna.visR, 48); lm.position.x = luna.orbR; lunaPivot.add(lm); clickables.push(lm); porId.Luna = lm;
         updaters.push((dt, sp) => { lunaPivot.rotation.y += dt * 2.2 * sp; });
       }
       camera.position.set(0, 70, 130); controls.target.set(0, 0, 0);
-      controls.minDistance = 12; controls.maxDistance = 400;
+      controls.minDistance = vista === 'tour' ? 1 : 12; controls.maxDistance = 400;
+
+      // ------------------------------------------------ TOUR GUIADO
+      // Mismas etapas que TourPlanetas.cs de Unity: llegada (3 s) → giro 360°
+      // (duración elegida, y como mínimo lo que dure la narración) → zoom in
+      // (2 s) → zoom out (2 s) → pausa → … → escena comparativa de tamaños.
+      if (vista === 'tour') {
+        const ZOOM_CERCA = 0.8, ZOOM_LEJOS = 0.25;
+        const v1 = new THREE.Vector3(), v2 = new THREE.Vector3();
+        const suave = (x) => x * x * (3 - 2 * x);
+        let T = null;      // estado del tour
+        let comp = null;   // grupo de la escena comparativa
+        const avisar = (e) => ctrlRef.current.onTour && ctrlRef.current.onTour(e);
+        const radioDe = (id) => porId[id].userData.radio;
+        const poseEn = (id, ang, elev, zoom, outPos, outT) => {
+          porId[id].getWorldPosition(outT);
+          const r = radioDe(id);
+          const dist = THREE.MathUtils.lerp(r * 7, r * 2.1, zoom);
+          outPos.set(Math.cos(ang) * Math.cos(elev), Math.sin(elev), Math.sin(ang) * Math.cos(elev)).multiplyScalar(dist).add(outT);
+        };
+        const empezarParada = (i) => {
+          if (i >= T.paradas.length) return empezarComparativa();
+          const id = T.paradas[i].id;
+          porId[id].getWorldPosition(v1);
+          // la cámara llega por el lado iluminado (entre el Sol y el planeta)
+          const ang = id === 'Sol' ? Math.atan2(camera.position.z, camera.position.x) : Math.atan2(-v1.z, -v1.x) + 0.55;
+          T.i = i; T.fase = 'llegada'; T.t = 0; T.ang = ang; T.elev = id === 'Sol' ? 0.25 : 0.18; T.zoom = ZOOM_LEJOS;
+          T.desde = camera.position.clone(); T.desdeT = controls.target.clone();
+          avisar({ tipo: 'llegando', i, id });
+        };
+        const empezarComparativa = () => {
+          if (!T.comparativa) return terminar();
+          avisar({ tipo: 'comparativa' });
+          // planetas del tour en fila, con su tamaño real relativo (máx. radio 10)
+          const ids = T.paradas.map(p => p.id).filter((x, k, a) => a.indexOf(x) === k);
+          const cs = ids.map(id => CUERPOS.find(c => c.id === id));
+          const rMax = Math.max(...cs.map(c => c.radioKm));
+          comp = new THREE.Group();
+          comp.add(new THREE.AmbientLight(0xffffff, 0.35));
+          const dl = new THREE.DirectionalLight(0xffffff, 2.2); dl.position.set(-40, 30, 60); comp.add(dl);
+          let x = 0; const sep = 10 * 0.6;
+          const radios = cs.map(c => Math.max(0.06, c.radioKm / rMax * 10));
+          cs.forEach((c, k) => {
+            const r = radios[k]; x += r;
+            const m = hazEsfera(c, r, 64); m.position.set(x, 0, 0); comp.add(m);
+            if (c.anillos) m.add(anilloSaturno(r));
+            if (c.tipo === 'estrella') { const h = haloSol(r, track); h.position.set(x, 0, 0); comp.add(h); }
+            x += r + sep;
+          });
+          const ancho = x - sep;
+          comp.children.forEach(o => { o.position.x -= ancho / 2; });
+          sis.visible = false; scene.add(comp);
+          const halfV = THREE.MathUtils.degToRad(camera.fov / 2), halfH = Math.atan(Math.tan(halfV) * camera.aspect);
+          const dist = Math.max((ancho / 2 / Math.tan(halfH)) * 1.25, 40);
+          T.fase = 'compIn'; T.t = 0;
+          T.desde = new THREE.Vector3(0, 30, dist * 1.8); T.desdeT = new THREE.Vector3(0, 0, 0);
+          T.hasta = new THREE.Vector3(0, 3, dist); T.hastaT = new THREE.Vector3(0, 0, 0);
+        };
+        const quitarComparativa = () => {
+          if (!comp) return;
+          scene.remove(comp); comp = null; sis.visible = true;
+        };
+        const terminar = () => {
+          quitarComparativa();
+          T = null;
+          ctrlRef.current.tourActivo = false;
+          controls.enabled = true;
+          camera.position.set(0, 70, 130); controls.target.set(0, 0, 0);
+          avisar({ tipo: 'fin' });
+        };
+        ctrlRef.current.tour = {
+          iniciar: ({ paradas, duracion, comparativa }) => {
+            quitarComparativa();
+            controls.enabled = false;
+            T = { paradas, duracion, comparativa, i: 0 };
+            ctrlRef.current.tourActivo = true;
+            empezarParada(0);
+          },
+          saltar: () => {
+            if (!T) return;
+            if (T.fase === 'compIn' || T.fase === 'comp') return terminar();
+            empezarParada(T.i + 1);
+          },
+          detener: () => { if (T) terminar(); },
+        };
+        // paso del tour (se llama en cada fotograma desde el bucle)
+        ctrlRef.current.pasoTour = (dt) => {
+          if (!T) return false;
+          const c = ctrlRef.current;
+          if (c.tourPausado) dt = 0;
+          T.t += dt;
+          if (T.fase === 'compIn' || T.fase === 'comp') {
+            if (T.fase === 'compIn') {
+              const e = suave(Math.min(1, T.t / 2.5));
+              camera.position.lerpVectors(T.desde, T.hasta, e); controls.target.lerpVectors(T.desdeT, T.hastaT, e);
+              if (T.t >= 2.5) { T.fase = 'comp'; T.t = 0; avisar({ tipo: 'narrarComparativa' }); }
+            } else {
+              camera.position.x = Math.sin(T.t * 0.08) * 4;   // leve vaivén
+              if (T.t >= T.comparativa.duracion && !c.narrando) terminar();
+            }
+            if (T) camera.lookAt(controls.target);
+            return true;
+          }
+          const id = T.paradas[T.i].id;
+          if (T.fase === 'llegada') {
+            poseEn(id, T.ang, T.elev, T.zoom, v1, v2);
+            const e = suave(Math.min(1, T.t / 3));
+            camera.position.lerpVectors(T.desde, v1, e); controls.target.lerpVectors(T.desdeT, v2, e);
+            if (T.t >= 3) { T.fase = 'girar'; T.t = 0; T.girado = 0; avisar({ tipo: 'parada', i: T.i, id }); }
+          } else {
+            if (T.fase === 'girar') {
+              const paso = (Math.PI * 2 / T.duracion) * dt;
+              T.ang += paso; T.girado += paso;
+              // sigue girando mientras se narra (como máximo 40 s más)
+              if (T.girado >= Math.PI * 2 && (!c.narrando || T.t > T.duracion + 40)) { T.fase = 'zoomIn'; T.t = 0; }
+            } else if (T.fase === 'zoomIn') {
+              T.zoom = THREE.MathUtils.lerp(ZOOM_LEJOS, ZOOM_CERCA, suave(Math.min(1, T.t / 2)));
+              if (T.t >= 2) { T.fase = 'zoomOut'; T.t = 0; }
+            } else if (T.fase === 'zoomOut') {
+              T.zoom = THREE.MathUtils.lerp(ZOOM_CERCA, ZOOM_LEJOS, suave(Math.min(1, T.t / 2)));
+              if (T.t >= 2) { T.fase = 'pausa'; T.t = 0; }
+            } else if (T.fase === 'pausa' && T.t >= 1.5) {
+              empezarParada(T.i + 1);
+              return true;
+            }
+            poseEn(id, T.ang, T.elev, T.zoom, camera.position, controls.target);
+          }
+          camera.lookAt(controls.target);
+          return true;
+        };
+      }
     }
 
     // ================================================== VISTA: COMPARAR TAMAÑOS
     else if (vista === 'comparar') {
+      fondoViaLactea(scene, loader, track, 0.4);
       scene.add(new THREE.AmbientLight(0xffffff, 0.9));
       const dir = new THREE.DirectionalLight(0xffffff, 1.1); dir.position.set(30, 40, 60); scene.add(dir);
       const orden = ['Sol', 'Mercurio', 'Venus', 'Tierra', 'Luna', 'Marte', 'Jupiter', 'Saturno', 'Urano', 'Neptuno'];
@@ -386,6 +511,7 @@ const Escena = ({ vista, movil, onSelect, ctrlRef }) => {
     else if (vista === 'escala') {
       // 1 unidad = 1.000.000 km  → Sol radio 0,70 u; Neptuno a 4.495 u
       const K = 1 / 1e6;
+      fondoViaLactea(scene, loader, track, 0.45);
       const sol = CUERPOS[0];
       const sunLight = new THREE.PointLight(0xffffff, 4, 0, 0); scene.add(sunLight);
       const solMesh = hazEsfera(sol, sol.radioKm * K, 48); scene.add(solMesh); clickables.push(solMesh);
@@ -530,8 +656,10 @@ const Escena = ({ vista, movil, onSelect, ctrlRef }) => {
     const animar = () => {
       const dt = Math.min(clock.getDelta(), 0.05);
       const c = ctrlRef.current;
-      const sp = c.playing ? c.velocidad : 0;
+      // en el tour los planetas siguen orbitando, pero despacio
+      const sp = c.tourActivo ? (c.tourPausado ? 0 : 0.12) : (c.playing ? c.velocidad : 0);
       updaters.forEach(u => u(dt, sp));
+      const enTour = c.pasoTour ? c.pasoTour(dt) : false;
       if (animForward) {
         animForward.t = Math.min(1, animForward.t + dt * 0.8);
         const e = 1 - Math.pow(1 - animForward.t, 3);
@@ -539,7 +667,7 @@ const Escena = ({ vista, movil, onSelect, ctrlRef }) => {
         controls.target.lerpVectors(animForward.fromT, animForward.toT, e);
         if (animForward.t >= 1) animForward = null;
       }
-      controls.update();
+      if (!enTour) controls.update();
       renderer.render(scene, camera);
       raf = requestAnimationFrame(animar);
     };
@@ -558,6 +686,7 @@ const Escena = ({ vista, movil, onSelect, ctrlRef }) => {
       renderer.dispose();
       if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
       ctrlRef.current.irA = null;
+      ctrlRef.current.tour = null; ctrlRef.current.pasoTour = null; ctrlRef.current.tourActivo = false;
     };
   }, [vista]);
 
@@ -567,8 +696,8 @@ const Escena = ({ vista, movil, onSelect, ctrlRef }) => {
 // =====================================================================
 //                            APP
 // =====================================================================
-const App = () => {
-  const [vista, setVista] = useState('orbitas'); // orbitas | comparar | escala | galaxia | test
+const App = ({ vistaInicial = 'orbitas', tourConfig = null, autoTour = false, onExit = null }) => {
+  const [vista, setVista] = useState(vistaInicial); // orbitas | tour | comparar | escala | galaxia | newton | test | calculos
   const [movil, setMovil] = useState(typeof window !== 'undefined' && window.innerWidth < 820);
   const [sel, setSel] = useState(null);          // cuerpo seleccionado (panel info)
   const [ui, setUi] = useState({ playing: true, velocidad: 1 });
@@ -579,11 +708,125 @@ const App = () => {
   useEffect(() => { const r = () => setMovil(window.innerWidth < 820); window.addEventListener('resize', r); return () => window.removeEventListener('resize', r); }, []);
   const setCtrl = (patch) => { setUi(u => { const n = { ...u, ...patch }; ctrlRef.current.playing = n.playing; ctrlRef.current.velocidad = n.velocidad; return n; }); };
 
+  // ------------------------------------------------------- TOUR GUIADO
+  const tour = useMemo(() => paradasDeConfig(tourConfig || configTourDefault()), [tourConfig]);
+  const [tourEstado, setTourEstado] = useState('inicio');   // inicio | jugando | fin
+  const [tourInfo, setTourInfo] = useState(null);           // parada actual o comparativa
+  const [tourPausado, setTourPausado] = useState(false);
+  const [musicaOn, setMusicaOn] = useState(true);
+  const [vozOn, setVozOn] = useState(true);
+  const [vocesDefault, setVocesDefault] = useState(null);   // voces grabadas del tour por defecto
+  const [grabando, setGrabando] = useState(null);           // progreso al grabar (admin)
+  const narradorRef = useRef(null), musicaRef = useRef(null), narrTok = useRef(0), autoHecho = useRef(false);
+  const narrador = () => narradorRef.current || (narradorRef.current = new Narrador());
+  const musica = () => musicaRef.current || (musicaRef.current = new Musica());
+  // audio grabado: el del propio tour o, si el texto coincide, el del tour por defecto
+  const urlVoz = (clave, texto) => audioValido(tour.audios, clave, texto) || audioValido(vocesDefault, clave, texto);
+  const nVoces = textosALocutar(tour).filter(x => urlVoz(x.clave, x.texto)).length;
+  const nTextos = textosALocutar(tour).length;
+
+  useEffect(() => { if (vista === 'tour' && vocesDefault === null) cargarVocesDefault().then(setVocesDefault); }, [vista, vocesDefault]);
+
+  const pararAudio = () => {
+    narrTok.current++;
+    narradorRef.current?.detener();
+    musicaRef.current?.detener();
+    ctrlRef.current.narrando = false;
+  };
+  // al salir de la pestaña del tour (o desmontar) se corta todo
+  useEffect(() => {
+    if (vista !== 'tour') { pararAudio(); setTourEstado('inicio'); setTourInfo(null); }
+  }, [vista]);
+  useEffect(() => () => pararAudio(), []);
+
+  const narrar = (texto, clave) => {
+    const tok = ++narrTok.current;
+    const c = ctrlRef.current;
+    if (!vozOn || !texto) { c.narrando = false; return; }
+    c.narrando = true;
+    musicaRef.current?.setDuck(true);
+    narrador().decir(texto, urlVoz(clave, texto)).then(() => {
+      if (tok !== narrTok.current) return;
+      c.narrando = false;
+      musicaRef.current?.setDuck(false);
+    });
+  };
+
+  // eventos que manda la escena 3D durante el tour
+  ctrlRef.current.onTour = (e) => {
+    if (e.tipo === 'llegando') {
+      narrTok.current++; narradorRef.current?.detener(); ctrlRef.current.narrando = false; musicaRef.current?.setDuck(false);
+      setTourInfo({ i: e.i, id: e.id, texto: tour.paradas[e.i].texto, llegando: true });
+    } else if (e.tipo === 'parada') {
+      setTourInfo({ i: e.i, id: e.id, texto: tour.paradas[e.i].texto, llegando: false });
+      narrar(tour.paradas[e.i].texto, tour.paradas[e.i].clave);
+    } else if (e.tipo === 'comparativa') {
+      setTourInfo({ comparativa: true, texto: tour.comparativa?.texto || '' });
+    } else if (e.tipo === 'narrarComparativa') {
+      narrar(tour.comparativa?.texto, tour.comparativa?.clave);
+    } else if (e.tipo === 'fin') {
+      pararAudio(); setTourInfo(null); setTourEstado('fin');
+    }
+  };
+
+  const iniciarTour = () => {
+    const c = ctrlRef.current;
+    if (!c.tour || !tour.paradas.length) return false;
+    pararAudio();
+    narrador().activo = vozOn;
+    if (musicaOn && tour.musicaUrl) musica().reproducir(tour.musicaUrl);
+    c.tourPausado = false; setTourPausado(false);
+    setTourEstado('jugando');
+    c.tour.iniciar(tour);
+    return true;
+  };
+  const pausarTour = () => {
+    const p = !tourPausado;
+    ctrlRef.current.tourPausado = p; setTourPausado(p);
+    if (p) { narradorRef.current?.pausar(); musicaRef.current?.pausar(); }
+    else { narradorRef.current?.reanudar(); musicaRef.current?.reanudar(); }
+  };
+  const saltarParada = () => {
+    if (tourPausado) pausarTour();
+    narrTok.current++; narradorRef.current?.detener(); ctrlRef.current.narrando = false; musicaRef.current?.setDuck(false);
+    ctrlRef.current.tour?.saltar();
+  };
+  const detenerTour = () => { ctrlRef.current.tourPausado = false; setTourPausado(false); ctrlRef.current.tour?.detener(); setTourEstado('inicio'); };
+  const cambiarMusica = () => {
+    const on = !musicaOn; setMusicaOn(on);
+    if (tourEstado !== 'jugando') return;
+    if (on && tour.musicaUrl) { musica().reproducir(tour.musicaUrl); if (ctrlRef.current.narrando) musica().setDuck(true); }
+    else musicaRef.current?.detener();
+  };
+  const cambiarVoz = () => {
+    const on = !vozOn; setVozOn(on);
+    narrador().activo = on;
+    if (!on) { narrTok.current++; narradorRef.current?.detener(); ctrlRef.current.narrando = false; musicaRef.current?.setDuck(false); }
+  };
+  // admin: graba en Cloudinary las voces del tour por defecto (una vez para todos)
+  const grabarVocesDefault = async () => {
+    try {
+      setGrabando('Preparando…');
+      const audios = await grabarVocesTour(tour, vocesDefault || {}, (h, n, clave) => setGrabando(clave ? `Grabando ${h + 1}/${n}: ${nombreParada(clave === '_comparativa' ? 'comparativa' : clave)}…` : 'Guardando…'));
+      await guardarVocesDefault(audios);
+      setVocesDefault(audios);
+      setGrabando(null);
+    } catch (e) { setGrabando(null); alert('No se pudieron grabar las voces: ' + e.message); }
+  };
+
+  // arranque automático (tarjeta "Sistema Solar" de la landing)
+  useEffect(() => {
+    if (!autoTour || autoHecho.current || vista !== 'tour' || vocesDefault === null) return;
+    const id = setInterval(() => { if (!autoHecho.current && iniciarTour()) { autoHecho.current = true; clearInterval(id); } }, 250);
+    return () => clearInterval(id);
+  });
+
   const sans = '"Segoe UI", system-ui, -apple-system, Arial, sans-serif';
   const mono = 'ui-monospace, Menlo, Consolas, monospace';
 
   const VISTAS = [
     { id: 'orbitas', t: 'Órbitas', tM: 'Órbitas', emoji: '🪐', sub: 'Movimiento (distancias no a escala)' },
+    { id: 'tour', t: 'Tour guiado', tM: 'Tour', emoji: '🎬', sub: 'Viaje narrado con voz y música' },
     { id: 'escala', t: 'Escala real', tM: 'Escala', emoji: '📏', sub: 'Tamaños y distancias reales' },
     { id: 'comparar', t: 'Comparar', tM: 'Comparar', emoji: '⚖️', sub: 'Tamaños reales en fila' },
     { id: 'galaxia', t: 'Galaxia', tM: 'Galaxia', emoji: '🌌', sub: 'El Sol orbita la Vía Láctea' },
@@ -623,6 +866,13 @@ const App = () => {
   //  Barra de vistas superior
   const NavVistas = () => (
     <div className="ss-scroll" style={{ display: 'flex', gap: movil ? 6 : 8, overflowX: 'auto', padding: movil ? '7px 8px' : '10px 14px', flexShrink: 0, justifyContent: movil ? 'flex-start' : 'center', WebkitOverflowScrolling: 'touch' }}>
+      {onExit && (
+        <button className="ss-btn" onClick={onExit} title="Salir"
+          style={{ ...chip(false), display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, minWidth: movil ? 52 : 70, padding: movil ? '7px 8px' : '8px 12px', flexShrink: 0 }}>
+          <span style={{ fontSize: movil ? 18 : 16 }}>←</span>
+          <span style={{ fontSize: movil ? 11 : 13, lineHeight: 1.1 }}>Salir</span>
+        </button>
+      )}
       {VISTAS.map(v => (
         <button key={v.id} className="ss-btn" onClick={() => { setVista(v.id); setSel(null); setQuiz('inicio'); setFichas(false); }}
           title={v.sub}
@@ -787,6 +1037,107 @@ const App = () => {
 
   // ===================================================================
   //  Vistas 3D
+  // ------------------------------------------------ panel del tour guiado
+  const esAdmin = auth.currentUser?.email === ADMIN_EMAIL;
+  const panelTour = () => {
+    const emojiDe = (id) => ({ Sol: '☀️', Mercurio: '🪨', Venus: '🌫️', Tierra: '🌍', Luna: '🌙', Marte: '🔴', Jupiter: '🪐', Saturno: '💫', Urano: '🔵', Neptuno: '🌀' })[id] || '🪐';
+    const btnCtrl = (activo, color) => ({ ...chip(activo, color), padding: movil ? '9px 11px' : '9px 14px', fontSize: movil ? 14 : 14 });
+
+    if (tourEstado === 'inicio') return (
+      <div style={{ position: 'absolute', left: '50%', bottom: movil ? 10 : 22, transform: 'translateX(-50%)', width: movil ? 'calc(100% - 20px)' : 560, ...panel, padding: movil ? 16 : 22, animation: 'ss-pop .4s', zIndex: 5 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+          <span style={{ fontSize: movil ? 26 : 30 }}>🎬</span>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: movil ? 17 : 20 }}>Tour guiado por el Sistema Solar</div>
+            <div style={{ fontSize: 12, opacity: .7 }}>La cámara viaja a cada astro, gira a su alrededor y una voz te lo cuenta. Al final, comparativa de tamaños.</div>
+          </div>
+        </div>
+        <div className="ss-scroll" style={{ display: 'flex', gap: 6, overflowX: 'auto', padding: '8px 0 10px' }}>
+          {tour.paradas.map((p, k) => (
+            <span key={k} style={{ ...chip(false), padding: '5px 9px', fontSize: 12, flexShrink: 0, cursor: 'default' }}>{emojiDe(p.id)} {nombreParada(p.id)}</span>
+          ))}
+          {tour.comparativa && <span style={{ ...chip(false), padding: '5px 9px', fontSize: 12, flexShrink: 0, cursor: 'default' }}>📏 Comparativa</span>}
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button className="ss-btn" onClick={iniciarTour} disabled={!tour.paradas.length} style={{ ...chip(true, '#fbbf24'), fontSize: 16, padding: '12px 22px' }}>▶ Iniciar tour</button>
+          <button className="ss-btn" onClick={cambiarMusica} style={btnCtrl(musicaOn, '#a78bfa')}>{musicaOn ? '🎵 Música' : '🔇 Sin música'}</button>
+          <button className="ss-btn" onClick={cambiarVoz} style={btnCtrl(vozOn, '#38bdf8')}>{vozOn ? '🗣️ Voz' : '🤐 Sin voz'}</button>
+        </div>
+        <div style={{ fontSize: 11.5, opacity: .6, marginTop: 10, lineHeight: 1.45 }}>
+          {vocesDefault === null ? 'Cargando voces…'
+            : nVoces >= nTextos ? '🎙️ Narración con voz natural grabada.'
+            : nVoces > 0 ? `🎙️ ${nVoces} de ${nTextos} narraciones con voz grabada; el resto, con la voz del navegador.`
+            : '🗣️ Narración con la voz del navegador.'}
+          {' '}Mientras tanto puedes girar y hacer zoom libremente.
+        </div>
+        {esAdmin && !tourConfig && (
+          <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,.12)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <button className="ss-btn" disabled={!!grabando} onClick={grabarVocesDefault} style={{ ...chip(false), fontSize: 12 }}>
+              {grabando ? '⏳ Grabando…' : nVoces >= nTextos ? '🎙️ Volver a comprobar voces' : '🎙️ Grabar voces del tour (Cloudinary)'}
+            </button>
+            <span style={{ fontSize: 11, opacity: .6 }}>{grabando || 'Solo admin · se guardan en voces_tour/sistema_solar'}</span>
+          </div>
+        )}
+      </div>
+    );
+
+    if (tourEstado === 'fin') return (
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.45)', zIndex: 5, padding: 14 }}>
+        <div style={{ ...panel, padding: movil ? 22 : 32, maxWidth: 460, width: '100%', textAlign: 'center', animation: 'ss-pop .4s' }}>
+          <div style={{ fontSize: 54 }}>🎉</div>
+          <h2 style={{ margin: '6px 0 8px', fontSize: movil ? 22 : 26 }}>¡Tour completado!</h2>
+          <p style={{ opacity: .8, lineHeight: 1.55, margin: '0 0 20px' }}>Sigue explorando: mira las órbitas, la escala real o ponte a prueba con el test.</p>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap', flexDirection: movil ? 'column' : 'row' }}>
+            <button className="ss-btn" onClick={iniciarTour} style={{ ...chip(true, '#fbbf24'), padding: '12px 18px' }}>🔁 Repetir el tour</button>
+            <button className="ss-btn" onClick={() => setTourEstado('inicio')} style={{ ...chip(false), padding: '12px 18px' }}>🧭 Explorar libremente</button>
+            <button className="ss-btn" onClick={() => { setVista('test'); setQuiz('inicio'); }} style={{ ...chip(false), padding: '12px 18px' }}>❓ Hacer el test</button>
+            {onExit && <button className="ss-btn" onClick={onExit} style={{ ...chip(false), padding: '12px 18px' }}>← Salir</button>}
+          </div>
+        </div>
+      </div>
+    );
+
+    // jugando
+    const info = tourInfo;
+    const cuerpo = info?.id ? CUERPOS.find(c => c.id === info.id) : null;
+    return (<>
+      {info && (
+        <div key={info.comparativa ? 'comp' : info.i} style={{ position: 'absolute', top: 10, left: 12, ...panel, padding: movil ? '9px 13px' : '12px 18px', maxWidth: movil ? 230 : 320, pointerEvents: 'none', animation: 'ss-pop .5s' }}>
+          <div style={{ fontSize: 11, letterSpacing: '.12em', fontWeight: 800, opacity: .6, textTransform: 'uppercase' }}>
+            {info.comparativa ? 'Escena final' : `Parada ${info.i + 1} de ${tour.paradas.length}`}
+          </div>
+          <div style={{ fontWeight: 800, fontSize: movil ? 20 : 26, color: '#fcd34d', marginTop: 2 }}>
+            {info.comparativa ? '📏 Comparativa de tamaños' : `${emojiDe(info.id)} ${nombreParada(info.id)}`}
+          </div>
+          {cuerpo && (
+            <div style={{ fontSize: movil ? 11 : 12.5, opacity: .8, marginTop: 4, fontFamily: mono }}>
+              Radio {nf(cuerpo.radioKm)} km · g = {cuerpo.gravedad} m/s²
+            </div>
+          )}
+        </div>
+      )}
+      <div style={{ position: 'absolute', left: '50%', bottom: movil ? 10 : 18, transform: 'translateX(-50%)', width: movil ? 'calc(100% - 20px)' : 'min(760px, 92%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, zIndex: 5 }}>
+        {info?.texto && !info.llegando && vozOn && (
+          <div style={{ ...panel, padding: movil ? '10px 13px' : '12px 18px', fontSize: movil ? 13.5 : 15.5, lineHeight: 1.5, fontStyle: 'italic', color: '#dbeafe', textAlign: 'center', maxHeight: movil ? '26vh' : 'none', overflowY: 'auto', animation: 'ss-pop .4s' }}>
+            {info.texto}
+          </div>
+        )}
+        <div style={{ ...panel, padding: movil ? 6 : 8, display: 'flex', gap: movil ? 5 : 8, alignItems: 'center' }}>
+          <button className="ss-btn" onClick={pausarTour} title={tourPausado ? 'Continuar' : 'Pausar'} style={btnCtrl(tourPausado, '#10b981')}>{tourPausado ? '▶' : '⏸'}</button>
+          <button className="ss-btn" onClick={saltarParada} title="Siguiente parada" style={btnCtrl(false)}>⏭</button>
+          <button className="ss-btn" onClick={detenerTour} title="Terminar el tour" style={btnCtrl(false)}>⏹</button>
+          <button className="ss-btn" onClick={cambiarMusica} title="Música" style={btnCtrl(musicaOn, '#a78bfa')}>{musicaOn ? '🎵' : '🔇'}</button>
+          <button className="ss-btn" onClick={cambiarVoz} title="Voz" style={btnCtrl(vozOn, '#38bdf8')}>{vozOn ? '🗣️' : '🤐'}</button>
+          <div style={{ display: 'flex', gap: 4, padding: '0 6px' }}>
+            {tour.paradas.map((p, k) => (
+              <span key={k} style={{ width: 7, height: 7, borderRadius: '50%', background: info?.comparativa || (info && k < info.i) ? '#fbbf24' : info && k === info.i ? '#fff' : 'rgba(255,255,255,.25)' }} />
+            ))}
+          </div>
+        </div>
+      </div>
+    </>);
+  };
+
   const vistaActual = VISTAS.find(v => v.id === vista);
   const mostrarControles = vista === 'orbitas' || vista === 'galaxia';
   return (
@@ -797,14 +1148,14 @@ const App = () => {
         <Escena vista={vista} movil={movil} onSelect={setSel} ctrlRef={ctrlRef} />
 
         {/* título de la vista */}
-        <div style={{ position: 'absolute', top: 10, left: 12, ...panel, padding: movil ? '7px 11px' : '9px 14px', maxWidth: movil ? 190 : 260, pointerEvents: 'none' }}>
+        {vista !== 'tour' && <div style={{ position: 'absolute', top: 10, left: 12, ...panel, padding: movil ? '7px 11px' : '9px 14px', maxWidth: movil ? 190 : 260, pointerEvents: 'none' }}>
           <div style={{ fontWeight: 800, fontSize: movil ? 14 : 16 }}>{vistaActual.emoji} {vistaActual.t}</div>
           <div style={{ fontSize: movil ? 11 : 12, opacity: .72 }}>{vistaActual.sub}</div>
           <div style={{ fontSize: movil ? 10 : 11, opacity: .5, marginTop: 3 }}>👆 Toca un astro para ver su ficha</div>
-        </div>
+        </div>}
 
         {/* selector rápido de cuerpos — columna en escritorio, desplegable en móvil */}
-        {movil ? (
+        {vista === 'tour' && tourEstado !== 'inicio' ? null : movil ? (
           <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 8, textAlign: 'right' }}>
             <button className="ss-btn" onClick={() => setFichas(f => !f)} style={{ ...chip(fichas, '#6366f1'), fontSize: 12, padding: '8px 12px' }}>🪐 Fichas {fichas ? '▴' : '▾'}</button>
             {fichas && (
@@ -824,6 +1175,8 @@ const App = () => {
             ))}
           </div>
         )}
+
+        {vista === 'tour' && panelTour()}
 
         {/* escala real: botones "viajar a" */}
         {vista === 'escala' && (

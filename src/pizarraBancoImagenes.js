@@ -34,8 +34,8 @@ const pisYiconos = import.meta.glob(
 
 // ── Sistema solar + monedas Euro ────────────────────────────────────────────
 const solarTodo = import.meta.glob('./assets/solar/*.{png,jpg,jpeg,webp}', { eager: true, query: '?url', import: 'default' });
-// milkyway.png es el fondo estrellado (no un planeta) → fuera del banco
-const solar = Object.fromEntries(Object.entries(solarTodo).filter(([ruta]) => !/milkyway/i.test(ruta)));
+// milkyway (fondo estrellado) y saturn_ring (tira del anillo) no son planetas → fuera del banco
+const solar = Object.fromEntries(Object.entries(solarTodo).filter(([ruta]) => !/milkyway|_ring/i.test(ruta)));
 const euros = import.meta.glob('./assets/Euros/*.{png,jpg,jpeg,webp}', { eager: true, query: '?url', import: 'default' });
 
 // ── Anatomía (public/assets/anatomia) ───────────────────────────────────────

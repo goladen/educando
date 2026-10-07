@@ -2,8 +2,8 @@
 import { useState, useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import earthTexUrl from '../assets/solar/earth.png';
-import moonTexUrl from '../assets/solar/moon.png';
+import earthTexUrl from '../assets/solar/earth.jpg';
+import moonTexUrl from '../assets/solar/moon.jpg';
 
 const PREGUNTAS = [
   // ---------- ASTRONOMÍA ----------

@@ -1,5 +1,6 @@
 ﻿import React, { useState, useEffect, lazy, Suspense } from 'react';
 import CargandoChunk from './CargandoChunk';
+import { TOUR_PLANETAS } from '../Simuladores física/sistemaSolarTour';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, setDoc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { Search, Key, Filter, Zap, Play, Home, ChevronDown, ChevronUp, Mail, Link2, Share2 } from 'lucide-react';
@@ -121,6 +122,8 @@ const DueloPiratasRecurso = lazy(() => import('../DueloPiratasRecurso'));
 const BlocklyEditor = lazy(() => import('../BlocklyEditor'));
 const ProgramacionRobotica = lazy(() => import('../ProgramacionRobotica'));
 import imgPiContento from '../assets/Pi-contento.png';
+import imgVaniLa from '../assets/icono_vanila.svg';
+import imgSixSeven from '../assets/icono_sixseven.svg';
 import imgPasapalabra from '../assets/icono_pasapal.png'; // Revisa si es .png o .jpg
 import imgBurbujas from '../assets/icono_burbujas.png';
 import imgPikatron from '../assets/icono_pikatron.png';
@@ -140,17 +143,8 @@ import imgOlympic from '../assets/icono_olympic.png';
 
 const SS_BG = 'linear-gradient(135deg, #080818 0%, #0c1530 60%, #080818 100%)';
 
-const SS_PLANETAS = [
-    { id: 'Sol',      emoji: '☀️',  texto: 'El Sol es la estrella central de nuestro sistema solar. Con 1,4 millones de kilómetros de diámetro, en su interior cabrían más de un millón de Tierras. Su temperatura superficial alcanza los 5.500 grados Celsius.' },
-    { id: 'Mercurio', emoji: '🪨',  texto: 'Mercurio es el planeta más pequeño y el más cercano al Sol. Carece de atmósfera, lo que provoca temperaturas extremas: 430 grados de día y -180 de noche. Un año en Mercurio dura solo 88 días terrestres.' },
-    { id: 'Venus',    emoji: '🌫️', texto: 'Venus es el planeta más caliente, con 465 grados Celsius. Su densa atmósfera de CO₂ genera un efecto invernadero extremo. Un día en Venus dura más que su propio año.' },
-    { id: 'Tierra',   emoji: '🌍',  texto: 'La Tierra es el único planeta conocido con vida. Su atmósfera protectora y el agua líquida la hacen única en el sistema solar. Orbita el Sol a 150 millones de kilómetros.' },
-    { id: 'Luna',     emoji: '🌙',  texto: 'La Luna es el único satélite natural de la Tierra. Está a 384.400 km y tarda 27 días en orbitar nuestro planeta. Es el único lugar fuera de la Tierra donde el ser humano ha pisado.' },
-    { id: 'Jupiter',  emoji: '🪐',  texto: 'Júpiter es el planeta más grande del sistema solar. La Gran Mancha Roja es una tormenta activa desde hace más de 350 años. Tiene 95 lunas conocidas.' },
-    { id: 'Saturno',  emoji: '💫',  texto: 'Saturno es famoso por sus anillos de hielo y roca. Es tan poco denso que flotaría en el agua. Tiene más de 80 lunas conocidas y su día dura solo 10 horas.' },
-    { id: 'Urano',    emoji: '🔵',  texto: 'Urano gira de lado con una inclinación de 98 grados, probablemente por una colisión gigante en el pasado. Es el planeta más frío, con -224 grados Celsius.' },
-    { id: 'Neptuno',  emoji: '🌀',  texto: 'Neptuno posee los vientos más rápidos del sistema solar, superando los 2.100 km/h. Está a 4.500 millones de km del Sol y un año aquí dura 165 años terrestres.' },
-];
+// Paradas del tour (mismas que el simulador de Física; incluye Marte)
+const SS_PLANETAS = TOUR_PLANETAS;
 
 const SS_LINKS = [
     { emoji: '🚀', titulo: 'NASA Solar System', desc: 'Exploración oficial de la NASA', url: 'https://solarsystem.nasa.gov/', bg: '#1e3a5f' },
@@ -178,10 +172,8 @@ export function SolarSystemViewer({ onExit, recursoConfig }) {
     const [toursBuscados, setToursBuscados] = React.useState(null);
     const [buscandoTours, setBuscandoTours] = React.useState(false);
     const [localShare, setLocalShare] = React.useState(null);
-    const [showLandscapeHint, setShowLandscapeHint] = React.useState(
-        () => isMobile && window.innerWidth <= window.innerHeight
-    );
-    const iframeRef = React.useRef(null);
+    // config del tour que se está reproduciendo (null = tour por defecto)
+    const [tourActual, setTourActual] = React.useState(null);
 
     const [seleccion, setSeleccion] = React.useState(() => {
         if (recursoConfig?.planetas) {
@@ -207,24 +199,18 @@ export function SolarSystemViewer({ onExit, recursoConfig }) {
         if (pantalla !== 'playing') return;
         if (isMobile && document.documentElement.requestFullscreen)
             document.documentElement.requestFullscreen().catch(() => {});
-        if (isMobile && screen.orientation?.lock)
-            screen.orientation.lock('landscape').catch(() => {});
-        const onResize = () => { if (window.innerWidth > window.innerHeight) setShowLandscapeHint(false); };
-        window.addEventListener('resize', onResize);
         return () => {
-            window.removeEventListener('resize', onResize);
             if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
-            if (screen.orientation?.unlock) screen.orientation.unlock();
         };
     }, [pantalla]);
 
     const lanzarPersonalizadoConConfig = (config) => {
-        localStorage.setItem('solarTourConfig', JSON.stringify(config));
+        setTourActual(config);
         setPantalla('playing');
     };
 
     const lanzarDefault = () => {
-        localStorage.removeItem('solarTourConfig');
+        setTourActual(null);
         setPantalla('playing');
     };
 
@@ -233,19 +219,16 @@ export function SolarSystemViewer({ onExit, recursoConfig }) {
             .filter(p => seleccion[p.id]?.activo)
             .map(p => ({ nombre: p.id, texto: seleccion[p.id]?.texto || '' }));
         if (!planetas.length) return;
-        localStorage.setItem('solarTourConfig', JSON.stringify({
+        setTourActual({
             planetas,
             musicaUrl: musica,
             duracionEscena: duracion,
             comparativa: { activa: compActiva, texto: compTexto, duracion: compDuracion },
-        }));
+        });
         setPantalla('playing');
     };
 
-    const salirDeUnity = () => {
-        localStorage.removeItem('solarTourConfig');
-        setPantalla('outro');
-    };
+    const salirDelTour = () => setPantalla('outro');
 
     const togglePlaneta = id => setSeleccion(prev => ({ ...prev, [id]: { ...prev[id], activo: !prev[id].activo } }));
     const setTexto = (id, texto) => setSeleccion(prev => ({ ...prev, [id]: { ...prev[id], texto } }));
@@ -483,22 +466,12 @@ export function SolarSystemViewer({ onExit, recursoConfig }) {
     );
 
     // ── PLAYING ───────────────────────────────────────────────────────────────
+    // Mismo simulador que Física y Química (three.js), abierto en la pestaña del tour
     if (pantalla === 'playing') return (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#000', display: 'flex', flexDirection: 'column' }}>
-            {showLandscapeHint && (
-                <div style={{ position: 'absolute', inset: 0, zIndex: 10001, background: 'rgba(0,0,0,0.92)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'white', gap: 16 }}>
-                    <div style={{ fontSize: 64 }}>📱↔️</div>
-                    <p style={{ fontSize: '1.3rem', fontWeight: 'bold', textAlign: 'center', margin: 0 }}>Gira el dispositivo</p>
-                    <p style={{ fontSize: '1rem', color: '#aaa', textAlign: 'center', margin: 0 }}>Para una mejor experiencia usa la vista horizontal</p>
-                    <button onClick={() => setShowLandscapeHint(false)} style={{ marginTop: 8, padding: '10px 28px', background: '#3B82F6', color: 'white', border: 'none', borderRadius: 10, fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer' }}>Continuar de todos modos</button>
-                    <button onClick={salirDeUnity} style={{ background: 'transparent', color: '#aaa', border: 'none', cursor: 'pointer', fontSize: '0.9rem' }}>Cancelar</button>
-                </div>
-            )}
-            <button onClick={salirDeUnity} style={{ position: 'absolute', top: 10, left: 10, zIndex: 10000, background: 'rgba(0,0,0,0.7)', color: 'white', border: '1px solid rgba(255,255,255,0.4)', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.95rem' }}>
-                ← Salir
-            </button>
-            <iframe ref={iframeRef} src="/SolarSystem/index.html" title="Sistema Solar"
-                style={{ flex: 1, border: 'none', width: '100%', height: '100%' }} allow="fullscreen" />
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#03040a' }}>
+            <Suspense fallback={<CargandoChunk />}>
+                <SimuladorSistemaSolar vistaInicial="tour" tourConfig={tourActual} autoTour onExit={salirDelTour} />
+            </Suspense>
         </div>
     );
 
@@ -581,6 +554,7 @@ export const APPS = [
         desc: 'Cálculo mental neón alrededor del 67: Speed Run, Target 67 y Neon Grid.',
         color: '#FF007F',
         emoji: '🔢',
+        img: imgSixSeven,
         isSpecial: true,
         alsoMath: true,
         shareable: true,
@@ -592,6 +566,7 @@ export const APPS = [
         desc: 'Forma palabras con 9 letras, ¡con su tilde! Solo, en duelo escalando la montaña o en tablero con amigos. ES · CA · EN · FR.',
         color: '#A78BFA',
         emoji: '🔤',
+        img: imgVaniLa,
         isSpecial: true,
         shareable: true,
         shareUrl: `${window.location.origin}/vanila`
@@ -1390,7 +1365,7 @@ export const MATERIAS_CONFIG = [
     {
         id: 'MATEMATICAS', label: 'Matemáticas', emoji: '🔢', color: '#009688',
         keywords: ['matemáticas', 'mates', 'math', 'calculo', 'algebra', 'geometria', 'estadistica', 'probabilidad', 'fraccion', 'ecuacion', 'funcion', 'numero', 'operacion'],
-        specificIds: ['MATH_WORLD_PORTAL', 'GEOMETRIX', 'CALCULO', 'DINERO', 'FRACCIONES', 'ECUACIONES', 'ECUACION_SISTEMAS', 'FUNCIONES', 'GEOMETRÍA_ANALÍTICA', 'POLINOMIOS', 'POTENCIAS_RAICES', 'ESTADISTICA', 'PROBABILIDAD', 'MATHLE', 'MATHLIVE', 'OLYMPICLIVE'],
+        specificIds: ['MATH_WORLD_PORTAL', 'GEOMETRIX', 'CALCULO', 'DINERO', 'FRACCIONES', 'ECUACIONES', 'ECUACION_SISTEMAS', 'FUNCIONES', 'GEOMETRÍA_ANALÍTICA', 'POLINOMIOS', 'POTENCIAS_RAICES', 'ESTADISTICA', 'PROBABILIDAD', 'MATHLE', 'MATHLIVE', 'OLYMPICLIVE', 'SOLAR_SYSTEM'],
     },
     {
         id: 'LENGUA', label: 'Lengua', emoji: '📖', color: '#7B1FA2',
@@ -1400,7 +1375,7 @@ export const MATERIAS_CONFIG = [
     {
         id: 'GEO_HISTORIA', label: 'Geo e Historia', emoji: '🌍', color: '#F57C00',
         keywords: ['geografia', 'historia', 'sociales', 'ciencias sociales', 'mapa', 'comunidades', 'europa', 'mundo', 'continente', 'pais', 'capital', 'civilizacion', 'cultura', 'prehistoria', 'imperio', 'imperios', 'edad antigua', 'edad media'],
-        specificIds: ['GEOGRAFIA', 'IMPERIOS', 'LINEA_TIEMPO', 'ETIQUETAS'],
+        specificIds: ['GEOGRAFIA', 'IMPERIOS', 'LINEA_TIEMPO', 'SOLAR_SYSTEM', 'ETIQUETAS'],
     },
     {
         id: 'FISICA_QUIMICA', label: 'Física y Química', emoji: '⚗️', color: '#C62828',
@@ -3156,12 +3131,14 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                                 )}
                                 {GAME_INFO[app.id] && (
                                     <button
-                                        onClick={e => { e.stopPropagation(); setInfoModal({ info: GAME_INFO[app.id], name: app.name, color: app.color, emoji: app.emoji }); }}
+                                        onClick={e => { e.stopPropagation(); setInfoModal({ info: GAME_INFO[app.id], name: app.name, color: app.color, emoji: app.emoji, img: app.img }); }}
                                         title="Información"
                                         style={{ position:'absolute', top:8, left:8, background:'rgba(255,255,255,0.8)', border:'none', borderRadius:6, padding:'3px 7px', cursor:'pointer', color: app.color, fontWeight:700, fontSize:'0.78rem', lineHeight:1 }}
                                     >ℹ</button>
                                 )}
-                                <div style={{ fontSize: '50px', marginBottom: '15px', filter: app.comingSoon ? 'grayscale(100%)' : 'none' }}>{app.emoji}</div>
+                                <div style={{ fontSize: '50px', marginBottom: '15px', filter: app.comingSoon ? 'grayscale(100%)' : 'none' }}>
+                                    {app.img ? <img src={app.img} alt={app.name} style={{ width: 64, height: 64, objectFit: 'contain', display: 'block', margin: '0 auto' }} /> : app.emoji}
+                                </div>
                                 <h3 style={{ margin: '0 0 10px 0', color: app.comingSoon ? '#7f8c8d' : app.color, fontSize: '1.4rem' }}>{app.name}</h3>
                                 <p style={{ margin: 0, color: '#666', fontSize: '0.95rem' }}>{t(app.desc)}</p>
                                 {app.comingSoon && <span style={{ display: 'inline-block', marginTop: '15px', background: '#e0e0e0', color: '#555', padding: '5px 12px', borderRadius: '15px', fontSize: '0.8rem', fontWeight: 'bold' }}>Próximamente</span>}

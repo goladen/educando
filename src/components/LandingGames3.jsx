@@ -24,6 +24,7 @@ const QuestionSenderClient = lazy(() => import('../QuestionSenderClient'));
 const PikatronRun = lazy(() => import('../PikatronRun'));
 const BunkerDisparo = lazy(() => import('../BunkerDisparo'));
 const JuegoCalamar = lazy(() => import('../JuegoCalamar'));
+const EscapeHalloween = lazy(() => import('../EscapeHalloween'));
 const MoneyBoard = lazy(() => import('../MoneyBoard'));
 const EnigmicLogic = lazy(() => import('../EnigmicLogic'));
 const SixSeven = lazy(() => import('../SixSeven'));
@@ -548,6 +549,16 @@ export const APPS = [
         shareUrl: `${window.location.origin}/calamar`
     },
     {
+        id: 'ESCAPE_HALLOWEEN',
+        name: 'Escape Room Halloween',
+        desc: 'La mansión del zombi: toda la clase coopera para escapar.',
+        color: '#ff8c1a',
+        emoji: '🎃',
+        isSpecial: true,
+        shareable: true,
+        shareUrl: `${window.location.origin}/escaperoom`
+    },
+    {
         // Sale en la cuadrícula de juegos y también en Math World (alsoMath)
         id: 'SIXSEVEN',
         name: 'Six Seven',
@@ -844,6 +855,14 @@ export const GAME_INFO = {
         multiplayer: 'Individual y online: el profesor crea una sala (código + QR) y todos los alumnos corren a la vez en la misma pista, con la luz sincronizada.',
         materias: ['Universal'],
         etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
+    ESCAPE_HALLOWEEN: {
+        descripcion: 'Escape room cooperativo de Halloween, «La mansión del zombi». El profesor proyecta la mansión y la clase recorre sus salas, una por materia: Matemáticas (laboratorio del Dr. Calavera), Geografía (biblioteca de los mapas malditos), Biología (sala de los huesos), Historia (galería de retratos), Lengua (cripta de los pergaminos) e Inglés (desván de la bruja). Los aciertos de todos cargan la energía de cada puerta; después aparece un candado cuyas pistas están repartidas entre los móviles, así que hay que hablar y juntarlas. Cada sala da un amuleto (una vida más) para la batalla final de toda la clase contra un zombi. El profesor elige las pruebas una a una (puede repetir materia, p. ej. un escape room solo de Matemáticas con fracciones, ecuaciones…) y puede crear pruebas propias con su texto y un código que los alumnos buscan por el aula. Cada alumno se disfraza (fantasma, vampiro, bruja, calabaza, esqueleto…) y su personaje aparece en la mansión 3D proyectada, pasando de sala en sala hasta el sótano del zombi.',
+        tipoPreguntas: 'Opción múltiple generada al momento con los bancos de las apps de cada materia: cálculo (Primaria o ESO), banderas y capitales, anatomía, personajes históricos, ortografía y léxico, y verbos irregulares en inglés. Los candados se responden escribiendo: un código de 4 cifras, una capital, un órgano o hueso, un personaje, una palabra con las letras desordenadas o una contraseña en inglés.',
+        biblioteca: 'No necesita recursos: usa los bancos de Geografía, Biología, Historia (¿Quién es quién? histórico), Lengua e Inglés de la plataforma. Los escape rooms se pueden guardar (privados o en la biblioteca pública) y volver a abrir.',
+        multiplayer: 'Toda la clase a la vez y en el mismo equipo: el profesor crea la sala (código + QR) y la proyecta, y cada alumno juega con su móvil. Se configuran la etapa, las salas, el tiempo, la duración de cada sala y la dificultad del zombi. Si se acaba el tiempo, el zombi despierta antes y con más vida; si gana el zombi, hay revancha.',
+        materias: ['Matemáticas', 'Geografía', 'Historia', 'Biología', 'Lengua y Literatura', 'Inglés'],
+        etapas: ['Primaria', 'ESO'],
     },
     VANILA: {
         descripcion: 'Juego de palabras al estilo de los concursos de letras, en español, catalán, inglés y francés: salen 9 letras y hay que formar todas las palabras posibles escribiendo bien la tilde (y la ç o la l·l en catalán): tocando una letra de la palabra se le pone. Las palabras se comprueban con los diccionarios ortográficos de LibreOffice (cientos de miles de formas, con plurales y conjugaciones). Al acabar cada ronda se muestran la palabra más larga posible y las tildes a repasar. Desde el menú se puede saltar al Wordle, que usa el mismo diccionario.',
@@ -1853,6 +1872,8 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
                 setJuegoActivo({ tipoJuego: 'SIXSEVEN' });
             } else if (path === 'calamar') {
                 setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'CALAMAR' });
+            } else if (path === 'escaperoom') {
+                setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'ESCAPE_HALLOWEEN' });
             } else if (path === '' || path === 'inicio') {
                 setZonaActiva('MAIN'); setJuegoActivo(null); setSubzonaMath(null);
             }
@@ -2277,6 +2298,12 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
             return;
         }
 
+        if (appId === 'ESCAPE_HALLOWEEN') {
+            window.history.pushState({}, '', '/escaperoom');
+            setJuegoActivo({ tipoJuego: 'ESCAPE_HALLOWEEN' });
+            return;
+        }
+
         if (appId === 'STORYCUBES') {
             setJuegoActivo({ tipoJuego: 'STORYCUBES' });
             return;
@@ -2509,6 +2536,7 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
         if (tipoFinal === 'MATHLIVE' || isMathLiveAlumno) return <MathLive isHost={false} codigoSala={typeof joinCode !== 'undefined' ? joinCode : joinLiveCode} usuario={{ displayName: typeof joinName !== 'undefined' ? joinName : joinLiveName, email: null }} onExit={() => setLiveModeAlumno(false)} />;
         if (tipoFinal === 'EAE') return <ExpresionArtEscri isHost={false} codigoSala={joinLiveCode} usuario={{ uid: joinLiveHostId || null, displayName: joinLiveName, email: null }} onExit={() => { setLiveModeAlumno(false); setJoinLiveHostId(null); }} />;
         if (tipoFinal === 'LISTENING') return <Listening codigoSala={typeof joinCode !== 'undefined' ? joinCode : joinLiveCode} usuario={{ displayName: typeof joinName !== 'undefined' ? joinName : joinLiveName, email: null }} onExit={() => setLiveModeAlumno(false)} />;
+        if (tipoFinal === 'ESCAPE_HALLOWEEN') return <EscapeHalloween codigoSala={typeof joinCode !== 'undefined' ? joinCode : joinLiveCode} usuario={{ displayName: typeof joinName !== 'undefined' ? joinName : joinLiveName, email: null }} onExit={() => setLiveModeAlumno(false)} />;
         if (tipoFinal === 'CALAMAR') return <JuegoCalamar codigoSala={typeof joinCode !== 'undefined' ? joinCode : joinLiveCode} usuario={{ displayName: typeof joinName !== 'undefined' ? joinName : joinLiveName, email: null }} onExit={() => setLiveModeAlumno(false)} />;
 
         return <ThinkHootGame isHost={false} codigoSala={typeof joinCode !== 'undefined' ? joinCode : joinLiveCode} usuario={{ displayName: typeof joinName !== 'undefined' ? joinName : joinLiveName, email: null }} onExit={() => setLiveModeAlumno(false)} />;
@@ -2850,6 +2878,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
         if (juegoActivo.tipoJuego === 'SIXSEVEN') return <SixSeven usuario={usuario} onExit={() => { window.history.pushState({}, '', juegoActivo.desdeMath ? '/math_world' : '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'BUNKER') return <BunkerDisparo usuario={usuario} recurso={juegoActivo.recurso || null} autoStart={!!juegoActivo.recurso} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'MONEYBOARD') return <MoneyBoard usuario={usuario} recurso={juegoActivo.recurso || null} autoStart={!!juegoActivo.recurso} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
+        if (juegoActivo.tipoJuego === 'ESCAPE_HALLOWEEN') return <EscapeHalloween usuario={usuario} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'CALAMAR') return <JuegoCalamar usuario={usuario} recurso={juegoActivo.recurso || null} autoStart={!!juegoActivo.recurso} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'TRIVIAL') {
             const salirTrivial = () => {

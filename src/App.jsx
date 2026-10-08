@@ -17,6 +17,7 @@ const QuienEsQuien = lazy(() => import('./QuienEsQuien'));
 const QuienEsQuienHistorico = lazy(() => import('./QuienEsQuienHistorico'));
 const BunkerDisparo = lazy(() => import('./BunkerDisparo'));
 const JuegoCalamar = lazy(() => import('./JuegoCalamar'));
+const EscapeHalloween = lazy(() => import('./EscapeHalloween'));
 const MoneyBoard = lazy(() => import('./MoneyBoard'));
 const EnigmicLogic = lazy(() => import('./EnigmicLogic'));
 const SixSeven = lazy(() => import('./SixSeven'));
@@ -142,7 +143,7 @@ function App() {
           || slug === 'arkade' || slug === 'imperios' || slug === 'whoknows'
           || slug === 'quienesquien' || slug === 'quienhistorico' || slug === 'pizarra' || slug === 'bunker'
           || slug === 'enigmic' || slug === 'calamar' || slug === 'visor3d' || slug === 'esculpir' || slug === 'piktboard'
-          || slug === 'moneyboard' || slug === 'videos' || slug === 'sixseven' || slug === 'vanila') {
+          || slug === 'moneyboard' || slug === 'videos' || slug === 'sixseven' || slug === 'vanila' || slug === 'escaperoom') {
         setRutaPublica(slug);
         return;
       }
@@ -169,7 +170,7 @@ function App() {
         'irregular_verbs','sistema_solar',
         'retos','conectapuntos','sudoku',
         'imperios','geografia','quienesquien','quienhistorico','pizarra','bunker','enigmic','calamar',
-        'visor3d','esculpir','piktboard','moneyboard','videos','sixseven','vanila',
+        'visor3d','esculpir','piktboard','moneyboard','videos','sixseven','vanila','escaperoom',
         'comunidades','comunidad','competicion',
         'fisica',
         'math_world','primaria','feria',
@@ -342,6 +343,7 @@ function App() {
     if (rutaPublica === 'visor3d') return <><Visor3D onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'videos') return <VideosInstagram onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />;
     if (rutaPublica === 'piktboard' || rutaPublica === 'moneyboard') return <><MoneyBoard onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
+    if (rutaPublica === 'escaperoom') return <><EscapeHalloween onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'calamar') return <><JuegoCalamar onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'pizarra') return <><div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#f1f5f9', overflow: 'auto', padding: '54px 12px 20px' }}><button onClick={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} style={{ position: 'fixed', top: 12, left: 12, zIndex: 10000, padding: '8px 14px', borderRadius: 10, border: 'none', background: '#fff', color: '#334155', fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}>← Volver</button><PizarraApp /></div>{anotadorUI}</>;
     if (rutaPublica === 'retos') return <><Retos onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;

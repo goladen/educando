@@ -45,6 +45,10 @@ async function eliminarComunidadCompleta(comId) {
         const snap = await getDocs(collection(db, 'comunidades', comId, sub));
         await Promise.all(snap.docs.map(d => deleteDoc(d.ref)));
     }
+    try { // tolerante por si las reglas de grupos_centro aún no están publicadas
+        const gc = await getDocs(collection(db, 'comunidades', comId, 'grupos_centro'));
+        await Promise.all(gc.docs.map(d => deleteDoc(d.ref)));
+    } catch (_) { /* sin acceso: nada que borrar */ }
     await deleteDoc(doc(db, 'comunidades', comId));
 }
 
@@ -1596,6 +1600,262 @@ function GeneradorSubgrupos({ alumnos, nombre }) {
     );
 }
 
+// ─── Grupos de todo el centro (mezclando cursos) ──────────────────────────────
+// Reparte los alumnos de varios cursos en N grupos de forma que cada curso quede
+// repartido por igual entre todos los grupos (estratificado) y los tamaños
+// difieran como mucho en 1.
+const barajar = (arr) => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+function GruposCentro({ usuario, comunidad, cursos, onBack, soloLectura }) {
+    const [guardadas, setGuardadas] = useState(null); // agrupaciones guardadas en comunidades/{id}/grupos_centro
+    const [editId, setEditId] = useState(null);       // agrupación guardada abierta (null = nueva)
+    const [nombreG, setNombreG] = useState('');
+    const [guardando, setGuardando] = useState(false);
+    const [guardadoOk, setGuardadoOk] = useState(false);
+    const [confirmarBorrar, setConfirmarBorrar] = useState(null);
+    const [listados, setListados] = useState(null); // cursoId -> [{ id, nombre }]
+    const [selCursos, setSelCursos] = useState(() => new Set(cursos.map(c => c.id)));
+    const [excluidos, setExcluidos] = useState(new Set()); // `${cursoId}:${alumnoId}`
+    const [abiertoCurso, setAbiertoCurso] = useState(null);
+    const [modo, setModo] = useState('grupos');
+    const [n, setN] = useState(5);
+    const [grupos, setGrupos] = useState(null);
+    const [sel, setSel] = useState(null); // key del alumno seleccionado para cambiarlo de grupo
+    const ref = useRef();
+
+    useEffect(() => {
+        let vivo = true;
+        (async () => {
+            const res = {};
+            await Promise.all(cursos.map(async c => {
+                try {
+                    const s = await getDoc(doc(db, 'comunidades', comunidad.id, 'cursos', c.id, 'privado', 'data'));
+                    res[c.id] = ((s.exists() && s.data().listado) || []).filter(a => a.nombre).map((a, i) => ({ id: a.id || `i${i}`, nombre: a.nombre }));
+                } catch (_) { res[c.id] = []; }
+            }));
+            if (vivo) setListados(res);
+        })();
+        return () => { vivo = false; };
+    }, [comunidad.id, cursos.map(c => c.id).join(',')]);
+
+    useEffect(() => onSnapshot(collection(db, 'comunidades', comunidad.id, 'grupos_centro'), snap => {
+        const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        docs.sort((a, b) => (b.fecha?.seconds || 0) - (a.fecha?.seconds || 0));
+        setGuardadas(docs);
+    }, () => setGuardadas([])), [comunidad.id]);
+
+    const guardar = async (comoNueva) => {
+        const nombre = nombreG.trim() || `Grupos del centro ${new Date().toLocaleDateString('es-ES')}`;
+        const datos = {
+            nombre,
+            grupos: grupos.map(g => ({ alumnos: g.map(a => ({ key: a.key, nombre: a.nombre, cursoId: a.cursoId, cursoNombre: cursoDe(a.cursoId)?.nombre || a.cursoNombre || '' })) })),
+            actualizado: serverTimestamp(),
+        };
+        setGuardando(true);
+        try {
+            if (editId && !comoNueva) await updateDoc(doc(db, 'comunidades', comunidad.id, 'grupos_centro', editId), datos);
+            else {
+                const r = await addDoc(collection(db, 'comunidades', comunidad.id, 'grupos_centro'), { ...datos, autorUid: usuario.uid, autorNombre: usuario.displayName || 'Profesor/a', fecha: serverTimestamp() });
+                setEditId(r.id);
+            }
+            setNombreG(nombre);
+            setGuardadoOk(true); setTimeout(() => setGuardadoOk(false), 2500);
+        } catch (e) { alert('No se pudo guardar: ' + e.message); }
+        setGuardando(false);
+    };
+    const abrirGuardada = (ag) => {
+        setGrupos((ag.grupos || []).map(g => ordenarGrupo(g.alumnos || [])));
+        setEditId(ag.id); setNombreG(ag.nombre || ''); setSel(null);
+        setTimeout(() => ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+    };
+    const borrarGuardada = async (id) => {
+        try { await deleteDoc(doc(db, 'comunidades', comunidad.id, 'grupos_centro', id)); }
+        catch (e) { alert('No se pudo borrar: ' + e.message); }
+        if (id === editId) { setEditId(null); setGrupos(null); setNombreG(''); }
+        setConfirmarBorrar(null);
+    };
+
+    const cursoDe = (id) => cursos.find(c => c.id === id);
+    const presentesDe = (cid) => (listados?.[cid] || []).filter(a => !excluidos.has(`${cid}:${a.id}`));
+    const cursosActivos = cursos.filter(c => selCursos.has(c.id) && (listados?.[c.id] || []).length > 0);
+    const total = cursosActivos.reduce((s, c) => s + presentesDe(c.id).length, 0);
+
+    const toggleCurso = (id) => setSelCursos(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
+    const toggleAlumno = (key) => setExcluidos(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s; });
+
+    const generar = () => {
+        if (total === 0) { setGrupos([]); return; }
+        const k = modo === 'grupos'
+            ? Math.max(1, Math.min(n, total))
+            : Math.max(1, Math.ceil(total / Math.max(1, n)));
+        // Cursos en orden aleatorio, alumnos barajados dentro de cada curso y
+        // reparto circular continuo: cada curso cae equilibrado en todos los grupos.
+        const secuencia = barajar(cursosActivos).flatMap(c => barajar(presentesDe(c.id)).map(a => ({ key: `${c.id}:${a.id}`, nombre: a.nombre, cursoId: c.id })));
+        const orden = barajar(Array.from({ length: k }, (_, i) => i)); // qué grupos reciben los "sobrantes"
+        const res = Array.from({ length: k }, () => []);
+        secuencia.forEach((a, i) => res[orden[i % k]].push(a));
+        setGrupos(res.map(ordenarGrupo));
+        setSel(null); setEditId(null); setNombreG('');
+    };
+
+    // Dentro de cada grupo: por curso (orden de la lista de cursos, de menor a mayor) y luego por nombre
+    const posCurso = (id) => { const i = cursos.findIndex(c => c.id === id); return i < 0 ? 9999 : i; };
+    const ordenarGrupo = (g) => [...g].sort((a, b) => posCurso(a.cursoId) - posCurso(b.cursoId) || a.nombre.localeCompare(b.nombre, 'es'));
+
+    // Cambiar de grupo: toca un alumno y luego el grupo de destino
+    const moverA = (destino) => {
+        if (!sel) return;
+        setGrupos(prev => {
+            const origen = prev.findIndex(g => g.some(a => a.key === sel));
+            if (origen < 0 || origen === destino) return prev;
+            const alumno = prev[origen].find(a => a.key === sel);
+            return prev.map((g, i) => i === origen ? g.filter(a => a.key !== sel) : i === destino ? ordenarGrupo([...g, alumno]) : g);
+        });
+        setSel(null);
+    };
+
+    const chip = (activo) => ({ padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${activo ? AZUL : '#e0e4f0'}`, background: activo ? AZUL : 'white', color: activo ? 'white' : '#555', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700 });
+
+    return (
+        <div>
+            <button onClick={onBack} style={st.backBtn}><ChevronLeft size={16} /> Cursos</button>
+            <h2 style={{ margin: '0 0 6px', color: '#2c3e50', display: 'flex', alignItems: 'center', gap: 8 }}><Users size={22} color={AZUL} /> Grupos del centro</h2>
+            <div style={{ fontSize: '0.82rem', color: '#7f8c8d', marginBottom: 12 }}>Mezcla los alumnos de varios cursos: cada grupo recibe un número equilibrado de alumnos de cada listado.</div>
+
+            {/* Agrupaciones guardadas (visibles para todos los miembros) */}
+            <div style={{ marginBottom: 16 }}>
+                <div style={st.label}>💾 Agrupaciones guardadas</div>
+                {guardadas === null ? <div style={{ fontSize: '0.8rem', color: '#95a5a6' }}>Cargando…</div>
+                    : guardadas.length === 0 ? <div style={{ fontSize: '0.8rem', color: '#95a5a6' }}>{soloLectura ? 'Todavía no hay agrupaciones guardadas.' : 'Todavía no hay ninguna. Genera unos grupos y pulsa «Guardar» para que los vean los miembros de la comunidad.'}</div>
+                    : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {guardadas.map(ag => {
+                                const nAl = (ag.grupos || []).reduce((s, g) => s + (g.alumnos || []).length, 0);
+                                const activa = ag.id === editId;
+                                return (
+                                    <div key={ag.id} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: '7px 10px', borderRadius: 10, border: `1.5px solid ${activa ? AZUL : '#e0e4f0'}`, background: activa ? '#eef4ff' : 'white' }}>
+                                        <div style={{ flex: 1, minWidth: 160 }}>
+                                            <div style={{ fontWeight: 700, color: '#2c3e50', fontSize: '0.86rem' }}>{ag.nombre || 'Agrupación'}</div>
+                                            <div style={{ fontSize: '0.72rem', color: '#95a5a6' }}>{(ag.grupos || []).length} grupos · {nAl} alumnos{ag.autorNombre ? ` · ${ag.autorNombre}` : ''}{ag.fecha?.seconds ? ` · ${new Date(ag.fecha.seconds * 1000).toLocaleDateString('es-ES')}` : ''}</div>
+                                        </div>
+                                        <button onClick={() => abrirGuardada(ag)} style={{ ...st.miniBtn, color: AZUL, borderColor: '#cdd6ea' }}><Eye size={13} /> Ver</button>
+                                        {!soloLectura && (confirmarBorrar === ag.id ? <>
+                                            <button onClick={() => borrarGuardada(ag.id)} style={{ ...st.miniBtn, color: 'white', background: '#e74c3c', borderColor: '#e74c3c' }}>Sí</button>
+                                            <button onClick={() => setConfirmarBorrar(null)} style={st.miniBtn}>No</button>
+                                        </> : <button onClick={() => setConfirmarBorrar(ag.id)} style={{ ...st.miniBtn, color: '#e74c3c', borderColor: '#f3c9c4' }}><Trash2 size={13} /></button>)}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+            </div>
+
+            {listados === null ? <div style={st.loader}><RefreshCw size={22} style={{ animation: 'spin 1s linear infinite' }} /></div> : <>
+                {!soloLectura && <>
+                <div style={st.label}>🎲 Nueva agrupación</div>
+                <div style={{ fontSize: '0.8rem', color: '#7f8c8d', marginBottom: 6 }}>Cursos incluidos (toca para quitar/poner · «ausentes» para marcar alumnos que no entran):</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+                    {cursos.map(c => {
+                        const lista = listados[c.id] || [];
+                        const on = selCursos.has(c.id) && lista.length > 0;
+                        const color = c.color || AZUL;
+                        return (
+                            <div key={c.id} style={{ border: '1px solid #e0e4f0', borderLeft: `4px solid ${color}`, borderRadius: 10, padding: '6px 10px', opacity: lista.length ? 1 : 0.5 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: lista.length ? 'pointer' : 'default', fontWeight: 700, color: '#2c3e50', fontSize: '0.86rem', flex: 1 }}>
+                                        <input type="checkbox" checked={on} disabled={!lista.length} onChange={() => toggleCurso(c.id)} /> {c.nombre}
+                                        <span style={{ fontWeight: 500, color: '#95a5a6', fontSize: '0.75rem' }}>{lista.length ? `${presentesDe(c.id).length}/${lista.length} alumnos` : 'sin listado'}</span>
+                                    </label>
+                                    {on && <button onClick={() => setAbiertoCurso(abiertoCurso === c.id ? null : c.id)} style={st.miniBtn}>{abiertoCurso === c.id ? 'Cerrar' : 'Ausentes'}</button>}
+                                </div>
+                                {on && abiertoCurso === c.id && (
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 8 }}>
+                                        {lista.map(a => {
+                                            const key = `${c.id}:${a.id}`; const fuera = excluidos.has(key);
+                                            return (
+                                                <button key={key} onClick={() => toggleAlumno(key)} title={fuera ? 'Marcar presente' : 'Marcar ausente'}
+                                                    style={{ padding: '4px 10px', borderRadius: 14, border: '1.5px solid ' + (fuera ? '#e0e4f0' : '#b6e2c1'), background: fuera ? '#f1f3f7' : '#eafaf0', color: fuera ? '#aeb6bf' : '#2c3e50', textDecoration: fuera ? 'line-through' : 'none', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600 }}>
+                                                    {a.nombre}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14, padding: '10px 12px', background: '#f8f9fb', borderRadius: 10 }}>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                        <button onClick={() => setModo('grupos')} style={chip(modo === 'grupos')}>Nº de grupos</button>
+                        <button onClick={() => setModo('porgrupo')} style={chip(modo === 'porgrupo')}>Alumnos por grupo</button>
+                    </div>
+                    <input type="number" min={1} max={total || 1} value={n} onChange={e => setN(Math.max(1, parseInt(e.target.value) || 1))} style={{ ...st.input, marginBottom: 0, width: 72 }} />
+                    <span style={{ fontSize: '0.8rem', color: '#7f8c8d' }}>{modo === 'grupos' ? 'grupos' : 'por grupo'} · {total} alumnos de {cursosActivos.length} cursos</span>
+                    <button onClick={generar} disabled={total === 0} style={st.btnPrimary}>🎲 Generar</button>
+                </div>
+                </>}
+
+                {grupos && (
+                    <>
+                        {editId && <div style={{ fontWeight: 800, color: '#2c3e50', fontSize: '1rem', marginBottom: 6 }}>📌 {nombreG || 'Agrupación'}</div>}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
+                            {!soloLectura ? <button onClick={generar} style={st.miniBtn}><RefreshCw size={13} /> {editId ? 'Generar otra nueva' : 'Volver a generar'}</button> : <span />}
+                            <ExportBar targetRef={ref} nombre={nombreG || 'Grupos del centro'} />
+                        </div>
+                        {!soloLectura && (
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10, padding: '8px 10px', background: '#f8f9fb', borderRadius: 10 }}>
+                                <input value={nombreG} onChange={e => setNombreG(e.target.value)} onKeyDown={e => e.key === 'Enter' && guardar(false)}
+                                    placeholder="Nombre (ej: Grupos jornada deportiva)" style={{ ...st.input, marginBottom: 0, flex: 1, minWidth: 180 }} />
+                                <button onClick={() => guardar(false)} disabled={guardando} style={{ ...st.btnPrimary, ...(guardadoOk ? { background: '#27ae60' } : {}) }}>
+                                    {guardando ? <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> : guardadoOk ? <CheckCircle size={14} /> : '💾'} {guardadoOk ? 'Guardado' : editId ? 'Guardar cambios' : 'Guardar'}
+                                </button>
+                                {editId && <button onClick={() => guardar(true)} disabled={guardando} style={st.btnSec}>Guardar como nueva</button>}
+                                <span style={{ fontSize: '0.72rem', color: '#95a5a6', width: '100%' }}>Lo verán todos los miembros de la comunidad en «Agrupaciones guardadas».</span>
+                            </div>
+                        )}
+                        {!soloLectura && <div style={{ fontSize: '0.75rem', color: sel ? AZUL : '#95a5a6', marginBottom: 6, fontWeight: sel ? 700 : 400 }}>
+                            {sel ? <>Ahora toca el grupo al que quieres moverlo · <button onClick={() => setSel(null)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.75rem', padding: 0 }}>cancelar</button></>
+                                : 'Toca un alumno y después otro grupo para cambiarlo de grupo.'}
+                        </div>}
+                        <div ref={ref} style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', background: 'white', padding: 8, borderRadius: 10 }}>
+                            {grupos.map((g, i) => {
+                                const porCurso = {};
+                                g.forEach(a => { porCurso[a.cursoId] = (porCurso[a.cursoId] || 0) + 1; });
+                                const destino = sel && !g.some(a => a.key === sel);
+                                return (
+                                    <div key={i} onClick={() => destino && moverA(i)}
+                                        style={{ borderRadius: 12, border: `2px solid ${COLORES_SG[i % COLORES_SG.length]}`, overflow: 'hidden', cursor: destino ? 'pointer' : 'default', ...(destino ? { outline: '2px dashed #94a3b8', outlineOffset: 2 } : {}) }}>
+                                        <div style={{ background: COLORES_SG[i % COLORES_SG.length], color: 'white', fontWeight: 700, padding: '6px 10px', fontSize: '0.85rem' }}>Grupo {i + 1} · {g.length}</div>
+                                        <div style={{ padding: '4px 10px', fontSize: '0.68rem', color: '#7f8c8d', borderBottom: '1px solid #f0f0f0', lineHeight: 1.5 }}>
+                                            {Object.keys(porCurso).sort((x, y) => posCurso(x) - posCurso(y)).map(cid => `${cursoDe(cid)?.nombre || g.find(a => a.cursoId === cid)?.cursoNombre || '?'}: ${porCurso[cid]}`).join(' · ')}
+                                        </div>
+                                        <div style={{ padding: '6px 10px' }}>
+                                            {g.map((a, j) => {
+                                                const c = cursoDe(a.cursoId); const color = c?.color || AZUL;
+                                                const marcado = sel === a.key;
+                                                return (
+                                                    <div key={a.key || j} title={soloLectura ? undefined : 'Toca para cambiarlo de grupo'}
+                                                        onClick={e => { if (soloLectura || destino) return; e.stopPropagation(); setSel(marcado ? null : a.key); }}
+                                                        style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.84rem', color: '#2c3e50', padding: '3px 4px', margin: '0 -4px', borderRadius: 6, cursor: soloLectura ? 'default' : 'pointer', background: marcado ? '#fff3cd' : 'transparent', fontWeight: marcado ? 700 : 400, borderBottom: j < g.length - 1 ? '1px solid #f3f3f3' : 'none' }}>
+                                                        <span style={{ flex: 1, minWidth: 0 }}>{a.nombre}</span>
+                                                        <span style={{ flexShrink: 0, fontSize: '0.68rem', fontWeight: 700, color, background: color + '1a', border: `1px solid ${color}55`, borderRadius: 8, padding: '1px 6px', whiteSpace: 'nowrap' }}>{c?.nombre || a.cursoNombre || ''}</span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </>
+                )}
+            </>}
+            <style>{spin}</style>
+        </div>
+    );
+}
+
 // ─── Detalle de un curso (miembro) ────────────────────────────────────────────
 function CursoDetalle({ usuario, comunidad, curso, onBack, soloLectura }) {
     const [sub, setSub]       = useState('listado');
@@ -1849,6 +2109,7 @@ function CursosPanel({ usuario, comunidad, soloLectura }) {
     const [abierto, setAbierto] = useState(null);
     const [confirmarBorrar, setConfirmarBorrar] = useState(null);
     const [conteos, setConteos] = useState({}); // cursoId -> nº alumnos del listado
+    const [gruposCentro, setGruposCentro] = useState(false);
 
     useEffect(() => {
         const ref = collection(db, 'comunidades', comunidad.id, 'cursos');
@@ -1907,6 +2168,7 @@ function CursosPanel({ usuario, comunidad, soloLectura }) {
         setConfirmarBorrar(null);
     };
 
+    if (gruposCentro) return <GruposCentro usuario={usuario} comunidad={comunidad} cursos={cursos} onBack={() => setGruposCentro(false)} soloLectura={soloLectura} />;
     if (abierto) {
         const viva = cursos.find(c => c.id === abierto.id) || abierto;
         return <CursoDetalle usuario={usuario} comunidad={comunidad} curso={viva} onBack={() => setAbierto(null)} soloLectura={soloLectura} />;
@@ -1914,6 +2176,11 @@ function CursosPanel({ usuario, comunidad, soloLectura }) {
 
     return (
         <div>
+            {cursos.length > 1 && (
+                <button onClick={() => setGruposCentro(true)} style={{ ...st.btnSec, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Users size={15} /> Grupos del centro <span style={{ fontWeight: 500, color: '#7f8c8d', fontSize: '0.78rem' }}>· mezclar alumnos de todos los cursos</span>
+                </button>
+            )}
             {!soloLectura && (
                 <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
                     <input value={nuevo} onChange={e => setNuevo(e.target.value)} onKeyDown={e => e.key === 'Enter' && crear()} placeholder="Nombre del curso (ej: 1º ESO A)" style={{ ...st.input, marginBottom: 0, flex: 1 }} />

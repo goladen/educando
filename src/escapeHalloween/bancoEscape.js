@@ -17,6 +17,7 @@ import ANATOMIA from '../anatomia_avanzada_dataset.json';
 import { PERSONAJES_HISTORICOS } from '../personajesHistoricos';
 import { TEMAS } from '../lengua/ejercicios';
 import { bibliotecaIrregularVerbs } from '../BibliotecaIrregularVerbs';
+import { preguntaDeRecurso, candadoRecurso } from './recursosEscape';
 
 export const rInt = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
 export const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -108,6 +109,15 @@ export function infoPrueba(prueba, idx = 0, pruebas = []) {
             decor: 'MANUAL',
         };
     }
+    if (prueba.tipo === 'RECURSO') {
+        return {
+            id: prueba.id, materia: `Recurso${prueba.autor ? ` de ${prueba.autor}` : ''}`, emoji: prueba.emoji || '📚', color: '#22d3ee',
+            nombre: prueba.nombre || prueba.recursoTitulo || 'La biblioteca prohibida',
+            historia: `Un libro polvoriento se abre solo: son las preguntas de «${prueba.recursoTitulo || 'un recurso'}»${prueba.autor ? `, escritas por ${prueba.autor}` : ''}. Solo quien las responda podrá seguir.`,
+            amuleto: AMULETOS_EXTRA[idx % AMULETOS_EXTRA.length],
+            decor: 'LENGUA',
+        };
+    }
     const base = SALAS[prueba.materia] || SALAS.MATES;
     const repeticion = pruebas.slice(0, idx).filter(p => p.tipo !== 'MANUAL' && p.materia === prueba.materia).length;
     const nombre = prueba.nombre || (repeticion === 0 ? base.nombre : (NOMBRES_EXTRA[base.id] || [])[(repeticion - 1) % 3] || base.nombre);
@@ -122,6 +132,9 @@ export function infoPrueba(prueba, idx = 0, pruebas = []) {
 /** Materia de las preguntas de una prueba (null si es una prueba propia sin preguntas). */
 export const materiaDePrueba = (p) => (p?.tipo === 'MANUAL' ? (p.materiaRetos || null) : p?.materia || null);
 export const temaDePrueba = (p) => (p?.tipo === 'MANUAL' ? (p.temaRetos || 'MIX') : p?.tema || 'MIX');
+
+/** ¿La prueba tiene preguntas antes del candado? (materia, prueba propia con preguntas o recurso) */
+export const tienePreguntas = (p) => (p?.tipo === 'RECURSO' ? (p.preguntas?.length || 0) > 0 : !!materiaDePrueba(p));
 
 // ═══════════════════════════════════════════════════════════════════
 //  MATEMÁTICAS
@@ -534,6 +547,9 @@ export const huellaCodigo = (codigo) => {
 
 /** Prepara una prueba para guardarla en la sala en vivo (el código va como huella). */
 export function pruebaParaSala(p) {
+    if (p.tipo === 'RECURSO') {
+        return { id: p.id, tipo: 'RECURSO', nombre: p.nombre || '', emoji: p.emoji || '📚', recursoTitulo: p.recursoTitulo || '', autor: p.autor || '', preguntas: (p.preguntas || []).slice(0, 80) };
+    }
     if (p.tipo !== 'MANUAL') return { id: p.id, tipo: 'MATERIA', materia: p.materia, tema: p.tema || 'MIX', nombre: p.nombre || '' };
     const codigos = String(p.codigo || '').split('|').map(c => c.trim()).filter(Boolean);
     return {
@@ -573,4 +589,17 @@ export function pistasDeJugador(pistas, idxJugador, numJugadores) {
     const n = Math.max(1, numJugadores);
     if (n >= pistas.length) return [pistas[idxJugador % pistas.length]];
     return pistas.filter((_, j) => j % n === idxJugador);
+}
+
+/** Una pregunta para la prueba, sea del tipo que sea. */
+export function preguntaDePrueba(p, etapa = 'ESO') {
+    if (p?.tipo === 'RECURSO') return preguntaDeRecurso(p) || generarPregunta('MATES', etapa);
+    return generarPregunta(materiaDePrueba(p) || 'MATES', etapa, temaDePrueba(p));
+}
+
+/** Candado de una prueba en el modo online (la prueba propia debe venir de pruebaParaSala, con huellas). */
+export function candadoDePrueba(p, etapa = 'ESO') {
+    if (p?.tipo === 'MANUAL') return candadoManual(p);
+    if (p?.tipo === 'RECURSO') return candadoRecurso(p);
+    return generarCandado(p?.materia, etapa, p?.tema);
 }

@@ -1604,6 +1604,9 @@ function GeneradorSubgrupos({ alumnos, nombre }) {
 // Reparte los alumnos de varios cursos en N grupos de forma que cada curso quede
 // repartido por igual entre todos los grupos (estratificado) y los tamaños
 // difieran como mucho en 1.
+const rgb = (hex) => { const h = (hex || AZUL).replace('#', ''); const f = h.length === 3 ? h.split('').map(x => x + x).join('') : h.padEnd(6, '0'); return [0, 2, 4].map(i => parseInt(f.slice(i, i + 2), 16) || 0); };
+const claro = (c, k = 0.88) => c.map(v => Math.round(v + (255 - v) * k));
+const cortarPdf = (pdf, txt, maxW) => { if (pdf.getTextWidth(txt) <= maxW) return txt; let t = txt; while (t.length > 1 && pdf.getTextWidth(t + '...') > maxW) t = t.slice(0, -1); return t + '...'; };
 const barajar = (arr) => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 function GruposCentro({ usuario, comunidad, cursos, onBack, soloLectura }) {
     const [guardadas, setGuardadas] = useState(null); // agrupaciones guardadas en comunidades/{id}/grupos_centro
@@ -1713,6 +1716,163 @@ function GruposCentro({ usuario, comunidad, cursos, onBack, soloLectura }) {
         setSel(null);
     };
 
+    // PDF apaisado, una hoja por grupo; dentro, un bloque por clase con sus alumnos en columnas.
+    // Texto vectorial (jsPDF) y tamaño de letra ajustado para que el grupo quepa en una hoja.
+    const [haciendoPdf, setHaciendoPdf] = useState(false);
+    const pdfPorGrupos = async () => {
+        if (!grupos?.length) return;
+        setHaciendoPdf(true);
+        try {
+            const { jsPDF } = await import('jspdf');
+            const pdf = new jsPDF({ orientation: 'l', unit: 'pt', format: 'a4' });
+            const W = pdf.internal.pageSize.getWidth(), H = pdf.internal.pageSize.getHeight();
+            const M = 30, topY = 92, bottomY = H - 28;
+            const titulo = nombreG.trim() || 'Grupos del centro';
+            const cortar = (txt, maxW) => cortarPdf(pdf, txt, maxW);
+
+            grupos.forEach((g, gi) => {
+                if (gi > 0) pdf.addPage();
+                // Bloques por clase en el orden de la lista de cursos
+                const ids = [...new Set(g.map(a => a.cursoId))].sort((x, y) => posCurso(x) - posCurso(y));
+                const bloques = ids.map(cid => ({ cid, nombre: cursoDe(cid)?.nombre || g.find(a => a.cursoId === cid)?.cursoNombre || 'Sin curso', color: rgb(cursoDe(cid)?.color), alumnos: g.filter(a => a.cursoId === cid) }));
+
+                // Elige columnas y tamaño de letra: el mayor que quepa en la hoja
+                const altoBloques = (cols, fs) => bloques.reduce((s, b) => s + fs * 1.9 + Math.ceil(b.alumnos.length / cols) * fs * 1.55 + 8, 0);
+                // (letra lo más grande posible y, a igual letra, menos columnas); si ni así cabe, sigue en otra hoja
+                let cols = 5, fs = 7;
+                buscar: for (let f = 14; f >= 7; f -= 0.5) for (const c of [3, 4, 5]) if (altoBloques(c, f) <= bottomY - topY) { cols = c; fs = f; break buscar; }
+                const colorG = rgb(COLORES_SG[gi % COLORES_SG.length]);
+
+                const cabecera = (cont) => {
+                    pdf.setFillColor(...colorG); pdf.rect(0, 0, W, 58, 'F');
+                    pdf.setTextColor(255, 255, 255); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(26);
+                    pdf.text(`Grupo ${gi + 1}${cont ? ' (cont.)' : ''}`, M, 38);
+                    pdf.setFontSize(13); pdf.setFont('helvetica', 'normal');
+                    pdf.text(`${g.length} alumnos`, W - M, 38, { align: 'right' });
+                    pdf.setTextColor(60, 70, 80); pdf.setFontSize(10);
+                    pdf.text(cortar(`${titulo}  ·  ` + bloques.map(b => `${b.nombre}: ${b.alumnos.length}`).join('  ·  '), W - 2 * M), M, 76);
+                    pdf.setFontSize(8); pdf.setTextColor(150, 160, 170);
+                    pdf.text(`${comunidad.nombre || ''}  ·  Grupo ${gi + 1} de ${grupos.length}`, W / 2, H - 12, { align: 'center' });
+                };
+                cabecera(false);
+
+                let y = topY;
+                const colW = (W - 2 * M) / cols, lh = fs * 1.55;
+                bloques.forEach(b => {
+                    const filas = Math.ceil(b.alumnos.length / cols);
+                    if (y + fs * 1.9 + lh > bottomY) { pdf.addPage(); cabecera(true); y = topY; }
+                    // Cabecera de la clase
+                    pdf.setFillColor(...claro(b.color)); pdf.rect(M, y, W - 2 * M, fs * 1.6, 'F');
+                    pdf.setFillColor(...b.color); pdf.rect(M, y, 5, fs * 1.6, 'F');
+                    pdf.setTextColor(...b.color); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(fs * 1.05);
+                    pdf.text(`${b.nombre}  (${b.alumnos.length})`, M + 12, y + fs * 1.15);
+                    y += fs * 1.9;
+                    // Alumnos en columnas (de arriba abajo y luego a la derecha)
+                    pdf.setFont('helvetica', 'normal'); pdf.setFontSize(fs); pdf.setTextColor(40, 50, 60);
+                    for (let r = 0; r < filas; r++) {
+                        if (y + lh > bottomY) { pdf.addPage(); cabecera(true); y = topY; }
+                        for (let c = 0; c < cols; c++) {
+                            const a = b.alumnos[c * filas + r]; if (!a) continue;
+                            const x = M + c * colW + 12;
+                            pdf.setTextColor(170, 178, 186); pdf.text(`${c * filas + r + 1}.`, x + 14, y + fs, { align: 'right' });
+                            // Nombre largo: primero se encoge (hasta un 65 %) y solo si aún no cabe se recorta
+                            const maxW = colW - 26; let f2 = fs;
+                            while (f2 > fs * 0.65 && pdf.setFontSize(f2).getTextWidth(a.nombre) > maxW) f2 -= 0.25;
+                            pdf.setTextColor(40, 50, 60); pdf.text(cortar(a.nombre, maxW), x + 18, y + fs);
+                            pdf.setFontSize(fs);
+                        }
+                        y += lh;
+                    }
+                    y += 8;
+                });
+            });
+            pdf.save(`${titulo.replace(/[\\/:*?"<>|]/g, '').trim() || 'Grupos'}.pdf`);
+        } catch (e) { alert('No se pudo crear el PDF: ' + e.message); }
+        setHaciendoPdf(false);
+    };
+
+    // PDF apaisado con todos los grupos juntos (como la vista de tarjetas): un grupo por columna,
+    // hasta 6 por hoja; dentro de cada columna los alumnos van agrupados por clase.
+    const pdfTodosJuntos = async () => {
+        if (!grupos?.length) return;
+        setHaciendoPdf(true);
+        try {
+            const { jsPDF } = await import('jspdf');
+            const pdf = new jsPDF({ orientation: 'l', unit: 'pt', format: 'a4' });
+            const W = pdf.internal.pageSize.getWidth(), H = pdf.internal.pageSize.getHeight();
+            const M = 24, GAP = 8, topY = 66, bottomY = H - 24, POR_HOJA = 6;
+            const titulo = nombreG.trim() || 'Grupos del centro';
+            const totalAl = grupos.reduce((s, g) => s + g.length, 0);
+            const cabecera = (cont) => {
+                pdf.setFillColor(...rgb(AZUL)); pdf.rect(0, 0, W, 40, 'F');
+                pdf.setTextColor(255, 255, 255); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(18);
+                pdf.text(cortarPdf(pdf, titulo + (cont ? ' (cont.)' : ''), W - 2 * M - 160), M, 27);
+                pdf.setFont('helvetica', 'normal'); pdf.setFontSize(11);
+                pdf.text(`${grupos.length} grupos · ${totalAl} alumnos`, W - M, 27, { align: 'right' });
+                pdf.setFontSize(8); pdf.setTextColor(150, 160, 170);
+                pdf.text(comunidad.nombre || '', W / 2, H - 10, { align: 'center' });
+            };
+            const bloquesDe = (g) => [...new Set(g.map(a => a.cursoId))].sort((x, y) => posCurso(x) - posCurso(y))
+                .map(cid => ({ nombre: cursoDe(cid)?.nombre || g.find(a => a.cursoId === cid)?.cursoNombre || 'Sin curso', color: rgb(cursoDe(cid)?.color), alumnos: g.filter(a => a.cursoId === cid) }));
+
+            for (let s = 0; s < grupos.length; s += POR_HOJA) {
+                if (s > 0) pdf.addPage();
+                cabecera(false);
+                const base = pdf.getNumberOfPages();
+                const lote = grupos.slice(s, s + POR_HOJA);
+                const k = lote.length;
+                const colW = (W - 2 * M - GAP * (k - 1)) / k;
+                // Letra común para el lote, según la columna más larga (cabecera de grupo + clases + alumnos)
+                const lineas = Math.max(...lote.map(g => g.length + bloquesDe(g).length * 1.6));
+                const fs = Math.max(6, Math.min(11, (bottomY - topY - 28) / (lineas * 1.25)));
+                const lh = fs * 1.25;
+                const irA = (p) => {
+                    while (pdf.getNumberOfPages() < p) { pdf.addPage(); cabecera(true); }
+                    pdf.setPage(p);
+                };
+                lote.forEach((g, ci) => {
+                    const gi = s + ci;
+                    const x = M + ci * (colW + GAP);
+                    const colorG = rgb(COLORES_SG[gi % COLORES_SG.length]);
+                    let p = base, y = topY;
+                    irA(p);
+                    const cabGrupo = () => {
+                        pdf.setFillColor(...colorG); pdf.roundedRect(x, y, colW, 22, 4, 4, 'F');
+                        pdf.setTextColor(255, 255, 255); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(11.5);
+                        pdf.text(`Grupo ${gi + 1}`, x + 7, y + 15);
+                        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9.5);
+                        pdf.text(String(g.length), x + colW - 7, y + 15, { align: 'right' });
+                        y += 28;
+                    };
+                    const salto = (alto) => { if (y + alto > bottomY) { p += 1; irA(p); y = topY; cabGrupo(); } };
+                    cabGrupo();
+                    bloquesDe(g).forEach(b => {
+                        salto(lh * 2.3);
+                        pdf.setFillColor(...claro(b.color)); pdf.rect(x, y, colW, lh * 1.15, 'F');
+                        pdf.setFillColor(...b.color); pdf.rect(x, y, 3, lh * 1.15, 'F');
+                        pdf.setTextColor(...b.color); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(fs * 0.95);
+                        pdf.text(cortarPdf(pdf, `${b.nombre} (${b.alumnos.length})`, colW - 12), x + 7, y + lh * 0.82);
+                        y += lh * 1.35;
+                        pdf.setFont('helvetica', 'normal');
+                        b.alumnos.forEach(a => {
+                            salto(lh);
+                            const maxW = colW - 12; let f2 = fs;
+                            while (f2 > fs * 0.7 && pdf.setFontSize(f2).getTextWidth(a.nombre) > maxW) f2 -= 0.25;
+                            pdf.setTextColor(40, 50, 60);
+                            pdf.text(cortarPdf(pdf, a.nombre, maxW), x + 7, y + fs);
+                            pdf.setFontSize(fs);
+                            y += lh;
+                        });
+                        y += lh * 0.25;
+                    });
+                });
+                pdf.setPage(pdf.getNumberOfPages());
+            }
+            pdf.save(`${titulo.replace(/[\\/:*?"<>|]/g, '').trim() || 'Grupos'}.pdf`);
+        } catch (e) { alert('No se pudo crear el PDF: ' + e.message); }
+        setHaciendoPdf(false);
+    };
+
     const chip = (activo) => ({ padding: '6px 12px', borderRadius: 20, border: `1.5px solid ${activo ? AZUL : '#e0e4f0'}`, background: activo ? AZUL : 'white', color: activo ? 'white' : '#555', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700 });
 
     return (
@@ -1801,7 +1961,16 @@ function GruposCentro({ usuario, comunidad, cursos, onBack, soloLectura }) {
                         {editId && <div style={{ fontWeight: 800, color: '#2c3e50', fontSize: '1rem', marginBottom: 6 }}>📌 {nombreG || 'Agrupación'}</div>}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
                             {!soloLectura ? <button onClick={generar} style={st.miniBtn}><RefreshCw size={13} /> {editId ? 'Generar otra nueva' : 'Volver a generar'}</button> : <span />}
-                            <ExportBar targetRef={ref} nombre={nombreG || 'Grupos del centro'} />
+                            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: '0.75rem', color: '#7f8c8d', fontWeight: 700 }}>{haciendoPdf ? <RefreshCw size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Download size={12} />} PDF horizontal:</span>
+                                <button onClick={pdfTodosJuntos} disabled={haciendoPdf} style={{ ...st.miniBtn, color: AZUL, borderColor: '#cdd6ea', fontWeight: 700 }} title="Todos los grupos en la misma hoja, un grupo por columna">
+                                    Todos juntos
+                                </button>
+                                <button onClick={pdfPorGrupos} disabled={haciendoPdf} style={{ ...st.miniBtn, color: AZUL, borderColor: '#cdd6ea', fontWeight: 700 }} title="Una hoja por grupo, alumnos ordenados por clase">
+                                    1 hoja por grupo
+                                </button>
+                                <ExportBar targetRef={ref} nombre={nombreG || 'Grupos del centro'} />
+                            </div>
                         </div>
                         {!soloLectura && (
                             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10, padding: '8px 10px', background: '#f8f9fb', borderRadius: 10 }}>
@@ -1857,7 +2026,7 @@ function GruposCentro({ usuario, comunidad, cursos, onBack, soloLectura }) {
 }
 
 // ─── Detalle de un curso (miembro) ────────────────────────────────────────────
-function CursoDetalle({ usuario, comunidad, curso, onBack, soloLectura }) {
+function CursoDetalle({ usuario, comunidad, curso, cursos = [], onBack, soloLectura }) {
     const [sub, setSub]       = useState('listado');
     const [priv, setPriv]     = useState(null); // { listado, plano }
     const [modalListado, setModalListado] = useState(false);
@@ -1879,6 +2048,24 @@ function CursoDetalle({ usuario, comunidad, curso, onBack, soloLectura }) {
         setNuevoAlumno('');
     };
     const eliminarAlumno = (id) => guardarListaAlumnos((priv?.listado || []).filter(a => a.id !== id));
+    // Cambiar un alumno de clase: se añade al final del listado del curso destino y se quita de este
+    const [moviendo, setMoviendo] = useState(null); // id del alumno con el selector de clase abierto
+    const [avisoMovido, setAvisoMovido] = useState('');
+    const cambiarDeClase = async (idx, destinoId) => {
+        const destino = cursos.find(c => c.id === destinoId);
+        const alumno = (priv?.listado || [])[idx];
+        if (!destino || !alumno) return;
+        try {
+            const refDest = doc(db, 'comunidades', comunidad.id, 'cursos', destinoId, 'privado', 'data');
+            const s = await getDoc(refDest);
+            const listaDest = (s.exists() && s.data().listado) || [];
+            const yaEsta = listaDest.some(a => a.id && a.id === alumno.id);
+            await setDoc(refDest, { listado: yaEsta ? listaDest : [...listaDest, { ...alumno, id: alumno.id || nuevoId() }] }, { merge: true });
+            await setDoc(privRef, { listado: (priv?.listado || []).filter((_, i) => i !== idx) }, { merge: true });
+            setAvisoMovido(`${alumno.nombre} → ${destino.nombre}`); setTimeout(() => setAvisoMovido(''), 3000);
+        } catch (e) { alert('No se pudo cambiar de clase: ' + e.message); }
+        setMoviendo(null);
+    };
     const renombrarAlumno = (id, nombre) => {
         const n = (nombre || '').trim(); if (!n) return;
         guardarListaAlumnos((priv?.listado || []).map(a => a.id === id ? { ...a, nombre: n } : a));
@@ -1945,12 +2132,18 @@ function CursoDetalle({ usuario, comunidad, curso, onBack, soloLectura }) {
                 {sub === 'listado' && (
                     <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
-                            <div style={{ fontSize: '0.8rem', color: '#7f8c8d' }}>{priv.listado?.length || 0} alumnos · solo visible para miembros</div>
+                            <div style={{ fontSize: '0.8rem', color: '#7f8c8d' }}>{priv.listado?.length || 0} alumnos · solo visible para miembros
+                                {avisoMovido && <span style={{ marginLeft: 8, color: '#27ae60', fontWeight: 700 }}><CheckCircle size={13} style={{ verticalAlign: '-2px' }} /> {avisoMovido}</span>}
+                            </div>
                             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                                 {priv.listado?.length > 0 && (
                                     <button onClick={() => setMostrarCopiaModal(true)} style={{ ...st.btnSec, color: copiadoListado ? '#27ae60' : AZUL, borderColor: copiadoListado ? '#27ae60' : '#cdd6ea' }}>
                                         {copiadoListado ? <><CheckCircle size={15} /> Copiado</> : <><Copy size={15} /> Copiar a mi zona</>}
                                     </button>
+                                )}
+                                {!soloLectura && priv.listado?.length > 1 && (
+                                    <button onClick={() => guardarListaAlumnos([...priv.listado].sort((x, y) => (x.nombre || '').localeCompare(y.nombre || '', 'es', { sensitivity: 'base', numeric: true })))}
+                                        title="Ordenar el listado por orden alfabético" style={st.btnSec}>A→Z Ordenar</button>
                                 )}
                                 {!soloLectura && <button onClick={() => setModalListado(true)} style={st.btnPrimary}><ClipboardList size={15} /> Definir listado</button>}
                             </div>
@@ -1966,6 +2159,18 @@ function CursoDetalle({ usuario, comunidad, curso, onBack, soloLectura }) {
                                             style={{ flex: 1, minWidth: 0, border: '1px solid transparent', borderRadius: 6, padding: '5px 6px', fontSize: '0.86rem', color: '#2c3e50', fontFamily: 'inherit', outline: 'none', background: 'transparent' }}
                                             onFocus={e => { if (soloLectura) return; e.target.style.background = '#fff'; e.target.style.borderColor = '#cdd6ea'; }} />
                                         {a.grupo && <span style={{ fontSize: '0.72rem', color: '#95a5a6', flexShrink: 0 }}>{a.grupo}</span>}
+                                        {!soloLectura && cursos.length > 1 && (moviendo === i ? (
+                                            <span style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
+                                                <select autoFocus defaultValue="" onChange={e => e.target.value && cambiarDeClase(i, e.target.value)}
+                                                    style={{ border: `1.5px solid ${AZUL}`, borderRadius: 6, padding: '3px 6px', fontSize: '0.78rem', color: '#2c3e50', background: 'white', maxWidth: 160 }}>
+                                                    <option value="" disabled>Mover a…</option>
+                                                    {cursos.filter(c => c.id !== curso.id).map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                                                </select>
+                                                <button onClick={() => setMoviendo(null)} title="Cancelar" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#95a5a6', padding: 2 }}><X size={14} /></button>
+                                            </span>
+                                        ) : (
+                                            <button onClick={() => setMoviendo(i)} title="Cambiar de clase" style={{ background: 'none', border: '1px solid #e0e4f0', borderRadius: 6, cursor: 'pointer', color: AZUL, padding: '1px 7px', flexShrink: 0, fontSize: '0.74rem', fontWeight: 700 }}>⇄ Clase</button>
+                                        ))}
                                         {!soloLectura && <button onClick={() => eliminarAlumno(a.id)} title="Eliminar alumno" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#e74c3c', padding: 2, flexShrink: 0 }}><Trash2 size={14} /></button>}
                                     </div>
                                 ))}
@@ -2171,7 +2376,7 @@ function CursosPanel({ usuario, comunidad, soloLectura }) {
     if (gruposCentro) return <GruposCentro usuario={usuario} comunidad={comunidad} cursos={cursos} onBack={() => setGruposCentro(false)} soloLectura={soloLectura} />;
     if (abierto) {
         const viva = cursos.find(c => c.id === abierto.id) || abierto;
-        return <CursoDetalle usuario={usuario} comunidad={comunidad} curso={viva} onBack={() => setAbierto(null)} soloLectura={soloLectura} />;
+        return <CursoDetalle usuario={usuario} comunidad={comunidad} curso={viva} cursos={cursos} onBack={() => setAbierto(null)} soloLectura={soloLectura} />;
     }
 
     return (

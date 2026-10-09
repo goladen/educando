@@ -243,8 +243,8 @@ export default function Mansion3D(props) {
     useEffect(() => {
         const cont = contRef.current; if (!cont) return;
         let renderer;
-        try { renderer = new THREE.WebGLRenderer({ antialias: true }); } catch { return; }
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+        try { renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' }); } catch { return; }
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.15;
@@ -293,7 +293,7 @@ export default function Mansion3D(props) {
                 const cuerpo = crearAvatar3D(j.avatar);
                 cuerpo.scale.setScalar(ESCALA_AVATAR);
                 raiz.add(cuerpo);
-                const et = etiquetaNombre(j.nombre || k); et.position.y = 1.95 * ESCALA_AVATAR + 0.3; raiz.add(et);
+                if (!j.sinEtiqueta) { const et = etiquetaNombre(j.nombre || k); et.position.y = 1.95 * ESCALA_AVATAR + 0.3; raiz.add(et); }
                 raiz.position.copy(pos); scene.add(raiz);
                 const puntos = (j.aciertos || 0) + (j.golpes || 0);
                 avatares.set(k, { raiz, cuerpo, firma: firmaAv, desde: pos.clone(), hacia: pos.clone(), t: 1, dur: 1, salto: 0, puntos, puntosVistos: puntos, fase: Math.random() * 6 });
@@ -320,8 +320,11 @@ export default function Mansion3D(props) {
         const camPos = new THREE.Vector3(0, L.alto / 2 + 2, 16), camMira = new THREE.Vector3(0, L.alto / 2, 0);
         camera.position.copy(camPos);
 
+        let tamPrevio = '';
         const ajustar = () => {
             const w = cont.clientWidth || 300, h = cont.clientHeight || 200;
+            if (`${w}x${h}` === tamPrevio) return;
+            tamPrevio = `${w}x${h}`;
             renderer.setSize(w, h, false);
             renderer.domElement.style.width = '100%'; renderer.domElement.style.height = '100%';
             camera.aspect = w / h; camera.updateProjectionMatrix();
@@ -331,8 +334,10 @@ export default function Mansion3D(props) {
 
         const reloj = new THREE.Clock();
         let raf = 0;
+        const objLuz = new THREE.Vector3(), objCam = new THREE.Vector3(), objMira = new THREE.Vector3();
         const bucle = () => {
             raf = requestAnimationFrame(bucle);
+            if (document.hidden) { reloj.getDelta(); return; }
             const dt = Math.min(0.05, reloj.getDelta()), t = reloj.elapsedTime;
             const p = propsRef.current;
             const fase = p.fase || 'LOBBY', salaIdx = p.salaIdx ?? 0;
@@ -389,7 +394,7 @@ export default function Mansion3D(props) {
             // luz de la sala activa
             const sAct = L.salas[salaIdx];
             const enSala = ['RETOS', 'CANDADO', 'ABIERTA'].includes(fase) && sAct;
-            const objLuz = enSala ? new THREE.Vector3(sAct.x, sAct.y + 2.4, 0.6) : pelea ? new THREE.Vector3(0, -H + 2.6, 1) : new THREE.Vector3(0, 2.5, D / 2 + 3);
+            if (enSala) objLuz.set(sAct.x, sAct.y + 2.4, 0.6); else if (pelea) objLuz.set(0, -H + 2.6, 1); else objLuz.set(0, 2.5, D / 2 + 3);
             luzSala.position.lerp(objLuz, Math.min(1, dt * 2));
             luzSala.intensity = (fase === 'ABIERTA' ? 45 : 28) + Math.sin(t * 9) * 3 + Math.sin(t * 23) * 2;
             luzSotano.intensity += ((pelea ? 30 : 4) + (pelea ? Math.sin(t * 7) * 6 : 0) - luzSotano.intensity) * Math.min(1, dt * 2);
@@ -418,10 +423,11 @@ export default function Mansion3D(props) {
             escudo.visible = escudoT > 0; escudo.scale.setScalar(1 + (1 - escudoT) * 0.6); escudo.material.opacity = escudoT;
 
             // cámara
-            let objCam, objMira;
-            if (enSala) { objMira = new THREE.Vector3(sAct.x, sAct.y + 1.3, -0.3); objCam = new THREE.Vector3(sAct.x + Math.sin(t * 0.25) * 0.8, sAct.y + 2.5, D / 2 + 5.8); }
-            else if (pelea) { objMira = new THREE.Vector3(0, -H + 1.2, -0.3); objCam = new THREE.Vector3(Math.sin(t * 0.3) * 1.2, -H + 2.0, D / 2 + 6.2); }
-            else { const dist = Math.max(13, L.ancho * 1.25 + L.alto * 0.9); objMira = new THREE.Vector3(0, L.alto * 0.45, D / 2 + 1); objCam = new THREE.Vector3(Math.sin(t * 0.15) * 3, L.alto * 0.55 + 2.2, D / 2 + dist); }
+            // Más lejos si la pantalla es estrecha (el panel lateral le quita ancho a la escena)
+            const lejos = camera.aspect < 1.2 ? 1.35 : 1;
+            if (enSala) { objMira.set(sAct.x, sAct.y + 0.85, -0.3); objCam.set(sAct.x + Math.sin(t * 0.25) * 0.8, sAct.y + 2.5, D / 2 + 5.8 * lejos); }
+            else if (pelea) { objMira.set(0, -H + 0.8, -0.3); objCam.set(Math.sin(t * 0.3) * 1.2, -H + 2.0, D / 2 + 6.2 * lejos); }
+            else { const dist = Math.max(13, L.ancho * 1.25 + L.alto * 0.9) * lejos; objMira.set(0, L.alto * 0.45, D / 2 + 1); objCam.set(Math.sin(t * 0.15) * 3, L.alto * 0.55 + 2.2, D / 2 + dist); }
             const k = Math.min(1, dt * 1.6);
             camPos.lerp(objCam, k); camMira.lerp(objMira, k);
             camera.position.copy(camPos);

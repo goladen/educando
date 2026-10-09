@@ -859,8 +859,8 @@ export const GAME_INFO = {
     ESCAPE_HALLOWEEN: {
         descripcion: 'Escape room cooperativo de Halloween, «La mansión del zombi». El profesor proyecta la mansión y la clase recorre sus salas, una por materia: Matemáticas (laboratorio del Dr. Calavera), Geografía (biblioteca de los mapas malditos), Biología (sala de los huesos), Historia (galería de retratos), Lengua (cripta de los pergaminos) e Inglés (desván de la bruja). Los aciertos de todos cargan la energía de cada puerta; después aparece un candado cuyas pistas están repartidas entre los móviles, así que hay que hablar y juntarlas. Cada sala da un amuleto (una vida más) para la batalla final de toda la clase contra un zombi. El profesor elige las pruebas una a una (puede repetir materia, p. ej. un escape room solo de Matemáticas con fracciones, ecuaciones…) y puede crear pruebas propias con su texto y un código que los alumnos buscan por el aula. Cada alumno se disfraza (fantasma, vampiro, bruja, calabaza, esqueleto…) y su personaje aparece en la mansión 3D proyectada, pasando de sala en sala hasta el sótano del zombi.',
         tipoPreguntas: 'Opción múltiple generada al momento con los bancos de las apps de cada materia: cálculo (Primaria o ESO), banderas y capitales, anatomía, personajes históricos, ortografía y léxico, y verbos irregulares en inglés. Los candados se responden escribiendo: un código de 4 cifras, una capital, un órgano o hueso, un personaje, una palabra con las letras desordenadas o una contraseña en inglés.',
-        biblioteca: 'No necesita recursos: usa los bancos de Geografía, Biología, Historia (¿Quién es quién? histórico), Lengua e Inglés de la plataforma. Los escape rooms se pueden guardar (privados o en la biblioteca pública) y volver a abrir.',
-        multiplayer: 'Toda la clase a la vez y en el mismo equipo: el profesor crea la sala (código + QR) y la proyecta, y cada alumno juega con su móvil. Se configuran la etapa, las salas, el tiempo, la duración de cada sala y la dificultad del zombi. Si se acaba el tiempo, el zombi despierta antes y con más vida; si gana el zombi, hay revancha.',
+        biblioteca: 'No necesita recursos: usa los bancos de Geografía, Biología, Historia (¿Quién es quién? histórico), Lengua e Inglés de la plataforma. Los escape rooms se pueden guardar (privados o en la biblioteca pública) y volver a abrir. Además, cualquier sala puede usar las preguntas de un recurso creado por otro profe (opción múltiple, respuesta corta o rellenar hueco).',
+        multiplayer: 'Toda la clase a la vez y en el mismo equipo: el profesor crea la sala (código + QR) y la proyecta, y cada alumno juega con su móvil. Se configuran la etapa, las salas, el tiempo, la duración de cada sala y la dificultad del zombi. Si se acaba el tiempo, el zombi despierta antes y con más vida; si gana el zombi, hay revancha. También se puede jugar SIN MÓVILES: modo pizarra con fichas en papel (cuadernillo con preguntas, candados y tarjetas de pistas recortables, y hoja de respuestas de media página), con las mismas preguntas que se proyectan y versiones con soluciones para el profe.',
         materias: ['Matemáticas', 'Geografía', 'Historia', 'Biología', 'Lengua y Literatura', 'Inglés'],
         etapas: ['Primaria', 'ESO'],
     },
@@ -889,10 +889,10 @@ export const GAME_INFO = {
         etapas: ['Primaria', 'ESO', 'Bachillerato'],
     },
     FUTBOLQUIZZ: {
-        descripcion: 'Pizarra de fútbol táctil por turnos. Antes de tirar, cada equipo debe responder una pregunta: si acierta arrastra y dispara un jugador para marcar gol; si falla, pasa el turno. Marcador de goles y de aciertos, con sonido de gol.',
+        descripcion: 'Dos modos. Pizarra: fútbol táctil por turnos; antes de tirar hay que responder una pregunta (si aciertas arrastras y disparas; si fallas, pasa el turno). Partido 3D: fútbol en tiempo real, 3 + portero contra el ordenador (3 niveles); cada pregunta acertada da un súper tiro ⚡ y 3 aciertos seguidos, turbo.',
         tipoPreguntas: 'Respuesta corta, opción múltiple, ordenar y rellenar (aspecto PiLive). Admite recursos de tipo PiLive, Burbujas y Pasapalabra. También se puede jugar sin recurso (modo libre).',
         biblioteca: 'No incluye biblioteca propia: reutiliza los recursos del profesor (PiLive / Burbujas / Pasapalabra) por código o búsqueda por tema.',
-        multiplayer: '2 jugadores por turnos en el mismo dispositivo (Equipo Rojo vs Equipo Azul).',
+        multiplayer: 'Pizarra: 2 jugadores por turnos en el mismo dispositivo o 1 contra el ordenador. Partido 3D: 1 jugador contra el ordenador (teclado o mandos táctiles).',
         materias: ['Universal'],
         etapas: ['Primaria', 'ESO', 'Bachillerato'],
     },

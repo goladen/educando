@@ -1,8 +1,11 @@
-import React, { useState, useRef, useEffect, memo } from 'react';
+import React, { useState, useRef, useEffect, memo, lazy, Suspense } from 'react';
 import { db } from './firebase';
 import { guardarRegistroLocal } from './utils/registrosLocales';
 import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, addDoc } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
+
+// Partido 3D en tiempo real (three.js): se carga solo al elegir ese modo
+const Futbol3D = lazy(() => import('./futbol3d/Futbol3D'));
 
 const CHAMPIONS_VIDEO_ID = '04854XqcfCY'; // We Are The Champions (empieza en seg. 37)
 const CHAMPIONS_START = 37;
@@ -261,13 +264,16 @@ function PantallaInicio({ onJugar, onExit }) {
     const [nombreAzul, setNombreAzul] = useState('');
     const [golesParaGanar, setGolesParaGanar] = useState(3);
     const [vsCPU, setVsCPU] = useState(false);
+    const [modo3D, setModo3D] = useState(false);       // Partido 3D en tiempo real (siempre vs Ordenador)
+    const [dificultad, setDificultad] = useState('normal');
     const [recursoElegido, setRecursoElegido] = useState(null); // recurso a la espera de elegir hojas
     const [hojasSel, setHojasSel] = useState(new Set());
+    const unJugador = vsCPU || modo3D;
 
     const lanzar = (recurso, hojas = null) => onJugar({
-        recurso, hojas, vsCPU,
-        nombreRojo: nombreRojo.trim() || (vsCPU ? 'Jugador' : 'Equipo Rojo'),
-        nombreAzul: vsCPU ? 'Ordenador' : (nombreAzul.trim() || 'Equipo Azul'),
+        recurso, hojas, vsCPU: unJugador, modo3D, dificultad,
+        nombreRojo: nombreRojo.trim() || (unJugador ? 'Jugador' : 'Equipo Rojo'),
+        nombreAzul: unJugador ? 'Ordenador' : (nombreAzul.trim() || 'Equipo Azul'),
         golesParaGanar
     });
 
@@ -362,14 +368,23 @@ function PantallaInicio({ onJugar, onExit }) {
                 {/* Reglas */}
                 <div style={{ background: 'rgba(0,0,0,0.35)', borderRadius: 16, padding: '18px 20px', lineHeight: 1.6, fontSize: '0.95rem' }}>
                     <div style={{ fontWeight: 800, color: '#f1c40f', marginBottom: 8, fontSize: '1.05rem' }}>📋 Cómo se juega</div>
-                    <ul style={{ margin: 0, paddingLeft: 20 }}>
-                        <li>Antes de tirar hay que <b>responder una pregunta</b> (el primer tiro es libre).</li>
-                        <li>Si <b>aciertas</b>, arrastra un jugador y suéltalo para chutar a portería.</li>
-                        {vsCPU
-                            ? <li><b>1 jugador:</b> si fallas <b>más de 3 preguntas seguidas</b>, el Ordenador marca gol.</li>
-                            : <li><b>2 jugadores:</b> si fallas, el turno pasa al otro equipo.</li>}
-                        <li>Gana el primero en marcar los goles fijados.</li>
-                    </ul>
+                    {modo3D ? (
+                        <ul style={{ margin: 0, paddingLeft: 20 }}>
+                            <li>Partido <b>en tiempo real</b>: tu equipo (3 + portero) contra el Ordenador.</li>
+                            <li>Antes de cada saque, y cuando quieras con <b>❓ Ganar ⚡</b>, responde una pregunta: cada <b>acierto</b> te da un <b>⚡ súper tiro</b> (máx. 3).</li>
+                            <li><b>3 aciertos seguidos</b> = turbo de velocidad durante 10 s. Fallar no quita nada.</li>
+                            <li>Teclado: WASD mover · J pase · K tiro · L vaselina · Espacio ⚡ · E cambiar. En móvil, joystick y botones.</li>
+                        </ul>
+                    ) : (
+                        <ul style={{ margin: 0, paddingLeft: 20 }}>
+                            <li>Antes de tirar hay que <b>responder una pregunta</b> (el primer tiro es libre).</li>
+                            <li>Si <b>aciertas</b>, arrastra un jugador y suéltalo para chutar a portería.</li>
+                            {vsCPU
+                                ? <li><b>1 jugador:</b> si fallas <b>más de 3 preguntas seguidas</b>, el Ordenador marca gol.</li>
+                                : <li><b>2 jugadores:</b> si fallas, el turno pasa al otro equipo.</li>}
+                            <li>Gana el primero en marcar los goles fijados.</li>
+                        </ul>
+                    )}
                     <div style={{ marginTop: 8, color: '#cbd5e1', fontSize: '0.85rem' }}>Admite recursos de tipo <b>PiLive</b>, <b>Burbujas</b> y <b>Pasapalabra</b>.</div>
                 </div>
 
@@ -377,23 +392,42 @@ function PantallaInicio({ onJugar, onExit }) {
                 <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 16, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
                     <div style={{ fontWeight: 700 }}>🎮 Modo de juego</div>
                     <div style={{ display: 'flex', gap: 8 }}>
-                        {[{ k: false, t: '👥 2 Jugadores', d: 'Rojo vs Azul' }, { k: true, t: '🤖 1 Jugador', d: 'vs Ordenador' }].map(o => (
-                            <button key={String(o.k)} onClick={() => setVsCPU(o.k)}
-                                style={{ flex: 1, padding: '12px', borderRadius: 12, border: vsCPU === o.k ? '2px solid #f1c40f' : '1.5px solid rgba(255,255,255,0.2)', background: vsCPU === o.k ? 'rgba(241,196,15,0.18)' : 'rgba(255,255,255,0.05)', color: 'white', cursor: 'pointer', fontWeight: 700 }}>
+                        {[{ k: false, t: '🎯 Pizarra', d: 'Por turnos, arrastrar y tirar' }, { k: true, t: '🏟️ Partido 3D', d: 'Tiempo real · 3 + portero' }].map(o => (
+                            <button key={String(o.k)} onClick={() => setModo3D(o.k)}
+                                style={{ flex: 1, padding: '12px', borderRadius: 12, border: modo3D === o.k ? '2px solid #f1c40f' : '1.5px solid rgba(255,255,255,0.2)', background: modo3D === o.k ? 'rgba(241,196,15,0.18)' : 'rgba(255,255,255,0.05)', color: 'white', cursor: 'pointer', fontWeight: 700 }}>
                                 <div>{o.t}</div>
                                 <div style={{ fontSize: '0.74rem', color: '#cbd5e1', fontWeight: 500 }}>{o.d}</div>
                             </button>
                         ))}
                     </div>
+                    {modo3D ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>🤖 Nivel del Ordenador:</span>
+                            {[{ k: 'facil', t: 'Fácil' }, { k: 'normal', t: 'Normal' }, { k: 'dificil', t: 'Difícil' }].map(o => (
+                                <button key={o.k} onClick={() => setDificultad(o.k)}
+                                    style={{ padding: '7px 14px', borderRadius: 10, border: dificultad === o.k ? '2px solid #f1c40f' : '1.5px solid rgba(255,255,255,0.2)', background: dificultad === o.k ? '#f1c40f' : 'rgba(255,255,255,0.08)', color: dificultad === o.k ? '#1e293b' : 'white', fontWeight: 800, cursor: 'pointer' }}>{o.t}</button>
+                            ))}
+                        </div>
+                    ) : (
+                        <div style={{ display: 'flex', gap: 8 }}>
+                            {[{ k: false, t: '👥 2 Jugadores', d: 'Rojo vs Azul' }, { k: true, t: '🤖 1 Jugador', d: 'vs Ordenador' }].map(o => (
+                                <button key={String(o.k)} onClick={() => setVsCPU(o.k)}
+                                    style={{ flex: 1, padding: '12px', borderRadius: 12, border: vsCPU === o.k ? '2px solid #f1c40f' : '1.5px solid rgba(255,255,255,0.2)', background: vsCPU === o.k ? 'rgba(241,196,15,0.18)' : 'rgba(255,255,255,0.05)', color: 'white', cursor: 'pointer', fontWeight: 700 }}>
+                                    <div>{o.t}</div>
+                                    <div style={{ fontSize: '0.74rem', color: '#cbd5e1', fontWeight: 500 }}>{o.d}</div>
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 {/* Equipos y goles para ganar */}
                 <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 16, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    <div style={{ fontWeight: 700 }}>{vsCPU ? '🙋 Tu nombre' : '👥 Jugadores'}</div>
+                    <div style={{ fontWeight: 700 }}>{unJugador ? '🙋 Tu nombre' : '👥 Jugadores'}</div>
                     <div style={{ display: 'flex', gap: 8 }}>
-                        <input value={nombreRojo} onChange={e => setNombreRojo(e.target.value)} maxLength={20} placeholder={vsCPU ? 'Tu nombre' : 'Nombre Equipo Rojo'}
+                        <input value={nombreRojo} onChange={e => setNombreRojo(e.target.value)} maxLength={20} placeholder={unJugador ? 'Tu nombre' : 'Nombre Equipo Rojo'}
                             style={{ ...inp, borderColor: '#ef4444', flex: 1 }} />
-                        {!vsCPU && (
+                        {!unJugador && (
                             <input value={nombreAzul} onChange={e => setNombreAzul(e.target.value)} maxLength={20} placeholder="Nombre Equipo Azul"
                                 style={{ ...inp, borderColor: '#3b82f6', flex: 1 }} />
                         )}
@@ -1237,10 +1271,12 @@ function PantallaCampeones({ resultado, recurso, hojas, onJugarOtra, onExit }) {
 
     return (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, overflow: 'hidden', background: 'radial-gradient(circle at 50% 30%, #1e293b 0%, #0b1220 100%)', fontFamily: 'system-ui, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', padding: '20px 16px', boxSizing: 'border-box', overflowY: 'auto' }}>
-            {/* Balones cayendo */}
-            {Array.from({ length: 14 }).map((_, i) => (
-                <div key={i} style={{ position: 'absolute', top: '-60px', left: `${(i * 7 + 3) % 100}%`, fontSize: `${1.4 + (i % 4) * 0.5}rem`, animation: `fqCaer ${4 + (i % 5)}s linear ${(i % 6) * 0.6}s infinite`, pointerEvents: 'none' }}>⚽</div>
-            ))}
+            {/* Balones cayendo (en una capa fija que los recorta: si no, al salirse por abajo hacían aparecer el scrollbar a ratos) */}
+            <div style={{ position: 'fixed', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 1 }}>
+                {Array.from({ length: 14 }).map((_, i) => (
+                    <div key={i} style={{ position: 'absolute', top: '-60px', left: `${(i * 7 + 3) % 100}%`, fontSize: `${1.4 + (i % 4) * 0.5}rem`, animation: `fqCaer ${4 + (i % 5)}s linear ${(i % 6) * 0.6}s infinite` }}>⚽</div>
+                ))}
+            </div>
 
             <div style={{ position: 'relative', zIndex: 2, width: '100%', maxWidth: 460, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
                 <div style={{ fontSize: '3.5rem', animation: 'fqLatido 1s ease infinite' }}>🏆</div>
@@ -1310,7 +1346,7 @@ function ModalEnviarProfeFutbol({ resultado, recurso, hojas, onClose }) {
                 };
             };
             await addDoc(collection(db, 'informes_juegos'), {
-                tipo: 'FUTBOLQUIZZ', modalidad: resultado.vsCPU ? 'Individual (vs Ordenador)' : 'Versus', fecha: new Date(),
+                tipo: 'FUTBOLQUIZZ', modalidad: resultado.modo3D ? 'Partido 3D (vs Ordenador)' : resultado.vsCPU ? 'Individual (vs Ordenador)' : 'Versus', fecha: new Date(),
                 recursoId: recurso?.id || '', recursoTitulo: recurso?.titulo || 'Fútbol Quizz (libre)',
                 hojas: hojasUsadas,
                 codigoProfesor: code,
@@ -1387,6 +1423,22 @@ export default function FutbolQuizz({ onExit }) {
             onJugarOtra={() => { setResultado(null); setFase('INICIO'); }}
             onExit={onExit}
         />;
+    }
+    if (config?.modo3D) {
+        return (
+            <Suspense fallback={<div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#0f172a', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui, sans-serif', fontWeight: 700 }}>⚽ Preparando el estadio…</div>}>
+                <Futbol3D
+                    config={config}
+                    pool={construirPool(config.recurso, config.hojas)}
+                    QuestionDisplay={QuestionDisplay}
+                    EstilosPregunta={EstilosPregunta}
+                    parseText={parseText}
+                    getCorrectAnswerText={getCorrectAnswerText}
+                    onVolverInicio={() => { setConfig(null); setFase('INICIO'); }}
+                    onFin={(res) => { setResultado(res); setFase('FIN'); }}
+                />
+            </Suspense>
+        );
     }
     return <JuegoFutbol
         config={config}

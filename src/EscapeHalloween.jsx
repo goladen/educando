@@ -4,14 +4,16 @@ import { doc, getDoc, setDoc, updateDoc, onSnapshot, serverTimestamp, increment,
 import QRSalaBoton, { urlSalaEnVivo } from './components/QRSalaBoton';
 import { guardarRegistroLocal } from './utils/registrosLocales';
 import {
-    ORDEN_SALAS, generarPregunta, generarCandado, compruebaCandado, pistasDeJugador, barajar, pick,
-    infoPrueba, materiaDePrueba, temaDePrueba, candadoManual, pruebaParaSala,
+    ORDEN_SALAS, compruebaCandado, pistasDeJugador, barajar, pick,
+    infoPrueba, candadoManual, pruebaParaSala, tienePreguntas, preguntaDePrueba, candadoDePrueba,
 } from './escapeHalloween/bancoEscape';
 import { TIPO_JUEGO, ETAPAS, ZOMBIS, configPorDefecto } from './escapeHalloween/constantes';
 import Mansion3D, { AvatarPreview3D } from './escapeHalloween/Mansion3D';
 import EditorDisfraz, { leerAvatarGuardado, avatarAleatorio } from './escapeHalloween/EditorDisfraz';
 import EditorEscape from './escapeHalloween/EditorEscape';
+import PizarraEscape from './escapeHalloween/PizarraEscape';
 import { disfrazDe } from './escapeHalloween/avatares3d';
+import { crearAudio, Ambiente, Confeti, Zombi, Corazones, BarraVidaZombi, MapaMansion, TarjetaPregunta, mmss, useNarrador, idNarracionFase, Subtitulo } from './escapeHalloween/comunes';
 
 /**
  *  ESCAPE ROOM DE HALLOWEEN — «La mansión del zombi»
@@ -35,285 +37,6 @@ const AVATARES = ['🧛', '🧙', '👻', '🎃', '🦇', '🕷️', '💀', '�
 const claveDe = (nombre) => String(nombre || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
     .replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'jugador';
 const hash = (s) => [...String(s)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
-const mmss = (ms) => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
-
-// =====================================================================
-//  SONIDO (Web Audio sintetizado, sin archivos)
-// =====================================================================
-function crearAudio() {
-    let ctx = null;
-    const a = { activo: true };
-    const c = () => {
-        if (!ctx) { try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return null; } }
-        if (ctx.state === 'suspended') ctx.resume().catch(() => { });
-        return ctx;
-    };
-    const tono = (f, dur, { tipo = 'sine', vol = 0.15, desde = 0, hasta = null } = {}) => {
-        if (!a.activo) return; const x = c(); if (!x) return;
-        const o = x.createOscillator(), g = x.createGain(), t = x.currentTime + desde;
-        o.type = tipo; o.frequency.setValueAtTime(f, t);
-        if (hasta) o.frequency.exponentialRampToValueAtTime(hasta, t + dur);
-        g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-        o.connect(g).connect(x.destination); o.start(t); o.stop(t + dur + 0.05);
-    };
-    const ruido = (dur, { vol = 0.25, frec = 800, desde = 0 } = {}) => {
-        if (!a.activo) return; const x = c(); if (!x) return;
-        const buf = x.createBuffer(1, Math.floor(x.sampleRate * dur), x.sampleRate);
-        const d = buf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
-        const s = x.createBufferSource(), f = x.createBiquadFilter(), g = x.createGain(), t = x.currentTime + desde;
-        f.type = 'lowpass'; f.frequency.value = frec; g.gain.value = vol;
-        s.buffer = buf; s.connect(f).connect(g).connect(x.destination); s.start(t);
-    };
-    a.desbloquear = () => c();
-    a.acierto = () => { tono(660, 0.12, { tipo: 'triangle' }); tono(990, 0.18, { tipo: 'triangle', desde: 0.08 }); };
-    a.fallo = () => tono(220, 0.35, { tipo: 'sawtooth', vol: 0.08, hasta: 110 });
-    a.golpe = () => { ruido(0.12, { vol: 0.35, frec: 1200 }); tono(140, 0.15, { tipo: 'square', vol: 0.08, hasta: 60 }); };
-    a.puerta = () => { tono(180, 1.1, { tipo: 'sawtooth', vol: 0.05, hasta: 420 }); tono(240, 0.9, { tipo: 'sawtooth', vol: 0.04, desde: 0.3, hasta: 130 }); ruido(0.4, { vol: 0.3, frec: 300, desde: 1.1 }); };
-    a.rugido = () => { tono(90, 1.0, { tipo: 'sawtooth', vol: 0.18, hasta: 55 }); tono(97, 1.0, { tipo: 'square', vol: 0.06, hasta: 50 }); ruido(0.8, { vol: 0.15, frec: 500 }); };
-    a.escudo = () => { tono(523, 0.15, { tipo: 'triangle' }); tono(784, 0.3, { tipo: 'triangle', desde: 0.1 }); };
-    a.trueno = () => { ruido(2.2, { vol: 0.5, frec: 260 }); ruido(0.3, { vol: 0.4, frec: 2000 }); };
-    a.victoria = () => [523, 659, 784, 1047, 784, 1047].forEach((f, i) => tono(f, 0.3, { tipo: 'triangle', vol: 0.13, desde: i * 0.16 }));
-    a.derrota = () => [392, 370, 349, 262].forEach((f, i) => tono(f, 0.5, { tipo: 'sawtooth', vol: 0.06, desde: i * 0.35 }));
-    a.campana = () => [0, 1.6, 3.2].forEach(d => { tono(196, 1.5, { vol: 0.12, desde: d }); tono(392, 1.2, { vol: 0.05, desde: d }); });
-    a.cerrar = () => { try { ctx?.close(); } catch { } ctx = null; };
-    return a;
-}
-
-// =====================================================================
-//  ESTILOS
-// =====================================================================
-const CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Creepster&display=swap');
-.eh-root { position: fixed; inset: 0; z-index: 9999; overflow-y: auto; color: #f5e9ff; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-  background: radial-gradient(ellipse at 50% 0%, #3b1d5e 0%, #1a0b2e 45%, #07030f 100%); }
-.eh-titulo { font-family: 'Creepster', 'Chiller', fantasy; letter-spacing: 2px; color: #ff8c1a; text-shadow: 0 0 12px rgba(255,120,0,.7), 0 3px 0 #4a1a00; margin: 0; }
-.eh-luna { position: fixed; top: 4%; right: 6%; width: 110px; height: 110px; border-radius: 50%; pointer-events: none;
-  background: radial-gradient(circle at 35% 35%, #fff9e0, #f3dc8a 60%, #c9a54a); box-shadow: 0 0 60px 20px rgba(255,230,150,.25); opacity: .85; }
-.eh-murcielago { position: fixed; font-size: 28px; pointer-events: none; animation: ehBat linear infinite; opacity: .8; z-index: 0; }
-@keyframes ehBat { 0% { transform: translate(-10vw, 0) scaleX(1); } 25% { transform: translate(25vw, -4vh); } 50% { transform: translate(55vw, 3vh); } 75% { transform: translate(80vw, -3vh); } 100% { transform: translate(115vw, 0); } }
-.eh-niebla { position: fixed; left: -20%; right: -20%; bottom: -40px; height: 180px; pointer-events: none; z-index: 0;
-  background: radial-gradient(ellipse at 30% 80%, rgba(200,180,255,.18), transparent 60%), radial-gradient(ellipse at 70% 90%, rgba(200,180,255,.14), transparent 60%);
-  animation: ehNiebla 14s ease-in-out infinite alternate; }
-@keyframes ehNiebla { from { transform: translateX(-4%); } to { transform: translateX(4%); } }
-.eh-panel { position: relative; z-index: 1; background: rgba(20, 8, 38, .78); border: 2px solid rgba(255,140,26,.35); border-radius: 20px;
-  box-shadow: 0 10px 40px rgba(0,0,0,.5), inset 0 0 30px rgba(120,40,200,.15); backdrop-filter: blur(4px); }
-.eh-btn { border: none; border-radius: 14px; padding: 12px 20px; font-weight: 800; font-size: 1rem; cursor: pointer; font-family: inherit;
-  background: linear-gradient(180deg, #ff9b2e, #e2650a); color: #1a0700; box-shadow: 0 4px 0 #8a3500, 0 0 18px rgba(255,120,0,.35); transition: transform .1s; }
-.eh-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #8a3500; }
-.eh-btn:disabled { opacity: .45; cursor: not-allowed; }
-.eh-btn2 { border: 2px solid rgba(255,255,255,.25); border-radius: 12px; padding: 9px 14px; font-weight: 700; font-size: .9rem; cursor: pointer;
-  font-family: inherit; background: rgba(255,255,255,.08); color: #f5e9ff; }
-.eh-btn2:hover { background: rgba(255,255,255,.16); }
-.eh-btn2:disabled { opacity: .4; cursor: not-allowed; }
-.eh-chip { border: 2px solid rgba(255,255,255,.2); border-radius: 12px; padding: 9px 12px; cursor: pointer; font-weight: 700; font-family: inherit;
-  background: rgba(255,255,255,.06); color: #e9dcff; font-size: .9rem; }
-.eh-chip.on { border-color: #ff8c1a; background: rgba(255,140,26,.22); color: #fff; box-shadow: 0 0 12px rgba(255,140,26,.35); }
-.eh-opcion { width: 100%; text-align: center; border-radius: 14px; padding: 14px 12px; font-size: 1.05rem; font-weight: 800; cursor: pointer; font-family: inherit;
-  border: 2px solid rgba(255,255,255,.18); background: rgba(70, 30, 110, .7); color: #fff; transition: transform .1s, background .2s; }
-.eh-opcion:active { transform: scale(.97); }
-.eh-opcion.ok { background: #15803d; border-color: #4ade80; }
-.eh-opcion.mal { background: #991b1b; border-color: #f87171; }
-.eh-input { width: 100%; box-sizing: border-box; padding: 14px; border-radius: 14px; border: 2px solid rgba(255,140,26,.5); background: rgba(0,0,0,.4);
-  color: #fff; font-size: 1.3rem; font-weight: 800; text-align: center; letter-spacing: 3px; font-family: inherit; outline: none; }
-.eh-barra { height: 26px; border-radius: 13px; background: rgba(0,0,0,.45); border: 2px solid rgba(255,255,255,.15); overflow: hidden; position: relative; }
-.eh-barra > div { height: 100%; border-radius: 11px; transition: width .5s ease; background: linear-gradient(90deg, #ff6a00, #ffb347); box-shadow: 0 0 16px rgba(255,140,0,.7); }
-.eh-vela { display: inline-block; animation: ehFlicker 1.6s ease-in-out infinite; }
-@keyframes ehFlicker { 0%,100% { opacity: 1; transform: scale(1); } 40% { opacity: .75; transform: scale(.96) rotate(-2deg); } 60% { opacity: .9; transform: scale(1.03) rotate(2deg); } }
-.eh-flota { animation: ehFlota 3s ease-in-out infinite; }
-@keyframes ehFlota { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-.eh-latido { animation: ehLatido 1s ease-in-out infinite; }
-@keyframes ehLatido { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
-.eh-aparece { animation: ehAparece .5s ease both; }
-@keyframes ehAparece { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
-.eh-susto { animation: ehSusto .45s ease; }
-@keyframes ehSusto { 0%,100% { transform: none; } 20% { transform: translateX(-10px) rotate(-2deg); } 40% { transform: translateX(10px) rotate(2deg); } 60% { transform: translateX(-6px); } 80% { transform: translateX(6px); } }
-.eh-flash-rojo { position: fixed; inset: 0; pointer-events: none; z-index: 50; animation: ehFlashRojo .9s ease forwards; background: radial-gradient(circle, transparent 30%, rgba(220,0,0,.65)); }
-@keyframes ehFlashRojo { from { opacity: 1; } to { opacity: 0; } }
-.eh-flash-azul { position: fixed; inset: 0; pointer-events: none; z-index: 50; animation: ehFlashRojo .9s ease forwards; background: radial-gradient(circle, transparent 35%, rgba(60,160,255,.55)); }
-.eh-zombi { transform-origin: 50% 100%; }
-.eh-zombi.idle { animation: ehZIdle 2.4s ease-in-out infinite; }
-@keyframes ehZIdle { 0%,100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg) translateY(-3px); } }
-.eh-zombi.golpe { animation: ehZGolpe .35s ease; }
-@keyframes ehZGolpe { 0% { transform: none; filter: none; } 30% { transform: translateX(14px) rotate(4deg); filter: brightness(2) saturate(0) sepia(1) hue-rotate(-50deg); } 100% { transform: none; filter: none; } }
-.eh-zombi.ataque { animation: ehZAtaque .9s ease; }
-@keyframes ehZAtaque { 0% { transform: scale(1); } 40% { transform: scale(1.35) translateY(20px); } 100% { transform: scale(1); } }
-.eh-zombi.muerto { animation: ehZMuerto 1.6s ease forwards; }
-@keyframes ehZMuerto { 0% { transform: none; opacity: 1; } 30% { transform: rotate(-8deg); } 100% { transform: translateY(70%) rotate(18deg); opacity: .15; } }
-.eh-zombi.victoria { animation: ehZRisa .5s ease-in-out infinite; }
-@keyframes ehZRisa { 0%,100% { transform: translateY(0) scale(1.05); } 50% { transform: translateY(-8px) scale(1.08); } }
-.eh-golpe-num { position: absolute; font-weight: 900; font-size: 2rem; color: #ffde59; text-shadow: 0 0 10px #ff3b00, 0 2px 0 #000; animation: ehNum 1s ease forwards; pointer-events: none; }
-@keyframes ehNum { from { opacity: 1; transform: translateY(0) scale(1); } to { opacity: 0; transform: translateY(-80px) scale(1.4); } }
-.eh-puerta { animation: ehPuerta 1.4s ease forwards; transform-origin: 0% 50%; }
-@keyframes ehPuerta { from { transform: perspective(600px) rotateY(0); } to { transform: perspective(600px) rotateY(-75deg); } }
-.eh-confeti { position: fixed; top: -30px; font-size: 26px; animation: ehCae linear forwards; pointer-events: none; z-index: 60; }
-@keyframes ehCae { to { transform: translateY(115vh) rotate(540deg); } }
-`;
-
-function Ambiente({ murcielagos = 5 }) {
-    const bats = useMemo(() => Array.from({ length: murcielagos }, (_, i) => ({
-        top: 5 + Math.random() * 45, dur: 14 + Math.random() * 16, delay: -Math.random() * 20, size: 18 + Math.random() * 18, id: i,
-    })), [murcielagos]);
-    return (
-        <>
-            <style>{CSS}</style>
-            <div className="eh-luna" />
-            {bats.map(b => (
-                <div key={b.id} className="eh-murcielago" style={{ top: `${b.top}%`, animationDuration: `${b.dur}s`, animationDelay: `${b.delay}s`, fontSize: b.size }}>🦇</div>
-            ))}
-            <div className="eh-niebla" />
-        </>
-    );
-}
-
-function Confeti() {
-    const piezas = useMemo(() => Array.from({ length: 40 }, (_, i) => ({
-        i, left: Math.random() * 100, dur: 3 + Math.random() * 3, delay: Math.random() * 2.5, e: pick(['🎃', '🍬', '🍭', '✨', '🦇', '⭐']),
-    })), []);
-    return piezas.map(p => <div key={p.i} className="eh-confeti" style={{ left: `${p.left}%`, animationDuration: `${p.dur}s`, animationDelay: `${p.delay}s` }}>{p.e}</div>);
-}
-
-// =====================================================================
-//  ZOMBI (SVG)
-// =====================================================================
-function Zombi({ estado = 'idle', size = 260 }) {
-    return (
-        <svg viewBox="0 0 220 260" width={size} height={size * 260 / 220} className={`eh-zombi ${estado}`} style={{ overflow: 'visible' }}>
-            <defs>
-                <radialGradient id="ehPiel" cx="45%" cy="40%" r="65%">
-                    <stop offset="0%" stopColor="#a3c97a" /><stop offset="100%" stopColor="#5b8a3c" />
-                </radialGradient>
-                <linearGradient id="ehRopa" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#5a4a7a" /><stop offset="100%" stopColor="#2e2342" />
-                </linearGradient>
-            </defs>
-            {/* brazos estirados */}
-            <g>
-                <rect x="10" y="132" width="78" height="26" rx="13" fill="url(#ehRopa)" transform="rotate(-12 50 145)" />
-                <ellipse cx="14" cy="150" rx="16" ry="13" fill="url(#ehPiel)" />
-                <path d="M2 142 l-10 -4 M0 150 l-12 0 M2 158 l-10 4" stroke="#5b8a3c" strokeWidth="5" strokeLinecap="round" />
-                <rect x="132" y="132" width="78" height="26" rx="13" fill="url(#ehRopa)" transform="rotate(12 170 145)" />
-                <ellipse cx="206" cy="150" rx="16" ry="13" fill="url(#ehPiel)" />
-                <path d="M218 142 l10 -4 M220 150 l12 0 M218 158 l10 4" stroke="#5b8a3c" strokeWidth="5" strokeLinecap="round" />
-            </g>
-            {/* torso con camisa rota */}
-            <path d="M62 128 Q110 112 158 128 L166 230 L54 230 Z" fill="url(#ehRopa)" />
-            <path d="M54 230 l10 -14 l10 14 l12 -16 l10 16 l12 -12 l12 12 l12 -16 l10 16 l12 -14 l12 14 Z" fill="#1a0b2e" />
-            <path d="M95 150 l6 18 l-8 10" stroke="#a3c97a" strokeWidth="6" fill="none" />
-            <circle cx="132" cy="175" r="9" fill="#5b8a3c" />
-            {/* cuello */}
-            <rect x="96" y="104" width="28" height="26" fill="#6f9a4a" />
-            {/* cabeza */}
-            <path d="M58 60 Q58 8 110 8 Q164 8 162 62 Q162 108 110 112 Q58 108 58 60 Z" fill="url(#ehPiel)" />
-            <ellipse cx="86" cy="40" rx="12" ry="8" fill="#6f9a4a" opacity=".7" />
-            <ellipse cx="140" cy="86" rx="10" ry="6" fill="#4d7a30" opacity=".6" />
-            {/* pelo */}
-            <path d="M70 26 l-6 -14 M86 14 l-2 -14 M110 9 l2 -14 M132 13 l6 -12 M150 24 l10 -10" stroke="#2b1d12" strokeWidth="5" strokeLinecap="round" />
-            {/* cicatriz */}
-            <path d="M120 22 L150 40" stroke="#2f4a1d" strokeWidth="3" />
-            {[0, 1, 2, 3].map(i => <path key={i} d={`M${124 + i * 8} ${20 + i * 5} l6 -8`} stroke="#2f4a1d" strokeWidth="2.5" />)}
-            {/* ojos */}
-            <circle cx="88" cy="60" r="17" fill="#fffbe6" />
-            <circle cx="91" cy="62" r="7" fill="#d10000"><animate attributeName="r" values="7;5;7" dur="2s" repeatCount="indefinite" /></circle>
-            <circle cx="134" cy="58" r="11" fill="#fffbe6" />
-            <circle cx="132" cy="60" r="5" fill="#d10000" />
-            <path d="M70 40 L104 48 M120 46 L150 40" stroke="#2b1d12" strokeWidth="5" strokeLinecap="round" />
-            {/* boca */}
-            <path d="M80 88 Q110 104 142 86 Q138 100 110 102 Q84 102 80 88 Z" fill="#2b0a0a" />
-            <path d="M88 91 l4 7 l4 -6 l4 7 l4 -6 l4 7 l4 -6 l4 7 l4 -6 l4 6 l4 -7" stroke="#fffbe6" strokeWidth="2.5" fill="none" strokeLinejoin="round" />
-            {/* lápida delante */}
-            <path d="M40 260 L40 214 Q40 190 70 190 L150 190 Q180 190 180 214 L180 260 Z" fill="#6b6f7a" stroke="#3d404a" strokeWidth="4" />
-            <text x="110" y="232" textAnchor="middle" fontSize="26" fontWeight="900" fill="#3d404a" fontFamily="Creepster, fantasy">R.I.P.</text>
-            <path d="M30 258 Q110 244 190 258" stroke="#3a2a12" strokeWidth="8" fill="none" />
-        </svg>
-    );
-}
-
-function Corazones({ vidas, max }) {
-    return (
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'center' }}>
-            {Array.from({ length: max }, (_, i) => (
-                <span key={i} style={{ fontSize: '1.6rem', filter: i < vidas ? 'none' : 'grayscale(1) opacity(.3)', transition: 'filter .4s' }}>❤️</span>
-            ))}
-        </div>
-    );
-}
-
-function BarraVidaZombi({ hp, hpMax }) {
-    const pct = hpMax ? Math.max(0, Math.min(100, (hp / hpMax) * 100)) : 0;
-    return (
-        <div style={{ width: '100%' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '.9rem', marginBottom: 4 }}>
-                <span>🧟 Vida del zombi</span><span>{Math.max(0, hp)} / {hpMax}</span>
-            </div>
-            <div className="eh-barra"><div style={{ width: `${pct}%`, background: 'linear-gradient(90deg,#16a34a,#84cc16)', boxShadow: '0 0 16px rgba(132,204,22,.7)' }} /></div>
-        </div>
-    );
-}
-
-function MapaMansion({ pruebas = [], salaIdx, amuletos = [], fase }) {
-    return (
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center' }}>
-            {pruebas.map((p, i) => {
-                const s = infoPrueba(p, i, pruebas);
-                const hecho = amuletos.includes(p.id);
-                const actual = i === salaIdx && !['BATALLA', 'VICTORIA', 'DERROTA', 'LOBBY', 'INTRO'].includes(fase);
-                return (
-                    <div key={p.id || i} title={s.nombre} style={{
-                        width: 50, height: 60, borderRadius: '24px 24px 6px 6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem',
-                        background: hecho ? 'rgba(255,170,40,.25)' : actual ? 'rgba(160,80,255,.35)' : 'rgba(0,0,0,.35)',
-                        border: `2px solid ${hecho ? '#ffb347' : actual ? '#c084fc' : 'rgba(255,255,255,.15)'}`,
-                        boxShadow: actual ? '0 0 18px rgba(192,132,252,.7)' : hecho ? '0 0 12px rgba(255,170,40,.5)' : 'none',
-                    }} className={actual ? 'eh-latido' : ''}>
-                        {hecho ? s.amuleto.emoji : actual ? s.emoji : '🔒'}
-                    </div>
-                );
-            })}
-            <div style={{ fontSize: '1.4rem', opacity: .7 }}>➜</div>
-            <div style={{
-                width: 60, height: 60, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem',
-                background: fase === 'BATALLA' ? 'rgba(220,0,0,.35)' : 'rgba(0,0,0,.35)', border: `2px solid ${fase === 'BATALLA' ? '#ef4444' : 'rgba(255,255,255,.15)'}`,
-            }}>🧟</div>
-        </div>
-    );
-}
-
-// =====================================================================
-//  TARJETA DE PREGUNTA (móvil)
-// =====================================================================
-function TarjetaPregunta({ pregunta, feedback, onResponder, color = '#ff8c1a' }) {
-    if (!pregunta) return null;
-    return (
-        <div className={`eh-panel eh-aparece ${feedback && !feedback.ok ? 'eh-susto' : ''}`} style={{ padding: 18, borderColor: color + '88' }}>
-            <div style={{ fontWeight: 800, fontSize: '1.05rem', marginBottom: 8, textAlign: 'center' }}>{pregunta.texto}</div>
-            {pregunta.img && (
-                <div style={{ textAlign: 'center', margin: '8px 0 12px' }}>
-                    <img src={pregunta.img} alt="" style={{ maxWidth: '100%', maxHeight: 150, borderRadius: 10, border: '3px solid rgba(255,255,255,.3)', background: '#fff' }} />
-                </div>
-            )}
-            {pregunta.detalle && (
-                <div style={{
-                    textAlign: 'center', margin: '6px 0 14px', padding: '10px 12px', borderRadius: 12, background: 'rgba(0,0,0,.35)',
-                    fontSize: pregunta.grande ? '1.7rem' : '1rem', fontWeight: pregunta.grande ? 900 : 600, lineHeight: 1.35,
-                }}>{pregunta.detalle}</div>
-            )}
-            {pregunta.frase && (
-                <div style={{ textAlign: 'center', margin: '6px 0 14px', padding: '10px 12px', borderRadius: 12, background: 'rgba(0,0,0,.35)', fontSize: '1.15rem', lineHeight: 1.6 }}>
-                    {pregunta.frase.tokens.map((t, i) => (
-                        <span key={i} style={i === pregunta.frase.resaltar ? { background: '#ff8c1a', color: '#1a0700', borderRadius: 6, padding: '0 6px', fontWeight: 900 } : null}>{t}{' '}</span>
-                    ))}
-                </div>
-            )}
-            <div style={{ display: 'grid', gridTemplateColumns: pregunta.opciones.length > 2 && pregunta.opciones.every(o => o.length < 18) ? '1fr 1fr' : '1fr', gap: 10 }}>
-                {pregunta.opciones.map((o, i) => {
-                    let cls = 'eh-opcion';
-                    if (feedback) { if (i === pregunta.correcta) cls += ' ok'; else if (i === feedback.elegida) cls += ' mal'; }
-                    return <button key={i} className={cls} disabled={!!feedback} onClick={() => onResponder(i)}>{o}</button>;
-                })}
-            </div>
-        </div>
-    );
-}
-
 
 // =====================================================================
 //  ANFITRIÓN (proyector del profesor)
@@ -325,8 +48,14 @@ function HostEscape({ config, usuario, onSalir }) {
     if (!audioRef.current) audioRef.current = crearAudio();
     const audio = audioRef.current;
     const [sonido, setSonido] = useState(true);
-    useEffect(() => { audio.activo = sonido; }, [sonido, audio]);
+    useEffect(() => { audio.silencio(!sonido); }, [sonido, audio]);
     useEffect(() => () => audio.cerrar(), [audio]);
+    // Música de fondo (solo en la pantalla proyectada): suena con el botón 🔊. El navegador exige un clic antes de sonar.
+    useEffect(() => {
+        const f = () => audio.desbloquear();
+        window.addEventListener('pointerdown', f);
+        return () => window.removeEventListener('pointerdown', f);
+    }, [audio]);
     const [usar3D, setUsar3D] = useState(leer3D);
     const cambiar3D = () => setUsar3D(v => { try { localStorage.setItem('pikt_escape_3d', v ? '0' : '1'); } catch { /* */ } return !v; });
 
@@ -334,6 +63,7 @@ function HostEscape({ config, usuario, onSalir }) {
     const [sala, setSala] = useState(null);
     const [error, setError] = useState('');
     const [ahora, setAhora] = useState(Date.now());
+    const [conexion, setConexion] = useState(true);
     const [feed, setFeed] = useState([]);
     const [zEstado, setZEstado] = useState('idle');
     const [numsGolpe, setNumsGolpe] = useState([]);
@@ -351,7 +81,7 @@ function HostEscape({ config, usuario, onSalir }) {
     useEffect(() => {
         if (creada.current) return;
         creada.current = true;
-        let unsub = null;
+        let unsub = null, vivo = true;
         (async () => {
             try {
                 const code = Math.random().toString(36).substring(2, 7).toUpperCase();
@@ -365,10 +95,17 @@ function HostEscape({ config, usuario, onSalir }) {
                     createdAt: serverTimestamp(),
                 });
                 setCodigo(code);
-                unsub = onSnapshot(doc(db, 'live_games', code), s => { if (s.exists()) setSala(s.data()); });
+                const escuchar = () => {
+                    unsub = onSnapshot(doc(db, 'live_games', code), s => { setConexion(true); if (s.exists()) setSala(s.data()); }, () => {
+                        setConexion(false);
+                        if (unsub) unsub();
+                        setTimeout(() => { if (vivo) escuchar(); }, 2000);
+                    });
+                };
+                escuchar();
             } catch (e) { setError('No se pudo crear la sala: ' + e.message); }
         })();
-        return () => { if (unsub) unsub(); };
+        return () => { vivo = false; if (unsub) unsub(); };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -391,7 +128,7 @@ function HostEscape({ config, usuario, onSalir }) {
         const n = Math.max(1, Object.keys(s.jugadores || {}).length);
         const datos = { salaIdx: i, candadoAbierto: null, pistasReveladas: 0, [`progreso.s${i}`]: 0 };
         if (!s.tiempoFin) datos.tiempoFin = Date.now() + config.minutos * 60000;
-        if (!materiaDePrueba(prueba)) {
+        if (!tienePreguntas(prueba)) {
             // Prueba propia sin preguntas: directamente al código
             transRef.current = `C${i}`;
             Object.assign(datos, { fase: 'CANDADO', objetivo: 0, candado: { ...candadoManual(prueba), reparto: barajar(Object.keys(s.jugadores || {})) } });
@@ -426,7 +163,7 @@ function HostEscape({ config, usuario, onSalir }) {
         audio.rugido();
     };
 
-    const empezar = () => { audio.desbloquear(); audio.trueno(); upd({ estado: 'jugando', fase: 'INTRO' }); };
+    const empezar = () => { audio.desbloquear(); audio.puertaCerrada(); upd({ estado: 'jugando', fase: 'INTRO' }); };
     const siguiente = () => { const s = salaRef.current; if (!s) return; if (s.salaIdx >= s.pruebas.length - 1) iniciarBatalla(false); else iniciarSala(s.salaIdx + 1); };
     const terminar = () => { if (window.confirm('¿Terminar la partida para todos?')) upd({ estado: 'fin', fase: 'TERMINADA' }); };
 
@@ -437,7 +174,7 @@ function HostEscape({ config, usuario, onSalir }) {
         const prueba = sala.pruebas?.[i];
         if (sala.fase === 'RETOS' && progreso >= sala.objetivo && sala.objetivo > 0 && transRef.current !== `C${i}`) {
             transRef.current = `C${i}`;
-            const cand = prueba?.tipo === 'MANUAL' ? candadoManual(prueba) : generarCandado(prueba?.materia, sala.etapa, prueba?.tema);
+            const cand = candadoDePrueba(prueba, sala.etapa);
             upd({ fase: 'CANDADO', candado: { ...cand, reparto: barajar(Object.keys(sala.jugadores || {})) } });
             audio.campana();
         }
@@ -454,7 +191,7 @@ function HostEscape({ config, usuario, onSalir }) {
         if (!refDoc) return;
         const id = setInterval(() => {
             const t = Date.now();
-            setAhora(t);
+            setAhora(prev => (Math.floor(prev / 1000) === Math.floor(t / 1000) ? prev : t));
             const s = salaRef.current; if (!s) return;
             if (['RETOS', 'CANDADO', 'ABIERTA'].includes(s.fase) && s.tiempoFin && s.tiempoFin - (s.penalSeg || 0) * 1000 - t <= 0 && transRef.current !== 'BATALLA') {
                 iniciarBatalla(true);
@@ -528,6 +265,35 @@ function HostEscape({ config, usuario, onSalir }) {
     }, [ataqueN]);
 
     useEffect(() => {
+        audio.musica(sonido && !['VICTORIA', 'TERMINADA'].includes(fase), fase === 'BATALLA' ? 'batalla' : 'suspense');
+    }, [sonido, fase, audio]);
+
+    // Narrador: una frase al entrar en cada fase, otra al fallar un código y otra cuando el zombi está a punto de caer
+    const narrador = useNarrador(audio, sonido);
+    const haySala = !!sala;
+    useEffect(() => {
+        if (!haySala) return;
+        const id = idNarracionFase(fase, salaIdx, pruebas.length, sala?.tiempoAgotado);
+        if (id) narrador.decir(id, fase === 'VICTORIA' ? 1600 : fase === 'INTRO' ? 900 : 350);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [fase, salaIdx, haySala]);
+    const penalPrev = useRef(0);
+    useEffect(() => {
+        const p = sala?.penalSeg || 0;
+        if (p > penalPrev.current && fase === 'CANDADO') narrador.decir('candado_error');
+        penalPrev.current = p;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [sala?.penalSeg]);
+    const finalDicho = useRef(false);
+    useEffect(() => {
+        const bt = sala?.batalla;
+        if (fase !== 'BATALLA' || !bt) { finalDicho.current = false; return; }
+        const vida = bt.hpMax - bt.golpes;
+        if (!finalDicho.current && vida > 0 && vida <= Math.max(2, Math.ceil(bt.hpMax * 0.15))) { finalDicho.current = true; narrador.decir('golpe_final'); }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [sala?.batalla?.golpes, fase]);
+
+    useEffect(() => {
         if (fase === 'VICTORIA') { setZEstado('muerto'); audio.victoria(); }
         if (fase === 'DERROTA') { setZEstado('victoria'); audio.derrota(); }
         if (fase === 'BATALLA') setZEstado('idle');
@@ -553,59 +319,16 @@ function HostEscape({ config, usuario, onSalir }) {
             <div style={{ fontWeight: 900, fontSize: '1.1rem' }}>🎃 Sala <span style={{ color: '#ffb347', letterSpacing: 3 }}>{codigo}</span></div>
             <QRSalaBoton codigo={codigo} texto="QR" style={{ padding: '7px 12px' }} />
             <div style={{ fontWeight: 700, opacity: .85 }}>👥 {nJug}</div>
+            {!conexion && <div className="eh-latido" style={{ fontWeight: 800, color: '#fca5a5' }}>⚠ Reconectando…</div>}
             <div style={{ flex: 1 }} />
             {sala.tiempoFin && enSalas && (
                 <div style={{ fontWeight: 900, fontSize: '1.6rem', color: restante < 120000 ? '#ef4444' : '#ffde59', fontVariantNumeric: 'tabular-nums' }}
                     className={restante < 60000 ? 'eh-latido' : ''}>⏳ {mmss(restante)}</div>
             )}
             <button className="eh-btn2" onClick={cambiar3D} title="Mostrar u ocultar la mansión 3D">{usar3D ? '🏚️ 3D' : '🖼️ 2D'}</button>
-            <button className="eh-btn2" onClick={() => setSonido(s => !s)}>{sonido ? '🔊' : '🔇'}</button>
+            <button className="eh-btn2" onClick={() => setSonido(s => !s)} title={sonido ? 'Silenciar sonido y música' : 'Activar sonido y música'}>{sonido ? '🔊' : '🔇'}</button>
         </div>
     );
-
-    // ── capa superpuesta sobre la escena 3D ──
-    const capa = { position: 'absolute', zIndex: 2, background: 'rgba(20,8,38,.8)', border: '2px solid rgba(255,140,26,.4)', borderRadius: 16, padding: '10px 14px', backdropFilter: 'blur(3px)' };
-    let superpuesto = null;
-    if (fase === 'LOBBY') {
-        superpuesto = (
-            <div style={{ ...capa, top: 12, right: 12, textAlign: 'center', width: 230 }}>
-                <div style={{ fontSize: '.85rem', opacity: .85 }}>{window.location.host}</div>
-                <div style={{ fontSize: '2.2rem', fontWeight: 900, letterSpacing: 6, color: '#ffb347' }}>{codigo}</div>
-                <img alt="QR" src={qr(220)} style={{ width: 180, height: 180, borderRadius: 12, border: '3px solid #ff8c1a' }} />
-                <button className="eh-btn" disabled={nJug === 0} onClick={empezar} style={{ width: '100%', marginTop: 10 }}>🕯️ Entrar en la mansión</button>
-            </div>
-        );
-    } else if (enSalas) {
-        const pct = sala.objetivo ? Math.min(100, (progreso / sala.objetivo) * 100) : 0;
-        superpuesto = (
-            <div style={{ ...capa, top: 12, left: 12, maxWidth: 'min(460px, 70%)' }}>
-                <div style={{ fontWeight: 800, color: salaInfo.color, textTransform: 'uppercase', letterSpacing: 2, fontSize: '.75rem' }}>Sala {salaIdx + 1} de {pruebas.length} · {salaInfo.materia}</div>
-                <div style={{ fontWeight: 900, fontSize: '1.25rem' }}>{salaInfo.emoji} {salaInfo.nombre}</div>
-                {fase === 'RETOS' && <div className="eh-barra" style={{ height: 16, marginTop: 6 }}><div style={{ width: `${pct}%` }} /></div>}
-                {fase === 'CANDADO' && <div style={{ marginTop: 4, fontWeight: 800, color: '#ffde59' }}>🔒 {cand?.titulo}</div>}
-                {fase === 'ABIERTA' && <div style={{ marginTop: 4, fontWeight: 800, color: '#4ade80' }}>🚪 ¡Puerta abierta! {salaInfo.amuleto.emoji}</div>}
-            </div>
-        );
-    } else if (enPelea) {
-        superpuesto = (
-            <div style={{ ...capa, top: 12, left: '50%', transform: 'translateX(-50%)', width: 'min(560px, 90%)' }}>
-                <BarraVidaZombi hp={hp} hpMax={b.hpMax} />
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, gap: 10, flexWrap: 'wrap' }}>
-                    <Corazones vidas={b.vidas} max={b.vidasMax} />
-                    {fase === 'BATALLA' && <div style={{ fontWeight: 800 }}>⏱️ {Math.max(0, Math.ceil((b.proximoAtaque - ahora) / 1000))} s · 🛡️ {Math.min(b.golpes - (b.golpesBase || 0), b.escudo)}/{b.escudo}</div>}
-                </div>
-            </div>
-        );
-    }
-    const escena = usar3D && fase !== 'TERMINADA' ? (
-        <div style={{ position: 'relative', zIndex: 1, maxWidth: 1240, margin: '0 auto', padding: '12px 18px 0' }}>
-            <Mansion3D pruebas={infos3D} fase={fase} salaIdx={salaIdx} abiertas={abiertas} jugadores={jugadores}
-                batalla={b ? { golpes: b.golpes, ataqueN: b.ultimoAtaque?.n || 0, bloqueado: !!b.ultimoAtaque?.bloqueado } : null}
-                alto={enSalas || enPelea ? 'min(52vh, 560px)' : 'min(60vh, 620px)'} />
-            {superpuesto}
-            {enPelea && numsGolpe.map(g => <div key={g.id} className="eh-golpe-num" style={{ left: `${g.x}%`, top: '40%', zIndex: 3 }}>−{g.dmg}</div>)}
-        </div>
-    ) : null;
 
     const controles = (extra) => (
         <div style={{ position: 'relative', zIndex: 2, display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap', padding: 14 }}>
@@ -617,6 +340,173 @@ function HostEscape({ config, usuario, onSalir }) {
             {fase !== 'VICTORIA' && fase !== 'TERMINADA' && <button className="eh-btn2" onClick={terminar}>⏹ Terminar</button>}
         </div>
     );
+
+    // ══════════ VISTA 3D: escena a la izquierda + panel lateral, todo en una pantalla ══════════
+    if (usar3D && fase !== 'TERMINADA') {
+        const pct = sala.objetivo ? Math.min(100, (progreso / sala.objetivo) * 100) : 0;
+        const titulo = (t, color) => <h2 className="eh-titulo" style={{ fontSize: 'clamp(1.4rem,2.4vw,2.1rem)', color }}>{t}</h2>;
+        const cabSala = (
+            <div>
+                <div style={{ fontWeight: 800, color: salaInfo.color, textTransform: 'uppercase', letterSpacing: 2, fontSize: '.78rem' }}>Sala {salaIdx + 1} de {pruebas.length} · {salaInfo.materia}</div>
+                <div style={{ fontWeight: 900, fontSize: '1.35rem' }}>{salaInfo.emoji} {salaInfo.nombre}</div>
+            </div>
+        );
+        const directo = (
+            <div>
+                <h3 style={{ margin: '4px 0 6px' }}>⚡ En directo</h3>
+                {feed.length === 0 && <div style={{ opacity: .6 }}>Aún no hay aciertos…</div>}
+                {feed.slice(0, 4).map(f => (
+                    <div key={f.id} className="eh-aparece" style={{ padding: '5px 10px', marginBottom: 5, borderRadius: 10, background: f.candado ? 'rgba(239,68,68,.2)' : 'rgba(74,222,128,.15)' }}>
+                        {f.candado ? `🔐 ${f.nombre}: código incorrecto (−${PENAL_CANDADO} s)` : `✔ ${f.nombre}`}
+                    </div>
+                ))}
+            </div>
+        );
+        const botonesProfe = (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 'auto', paddingTop: 8, borderTop: '1px solid rgba(255,255,255,.1)' }}>
+                {fase === 'CANDADO' && cand && <>
+                    {cand.pistas.length > 0 && <button className="eh-btn2" disabled={sala.pistasReveladas >= cand.pistas.length} onClick={() => upd({ pistasReveladas: increment(1) })}>💡 Pista</button>}
+                    <button className="eh-btn2" onClick={() => upd({ candadoAbierto: { nombre: 'El profe', ts: Date.now() } })}>🔓 Abrir</button>
+                </>}
+                {enSalas && <>
+                    <button className="eh-btn2" onClick={() => upd({ tiempoFin: (sala.tiempoFin || Date.now()) + 5 * 60000 })}>➕ 5 min</button>
+                    <button className="eh-btn2" onClick={siguiente}>⏭ {esUltima ? 'A la batalla' : 'Saltar sala'}</button>
+                </>}
+                {fase === 'VICTORIA' ? <button className="eh-btn2" onClick={onSalir}>← Salir</button> : <button className="eh-btn2" onClick={terminar}>⏹ Terminar</button>}
+            </div>
+        );
+
+        let lateral = null, banda = null;
+        if (fase === 'LOBBY') {
+            lateral = <>
+                {titulo('La mansión del zombi')}
+                <div style={{ textAlign: 'center' }}>
+                    <div style={{ opacity: .85, fontSize: '.95rem' }}>Entrad en <b>{window.location.host}</b> o escanead:</div>
+                    <div style={{ fontSize: '2.8rem', fontWeight: 900, letterSpacing: 8, color: '#ffb347', lineHeight: 1.1 }}>{codigo}</div>
+                    <img alt="QR" src={qr(260)} style={{ width: 'min(230px, 100%)', aspectRatio: '1', borderRadius: 14, border: '4px solid #ff8c1a', marginTop: 6 }} />
+                </div>
+                <button className="eh-btn" disabled={nJug === 0} onClick={empezar} style={{ fontSize: '1.1rem' }}>🕯️ Entrar en la mansión</button>
+                <div style={{ fontSize: '.82rem', opacity: .7 }}>{pruebas.length} pruebas · {ETAPAS.find(e => e.v === sala.etapa)?.l} · {config.minutos} min · {Z.l}</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {listaJug.length === 0 && <div style={{ opacity: .6 }}>Esperando a los primeros valientes…</div>}
+                    {listaJug.map(j => (
+                        <span key={j.k} className="eh-aparece" style={{ padding: '4px 10px', borderRadius: 20, background: 'rgba(255,140,26,.18)', border: '1px solid rgba(255,140,26,.4)', fontWeight: 700, fontSize: '.9rem' }}>
+                            {j.avatar?.disfraz ? disfrazDe(j.avatar.disfraz).emoji : AVATARES[hash(j.k) % AVATARES.length]} {j.nombre}
+                        </span>
+                    ))}
+                </div>
+            </>;
+            banda = <div style={{ fontWeight: 800, fontSize: '1.15rem', textAlign: 'center' }}>👻 {nJug} {nJug === 1 ? 'valiente espera' : 'valientes esperan'} en el jardín de la mansión</div>;
+        } else if (fase === 'INTRO') {
+            lateral = <>
+                {titulo('¡La puerta se ha cerrado!')}
+                <p style={{ fontSize: '1.1rem', lineHeight: 1.5, margin: 0 }}>Es la noche de Halloween… <b>¡CLAC!</b> La puerta se ha cerrado a vuestra espalda y en el sótano un <b>zombi</b> está a punto de despertar.</p>
+                <p style={{ lineHeight: 1.5, margin: 0, opacity: .9 }}>Superad las <b>{pruebas.length} pruebas</b> entre todos. Cada sala da un <b>amuleto</b> (una vida más para la batalla). Tenéis <b>{config.minutos} minutos</b>.</p>
+                <MapaMansion pruebas={pruebas} salaIdx={-1} fase="INTRO" />
+                <button className="eh-btn" style={{ fontSize: '1.15rem' }} onClick={() => iniciarSala(0)}>🚪 Abrir la primera puerta</button>
+            </>;
+        } else if (fase === 'RETOS') {
+            const historia = pruebas[salaIdx]?.tipo === 'MANUAL' ? '' : salaInfo.historia;
+            lateral = <>
+                {cabSala}
+                {historia && <p style={{ margin: 0, lineHeight: 1.45, opacity: .9 }}>{historia}</p>}
+                <div style={{ fontWeight: 800 }}>📱 ¡Responded en los móviles para cargar la energía de la puerta!</div>
+                {directo}
+                <MapaMansion pruebas={pruebas} salaIdx={salaIdx} amuletos={sala.amuletos} fase={fase} />
+            </>;
+            banda = (
+                <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, fontSize: '1.25rem', marginBottom: 6 }}>
+                        <span><span className="eh-vela">🕯️</span> Energía de la puerta</span><span>{progreso} / {sala.objetivo} · {Math.round(pct)} %</span>
+                    </div>
+                    <div className="eh-barra" style={{ height: 34, borderRadius: 17 }}><div style={{ width: `${pct}%` }} /></div>
+                </div>
+            );
+        } else if (fase === 'CANDADO' && cand) {
+            lateral = <>
+                {cabSala}
+                <div style={{ textAlign: 'center' }}><div className="eh-latido" style={{ fontSize: '2.6rem' }}>🔒</div><h2 style={{ margin: 0, color: '#ffde59' }}>{cand.titulo}</h2></div>
+                <p style={{ fontSize: '1.15rem', lineHeight: 1.45, margin: 0, whiteSpace: 'pre-wrap' }}>{cand.instruccion}</p>
+                {cand.imagen && <img src={cand.imagen} alt="" style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 12 }} />}
+                <div style={{ fontWeight: 800, color: '#ffb347' }}>
+                    {cand.compartidas ? '🔎 ¡Buscad el código! Escribidlo en cualquier móvil.' : `🗣️ ¡Hablad! Las pistas están repartidas en ${Math.min(cand.pistas.length, Math.max(1, cand.reparto?.length || nJug))} grupos de móviles.`}
+                    {cand.longitud ? ` (${cand.longitud} ${cand.tipo === 'numero' ? 'cifras' : 'caracteres'})` : ''}
+                </div>
+                {cand.pistas.slice(0, sala.pistasReveladas || 0).map((p, i) => (
+                    <div key={i} className="eh-aparece" style={{ padding: 10, borderRadius: 12, background: 'rgba(255,222,89,.12)', border: '1px solid rgba(255,222,89,.4)', display: 'flex', gap: 10, alignItems: 'center' }}>
+                        💡 {p.texto} {p.img && <img src={p.img} alt="" style={{ height: 44, borderRadius: 6, background: '#fff' }} />}
+                    </div>
+                ))}
+                {directo}
+            </>;
+            banda = <div style={{ fontWeight: 900, fontSize: '1.2rem', textAlign: 'center' }}>🔒 {cand.titulo} · cada código incorrecto resta {PENAL_CANDADO} s</div>;
+        } else if (fase === 'ABIERTA') {
+            lateral = <>
+                {cabSala}
+                <h2 style={{ fontSize: '2rem', margin: 0, color: '#4ade80' }}>¡Puerta abierta!</h2>
+                {sala.candadoAbierto?.nombre && <p style={{ margin: 0, fontSize: '1.1rem' }}>🗝️ <b>{sala.candadoAbierto.nombre}</b> ha escrito el código: <b style={{ color: '#ffde59' }}>{cand?.manual ? codigoManual(salaIdx) : cand?.solucionVisible}</b></p>}
+                <p style={{ margin: 0, fontSize: '1.1rem' }}>Amuleto: <span style={{ fontSize: '1.8rem' }}>{salaInfo.amuleto.emoji}</span> <b>{salaInfo.amuleto.nombre}</b> (+1 vida)</p>
+                <button className="eh-btn" onClick={siguiente} style={{ fontSize: '1.1rem' }}>{esUltima ? '⚔️ ¡Al sótano a por el zombi!' : '🚪 Siguiente sala'}</button>
+                <MapaMansion pruebas={pruebas} salaIdx={salaIdx} amuletos={sala.amuletos} fase={fase} />
+            </>;
+            banda = <div style={{ fontWeight: 900, fontSize: '1.25rem', textAlign: 'center', color: '#4ade80' }}>🚪 ¡Puerta abierta! {salaInfo.amuleto.emoji} {salaInfo.amuleto.nombre}</div>;
+        } else if (enPelea) {
+            const heroes = [...listaJug].sort((x, y) => ((y.golpes || 0) + (y.aciertos || 0)) - ((x.golpes || 0) + (x.aciertos || 0)));
+            lateral = <>
+                {fase === 'BATALLA' && titulo('¡Batalla final!')}
+                {fase === 'VICTORIA' && titulo('¡Habéis escapado!', '#4ade80')}
+                {fase === 'DERROTA' && titulo('¡El zombi os ha atrapado!', '#ef4444')}
+                {sala.tiempoAgotado && fase === 'BATALLA' && <div style={{ color: '#fca5a5', fontWeight: 800 }}>⏰ Se acabó el tiempo: el zombi tiene un 50 % más de vida.</div>}
+                {fase === 'BATALLA' && <div style={{ lineHeight: 1.45 }}>📱 Cada acierto es un golpe (¡doble en menos de 4 s!). Juntad <b>{b.escudo} golpes</b> antes de cada ataque para bloquearlo.</div>}
+                {fase === 'DERROTA' && <>
+                    <div>Pero está herido… ¡le quedan {hp} puntos de vida!</div>
+                    <button className="eh-btn" onClick={revancha}>🔁 ¡Revancha!</button>
+                </>}
+                {fase === 'VICTORIA' && <div style={{ fontSize: '1.15rem' }}>El zombi ha caído. ¡Feliz Halloween! 🎃</div>}
+                <h3 style={{ margin: '4px 0' }}>{fase === 'VICTORIA' ? '🏆 Héroes de la noche' : '⚔️ Golpes'}</h3>
+                <div>
+                    {heroes.map((j, i) => (
+                        <div key={j.k} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid rgba(255,255,255,.08)' }}>
+                            <span>{i < 3 ? ['🥇', '🥈', '🥉'][i] : `${i + 1}.`} {j.avatar?.disfraz ? disfrazDe(j.avatar.disfraz).emoji : ''} {j.nombre}</span>
+                            <span>✔ {j.aciertos || 0} · 💥 {j.golpes || 0}</span>
+                        </div>
+                    ))}
+                </div>
+            </>;
+            banda = (
+                <div>
+                    <BarraVidaZombi hp={hp} hpMax={b.hpMax} />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, gap: 10, flexWrap: 'wrap' }}>
+                        <Corazones vidas={b.vidas} max={b.vidasMax} />
+                        {fase === 'BATALLA' && <div style={{ fontWeight: 900, fontSize: '1.15rem' }}>⏱️ Ataque en {Math.max(0, Math.ceil((b.proximoAtaque - ahora) / 1000))} s · 🛡️ <span style={{ color: b.golpes - (b.golpesBase || 0) >= b.escudo ? '#60a5fa' : '#fca5a5' }}>{Math.min(b.golpes - (b.golpesBase || 0), b.escudo)}/{b.escudo}</span></div>}
+                    </div>
+                </div>
+            );
+        }
+
+        return (
+            <div className="eh-root eh-3d" style={fase === 'VICTORIA' ? { background: 'radial-gradient(ellipse at 50% 0%, #5e3b1d 0%, #2e1a0b 50%, #0f0703 100%)' } : undefined}>
+                <Ambiente ligero />
+                {flash && <div className={flash === 'rojo' ? 'eh-flash-rojo' : 'eh-flash-azul'} />}
+                {fase === 'VICTORIA' && <Confeti />}
+                {barraSup}
+                <Subtitulo texto={narrador.subtitulo} />
+                <div className="eh-layout3d">
+                    <div className="eh-escena3d">
+                        <Mansion3D pruebas={infos3D} fase={fase} salaIdx={salaIdx} abiertas={abiertas} jugadores={jugadores}
+                            batalla={b ? { golpes: b.golpes, ataqueN: b.ultimoAtaque?.n || 0, bloqueado: !!b.ultimoAtaque?.bloqueado } : null}
+                            alto="100%" />
+                        {banda && <div className="eh-banda">{banda}</div>}
+                        {enPelea && numsGolpe.map(g => <div key={g.id} className="eh-golpe-num" style={{ left: `${g.x}%`, top: '35%', zIndex: 3 }}>−{g.dmg}</div>)}
+                    </div>
+                    <div className="eh-panel eh-lateral">
+                        {lateral}
+                        {fase !== 'LOBBY' && botonesProfe}
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     // ── contenido por fase ──
     let contenido = null, extraControles = null;
@@ -816,7 +706,7 @@ function HostEscape({ config, usuario, onSalir }) {
             {flash && <div className={flash === 'rojo' ? 'eh-flash-rojo' : 'eh-flash-azul'} />}
             {fase === 'VICTORIA' && <Confeti />}
             {barraSup}
-            {escena}
+            <Subtitulo texto={narrador.subtitulo} />
             {contenido}
             {fase === 'VICTORIA'
                 ? <div style={{ position: 'relative', zIndex: 2, textAlign: 'center', padding: 14 }}><button className="eh-btn2" onClick={onSalir}>← Salir</button></div>
@@ -855,6 +745,9 @@ function ClienteEscape({ codigo, nombre, avatarInicial, onSalir }) {
     const registrado = useRef(false);
     const salaRef = useRef(null);
     salaRef.current = sala;
+    const siguienteRef = useRef(null);      // temporizador de «siguiente pregunta» (se cancela al cambiar de fase)
+    const cancelarSiguiente = () => { if (siguienteRef.current) { clearTimeout(siguienteRef.current); siguienteRef.current = null; } };
+    useEffect(() => cancelarSiguiente, []);
 
     useEffect(() => {
         let unsub = null, vivo = true;
@@ -869,7 +762,7 @@ function ClienteEscape({ codigo, nombre, avatarInicial, onSalir }) {
                 unsub = onSnapshot(refSala, s => {
                     if (!s.exists()) { setError('La sala se ha cerrado.'); return; }
                     setSala(s.data());
-                });
+                }, e => setError('Se ha perdido la conexión con la sala (' + e.code + '). Vuelve a entrar con el mismo nombre.'));
             } catch (e) { setError('Error al entrar: ' + e.message); }
         })();
         return () => { vivo = false; if (unsub) unsub(); };
@@ -890,16 +783,18 @@ function ClienteEscape({ codigo, nombre, avatarInicial, onSalir }) {
         const lista = s.pruebas || [];
         let prueba = lista[s.salaIdx];
         if (s.fase === 'BATALLA') {
-            const conPreguntas = lista.filter(p => materiaDePrueba(p));
+            const conPreguntas = lista.filter(p => tienePreguntas(p));
             prueba = conPreguntas.length ? pick(conPreguntas) : { tipo: 'MATERIA', materia: pick(ORDEN_SALAS), tema: 'MIX' };
         }
-        const materia = materiaDePrueba(prueba) || 'MATES';
-        setPregunta(generarPregunta(materia, s.etapa, temaDePrueba(prueba)));
+        setPregunta(preguntaDePrueba(prueba, s.etapa));
         setT0(Date.now());
     }, []);
 
     useEffect(() => {
-        if (fase === 'RETOS' || fase === 'BATALLA') { setFeedback(null); nuevaPregunta(); }
+        cancelarSiguiente();
+        setFeedback(null); setCritico(false);
+        if (fase === 'RETOS' || fase === 'BATALLA') nuevaPregunta();
+        else setPregunta(null);
         if (fase === 'CANDADO') { setCodigoTxt(''); setMsgCandado(''); }
         if (fase !== 'LOBBY' && fase !== 'INTRO') setEditandoDisfraz(false);
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -948,7 +843,15 @@ function ClienteEscape({ codigo, nombre, avatarInicial, onSalir }) {
             audio.fallo();
             stats.current.fallos++;
         }
-        setTimeout(() => { setFeedback(null); setCritico(false); nuevaPregunta(); }, ok ? 650 : 1900);
+        cancelarSiguiente();
+        const faseRespuesta = fase, salaRespuesta = salaIdx;
+        siguienteRef.current = setTimeout(() => {
+            siguienteRef.current = null;
+            const s = salaRef.current;
+            // Si mientras tanto ha cambiado la sala o la fase, el efecto de fase ya ha puesto la pregunta nueva
+            if (!s || s.fase !== faseRespuesta || s.salaIdx !== salaRespuesta) return;
+            setFeedback(null); setCritico(false); nuevaPregunta();
+        }, ok ? 650 : 1900);
     };
 
     const intentarCandado = () => {
@@ -1137,11 +1040,14 @@ export default function EscapeHalloween({ usuario, onExit, codigoSala = null }) 
     const [errorUnir, setErrorUnir] = useState('');
     const [config, setConfig] = useState(configPorDefecto);
     const [configPartida, setConfigPartida] = useState(null);
+    const [tituloPartida, setTituloPartida] = useState('');
+    const [metaEditor, setMetaEditor] = useState({ titulo: '', publico: false, guardado: null });
     const [avatar, setAvatar] = useState(() => leerAvatarGuardado() || avatarAleatorio());
     const [semilla, setSemilla] = useState(0);
 
     const salirAlMenu = () => { setPantalla('MENU'); setSemilla(s => s + 1); };
 
+    if (pantalla === 'PIZARRA' && configPartida?.partida) return <PizarraEscape key={'p' + semilla} config={configPartida} titulo={tituloPartida} onSalir={() => setPantalla('CONFIG')} />;
     if (pantalla === 'HOST' && configPartida) return <HostEscape key={'h' + semilla} config={configPartida} usuario={usuario} onSalir={salirAlMenu} />;
     if (pantalla === 'CLIENTE') return <ClienteEscape key={'c' + codigoEntrada} codigo={codigoEntrada} nombre={nombre.trim()} avatarInicial={avatar} onSalir={() => (codigoSala ? onExit?.() : salirAlMenu())} />;
 
@@ -1188,8 +1094,9 @@ export default function EscapeHalloween({ usuario, onExit, codigoSala = null }) 
     if (pantalla === 'CONFIG') {
         return (
             <div className="eh-root"><Ambiente />
-                <EditorEscape config={config} setConfig={setConfig} usuario={usuario} onAtras={() => setPantalla('MENU')}
-                    onCrear={(c) => { setConfigPartida(c); setSemilla(s => s + 1); setPantalla('HOST'); }} />
+                <EditorEscape config={config} setConfig={setConfig} usuario={usuario} meta={metaEditor} setMeta={setMetaEditor} onAtras={() => setPantalla('MENU')}
+                    onCrear={(c) => { setConfigPartida(c); setSemilla(s => s + 1); setPantalla('HOST'); }}
+                    onPizarra={(c, t) => { setConfigPartida(c); setTituloPartida(t || ''); setSemilla(s => s + 1); setPantalla('PIZARRA'); }} />
             </div>
         );
     }
@@ -1209,8 +1116,8 @@ export default function EscapeHalloween({ usuario, onExit, codigoSala = null }) 
                     <div className="eh-panel" style={{ padding: 22 }}>
                         <div style={{ fontSize: '2.6rem' }}>📽️</div>
                         <h3 style={{ margin: '6px 0' }}>Soy el profe</h3>
-                        <p style={{ opacity: .8, fontSize: '.95rem' }}>Prepara (o abre uno guardado) y proyéctalo en la pizarra digital.</p>
-                        <button className="eh-btn" style={{ width: '100%' }} onClick={() => setPantalla('CONFIG')}>🕯️ Crear escape room</button>
+                        <p style={{ opacity: .8, fontSize: '.95rem' }}>Prepara (o abre uno guardado) y juega con móviles o solo con la pizarra y fichas en papel.</p>
+                        <button className="eh-btn" style={{ width: '100%' }} onClick={() => { setConfig(c => ({ ...c, modo: undefined })); setPantalla('CONFIG'); }}>🕯️ Crear escape room</button>
                     </div>
                     <div className="eh-panel" style={{ padding: 22 }}>
                         <div style={{ fontSize: '2.6rem' }}>📱</div>

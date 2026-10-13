@@ -29,7 +29,11 @@ export default async function handler(req, res) {
             const r = await fetch(`https://${meteredSub}.metered.live/api/v1/turn/credentials?apiKey=${meteredKey}`);
             diag.upstreamStatus = r.status;
             diag.upstreamOk = r.ok;
-            const servers = await r.json();
+            diag.keyLen = (meteredKey || '').length;         // longitud (no el valor) para detectar recortes/espacios
+            const text = await r.text();
+            if (!r.ok) diag.upstreamBody = text.slice(0, 300); // mensaje de error de Metered
+            let servers = null;
+            try { servers = JSON.parse(text); } catch { /* no JSON */ }
             diag.count = Array.isArray(servers) ? servers.length : -1;
             if (Array.isArray(servers) && servers.length) {
                 return res.status(200).json({ iceServers: [stun, ...servers], turn: true, ...(debug ? { diag } : {}) });

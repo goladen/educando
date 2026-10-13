@@ -16,13 +16,14 @@ import React, { useEffect, useMemo, useRef, useState, lazy, Suspense } from 'rea
 import { db, auth } from './firebase';
 import {
     doc, setDoc, updateDoc, onSnapshot, collection, getDoc, getDocs,
-    query, where, serverTimestamp, deleteField, deleteDoc, addDoc,
+    query, where, serverTimestamp, deleteField, deleteDoc,
 } from 'firebase/firestore';
 import { onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { Radio, Rocket, Bell, Link as LinkIcon, LogIn, Trophy, Gamepad2 } from 'lucide-react';
 import usePresenceRoom, { ESTADO, getDeviceId } from './hooks/usePresenceRoom';
 import { EditorEscrituraAlumno, FormEscritura, PanelEscrituraProfesor } from './EditorEscritura';
 import { FormAppAula, AppAulaRunner, APPS_AULA } from './AppsAula';
+import GestionEquipos from './GestionEquipos';
 
 // Juegos puntuables cargados bajo demanda (comparten el contrato modoOlimpico).
 const PasapalabraGame  = lazy(() => import('./PasapalabraGame'));
@@ -100,17 +101,6 @@ const absoluteUrl = (url) => {
     return `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
 };
 
-// Servidores ICE (STUN + TURN) para el vídeo en vivo. Se piden a /api/turn (las credenciales
-// TURN viven en el servidor). Si falla (p. ej. en dev con Vite, donde no hay /api), usa solo STUN.
-const ICE_FALLBACK = [{ urls: 'stun:stun.l.google.com:19302' }];
-async function obtenerIceServers() {
-    try {
-        const r = await fetch('/api/turn');
-        if (r.ok) { const d = await r.json(); if (Array.isArray(d.iceServers) && d.iceServers.length) return d.iceServers; }
-    } catch { /* sin endpoint: fallback */ }
-    return ICE_FALLBACK;
-}
-
 // ═════════════════════════════════════════════════════════════════════════════
 // RUNNER: renderiza el juego puntuable correcto en modoOlimpico.
 // ═════════════════════════════════════════════════════════════════════════════
@@ -151,8 +141,6 @@ export function TeacherControlPanel() {
     const [loginError, setLoginError] = useState('');
     const [codigo] = useState(() => generarCodigo());
     const [alumnos, setAlumnos] = useState([]);
-    const [agentes, setAgentes] = useState([]); // equipos con el Agente Pikt instalado (subcolección agents)
-    const [verPantallas, setVerPantallas] = useState(false); // activa el envío de miniaturas desde los equipos
     const [salaAbierta, setSalaAbierta] = useState(false);
     const [room, setRoom] = useState(null);
     const [urlManual, setUrlManual] = useState('');
@@ -172,7 +160,6 @@ export function TeacherControlPanel() {
     // Cuándo recibió ESTE panel el último latido de cada alumno (reloj del profe). No se compara la
     // hora del dispositivo del alumno con la del profe: un reloj desfasado lo daba por desconectado.
     const vistoRef = useRef({}); // id → { marca, at }
-    const vistoAgentesRef = useRef({}); // igual que vistoRef pero para los equipos (Agente Pikt)
     const primeraCargaAlumnos = useRef(true);
 
     const roomRef = useMemo(() => doc(db, 'control_rooms', codigo), [codigo]);
@@ -279,41 +266,6 @@ export function TeacherControlPanel() {
             .catch(() => setCodigoProfesor(''));
     }, [user]);
 
-    // ── Equipos (Agente Pikt): vínculo PERMANENTE ──
-    // Los equipos NO se vinculan al código efímero de la sala, sino a tu código de profesor
-    // (fijo). Así el agente se instala y vincula una sola vez por equipo y aparece en cualquier
-    // sala tuya. Viven en aulas_fijas/{codigoProfesor}/agents; el flag thumbs va en el doc padre.
-    const aulaFijaRef = useMemo(
-        () => (codigoProfesor ? doc(db, 'aulas_fijas', codigoProfesor) : null),
-        [codigoProfesor]
-    );
-    useEffect(() => {
-        if (!codigoProfesor) { setAgentes([]); return; }
-        const unsubAgentes = onSnapshot(collection(db, 'aulas_fijas', codigoProfesor, 'agents'), (snap) => {
-            const ahora = Date.now();
-            const lista = snap.docs.map((d) => {
-                const a = { id: d.id, ...d.data() };
-                const marca = a.lastSeenMs ?? null;
-                const prev = vistoAgentesRef.current[a.id];
-                if (!prev) {
-                    const srv = a.lastSeen?.toMillis?.();
-                    vistoAgentesRef.current[a.id] = { marca, at: srv ? Math.min(ahora, srv) : 0 };
-                } else if (prev.marca !== marca) {
-                    vistoAgentesRef.current[a.id] = { marca, at: ahora };
-                }
-                a._vistoAt = vistoAgentesRef.current[a.id].at;
-                return a;
-            });
-            setAgentes(lista.sort((x, y) => (x.name || '').localeCompare(y.name || '')));
-        });
-        return () => {
-            unsubAgentes();
-            // Al salir del panel, apagar las miniaturas (si estaban activas).
-            if (aulaFijaRef) setDoc(aulaFijaRef, { thumbs: false }, { merge: true }).catch(() => {});
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [codigoProfesor]);
-
     useEffect(() => {
         const id = setInterval(() => forceTick((t) => t + 1), 3000);
         return () => clearInterval(id);
@@ -338,36 +290,6 @@ export function TeacherControlPanel() {
         try { await deleteDoc(doc(db, 'control_rooms', codigo, 'students', a.id)); } catch (e) { console.error(e); }
     };
 
-    // ── Equipos (Agente Pikt) ──
-    // Un equipo cuenta como en línea si su último latido es reciente (reloj del profe sobre _vistoAt).
-    const agenteOnline = (a) => Date.now() - (a._vistoAt || 0) < DESCONEXION_MS;
-
-    // Escribe el campo `cmd` en el doc del agente; el agente lo ejecuta y responde con `lastCmd`.
-    const enviarCmdAgente = async (agentId, type, payload = {}) => {
-        if (!codigoProfesor) return;
-        try {
-            await setDoc(doc(db, 'aulas_fijas', codigoProfesor, 'agents', agentId),
-                { cmd: { id: `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, type, payload, at: Date.now() } },
-                { merge: true });
-        } catch (e) { console.error(e); }
-    };
-    // Manda la misma orden a todos los equipos en línea (ids distintos para que cada uno la detecte).
-    const enviarCmdTodos = async (type, payload = {}) => {
-        await Promise.all(agentes.filter(agenteOnline).map((a) => enviarCmdAgente(a.id, type, payload)));
-    };
-    const quitarAgente = async (a) => {
-        if (!codigoProfesor) return;
-        if (!window.confirm(`¿Quitar el equipo "${a.name || 'equipo'}" de la lista? Volverá a aparecer en su próximo latido si sigue encendido.`)) return;
-        try { await deleteDoc(doc(db, 'aulas_fijas', codigoProfesor, 'agents', a.id)); } catch (e) { console.error(e); }
-    };
-
-    // Activa/desactiva el envío de miniaturas desde TODOS los equipos (flag en el doc del aula fija).
-    // Los equipos solo capturan mientras esté activo → nada de capturas cuando nadie mira.
-    const toggleVerPantallas = async (on) => {
-        if (!aulaFijaRef) return;
-        setVerPantallas(on);
-        try { await setDoc(aulaFijaRef, { thumbs: on }, { merge: true }); } catch (e) { console.error(e); }
-    };
 
     // Al elegir un recurso, preselecciona el primer modo y hoja disponibles.
     const elegirRecurso = (r) => {
@@ -759,17 +681,9 @@ export function TeacherControlPanel() {
                 </div>
             </div>
 
-            {/* Equipos con el Agente Pikt instalado */}
-            <PanelEquipos
-                agentes={agentes}
-                online={agenteOnline}
-                onCmd={enviarCmdAgente}
-                onCmdTodos={enviarCmdTodos}
-                onQuitar={quitarAgente}
-                verPantallas={verPantallas}
-                onToggleVerPantallas={toggleVerPantallas}
-                codigoProfesor={codigoProfesor}
-            />
+            {/* Equipos con el Agente Pikt instalado (vínculo personal por código de profesor) */}
+            <GestionEquipos scope="personal" id={codigoProfesor} canManage />
+
 
             {/* Toasts */}
             <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', gap: 8, zIndex: 10001, alignItems: 'center' }}>
@@ -795,208 +709,6 @@ function ResumenCard({ color, label, valor, icon }) {
         <div style={{ background: 'white', border: `1px solid #e2e8f0`, borderLeft: `4px solid ${color}`, borderRadius: 12, padding: '10px 16px', minWidth: 130, flex: '1 1 auto' }}>
             <div style={{ fontSize: '0.75rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: 4 }}>{icon}{label}</div>
             <div style={{ fontSize: '1.4rem', fontWeight: 800, color }}>{valor}</div>
-        </div>
-    );
-}
-
-// Tarjeta de control de los equipos que tienen instalado el Agente Pikt (app de escritorio).
-// Lista cada equipo y envía órdenes (bloquear / desbloquear / mensaje / abrir web) escribiendo
-// el campo `cmd` en aulas_fijas/{codigoProfesor}/agents/{id}. Vínculo PERMANENTE: el agente se
-// vincula una vez a tu código de profesor (fijo) y aparece en cualquier sala tuya, estén en la
-// red del centro o en casa.
-function PanelEquipos({ agentes, online, onCmd, onCmdTodos, onQuitar, verPantallas, onToggleVerPantallas, codigoProfesor }) {
-    const conectados = agentes.filter(online);
-    const [vivo, setVivo] = useState(null); // equipo cuyo vídeo en vivo se está viendo
-
-    const pedirMensaje = () => {
-        const txt = window.prompt('Mensaje para mostrar en las pantallas:');
-        return (txt && txt.trim()) ? txt.trim() : null;
-    };
-    const pedirUrl = () => {
-        const url = window.prompt('Web a abrir en los equipos (https://…):', 'https://');
-        return (url && /^https?:\/\//i.test(url.trim())) ? url.trim() : null;
-    };
-
-    const badge = (txt, bg, c) => (
-        <span style={{ background: bg, color: c, borderRadius: 20, padding: '3px 10px', fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap' }}>{txt}</span>
-    );
-    const miniBtn = (bg) => ({ background: bg, color: 'white', border: 'none', borderRadius: 8, padding: '5px 10px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 700 });
-
-    return (
-        <div style={{ background: '#0f172a', borderRadius: 14, padding: 16, marginTop: 18 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
-                <h3 style={{ margin: 0, color: 'white', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    🖥️ Equipos del aula <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#94a3b8' }}>· {conectados.length} en línea de {agentes.length}</span>
-                    {codigoProfesor && (
-                        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a', background: '#67e8f9', borderRadius: 20, padding: '2px 10px' }} title="Código fijo para vincular los equipos (no cambia entre sesiones)">
-                            código de equipos: {codigoProfesor}
-                        </span>
-                    )}
-                </h3>
-                {codigoProfesor && agentes.length > 0 && (
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        <button onClick={() => onToggleVerPantallas(!verPantallas)} style={miniBtn(verPantallas ? '#f59e0b' : '#334155')}>
-                            {verPantallas ? '🙈 Ocultar pantallas' : '👁️ Ver pantallas'}
-                        </button>
-                        <button onClick={() => onCmdTodos('lock', { message: 'Atiende a la pantalla del profesor' })} style={miniBtn('#dc2626')}>🔒 Bloquear todos</button>
-                        <button onClick={() => onCmdTodos('unlock')} style={miniBtn('#16a34a')}>🔓 Desbloquear todos</button>
-                        <button onClick={() => { const m = pedirMensaje(); if (m) onCmdTodos('message', { text: m }); }} style={miniBtn('#7c3aed')}>💬 Mensaje a todos</button>
-                    </div>
-                )}
-            </div>
-
-            {!codigoProfesor ? (
-                <div style={{ color: '#fbbf24', fontSize: '0.88rem', lineHeight: 1.5 }}>
-                    ⚠️ Necesitas un <b>código de profesor</b> para vincular equipos de forma permanente.
-                    Ponlo en <b style={{ color: '#e2e8f0' }}>Informes</b> (tu código fijo) y vuelve aquí; los equipos
-                    se vinculan a ese código una sola vez.
-                </div>
-            ) : agentes.length === 0 ? (
-                <div style={{ color: '#94a3b8', fontSize: '0.88rem', lineHeight: 1.5 }}>
-                    No hay equipos vinculados todavía. Instala el <b>Agente Pikt</b> en los ordenadores del aula
-                    e introduce tu <b style={{ color: '#e2e8f0' }}>código de equipos: {codigoProfesor}</b> la primera vez.
-                    Quedan vinculados para siempre y aparecerán aquí al encenderse, en cualquier sala tuya.
-                </div>
-            ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(300px,100%),1fr))', gap: 10 }}>
-                    {agentes.map((a) => {
-                        const on = online(a);
-                        return (
-                            <div key={a.id} style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${a.locked ? '#f87171' : 'rgba(255,255,255,0.12)'}`, borderRadius: 10, padding: 12 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
-                                    <span style={{ color: 'white', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>💻 {a.name || 'Equipo'}</span>
-                                    <div style={{ display: 'flex', gap: 6 }}>
-                                        {on ? badge('🟢 En línea', '#064e3b', '#6ee7b7') : badge('⚫ Desconectado', '#334155', '#cbd5e1')}
-                                        {a.locked && badge('🔒', '#7f1d1d', '#fecaca')}
-                                    </div>
-                                </div>
-                                {verPantallas && (
-                                    <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 10', background: '#000', borderRadius: 8, overflow: 'hidden', marginBottom: 8, border: '1px solid rgba(255,255,255,0.1)' }}>
-                                        {a.thumb?.data ? (
-                                            <img src={a.thumb.data} alt={`Pantalla de ${a.name || 'equipo'}`}
-                                                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: on ? 1 : 0.4 }} />
-                                        ) : (
-                                            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.8rem' }}>
-                                                {on ? '⏳ esperando captura…' : 'sin señal'}
-                                            </div>
-                                        )}
-                                        {!on && a.thumb?.data && (
-                                            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)', color: '#e2e8f0', fontSize: '0.8rem', fontWeight: 700 }}>
-                                                ⚫ desconectado
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                                    {a.locked
-                                        ? <button onClick={() => onCmd(a.id, 'unlock')} disabled={!on} style={{ ...miniBtn('#16a34a'), opacity: on ? 1 : 0.5 }}>🔓 Desbloquear</button>
-                                        : <button onClick={() => onCmd(a.id, 'lock', { message: 'Atiende a la pantalla del profesor' })} disabled={!on} style={{ ...miniBtn('#dc2626'), opacity: on ? 1 : 0.5 }}>🔒 Bloquear</button>}
-                                    <button onClick={() => { const m = pedirMensaje(); if (m) onCmd(a.id, 'message', { text: m }); }} disabled={!on} style={{ ...miniBtn('#7c3aed'), opacity: on ? 1 : 0.5 }}>💬</button>
-                                    <button onClick={() => { const u = pedirUrl(); if (u) onCmd(a.id, 'openUrl', { url: u }); }} disabled={!on} style={{ ...miniBtn('#0ea5e9'), opacity: on ? 1 : 0.5 }}>🌐 Abrir web</button>
-                                    <button onClick={() => setVivo(a)} disabled={!on} style={{ ...miniBtn('#e11d48'), opacity: on ? 1 : 0.5 }}>📹 En vivo</button>
-                                    {!on && <button onClick={() => onQuitar(a)} title="Quitar de la lista" style={miniBtn('#475569')}>✕</button>}
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
-
-            {vivo && (
-                <VistaEnVivo
-                    agente={vivo}
-                    codigoProfesor={codigoProfesor}
-                    onCmd={onCmd}
-                    onClose={() => setVivo(null)}
-                />
-            )}
-        </div>
-    );
-}
-
-// Modal de vídeo EN VIVO (WebRTC). El profe es el "answerer": pide al agente que empiece
-// (cmd liveStart), recibe la oferta por Firestore, responde, intercambia ICE y muestra el
-// stream. Los fotogramas van peer-to-peer; por Firebase solo pasa la señalización.
-function VistaEnVivo({ agente, codigoProfesor, onCmd, onClose }) {
-    const videoRef = useRef(null);
-    const [estado, setEstado] = useState('Conectando con el equipo…');
-
-    useEffect(() => {
-        if (!codigoProfesor || !agente) return;
-        let pc = null, unsubCall = () => {}, unsubCands = () => {}, cancelado = false;
-        const sessionId = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-        const callDoc = doc(db, 'aulas_fijas', codigoProfesor, 'agents', agente.id, 'calls', sessionId);
-        const agentCands = collection(callDoc, 'agentCandidates');
-        const viewerCands = collection(callDoc, 'viewerCandidates');
-
-        (async () => {
-            const iceServers = await obtenerIceServers();   // STUN + TURN desde /api/turn
-            if (cancelado) return;
-            pc = new RTCPeerConnection({ iceServers });
-            pc.ontrack = (e) => {
-                if (videoRef.current) { videoRef.current.srcObject = e.streams[0]; setEstado(''); }
-            };
-            pc.onicecandidate = (e) => { if (e.candidate) addDoc(viewerCands, e.candidate.toJSON()).catch(() => {}); };
-            pc.onconnectionstatechange = () => {
-                if (pc.connectionState === 'failed') setEstado('No se pudo conectar (NAT/cortafuegos). Revisa el TURN en /api/turn.');
-                else if (pc.connectionState === 'disconnected') setEstado('Conexión perdida.');
-            };
-
-            // Pedir al agente que arranque la captura.
-            onCmd(agente.id, 'liveStart', { sessionId });
-
-            unsubCall = onSnapshot(callDoc, async (snap) => {
-                const d = snap.data();
-                if (d && d.offer && pc && !pc.currentRemoteDescription) {
-                    try {
-                        await pc.setRemoteDescription(new RTCSessionDescription(d.offer));
-                        const answer = await pc.createAnswer();
-                        await pc.setLocalDescription(answer);
-                        await setDoc(callDoc, { answer: { type: answer.type, sdp: answer.sdp } }, { merge: true });
-                    } catch (err) { console.error('answer:', err); }
-                }
-            });
-            unsubCands = onSnapshot(agentCands, (s) => {
-                s.docChanges().forEach((ch) => {
-                    if (ch.type === 'added' && pc) pc.addIceCandidate(new RTCIceCandidate(ch.doc.data())).catch(() => {});
-                });
-            });
-        })();
-
-        return () => {
-            cancelado = true;
-            onCmd(agente.id, 'liveStop', {});
-            unsubCall(); unsubCands();
-            try { if (pc) pc.close(); } catch { /* nada */ }
-            // Limpiar la señalización (best-effort).
-            (async () => {
-                try {
-                    for (const c of [agentCands, viewerCands]) {
-                        const qs = await getDocs(c);
-                        await Promise.all(qs.docs.map((d) => deleteDoc(d.ref)));
-                    }
-                    await deleteDoc(callDoc);
-                } catch { /* nada */ }
-            })();
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [codigoProfesor, agente?.id]);
-
-    return (
-        <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 10010, background: 'rgba(2,6,23,0.92)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, padding: 20 }}>
-            <div style={{ color: 'white', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 10 }}>
-                📹 {agente?.name || 'Equipo'} — en vivo
-                <button onClick={onClose} style={{ background: '#e11d48', color: 'white', border: 'none', borderRadius: 8, padding: '5px 12px', cursor: 'pointer', fontWeight: 700 }}>Cerrar</button>
-            </div>
-            <div onClick={(e) => e.stopPropagation()} style={{ position: 'relative', width: 'min(92vw, 1280px)', aspectRatio: '16 / 9', background: '#000', borderRadius: 12, overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}>
-                <video ref={videoRef} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000' }} />
-                {estado && (
-                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#e2e8f0', fontSize: '0.95rem', textAlign: 'center', padding: 20 }}>
-                        {estado}
-                    </div>
-                )}
-            </div>
-            <div style={{ color: '#64748b', fontSize: '0.8rem' }}>El vídeo va directo equipo↔tú (WebRTC); por Firebase solo pasa la conexión inicial.</div>
         </div>
     );
 }

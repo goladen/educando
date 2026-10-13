@@ -3,6 +3,7 @@ import { db, auth } from '../firebase';
 import { descargarPNG, descargarPDF, compartirClassroom, imprimirElemento } from '../utils/exportar';
 import { FONDOS, fondoUrl, fondoBg } from '../utils/fondos';
 import { callGeminiProxy, extractText } from '../geminiProxy';
+import GestionEquipos from '../GestionEquipos';
 import {
     collection, query, where, getDocs, getDoc, setDoc,
     doc, addDoc, updateDoc, deleteDoc, arrayUnion, arrayRemove,
@@ -3000,7 +3001,7 @@ function DetalleComunidad({ usuario, comunidad, onBack, onSalir, onCambio, tabIn
 
             {/* Tabs */}
             <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '2px solid #e0e4f0' }}>
-                {[['cursos', '📚 Cursos'], ['calendario', '📅 Calendario'], ['profesores', '👤 Profesores'], ['competiciones', '🏆 Competiciones'], ['mensajes', '💬 Mensajes'], ['miembros', '👤 Miembros']].map(([id, lbl]) => (
+                {[['cursos', '📚 Cursos'], ['calendario', '📅 Calendario'], ['profesores', '👤 Profesores'], ['competiciones', '🏆 Competiciones'], ['equipos', '🖥️ Equipos'], ['mensajes', '💬 Mensajes'], ['miembros', '👤 Miembros']].map(([id, lbl]) => (
                     <button key={id} onClick={() => setTab(id)} style={{ ...st.tabBtn, color: tab === id ? AZUL : '#7f8c8d', borderBottom: tab === id ? `3px solid ${AZUL}` : '3px solid transparent', fontWeight: tab === id ? 700 : 500 }}>{lbl}</button>
                 ))}
             </div>
@@ -3048,6 +3049,7 @@ function DetalleComunidad({ usuario, comunidad, onBack, onSalir, onCambio, tabIn
             {tab === 'profesores' && <ProfesoresPanel usuario={usuario} comunidad={comunidad} soloLectura={soloLectura} />}
             {tab === 'calendario' && <PanelCalendarios usuario={usuario} comunidad={comunidad} soloLectura={soloLectura} />}
             {tab === 'competiciones' && <CompeticionesComunidadPanel usuario={usuario} comunidad={comunidad} soloLectura={soloLectura} />}
+            {tab === 'equipos' && <GestionEquipos scope="comunidad" id={comunidad.id} canManage={!soloLectura} />}
             {tab === 'mensajes' && <PanelMensajes usuario={usuario} comunidad={comunidad} />}
             {tab === 'miembros' && <PanelMiembros usuario={usuario} comunidad={comunidad} onCambio={onCambio} />}
 

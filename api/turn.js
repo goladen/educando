@@ -15,19 +15,29 @@ export default async function handler(req, res) {
     if (req.method === 'OPTIONS') return res.status(200).end();
 
     const stun = { urls: 'stun:stun.l.google.com:19302' };
+    const debug = 'debug' in (req.query || {});
+    const diag = { hasKey: false, hasSub: false, sub: null, upstreamStatus: null, upstreamOk: null, count: null, error: null };
 
     // A) Metered — credenciales efímeras.
     const meteredKey = process.env.METERED_API_KEY;
     const meteredSub = process.env.METERED_SUBDOMAIN;
+    diag.hasKey = !!meteredKey;
+    diag.hasSub = !!meteredSub;
+    diag.sub = meteredSub || null;
     if (meteredKey && meteredSub) {
         try {
             const r = await fetch(`https://${meteredSub}.metered.live/api/v1/turn/credentials?apiKey=${meteredKey}`);
+            diag.upstreamStatus = r.status;
+            diag.upstreamOk = r.ok;
             const servers = await r.json();
+            diag.count = Array.isArray(servers) ? servers.length : -1;
             if (Array.isArray(servers) && servers.length) {
-                return res.status(200).json({ iceServers: [stun, ...servers], turn: true });
+                return res.status(200).json({ iceServers: [stun, ...servers], turn: true, ...(debug ? { diag } : {}) });
             }
-        } catch (e) { /* cae al siguiente */ }
+        } catch (e) { diag.error = String(e && e.message || e); }
     }
+
+    if (debug) return res.status(200).json({ iceServers: [stun], turn: false, diag });
 
     // B) TURN estático por variables de entorno.
     const urls = process.env.TURN_URLS;

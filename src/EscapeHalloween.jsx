@@ -12,6 +12,8 @@ import Mansion3D, { AvatarPreview3D } from './escapeHalloween/Mansion3D';
 import EditorDisfraz, { leerAvatarGuardado, avatarAleatorio } from './escapeHalloween/EditorDisfraz';
 import EditorEscape from './escapeHalloween/EditorEscape';
 import PizarraEscape from './escapeHalloween/PizarraEscape';
+import EscapesListos from './escapeHalloween/EscapesListos';
+import { limpiarConfig } from './escapeHalloween/EditorEscape';
 import { disfrazDe } from './escapeHalloween/avatares3d';
 import { crearAudio, Ambiente, Confeti, Zombi, Corazones, BarraVidaZombi, MapaMansion, TarjetaPregunta, mmss, useNarrador, idNarracionFase, Subtitulo } from './escapeHalloween/comunes';
 
@@ -1042,12 +1044,13 @@ export default function EscapeHalloween({ usuario, onExit, codigoSala = null }) 
     const [configPartida, setConfigPartida] = useState(null);
     const [tituloPartida, setTituloPartida] = useState('');
     const [metaEditor, setMetaEditor] = useState({ titulo: '', publico: false, guardado: null });
+    const [vueltaPizarra, setVueltaPizarra] = useState('CONFIG');   // a dónde se vuelve al salir de la pizarra
     const [avatar, setAvatar] = useState(() => leerAvatarGuardado() || avatarAleatorio());
     const [semilla, setSemilla] = useState(0);
 
     const salirAlMenu = () => { setPantalla('MENU'); setSemilla(s => s + 1); };
 
-    if (pantalla === 'PIZARRA' && configPartida?.partida) return <PizarraEscape key={'p' + semilla} config={configPartida} titulo={tituloPartida} onSalir={() => setPantalla('CONFIG')} />;
+    if (pantalla === 'PIZARRA' && configPartida?.partida) return <PizarraEscape key={'p' + semilla} config={configPartida} titulo={tituloPartida} onSalir={() => setPantalla(vueltaPizarra)} />;
     if (pantalla === 'HOST' && configPartida) return <HostEscape key={'h' + semilla} config={configPartida} usuario={usuario} onSalir={salirAlMenu} />;
     if (pantalla === 'CLIENTE') return <ClienteEscape key={'c' + codigoEntrada} codigo={codigoEntrada} nombre={nombre.trim()} avatarInicial={avatar} onSalir={() => (codigoSala ? onExit?.() : salirAlMenu())} />;
 
@@ -1096,7 +1099,22 @@ export default function EscapeHalloween({ usuario, onExit, codigoSala = null }) 
             <div className="eh-root"><Ambiente />
                 <EditorEscape config={config} setConfig={setConfig} usuario={usuario} meta={metaEditor} setMeta={setMetaEditor} onAtras={() => setPantalla('MENU')}
                     onCrear={(c) => { setConfigPartida(c); setSemilla(s => s + 1); setPantalla('HOST'); }}
-                    onPizarra={(c, t) => { setConfigPartida(c); setTituloPartida(t || ''); setSemilla(s => s + 1); setPantalla('PIZARRA'); }} />
+                    onPizarra={(c, t) => { setConfigPartida(c); setTituloPartida(t || ''); setVueltaPizarra('CONFIG'); setSemilla(s => s + 1); setPantalla('PIZARRA'); }} />
+            </div>
+        );
+    }
+
+    if (pantalla === 'LISTOS') {
+        return (
+            <div className="eh-root"><Ambiente />
+                <EscapesListos onAtras={() => setPantalla('MENU')}
+                    onJugar={(c, t) => { setConfigPartida(limpiarConfig(c)); setTituloPartida(t); setVueltaPizarra('LISTOS'); setSemilla(s => s + 1); setPantalla('PIZARRA'); }}
+                    onPersonalizar={(c, t) => {
+                        // copia editable: mismas pruebas y las mismas preguntas fijas (si no se cambian, las fichas siguen valiendo)
+                        setConfig(limpiarConfig(JSON.parse(JSON.stringify(c))));
+                        setMetaEditor({ titulo: `${t} (mi versión)`, publico: false, guardado: null });
+                        setPantalla('CONFIG');
+                    }} />
             </div>
         );
     }
@@ -1112,12 +1130,21 @@ export default function EscapeHalloween({ usuario, onExit, codigoSala = null }) 
                     Escape room de Halloween para <b>toda la clase</b>. Montad las pruebas que queráis (de Matemáticas, Geografía, Biología, Historia, Lengua, Inglés… o con
                     vuestro propio texto y un código escondido en el aula), entrad disfrazados en la mansión 3D y derrotad juntos al <b>zombi</b> en la batalla final.
                 </p>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 16, marginTop: 24 }}>
+                <div className="eh-panel" style={{ padding: 22, marginTop: 24, borderColor: '#ff8c1a', boxShadow: '0 0 30px rgba(255,140,26,.35)', textAlign: 'left', display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: '3.4rem' }}>⚡</div>
+                    <div style={{ flex: 1, minWidth: 240 }}>
+                        <div style={{ fontSize: '.78rem', fontWeight: 900, letterSpacing: 2, color: '#ffb347' }}>LO MÁS FÁCIL · SIN CONFIGURAR</div>
+                        <h3 style={{ margin: '2px 0 4px', fontSize: '1.4rem' }}>Listo para jugar: fichas + pizarra</h3>
+                        <p style={{ opacity: .85, fontSize: '.95rem', margin: 0 }}>Escape room ya montado (Primaria o ESO) con sus fichas en PDF. Imprímelas, proyecta y a jugar. Sin móviles.</p>
+                    </div>
+                    <button className="eh-btn" style={{ fontSize: '1.1rem', padding: '14px 24px' }} onClick={() => setPantalla('LISTOS')}>🎃 Empezar</button>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 16, marginTop: 16 }}>
                     <div className="eh-panel" style={{ padding: 22 }}>
-                        <div style={{ fontSize: '2.6rem' }}>📽️</div>
-                        <h3 style={{ margin: '6px 0' }}>Soy el profe</h3>
-                        <p style={{ opacity: .8, fontSize: '.95rem' }}>Prepara (o abre uno guardado) y juega con móviles o solo con la pizarra y fichas en papel.</p>
-                        <button className="eh-btn" style={{ width: '100%' }} onClick={() => { setConfig(c => ({ ...c, modo: undefined })); setPantalla('CONFIG'); }}>🕯️ Crear escape room</button>
+                        <div style={{ fontSize: '2.6rem' }}>🛠️</div>
+                        <h3 style={{ margin: '6px 0' }}>Crear el mío</h3>
+                        <p style={{ opacity: .8, fontSize: '.95rem' }}>Elige las pruebas, materias, recursos o retos propios. Online con móviles o con fichas y pizarra.</p>
+                        <button className="eh-btn" style={{ width: '100%' }} onClick={() => { setConfig(c => ({ ...c, modo: undefined })); setMetaEditor({ titulo: '', publico: false, guardado: null }); setPantalla('CONFIG'); }}>🕯️ Crear escape room</button>
                     </div>
                     <div className="eh-panel" style={{ padding: 22 }}>
                         <div style={{ fontSize: '2.6rem' }}>📱</div>

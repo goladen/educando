@@ -85,18 +85,19 @@ function delRecurso(p, n) {
 
 export function generarPartidaFija(config, { nPreguntas = 6, nBatalla = 8 } = {}) {
     const etapa = config.etapa;
+    const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s*\(.*\)$/, '').trim();
     const pruebas = (config.pruebas || []).map(p => {
         const materia = materiaDePrueba(p);
-        return {
-            id: p.id,
-            preguntas: p.tipo === 'RECURSO' ? delRecurso(p, nPreguntas)
-                : materia ? preguntasSinRepetir(materia, etapa, temaDePrueba(p), nPreguntas) : [],
-            candado: candadoFijo(p, etapa),
-        };
+        const preguntas = p.tipo === 'RECURSO' ? delRecurso(p, nPreguntas)
+            : materia ? preguntasSinRepetir(materia, etapa, temaDePrueba(p), nPreguntas) : [];
+        const respuestas = new Set(preguntas.map(q => norm(q.opciones[q.correcta])));
+        let candado = candadoFijo(p, etapa);
+        for (let i = 0; i < 12 && p.tipo === 'MATERIA' && respuestas.has(norm(candado.solucionVisible)); i++) candado = candadoFijo(p, etapa);
+        return { id: p.id, preguntas, candado };
     });
     const conPreguntas = (config.pruebas || []).filter(p => tienePreguntas(p));
     const batalla = [];
-    const vistas = new Set();
+    const vistas = new Set(pruebas.flatMap(pp => pp.preguntas.map(q => `${q.texto}|${q.detalle || ''}|${q.img || ''}`)));
     for (let i = 0; batalla.length < nBatalla && i < nBatalla * 15; i++) {
         const p = conPreguntas.length ? pick(conPreguntas) : { tipo: 'MATERIA', materia: pick(ORDEN_SALAS), tema: 'MIX' };
         const q = preguntaDePrueba(p, etapa);

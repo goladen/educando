@@ -23,7 +23,7 @@ import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts';
 import { usuarioDelToken, credencialesCloudinary } from './_auth.js';
 
 const MAX_CARACTERES = 6000;          // ≈ 6-7 minutos de audio
-const MAX_TROZO = 2500;               // caracteres por petición a Edge
+const MAX_TROZO = 1200;               // caracteres por petición a Edge (trozos cortos → en paralelo)
 const RATE_VALIDO = /^[+-]?\d{1,2}%$/;
 const VOZ_VALIDA = /^[a-z]{2,3}-[A-Z]{2}-[A-Za-z]+Neural$/;
 
@@ -73,13 +73,98 @@ function planificar(texto, voz, voz2, dialogo) {
     return turnos.flatMap(t => trocear(t.texto).map(x => ({ voz: t.voz, texto: x })));
 }
 
+const INTENTOS = 8;                   // Edge rechaza (403) muchas conexiones nuevas
+const LIMITE_TROZO_MS = 25000;        // un trozo que no acaba en este tiempo se reintenta
+const LIMITE_TOTAL_MS = 50000;        // margen antes del maxDuration (60 s) de Vercel
+const EN_PARALELO = 5;
+
+const esperar = (ms) => new Promise(r => setTimeout(r, ms));
+
+function conLimite(promesa, ms, mensaje) {
+    let t;
+    return Promise.race([
+        promesa,
+        new Promise((_, rej) => { t = setTimeout(() => rej(new Error(mensaje)), ms); }),
+    ]).finally(() => clearTimeout(t));
+}
+
 // Ojo: el servicio de Edge corta la conexión si el SSML lleva <break>; cada
 // trozo ya trae un pequeño silencio final, que sirve de pausa entre turnos.
-async function sintetizar(tts, texto, rate) {
+//
+// msedge-tts hace `this._send(request).then()` sin catch: si la (re)conexión
+// falla con 403 el error se pierde y el stream no termina nunca (→ 504 de
+// Vercel). Por eso se intercepta _send para cortar el stream, todo va con
+// tiempo límite y, si algo falla, se descarta esa conexión y se reintenta.
+// Las conexiones se reutilizan: el 403 solo aparece al conectar.
+// Si un trozo se descarta (tiempo agotado) y luego llegan más datos suyos, la
+// librería hace this._streams[id].audio.push() sobre undefined y tumba el
+// proceso: los ids desconocidos van a un destino vacío.
+const HUERFANO = { audio: { push() {}, destroy() {} }, metadata: { push() {}, destroy() {} }, turnEnded: true };
+const streamsSeguros = () => new Proxy({}, { get: (o, k) => (k in o || typeof k !== 'string' ? o[k] : HUERFANO) });
+
+async function conectar(voz) {
+    const tts = new MsEdgeTTS();
+    tts._streams = streamsSeguros();
+    try {
+        await conLimite(tts.setMetadata(voz, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3),
+            LIMITE_TROZO_MS, 'El servicio de voz no responde.');
+    } catch (e) { cerrar(tts); throw e; }
+    const enviar = tts._send.bind(tts);
+    tts._send = (msg) => enviar(msg).catch(e => {
+        Object.values(tts._streams || {}).forEach(s => s.audio.destroy(e));
+    });
+    return tts;
+}
+
+function cerrar(tts) { try { tts?.close(); } catch { /* ya cerrado */ } }
+
+async function pedirAudio(tts, texto, rate) {
     const { audioStream } = tts.toStream(escaparXml(texto.trim()), { rate });
-    const chunks = [];
-    for await (const c of audioStream) chunks.push(c);
-    return Buffer.concat(chunks);
+    const leer = (async () => {
+        const chunks = [];
+        for await (const c of audioStream) chunks.push(c);
+        return Buffer.concat(chunks);
+    })();
+    const audio = await conLimite(leer, LIMITE_TROZO_MS, 'El servicio de voz tardó demasiado.')
+        .catch(e => { audioStream.destroy(); throw e; });
+    if (!audio.length) throw new Error('audio vacío');
+    return audio;
+}
+
+// motores: conexiones { voz: MsEdgeTTS } de un mismo hilo de trabajo
+async function sintetizar(motores, voz, texto, rate, fin) {
+    let ultimo;
+    for (let i = 0; i < INTENTOS && Date.now() < fin; i++) {
+        try {
+            if (!motores[voz] || motores[voz]._ws?.readyState !== 1) {
+                cerrar(motores[voz]);
+                motores[voz] = await conectar(voz);
+            }
+            return await pedirAudio(motores[voz], texto, rate);
+        } catch (e) {
+            ultimo = e;
+            cerrar(motores[voz]);
+            delete motores[voz];
+            await esperar(200 * (i + 1));
+        }
+    }
+    throw ultimo || new Error('Se agotó el tiempo para generar la voz.');
+}
+
+// Ejecuta las tareas con concurrencia limitada conservando el orden; cada
+// hilo recibe sus propias conexiones, que se cierran al terminar
+async function enParalelo(tareas, n) {
+    const res = new Array(tareas.length);
+    let sig = 0;
+    await Promise.all(Array.from({ length: Math.min(n, tareas.length) }, async () => {
+        const motores = {};
+        try {
+            while (sig < tareas.length) { const i = sig++; res[i] = await tareas[i](motores); }
+        } finally {
+            Object.values(motores).forEach(cerrar);
+        }
+    }));
+    return res;
 }
 
 export default async function handler(req, res) {
@@ -112,23 +197,14 @@ export default async function handler(req, res) {
 
     // ── síntesis ────────────────────────────────────────────────────────────
     const plan = planificar(limpio, voz, voz2, !!dialogo);
-    const motores = {};
+    const fin = Date.now() + LIMITE_TOTAL_MS;
     let audio;
     try {
-        const partes = [];
-        for (const p of plan) {
-            if (!motores[p.voz]) {
-                motores[p.voz] = new MsEdgeTTS();
-                await motores[p.voz].setMetadata(p.voz, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
-            }
-            partes.push(await sintetizar(motores[p.voz], p.texto, rateOk));
-        }
+        const partes = await enParalelo(plan.map(p => (motores) => sintetizar(motores, p.voz, p.texto, rateOk, fin)), EN_PARALELO);
         // Los fotogramas mp3 del mismo formato se pueden concatenar sin más
         audio = Buffer.concat(partes);
     } catch (e) {
-        return res.status(502).json({ error: 'No se pudo generar la voz: ' + e.message });
-    } finally {
-        Object.values(motores).forEach(m => { try { m.close(); } catch { /* ya cerrado */ } });
+        return res.status(502).json({ error: 'No se pudo generar la voz (inténtalo de nuevo en un momento): ' + e.message });
     }
     if (audio.length < 2048) return res.status(502).json({ error: 'El servicio de voz devolvió un audio vacío.' });
 

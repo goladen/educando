@@ -350,6 +350,9 @@ function candadoBiologia(etapa, tema = 'MIX') {
 //  HISTORIA
 // ═══════════════════════════════════════════════════════════════════
 const PALABRAS_VACIAS = new Set(['de', 'la', 'el', 'los', 'las', 'del', 'van', 'von', 'da', 'di', 'y', 'i', 'ii', 'iii', 'iv', 'vii', 'viii']);
+// «Física» es una disciplina (destacó en…); «Reina» o «Inventor», un cargo o profesión (fue…)
+const DISCIPLINAS = /filosof|ciencia|f[ií]sica|qu[ií]mica|matem[aá]tica|astronom|medicina|gen[eé]tica|biolog|paleontolog|inform[aá]tica|ingenier/i;
+const queHizo = (p) => (DISCIPLINAS.test(p.campo) ? `destacó en ${p.campo.toLowerCase()}` : `fue ${p.campo.toLowerCase()}`);
 const fechaTxt = (y) => (y < 0 ? `${-y} a. C.` : `${y}`);
 const enEpoca = (e) => (/^siglo/i.test(e) ? `en el siglo ${e.replace(/^siglo\s*/i, '')}` : `en la ${e}`);
 
@@ -365,7 +368,9 @@ function preguntaHistoria(etapa, tema = 'MIX') {
     }
     if (t === 'campo') {
         const mismos = PERSONAJES_HISTORICOS.filter(x => x.categoria === p.categoria).map(x => x.nombre);
-        return opcionMultiple({ texto: `¿Quién fue ${p.campo.toLowerCase()} (${p.pais}, ${fechaTxt(p.nac)}–${fechaTxt(p.fall)})?` }, p.nombre, tomar(mismos, 3, [p.nombre]));
+        // En los científicos el campo es una disciplina («Física»); en el resto, un cargo («Reina»)
+        const quien = queHizo(p);
+        return opcionMultiple({ texto: `¿Quién ${quien} (${p.pais}, ${fechaTxt(p.nac)}–${fechaTxt(p.fall)})?` }, p.nombre, tomar(mismos, 3, [p.nombre]));
     }
     return opcionMultiple({ texto: '¿De quién hablamos?', detalle: pick(p.datos) }, p.nombre, tomar(nombres, 3, [p.nombre]));
 }
@@ -379,8 +384,8 @@ function candadoHistoria(etapa, tema = 'MIX') {
         tipo: 'texto', longitud: null,
         pistas: [
             ...p.datos.map(d => ({ texto: `Recuerdo: «${d}»` })),
-            { texto: `Vivió ${enEpoca(p.epoca)} (${p.pais}).` },
-            { texto: `Fue ${p.campo.toLowerCase()}. Su nombre empieza por «${p.nombre[0]}».` },
+            { texto: `Vivió ${enEpoca(p.epoca)}. Lugar: ${p.pais}.` },
+            { texto: `${queHizo(p).replace(/^./, c => c.toUpperCase())}. Su nombre empieza por «${p.nombre[0]}».` },
         ],
         soluciones: [p.nombre, ...tokens],
         solucionVisible: p.nombre,

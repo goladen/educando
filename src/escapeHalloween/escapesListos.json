@@ -1,0 +1,1203 @@
+[
+ {
+  "id": "PRIMARIA",
+  "titulo": "La mansión del zombi · Primaria",
+  "config": {
+   "modo": "PAPEL",
+   "etapa": "PRIMARIA",
+   "minutos": 30,
+   "ritmo": 5,
+   "zombi": "NORMAL",
+   "nPreguntas": 5,
+   "nBatalla": 8,
+   "pruebas": [
+    {
+     "id": "listo_primaria_1",
+     "tipo": "MATERIA",
+     "materia": "MATES",
+     "tema": "OPERACIONES",
+     "nombre": ""
+    },
+    {
+     "id": "listo_primaria_2",
+     "tipo": "MATERIA",
+     "materia": "GEOGRAFIA",
+     "tema": "BANDERAS",
+     "nombre": ""
+    },
+    {
+     "id": "listo_primaria_3",
+     "tipo": "MATERIA",
+     "materia": "BIOLOGIA",
+     "tema": "ORGANOS",
+     "nombre": ""
+    },
+    {
+     "id": "listo_primaria_4",
+     "tipo": "MATERIA",
+     "materia": "HISTORIA",
+     "tema": "MIX",
+     "nombre": ""
+    },
+    {
+     "id": "listo_primaria_5",
+     "tipo": "MATERIA",
+     "materia": "LENGUA",
+     "tema": "ORTOGRAFIA",
+     "nombre": ""
+    }
+   ],
+   "partida": {
+    "firma": "[\"PRIMARIA\",[[\"listo_primaria_1\",\"MATERIA\",\"MATES\",\"OPERACIONES\",null,null,null,null,null,null,null,\"\",0],[\"listo_primaria_2\",\"MATERIA\",\"GEOGRAFIA\",\"BANDERAS\",null,null,null,null,null,null,null,\"\",0],[\"listo_primaria_3\",\"MATERIA\",\"BIOLOGIA\",\"ORGANOS\",null,null,null,null,null,null,null,\"\",0],[\"listo_primaria_4\",\"MATERIA\",\"HISTORIA\",\"MIX\",null,null,null,null,null,null,null,\"\",0],[\"listo_primaria_5\",\"MATERIA\",\"LENGUA\",\"ORTOGRAFIA\",null,null,null,null,null,null,null,\"\",0]]]",
+    "creada": 1791567036505,
+    "nPreguntas": 5,
+    "nBatalla": 8,
+    "pruebas": [
+     {
+      "id": "listo_primaria_1",
+      "preguntas": [
+       {
+        "texto": "¿Cuánto vale?",
+        "opciones": [
+         "122",
+         "112",
+         "110",
+         "115"
+        ],
+        "correcta": 1,
+        "materia": "MATES",
+        "detalle": "131 − 19",
+        "grande": true
+       },
+       {
+        "texto": "¿Cuánto vale?",
+        "opciones": [
+         "10",
+         "12",
+         "11",
+         "13"
+        ],
+        "correcta": 2,
+        "materia": "MATES",
+        "detalle": "32 − 21",
+        "grande": true
+       },
+       {
+        "texto": "¿Cuánto vale?",
+        "opciones": [
+         "145",
+         "150",
+         "143",
+         "155"
+        ],
+        "correcta": 0,
+        "materia": "MATES",
+        "detalle": "97 + 48",
+        "grande": true
+       },
+       {
+        "texto": "¿Cuánto vale?",
+        "opciones": [
+         "28",
+         "29",
+         "26",
+         "27"
+        ],
+        "correcta": 2,
+        "materia": "MATES",
+        "detalle": "134 − 108",
+        "grande": true
+       },
+       {
+        "texto": "¿Cuánto vale?",
+        "opciones": [
+         "84",
+         "87",
+         "97",
+         "77"
+        ],
+        "correcta": 1,
+        "materia": "MATES",
+        "detalle": "20 + 67",
+        "grande": true
+       }
+      ],
+      "candado": {
+       "titulo": "Candado de 4 cifras",
+       "instruccion": "Cada cifra del código es el resultado de una operación. Resolved las cuatro operaciones de las pistas y escribid las cifras en orden.",
+       "tipo": "numero",
+       "longitud": 4,
+       "pistas": [
+        {
+         "texto": "La primera cifra es: 0 + 4"
+        },
+        {
+         "texto": "La segunda cifra es: 5 − 4"
+        },
+        {
+         "texto": "La tercera cifra es: 1 + 0"
+        },
+        {
+         "texto": "La cuarta cifra es: 3 + 1"
+        }
+       ],
+       "soluciones": [
+        "4114"
+       ],
+       "solucionVisible": "4114"
+      }
+     },
+     {
+      "id": "listo_primaria_2",
+      "preguntas": [
+       {
+        "texto": "¿De qué país es esta bandera?",
+        "opciones": [
+         "Bielorrusia",
+         "Lituania",
+         "Países Bajos",
+         "Paraguay"
+        ],
+        "correcta": 2,
+        "materia": "GEOGRAFIA",
+        "img": "https://flagcdn.com/w320/nl.png"
+       },
+       {
+        "texto": "¿De qué país es esta bandera?",
+        "opciones": [
+         "México",
+         "Bélgica",
+         "España",
+         "Ucrania"
+        ],
+        "correcta": 1,
+        "materia": "GEOGRAFIA",
+        "img": "https://flagcdn.com/w320/be.png"
+       },
+       {
+        "texto": "¿De qué país es esta bandera?",
+        "opciones": [
+         "Francia",
+         "Honduras",
+         "Dinamarca",
+         "Perú"
+        ],
+        "correcta": 2,
+        "materia": "GEOGRAFIA",
+        "img": "https://flagcdn.com/w320/dk.png"
+       },
+       {
+        "texto": "¿De qué país es esta bandera?",
+        "opciones": [
+         "Bolivia",
+         "Irlanda",
+         "Serbia",
+         "Suecia"
+        ],
+        "correcta": 3,
+        "materia": "GEOGRAFIA",
+        "img": "https://flagcdn.com/w320/se.png"
+       },
+       {
+        "texto": "¿De qué país es esta bandera?",
+        "opciones": [
+         "Austria",
+         "España",
+         "Letonia",
+         "Brasil"
+        ],
+        "correcta": 3,
+        "materia": "GEOGRAFIA",
+        "img": "https://flagcdn.com/w320/br.png"
+       }
+      ],
+      "candado": {
+       "titulo": "La capital secreta",
+       "instruccion": "El fantasma bibliotecario esconde una ciudad. Con las pistas, descubrid de qué país es la bandera… ¡y escribid su CAPITAL!",
+       "tipo": "texto",
+       "longitud": 9,
+       "pistas": [
+        {
+         "texto": "Esta es la bandera del país:",
+         "img": "https://flagcdn.com/w320/si.png"
+        },
+        {
+         "texto": "El país está en Europa."
+        },
+        {
+         "texto": "La capital empieza por «L»."
+        },
+        {
+         "texto": "El nombre de la capital tiene 9 letras."
+        }
+       ],
+       "soluciones": [
+        "Liubliana"
+       ],
+       "solucionVisible": "Liubliana (Eslovenia)"
+      }
+     },
+     {
+      "id": "listo_primaria_3",
+      "preguntas": [
+       {
+        "texto": "¿Qué órgano es este?",
+        "opciones": [
+         "Tiroides",
+         "Vesícula biliar",
+         "Pulmones",
+         "Cerebro"
+        ],
+        "correcta": 2,
+        "materia": "BIOLOGIA",
+        "img": "/assets/anatomia/pulmones.jpg"
+       },
+       {
+        "texto": "¿A qué sistema o aparato pertenece: Corazón?",
+        "opciones": [
+         "Sistema Nervioso",
+         "Sistema Respiratorio",
+         "Sistema Cardiovascular",
+         "Sistema Endocrino y Digestivo"
+        ],
+        "correcta": 2,
+        "materia": "BIOLOGIA"
+       },
+       {
+        "texto": "¿Qué órgano es?",
+        "opciones": [
+         "Laringe",
+         "Hígado",
+         "Intestino grueso",
+         "Pulmones"
+        ],
+        "correcta": 0,
+        "materia": "BIOLOGIA",
+        "detalle": "Contiene las cuerdas vocales, es fundamental para la fonación."
+       },
+       {
+        "texto": "¿Qué órgano es este?",
+        "opciones": [
+         "Laringe",
+         "Páncreas",
+         "Corazón",
+         "Intestino grueso"
+        ],
+        "correcta": 2,
+        "materia": "BIOLOGIA",
+        "img": "/assets/anatomia/corazon.jpg"
+       },
+       {
+        "texto": "¿Qué órgano es este?",
+        "opciones": [
+         "Médula espinal",
+         "Corazón",
+         "Riñones",
+         "Hipófisis (Glándula pituitaria)"
+        ],
+        "correcta": 2,
+        "materia": "BIOLOGIA",
+        "img": "/assets/anatomia/rinones.jpg"
+       }
+      ],
+      "candado": {
+       "titulo": "La pieza perdida del esqueleto",
+       "instruccion": "Al guardián le falta una pieza: es un órgano. Juntad las pistas y escribid su nombre.",
+       "tipo": "texto",
+       "longitud": 7,
+       "pistas": [
+        {
+         "texto": "Pertenece al Sistema Nervioso."
+        },
+        {
+         "texto": "Lo que sé: «Centro de control del cuerpo, responsable del pensamiento, la memoria y el control del resto de órganos.»"
+        },
+        {
+         "texto": "Empieza por «C» y tiene 7 letras."
+        },
+        {
+         "texto": "Es un órgano. Termina en «ro»."
+        }
+       ],
+       "soluciones": [
+        "Cerebro"
+       ],
+       "solucionVisible": "Cerebro"
+      }
+     },
+     {
+      "id": "listo_primaria_4",
+      "preguntas": [
+       {
+        "texto": "¿De quién hablamos?",
+        "opciones": [
+         "Auguste Rodin",
+         "María Antonieta",
+         "Charles Darwin",
+         "Thomas Edison"
+        ],
+        "correcta": 3,
+        "materia": "HISTORIA",
+        "detalle": "Registró más de mil patentes."
+       },
+       {
+        "texto": "¿En qué época vivió Salvador Dalí?",
+        "opciones": [
+         "Siglo XVII",
+         "Siglo XIX",
+         "Siglo XX",
+         "Siglo XVI"
+        ],
+        "correcta": 2,
+        "materia": "HISTORIA"
+       },
+       {
+        "texto": "¿En qué época vivió Antoine Lavoisier?",
+        "opciones": [
+         "Siglo XVII",
+         "Edad Media",
+         "Siglo XIX",
+         "Siglo XVIII"
+        ],
+        "correcta": 3,
+        "materia": "HISTORIA"
+       },
+       {
+        "texto": "¿De quién hablamos?",
+        "opciones": [
+         "Georgia O'Keeffe",
+         "Arquímedes",
+         "Juana I de Castilla",
+         "Antonio Vivaldi"
+        ],
+        "correcta": 3,
+        "materia": "HISTORIA",
+        "detalle": "Era sacerdote y lo apodaban \"el cura rojo\"."
+       },
+       {
+        "texto": "¿Quién destacó en ingeniería (Serbia, 1856–1943)?",
+        "opciones": [
+         "Nikola Tesla",
+         "Alessandro Volta",
+         "Niels Bohr",
+         "Vera Rubin"
+        ],
+        "correcta": 0,
+        "materia": "HISTORIA"
+       }
+      ],
+      "candado": {
+       "titulo": "El retrato que habla",
+       "instruccion": "Un retrato ha perdido su placa con el nombre. Leed sus recuerdos en las pistas y descubrid quién es.",
+       "tipo": "texto",
+       "longitud": null,
+       "pistas": [
+        {
+         "texto": "Recuerdo: «Gobernaba Tenochtitlan cuando llegaron los españoles.»"
+        },
+        {
+         "texto": "Recuerdo: «Fue el emperador azteca durante la llegada de Hernán Cortés.»"
+        },
+        {
+         "texto": "Vivió en el siglo XVI. Lugar: Imperio azteca (México)."
+        },
+        {
+         "texto": "Fue emperador. Su nombre empieza por «M»."
+        }
+       ],
+       "soluciones": [
+        "Moctezuma II",
+        "Moctezuma"
+       ],
+       "solucionVisible": "Moctezuma II"
+      }
+     },
+     {
+      "id": "listo_primaria_5",
+      "preguntas": [
+       {
+        "texto": "¿Qué clase de palabra es según su acentuación?",
+        "opciones": [
+         "Aguda",
+         "Llana",
+         "Esdrújula",
+         "Sobresdrújula"
+        ],
+        "correcta": 2,
+        "materia": "LENGUA",
+        "detalle": "lám - pa - ra",
+        "grande": true
+       },
+       {
+        "texto": "Completa con b / v",
+        "opciones": [
+         "b",
+         "v"
+        ],
+        "correcta": 1,
+        "materia": "LENGUA",
+        "detalle": "resol__er",
+        "grande": true
+       },
+       {
+        "texto": "¿Qué clase de palabra es según su acentuación?",
+        "opciones": [
+         "Aguda",
+         "Llana",
+         "Esdrújula",
+         "Sobresdrújula"
+        ],
+        "correcta": 0,
+        "materia": "LENGUA",
+        "detalle": "al - ba - ñil",
+        "grande": true
+       },
+       {
+        "texto": "¿Cuál está bien escrita?",
+        "opciones": [
+         "pelota",
+         "pelóta"
+        ],
+        "correcta": 0,
+        "materia": "LENGUA"
+       },
+       {
+        "texto": "¿Qué clase de palabra es según su acentuación?",
+        "opciones": [
+         "Aguda",
+         "Llana",
+         "Esdrújula",
+         "Sobresdrújula"
+        ],
+        "correcta": 0,
+        "materia": "LENGUA",
+        "detalle": "a - zul",
+        "grande": true
+       }
+      ],
+      "candado": {
+       "titulo": "El pergamino desordenado",
+       "instruccion": "Las letras de una palabra mágica se han desperdigado por la cripta. Juntad todas las letras de las pistas y ordenadlas.",
+       "tipo": "texto",
+       "longitud": 8,
+       "pistas": [
+        {
+         "texto": "Letras: L · M · A"
+        },
+        {
+         "texto": "Letras: C · R · E"
+        },
+        {
+         "texto": "Letras: A · O"
+        },
+        {
+         "texto": "Definición: Dulce que piden los niños de puerta en puerta. (8 letras)"
+        }
+       ],
+       "soluciones": [
+        "CARAMELO"
+       ],
+       "solucionVisible": "CARAMELO"
+      }
+     }
+    ],
+    "batalla": [
+     {
+      "texto": "¿En qué época vivió Diego Rivera?",
+      "opciones": [
+       "Siglo XV",
+       "Antigüedad",
+       "Siglo XVI",
+       "Siglo XX"
+      ],
+      "correcta": 3,
+      "materia": "HISTORIA"
+     },
+     {
+      "texto": "¿Qué clase de palabra es según su acentuación?",
+      "opciones": [
+       "Aguda",
+       "Llana",
+       "Esdrújula",
+       "Sobresdrújula"
+      ],
+      "correcta": 0,
+      "materia": "LENGUA",
+      "detalle": "ma - má",
+      "grande": true
+     },
+     {
+      "texto": "¿A qué sistema o aparato pertenece: Vesícula biliar?",
+      "opciones": [
+       "Sistema Respiratorio",
+       "Sistema Digestivo",
+       "Sistema Óseo",
+       "Sistema Excretor"
+      ],
+      "correcta": 1,
+      "materia": "BIOLOGIA"
+     },
+     {
+      "texto": "¿Cuánto vale?",
+      "opciones": [
+       "36",
+       "26",
+       "35",
+       "33"
+      ],
+      "correcta": 0,
+      "materia": "MATES",
+      "detalle": "41 − 5",
+      "grande": true
+     },
+     {
+      "texto": "¿Qué órgano es este?",
+      "opciones": [
+       "Tiroides",
+       "Glándulas suprarrenales",
+       "Intestino delgado",
+       "Intestino grueso"
+      ],
+      "correcta": 3,
+      "materia": "BIOLOGIA",
+      "img": "/assets/anatomia/intestino_grueso.jpg"
+     },
+     {
+      "texto": "¿Qué órgano es?",
+      "opciones": [
+       "Vesícula biliar",
+       "Intestino delgado",
+       "Vejiga urinaria",
+       "Laringe"
+      ],
+      "correcta": 0,
+      "materia": "BIOLOGIA",
+      "detalle": "Almacena y concentra la bilis producida por el hígado."
+     },
+     {
+      "texto": "¿Quién fue compositor (Alemania, 1685–1750)?",
+      "opciones": [
+       "Andy Warhol",
+       "William Shakespeare",
+       "Clara Schumann",
+       "Johann Sebastian Bach"
+      ],
+      "correcta": 3,
+      "materia": "HISTORIA"
+     },
+     {
+      "texto": "¿Qué clase de palabra es según su acentuación?",
+      "opciones": [
+       "Aguda",
+       "Llana",
+       "Esdrújula",
+       "Sobresdrújula"
+      ],
+      "correcta": 0,
+      "materia": "LENGUA",
+      "detalle": "a - vión",
+      "grande": true
+     }
+    ]
+   }
+  }
+ },
+ {
+  "id": "ESO",
+  "titulo": "La mansión del zombi · ESO",
+  "config": {
+   "modo": "PAPEL",
+   "etapa": "ESO",
+   "minutos": 30,
+   "ritmo": 5,
+   "zombi": "NORMAL",
+   "nPreguntas": 5,
+   "nBatalla": 8,
+   "pruebas": [
+    {
+     "id": "listo_eso_1",
+     "tipo": "MATERIA",
+     "materia": "MATES",
+     "tema": "MIX",
+     "nombre": ""
+    },
+    {
+     "id": "listo_eso_2",
+     "tipo": "MATERIA",
+     "materia": "GEOGRAFIA",
+     "tema": "MIX",
+     "nombre": ""
+    },
+    {
+     "id": "listo_eso_3",
+     "tipo": "MATERIA",
+     "materia": "BIOLOGIA",
+     "tema": "MIX",
+     "nombre": ""
+    },
+    {
+     "id": "listo_eso_4",
+     "tipo": "MATERIA",
+     "materia": "HISTORIA",
+     "tema": "MIX",
+     "nombre": ""
+    },
+    {
+     "id": "listo_eso_5",
+     "tipo": "MATERIA",
+     "materia": "LENGUA",
+     "tema": "MIX",
+     "nombre": ""
+    }
+   ],
+   "partida": {
+    "firma": "[\"ESO\",[[\"listo_eso_1\",\"MATERIA\",\"MATES\",\"MIX\",null,null,null,null,null,null,null,\"\",0],[\"listo_eso_2\",\"MATERIA\",\"GEOGRAFIA\",\"MIX\",null,null,null,null,null,null,null,\"\",0],[\"listo_eso_3\",\"MATERIA\",\"BIOLOGIA\",\"MIX\",null,null,null,null,null,null,null,\"\",0],[\"listo_eso_4\",\"MATERIA\",\"HISTORIA\",\"MIX\",null,null,null,null,null,null,null,\"\",0],[\"listo_eso_5\",\"MATERIA\",\"LENGUA\",\"MIX\",null,null,null,null,null,null,null,\"\",0]]]",
+    "creada": 1791567036508,
+    "nPreguntas": 5,
+    "nBatalla": 8,
+    "pruebas": [
+     {
+      "id": "listo_eso_1",
+      "preguntas": [
+       {
+        "texto": "¿Cuánto vale?",
+        "opciones": [
+         "34",
+         "37",
+         "40",
+         "27"
+        ],
+        "correcta": 1,
+        "materia": "MATES",
+        "detalle": "17 + 4 · 5",
+        "grande": true
+       },
+       {
+        "texto": "¿Cuánto vale?",
+        "opciones": [
+         "13",
+         "11",
+         "8",
+         "14"
+        ],
+        "correcta": 1,
+        "materia": "MATES",
+        "detalle": "(8) − (-3)",
+        "grande": true
+       },
+       {
+        "texto": "¿Cuánto vale?",
+        "opciones": [
+         "65",
+         "60",
+         "59",
+         "63"
+        ],
+        "correcta": 1,
+        "materia": "MATES",
+        "detalle": "75 % de 80",
+        "grande": true
+       },
+       {
+        "texto": "¿Cuánto vale?",
+        "opciones": [
+         "15",
+         "14",
+         "18",
+         "16"
+        ],
+        "correcta": 3,
+        "materia": "MATES",
+        "detalle": "2⁴",
+        "grande": true
+       },
+       {
+        "texto": "¿Cuánto vale?",
+        "opciones": [
+         "9",
+         "10",
+         "20",
+         "0"
+        ],
+        "correcta": 1,
+        "materia": "MATES",
+        "detalle": "25 % de 40",
+        "grande": true
+       }
+      ],
+      "candado": {
+       "titulo": "Candado de 4 cifras",
+       "instruccion": "Cada cifra del código es el resultado de una operación. Resolved las cuatro operaciones de las pistas y escribid las cifras en orden.",
+       "tipo": "numero",
+       "longitud": 4,
+       "pistas": [
+        {
+         "texto": "La primera cifra es: (21 − 1) ÷ 5"
+        },
+        {
+         "texto": "La segunda cifra es: √9"
+        },
+        {
+         "texto": "La tercera cifra es: (-6) + (13)"
+        },
+        {
+         "texto": "La cuarta cifra es: 3·8 + 2 − 18"
+        }
+       ],
+       "soluciones": [
+        "4378"
+       ],
+       "solucionVisible": "4378"
+      }
+     },
+     {
+      "id": "listo_eso_2",
+      "preguntas": [
+       {
+        "texto": "¿De qué país es esta bandera?",
+        "opciones": [
+         "Venezuela",
+         "Ecuador",
+         "Suecia",
+         "Italia"
+        ],
+        "correcta": 3,
+        "materia": "GEOGRAFIA",
+        "img": "https://flagcdn.com/w320/it.png"
+       },
+       {
+        "texto": "¿De qué país es capital Adís Abeba?",
+        "opciones": [
+         "Portugal",
+         "Etiopía",
+         "Rusia",
+         "Corea del Sur"
+        ],
+        "correcta": 1,
+        "materia": "GEOGRAFIA"
+       },
+       {
+        "texto": "¿De qué país es esta bandera?",
+        "opciones": [
+         "Japón",
+         "Uruguay",
+         "Nigeria",
+         "Libia"
+        ],
+        "correcta": 3,
+        "materia": "GEOGRAFIA",
+        "img": "https://flagcdn.com/w320/ly.png"
+       },
+       {
+        "texto": "¿Cuál es la capital de Indonesia?",
+        "opciones": [
+         "Adís Abeba",
+         "Yakarta",
+         "Acra",
+         "Naipyidó"
+        ],
+        "correcta": 1,
+        "materia": "GEOGRAFIA"
+       },
+       {
+        "texto": "¿De qué país es capital Port Moresby?",
+        "opciones": [
+         "Argentina",
+         "Australia",
+         "Papúa N. Guinea",
+         "Tailandia"
+        ],
+        "correcta": 2,
+        "materia": "GEOGRAFIA"
+       }
+      ],
+      "candado": {
+       "titulo": "La capital secreta",
+       "instruccion": "El fantasma bibliotecario esconde una ciudad. Con las pistas, descubrid de qué país es la bandera… ¡y escribid su CAPITAL!",
+       "tipo": "texto",
+       "longitud": 8,
+       "pistas": [
+        {
+         "texto": "Esta es la bandera del país:",
+         "img": "https://flagcdn.com/w320/pl.png"
+        },
+        {
+         "texto": "El país está en Europa."
+        },
+        {
+         "texto": "La capital empieza por «V»."
+        },
+        {
+         "texto": "El nombre de la capital tiene 8 letras."
+        }
+       ],
+       "soluciones": [
+        "Varsovia"
+       ],
+       "solucionVisible": "Varsovia (Polonia)"
+      }
+     },
+     {
+      "id": "listo_eso_3",
+      "preguntas": [
+       {
+        "texto": "¿Qué músculo es?",
+        "opciones": [
+         "Tríceps braquial",
+         "Sartorio",
+         "Intercostales",
+         "Tibial anterior"
+        ],
+        "correcta": 1,
+        "materia": "BIOLOGIA",
+        "detalle": "El músculo más largo del cuerpo, cruza el muslo en diagonal."
+       },
+       {
+        "texto": "¿Qué músculo es este?",
+        "opciones": [
+         "Trapecio",
+         "Cuádriceps femoral",
+         "Gastrocnemio (Gemelos)",
+         "Deltoides"
+        ],
+        "correcta": 1,
+        "materia": "BIOLOGIA",
+        "img": "/assets/anatomia/cuadriceps.jpg"
+       },
+       {
+        "texto": "¿Qué músculo es este?",
+        "opciones": [
+         "Sartorio",
+         "Tibial anterior",
+         "Tríceps braquial",
+         "Glúteo mayor"
+        ],
+        "correcta": 0,
+        "materia": "BIOLOGIA",
+        "img": "/assets/anatomia/sartorio.jpg"
+       },
+       {
+        "texto": "¿Qué músculo es?",
+        "opciones": [
+         "Pectoral mayor",
+         "Esternocleidomastoideo",
+         "Sartorio",
+         "Romboides"
+        ],
+        "correcta": 0,
+        "materia": "BIOLOGIA",
+        "detalle": "Músculo grande que cubre la parte superior del pecho."
+       },
+       {
+        "texto": "¿Qué órgano es?",
+        "opciones": [
+         "Intestino delgado",
+         "Tiroides",
+         "Hipófisis (Glándula pituitaria)",
+         "Cerebro"
+        ],
+        "correcta": 2,
+        "materia": "BIOLOGIA",
+        "detalle": "Glándula maestra en la base del cerebro que controla a otras glándulas."
+       }
+      ],
+      "candado": {
+       "titulo": "La pieza perdida del esqueleto",
+       "instruccion": "Al guardián le falta una pieza: es un hueso. Juntad las pistas y escribid su nombre.",
+       "tipo": "texto",
+       "longitud": 9,
+       "pistas": [
+        {
+         "texto": "Pertenece al Sistema Óseo."
+        },
+        {
+         "texto": "Lo que sé: «Único hueso móvil de la cabeza.»"
+        },
+        {
+         "texto": "Empieza por «M» y tiene 9 letras."
+        },
+        {
+         "texto": "Es un hueso. Termina en «la»."
+        }
+       ],
+       "soluciones": [
+        "Mandíbula"
+       ],
+       "solucionVisible": "Mandíbula"
+      }
+     },
+     {
+      "id": "listo_eso_4",
+      "preguntas": [
+       {
+        "texto": "¿Quién fue primera ministra (Reino Unido, 1925–2013)?",
+        "opciones": [
+         "Margaret Thatcher",
+         "Indira Gandhi",
+         "Nelson Mandela",
+         "Rosa Parks"
+        ],
+        "correcta": 0,
+        "materia": "HISTORIA"
+       },
+       {
+        "texto": "¿De quién hablamos?",
+        "opciones": [
+         "Enrique VIII",
+         "Alan Turing",
+         "Abraham Lincoln",
+         "Piotr Chaikovski"
+        ],
+        "correcta": 0,
+        "materia": "HISTORIA",
+        "detalle": "Fue padre de Isabel I."
+       },
+       {
+        "texto": "¿De quién hablamos?",
+        "opciones": [
+         "Vera Rubin",
+         "Alessandro Volta",
+         "Clara Schumann",
+         "Carlos V"
+        ],
+        "correcta": 1,
+        "materia": "HISTORIA",
+        "detalle": "El \"voltio\" lleva su nombre."
+       },
+       {
+        "texto": "¿De quién hablamos?",
+        "opciones": [
+         "Luis XIV",
+         "Juana de Arco",
+         "Emily Dickinson",
+         "Alessandro Volta"
+        ],
+        "correcta": 0,
+        "materia": "HISTORIA",
+        "detalle": "Reinó durante más de 70 años."
+       },
+       {
+        "texto": "¿De quién hablamos?",
+        "opciones": [
+         "Simón Bolívar",
+         "Erwin Schrödinger",
+         "Jocelyn Bell Burnell",
+         "Mahatma Gandhi"
+        ],
+        "correcta": 0,
+        "materia": "HISTORIA",
+        "detalle": "Fue apodado \"El Libertador\"."
+       }
+      ],
+      "candado": {
+       "titulo": "El retrato que habla",
+       "instruccion": "Un retrato ha perdido su placa con el nombre. Leed sus recuerdos en las pistas y descubrid quién es.",
+       "tipo": "texto",
+       "longitud": null,
+       "pistas": [
+        {
+         "texto": "Recuerdo: «Creó la tabla periódica de los elementos.»"
+        },
+        {
+         "texto": "Vivió en el siglo XIX. Lugar: Rusia."
+        },
+        {
+         "texto": "Destacó en química. Su nombre empieza por «D»."
+        }
+       ],
+       "soluciones": [
+        "Dmitri Mendeléyev",
+        "Dmitri",
+        "Mendeléyev"
+       ],
+       "solucionVisible": "Dmitri Mendeléyev"
+      }
+     },
+     {
+      "id": "listo_eso_5",
+      "preguntas": [
+       {
+        "texto": "¿Qué palabra NO pertenece al campo «Colores»?",
+        "opciones": [
+         "morado",
+         "marrón",
+         "saxofón",
+         "blanco"
+        ],
+        "correcta": 2,
+        "materia": "LENGUA",
+        "detalle": "🎨",
+        "grande": true
+       },
+       {
+        "texto": "¿Cuál está bien escrita?",
+        "opciones": [
+         "brújula",
+         "brujula"
+        ],
+        "correcta": 0,
+        "materia": "LENGUA"
+       },
+       {
+        "texto": "¿Cuál es el antónimo de…?",
+        "opciones": [
+         "imprudente",
+         "lejos",
+         "comprar",
+         "estrecho"
+        ],
+        "correcta": 0,
+        "materia": "LENGUA",
+        "detalle": "prudente",
+        "grande": true
+       },
+       {
+        "texto": "¿Cuál es el antónimo de…?",
+        "opciones": [
+         "recordar",
+         "rechazar",
+         "lejos",
+         "poco"
+        ],
+        "correcta": 1,
+        "materia": "LENGUA",
+        "detalle": "aceptar",
+        "grande": true
+       },
+       {
+        "texto": "Completa con ll / y",
+        "opciones": [
+         "ll",
+         "y"
+        ],
+        "correcta": 1,
+        "materia": "LENGUA",
+        "detalle": "pro__ecto",
+        "grande": true
+       }
+      ],
+      "candado": {
+       "titulo": "El pergamino desordenado",
+       "instruccion": "Las letras de una palabra mágica se han desperdigado por la cripta. Juntad todas las letras de las pistas y ordenadlas.",
+       "tipo": "texto",
+       "longitud": 8,
+       "pistas": [
+        {
+         "texto": "Letras: A · E · L"
+        },
+        {
+         "texto": "Letras: R · T · Ñ"
+        },
+        {
+         "texto": "Letras: A · A"
+        },
+        {
+         "texto": "Definición: Red que teje un animal de ocho patas. (8 letras)"
+        }
+       ],
+       "soluciones": [
+        "TELARAÑA"
+       ],
+       "solucionVisible": "TELARAÑA"
+      }
+     }
+    ],
+    "batalla": [
+     {
+      "texto": "¿Cuánto vale?",
+      "opciones": [
+       "80",
+       "90",
+       "91",
+       "93"
+      ],
+      "correcta": 1,
+      "materia": "MATES",
+      "detalle": "75 % de 120",
+      "grande": true
+     },
+     {
+      "texto": "Completa con b / v",
+      "opciones": [
+       "b",
+       "v"
+      ],
+      "correcta": 0,
+      "materia": "LENGUA",
+      "detalle": "hier__a",
+      "grande": true
+     },
+     {
+      "texto": "¿De qué país es esta bandera?",
+      "opciones": [
+       "Estonia",
+       "Perú",
+       "Sudán",
+       "Eslovaquia"
+      ],
+      "correcta": 2,
+      "materia": "GEOGRAFIA",
+      "img": "https://flagcdn.com/w320/sd.png"
+     },
+     {
+      "texto": "¿Qué músculo es?",
+      "opciones": [
+       "Tríceps braquial",
+       "Dorsal ancho",
+       "Recto del abdomen",
+       "Masetero"
+      ],
+      "correcta": 3,
+      "materia": "BIOLOGIA",
+      "detalle": "El músculo principal de la masticación."
+     },
+     {
+      "texto": "¿De qué país es capital Abuya?",
+      "opciones": [
+       "Nigeria",
+       "Malasia",
+       "Tailandia",
+       "Polonia"
+      ],
+      "correcta": 0,
+      "materia": "GEOGRAFIA"
+     },
+     {
+      "texto": "¿Qué significa este refrán?",
+      "opciones": [
+       "Ayudar a alguien.",
+       "Equivocarse o decir algo inoportuno.",
+       "Hablar demasiado.",
+       "Una persona lista entiende enseguida sin largas explicaciones."
+      ],
+      "correcta": 3,
+      "materia": "LENGUA",
+      "detalle": "«A buen entendedor, pocas palabras bastan»"
+     },
+     {
+      "texto": "Completa con h / sin h",
+      "opciones": [
+       "h",
+       "(nada)"
+      ],
+      "correcta": 0,
+      "materia": "LENGUA",
+      "detalle": "__ilo",
+      "grande": true
+     },
+     {
+      "texto": "¿De qué país es capital Teherán?",
+      "opciones": [
+       "Suiza",
+       "Estados Unidos",
+       "Suecia",
+       "Irán"
+      ],
+      "correcta": 3,
+      "materia": "GEOGRAFIA"
+     }
+    ]
+   }
+  }
+ }
+]

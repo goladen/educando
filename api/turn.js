@@ -41,8 +41,6 @@ export default async function handler(req, res) {
         } catch (e) { diag.error = String(e && e.message || e); }
     }
 
-    if (debug) return res.status(200).json({ iceServers: [stun], turn: false, diag });
-
     // B) TURN estático por variables de entorno.
     const urls = process.env.TURN_URLS;
     if (urls) {
@@ -53,9 +51,10 @@ export default async function handler(req, res) {
                 credential: process.env.TURN_CREDENTIAL || '',
             }],
             turn: true,
+            ...(debug ? { diag } : {}),
         });
     }
 
     // C) Solo STUN.
-    return res.status(200).json({ iceServers: [stun], turn: false });
+    return res.status(200).json({ iceServers: [stun], turn: false, ...(debug ? { diag } : {}) });
 }

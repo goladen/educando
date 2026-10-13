@@ -143,6 +143,7 @@ async function sintetizar(motores, voz, texto, rate, fin) {
             return await pedirAudio(motores[voz], texto, rate);
         } catch (e) {
             ultimo = e;
+            console.error(`[listening-tts] intento ${i + 1} (${voz}): ${e.message}`);
             cerrar(motores[voz]);
             delete motores[voz];
             await esperar(200 * (i + 1));
@@ -204,6 +205,7 @@ export default async function handler(req, res) {
         // Los fotogramas mp3 del mismo formato se pueden concatenar sin más
         audio = Buffer.concat(partes);
     } catch (e) {
+        console.error("[listening-tts] sin voz:", e.message);
         return res.status(502).json({ error: 'No se pudo generar la voz (inténtalo de nuevo en un momento): ' + e.message });
     }
     if (audio.length < 2048) return res.status(502).json({ error: 'El servicio de voz devolvió un audio vacío.' });
@@ -225,6 +227,7 @@ export default async function handler(req, res) {
         subida = await r.json();
         if (!r.ok) return res.status(r.status).json({ error: subida?.error?.message || 'Error al subir a Cloudinary' });
     } catch (e) {
+        console.error('[listening-tts] Cloudinary:', e.message);
         return res.status(502).json({ error: 'Error al subir a Cloudinary: ' + e.message });
     }
 

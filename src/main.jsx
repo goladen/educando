@@ -4,6 +4,10 @@ import './index.css'
 import App from './App.jsx'
 import CargandoChunk from './components/CargandoChunk.jsx'
 import { LanguageProvider } from './i18n/LanguageContext.jsx'
+import { instalarCapturaErrores } from './utils/reportarError.js'
+
+// Registro de fallos de los usuarios (errores_web, panel 🐞 del admin)
+instalarCapturaErrores();
 
 // When a new Service Worker takes control, reload the page so users get
 // the latest bundles instead of the old cached version.

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { db } from '../firebase';
 import {
     collection, collectionGroup, query, where, orderBy, limit, onSnapshot,
@@ -7,6 +7,8 @@ import {
 import { Users, Check, X as XIcon, MessageSquare, UserPlus, Settings } from 'lucide-react';
 import useNotificacionesProfesor, { INTERESES } from '../hooks/useNotificacionesProfesor';
 import AdminUsuariosPanel from './AdminUsuariosPanel';
+
+const ErroresWebPanel = lazy(() => import('./ErroresWebPanel'));
 
 const ADMIN_EMAIL = 'goladen@gmail.com';
 
@@ -32,6 +34,7 @@ export default function BuzonNovedades({ usuario, onIr }) {
     const [seleccion, setSeleccion] = useState({});   // { uid: nombre }
     const [destino, setDestino]     = useState('todos'); // 'todos' | 'seleccion'
     const [mensajes, setMensajes]   = useState([]);
+    const [verErrores, setVerErrores] = useState(false); // panel 🐞 (errores_web)
 
     const esAdmin = usuario?.email === ADMIN_EMAIL;
 
@@ -271,6 +274,12 @@ export default function BuzonNovedades({ usuario, onIr }) {
                                     <button onClick={() => setVerUsuarios(v => !v)} title="Usuarios y mensajes personales"
                                         style={{ background: verUsuarios ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.22)', border: 'none', color: 'white', borderRadius: 9, padding: '6px 11px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontWeight: 700, fontSize: '0.8rem' }}>
                                         <Users size={16} />{nSel > 0 && nSel}
+                                    </button>
+                                )}
+                                {esAdmin && (
+                                    <button onClick={() => setVerErrores(true)} title="Fallos de los usuarios"
+                                        style={{ background: 'rgba(255,255,255,0.22)', border: 'none', color: 'white', borderRadius: 9, padding: '6px 10px', cursor: 'pointer', fontSize: '0.9rem' }}>
+                                        🐞
                                     </button>
                                 )}
                                 {esAdmin && (
@@ -539,6 +548,11 @@ export default function BuzonNovedades({ usuario, onIr }) {
                         </div>
                     </div>
                 </div>
+            )}
+            {esAdmin && verErrores && (
+                <Suspense fallback={null}>
+                    <ErroresWebPanel onClose={() => setVerErrores(false)} />
+                </Suspense>
             )}
         </>
     );

@@ -16,6 +16,8 @@
 //     Signing mode: Unsigned · Folder: modelos3d · Allowed formats: glb,gltf
 //     Max file size: ~30 MB   (un preset unsigned es público: limítalo)
 
+import { reportarError } from '../utils/reportarError';
+
 export const CLOUDINARY_CLOUD  = import.meta.env.VITE_CLOUDINARY_CLOUD  || '';
 export const CLOUDINARY_PRESET = import.meta.env.VITE_CLOUDINARY_PRESET || '';
 
@@ -58,10 +60,16 @@ function enviarACloudinary(cloud, campos, file, onProgress) {
             if (xhr.status >= 200 && xhr.status < 300 && data.secure_url) {
                 resolve({ url: data.secure_url, publicId: data.public_id, bytes: data.bytes });
             } else {
-                reject(new Error(data?.error?.message || `Cloudinary respondió ${xhr.status}.`));
+                const err = new Error(data?.error?.message || `Cloudinary respondió ${xhr.status}.`);
+                reportarError('cloudinary', err, { estado: xhr.status, tamano: file?.size || 0 });
+                reject(err);
             }
         };
-        xhr.onerror = () => reject(new Error('No se pudo conectar con Cloudinary.'));
+        xhr.onerror = () => {
+            const err = new Error('No se pudo conectar con Cloudinary.');
+            reportarError('cloudinary', err, { red: true, tamano: file?.size || 0 });
+            reject(err);
+        };
         xhr.send(fd);
     });
 }
@@ -128,10 +136,16 @@ export function subirModelo(file, { carpeta = 'modelos3d', onProgress } = {}) {
             if (xhr.status >= 200 && xhr.status < 300 && data.secure_url) {
                 resolve({ url: data.secure_url, publicId: data.public_id, bytes: data.bytes });
             } else {
-                reject(new Error(data?.error?.message || `Cloudinary respondió ${xhr.status}.`));
+                const err = new Error(data?.error?.message || `Cloudinary respondió ${xhr.status}.`);
+                reportarError('cloudinary', err, { estado: xhr.status, tamano: file?.size || 0 });
+                reject(err);
             }
         };
-        xhr.onerror = () => reject(new Error('No se pudo conectar con Cloudinary.'));
+        xhr.onerror = () => {
+            const err = new Error('No se pudo conectar con Cloudinary.');
+            reportarError('cloudinary', err, { red: true, tamano: file?.size || 0 });
+            reject(err);
+        };
         xhr.send(fd);
     });
 }

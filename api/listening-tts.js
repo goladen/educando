@@ -27,6 +27,19 @@ const MAX_TROZO = 1200;               // caracteres por petición a Edge (trozos
 const RATE_VALIDO = /^[+-]?\d{1,2}%$/;
 const VOZ_VALIDA = /^[a-z]{2,3}-[A-Z]{2}-[A-Za-z]+Neural$/;
 
+// Desde el 10/10/2026 Microsoft está migrando el servicio a api.msedgeservices.com
+// y el servidor antiguo responde 403 a casi todo (siempre desde Vercel). Se usa
+// el nuevo (mismo token, como Ocp-Apim-Subscription-Key) y, 1 de cada 3
+// conexiones, el antiguo por si el nuevo fallara en alguna región.
+const WSS_ANTIGUO = 'wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=';
+const WSS_NUEVO = 'wss://api.msedgeservices.com/tts/cognitiveservices/websocket/v1?Ocp-Apim-Subscription-Key=';
+const urlOriginal = MsEdgeTTS.getSynthUrl;
+let conexiones = 0;
+MsEdgeTTS.getSynthUrl = async function () {
+    const url = await urlOriginal.call(this);
+    return conexiones++ % 3 === 2 ? url : url.replace(WSS_ANTIGUO, WSS_NUEVO);
+};
+
 function firmar(params, secret) {
     const cadena = Object.keys(params).sort().map(k => `${k}=${params[k]}`).join('&');
     return createHash('sha1').update(cadena + secret).digest('hex');

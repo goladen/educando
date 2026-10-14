@@ -42,6 +42,8 @@ const IGNORAR = [
     /chrome-extension:|moz-extension:|safari-extension:/i,
     /Non-Error promise rejection captured/i,
     /AbortError|The user aborted a request|signal is aborted/i,
+    // Navegadores/WebViews que bloquean el service worker de la PWA (p. ej. wrsParams inyectado)
+    /wrsParams|serviceWorker\.register/i,
 ];
 
 export function reportarError(servicio, error, contexto = {}) {

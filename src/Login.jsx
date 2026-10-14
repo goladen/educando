@@ -3,7 +3,8 @@ import React, { useState, useEffect, lazy, Suspense } from 'react';
 const MathWordleGame = lazy(() => import('./MathWordleGame'));
 const TextWordleGame = lazy(() => import('./TextWordleGame'));
 import { auth } from './firebase';
-import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from "firebase/auth";
+import { reportarError } from './utils/reportarError';
 import { Menu, X } from 'lucide-react';
 import logoPikt from './assets/icono2.png';
 import LandingGames, { APPS, SpecificGamePage, ResourceCard } from './components/LandingGames3';
@@ -14,6 +15,32 @@ const ComunidadesPublico = lazy(() => import('./components/ComunidadesPublico'))
 const PaginaProfesor = lazy(() => import('./components/PaginaProfesor'));
 import ContadorVisitantes from './components/ContadorVisitantes';
 import PiTutorial from './components/PiTutorial';
+
+// Navegadores dentro de apps (Instagram, Facebook, TikTok, WhatsApp…): Google bloquea ahí el login (disallowed_useragent)
+function navegadorIntegrado() {
+    const ua = navigator.userAgent || '';
+    return /Instagram|FBAN|FBAV|FB_IAB|TikTok|musical_ly|Snapchat|Line\/|WhatsApp|Twitter|LinkedInApp|Pinterest|; wv\)/i.test(ua);
+}
+
+function mensajeErrorLogin(e) {
+    switch (e?.code) {
+        case 'auth/popup-closed-by-user':
+        case 'auth/cancelled-popup-request':
+            return 'Has cerrado la ventana de Google antes de terminar.';
+        case 'auth/popup-blocked':
+            return 'El navegador ha bloqueado la ventana de Google. Permite las ventanas emergentes para pikt.es.';
+        case 'auth/network-request-failed':
+            return 'Sin conexión con Google. Revisa la red (algunas redes de centros bloquean el acceso).';
+        case 'auth/web-storage-unsupported':
+            return 'El navegador bloquea las cookies o está en modo incógnito estricto. Prueba en una ventana normal.';
+        case 'auth/unauthorized-domain':
+            return 'Dominio no autorizado para iniciar sesión.';
+        case 'auth/user-disabled':
+            return 'Esta cuenta está desactivada.';
+        default:
+            return 'No se pudo entrar con Google' + (e?.code ? ` (${e.code})` : '') + '. Si usas una cuenta del centro, prueba con una cuenta personal.';
+    }
+}
 
 export default function Login({ setGoogleToken }) {
     const [error, setError] = useState(null);
@@ -58,18 +85,42 @@ export default function Login({ setGoogleToken }) {
         } catch (e) { console.error(e); }
     };
 
+    // Vuelta de un login por redirección (plan B cuando el popup no se puede abrir)
+    useEffect(() => {
+        getRedirectResult(auth).then(result => {
+            if (!result) return;
+            const credential = GoogleAuthProvider.credentialFromResult(result);
+            if (setGoogleToken && credential?.accessToken) setGoogleToken(credential.accessToken);
+        }).catch(e => {
+            setError(mensajeErrorLogin(e));
+            reportarError('auth', e, { via: 'redirect', code: e?.code });
+        });
+    }, []);
+
     const handleLogin = async () => {
+        if (navegadorIntegrado()) {
+            setError('Este navegador (Instagram, WhatsApp…) no permite entrar con Google. Ábrelo en Chrome o Safari: menú ⋮ → «Abrir en el navegador».');
+            return;
+        }
         setLoading(true); setError(null);
         const provider = new GoogleAuthProvider();
         provider.addScope('https://www.googleapis.com/auth/drive.file');
         provider.addScope('https://www.googleapis.com/auth/forms.body');
+        provider.setCustomParameters({ prompt: 'select_account' });
 
         try {
             const result = await signInWithPopup(auth, provider);
             const credential = GoogleAuthProvider.credentialFromResult(result);
-            if (setGoogleToken) setGoogleToken(credential.accessToken);
-        } catch (error) {
-            setError("Error conectando con Google.");
+            if (setGoogleToken && credential?.accessToken) setGoogleToken(credential.accessToken);
+        } catch (e) {
+            // Popup bloqueado o no soportado → probamos por redirección
+            if (e?.code === 'auth/popup-blocked' || e?.code === 'auth/operation-not-supported-in-this-environment') {
+                try { await signInWithRedirect(auth, provider); return; } catch (e2) { e = e2; }
+            }
+            if (e?.code !== 'auth/popup-closed-by-user' && e?.code !== 'auth/cancelled-popup-request') {
+                reportarError('auth', e, { via: 'popup', code: e?.code });
+            }
+            setError(mensajeErrorLogin(e));
             setLoading(false);
         }
     };
@@ -171,8 +222,12 @@ export default function Login({ setGoogleToken }) {
                         <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="G" style={{ width: '16px' }} />
                         {loading ? '...' : 'Entrar'}
                     </button>
-                    {error && <span style={{ color: 'red', fontSize: '10px' }}>{error}</span>}
                 </div>
+                {error && (
+                    <div onClick={() => setError(null)} style={{ position: 'absolute', top: '62px', right: '20px', maxWidth: '300px', background: '#fff', color: '#c0392b', fontSize: '13px', padding: '10px 14px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.25)', cursor: 'pointer' }}>
+                        {error}
+                    </div>
+                )}
             </header>
 
 

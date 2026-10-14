@@ -23,6 +23,8 @@ import { doc, setDoc, onSnapshot, collection, getDocs, deleteDoc, addDoc } from 
 
 const DESCONEXION_MS = 20000;
 const ICE_FALLBACK = [{ urls: 'stun:stun.l.google.com:19302' }];
+// Instalador del Agente Pikt (GitHub Releases). Actualiza la URL al subir una versión nueva.
+const URL_AGENTE = 'https://github.com/goladen/pikt-agente/releases/download/v.0.1.1/AgentePikt-Setup-0.1.1.exe';
 
 export const collForScope = (scope) => (scope === 'comunidad' ? 'aulas_comunidad' : 'aulas_fijas');
 
@@ -40,6 +42,7 @@ export default function GestionEquipos({ scope = 'personal', id, canManage = tru
     const coll = collForScope(scope);
     const [agentes, setAgentes] = useState([]);
     const [verPantallas, setVerPantallas] = useState(false); // refleja el flag thumbs del doc del aula
+    const [thumbs, setThumbs] = useState({}); // agentId → { data, at } leído del subdoc screen/latest
     const vistoAgentesRef = useRef({});
     const aulaRef = useMemo(() => (id ? doc(db, coll, id) : null), [coll, id]);
 
@@ -75,6 +78,20 @@ export default function GestionEquipos({ scope = 'personal', id, canManage = tru
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [coll, id]);
 
+    // Miniaturas: un listener por equipo al subdoc screen/latest, SOLO mientras se ven las pantallas.
+    const agentIds = agentes.map((a) => a.id).join(',');
+    useEffect(() => {
+        if (!verPantallas || !id) { setThumbs({}); return; }
+        const ids = agentIds ? agentIds.split(',') : [];
+        const unsubs = ids.map((aid) => onSnapshot(
+            doc(db, coll, id, 'agents', aid, 'screen', 'latest'),
+            (snap) => setThumbs((prev) => ({ ...prev, [aid]: snap.exists() ? snap.data() : null })),
+            () => { /* sin permiso o error: se queda sin miniatura */ }
+        ));
+        return () => unsubs.forEach((u) => u());
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [verPantallas, coll, id, agentIds]);
+
     const agenteOnline = (a) => Date.now() - (a._vistoAt || 0) < DESCONEXION_MS;
 
     const enviarCmdAgente = async (agentId, type, payload = {}) => {
@@ -107,6 +124,7 @@ export default function GestionEquipos({ scope = 'personal', id, canManage = tru
             onQuitar={quitarAgente}
             verPantallas={verPantallas}
             onToggleVerPantallas={toggleVerPantallas}
+            thumbs={thumbs}
             codigoEquipos={id}
             scope={scope}
             canManage={canManage}
@@ -115,7 +133,7 @@ export default function GestionEquipos({ scope = 'personal', id, canManage = tru
 }
 
 // ── Tarjeta de equipos ──
-function PanelEquipos({ agentes, online, onCmd, onCmdTodos, onQuitar, verPantallas, onToggleVerPantallas, codigoEquipos, scope, canManage }) {
+function PanelEquipos({ agentes, online, onCmd, onCmdTodos, onQuitar, verPantallas, onToggleVerPantallas, thumbs = {}, codigoEquipos, scope, canManage }) {
     const conectados = agentes.filter(online);
     const [vivo, setVivo] = useState(null);
 
@@ -144,6 +162,12 @@ function PanelEquipos({ agentes, online, onCmd, onCmdTodos, onQuitar, verPantall
                             {etiquetaCodigo}: {codigoEquipos}
                             <button onClick={() => navigator.clipboard?.writeText(codigoEquipos)} style={{ background: 'rgba(15,23,42,0.15)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: '0.72rem', padding: '0 5px' }}>copiar</button>
                         </span>
+                    )}
+                    {codigoEquipos && (
+                        <a href={URL_AGENTE} download style={{ fontSize: '0.78rem', fontWeight: 700, color: 'white', background: '#2563eb', borderRadius: 20, padding: '3px 12px', textDecoration: 'none' }}
+                            title="Descarga el instalador. Ejecútalo en el PC del aula e introduce el código de arriba.">
+                            ⬇️ Descargar Agente
+                        </a>
                     )}
                 </h3>
                 {canManage && codigoEquipos && agentes.length > 0 && (
@@ -175,6 +199,7 @@ function PanelEquipos({ agentes, online, onCmd, onCmdTodos, onQuitar, verPantall
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(300px,100%),1fr))', gap: 10 }}>
                     {agentes.map((a) => {
                         const on = online(a);
+                        const th = thumbs[a.id];
                         return (
                             <div key={a.id} style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${a.locked ? '#f87171' : 'rgba(255,255,255,0.12)'}`, borderRadius: 10, padding: 12 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
@@ -186,15 +211,15 @@ function PanelEquipos({ agentes, online, onCmd, onCmdTodos, onQuitar, verPantall
                                 </div>
                                 {verPantallas && (
                                     <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 10', background: '#000', borderRadius: 8, overflow: 'hidden', marginBottom: 8, border: '1px solid rgba(255,255,255,0.1)' }}>
-                                        {a.thumb?.data ? (
-                                            <img src={a.thumb.data} alt={`Pantalla de ${a.name || 'equipo'}`}
+                                        {th?.data ? (
+                                            <img src={th.data} alt={`Pantalla de ${a.name || 'equipo'}`}
                                                 style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: on ? 1 : 0.4 }} />
                                         ) : (
                                             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.8rem' }}>
                                                 {on ? '⏳ esperando captura…' : 'sin señal'}
                                             </div>
                                         )}
-                                        {!on && a.thumb?.data && (
+                                        {!on && th?.data && (
                                             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)', color: '#e2e8f0', fontSize: '0.8rem', fontWeight: 700 }}>⚫ desconectado</div>
                                         )}
                                     </div>

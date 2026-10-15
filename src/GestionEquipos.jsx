@@ -22,10 +22,11 @@ import { db } from './firebase';
 import { doc, setDoc, onSnapshot, collection, getDocs, deleteDoc, addDoc } from 'firebase/firestore';
 import SesionEquipos, { RegistroSesiones } from './SesionEquipos';
 
-const DESCONEXION_MS = 20000;
+// El agente late cada 30 s (espaciado para ahorrar escrituras en Firebase). Damos margen (3 latidos).
+const DESCONEXION_MS = 90000;
 const ICE_FALLBACK = [{ urls: 'stun:stun.l.google.com:19302' }];
 // Instalador del Agente Pikt (GitHub Releases). Actualiza la URL al subir una versión nueva.
-const URL_AGENTE = 'https://github.com/goladen/pikt-agente/releases/download/v.0.1.2/AgentePikt-Setup-0.1.2.exe';
+const URL_AGENTE = 'https://github.com/goladen/pikt-agente/releases/download/v.0.1.3/AgentePikt-Setup-0.1.3.exe';
 
 export const collForScope = (scope) => (scope === 'comunidad' ? 'aulas_comunidad' : 'aulas_fijas');
 
@@ -39,8 +40,11 @@ async function obtenerIceServers() {
     return ICE_FALLBACK;
 }
 
-export default function GestionEquipos({ scope = 'personal', id, canManage = true }) {
+export default function GestionEquipos({ scope = 'personal', id, canManage = true, esGestor = false }) {
     const coll = collForScope(scope);
+    const [vista, setVista] = useState('inicio');   // 'inicio' | 'config'
+    const [sesion, setSesion] = useState(null);      // machineIds de la sesión activa, o null
+    const [verRegistro, setVerRegistro] = useState(false);
     const [agentes, setAgentes] = useState([]);
     const [verPantallas, setVerPantallas] = useState(false); // refleja el flag thumbs del doc del aula
     const [thumbs, setThumbs] = useState({}); // agentId → { data, at } leído del subdoc screen/latest
@@ -115,21 +119,85 @@ export default function GestionEquipos({ scope = 'personal', id, canManage = tru
         if (!aulaRef) return;
         try { await setDoc(aulaRef, { thumbs: on }, { merge: true }); } catch (e) { console.error(e); }
     };
+    // Guarda metadatos del equipo (tipo alumno/profesor, ubicación) en su doc.
+    const guardarMeta = async (agentId, campos) => {
+        if (!id) return;
+        try { await setDoc(doc(db, coll, id, 'agents', agentId), campos, { merge: true }); } catch (e) { console.error(e); }
+    };
+
+    const conectados = agentes.filter(agenteOnline).length;
+    const abrirSesion = (ids = []) => setSesion(ids);
+
+    const modales = (
+        <>
+            {sesion && (
+                <SesionEquipos scope={scope} codigoEquipos={id} agentes={agentes} machineIds={sesion} online={agenteOnline} onCmd={enviarCmdAgente} onClose={() => setSesion(null)} />
+            )}
+            {verRegistro && (
+                <RegistroSesiones scope={scope} codigoEquipos={id} canGestionar={esGestor} onClose={() => setVerRegistro(false)} />
+            )}
+        </>
+    );
+
+    if (vista === 'config') {
+        return (
+            <>
+                <PanelEquipos
+                    agentes={agentes}
+                    online={agenteOnline}
+                    onCmd={enviarCmdAgente}
+                    onCmdTodos={enviarCmdTodos}
+                    onQuitar={quitarAgente}
+                    verPantallas={verPantallas}
+                    onToggleVerPantallas={toggleVerPantallas}
+                    thumbs={thumbs}
+                    codigoEquipos={id}
+                    scope={scope}
+                    canManage={canManage}
+                    onVolver={() => setVista('inicio')}
+                    onNuevaSesion={abrirSesion}
+                    onMeta={guardarMeta}
+                />
+                {modales}
+            </>
+        );
+    }
 
     return (
-        <PanelEquipos
-            agentes={agentes}
-            online={agenteOnline}
-            onCmd={enviarCmdAgente}
-            onCmdTodos={enviarCmdTodos}
-            onQuitar={quitarAgente}
-            verPantallas={verPantallas}
-            onToggleVerPantallas={toggleVerPantallas}
-            thumbs={thumbs}
-            codigoEquipos={id}
-            scope={scope}
-            canManage={canManage}
-        />
+        <>
+            <PanelInicio
+                scope={scope}
+                codigoEquipos={id}
+                conectados={conectados}
+                total={agentes.length}
+                canManage={canManage}
+                onNuevaSesion={() => abrirSesion([])}
+                onVerRegistro={() => setVerRegistro(true)}
+                onConfig={() => setVista('config')}
+            />
+            {modales}
+        </>
+    );
+}
+
+// ── Pantalla de inicio de Equipos: acciones principales + acceso a configuración ──
+function PanelInicio({ scope, codigoEquipos, conectados, total, canManage, onNuevaSesion, onVerRegistro, onConfig }) {
+    const bigBtn = (bg) => ({ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, background: bg, color: 'white', border: 'none', borderRadius: 16, padding: '26px 20px', cursor: 'pointer', fontWeight: 800, fontSize: '1.05rem', minHeight: 120 });
+    return (
+        <div style={{ background: '#0f172a', borderRadius: 14, padding: 20, marginTop: 18, maxWidth: '100%', boxSizing: 'border-box', overflowX: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 18 }}>
+                <h3 style={{ margin: 0, color: 'white', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    🖥️ Equipos{scope === 'comunidad' ? ' del centro' : ''}
+                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#94a3b8' }}>· {conectados} en línea de {total}</span>
+                </h3>
+                <button onClick={onConfig} style={{ background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 10, padding: '8px 14px', cursor: 'pointer', fontWeight: 700 }}>⚙️ Configuración de la sala</button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px,1fr))', gap: 14 }}>
+                {canManage && <button onClick={onNuevaSesion} style={bigBtn('#15803d')}><span style={{ fontSize: 34 }}>📋</span> Crear una nueva sesión</button>}
+                <button onClick={onVerRegistro} style={bigBtn('#2563eb')}><span style={{ fontSize: 34 }}>📚</span> Ver registro de sesiones</button>
+            </div>
+            {!canManage && <div style={{ color: '#94a3b8', fontSize: '0.82rem', marginTop: 12 }}>Tienes acceso de solo lectura: puedes ver el registro de sesiones.</div>}
+        </div>
     );
 }
 
@@ -180,9 +248,9 @@ function GuiaVinculacion({ scope, codigoEquipos, abiertaInicial }) {
                         {paso(2, 'Ejecútalo e instálalo', <>Al abrirlo, Windows avisa de «editor desconocido» → <b>Más información → Ejecutar de todas formas</b>, y acepta los permisos (<b>Sí</b>).</>)}
                         {paso(3, esCom ? 'Elige «Comunidad» y pega el código' : 'Elige «Personal» y pega tu código', (
                             <>En la ventana del agente, marca <b>{esCom ? '🏫 Comunidad' : '👤 Personal'}</b> y pega este código:{' '}
-                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#0f172a', color: '#67e8f9', borderRadius: 8, padding: '2px 8px', fontWeight: 800, fontSize: '0.82rem' }}>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#0f172a', color: '#67e8f9', borderRadius: 8, padding: '2px 8px', fontWeight: 800, fontSize: '0.82rem', maxWidth: '100%', flexWrap: 'wrap', wordBreak: 'break-all' }}>
                                     {codigoEquipos || '—'}
-                                    <button onClick={copiar} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', borderRadius: 6, cursor: 'pointer', fontSize: '0.72rem', padding: '0 6px' }}>copiar</button>
+                                    <button onClick={copiar} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', borderRadius: 6, cursor: 'pointer', fontSize: '0.72rem', padding: '0 6px', flexShrink: 0 }}>copiar</button>
                                 </span>
                             </>
                         ))}
@@ -199,13 +267,29 @@ function GuiaVinculacion({ scope, codigoEquipos, abiertaInicial }) {
 }
 
 // ── Tarjeta de equipos ──
-function PanelEquipos({ agentes, online, onCmd, onCmdTodos, onQuitar, verPantallas, onToggleVerPantallas, thumbs = {}, codigoEquipos, scope, canManage }) {
+function PanelEquipos({ agentes, online, onCmd, onCmdTodos, onQuitar, verPantallas, onToggleVerPantallas, thumbs = {}, codigoEquipos, scope, canManage, onVolver, onNuevaSesion, onMeta }) {
     const conectados = agentes.filter(online);
+
+    // Enciende por Wake-on-LAN los equipos apagados de un grupo, usando los encendidos como emisores.
+    const encender = (grupo) => {
+        // MACs de los equipos apagados del grupo (todas las interfaces conocidas de cada uno).
+        const macs = [...new Set(grupo.filter((a) => !online(a)).flatMap((a) => (a.macs && a.macs.length ? a.macs : (a.mac ? [a.mac] : []))))];
+        const emisores = agentes.filter(online);
+        if (!macs.length) { alert('No hay equipos apagados con MAC conocida en ese grupo. (Enciéndelos una vez con el agente instalado para registrar su MAC.)'); return; }
+        if (!emisores.length) { alert('Hace falta al menos un equipo encendido en la misma red para despertar a los demás.'); return; }
+        emisores.forEach((a) => onCmd(a.id, 'wake', { macs }));
+    };
+    const apagarGrupo = (grupo) => {
+        const ids = grupo.filter(online).map((a) => a.id);
+        if (!ids.length) { alert('No hay equipos encendidos en ese grupo.'); return; }
+        if (window.confirm(`¿Apagar ${ids.length} equipo(s)?`)) ids.forEach((id) => onCmd(id, 'shutdown'));
+    };
+    // Agrupa por ubicación.
+    const porUbicacion = {};
+    agentes.forEach((a) => { const u = (a.ubicacion || '').trim() || 'Sin ubicación'; (porUbicacion[u] = porUbicacion[u] || []).push(a); });
     const [vivo, setVivo] = useState(null);
     const [sel, setSel] = useState(() => new Set());   // ids de equipos seleccionados
     const [ampliada, setAmpliada] = useState(null);     // miniatura ampliada (dataURL) o null
-    const [sesion, setSesion] = useState(null);         // machineIds de la sesión activa, o null
-    const [verRegistro, setVerRegistro] = useState(false);
 
     const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
     const seleccionOnline = () => agentes.filter((a) => sel.has(a.id) && online(a)).map((a) => a.id);
@@ -228,19 +312,26 @@ function PanelEquipos({ agentes, online, onCmd, onCmdTodos, onQuitar, verPantall
         <span style={{ background: bg, color: c, borderRadius: 20, padding: '3px 10px', fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap' }}>{txt}</span>
     );
     const miniBtn = (bg) => ({ background: bg, color: 'white', border: 'none', borderRadius: 8, padding: '5px 10px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 700 });
+    const metaInp = { background: 'rgba(255,255,255,0.08)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, padding: '4px 6px', fontSize: '0.74rem', boxSizing: 'border-box' };
 
     const etiquetaCodigo = scope === 'comunidad' ? 'código de la comunidad' : 'código de equipos';
 
     return (
-        <div style={{ background: '#0f172a', borderRadius: 14, padding: 16, marginTop: 18 }}>
+        <div style={{ background: '#0f172a', borderRadius: 14, padding: 16, marginTop: 18, maxWidth: '100%', boxSizing: 'border-box', overflowX: 'hidden' }}>
+            {onVolver && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                    <button onClick={onVolver} style={{ background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 10, padding: '6px 12px', cursor: 'pointer', fontWeight: 700 }}>← Volver</button>
+                    <span style={{ color: '#e2e8f0', fontWeight: 800 }}>⚙️ Configuración de la sala</span>
+                </div>
+            )}
             {codigoEquipos && <GuiaVinculacion scope={scope} codigoEquipos={codigoEquipos} abiertaInicial={agentes.length === 0} />}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
                 <h3 style={{ margin: 0, color: 'white', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     🖥️ Equipos{scope === 'comunidad' ? ' del centro' : ' del aula'} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#94a3b8' }}>· {conectados.length} en línea de {agentes.length}</span>
                     {codigoEquipos && (
-                        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a', background: '#67e8f9', borderRadius: 20, padding: '2px 10px', display: 'inline-flex', alignItems: 'center', gap: 6 }} title="Código para vincular los equipos (no cambia)">
+                        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a', background: '#67e8f9', borderRadius: 14, padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: 6, maxWidth: '100%', flexWrap: 'wrap', wordBreak: 'break-all' }} title="Código para vincular los equipos (no cambia)">
                             {etiquetaCodigo}: {codigoEquipos}
-                            <button onClick={() => navigator.clipboard?.writeText(codigoEquipos)} style={{ background: 'rgba(15,23,42,0.15)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: '0.72rem', padding: '0 5px' }}>copiar</button>
+                            <button onClick={() => navigator.clipboard?.writeText(codigoEquipos)} style={{ background: 'rgba(15,23,42,0.15)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: '0.72rem', padding: '0 5px', flexShrink: 0 }}>copiar</button>
                         </span>
                     )}
                     {codigoEquipos && (
@@ -257,11 +348,11 @@ function PanelEquipos({ agentes, online, onCmd, onCmdTodos, onQuitar, verPantall
                         </button>
                         <button onClick={() => onCmdTodos('lock', { message: 'Atiende a la pantalla del profesor' })} style={miniBtn('#dc2626')}>🔒 Bloquear todos</button>
                         <button onClick={() => onCmdTodos('unlock')} style={miniBtn('#16a34a')}>🔓 Desbloquear todos</button>
+                        <button onClick={() => { if (window.confirm('¿Parar las órdenes activas en todos los equipos (desbloquear, parar captura/vídeo)?')) onCmdTodos('reset'); }} style={miniBtn('#0f766e')}>🧯 Parar órdenes</button>
                         <button onClick={() => { const m = pedirMensaje(); if (m) onCmdTodos('message', { text: m }); }} style={miniBtn('#7c3aed')}>💬 Mensaje a todos</button>
                         <button onClick={() => energiaA(conectados.map((a) => a.id), 'logoff', 'Cerrar sesión en')} style={miniBtn('#0891b2')}>🚪 Cerrar sesión</button>
                         <button onClick={() => energiaA(conectados.map((a) => a.id), 'reboot', 'Reiniciar')} style={miniBtn('#ca8a04')}>🔄 Reiniciar</button>
                         <button onClick={() => energiaA(conectados.map((a) => a.id), 'shutdown', 'Apagar')} style={miniBtn('#475569')}>🔌 Apagar</button>
-                        <button onClick={() => setVerRegistro(true)} style={miniBtn('#1e293b')}>📚 Registro de uso</button>
                     </div>
                 )}
             </div>
@@ -269,15 +360,40 @@ function PanelEquipos({ agentes, online, onCmd, onCmdTodos, onQuitar, verPantall
             {canManage && sel.size > 0 && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', background: 'rgba(37,99,235,0.15)', border: '1px solid #2563eb', borderRadius: 10, padding: '8px 12px', marginBottom: 12 }}>
                     <span style={{ color: '#bfdbfe', fontWeight: 800, fontSize: '0.82rem' }}>{sel.size} seleccionado(s):</span>
-                    <button onClick={() => setSesion([...sel])} style={miniBtn('#15803d')}>📋 Crear sesión</button>
+                    <button onClick={() => onNuevaSesion([...sel])} style={miniBtn('#15803d')}>📋 Crear sesión</button>
                     <button onClick={() => aplicarA(seleccionOnline(), 'lock', { message: 'Atiende a la pantalla del profesor' })} style={miniBtn('#dc2626')}>🔒 Bloquear</button>
                     <button onClick={() => aplicarA(seleccionOnline(), 'unlock')} style={miniBtn('#16a34a')}>🔓 Desbloquear</button>
+                    <button onClick={() => aplicarA(seleccionOnline(), 'reset')} style={miniBtn('#0f766e')}>🧯 Parar</button>
                     <button onClick={() => { const m = pedirMensaje(); if (m) aplicarA(seleccionOnline(), 'message', { text: m }); }} style={miniBtn('#7c3aed')}>💬 Mensaje</button>
                     <button onClick={() => { const u = pedirUrl(); if (u) aplicarA(seleccionOnline(), 'openUrl', { url: u }); }} style={miniBtn('#0ea5e9')}>🌐 Abrir web</button>
                     <button onClick={() => energiaA(seleccionOnline(), 'logoff', 'Cerrar sesión en')} style={miniBtn('#0891b2')}>🚪 Cerrar sesión</button>
                     <button onClick={() => energiaA(seleccionOnline(), 'reboot', 'Reiniciar')} style={miniBtn('#ca8a04')}>🔄 Reiniciar</button>
                     <button onClick={() => energiaA(seleccionOnline(), 'shutdown', 'Apagar')} style={miniBtn('#475569')}>🔌 Apagar</button>
                     <button onClick={() => setSel(new Set())} style={{ ...miniBtn('transparent'), color: '#bfdbfe' }}>✕ deseleccionar</button>
+                </div>
+            )}
+
+            {canManage && agentes.length > 0 && (
+                <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: 12, marginBottom: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                        <span style={{ color: '#e2e8f0', fontWeight: 700 }}>⚡ Energía por ubicación</span>
+                        <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            <button onClick={() => apagarGrupo(agentes)} style={miniBtn('#475569')}>🔌 Apagar todos</button>
+                            <button onClick={() => encender(agentes)} style={miniBtn('#0891b2')}>⚡ Encender todos</button>
+                        </span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {Object.entries(porUbicacion).map(([u, grupo]) => (
+                            <div key={u} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: '6px 10px' }}>
+                                <span style={{ color: 'white', fontSize: '0.85rem', fontWeight: 700 }}>📍 {u} <span style={{ color: '#94a3b8', fontWeight: 500 }}>· {grupo.filter(online).length}/{grupo.length} encendidos</span></span>
+                                <span style={{ display: 'flex', gap: 6 }}>
+                                    <button onClick={() => apagarGrupo(grupo)} style={miniBtn('#475569')}>🔌 Apagar</button>
+                                    <button onClick={() => encender(grupo)} style={miniBtn('#0891b2')}>⚡ Encender</button>
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                    <div style={{ color: '#64748b', fontSize: '0.72rem', marginTop: 8 }}>«Encender» usa Wake-on-LAN: requiere WoL activado en la BIOS, cable de red y un equipo encendido en la misma red.</div>
                 </div>
             )}
 
@@ -309,12 +425,22 @@ function PanelEquipos({ agentes, online, onCmd, onCmdTodos, onQuitar, verPantall
                                     <div style={{ display: 'flex', gap: 6 }}>
                                         {on ? badge('🟢 En línea', '#064e3b', '#6ee7b7') : badge('⚫ Desconectado', '#334155', '#cbd5e1')}
                                         {a.locked && badge('🔒', '#7f1d1d', '#fecaca')}
+                                        {a.live && badge('📹 en uso', '#1e3a8a', '#bfdbfe')}
                                     </div>
                                 </div>
                                 {(a.battery != null || a.student?.name) && (
                                     <div style={{ display: 'flex', gap: 12, fontSize: '0.74rem', color: '#94a3b8', marginBottom: 6, flexWrap: 'wrap' }}>
                                         {a.battery != null && <span style={{ color: a.battery <= 20 ? '#f87171' : '#94a3b8' }}>🔋 {a.battery}%</span>}
                                         {a.student?.name && <span>👤 {a.student.name}</span>}
+                                    </div>
+                                )}
+                                {canManage && onMeta && (
+                                    <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
+                                        <select value={a.tipo || 'alumno'} onChange={(e) => onMeta(a.id, { tipo: e.target.value })} style={metaInp}>
+                                            <option value="alumno">👦 Alumno</option>
+                                            <option value="profesor">🧑‍🏫 Profesor</option>
+                                        </select>
+                                        <input defaultValue={a.ubicacion || ''} onBlur={(e) => { const v = e.target.value.trim(); if (v !== (a.ubicacion || '')) onMeta(a.id, { ubicacion: v }); }} placeholder="📍 ubicación" style={{ ...metaInp, flex: 1, minWidth: 90 }} />
                                     </div>
                                 )}
                                 {verPantallas && (
@@ -342,6 +468,7 @@ function PanelEquipos({ agentes, online, onCmd, onCmdTodos, onQuitar, verPantall
                                         <button onClick={() => { const m = pedirMensaje(); if (m) onCmd(a.id, 'message', { text: m }); }} disabled={!on} style={{ ...miniBtn('#7c3aed'), opacity: on ? 1 : 0.5 }}>💬</button>
                                         <button onClick={() => { const u = pedirUrl(); if (u) onCmd(a.id, 'openUrl', { url: u }); }} disabled={!on} style={{ ...miniBtn('#0ea5e9'), opacity: on ? 1 : 0.5 }}>🌐 Abrir web</button>
                                         <button onClick={() => setVivo(a)} disabled={!on} style={{ ...miniBtn('#e11d48'), opacity: on ? 1 : 0.5 }}>📹 En vivo</button>
+                                        <button onClick={() => onCmd(a.id, 'reset')} disabled={!on} title="Parar órdenes / desbloquear este equipo" style={{ ...miniBtn('#0f766e'), opacity: on ? 1 : 0.5 }}>🧯</button>
                                         {!on && <button onClick={() => onQuitar(a)} title="Quitar de la lista" style={miniBtn('#475569')}>✕</button>}
                                     </div>
                                 ) : (
@@ -355,13 +482,6 @@ function PanelEquipos({ agentes, online, onCmd, onCmdTodos, onQuitar, verPantall
 
             {vivo && (
                 <VistaEnVivo scope={scope} codigoEquipos={codigoEquipos} agente={vivo} onCmd={onCmd} onClose={() => setVivo(null)} />
-            )}
-
-            {sesion && (
-                <SesionEquipos scope={scope} codigoEquipos={codigoEquipos} agentes={agentes} machineIds={sesion} online={online} onCmd={onCmd} onClose={() => setSesion(null)} />
-            )}
-            {verRegistro && (
-                <RegistroSesiones codigoEquipos={codigoEquipos} onClose={() => setVerRegistro(false)} />
             )}
 
             {ampliada && (
@@ -381,6 +501,7 @@ function PanelEquipos({ agentes, online, onCmd, onCmdTodos, onQuitar, verPantall
 function VistaEnVivo({ scope, codigoEquipos, agente, onCmd, onClose }) {
     const videoRef = useRef(null);
     const [estado, setEstado] = useState('Conectando con el equipo…');
+    const [avisoToma] = useState(() => !!agente?.live); // ya lo veía otro profe → al conectar tomas el control
 
     useEffect(() => {
         if (!codigoEquipos || !agente) return;
@@ -446,6 +567,11 @@ function VistaEnVivo({ scope, codigoEquipos, agente, onCmd, onClose }) {
                 📹 {agente?.name || 'Equipo'} — en vivo
                 <button onClick={onClose} style={{ background: '#e11d48', color: 'white', border: 'none', borderRadius: 8, padding: '5px 12px', cursor: 'pointer', fontWeight: 700 }}>Cerrar</button>
             </div>
+            {avisoToma && (
+                <div style={{ background: '#78350f', color: '#fde68a', borderRadius: 8, padding: '6px 12px', fontSize: '0.82rem' }}>
+                    ⚠️ Otro profesor estaba viendo este equipo. Al conectar tomas tú el control del vídeo.
+                </div>
+            )}
             <div onClick={(e) => e.stopPropagation()} style={{ position: 'relative', width: 'min(92vw, 1280px)', aspectRatio: '16 / 9', background: '#000', borderRadius: 12, overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}>
                 <video ref={videoRef} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000' }} />
                 {estado && (

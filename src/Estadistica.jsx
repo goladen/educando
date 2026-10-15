@@ -149,7 +149,8 @@ export default function EstadisticaApp({ onExit, usuario }) {
     const [errorEnv,setErrorEnv]=useState('');
     const [isFullscreen,setIsFullscreen]=useState(false);
     const [modoClase,setModoClase]=useState(false);
-    const [explorador,setExplorador]=useState(false);
+    // ?ine=… (enlace compartido desde el Explorador INE) abre directamente los datos del INE
+    const [explorador,setExplorador]=useState(()=>new URLSearchParams(window.location.search).has('ine'));
     const appRef=useRef(null);
 
     useEffect(()=>{ const fn=()=>setIsFullscreen(!!document.fullscreenElement); document.addEventListener('fullscreenchange',fn); return()=>document.removeEventListener('fullscreenchange',fn); },[]);
@@ -253,7 +254,7 @@ export default function EstadisticaApp({ onExit, usuario }) {
                             <span style={{fontSize:34}}>🇪🇸</span>
                             <span>
                                 <span style={{display:'block',fontWeight:700,fontSize:'1rem',color:D.green2,marginBottom:4}}>Datos reales del INE — busca tu población</span>
-                                <span style={{display:'block',fontSize:'0.83rem',color:D.muted,lineHeight:1.5}}>Población desde 1996, hombres y mujeres, edades, renta y desigualdad de cualquier municipio de España, comparado con su provincia.</span>
+                                <span style={{display:'block',fontSize:'0.83rem',color:D.muted,lineHeight:1.5}}>Población, superficie y densidad, edades, renta y desigualdad de cualquier municipio, provincia o comunidad autónoma. Compara dos lugares y comparte el enlace.</span>
                             </span>
                         </button>
                     </div>
@@ -312,7 +313,7 @@ export default function EstadisticaApp({ onExit, usuario }) {
             {modoClase&&<ModoClase onClose={()=>setModoClase(false)}/>}
             {explorador&&(
                 <React.Suspense fallback={<div style={{position:'fixed',inset:0,zIndex:9000,background:D.bg,color:D.muted,display:'flex',alignItems:'center',justifyContent:'center'}}>Cargando…</div>}>
-                    <ExploradorINE onClose={()=>setExplorador(false)}/>
+                    <ExploradorINE onClose={()=>setExplorador(false)} rutaCompartir={claves=>`${window.location.origin}${RUTA_ESTADISTICA}?ine=${claves.join(',')}`}/>
                 </React.Suspense>
             )}
 

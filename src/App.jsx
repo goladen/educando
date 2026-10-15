@@ -12,6 +12,7 @@ const IrregularVerbsTest = lazy(() => import('./IrregularVerbsTest'));
 import { SolarSystemViewer } from './components/LandingGames3';
 const ImperiosGame = lazy(() => import('./components/ImperiosGame'));
 const ComunidadesPublico = lazy(() => import('./components/ComunidadesPublico'));
+const PaginaRegistroEquipos = lazy(() => import('./PaginaRegistroEquipos'));
 const CompeticionPublica = lazy(() => import('./components/CompeticionPublica'));
 const QuienEsQuien = lazy(() => import('./QuienEsQuien'));
 const QuienEsQuienHistorico = lazy(() => import('./QuienEsQuienHistorico'));
@@ -76,6 +77,7 @@ function App() {
     const [climbing,          setClimbing]          = useState(false);
     const [questionSenderCode,setQuestionSenderCode]= useState(null);
     const [aulaCode,          setAulaCode]          = useState(null); // Control de Aula: alumno vía ?aula=CODE o /join
+    const [registroEquiposId, setRegistroEquiposId] = useState(null); // Registro de equipos por enlace ?equipos_registro=<comId>
 
     // ANNOTATION OVERLAY + PIZARRA DESDE CAPTURA
     const [annotationOpen,   setAnnotationOpen]   = useState(false);
@@ -105,6 +107,8 @@ function App() {
       const params = new URLSearchParams(window.location.search);
       const aula = params.get('aula');
       if (aula !== null) { setAulaCode(aula.toUpperCase()); return; }
+      const regEq = params.get('equipos_registro');
+      if (regEq) { setRegistroEquiposId(regEq); return; }
       const mid = params.get('miniapp');
       if (mid) { setMiniappId(mid); return; }
       const trivialEnvio = params.get('trivial_envio');
@@ -363,6 +367,13 @@ function App() {
 
     // Vista del alumno de Control de Aula (no requiere login) — ?aula=CODE o /join
     if (aulaCode !== null) return <StudentJoinView codigoInicial={aulaCode} onExit={() => { setAulaCode(null); window.history.pushState({}, '', '/'); }} />;
+
+    // Registro de uso de equipos por enlace (?equipos_registro=<comId>) — requiere ser miembro.
+    if (registroEquiposId) return (
+        <Suspense fallback={null}>
+            <PaginaRegistroEquipos comId={registroEquiposId} onExit={() => { setRegistroEquiposId(null); window.history.pushState({}, '', '/'); }} />
+        </Suspense>
+    );
 
     // Mini-app pública (no requiere login)
     if (miniappId) return <MiniAppViewer miniappId={miniappId} onBack={() => { setMiniappId(null); window.history.pushState({}, '', '/'); }} />;

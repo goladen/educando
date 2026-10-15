@@ -148,7 +148,7 @@ function ModalCrearComunidad({ usuario, onClose, onCreada }) {
                     placeholder="https://…" style={st.input} />
                 <div style={st.aviso}>
                     <Lock size={14} style={{ flexShrink: 0, marginTop: 1 }} />
-                    Cualquier profesor verá el nombre y el escaparate. Para entrar deberá <strong>pedir acceso</strong> (tú lo apruebas) o aceptar tu <strong>invitación</strong>.
+                    <span>Cualquier profesor verá el nombre y el escaparate. Para entrar deberá <strong>pedir acceso</strong> (tú lo apruebas) o aceptar tu <strong>invitación</strong>.</span>
                 </div>
                 {error && <div style={st.error}>{error}</div>}
                 <div style={st.btnRow}>
@@ -206,7 +206,7 @@ function ModalCompartirGrupo({ usuario, comunidad, onClose, onCompartido }) {
                 </div>
                 <div style={st.aviso}>
                     <ShieldCheck size={14} style={{ flexShrink: 0, marginTop: 1 }} />
-                    Se comparte solo la <strong>lista de nombres</strong> de los alumnos. Las notas y calificaciones <strong>nunca</strong> se comparten.
+                    <span>Se comparte solo la <strong>lista de nombres</strong> de los alumnos. Las notas y calificaciones <strong>nunca</strong> se comparten.</span>
                 </div>
                 {cargando ? (
                     <div style={st.loader}><RefreshCw size={22} style={{ animation: 'spin 1s linear infinite' }} /></div>
@@ -3000,7 +3000,7 @@ function DetalleComunidad({ usuario, comunidad, onBack, onSalir, onCambio, tabIn
             </div>
 
             {/* Tabs */}
-            <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '2px solid #e0e4f0' }}>
+            <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '2px solid #e0e4f0', flexWrap: 'wrap' }}>
                 {[['cursos', '📚 Cursos'], ['calendario', '📅 Calendario'], ['profesores', '👤 Profesores'], ['competiciones', '🏆 Competiciones'], ['equipos', '🖥️ Equipos'], ['mensajes', '💬 Mensajes'], ['miembros', '👤 Miembros']].map(([id, lbl]) => (
                     <button key={id} onClick={() => setTab(id)} style={{ ...st.tabBtn, color: tab === id ? AZUL : '#7f8c8d', borderBottom: tab === id ? `3px solid ${AZUL}` : '3px solid transparent', fontWeight: tab === id ? 700 : 500 }}>{lbl}</button>
                 ))}
@@ -3010,7 +3010,7 @@ function DetalleComunidad({ usuario, comunidad, onBack, onSalir, onCambio, tabIn
             {soloLectura && tab !== 'mensajes' && tab !== 'miembros' && (
                 <div style={{ ...st.aviso, marginBottom: 12 }}>
                     <Eye size={15} style={{ flexShrink: 0, marginTop: 1 }} />
-                    Tienes acceso de <strong>&nbsp;solo lectura&nbsp;</strong>: puedes verlo todo, pero no hacer cambios.
+                    <span>Tienes acceso de <strong>&nbsp;solo lectura&nbsp;</strong>: puedes verlo todo, pero no hacer cambios.</span>
                 </div>
             )}
 
@@ -3049,7 +3049,7 @@ function DetalleComunidad({ usuario, comunidad, onBack, onSalir, onCambio, tabIn
             {tab === 'profesores' && <ProfesoresPanel usuario={usuario} comunidad={comunidad} soloLectura={soloLectura} />}
             {tab === 'calendario' && <PanelCalendarios usuario={usuario} comunidad={comunidad} soloLectura={soloLectura} />}
             {tab === 'competiciones' && <CompeticionesComunidadPanel usuario={usuario} comunidad={comunidad} soloLectura={soloLectura} />}
-            {tab === 'equipos' && <GestionEquipos scope="comunidad" id={comunidad.id} canManage={!soloLectura} />}
+            {tab === 'equipos' && <GestionEquipos scope="comunidad" id={comunidad.id} canManage={!soloLectura} esGestor={esCreador} />}
             {tab === 'mensajes' && <PanelMensajes usuario={usuario} comunidad={comunidad} />}
             {tab === 'miembros' && <PanelMiembros usuario={usuario} comunidad={comunidad} onCambio={onCambio} />}
 
@@ -3161,7 +3161,7 @@ export default function ComunidadesTab({ usuario }) {
 
             <div style={{ ...st.aviso, marginBottom: 18 }}>
                 <Lock size={16} style={{ flexShrink: 0, marginTop: 1 }} />
-                Comparte <strong>grupos de alumnos</strong> (solo nombres) y mensajes con otros profesores. El contenido solo es visible para los <strong>miembros</strong>; para entrar hay que pedir acceso o ser invitado.
+                <span>Comparte <strong>grupos de alumnos</strong> (solo nombres) y mensajes con otros profesores. El contenido solo es visible para los <strong>miembros</strong>; para entrar hay que pedir acceso o ser invitado.</span>
             </div>
 
             {error && <div style={{ ...st.error, marginBottom: 12 }}>{error}</div>}

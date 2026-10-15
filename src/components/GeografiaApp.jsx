@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { db } from '../firebase';
 import { collection, addDoc, doc, getDoc, setDoc, onSnapshot, updateDoc, increment } from 'firebase/firestore';
 import correctSoundFile from '../assets/correct-choice-43861.mp3';
@@ -7,6 +7,9 @@ import { CompeticionCuerda } from './TironCuerdaEscena';
 import ModalEnviarCompeticion from './ModalEnviarCompeticion';
 import { leerRetoUrl } from '../utils/retoLink';
 import BotonFichas from './BotonFichas';
+
+// Datos reales del INE (municipios, provincias, comunidades); compartido con Estadística
+const ExploradorINE = lazy(() => import('../estadistica/ExploradorINE'));
 
 const WORLD_URL    = 'https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson';
 const ESP_PROV_URL = 'https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/spain-provinces.geojson';
@@ -679,7 +682,7 @@ function PanelGeoCompeticion({ aplicar, bloqueado, equipo, tipo = 'mix', ambito 
   );
 }
 
-function GeografiaAppInner({ onBack, onCreateLive, onJoinLive }) {
+function GeografiaAppInner({ onBack, onCreateLive, onJoinLive, onAbrirINE }) {
   // Reto por enlace: configuración fija (y, si viene de una competición, envío allí)
   const [reto] = useState(() => leerRetoUrl());
   const esRetoCompeticion = !!(reto && reto.compId && reto.catId);
@@ -1229,6 +1232,18 @@ function GeografiaAppInner({ onBack, onCreateLive, onJoinLive }) {
 
           {/* Fichas imprimibles de Geografía (para el profesor) */}
           <div style={{ marginTop:10 }}><BotonFichas materia="geografia" color="#0d9488" texto="Fichas de Geografía para imprimir" /></div>
+
+          {/* Datos reales del INE */}
+          {onAbrirINE && (
+            <button onClick={onAbrirINE}
+              style={{ width:'100%', marginTop:10, padding:'12px 14px', borderRadius:14, border:'1px solid rgba(255,255,255,0.18)', background:'rgba(255,255,255,0.08)', color:'white', cursor:'pointer', textAlign:'left', display:'flex', alignItems:'center', gap:12 }}>
+              <span style={{ fontSize:28 }}>🇪🇸</span>
+              <span>
+                <span style={{ display:'block', fontWeight:800, fontSize:'0.95rem' }}>Datos reales del INE</span>
+                <span style={{ display:'block', fontSize:'0.75rem', opacity:0.7, marginTop:2 }}>Población, superficie y densidad de municipios, provincias y comunidades · compara dos lugares</span>
+              </span>
+            </button>
+          )}
 
           {/* Live mode */}
           <div style={{ marginTop:16, borderTop:'1px solid rgba(255,255,255,0.1)', paddingTop:16 }}>
@@ -2100,6 +2115,8 @@ export default function GeografiaApp({ onBack }) {
   const [liveConfig, setLiveConfig] = useState(false);
   const [liveHost,   setLiveHost]   = useState(null);
   const [liveClient, setLiveClient] = useState(null);
+  // ?ine=… (enlace compartido desde el Explorador INE) abre directamente los datos del INE
+  const [explorINE,  setExplorINE]  = useState(() => new URLSearchParams(window.location.search).has('ine'));
 
   if (liveHost)   return <GeografiaLiveHost   codigo={liveHost}          onSalir={() => setLiveHost(null)}   />;
   if (liveClient) return <GeografiaLiveClient codigo={liveClient.codigo} player={liveClient.player} onSalir={() => setLiveClient(null)} />;
@@ -2116,7 +2133,14 @@ export default function GeografiaApp({ onBack }) {
         onBack={onBack}
         onCreateLive={() => setLiveConfig(true)}
         onJoinLive={(code, player) => setLiveClient({ codigo: code, player })}
+        onAbrirINE={() => setExplorINE(true)}
       />
+      {explorINE && (
+        <Suspense fallback={<div style={{ position:'fixed', inset:0, zIndex:9000, background:'#0d1117', color:'#8b949e', display:'flex', alignItems:'center', justifyContent:'center' }}>Cargando…</div>}>
+          <ExploradorINE onClose={() => setExplorINE(false)}
+            rutaCompartir={claves => `${window.location.origin}/?juego=geografia&ine=${claves.join(',')}`} />
+        </Suspense>
+      )}
     </>
   );
 }

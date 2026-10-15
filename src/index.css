@@ -1,1 +1,12 @@
-
+/* Barrera global contra el desbordamiento horizontal en móvil:
+   evita que un elemento ancho ensanche toda la página y deje el contenido
+   apretado a la izquierda con hueco en blanco a la derecha. */
+html, body {
+  margin: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+#root {
+  max-width: 100%;
+  overflow-x: hidden;
+}

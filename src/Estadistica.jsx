@@ -7,6 +7,8 @@ import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
 import PantallaReto, { textoBotonEnvio } from './components/retos/PantallaReto';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 
+const ExploradorINE = React.lazy(() => import('./estadistica/ExploradorINE'));
+
 const D = {
     bg:'#0d1117', card:'#161b22', border:'#30363d',
     text:'#e6edf3', muted:'#8b949e', accent:'#3498db',
@@ -147,6 +149,7 @@ export default function EstadisticaApp({ onExit, usuario }) {
     const [errorEnv,setErrorEnv]=useState('');
     const [isFullscreen,setIsFullscreen]=useState(false);
     const [modoClase,setModoClase]=useState(false);
+    const [explorador,setExplorador]=useState(false);
     const appRef=useRef(null);
 
     useEffect(()=>{ const fn=()=>setIsFullscreen(!!document.fullscreenElement); document.addEventListener('fullscreenchange',fn); return()=>document.removeEventListener('fullscreenchange',fn); },[]);
@@ -243,6 +246,16 @@ export default function EstadisticaApp({ onExit, usuario }) {
                             </button>
                             <div style={{fontSize:'0.75rem',color:D.muted,marginTop:6}}>Introduce los datos en clase y comprueba fi, %, xᵢ·nᵢ y (xᵢ−x̄)²·nᵢ</div>
                         </div>
+                        <button onClick={()=>setExplorador(true)}
+                            style={{...CARD,marginTop:20,width:'100%',cursor:'pointer',textAlign:'left',color:D.text,border:`2px solid ${D.green}`,display:'flex',alignItems:'center',gap:14}}
+                            onMouseEnter={e=>e.currentTarget.style.background='#1c2230'}
+                            onMouseLeave={e=>e.currentTarget.style.background=D.card}>
+                            <span style={{fontSize:34}}>🇪🇸</span>
+                            <span>
+                                <span style={{display:'block',fontWeight:700,fontSize:'1rem',color:D.green2,marginBottom:4}}>Datos reales del INE — busca tu población</span>
+                                <span style={{display:'block',fontSize:'0.83rem',color:D.muted,lineHeight:1.5}}>Población desde 1996, hombres y mujeres, edades, renta y desigualdad de cualquier municipio de España, comparado con su provincia.</span>
+                            </span>
+                        </button>
                     </div>
                 )}
 
@@ -297,6 +310,11 @@ export default function EstadisticaApp({ onExit, usuario }) {
             </div>
 
             {modoClase&&<ModoClase onClose={()=>setModoClase(false)}/>}
+            {explorador&&(
+                <React.Suspense fallback={<div style={{position:'fixed',inset:0,zIndex:9000,background:D.bg,color:D.muted,display:'flex',alignItems:'center',justifyContent:'center'}}>Cargando…</div>}>
+                    <ExploradorINE onClose={()=>setExplorador(false)}/>
+                </React.Suspense>
+            )}
 
             {/* Send modal */}
             {showEnviar&&(

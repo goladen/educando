@@ -20,11 +20,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { db } from './firebase';
 import { doc, setDoc, onSnapshot, collection, getDocs, deleteDoc, addDoc } from 'firebase/firestore';
+import SesionEquipos, { RegistroSesiones } from './SesionEquipos';
 
 const DESCONEXION_MS = 20000;
 const ICE_FALLBACK = [{ urls: 'stun:stun.l.google.com:19302' }];
 // Instalador del Agente Pikt (GitHub Releases). Actualiza la URL al subir una versión nueva.
-const URL_AGENTE = 'https://github.com/goladen/pikt-agente/releases/download/v.0.1.1/AgentePikt-Setup-0.1.1.exe';
+const URL_AGENTE = 'https://github.com/goladen/pikt-agente/releases/download/v.0.1.2/AgentePikt-Setup-0.1.2.exe';
 
 export const collForScope = (scope) => (scope === 'comunidad' ? 'aulas_comunidad' : 'aulas_fijas');
 
@@ -132,10 +133,88 @@ export default function GestionEquipos({ scope = 'personal', id, canManage = tru
     );
 }
 
+// ── Guía paso a paso para vincular los equipos del centro (sobre todo en comunidad) ──
+function GuiaVinculacion({ scope, codigoEquipos, abiertaInicial }) {
+    const [abierta, setAbierta] = useState(abiertaInicial);
+    const esCom = scope === 'comunidad';
+    const copiar = () => { try { navigator.clipboard?.writeText(codigoEquipos || ''); } catch { /* nada */ } };
+
+    const paso = (n, titulo, cuerpo) => (
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+            <div style={{ flexShrink: 0, width: 28, height: 28, borderRadius: '50%', background: '#2563eb', color: 'white', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem' }}>{n}</div>
+            <div style={{ fontSize: '0.9rem', color: '#334155', lineHeight: 1.5 }}><b>{titulo}</b><br />{cuerpo}</div>
+        </div>
+    );
+
+    return (
+        <div style={{ background: 'white', borderRadius: 12, padding: 16, marginBottom: 14, border: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, cursor: 'pointer' }} onClick={() => setAbierta((v) => !v)}>
+                <h4 style={{ margin: 0, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}>📘 Cómo vincular los equipos del centro</h4>
+                <span style={{ color: '#64748b', fontSize: '0.85rem', fontWeight: 700 }}>{abierta ? '▲ ocultar' : '▼ ver guía'}</span>
+            </div>
+
+            {abierta && (
+                <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, padding: 12, fontSize: '0.88rem', color: '#1e3a8a', lineHeight: 1.55 }}>
+                        Esta herramienta instala un pequeño programa (<b>Agente Pikt</b>) en los ordenadores del centro
+                        para <b>supervisarlos y gestionarlos</b> (ver pantallas, bloquear, lanzar webs, vídeo en vivo),
+                        funcionen donde funcionen (también fuera del centro). {esCom && 'Todos los miembros de la comunidad los ven; los de solo lectura solo los ven.'}
+                    </div>
+
+                    <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: 12, fontSize: '0.88rem', color: '#991b1b', lineHeight: 1.55 }}>
+                        ⚠️ <b>Solo funciona en Windows.</b> En tablets, móviles o Chromebooks no se puede instalar el agente.
+                    </div>
+
+                    <div style={{ background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: 10, padding: 12, fontSize: '0.85rem', color: '#475569', lineHeight: 1.55 }}>
+                        <b>No confundir con «Control de Aula»:</b>
+                        <div style={{ marginTop: 6 }}>
+                            🧭 <b>Control de Aula</b> — supervisión <b>dentro del navegador</b>, por sesión con código/QR, en <b>cualquier dispositivo</b> y <b>sin instalar nada</b>. Para dirigir actividades en clase.
+                        </div>
+                        <div style={{ marginTop: 6 }}>
+                            🖥️ <b>Vinculación de equipos</b> (esto) — supervisión del <b>ordenador entero</b>, <b>permanente</b>, con un programa instalado. <b>Solo Windows</b>. Para gestionar los PCs del centro.
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        {paso(1, 'Descarga el Agente Pikt en cada ordenador', <>Pulsa el botón <b>⬇️ Descargar Agente</b> (arriba) en el propio PC del centro, o lleva el instalador por USB.</>)}
+                        {paso(2, 'Ejecútalo e instálalo', <>Al abrirlo, Windows avisa de «editor desconocido» → <b>Más información → Ejecutar de todas formas</b>, y acepta los permisos (<b>Sí</b>).</>)}
+                        {paso(3, esCom ? 'Elige «Comunidad» y pega el código' : 'Elige «Personal» y pega tu código', (
+                            <>En la ventana del agente, marca <b>{esCom ? '🏫 Comunidad' : '👤 Personal'}</b> y pega este código:{' '}
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#0f172a', color: '#67e8f9', borderRadius: 8, padding: '2px 8px', fontWeight: 800, fontSize: '0.82rem' }}>
+                                    {codigoEquipos || '—'}
+                                    <button onClick={copiar} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', borderRadius: 6, cursor: 'pointer', fontSize: '0.72rem', padding: '0 6px' }}>copiar</button>
+                                </span>
+                            </>
+                        ))}
+                        {paso(4, '¡Listo! Queda vinculado para siempre', <>El equipo aparecerá abajo como <b>🟢 En línea</b>, arrancará solo con Windows y se <b>actualizará solo</b>. Repite en cada ordenador.</>)}
+                    </div>
+
+                    <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                        ¿Muchos equipos? Se puede desplegar de forma desatendida por IT (instalación silenciosa + código pre-configurado). Pídelo si lo necesitas.
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
 // ── Tarjeta de equipos ──
 function PanelEquipos({ agentes, online, onCmd, onCmdTodos, onQuitar, verPantallas, onToggleVerPantallas, thumbs = {}, codigoEquipos, scope, canManage }) {
     const conectados = agentes.filter(online);
     const [vivo, setVivo] = useState(null);
+    const [sel, setSel] = useState(() => new Set());   // ids de equipos seleccionados
+    const [ampliada, setAmpliada] = useState(null);     // miniatura ampliada (dataURL) o null
+    const [sesion, setSesion] = useState(null);         // machineIds de la sesión activa, o null
+    const [verRegistro, setVerRegistro] = useState(false);
+
+    const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+    const seleccionOnline = () => agentes.filter((a) => sel.has(a.id) && online(a)).map((a) => a.id);
+    // Aplica una orden a un conjunto de equipos (solo a los que estén en línea).
+    const aplicarA = (ids, type, payload = {}) => ids.forEach((id) => onCmd(id, type, payload));
+    const energiaA = (ids, type, verbo) => {
+        if (!ids.length) return;
+        if (window.confirm(`¿${verbo} ${ids.length} equipo(s)? Esta acción es inmediata.`)) aplicarA(ids, type);
+    };
 
     const pedirMensaje = () => {
         const txt = window.prompt('Mensaje para mostrar en las pantallas:');
@@ -154,6 +233,7 @@ function PanelEquipos({ agentes, online, onCmd, onCmdTodos, onQuitar, verPantall
 
     return (
         <div style={{ background: '#0f172a', borderRadius: 14, padding: 16, marginTop: 18 }}>
+            {codigoEquipos && <GuiaVinculacion scope={scope} codigoEquipos={codigoEquipos} abiertaInicial={agentes.length === 0} />}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
                 <h3 style={{ margin: 0, color: 'white', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     🖥️ Equipos{scope === 'comunidad' ? ' del centro' : ' del aula'} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#94a3b8' }}>· {conectados.length} en línea de {agentes.length}</span>
@@ -178,9 +258,28 @@ function PanelEquipos({ agentes, online, onCmd, onCmdTodos, onQuitar, verPantall
                         <button onClick={() => onCmdTodos('lock', { message: 'Atiende a la pantalla del profesor' })} style={miniBtn('#dc2626')}>🔒 Bloquear todos</button>
                         <button onClick={() => onCmdTodos('unlock')} style={miniBtn('#16a34a')}>🔓 Desbloquear todos</button>
                         <button onClick={() => { const m = pedirMensaje(); if (m) onCmdTodos('message', { text: m }); }} style={miniBtn('#7c3aed')}>💬 Mensaje a todos</button>
+                        <button onClick={() => energiaA(conectados.map((a) => a.id), 'logoff', 'Cerrar sesión en')} style={miniBtn('#0891b2')}>🚪 Cerrar sesión</button>
+                        <button onClick={() => energiaA(conectados.map((a) => a.id), 'reboot', 'Reiniciar')} style={miniBtn('#ca8a04')}>🔄 Reiniciar</button>
+                        <button onClick={() => energiaA(conectados.map((a) => a.id), 'shutdown', 'Apagar')} style={miniBtn('#475569')}>🔌 Apagar</button>
+                        <button onClick={() => setVerRegistro(true)} style={miniBtn('#1e293b')}>📚 Registro de uso</button>
                     </div>
                 )}
             </div>
+
+            {canManage && sel.size > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', background: 'rgba(37,99,235,0.15)', border: '1px solid #2563eb', borderRadius: 10, padding: '8px 12px', marginBottom: 12 }}>
+                    <span style={{ color: '#bfdbfe', fontWeight: 800, fontSize: '0.82rem' }}>{sel.size} seleccionado(s):</span>
+                    <button onClick={() => setSesion([...sel])} style={miniBtn('#15803d')}>📋 Crear sesión</button>
+                    <button onClick={() => aplicarA(seleccionOnline(), 'lock', { message: 'Atiende a la pantalla del profesor' })} style={miniBtn('#dc2626')}>🔒 Bloquear</button>
+                    <button onClick={() => aplicarA(seleccionOnline(), 'unlock')} style={miniBtn('#16a34a')}>🔓 Desbloquear</button>
+                    <button onClick={() => { const m = pedirMensaje(); if (m) aplicarA(seleccionOnline(), 'message', { text: m }); }} style={miniBtn('#7c3aed')}>💬 Mensaje</button>
+                    <button onClick={() => { const u = pedirUrl(); if (u) aplicarA(seleccionOnline(), 'openUrl', { url: u }); }} style={miniBtn('#0ea5e9')}>🌐 Abrir web</button>
+                    <button onClick={() => energiaA(seleccionOnline(), 'logoff', 'Cerrar sesión en')} style={miniBtn('#0891b2')}>🚪 Cerrar sesión</button>
+                    <button onClick={() => energiaA(seleccionOnline(), 'reboot', 'Reiniciar')} style={miniBtn('#ca8a04')}>🔄 Reiniciar</button>
+                    <button onClick={() => energiaA(seleccionOnline(), 'shutdown', 'Apagar')} style={miniBtn('#475569')}>🔌 Apagar</button>
+                    <button onClick={() => setSel(new Set())} style={{ ...miniBtn('transparent'), color: '#bfdbfe' }}>✕ deseleccionar</button>
+                </div>
+            )}
 
             {!codigoEquipos ? (
                 <div style={{ color: '#fbbf24', fontSize: '0.88rem', lineHeight: 1.5 }}>
@@ -203,17 +302,28 @@ function PanelEquipos({ agentes, online, onCmd, onCmdTodos, onQuitar, verPantall
                         return (
                             <div key={a.id} style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${a.locked ? '#f87171' : 'rgba(255,255,255,0.12)'}`, borderRadius: 10, padding: 12 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
-                                    <span style={{ color: 'white', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>💻 {a.name || 'Equipo'}</span>
+                                    <label style={{ color: 'white', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6, cursor: canManage ? 'pointer' : 'default' }}>
+                                        {canManage && <input type="checkbox" checked={sel.has(a.id)} onChange={() => toggleSel(a.id)} style={{ cursor: 'pointer' }} />}
+                                        💻 {a.name || 'Equipo'}
+                                    </label>
                                     <div style={{ display: 'flex', gap: 6 }}>
                                         {on ? badge('🟢 En línea', '#064e3b', '#6ee7b7') : badge('⚫ Desconectado', '#334155', '#cbd5e1')}
                                         {a.locked && badge('🔒', '#7f1d1d', '#fecaca')}
                                     </div>
                                 </div>
+                                {(a.battery != null || a.student?.name) && (
+                                    <div style={{ display: 'flex', gap: 12, fontSize: '0.74rem', color: '#94a3b8', marginBottom: 6, flexWrap: 'wrap' }}>
+                                        {a.battery != null && <span style={{ color: a.battery <= 20 ? '#f87171' : '#94a3b8' }}>🔋 {a.battery}%</span>}
+                                        {a.student?.name && <span>👤 {a.student.name}</span>}
+                                    </div>
+                                )}
                                 {verPantallas && (
                                     <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 10', background: '#000', borderRadius: 8, overflow: 'hidden', marginBottom: 8, border: '1px solid rgba(255,255,255,0.1)' }}>
                                         {th?.data ? (
                                             <img src={th.data} alt={`Pantalla de ${a.name || 'equipo'}`}
-                                                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: on ? 1 : 0.4 }} />
+                                                onClick={() => setAmpliada({ data: th.data, name: a.name })}
+                                                title="Clic para ampliar"
+                                                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: on ? 1 : 0.4, cursor: 'zoom-in' }} />
                                         ) : (
                                             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.8rem' }}>
                                                 {on ? '⏳ esperando captura…' : 'sin señal'}
@@ -245,6 +355,21 @@ function PanelEquipos({ agentes, online, onCmd, onCmdTodos, onQuitar, verPantall
 
             {vivo && (
                 <VistaEnVivo scope={scope} codigoEquipos={codigoEquipos} agente={vivo} onCmd={onCmd} onClose={() => setVivo(null)} />
+            )}
+
+            {sesion && (
+                <SesionEquipos scope={scope} codigoEquipos={codigoEquipos} agentes={agentes} machineIds={sesion} online={online} onCmd={onCmd} onClose={() => setSesion(null)} />
+            )}
+            {verRegistro && (
+                <RegistroSesiones codigoEquipos={codigoEquipos} onClose={() => setVerRegistro(false)} />
+            )}
+
+            {ampliada && (
+                <div onClick={() => setAmpliada(null)} style={{ position: 'fixed', inset: 0, zIndex: 10010, background: 'rgba(2,6,23,0.92)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 20, cursor: 'zoom-out' }}>
+                    <div style={{ color: 'white', fontWeight: 700 }}>🖥️ {ampliada.name || 'Equipo'} — miniatura</div>
+                    <img src={ampliada.data} alt="Pantalla ampliada" style={{ maxWidth: '92vw', maxHeight: '80vh', borderRadius: 10, boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }} />
+                    <div style={{ color: '#64748b', fontSize: '0.8rem' }}>Es la miniatura (poca resolución). Para verla nítida y en movimiento usa 📹 En vivo. (toca para cerrar)</div>
+                </div>
             )}
         </div>
     );

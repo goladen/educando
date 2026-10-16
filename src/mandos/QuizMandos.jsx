@@ -22,7 +22,7 @@ const LS_NOMBRES = 'pikt_mandos_nombres';
 const LS_PROPIAS = 'pikt_mandos_preguntas';
 
 const rnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
-const barajar = (arr) => {
+export const barajar = (arr) => {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -44,7 +44,7 @@ function conDistractores(texto, correcta, candidatos) {
   return { texto, opciones: opciones.map(String), correcta: opciones.indexOf(correcta), valor: correcta };
 }
 
-const GENERADORES = {
+export const GENERADORES = {
   tablas: () => {
     const a = rnd(2, 10);
     const b = rnd(2, 10);

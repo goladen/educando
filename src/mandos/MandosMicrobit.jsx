@@ -8,6 +8,7 @@ import PistaRobotsMandos from './PistaRobotsMandos.jsx';
 import DibujoMandos from './DibujoMandos.jsx';
 import {
   MODOS,
+  VERSION_PROGRAMAS,
   setModoMandos,
   GRUPO_POR_DEFECTO,
   LETRAS,
@@ -134,7 +135,7 @@ export default function MandosMicrobit({ onExit }) {
 
   const modo = estado.modo || MODOS.LETRAS;
   const verValor = (v) =>
-    v.tipo === 'numero' ? v.numero : v.tipo === 'mover' ? { A: '⬆', B: '↻', X: '✏️' }[v.mov] : v.letra;
+    v.tipo === 'numero' ? v.numero : v.tipo === 'texto' ? v.caracter : v.tipo === 'mover' ? { A: '⬆', B: '↻', X: '✏️' }[v.mov] : v.letra;
 
   const listaVistos = Object.values(vistos).sort((a, b) => a.id - b.id);
   const hace = (t) => Math.max(0, Math.round((Date.now() - t) / 1000));
@@ -170,13 +171,16 @@ export default function MandosMicrobit({ onExit }) {
             <b>🔢 Número:</b> A baja y B sube (manteniendo, cada vez más rápido); A y B a la vez lo envía.
           </li>
           <li>
+            <b>🔡 Abecedario:</b> A letra anterior y B la siguiente (A-Z y luego 0-9); A y B a la vez la envía.
+          </li>
+          <li>
             <b>🤖 Mover:</b> A avanza, B gira y A + B sube o baja el lápiz.
           </li>
         </ul>
-        {estado.antenaOk && estado.version < 2 && (
+        {estado.antenaOk && estado.version < VERSION_PROGRAMAS && (
           <div style={st.aviso}>
-            ⚠️ La antena tiene el programa antiguo (solo letras). Vuelve a pulsar <b>Grabar y conectar antena</b> y
-            graba de nuevo los mandos para usar los modos número y mover.
+            ⚠️ La antena tiene un programa antiguo. Vuelve a pulsar <b>Grabar y conectar antena</b> y graba de nuevo
+            los mandos para tener todos los modos (número, abecedario y mover).
           </div>
         )}
 
@@ -308,6 +312,7 @@ export default function MandosMicrobit({ onExit }) {
             {[
               [MODOS.LETRAS, '🔤 Letras'],
               [MODOS.NUMERO, '🔢 Número'],
+              [MODOS.TEXTO, '🔡 Abecedario'],
               [MODOS.MOVER, '🤖 Mover'],
             ].map(([m, txt]) => (
               <button key={m} style={st.modoBtn(modo === m)} onClick={() => setModoMandos(m)}>
@@ -349,6 +354,12 @@ export default function MandosMicrobit({ onExit }) {
                         {n}
                       </button>
                     ))
+                  : modo === MODOS.TEXTO
+                    ? ['H', 'O', 'L', 'A', '7'].map((c, i) => (
+                        <button key={i} style={st.miniBtn} onClick={() => simularPulsacion(id, 'T' + c)}>
+                          {c}
+                        </button>
+                      ))
                   : modo === MODOS.MOVER
                     ? [
                         ['MA', '⬆ A'],

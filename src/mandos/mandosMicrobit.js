@@ -73,8 +73,9 @@ export async function flashearMicropython(onProgreso) {
 
 // v2: la antena guarda el modo de los mandos (MODO:L|N|M) que le manda el
 // juego y lo retransmite cada 2 s, así un mando que se enciende tarde se pone
-// al día solo. Anuncia «ANTENA:<grupo>:v2».
-export const VERSION_PROGRAMAS = 2;
+// al día solo. Anuncia «ANTENA:<grupo>:v<VERSION_PROGRAMAS>».
+// v3: modo T (abecedario) en los mandos; la antena solo cambia de número de versión.
+export const VERSION_PROGRAMAS = 3;
 
 export function programaAntena(grupo = GRUPO_POR_DEFECTO) {
   return `# PiKT - ANTENA receptora de mandos (v${VERSION_PROGRAMAS})
@@ -122,12 +123,13 @@ while True:
 `;
 }
 
-// Un único programa con tres modos; el juego elige el modo (setModoMandos):
-//   L letras: A cambia A>B>C>D, B envia            -> P:<id>:<A-D>:<seq>
-//   N numero: A baja, B sube (mantener = acelera), A+B envia -> P:<id>:N<n>:<seq>
-//   M mover:  A avanza, B gira, A+B accion          -> P:<id>:MA|MB|MX:<seq>
+// Un único programa con cuatro modos; el juego elige el modo (setModoMandos):
+//   L letras:     A cambia A>B>C>D, B envia                         -> P:<id>:<A-D>:<seq>
+//   N numero:     A baja, B sube (mantener = acelera), A+B envia     -> P:<id>:N<n>:<seq>
+//   T abecedario: A letra anterior, B siguiente (A-Z y 0-9), A+B envia -> P:<id>:T<c>:<seq>
+//   M mover:      A avanza, B gira, A+B accion                       -> P:<id>:MA|MB|MX:<seq>
 export function programaMando(id, grupo = GRUPO_POR_DEFECTO) {
-  return `# PiKT - MANDO ${id} (v${VERSION_PROGRAMAS}): modos letras / numero / mover
+  return `# PiKT - MANDO ${id} (v${VERSION_PROGRAMAS}): modos letras / numero / abecedario / mover
 from microbit import *
 import radio
 import random
@@ -135,12 +137,14 @@ import music
 ID = ${id}
 GRUPO = ${grupo}
 LETRAS = 'ABCD'
+ALFA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 GIRO = Image('09990:00009:90909:09909:09990')
 radio.config(group=GRUPO, power=7, length=32, queue=10)
 radio.on()
 modo = 'L'
 sel = 0
 num = 0
+car = 0
 seq = random.randint(0, 99)
 activo = 0
 inicio = 0
@@ -155,6 +159,8 @@ def pantalla():
             display.show(num)
         else:
             display.scroll(str(num), delay=60, wait=False)
+    elif modo == 'T':
+        display.show(ALFA[car])
     else:
         display.show(Image.ARROW_N)
 
@@ -189,8 +195,9 @@ def paso_letras():
     if button_b.was_pressed():
         confirmar(enviar(LETRAS[sel]))
 
-def paso_numero():
-    global num, activo, inicio, paso_t, combo
+# Modos N y T: A/B cambian el valor (mantener = acelera) y A+B lo envia
+def paso_ajuste():
+    global num, car, activo, inicio, paso_t, combo
     a = button_a.is_pressed()
     b = button_b.is_pressed()
     ahora = running_time()
@@ -200,7 +207,7 @@ def paso_numero():
     elif combo:
         if not a and not b:
             combo = False
-            confirmar(enviar('N%d' % num))
+            confirmar(enviar(('N%d' % num) if modo == 'N' else ('T' + ALFA[car])))
     elif a or b:
         d = -1 if a else 1
         if activo != d:
@@ -208,7 +215,10 @@ def paso_numero():
             inicio = ahora
             paso_t = ahora + 90
         elif ahora >= paso_t:
-            num = max(-999, min(9999, num + d))
+            if modo == 'N':
+                num = max(-999, min(9999, num + d))
+            else:
+                car = (car + d) % len(ALFA)
             pantalla()
             dur = ahora - inicio
             paso_t = ahora + (450 if dur < 200 else (150 if dur < 1500 else 50))
@@ -232,12 +242,13 @@ def paso_mover():
         pantalla()
 
 def cambiar_modo(m):
-    global modo, sel, num, activo, combo
-    if m == modo or len(m) != 1 or m not in 'LNM':
+    global modo, sel, num, car, activo, combo
+    if m == modo or len(m) != 1 or m not in 'LNTM':
         return
     modo = m
     sel = 0
     num = 0
+    car = 0
     activo = 0
     combo = False
     button_a.was_pressed()
@@ -245,7 +256,7 @@ def cambiar_modo(m):
     pantalla()
 
 def escuchar_radio():
-    global sel, num
+    global sel, num, car
     r = radio.receive()
     if not r:
         return
@@ -254,6 +265,7 @@ def escuchar_radio():
     elif r == 'N':
         sel = 0
         num = 0
+        car = 0
         pantalla()
     elif r == 'F:%d:1' % ID:
         display.show(Image.HAPPY)
@@ -271,8 +283,8 @@ pantalla()
 while True:
     if modo == 'L':
         paso_letras()
-    elif modo == 'N':
-        paso_numero()
+    elif modo == 'N' or modo == 'T':
+        paso_ajuste()
     else:
         paso_mover()
     escuchar_radio()
@@ -438,10 +450,10 @@ let modoMandos = 'L';
 let lineaPendiente = '';
 const oyentesMandos = new Set();
 const oyentesEstado = new Set();
-const RE_PULSACION = /^P:(\d{1,3}):([ABCD]|N-?\d{1,4}|M[ABX]):(\d{1,3})$/;
+const RE_PULSACION = /^P:(\d{1,3}):([ABCD]|N-?\d{1,4}|T[A-Z0-9]|M[ABX]):(\d{1,3})$/;
 
 /** Modos de los mandos (los cambia el juego con setModoMandos). */
-export const MODOS = { LETRAS: 'L', NUMERO: 'N', MOVER: 'M' };
+export const MODOS = { LETRAS: 'L', NUMERO: 'N', TEXTO: 'T', MOVER: 'M' };
 
 /** Texto → entero que se puede marcar en el mando (-999 … 9999), o null. */
 export const aNumeroMando = (txt) => {
@@ -455,11 +467,13 @@ export const aNumeroMando = (txt) => {
  * Valor crudo del mando → evento:
  *   letra:  { tipo: 'letra', letra: 'A'..'D' }
  *   número: { tipo: 'numero', numero }
+ *   texto:  { tipo: 'texto', caracter: 'A'..'Z' | '0'..'9' }
  *   mover:  { tipo: 'mover', mov: 'A' (avanza) | 'B' (gira) | 'X' (A+B, acción) }
  */
 function aEvento(id, valor) {
   if (/^[ABCD]$/.test(valor)) return { id, tipo: 'letra', letra: valor };
   if (valor[0] === 'N') return { id, tipo: 'numero', numero: Number(valor.slice(1)) };
+  if (valor[0] === 'T') return { id, tipo: 'texto', caracter: valor[1] };
   return { id, tipo: 'mover', mov: valor[1] };
 }
 
@@ -503,7 +517,7 @@ function procesarTexto(txt) {
 }
 
 /**
- * Pone todos los mandos en un modo (MODOS.LETRAS / NUMERO / MOVER).
+ * Pone todos los mandos en un modo (MODOS.LETRAS / NUMERO / TEXTO / MOVER).
  * Cada juego lo llama al montarse; la antena lo recuerda y lo repite.
  */
 export function setModoMandos(modo) {
@@ -529,7 +543,7 @@ export function escucharEstadoAntena(fn) {
   return () => oyentesEstado.delete(fn);
 }
 
-/** Mando virtual (pruebas sin hardware). `valor`: 'A'-'D', 'N<num>' o 'MA'|'MB'|'MX'. */
+/** Mando virtual (pruebas sin hardware). `valor`: 'A'-'D', 'N<num>', 'T<letra>' o 'MA'|'MB'|'MX'. */
 export function simularPulsacion(id, valor) {
   emitirPulsacion({ ...aEvento(id, String(valor)), t: Date.now(), simulado: true });
 }

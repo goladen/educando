@@ -67,6 +67,7 @@ export default function EscapesListos({ onJugar, onPersonalizar, onAtras }) {
                                 {paso(3, <>Proyecta en la pizarra y pulsa <b>Jugar</b>. Tú pasas las preguntas y escribes los códigos que diga la clase.</>)}
                             </div>
                             <button className="eh-btn" style={{ fontSize: '1.15rem', marginTop: 'auto' }} onClick={() => onJugar(config, listo.titulo)}>📽️ Jugar en el monitor</button>
+                            <button className="eh-btn" style={{ fontSize: '1.05rem', background: 'linear-gradient(180deg,#a78bfa,#7c3aed)', color: '#fff' }} onClick={() => onJugar({ ...config, modo: 'MANDOS' }, listo.titulo)}>🎮 Jugar con mandos micro:bit</button>
                             <button className="eh-btn2" onClick={() => onPersonalizar(config, listo.titulo)}>✏️ Usarlo como base y personalizarlo</button>
                         </div>
                     );

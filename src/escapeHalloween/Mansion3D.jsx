@@ -8,7 +8,7 @@ import { crearAvatar3D, crearZombiJefe, liberar, etiquetaNombre } from './avatar
  *   · los avatares de los alumnos esperan en el jardín, caminan/saltan a la sala activa,
  *     dan un brinco con cada acierto y bajan al sótano para la batalla;
  *   · el zombi duerme en el sótano y se levanta en la batalla final.
- *  Props: pruebas [{emoji, nombre, color, decor}], fase, salaIdx, abiertas [idx], jugadores {clave: {nombre, avatar, aciertos, golpes}},
+ *  Props: pruebas [{emoji, nombre, color, decor}], fase, salaIdx, abiertas [idx], jugadores {clave: {nombre, avatar, aciertos, golpes, destacado?}},
  *         batalla {golpes, ataqueN, bloqueado}, alto (px).
  */
 
@@ -286,7 +286,7 @@ export default function Mansion3D(props) {
                 vistos.add(k);
                 const firmaAv = JSON.stringify(j.avatar || {}) + '|' + (j.nombre || k);
                 let a = avatares.get(k);
-                if (a && a.firma === firmaAv) { a.puntos = (j.aciertos || 0) + (j.golpes || 0); return; }
+                if (a && a.firma === firmaAv) { a.puntos = (j.aciertos || 0) + (j.golpes || 0); a.destacado = !!j.destacado; return; }
                 const pos = a ? a.raiz.position.clone() : new THREE.Vector3((Math.random() - 0.5) * 4, 0, D / 2 + 9 + Math.random() * 2);
                 if (a) { scene.remove(a.raiz); liberar(a.raiz); }
                 const raiz = new THREE.Group();
@@ -296,7 +296,7 @@ export default function Mansion3D(props) {
                 if (!j.sinEtiqueta) { const et = etiquetaNombre(j.nombre || k); et.position.y = 1.95 * ESCALA_AVATAR + 0.3; raiz.add(et); }
                 raiz.position.copy(pos); scene.add(raiz);
                 const puntos = (j.aciertos || 0) + (j.golpes || 0);
-                avatares.set(k, { raiz, cuerpo, firma: firmaAv, desde: pos.clone(), hacia: pos.clone(), t: 1, dur: 1, salto: 0, puntos, puntosVistos: puntos, fase: Math.random() * 6 });
+                avatares.set(k, { raiz, cuerpo, firma: firmaAv, desde: pos.clone(), hacia: pos.clone(), t: 1, dur: 1, salto: 0, puntos, puntosVistos: puntos, fase: Math.random() * 6, destacado: !!j.destacado });
             });
             [...avatares.keys()].forEach(k => { if (!vistos.has(k)) { const a = avatares.get(k); scene.remove(a.raiz); liberar(a.raiz); avatares.delete(k); } });
         };
@@ -379,6 +379,14 @@ export default function Mansion3D(props) {
                 if (a.salto > 0) { a.salto = Math.max(0, a.salto - dt * 2.4); a.raiz.position.y += Math.sin((1 - a.salto) * Math.PI) * 0.45; }
                 if (fase === 'VICTORIA') a.raiz.position.y += Math.abs(Math.sin(t * 5 + a.fase)) * 0.35;
                 if (a.cuerpo.userData.flota) a.raiz.position.y += 0.12 + Math.sin(t * 2 + a.fase) * 0.06;
+                // Destacado (p. ej. quien ha abierto el candado): crece, se adelanta y da saltos de alegría
+                const escala = a.raiz.scale.x + ((a.destacado ? 2.2 : 1) - a.raiz.scale.x) * Math.min(1, dt * 4);
+                a.raiz.scale.setScalar(escala);
+                if (a.destacado) {
+                    a.raiz.position.z += 1.4;
+                    a.raiz.position.y += Math.abs(Math.sin(t * 4.5)) * 0.5;
+                    a.cuerpo.rotation.y = Math.sin(t * 2.2) * 0.5;
+                }
                 const tumbado = fase === 'DERROTA' ? -Math.PI / 2 : 0;
                 a.cuerpo.rotation.x += (tumbado - a.cuerpo.rotation.x) * Math.min(1, dt * 3);
                 a.cuerpo.userData.animar?.(t, andando || (pelea && fase === 'BATALLA' && a.salto > 0), a.fase);

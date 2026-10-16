@@ -41,7 +41,7 @@ export function limpiarConfig(c = {}) {
         minutos: Number(c.minutos) || 30, ritmo: Number(c.ritmo) || 5, zombi: ZOMBIS[c.zombi] ? c.zombi : 'NORMAL',
         pruebas: pruebas.length ? pruebas : [pruebaMateria('MATES')],
         partida: c.partida && Array.isArray(c.partida.pruebas) && Array.isArray(c.partida.batalla) ? c.partida : null,
-        modo: c.modo === 'PAPEL' || c.modo === 'ONLINE' ? c.modo : (c.partida ? 'PAPEL' : 'ONLINE'),
+        modo: ['PAPEL', 'ONLINE', 'MANDOS'].includes(c.modo) ? c.modo : (c.partida ? 'PAPEL' : 'ONLINE'),
         nPreguntas: Number(c.nPreguntas) || c.partida?.nPreguntas || 6,
         nBatalla: Number(c.nBatalla) || c.partida?.nBatalla || 8,
     };
@@ -50,6 +50,7 @@ export function limpiarConfig(c = {}) {
 export const MODOS = {
     ONLINE: { emoji: '📱', nombre: 'Online con móviles', desc: 'Proyectas la mansión y cada alumno juega con su móvil (QR o código). Las preguntas cambian en cada partida.' },
     PAPEL: { emoji: '📽️', nombre: 'Pizarra + fichas en papel', desc: 'Sin móviles: proyectas las preguntas y los alumnos anotan en un cuadernillo o una hoja de respuestas en PDF.' },
+    MANDOS: { emoji: '🎮', nombre: 'Con mandos micro:bit', desc: 'Sin móviles: proyectas las preguntas y cada alumno responde A-D con su micro:bit. Su avatar aparece en la mansión.' },
 };
 
 /** Primera pantalla al crear: elegir cómo se va a jugar. */
@@ -78,13 +79,14 @@ function EleccionModo({ onElegir, onAbrir, onAtras }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 16, marginTop: 10 }}>
                 {tarjeta('ONLINE', ['Avatares disfrazados en la mansión 3D', 'Candados con pistas repartidas entre los móviles', 'Batalla final en tiempo real'])}
                 {tarjeta('PAPEL', ['Cuadernillo y hoja de respuestas en PDF', 'Mismas preguntas en la pizarra y en las fichas', 'Tú llevas el ritmo desde el ordenador'])}
+                {tarjeta('MANDOS', ['Cada alumno responde con su mando (A cambia, B envía)', 'Se corrige sola cuando han respondido todos', 'En la batalla, si acierta la mitad de la clase, ¡golpe!'])}
             </div>
         </div>
     );
 }
 
 /** Modo pizarra con fichas en papel: congela preguntas y candados y saca los PDF. */
-function SeccionPapel({ config, setConfig, titulo }) {
+function SeccionPapel({ config, setConfig, titulo, conPdf = true }) {
     const nPreg = config.nPreguntas || config.partida?.nPreguntas || 6;
     const nBat = config.nBatalla || config.partida?.nBatalla || 8;
     const setNPreg = (n) => setConfig(c => ({ ...c, nPreguntas: n }));
@@ -105,8 +107,10 @@ function SeccionPapel({ config, setConfig, titulo }) {
     };
     return (
         <div style={{ marginTop: 20, padding: 14, borderRadius: 14, background: 'rgba(91,33,182,.18)', border: '2px solid rgba(167,139,250,.45)' }}>
-            <h4 style={{ margin: '0 0 4px' }}>📄 Preguntas fijas y fichas en PDF</h4>
-            <div style={{ fontSize: '.82rem', opacity: .8 }}>Se congelan las preguntas y los candados: lo que se proyecta es exactamente lo que sale en las fichas. Genera, descarga los PDF y guarda el escape room para conservarlo.</div>
+            <h4 style={{ margin: '0 0 4px' }}>{conPdf ? '📄 Preguntas fijas y fichas en PDF' : '❓ Preguntas de la partida'}</h4>
+            <div style={{ fontSize: '.82rem', opacity: .8 }}>{conPdf
+                ? 'Se congelan las preguntas y los candados: lo que se proyecta es exactamente lo que sale en las fichas. Genera, descarga los PDF y guarda el escape room para conservarlo.'
+                : 'Se proyectan una a una y la clase responde con los mandos (A-D). Se generan solas al empezar; guarda el escape room para repetir las mismas.'}</div>
             <div style={{ ...fila, alignItems: 'center' }}>
                 <span style={{ fontSize: '.85rem' }}>Preguntas por sala:</span>
                 {PREGUNTAS_POR_SALA.map(n => <button key={n} className={`eh-chip ${nPreg === n ? 'on' : ''}`} style={{ padding: '5px 10px' }} onClick={() => setNPreg(n)}>{n}</button>)}
@@ -119,7 +123,7 @@ function SeccionPapel({ config, setConfig, titulo }) {
                     {vigente ? `✔ ${resumenPartida(config)}` : config.partida ? '⚠ Has cambiado las pruebas o el número de preguntas: vuelve a generarlas' : 'Aún no hay preguntas fijas'}
                 </span>
             </div>
-            {vigente && <>
+            {vigente && conPdf && <>
                 <div style={{ ...fila, marginTop: 10 }}>
                     <button className="eh-btn2" disabled={!!creando} onClick={() => pdf('CUADERNILLO', false)}>{creando === 'CUADERNILLOfalse' ? '⏳ Creando…' : '📘 PDF cuadernillo (preguntas + candados)'}</button>
                     <button className="eh-btn2" disabled={!!creando} onClick={() => pdf('HOJA', false)}>{creando === 'HOJAfalse' ? '⏳ Creando…' : '📝 PDF hoja de respuestas'}</button>
@@ -404,9 +408,11 @@ export default function EditorEscape({ config, setConfig, usuario, onCrear, onAt
                         <div style={{ fontWeight: 900 }}>Modo: {MODOS[modo].nombre}</div>
                         <div style={{ fontSize: '.82rem', opacity: .8 }}>{MODOS[modo].desc}</div>
                     </div>
-                    <button className="eh-btn2" onClick={() => setConfig(c => ({ ...c, modo: modo === 'ONLINE' ? 'PAPEL' : 'ONLINE' }))}>
-                        🔁 Cambiar a {MODOS[modo === 'ONLINE' ? 'PAPEL' : 'ONLINE'].nombre.toLowerCase()}
-                    </button>
+                    {Object.keys(MODOS).filter(k => k !== modo).map(k => (
+                        <button key={k} className="eh-btn2" onClick={() => setConfig(c => ({ ...c, modo: k }))}>
+                            🔁 {MODOS[k].emoji} {MODOS[k].nombre}
+                        </button>
+                    ))}
                 </div>
 
                 <h4 style={{ margin: '14px 0 0' }}>🎓 Etapa</h4>
@@ -449,6 +455,7 @@ export default function EditorEscape({ config, setConfig, usuario, onCrear, onAt
                 </>}
 
                 {modo === 'PAPEL' && <SeccionPapel config={config} setConfig={setConfig} titulo={titulo} />}
+                {modo === 'MANDOS' && <SeccionPapel config={config} setConfig={setConfig} titulo={titulo} conPdf={false} />}
 
                 <div style={{ marginTop: 20, padding: 14, borderRadius: 14, background: 'rgba(0,0,0,.28)', border: '1px dashed rgba(255,255,255,.2)' }}>
                     <h4 style={{ margin: '0 0 8px' }}>💾 Guardar este escape room</h4>
@@ -470,7 +477,7 @@ export default function EditorEscape({ config, setConfig, usuario, onCrear, onAt
                 {errores.length > 0 && <div style={{ marginTop: 14, color: '#fca5a5', fontWeight: 700 }}>{errores.map((e, i) => <div key={i}>⚠ {e}</div>)}</div>}
                 {modo === 'ONLINE'
                     ? <button className="eh-btn" style={{ width: '100%', marginTop: 18, fontSize: '1.15rem' }} onClick={crear}>📱 Crear la sala online y mostrar el QR</button>
-                    : <button className="eh-btn" style={{ width: '100%', marginTop: 18, fontSize: '1.15rem' }} onClick={jugarPizarra}>📽️ Empezar en la pizarra</button>}
+                    : <button className="eh-btn" style={{ width: '100%', marginTop: 18, fontSize: '1.15rem' }} onClick={jugarPizarra}>{modo === 'MANDOS' ? '🎮 Empezar con los mandos' : '📽️ Empezar en la pizarra'}</button>}
             </div>
         </div>
     );

@@ -305,10 +305,11 @@ const CLAVE_OK = /^(m\d{5}|p\d{2}|c\d{2}|es)$/;
 export const leerClavesUrl = (search = window.location.search) =>
     (new URLSearchParams(search).get('ine') || '').split(',').map(s => s.trim()).filter(s => CLAVE_OK.test(s)).slice(0, 2);
 
-// Mantiene ?ine= en la barra de direcciones (recargar o copiar la URL conserva lo que se ve)
-export function escribirClavesUrl(claves) {
+// Mantiene ?ine= / ?inemapa= en la barra de direcciones (recargar o copiar la URL conserva lo que se ve)
+export function escribirParamUrl(nombre, valor) {
     const u = new URL(window.location.href);
-    if (claves.length) u.searchParams.set('ine', claves.join(','));
-    else u.searchParams.delete('ine');
+    if (valor) u.searchParams.set(nombre, valor);
+    else u.searchParams.delete(nombre);
     window.history.replaceState(window.history.state, '', u.pathname + u.search.replace(/%2C/gi, ',') + u.hash);
 }
+export const escribirClavesUrl = (claves) => escribirParamUrl('ine', claves.join(','));

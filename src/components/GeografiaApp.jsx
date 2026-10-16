@@ -1240,7 +1240,7 @@ function GeografiaAppInner({ onBack, onCreateLive, onJoinLive, onAbrirINE }) {
               <span style={{ fontSize:28 }}>🇪🇸</span>
               <span>
                 <span style={{ display:'block', fontWeight:800, fontSize:'0.95rem' }}>Datos reales del INE</span>
-                <span style={{ display:'block', fontSize:'0.75rem', opacity:0.7, marginTop:2 }}>Población, superficie y densidad de municipios, provincias y comunidades · compara dos lugares</span>
+                <span style={{ display:'block', fontSize:'0.75rem', opacity:0.7, marginTop:2 }}>Población, superficie y densidad de municipios, provincias y comunidades · compara lugares · mapas con leyenda, fichas PDF y juego</span>
               </span>
             </button>
           )}
@@ -2116,7 +2116,7 @@ export default function GeografiaApp({ onBack }) {
   const [liveHost,   setLiveHost]   = useState(null);
   const [liveClient, setLiveClient] = useState(null);
   // ?ine=… (enlace compartido desde el Explorador INE) abre directamente los datos del INE
-  const [explorINE,  setExplorINE]  = useState(() => new URLSearchParams(window.location.search).has('ine'));
+  const [explorINE,  setExplorINE]  = useState(() => { const p = new URLSearchParams(window.location.search); return p.has('ine') || p.has('inemapa'); });
 
   if (liveHost)   return <GeografiaLiveHost   codigo={liveHost}          onSalir={() => setLiveHost(null)}   />;
   if (liveClient) return <GeografiaLiveClient codigo={liveClient.codigo} player={liveClient.player} onSalir={() => setLiveClient(null)} />;
@@ -2138,7 +2138,7 @@ export default function GeografiaApp({ onBack }) {
       {explorINE && (
         <Suspense fallback={<div style={{ position:'fixed', inset:0, zIndex:9000, background:'#0d1117', color:'#8b949e', display:'flex', alignItems:'center', justifyContent:'center' }}>Cargando…</div>}>
           <ExploradorINE onClose={() => setExplorINE(false)}
-            rutaCompartir={claves => `${window.location.origin}/?juego=geografia&ine=${claves.join(',')}`} />
+            rutaCompartir={q => `${window.location.origin}/?juego=geografia&${q}`} />
         </Suspense>
       )}
     </>

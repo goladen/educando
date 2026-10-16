@@ -5,8 +5,11 @@
 // La selección vive en la URL (?ine=m22125,p50) para poder compartirla. Datos: ./ineDatos.js
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Search, X, ExternalLink, Table2, Copy, CheckCircle, Share2, Scale, ArrowLeftRight, LineChart as IconoLinea } from 'lucide-react';
-import { cargarIndice, buscarLugares, cargarLugar, leerClavesUrl, escribirClavesUrl, nombreNatural, TIPOS, tipoDe } from './ineDatos';
+import { cargarIndice, buscarLugares, cargarLugar, leerClavesUrl, escribirClavesUrl, escribirParamUrl, nombreNatural, TIPOS, tipoDe } from './ineDatos';
 import { D, nf, GraficoLineas, BarrasH, Piramide, BarrasPareadas } from './ineGraficos';
+import { leerMapaUrl } from './ineMapas';
+import ModalCompartir from './ineCompartir';
+import MapasINE from './MapasINE';
 
 const CARD = { background: D.card, borderRadius: 14, padding: 18, border: `1px solid ${D.border}` };
 const BTN = (bg, col = 'white') => ({ padding: '8px 14px', borderRadius: 9, border: 'none', background: bg, color: col, fontWeight: 700, cursor: 'pointer', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: 6 });
@@ -157,42 +160,6 @@ function actividadesComparativa(fa, fb) {
     if (A.edadMedia != null && B.edadMedia != null) acts.push({ id: 'edad', texto: `La edad media en ${na} es ${nf(A.edadMedia, 1)} años y en ${nb} ${nf(B.edadMedia, 1)}. ¿Cuántos años de diferencia hay? (1 decimal)`, sol: Math.abs(A.edadMedia - B.edadMedia), dec: 1 });
     if (A.var10 && B.var10) acts.push({ id: 'var', texto: `Entre ${A.var10.desde} y ${A.var10.hasta}, ${na} varió un ${nf(A.var10.valor, 1)} % y ${nb} un ${nf(B.var10.valor, 1)} %. ¿Cuántos puntos porcentuales de diferencia hay? (1 decimal)`, sol: Math.abs(A.var10.valor - B.var10.valor), dec: 1 });
     return acts;
-}
-
-// ─── Compartir ───────────────────────────────────────────────────────────────
-function ModalCompartir({ url, titulo, onClose }) {
-    const [copiado, setCopiado] = useState(false);
-    const texto = encodeURIComponent(`📊 ${titulo}\n${url}`);
-    const copiar = () => { navigator.clipboard?.writeText(url).catch(() => {}); setCopiado(true); setTimeout(() => setCopiado(false), 2000); };
-    const ops = [
-        { l: copiado ? 'Copiado' : 'Copiar enlace', i: copiado ? '✅' : '🔗', a: copiar },
-        { l: 'WhatsApp', i: '💬', a: () => window.open(`https://wa.me/?text=${texto}`, '_blank') },
-        { l: 'Telegram', i: '✈️', a: () => window.open(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(titulo)}`, '_blank') },
-        { l: 'Correo', i: '📧', a: () => window.open(`mailto:?subject=${encodeURIComponent(titulo)}&body=${texto}`, '_blank') },
-        { l: 'Google Classroom', i: '🎓', a: () => window.open(`https://classroom.google.com/share?url=${encodeURIComponent(url)}`, '_blank') },
-    ];
-    return (
-        <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 9100, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-            <div onClick={e => e.stopPropagation()} style={{ ...CARD, width: '100%', maxWidth: 380, boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                    <b>Compartir: {titulo}</b>
-                    <button onClick={onClose} style={{ background: 'none', border: 'none', color: D.muted, cursor: 'pointer', display: 'flex' }}><X size={18} /></button>
-                </div>
-                <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12 }}>
-                    <img alt="Código QR del enlace" width={110} height={110} style={{ borderRadius: 8, background: 'white', flexShrink: 0 }}
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(url)}&bgcolor=ffffff&color=0d1117&margin=8`} />
-                    <div style={{ fontSize: '0.75rem', color: D.muted, wordBreak: 'break-all', background: D.bg, borderRadius: 8, padding: '8px 10px', border: `1px solid ${D.border}` }}>{url}</div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {ops.map(o => (
-                        <button key={o.l} onClick={o.a} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 10, border: `1px solid ${D.border}`, background: D.bg, color: D.text, cursor: 'pointer', fontSize: '0.88rem', fontWeight: 600, textAlign: 'left' }}>
-                            <span style={{ width: 22, textAlign: 'center' }}>{o.i}</span>{o.l}
-                        </button>
-                    ))}
-                </div>
-            </div>
-        </div>
-    );
 }
 
 // ─── Ficha de un lugar ───────────────────────────────────────────────────────
@@ -553,10 +520,12 @@ function Comparativa({ fa, fb, onCambiar, onQuitar, onVer, onIntercambiar }) {
 }
 
 // ─── Componente principal ────────────────────────────────────────────────────
-// rutaCompartir(claves) → URL absoluta para compartir esa selección
+// rutaCompartir(query) → URL absoluta para compartir (query: «ine=m22125,p50» o «inemapa=dens.p.5.q.azul»)
 export default function ExploradorINE({ onClose, rutaCompartir }) {
     const [idx, setIdx] = useState(null);
     const [errorIndice, setErrorIndice] = useState('');
+    const [mapaInicial] = useState(() => leerMapaUrl());
+    const [pestana, setPestana] = useState(() => (leerMapaUrl() ? 'mapas' : 'lugares'));
     const [claves, setClaves] = useState(() => leerClavesUrl());
     const [fichas, setFichas] = useState({});          // clave → ficha | { error }
     const [q, setQ] = useState('');
@@ -571,6 +540,7 @@ export default function ExploradorINE({ onClose, rutaCompartir }) {
 
     // La selección se refleja en la URL y se cargan las fichas que falten
     useEffect(() => {
+        if (pestana !== 'lugares') return;
         escribirClavesUrl(claves);
         contRef.current?.scrollTo?.({ top: 0 });
         if (!idx) return;
@@ -582,9 +552,14 @@ export default function ExploradorINE({ onClose, rutaCompartir }) {
                 .then(f => setFichas(s => ({ ...s, [c]: f })))
                 .catch(e => setFichas(s => ({ ...s, [c]: { error: e.message === 'Failed to fetch' ? 'No se pudo conectar con el INE. Revisa la conexión o inténtalo más tarde.' : e.message } })));
         }
-    }, [claves, idx]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [claves, idx, pestana]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const cerrar = () => { escribirClavesUrl([]); onClose?.(); };
+    // Cada pestaña deja en la URL solo su parámetro (?ine= o ?inemapa=)
+    const cambiarPestana = (p) => {
+        if (p === 'mapas') escribirClavesUrl([]); else escribirParamUrl('inemapa', null);
+        setPestana(p);
+    };
+    const cerrar = () => { escribirClavesUrl([]); escribirParamUrl('inemapa', null); onClose?.(); };
 
     const resultados = useMemo(() => buscarLugares(idx, q), [idx, q]);
 
@@ -621,13 +596,23 @@ export default function ExploradorINE({ onClose, rutaCompartir }) {
             <div style={{ position: 'sticky', top: 0, zIndex: 5, padding: '10px 16px', background: D.card, borderBottom: `1px solid ${D.border}`, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 <button onClick={cerrar} style={{ background: 'transparent', border: `1px solid ${D.border}`, color: D.muted, padding: '6px 12px', borderRadius: 7, cursor: 'pointer' }}>← Volver</button>
                 <span style={{ fontWeight: 700, fontSize: '1.05rem' }}>🇪🇸 Datos reales del INE</span>
+                <div style={{ display: 'flex', gap: 4, background: D.bg, borderRadius: 9, padding: 3, border: `1px solid ${D.border}` }}>
+                    {[['lugares', '📍 Lugares'], ['mapas', '🗺️ Mapas']].map(([k, l]) => (
+                        <button key={k} onClick={() => cambiarPestana(k)} style={{ padding: '5px 12px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 700, background: pestana === k ? D.accent : 'transparent', color: pestana === k ? 'white' : D.muted }}>{l}</button>
+                    ))}
+                </div>
                 <span style={{ flex: 1 }} />
-                {claves.length > 0 && rutaCompartir && (
+                {pestana === 'lugares' && claves.length > 0 && rutaCompartir && (
                     <button onClick={() => setCompartir(true)} style={BTN(D.accent)}><Share2 size={14} />{claves.length === 2 ? 'Compartir comparativa' : 'Compartir'}</button>
                 )}
             </div>
 
-            <div style={{ maxWidth: 980, margin: '0 auto', padding: '18px 16px 40px', boxSizing: 'border-box' }}>
+            <div style={{ maxWidth: pestana === 'mapas' ? 1240 : 980, margin: '0 auto', padding: '18px 16px 40px', boxSizing: 'border-box' }}>
+                {pestana === 'mapas' && (idx
+                    ? <MapasINE idx={idx} inicial={mapaInicial} rutaCompartir={rutaCompartir} />
+                    : <div style={{ ...CARD, textAlign: 'center', color: errorIndice ? D.red : D.muted, padding: 40 }}>{errorIndice || '⏳ Cargando…'}</div>)}
+
+                {pestana === 'lugares' && <>
                 {/* Buscador */}
                 <div style={{ position: 'relative', marginBottom: 18 }}>
                     {destino != null && (
@@ -686,6 +671,14 @@ export default function ExploradorINE({ onClose, rutaCompartir }) {
                             ))}
                             <button onClick={() => setClaves(['p42', 'p28'])} disabled={!idx} style={{ ...BTN(D.dark2, D.text), border: `1px solid ${D.border}` }}>⚖️ Soria vs Madrid</button>
                         </div>
+                        <button onClick={() => cambiarPestana('mapas')}
+                            style={{ marginTop: 20, width: '100%', maxWidth: 560, display: 'inline-flex', alignItems: 'center', gap: 12, textAlign: 'left', padding: '12px 16px', borderRadius: 12, border: `2px solid ${D.gold}`, background: 'transparent', color: D.text, cursor: 'pointer' }}>
+                            <span style={{ fontSize: 30 }}>🗺️</span>
+                            <span>
+                                <span style={{ display: 'block', fontWeight: 800, color: D.gold }}>Mapas de España con leyenda</span>
+                                <span style={{ display: 'block', fontSize: '0.8rem', color: D.muted }}>Colorea provincias o comunidades por densidad, edad media, natalidad… crea fichas en PDF y juega a pintar el mapa.</span>
+                            </span>
+                        </button>
                     </div>
                 )}
 
@@ -700,6 +693,7 @@ export default function ExploradorINE({ onClose, rutaCompartir }) {
                             onIntercambiar={() => setClaves(cs => [cs[1], cs[0]])} />
                     )
                 )}
+                </>}
 
                 <div style={{ fontSize: '0.72rem', color: D.muted, marginTop: 18, lineHeight: 1.6, textAlign: 'center' }}>
                     Fuentes: <a href="https://www.ine.es" target="_blank" rel="noreferrer" style={{ color: D.accent }}>Instituto Nacional de Estadística <ExternalLink size={10} /></a> —
@@ -708,7 +702,7 @@ export default function ExploradorINE({ onClose, rutaCompartir }) {
                 </div>
             </div>
 
-            {compartir && rutaCompartir && <ModalCompartir url={rutaCompartir(claves)} titulo={tituloCompartir} onClose={() => setCompartir(false)} />}
+            {compartir && rutaCompartir && <ModalCompartir url={rutaCompartir(`ine=${claves.join(',')}`)} titulo={tituloCompartir} onClose={() => setCompartir(false)} />}
         </div>
     );
 }

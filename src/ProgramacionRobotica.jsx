@@ -9,6 +9,7 @@
 import React, { useState } from 'react';
 import BlocklyEditor from './BlocklyEditor';
 import RetosEditor from './RetosEditor';
+import MandosMicrobit from './mandos/MandosMicrobit.jsx';
 import mbot2Img from './assets/Imagenmbot.avif';
 import microbitImg from './assets/imagenmicrobit.jfif';
 import keystudioImg from './assets/imagenkeystudio.jpg';
@@ -118,7 +119,7 @@ const KITS = [
 ];
 
 export default function ProgramacionRobotica({ usuario = null, onLoginRequest, onExit }) {
-  const [vista, setVista] = useState('hub'); // 'hub' | 'bloques' | 'retos'
+  const [vista, setVista] = useState('hub'); // 'hub' | 'bloques' | 'retos' | 'mandos'
   const [infoKit, setInfoKit] = useState(null); // kit seleccionado para "más info"
 
   if (vista === 'bloques') {
@@ -133,6 +134,9 @@ export default function ProgramacionRobotica({ usuario = null, onLoginRequest, o
   }
   if (vista === 'retos') {
     return <RetosEditor usuario={usuario} onExit={() => setVista('hub')} />;
+  }
+  if (vista === 'mandos') {
+    return <MandosMicrobit onExit={() => setVista('hub')} />;
   }
 
   return (
@@ -196,6 +200,13 @@ export default function ProgramacionRobotica({ usuario = null, onLoginRequest, o
             <span style={styles.editorBtnTitle}>Editor de retos</span>
             <span style={styles.editorBtnDesc}>
               Resuelve retos moviendo a Pi con bloques (estilo Scratch). ¡Llega al objetivo!
+            </span>
+          </button>
+          <button onClick={() => setVista('mandos')} style={styles.editorBtn('#16a34a')}>
+            <span style={{ fontSize: 34 }}>🎮</span>
+            <span style={styles.editorBtnTitle}>Mandos micro:bit</span>
+            <span style={styles.editorBtnDesc}>
+              Convierte las micro:bit en pulsadores de respuesta (A·B·C·D) por radio y juega al Quiz en clase.
             </span>
           </button>
         </div>

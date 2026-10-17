@@ -59,92 +59,89 @@
        {
         "texto": "¿Cuánto vale?",
         "opciones": [
-         "122",
-         "112",
-         "110",
-         "115"
+         "18",
+         "19",
+         "20",
+         "17"
         ],
         "correcta": 1,
         "materia": "MATES",
-        "detalle": "131 − 19",
+        "detalle": "12 + 7",
         "grande": true
        },
        {
         "texto": "¿Cuánto vale?",
         "opciones": [
-         "10",
-         "12",
+         "9",
+         "8",
          "11",
-         "13"
-        ],
-        "correcta": 2,
-        "materia": "MATES",
-        "detalle": "32 − 21",
-        "grande": true
-       },
-       {
-        "texto": "¿Cuánto vale?",
-        "opciones": [
-         "145",
-         "150",
-         "143",
-         "155"
+         "10"
         ],
         "correcta": 0,
         "materia": "MATES",
-        "detalle": "97 + 48",
+        "detalle": "15 − 6",
         "grande": true
        },
        {
         "texto": "¿Cuánto vale?",
         "opciones": [
-         "28",
-         "29",
-         "26",
-         "27"
+         "16",
+         "18",
+         "17",
+         "15"
         ],
         "correcta": 2,
         "materia": "MATES",
-        "detalle": "134 − 108",
+        "detalle": "8 + 9",
         "grande": true
        },
        {
         "texto": "¿Cuánto vale?",
         "opciones": [
-         "84",
-         "87",
-         "97",
-         "77"
+         "13",
+         "11",
+         "14",
+         "12"
+        ],
+        "correcta": 3,
+        "materia": "MATES",
+        "detalle": "20 − 8",
+        "grande": true
+       },
+       {
+        "texto": "¿Cuánto vale?",
+        "opciones": [
+         "14",
+         "13",
+         "12",
+         "15"
         ],
         "correcta": 1,
         "materia": "MATES",
-        "detalle": "20 + 67",
+        "detalle": "6 + 7",
         "grande": true
        }
       ],
       "candado": {
-       "titulo": "Candado de 4 cifras",
-       "instruccion": "Cada cifra del código es el resultado de una operación. Resolved las cuatro operaciones de las pistas y escribid las cifras en orden.",
+       "titulo": "Candado de 3 cifras",
+       "instruccion": "Cada cifra del código es el resultado de una operación. Resolved las tres operaciones de las pistas y escribid las cifras en orden.",
        "tipo": "numero",
-       "longitud": 4,
+       "longitud": 3,
        "pistas": [
         {
-         "texto": "La primera cifra es: 0 + 4"
+         "texto": "La primera cifra es: 2 + 3"
         },
         {
-         "texto": "La segunda cifra es: 5 − 4"
+         "texto": "La segunda cifra es: 4 − 1"
         },
         {
-         "texto": "La tercera cifra es: 1 + 0"
-        },
-        {
-         "texto": "La cuarta cifra es: 3 + 1"
+         "texto": "La tercera cifra es: 1 + 1"
         }
        ],
        "soluciones": [
-        "4114"
+        "532"
        ],
-       "solucionVisible": "4114"
+       "solucionVisible": "532"
       }
      },
      {
@@ -153,88 +150,88 @@
        {
         "texto": "¿De qué país es esta bandera?",
         "opciones": [
-         "Bielorrusia",
-         "Lituania",
-         "Países Bajos",
-         "Paraguay"
+         "Francia",
+         "España",
+         "Italia",
+         "Portugal"
         ],
-        "correcta": 2,
+        "correcta": 1,
         "materia": "GEOGRAFIA",
-        "img": "https://flagcdn.com/w320/nl.png"
+        "img": "https://flagcdn.com/w320/es.png"
+       },
+       {
+        "texto": "¿De qué país es esta bandera?",
+        "opciones": [
+         "Alemania",
+         "Bélgica",
+         "Brasil",
+         "México"
+        ],
+        "correcta": 0,
+        "materia": "GEOGRAFIA",
+        "img": "https://flagcdn.com/w320/de.png"
        },
        {
         "texto": "¿De qué país es esta bandera?",
         "opciones": [
          "México",
-         "Bélgica",
-         "España",
-         "Ucrania"
-        ],
-        "correcta": 1,
-        "materia": "GEOGRAFIA",
-        "img": "https://flagcdn.com/w320/be.png"
-       },
-       {
-        "texto": "¿De qué país es esta bandera?",
-        "opciones": [
-         "Francia",
-         "Honduras",
-         "Dinamarca",
-         "Perú"
+         "Irlanda",
+         "Italia",
+         "Japón"
         ],
         "correcta": 2,
         "materia": "GEOGRAFIA",
-        "img": "https://flagcdn.com/w320/dk.png"
+        "img": "https://flagcdn.com/w320/it.png"
        },
        {
         "texto": "¿De qué país es esta bandera?",
         "opciones": [
-         "Bolivia",
-         "Irlanda",
-         "Serbia",
-         "Suecia"
-        ],
-        "correcta": 3,
-        "materia": "GEOGRAFIA",
-        "img": "https://flagcdn.com/w320/se.png"
-       },
-       {
-        "texto": "¿De qué país es esta bandera?",
-        "opciones": [
-         "Austria",
-         "España",
-         "Letonia",
+         "Argentina",
+         "Portugal",
+         "Japón",
          "Brasil"
         ],
         "correcta": 3,
         "materia": "GEOGRAFIA",
         "img": "https://flagcdn.com/w320/br.png"
+       },
+       {
+        "texto": "¿De qué país es esta bandera?",
+        "opciones": [
+         "China",
+         "Japón",
+         "Canadá",
+         "Brasil"
+        ],
+        "correcta": 1,
+        "materia": "GEOGRAFIA",
+        "img": "https://flagcdn.com/w320/jp.png"
        }
       ],
       "candado": {
        "titulo": "La capital secreta",
        "instruccion": "El fantasma bibliotecario esconde una ciudad. Con las pistas, descubrid de qué país es la bandera… ¡y escribid su CAPITAL!",
        "tipo": "texto",
-       "longitud": 9,
+       "longitud": 5,
        "pistas": [
         {
          "texto": "Esta es la bandera del país:",
-         "img": "https://flagcdn.com/w320/si.png"
+         "img": "https://flagcdn.com/w320/fr.png"
         },
         {
-         "texto": "El país está en Europa."
+         "texto": "En esa ciudad está la Torre Eiffel."
         },
         {
-         "texto": "La capital empieza por «L»."
+         "texto": "La capital empieza por «P»."
         },
         {
-         "texto": "El nombre de la capital tiene 9 letras."
+         "texto": "El nombre de la capital tiene 5 letras."
         }
        ],
        "soluciones": [
-        "Liubliana"
+        "París"
        ],
-       "solucionVisible": "Liubliana (Eslovenia)"
+       "solucionVisible": "París (Francia)"
       }
      },
      {
@@ -243,8 +240,8 @@
        {
         "texto": "¿Qué órgano es este?",
         "opciones": [
-         "Tiroides",
-         "Vesícula biliar",
+         "Corazón",
+         "Estómago",
          "Pulmones",
          "Cerebro"
         ],
@@ -253,12 +250,12 @@
         "img": "/assets/anatomia/pulmones.jpg"
        },
        {
-        "texto": "¿A qué sistema o aparato pertenece: Corazón?",
+        "texto": "¿A qué aparato pertenece el corazón?",
         "opciones": [
-         "Sistema Nervioso",
-         "Sistema Respiratorio",
-         "Sistema Cardiovascular",
-         "Sistema Endocrino y Digestivo"
+         "Aparato digestivo",
+         "Aparato respiratorio",
+         "Aparato circulatorio",
+         "Sistema nervioso"
         ],
         "correcta": 2,
         "materia": "BIOLOGIA"
@@ -266,36 +263,36 @@
        {
         "texto": "¿Qué órgano es?",
         "opciones": [
-         "Laringe",
+         "Estómago",
          "Hígado",
-         "Intestino grueso",
-         "Pulmones"
+         "Pulmones",
+         "Cerebro"
         ],
         "correcta": 0,
         "materia": "BIOLOGIA",
-        "detalle": "Contiene las cuerdas vocales, es fundamental para la fonación."
+        "detalle": "Aquí se deshace la comida que tragamos."
        },
        {
         "texto": "¿Qué órgano es este?",
         "opciones": [
-         "Laringe",
-         "Páncreas",
+         "Cerebro",
          "Corazón",
-         "Intestino grueso"
+         "Hígado",
+         "Pulmones"
         ],
-        "correcta": 2,
+        "correcta": 1,
         "materia": "BIOLOGIA",
         "img": "/assets/anatomia/corazon.jpg"
        },
        {
         "texto": "¿Qué órgano es este?",
         "opciones": [
-         "Médula espinal",
          "Corazón",
-         "Riñones",
-         "Hipófisis (Glándula pituitaria)"
+         "Estómago",
+         "Pulmones",
+         "Riñones"
         ],
-        "correcta": 2,
+        "correcta": 3,
         "materia": "BIOLOGIA",
         "img": "/assets/anatomia/rinones.jpg"
        }
@@ -304,25 +301,25 @@
        "titulo": "La pieza perdida del esqueleto",
        "instruccion": "Al guardián le falta una pieza: es un órgano. Juntad las pistas y escribid su nombre.",
        "tipo": "texto",
-       "longitud": 7,
+       "longitud": 4,
        "pistas": [
         {
-         "texto": "Pertenece al Sistema Nervioso."
+         "texto": "Es el órgano más grande del cuerpo: nos cubre por fuera."
         },
         {
-         "texto": "Lo que sé: «Centro de control del cuerpo, responsable del pensamiento, la memoria y el control del resto de órganos.»"
+         "texto": "Con él notamos el frío, el calor y las cosquillas."
         },
         {
-         "texto": "Empieza por «C» y tiene 7 letras."
+         "texto": "Empieza por «P» y tiene 4 letras."
         },
         {
-         "texto": "Es un órgano. Termina en «ro»."
+         "texto": "Termina en «el»."
         }
        ],
        "soluciones": [
-        "Cerebro"
+        "Piel"
        ],
-       "solucionVisible": "Cerebro"
+       "solucionVisible": "Piel"
       }
      },
      {
@@ -331,56 +328,56 @@
        {
         "texto": "¿De quién hablamos?",
         "opciones": [
-         "Auguste Rodin",
-         "María Antonieta",
-         "Charles Darwin",
-         "Thomas Edison"
+         "Pablo Picasso",
+         "Thomas Edison",
+         "Albert Einstein",
+         "Mozart"
         ],
-        "correcta": 3,
+        "correcta": 1,
         "materia": "HISTORIA",
-        "detalle": "Registró más de mil patentes."
+        "detalle": "Inventó la bombilla eléctrica."
        },
        {
-        "texto": "¿En qué época vivió Salvador Dalí?",
+        "texto": "¿Quién pintó la Mona Lisa (La Gioconda)?",
         "opciones": [
-         "Siglo XVII",
-         "Siglo XIX",
-         "Siglo XX",
-         "Siglo XVI"
+         "Leonardo da Vinci",
+         "Velázquez",
+         "Picasso",
+         "Dalí"
+        ],
+        "correcta": 0,
+        "materia": "HISTORIA"
+       },
+       {
+        "texto": "¿Quién escribió Don Quijote de la Mancha?",
+        "opciones": [
+         "Lope de Vega",
+         "Shakespeare",
+         "Miguel de Cervantes",
+         "Gloria Fuertes"
         ],
         "correcta": 2,
         "materia": "HISTORIA"
        },
        {
-        "texto": "¿En qué época vivió Antoine Lavoisier?",
-        "opciones": [
-         "Siglo XVII",
-         "Edad Media",
-         "Siglo XIX",
-         "Siglo XVIII"
-        ],
-        "correcta": 3,
-        "materia": "HISTORIA"
-       },
-       {
         "texto": "¿De quién hablamos?",
         "opciones": [
-         "Georgia O'Keeffe",
-         "Arquímedes",
-         "Juana I de Castilla",
-         "Antonio Vivaldi"
+         "Beethoven",
+         "Picasso",
+         "Edison",
+         "Mozart"
         ],
         "correcta": 3,
         "materia": "HISTORIA",
-        "detalle": "Era sacerdote y lo apodaban \"el cura rojo\"."
+        "detalle": "Era de Austria y tocaba el piano con solo 5 años."
        },
        {
-        "texto": "¿Quién destacó en ingeniería (Serbia, 1856–1943)?",
+        "texto": "¿Quién fue la primera persona en pisar la Luna?",
         "opciones": [
-         "Nikola Tesla",
-         "Alessandro Volta",
-         "Niels Bohr",
-         "Vera Rubin"
+         "Neil Armstrong",
+         "Cristiano Ronaldo",
+         "Albert Einstein",
+         "Marie Curie"
         ],
         "correcta": 0,
         "materia": "HISTORIA"
@@ -393,23 +390,23 @@
        "longitud": null,
        "pistas": [
         {
-         "texto": "Recuerdo: «Gobernaba Tenochtitlan cuando llegaron los españoles.»"
+         "texto": "Recuerdo: «Navegué con tres barcos: la Pinta, la Niña y la Santa María.»"
         },
         {
-         "texto": "Recuerdo: «Fue el emperador azteca durante la llegada de Hernán Cortés.»"
+         "texto": "Recuerdo: «Llegué a América en el año 1492.»"
         },
         {
-         "texto": "Vivió en el siglo XVI. Lugar: Imperio azteca (México)."
+         "texto": "Vivió hace más de 500 años."
         },
         {
-         "texto": "Fue emperador. Su nombre empieza por «M»."
+         "texto": "Su apellido empieza por «C» y tiene 5 letras."
         }
        ],
        "soluciones": [
-        "Moctezuma II",
-        "Moctezuma"
+        "Cristóbal Colón",
+        "Colón"
        ],
-       "solucionVisible": "Moctezuma II"
+       "solucionVisible": "Cristóbal Colón"
       }
      },
      {
@@ -479,36 +476,33 @@
        "titulo": "El pergamino desordenado",
        "instruccion": "Las letras de una palabra mágica se han desperdigado por la cripta. Juntad todas las letras de las pistas y ordenadlas.",
        "tipo": "texto",
-       "longitud": 8,
+       "longitud": 5,
        "pistas": [
         {
-         "texto": "Letras: L · M · A"
+         "texto": "Letras: B · R"
         },
         {
-         "texto": "Letras: C · R · E"
+         "texto": "Letras: U · J · A"
         },
         {
-         "texto": "Letras: A · O"
-        },
-        {
-         "texto": "Definición: Dulce que piden los niños de puerta en puerta. (8 letras)"
+         "texto": "Definición: Vuela en escoba y lleva sombrero de pico. (5 letras)"
         }
        ],
        "soluciones": [
-        "CARAMELO"
+        "BRUJA"
        ],
-       "solucionVisible": "CARAMELO"
+       "solucionVisible": "BRUJA"
       }
      }
     ],
     "batalla": [
      {
-      "texto": "¿En qué época vivió Diego Rivera?",
+      "texto": "¿Quién pintó el Guernica?",
       "opciones": [
-       "Siglo XV",
-       "Antigüedad",
-       "Siglo XVI",
-       "Siglo XX"
+       "Velázquez",
+       "Goya",
+       "Dalí",
+       "Pablo Picasso"
       ],
       "correcta": 3,
       "materia": "HISTORIA"
@@ -527,12 +521,12 @@
       "grande": true
      },
      {
-      "texto": "¿A qué sistema o aparato pertenece: Vesícula biliar?",
+      "texto": "¿A qué aparato pertenece el estómago?",
       "opciones": [
-       "Sistema Respiratorio",
-       "Sistema Digestivo",
-       "Sistema Óseo",
-       "Sistema Excretor"
+       "Aparato respiratorio",
+       "Aparato digestivo",
+       "Sistema nervioso",
+       "Aparato circulatorio"
       ],
       "correcta": 1,
       "materia": "BIOLOGIA"
@@ -540,50 +534,50 @@
      {
       "texto": "¿Cuánto vale?",
       "opciones": [
-       "36",
-       "26",
-       "35",
-       "33"
+       "17",
+       "16",
+       "18",
+       "15"
       ],
       "correcta": 0,
       "materia": "MATES",
-      "detalle": "41 − 5",
+      "detalle": "9 + 8",
       "grande": true
      },
      {
       "texto": "¿Qué órgano es este?",
       "opciones": [
-       "Tiroides",
-       "Glándulas suprarrenales",
-       "Intestino delgado",
-       "Intestino grueso"
+       "Cerebro",
+       "Pulmones",
+       "Estómago",
+       "Corazón"
       ],
-      "correcta": 3,
+      "correcta": 2,
       "materia": "BIOLOGIA",
-      "img": "/assets/anatomia/intestino_grueso.jpg"
+      "img": "/assets/anatomia/estomago.jpg"
      },
      {
-      "texto": "¿Qué órgano es?",
+      "texto": "¿Con qué órgano respiramos?",
       "opciones": [
-       "Vesícula biliar",
-       "Intestino delgado",
-       "Vejiga urinaria",
-       "Laringe"
+       "Pulmones",
+       "Estómago",
+       "Riñones",
+       "Hígado"
       ],
       "correcta": 0,
-      "materia": "BIOLOGIA",
-      "detalle": "Almacena y concentra la bilis producida por el hígado."
+      "materia": "BIOLOGIA"
      },
      {
-      "texto": "¿Quién fue compositor (Alemania, 1685–1750)?",
+      "texto": "¿De qué país es esta bandera?",
       "opciones": [
-       "Andy Warhol",
-       "William Shakespeare",
-       "Clara Schumann",
-       "Johann Sebastian Bach"
+       "Italia",
+       "Francia",
+       "Rusia",
+       "Países Bajos"
       ],
-      "correcta": 3,
-      "materia": "HISTORIA"
+      "correcta": 1,
+      "materia": "GEOGRAFIA",
+      "img": "https://flagcdn.com/w320/fr.png"
      },
      {
       "texto": "¿Qué clase de palabra es según su acentuación?",

@@ -3,13 +3,17 @@
 //  - Infografía didáctica del kit de robótica del centro (3 bloques con "más info").
 //  - Botón al editor de bloques (BlocklyEditor, el que ya existe).
 //  - Botón al editor de retos (RetosEditor, tipo Scratch).
+//  - Mandos micro:bit (panel) y accesos directos a los juegos con mandos: escape room de Halloween
+//    (abre en «Listos para jugar») y partido de fútbol 3D. Ambos con lazy: cargan three.js.
 //
 // Los enlaces de referencia se pueden rellenar en KITS[].detalle.enlaces[].url.
 
-import React, { useState } from 'react';
+import React, { Suspense, lazy, useState } from 'react';
 import BlocklyEditor from './BlocklyEditor';
 import RetosEditor from './RetosEditor';
 import MandosMicrobit from './mandos/MandosMicrobit.jsx';
+const EscapeHalloween = lazy(() => import('./EscapeHalloween'));
+const FutbolMandos = lazy(() => import('./futbol3d/FutbolMandos.jsx'));
 import mbot2Img from './assets/Imagenmbot.avif';
 import microbitImg from './assets/imagenmicrobit.jfif';
 import keystudioImg from './assets/imagenkeystudio.jpg';
@@ -119,7 +123,7 @@ const KITS = [
 ];
 
 export default function ProgramacionRobotica({ usuario = null, onLoginRequest, onExit }) {
-  const [vista, setVista] = useState('hub'); // 'hub' | 'bloques' | 'retos' | 'mandos'
+  const [vista, setVista] = useState('hub'); // 'hub' | 'bloques' | 'retos' | 'mandos' | 'escape' | 'futbol'
   const [infoKit, setInfoKit] = useState(null); // kit seleccionado para "más info"
 
   if (vista === 'bloques') {
@@ -137,6 +141,15 @@ export default function ProgramacionRobotica({ usuario = null, onLoginRequest, o
   }
   if (vista === 'mandos') {
     return <MandosMicrobit onExit={() => setVista('hub')} />;
+  }
+  if (vista === 'escape' || vista === 'futbol') {
+    return (
+      <Suspense fallback={<div style={{ padding: 40, fontFamily: 'system-ui, sans-serif' }}>Cargando…</div>}>
+        {vista === 'escape'
+          ? <EscapeHalloween usuario={usuario} onExit={() => setVista('hub')} pantallaInicial="LISTOS" />
+          : <FutbolMandos onExit={() => setVista('hub')} />}
+      </Suspense>
+    );
   }
 
   return (
@@ -210,6 +223,28 @@ export default function ProgramacionRobotica({ usuario = null, onLoginRequest, o
             </span>
           </button>
         </div>
+
+        {/* Juegos que se juegan con los mandos micro:bit */}
+        <h3 style={styles.editoresH3}>🎮 Juegos con mandos micro:bit</h3>
+        <div style={styles.editoresRow}>
+          <button onClick={() => setVista('escape')} style={styles.editorBtn('#c2410c')}>
+            <span style={{ fontSize: 34 }}>🎃</span>
+            <span style={styles.editorBtnTitle}>Escape room de Halloween</span>
+            <span style={styles.editorBtnDesc}>
+              La mansión del zombi en la pizarra: cada alumno responde con su mando y abre los candados letra a letra.
+            </span>
+          </button>
+          <button onClick={() => setVista('futbol')} style={styles.editorBtn('#15803d')}>
+            <span style={{ fontSize: 34 }}>⚽</span>
+            <span style={styles.editorBtnTitle}>Fútbol 3D con mandos</span>
+            <span style={styles.editorBtnDesc}>
+              Partido por equipos: cada mando es un jugador. Si te alcanzan, ¡duelo de preguntas por el balón!
+            </span>
+          </button>
+        </div>
+        <p style={{ margin: '8px 0 0', fontSize: 13, color: '#64748b' }}>
+          Antes de jugar, conecta la antena y graba los mandos en <b>🎮 Mandos micro:bit</b>.
+        </p>
       </div>
 
       {/* Modal "más info" */}

@@ -6,6 +6,7 @@ import correctSoundFile from '../assets/correct-choice-43861.mp3';
 import wrongSoundFile   from '../assets/negative_beeps-6008.mp3';
 import ANATOMIA         from '../anatomia_avanzada_dataset.json';
 import { CompeticionCuerda } from './TironCuerdaEscena';
+import { useMandoPregunta, LetraMando } from './MandosCuerda';
 import ModalEnviarCompeticion from './ModalEnviarCompeticion';
 import { leerRetoUrl } from '../utils/retoLink';
 import BotonFichas from './BotonFichas';
@@ -443,6 +444,8 @@ function PanelBioCompeticion({ aplicar, bloqueado, equipo, tipo = 'mix', ambito 
     aplicar(ok);
     setTimeout(() => { setSel(null); setQ(gen()); }, 1050);
   };
+  // Mandos micro:bit: el equipo vota la opción (ver MandosCuerda)
+  const { conMandos } = useMandoPregunta({ clave: q, n: q.opciones.length, correcta: q.opciones.indexOf(q.correcta), elegir: (i) => responder(q.opciones[i]), activa: !sel && !bloqueado });
   return (
     <div style={{ background: 'white', borderRadius: 16, padding: 14, border: `3px solid ${sel ? (sel === q.correcta ? '#10b981' : '#ef4444') : color}`, boxShadow: '0 4px 15px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ fontWeight: 900, color }}>{equipo === 1 ? '🔵 Equipo 1' : '🔴 Equipo 2'}</div>
@@ -470,7 +473,7 @@ function PanelBioCompeticion({ aplicar, bloqueado, equipo, tipo = 'mix', ambito 
             <button key={i} onClick={() => responder(op)} disabled={!!sel || bloqueado}
               style={{ padding: '10px 8px', borderRadius: 10, border: '2px solid #e2e8f0', cursor: (sel || bloqueado) ? 'default' : 'pointer', fontWeight: 700, fontSize: '0.85rem',
                 background: estado === 'ok' ? '#d1fae5' : estado === 'bad' ? '#fee2e2' : '#f8fafc', color: '#1e293b' }}>
-              {op}
+              {conMandos && <LetraMando i={i} />}{op}
             </button>
           );
         })}

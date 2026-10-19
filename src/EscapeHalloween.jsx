@@ -1034,9 +1034,9 @@ function PantallaSimple({ titulo, texto, onSalir }) {
 // =====================================================================
 //  COMPONENTE PRINCIPAL
 // =====================================================================
-export default function EscapeHalloween({ usuario, onExit, codigoSala = null }) {
+export default function EscapeHalloween({ usuario, onExit, codigoSala = null, pantallaInicial = 'MENU' }) {
     const nombreUsuario = usuario?.displayName && usuario.displayName !== 'Profe Invitado' ? usuario.displayName : '';
-    const [pantalla, setPantalla] = useState(codigoSala ? (nombreUsuario ? 'DISFRAZ' : 'UNIRSE') : 'MENU');
+    const [pantalla, setPantalla] = useState(codigoSala ? (nombreUsuario ? 'DISFRAZ' : 'UNIRSE') : pantallaInicial);
     const [nombre, setNombre] = useState(nombreUsuario);
     const [codigoEntrada, setCodigoEntrada] = useState(String(codigoSala || '').toUpperCase());
     const [errorUnir, setErrorUnir] = useState('');

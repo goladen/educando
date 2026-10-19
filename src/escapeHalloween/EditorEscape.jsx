@@ -79,7 +79,7 @@ function EleccionModo({ onElegir, onAbrir, onAtras }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 16, marginTop: 10 }}>
                 {tarjeta('ONLINE', ['Avatares disfrazados en la mansión 3D', 'Candados con pistas repartidas entre los móviles', 'Batalla final en tiempo real'])}
                 {tarjeta('PAPEL', ['Cuadernillo y hoja de respuestas en PDF', 'Mismas preguntas en la pizarra y en las fichas', 'Tú llevas el ritmo desde el ordenador'])}
-                {tarjeta('MANDOS', ['Cada alumno responde con su mando (A cambia, B envía)', 'Se corrige sola cuando han respondido todos', 'En la batalla, si acierta la mitad de la clase, ¡golpe!'])}
+                {tarjeta('MANDOS', ['Cada alumno responde con su mando (A cambia; B o agitar envía)', 'Se corrige sola cuando han respondido todos', 'En la batalla, si acierta la mitad de la clase, ¡golpe!'])}
             </div>
         </div>
     );

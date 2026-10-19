@@ -15,6 +15,7 @@ import {
   feedbackMando,
 } from './mandosMicrobit.js';
 import { despertarAudio, sonidoCorrecto, sonidoFinal } from '../utils/sonidosFeedback';
+import { BotonTutorialMandos } from './TutorialMandos.jsx';
 
 const N = 7; // puntos por lado (0..6)
 const DX = [0, 1, 0, -1]; // 0 norte, 1 este, 2 sur, 3 oeste
@@ -348,6 +349,7 @@ export default function DibujoMandos({ onExit }) {
               o baja el lápiz (empieza bajado). Los trazos que sobran salen en rojo y restan puntos: con el lápiz
               levantado se puede pasar sin pintar. Su tablero aparece al pulsar cualquier botón.
             </p>
+            <div style={{ marginBottom: 12 }}><BotonTutorialMandos inicial="mover" texto="📖 Tutorial del mando" style={{ padding: '6px 12px' }} /></div>
             <h3 style={st.h3}>Elige la figura</h3>
             <div style={st.galeria}>
               {catalogo.map((f) => (

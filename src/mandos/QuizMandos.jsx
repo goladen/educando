@@ -15,6 +15,7 @@ import {
   aNumeroMando,
 } from './mandosMicrobit.js';
 import { despertarAudio, sonidoFinal } from '../utils/sonidosFeedback';
+import { BotonTutorialMandos } from './TutorialMandos.jsx';
 import SelectorRecursoMandos, { hojasQuiz, numeroQuiz, MIN_NUM_QUIZ, MAX_NUM_QUIZ } from './SelectorRecursoMandos.jsx';
 
 const COLORES = ['#ef4444', '#3b82f6', '#f59e0b', '#22c55e'];
@@ -338,7 +339,10 @@ export default function QuizMandos({ onExit }) {
       <div style={st.scroll}>
         {fase === 'config' && (
           <div style={st.panel}>
-            <h3 style={st.h3}>Se responde con…</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+              <h3 style={{ ...st.h3, margin: 0 }}>Se responde con…</h3>
+              <BotonTutorialMandos inicial={numerico ? 'numero' : 'letras'} texto="📖 Tutorial del mando" style={{ padding: '6px 12px' }} />
+            </div>
             <div style={{ ...st.fila, marginBottom: 6 }}>
               <button onClick={() => setRespuesta('letras')} style={st.opcionCfg(!numerico)}>
                 🔤 Letras A-D
@@ -351,11 +355,11 @@ export default function QuizMandos({ onExit }) {
               {numerico ? (
                 <>
                   En el mando: <b>A</b> baja y <b>B</b> sube (si lo mantienes, va cada vez más rápido);{' '}
-                  <b>A y B a la vez</b> envía el número.
+                  <b>agitar el mando</b> envía el número.
                 </>
               ) : (
                 <>
-                  En el mando: <b>A</b> cambia de letra y <b>B</b> la envía.
+                  En el mando: <b>A</b> cambia de letra y se envía con <b>B</b> o <b>agitando el mando</b>.
                 </>
               )}
             </p>
@@ -469,7 +473,7 @@ export default function QuizMandos({ onExit }) {
         {fase === 'lobby' && (
           <div style={st.panel}>
             <h3 style={{ ...st.h3, textAlign: 'center', fontSize: 26 }}>
-              {numerico ? 'Pulsad A y B a la vez para uniros' : 'Pulsad el botón B para uniros'}
+              {numerico ? 'Agitad el mando para uniros' : 'Pulsad B o agitad el mando para uniros'}
             </h3>
             <p style={{ ...st.ayuda, textAlign: 'center' }}>Puedes escribir el nombre de cada alumno junto a su mando.</p>
             <div style={st.jugGrid}>
@@ -506,7 +510,7 @@ export default function QuizMandos({ onExit }) {
             {numerico ? (
               fase === 'pregunta' ? (
                 <div style={st.pistaNum}>
-                  🔢 Marca el número con <b>A</b> (−) y <b>B</b> (+) y envíalo con <b>A + B</b>
+                  🔢 Marca el número con <b>A</b> (−) y <b>B</b> (+) y envíalo <b>agitando el mando</b>
                 </div>
               ) : (
                 <div>

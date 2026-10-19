@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { db } from './firebase';
 import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
 import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
-import { datosSimplificar, problemasCientifica, datosRadPotencia, datosPotRadical, datosExtraer, datosIntroducir, datosSimpRaiz, datosSumar, datosIndiceComun, datosComparar, datosRaizRaiz, datosRacionalizar } from './utils/potenciasRadicales';
+import { shuffle, datosSimplificar, problemasCientifica, datosRadPotencia, datosPotRadical, datosExtraer, datosIntroducir, datosSimpRaiz, datosSumar, datosIndiceComun, datosComparar, datosRaizRaiz, datosRacionalizar } from './utils/potenciasRadicales';
 import PantallaReto, { textoBotonEnvio } from './components/retos/PantallaReto';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import correctSoundFile from './assets/correct-choice-43861.mp3';
 import wrongSoundFile from './assets/negative_beeps-6008.mp3';
-import pikaSprite from './assets/pikatron-sprite2.png';
+import { CompeticionCuerda } from './components/TironCuerdaEscena';
+import { useMandoPregunta, LetraMando } from './components/MandosCuerda';
 
 // ─── Sonidos ───────────────────────────────────────────────────────────────────
 const playSound = (type) => {
@@ -507,13 +508,15 @@ function genRaizRaiz(n = 6) {
     return { id: `rr${i}`, q, format: 'radn', askIdx: true, ans: d.ans };
   });
 }
+// Numerador sobre denominador (sin fracción si el denominador es 1)
+const conDen = (num, den) => (den === 1 ? num : `FRAC(${num},${den})`);
 // Ej. 17: racionalizar (raíz n-ésima en el denominador o binomio con conjugado)
 function genRacionalizar(n = 6) {
   return Array.from({ length: n }, (_, i) => {
     const d = datosRacionalizar();
     return d.tipo === 'mono'
-      ? { id: `ra${i}`, q: `FRAC(${d.c},${rad(d.idx, potStr(d.a, d.m))})`, format: 'racMono', ans: { idx: d.idx, valor: d.valor } }
-      : { id: `ra${i}`, q: `FRAC(${d.c},SQRT(${d.a}) ${d.mas ? '+' : '-'} SQRT(${d.b}))`, format: 'racConj', ans: { valor: d.valor } };
+      ? { id: `ra${i}`, q: `FRAC(${d.c},${rad(d.idx, potStr(d.a, d.m))})`, format: 'racMono', ans: { idx: d.idx, valor: d.valor }, sol: conDen(`${d.k === 1 ? '' : d.k}${rad(d.idx, d.radNum)}`, d.d) }
+      : { id: `ra${i}`, q: `FRAC(${d.c},SQRT(${d.a}) ${d.mas ? '+' : '-'} SQRT(${d.b}))`, format: 'racConj', ans: { valor: d.valor }, sol: conDen(`${d.k === 1 ? '' : d.k}(SQRT(${d.a}) ${d.mas ? '-' : '+'} SQRT(${d.b}))`, d.d) };
   });
 }
 
@@ -927,6 +930,41 @@ function AnswerInputs({ item, u, onChange, isMobile }) {
 }
 
 // ─── Tablero individual (usado en dual y competición) ──────────────────────────
+// ─── Opción múltiple para los mandos micro:bit (tirón de cuerda) ──────────────
+// La respuesta correcta escrita como texto matemático (lo pinta renderMath) y tres opciones
+// falsas: las soluciones de otros ejercicios del mismo tipo (así tienen la misma forma).
+const aFracMath = (x) => {
+  for (let d = 1; d <= 24; d++) { const n = Math.round(x * d); if (Math.abs(n / d - x) < 1e-9) return d === 1 ? `${n}` : `FRAC(${n},${d})`; }
+  return String(x);
+};
+function solucionMath(item) {
+  const a = item.ans || {};
+  const menos = item.sign === '-' ? '-' : '';
+  switch (item.format) {
+    case 'number': { const [n, d] = String(a.val).split('/'); return menos + (d ? `FRAC(${n},${d})` : n); }
+    case 'power': return `${menos}${a.base}^{${a.exp}}`;
+    case 'coefpow': return `${a.coef}·${a.base}^{${a.exp}}`;
+    case 'sci': return `${String(a.mant).replace('.', ',')}·10^{${a.exp}}`;
+    case 'powfrac': return `${a.base}^{${aFracMath(a.exp)}}`;
+    case 'radn': return `${a.coef != null && a.coef !== 1 ? a.coef : ''}${rad(a.idx || 2, a.rad)}`;
+    case 'racMono': case 'racConj': return item.sol || null;
+    default: return null;
+  }
+}
+function opcionesMando(item, modo) {
+  if (item.format === 'mayor') return item.opciones?.length === 2 ? { opciones: item.opciones, correcta: item.ans.choice === 'A' ? 0 : 1 } : null;
+  const sol = solucionMath(item);
+  const m = MODES.find((x) => x.id === modo);
+  if (!sol || !m?.gen) return null;
+  const otras = [];
+  for (let intento = 0; intento < 4 && otras.length < 3; intento++) {
+    m.gen(8).forEach((it) => { const t = solucionMath(it); if (t && t !== sol && !otras.includes(t) && otras.length < 3) otras.push(t); });
+  }
+  if (!otras.length) return null;
+  const opciones = shuffle([sol, ...otras]);
+  return { opciones, correcta: opciones.indexOf(sol) };
+}
+
 function TableroPot({ isMobile, initialMode, fixedMode, panelLabel, panelColor, competitivo = false, onResultado = null, bloqueado = false }) {
   const [mode, setMode] = useState(fixedMode || initialMode || 'calcular');
   const modo = fixedMode || mode;
@@ -940,9 +978,7 @@ function TableroPot({ isMobile, initialMode, fixedMode, panelLabel, panelColor, 
   // Al cambiar de tipo, regenerar
   useEffect(() => { setItem(gen1()); setAns({}); setFeedback(null); /* eslint-disable-next-line */ }, [modo]);
 
-  const comprobar = () => {
-    if (bloqueado || !item || feedback) return;
-    const ok = checkAns(item, ans);
+  const resolver = (ok) => {
     setFeedback(ok ? 'correct' : 'incorrect');
     playSound(ok ? 'correct' : 'incorrect');
     if (ok) setAciertos((a) => a + 1);
@@ -953,6 +989,16 @@ function TableroPot({ isMobile, initialMode, fixedMode, panelLabel, panelColor, 
       setTimeout(() => setFeedback(null), 700);
     }
   };
+  const comprobar = () => {
+    if (bloqueado || !item || feedback) return;
+    resolver(checkAns(item, ans));
+  };
+
+  // Mandos micro:bit (solo en el tirón de cuerda): el equipo vota entre 4 soluciones
+  const mc = useMemo(() => (competitivo && item ? opcionesMando(item, modo) : null), [item, competitivo]); // eslint-disable-line react-hooks/exhaustive-deps
+  const elegirMC = (i) => { if (bloqueado || !mc || feedback) return; resolver(i === mc.correcta); };
+  const { conMandos } = useMandoPregunta({ clave: item, n: mc ? mc.opciones.length : 0, correcta: mc?.correcta, elegir: elegirMC, activa: !!mc && !feedback && !bloqueado });
+  const verMC = conMandos && !!mc;
 
   const borderC = feedback === 'correct' ? '#10b981' : feedback === 'incorrect' ? '#ef4444' : '#e2e8f0';
 
@@ -978,15 +1024,25 @@ function TableroPot({ isMobile, initialMode, fixedMode, panelLabel, panelColor, 
         {item ? renderEnunciado(item, isMobile) : '—'}
       </div>
 
-      {item && (
+      {item && !verMC && (
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <AnswerInputs item={item} u={ans} onChange={(f, v) => { setAns((p) => ({ ...p, [f]: v })); }} isMobile={isMobile} />
+        </div>
+      )}
+      {verMC && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          {mc.opciones.map((o, i) => (
+            <button key={i} onClick={() => elegirMC(i)} disabled={bloqueado || !!feedback}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px 6px', borderRadius: 10, border: `2px solid ${panelColor}55`, background: '#f8fafc', cursor: (bloqueado || feedback) ? 'default' : 'pointer', minHeight: 54 }}>
+              <LetraMando i={i} />{renderMath(o, isMobile)}
+            </button>
+          ))}
         </div>
       )}
 
       <div style={{ display: 'flex', gap: 8 }}>
         <button onClick={comprobar} disabled={bloqueado || !!feedback}
-          style={{ flex: 1, padding: '11px', border: 'none', borderRadius: 10, fontWeight: 800, fontSize: '0.95rem', cursor: (bloqueado || feedback) ? 'default' : 'pointer', color: 'white', background: (bloqueado || feedback) ? '#94a3b8' : '#10b981' }}>
+          style={{ display: verMC ? 'none' : undefined, flex: 1, padding: '11px', border: 'none', borderRadius: 10, fontWeight: 800, fontSize: '0.95rem', cursor: (bloqueado || feedback) ? 'default' : 'pointer', color: 'white', background: (bloqueado || feedback) ? '#94a3b8' : '#10b981' }}>
           ✅ Comprobar
         </button>
         {!competitivo && (
@@ -1003,167 +1059,27 @@ function TableroPot({ isMobile, initialMode, fixedMode, panelLabel, panelColor, 
   );
 }
 
-// ─── Tirón de cuerda por EQUIPOS · 2 estilos (muñeco Pikatron / dibujo SVG) ────
-const CUERDA_CSS = `
-  @keyframes prHeaveL{0%,100%{transform:rotate(-9deg)}50%{transform:rotate(-19deg)}}
-  @keyframes prHeaveR{0%,100%{transform:rotate(9deg)}50%{transform:rotate(19deg)}}
-  @keyframes prCelebrate{0%,100%{transform:rotate(-5deg)}50%{transform:rotate(5deg)}}
-  @keyframes prWinJump{0%,100%{transform:translateY(0)}40%{transform:translateY(-9px)}}
-  @keyframes prDust{0%{opacity:.55;transform:translateX(-50%) scale(.5)}100%{opacity:0;transform:translateX(-50%) scale(1.7)}}
-  @keyframes prRopeB{0%,100%{transform:translateY(0)}50%{transform:translateY(2px)}}
-  @keyframes prPikaRun{0%{background-position:0% 0%}50%{background-position:0% 100%}100%{background-position:0% 0%}}
-`;
-
-// Muñequito dibujado (SVG) mirando a la derecha, pies en y=0
-function FiguraSVG({ shirt, hair }) {
-  return (
-    <svg viewBox="-22 -64 46 68" width="48" height="70" style={{ overflow: 'visible', display: 'block' }}>
-      <path d="M-12,0 L-1,-26" stroke="#324a5f" strokeWidth="5" strokeLinecap="round" fill="none" />
-      <path d="M13,0 L5,-14 L0,-27" stroke="#3a5568" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-      <path d="M0,-25 L-6,-46" stroke={shirt} strokeWidth="12" strokeLinecap="round" fill="none" />
-      <path d="M-5,-44 L18,-33" stroke={shirt} strokeWidth="6" strokeLinecap="round" fill="none" />
-      <circle cx="18" cy="-33" r="3.6" fill="#f6c9a0" />
-      <circle cx="-8" cy="-52" r="7.6" fill="#f6c9a0" />
-      {hair === 'pony'
-        ? <><path d="M-16,-54 a8.5,8.5 0 0 1 15,-2 l-2,5 z" fill="#7a4a1e" /><path d="M-14,-56 q-12,6 -9,21 q1,6 6,6" fill="none" stroke="#7a4a1e" strokeWidth="6" strokeLinecap="round" /></>
-        : <path d="M-16,-52 a8,8 0 0 1 15,-3 l-2,4 z" fill="#3a2817" />}
-    </svg>
-  );
-}
-
-function ZonaCuerda({ diff, ganador, limite, variant = 'pika' }) {
-  const off = diff * (30 / limite); // % desplazamiento del conjunto
-  const POS = [3, 12, 21];           // % desde el borde (3 miembros por equipo)
-
-  const miembro = (side, idx) => {
-    const win = (side === 'L' && ganador === 1) || (side === 'R' && ganador === 2);
-    const delay = `${idx * 0.13}s`;
-    const anclaje = side === 'L' ? { left: `${POS[idx]}%` } : { right: `${POS[idx]}%` };
-    // Cada personaje debe MIRAR al centro (a la cuerda). El sprite Pi mira a la izquierda;
-    // la figura SVG mira a la derecha → el volteo es opuesto según la variante.
-    const faceFlip = variant === 'pika' ? (side === 'L') : (side === 'R');
-    const leanAnim = win ? 'prCelebrate' : (side === 'L' ? 'prHeaveL' : 'prHeaveR');
-    const cuerpo = variant === 'pika'
-      ? <div style={{ width: 46, height: 46, backgroundImage: `url(${pikaSprite})`, backgroundSize: '200% 200%', backgroundRepeat: 'no-repeat', animation: 'prPikaRun 0.55s steps(1) infinite', animationDelay: delay, filter: side === 'R' ? 'hue-rotate(150deg) saturate(1.5)' : 'none' }} />
-      : <FiguraSVG shirt={side === 'L' ? '#2f7fd8' : '#e14b4b'} hair={side === 'L' ? 'pony' : 'short'} />;
-    return (
-      <div key={side + idx} style={{ position: 'absolute', bottom: 16, ...anclaje, zIndex: 5 - idx }}>
-        <div style={{ animation: win ? 'prWinJump 0.6s ease-in-out infinite' : 'none', filter: win ? 'drop-shadow(0 0 7px #FFE234)' : 'none' }}>
-          <div style={{ transformOrigin: '50% 100%', animation: `${leanAnim} 0.8s ease-in-out infinite`, animationDelay: delay }}>
-            <div style={{ transform: faceFlip ? 'scaleX(-1)' : 'none' }}>{cuerpo}</div>
-          </div>
-        </div>
-        <span style={{ position: 'absolute', bottom: -2, left: '50%', width: 22, height: 7, borderRadius: '50%', background: '#fff', animation: 'prDust 0.9s ease-out infinite', animationDelay: delay }} />
-      </div>
-    );
-  };
-
-  return (
-    <div style={{ position: 'relative', height: 138, overflow: 'hidden', borderRadius: 16, background: 'linear-gradient(180deg,#0b2447 0%,#19376d 58%,#3aa15f 58%,#1c7a43 100%)', boxShadow: 'inset 0 -10px 18px rgba(0,0,0,0.25)' }}>
-      <style>{CUERDA_CSS}</style>
-      <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 24, width: 2, background: 'rgba(255,255,255,0.14)', zIndex: 1 }} />
-      <div style={{ position: 'absolute', inset: 0, transform: `translateX(${off}%)`, transition: 'transform 0.4s cubic-bezier(0.34,1.56,0.64,1)', zIndex: 2 }}>
-        {/* Cuerda */}
-        <div style={{ position: 'absolute', left: '24%', right: '24%', bottom: 40, height: 9, borderRadius: 5,
-          background: 'repeating-linear-gradient(62deg,#5c3a0e 0 3px,#9a6a18 3px 6px,#d29a2c 6px 8px,#9a6a18 8px 10px)',
-          boxShadow: '0 2px 5px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.25), inset 0 -2px 3px rgba(0,0,0,0.35)',
-          animation: 'prRopeB 0.75s ease-in-out infinite', zIndex: 3 }}>
-          <div style={{ position: 'absolute', left: '50%', top: -24, transform: 'translateX(-50%)' }}>
-            <div style={{ width: 2, height: 26, background: '#FFE234' }} />
-            <div style={{ position: 'absolute', top: 0, left: 2, width: 16, height: 11, background: 'linear-gradient(135deg,#E53935,#FF5722)', clipPath: 'polygon(0 0,100% 0,80% 100%,0 100%)' }} />
-          </div>
-        </div>
-        {/* Equipos */}
-        {[0, 1, 2].map((i) => miembro('L', i))}
-        {[0, 1, 2].map((i) => miembro('R', i))}
-      </div>
-      <div style={{ position: 'absolute', bottom: 5, left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,0.6)', borderRadius: 20, padding: '2px 12px', fontSize: '0.7rem', color: 'rgba(255,255,255,0.85)', fontWeight: 700, zIndex: 6, whiteSpace: 'nowrap' }}>
-        {diff === 0 ? '— ¡Igualados! —' : diff < 0 ? `🔵 Equipo 1 +${Math.abs(diff)}` : `🔴 Equipo 2 +${diff}`}
-      </div>
-    </div>
-  );
-}
-
-const METAS_POT = [
-  { valor: 3, label: '⚡ Exprés', desc: '±3' },
-  { valor: 5, label: '🎯 Corta', desc: '±5' },
-  { valor: 7, label: '🔥 Media', desc: '±7' },
-  { valor: 10, label: '🏔️ Larga', desc: '±10' },
-];
-
+// ─── Tirón de cuerda por EQUIPOS (componente compartido: escenario, metas, personajes y mandos) ───
 function CompeticionPot({ isMobile, onSalir }) {
   const [tipo, setTipo] = useState('calcular');
-  const [limite, setLimite] = useState(5);
-  const [variante, setVariante] = useState('pika'); // 'pika' | 'svg'
-  const [diff, setDiff] = useState(0);
-  const [ganador, setGanador] = useState(null);
-  const [p1, setP1] = useState(0);
-  const [p2, setP2] = useState(0);
-  const [ronda, setRonda] = useState(0);
-
-  useEffect(() => { if (!ganador && Math.abs(diff) >= limite) setGanador(diff < 0 ? 1 : 2); }, [diff, ganador, limite]);
-
-  const reiniciar = () => { setDiff(0); setGanador(null); setP1(0); setP2(0); setRonda((r) => r + 1); };
-  const cambiar = (fn) => { fn(); reiniciar(); };
-
-  const aplicar = (jugador, ok) => {
-    if (ganador) return;
-    if (ok) (jugador === 1 ? setP1 : setP2)((v) => v + 1);
-    const delta = ok ? (jugador === 1 ? -1 : 1) : (jugador === 1 ? 1 : -1);
-    setDiff((prev) => Math.max(-limite, Math.min(limite, prev + delta)));
-  };
-
   return (
-    <div>
-      <style>{CUERDA_CSS}</style>
-      <div style={{ background: '#fff9e6', border: '2px solid #f39c12', borderRadius: 12, padding: '10px 14px', marginBottom: 12, fontSize: '0.85rem', color: '#7d6608', fontWeight: 700 }}>
-        <div style={{ textAlign: 'center', marginBottom: 8 }}>🪢 <b>Competición</b> · Acierta para tirar de la cuerda · Falla y el rival gana terreno</div>
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center' }}>
+    <CompeticionCuerda metaInicial={5} isMobile={isMobile} onSalir={onSalir}
+      configExtra={(
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
           <span>Tipo:</span>
-          <select value={tipo} onChange={(e) => cambiar(() => setTipo(e.target.value))} style={{ padding: '6px 10px', borderRadius: 10, border: '2px solid #f39c12', fontWeight: 700, background: 'white', cursor: 'pointer' }}>
+          <select value={tipo} onChange={(e) => setTipo(e.target.value)} style={{ padding: '6px 10px', borderRadius: 10, border: '2px solid #f39c12', fontWeight: 700, background: 'white', cursor: 'pointer' }}>
             {GRUPOS.map((g) => (
-            <optgroup key={g} label={g}>
-              {MODOS_JUEGO.filter((m) => m.grupo === g).map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
-            </optgroup>
-          ))}
+              <optgroup key={g} label={g}>
+                {MODOS_JUEGO.filter((m) => m.grupo === g).map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+              </optgroup>
+            ))}
           </select>
-          <span style={{ marginLeft: 8 }}>Meta:</span>
-          {METAS_POT.map((m) => (
-            <button key={m.valor} onClick={() => cambiar(() => setLimite(m.valor))}
-              style={{ padding: '5px 11px', borderRadius: 20, cursor: 'pointer', fontWeight: 800, fontSize: '0.78rem', border: '2px solid #f39c12', background: limite === m.valor ? '#f39c12' : 'white', color: limite === m.valor ? 'white' : '#b9770f' }}>
-              {m.label} <span style={{ opacity: 0.8 }}>{m.desc}</span>
-            </button>
-          ))}
-          <span style={{ marginLeft: 8 }}>Animación:</span>
-          {[{ id: 'pika', label: '🕹️ Muñecos' }, { id: 'svg', label: '✏️ Dibujo' }].map((v) => (
-            <button key={v.id} onClick={() => setVariante(v.id)}
-              style={{ padding: '5px 11px', borderRadius: 20, cursor: 'pointer', fontWeight: 800, fontSize: '0.78rem', border: '2px solid #8e44ad', background: variante === v.id ? '#8e44ad' : 'white', color: variante === v.id ? 'white' : '#8e44ad' }}>
-              {v.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <ZonaCuerda diff={diff} ganador={ganador} limite={limite} variant={variante} />
-
-      <div style={{ display: 'flex', gap: 16, marginTop: 14, alignItems: 'flex-start' }}>
-        <TableroPot key={`c1-${tipo}-${ronda}`} isMobile={isMobile} fixedMode={tipo} panelLabel="🔵 Equipo 1" panelColor="#3498db" competitivo onResultado={(ok) => aplicar(1, ok)} bloqueado={!!ganador} />
-        <div style={{ width: 4, background: '#e2e8f0', alignSelf: 'stretch', borderRadius: 4 }} />
-        <TableroPot key={`c2-${tipo}-${ronda}`} isMobile={isMobile} fixedMode={tipo} panelLabel="🔴 Equipo 2" panelColor="#e74c3c" competitivo onResultado={(ok) => aplicar(2, ok)} bloqueado={!!ganador} />
-      </div>
-
-      {ganador && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 10002, gap: 14, padding: 20 }}>
-          <div style={{ fontSize: '4.5rem' }}>🏆</div>
-          <div style={{ fontSize: '2.2rem', fontWeight: 900, color: ganador === 1 ? '#42A5F5' : '#EF5350', textAlign: 'center' }}>¡Gana el Equipo {ganador}!</div>
-          <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.95rem' }}>🔵 Equipo 1: {p1} aciertos · 🔴 Equipo 2: {p2} aciertos</div>
-          <div style={{ display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-            <button onClick={reiniciar} style={{ padding: '13px 32px', fontSize: '1rem', fontWeight: 900, border: 'none', borderRadius: 16, background: 'linear-gradient(135deg,#f093fb,#f5576c)', color: 'white', cursor: 'pointer' }}>🔄 Revancha</button>
-            <button onClick={onSalir} style={{ padding: '13px 24px', fontSize: '0.9rem', fontWeight: 900, borderRadius: 16, background: 'transparent', color: 'rgba(255,255,255,0.7)', border: '2px solid rgba(255,255,255,0.25)', cursor: 'pointer' }}>← Salir</button>
-          </div>
         </div>
       )}
-    </div>
+      renderPanel={(equipo, { key, aplicar, bloqueado }) => (
+        <TableroPot key={`${key}-${tipo}`} isMobile={isMobile} fixedMode={tipo} panelLabel={equipo === 1 ? '🔵 Equipo 1' : '🔴 Equipo 2'}
+          panelColor={equipo === 1 ? '#3498db' : '#e74c3c'} competitivo onResultado={aplicar} bloqueado={bloqueado} />
+      )} />
   );
 }
 

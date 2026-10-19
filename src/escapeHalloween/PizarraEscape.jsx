@@ -3,6 +3,7 @@ import { infoPrueba, compruebaCandado, normalizar } from './bancoEscape';
 import { LETRAS, candadoParaPapel } from './partidaFija';
 import { DISFRACES, ACCESORIOS } from './avatares3d';
 import Mansion3D, { AvatarPreview3D } from './Mansion3D';
+import { BotonTutorialMandos } from '../mandos/TutorialMandos.jsx';
 import { descargarPdfEscape } from './FichasEscape';
 import { crearAudio, Ambiente, Confeti, Zombi, Corazones, BarraVidaZombi, MapaMansion, mmss, useNarrador, idNarracionFase, Subtitulo } from './comunes';
 import {
@@ -16,10 +17,10 @@ import {
  *         → ABIERTA → BATALLA (el profe marca si la clase acierta: golpe; o falla: mordisco) → VICTORIA / DERROTA.
  *
  *  Modo MANDOS (config.modo === 'MANDOS', ../mandos): cada alumno responde A-D con su micro:bit. Los avatares son los mandos que se
- *  unen (pulsando B). Se corrige cuando han respondido todos o el profe pulsa «Corregir»: en las salas, si
+ *  unen (pulsando B o agitando el mando). Se corrige cuando han respondido todos o el profe pulsa «Corregir»: en las salas, si
  *  acierta menos de la mitad se pierde tiempo; en la batalla, si acierta al menos la mitad hay golpe.
  *  En el CANDADO cada mando escribe su propio intento carácter a carácter (modo número si el código es numérico,
- *  modo abecedario si no; A+B envía cada carácter). Cada carácter se comprueba al llegar: si no encaja con el
+ *  modo abecedario si no; agitar el mando, o A+B, envía cada carácter). Cada carácter se comprueba al llegar: si no encaja con el
  *  principio de ninguna solución, el intento de ese mando se borra (carita triste y ESPERA_MANDO ms sin poder
  *  probar). Quien completa el código abre la puerta y su avatar se destaca (crece en la mansión + tarjeta).
  *  Los nombres de los mandos se pueden cambiar en el vestíbulo (se guardan en pikt_mandos_nombres).
@@ -406,8 +407,12 @@ export default function PizarraEscape({ config, titulo = '', onSalir }) {
             </>}
             {mandos && (
             <div style={{ padding: '10px 12px', borderRadius: 14, background: 'rgba(0,0,0,.3)', border: '2px solid rgba(255,255,255,.12)' }}>
-                    <div style={{ fontWeight: 800, color: '#ffb347' }}>🎮 Modo mandos micro:bit</div>
-                    <p style={{ margin: '8px 0', lineHeight: 1.4, opacity: .9 }}>Cada alumno responde con su mando (A cambia la letra, B la envía). <b>Pulsad B para uniros</b>: aparecerá vuestro avatar en la mansión.</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 800, color: '#ffb347' }}>🎮 Modo mandos micro:bit</span>
+                        <BotonTutorialMandos inicial="letras" texto="📖 Tutorial" style={{ background: '#7c3aed', padding: '5px 12px' }} />
+                        <BotonTutorialMandos inicial="candado" texto="🔒 Cómo se abre el candado" style={{ background: '#d97706', padding: '5px 12px' }} />
+                    </div>
+                    <p style={{ margin: '8px 0', lineHeight: 1.4, opacity: .9 }}>Cada alumno responde con su mando: A cambia la letra y se envía con <b>B</b> o <b>agitando el mando</b>. <b>Pulsad B o agitad el mando para uniros</b>: aparecerá vuestro avatar en la mansión.</p>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                         {antena.antenaOk
                             ? <span style={{ color: '#4ade80', fontWeight: 800 }}>📡 Antena lista</span>
@@ -483,9 +488,12 @@ export default function PizarraEscape({ config, titulo = '', onSalir }) {
                 <div style={{ padding: '10px 12px', borderRadius: 14, background: 'rgba(124,58,237,.22)', border: '2px solid rgba(167,139,250,.6)' }}>
                     <div style={{ fontWeight: 800, fontSize: 'clamp(1rem,1.5vw,1.25rem)', lineHeight: 1.4 }}>
                         🎮 Con el mando, {candNumerico
-                            ? <>marca cada <b>cifra</b> con A (−) y B (+) y envíala con <b>A + B</b>.</>
-                            : <>busca cada <b>letra</b> con A (◀) y B (▶) y envíala con <b>A + B</b>.</>}
+                            ? <>marca cada <b>cifra</b> con A (−) y B (+) y envíala <b>agitando el mando</b>.</>
+                            : <>busca cada <b>letra</b> con A (◀) y B (▶) y envíala <b>agitando el mando</b>.</>}
                         {' '}Código de <b>{largoCandado}</b> {candNumerico ? 'cifras' : 'caracteres'}. Si un carácter no es, ese mando vuelve a empezar.
+                    </div>
+                    <div style={{ marginTop: 8 }}>
+                        <BotonTutorialMandos inicial="candado" texto="📖 Ver cómo se escribe el código con el mando" style={{ background: '#d97706', padding: '6px 14px' }} />
                     </div>
                     {Object.keys(intentos).length > 0 && (
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>

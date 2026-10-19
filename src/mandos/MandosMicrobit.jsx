@@ -2,10 +2,13 @@
 // los mandos por USB (Web Serial + MicroPython), muestra las pulsaciones en
 // directo, tiene mandos virtuales para probar y lanza el Quiz con mandos.
 // El servicio de conexión está en ./mandosMicrobit.js (lo reutilizan los juegos).
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import QuizMandos from './QuizMandos';
 import PistaRobotsMandos from './PistaRobotsMandos.jsx';
 import DibujoMandos from './DibujoMandos.jsx';
+import { BotonTutorialMandos } from './TutorialMandos.jsx';
+// El partido de fútbol carga three.js: va aparte (lazy) para no engordar el panel
+const FutbolMandos = lazy(() => import('../futbol3d/FutbolMandos.jsx'));
 import {
   MODOS,
   VERSION_PROGRAMAS,
@@ -132,6 +135,12 @@ export default function MandosMicrobit({ onExit }) {
   if (vista === 'quiz') return <QuizMandos onExit={() => setVista('panel')} />;
   if (vista === 'robots') return <PistaRobotsMandos onExit={() => setVista('panel')} />;
   if (vista === 'dibujo') return <DibujoMandos onExit={() => setVista('panel')} />;
+  if (vista === 'futbol')
+    return (
+      <Suspense fallback={<div style={{ padding: 40, color: '#e2e8f0' }}>⚽ Preparando el estadio…</div>}>
+        <FutbolMandos onExit={() => setVista('panel')} />
+      </Suspense>
+    );
 
   const modo = estado.modo || MODOS.LETRAS;
   const verValor = (v) =>
@@ -159,22 +168,28 @@ export default function MandosMicrobit({ onExit }) {
       </header>
 
       <div style={st.scroll}>
+        <div style={{ marginBottom: 12 }}>
+          <BotonTutorialMandos texto="📖 Tutorial: cómo se usa el mando en cada juego" style={{ fontSize: 16, padding: '10px 18px' }} />
+        </div>
         <p style={st.intro}>
           Cada alumno tiene una micro:bit con pilas y una micro:bit «antena» conectada por USB a tu ordenador recibe
           sus pulsaciones por radio. Los mandos cambian de modo solos según el juego que abras:
         </p>
         <ul style={st.modos}>
           <li>
-            <b>🔤 Letras:</b> A cambia la respuesta (A → B → C → D) y B la envía.
+            <b>🔤 Letras:</b> A cambia la respuesta (A → B → C → D); se envía con <b>B</b> o <b>agitando el mando</b>.
           </li>
           <li>
-            <b>🔢 Número:</b> A baja y B sube (manteniendo, cada vez más rápido); A y B a la vez lo envía.
+            <b>🔢 Número:</b> A baja y B sube (manteniendo, cada vez más rápido); <b>agitar</b> lo envía (o A y B a la vez).
           </li>
           <li>
-            <b>🔡 Abecedario:</b> A letra anterior y B la siguiente (A-Z y luego 0-9); A y B a la vez la envía.
+            <b>🔡 Abecedario:</b> A letra anterior y B la siguiente (A-Z y luego 0-9); <b>agitar</b> la envía (o A y B a la vez).
           </li>
           <li>
             <b>🤖 Mover:</b> A avanza, B gira y A + B sube o baja el lápiz.
+          </li>
+          <li>
+            <b>⚽ Fútbol</b> (micro:bit V2): A corre, B y el logo giran, agitar tira e inclinar pasa.
           </li>
         </ul>
         {estado.antenaOk && estado.version < VERSION_PROGRAMAS && (
@@ -389,6 +404,9 @@ export default function MandosMicrobit({ onExit }) {
           </button>
           <button style={{ ...st.btn('#db2777'), fontSize: 18, padding: '14px 28px' }} onClick={() => setVista('dibujo')}>
             ✏️ Copia el dibujo
+          </button>
+          <button style={{ ...st.btn('#15803d'), fontSize: 18, padding: '14px 28px' }} onClick={() => setVista('futbol')}>
+            ⚽ Fútbol 3D con mandos
           </button>
         </div>
       </div>

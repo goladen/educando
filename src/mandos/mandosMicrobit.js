@@ -4,8 +4,8 @@
 //   · ANTENA: una micro:bit conectada por USB al ordenador del profesor. Recibe
 //     por radio las pulsaciones de los mandos y las escribe por el puerto serie
 //     («P:<id>:<letra>:<seq>»). PiKT las lee con Web Serial.
-//   · MANDOS: micro:bit con pilas. Botón A cambia la respuesta (A→B→C→D) y
-//     botón B la envía. La antena confirma (ACK) y el mando muestra ✓.
+//   · MANDOS: micro:bit con pilas. Los botones cambian la respuesta y se
+//     envía AGITANDO el mando (en el modo letras, también con B). La antena confirma (ACK) y el mando muestra ✓.
 //   · Desde el juego se puede devolver feedback a cada mando («F:<id>:1|0») o
 //     avisar de nueva pregunta («N»): la antena lo reenvía por radio.
 //
@@ -75,7 +75,9 @@ export async function flashearMicropython(onProgreso) {
 // juego y lo retransmite cada 2 s, así un mando que se enciende tarde se pone
 // al día solo. Anuncia «ANTENA:<grupo>:v<VERSION_PROGRAMAS>».
 // v3: modo T (abecedario) en los mandos; la antena solo cambia de número de versión.
-export const VERSION_PROGRAMAS = 3;
+// v4: en los modos L, N y T la respuesta se envía agitando el mando (en L también con B).
+// v5: modo F (fútbol, micro:bit V2): botones, logo táctil, agitar e inclinar + duelos de preguntas.
+export const VERSION_PROGRAMAS = 5;
 
 export function programaAntena(grupo = GRUPO_POR_DEFECTO) {
   return `# PiKT - ANTENA receptora de mandos (v${VERSION_PROGRAMAS})
@@ -124,12 +126,15 @@ while True:
 }
 
 // Un único programa con cuatro modos; el juego elige el modo (setModoMandos):
-//   L letras:     A cambia A>B>C>D, B envia                         -> P:<id>:<A-D>:<seq>
-//   N numero:     A baja, B sube (mantener = acelera), A+B envia     -> P:<id>:N<n>:<seq>
-//   T abecedario: A letra anterior, B siguiente (A-Z y 0-9), A+B envia -> P:<id>:T<c>:<seq>
+//   L letras:     A cambia A>B>C>D; B o AGITAR envia                         -> P:<id>:<A-D>:<seq>
+//   N numero:     A baja, B sube (mantener = acelera); AGITAR (o A+B) envia  -> P:<id>:N<n>:<seq>
+//   T abecedario: A letra anterior, B siguiente (A-Z, 0-9); AGITAR (o A+B)   -> P:<id>:T<c>:<seq>
 //   M mover:      A avanza, B gira, A+B accion                       -> P:<id>:MA|MB|MX:<seq>
+//   F futbol:     A/B/logo pulsados o soltados (con latido cada 400 ms mientras se mantienen)
+//                 -> FA1|FA0|FB1|FB0|FL1|FL0; agitar -> FS; inclinar -> FPI|FPD|FPF|FPT (izq/der/delante/detras).
+//                 Con 'Q:<id>' ese mando entra en duelo: A cambia A-D, B o agitar envia la letra (una vez).
 export function programaMando(id, grupo = GRUPO_POR_DEFECTO) {
-  return `# PiKT - MANDO ${id} (v${VERSION_PROGRAMAS}): modos letras / numero / abecedario / mover
+  return `# PiKT - MANDO ${id} (v${VERSION_PROGRAMAS}): modos letras / numero / abecedario / mover / futbol
 from microbit import *
 import radio
 import random
@@ -139,6 +144,12 @@ GRUPO = ${grupo}
 LETRAS = 'ABCD'
 ALFA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 GIRO = Image('09990:00009:90909:09909:09990')
+BALON = Image('00900:09990:99999:09990:00900')
+try:
+    pin_logo.is_touched()
+    HAY_LOGO = True
+except Exception:
+    HAY_LOGO = False
 radio.config(group=GRUPO, power=7, length=32, queue=10)
 radio.on()
 modo = 'L'
@@ -150,6 +161,13 @@ activo = 0
 inicio = 0
 paso_t = 0
 combo = False
+duelo = False
+fut = {'A': False, 'B': False, 'L': False}
+fut_t = {'A': 0, 'B': 0, 'L': 0}
+armado = True
+incl_d = ''
+incl_t = 0
+tras_agitar = 0
 
 def pantalla():
     if modo == 'L':
@@ -161,6 +179,8 @@ def pantalla():
             display.scroll(str(num), delay=60, wait=False)
     elif modo == 'T':
         display.show(ALFA[car])
+    elif modo == 'F':
+        display.show(LETRAS[sel] if duelo else BALON)
     else:
         display.show(Image.ARROW_N)
 
@@ -185,15 +205,28 @@ def confirmar(ok):
     else:
         display.show(Image.NO)
     sleep(400)
+    agitado()
     pantalla()
+
+# True si se ha agitado el mando desde la ultima consulta (y lo olvida)
+def agitado():
+    return accelerometer.was_gesture('shake')
+
+def valor_actual():
+    if modo == 'L':
+        return LETRAS[sel]
+    if modo == 'N':
+        return 'N%d' % num
+    return 'T' + ALFA[car]
 
 def paso_letras():
     global sel
     if button_a.was_pressed():
         sel = (sel + 1) % 4
         pantalla()
-    if button_b.was_pressed():
-        confirmar(enviar(LETRAS[sel]))
+    if button_b.was_pressed() or agitado():
+        confirmar(enviar(valor_actual()))
+        button_b.was_pressed()
 
 # Modos N y T: A/B cambian el valor (mantener = acelera) y A+B lo envia
 def paso_ajuste():
@@ -201,13 +234,17 @@ def paso_ajuste():
     a = button_a.is_pressed()
     b = button_b.is_pressed()
     ahora = running_time()
+    if agitado():
+        if not a and not b and not combo:
+            confirmar(enviar(valor_actual()))
+        return
     if a and b:
         combo = True
         activo = 0
     elif combo:
         if not a and not b:
             combo = False
-            confirmar(enviar(('N%d' % num) if modo == 'N' else ('T' + ALFA[car])))
+            confirmar(enviar(valor_actual()))
     elif a or b:
         d = -1 if a else 1
         if activo != d:
@@ -226,6 +263,7 @@ def paso_ajuste():
         activo = 0
 
 def paso_mover():
+    agitado()  # en este modo agitar no hace nada
     if button_a.is_pressed() or button_b.is_pressed():
         sleep(70)
         a = button_a.is_pressed()
@@ -241,10 +279,68 @@ def paso_mover():
             sleep(10)
         pantalla()
 
-def cambiar_modo(m):
-    global modo, sel, num, car, activo, combo
-    if m == modo or len(m) != 1 or m not in 'LNTM':
+# Modo F: envia los cambios de A, B y el logo (y un latido mientras siguen pulsados),
+# agitar = tiro e inclinar = pase. En duelo, A cambia la letra y B o agitar la envia.
+def paso_futbol():
+    global duelo, sel, armado, incl_d, incl_t, tras_agitar
+    if duelo:
+        if button_a.was_pressed():
+            sel = (sel + 1) % 4
+            pantalla()
+        if button_b.was_pressed() or agitado():
+            ok = enviar(LETRAS[sel])
+            duelo = False
+            button_a.was_pressed()
+            button_b.was_pressed()
+            agitado()
+            display.show(Image.YES if ok else Image.NO)
+            sleep(300)
+            pantalla()
         return
+    ahora = running_time()
+    est = {'A': button_a.is_pressed(), 'B': button_b.is_pressed(), 'L': HAY_LOGO and pin_logo.is_touched()}
+    for k in 'ABL':
+        v = est[k]
+        if v != fut[k] or (v and ahora - fut_t[k] > 400):
+            fut[k] = v
+            fut_t[k] = ahora
+            enviar('F' + k + ('1' if v else '0'))
+    if agitado():
+        tras_agitar = ahora
+        enviar('FS')
+        return
+    if ahora - tras_agitar < 700:
+        return
+    x = accelerometer.get_x()
+    y = accelerometer.get_y()
+    d = ''
+    if x < -550:
+        d = 'I'
+    elif x > 550:
+        d = 'D'
+    elif y < -550:
+        d = 'F'
+    elif y > 550:
+        d = 'T'
+    if not d:
+        if abs(x) < 250 and abs(y) < 250:
+            armado = True
+        incl_d = ''
+        return
+    if not armado:
+        return
+    if d != incl_d:
+        incl_d = d
+        incl_t = ahora
+    elif ahora - incl_t > 180:
+        armado = False
+        enviar('FP' + d)
+
+def cambiar_modo(m):
+    global modo, sel, num, car, activo, combo, duelo
+    if m == modo or len(m) != 1 or m not in 'LNTMF':
+        return
+    duelo = False
     modo = m
     sel = 0
     num = 0
@@ -253,19 +349,33 @@ def cambiar_modo(m):
     combo = False
     button_a.was_pressed()
     button_b.was_pressed()
+    agitado()
     pantalla()
 
 def escuchar_radio():
-    global sel, num, car
+    global sel, num, car, duelo
     r = radio.receive()
     if not r:
         return
     if r.startswith('MODO:'):
         cambiar_modo(r[5:])
+    elif r == 'Q:%d' % ID and modo == 'F':
+        duelo = True
+        sel = 0
+        button_a.was_pressed()
+        button_b.was_pressed()
+        agitado()
+        music.pitch(1000, 120, wait=False)
+        pantalla()
+    elif r == 'Q0':
+        if duelo:
+            duelo = False
+            pantalla()
     elif r == 'N':
         sel = 0
         num = 0
         car = 0
+        agitado()
         pantalla()
     elif r == 'F:%d:1' % ID:
         display.show(Image.HAPPY)
@@ -285,6 +395,8 @@ while True:
         paso_letras()
     elif modo == 'N' or modo == 'T':
         paso_ajuste()
+    elif modo == 'F':
+        paso_futbol()
     else:
         paso_mover()
     escuchar_radio()
@@ -450,10 +562,10 @@ let modoMandos = 'L';
 let lineaPendiente = '';
 const oyentesMandos = new Set();
 const oyentesEstado = new Set();
-const RE_PULSACION = /^P:(\d{1,3}):([ABCD]|N-?\d{1,4}|T[A-Z0-9]|M[ABX]):(\d{1,3})$/;
+const RE_PULSACION = /^P:(\d{1,3}):([ABCD]|N-?\d{1,4}|T[A-Z0-9]|M[ABX]|F(?:[ABL][01]|S|P[IDFT])):(\d{1,3})$/;
 
 /** Modos de los mandos (los cambia el juego con setModoMandos). */
-export const MODOS = { LETRAS: 'L', NUMERO: 'N', TEXTO: 'T', MOVER: 'M' };
+export const MODOS = { LETRAS: 'L', NUMERO: 'N', TEXTO: 'T', MOVER: 'M', FUTBOL: 'F' };
 
 /** Texto → entero que se puede marcar en el mando (-999 … 9999), o null. */
 export const aNumeroMando = (txt) => {
@@ -468,12 +580,18 @@ export const aNumeroMando = (txt) => {
  *   letra:  { tipo: 'letra', letra: 'A'..'D' }
  *   número: { tipo: 'numero', numero }
  *   texto:  { tipo: 'texto', caracter: 'A'..'Z' | '0'..'9' }
+ *   fútbol: { tipo: 'futbol', accion: 'A'|'B'|'L' (con on: true/false) | 'S' (agitar) | 'P' (con dir: 'I'|'D'|'F'|'T') }
  *   mover:  { tipo: 'mover', mov: 'A' (avanza) | 'B' (gira) | 'X' (A+B, acción) }
  */
 function aEvento(id, valor) {
   if (/^[ABCD]$/.test(valor)) return { id, tipo: 'letra', letra: valor };
   if (valor[0] === 'N') return { id, tipo: 'numero', numero: Number(valor.slice(1)) };
   if (valor[0] === 'T') return { id, tipo: 'texto', caracter: valor[1] };
+  if (valor[0] === 'F') {
+    const accion = valor[1];
+    if (accion === 'P') return { id, tipo: 'futbol', accion, dir: valor[2] };
+    return { id, tipo: 'futbol', accion, on: valor[2] === '1' };
+  }
   return { id, tipo: 'mover', mov: valor[1] };
 }
 
@@ -543,7 +661,7 @@ export function escucharEstadoAntena(fn) {
   return () => oyentesEstado.delete(fn);
 }
 
-/** Mando virtual (pruebas sin hardware). `valor`: 'A'-'D', 'N<num>', 'T<letra>' o 'MA'|'MB'|'MX'. */
+/** Mando virtual (pruebas sin hardware). `valor`: 'A'-'D', 'N<num>', 'T<letra>', 'MA'|'MB'|'MX' o 'F…' (fútbol). */
 export function simularPulsacion(id, valor) {
   emitirPulsacion({ ...aEvento(id, String(valor)), t: Date.now(), simulado: true });
 }
@@ -627,6 +745,12 @@ export async function enviarAMandos(linea) {
 
 /** Carita feliz/triste + sonido en el mando `id`. */
 export const feedbackMando = (id, acierto) => enviarAMandos(`F:${id}:${acierto ? 1 : 0}`);
+
+/** Modo fútbol: el mando `id` entra en duelo (elige A-D y la envía una vez). */
+export const dueloMando = (id) => enviarAMandos(`Q:${id}`);
+
+/** Modo fútbol: termina cualquier duelo abierto en los mandos. */
+export const finDuelosMandos = () => enviarAMandos('Q0');
 
 /** Vuelve todos los mandos a la letra A. */
 export const nuevaPreguntaMandos = () => enviarAMandos('N');

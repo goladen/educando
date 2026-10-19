@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { db } from './firebase';
 import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
 import correctSoundFile from './assets/correct-choice-43861.mp3';
 import wrongSoundFile from './assets/negative_beeps-6008.mp3';
 import winSoundFile from './assets/applause-small-audience-97257.mp3';
-import pikaSprite from './assets/pikatron-sprite2.png';
+import { CompeticionCuerda } from './components/TironCuerdaEscena';
+import { useMandoPregunta, LetraMando } from './components/MandosCuerda';
 import problemasData from './data/problemasSistemas.json';
 import { guardarRegistroLocal } from './utils/registrosLocales';
 import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
@@ -536,6 +537,35 @@ const makeStyles = (isMobile, isCanvasOpen) => ({
 });
 
 // ─── Panel resolutor reutilizable (usado en modo simple y dual) ────────────────
+// ─── Opción múltiple para los mandos micro:bit (tirón de cuerda) ──────────────
+// Solución «x = 2 · y = −1» y variaciones típicas de error: valores intercambiados,
+// signo cambiado o una unidad de más/menos.
+function opcionesSistema(p, mode) {
+  if (!p) return null;
+  let vars, vals, etiqueta;
+  if (mode === 'visual' || p.type === 'visual') {
+    if (!p.items) return null;
+    vars = Object.keys(p.items); vals = vars.map((k) => p.items[k].value); etiqueta = (k) => p.items[k].label;
+  } else if (Array.isArray(p.variables) && p.answers) {
+    vars = p.variables; vals = vars.map((v) => p.answers[v]); etiqueta = (v) => v;
+  } else return null;
+  if (vals.some((v) => typeof v !== 'number' || !isFinite(v))) return null;
+  const fmt = (n) => String(Math.round(n * 100) / 100).replace('.', ',').replace('-', '−');
+  const texto = (arr) => vars.map((v, i) => `${etiqueta(v)} = ${fmt(arr[i])}`).join('  ·  ');
+  const correcta = texto(vals);
+  const variantes = [];
+  const add = (arr) => { const t = texto(arr); if (t !== correcta && !variantes.includes(t)) variantes.push(t); };
+  if (vals.length > 1) add([...vals].reverse());
+  add(vals.map((v, i) => (i === 0 ? -v : v)));
+  add(vals.map((v, i) => (i === vals.length - 1 ? -v : v)));
+  add(vals.map((v, i) => (i === 0 ? v + 1 : v)));
+  add(vals.map((v, i) => (i === vals.length - 1 ? v - 1 : v)));
+  add(vals.map((v) => v + 2));
+  const azar = (a) => a.map((x) => [Math.random(), x]).sort((m, n) => m[0] - n[0]).map((x) => x[1]);
+  const opciones = azar([correcta, ...azar(variantes).slice(0, 3)]);
+  return { opciones, correcta: opciones.indexOf(correcta) };
+}
+
 function SolverPanel({ mode, subMode, isMobile, compact = false, panelLabel = null, panelColor = '#6c5ce7', difficulty = 'facil', reportar = null, competitivo = false, onResultado = null, bloqueado = false }) {
   const styles = makeStyles(isMobile, false);
   const gen = GENERADORES[mode];            // generador aleatorio (si el modo lo tiene)
@@ -628,6 +658,19 @@ function SolverPanel({ mode, subMode, isMobile, compact = false, panelLabel = nu
       playSound('incorrect');
     }
   };
+
+  // Mandos micro:bit (solo en el tirón de cuerda): el equipo vota entre 4 soluciones
+  const mc = useMemo(() => (competitivo ? opcionesSistema(currentProblem, mode) : null), [currentProblem, competitivo, mode]);
+  const elegirMC = (i) => {
+    if (terminal || bloqueado || feedback || !mc) return;
+    const ok = i === mc.correcta;
+    if (ok) { setFeedback('correct'); playSound('correct'); if (esProblema) registrarAcierto(); }
+    else { setFeedback('incorrect'); playSound('incorrect'); }
+    if (typeof onResultado === 'function') onResultado(ok);
+    setTimeout(() => { setFeedback(null); siguienteProblema(); }, 700);
+  };
+  const { conMandos } = useMandoPregunta({ clave: currentProblem, n: mc ? mc.opciones.length : 0, correcta: mc?.correcta, elegir: elegirMC, activa: !!mc && !feedback && !bloqueado && !terminal });
+  const verMC = conMandos && !!mc;
 
   // Guarda el progreso en el dispositivo cuando se resuelve bien un problema
   const registrarAcierto = () => {
@@ -748,8 +791,19 @@ function SolverPanel({ mode, subMode, isMobile, compact = false, panelLabel = nu
       </div>
       )}
 
+      {verMC && (
+        <div style={{ display: 'grid', gap: 8, margin: '10px 0' }}>
+          {mc.opciones.map((o, i) => (
+            <button key={i} onClick={() => elegirMC(i)} disabled={!!feedback || bloqueado}
+              style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '10px 12px', borderRadius: 12, border: `2px solid ${panelColor}66`, background: 'white', fontWeight: 800, fontSize: '1.05rem', color: '#2f3542', cursor: (feedback || bloqueado) ? 'default' : 'pointer', textAlign: 'left' }}>
+              <LetraMando i={i} />{o}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Inputs */}
-      <div style={styles.inputSection}>
+      <div style={{ ...styles.inputSection, ...(verMC ? { display: 'none' } : {}) }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '15px' }}>
           {mode === 'visual' ? (
             Object.keys(currentProblem.items).map((key) => (
@@ -1337,179 +1391,14 @@ function DificultadSelector({ value, onChange }) {
   );
 }
 
-// ─── Tirón de cuerda por EQUIPOS · 2 estilos (muñeco Pikatron / dibujo SVG) ────
-const CUERDA_CSS = `
-  @keyframes esHeaveL{0%,100%{transform:rotate(-9deg)}50%{transform:rotate(-19deg)}}
-  @keyframes esHeaveR{0%,100%{transform:rotate(9deg)}50%{transform:rotate(19deg)}}
-  @keyframes esCelebrate{0%,100%{transform:rotate(-5deg)}50%{transform:rotate(5deg)}}
-  @keyframes esWinJump{0%,100%{transform:translateY(0)}40%{transform:translateY(-9px)}}
-  @keyframes esDust{0%{opacity:.55;transform:translateX(-50%) scale(.5)}100%{opacity:0;transform:translateX(-50%) scale(1.7)}}
-  @keyframes esRopeB{0%,100%{transform:translateY(0)}50%{transform:translateY(2px)}}
-  @keyframes esPikaRun{0%{background-position:0% 0%}50%{background-position:0% 100%}100%{background-position:0% 0%}}
-`;
-
-function FiguraSVG({ shirt, hair }) {
-  return (
-    <svg viewBox="-22 -64 46 68" width="48" height="70" style={{ overflow: 'visible', display: 'block' }}>
-      <path d="M-12,0 L-1,-26" stroke="#324a5f" strokeWidth="5" strokeLinecap="round" fill="none" />
-      <path d="M13,0 L5,-14 L0,-27" stroke="#3a5568" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-      <path d="M0,-25 L-6,-46" stroke={shirt} strokeWidth="12" strokeLinecap="round" fill="none" />
-      <path d="M-5,-44 L18,-33" stroke={shirt} strokeWidth="6" strokeLinecap="round" fill="none" />
-      <circle cx="18" cy="-33" r="3.6" fill="#f6c9a0" />
-      <circle cx="-8" cy="-52" r="7.6" fill="#f6c9a0" />
-      {hair === 'pony'
-        ? <><path d="M-16,-54 a8.5,8.5 0 0 1 15,-2 l-2,5 z" fill="#7a4a1e" /><path d="M-14,-56 q-12,6 -9,21 q1,6 6,6" fill="none" stroke="#7a4a1e" strokeWidth="6" strokeLinecap="round" /></>
-        : <path d="M-16,-52 a8,8 0 0 1 15,-3 l-2,4 z" fill="#3a2817" />}
-    </svg>
-  );
-}
-
-function ZonaCuerda({ diff, ganador, limite, variant = 'pika' }) {
-  const off = diff * (30 / limite);
-  const POS = [3, 12, 21];
-
-  const miembro = (side, idx) => {
-    const win = (side === 'L' && ganador === 1) || (side === 'R' && ganador === 2);
-    const delay = `${idx * 0.13}s`;
-    const anclaje = side === 'L' ? { left: `${POS[idx]}%` } : { right: `${POS[idx]}%` };
-    const faceFlip = variant === 'pika' ? (side === 'L') : (side === 'R');
-    const leanAnim = win ? 'esCelebrate' : (side === 'L' ? 'esHeaveL' : 'esHeaveR');
-    const cuerpo = variant === 'pika'
-      ? <div style={{ width: 46, height: 46, backgroundImage: `url(${pikaSprite})`, backgroundSize: '200% 200%', backgroundRepeat: 'no-repeat', animation: 'esPikaRun 0.55s steps(1) infinite', animationDelay: delay, filter: side === 'R' ? 'hue-rotate(150deg) saturate(1.5)' : 'none' }} />
-      : <FiguraSVG shirt={side === 'L' ? '#2f7fd8' : '#e14b4b'} hair={side === 'L' ? 'pony' : 'short'} />;
-    return (
-      <div key={side + idx} style={{ position: 'absolute', bottom: 16, ...anclaje, zIndex: 5 - idx }}>
-        <div style={{ animation: win ? 'esWinJump 0.6s ease-in-out infinite' : 'none', filter: win ? 'drop-shadow(0 0 7px #FFE234)' : 'none' }}>
-          <div style={{ transformOrigin: '50% 100%', animation: `${leanAnim} 0.8s ease-in-out infinite`, animationDelay: delay }}>
-            <div style={{ transform: faceFlip ? 'scaleX(-1)' : 'none' }}>{cuerpo}</div>
-          </div>
-        </div>
-        <span style={{ position: 'absolute', bottom: -2, left: '50%', width: 22, height: 7, borderRadius: '50%', background: '#fff', animation: 'esDust 0.9s ease-out infinite', animationDelay: delay }} />
-      </div>
-    );
-  };
-
-  return (
-    <div style={{ position: 'relative', height: 138, overflow: 'hidden', borderRadius: 16, background: 'linear-gradient(180deg,#0b2447 0%,#19376d 58%,#3aa15f 58%,#1c7a43 100%)', boxShadow: 'inset 0 -10px 18px rgba(0,0,0,0.25)' }}>
-      <style>{CUERDA_CSS}</style>
-      <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 24, width: 2, background: 'rgba(255,255,255,0.14)', zIndex: 1 }} />
-      <div style={{ position: 'absolute', inset: 0, transform: `translateX(${off}%)`, transition: 'transform 0.4s cubic-bezier(0.34,1.56,0.64,1)', zIndex: 2 }}>
-        <div style={{ position: 'absolute', left: '24%', right: '24%', bottom: 40, height: 9, borderRadius: 5,
-          background: 'repeating-linear-gradient(62deg,#5c3a0e 0 3px,#9a6a18 3px 6px,#d29a2c 6px 8px,#9a6a18 8px 10px)',
-          boxShadow: '0 2px 5px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.25), inset 0 -2px 3px rgba(0,0,0,0.35)',
-          animation: 'esRopeB 0.75s ease-in-out infinite', zIndex: 3 }}>
-          <div style={{ position: 'absolute', left: '50%', top: -24, transform: 'translateX(-50%)' }}>
-            <div style={{ width: 2, height: 26, background: '#FFE234' }} />
-            <div style={{ position: 'absolute', top: 0, left: 2, width: 16, height: 11, background: 'linear-gradient(135deg,#E53935,#FF5722)', clipPath: 'polygon(0 0,100% 0,80% 100%,0 100%)' }} />
-          </div>
-        </div>
-        {[0, 1, 2].map((i) => miembro('L', i))}
-        {[0, 1, 2].map((i) => miembro('R', i))}
-      </div>
-      <div style={{ position: 'absolute', bottom: 5, left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,0.6)', borderRadius: 20, padding: '2px 12px', fontSize: '0.7rem', color: 'rgba(255,255,255,0.85)', fontWeight: 700, zIndex: 6, whiteSpace: 'nowrap' }}>
-        {diff === 0 ? '— ¡Igualados! —' : diff < 0 ? `🔵 Equipo 1 +${Math.abs(diff)}` : `🔴 Equipo 2 +${diff}`}
-      </div>
-    </div>
-  );
-}
-
-const METAS_COMPETICION = [
-  { valor: 3, label: '⚡ Exprés', desc: '±3' },
-  { valor: 5, label: '🎯 Corta', desc: '±5' },
-  { valor: 7, label: '🔥 Media', desc: '±7' },
-  { valor: 10, label: '🏔️ Larga', desc: '±10' },
-];
-
+// ─── Tirón de cuerda por EQUIPOS (componente compartido: escenario, metas, personajes y mandos) ───
 function CompeticionDual({ isMobile, onSalir }) {
-  const [limite, setLimite] = useState(7);
-  const [variante, setVariante] = useState('pika'); // 'pika' | 'svg'
-  const [diff, setDiff] = useState(0);
-  const [ganador, setGanador] = useState(null);
-  const [p1, setP1] = useState(0);
-  const [p2, setP2] = useState(0);
-  const [ronda, setRonda] = useState(0);
-
-  // Declara ganador cuando la ventaja llega al límite
-  useEffect(() => {
-    if (!ganador && Math.abs(diff) >= limite) setGanador(diff < 0 ? 1 : 2);
-  }, [diff, ganador, limite]);
-
-  const reiniciar = () => { setDiff(0); setGanador(null); setP1(0); setP2(0); setRonda((r) => r + 1); };
-
-  const cambiarMeta = (v) => { setLimite(v); reiniciar(); };
-
-  const aplicar = (jugador, correcto) => {
-    if (ganador) return;
-    if (correcto) (jugador === 1 ? setP1 : setP2)((v) => v + 1);
-    // acierto → tira hacia tu lado; fallo → cede terreno al rival
-    const delta = correcto ? (jugador === 1 ? -1 : 1) : (jugador === 1 ? 1 : -1);
-    setDiff((prev) => Math.max(-limite, Math.min(limite, prev + delta)));
-  };
-
-  const revancha = () => reiniciar();
-
   return (
-    <div>
-      <style>{CUERDA_CSS}</style>
-      <div style={{ background: '#fff9e6', border: '2px solid #f39c12', borderRadius: 12, padding: '10px 14px', marginBottom: 12, fontSize: '0.82rem', color: '#7d6608', textAlign: 'center', fontWeight: 700 }}>
-        🪢 <b>Modo Competición</b> · Acierta para tirar de la cuerda · Falla y el rival gana terreno
-        {/* Selector de meta (según el tiempo de clase) */}
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap', marginTop: 8 }}>
-          <span style={{ alignSelf: 'center', color: '#a37f10' }}>Meta:</span>
-          {METAS_COMPETICION.map((m) => {
-            const activo = limite === m.valor;
-            return (
-              <button key={m.valor} onClick={() => cambiarMeta(m.valor)}
-                style={{ padding: '6px 12px', borderRadius: 20, cursor: 'pointer', fontWeight: 800, fontSize: '0.78rem',
-                  border: `2px solid #f39c12`, background: activo ? '#f39c12' : 'white', color: activo ? 'white' : '#b9770f' }}>
-                {m.label} <span style={{ opacity: 0.8 }}>{m.desc}</span>
-              </button>
-            );
-          })}
-          <span style={{ alignSelf: 'center', color: '#a37f10', marginLeft: 8 }}>Animación:</span>
-          {[{ id: 'pika', label: '🕹️ Muñecos' }, { id: 'svg', label: '✏️ Dibujo' }].map((v) => (
-            <button key={v.id} onClick={() => setVariante(v.id)}
-              style={{ padding: '6px 12px', borderRadius: 20, cursor: 'pointer', fontWeight: 800, fontSize: '0.78rem', border: '2px solid #8e44ad', background: variante === v.id ? '#8e44ad' : 'white', color: variante === v.id ? 'white' : '#8e44ad' }}>
-              {v.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <ZonaCuerda diff={diff} ganador={ganador} limite={limite} variant={variante} />
-
-      <div style={{ display: 'flex', gap: '18px', alignItems: 'flex-start', marginTop: 14 }}>
-        <DualColumn key={`comp1-${ronda}`} isMobile={isMobile} initialMode="2x2" panelLabel="🔵 Jugador 1" panelColor="#3498db"
-          competitivo onResultado={(c) => aplicar(1, c)} bloqueado={!!ganador} />
-        <div style={{ width: 4, background: '#dfe4ea', alignSelf: 'stretch', borderRadius: 4 }} />
-        <DualColumn key={`comp2-${ronda}`} isMobile={isMobile} initialMode="2x2" panelLabel="🔴 Jugador 2" panelColor="#e74c3c"
-          competitivo onResultado={(c) => aplicar(2, c)} bloqueado={!!ganador} />
-      </div>
-
-      {ganador && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center', zIndex: 10000, gap: 14, padding: 20, boxSizing: 'border-box' }}>
-          <div style={{ fontSize: '4.5rem' }}>🏆</div>
-          <div style={{ fontSize: '2.2rem', fontWeight: 900, color: ganador === 1 ? '#42A5F5' : '#EF5350', textAlign: 'center',
-            textShadow: '0 4px 16px rgba(0,0,0,0.5)' }}>
-            ¡Gana el Jugador {ganador}!
-          </div>
-          <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.95rem' }}>
-            🔵 J1: {p1} aciertos · 🔴 J2: {p2} aciertos
-          </div>
-          <div style={{ display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-            <button onClick={revancha} style={{ padding: '13px 32px', fontSize: '1rem', fontWeight: 900, border: 'none', borderRadius: 16,
-              background: 'linear-gradient(135deg,#f093fb,#f5576c)', color: 'white', cursor: 'pointer', boxShadow: '0 6px 18px rgba(245,87,108,0.35)' }}>
-              🔄 Revancha
-            </button>
-            <button onClick={onSalir} style={{ padding: '13px 24px', fontSize: '0.9rem', fontWeight: 900, borderRadius: 16,
-              background: 'transparent', color: 'rgba(255,255,255,0.7)', border: '2px solid rgba(255,255,255,0.25)', cursor: 'pointer' }}>
-              ← Salir de competición
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
+    <CompeticionCuerda metaInicial={7} isMobile={isMobile} onSalir={onSalir}
+      renderPanel={(equipo, { key, aplicar, bloqueado }) => (
+        <DualColumn key={key} isMobile={isMobile} initialMode="2x2" panelLabel={equipo === 1 ? '🔵 Equipo 1' : '🔴 Equipo 2'}
+          panelColor={equipo === 1 ? '#3498db' : '#e74c3c'} competitivo onResultado={aplicar} bloqueado={bloqueado} />
+      )} />
   );
 }
 

@@ -3,18 +3,18 @@
 // React solo maneja el HUD y las preguntas: el motor avisa por callbacks (cb()) y lee los mandos de `input`.
 import * as THREE from 'three';
 
-const L = 20;          // media longitud del campo (x)
-const W = 13;          // media anchura del campo (z)
-const GOAL_W = 2.6;    // media anchura de la portería
-const GOAL_H = 2.1;
-const GOAL_D = 1.5;    // fondo de la red
-const BALL_R = 0.22;
-const GRAV = 18;
-const PR = 0.42;       // radio de un jugador (para separarlos)
-const MURO_Z = W + 0.6;
-const MURO_X = L + 0.25;
-const VEL_BASE = 6.2;
-const VEL_SPRINT = 8.4;
+export const L = 20;          // media longitud del campo (x)
+export const W = 13;          // media anchura del campo (z)
+export const GOAL_W = 2.6;    // media anchura de la portería
+export const GOAL_H = 2.1;
+export const GOAL_D = 1.5;    // fondo de la red
+export const BALL_R = 0.22;
+export const GRAV = 18;
+export const PR = 0.42;       // radio de un jugador (para separarlos)
+export const MURO_Z = W + 0.6;
+export const MURO_X = L + 0.25;
+export const VEL_BASE = 6.2;
+export const VEL_SPRINT = 8.4;
 
 // Nivel del ordenador. vel = velocidad de crucero; presion = fracción del sprint al presionar al que lleva el balón
 // (por debajo de 0,74 el alumno puede escaparse regateando sin esprintar); robo = intentos/s cuando está pegado;
@@ -64,7 +64,7 @@ function texturaCesped() {
     return t;
 }
 
-function texturaBalon() {
+export function texturaBalon() {
     const c = document.createElement('canvas'); c.width = 256; c.height = 128;
     const g = c.getContext('2d');
     g.fillStyle = '#ffffff'; g.fillRect(0, 0, 256, 128);
@@ -132,7 +132,7 @@ function planoRed(w, h, mat) {
 const PIELES = [0xf1c27d, 0xe0ac69, 0x8d5524, 0xc68642, 0xffdbac];
 const PELOS = [0x2b1b0e, 0x111111, 0x6b3e1e, 0xd9b45a, 0x4a2c17];
 
-function crearGeometriasJugador() {
+export function crearGeometriasJugador() {
     const pierna = new THREE.BoxGeometry(0.15, 0.6, 0.15); pierna.translate(0, -0.3, 0);
     const brazo = new THREE.BoxGeometry(0.11, 0.48, 0.11); brazo.translate(0, -0.24, 0);
     return {
@@ -146,7 +146,7 @@ function crearGeometriasJugador() {
     };
 }
 
-function crearMallaJugador(GEO, colores) {
+export function crearMallaJugador(GEO, colores) {
     const lam = (c) => new THREE.MeshLambertMaterial({ color: c });
     const matCam = lam(colores.camiseta), matShort = lam(colores.short), matPiel = lam(PIELES[(Math.random() * PIELES.length) | 0]);
     const matMedia = lam(colores.media), matBota = lam(0x161616), matPelo = lam(PELOS[(Math.random() * PELOS.length) | 0]), matOjo = lam(0x111111);
@@ -180,7 +180,7 @@ function crearMallaJugador(GEO, colores) {
 // ---------------------------------------------------------------------------
 // Sonidos sintetizados (Web Audio)
 // ---------------------------------------------------------------------------
-function crearAudio() {
+export function crearAudio() {
     let actx = null;
     const asegurar = () => {
         try {
@@ -222,30 +222,9 @@ function crearAudio() {
 }
 
 // ---------------------------------------------------------------------------
-// MOTOR
+// Estadio: césped, vallas, gradas con público y porterías (lo comparte el partido con mandos)
 // ---------------------------------------------------------------------------
-export function montarMotor({ host, dificultad = 'normal', input, cb }) {
-    const dif = DIFICULTAD[dificultad] || DIFICULTAD.normal;
-    const audio = crearAudio();
-
-    // --- Render ---
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.domElement.style.display = 'block';
-    renderer.domElement.style.width = '100%';
-    renderer.domElement.style.height = '100%';
-    host.appendChild(renderer.domElement);
-
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x86b9e8);
-    scene.fog = new THREE.Fog(0x86b9e8, 70, 140);
-    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 300);
-
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x3a5a3a, 1.6));
-    const sol = new THREE.DirectionalLight(0xffffff, 1.6);
-    sol.position.set(-12, 30, 18); scene.add(sol);
-
+export function construirEstadio(scene) {
     // --- Campo y estadio ---
     const suelo = new THREE.Mesh(new THREE.PlaneGeometry(140, 100), new THREE.MeshLambertMaterial({ color: 0x2f6e2f }));
     suelo.rotation.x = -Math.PI / 2; suelo.position.y = -0.02; scene.add(suelo);
@@ -312,6 +291,35 @@ export function montarMotor({ host, dificultad = 'normal', input, cb }) {
         const m = new THREE.Mesh(geoSombra, matSombra);
         m.rotation.x = -Math.PI / 2; m.position.y = 0.015; m.scale.set(tam, tam, 1); scene.add(m); return m;
     };
+    return { gradas, redesFondo, crearSombra };
+}
+
+// ---------------------------------------------------------------------------
+// MOTOR
+// ---------------------------------------------------------------------------
+export function montarMotor({ host, dificultad = 'normal', input, cb }) {
+    const dif = DIFICULTAD[dificultad] || DIFICULTAD.normal;
+    const audio = crearAudio();
+
+    // --- Render ---
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.domElement.style.display = 'block';
+    renderer.domElement.style.width = '100%';
+    renderer.domElement.style.height = '100%';
+    host.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x86b9e8);
+    scene.fog = new THREE.Fog(0x86b9e8, 70, 140);
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 300);
+
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x3a5a3a, 1.6));
+    const sol = new THREE.DirectionalLight(0xffffff, 1.6);
+    sol.position.set(-12, 30, 18); scene.add(sol);
+
+    const { gradas, redesFondo, crearSombra } = construirEstadio(scene);
 
     // Balón
     const matBalon = new THREE.MeshLambertMaterial({ map: texturaBalon(), emissive: 0x000000 });

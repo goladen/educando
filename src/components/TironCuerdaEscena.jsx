@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import pikaSprite from '../assets/pikatron-sprite2.png';
 import pikaSprite1 from '../assets/pikatron-sprite.png';
+import { useMandosCuerda, ProveedorMandos, OpcionesMandos, VotosEquipo, EquipoCuerdaCtx } from './MandosCuerda';
 
 // ─── Componente COMPARTIDO del tirón de cuerda ─────────────────────────────────
 // Escenario + personajes elegibles por equipo + armazón de competición.
 // Cada juego aporta su PANEL NATIVO de preguntas (render-prop) que llama a
 // onResultado(true|false) por cada respuesta.
+// Mandos micro:bit: opción «🎮 Jugar con mandos» (MandosCuerda.jsx). Los paneles de opción múltiple
+// que llaman a useMandoPregunta() se pueden responder votando con los mandos de cada equipo.
 
 export const TIRON_CSS = `
   @keyframes cuHeaveL{0%,100%{transform:rotate(-9deg)}50%{transform:rotate(-19deg)}}
@@ -193,7 +196,15 @@ export function PantallaGanador({ ganador, p1, p2, onRevancha, onSalir }) {
 export function CompeticionCuerda({ metaInicial = 5, onSalir, renderPanel, isMobile = false, extraBar = null, configExtra = null }) {
   const t = useTironCuerda(metaInicial);
   const [mostrarConfig, setMostrarConfig] = useState(true);
+  const mandos = useMandosCuerda(!!t.ganador);
+  const panel = (equipo) => (
+    <EquipoCuerdaCtx.Provider value={equipo}>
+      {renderPanel(equipo, { key: `e${equipo}-${t.ronda}`, aplicar: (ok) => t.aplicar(equipo, ok), bloqueado: !!t.ganador, ronda: t.ronda })}
+      <VotosEquipo m={mandos} equipo={equipo} />
+    </EquipoCuerdaCtx.Provider>
+  );
   return (
+    <ProveedorMandos m={mandos}>
     <div>
       <style>{TIRON_CSS}</style>
 
@@ -219,6 +230,7 @@ export function CompeticionCuerda({ metaInicial = 5, onSalir, renderPanel, isMob
             {extraBar}
           </div>
           <SelectorPersonajes charLId={t.charLId} setCharLId={t.setCharLId} charRId={t.charRId} setCharRId={t.setCharRId} />
+          <OpcionesMandos m={mandos} />
         </div>
       )}
 
@@ -226,15 +238,16 @@ export function CompeticionCuerda({ metaInicial = 5, onSalir, renderPanel, isMob
 
       <div style={{ display: 'flex', gap: 16, marginTop: 14, alignItems: 'flex-start', flexDirection: isMobile ? 'column' : 'row' }}>
         <div style={{ flex: 1, minWidth: 0, width: '100%' }}>
-          {renderPanel(1, { key: `e1-${t.ronda}`, aplicar: (ok) => t.aplicar(1, ok), bloqueado: !!t.ganador, ronda: t.ronda })}
+          {panel(1)}
         </div>
         <div style={{ width: 4, background: '#e2e8f0', alignSelf: 'stretch', borderRadius: 4 }} />
         <div style={{ flex: 1, minWidth: 0, width: '100%' }}>
-          {renderPanel(2, { key: `e2-${t.ronda}`, aplicar: (ok) => t.aplicar(2, ok), bloqueado: !!t.ganador, ronda: t.ronda })}
+          {panel(2)}
         </div>
       </div>
 
       <PantallaGanador ganador={t.ganador} p1={t.p1} p2={t.p2} onRevancha={t.reiniciar} onSalir={onSalir} />
     </div>
+    </ProveedorMandos>
   );
 }

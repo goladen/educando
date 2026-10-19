@@ -20,6 +20,7 @@ import {
 import { despertarAudio, sonidoCorrecto, sonidoIncorrecto, sonidoFinal } from '../utils/sonidosFeedback';
 import { GENERADORES, barajar } from './QuizMandos.jsx';
 import SelectorRecursoMandos, { hojasQuiz } from './SelectorRecursoMandos.jsx';
+import { BotonTutorialMandos } from './TutorialMandos.jsx';
 
 const TAMANOS = {
   normal: { l: 'Normal', cols: 16, filas: 10 },
@@ -444,6 +445,7 @@ export default function PistaRobotsMandos({ onExit }) {
               Con el mando: <b>A</b> avanza, <b>B</b> gira a la derecha y <b>A + B</b> sube o baja el lápiz. El robot
               aparece al pulsar cualquier botón.
             </p>
+            <BotonTutorialMandos inicial="mover" texto="📖 Tutorial del mando" style={{ padding: '6px 12px' }} />
             <button style={st.btnGrande} onClick={empezar}>
               Empezar ▶
             </button>

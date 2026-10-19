@@ -6,6 +6,7 @@ import confetti from 'canvas-confetti';
 
 // Partido 3D en tiempo real (three.js): se carga solo al elegir ese modo
 const Futbol3D = lazy(() => import('./futbol3d/Futbol3D'));
+const FutbolMandos = lazy(() => import('./futbol3d/FutbolMandos'));
 
 const CHAMPIONS_VIDEO_ID = '04854XqcfCY'; // We Are The Champions (empieza en seg. 37)
 const CHAMPIONS_START = 37;
@@ -399,6 +400,11 @@ function PantallaInicio({ onJugar, onExit }) {
                                 <div style={{ fontSize: '0.74rem', color: '#cbd5e1', fontWeight: 500 }}>{o.d}</div>
                             </button>
                         ))}
+                        <button onClick={() => onJugar({ modoMandos: true })} title="Partido en 3D con mandos micro:bit: cada alumno es un jugador"
+                            style={{ flex: 1, padding: '12px', borderRadius: 12, border: '1.5px solid rgba(167,139,250,0.7)', background: 'rgba(124,58,237,0.22)', color: 'white', cursor: 'pointer', fontWeight: 700 }}>
+                            <div>🎮 Mandos micro:bit</div>
+                            <div style={{ fontSize: '0.74rem', color: '#cbd5e1', fontWeight: 500 }}>Toda la clase · por equipos</div>
+                        </button>
                     </div>
                     {modo3D ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -1423,6 +1429,13 @@ export default function FutbolQuizz({ onExit }) {
             onJugarOtra={() => { setResultado(null); setFase('INICIO'); }}
             onExit={onExit}
         />;
+    }
+    if (config?.modoMandos) {
+        return (
+            <Suspense fallback={<div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#0f172a', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui, sans-serif', fontWeight: 700 }}>⚽ Preparando el estadio…</div>}>
+                <FutbolMandos onExit={() => { setConfig(null); setFase('INICIO'); }} />
+            </Suspense>
+        );
     }
     if (config?.modo3D) {
         return (

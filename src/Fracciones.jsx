@@ -6,6 +6,7 @@ import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
 import { RotateCcw, CheckCircle, Trophy, Clock, Delete, Settings, SkipForward, Share2, PieChart, Volume2, VolumeX } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { CompeticionCuerda } from './components/TironCuerdaEscena';
+import { useMandoPregunta, LetraMando } from './components/MandosCuerda';
 import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
 import PantallaReto, { textoBotonEnvio } from './components/retos/PantallaReto';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
@@ -1271,6 +1272,11 @@ const PanelCuerdaFracciones = ({ equipo, aplicar, bloqueado, tipos, nivel, isMob
         aplicar(ok);
         setTimeout(() => { setEj(generarEjercicio(tipos, nivel)); setEstado(null); }, 850);
     };
+    // Mandos micro:bit: el equipo vota la opción (ver MandosCuerda)
+    const { conMandos } = useMandoPregunta({
+        clave: opciones, n: opciones.length, elegir: (i) => responder(opciones[i]), activa: !estado && !bloqueado,
+        correcta: opciones.findIndex(op => Math.abs(valor(op) - valor(ej.respuesta)) < 1e-9),
+    });
 
     const meta = TIPOS_EJERCICIO[ej.tipo] || { color: acento, label: '' };
     return (
@@ -1286,7 +1292,7 @@ const PanelCuerdaFracciones = ({ equipo, aplicar, bloqueado, tipos, nivel, isMob
                 {opciones.map((op, i) => (
                     <button key={i} onClick={() => responder(op)} disabled={!!estado || bloqueado}
                         style={{ padding: isMobile ? '10px 4px' : '13px 6px', borderRadius: 12, border: `2px solid ${acento}55`, background: 'white', cursor: (estado || bloqueado) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: (estado || bloqueado) ? 0.55 : 1, boxShadow: '0 3px 0 rgba(0,0,0,0.12)', touchAction: 'manipulation' }}>
-                        <FracTexto n={op[0]} d={op[1]} size={isMobile ? '1.3rem' : '1.5rem'} color="#2c3e50" />
+                        {conMandos && <LetraMando i={i} />}<FracTexto n={op[0]} d={op[1]} size={isMobile ? '1.3rem' : '1.5rem'} color="#2c3e50" />
                     </button>
                 ))}
             </div>

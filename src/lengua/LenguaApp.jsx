@@ -11,6 +11,7 @@ import { db } from '../firebase';
 import SintaxisGame from '../SintaxisGamen2';
 import { leerRetoUrl } from '../utils/retoLink';
 import { CompeticionCuerda } from '../components/TironCuerdaEscena';
+import { useMandoPregunta, LetraMando } from '../components/MandosCuerda';
 import { guardarRegistroLocal } from '../utils/registrosLocales';
 import { sonidoCorrecto, sonidoIncorrecto, sonidoFinal, despertarAudio, sonidoActivo, setSonidoActivo } from '../utils/sonidosFeedback';
 import { TEMAS, temaPorId, configPorDefecto, resumenConfig, barajar, CAMPOS } from './ejercicios';
@@ -297,6 +298,13 @@ function PreguntaView({ q, color, onResuelta, compacto = false, bloqueado = fals
     const [elegida, setElegida] = useState(null);
     const [resultado, setResultado] = useState(null);
     const terminar = (ok) => { if (resultado !== null) return; setResultado(ok); onResuelta(ok); };
+    // Mandos micro:bit (solo dentro del tirón de cuerda): el equipo vota la opción
+    const esOpciones = q.tipo === 'opciones';
+    const { conMandos } = useMandoPregunta({
+        clave: q, n: esOpciones ? q.opciones.length : 0, correcta: esOpciones ? q.opciones.findIndex(o => o.v === q.correcta) : null,
+        elegir: (i) => { const o = q.opciones[i]; if (!o) return; setElegida(o.v); terminar(o.v === q.correcta); },
+        activa: esOpciones && resultado === null && !bloqueado,
+    });
 
     return (
         <div style={{ ...S.tarjeta, padding: compacto ? 14 : 22 }}>
@@ -305,7 +313,7 @@ function PreguntaView({ q, color, onResuelta, compacto = false, bloqueado = fals
             {q.tipo === 'opciones' && (<>
                 <Enunciado e={q.enunciado} resultado={resultado} q={q} compacto={compacto} />
                 <div style={{ display: 'grid', gridTemplateColumns: q.largas ? '1fr' : `repeat(auto-fit,minmax(${q.grandes ? 140 : 120}px,1fr))`, gap: 9, marginTop: 14 }}>
-                    {q.opciones.map(o => {
+                    {q.opciones.map((o, i) => {
                         const esCorrecta = o.v === q.correcta;
                         const marcada = elegida === o.v;
                         let bg = 'white', bd = o.color || '#d8cfbd', fg = '#2c3e50';
@@ -317,7 +325,7 @@ function PreguntaView({ q, color, onResuelta, compacto = false, bloqueado = fals
                                 style={{ padding: q.grandes ? '16px 10px' : '12px 10px', borderRadius: 14, border: `2.5px solid ${bd}`, background: bg, color: fg, fontWeight: 800,
                                     fontSize: q.grandes ? 'clamp(1.1rem,4vw,1.45rem)' : q.largas ? '0.9rem' : '0.98rem', cursor: resultado === null ? 'pointer' : 'default',
                                     fontFamily: 'inherit', textAlign: q.largas ? 'left' : 'center', transition: 'background .15s', lineHeight: 1.3 }}>
-                                {o.label}
+                                {conMandos && <LetraMando i={i} />}{o.label}
                             </button>
                         );
                     })}

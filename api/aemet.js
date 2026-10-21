@@ -77,6 +77,20 @@ async function observaciones(apiKey) {
     return lista;
 }
 
+// Lluvia de las últimas 24 h de una estación automática (su observación propia trae más
+// horas que el listado de todas, que solo cubre ~12 h). Devuelve { suma, horas } o null.
+async function lluvia24(id, apiKey) {
+    const filas = await aemet(`/observacion/convencional/datos/estacion/${encodeURIComponent(id)}`, apiKey);
+    const limite = Date.now() - 24 * 3600e3;
+    let suma = 0, horas = 0;
+    (Array.isArray(filas) ? filas : []).forEach(o => {
+        const t = Date.parse(String(o.fint).replace(/([+-]\d{2})(\d{2})$/, '$1:$2'));
+        if (!Number.isFinite(t) || t <= limite || typeof o.prec !== 'number') return;
+        suma += o.prec; horas += 1;
+    });
+    return horas ? { suma, horas } : null;
+}
+
 // Valores diarios de una estación entre dos fechas, partidos en tramos de ≤ 6 meses.
 async function diarios(id, desde, hasta, apiKey) {
     const tramos = [];
@@ -145,6 +159,12 @@ export default async function handler(req, res) {
                 h24: e24 && e24.km < 40 ? Math.round(e24.suma * 10) / 10 : null,
                 d7: null, d30: null, mesAnt: null, anio: null, hasta: null, diasSeco: null,
             };
+            if (fila.est24) {
+                try {
+                    const r24 = await lluvia24(fila.est24.id, apiKey);
+                    if (r24 && r24.horas >= fila.est24.horas) { fila.h24 = Math.round(r24.suma * 10) / 10; fila.est24.horas = r24.horas; }
+                } catch { /* se queda con el listado general */ }
+            }
 
             if (est && est.km < 40) {
                 try {
@@ -153,7 +173,9 @@ export default async function handler(req, res) {
                     if (fechas.length) {
                         const suma = (f) => Math.round(fechas.filter(f).reduce((s, d) => s + dia[d], 0) * 10) / 10;
                         fila.hasta = fechas[fechas.length - 1];
-                        fila.d7 = suma(d => d > sumarDias(hoy, -7));
+                        // Con el retraso de los diarios, la semana solo tiene sentido si cubre ≥ 4 de los 7 días.
+                        const dias7 = fechas.filter(d => d > sumarDias(hoy, -7)).length;
+                        fila.d7 = dias7 >= 4 ? suma(d => d > sumarDias(hoy, -7)) : null;
                         fila.d30 = suma(d => d > sumarDias(hoy, -30));
                         fila.mesAnt = suma(d => d.startsWith(prefMesAnt));
                         fila.anio = suma(d => d.startsWith(String(anio)));

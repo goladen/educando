@@ -542,7 +542,10 @@ export default function Precipitaciones() {
                                     const cargandoP = fuente === 'aemet' ? estadoAemet === 'cargando' : estado === 'cargando';
                                     // Periodos que AEMET cubre con valores diarios (que llegan con unos días de retraso).
                                     const parcial = (k) => ['d7', 'd30', 'anio', 'diasSeco'].includes(k) && aemetAtrasado(a);
-                                    const notaAemet = (k) => (parcial(k) ? `Datos AEMET hasta el ${fechaCorta(a.hasta)}` : k === 'h24' && a?.est24 ? `Estación ${a.est24.nombre} (${a.est24.km} km)` : a?.estacion ? `Estación ${a.estacion.nombre} (${a.estacion.km} km)` : '');
+                                    // Si la estación no cubre las 24 h completas, se dice cuántas horas son.
+                                    const horas24 = a?.est24?.horas && a.est24.horas < 20 ? ` (${a.est24.horas} h)` : '';
+                                    const extra = (k) => (k === 'h24' ? horas24 : parcial(k) ? '*' : '');
+                                    const notaAemet = (k) => (k === 'd7' && a && a.d7 == null && a.hasta ? `AEMET aún no tiene suficientes días de esta semana (datos hasta el ${fechaCorta(a.hasta)})` : parcial(k) ? `Datos AEMET hasta el ${fechaCorta(a.hasta)}` : k === 'h24' && a?.est24 ? `Estación ${a.est24.nombre} (${a.est24.km} km) · ${a.est24.horas} h de datos` : a?.estacion ? `Estación ${a.estacion.nombre} (${a.estacion.km} km)` : '');
                                     const textoSeco = (x) => (x?.diasSeco == null ? (x === a ? '—' : `> ${DIAS_PASADOS}`) : x.diasSeco === 0 ? 'hoy' : x.diasSeco);
                                     return (
                                     <tr key={s.id} onClick={() => setDetalle(detalle === s.id ? null : s.id)} style={{ cursor: 'pointer', background: detalle === s.id ? 'rgba(14,165,233,0.12)' : 'transparent' }}>
@@ -555,10 +558,10 @@ export default function Precipitaciones() {
                                         </td>
                                         {COLUMNAS.map(c => (
                                             <td key={c.key} style={celda(p?.[c.key], maximos[c.key])} title={fuente !== 'om' ? notaAemet(c.key) : undefined}>
-                                                {p ? `${fmt(p[c.key])}${fuente === 'aemet' && parcial(c.key) ? '*' : ''}` : cargandoP ? '…' : '—'}
+                                                {p ? `${fmt(p[c.key])}${fuente === 'aemet' ? extra(c.key) : ''}` : cargandoP ? '…' : '—'}
                                                 {fuente === 'ambas' && (
                                                     <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#fbbf24' }}>
-                                                        {a ? `AEMET ${fmt(a[c.key])}${parcial(c.key) ? '*' : ''}` : estadoAemet === 'cargando' ? 'AEMET …' : ''}
+                                                        {a ? `AEMET ${fmt(a[c.key])}${extra(c.key)}` : estadoAemet === 'cargando' ? 'AEMET …' : ''}
                                                     </div>
                                                 )}
                                             </td>

@@ -1,6 +1,7 @@
 {
   "functions": {
     "api/listening-tts.js": { "maxDuration": 60 },
+    "api/aemet.js": { "maxDuration": 120 },
     "api/ia-recurso.js": { "maxDuration": 300 }
   },
   "headers": [

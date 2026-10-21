@@ -4,6 +4,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import TrivialGame from './Trivial';
 import CaidaEscalada from './Simuladores física/CaidaEscalada';
 import WhoKnows from './WhoKnows';
+import Precipitaciones from './Simuladores física/Precipitaciones';
 import TrivialEnvioForm from './components/TrivialEnvioForm';
 
 // ⚠️ ID del recurso del "Trivial de escalada" en Firebase (colección trivial_recursos).
@@ -15,11 +16,12 @@ const CARDS = [
     { key: 'WHOKNOWS', path: 'whoknows',   emoji: '🧠', titulo: 'Who Knows?',          desc: 'Test cronometrado por categorías con ranking global.', color: '#22c55e' },
     { key: 'SEND',     path: 'send',       emoji: '✉️', titulo: 'Send your question',  desc: 'Envía tus preguntas al banco de escalada para que el profe las revise.', color: '#f59e0b' },
     { key: 'SIM',      path: 'simulador',  emoji: '🪂', titulo: 'Simulador de caída',   desc: 'Fuerzas de una caída deportiva según cuerda, factor y anclaje.', color: '#0ea5e9' },
+    { key: 'LLUVIA',   path: 'lluvia',     emoji: '🌧️', titulo: 'Lluvia acumulada',     desc: 'Lluvia de las últimas 24 h, semana, mes y año en cada zona de escalada.', color: '#38bdf8' },
 ];
 
 // Rutas anidadas: pikt.es/escalada/<path>
-const PATH_TO_VISTA = { trivial: 'TRIVIAL', whoknows: 'WHOKNOWS', send: 'SEND', simulador: 'SIM' };
-const VISTA_TO_PATH = { TRIVIAL: 'trivial', WHOKNOWS: 'whoknows', SEND: 'send', SIM: 'simulador' };
+const PATH_TO_VISTA = { trivial: 'TRIVIAL', whoknows: 'WHOKNOWS', send: 'SEND', simulador: 'SIM', lluvia: 'LLUVIA' };
+const VISTA_TO_PATH = { TRIVIAL: 'trivial', WHOKNOWS: 'whoknows', SEND: 'send', SIM: 'simulador', LLUVIA: 'lluvia' };
 const enlaceActividad = (path) => `${window.location.origin}/escalada/${path}`;
 
 // Lee el segmento tras /escalada/ (o el legacy ?a=) para saber qué actividad abrir.
@@ -100,6 +102,18 @@ export default function ClimbingHub({ onExit }) {
 
     if (vista === 'SEND') {
         return <EnvioEscalada onBack={volverMenu} />;
+    }
+
+    if (vista === 'LLUVIA') {
+        return (
+            <div style={{ position: 'relative', minHeight: '100vh' }}>
+                <button onClick={volverMenu}
+                    style={{ position: 'fixed', top: 12, left: 12, zIndex: 9999, background: 'rgba(15,23,42,0.85)', border: '1px solid #475569', color: '#e2e8f0', borderRadius: 10, padding: '8px 14px', cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem', backdropFilter: 'blur(6px)' }}>
+                    ← Climbing
+                </button>
+                <Precipitaciones />
+            </div>
+        );
     }
 
     if (vista === 'SIM') {

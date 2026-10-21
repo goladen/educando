@@ -108,6 +108,7 @@ const SimuladorAtomos = lazy(() => import('../Simuladores física/SimuladorAtomo
 const GayLusac = lazy(() => import('../Simuladores física/GayLusac'));
 const SimuladorEclipse = lazy(() => import('../Simuladores física/SimuladorEclipse'));
 const SimuladorSistemaSolar = lazy(() => import('../Simuladores física/SimuladorSistemaSolar'));
+const Precipitaciones = lazy(() => import('../Simuladores física/Precipitaciones'));
 const RetosApp = lazy(() => import('../Retos'));
 import ModalElegirHerramienta, { herramientaPorId } from './ModalElegirHerramienta';
 import ModalCompartirReto from './ModalCompartirReto';
@@ -1741,7 +1742,7 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
             // Física: rutas /fisica y /fisica/<slug>
             if (path === 'fisica') { setSimuladoresFisica(true); return; }
             if (path.startsWith('fisica/')) {
-                const SLUG_MAP = { colisiones:'COLISIONES', planoinclinado:'PLANO_INCLINADO', tiroparabolico:'TIRO_PARABOLICO', caidalibre:'CAIDA_LIBRE', pendulo:'PENDULO', leydeohm:'LEY_OHM', enlacemoleculas:'ENLACE_MOLECULAS', ajustesreaccion:'AJUSTES_REACCION', caidaescalada:'CAIDA_ESCALADA', atomos:'ATOMOS', gaylusac:'GAY_LUSAC', eclipse:'ECLIPSE', sistemasolar:'SISTEMA_SOLAR' };
+                const SLUG_MAP = { colisiones:'COLISIONES', planoinclinado:'PLANO_INCLINADO', tiroparabolico:'TIRO_PARABOLICO', caidalibre:'CAIDA_LIBRE', pendulo:'PENDULO', leydeohm:'LEY_OHM', enlacemoleculas:'ENLACE_MOLECULAS', ajustesreaccion:'AJUSTES_REACCION', caidaescalada:'CAIDA_ESCALADA', atomos:'ATOMOS', gaylusac:'GAY_LUSAC', eclipse:'ECLIPSE', sistemasolar:'SISTEMA_SOLAR', lluvia:'LLUVIA' };
                 const key = SLUG_MAP[path.slice(7)];
                 setSimuladoresFisica(true);
                 if (key) setSimuladorFisicaActivo(key);
@@ -2684,6 +2685,7 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
             { key: 'GAY_LUSAC',         slug: 'gaylusac',          label: 'Ley de Gay-Lussac',  emoji: '🌡️', color: '#dc2626', desc: 'Presión y temperatura en volumen constante', comp: GayLusac },
             { key: 'ECLIPSE',           slug: 'eclipse',           label: 'Eclipse Solar',      emoji: '🌒', color: '#f59e0b', desc: 'Modelo 3D Sol–Tierra–Luna + vista del eclipse', comp: SimuladorEclipse },
             { key: 'SISTEMA_SOLAR',     slug: 'sistemasolar',      label: 'Sistema Solar y Leyes de Newton', emoji: '🪐', color: '#6366f1', desc: 'Planetas 3D a escala, órbitas, galaxia, leyes de Newton y tests', comp: SimuladorSistemaSolar },
+            { key: 'LLUVIA',            slug: 'lluvia',            label: 'Lluvia acumulada',   emoji: '🌧️', color: '#38bdf8', desc: 'Precipitación real de 24 h, semana, mes y año (Open-Meteo)', comp: Precipitaciones },
         ];
 
         const volverAlMenu = () => { setSimuladorFisicaActivo(null); window.history.pushState({}, '', '/fisica'); };

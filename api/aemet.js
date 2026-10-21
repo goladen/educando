@@ -173,9 +173,10 @@ export default async function handler(req, res) {
                     if (fechas.length) {
                         const suma = (f) => Math.round(fechas.filter(f).reduce((s, d) => s + dia[d], 0) * 10) / 10;
                         fila.hasta = fechas[fechas.length - 1];
-                        // Con el retraso de los diarios, la semana solo tiene sentido si cubre ≥ 4 de los 7 días.
-                        const dias7 = fechas.filter(d => d > sumarDias(hoy, -7)).length;
-                        fila.d7 = dias7 >= 4 ? suma(d => d > sumarDias(hoy, -7)) : null;
+                        // Los diarios llegan con días de retraso: si falta ayer, la semana y los "días sin
+                        // lluvia" no son fiables (un 0 diría que no ha llovido cuando aún no hay datos).
+                        const completo = fila.hasta >= sumarDias(hoy, -1);
+                        fila.d7 = completo ? suma(d => d > sumarDias(hoy, -7)) : null;
                         fila.d30 = suma(d => d > sumarDias(hoy, -30));
                         fila.mesAnt = suma(d => d.startsWith(prefMesAnt));
                         fila.anio = suma(d => d.startsWith(String(anio)));
@@ -184,6 +185,9 @@ export default async function handler(req, res) {
                             if (d < fechas[0]) break;
                             if ((dia[d] || 0) >= UMBRAL_DIA_LLUVIA) { fila.diasSeco = n + Math.round((Date.parse(hoy) - Date.parse(fila.hasta)) / 864e5); break; }
                         }
+                        if (!completo) fila.diasSeco = null;
+                        // Si en las últimas 24 h ha llovido, eso manda aunque falten los diarios.
+                        if (fila.h24 >= UMBRAL_DIA_LLUVIA) fila.diasSeco = 0;
                     }
                 } catch (e) { fila.error = e.message; }
             }

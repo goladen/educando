@@ -3,16 +3,16 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { db } from './firebase';
 import { guardarRegistroLocal } from './utils/registrosLocales';
 import { addDoc, collection, doc, getDoc } from 'firebase/firestore';
-import { CheckCircle, XCircle, RefreshCw, Send, Share2, ChevronDown, ChevronUp, Maximize2, Minimize2 } from 'lucide-react';
+import { CheckCircle, XCircle, RefreshCw, Send, Share2, Maximize2, Minimize2 } from 'lucide-react';
 import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
 import PantallaReto, { textoBotonEnvio } from './components/retos/PantallaReto';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
+import { M_FactorComun, M_Factorizacion } from './algebra/Factorizacion';
 
 // ─── Math utilities ───────────────────────────────────────────────────────────
 const SUP = { 0:'', 1:'', 2:'²', 3:'³', 4:'⁴', 5:'⁵' };
 const rInt = (lo, hi, ne) => { let v; do { v = Math.floor(Math.random()*(hi-lo+1))+lo; } while (ne !== undefined && v === ne); return v; };
 const rItem = a => a[Math.floor(Math.random()*a.length)];
-const shuffle = a => [...a].sort(() => Math.random() - 0.5);
 
 function normPoly(c) { const a=[...c]; while(a.length>1&&a[a.length-1]===0)a.pop(); return a; }
 function polyEq(a,b) { const na=normPoly(a),nb=normPoly(b); return na.length===nb.length&&na.every((v,i)=>v===nb[i]); }
@@ -56,11 +56,6 @@ function ruffiniRow(descCoeffs, root) {
 const toDesc = c => normPoly(c).reverse();
 const toAsc  = c => [...c].reverse();
 
-// Factor string: "(x − 3)" or "(x + 2)"
-function factorStr(root) {
-    if(root===0) return 'x';
-    return root>0 ? `(x − ${root})` : `(x + ${Math.abs(root)})`;
-}
 
 // ─── PolyInput component ──────────────────────────────────────────────────────
 function PolyInput({ value, onChange, maxDeg=4 }) {
@@ -135,7 +130,7 @@ function FeedbackBlock({ result, onNext, label='Siguiente →' }) {
 }
 
 // ─── Module colors ────────────────────────────────────────────────────────────
-const MOD_COLORS = ['#9b59b6','#3498db','#27ae60','#f39c12','#e74c3c','#1abc9c','#e67e22'];
+const MOD_COLORS = ['#9b59b6','#3498db','#27ae60','#f39c12','#e74c3c','#1abc9c','#c39bd3','#e67e22'];
 const MODULES = [
     { id:'terminologia',  label:'1. Terminología',        short:'1.' },
     { id:'valores',       label:'2. Valores Numéricos',   short:'2.' },
@@ -143,7 +138,8 @@ const MODULES = [
     { id:'polinomios',    label:'4. Ops. Polinomios',     short:'4.' },
     { id:'ruffini',       label:'5. División Ruffini',    short:'5.' },
     { id:'identidades',   label:'6. Identidades Notables',short:'6.' },
-    { id:'factorizacion', label:'7. Factorización',       short:'7.' },
+    { id:'factorcomun',   label:'7. Factor común',        short:'7.' },
+    { id:'factorizacion', label:'8. Factorización',       short:'8.' },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -633,148 +629,7 @@ function M6_Identidades({ onScore }) {
     );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// MODULE 7 — Factorización por Ruffini
-// ═══════════════════════════════════════════════════════════════════════════════
-function M7_Factorizacion({ onScore }) {
-    const genEj = () => {
-        const numRoots = rInt(2,3);
-        const pool = shuffle([-4,-3,-2,-1,1,2,3,4]);
-        const roots = pool.slice(0, numRoots);
-        let poly = [1];
-        roots.forEach(r => { poly = mulPoly(poly, [-r, 1]); });
-        poly = normPoly(poly);
-        return { roots: [...roots].sort((a,b)=>a-b), poly };
-    };
-
-    const [ej, setEj] = useState(genEj);
-    const [currentPoly, setCurrentPoly] = useState(ej.poly);
-    const [foundRoots, setFoundRoots] = useState([]);
-    const [testInput, setTestInput] = useState('');
-    const [testResult, setTestResult] = useState(null);
-    const [steps, setSteps] = useState([]);
-    const [done, setDone] = useState(false);
-    const [showHint, setShowHint] = useState(false);
-    const [score, setScore] = useState({ok:0,total:0});
-
-    const nuevo = () => {
-        const e = genEj();
-        setEj(e); setCurrentPoly(e.poly); setFoundRoots([]); setTestInput('');
-        setTestResult(null); setSteps([]); setDone(false); setShowHint(false);
-    };
-
-    const probarRaiz = () => {
-        const val = parseInt(testInput);
-        if(isNaN(val)) return;
-        const ev = evalPoly(currentPoly, val);
-        if(ev === 0) {
-            const desc = toDesc(currentPoly);
-            const row = ruffiniRow(desc, val);
-            const newDescQuotient = row.slice(0,-1);
-            const newPoly = toAsc(newDescQuotient);
-            const newFound = [...foundRoots, val];
-            const newSteps = [...steps, {root:val, descCoeffs:desc, row}];
-            setSteps(newSteps);
-            setFoundRoots(newFound);
-            setCurrentPoly(normPoly(newPoly));
-            setTestInput('');
-            setTestResult({ok:true, msg:`✅ ¡${val} es raíz! p(${val}) = 0`});
-            // Check if fully factored (degree 1 remaining or all roots found)
-            if(normPoly(newPoly).length <= 2 || newFound.length >= ej.roots.length) {
-                setDone(true);
-                setScore(s=>({ok:s.ok+1,total:s.total+1}));
-                onScore(1,1);
-            }
-        } else {
-            setTestResult({ok:false, msg:`❌ ${val} no es raíz: p(${val}) = ${ev}`});
-        }
-        setTimeout(()=>setTestResult(null), 2500);
-    };
-
-    const termIndep = Math.abs(ej.poly[0]);
-    const divisors = Array.from({length:termIndep*2},(_,i)=>i-termIndep).filter(v=>v!==0&&termIndep%Math.abs(v)===0);
-
-    return (
-        <div style={{display:'flex',flexDirection:'column',gap:16}}>
-            <p style={{margin:0,color:'#8b949e',fontSize:'0.9rem'}}>
-                Encuentra las raíces enteras del polinomio usando Ruffini y escribe su factorización.
-            </p>
-            <div style={{...CARD,textAlign:'center'}}>
-                <div style={{fontSize:'0.85rem',color:'#8b949e',marginBottom:6}}>p(x) =</div>
-                <div style={{fontSize:'1.4rem',fontWeight:700,color:'#f39c12',fontFamily:'Georgia,serif'}}>{polyStr(ej.poly)}</div>
-            </div>
-
-            {/* Hint */}
-            <button onClick={()=>setShowHint(v=>!v)} style={{...BTN('transparent'),border:'1px solid #30363d',color:'#8b949e',display:'flex',alignItems:'center',gap:6,alignSelf:'flex-start'}}>
-                {showHint?<ChevronUp size={14}/>:<ChevronDown size={14}/>} Pista: divisores del término independiente
-            </button>
-            {showHint && <div style={{...CARD,background:'#1a1a2e'}}>
-                <div style={{fontSize:'0.85rem',color:'#8b949e'}}>
-                    Término independiente: <b style={{color:'#f39c12'}}>{ej.poly[0]}</b> → posibles raíces enteras: <b style={{color:'#e67e22'}}>{divisors.join(', ')}</b>
-                </div>
-            </div>}
-
-            {/* Root tester */}
-            {!done && (
-                <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
-                    <span style={{color:'#8b949e',fontSize:'0.9rem'}}>Prueba x =</span>
-                    <input type="number" value={testInput} onChange={e=>setTestInput(e.target.value)}
-                        onKeyDown={e=>e.key==='Enter'&&probarRaiz()}
-                        style={{width:80,padding:'8px 12px',borderRadius:7,border:'1.5px solid #30363d',background:'#0d1117',color:'#e6edf3',textAlign:'center',fontSize:'1rem'}}
-                    />
-                    <button style={BTN('#e67e22')} onClick={probarRaiz}>Comprobar raíz</button>
-                    {testResult && <span style={{color:testResult.ok?'#2ecc71':'#e74c3c',fontWeight:700,fontSize:'0.9rem'}}>{testResult.msg}</span>}
-                </div>
-            )}
-
-            {/* Ruffini steps */}
-            {steps.length>0 && (
-                <div style={{display:'flex',flexDirection:'column',gap:12}}>
-                    <div style={{fontSize:'0.85rem',color:'#8b949e',fontWeight:700}}>Pasos de Ruffini realizados:</div>
-                    {steps.map((st,idx)=>(
-                        <div key={idx} style={{...CARD,background:'#0d1117'}}>
-                            <div style={{fontSize:'0.82rem',color:'#e67e22',marginBottom:6}}>Paso {idx+1}: raíz = {st.root}</div>
-                            <div style={{overflowX:'auto'}}>
-                                <table style={{borderCollapse:'collapse',fontSize:'0.9rem'}}>
-                                    <tbody>
-                                        <tr><td style={{padding:'4px 10px',color:'#e67e22',borderRight:'2px solid #e67e22',fontWeight:700}}>{st.root}</td>
-                                            {st.descCoeffs.map((c,i)=><td key={i} style={{padding:'4px 10px',color:'#e6edf3',borderLeft:i>0?'1px solid #30363d':'none',textAlign:'center',fontWeight:700}}>{c}</td>)}
-                                        </tr>
-                                        <tr style={{borderBottom:'2px solid #566573'}}>
-                                            <td style={{padding:'4px 10px',borderRight:'2px solid #e67e22'}}></td>
-                                            {st.row.map((q,i)=><td key={i} style={{padding:'4px 10px',color:'#3498db',borderLeft:i>0?'1px solid #30363d':'none',textAlign:'center'}}>
-                                                {i>0?st.root*st.row[i-1]:''}
-                                            </td>)}
-                                        </tr>
-                                        <tr>
-                                            <td style={{padding:'4px 10px',borderRight:'2px solid #e67e22'}}></td>
-                                            {st.row.map((q,i)=><td key={i} style={{padding:'4px 10px',color:i===st.row.length-1?'#e74c3c':'#2ecc71',borderLeft:i>0?'1px solid #30363d':'none',textAlign:'center',fontWeight:700}}>{q}</td>)}
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
-
-            {/* Result */}
-            {done && (
-                <div style={{...CARD,background:'#0d3321',border:'1px solid #27ae60',textAlign:'center'}}>
-                    <CheckCircle size={28} color="#2ecc71" style={{marginBottom:8}}/>
-                    <div style={{color:'#2ecc71',fontWeight:700,fontSize:'1rem',marginBottom:10}}>¡Factorización completada!</div>
-                    <div style={{fontSize:'1.2rem',fontFamily:'Georgia,serif',color:'#f39c12',fontWeight:700}}>
-                        p(x) = {foundRoots.map(r=>factorStr(r)).join('')}
-                        {normPoly(currentPoly).length===2 && currentPoly[1]!==1 && `· ${currentPoly[1]}`}
-                    </div>
-                    <div style={{fontSize:'0.8rem',color:'#8b949e',marginTop:6}}>Raíces encontradas: {foundRoots.join(', ')}</div>
-                    <button style={{...BTN('#3498db'),marginTop:14}} onClick={nuevo}><RefreshCw size={14} style={{marginRight:6,verticalAlign:'middle'}}/>Nuevo polinomio</button>
-                </div>
-            )}
-            <ScoreLine ok={score.ok} total={score.total}/>
-        </div>
-    );
-}
+// MODULES 7–8 — Factor común y Factorización: ./algebra/Factorizacion.jsx
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN — AlgebraApp
@@ -799,7 +654,7 @@ export default function AlgebraApp({ onExit, usuario }) {
         const i = cfgReto ? MODULES.findIndex(m => cfgReto.modulos.includes(m.id)) : 0;
         return i >= 0 ? i : 0;
     });
-    const [totals, setTotals] = useState(Array(7).fill(null).map(()=>({ok:0,total:0})));
+    const [totals, setTotals] = useState(Array(MODULES.length).fill(null).map(()=>({ok:0,total:0})));
     const [showEnviar, setShowEnviar] = useState(false);
     const [enviado,   setEnviado]   = useState(false);
     const [enviando,  setEnviando]  = useState(false);
@@ -900,7 +755,8 @@ export default function AlgebraApp({ onExit, usuario }) {
         <M4_Polinomios    onScore={handleScore(3)}/>,
         <M5_Ruffini       onScore={handleScore(4)}/>,
         <M6_Identidades   onScore={handleScore(5)}/>,
-        <M7_Factorizacion onScore={handleScore(6)}/>,
+        <M_FactorComun    onScore={handleScore(6)}/>,
+        <M_Factorizacion  onScore={handleScore(7)}/>,
     ];
 
     return (
@@ -958,7 +814,8 @@ export default function AlgebraApp({ onExit, usuario }) {
                           'Opera con polinomios de dos o tres términos.',
                           'Divide un polinomio por (x±a) usando el esquema de Ruffini.',
                           'Aplica las tres identidades notables para desarrollar expresiones cuadráticas.',
-                          'Encuentra las raíces enteras de un polinomio y escribe su factorización como producto de factores lineales.'][modIdx]}
+                          'Saca factor común: el MCD de los coeficientes y la menor potencia de x.',
+                          'Factoriza paso a paso: factor común, identidades notables, Ruffini y ecuación de 2.º grado. Puedes ver la gráfica o escribir tu propio polinomio.'][modIdx]}
                     </div>
                 </div>
                 {MODS_JSX[modIdx]}

@@ -9,6 +9,7 @@ import correctSoundFile from './assets/correct-choice-43861.mp3';
 import wrongSoundFile from './assets/negative_beeps-6008.mp3';
 import { CompeticionCuerda } from './components/TironCuerdaEscena';
 import { useMandoPregunta, LetraMando } from './components/MandosCuerda';
+import PizarraEjercicio, { BotonLapiz } from './components/PizarraEjercicio';
 
 // ─── Sonidos ───────────────────────────────────────────────────────────────────
 const playSound = (type) => {
@@ -756,6 +757,21 @@ function checkAns(item, u = {}) {
 }
 // Ejercicios sin «=» delante de la respuesta (problemas con enunciado y comparar)
 const sinIgual = (item) => !!item.enun || item.format === 'mayor';
+
+// Tarjeta de ejercicio con lápiz ✏️: abre una pizarra baja, del ancho del ejercicio, para
+// hacer cuentas debajo. Al cerrarla solo se oculta, así no se pierde lo escrito.
+function TarjetaEjercicio({ cardStyle, rowStyle, isMobile, children }) {
+  const [abierta, setAbierta] = useState(false);
+  const [montada, setMontada] = useState(false);
+  const toggle = () => { setMontada(true); setAbierta((a) => !a); };
+  return (
+    <div style={{ ...cardStyle, position: 'relative' }}>
+      <div style={{ ...rowStyle, paddingRight: isMobile ? 0 : 40 }}>{children}</div>
+      <BotonLapiz abierta={abierta} onClick={toggle} style={{ position: 'absolute', top: 8, right: 8 }} />
+      {montada && <div style={{ display: abierta ? 'block' : 'none' }}><PizarraEjercicio altura={isMobile ? 130 : 150} /></div>}
+    </div>
+  );
+}
 const inpStyleFor = (type, isMobile) => {
   const base = { textAlign: 'center', outline: 'none', border: '2px solid #cbd5e1', borderRadius: '8px', color: '#0f172a', backgroundColor: '#fff' };
   if (type === 'sign') return { ...base, width: isMobile ? '44px' : '52px', height: '44px', fontSize: '1.3rem', cursor: 'pointer' };
@@ -1246,7 +1262,9 @@ function FichaRetoPot({ reto, isMobile, onLibre, onExit }) {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, pointerEvents: fase === 'fin' ? 'none' : 'auto' }}>
           {items.map((item, i) => (
-            <div key={item.id} style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'center', gap: isMobile ? 10 : 22, padding: 16, backgroundColor: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0' }}>
+            <TarjetaEjercicio key={item.id} isMobile={isMobile}
+              cardStyle={{ padding: 16, backgroundColor: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0' }}
+              rowStyle={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'center', gap: isMobile ? 10 : 22 }}>
               <span style={{ fontWeight: 800, color: '#94a3b8', minWidth: 28 }}>{i + 1}.</span>
               <div style={{ flex: 1, display: 'flex', justifyContent: (isMobile || item.enun) ? 'center' : 'flex-end', color: '#1e293b' }}>{renderEnunciado(item, isMobile)}</div>
               <span style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#94a3b8', display: (isMobile || sinIgual(item)) ? 'none' : 'block' }}>=</span>
@@ -1255,7 +1273,7 @@ function FichaRetoPot({ reto, isMobile, onLibre, onExit }) {
                 {results[item.id] === 'correct' && <span style={{ color: '#10b981', fontSize: '1.6rem', fontWeight: 'bold' }}>✓</span>}
                 {results[item.id] === 'incorrect' && <span style={{ color: '#ef4444', fontSize: '1.6rem', fontWeight: 'bold' }}>✗</span>}
               </div>
-            </div>
+            </TarjetaEjercicio>
           ))}
         </div>
 
@@ -1476,7 +1494,9 @@ export default function PotenciasRaices({ onExit }) {
 
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '18px' }}>
               {items.map((item) => (
-                <div key={item.id} style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'center', justifyContent: 'center', gap: isMobile ? '10px' : '24px', padding: '18px', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', width: '100%', boxSizing: 'border-box' }}>
+                <TarjetaEjercicio key={item.id} isMobile={isMobile}
+                  cardStyle={{ padding: '18px', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', width: '100%', boxSizing: 'border-box' }}
+                  rowStyle={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'center', justifyContent: 'center', gap: isMobile ? '10px' : '24px' }}>
                   <div style={{ flex: 1, display: 'flex', justifyContent: (isMobile || item.enun) ? 'center' : 'flex-end', color: '#1e293b', width: '100%' }}>
                     {renderEnunciado(item, isMobile)}
                   </div>
@@ -1486,7 +1506,7 @@ export default function PotenciasRaices({ onExit }) {
                     {results[item.id] === 'correct' && <span style={{ color: '#10b981', fontSize: '1.6rem', fontWeight: 'bold' }}>✓</span>}
                     {results[item.id] === 'incorrect' && <span style={{ color: '#ef4444', fontSize: '1.6rem', fontWeight: 'bold' }}>✗</span>}
                   </div>
-                </div>
+                </TarjetaEjercicio>
               ))}
             </div>
           </div>

@@ -44,6 +44,8 @@ const actualizarCacheLocal = (fecha, clave, valores) => {
 // AEMET: proxy propio en Vercel (api/aemet.js) porque la API key no puede ir al navegador.
 const URL_AEMET = '/api/aemet';
 const AEMET_POR_LLAMADA = 15;
+// Subir al cambiar api/aemet.js: las entradas de caché de otra versión se vuelven a pedir.
+const AEMET_VER = 3;
 
 // Zonas de escalada de referencia (coordenadas aproximadas del sector principal).
 export const ZONAS_ESCALADA = [
@@ -167,6 +169,19 @@ function procesar(prev, arch) {
     };
 }
 
+// En móvil la tabla se sustituye por tarjetas (una por ubicación).
+function useEsMovil(max = 640) {
+    const consulta = `(max-width: ${max}px)`;
+    const [movil, setMovil] = useState(() => typeof window !== 'undefined' && window.matchMedia(consulta).matches);
+    useEffect(() => {
+        const mq = window.matchMedia(consulta);
+        const cambio = () => setMovil(mq.matches);
+        mq.addEventListener('change', cambio);
+        return () => mq.removeEventListener('change', cambio);
+    }, [consulta]);
+    return movil;
+}
+
 // ─── Gráfico de barras SVG ───────────────────────────────────────────────────
 function Barras({ datos, color, alto = 140, destacarUltimo = false }) {
     const max = Math.max(1, ...datos.map(d => d.v));
@@ -203,7 +218,8 @@ function Mapa({ sitios, datos, metrica, seleccionado, onSeleccionar }) {
     const encuadreRef = useRef('');
 
     useEffect(() => {
-        const map = L.map(divRef.current, { zoomControl: true, scrollWheelZoom: false, attributionControl: false, minZoom: 5, maxZoom: 12 }).setView([41.9, 0.6], 8);
+        // En táctil, arrastrar con un dedo debe desplazar la página, no el mapa (se hace zoom con dos dedos).
+        const map = L.map(divRef.current, { zoomControl: true, scrollWheelZoom: false, dragging: !L.Browser.mobile, attributionControl: false, minZoom: 5, maxZoom: 12 }).setView([41.9, 0.6], 8);
         // Panel propio por debajo de los círculos, aunque el GeoJSON llegue después que los datos.
         map.createPane('provincias').style.zIndex = 350;
         let vivo = true;
@@ -251,13 +267,13 @@ function Mapa({ sitios, datos, metrica, seleccionado, onSeleccionar }) {
         <>
             <style>{`.pikt-lluvia-tip{background:rgba(15,23,42,.88);color:#e2e8f0;border:1px solid #334155;border-radius:8px;font-size:11px;padding:3px 7px;box-shadow:none;text-align:center;line-height:1.25}
 .pikt-lluvia-tip.leaflet-tooltip-top:before{border-top-color:rgba(15,23,42,.88)}`}</style>
-            <div ref={divRef} style={{ height: 'min(70vh, 460px)', width: '100%', borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', background: '#0b1a2e' }} />
+            <div ref={divRef} style={{ height: 'clamp(300px, 60vh, 460px)', width: '100%', borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', background: '#0b1a2e' }} />
         </>
     );
 }
 
 // ─── Buscador de lugares (geocoding de Open-Meteo) ──────────────────────────
-function Buscador({ onAnadir, yaIds }) {
+function Buscador({ onAnadir, yaIds, movil }) {
     const [texto, setTexto] = useState('');
     const [res, setRes] = useState([]);
     const [cargando, setCargando] = useState(false);
@@ -294,12 +310,17 @@ function Buscador({ onAnadir, yaIds }) {
     };
 
     const zonasLibres = ZONAS_ESCALADA.filter(z => !yaIds.includes(z.id));
+    const chips = zonasLibres.map(z => (
+        <button key={z.id} onClick={() => onAnadir(z)} style={{ background: 'transparent', border: '1px dashed #475569', borderRadius: 999, padding: movil ? '6px 12px' : '3px 10px', color: '#cbd5e1', cursor: 'pointer', fontSize: movil ? '0.82rem' : '0.75rem' }}>
+            + {z.nombre}
+        </button>
+    ));
 
     return (
         <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 14, padding: 14, marginBottom: 18 }}>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <input value={texto} onChange={e => setTexto(e.target.value)} placeholder="Buscar un pueblo, ciudad o zona…"
-                    style={{ flex: '1 1 220px', minWidth: 0, background: '#0b1220', border: '1px solid #334155', borderRadius: 10, padding: '9px 12px', color: 'white', fontSize: '0.92rem' }} />
+                    style={{ flex: '1 1 220px', minWidth: 0, background: '#0b1220', border: '1px solid #334155', borderRadius: 10, padding: '9px 12px', color: 'white', fontSize: 16 }} />
                 <button onClick={miUbicacion} style={btn('#0ea5e9')}>📍 Mi ubicación</button>
             </div>
             {geoMsg && <div style={{ color: '#94a3b8', fontSize: '0.8rem', marginTop: 8 }}>{geoMsg}</div>}
@@ -314,16 +335,17 @@ function Buscador({ onAnadir, yaIds }) {
                     ))}
                 </div>
             )}
-            {zonasLibres.length > 0 && (
+            {zonasLibres.length > 0 && (movil ? (
+                <details style={{ marginTop: 10 }}>
+                    <summary style={{ color: '#94a3b8', fontSize: '0.82rem', cursor: 'pointer', padding: '4px 0' }}>➕ Añadir zonas de escalada ({zonasLibres.length})</summary>
+                    <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>{chips}</div>
+                </details>
+            ) : (
                 <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
                     <span style={{ color: '#64748b', fontSize: '0.75rem' }}>Zonas de escalada:</span>
-                    {zonasLibres.map(z => (
-                        <button key={z.id} onClick={() => onAnadir(z)} style={{ background: 'transparent', border: '1px dashed #475569', borderRadius: 999, padding: '3px 10px', color: '#cbd5e1', cursor: 'pointer', fontSize: '0.75rem' }}>
-                            + {z.nombre}
-                        </button>
-                    ))}
+                    {chips}
                 </div>
-            )}
+            ))}
         </div>
     );
 }
@@ -344,6 +366,7 @@ export default function Precipitaciones() {
     const [aemet, setAemet] = useState({});            // id → fila de api/aemet
     const [estadoAemet, setEstadoAemet] = useState('cargando');
     const [fuente, setFuente] = useState('ambas');     // ambas | om | aemet
+    const movil = useEsMovil();
 
     useEffect(() => { try { localStorage.setItem(LS_KEY, JSON.stringify(sitios)); } catch { /* noop */ } }, [sitios]);
 
@@ -414,11 +437,11 @@ export default function Precipitaciones() {
             try {
                 const fecha = fechaMadrid();
                 const cache = leerCacheLocal(fecha).aemet;
-                const pendientes = () => sitios.filter(s => !cache[s.id]);
+                const pendientes = () => sitios.filter(s => cache[s.id]?.ver !== AEMET_VER);
                 if (pendientes().length) {
                     try {
                         const snap = await getDoc(doc(db, COL_CACHE, fecha));
-                        if (snap.exists()) Object.assign(cache, snap.data().aemet || {});
+                        if (snap.exists()) Object.entries(snap.data().aemet || {}).forEach(([id, v]) => { if (v?.ver === AEMET_VER) cache[id] = v; });
                     } catch { /* sin Firestore se consulta la API */ }
                 }
                 const faltan = pendientes();
@@ -429,14 +452,14 @@ export default function Precipitaciones() {
                     const j = await r.json().catch(() => null);
                     if (!r.ok || !Array.isArray(j)) throw new Error(j?.error || `AEMET ${r.status}`);
                     // Las filas con error (p. ej. límite de peticiones) no se guardan para reintentar otro día/visita.
-                    lote.forEach((s, k) => { if (j[k] && !j[k].error) nuevos[s.id] = JSON.parse(JSON.stringify({ ...j[k], hora: Date.now() })); else if (j[k]) cache[s.id] = j[k]; });
+                    lote.forEach((s, k) => { if (j[k] && !j[k].error) nuevos[s.id] = JSON.parse(JSON.stringify({ ...j[k], hora: Date.now(), ver: AEMET_VER })); else if (j[k]) cache[s.id] = j[k]; });
                 }
                 Object.assign(cache, nuevos);
                 if (Object.keys(nuevos).length) {
                     actualizarCacheLocal(fecha, 'aemet', nuevos);
                     setDoc(doc(db, COL_CACHE, fecha), { aemet: nuevos, actualizado: Date.now() }, { merge: true }).catch(() => { /* la copia local basta */ });
                 } else {
-                    actualizarCacheLocal(fecha, 'aemet', Object.fromEntries(Object.entries(cache).filter(([, v]) => !v.error)));
+                    actualizarCacheLocal(fecha, 'aemet', Object.fromEntries(Object.entries(cache).filter(([, v]) => !v.error && v.ver === AEMET_VER)));
                 }
                 if (!cancel) { setAemet({ ...cache }); setEstadoAemet('listo'); }
             } catch {
@@ -463,7 +486,9 @@ export default function Precipitaciones() {
         const f = sitios.map(s => ({ s, d: datos[s.id], a: aemet[s.id], p: principal[s.id] }));
         if (!orden) return f;
         return [...f].sort((a, b) => {
-            const va = a.p?.[orden.key] ?? -1, vb = b.p?.[orden.key] ?? -1;
+            // En Open-Meteo, diasSeco null = más de 92 días sin lluvia (el más seco); sin datos va al final.
+            const valor = (x) => (orden.key === 'diasSeco' && x.p && x.p.diasSeco == null && x.p !== x.a ? 9999 : orden.key === 'prox24' ? x.d?.prox24 : x.p?.[orden.key]);
+            const va = valor(a) ?? -1, vb = valor(b) ?? -1;
             return orden.dir * (va - vb);
         });
     }, [sitios, datos, aemet, principal, orden]);
@@ -471,6 +496,26 @@ export default function Precipitaciones() {
     const hoyLocal = fechaMadrid();
     const aemetAtrasado = (a) => a?.hasta && a.hasta < sumarDias(hoyLocal, -1);
     const fechaCorta = (d) => d.split('-').reverse().slice(0, 2).join('/');
+
+    const cargandoP = fuente === 'aemet' ? estadoAemet === 'cargando' : estado === 'cargando';
+    // Utilidades de presentación de los valores AEMET de una fila (tabla y tarjetas).
+    const ayudasAemet = (a) => {
+        // Periodos que AEMET cubre con valores diarios (que llegan con unos días de retraso).
+        const parcial = (k) => ['d7', 'd30', 'anio', 'diasSeco'].includes(k) && aemetAtrasado(a);
+        // Si la estación no cubre las 24 h completas, se dice cuántas horas son.
+        const horas24 = a?.est24?.horas && a.est24.horas < 20 ? ` (${a.est24.horas} h)` : '';
+        const extra = (k) => (k === 'h24' ? horas24 : parcial(k) ? '*' : '');
+        const notaAemet = (k) => (k === 'd7' && a && a.d7 == null && a.hasta ? `AEMET aún no tiene suficientes días de esta semana (datos hasta el ${fechaCorta(a.hasta)})` : parcial(k) ? `Datos AEMET hasta el ${fechaCorta(a.hasta)}` : k === 'h24' && a?.est24 ? `Estación ${a.est24.nombre} (${a.est24.km} km) · ${a.est24.horas} h de datos` : a?.estacion ? `Estación ${a.estacion.nombre} (${a.estacion.km} km)` : '');
+        const textoSeco = (x) => (x?.diasSeco == null ? (x === a ? '—' : `> ${DIAS_PASADOS}`) : x.diasSeco === 0 ? 'hoy' : x.diasSeco);
+        return { parcial, extra, notaAemet, textoSeco };
+    };
+    const colorSeco = (x) => (x?.diasSeco == null ? '#4ade80' : x.diasSeco >= 3 ? '#4ade80' : x.diasSeco >= 1 ? '#fbbf24' : '#f87171');
+
+    // Al pulsar un punto del mapa en móvil, se lleva la vista a su tarjeta (donde se abre el detalle).
+    const seleccionarDesdeMapa = useCallback((id) => {
+        setDetalle(id);
+        if (movil) setTimeout(() => document.getElementById(`lluvia-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+    }, [movil]);
 
     const ordenarPor = (key) => setOrden(o => (o?.key === key ? (o.dir === -1 ? { key, dir: 1 } : null) : { key, dir: -1 }));
     const flecha = (key) => (orden?.key === key ? (orden.dir === -1 ? ' ▼' : ' ▲') : '');
@@ -485,16 +530,89 @@ export default function Precipitaciones() {
     const sitioDetalle = sitios.find(s => s.id === detalle);
     const dDetalle = detalle ? datos[detalle] : null;
 
+    // Gráficos de la ubicación elegida: debajo del mapa en escritorio, dentro de su tarjeta en móvil.
+    const panelDetalle = sitioDetalle && dDetalle && (
+        <div style={{ marginTop: movil ? 12 : 16, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(14,165,233,0.4)', borderRadius: movil ? 12 : 16, padding: movil ? 12 : 18 }}>
+            {!movil && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+                    <h2 style={{ margin: 0, fontSize: '1.3rem' }}>📍 {sitioDetalle.nombre}</h2>
+                    <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>{sitioDetalle.lat.toFixed(3)}, {sitioDetalle.lon.toFixed(3)}</span>
+                </div>
+            )}
+            <h3 style={{ ...sub, marginTop: movil ? 0 : 18 }}>Lluvia diaria · últimos 30 días</h3>
+            <Barras color="#38bdf8" alto={movil ? 110 : 140} destacarUltimo datos={dDetalle.ultimos30.map(x => ({ ...x, etiqueta: fechaCorta(x.d) }))} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', fontSize: '0.7rem', marginTop: 4 }}>
+                <span>{fechaCorta(dDetalle.ultimos30[0].d)}</span><span>hoy</span>
+            </div>
+            <h3 style={sub}>Lluvia por meses · {dDetalle.anioActual}</h3>
+            <Barras color="#22c55e" alto={movil ? 100 : 120} datos={dDetalle.porMes.slice(0, dDetalle.mesActual).map((v, i) => ({ v, etiqueta: MESES_LARGO[i] }))} />
+            <div style={{ display: 'flex', color: '#64748b', fontSize: movil ? '0.6rem' : '0.7rem', marginTop: 4 }}>
+                {dDetalle.porMes.slice(0, dDetalle.mesActual).map((v, i) => (
+                    <span key={i} style={{ flex: 1, textAlign: 'center', minWidth: 0 }}>{movil ? MESES[i][0].toUpperCase() : MESES[i]}<br /><span style={{ color: '#94a3b8' }}>{Math.round(v)}</span></span>
+                ))}
+            </div>
+        </div>
+    );
+
+    // Tarjeta de una ubicación (vista móvil): cuadrícula de periodos con el valor principal y, debajo, AEMET.
+    const TILES = [...COLUMNAS.map(c => ({ ...c, label: c.key === 'mesAnt' && ejemplo ? `Mes ant. (${ejemplo.nombreMesAnt.slice(0, 3)})` : c.key === 'anio' && ejemplo ? `Año ${ejemplo.anioActual}` : c.label.replace('Últimas ', '').replace('Última ', '').replace('Último ', '') })),
+        { key: 'diasSeco', label: 'Días sin lluvia' }, { key: 'prox24', label: 'Próx. 24 h' }];
+    const tarjeta = ({ s, d, a, p }) => {
+        const { parcial, extra, textoSeco } = ayudasAemet(a);
+        const abierta = detalle === s.id;
+        return (
+            <div key={s.id} id={`lluvia-${s.id}`} onClick={() => setDetalle(abierta ? null : s.id)}
+                style={{ background: abierta ? 'rgba(14,165,233,0.1)' : 'rgba(255,255,255,0.04)', border: `1px solid ${abierta ? 'rgba(56,189,248,0.6)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 14, padding: 12, scrollMarginTop: 60 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 10 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 800, fontSize: '1.05rem' }}>{s.nombre}</div>
+                        <div style={{ color: '#64748b', fontSize: '0.75rem' }}>{s.region}{d?.elevacion != null ? ` · ${Math.round(d.elevacion)} m` : ''}</div>
+                        {fuente !== 'om' && a?.estacion && (
+                            <div style={{ color: '#d97706', fontSize: '0.72rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📡 {a.estacion.nombre} · {a.estacion.km} km</div>
+                        )}
+                    </div>
+                    <span style={{ color: '#64748b', fontSize: '0.75rem', paddingTop: 4 }}>{abierta ? '▲' : '▼'}</span>
+                    <button onClick={e => { e.stopPropagation(); quitar(s.id); }} aria-label={`Quitar ${s.nombre}`}
+                        style={{ background: 'rgba(255,255,255,0.06)', border: 'none', color: '#94a3b8', borderRadius: 8, width: 32, height: 32, cursor: 'pointer', fontSize: '0.9rem', flexShrink: 0 }}>✕</button>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 6 }}>
+                    {TILES.map(t => {
+                        const esSeco = t.key === 'diasSeco', esProx = t.key === 'prox24';
+                        const fuenteP = esProx ? d : p;
+                        const v = fuenteP?.[t.key];
+                        const fondo = esSeco ? 'rgba(255,255,255,0.04)' : v ? `rgba(${esProx ? '167,139,250' : '56,189,248'},${0.1 + 0.5 * Math.min(1, v / maximos[t.key])})` : 'rgba(255,255,255,0.04)';
+                        const destacado = t.key === orden?.key;
+                        return (
+                            <div key={t.key} style={{ background: fondo, borderRadius: 10, padding: '7px 8px', minWidth: 0, outline: destacado ? '1px solid #38bdf8' : 'none' }}>
+                                <div style={{ color: esProx ? '#c4b5fd' : '#94a3b8', fontSize: '0.64rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.label}</div>
+                                <div style={{ fontWeight: 800, fontSize: '1.05rem', fontVariantNumeric: 'tabular-nums', color: esSeco ? colorSeco(p) : v ? 'white' : '#64748b' }}>
+                                    {fuenteP ? (esSeco ? textoSeco(p) : fmt(v)) + (fuente === 'aemet' && !esProx ? extra(t.key) : '') : cargandoP ? '…' : '—'}
+                                    {!esSeco && fuenteP && <span style={{ fontSize: '0.62rem', fontWeight: 600, color: '#94a3b8' }}> mm</span>}
+                                </div>
+                                {fuente === 'ambas' && !esProx && (
+                                    <div style={{ fontSize: '0.66rem', fontWeight: 600, color: '#fbbf24', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {a ? `AEMET ${esSeco ? textoSeco(a) : fmt(a[t.key])}${esSeco ? (parcial('diasSeco') ? '*' : '') : extra(t.key)}` : estadoAemet === 'cargando' ? 'AEMET …' : ''}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+                {abierta && <div onClick={e => e.stopPropagation()}>{panelDetalle}</div>}
+            </div>
+        );
+    };
+
     return (
-        <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg,#0b1220 0%,#0e2233 60%,#0a2a3a 100%)', color: 'white', fontFamily: "'Segoe UI', sans-serif", padding: '64px 16px 40px', boxSizing: 'border-box' }}>
+        <div style={{ minHeight: '100vh', background: 'linear-gradient(160deg,#0b1220 0%,#0e2233 60%,#0a2a3a 100%)', color: 'white', fontFamily: "'Segoe UI', sans-serif", padding: movil ? '60px 12px 32px' : '64px 16px 40px', boxSizing: 'border-box', overflowX: 'hidden' }}>
             <div style={{ maxWidth: 960, margin: '0 auto' }}>
-                <div style={{ textAlign: 'center', marginBottom: 22 }}>
-                    <div style={{ fontSize: '3rem', lineHeight: 1 }}>🌧️</div>
+                <div style={{ textAlign: 'center', marginBottom: movil ? 14 : 22 }}>
+                    <div style={{ fontSize: movil ? '2.2rem' : '3rem', lineHeight: 1 }}>🌧️</div>
                     <h1 style={{ margin: '8px 0 4px', fontSize: 'clamp(1.6rem,4.5vw,2.3rem)', fontWeight: 900 }}>Lluvia acumulada</h1>
                     <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.95rem' }}>Compara cuánto ha llovido en cada zona: ¿dónde estará la roca seca?</p>
                 </div>
 
-                <Buscador onAnadir={anadir} yaIds={sitios.map(s => s.id)} />
+                <Buscador onAnadir={anadir} yaIds={sitios.map(s => s.id)} movil={movil} />
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
                     <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>
@@ -502,10 +620,10 @@ export default function Precipitaciones() {
                         {estadoAemet === 'cargando' && fuente !== 'om' && <span style={{ color: '#fbbf24' }}> · Cargando estaciones AEMET…</span>}
                         {estadoAemet === 'error' && fuente !== 'om' && <span style={{ color: '#f87171' }}> · AEMET no disponible ahora</span>}
                     </span>
-                    <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,0.05)', borderRadius: 999, padding: 3 }}>
+                    <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,0.05)', borderRadius: 999, padding: 3, width: movil ? '100%' : 'auto', order: movil ? -1 : 0 }}>
                         {[['ambas', 'Comparar'], ['om', 'Open-Meteo'], ['aemet', 'AEMET']].map(([k, l]) => (
                             <button key={k} onClick={() => setFuente(k)}
-                                style={{ background: fuente === k ? (k === 'aemet' ? '#f59e0b' : '#0ea5e9') : 'transparent', border: 'none', color: 'white', borderRadius: 999, padding: '5px 12px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 700 }}>
+                                style={{ flex: movil ? 1 : 'none', background: fuente === k ? (k === 'aemet' ? '#f59e0b' : '#0ea5e9') : 'transparent', border: 'none', color: 'white', borderRadius: 999, padding: movil ? '8px 6px' : '5px 12px', cursor: 'pointer', fontSize: movil ? '0.82rem' : '0.78rem', fontWeight: 700 }}>
                                 {l}
                             </button>
                         ))}
@@ -521,6 +639,20 @@ export default function Precipitaciones() {
 
                 {sitios.length === 0 ? (
                     <div style={{ textAlign: 'center', color: '#94a3b8', padding: 30 }}>Añade alguna ubicación para empezar.</div>
+                ) : movil ? (
+                    <>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, color: '#94a3b8', fontSize: '0.82rem' }}>
+                            Ordenar:
+                            <select value={orden ? `${orden.key}:${orden.dir}` : ''} onChange={e => { const [k, dir] = e.target.value.split(':'); setOrden(k ? { key: k, dir: Number(dir) } : null); }}
+                                style={{ flex: 1, minWidth: 0, background: '#0b1220', color: 'white', border: '1px solid #334155', borderRadius: 10, padding: '8px 10px', fontSize: 16 }}>
+                                <option value="">Orden de la lista</option>
+                                <option value="diasSeco:-1">Más días sin lluvia primero</option>
+                                {TILES.filter(t => t.key !== 'diasSeco').map(t => <option key={t.key} value={`${t.key}:1`}>Menos lluvia · {t.label}</option>)}
+                                {TILES.filter(t => t.key !== 'diasSeco').map(t => <option key={`${t.key}-`} value={`${t.key}:-1`}>Más lluvia · {t.label}</option>)}
+                            </select>
+                        </label>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{filas.map(tarjeta)}</div>
+                    </>
                 ) : (
                     <div style={{ overflowX: 'auto', borderRadius: 14, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem', minWidth: 720 }}>
@@ -539,14 +671,7 @@ export default function Precipitaciones() {
                             </thead>
                             <tbody>
                                 {filas.map(({ s, d, a, p }) => {
-                                    const cargandoP = fuente === 'aemet' ? estadoAemet === 'cargando' : estado === 'cargando';
-                                    // Periodos que AEMET cubre con valores diarios (que llegan con unos días de retraso).
-                                    const parcial = (k) => ['d7', 'd30', 'anio', 'diasSeco'].includes(k) && aemetAtrasado(a);
-                                    // Si la estación no cubre las 24 h completas, se dice cuántas horas son.
-                                    const horas24 = a?.est24?.horas && a.est24.horas < 20 ? ` (${a.est24.horas} h)` : '';
-                                    const extra = (k) => (k === 'h24' ? horas24 : parcial(k) ? '*' : '');
-                                    const notaAemet = (k) => (k === 'd7' && a && a.d7 == null && a.hasta ? `AEMET aún no tiene suficientes días de esta semana (datos hasta el ${fechaCorta(a.hasta)})` : parcial(k) ? `Datos AEMET hasta el ${fechaCorta(a.hasta)}` : k === 'h24' && a?.est24 ? `Estación ${a.est24.nombre} (${a.est24.km} km) · ${a.est24.horas} h de datos` : a?.estacion ? `Estación ${a.estacion.nombre} (${a.estacion.km} km)` : '');
-                                    const textoSeco = (x) => (x?.diasSeco == null ? (x === a ? '—' : `> ${DIAS_PASADOS}`) : x.diasSeco === 0 ? 'hoy' : x.diasSeco);
+                                    const { parcial, extra, notaAemet, textoSeco } = ayudasAemet(a);
                                     return (
                                     <tr key={s.id} onClick={() => setDetalle(detalle === s.id ? null : s.id)} style={{ cursor: 'pointer', background: detalle === s.id ? 'rgba(14,165,233,0.12)' : 'transparent' }}>
                                         <td style={{ padding: '9px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
@@ -586,45 +711,26 @@ export default function Precipitaciones() {
                     <p style={{ color: '#fbbf24', fontSize: '0.78rem', marginTop: 8 }}>⚠️ No se ha podido cargar el histórico del año: el total anual solo incluye los últimos {DIAS_PASADOS} días.</p>
                 )}
                 <p style={{ color: '#64748b', fontSize: '0.75rem', marginTop: 8 }}>
-                    Pulsa una fila (o un punto del mapa) para ver el detalle. Pulsa una cabecera para ordenar.
-                    {fuente !== 'om' && <> AEMET usa la estación más cercana (pasa el ratón por una cifra para verla); <span style={{ color: '#fbbf24' }}>*</span> = los valores diarios de AEMET llegan con unos días de retraso.</>}
+                    {movil ? 'Toca una tarjeta (o un punto del mapa) para ver sus gráficos.' : 'Pulsa una fila (o un punto del mapa) para ver el detalle. Pulsa una cabecera para ordenar.'}
+                    {fuente !== 'om' && <> AEMET usa la estación más cercana{movil ? '' : ' (pasa el ratón por una cifra para verla)'}; <span style={{ color: '#fbbf24' }}>*</span> = los valores diarios de AEMET llegan con unos días de retraso.</>}
                 </p>
 
                 {sitios.length > 0 && (
                     <div style={{ marginTop: 16 }}>
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10, alignItems: 'center' }}>
-                            <span style={{ color: '#94a3b8', fontSize: '0.8rem', fontWeight: 700, marginRight: 4 }}>🗺️ Mapa:</span>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: movil ? 'nowrap' : 'wrap', overflowX: movil ? 'auto' : 'visible', marginBottom: 10, alignItems: 'center', paddingBottom: movil ? 4 : 0 }}>
+                            <span style={{ color: '#94a3b8', fontSize: '0.8rem', fontWeight: 700, marginRight: 4, flexShrink: 0 }}>🗺️ Mapa:</span>
                             {[...COLUMNAS, { key: 'prox24', label: 'Próx. 24 h' }].map(c => (
                                 <button key={c.key} onClick={() => setMetricaMapa(c.key)}
-                                    style={{ background: metricaMapa === c.key ? '#0ea5e9' : 'rgba(255,255,255,0.06)', border: `1px solid ${metricaMapa === c.key ? '#38bdf8' : 'rgba(255,255,255,0.15)'}`, color: 'white', borderRadius: 999, padding: '5px 11px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 700 }}>
+                                    style={{ flexShrink: 0, whiteSpace: 'nowrap', background: metricaMapa === c.key ? '#0ea5e9' : 'rgba(255,255,255,0.06)', border: `1px solid ${metricaMapa === c.key ? '#38bdf8' : 'rgba(255,255,255,0.15)'}`, color: 'white', borderRadius: 999, padding: movil ? '7px 12px' : '5px 11px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 700 }}>
                                     {c.label}
                                 </button>
                             ))}
                         </div>
-                        <Mapa sitios={sitios} datos={principal} metrica={metricaMapa} seleccionado={detalle} onSeleccionar={setDetalle} />
+                        <Mapa sitios={sitios} datos={principal} metrica={metricaMapa} seleccionado={detalle} onSeleccionar={seleccionarDesdeMapa} />
                     </div>
                 )}
 
-                {sitioDetalle && dDetalle && (
-                    <div style={{ marginTop: 16, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(14,165,233,0.4)', borderRadius: 16, padding: 18 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-                            <h2 style={{ margin: 0, fontSize: '1.3rem' }}>📍 {sitioDetalle.nombre}</h2>
-                            <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>{sitioDetalle.lat.toFixed(3)}, {sitioDetalle.lon.toFixed(3)}</span>
-                        </div>
-                        <h3 style={sub}>Lluvia diaria · últimos 30 días</h3>
-                        <Barras color="#38bdf8" destacarUltimo datos={dDetalle.ultimos30.map(x => ({ ...x, etiqueta: x.d.split('-').reverse().slice(0, 2).join('/') }))} />
-                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', fontSize: '0.7rem', marginTop: 4 }}>
-                            <span>{dDetalle.ultimos30[0].d.split('-').reverse().slice(0, 2).join('/')}</span><span>hoy</span>
-                        </div>
-                        <h3 style={sub}>Lluvia por meses · {dDetalle.anioActual}</h3>
-                        <Barras color="#22c55e" alto={120} datos={dDetalle.porMes.slice(0, dDetalle.mesActual).map((v, i) => ({ v, etiqueta: MESES_LARGO[i] }))} />
-                        <div style={{ display: 'flex', color: '#64748b', fontSize: '0.7rem', marginTop: 4 }}>
-                            {dDetalle.porMes.slice(0, dDetalle.mesActual).map((v, i) => (
-                                <span key={i} style={{ flex: 1, textAlign: 'center' }}>{MESES[i]}<br /><span style={{ color: '#94a3b8' }}>{Math.round(v)}</span></span>
-                            ))}
-                        </div>
-                    </div>
-                )}
+                {!movil && panelDetalle}
 
                 <div style={{ marginTop: 22, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: '14px 16px', color: '#94a3b8', fontSize: '0.82rem', lineHeight: 1.55 }}>
                     <strong style={{ color: '#e2e8f0' }}>💡 ¿Qué significa 1 mm de lluvia?</strong> Que en cada metro cuadrado de suelo ha caído 1 litro de agua

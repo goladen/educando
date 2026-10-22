@@ -62,6 +62,7 @@ export const JUEGOS_REGISTRO_META = {
     ESCULPIR_3D:         { nombre: 'Taller de escultura', emoji: '🗿', color: '#b45309' },
     JEOPARDY:            { nombre: 'Money Board',         emoji: '💰', color: '#2563eb' },
     LENGUA:              { nombre: 'Lengua',              emoji: '📖', color: '#3498db' },
+    CALCULADORA:         { nombre: 'Calculadora',         emoji: '🧮', color: '#0f766e' },
 };
 
 export const metaDe = (tipo) => JUEGOS_REGISTRO_META[tipo] || { nombre: tipo, emoji: '🎮', color: '#718093' };

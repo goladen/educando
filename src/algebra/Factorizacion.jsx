@@ -229,9 +229,34 @@ export function ResolucionAuto({ P }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // Modo guiado: el alumno hace cada paso y se le corrige
 // ═══════════════════════════════════════════════════════════════════════════════
+// Resumen de un ejercicio terminado (se guarda en el informe del profesor)
+export const PASOS_NOMBRE = { fc: 'Factor común', id: 'Identidades', ruf: 'Ruffini', cuad: 'Ec. 2.º grado' };
+const sumaV = o => Object.values(o).reduce((a, b) => a + b, 0);
+export const resumenPaso = (det, k) => [det.fallos[k] && `${det.fallos[k]} fallo(s)`, det.ayudas[k] && `${det.ayudas[k]} ayuda(s)`].filter(Boolean).join(', ').replace(/^/, `${PASOS_NOMBRE[k]}: `);
+export const puntosEjercicio =(fallos, ayudas) => Math.max(0, 10 - 2 * fallos - 3 * ayudas);
+function detalleEjercicio(P, st, stats) {
+    const r = resultadoFinal(st);
+    const nf = sumaV(stats.fallos), na = sumaV(stats.ayudas);
+    const pasos = st.log.map(l => l.tipo).filter(t => ['fc', 'id', 'ruf', 'cuad'].includes(t));
+    return {
+        polinomio: polyStr(P),
+        factorizacion: r.formaEntera || r.forma,
+        raices: r.raices.map(x => x.txt + multTxt(x.mult)).join(', ') || 'sin raíces reales',
+        pasos: [...new Set(pasos)].map(t => PASOS_NOMBRE[t]).join(' → '),
+        fallos: { ...stats.fallos }, ayudas: { ...stats.ayudas },
+        totalFallos: nf, totalAyudas: na,
+        pruebasRuffini: stats.pruebas,
+        segundos: Math.round((Date.now() - stats.t0) / 1000),
+        puntos: puntosEjercicio(nf, na),
+        ok: nf === 0 && na === 0,
+    };
+}
+
 export function GuiaFactorizacion({ P, onTerminar }) {
     const [st, setSt] = useState(() => estadoInicial(P));
     const [errores, setErrores] = useState(0);
+    // Seguimiento para el informe del profesor: fallos y ayudas por paso, valores probados, tiempo
+    const statsRef = useRef({ fallos: { fc: 0, id: 0, ruf: 0, cuad: 0 }, ayudas: { fc: 0, id: 0, ruf: 0, cuad: 0 }, pruebas: 0, t0: Date.now() });
     const [aviso, setAviso] = useState(null);
     const [fcK, setFcK] = useState(''); const [fcM, setFcM] = useState('0');
     const [idResp, setIdResp] = useState(null);
@@ -243,11 +268,11 @@ export function GuiaFactorizacion({ P, onTerminar }) {
     const finRef = useRef(null);
 
     useEffect(() => {
-        if (st.fase === 'fin' && !terminadoRef.current) { terminadoRef.current = true; onTerminar?.(errores === 0, st); }
+        if (st.fase === 'fin' && !terminadoRef.current) { terminadoRef.current = true; onTerminar?.(errores === 0, st, detalleEjercicio(P, st, statsRef.current)); }
         finRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
     }, [st.fase, st.log.length]); // eslint-disable-line
 
-    const fallo = msg => { setErrores(e => e + 1); setAviso({ ok: false, msg }); };
+    const fallo = msg => { statsRef.current.fallos[st.fase] = (statsRef.current.fallos[st.fase] || 0) + 1; setErrores(e => e + 1); setAviso({ ok: false, msg }); };
     const pasar = (fn, msg) => { const n = fn(clonar(st)); setSt(n); setAviso(msg ? { ok: true, msg } : null); resetInputs(); };
     const resetInputs = () => { setIdResp(null); setPrueba(''); setVerCand(false); setX1(''); setX2(''); setSinSol(false); setVerFormula(false); };
 
@@ -274,6 +299,7 @@ export function GuiaFactorizacion({ P, onTerminar }) {
     const probar = (valTxt) => {
         const v = parseNumero(valTxt ?? prueba);
         if (!v?.frac) { setAviso({ ok: false, msg: 'Escribe un número entero o una fracción (p. ej. 3/2).' }); return; }
+        statsRef.current.pruebas++;
         const n = clonar(st);
         const res = probarValor(n, v.frac);
         setPrueba('');
@@ -301,6 +327,7 @@ export function GuiaFactorizacion({ P, onTerminar }) {
     };
 
     const verSolucion = () => {
+        statsRef.current.ayudas[st.fase] = (statsRef.current.ayudas[st.fase] || 0) + 1;
         setErrores(e => e + 1);
         if (st.fase === 'fc') pasar(aplicarFactorComun);
         else if (st.fase === 'id') pasar(aplicarIdentidad);
@@ -458,10 +485,10 @@ export function M_Factorizacion({ onScore }) {
     const auto = useMemo(() => factorizarAuto(ej.P), [ej]);
 
     const nuevo = (nv = nivel, tp = tipo) => { setEj(e => ({ ...generarEjercicio(nv, tp || undefined), n: e.n + 1 })); setFin(null); };
-    const terminar = (ok) => {
-        setFin({ ok });
+    const terminar = (ok, _st, det) => {
+        setFin({ ok, det });
         setScore(s => ({ ok: s.ok + (ok ? 1 : 0), total: s.total + 1 }));
-        onScore(ok ? 1 : 0, 1);
+        onScore(ok ? 1 : 0, 1, { modulo: 'factorizacion', nivel: `${nivel}.º ESO`, tipo: TIPOS_EJ.find(t => t.id === ej.tipo)?.lbl.replace(/^\S+\s/, '') || ej.tipo, ...det });
     };
     const chip = (act, color) => ({ padding: '6px 14px', borderRadius: 8, border: `2px solid ${act ? color : '#30363d'}`, background: act ? color + '22' : 'transparent', color: 'white', cursor: 'pointer', fontWeight: act ? 700 : 400, fontSize: '0.85rem' });
 
@@ -495,6 +522,13 @@ export function M_Factorizacion({ onScore }) {
             {fin && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
                     <div style={{ color: fin.ok ? '#2ecc71' : '#f5b041', fontWeight: 700 }}>{fin.ok ? '🎉 ¡Perfecto, sin errores!' : 'Terminado, pero con algún fallo o ayuda. ¡Prueba otro!'}</div>
+                    {fin.det && <div style={{ ...CARD, padding: '10px 16px', fontSize: '0.85rem', color: '#c9d1d9', textAlign: 'center' }}>
+                        <b style={{ color: '#f39c12', fontSize: '1.1rem' }}>{fin.det.puntos}/10 puntos</b> · ⏱ {fin.det.segundos}s · {fin.det.pruebasRuffini} valores probados
+                        {(fin.det.totalFallos + fin.det.totalAyudas) > 0 && <div style={{ color: '#8b949e', marginTop: 4 }}>
+                            {Object.keys(PASOS_NOMBRE).filter(k => fin.det.fallos[k] || fin.det.ayudas[k]).map(k => resumenPaso(fin.det, k)).join(' · ')}
+                            <div style={{ fontSize: '0.75rem', marginTop: 2 }}>Cada fallo resta 2 puntos y cada «Ver solución», 3.</div>
+                        </div>}
+                    </div>}
                     <button style={BTN('#3498db')} onClick={() => nuevo()}><RefreshCw size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />Nuevo polinomio</button>
                 </div>
             )}
@@ -546,7 +580,7 @@ export function M_FactorComun({ onScore }) {
         const fcTxt = monoStr(ej.g, ej.m);
         setResult({ ok, msg, explicacion: `${polyStr(ej.P)} = ${fcTxt} · (${polyStr(ej.Q)})` });
         setScore(s => ({ ok: s.ok + (ok ? 1 : 0), total: s.total + 1 }));
-        onScore(ok ? 1 : 0, 1);
+        onScore(ok ? 1 : 0, 1, { modulo: 'factorcomun', polinomio: polyStr(ej.P), respuesta: `${kk}·x^${mm}·(${Array.isArray(innerParsed) ? polyStr(innerParsed) : inner || '—'})`, correcta: `${fcTxt} · (${polyStr(ej.Q)})`, ok, error: ok ? '' : msg });
     };
     const nuevo = () => { setEj(genFactorComun()); setK(''); setM('0'); setInner(''); setResult(null); };
 

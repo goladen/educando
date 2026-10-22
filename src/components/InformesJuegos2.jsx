@@ -1081,6 +1081,78 @@ const InformeCard = ({ inf, expandido, onToggle, onBorrar, borrando, borradoOk, 
                             ))}
                         </div>
                     )}
+                    {/* Detalle de factorización y factor común (ALGEBRA) */}
+                    {tipo === 'ALGEBRA' && (jugs[0]?.factorizacion || jugs[0]?.factorComun) && (() => {
+                        const F = jugs[0].factorizacion, FC = jugs[0].factorComun;
+                        const caja = { marginTop:12, padding:'10px 12px', background:'#f8f9fa', borderRadius:10, border:'1px solid #ecf0f1' };
+                        const tit = { fontSize:'0.72rem', color:'#7f8c8d', fontWeight:700, letterSpacing:.5, marginBottom:8 };
+                        const chip = (bg, col) => ({ padding:'1px 7px', borderRadius:10, background:bg, color:col, fontSize:'0.72rem', fontWeight:700, whiteSpace:'nowrap' });
+                        const ptsColor = p => p >= 8 ? '#27ae60' : p >= 5 ? '#e67e22' : '#e74c3c';
+                        const fmtS = s => s >= 60 ? `${Math.floor(s/60)}m ${s%60}s` : `${s}s`;
+                        return (<>
+                            {F && (
+                                <div style={caja}>
+                                    <div style={tit}>🧩 FACTORIZACIÓN — DETALLE</div>
+                                    <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginBottom:8, fontSize:'0.8rem' }}>
+                                        <span style={chip('#fef5e7', '#d35400')}>🏅 {F.puntos}/{F.puntosMax} puntos</span>
+                                        <span style={chip('#eaf2f8', '#2471a3')}>Media {F.media}/10</span>
+                                        <span style={chip('#e8f8f0', '#1e8449')}>✅ {F.perfectos}/{F.ejercicios} sin fallos</span>
+                                        <span style={chip('#f4f6f7', '#566573')}>⏱ {fmtS(F.segundosMedios)} por polinomio</span>
+                                        {F.puntoDebil && <span style={chip('#fdedec', '#c0392b')}>⚠️ A repasar: {F.puntoDebil}</span>}
+                                    </div>
+                                    <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'0.78rem', marginBottom:8 }}>
+                                        <thead><tr style={{ color:'#7f8c8d' }}>
+                                            <th style={{ textAlign:'left', padding:'3px 4px' }}>Paso</th>
+                                            <th style={{ padding:'3px 4px' }}>Fallos</th>
+                                            <th style={{ padding:'3px 4px' }}>«Ver solución»</th>
+                                        </tr></thead>
+                                        <tbody>{Object.keys(F.fallos || {}).map(p => (
+                                            <tr key={p} style={{ borderTop:'1px solid #ecf0f1' }}>
+                                                <td style={{ padding:'3px 4px', color:'#2c3e50' }}>{p}</td>
+                                                <td style={{ padding:'3px 4px', textAlign:'center', color: F.fallos[p] ? '#e74c3c' : '#95a5a6', fontWeight:700 }}>{F.fallos[p]}</td>
+                                                <td style={{ padding:'3px 4px', textAlign:'center', color: F.ayudas?.[p] ? '#e67e22' : '#95a5a6', fontWeight:700 }}>{F.ayudas?.[p] || 0}</td>
+                                            </tr>
+                                        ))}</tbody>
+                                    </table>
+                                    <div style={{ maxHeight:340, overflowY:'auto', display:'flex', flexDirection:'column', gap:6 }}>
+                                        {(F.detalle || []).map((e, i) => {
+                                            const problemas = Object.keys(e.fallos || {}).filter(p => e.fallos[p] || e.ayudas?.[p]);
+                                            return (
+                                                <div key={i} style={{ background:'white', border:'1px solid #ecf0f1', borderLeft:`4px solid ${ptsColor(e.puntos)}`, borderRadius:8, padding:'6px 9px', fontSize:'0.78rem' }}>
+                                                    <div style={{ display:'flex', justifyContent:'space-between', gap:8, alignItems:'center' }}>
+                                                        <span style={{ fontFamily:'Georgia,serif', fontWeight:700, color:'#2c3e50' }}>{e.polinomio}</span>
+                                                        <span style={{ ...chip('#f4f6f7', ptsColor(e.puntos)), fontSize:'0.75rem' }}>{e.puntos}/10</span>
+                                                    </div>
+                                                    <div style={{ fontFamily:'Georgia,serif', color:'#7f8c8d' }}>= {e.factorizacion} · raíces: {e.raices}</div>
+                                                    <div style={{ color:'#95a5a6', marginTop:2 }}>{[e.nivel, e.tipo, e.pasos, e.segundos != null && `⏱ ${fmtS(e.segundos)}`, e.pruebasRuffini ? `${e.pruebasRuffini} valores probados` : null, e.hora].filter(Boolean).join(' · ')}</div>
+                                                    {problemas.length > 0
+                                                        ? <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:4 }}>{problemas.map(p => (
+                                                            <span key={p} style={chip('#fdedec', '#c0392b')}>{p}: {[e.fallos[p] && `${e.fallos[p]} fallo${e.fallos[p] > 1 ? 's' : ''}`, e.ayudas?.[p] && `${e.ayudas[p]} ayuda${e.ayudas[p] > 1 ? 's' : ''}`].filter(Boolean).join(', ')}</span>
+                                                        ))}</div>
+                                                        : <div style={{ color:'#27ae60', fontWeight:700, marginTop:2 }}>✓ Sin fallos ni ayudas</div>}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                    <div style={{ fontSize:'0.7rem', color:'#95a5a6', marginTop:6 }}>Puntuación: 10 por polinomio, −2 por cada fallo y −3 por cada «Ver solución».</div>
+                                </div>
+                            )}
+                            {FC && (
+                                <div style={caja}>
+                                    <div style={tit}>🧲 FACTOR COMÚN — {FC.aciertos}/{FC.ejercicios} CORRECTOS</div>
+                                    <div style={{ maxHeight:240, overflowY:'auto' }}>
+                                        {(FC.detalle || []).map((e, i) => (
+                                            <div key={i} style={{ padding:'4px 0', borderBottom:'1px solid #ecf0f1', fontSize:'0.78rem' }}>
+                                                <span style={{ fontWeight:700, color: e.ok ? '#27ae60' : '#e74c3c' }}>{e.ok ? '✓' : '✗'}</span>{' '}
+                                                <span style={{ fontFamily:'Georgia,serif', color:'#2c3e50', fontWeight:700 }}>{e.polinomio}</span>
+                                                {!e.ok && <div style={{ color:'#7f8c8d', paddingLeft:16 }}>Respondió {e.respuesta} · correcto: {e.correcta}{e.error ? ` — ${e.error}` : ''}</div>}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </>);
+                    })()}
                     {/* Detalle ampliado: Geometrix y Perímetro y Área (máximo feedback) */}
                     {(tipo === 'GEOMETRIX' || tipo === 'GEOMETRIX_COMPUESTO' || tipo === 'PERIMETRO_AREA') && (() => {
                         const j0 = jugs[0] || {};

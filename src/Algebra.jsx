@@ -7,7 +7,7 @@ import { CheckCircle, XCircle, RefreshCw, Send, Share2, Maximize2, Minimize2 } f
 import { leerRetoUrl, limpiarRetoUrl } from './utils/retoLink';
 import PantallaReto, { textoBotonEnvio } from './components/retos/PantallaReto';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
-import { M_FactorComun, M_Factorizacion } from './algebra/Factorizacion';
+import { M_FactorComun, M_Factorizacion, PASOS_NOMBRE } from './algebra/Factorizacion';
 
 // ─── Math utilities ───────────────────────────────────────────────────────────
 const SUP = { 0:'', 1:'', 2:'²', 3:'³', 4:'⁴', 5:'⁵' };
@@ -678,14 +678,51 @@ export default function AlgebraApp({ onExit, usuario }) {
         }
     };
 
-    const handleScore = (modI) => (ok, total) => {
+    // Detalle por ejercicio (factor común y factorización) para el informe del profesor
+    const [detalles, setDetalles] = useState([]);
+    const handleScore = (modI) => (ok, total, det) => {
         setTotals(t => { const n=[...t]; n[modI]={ok:n[modI].ok+ok, total:n[modI].total+total}; return n; });
+        if(det) setDetalles(d => [...d, { ...det, hora: new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}) }]);
     };
 
     const totalOk    = totals.reduce((s,t)=>s+t.ok,0);
     const totalTotal = totals.reduce((s,t)=>s+t.total,0);
 
-    const modulosPracticados = totals.map((t,i)=>({...t, label:MODULES[i].label})).filter(t=>t.total>0);
+    const modulosPracticados = totals.map((t,i)=>({...t, label:MODULES[i].label, id:MODULES[i].id})).filter(t=>t.total>0);
+
+    // Resumen de factorización: puntos (10 por ejercicio, −2 por fallo, −3 por «Ver solución»),
+    // fallos y ayudas por paso, tiempo medio y paso más flojo
+    const ejFact = detalles.filter(d => d.modulo === 'factorizacion');
+    const ejFC   = detalles.filter(d => d.modulo === 'factorcomun');
+    const resumenFact = (() => {
+        if(!ejFact.length) return null;
+        const pasos = Object.keys(PASOS_NOMBRE);
+        const suma = (k, p) => ejFact.reduce((s, e) => s + (e[k]?.[p] || 0), 0);
+        const fallos = Object.fromEntries(pasos.map(p => [p, suma('fallos', p)]));
+        const ayudas = Object.fromEntries(pasos.map(p => [p, suma('ayudas', p)]));
+        const peso = p => fallos[p] + 2 * ayudas[p];
+        const debil = pasos.reduce((a, p) => peso(p) > peso(a) ? p : a, pasos[0]);
+        const puntos = ejFact.reduce((s, e) => s + e.puntos, 0);
+        return {
+            ejercicios: ejFact.length,
+            perfectos: ejFact.filter(e => e.ok).length,
+            puntos, puntosMax: ejFact.length * 10,
+            media: Math.round(puntos / ejFact.length * 10) / 10,
+            segundosMedios: Math.round(ejFact.reduce((s, e) => s + e.segundos, 0) / ejFact.length),
+            fallos: Object.fromEntries(pasos.map(p => [PASOS_NOMBRE[p], fallos[p]])),
+            ayudas: Object.fromEntries(pasos.map(p => [PASOS_NOMBRE[p], ayudas[p]])),
+            puntoDebil: peso(debil) > 0 ? PASOS_NOMBRE[debil] : null,
+            detalle: ejFact.slice(-30).map(({ modulo, fallos: f, ayudas: a, ...e }) => ({
+                ...e,
+                fallos: Object.fromEntries(pasos.map(p => [PASOS_NOMBRE[p], f[p] || 0])),
+                ayudas: Object.fromEntries(pasos.map(p => [PASOS_NOMBRE[p], a[p] || 0])),
+            })),
+        };
+    })();
+    const resumenFC = ejFC.length ? {
+        ejercicios: ejFC.length, aciertos: ejFC.filter(e => e.ok).length,
+        detalle: ejFC.slice(-30).map(({ modulo, ...e }) => e),
+    } : null;
 
     const enviar = async () => {
         const code = codigoInput.trim().toUpperCase();
@@ -715,7 +752,10 @@ export default function AlgebraApp({ onExit, usuario }) {
                         aciertos:   t.ok,
                         intentos:   t.total,
                         porcentaje: t.total>0 ? Math.round(t.ok/t.total*100) : 0,
+                        ...(t.id === 'factorizacion' && resumenFact ? { puntos: resumenFact.puntos, puntosMax: resumenFact.puntosMax } : {}),
                     })),
+                    ...(resumenFact ? { factorizacion: resumenFact, puntos: resumenFact.puntos } : {}),
+                    ...(resumenFC ? { factorComun: resumenFC } : {}),
                 }],
             });
             guardarRegistroLocal('ALGEBRA', {
@@ -848,6 +888,13 @@ export default function AlgebraApp({ onExit, usuario }) {
                                 <span style={{color:'#8b949e'}}>Total</span>
                                 <span style={{color:'#e6edf3'}}>{totalOk}/{totalTotal}</span>
                             </div>
+                            {resumenFact && (
+                                <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid #21262d',fontSize:'0.82rem',color:'#8b949e',lineHeight:1.6}}>
+                                    🧩 Factorización: <b style={{color:'#f39c12'}}>{resumenFact.puntos}/{resumenFact.puntosMax} puntos</b> (media {resumenFact.media}/10) · {resumenFact.perfectos} sin fallos
+                                    {resumenFact.puntoDebil && <div>A repasar: <b style={{color:'#e6edf3'}}>{resumenFact.puntoDebil}</b></div>}
+                                    <div style={{fontSize:'0.75rem'}}>El profesor verá cada polinomio con tus fallos y ayudas por paso.</div>
+                                </div>
+                            )}
                         </div>
 
                         {enviado ? (

@@ -167,7 +167,7 @@ function App() {
         'sopa','sopa_letras','question_sender','q-sender',
         'omninteractive','videoquizz','sintaxis','listening',
         'etiquetas','etiquetame',
-        'geometrix','calculo','fracciones','dinero','fichas','funciones','funciones2','geometria_analitica','geometriaanalitica',
+        'geometrix','calculo','calculadora','fracciones','dinero','fichas','funciones','funciones2','geometria_analitica','geometriaanalitica',
         'ecuaciones','oca','domino','musica',
         'algebra','polinomios','estadistica','probabilidad',
         'api','admin','login','app','join',
@@ -190,7 +190,7 @@ function App() {
         'plastica','plastik',
         'idiomas','ingles',
       ]);
-      if (slug && !RUTAS_RESERVADAS.has(slug) && !slug.startsWith('fisica/') && !slug.startsWith('primaria/') && !slug.startsWith('fichas/')) {
+      if (slug && !RUTAS_RESERVADAS.has(slug) && !slug.startsWith('fisica/') && !slug.startsWith('primaria/') && !slug.startsWith('fichas/') && !slug.startsWith('calculadora/')) {
         // Check if it's a professor page slug
         getDocs(query(collection(db,'paginas_profesores'), where('slug','==',slug), where('publicada','==',true)))
           .then(snap => { if (!snap.empty) setPaginaTarget({ slug, uid: snap.docs[0].id }); })

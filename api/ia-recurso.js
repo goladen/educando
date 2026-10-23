@@ -71,7 +71,13 @@ export default async function handler(req, res) {
 
     let estado;
     try { estado = await estadoUso(usuario.uid, esAdmin); }
-    catch (e) { return res.status(500).json({ error: `No se pudo comprobar el límite de uso: ${e.message}` }); }
+    catch (e) {
+        // Cuota diaria de Firestore agotada (plan gratuito): se recupera sola al día siguiente
+        if (/quota exceeded|resource.?exhausted/i.test(e.message)) {
+            return res.status(503).json({ error: 'La web ha llegado hoy a su límite de uso de la base de datos. Vuelve a intentarlo mañana.', cuota: true });
+        }
+        return res.status(500).json({ error: `No se pudo comprobar el límite de uso: ${e.message}` });
+    }
 
     if (accion === 'estado') return res.status(200).json(estado);
 

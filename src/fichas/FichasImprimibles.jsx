@@ -598,7 +598,7 @@ function FichasApp({ motor, isMobile, onSalir, fichaPublicaId = null }) {
     useEffect(() => () => { if (visor) URL.revokeObjectURL(visor.url); }, [visor]);
 
     const login = async () => {
-        try { await signInWithPopup(auth, new GoogleAuthProvider()); } catch (e) { if (e.code !== 'auth/popup-closed-by-user') setAviso('No se pudo iniciar sesión: ' + e.message); }
+        try { await signInWithPopup(auth, new GoogleAuthProvider()); } catch (e) { if (!['auth/popup-closed-by-user', 'auth/cancelled-popup-request', 'auth/user-cancelled'].includes(e.code)) setAviso('No se pudo iniciar sesión: ' + e.message); }
     };
 
     const avisar = (t) => { setAviso(t); setTimeout(() => setAviso(a => (a === t ? '' : a)), 3500); };

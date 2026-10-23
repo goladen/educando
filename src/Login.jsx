@@ -27,6 +27,8 @@ function mensajeErrorLogin(e) {
         case 'auth/popup-closed-by-user':
         case 'auth/cancelled-popup-request':
             return 'Has cerrado la ventana de Google antes de terminar.';
+        case 'auth/user-cancelled':
+            return 'Has cancelado los permisos en Google. Para entrar, pulsa «Continuar» en la pantalla de Google.';
         case 'auth/popup-blocked':
             return 'El navegador ha bloqueado la ventana de Google. Permite las ventanas emergentes para pikt.es.';
         case 'auth/network-request-failed':
@@ -93,7 +95,7 @@ export default function Login({ setGoogleToken }) {
             if (setGoogleToken && credential?.accessToken) setGoogleToken(credential.accessToken);
         }).catch(e => {
             setError(mensajeErrorLogin(e));
-            reportarError('auth', e, { via: 'redirect', code: e?.code });
+            if (e?.code !== 'auth/user-cancelled') reportarError('auth', e, { via: 'redirect', code: e?.code });
         });
     }, []);
 
@@ -117,7 +119,9 @@ export default function Login({ setGoogleToken }) {
             if (e?.code === 'auth/popup-blocked' || e?.code === 'auth/operation-not-supported-in-this-environment') {
                 try { await signInWithRedirect(auth, provider); return; } catch (e2) { e = e2; }
             }
-            if (e?.code !== 'auth/popup-closed-by-user' && e?.code !== 'auth/cancelled-popup-request') {
+            // Cancelaciones del propio usuario: no son fallos de la web
+            const cancelado = ['auth/popup-closed-by-user', 'auth/cancelled-popup-request', 'auth/user-cancelled'];
+            if (!cancelado.includes(e?.code)) {
                 reportarError('auth', e, { via: 'popup', code: e?.code });
             }
             setError(mensajeErrorLogin(e));

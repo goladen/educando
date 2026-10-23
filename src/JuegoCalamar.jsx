@@ -731,12 +731,12 @@ function PanelPregunta({ pregunta, luz, deshabilitado, onResponder }) {
 // =====================================================================
 //  HUD SUPERIOR
 // =====================================================================
-function HudSuperior({ luz, paso, meta, aciertos, fallos, sonido, setSonido, onSalir, titulo, extra }) {
-    const conf = luz === VERDE
+function HudSuperior({ luz, etiqueta, paso, meta, aciertos, fallos, sonido, setSonido, onSalir, titulo, extra }) {
+    const conf = etiqueta || (luz === VERDE
         ? { txt: '🟢 LUZ VERDE', bg: 'linear-gradient(135deg,#1ea65f,#0f7a45)' }
         : luz === AVISO
             ? { txt: '🟡 ¡SE GIRA!', bg: 'linear-gradient(135deg,#f0b429,#c98a08)' }
-            : { txt: '🔴 LUZ ROJA', bg: 'linear-gradient(135deg,#e03131,#8d1111)' };
+            : { txt: '🔴 LUZ ROJA', bg: 'linear-gradient(135deg,#e03131,#8d1111)' });
 
     return (
         <div style={{
@@ -1327,12 +1327,11 @@ function SalaHost({ preguntas, titulo, meta, dificultad, usuario, onSalir }) {
 
 // =====================================================================
 //  PARTIDA CON MANDOS micro:bit (modo letras: A cambia, B o agitar envía)
-//  - Una pregunta de 2-4 opciones para todos, que CAMBIA cada vez que llega la luz roja.
-//  - Con luz verde, el primer envío de cada mando es su respuesta. Si acierta, cada nuevo
-//    envío (agitar o B) es un paso adelante hasta la siguiente pregunta.
-//  - Con la luz ROJA, quien se mueve (agita o responde) queda ELIMINADO: disparo y cae al suelo.
-//    Al volver la luz verde, una voz anuncia «Jugador N, eliminado». Con la luz amarilla (la muñeca
-//    se está girando) no se avanza, pero tampoco se elimina.
+//  Cada ronda separa RESPONDER de MOVERSE (más claro con mandos):
+//    PREGUNTA (cuenta la 1.ª letra enviada; acaba al terminar el tiempo o si han respondido todos)
+//    → SOLUCIÓN (caritas en los mandos) → VERDE (solo los que acertaron avanzan agitando)
+//    → AVISO (la muñeca se gira) → ROJA 2,5 s (quien se mueva, ELIMINADO: disparo y cae)
+//    → anuncio de voz «Jugador N, eliminado» → siguiente PREGUNTA.
 //  - La partida acaba al terminar el tiempo total o cuando todos los que siguen vivos han cruzado.
 // =====================================================================
 const LS_NOMBRES_MANDOS = 'pikt_mandos_nombres';
@@ -1362,12 +1361,25 @@ function hablarCalamar(texto) {
     } catch { /* sin voz */ }
 }
 
+// Ciclo de cada ronda (solo con mandos): responder → solución → correr → se gira → luz roja → siguiente
+const TIEMPOS_RESPUESTA = [10, 15, 20, 30];
+const MS_SOLUCION = 2600;
+const MS_ROJA = 2500;
+const ETIQUETA_RONDA = {
+    PREGUNTA: { txt: '❓ ¡RESPONDED!', bg: 'linear-gradient(135deg,#7c3aed,#5b21b6)' },
+    SOLUCION: { txt: '✅ SOLUCIÓN', bg: 'linear-gradient(135deg,#2563eb,#1e40af)' },
+    VERDE: { txt: '🟢 ¡A CORRER! (los que acertaron)', bg: 'linear-gradient(135deg,#1ea65f,#0f7a45)' },
+    AVISO: { txt: '🟡 ¡SE GIRA!', bg: 'linear-gradient(135deg,#f0b429,#c98a08)' },
+    ROJA: { txt: '🔴 LUZ ROJA · ¡QUIETOS!', bg: 'linear-gradient(135deg,#e03131,#8d1111)' },
+};
+
 function SalaMandos({ preguntas, titulo, meta, dificultad, onSalir }) {
     const audioRef = useRef(null);
     if (!audioRef.current) audioRef.current = crearAudio();
     const audio = audioRef.current;
     const [sonido, setSonido] = useState(true);
     useEffect(() => { audio.activo = sonido; }, [sonido, audio]);
+    const sonidoRef = useRef(sonido); sonidoRef.current = sonido;
 
     // Solo valen las preguntas de opción múltiple de hasta 4 opciones (A-D)
     const validas = useRef(preguntas.filter(p => p.tipo === 'MULTIPLE' && p.opciones?.length >= 2 && p.opciones.length <= 4));
@@ -1379,43 +1391,90 @@ function SalaMandos({ preguntas, titulo, meta, dificultad, onSalir }) {
     };
 
     const [fase, setFase] = useState('LOBBY'); // LOBBY | JUEGO | FIN
-    const [jugadores, setJugadores] = useState({}); // id → { id, nombre, paso, estado, aciertos, fallos, pillados, llegada, pilladoTs, eliminado }
-    const [minutos, setMinutos] = useState(5);
-    const [restante, setRestante] = useState(0);
-    const [anuncio, setAnuncio] = useState(null); // nombres eliminados en la última luz roja
-    const finRef = useRef(0);
-    const eliminadosRonda = useRef([]);
-    const sonidoRef = useRef(sonido); sonidoRef.current = sonido;
+    const [ronda, setRonda] = useState('PREGUNTA'); // PREGUNTA | SOLUCION | VERDE | AVISO | ROJA
+    const [jugadores, setJugadores] = useState({}); // id → { id, nombre, paso, estado, respuesta, aciertos, fallos, pillados, llegada, eliminado }
     const [pregunta, setPregunta] = useState(null);
     const [virtuales, setVirtuales] = useState(false);
+    const [minutos, setMinutos] = useState(5);
+    const [segRespuesta, setSegRespuesta] = useState(15);
+    const [restante, setRestante] = useState(0);
+    const [restanteRonda, setRestanteRonda] = useState(0);
+    const [anuncio, setAnuncio] = useState(null);
     const jugRef = useRef(jugadores); jugRef.current = jugadores;
     const faseRef = useRef(fase); faseRef.current = fase;
+    const rondaRef = useRef(ronda);
     const preguntaRef = useRef(pregunta); preguntaRef.current = pregunta;
     const llegadas = useRef(0);
+    const finRef = useRef(0);
+    const finRondaRef = useRef(0);
+    const temporizador = useRef(null);
+    const eliminadosRonda = useRef([]);
 
     useEffect(() => { setModoMandos(MODOS.LETRAS); }, []);
+    useEffect(() => () => clearTimeout(temporizador.current), []);
     // Los cambios se aplican al momento sobre el ref (dos pulsaciones seguidas ven el estado ya actualizado)
     const todos = (fn) => { const nuevo = fn(jugRef.current); jugRef.current = nuevo; setJugadores(nuevo); };
     const cambiar = (id, fn) => todos(js => (js[id] ? { ...js, [id]: fn(js[id]) } : js));
+    const enCarrera = (j) => !j.eliminado && !j.llegada;
 
-    // Ciclo de luces: con cada luz roja, pregunta nueva para todos
-    const [luz, luzRef] = useCicloLuz({
-        activo: fase === 'JUEGO', dificultad, audio, sonido,
-        onCambio: (nueva) => {
-            if (nueva === VERDE && eliminadosRonda.current.length) {
-                const caidos = eliminadosRonda.current;
-                eliminadosRonda.current = [];
-                setAnuncio(caidos.map(j => j.nombre));
-                if (sonidoRef.current) caidos.forEach(j => hablarCalamar(`Jugador ${j.id}, eliminado`));
-                setTimeout(() => setAnuncio(a => (a && a.length === caidos.length ? null : a)), 2500 + caidos.length * 1300);
-            }
-            if (nueva !== ROJA) return;
+    // ── Máquina de la ronda ──
+    const irA = (nueva) => {
+        clearTimeout(temporizador.current);
+        if (faseRef.current !== 'JUEGO') return;
+        const cfg = DIFICULTADES[dificultad] || DIFICULTADES.NORMAL;
+        rondaRef.current = nueva;
+        setRonda(nueva);
+        let espera, siguiente;
+        if (nueva === 'PREGUNTA') {
             setPregunta(sacarPregunta());
-            todos(js => Object.fromEntries(Object.entries(js).map(([k, j]) => [k, { ...j, estado: j.eliminado ? 'eliminado' : j.llegada ? 'meta' : 'pendiente' }])));
+            todos(js => Object.fromEntries(Object.entries(js).map(([k, j]) => [k, { ...j, estado: enCarrera(j) ? 'pendiente' : j.estado, respuesta: null }])));
             nuevaPreguntaMandos();
-        },
-    });
+            espera = segRespuesta * 1000; siguiente = 'SOLUCION';
+        } else if (nueva === 'SOLUCION') {
+            const q = preguntaRef.current;
+            todos(js => Object.fromEntries(Object.entries(js).map(([k, j]) => {
+                if (!enCarrera(j)) return [k, j];
+                const ok = j.respuesta != null && LETRAS.indexOf(j.respuesta) === q?.correctaIdx;
+                if (j.id < 900) feedbackMando(j.id, ok);
+                return [k, { ...j, estado: ok ? 'bien' : 'mal', aciertos: j.aciertos + (ok ? 1 : 0), fallos: j.fallos + (ok ? 0 : 1) }];
+            })));
+            if (sonidoRef.current) audio.acierto();
+            espera = MS_SOLUCION; siguiente = 'VERDE';
+        } else if (nueva === 'VERDE') {
+            espera = rnd(cfg.verde[0], cfg.verde[1]); siguiente = 'AVISO';
+            if (sonidoRef.current) audio.cancion(espera);
+        } else if (nueva === 'AVISO') {
+            espera = cfg.aviso; siguiente = 'ROJA';
+            if (sonidoRef.current) audio.aviso();
+        } else {
+            espera = MS_ROJA; siguiente = 'PREGUNTA';
+            if (sonidoRef.current) audio.roja();
+        }
+        finRondaRef.current = Date.now() + espera;
+        setRestanteRonda(Math.ceil(espera / 1000));
+        temporizador.current = setTimeout(() => {
+            if (nueva === 'ROJA') anunciarEliminados();
+            irA(siguiente);
+        }, espera);
+    };
 
+    const anunciarEliminados = () => {
+        const caidos = eliminadosRonda.current;
+        eliminadosRonda.current = [];
+        if (!caidos.length) return;
+        setAnuncio(caidos.map(j => j.nombre));
+        if (sonidoRef.current) caidos.forEach(j => hablarCalamar(`Jugador ${j.id}, eliminado`));
+        setTimeout(() => setAnuncio(a => (a && a.length === caidos.length ? null : a)), 2500 + caidos.length * 1300);
+    };
+
+    // Si ya han respondido todos los que siguen en carrera, se pasa antes a la solución
+    useEffect(() => {
+        if (fase !== 'JUEGO' || ronda !== 'PREGUNTA') return undefined;
+        const enJuego = Object.values(jugadores).filter(enCarrera);
+        if (!enJuego.length || enJuego.some(j => j.respuesta == null)) return undefined;
+        const t = setTimeout(() => { if (rondaRef.current === 'PREGUNTA') irA('SOLUCION'); }, 900);
+        return () => clearTimeout(t);
+    }, [jugadores, ronda, fase]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Pulsaciones de los mandos
     useEffect(() => escucharMandos(({ id, tipo, letra }) => {
@@ -1423,39 +1482,32 @@ function SalaMandos({ preguntas, titulo, meta, dificultad, onSalir }) {
         const f = faseRef.current;
         if (f === 'FIN') return;
         if (!jugRef.current[id]) {
-            const nuevo = { id, nombre: nombreMando(id), paso: 0, estado: 'pendiente', aciertos: 0, fallos: 0, pillados: 0, llegada: 0, pilladoTs: 0, eliminado: false };
+            const nuevo = { id, nombre: nombreMando(id), paso: 0, estado: 'pendiente', respuesta: null, aciertos: 0, fallos: 0, pillados: 0, llegada: 0, eliminado: false };
             todos(js => ({ ...js, [id]: nuevo }));
             if (f === 'LOBBY') return;
         }
         if (f !== 'JUEGO') return;
         const j = jugRef.current[id];
-        const q = preguntaRef.current;
-        if (!q || j.llegada || j.eliminado) return;
-        // Luz roja: ¡se ha movido! → eliminado (disparo en la escena, cae y se queda en el suelo)
-        if (luzRef.current === ROJA) {
+        if (!enCarrera(j)) return;
+        const r = rondaRef.current;
+        if (r === 'PREGUNTA') {
+            // Solo cuenta la primera respuesta
+            if (j.respuesta == null) cambiar(id, x => ({ ...x, respuesta: letra, estado: 'respondida' }));
+        } else if (r === 'VERDE') {
+            if (j.estado !== 'bien') return; // solo se mueven los que acertaron
+            cambiar(id, x => {
+                const paso = Math.min(meta, x.paso + 1);
+                if (paso >= meta) { llegadas.current += 1; if (sonidoRef.current) audio.meta(); return { ...x, paso, llegada: llegadas.current, estado: 'meta' }; }
+                return { ...x, paso };
+            });
+        } else if (r === 'ROJA') {
+            // ¡Se ha movido con la luz roja! → eliminado (disparo en la escena, cae y se queda en el suelo)
             cambiar(id, x => ({ ...x, eliminado: true, estado: 'eliminado', pillados: x.pillados + 1 }));
             eliminadosRonda.current.push({ id, nombre: j.nombre });
             if (sonidoRef.current) audio.disparo();
             if (id < 900) feedbackMando(id, false);
-            return;
         }
-        // Luz amarilla (la muñeca se gira): no avanza, pero no se elimina
-        if (luzRef.current !== VERDE) {
-            cambiar(id, x => ({ ...x, pillados: x.pillados + 1, pilladoTs: Date.now() }));
-            if (id < 900) feedbackMando(id, false);
-            return;
-        }
-        if (j.estado === 'pendiente') {
-            const ok = LETRAS.indexOf(letra) === q.correctaIdx;
-            cambiar(id, x => ({ ...x, estado: ok ? 'bien' : 'mal', aciertos: x.aciertos + (ok ? 1 : 0), fallos: x.fallos + (ok ? 0 : 1) }));
-            if (id < 900) feedbackMando(id, ok);
-        } else if (j.estado === 'bien') {
-            cambiar(id, x => {
-                const paso = Math.min(meta, x.paso + 1);
-                if (paso >= meta && !x.llegada) { llegadas.current += 1; return { ...x, paso, llegada: llegadas.current, estado: 'meta' }; }
-                return { ...x, paso };
-            });
-        }
+        // En SOLUCION y AVISO no pasa nada
     }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Fin: todos los que siguen vivos han cruzado (o no queda nadie vivo)
@@ -1464,30 +1516,31 @@ function SalaMandos({ preguntas, titulo, meta, dificultad, onSalir }) {
         if (fase === 'JUEGO' && l.length && l.filter(j => !j.eliminado).every(j => j.llegada)) setFase('FIN');
     }, [jugadores, fase]);
 
-    // Fin: se acaba el tiempo total
+    // Relojes: tiempo total y cuenta atrás de la fase de la ronda
     useEffect(() => {
-        if (fase !== 'JUEGO') return undefined;
+        if (fase !== 'JUEGO') { clearTimeout(temporizador.current); return undefined; }
         const t = setInterval(() => {
             const q = Math.max(0, Math.ceil((finRef.current - Date.now()) / 1000));
             setRestante(q);
+            setRestanteRonda(Math.max(0, Math.ceil((finRondaRef.current - Date.now()) / 1000)));
             if (q <= 0) setFase('FIN');
-        }, 500);
+        }, 250);
         return () => clearInterval(t);
     }, [fase]);
-    useEffect(() => { if (fase === 'FIN') eliminadosRonda.current = []; }, [fase]);
+    useEffect(() => { if (fase === 'FIN') { clearTimeout(temporizador.current); eliminadosRonda.current = []; } }, [fase]);
 
     const empezar = () => {
         if (!validas.current.length) return;
         llegadas.current = 0;
         cola.current = [];
-        setPregunta(sacarPregunta());
-        todos(js => Object.fromEntries(Object.entries(js).map(([k, j]) => [k, { ...j, paso: 0, estado: 'pendiente', aciertos: 0, fallos: 0, pillados: 0, llegada: 0, eliminado: false }])));
-        nuevaPreguntaMandos();
         eliminadosRonda.current = [];
         setAnuncio(null);
+        todos(js => Object.fromEntries(Object.entries(js).map(([k, j]) => [k, { ...j, paso: 0, estado: 'pendiente', respuesta: null, aciertos: 0, fallos: 0, pillados: 0, llegada: 0, eliminado: false }])));
         finRef.current = Date.now() + minutos * 60000;
         setRestante(minutos * 60);
+        faseRef.current = 'JUEGO';
         setFase('JUEGO');
+        irA('PREGUNTA');
     };
     const renombrar = (id, txt) => { cambiar(id, j => ({ ...j, nombre: txt })); guardarNombreMando(id, txt); };
 
@@ -1502,7 +1555,7 @@ function SalaMandos({ preguntas, titulo, meta, dificultad, onSalir }) {
                     {LETRAS.map((l, i) => <button key={l} onClick={() => simularPulsacion(id, l)} style={{ ...chip(COLORES_OPCION[i]), border: 'none', cursor: 'pointer', padding: '3px 9px' }}>{l}</button>)}
                 </span>
             ))}
-            <span style={{ color: '#9fb0bb', fontSize: '0.75rem', alignSelf: 'center' }}>(1.ª pulsación = respuesta · las siguientes = pasos)</span>
+            <span style={{ color: '#9fb0bb', fontSize: '0.75rem', alignSelf: 'center' }}>(al preguntar = respuesta · en luz verde = paso)</span>
         </div>
     );
 
@@ -1516,16 +1569,20 @@ function SalaMandos({ preguntas, titulo, meta, dificultad, onSalir }) {
                         <ChipAntena />
                     </div>
                     <p style={{ color: '#9fb0bb', margin: '0 0 12px', fontSize: '0.92rem' }}>{titulo} · {meta} pasos · {DIFICULTADES[dificultad].nombre}</p>
-                    <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: 12, padding: 12, color: '#e7f3ec', lineHeight: 1.55, fontSize: '0.93rem' }}>
-                        <div>🟢 <b>Luz verde:</b> elige la respuesta con <b>A</b> y envíala con <b>B</b> o <b>agitando</b>.</div>
-                        <div>✅ Si <b>aciertas</b>, cada vez que <b>agitas</b> el mando avanzas un paso.</div>
-                        <div>🔴 <b>Luz roja:</b> ¡quieto! Si agitas o respondes, <b>quedas eliminado</b>.</div>
-                        <div>🔄 Con cada luz roja cambia la pregunta: hay que volver a acertar para seguir avanzando.</div>
+                    <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: 12, padding: 12, color: '#e7f3ec', lineHeight: 1.6, fontSize: '0.93rem' }}>
+                        <div>1️⃣ <b>❓ Pregunta:</b> elige la respuesta con <b>A</b> y envíala con <b>B</b> o <b>agitando</b> (solo cuenta la primera).</div>
+                        <div>2️⃣ <b>✅ Solución:</b> tu mando te dice si has acertado 🙂 o no 🙁.</div>
+                        <div>3️⃣ <b>🟢 Luz verde:</b> los que han acertado <b>agitan el mando para avanzar</b>. Los demás, quietos.</div>
+                        <div>4️⃣ <b>🔴 Luz roja:</b> ¡nadie se mueve! Quien agite queda <b>eliminado</b>. Después llega otra pregunta.</div>
                         <div>🏁 La partida acaba cuando se termina el tiempo o cuando todos los que siguen vivos han cruzado la meta.</div>
                     </div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 10 }}>
                         <span style={{ color: '#9fb0bb', fontWeight: 700, fontSize: '0.88rem' }}>⏱ Tiempo total:</span>
                         {DURACIONES_MANDOS.map(([m, t]) => <button key={m} onClick={() => setMinutos(m)} style={opcionChip(minutos === m)}>{t}</button>)}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
+                        <span style={{ color: '#9fb0bb', fontWeight: 700, fontSize: '0.88rem' }}>❓ Tiempo para responder:</span>
+                        {TIEMPOS_RESPUESTA.map(sg => <button key={sg} onClick={() => setSegRespuesta(sg)} style={opcionChip(segRespuesta === sg)}>{sg} s</button>)}
                     </div>
                     <div style={{ marginTop: 10 }}><BotonTutorialMandos inicial="calamar" texto="📖 Tutorial del mando" style={{ background: '#e6317f' }} /></div>
                     {!validas.current.length && (
@@ -1576,7 +1633,6 @@ function SalaMandos({ preguntas, titulo, meta, dificultad, onSalir }) {
                                 </span>
                                 <span style={chip('#0f7a45')}>✔ {j.aciertos}</span>
                                 <span style={chip('#a32222')}>✘ {j.fallos}</span>
-                                <span style={chip('#7c2d12')} title="Veces que se movió fuera de la luz verde">👀 {j.pillados}</span>
                                 <span style={{ ...chip('#34495e'), minWidth: 62, textAlign: 'center' }}>{j.paso}/{meta}</span>
                             </div>
                         ))}
@@ -1590,22 +1646,35 @@ function SalaMandos({ preguntas, titulo, meta, dificultad, onSalir }) {
 
     // ---------- PARTIDA ----------
     const q = pregunta;
-    const ahora = Date.now();
-    const respondidos = lista.filter(j => j.estado !== 'pendiente').length;
-    const marca = (j) => (j.eliminado ? '💀' : j.llegada ? '🏁' : ahora - j.pilladoTs < 1800 ? '👀' : j.estado === 'bien' ? '✅' : j.estado === 'mal' ? '✘' : '⏳');
-    const vivos = lista.filter(j => !j.eliminado).length;
+    const enJuego = lista.filter(enCarrera);
+    const respondidos = enJuego.filter(j => j.respuesta != null).length;
+    const pueden = enJuego.filter(j => j.estado === 'bien').length;
+    // La muñeca mira mientras se pregunta (nadie corre); solo se gira de espaldas con la luz verde
+    const luzEscena = ronda === 'VERDE' ? VERDE : ronda === 'AVISO' ? AVISO : ROJA;
+    const marca = (j) => (j.eliminado ? '💀' : j.llegada ? '🏁'
+        : ronda === 'PREGUNTA' ? (j.respuesta != null ? '📨' : '⏳')
+            : j.estado === 'bien' ? '🏃' : '✘');
+    const mensaje = {
+        PREGUNTA: `❓ Elegid la respuesta con A y enviadla con B o agitando · quedan ${restanteRonda} s · ${respondidos}/${enJuego.length} han respondido`,
+        SOLUCION: `✅ La respuesta correcta es la ${q ? LETRAS[q.correctaIdx] : ''} · ${pueden} ${pueden === 1 ? 'jugador podrá' : 'jugadores podrán'} avanzar`,
+        VERDE: '🟢 ¡Los que habéis acertado, agitad el mando para avanzar! Los demás, quietos.',
+        AVISO: '🟡 ¡La muñeca se está girando! Dejad de agitar…',
+        ROJA: '🔴 ¡QUIETOS! Quien se mueva queda eliminado',
+    }[ronda];
+    const colorMensaje = { PREGUNTA: '#c4b5fd', SOLUCION: '#93c5fd', VERDE: '#7dffb2', AVISO: '#fde68a', ROJA: '#ff8a8a' }[ronda];
+    const verOpciones = ronda === 'PREGUNTA' || ronda === 'SOLUCION';
     return (
         <div style={contenedor}>
-            <Pista jugadores={escena} luz={luz} meta={meta} idYo={null} panoramica />
+            <Pista jugadores={escena} luz={luzEscena} meta={meta} idYo={null} panoramica />
             <HudSuperior
-                luz={luz} paso={undefined} meta={meta}
+                luz={luzEscena} etiqueta={ETIQUETA_RONDA[ronda]} paso={undefined} meta={meta}
                 sonido={sonido} setSonido={setSonido} onSalir={onSalir}
                 titulo={`${titulo} · con mandos micro:bit`}
                 extra={
                     <>
                         <span style={{ ...chip(restante <= 30 ? '#c0392b' : '#2c3e50'), fontVariantNumeric: 'tabular-nums' }}>⏱ {mmssCalamar(restante)}</span>
                         <ChipAntena />
-                        <span style={chip('#2c3e50')} title="Siguen vivos / jugadores">❤️ {vivos}/{lista.length}</span>
+                        <span style={chip('#2c3e50')} title="Siguen vivos / jugadores">❤️ {lista.filter(j => !j.eliminado).length}/{lista.length}</span>
                         <BotonTutorialMandos inicial="calamar" texto="📖" style={{ ...chip('#2c3e50'), border: 'none' }} />
                         <button onClick={() => setVirtuales(v => !v)} style={{ ...chip('#2c3e50'), border: 'none', cursor: 'pointer' }}>🧪</button>
                         <button onClick={() => setFase('FIN')} style={{ ...chip('#c0392b'), border: 'none', cursor: 'pointer' }}>Terminar</button>
@@ -1623,28 +1692,36 @@ function SalaMandos({ preguntas, titulo, meta, dificultad, onSalir }) {
                 </div>
             )}
             <div style={{ position: 'relative', zIndex: 5, padding: '12px 16px max(14px, env(safe-area-inset-bottom))', background: 'linear-gradient(180deg, rgba(8,12,16,0.15), rgba(8,12,16,0.95))' }}>
-                {q && (
-                    <div style={{ maxWidth: 980, margin: '0 auto' }}>
-                        <div style={{ textAlign: 'center', color: luz === VERDE ? '#7dffb2' : '#ff8a8a', fontWeight: 900, fontSize: '0.95rem', marginBottom: 4 }}>
-                            {luz === VERDE ? `🟢 ¡Responded y, si acertáis, agitad para avanzar! (${respondidos}/${lista.length} han respondido)` : '🔴 ¡QUIETOS! Quien se mueva queda eliminado… pensad la respuesta'}
-                        </div>
-                        <div style={{ color: 'white', fontWeight: 900, fontSize: 'clamp(1.2rem,3vw,2rem)', textAlign: 'center', marginBottom: 8 }}>{q.enunciado}</div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(170px,1fr))', gap: 8 }}>
-                            {q.opciones.map((o, i) => (
-                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderRadius: 12, background: COLORES_OPCION[i], color: 'white', fontWeight: 800, fontSize: 'clamp(0.95rem,2vw,1.25rem)' }}>
-                                    <span style={{ width: 30, height: 30, borderRadius: 99, background: 'rgba(0,0,0,0.3)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{LETRAS[i]}</span>{o}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
+                <div style={{ maxWidth: 980, margin: '0 auto' }}>
+                    <div style={{ textAlign: 'center', color: colorMensaje, fontWeight: 900, fontSize: 'clamp(0.95rem,2vw,1.2rem)', marginBottom: 6 }}>{mensaje}</div>
+                    {q && verOpciones && (
+                        <>
+                            <div style={{ color: 'white', fontWeight: 900, fontSize: 'clamp(1.2rem,3vw,2rem)', textAlign: 'center', marginBottom: 8 }}>{q.enunciado}</div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(170px,1fr))', gap: 8 }}>
+                                {q.opciones.map((o, i) => {
+                                    const correcta = ronda === 'SOLUCION' && i === q.correctaIdx;
+                                    const apagada = ronda === 'SOLUCION' && i !== q.correctaIdx;
+                                    return (
+                                        <div key={i} style={{
+                                            display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderRadius: 12, background: COLORES_OPCION[i], color: 'white',
+                                            fontWeight: 800, fontSize: 'clamp(0.95rem,2vw,1.25rem)', opacity: apagada ? 0.3 : 1,
+                                            boxShadow: correcta ? '0 0 0 4px #fff, 0 0 26px #7dffb2' : 'none', transition: 'opacity .3s, box-shadow .3s',
+                                        }}>
+                                            <span style={{ width: 30, height: 30, borderRadius: 99, background: 'rgba(0,0,0,0.3)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{LETRAS[i]}</span>{o}
+                                            {correcta && <span style={{ marginLeft: 'auto' }}>✔</span>}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </>
+                    )}
+                </div>
                 <div style={{ display: 'flex', gap: 8, overflowX: 'auto', marginTop: 10 }}>
                     {[...lista].sort((a, b) => b.paso - a.paso).map(j => (
                         <div key={j.id} style={{
-                            flex: '0 0 auto', padding: '6px 12px', borderRadius: 12, color: 'white',
-                            opacity: j.eliminado ? 0.55 : 1,
-                            background: j.estado === 'bien' ? 'rgba(46,204,113,0.25)' : j.estado === 'mal' ? 'rgba(192,57,43,0.25)' : 'rgba(255,255,255,0.09)',
-                            border: `1px solid ${j.estado === 'bien' ? '#2ecc71' : j.estado === 'mal' ? '#c0392b' : 'rgba(255,255,255,0.15)'}`,
+                            flex: '0 0 auto', padding: '6px 12px', borderRadius: 12, color: 'white', opacity: j.eliminado ? 0.55 : 1,
+                            background: ronda !== 'PREGUNTA' && j.estado === 'bien' ? 'rgba(46,204,113,0.25)' : ronda !== 'PREGUNTA' && j.estado === 'mal' ? 'rgba(192,57,43,0.25)' : 'rgba(255,255,255,0.09)',
+                            border: `1px solid ${ronda !== 'PREGUNTA' && j.estado === 'bien' ? '#2ecc71' : ronda !== 'PREGUNTA' && j.estado === 'mal' ? '#c0392b' : 'rgba(255,255,255,0.15)'}`,
                         }}>
                             <div style={{ fontWeight: 800, fontSize: '0.88rem' }}>{marca(j)} {j.nombre}</div>
                             <div style={{ fontSize: '0.75rem', color: '#9fb0bb' }}>{j.paso}/{meta} · ✔{j.aciertos} ✘{j.fallos}</div>

@@ -83,14 +83,14 @@ const PESTANAS = {
   },
   calamar: {
     t: '🦑 Luz roja · Luz verde', color: '#e6317f', usos: 'Juego del calamar con mandos',
-    intro: 'Hay una pregunta para todos en la pizarra. Solo los que aciertan pueden avanzar, y solo con la luz verde. ¡Cuidado con la muñeca!',
+    intro: 'Cada ronda tiene dos momentos separados: primero se RESPONDE la pregunta y después, con la luz verde, se CORRE. ¡Cuidado con la muñeca!',
     pasos: [
-      { zona: 'A', led: 'B', titulo: '🟢 Luz verde: A cambia la letra', texto: 'Elige la respuesta (A → B → C → D) mirando la pizarra.' },
-      { zona: 'B', gesto: 'agitarB', led: 'si', titulo: 'B o agitar: envías tu respuesta', texto: 'Tu primer envío de cada pregunta es la respuesta. Carita feliz = has acertado.' },
-      { zona: null, gesto: 'agitar', led: 'feliz', titulo: '✅ Si aciertas: ¡agita para avanzar!', texto: 'Cada sacudida es un paso hacia la meta, mientras dure la luz verde.' },
-      { zona: 'pantalla', led: 'triste', titulo: '🔴 Luz roja: ¡quieto!', texto: 'Si agitas o respondes con la luz roja, ¡quedas ELIMINADO! (Con la luz amarilla, mientras la muñeca se gira, no avanzas pero sigues vivo).' },
-      { zona: 'pantalla', led: 'A', titulo: '🔄 Con cada luz roja cambia la pregunta', texto: 'Hay que volver a acertar la nueva pregunta para seguir avanzando. ¡Aprovecha la luz roja para pensarla (sin moverte)!' },
-      { zona: null, led: 'balon', titulo: '🏁 ¿Cuándo acaba?', texto: 'Cuando se termina el tiempo o cuando todos los que siguen vivos han cruzado la meta.' },
+      { zona: 'A', led: 'B', titulo: '1 · ❓ Pregunta: A cambia la letra', texto: 'Mira la pregunta en la pizarra y elige la respuesta (A → B → C → D). Hay un tiempo para responder.' },
+      { zona: 'B', gesto: 'agitarB', led: 'si', titulo: '2 · B o agitar: envías tu respuesta', texto: 'Solo cuenta la primera vez. Mientras se pregunta, nadie se mueve.' },
+      { zona: 'pantalla', led: 'feliz', titulo: '3 · ✅ Solución', texto: 'Se marca la respuesta correcta y tu mando te dice si has acertado 🙂 o no 🙁.' },
+      { zona: null, gesto: 'agitar', led: 'feliz', titulo: '4 · 🟢 Luz verde: ¡agita para avanzar!', texto: 'Solo los que han acertado. Cada sacudida es un paso hacia la meta. Los que han fallado se quedan quietos.' },
+      { zona: 'pantalla', led: 'triste', titulo: '5 · 🔴 Luz roja: ¡QUIETO!', texto: 'La muñeca se gira (luz amarilla: deja de agitar) y mira 2 segundos. Si agitas con la luz roja, ¡quedas ELIMINADO!' },
+      { zona: null, led: 'balon', titulo: '🏁 ¿Cuándo acaba?', texto: 'Después de cada luz roja llega otra pregunta. La partida acaba cuando se termina el tiempo o cuando todos los que siguen vivos han cruzado la meta.' },
     ],
   },
   mover: {

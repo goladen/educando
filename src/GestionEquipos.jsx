@@ -18,8 +18,8 @@
 //   donde coll = 'aulas_fijas' (personal) | 'aulas_comunidad' (comunidad).
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { db } from './firebase';
-import { doc, setDoc, onSnapshot, collection, getDocs, deleteDoc, addDoc } from 'firebase/firestore';
+import { db, auth } from './firebase';
+import { doc, setDoc, onSnapshot, collection, getDocs, deleteDoc, addDoc, query, where } from 'firebase/firestore';
 import SesionEquipos, { RegistroSesiones } from './SesionEquipos';
 
 // El agente late cada 30 s (espaciado para ahorrar escrituras en Firebase). Damos margen (3 latidos).
@@ -43,8 +43,10 @@ async function obtenerIceServers() {
 export default function GestionEquipos({ scope = 'personal', id, esGestor = false }) {
     const coll = collForScope(scope);
     const [vista, setVista] = useState('inicio');   // 'inicio' | 'config'
-    const [sesion, setSesion] = useState(null);      // machineIds de la sesión activa, o null
+    const [sesion, setSesion] = useState(null);      // { id? } sesión abierta en pantalla, o null
     const [verRegistro, setVerRegistro] = useState(false);
+    const [vivoSesion, setVivoSesion] = useState(null); // equipo cuyo vídeo en vivo se ve desde la sesión
+    const [abiertas, setAbiertas] = useState([]);    // sesiones mías ABIERTAS (para continuar)
     const [agentes, setAgentes] = useState([]);
     const [verPantallas, setVerPantallas] = useState(false); // refleja el flag thumbs del doc del aula
     const [thumbs, setThumbs] = useState({}); // agentId → { data, at } leído del subdoc screen/latest
@@ -126,15 +128,37 @@ export default function GestionEquipos({ scope = 'personal', id, esGestor = fals
     };
 
     const conectados = agentes.filter(agenteOnline).length;
-    const abrirSesion = (ids = []) => setSesion(ids);
+    const abrirNueva = () => setSesion({});
+    const continuar = (sid) => setSesion({ id: sid });
+
+    // Mis sesiones ABIERTAS (para ofrecer "Continuar"). Se recarga al cerrar el modal de sesión.
+    useEffect(() => {
+        if (!id) { setAbiertas([]); return; }
+        let vivo = true;
+        const uid = auth.currentUser?.uid;
+        getDocs(query(collection(db, 'registro_equipos'), where('code', '==', id)))
+            .then((snap) => {
+                if (!vivo) return;
+                const mias = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+                    .filter((s) => s.estado === 'abierta' && s.ownerUid === uid)
+                    .sort((a, b) => (b.inicioMs || 0) - (a.inicioMs || 0));
+                setAbiertas(mias);
+            })
+            .catch(() => {});
+        return () => { vivo = false; };
+        // recargar cuando se cierra el modal (sesion pasa a null)
+    }, [id, sesion]);
 
     const modales = (
         <>
             {sesion && (
-                <SesionEquipos scope={scope} codigoEquipos={id} agentes={agentes} machineIds={sesion} online={agenteOnline} onCmd={enviarCmdAgente} onClose={() => setSesion(null)} />
+                <SesionEquipos scope={scope} codigoEquipos={id} agentes={agentes} sesionIdInicial={sesion.id || null} online={agenteOnline} onCmd={enviarCmdAgente} onVivo={setVivoSesion} esGestor={esGestor} onClose={() => setSesion(null)} />
             )}
             {verRegistro && (
                 <RegistroSesiones scope={scope} codigoEquipos={id} canGestionar={esGestor} onClose={() => setVerRegistro(false)} />
+            )}
+            {vivoSesion && (
+                <VistaEnVivo scope={scope} codigoEquipos={id} agente={vivoSesion} onCmd={enviarCmdAgente} onClose={() => setVivoSesion(null)} />
             )}
         </>
     );
@@ -157,7 +181,7 @@ export default function GestionEquipos({ scope = 'personal', id, esGestor = fals
                     scope={scope}
                     canManage={esGestor}
                     onVolver={() => setVista('inicio')}
-                    onNuevaSesion={abrirSesion}
+                    onNuevaSesion={abrirNueva}
                     onMeta={guardarMeta}
                 />
                 {modales}
@@ -173,7 +197,9 @@ export default function GestionEquipos({ scope = 'personal', id, esGestor = fals
                 conectados={conectados}
                 total={agentes.length}
                 esGestor={esGestor}
-                onNuevaSesion={() => abrirSesion([])}
+                abiertas={abiertas}
+                onContinuar={continuar}
+                onNuevaSesion={abrirNueva}
                 onVerRegistro={() => setVerRegistro(true)}
                 onConfig={() => setVista('config')}
             />
@@ -183,8 +209,9 @@ export default function GestionEquipos({ scope = 'personal', id, esGestor = fals
 }
 
 // ── Pantalla de inicio de Equipos: acciones principales + acceso a configuración ──
-function PanelInicio({ scope, conectados, total, esGestor, onNuevaSesion, onVerRegistro, onConfig }) {
+function PanelInicio({ scope, conectados, total, esGestor, abiertas = [], onContinuar, onNuevaSesion, onVerRegistro, onConfig }) {
     const bigBtn = (bg) => ({ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, background: bg, color: 'white', border: 'none', borderRadius: 16, padding: '26px 20px', cursor: 'pointer', fontWeight: 800, fontSize: '1.05rem', minHeight: 120 });
+    const tituloSesion = (s) => (s.cursos || []).map((c) => c.nombre).join(', ') || s.grupo || 'Sesión';
     return (
         <div style={{ background: '#0f172a', borderRadius: 14, padding: 20, marginTop: 18, maxWidth: '100%', boxSizing: 'border-box', overflowX: 'hidden' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 18 }}>
@@ -195,6 +222,16 @@ function PanelInicio({ scope, conectados, total, esGestor, onNuevaSesion, onVerR
                 {/* La configuración (instalar, gestionar, energía…) solo la ve el gestor/creador. */}
                 {esGestor && <button onClick={onConfig} style={{ background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 10, padding: '8px 14px', cursor: 'pointer', fontWeight: 700 }}>⚙️ Configuración de la sala</button>}
             </div>
+            {abiertas.length > 0 && (
+                <div style={{ marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {abiertas.map((s) => (
+                        <button key={s.id} onClick={() => onContinuar(s.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, background: '#15803d', color: 'white', border: 'none', borderRadius: 12, padding: '12px 16px', cursor: 'pointer', fontWeight: 800 }}>
+                            <span>▶ Continuar sesión: {tituloSesion(s)}</span>
+                            <span style={{ fontSize: '0.8rem', fontWeight: 600, opacity: 0.9 }}>🟢 abierta · {s.machineIds?.length || 0} equipos</span>
+                        </button>
+                    ))}
+                </div>
+            )}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px,1fr))', gap: 14 }}>
                 {/* Crear sesión está disponible para TODOS los miembros (incluidos los de solo lectura). */}
                 <button onClick={onNuevaSesion} style={bigBtn('#15803d')}><span style={{ fontSize: 34 }}>📋</span> Crear una nueva sesión</button>

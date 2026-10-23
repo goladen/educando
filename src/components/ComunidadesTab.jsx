@@ -3049,7 +3049,7 @@ function DetalleComunidad({ usuario, comunidad, onBack, onSalir, onCambio, tabIn
             {tab === 'profesores' && <ProfesoresPanel usuario={usuario} comunidad={comunidad} soloLectura={soloLectura} />}
             {tab === 'calendario' && <PanelCalendarios usuario={usuario} comunidad={comunidad} soloLectura={soloLectura} />}
             {tab === 'competiciones' && <CompeticionesComunidadPanel usuario={usuario} comunidad={comunidad} soloLectura={soloLectura} />}
-            {tab === 'equipos' && <GestionEquipos scope="comunidad" id={comunidad.id} canManage={!soloLectura} esGestor={esCreador} />}
+            {tab === 'equipos' && <GestionEquipos scope="comunidad" id={comunidad.id} esGestor={esCreador} />}
             {tab === 'mensajes' && <PanelMensajes usuario={usuario} comunidad={comunidad} />}
             {tab === 'miembros' && <PanelMiembros usuario={usuario} comunidad={comunidad} onCambio={onCambio} />}
 

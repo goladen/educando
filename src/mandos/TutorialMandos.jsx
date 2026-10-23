@@ -81,6 +81,18 @@ const PESTANAS = {
       { zona: 'pantalla', led: 'feliz', titulo: '🗝️ ¡El primero que lo completa abre la puerta!', texto: 'Su avatar se hace GIGANTE en la mansión y sale su nombre en grande.' },
     ],
   },
+  calamar: {
+    t: '🦑 Luz roja · Luz verde', color: '#e6317f', usos: 'Juego del calamar con mandos',
+    intro: 'Hay una pregunta para todos en la pizarra. Solo los que aciertan pueden avanzar, y solo con la luz verde. ¡Cuidado con la muñeca!',
+    pasos: [
+      { zona: 'A', led: 'B', titulo: '🟢 Luz verde: A cambia la letra', texto: 'Elige la respuesta (A → B → C → D) mirando la pizarra.' },
+      { zona: 'B', gesto: 'agitarB', led: 'si', titulo: 'B o agitar: envías tu respuesta', texto: 'Tu primer envío de cada pregunta es la respuesta. Carita feliz = has acertado.' },
+      { zona: null, gesto: 'agitar', led: 'feliz', titulo: '✅ Si aciertas: ¡agita para avanzar!', texto: 'Cada sacudida es un paso hacia la meta, mientras dure la luz verde.' },
+      { zona: 'pantalla', led: 'triste', titulo: '🔴 Luz roja: ¡quieto!', texto: 'Si agitas o respondes con la luz roja, ¡quedas ELIMINADO! (Con la luz amarilla, mientras la muñeca se gira, no avanzas pero sigues vivo).' },
+      { zona: 'pantalla', led: 'A', titulo: '🔄 Con cada luz roja cambia la pregunta', texto: 'Hay que volver a acertar la nueva pregunta para seguir avanzando. ¡Aprovecha la luz roja para pensarla (sin moverte)!' },
+      { zona: null, led: 'balon', titulo: '🏁 ¿Cuándo acaba?', texto: 'Cuando se termina el tiempo o cuando todos los que siguen vivos han cruzado la meta.' },
+    ],
+  },
   mover: {
     t: '🤖 Mover', color: '#16a34a', usos: 'Pista de robots · Copia el dibujo',
     intro: 'Tu mando lleva un robot (o una tortuga que dibuja). La pantalla muestra una flecha.',
@@ -105,7 +117,7 @@ const PESTANAS = {
     ],
   },
 };
-const ORDEN = ['inicio', 'letras', 'numero', 'abecedario', 'candado', 'mover', 'futbol'];
+const ORDEN = ['inicio', 'letras', 'numero', 'abecedario', 'candado', 'calamar', 'mover', 'futbol'];
 
 const CSS = `
 @keyframes tmAgitar { 0%,100% { transform: translate(0,0) rotate(0deg); } 15% { transform: translate(-10px,-3px) rotate(-6deg); } 30% { transform: translate(10px,3px) rotate(6deg); } 45% { transform: translate(-9px,2px) rotate(-5deg); } 60% { transform: translate(9px,-2px) rotate(5deg); } 75% { transform: translate(-4px,0) rotate(-2deg); } }

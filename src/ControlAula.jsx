@@ -682,7 +682,7 @@ export function TeacherControlPanel() {
             </div>
 
             {/* Equipos con el Agente Pikt instalado (vínculo personal por código de profesor) */}
-            <GestionEquipos scope="personal" id={codigoProfesor} canManage />
+            <GestionEquipos scope="personal" id={codigoProfesor} esGestor />
 
 
             {/* Toasts */}

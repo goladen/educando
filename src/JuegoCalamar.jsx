@@ -12,6 +12,11 @@ import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import {
     limpiar, barajar, normalizarPregunta, preguntasDeRecurso, esRespuestaCorrecta,
 } from './utils/normalizarPreguntas';
+import {
+    MODOS, LETRAS, setModoMandos, escucharMandos, feedbackMando, nuevaPreguntaMandos, simularPulsacion,
+} from './mandos/mandosMicrobit.js';
+import ChipAntena from './mandos/ChipAntena.jsx';
+import { BotonTutorialMandos } from './mandos/TutorialMandos.jsx';
 
 /* =====================================================================
  *  LUZ ROJA · LUZ VERDE  (juego del calamar educativo)
@@ -335,11 +340,18 @@ function crearEscena(root) {
         return t;
     };
 
+    // Aspecto propio de cada jugador según su número (piel, color y tipo de pelo, altura)
+    const PIELES = [0xf2cfa9, 0xe0ac69, 0xc68642, 0x8d5524, 0xffdbac, 0xd8a47f];
+    const PELOS = [0x2b2118, 0x111111, 0x6b3e1e, 0xd9b45a, 0x8a2d1b, 0x4a2c17, 0x9a9a9a];
+    const azarNum = (n, k) => { const x = Math.sin((Number(n) || 0) * 12.9898 + k * 78.233) * 43758.5453; return x - Math.floor(x); };
+
     function construirJugador({ numero, nombre, esYo }) {
         const g = new THREE.Group();
+        const pick = (lista, k) => lista[Math.floor(azarNum(numero, k) * lista.length)];
         const matChandal = new THREE.MeshStandardMaterial({ color: COLOR_CHANDAL, roughness: 0.85 });
-        const matPiel = new THREE.MeshStandardMaterial({ color: 0xf2cfa9, roughness: 0.9 });
-        const matPelo = new THREE.MeshStandardMaterial({ color: 0x2b2118, roughness: 0.9 });
+        const matPiel = new THREE.MeshStandardMaterial({ color: pick(PIELES, 1), roughness: 0.9 });
+        const matPelo = new THREE.MeshStandardMaterial({ color: pick(PELOS, 2), roughness: 0.9 });
+        const peinado = Math.floor(azarNum(numero, 3) * 4); // 0 corto · 1 coleta · 2 de punta · 3 melena
 
         const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.42, 0.95, 6, 14), matChandal);
         torso.position.y = 1.35; g.add(torso);
@@ -352,6 +364,19 @@ function crearEscena(root) {
         cabeza.position.y = 2.15; g.add(cabeza);
         const pelo = new THREE.Mesh(new THREE.SphereGeometry(0.36, 18, 14, 0, Math.PI * 2, 0, Math.PI * 0.6), matPelo);
         pelo.position.y = 2.2; g.add(pelo);
+        if (peinado === 1) {            // coleta hacia atrás
+            const coleta = new THREE.Mesh(new THREE.CapsuleGeometry(0.11, 0.4, 4, 8), matPelo);
+            coleta.position.set(0, 2.05, -0.42); coleta.rotation.x = 0.5; g.add(coleta);
+        } else if (peinado === 2) {     // pelo de punta
+            for (let i = 0; i < 5; i++) {
+                const punta = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.26, 6), matPelo);
+                const a = (i / 5) * Math.PI * 2;
+                punta.position.set(Math.cos(a) * 0.17, 2.5, Math.sin(a) * 0.17); g.add(punta);
+            }
+        } else if (peinado === 3) {     // melena
+            const melena = new THREE.Mesh(new THREE.CylinderGeometry(0.37, 0.4, 0.5, 16, 1, true, Math.PI * 0.25, Math.PI * 1.5), matPelo);
+            melena.position.y = 1.98; melena.rotation.y = Math.PI; g.add(melena);
+        }
 
         const brazos = [-1, 1].map(l => {
             const b = new THREE.Mesh(new THREE.CapsuleGeometry(0.15, 0.75, 6, 10), matChandal);
@@ -369,9 +394,35 @@ function crearEscena(root) {
         const label = etiqueta(nombre, esYo ? '#7dffb2' : '#ffffff');
         label.position.y = 3.05; g.add(label);
 
+        g.scale.setScalar(0.92 + azarNum(numero, 4) * 0.16);
         g.rotation.y = Math.PI;             // mira hacia la muñeca (-Z del mundo)
         g.traverse(o => { if (o.isMesh) o.castShadow = true; });
         return { g, brazos, piernas, matChandal, matPiel, label };
+    }
+
+    // ================== DISPAROS ==================
+    const efectos = [];   // { obj, vida, total, tipo }
+    const geoDestello = new THREE.SphereGeometry(0.45, 12, 10);
+    function disparar(reg) {
+        const origen = new THREE.Vector3();
+        munieca.userData.cabeza.getWorldPosition(origen);
+        origen.y += 0.3;
+        const destino = reg.g.position.clone(); destino.y += 1.45;
+        const traza = new THREE.Line(
+            new THREE.BufferGeometry().setFromPoints([origen, destino]),
+            new THREE.LineBasicMaterial({ color: 0xfff2a8, transparent: true, opacity: 1 }));
+        scene.add(traza);
+        efectos.push({ obj: traza, vida: 0.22, total: 0.22, tipo: 'traza' });
+        [[origen, 0xffe066, 1.6], [destino, 0xff7a1a, 1.1]].forEach(([pos, color, tam]) => {
+            const m = new THREE.Mesh(geoDestello, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95, depthWrite: false }));
+            m.position.copy(pos); m.scale.setScalar(tam * 0.4); scene.add(m);
+            efectos.push({ obj: m, vida: 0.38, total: 0.38, tipo: 'destello', tam });
+        });
+        const luzDisparo = new THREE.PointLight(0xffb347, 6, 14);
+        luzDisparo.position.copy(destino); scene.add(luzDisparo);
+        efectos.push({ obj: luzDisparo, vida: 0.18, total: 0.18, tipo: 'luz' });
+        reg.esperaCaida = 0.12;
+        reg.ladoCaida = (Math.random() - 0.5) * 1.1;
     }
 
     // ================== ESTADO Y BUCLE ==================
@@ -412,8 +463,9 @@ function crearEscena(root) {
             reg.objetivoZ = zDePaso(j.paso || 0, metaPasos);
             if (j.eliminado && !reg.eliminado) {
                 reg.eliminado = true;
-                reg.matChandal.color.setHex(0x7a2222);
-                reg.label.material.opacity = 0.5;
+                reg.matChandal.color.setHex(0x0b6b53);
+                reg.label.material.opacity = 0.45;
+                disparar(reg);
             }
         });
         // Quitar jugadores que ya no están
@@ -453,9 +505,13 @@ function crearEscena(root) {
             p.x += dx * Math.min(1, dt * 3.4);
 
             if (reg.eliminado) {
-                reg.caida = Math.min(1, reg.caida + dt * 2.2);
-                reg.g.rotation.x = -reg.caida * Math.PI * 0.5;
-                reg.g.position.y = -reg.caida * 0.35;
+                if (reg.esperaCaida > 0) reg.esperaCaida -= dt;
+                else reg.caida = Math.min(1, reg.caida + dt * 2.6);
+                const k = 1 - Math.pow(1 - reg.caida, 2);
+                reg.g.rotation.x = -k * Math.PI * 0.5;
+                reg.g.rotation.z = k * (reg.ladoCaida || 0);
+                reg.g.position.y = -k * 0.35;
+                [...reg.piernas, ...reg.brazos].forEach(m => { m.rotation.x *= 0.9; });
             } else if (moviendo) {
                 reg.fase += dt * 9;
                 reg.piernas[0].rotation.x = Math.sin(reg.fase) * 0.7;
@@ -469,6 +525,24 @@ function crearEscena(root) {
             }
         });
         if (idYo != null) yo = jugadores.get(idYo) || null;
+
+        // Efectos de los disparos
+        for (let i = efectos.length - 1; i >= 0; i--) {
+            const e = efectos[i];
+            e.vida -= dt;
+            const k = Math.max(0, e.vida / e.total);
+            if (e.tipo === 'luz') e.obj.intensity = 6 * k;
+            else {
+                e.obj.material.opacity = k;
+                if (e.tipo === 'destello') e.obj.scale.setScalar(e.tam * (0.4 + (1 - k) * 0.9));
+            }
+            if (e.vida <= 0) {
+                scene.remove(e.obj);
+                if (e.tipo === 'traza') e.obj.geometry.dispose();
+                e.obj.material?.dispose?.();
+                efectos.splice(i, 1);
+            }
+        }
 
         // Cámara
         if (yo && !modoPanoramica) {
@@ -777,9 +851,15 @@ function PartidaSolo({ preguntas, titulo, meta, dificultad, nombre, usuario, onS
     const [aviso, setAviso] = useState(null);
     const [mostrarEnvio, setMostrarEnvio] = useState(false);
     const [guardado, setGuardado] = useState(false);
+    const [verFinal, setVerFinal] = useState(false);   // la pantalla final espera a que se vea la caída (o la llegada)
 
     useEffect(() => { audio.activo = sonido; }, [sonido, audio]);
     useEffect(() => () => audio.cerrar(), [audio]);
+    useEffect(() => {
+        if (estado === 'JUGANDO') { setVerFinal(false); return undefined; }
+        const t = setTimeout(() => setVerFinal(true), estado === 'ELIMINADO' ? 3000 : 1600);
+        return () => clearTimeout(t);
+    }, [estado]);
 
     const [luz, luzRef] = useCicloLuz({
         activo: estado === 'JUGANDO', dificultad, audio, sonido,
@@ -860,7 +940,15 @@ function PartidaSolo({ preguntas, titulo, meta, dificultad, nombre, usuario, onS
                 <PanelPregunta pregunta={pregunta} luz={luz} deshabilitado={false} onResponder={responder} />
             )}
 
-            {estado !== 'JUGANDO' && (
+            {estado !== 'JUGANDO' && !verFinal && (
+                <div style={{
+                    position: 'absolute', top: '30%', left: 0, right: 0, textAlign: 'center', zIndex: 6, pointerEvents: 'none',
+                    color: estado === 'ELIMINADO' ? '#ff5c8a' : '#7dffb2', fontSize: 'clamp(2rem,8vw,4rem)', fontWeight: 900,
+                    letterSpacing: 2, textShadow: '0 4px 22px rgba(0,0,0,0.9)',
+                }}>{estado === 'ELIMINADO' ? '💀 ¡ELIMINADO!' : '🏁 ¡META!'}</div>
+            )}
+
+            {estado !== 'JUGANDO' && verFinal && (
                 <PantallaFinal
                     victoria={estado === 'GANA'} datos={datosInforme}
                     onReintentar={onReiniciar} onSalir={onSalir}
@@ -1238,6 +1326,338 @@ function SalaHost({ preguntas, titulo, meta, dificultad, usuario, onSalir }) {
 }
 
 // =====================================================================
+//  PARTIDA CON MANDOS micro:bit (modo letras: A cambia, B o agitar envía)
+//  - Una pregunta de 2-4 opciones para todos, que CAMBIA cada vez que llega la luz roja.
+//  - Con luz verde, el primer envío de cada mando es su respuesta. Si acierta, cada nuevo
+//    envío (agitar o B) es un paso adelante hasta la siguiente pregunta.
+//  - Con la luz ROJA, quien se mueve (agita o responde) queda ELIMINADO: disparo y cae al suelo.
+//    Al volver la luz verde, una voz anuncia «Jugador N, eliminado». Con la luz amarilla (la muñeca
+//    se está girando) no se avanza, pero tampoco se elimina.
+//  - La partida acaba al terminar el tiempo total o cuando todos los que siguen vivos han cruzado.
+// =====================================================================
+const LS_NOMBRES_MANDOS = 'pikt_mandos_nombres';
+const leerNombresMandos = () => { try { return JSON.parse(localStorage.getItem(LS_NOMBRES_MANDOS) || '{}') || {}; } catch { return {}; } };
+const guardarNombreMando = (id, nombre) => {
+    try {
+        const n = leerNombresMandos();
+        if (nombre.trim()) n[id] = nombre.trim(); else delete n[id];
+        localStorage.setItem(LS_NOMBRES_MANDOS, JSON.stringify(n));
+    } catch { /* sin almacenamiento */ }
+};
+const nombreMando = (id) => leerNombresMandos()[id] || (id > 900 ? `Virtual ${id - 900}` : `Mando ${id}`);
+const COLORES_OPCION = ['#ef4444', '#3b82f6', '#f59e0b', '#22c55e'];
+const DURACIONES_MANDOS = [[3, '3 min'], [5, '5 min'], [8, '8 min'], [10, '10 min'], [15, '15 min']];
+const mmssCalamar = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+
+// Voz grave en español para anunciar a los eliminados (síntesis del navegador)
+function hablarCalamar(texto) {
+    try {
+        const sintesis = window.speechSynthesis;
+        if (!sintesis) return;
+        const u = new SpeechSynthesisUtterance(texto);
+        u.lang = 'es-ES'; u.rate = 0.88; u.pitch = 0.5;
+        const voz = sintesis.getVoices().find(v => /^es(-|_)ES/i.test(v.lang)) || sintesis.getVoices().find(v => /^es/i.test(v.lang));
+        if (voz) u.voice = voz;
+        sintesis.speak(u);
+    } catch { /* sin voz */ }
+}
+
+function SalaMandos({ preguntas, titulo, meta, dificultad, onSalir }) {
+    const audioRef = useRef(null);
+    if (!audioRef.current) audioRef.current = crearAudio();
+    const audio = audioRef.current;
+    const [sonido, setSonido] = useState(true);
+    useEffect(() => { audio.activo = sonido; }, [sonido, audio]);
+
+    // Solo valen las preguntas de opción múltiple de hasta 4 opciones (A-D)
+    const validas = useRef(preguntas.filter(p => p.tipo === 'MULTIPLE' && p.opciones?.length >= 2 && p.opciones.length <= 4));
+    const cola = useRef([]);
+    const sacarPregunta = () => {
+        if (!cola.current.length) cola.current = barajar(validas.current);
+        const p = cola.current.shift();
+        return p ? { ...p, correctaIdx: p.opciones.indexOf(p.correcta), n: Math.random() } : null;
+    };
+
+    const [fase, setFase] = useState('LOBBY'); // LOBBY | JUEGO | FIN
+    const [jugadores, setJugadores] = useState({}); // id → { id, nombre, paso, estado, aciertos, fallos, pillados, llegada, pilladoTs, eliminado }
+    const [minutos, setMinutos] = useState(5);
+    const [restante, setRestante] = useState(0);
+    const [anuncio, setAnuncio] = useState(null); // nombres eliminados en la última luz roja
+    const finRef = useRef(0);
+    const eliminadosRonda = useRef([]);
+    const sonidoRef = useRef(sonido); sonidoRef.current = sonido;
+    const [pregunta, setPregunta] = useState(null);
+    const [virtuales, setVirtuales] = useState(false);
+    const jugRef = useRef(jugadores); jugRef.current = jugadores;
+    const faseRef = useRef(fase); faseRef.current = fase;
+    const preguntaRef = useRef(pregunta); preguntaRef.current = pregunta;
+    const llegadas = useRef(0);
+
+    useEffect(() => { setModoMandos(MODOS.LETRAS); }, []);
+    // Los cambios se aplican al momento sobre el ref (dos pulsaciones seguidas ven el estado ya actualizado)
+    const todos = (fn) => { const nuevo = fn(jugRef.current); jugRef.current = nuevo; setJugadores(nuevo); };
+    const cambiar = (id, fn) => todos(js => (js[id] ? { ...js, [id]: fn(js[id]) } : js));
+
+    // Ciclo de luces: con cada luz roja, pregunta nueva para todos
+    const [luz, luzRef] = useCicloLuz({
+        activo: fase === 'JUEGO', dificultad, audio, sonido,
+        onCambio: (nueva) => {
+            if (nueva === VERDE && eliminadosRonda.current.length) {
+                const caidos = eliminadosRonda.current;
+                eliminadosRonda.current = [];
+                setAnuncio(caidos.map(j => j.nombre));
+                if (sonidoRef.current) caidos.forEach(j => hablarCalamar(`Jugador ${j.id}, eliminado`));
+                setTimeout(() => setAnuncio(a => (a && a.length === caidos.length ? null : a)), 2500 + caidos.length * 1300);
+            }
+            if (nueva !== ROJA) return;
+            setPregunta(sacarPregunta());
+            todos(js => Object.fromEntries(Object.entries(js).map(([k, j]) => [k, { ...j, estado: j.eliminado ? 'eliminado' : j.llegada ? 'meta' : 'pendiente' }])));
+            nuevaPreguntaMandos();
+        },
+    });
+
+
+    // Pulsaciones de los mandos
+    useEffect(() => escucharMandos(({ id, tipo, letra }) => {
+        if (tipo !== 'letra') return;
+        const f = faseRef.current;
+        if (f === 'FIN') return;
+        if (!jugRef.current[id]) {
+            const nuevo = { id, nombre: nombreMando(id), paso: 0, estado: 'pendiente', aciertos: 0, fallos: 0, pillados: 0, llegada: 0, pilladoTs: 0, eliminado: false };
+            todos(js => ({ ...js, [id]: nuevo }));
+            if (f === 'LOBBY') return;
+        }
+        if (f !== 'JUEGO') return;
+        const j = jugRef.current[id];
+        const q = preguntaRef.current;
+        if (!q || j.llegada || j.eliminado) return;
+        // Luz roja: ¡se ha movido! → eliminado (disparo en la escena, cae y se queda en el suelo)
+        if (luzRef.current === ROJA) {
+            cambiar(id, x => ({ ...x, eliminado: true, estado: 'eliminado', pillados: x.pillados + 1 }));
+            eliminadosRonda.current.push({ id, nombre: j.nombre });
+            if (sonidoRef.current) audio.disparo();
+            if (id < 900) feedbackMando(id, false);
+            return;
+        }
+        // Luz amarilla (la muñeca se gira): no avanza, pero no se elimina
+        if (luzRef.current !== VERDE) {
+            cambiar(id, x => ({ ...x, pillados: x.pillados + 1, pilladoTs: Date.now() }));
+            if (id < 900) feedbackMando(id, false);
+            return;
+        }
+        if (j.estado === 'pendiente') {
+            const ok = LETRAS.indexOf(letra) === q.correctaIdx;
+            cambiar(id, x => ({ ...x, estado: ok ? 'bien' : 'mal', aciertos: x.aciertos + (ok ? 1 : 0), fallos: x.fallos + (ok ? 0 : 1) }));
+            if (id < 900) feedbackMando(id, ok);
+        } else if (j.estado === 'bien') {
+            cambiar(id, x => {
+                const paso = Math.min(meta, x.paso + 1);
+                if (paso >= meta && !x.llegada) { llegadas.current += 1; return { ...x, paso, llegada: llegadas.current, estado: 'meta' }; }
+                return { ...x, paso };
+            });
+        }
+    }), []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Fin: todos los que siguen vivos han cruzado (o no queda nadie vivo)
+    useEffect(() => {
+        const l = Object.values(jugadores);
+        if (fase === 'JUEGO' && l.length && l.filter(j => !j.eliminado).every(j => j.llegada)) setFase('FIN');
+    }, [jugadores, fase]);
+
+    // Fin: se acaba el tiempo total
+    useEffect(() => {
+        if (fase !== 'JUEGO') return undefined;
+        const t = setInterval(() => {
+            const q = Math.max(0, Math.ceil((finRef.current - Date.now()) / 1000));
+            setRestante(q);
+            if (q <= 0) setFase('FIN');
+        }, 500);
+        return () => clearInterval(t);
+    }, [fase]);
+    useEffect(() => { if (fase === 'FIN') eliminadosRonda.current = []; }, [fase]);
+
+    const empezar = () => {
+        if (!validas.current.length) return;
+        llegadas.current = 0;
+        cola.current = [];
+        setPregunta(sacarPregunta());
+        todos(js => Object.fromEntries(Object.entries(js).map(([k, j]) => [k, { ...j, paso: 0, estado: 'pendiente', aciertos: 0, fallos: 0, pillados: 0, llegada: 0, eliminado: false }])));
+        nuevaPreguntaMandos();
+        eliminadosRonda.current = [];
+        setAnuncio(null);
+        finRef.current = Date.now() + minutos * 60000;
+        setRestante(minutos * 60);
+        setFase('JUEGO');
+    };
+    const renombrar = (id, txt) => { cambiar(id, j => ({ ...j, nombre: txt })); guardarNombreMando(id, txt); };
+
+    const lista = Object.values(jugadores).sort((a, b) => a.id - b.id);
+    const ranking = [...lista].sort((a, b) => (Number(a.eliminado) - Number(b.eliminado)) || ((a.llegada || 1e9) - (b.llegada || 1e9)) || (b.paso - a.paso) || (b.aciertos - a.aciertos));
+    const escena = lista.map(j => ({ id: String(j.id), nombre: j.nombre, paso: j.paso, numero: j.id, eliminado: !!j.eliminado }));
+    const panelVirtuales = virtuales && (
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center', marginTop: 8 }}>
+            {[901, 902, 903].map(id => (
+                <span key={id} style={{ display: 'flex', gap: 4, alignItems: 'center', color: '#9fb0bb', fontSize: '0.8rem' }}>
+                    V{id - 900}
+                    {LETRAS.map((l, i) => <button key={l} onClick={() => simularPulsacion(id, l)} style={{ ...chip(COLORES_OPCION[i]), border: 'none', cursor: 'pointer', padding: '3px 9px' }}>{l}</button>)}
+                </span>
+            ))}
+            <span style={{ color: '#9fb0bb', fontSize: '0.75rem', alignSelf: 'center' }}>(1.ª pulsación = respuesta · las siguientes = pasos)</span>
+        </div>
+    );
+
+    // ---------- VESTÍBULO ----------
+    if (fase === 'LOBBY') {
+        return (
+            <div style={{ ...menuWrap, flexDirection: 'column', gap: 16 }}>
+                <div style={{ ...tarjeta, maxWidth: 720 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+                        <h2 style={{ margin: 0, color: '#e6317f', fontSize: '1.5rem', flex: 1 }}>🎮 Luz roja · Luz verde con mandos</h2>
+                        <ChipAntena />
+                    </div>
+                    <p style={{ color: '#9fb0bb', margin: '0 0 12px', fontSize: '0.92rem' }}>{titulo} · {meta} pasos · {DIFICULTADES[dificultad].nombre}</p>
+                    <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: 12, padding: 12, color: '#e7f3ec', lineHeight: 1.55, fontSize: '0.93rem' }}>
+                        <div>🟢 <b>Luz verde:</b> elige la respuesta con <b>A</b> y envíala con <b>B</b> o <b>agitando</b>.</div>
+                        <div>✅ Si <b>aciertas</b>, cada vez que <b>agitas</b> el mando avanzas un paso.</div>
+                        <div>🔴 <b>Luz roja:</b> ¡quieto! Si agitas o respondes, <b>quedas eliminado</b>.</div>
+                        <div>🔄 Con cada luz roja cambia la pregunta: hay que volver a acertar para seguir avanzando.</div>
+                        <div>🏁 La partida acaba cuando se termina el tiempo o cuando todos los que siguen vivos han cruzado la meta.</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 10 }}>
+                        <span style={{ color: '#9fb0bb', fontWeight: 700, fontSize: '0.88rem' }}>⏱ Tiempo total:</span>
+                        {DURACIONES_MANDOS.map(([m, t]) => <button key={m} onClick={() => setMinutos(m)} style={opcionChip(minutos === m)}>{t}</button>)}
+                    </div>
+                    <div style={{ marginTop: 10 }}><BotonTutorialMandos inicial="calamar" texto="📖 Tutorial del mando" style={{ background: '#e6317f' }} /></div>
+                    {!validas.current.length && (
+                        <p style={{ color: '#f87171', fontWeight: 700 }}>⚠️ Este recurso no tiene preguntas de opción múltiple de hasta 4 respuestas: elige otro en el menú.</p>
+                    )}
+                    <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: 12, padding: 12, marginTop: 12, maxHeight: 240, overflowY: 'auto' }}>
+                        <div style={{ color: '#9fb0bb', fontSize: '0.8rem', fontWeight: 700, marginBottom: 8 }}>
+                            JUGADORES ({lista.length}) · pulsad <b>B</b> o <b>agitad</b> el mando para uniros
+                        </div>
+                        {lista.length === 0
+                            ? <div style={{ color: '#6d7d87', fontSize: '0.88rem' }}>Esperando a los mandos…</div>
+                            : <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                {lista.map(j => (
+                                    <label key={j.id} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 4px 3px 10px', borderRadius: 99, background: '#149e7a', color: 'white', fontWeight: 800, fontSize: '0.88rem' }}>
+                                        {j.id > 900 ? `V${j.id - 900}` : j.id}
+                                        <input value={j.nombre} onChange={e => renombrar(j.id, e.target.value)}
+                                            onBlur={e => { if (!e.target.value.trim()) renombrar(j.id, j.id > 900 ? `Virtual ${j.id - 900}` : `Mando ${j.id}`); }}
+                                            style={{ width: 110, border: 'none', borderRadius: 99, padding: '3px 8px', background: 'rgba(0,0,0,0.3)', color: 'white', fontWeight: 700, fontFamily: 'inherit' }} />
+                                    </label>
+                                ))}
+                            </div>}
+                    </div>
+                    <button onClick={() => setVirtuales(v => !v)} style={{ ...btnSecundario, marginTop: 10 }}>🧪 Mandos virtuales</button>
+                    {panelVirtuales}
+                    <button onClick={empezar} disabled={!lista.length || !validas.current.length}
+                        style={{ ...btnPrincipal, marginTop: 14, opacity: (!lista.length || !validas.current.length) ? 0.5 : 1 }}>
+                        <Play size={18} /> Empezar partida
+                    </button>
+                    <button onClick={onSalir} style={btnSecundario}>Salir</button>
+                </div>
+            </div>
+        );
+    }
+
+    // ---------- FIN ----------
+    if (fase === 'FIN') {
+        return (
+            <div style={{ ...menuWrap, flexDirection: 'column' }}>
+                <div style={{ ...tarjeta, maxWidth: 640 }}>
+                    <h2 style={{ margin: '0 0 12px', color: '#e6317f' }}><Trophy size={22} style={{ verticalAlign: -3 }} /> Resultados · {titulo}</h2>
+                    <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: 12, padding: 10, maxHeight: 400, overflowY: 'auto' }}>
+                        {ranking.map((j, i) => (
+                            <div key={j.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 6px', borderBottom: '1px solid rgba(255,255,255,0.07)', color: '#e7f3ec', flexWrap: 'wrap' }}>
+                                <span style={{ width: 30, fontWeight: 900, color: i < 3 ? '#f5c518' : '#7f8c8d' }}>#{i + 1}</span>
+                                <span style={{ flex: 1, fontWeight: 700 }}>{j.eliminado ? '💀 ' : ''}{j.nombre}
+                                    {j.llegada ? <span style={{ color: '#2ecc71', fontSize: '0.8rem' }}> · 🏁 {j.llegada}.º en llegar</span> : null}
+                                    {j.eliminado ? <span style={{ color: '#e74c3c', fontSize: '0.8rem' }}> · eliminado</span> : null}
+                                </span>
+                                <span style={chip('#0f7a45')}>✔ {j.aciertos}</span>
+                                <span style={chip('#a32222')}>✘ {j.fallos}</span>
+                                <span style={chip('#7c2d12')} title="Veces que se movió fuera de la luz verde">👀 {j.pillados}</span>
+                                <span style={{ ...chip('#34495e'), minWidth: 62, textAlign: 'center' }}>{j.paso}/{meta}</span>
+                            </div>
+                        ))}
+                    </div>
+                    <button onClick={() => setFase('LOBBY')} style={{ ...btnPrincipal, marginTop: 16 }}>🔁 Otra partida</button>
+                    <button onClick={onSalir} style={btnSecundario}>Salir</button>
+                </div>
+            </div>
+        );
+    }
+
+    // ---------- PARTIDA ----------
+    const q = pregunta;
+    const ahora = Date.now();
+    const respondidos = lista.filter(j => j.estado !== 'pendiente').length;
+    const marca = (j) => (j.eliminado ? '💀' : j.llegada ? '🏁' : ahora - j.pilladoTs < 1800 ? '👀' : j.estado === 'bien' ? '✅' : j.estado === 'mal' ? '✘' : '⏳');
+    const vivos = lista.filter(j => !j.eliminado).length;
+    return (
+        <div style={contenedor}>
+            <Pista jugadores={escena} luz={luz} meta={meta} idYo={null} panoramica />
+            <HudSuperior
+                luz={luz} paso={undefined} meta={meta}
+                sonido={sonido} setSonido={setSonido} onSalir={onSalir}
+                titulo={`${titulo} · con mandos micro:bit`}
+                extra={
+                    <>
+                        <span style={{ ...chip(restante <= 30 ? '#c0392b' : '#2c3e50'), fontVariantNumeric: 'tabular-nums' }}>⏱ {mmssCalamar(restante)}</span>
+                        <ChipAntena />
+                        <span style={chip('#2c3e50')} title="Siguen vivos / jugadores">❤️ {vivos}/{lista.length}</span>
+                        <BotonTutorialMandos inicial="calamar" texto="📖" style={{ ...chip('#2c3e50'), border: 'none' }} />
+                        <button onClick={() => setVirtuales(v => !v)} style={{ ...chip('#2c3e50'), border: 'none', cursor: 'pointer' }}>🧪</button>
+                        <button onClick={() => setFase('FIN')} style={{ ...chip('#c0392b'), border: 'none', cursor: 'pointer' }}>Terminar</button>
+                    </>
+                }
+            />
+            <div style={{ flex: 1 }} />
+            {anuncio && (
+                <div style={{ position: 'absolute', top: '26%', left: '50%', transform: 'translateX(-50%)', zIndex: 8, textAlign: 'center', pointerEvents: 'none' }}>
+                    {anuncio.map((n, i) => (
+                        <div key={i} style={{ margin: '6px 0', padding: '10px 26px', borderRadius: 14, background: 'rgba(10,10,10,0.82)', border: '2px solid #e6317f', color: 'white', fontWeight: 900, fontSize: 'clamp(1.2rem,3.4vw,2.3rem)', letterSpacing: 1, whiteSpace: 'nowrap' }}>
+                            💀 {n} <span style={{ color: '#ff5c8a' }}>ELIMINADO</span>
+                        </div>
+                    ))}
+                </div>
+            )}
+            <div style={{ position: 'relative', zIndex: 5, padding: '12px 16px max(14px, env(safe-area-inset-bottom))', background: 'linear-gradient(180deg, rgba(8,12,16,0.15), rgba(8,12,16,0.95))' }}>
+                {q && (
+                    <div style={{ maxWidth: 980, margin: '0 auto' }}>
+                        <div style={{ textAlign: 'center', color: luz === VERDE ? '#7dffb2' : '#ff8a8a', fontWeight: 900, fontSize: '0.95rem', marginBottom: 4 }}>
+                            {luz === VERDE ? `🟢 ¡Responded y, si acertáis, agitad para avanzar! (${respondidos}/${lista.length} han respondido)` : '🔴 ¡QUIETOS! Quien se mueva queda eliminado… pensad la respuesta'}
+                        </div>
+                        <div style={{ color: 'white', fontWeight: 900, fontSize: 'clamp(1.2rem,3vw,2rem)', textAlign: 'center', marginBottom: 8 }}>{q.enunciado}</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(170px,1fr))', gap: 8 }}>
+                            {q.opciones.map((o, i) => (
+                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderRadius: 12, background: COLORES_OPCION[i], color: 'white', fontWeight: 800, fontSize: 'clamp(0.95rem,2vw,1.25rem)' }}>
+                                    <span style={{ width: 30, height: 30, borderRadius: 99, background: 'rgba(0,0,0,0.3)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{LETRAS[i]}</span>{o}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+                <div style={{ display: 'flex', gap: 8, overflowX: 'auto', marginTop: 10 }}>
+                    {[...lista].sort((a, b) => b.paso - a.paso).map(j => (
+                        <div key={j.id} style={{
+                            flex: '0 0 auto', padding: '6px 12px', borderRadius: 12, color: 'white',
+                            opacity: j.eliminado ? 0.55 : 1,
+                            background: j.estado === 'bien' ? 'rgba(46,204,113,0.25)' : j.estado === 'mal' ? 'rgba(192,57,43,0.25)' : 'rgba(255,255,255,0.09)',
+                            border: `1px solid ${j.estado === 'bien' ? '#2ecc71' : j.estado === 'mal' ? '#c0392b' : 'rgba(255,255,255,0.15)'}`,
+                        }}>
+                            <div style={{ fontWeight: 800, fontSize: '0.88rem' }}>{marca(j)} {j.nombre}</div>
+                            <div style={{ fontSize: '0.75rem', color: '#9fb0bb' }}>{j.paso}/{meta} · ✔{j.aciertos} ✘{j.fallos}</div>
+                        </div>
+                    ))}
+                </div>
+                {panelVirtuales}
+            </div>
+        </div>
+    );
+}
+
+// =====================================================================
 //  PANTALLAS AUXILIARES
 // =====================================================================
 function PantallaMensaje({ titulo, texto, onSalir, extra }) {
@@ -1556,6 +1976,16 @@ export default function JuegoCalamar({ recurso = null, usuario, onExit, autoStar
         );
     }
 
+    if (pantalla === 'MANDOS') {
+        return (
+            <SalaMandos
+                key={'mandos' + semilla}
+                preguntas={preguntas} titulo={titulo} meta={meta} dificultad={dificultad}
+                onSalir={salirAlMenu}
+            />
+        );
+    }
+
     if (pantalla === 'ONLINE') {
         return (
             <PartidaOnline
@@ -1642,6 +2072,13 @@ export default function JuegoCalamar({ recurso = null, usuario, onExit, autoStar
                     </button>
                     <button onClick={() => { setSemilla(s => s + 1); setPantalla('HOST'); }} style={{ ...btnSecundario, background: 'rgba(230,49,127,0.2)', border: '1px solid #e6317f' }}>
                         <Users size={17} style={{ verticalAlign: -3, marginRight: 6 }} /> Crear sala online (profesor)
+                    </button>
+                    <button onClick={() => { setSemilla(s => s + 1); setPantalla('MANDOS'); }} style={{ ...btnSecundario, background: 'rgba(124,58,237,0.25)', border: '1px solid #a78bfa' }}
+                        title="Toda la clase en la pizarra: cada alumno juega con su micro:bit">
+                        🎮 Jugar con mandos micro:bit
+                        {preguntas.filter(p => p.tipo === 'MULTIPLE' && p.opciones?.length <= 4).length < preguntas.length && (
+                            <span style={{ display: 'block', fontSize: '0.72rem', opacity: 0.8 }}>(solo las preguntas de opción múltiple: {preguntas.filter(p => p.tipo === 'MULTIPLE' && p.opciones?.length <= 4).length})</span>
+                        )}
                     </button>
                 </div>
             </div>

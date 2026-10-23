@@ -6,9 +6,10 @@
 // siempre (aplicar → la cuerda se mueve). Los equipos sin mandos siguen respondiendo con clic.
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import {
-  LETRAS, MODOS, setModoMandos, escucharMandos, escucharEstadoAntena, conectarAntena, feedbackMando, simularPulsacion,
+  LETRAS, MODOS, setModoMandos, escucharMandos, feedbackMando, simularPulsacion,
 } from '../mandos/mandosMicrobit.js';
 import { BotonTutorialMandos } from '../mandos/TutorialMandos.jsx';
+import ChipAntena from '../mandos/ChipAntena.jsx';
 
 const SEG_VOTO = 8;
 const LS_NOMBRES = 'pikt_mandos_nombres';
@@ -64,8 +65,6 @@ export function useMandosCuerda(bloqueado) {
   const [activo, setActivo] = useState(false);
   const [mandos, setMandos] = useState({}); // id → { id, nombre, equipo: 0 | 1 | 2 }
   const [votos, setVotos] = useState({ 1: {}, 2: {} });
-  const [antena, setAntena] = useState({ antenaOk: false });
-  const [msg, setMsg] = useState('');
   const preguntas = useRef({ 1: null, 2: null });
   const votosRef = useRef(votos); votosRef.current = votos;
   const mandosRef = useRef(mandos); mandosRef.current = mandos;
@@ -73,7 +72,6 @@ export function useMandosCuerda(bloqueado) {
   const bloqueadoRef = useRef(bloqueado); bloqueadoRef.current = bloqueado;
   const relojes = useRef({});
 
-  useEffect(() => escucharEstadoAntena(setAntena), []);
   useEffect(() => { if (activo) setModoMandos(MODOS.LETRAS); }, [activo]);
   useEffect(() => () => Object.values(relojes.current).forEach(clearTimeout), []);
 
@@ -141,13 +139,6 @@ export function useMandosCuerda(bloqueado) {
   }
   const api = apiRef.current;
 
-  const conectar = async () => {
-    setMsg('Elige la micro:bit antena…');
-    try {
-      const ok = await conectarAntena({ grabar: false });
-      setMsg(ok ? '' : '⚠️ Esa placa no responde como antena. Grábala en Programación y robótica → Mandos micro:bit.');
-    } catch (e) { setMsg('❌ ' + (e?.message || e)); }
-  };
   const cambiarEquipo = (id) => setMandos(x => ({ ...x, [id]: { ...x[id], equipo: (x[id].equipo + 1) % 3 } }));
   const renombrar = (id, txt) => { setMandos(x => ({ ...x, [id]: { ...x[id], nombre: txt } })); guardarNombre(id, txt); };
   const repartir = () => setMandos(x => {
@@ -155,7 +146,7 @@ export function useMandosCuerda(bloqueado) {
     return Object.fromEntries(ids.map((id, i) => [id, { ...x[id], equipo: (i % 2) + 1 }]));
   });
 
-  return { api, activo, setActivo, mandos, votos, antena, msg, conectar, cambiarEquipo, renombrar, repartir, miembros: (e) => Object.values(mandos).filter(m => m.equipo === e) };
+  return { api, activo, setActivo, mandos, votos, cambiarEquipo, renombrar, repartir, miembros: (e) => Object.values(mandos).filter(m => m.equipo === e) };
 }
 
 /** Proveedor para que los paneles (useMandoPregunta) encuentren los mandos. */
@@ -176,15 +167,12 @@ export function OpcionesMandos({ m }) {
       {m.activo && (
         <div style={{ marginTop: 8, fontWeight: 600 }}>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center' }}>
-            {m.antena.antenaOk
-              ? <span style={{ color: '#16a34a', fontWeight: 800 }}>📡 Antena lista</span>
-              : <button onClick={m.conectar} style={btn('#7c3aed')}>🔌 Conectar antena</button>}
+            <ChipAntena />
             <span>Pulsad <b>B</b> o <b>agitad</b> el mando para uniros · pulsa el número para cambiarlo de equipo</span>
             <button onClick={m.repartir} disabled={!lista.length} style={btn('#64748b')}>🎲 Repartir</button>
             <button onClick={() => setVirtuales(v => !v)} style={btn('#64748b')}>🧪</button>
             <BotonTutorialMandos inicial="letras" texto="📖 Tutorial" style={{ padding: '4px 10px', fontSize: '0.78rem' }} />
           </div>
-          {m.msg && <div style={{ textAlign: 'center', color: '#b91c1c', marginTop: 4 }}>{m.msg}</div>}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(170px,1fr))', gap: 8, marginTop: 8 }}>
             {[[0, 'Sin equipo', '#94a3b8'], [1, '🔵 Equipo 1', COLOR[1]], [2, '🔴 Equipo 2', COLOR[2]]].map(([e, t, c]) => (
               <div key={e} style={{ border: `2px solid ${c}`, borderRadius: 10, padding: 6 }}>

@@ -16,6 +16,7 @@ import {
 } from './mandosMicrobit.js';
 import { despertarAudio, sonidoFinal } from '../utils/sonidosFeedback';
 import { BotonTutorialMandos } from './TutorialMandos.jsx';
+import ChipAntena from './ChipAntena.jsx';
 import SelectorRecursoMandos, { hojasQuiz, numeroQuiz, MIN_NUM_QUIZ, MAX_NUM_QUIZ } from './SelectorRecursoMandos.jsx';
 
 const COLORES = ['#ef4444', '#3b82f6', '#f59e0b', '#22c55e'];
@@ -326,9 +327,7 @@ export default function QuizMandos({ onExit }) {
           ← Volver
         </button>
         <h2 style={st.title}>🏆 Quiz con mandos</h2>
-        <span style={{ ...st.chip, background: antena.antenaOk ? '#16a34a' : '#475569' }}>
-          {antena.antenaOk ? '📡 Antena lista' : '⚪ Sin antena'}
-        </span>
+        <ChipAntena />
         {(fase === 'pregunta' || fase === 'resultado') && (
           <span style={st.contador}>
             {indice + 1}/{preguntas.length}
@@ -461,7 +460,7 @@ export default function QuizMandos({ onExit }) {
             </div>
             {!antena.antenaOk && (
               <p style={st.aviso}>
-                La antena no está conectada: conéctala en el panel anterior o prueba con los mandos virtuales (🧪).
+                La antena no está conectada: pulsa «🔌 Antena desconectada» arriba a la derecha o prueba con los mandos virtuales (🧪).
               </p>
             )}
             <button style={st.btnGrande} onClick={abrirSala}>

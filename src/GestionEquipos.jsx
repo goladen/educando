@@ -26,7 +26,7 @@ import SesionEquipos, { RegistroSesiones } from './SesionEquipos';
 const DESCONEXION_MS = 90000;
 const ICE_FALLBACK = [{ urls: 'stun:stun.l.google.com:19302' }];
 // Instalador del Agente Pikt (GitHub Releases). Actualiza la URL al subir una versión nueva.
-const URL_AGENTE = 'https://github.com/goladen/pikt-agente/releases/download/v.0.1.3/AgentePikt-Setup-0.1.3.exe';
+const URL_AGENTE = 'https://github.com/goladen/pikt-agente/releases/download/v.0.1.4/AgentePikt-Setup-0.1.4.exe';
 
 export const collForScope = (scope) => (scope === 'comunidad' ? 'aulas_comunidad' : 'aulas_fijas');
 
@@ -40,7 +40,7 @@ async function obtenerIceServers() {
     return ICE_FALLBACK;
 }
 
-export default function GestionEquipos({ scope = 'personal', id, canManage = true, esGestor = false }) {
+export default function GestionEquipos({ scope = 'personal', id, esGestor = false }) {
     const coll = collForScope(scope);
     const [vista, setVista] = useState('inicio');   // 'inicio' | 'config'
     const [sesion, setSesion] = useState(null);      // machineIds de la sesión activa, o null
@@ -78,7 +78,7 @@ export default function GestionEquipos({ scope = 'personal', id, canManage = tru
             unsubAgentes();
             unsubAula();
             // Al salir, si soy gestor, apago las miniaturas.
-            if (canManage && aulaRef) setDoc(aulaRef, { thumbs: false }, { merge: true }).catch(() => {});
+            if (esGestor && aulaRef) setDoc(aulaRef, { thumbs: false }, { merge: true }).catch(() => {});
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [coll, id]);
@@ -139,7 +139,9 @@ export default function GestionEquipos({ scope = 'personal', id, canManage = tru
         </>
     );
 
-    if (vista === 'config') {
+    // La Configuración (gestión técnica: pantallas, bloqueo, vídeo, energía, tipo/ubicación,
+    // instalación) es SOLO para el gestor (creador de la comunidad / dueño en personal).
+    if (vista === 'config' && esGestor) {
         return (
             <>
                 <PanelEquipos
@@ -153,7 +155,7 @@ export default function GestionEquipos({ scope = 'personal', id, canManage = tru
                     thumbs={thumbs}
                     codigoEquipos={id}
                     scope={scope}
-                    canManage={canManage}
+                    canManage={esGestor}
                     onVolver={() => setVista('inicio')}
                     onNuevaSesion={abrirSesion}
                     onMeta={guardarMeta}
@@ -170,7 +172,7 @@ export default function GestionEquipos({ scope = 'personal', id, canManage = tru
                 codigoEquipos={id}
                 conectados={conectados}
                 total={agentes.length}
-                canManage={canManage}
+                esGestor={esGestor}
                 onNuevaSesion={() => abrirSesion([])}
                 onVerRegistro={() => setVerRegistro(true)}
                 onConfig={() => setVista('config')}
@@ -181,7 +183,7 @@ export default function GestionEquipos({ scope = 'personal', id, canManage = tru
 }
 
 // ── Pantalla de inicio de Equipos: acciones principales + acceso a configuración ──
-function PanelInicio({ scope, codigoEquipos, conectados, total, canManage, onNuevaSesion, onVerRegistro, onConfig }) {
+function PanelInicio({ scope, conectados, total, esGestor, onNuevaSesion, onVerRegistro, onConfig }) {
     const bigBtn = (bg) => ({ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, background: bg, color: 'white', border: 'none', borderRadius: 16, padding: '26px 20px', cursor: 'pointer', fontWeight: 800, fontSize: '1.05rem', minHeight: 120 });
     return (
         <div style={{ background: '#0f172a', borderRadius: 14, padding: 20, marginTop: 18, maxWidth: '100%', boxSizing: 'border-box', overflowX: 'hidden' }}>
@@ -190,13 +192,14 @@ function PanelInicio({ scope, codigoEquipos, conectados, total, canManage, onNue
                     🖥️ Equipos{scope === 'comunidad' ? ' del centro' : ''}
                     <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#94a3b8' }}>· {conectados} en línea de {total}</span>
                 </h3>
-                <button onClick={onConfig} style={{ background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 10, padding: '8px 14px', cursor: 'pointer', fontWeight: 700 }}>⚙️ Configuración de la sala</button>
+                {/* La configuración (instalar, gestionar, energía…) solo la ve el gestor/creador. */}
+                {esGestor && <button onClick={onConfig} style={{ background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 10, padding: '8px 14px', cursor: 'pointer', fontWeight: 700 }}>⚙️ Configuración de la sala</button>}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px,1fr))', gap: 14 }}>
-                {canManage && <button onClick={onNuevaSesion} style={bigBtn('#15803d')}><span style={{ fontSize: 34 }}>📋</span> Crear una nueva sesión</button>}
+                {/* Crear sesión está disponible para TODOS los miembros (incluidos los de solo lectura). */}
+                <button onClick={onNuevaSesion} style={bigBtn('#15803d')}><span style={{ fontSize: 34 }}>📋</span> Crear una nueva sesión</button>
                 <button onClick={onVerRegistro} style={bigBtn('#2563eb')}><span style={{ fontSize: 34 }}>📚</span> Ver registro de sesiones</button>
             </div>
-            {!canManage && <div style={{ color: '#94a3b8', fontSize: '0.82rem', marginTop: 12 }}>Tienes acceso de solo lectura: puedes ver el registro de sesiones.</div>}
         </div>
     );
 }

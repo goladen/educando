@@ -7,13 +7,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { montarMotorMandos } from './motorFutbolMandos';
 import {
-    MODOS, LETRAS, VERSION_PROGRAMAS, setModoMandos, escucharMandos, escucharEstadoAntena, conectarAntena,
+    MODOS, LETRAS, VERSION_PROGRAMAS, setModoMandos, escucharMandos, escucharEstadoAntena,
     simularPulsacion, feedbackMando, dueloMando, finDuelosMandos,
 } from '../mandos/mandosMicrobit.js';
 import { GENERADORES, barajar } from '../mandos/QuizMandos.jsx';
 import SelectorRecursoMandos, { hojasQuiz } from '../mandos/SelectorRecursoMandos.jsx';
 import { despertarAudio, sonidoCorrecto, sonidoIncorrecto, sonidoFinal } from '../utils/sonidosFeedback';
 import { BotonTutorialMandos } from '../mandos/TutorialMandos.jsx';
+import ChipAntena from '../mandos/ChipAntena.jsx';
 
 const LS_NOMBRES = 'pikt_mandos_nombres';
 const SEG_DUELO = 15;
@@ -72,7 +73,6 @@ export default function FutbolMandos({ onExit }) {
     const [fuente, setFuente] = useState('tablas');
     const [recurso, setRecurso] = useState(null);
     const [antena, setAntena] = useState({ antenaOk: false, version: 0 });
-    const [msgAntena, setMsgAntena] = useState('');
     const [virtuales, setVirtuales] = useState(false);
 
     const [marcador, setMarcador] = useState({ red: 0, blue: 0 });
@@ -99,13 +99,6 @@ export default function FutbolMandos({ onExit }) {
         return () => { finDuelosMandos(); setModoMandos(MODOS.LETRAS); timers.current.forEach(clearTimeout); };
     }, []);
 
-    const conectar = async () => {
-        setMsgAntena('Elige la micro:bit antena…');
-        try {
-            const ok = await conectarAntena({ grabar: false });
-            setMsgAntena(ok ? '' : '⚠️ Esa placa no responde como antena. Grábala en Programación y robótica → Mandos micro:bit.');
-        } catch (e) { setMsgAntena('❌ ' + (e?.message || e)); }
-    };
 
     // ── Preguntas ──
     const preguntasRecurso = recurso ? hojasQuiz(recurso).flatMap(h => h.preguntas) : [];
@@ -270,10 +263,9 @@ export default function FutbolMandos({ onExit }) {
                 <header style={st.cab}>
                     <button style={st.btnSec} onClick={onExit}>← Volver</button>
                     <h2 style={{ margin: 0, flex: 1 }}>⚽ Partido con mandos micro:bit</h2>
-                    {antena.antenaOk ? <span style={{ ...st.pill, background: '#16a34a' }}>📡 Antena lista</span> : <button style={st.btnSec} onClick={conectar}>🔌 Conectar antena</button>}
+                    <ChipAntena />
                 </header>
                 <div style={st.scroll}>
-                    {msgAntena && <p style={st.aviso}>{msgAntena}</p>}
                     {antena.antenaOk && antena.version < VERSION_PROGRAMAS && <p style={st.aviso}>⚠️ La antena tiene un programa antiguo: graba de nuevo la antena y los mandos (Programación y robótica → Mandos micro:bit) para tener el modo fútbol.</p>}
                     <div style={st.panel}>
                         <p style={{ margin: '0 0 8px', lineHeight: 1.5 }}>
@@ -384,6 +376,7 @@ export default function FutbolMandos({ onExit }) {
                 </div>
                 {minutos > 0 && <span style={{ fontWeight: 900, fontVariantNumeric: 'tabular-nums' }}>⏱ {mmss(restante)}</span>}
                 <button style={st.btnSec} onClick={() => setPausa(p => !p)}>{pausa ? '▶' : '⏸'}</button>
+                <ChipAntena />
                 <button style={st.btnSec} onClick={() => setVirtuales(v => !v)}>🧪</button>
                 <BotonTutorialMandos inicial="futbol" texto="📖" style={{ background: 'rgba(255,255,255,.1)', border: '1px solid rgba(255,255,255,.25)', padding: '7px 12px' }} />
             </div>

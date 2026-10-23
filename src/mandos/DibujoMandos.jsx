@@ -16,6 +16,7 @@ import {
 } from './mandosMicrobit.js';
 import { despertarAudio, sonidoCorrecto, sonidoFinal } from '../utils/sonidosFeedback';
 import { BotonTutorialMandos } from './TutorialMandos.jsx';
+import ChipAntena from './ChipAntena.jsx';
 
 const N = 7; // puntos por lado (0..6)
 const DX = [0, 1, 0, -1]; // 0 norte, 1 este, 2 sur, 3 oeste
@@ -328,9 +329,7 @@ export default function DibujoMandos({ onExit }) {
         </button>
         <h2 style={st.title}>✏️ Copia el dibujo</h2>
         {fase === 'juego' && <span style={st.figuraChip}>{fig.nombre}</span>}
-        <span style={{ ...st.chip, background: antena.antenaOk ? '#16a34a' : '#475569' }}>
-          {antena.antenaOk ? '📡 Antena lista' : '⚪ Sin antena'}
-        </span>
+        <ChipAntena />
       </header>
 
       <div style={st.scroll}>

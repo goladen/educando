@@ -21,6 +21,7 @@ import { despertarAudio, sonidoCorrecto, sonidoIncorrecto, sonidoFinal } from '.
 import { GENERADORES, barajar } from './QuizMandos.jsx';
 import SelectorRecursoMandos, { hojasQuiz } from './SelectorRecursoMandos.jsx';
 import { BotonTutorialMandos } from './TutorialMandos.jsx';
+import ChipAntena from './ChipAntena.jsx';
 
 const TAMANOS = {
   normal: { l: 'Normal', cols: 16, filas: 10 },
@@ -339,9 +340,7 @@ export default function PistaRobotsMandos({ onExit }) {
         {fase === 'juego' && duracion > 0 && (
           <span style={{ ...st.reloj, color: restante <= 10 ? '#f87171' : '#facc15' }}>⏱ {restante}s</span>
         )}
-        <span style={{ ...st.chip, background: antena.antenaOk ? '#16a34a' : '#475569' }}>
-          {antena.antenaOk ? '📡 Antena lista' : '⚪ Sin antena'}
-        </span>
+        <ChipAntena />
         <button style={st.btnSec} onClick={pantallaCompleta} title="Pantalla completa">
           ⛶
         </button>

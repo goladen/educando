@@ -224,7 +224,7 @@ export default function Login({ setGoogleToken }) {
                     </button>
                 </div>
                 {error && (
-                    <div onClick={() => setError(null)} style={{ position: 'absolute', top: '62px', right: '20px', maxWidth: '300px', background: '#fff', color: '#c0392b', fontSize: '13px', padding: '10px 14px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.25)', cursor: 'pointer' }}>
+                    <div onClick={() => setError(null)} style={{ position: 'absolute', top: '62px', right: '20px', maxWidth: '300px', background: '#fff', color: '#c0392b', fontSize: '13px', padding: '10px 14px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.25)', cursor: 'pointer', pointerEvents: 'auto' }}>
                         {error}
                     </div>
                 )}
@@ -301,11 +301,11 @@ const styles = {
     container: { minHeight: '100vh', width: '100%', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', fontFamily: "'Segoe UI', Roboto, sans-serif", overflowY: 'auto', position: 'relative' },
 
     // Header y Menu
-    header: { position: 'fixed', top: 0, left: 0, width: '100%', padding: '15px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 50, boxSizing: 'border-box' },
-    menuButton: { background: 'rgba(255, 255, 255, 0.2)', border: 'none', borderRadius: '8px', padding: '8px', cursor: 'pointer', backdropFilter: 'blur(5px)' },
+    header: { position: 'fixed', top: 0, left: 0, width: '100%', padding: '15px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 50, boxSizing: 'border-box', pointerEvents: 'none' },
+    menuButton: { background: 'rgba(255, 255, 255, 0.2)', border: 'none', borderRadius: '8px', padding: '8px', cursor: 'pointer', backdropFilter: 'blur(5px)', pointerEvents: 'auto' },
 
     // Login Mini Top Right
-    smallLoginBox: { background: 'rgba(255, 255, 255, 0.9)', padding: '5px 15px', borderRadius: '30px', display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 4px 10px rgba(0,0,0,0.2)' },
+    smallLoginBox: { background: 'rgba(255, 255, 255, 0.9)', padding: '5px 15px', borderRadius: '30px', display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', pointerEvents: 'auto' },
     smallLoginBtn: { background: 'white', border: '1px solid #ccc', borderRadius: '20px', padding: '6px 12px', fontSize: '0.9rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' },
 
     // Panel Menú Lateral

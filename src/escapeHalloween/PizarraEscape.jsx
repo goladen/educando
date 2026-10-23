@@ -4,10 +4,11 @@ import { LETRAS, candadoParaPapel } from './partidaFija';
 import { DISFRACES, ACCESORIOS } from './avatares3d';
 import Mansion3D, { AvatarPreview3D } from './Mansion3D';
 import { BotonTutorialMandos } from '../mandos/TutorialMandos.jsx';
+import ChipAntena from '../mandos/ChipAntena.jsx';
 import { descargarPdfEscape } from './FichasEscape';
 import { crearAudio, Ambiente, Confeti, Zombi, Corazones, BarraVidaZombi, MapaMansion, mmss, useNarrador, idNarracionFase, Subtitulo } from './comunes';
 import {
-    MODOS, setModoMandos, escucharMandos, escucharEstadoAntena, conectarAntena, feedbackMando, nuevaPreguntaMandos, simularPulsacion,
+    MODOS, setModoMandos, escucharMandos, feedbackMando, nuevaPreguntaMandos, simularPulsacion,
 } from '../mandos/mandosMicrobit.js';
 
 /**
@@ -132,16 +133,13 @@ export default function PizarraEscape({ config, titulo = '', onSalir }) {
     const transicion = useRef(false);
 
     // ── Mandos micro:bit ──
-    const [antena, setAntena] = useState({ antenaOk: false });
     const [respM, setRespM] = useState({});          // id de mando → letra (primera respuesta de la pregunta actual)
     const [verVirtuales, setVerVirtuales] = useState(false);
-    const [msgAntena, setMsgAntena] = useState('');
     const mandosRef = useRef(false);
     mandosRef.current = mandos;
     const aceptaRef = useRef(false);
     const faseRef = useRef(fase);
     faseRef.current = fase;
-    useEffect(() => escucharEstadoAntena(setAntena), []);
     const [intentos, setIntentos] = useState({});   // candado: id de mando → caracteres enviados
     const intentosRef = useRef({});
     const esperaM = useRef({});                       // id de mando → hasta cuándo no puede probar
@@ -157,13 +155,6 @@ export default function PizarraEscape({ config, titulo = '', onSalir }) {
         guardarNombreMando(id, txt);
     };
     useEffect(() => () => setModoMandos(MODOS.LETRAS), []);
-    const conectar = async () => {
-        setMsgAntena('Elige la micro:bit antena…');
-        try {
-            const ok = await conectarAntena({ grabar: false });
-            setMsgAntena(ok ? '' : '⚠️ Esa placa no responde como antena. Grábala en Programación y robótica → Mandos micro:bit.');
-        } catch (e) { setMsgAntena('❌ ' + (e?.message || e)); }
-    };
     useEffect(() => escucharMandos((ev) => {
         const { id, tipo, letra } = ev;
         if (!mandosRef.current) return;
@@ -414,12 +405,9 @@ export default function PizarraEscape({ config, titulo = '', onSalir }) {
                     </div>
                     <p style={{ margin: '8px 0', lineHeight: 1.4, opacity: .9 }}>Cada alumno responde con su mando: A cambia la letra y se envía con <b>B</b> o <b>agitando el mando</b>. <b>Pulsad B o agitad el mando para uniros</b>: aparecerá vuestro avatar en la mansión.</p>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                        {antena.antenaOk
-                            ? <span style={{ color: '#4ade80', fontWeight: 800 }}>📡 Antena lista</span>
-                            : <button className="eh-btn2" onClick={conectar}>🔌 Conectar antena</button>}
+                        <ChipAntena />
                         <span style={{ fontWeight: 800 }}>{nJugM} {nJugM === 1 ? 'mando unido' : 'mandos unidos'}</span>
                     </div>
-                    {msgAntena && <div style={{ marginTop: 6, color: '#fca5a5', fontWeight: 700 }}>{msgAntena}</div>}
                     {nJugM > 0 && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
                         {Object.entries(jugadores).map(([k, j]) => (
                             <label key={k} title="Escribe el nombre del alumno" style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 4px 3px 10px', borderRadius: 99, background: '#5b21b6', fontWeight: 700, fontSize: '.9rem' }}>
@@ -609,6 +597,7 @@ export default function PizarraEscape({ config, titulo = '', onSalir }) {
                 )}
                 {mandos && <button className="eh-btn2" onClick={() => setVerVirtuales(v => !v)} title="Mandos virtuales para probar sin placas">🧪</button>}
                 <button className="eh-btn2" onClick={cambiar3D} title="Mostrar u ocultar la mansión 3D">{usar3D ? '🏚️ 3D' : '🖼️ 2D'}</button>
+                {mandos && <ChipAntena />}
                 <button className="eh-btn2" onClick={() => setSonido(s => !s)} title={sonido ? 'Silenciar sonido y música' : 'Activar sonido y música'}>{sonido ? '🔊' : '🔇'}</button>
             </div>
             {mandos && verVirtuales && (

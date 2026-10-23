@@ -26,7 +26,7 @@ import SesionEquipos, { RegistroSesiones } from './SesionEquipos';
 const DESCONEXION_MS = 90000;
 const ICE_FALLBACK = [{ urls: 'stun:stun.l.google.com:19302' }];
 // Instalador del Agente Pikt (GitHub Releases). Actualiza la URL al subir una versión nueva.
-const URL_AGENTE = 'https://github.com/goladen/pikt-agente/releases/download/v.0.1.4/AgentePikt-Setup-0.1.4.exe';
+const URL_AGENTE = 'https://github.com/goladen/pikt-agente/releases/download/v.0.1.5/AgentePikt-Setup-0.1.5.exe';
 
 export const collForScope = (scope) => (scope === 'comunidad' ? 'aulas_comunidad' : 'aulas_fijas');
 

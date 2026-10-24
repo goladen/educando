@@ -59,6 +59,7 @@ const EditorSolarSystem = lazy(() => import('./components/EditorSolarSystem'));
 const OmninteractiveApp = lazy(() => import('./OmninteractiveApp'));
 const VideoQuizzApp = lazy(() => import('./VideoQuizzApp'));
 import BuzonNovedades from './components/BuzonNovedades';
+import { interesesCompletos } from './hooks/useNotificacionesProfesor';
 const PresentationEditor = lazy(() => import('./components/PresentationEditor'));
 const PresentationList = lazy(() => import('./components/PresentationList'));
 import * as XLSX from 'xlsx'; // <--- IMPORTANTE
@@ -1149,11 +1150,31 @@ function ProfesorDashboardInterno({ usuario, googleToken }) {
                     inline={true}
                 />
 
-                <BuzonNovedades usuario={usuario} onIr={navegar} />
+                <BuzonNovedades usuario={usuario} onIr={navegar} onAbrirPerfil={() => setMostrandoPerfil(true)} />
 
                 <button onClick={() => setModoVista('ALUMNO')} style={{ background: 'white', color: '#1565C0', border: 'none', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', boxShadow:'0 2px 5px rgba(0,0,0,0.1)' }}><Eye size={18} /> Vista Alumno</button>
-                <button onClick={() => setMostrandoPerfil(true)} style={{ background: 'white', color: '#8E24AA', border: 'none', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', boxShadow:'0 2px 5px rgba(0,0,0,0.1)' }}><UserCircle size={18} /> Mi Perfil</button>
+                <button onClick={() => setMostrandoPerfil(true)} style={{ position: 'relative', background: 'white', color: '#8E24AA', border: 'none', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', boxShadow:'0 2px 5px rgba(0,0,0,0.1)' }}><UserCircle size={18} /> Mi Perfil
+                    {perfilProfesor && !interesesCompletos(perfilProfesor) && (
+                        <span title="Completa tus intereses" style={{ position: 'absolute', top: -4, right: -4, width: 14, height: 14, borderRadius: '50%', background: '#e74c3c', border: '2px solid white' }} />
+                    )}
+                </button>
             </div>
+
+            {/* Aviso rojo: profe sin intereses (o con categorías que ya no existen) */}
+            {perfilProfesor && !interesesCompletos(perfilProfesor) && (
+                <div onClick={() => setMostrandoPerfil(true)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', background: '#fdecea', border: '2px solid #e74c3c', borderRadius: 14, padding: '12px 16px', margin: '-12px 0 24px', cursor: 'pointer', boxShadow: '0 4px 14px rgba(231,76,60,0.18)' }}>
+                    <span style={{ fontSize: '1.6rem' }}>🎯</span>
+                    <div style={{ flex: 1, minWidth: 200 }}>
+                        <div style={{ fontWeight: 800, color: '#c0392b' }}>Completa tus intereses</div>
+                        <div style={{ fontSize: '0.86rem', color: '#7b241c' }}>Indica qué materias te interesan para que te avisemos cuando haya una herramienta nueva de tu área.</div>
+                    </div>
+                    <button onClick={e => { e.stopPropagation(); setMostrandoPerfil(true); }}
+                        style={{ background: '#e74c3c', color: 'white', border: 'none', borderRadius: 10, padding: '9px 16px', fontWeight: 800, cursor: 'pointer' }}>
+                        Rellenar ahora
+                    </button>
+                </div>
+            )}
 
             {/* --- CONTENIDO SEGÚN MODO --- */}
 

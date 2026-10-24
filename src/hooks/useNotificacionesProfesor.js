@@ -19,20 +19,40 @@ import {
 
 export const CLAVES_NOTIF = ['resultados', 'preguntas', 'apps'];
 
-// Intereses disponibles (los mismos que usa el admin al publicar una novedad)
+// Intereses disponibles (los mismos que usa el admin al publicar una novedad).
+// Son las materias de la vista «Por Materia» de la página principal
+// (MATERIAS de LandingGames3). Además el profe puede escribir «Otros» en
+// users/{uid}.interesesOtros.
 export const INTERESES = [
     { id: 'mates',    label: 'Matemáticas',           emoji: '🔢' },
     { id: 'lengua',   label: 'Lengua',                emoji: '📖' },
-    { id: 'idiomas',  label: 'Idiomas',               emoji: '🌍' },
-    { id: 'ciencias', label: 'Ciencias',              emoji: '🔬' },
-    { id: 'sociales', label: 'Sociales',              emoji: '🏛️' },
+    { id: 'sociales', label: 'Geografía e Historia',  emoji: '🌍' },
+    { id: 'fyq',      label: 'Física y Química',      emoji: '⚗️' },
+    { id: 'biologia', label: 'Biología',              emoji: '🔬' },
     { id: 'musica',   label: 'Música',                emoji: '🎵' },
-    { id: 'plastica', label: 'Plástica',              emoji: '🎨' },
-    { id: 'edfisica', label: 'Educación Física',      emoji: '🏃' },
     { id: 'tecno',    label: 'Tecnología y robótica', emoji: '🤖' },
-    { id: 'infantil', label: 'Infantil y Primaria',   emoji: '🧸' },
+    { id: 'plastica', label: 'Plástica',              emoji: '🎨' },
+    { id: 'idiomas',  label: 'Idiomas',               emoji: '🌐' },
+    { id: 'edfisica', label: 'Educación Física',      emoji: '🏃' },
     { id: 'tutoria',  label: 'Tutoría y aula',        emoji: '🍎' },
 ];
+const IDS_INTERESES = new Set(INTERESES.map(i => i.id));
+// Ids antiguos que siguen valiendo: «Ciencias» se partió en FyQ y Biología.
+// (infantil ya no es categoría → esos profes reciben el aviso.)
+const ALIAS_INTERESES = { ciencias: ['fyq', 'biologia'] };
+
+/** Intereses válidos (categorías actuales) a partir de una lista que puede tener ids antiguos. */
+export function normalizarIntereses(ids = []) {
+    const out = [];
+    (ids || []).forEach(id => (ALIAS_INTERESES[id] || [id]).forEach(x => {
+        if (IDS_INTERESES.has(x) && !out.includes(x)) out.push(x);
+    }));
+    return out;
+}
+
+/** ¿Tiene el profe los intereses rellenos? (alguna categoría actual o un «Otros» escrito) */
+export const interesesCompletos = (perfil) =>
+    normalizarIntereses(perfil?.intereses).length > 0 || !!String(perfil?.interesesOtros || '').trim();
 
 export const ms = (f) => {
     if (!f) return 0;
@@ -59,7 +79,9 @@ export default function useNotificacionesProfesor(usuario) {
 
     const codigo    = perfil?.codigoProfesor || '';
     const visto     = perfil?.notifVisto || {};
-    const intereses = perfil?.intereses || [];
+    const intereses = normalizarIntereses(perfil?.intereses);
+    // Profe sin intereses (o solo con categorías que ya no existen): aviso fijo
+    const faltanIntereses = !!perfil && perfil.role !== 'alumno' && !interesesCompletos(perfil);
 
     // Sella la primera visita para no mostrar el histórico como "nuevo"
     const sellado = useRef({});
@@ -141,7 +163,7 @@ export default function useNotificacionesProfesor(usuario) {
     }, []);
 
     const encajaIntereses = (n) => {
-        const cats = n.categorias || [];
+        const cats = normalizarIntereses(n.categorias);
         if (!cats.length) return true;               // novedad general → para todos
         if (!intereses.length) return true;          // sin intereses → lo ve todo
         return cats.some(c => intereses.includes(c));
@@ -160,6 +182,15 @@ export default function useNotificacionesProfesor(usuario) {
     };
 
     const grupos = [];
+    // No se puede «marcar como visto»: desaparece al guardar los intereses en Mi perfil
+    if (faltanIntereses) grupos.push({
+        clave: 'intereses',
+        emoji: '🎯',
+        titulo: 'Completa tus intereses',
+        detalle: 'Indica qué materias te interesan en Mi perfil: así te avisaremos cuando haya una herramienta nueva de tu área.',
+        fecha: Date.now(),
+        items: [],
+    });
     if (nuevosInformes.length) grupos.push({
         clave: 'resultados',
         emoji: '📊',
@@ -195,6 +226,7 @@ export default function useNotificacionesProfesor(usuario) {
         total: grupos.length,   // lo que suma la campanita
         marcarVisto,
         intereses,
+        faltanIntereses,
         codigo,
     };
 }

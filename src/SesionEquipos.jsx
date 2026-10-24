@@ -46,6 +46,8 @@ export default function SesionEquipos({ scope, codigoEquipos, agentes, online, o
     const idsKey = [...ids].sort().join(',');
 
     const alumnoDe = (a) => (datos[a.id]?.alumno !== undefined ? datos[a.id].alumno : (a.student?.name || ''));
+    // Incidencias de configuración ocurridas DURANTE la sesión (desde que se abrió).
+    const incsDe = (a) => (a.incidencias || []).filter((i) => i && i.at >= (inicioMs || 0));
     const setCampo = (id, campo, val) => setDatos((d) => ({ ...d, [id]: { ...d[id], [campo]: val } }));
     const pedirMensaje = () => { const t = window.prompt('Mensaje para la pantalla:'); return (t && t.trim()) ? t.trim() : null; };
     const pedirUrl = () => { const u = window.prompt('Web a abrir (https://…):', 'https://'); return (u && /^https?:\/\//i.test(u.trim())) ? u.trim() : null; };
@@ -139,6 +141,7 @@ export default function SesionEquipos({ scope, codigoEquipos, agentes, online, o
             alumno: (alumnoDe(a).trim() || null),
             observacion: (datos[a.id]?.observacion?.trim() || null),
             bateria: a.battery ?? null,
+            incidencias: incsDe(a).map((i) => ({ tipo: i.tipo || null, detalle: i.detalle || '', at: i.at || null, alumno: (alumnoDe(a).trim() || null) })),
         }));
         try {
             await updateDoc(doc(db, 'registro_equipos', regId), {
@@ -265,6 +268,11 @@ export default function SesionEquipos({ scope, codigoEquipos, agentes, online, o
                                                     : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.78rem' }}>{on ? '⏳ esperando…' : 'sin señal'}</div>}
                                             </div>
                                         )}
+                                        {incsDe(a).length > 0 && (
+                                            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 7, padding: '4px 7px', marginBottom: 6, fontSize: '0.74rem', color: '#991b1b' }}>
+                                                {incsDe(a).slice(-3).map((i, k) => <div key={k}>🚨 {i.detalle} <span style={{ color: '#f87171' }}>({fmtFecha(i.at).split(' ').slice(-1)[0] || ''})</span></div>)}
+                                            </div>
+                                        )}
                                         <input value={alumnoDe(a)} onChange={(e) => setCampo(a.id, 'alumno', e.target.value)} placeholder="— nombre del alumno —"
                                             style={{ ...inpMini, marginBottom: 6, borderColor: alumnoDe(a).trim() ? '#cbd5e1' : '#fca5a5' }} />
                                         <input value={datos[a.id]?.observacion || ''} onChange={(e) => setCampo(a.id, 'observacion', e.target.value)} placeholder="observación / incidencia" style={inpMini} />
@@ -359,7 +367,7 @@ export function RegistroSesiones({ scope, codigoEquipos, canGestionar = false, o
                                 {abierto === s.id && (
                                     <div style={{ overflowX: 'auto', marginTop: 10 }}>
                                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem', minWidth: 420 }}>
-                                            <thead><tr style={{ color: '#475569', textAlign: 'left' }}><th style={th}>Equipo</th><th style={th}>Alumno</th><th style={th}>Observación</th><th style={th}>Batería</th></tr></thead>
+                                            <thead><tr style={{ color: '#475569', textAlign: 'left' }}><th style={th}>Equipo</th><th style={th}>Alumno</th><th style={th}>Observación</th><th style={th}>Batería</th><th style={th}>Incidencias</th></tr></thead>
                                             <tbody>
                                                 {(s.equipos || []).map((e, i) => (
                                                     <tr key={i} style={{ borderTop: '1px solid #eef2f7' }}>
@@ -367,6 +375,11 @@ export function RegistroSesiones({ scope, codigoEquipos, canGestionar = false, o
                                                         <td style={{ ...td, color: e.alumno ? '#334155' : '#f87171' }}>{e.alumno || '⚠️ sin nombre'}</td>
                                                         <td style={{ ...td, color: e.observacion ? '#b45309' : '#cbd5e1' }}>{e.observacion || '—'}</td>
                                                         <td style={{ ...td, color: bateriaColor(e.bateria) }}>🔋 {bateriaTxt(e.bateria)}</td>
+                                                        <td style={{ ...td, color: (e.incidencias || []).length ? '#b91c1c' : '#cbd5e1' }}>
+                                                            {(e.incidencias || []).length
+                                                                ? (e.incidencias || []).map((inc, k) => <div key={k}>🚨 {inc.detalle}{inc.alumno ? ` — ${inc.alumno}` : ''}{inc.at ? ` (${fmtFecha(inc.at)})` : ''}</div>)
+                                                                : '—'}
+                                                        </td>
                                                     </tr>
                                                 ))}
                                             </tbody>

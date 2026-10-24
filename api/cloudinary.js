@@ -17,7 +17,7 @@
 // process.env, el prefijo VITE_ solo afecta al empaquetado del cliente.
 
 import { createHash } from 'node:crypto';
-import { exigirAdmin, credencialesCloudinary } from './_auth.js';
+import { exigirAdmin, credencialesCloudinary, usuarioDelToken } from './_auth.js';
 
 /**
  * Firma de Cloudinary: parámetros ordenados alfabéticamente, unidos como
@@ -35,6 +35,21 @@ export default async function handler(req, res) {
 
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+    // Imagen de una comunidad: la puede subir cualquier usuario con sesión, pero
+    // la firma fija la carpeta y los formatos, así que no sirve para otra cosa.
+    if (req.body?.accion === 'firmarImagenComunidad') {
+        const idToken = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+        let usuario = null;
+        try { usuario = idToken ? await usuarioDelToken(idToken) : null; }
+        catch (e) { return res.status(500).json({ error: e.message }); }
+        if (!usuario) return res.status(401).json({ error: 'Inicia sesión para subir imágenes.' });
+        const credsImg = credencialesCloudinary();
+        if (!credsImg) return res.status(500).json({ error: 'Cloudinary no está configurado en el servidor.' });
+        const timestamp = Math.round(Date.now() / 1000);
+        const params = { allowed_formats: 'jpg,jpeg,png,webp', folder: 'comunidades', timestamp };
+        return res.status(200).json({ cloud: credsImg.cloud, apiKey: credsImg.apiKey, ...params, signature: firmar(params, credsImg.secret) });
+    }
 
     if (!(await exigirAdmin(req, res))) return;
 

@@ -7,19 +7,19 @@
 const limpiar = (s) => ` ${String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ')} `;
 
 // Raíces de palabra por interés. Educación física va antes que ciencias y se
-// quita del texto para que «física» no cuente también como ciencias.
+// quita del texto para que «física» no cuente también como Física y Química.
 const CLAVES = [
     ['edfisica', ['educacion fisica', 'ed fisica', 'efisica', 'deporte', 'deportiv', 'atletism', 'baloncesto', 'futbol', 'gimnasi', 'escalada', 'climbing', 'olympic']],
     ['mates',    ['matemat', 'mates', 'algebra', 'ecuacion', 'fraccion', 'geometr', 'calculo', 'numero', 'estadist', 'probabil', 'funcion', 'potencia', 'derivad', 'mathlive', 'geometrix', 'trigonometr', 'aritmet', 'divisib', 'decimal', 'porcentaj']],
     ['lengua',   ['lengua', 'literat', 'sintaxis', 'ortograf', 'gramatic', 'castellano', 'lectura', 'poesia', 'poema', 'morfolog', 'acentua', 'catalan', 'valencia', 'euskera', 'gallego', 'redaccion', 'escritura']],
     ['idiomas',  ['ingles', 'english', 'frances', 'french', 'francais', 'aleman', 'german', 'italiano', 'idioma', 'listening', 'vocabulary', 'irregular verb', 'phrasal', 'grammar', 'wordle', 'enigmic', 'listening recurso']],
-    ['ciencias', ['ciencia', 'biolog', 'fisica', 'quimic', 'naturales', 'geolog', 'celula', 'cuerpo humano', 'anatom', 'sistema solar', 'astronom', 'ecosistema', 'periodic', 'element', 'energia', 'planeta', 'solar system', 'genetic']],
+    ['fyq',      ['fisica', 'quimic', 'sistema solar', 'astronom', 'periodic', 'element', 'energia', 'planeta', 'solar system', 'eclipse', 'fuerza', 'atomo']],
+    ['biologia', ['ciencia', 'biolog', 'naturales', 'geolog', 'celula', 'cuerpo humano', 'anatom', 'ecosistema', 'genetic', 'animal', 'planta']],
     ['sociales', ['historia', 'geograf', 'sociales', 'imperio', 'prehistori', 'edad media', 'edad antigua', 'romano', 'mapa', 'capital', 'economia', 'filosof', 'linea tiempo', 'revolucion', 'constitucion', 'paises', 'rios']],
     ['musica',   ['musica', 'music', 'instrumento', 'ritmo', 'partitura', 'melodia', 'canción', 'cancion']],
     ['plastica', ['plastica', 'dibujo', 'arte', 'pintur', 'visual', 'diedric', 'artista', 'escultur']],
     ['tecno',    ['tecnolog', 'robot', 'program', 'informat', 'scratch', 'arduino', 'microbit', 'digital', 'codigo', 'blockly', 'computac']],
-    ['infantil', ['infantil', 'primaria', 'abecedario', 'colores', 'sumas', 'restas', 'tablas de multiplicar', 'oaoa']],
-    ['tutoria',  ['tutoria', 'convivencia', 'emocion', 'valores', 'orientacion', 'acoso', 'igualdad', 'quien es quien']],
+    ['tutoria',  ['tutoria', 'convivencia', 'emocion', 'valores', 'orientacion', 'acoso', 'igualdad', 'quien es quien', 'funciones ejecutivas', 'atencion', 'memoria de trabajo', 'gestion aula', 'control de aula']],
 ];
 
 /** Devuelve los ids de interés que aparecen en el texto, del más mencionado al menos. */

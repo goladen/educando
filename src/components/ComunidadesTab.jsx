@@ -3,6 +3,7 @@ import { db, auth } from '../firebase';
 import { descargarPNG, descargarPDF, compartirClassroom, imprimirElemento } from '../utils/exportar';
 import { FONDOS, fondoUrl, fondoBg } from '../utils/fondos';
 import { callGeminiProxy, extractText } from '../geminiProxy';
+import { subirImagenComunidad } from '../config/cloudinary';
 import GestionEquipos from '../GestionEquipos';
 import {
     collection, query, where, getDocs, getDoc, setDoc,
@@ -18,6 +19,7 @@ import {
 } from 'lucide-react';
 import { EditorAula } from './MapaAula';
 import { CompeticionesComunidadPanel } from './CompeticionesTab';
+import PanelConversaciones from './MensajesPrivados';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 const norm = (s) => (s || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -92,11 +94,27 @@ function SelectorFondo({ value, onChange }) {
 }
 
 // ─── Modal: crear comunidad ───────────────────────────────────────────────────
-function ModalCrearComunidad({ usuario, onClose, onCreada }) {
-    const [nombre, setNombre]           = useState('');
-    const [descripcion, setDescripcion] = useState('');
-    const [imagenUrl, setImagenUrl]     = useState('');
-    const [webUrl, setWebUrl]           = useState('');
+// Con 'comunidad' edita la existente (solo el creador puede, por las reglas).
+function ModalCrearComunidad({ usuario, onClose, onCreada, comunidad }) {
+    const editando = !!comunidad;
+    const [nombre, setNombre]           = useState(comunidad?.nombre || '');
+    const [descripcion, setDescripcion] = useState(comunidad?.descripcion || '');
+    const [imagenUrl, setImagenUrl]     = useState(comunidad?.imagenUrl || '');
+    const [webUrl, setWebUrl]           = useState(comunidad?.webUrl || '');
+    const [subiendo, setSubiendo]       = useState(null); // null | 0..100
+    const [imgFalla, setImgFalla]       = useState(false);
+    const fileRef = useRef();
+
+    const subirImagen = async (file) => {
+        if (!file) return;
+        setError(''); setSubiendo(0);
+        try {
+            const idToken = await auth.currentUser.getIdToken();
+            const r = await subirImagenComunidad(file, { idToken, onProgress: setSubiendo });
+            setImagenUrl(r.url); setImgFalla(false);
+        } catch (e) { setError('No se pudo subir la imagen: ' + e.message); }
+        setSubiendo(null);
+    };
     const [guardando, setGuardando]     = useState(false);
     const [error, setError]             = useState('');
 
@@ -104,6 +122,13 @@ function ModalCrearComunidad({ usuario, onClose, onCreada }) {
         const n = nombre.trim();
         if (!n) { setError('Ponle un nombre a la comunidad.'); return; }
         setGuardando(true); setError('');
+        if (editando) {
+            try {
+                await updateDoc(doc(db, 'comunidades', comunidad.id), { nombre: n, descripcion: descripcion.trim(), imagenUrl: imagenUrl.trim(), webUrl: webUrl.trim() });
+                onCreada({ id: comunidad.id });
+            } catch (e) { setError('No se pudo guardar: ' + e.message); setGuardando(false); }
+            return;
+        }
         try {
             const ref = await addDoc(collection(db, 'comunidades'), {
                 nombre: n,
@@ -126,7 +151,7 @@ function ModalCrearComunidad({ usuario, onClose, onCreada }) {
         <div style={st.overlay} onClick={onClose}>
             <div style={{ ...st.panel, maxWidth: 500 }} onClick={e => e.stopPropagation()}>
                 <div style={st.header}>
-                    <div style={st.hTitle}><Users size={20} color={AZUL} /> Nueva comunidad</div>
+                    <div style={st.hTitle}>{editando ? <Pencil size={20} color={AZUL} /> : <Users size={20} color={AZUL} />} {editando ? 'Editar comunidad' : 'Nueva comunidad'}</div>
                     <button onClick={onClose} style={st.closeBtn}><X size={18} /></button>
                 </div>
                 <div style={st.label}>Nombre</div>
@@ -136,12 +161,21 @@ function ModalCrearComunidad({ usuario, onClose, onCreada }) {
                 <textarea value={descripcion} onChange={e => setDescripcion(e.target.value)}
                     placeholder="¿De qué va esta comunidad? ¿Quién puede unirse?"
                     rows={3} style={{ ...st.input, resize: 'vertical' }} />
-                <div style={st.label}>Imagen (URL, opcional)</div>
-                <input value={imagenUrl} onChange={e => setImagenUrl(e.target.value)}
-                    placeholder="https://…/logo.png" style={st.input} />
-                {imagenUrl.trim() && (
-                    <img src={imagenUrl} alt="" onError={e => { e.currentTarget.style.display = 'none'; }}
-                        style={{ width: '100%', maxHeight: 120, objectFit: 'cover', borderRadius: 10, marginBottom: 12 }} />
+                <div style={st.label}>Imagen (opcional)</div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+                    <button type="button" onClick={() => fileRef.current?.click()} disabled={subiendo !== null} style={st.btnPrimary}>
+                        {subiendo !== null ? <><RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Subiendo… {subiendo}%</> : <>📷 Subir imagen</>}
+                    </button>
+                    {imagenUrl.trim() && <button type="button" onClick={() => { setImagenUrl(''); setImgFalla(false); }} style={{ ...st.btnSec, color: '#e74c3c', borderColor: '#f3c9c4' }}><Trash2 size={14} /> Quitar</button>}
+                    <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => { subirImagen(e.target.files?.[0]); e.target.value = ''; }} />
+                </div>
+                <input value={imagenUrl} onChange={e => { setImagenUrl(e.target.value); setImgFalla(false); }}
+                    placeholder="…o pega la dirección de una imagen (https://…)" style={st.input} />
+                {/^http:\/\//i.test(imagenUrl.trim()) && <div style={{ ...st.error, marginTop: -6 }}>Esta dirección empieza por http:// y en pikt.es (https) no se verá. Mejor súbela con «📷 Subir imagen».</div>}
+                {imgFalla && <div style={{ ...st.error, marginTop: -6 }}>No se puede cargar la imagen de esa dirección. Súbela con «📷 Subir imagen».</div>}
+                {imagenUrl.trim() && !imgFalla && (
+                    <img src={imagenUrl} alt="" onError={() => setImgFalla(true)}
+                        style={{ width: '100%', maxHeight: 140, objectFit: 'cover', borderRadius: 10, marginBottom: 12 }} />
                 )}
                 <div style={st.label}>Dirección web (opcional)</div>
                 <input value={webUrl} onChange={e => setWebUrl(e.target.value)}
@@ -153,8 +187,8 @@ function ModalCrearComunidad({ usuario, onClose, onCreada }) {
                 {error && <div style={st.error}>{error}</div>}
                 <div style={st.btnRow}>
                     <button onClick={onClose} style={st.btnSec}>Cancelar</button>
-                    <button onClick={crear} disabled={guardando} style={st.btnPrimary}>
-                        {guardando ? <><RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Creando…</> : <><Plus size={14} /> Crear</>}
+                    <button onClick={crear} disabled={guardando || subiendo !== null} style={st.btnPrimary}>
+                        {guardando ? <><RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> {editando ? 'Guardando…' : 'Creando…'}</> : editando ? <><CheckCircle size={14} /> Guardar</> : <><Plus size={14} /> Crear</>}
                     </button>
                 </div>
                 <style>{spin}</style>
@@ -546,6 +580,7 @@ function PanelMiembros({ usuario, comunidad, onCambio }) {
     const [invitando, setInvitando] = useState(false);
     const [proc, setProc]           = useState(null);
     const [linkCopiado, setLinkCopiado] = useState(false);
+    const [chatCon, setChatCon]     = useState(null); // { uid, nombre } → mensaje privado
 
     const enlaceInvitacion = `${window.location.origin}/comunidad/${comunidad.id}/unirse`;
     const copiarEnlace = async () => {
@@ -692,6 +727,10 @@ function PanelMiembros({ usuario, comunidad, onCambio }) {
                             </div>
                             {d.email && <div style={{ fontSize: '0.78rem', color: '#7f8c8d', display: 'flex', alignItems: 'center', gap: 4 }}><Mail size={11} /> {d.email}</div>}
                         </div>
+                        {uid !== usuario.uid && (
+                            <button onClick={() => setChatCon({ uid, nombre: d.displayName || d.nombre || 'Profesor/a' })} title="Mensaje privado"
+                                style={{ ...st.miniBtn, color: AZUL }}><MessageSquare size={13} /> Escribir</button>
+                        )}
                         {esCreador && !esC && (
                             <label title="Puede ver la parte interna, pero no hacer cambios"
                                 style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.76rem', color: lector ? AZUL : '#7f8c8d', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', opacity: proc === uid ? 0.5 : 1 }}>
@@ -706,6 +745,7 @@ function PanelMiembros({ usuario, comunidad, onCambio }) {
                     </div>
                 );
             })}
+            {chatCon && <PanelConversaciones usuario={usuario} inicial={{ con: chatCon }} onClose={() => setChatCon(null)} />}
         </div>
     );
 }
@@ -2922,6 +2962,7 @@ function DetalleComunidad({ usuario, comunidad, onBack, onSalir, onCambio, tabIn
     const [aviso, setAviso]             = useState('');
     const [confirmarBorrarCom, setConfirmarBorrarCom] = useState(false);
     const [borrandoCom, setBorrandoCom] = useState(false);
+    const [editarCom, setEditarCom]     = useState(false);
     const esCreador = comunidad.creadorUid === usuario.uid;
     const soloLectura = esLector(comunidad, usuario.uid);
 
@@ -2981,6 +3022,7 @@ function DetalleComunidad({ usuario, comunidad, onBack, onSalir, onCambio, tabIn
                         {comunidad.descripcion && <p style={{ margin: '4px 0 0', color: '#7f8c8d', fontSize: '0.86rem' }}>{comunidad.descripcion}</p>}
                         <div style={{ marginTop: 6, fontSize: '0.76rem', color: '#95a5a6' }}>{comunidad.miembros?.length || 1} miembros{comunidad.webUrl && <> · <a href={comunidad.webUrl} target="_blank" rel="noreferrer" style={{ color: AZUL }}>web</a></>}</div>
                     </div>
+                    {esCreador && !confirmarBorrarCom && <button onClick={() => setEditarCom(true)} style={{ ...st.btnSec, color: AZUL, borderColor: '#cdd6ea' }}><Pencil size={15} /> Editar</button>}
                     {!esCreador ? (
                         <button onClick={() => { if (window.confirm(`¿Seguro que quieres abandonar la comunidad «${comunidad.nombre}»? Para volver tendrás que pedir acceso de nuevo.`)) onSalir(); }} style={{ ...st.btnSec, color: '#e74c3c', borderColor: '#f3c9c4' }}><LogOut size={15} /> Abandonar la comunidad</button>
                     ) : confirmarBorrarCom ? (
@@ -3055,6 +3097,7 @@ function DetalleComunidad({ usuario, comunidad, onBack, onSalir, onCambio, tabIn
 
             {modalCompartir && <ModalCompartirGrupo usuario={usuario} comunidad={comunidad} onClose={() => setModalCompartir(false)} onCompartido={() => setModalCompartir(false)} />}
             {viendo && <ModalVerGrupo compartido={viendo} onClose={() => setViendo(null)} />}
+            {editarCom && <ModalCrearComunidad usuario={usuario} comunidad={comunidad} onClose={() => setEditarCom(false)} onCreada={() => { setEditarCom(false); onCambio?.(); }} />}
             <style>{spin}</style>
         </div>
     );

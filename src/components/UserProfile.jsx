@@ -1,33 +1,67 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
-import { doc, updateDoc, deleteDoc, collection, query, where, getDocs, setDoc } from 'firebase/firestore';
+import { doc, getDoc, deleteDoc, collection, query, where, getDocs, setDoc } from 'firebase/firestore';
 import { deleteUser } from 'firebase/auth';
-import { User, MapPin, Heart, LifeBuoy, Shield, Trash2, X, Save, CheckCircle, Copy, AlertTriangle } from 'lucide-react';
+import { User, MapPin, Heart, LifeBuoy, Shield, Trash2, X, Save, CheckCircle, AlertTriangle, Repeat } from 'lucide-react';
+import SelectorIntereses, { textoIntereses } from './SelectorIntereses';
+import PanelConversaciones, { ADMIN_EMAIL } from './MensajesPrivados';
+import { normalizarIntereses, interesesCompletos } from '../hooks/useNotificacionesProfesor';
 
 // --- ENLACES EXTERNOS ---
 const LINK_PRIVACIDAD = "https://pikt.es/politica.html";
 const LINK_BAJA_FEEDBACK = "https://docs.google.com/forms/d/e/1FAIpQLSdfWMkZmyfbNa1nD2142zIV67_ErKqt-gYNMo6fEuYVhebqmw/viewform?usp=sharing&ouid=105455740891314946675";
 
 // AÑADIMOS showSupport COMO PROP (Por defecto true)
-export default function UserProfile({ usuario, perfil, onClose, onUpdate, showSupport = true }) {
-    const [formData, setFormData] = useState({
-        displayName: perfil?.displayName || usuario.displayName || '',
-        pais: perfil?.pais || '',
-        region: perfil?.region || '',
-        poblacion: perfil?.poblacion || '',
-        temasPreferidos: perfil?.temasPreferidos || '',
-        ciclo: perfil?.ciclo || 'Secundaria',
-    });
+const datosDe = (perfil, usuario) => ({
+    displayName: perfil?.displayName || usuario.displayName || '',
+    pais: perfil?.pais || '',
+    region: perfil?.region || '',
+    poblacion: perfil?.poblacion || '',
+    ciclo: perfil?.ciclo || 'Secundaria',
+    role: (perfil?.role || '').toLowerCase() === 'alumno' ? 'alumno' : 'profesor',
+    intereses: normalizarIntereses(perfil?.intereses),
+    interesesOtros: perfil?.interesesOtros || '',
+});
+
+export default function UserProfile({ usuario, perfil: perfilProp, onClose, onUpdate, showSupport = true }) {
+    // Si quien lo abre no pasa el perfil, se carga aquí (si no, al guardar se vaciarían los campos)
+    const [perfil, setPerfil] = useState(perfilProp || null);
+    const [formData, setFormData] = useState(() => datosDe(perfilProp, usuario));
+    const [otrosActivo, setOtrosActivo] = useState(!!perfilProp?.interesesOtros);
+    useEffect(() => {
+        if (perfilProp) return;
+        getDoc(doc(db, 'users', usuario.uid)).then(s => {
+            const p = s.data() || {};
+            setPerfil(p);
+            setFormData(datosDe(p, usuario));
+            setOtrosActivo(!!p.interesesOtros);
+        }).catch(() => setPerfil({}));
+    }, [perfilProp, usuario.uid]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const [guardando, setGuardando] = useState(false);
     const [faseBaja, setFaseBaja] = useState('NORMAL');
-    const [mensajeCopia, setMensajeCopia] = useState('');
+
+    const rolOriginal = datosDe(perfil, usuario).role;
+    const esProfe = formData.role === 'profesor';
+    const otros = otrosActivo ? formData.interesesOtros.trim() : '';
+    const faltanIntereses = esProfe && !interesesCompletos({ intereses: formData.intereses, interesesOtros: otros });
 
     // --- GUARDAR CAMBIOS ---
     const guardarCambios = async () => {
+        if (!perfil) return;
+        const cambiaRol = formData.role !== rolOriginal;
+        if (cambiaRol && !window.confirm(formData.role === 'alumno'
+            ? 'Vas a cambiar tu cuenta a ALUMNO: dejarás de ver el panel del profesor (tus recursos no se borran). ¿Seguir?'
+            : 'Vas a cambiar tu cuenta a PROFESOR: verás el panel del profesor. ¿Seguir?')) return;
         setGuardando(true);
         try {
-            await setDoc(doc(db, "users", usuario.uid), formData, { merge: true });
+            await setDoc(doc(db, "users", usuario.uid), {
+                ...formData,
+                interesesOtros: otros,
+                temasPreferidos: textoIntereses(formData.intereses, otros),
+            }, { merge: true });
+            // El rol se lee al entrar en App.jsx: recargar para pasar al otro panel
+            if (cambiaRol) { window.location.reload(); return; }
             if (onUpdate) onUpdate();
             alert("¡Perfil actualizado!");
             onClose();
@@ -38,12 +72,8 @@ export default function UserProfile({ usuario, perfil, onClose, onUpdate, showSu
         setGuardando(false);
     };
 
-    // --- SOPORTE ---
-    const copiarSoporte = () => {
-        navigator.clipboard.writeText("pikt314@gmail.com");
-        setMensajeCopia("Has copiado el e-mail para soporte. Ve a tu correo y notifica lo que necesites.");
-        setTimeout(() => setMensajeCopia(''), 5000);
-    };
+    // --- SOPORTE: abre el chat con el administrador (MensajesPrivados) ---
+    const [verSoporte, setVerSoporte] = useState(false);
 
     // --- ELIMINAR CUENTA ---
     const eliminarCuenta = async () => {
@@ -116,20 +146,53 @@ export default function UserProfile({ usuario, perfil, onClose, onUpdate, showSu
 
 
 
-                    <SectionTitle icon={<Heart size={18} />} title="Intereses" />
-                    <Input label="Temas Preferidos" val={formData.temasPreferidos} set={v => setFormData({ ...formData, temasPreferidos: v })} placeholder="Ej: Matemáticas, Historia, Gamificación..." />
+                    <SectionTitle icon={<Repeat size={18} />} title="Tipo de cuenta" />
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+                        {[['profesor', '👨‍🏫 Profesor'], ['alumno', '🎓 Alumno']].map(([id, l]) => (
+                            <button key={id} type="button" onClick={() => setFormData({ ...formData, role: id })}
+                                style={{ flex: 1, padding: 10, borderRadius: 10, cursor: 'pointer', fontWeight: 'bold', fontSize: 14,
+                                    border: `2px solid ${formData.role === id ? '#3F51B5' : '#ddd'}`,
+                                    background: formData.role === id ? '#e8eaf6' : 'white', color: formData.role === id ? '#3F51B5' : '#777' }}>
+                                {l}
+                            </button>
+                        ))}
+                    </div>
+                    {formData.role !== rolOriginal && (
+                        <div style={{ fontSize: 12, color: '#e67e22', marginBottom: 6 }}>Al guardar, la página se recargará con el panel de {formData.role}.</div>
+                    )}
+
+                    {esProfe && (<>
+                        <SectionTitle icon={<Heart size={18} />} title="Intereses" />
+                        <div style={faltanIntereses
+                            ? { border: '2px solid #e74c3c', background: '#fdecea', borderRadius: 12, padding: 12, marginBottom: 10 }
+                            : { marginBottom: 10 }}>
+                            {faltanIntereses && (
+                                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', color: '#c0392b', fontSize: 13, fontWeight: 'bold', marginBottom: 10 }}>
+                                    <AlertTriangle size={18} style={{ flexShrink: 0 }} />
+                                    <span>Marca las materias que te interesan: las usamos para avisarte cuando haya una herramienta nueva de tu área.</span>
+                                </div>
+                            )}
+                            <SelectorIntereses
+                                intereses={formData.intereses} setIntereses={v => setFormData(f => ({ ...f, intereses: v }))}
+                                otros={formData.interesesOtros} setOtros={v => setFormData(f => ({ ...f, interesesOtros: v }))}
+                                otrosActivo={otrosActivo} setOtrosActivo={setOtrosActivo} />
+                        </div>
+                    </>)}
 
                     <div style={styles.divider}></div>
 
                     <div style={styles.actionsGrid}>
                         {/* CONDICIÓN: SOLO MOSTRAMOS SOPORTE SI showSupport ES TRUE */}
                         {showSupport && (
-                            <ActionButton icon={<LifeBuoy size={18} />} label="Soporte" onClick={copiarSoporte} color="#2980b9" bg="#eaf2f8" />
+                            <ActionButton icon={<LifeBuoy size={18} />} label="Soporte" onClick={() => setVerSoporte(true)} color="#2980b9" bg="#eaf2f8" />
                         )}
                         <ActionButton icon={<Shield size={18} />} label="Privacidad" onClick={() => window.open(LINK_PRIVACIDAD, '_blank')} color="#27ae60" bg="#eafaf1" />
                     </div>
 
-                    {mensajeCopia && <div style={styles.toast}><CheckCircle size={16} /> {mensajeCopia}</div>}
+                    {verSoporte && (
+                        <PanelConversaciones usuario={usuario} onClose={() => setVerSoporte(false)}
+                            inicial={usuario.email === ADMIN_EMAIL ? null : { admin: true }} />
+                    )}
 
                     {faseBaja === 'NORMAL' ? (
                         <button onClick={() => setFaseBaja('CONFIRMACION')} style={styles.btnDanger}><Trash2 size={16} /> Darse de baja</button>
@@ -146,7 +209,7 @@ export default function UserProfile({ usuario, perfil, onClose, onUpdate, showSu
                 </div>
 
                 <div style={styles.footer}>
-                    <button onClick={guardarCambios} disabled={guardando} style={styles.btnSave}>{guardando ? 'Guardando...' : <><Save size={18} /> Guardar Cambios</>}</button>
+                    <button onClick={guardarCambios} disabled={guardando || !perfil} style={styles.btnSave}>{guardando ? 'Guardando...' : <><Save size={18} /> Guardar Cambios</>}</button>
                 </div>
             </div>
         </div>

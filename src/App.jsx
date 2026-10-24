@@ -28,6 +28,7 @@ const Esculpir3D = lazy(() => import('./Esculpir3D'));
 const VideosInstagram = lazy(() => import('./components/VideosInstagram'));
 const PizarraApp = lazy(() => import('./GestionAula').then(m => ({ default: m.PizarraApp })));
 import PiTutorial from './components/PiTutorial';
+import SelectorIntereses, { textoIntereses } from './components/SelectorIntereses';
 const Retos = lazy(() => import('./Retos'));
 import AnnotationOverlay from './components/AnnotationOverlay';
 const HerramientasClase = lazy(() => import('./GestionAula'));
@@ -68,7 +69,10 @@ function App() {
     const [pais, setPais] = useState("");
     const [region, setRegion] = useState("");
     const [poblacion, setPoblacion] = useState("");
-    const [temas, setTemas] = useState("");
+    // Intereses del alta: materias de la página principal + «Otros» (texto libre)
+    const [intereses, setIntereses] = useState([]);
+    const [interesesOtros, setInteresesOtros] = useState("");
+    const [otrosActivo, setOtrosActivo] = useState(false);
     // DETECTAR PÁGINA PÚBLICA DE PROFESOR — por slug (/nombre) o por ?p=uid
     const [paginaTarget,    setPaginaTarget]    = useState(null); // { uid } | { slug }
     const [miniappId,         setMiniappId]         = useState(null);
@@ -189,6 +193,8 @@ function App() {
         'tecno','tecnologia',
         'plastica','plastik',
         'idiomas','ingles',
+        'edfisica','educacion-fisica',
+        'tutoria',
       ]);
       if (slug && !RUTAS_RESERVADAS.has(slug) && !slug.startsWith('fisica/') && !slug.startsWith('primaria/') && !slug.startsWith('fichas/') && !slug.startsWith('calculadora/')) {
         // Check if it's a professor page slug
@@ -282,7 +288,9 @@ function App() {
                 pais: pais,
                 region: region,
                 poblacion: poblacion,
-                temasPreferidos: temas, // <--- NUEVO CAMPO AÑADIDO
+                intereses,
+                interesesOtros: otrosActivo ? interesesOtros.trim() : "",
+                temasPreferidos: textoIntereses(intereses, otrosActivo ? interesesOtros : ""),
                 createdAt: new Date()
             });
 
@@ -430,8 +438,12 @@ function App() {
                         <input type="text" placeholder="País (ej: España)" value={pais} onChange={(e) => setPais(e.target.value)} style={{ padding: '10px', borderRadius: '5px', border: '1px solid #ccc' }} />
                         <input type="text" placeholder="Región / Provincia" value={region} onChange={(e) => setRegion(e.target.value)} style={{ padding: '10px', borderRadius: '5px', border: '1px solid #ccc' }} />
                         <input type="text" placeholder="Población / Ciudad" value={poblacion} onChange={(e) => setPoblacion(e.target.value)} style={{ padding: '10px', borderRadius: '5px', border: '1px solid #ccc' }} />
-                        <input type="text" placeholder="Temas Preferidos (ej: Historia, Mates...)" value={temas} onChange={(e) => setTemas(e.target.value)} style={{ padding: '10px', borderRadius: '5px', border: '1px solid #ccc' }} />
+                    </div>
 
+                    <p style={{ fontWeight: 'bold', marginBottom: 4 }}>¿Qué materias te interesan?</p>
+                    <p style={{ fontSize: '0.82rem', color: '#777', marginTop: 0 }}>Puedes marcar varias. Te avisaremos cuando haya herramientas nuevas de tus materias.</p>
+                    <div style={{ marginBottom: '20px' }}>
+                        <SelectorIntereses intereses={intereses} setIntereses={setIntereses} otros={interesesOtros} setOtros={setInteresesOtros} otrosActivo={otrosActivo} setOtrosActivo={setOtrosActivo} />
                     </div>
 
                     <p style={{ fontWeight: 'bold' }}>¿Cómo vas a usar la app?</p>

@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, updateDoc } from 'firebase/firestore';
 import { Search, RefreshCw } from 'lucide-react';
-import { INTERESES, ms } from '../hooks/useNotificacionesProfesor';
+import { INTERESES, ms, normalizarIntereses, interesesCompletos } from '../hooks/useNotificacionesProfesor';
 import { inferirIntereses, textoRecurso } from '../utils/inferirIntereses';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -25,6 +25,20 @@ export default function AdminUsuariosPanel({ seleccion, setSeleccion, onEscribir
     const [soloSel, setSoloSel] = useState(false);
     const [deducidos, setDeducidos] = useState({});      // uid → { ids, origen }
     const [deduciendo, setDeduciendo] = useState(false);
+    const [sinIntereses, setSinIntereses] = useState(false); // profes que verán el aviso rojo
+    const [cambiandoRol, setCambiandoRol] = useState(null);
+
+    // El admin cambia el tipo de cuenta (reglas: users/{uid} editable por el admin)
+    const cambiarRol = async (u, role) => {
+        if (role === (u.role === 'alumno' ? 'alumno' : 'profesor')) return;
+        if (!window.confirm(`¿Cambiar a ${nombreUsuario(u)} a ${role.toUpperCase()}? Lo notará la próxima vez que entre o recargue.`)) return;
+        setCambiandoRol(u.uid);
+        try {
+            await updateDoc(doc(db, 'users', u.uid), { role });
+            setUsuarios(l => l.map(x => x.uid === u.uid ? { ...x, role } : x));
+        } catch (e) { alert('No se pudo cambiar el rol: ' + e.message); }
+        setCambiandoRol(null);
+    };
 
     const cargar = async () => {
         setUsuarios(null); setError('');
@@ -41,7 +55,7 @@ export default function AdminUsuariosPanel({ seleccion, setSeleccion, onEscribir
     const deducir = async (lista) => {
         const res = {};
         const sinDatos = [];
-        lista.filter(u => u.role !== 'alumno' && !(u.intereses || []).length).forEach(u => {
+        lista.filter(u => u.role !== 'alumno' && !normalizarIntereses(u.intereses).length).forEach(u => {
             const ids = inferirIntereses(u.temasPreferidos);
             if (ids.length) res[u.uid] = { ids: ids.slice(0, 2), origen: 'perfil' };
             else sinDatos.push(u.uid);
@@ -70,7 +84,8 @@ export default function AdminUsuariosPanel({ seleccion, setSeleccion, onEscribir
 
     // Intereses con los que se filtra y se pinta a cada usuario
     const interesesDe = (u) => {
-        if ((u.intereses || []).length) return { ids: u.intereses, origen: 'declarado' };
+        const propios = normalizarIntereses(u.intereses);
+        if (propios.length) return { ids: propios, origen: 'declarado' };
         return deducidos[u.uid] || { ids: [], origen: null };
     };
     useEffect(() => { cargar(); }, []);
@@ -81,13 +96,14 @@ export default function AdminUsuariosPanel({ seleccion, setSeleccion, onEscribir
             if (soloSel && !seleccion[u.uid]) return false;
             if (rol === 'profesor' && u.role === 'alumno') return false;
             if (rol === 'alumno' && u.role !== 'alumno') return false;
+            if (sinIntereses && (u.role === 'alumno' || interesesCompletos(u))) return false;
             const { ids } = interesesDe(u);
             if (interes === '_ninguno' && ids.length) return false;
             if (interes && interes !== '_ninguno' && !ids.includes(interes)) return false;
             if (t && ![nombreUsuario(u), u.email, u.poblacion, u.region, u.pais].some(x => limpiar(x).includes(t))) return false;
             return true;
         });
-    }, [usuarios, texto, rol, interes, soloSel, seleccion, deducidos]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [usuarios, texto, rol, interes, soloSel, seleccion, deducidos, sinIntereses]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const nSel = Object.keys(seleccion).length;
     const toggle = (u) => setSeleccion(prev => {
@@ -105,7 +121,7 @@ export default function AdminUsuariosPanel({ seleccion, setSeleccion, onEscribir
     const btn = { background: 'white', color: '#1565C0', border: '1.5px solid #cfe0f5', borderRadius: 8, padding: '5px 11px', cursor: 'pointer', fontWeight: 700, fontSize: '0.76rem' };
 
     return (
-        <div style={{ padding: '12px 20px', background: '#f7f9fc', borderBottom: '2px dashed #90caf9', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '52vh' }}>
+        <div style={{ padding: '12px 20px', background: '#f7f9fc', borderBottom: '2px dashed #90caf9', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, background: 'white', border: '1.5px solid #d9e2ec', borderRadius: 9, padding: '6px 10px' }}>
                     <Search size={15} color="#90a4ae" />
@@ -126,6 +142,8 @@ export default function AdminUsuariosPanel({ seleccion, setSeleccion, onEscribir
                     <button key={i.id} onClick={() => setInteres(v => v === i.id ? '' : i.id)} style={chip(interes === i.id)}>{i.emoji} {i.label}</button>
                 ))}
                 <button onClick={() => setInteres(v => v === '_ninguno' ? '' : '_ninguno')} style={chip(interes === '_ninguno')}>❔ Sin datos</button>
+                <button onClick={() => setSinIntereses(v => !v)} title="Profes que no han rellenado sus intereses (ven el aviso rojo en su panel)"
+                    style={{ ...chip(sinIntereses), ...(sinIntereses ? { background: '#e74c3c', borderColor: '#e74c3c' } : { color: '#c0392b', borderColor: '#f3c9c4' }) }}>🎯 Sin intereses rellenos</button>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: '0.78rem', color: '#546e7a' }}>
@@ -139,7 +157,7 @@ export default function AdminUsuariosPanel({ seleccion, setSeleccion, onEscribir
                 </button>
             </div>
 
-            <div style={{ overflowY: 'auto', background: 'white', borderRadius: 10, border: '1px solid #e3e9f0', minHeight: 80 }}>
+            <div style={{ overflowY: 'auto', background: 'white', borderRadius: 10, border: '1px solid #e3e9f0', minHeight: 80, maxHeight: '42vh' }}>
                 {error && <div style={{ padding: 12, color: '#c0392b', fontSize: '0.82rem' }}>{error}</div>}
                 {!usuarios && !error && <div style={{ padding: 16, color: '#90a4ae', fontSize: '0.84rem', textAlign: 'center' }}>Cargando usuarios…</div>}
                 {usuarios && !filtrados.length && !error && <div style={{ padding: 16, color: '#90a4ae', fontSize: '0.84rem', textAlign: 'center' }}>Ningún usuario con esos filtros.</div>}
@@ -162,6 +180,17 @@ export default function AdminUsuariosPanel({ seleccion, setSeleccion, onEscribir
                                 </div>
                             </div>
                             <IconosInteres {...interesesDe(u)} esAlumno={u.role === 'alumno'} />
+                            {u.role !== 'alumno' && !interesesCompletos(u) && (
+                                <span title="Sin intereses rellenos: ve el aviso rojo" style={{ width: 8, height: 8, borderRadius: '50%', background: '#e74c3c', flexShrink: 0 }} />
+                            )}
+                            <select value={u.role === 'alumno' ? 'alumno' : 'profesor'} disabled={cambiandoRol === u.uid}
+                                onClick={e => e.stopPropagation()}
+                                onChange={e => cambiarRol(u, e.target.value)}
+                                title="Tipo de cuenta"
+                                style={{ border: '1.5px solid #d9e2ec', borderRadius: 7, padding: '3px 4px', fontSize: '0.72rem', background: 'white', flexShrink: 0, cursor: 'pointer' }}>
+                                <option value="profesor">👨‍🏫 Profe</option>
+                                <option value="alumno">🎓 Alumno</option>
+                            </select>
                         </label>
                     );
                 })}

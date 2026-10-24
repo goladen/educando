@@ -26,7 +26,7 @@ import SesionEquipos, { RegistroSesiones } from './SesionEquipos';
 const DESCONEXION_MS = 90000;
 const ICE_FALLBACK = [{ urls: 'stun:stun.l.google.com:19302' }];
 // Instalador del Agente Pikt (GitHub Releases). Actualiza la URL al subir una versión nueva.
-const URL_AGENTE = 'https://github.com/goladen/pikt-agente/releases/download/v.0.1.5/AgentePikt-Setup-0.1.5.exe';
+const URL_AGENTE = 'https://github.com/goladen/pikt-agente/releases/download/v.0.1.6/AgentePikt-Setup-0.1.6.exe';
 
 export const collForScope = (scope) => (scope === 'comunidad' ? 'aulas_comunidad' : 'aulas_fijas');
 
@@ -475,12 +475,25 @@ function PanelEquipos({ agentes, online, onCmd, onCmdTodos, onQuitar, verPantall
                                     </div>
                                 )}
                                 {canManage && onMeta && (
-                                    <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
+                                    <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                                         <select value={a.tipo || 'alumno'} onChange={(e) => onMeta(a.id, { tipo: e.target.value })} style={metaInp}>
                                             <option value="alumno">👦 Alumno</option>
                                             <option value="profesor">🧑‍🏫 Profesor</option>
                                         </select>
                                         <input defaultValue={a.ubicacion || ''} onBlur={(e) => { const v = e.target.value.trim(); if (v !== (a.ubicacion || '')) onMeta(a.id, { ubicacion: v }); }} placeholder="📍 ubicación" style={{ ...metaInp, flex: 1, minWidth: 90 }} />
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#cbd5e1', fontSize: '0.72rem', cursor: 'pointer', whiteSpace: 'nowrap' }} title="Avisar y registrar si el alumno cambia el fondo de escritorio">
+                                            <input type="checkbox" checked={!!a.vigilar} onChange={(e) => onMeta(a.id, { vigilar: e.target.checked })} /> 👁️ Vigilar
+                                        </label>
+                                    </div>
+                                )}
+                                {Array.isArray(a.incidencias) && a.incidencias.length > 0 && (
+                                    <div style={{ background: 'rgba(185,28,28,0.15)', border: '1px solid rgba(248,113,113,0.4)', borderRadius: 7, padding: '4px 8px', marginBottom: 8, fontSize: '0.72rem', color: '#fecaca', maxHeight: 120, overflowY: 'auto' }}>
+                                        {a.incidencias.slice(-15).reverse().map((inc, k) => (
+                                            <div key={k} style={{ padding: '1px 0' }}>
+                                                🚨 {inc.detalle}
+                                                {inc.at ? <span style={{ color: '#f87171' }}> · {new Date(inc.at).toLocaleString('es-ES')}</span> : null}
+                                            </div>
+                                        ))}
                                     </div>
                                 )}
                                 {verPantallas && (

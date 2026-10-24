@@ -43,14 +43,14 @@ function validarArchivo(file) {
 }
 
 /** POST del archivo a Cloudinary con barra de progreso. */
-function enviarACloudinary(cloud, campos, file, onProgress) {
+function enviarACloudinary(cloud, campos, file, onProgress, tipo = 'raw') {
     return new Promise((resolve, reject) => {
         const fd = new FormData();
         fd.append('file', file);
         Object.entries(campos).forEach(([k, v]) => fd.append(k, v));
 
         const xhr = new XMLHttpRequest();
-        xhr.open('POST', `https://api.cloudinary.com/v1_1/${cloud}/raw/upload`);
+        xhr.open('POST', `https://api.cloudinary.com/v1_1/${cloud}/${tipo}/upload`);
         xhr.upload.onprogress = (e) => {
             if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
         };
@@ -72,6 +72,50 @@ function enviarACloudinary(cloud, campos, file, onProgress) {
         };
         xhr.send(fd);
     });
+}
+
+/** Reduce una imagen a JPEG de como mucho `maxLado` px (para no subir fotos de 5 MB). */
+function reducirImagen(file, maxLado = 1400, calidad = 0.85) {
+    return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+            const k = Math.min(1, maxLado / Math.max(img.width, img.height));
+            const c = document.createElement('canvas');
+            c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+            const ctx = c.getContext('2d');
+            ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, c.width, c.height); // PNG transparente → fondo blanco
+            ctx.drawImage(img, 0, 0, c.width, c.height);
+            URL.revokeObjectURL(url);
+            c.toBlob(b => b ? resolve(new File([b], 'imagen.jpg', { type: 'image/jpeg' })) : reject(new Error('No se pudo procesar la imagen.')), 'image/jpeg', calidad);
+        };
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('El archivo no es una imagen válida.')); };
+        img.src = url;
+    });
+}
+
+/**
+ * Sube la imagen de una comunidad (cualquier usuario con sesión). La firma la
+ * da /api/cloudinary con carpeta y formatos fijos. Devuelve { url, publicId, bytes }.
+ */
+export async function subirImagenComunidad(file, { idToken, onProgress } = {}) {
+    if (!/^image\//.test(file?.type || '')) throw new Error('Elige un archivo de imagen (JPG, PNG o WebP).');
+    if (file.size > 20 * 1024 * 1024) throw new Error('La imagen pesa demasiado (máx. 20 MB).');
+    const reducida = await reducirImagen(file);
+    const r = await fetch('/api/cloudinary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ accion: 'firmarImagenComunidad' }),
+    });
+    const firma = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(firma?.error || `Error ${r.status} al pedir la firma.`);
+    return enviarACloudinary(firma.cloud, {
+        api_key: firma.apiKey,
+        timestamp: firma.timestamp,
+        signature: firma.signature,
+        folder: firma.folder,
+        allowed_formats: firma.allowed_formats,
+    }, reducida, onProgress, 'image');
 }
 
 /**

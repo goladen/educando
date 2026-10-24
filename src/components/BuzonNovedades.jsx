@@ -7,6 +7,7 @@ import {
 import { Users, Check, X as XIcon, MessageSquare, UserPlus, Settings } from 'lucide-react';
 import useNotificacionesProfesor, { INTERESES } from '../hooks/useNotificacionesProfesor';
 import AdminUsuariosPanel from './AdminUsuariosPanel';
+import PanelConversaciones, { useConversaciones } from './MensajesPrivados';
 
 const ErroresWebPanel = lazy(() => import('./ErroresWebPanel'));
 
@@ -14,7 +15,7 @@ const ADMIN_EMAIL = 'goladen@gmail.com';
 
 const fechaMs = (f) => !f ? 0 : f.toMillis ? f.toMillis() : f.seconds ? f.seconds * 1000 : new Date(f).getTime() || 0;
 
-export default function BuzonNovedades({ usuario, onIr }) {
+export default function BuzonNovedades({ usuario, onIr, onAbrirPerfil }) {
     const [open, setOpen]           = useState(false);
     const [novedades, setNovedades] = useState([]);
     const [leidas, setLeidas]       = useState([]);
@@ -35,11 +36,14 @@ export default function BuzonNovedades({ usuario, onIr }) {
     const [destino, setDestino]     = useState('todos'); // 'todos' | 'seleccion'
     const [mensajes, setMensajes]   = useState([]);
     const [verErrores, setVerErrores] = useState(false); // panel 🐞 (errores_web)
+    const [chat, setChat] = useState(null); // null | {} | { convId } | { admin: true } → PanelConversaciones
 
     const esAdmin = usuario?.email === ADMIN_EMAIL;
 
     // Notificaciones agregadas: resultados nuevos, preguntas del trivial y apps nuevas
     const { grupos, total: totalGrupos, marcarVisto, intereses } = useNotificacionesProfesor(usuario);
+    // Mensajes privados (directos entre profes y buzón del admin)
+    const { sinLeer: convSinLeer } = useConversaciones(usuario);
 
     const toggleInteres = async (id) => {
         if (!usuario?.uid) return;
@@ -49,6 +53,11 @@ export default function BuzonNovedades({ usuario, onIr }) {
 
     // Destino de cada grupo dentro del panel del profesor
     const irAGrupo = (g) => {
+        if (g.clave === 'intereses') {
+            setOpen(false);
+            if (onAbrirPerfil) onAbrirPerfil(); else setEditIntereses(true);
+            return;
+        }
         marcarVisto(g.clave);
         if (g.clave === 'resultados' && onIr) { onIr('INFORMES'); setOpen(false); }
         if (g.clave === 'preguntas'  && onIr) { onIr('TRIVIAL_RECURSOS'); setOpen(false); }
@@ -62,7 +71,7 @@ export default function BuzonNovedades({ usuario, onIr }) {
     const entradas = [...novedades, ...mensajes]
         .sort((a, b) => fechaMs(b.fecha) - fechaMs(a.fecha));
     const noLeidas = entradas.filter(n => !leidas.includes(n.id) && n.autorUid !== usuario?.uid).length
-        + invitaciones.length + comsConMensajes.length + solicitudesPend.length + totalGrupos;
+        + invitaciones.length + comsConMensajes.length + solicitudesPend.length + totalGrupos + convSinLeer.length;
 
     // Comunidades a las que pertenezco (para detectar mensajes nuevos)
     useEffect(() => {
@@ -265,7 +274,16 @@ export default function BuzonNovedades({ usuario, onIr }) {
                                     </span>
                                 )}
                             </h3>
-                            <div style={{ display: 'flex', gap: 8 }}>
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                                {usuario?.uid && (
+                                    <button onClick={() => setChat({})} title="Mensajes privados"
+                                        style={{ position: 'relative', background: 'rgba(255,255,255,0.22)', border: 'none', color: 'white', borderRadius: 9, padding: '6px 11px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                                        <MessageSquare size={16} />
+                                        {convSinLeer.length > 0 && (
+                                            <span style={{ position: 'absolute', top: -5, right: -5, background: '#e74c3c', color: 'white', borderRadius: '50%', minWidth: 16, height: 16, fontSize: '0.62rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{convSinLeer.length}</span>
+                                        )}
+                                    </button>
+                                )}
                                 <button onClick={() => setEditIntereses(v => !v)} title="Mis intereses"
                                     style={{ background: editIntereses ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.22)', border: 'none', color: 'white', borderRadius: 9, padding: '6px 11px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
                                     <Settings size={16} />
@@ -291,6 +309,9 @@ export default function BuzonNovedades({ usuario, onIr }) {
                             </div>
                         </div>
 
+                        {/* Cuerpo: un único scroll para paneles + lista (si no, con el panel de
+                            usuarios y el formulario abiertos, los botones quedaban fuera) */}
+                        <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
                         {/* Panel de usuarios (admin) */}
                         {esAdmin && verUsuarios && (
                             <AdminUsuariosPanel seleccion={seleccion} setSeleccion={setSeleccion} onEscribir={escribirASeleccion} />
@@ -398,43 +419,58 @@ export default function BuzonNovedades({ usuario, onIr }) {
                         )}
 
                         {/* Lista */}
-                        <div style={{ overflowY: 'auto', flex: 1 }}>
-                            {/* Profe sin intereses: invitarle a elegirlos (si no, el admin solo puede deducirlos) */}
-                            {!esAdmin && usuario?.uid && intereses.length === 0 && !editIntereses && (
-                                <div style={{ padding: '14px 20px', borderBottom: '1px solid #f3f3f3', background: '#f7f9fc' }}>
-                                    <div style={{ fontWeight: 800, color: '#1565C0', fontSize: '0.92rem', marginBottom: 4 }}>🎯 ¿Qué áreas te interesan?</div>
-                                    <div style={{ fontSize: '0.8rem', color: '#546e7a', marginBottom: 8 }}>Márcalas y te avisaremos solo de las novedades de tus materias.</div>
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                                        {INTERESES.map(i => (
-                                            <button key={i.id} onClick={() => toggleInteres(i.id)}
-                                                style={{ background: 'white', color: '#546e7a', border: '1.5px solid #d9e2ec', borderRadius: 20, padding: '4px 11px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}>
-                                                {i.emoji} {i.label}
-                                            </button>
-                                        ))}
+                        <div>
+                            {/* Mensajes privados: hilos con mensajes nuevos + escribir al admin */}
+                            {convSinLeer.map(c => (
+                                <div key={c.id} onClick={() => setChat({ convId: c.id })}
+                                    style={{ padding: '14px 20px', borderBottom: '1px solid #f3f3f3', background: '#eef5ff', cursor: 'pointer' }}>
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
+                                        <MessageSquare size={20} color="#1565C0" style={{ marginTop: 2, flexShrink: 0 }} />
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ fontWeight: 800, color: '#1565C0', fontSize: '0.95rem' }}>
+                                                {c.paraAdmin
+                                                    ? (esAdmin ? `📮 ${c.nombres?.[c.participantes?.[0]] || 'Profesor/a'}: ${c.asunto || ''}` : `📮 Respuesta del administrador: ${c.asunto || ''}`)
+                                                    : `💬 Mensaje de ${c.nombres?.[(c.participantes || []).find(u => u !== usuario?.uid)] || 'un compañero'}`}
+                                            </div>
+                                            <div style={{ fontSize: '0.82rem', color: '#555', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.ultimoTexto}</div>
+                                        </div>
                                     </div>
+                                </div>
+                            ))}
+                            {usuario?.uid && !esAdmin && (
+                                <div style={{ padding: '10px 20px', borderBottom: '1px solid #f3f3f3', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '0.78rem', color: '#78909c', flex: 1, minWidth: 160 }}>¿Un problema, un cambio o una idea?</span>
+                                    <button onClick={() => setChat({ admin: true })}
+                                        style={{ background: 'white', color: '#c15600', border: '1.5px solid #f5c99a', borderRadius: 8, padding: '5px 12px', cursor: 'pointer', fontWeight: 700, fontSize: '0.78rem' }}>
+                                        📮 Escribir al administrador
+                                    </button>
+                                    <button onClick={() => setChat({})}
+                                        style={{ background: 'white', color: '#1565C0', border: '1.5px solid #cfe0f5', borderRadius: 8, padding: '5px 12px', cursor: 'pointer', fontWeight: 700, fontSize: '0.78rem' }}>
+                                        💬 Mis mensajes
+                                    </button>
                                 </div>
                             )}
                             {/* Resumen agregado: resultados, preguntas del trivial y apps nuevas */}
                             {grupos.map(g => (
-                                <div key={g.clave} style={{ padding: '14px 20px', borderBottom: '1px solid #f3f3f3', background: '#f4f8ff' }}>
+                                <div key={g.clave} style={{ padding: '14px 20px', borderBottom: '1px solid #f3f3f3', background: g.clave === 'intereses' ? '#fdecea' : '#f4f8ff', borderLeft: g.clave === 'intereses' ? '4px solid #e74c3c' : 'none' }}>
                                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                                         <span style={{ fontSize: '1.4rem', lineHeight: 1, flexShrink: 0 }}>{g.emoji}</span>
                                         <div style={{ flex: 1 }}>
-                                            <div style={{ fontWeight: 800, color: '#1565C0', fontSize: '0.95rem' }}>{g.titulo}</div>
+                                            <div style={{ fontWeight: 800, color: g.clave === 'intereses' ? '#c0392b' : '#1565C0', fontSize: '0.95rem' }}>{g.titulo}</div>
                                             {g.detalle && (
                                                 <p style={{ margin: '3px 0 8px', color: '#555', fontSize: '0.84rem' }}>{g.detalle}</p>
                                             )}
                                             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                                                 {g.clave !== 'apps' && (
                                                     <button onClick={() => irAGrupo(g)}
-                                                        style={{ background: '#1565C0', color: 'white', border: 'none', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontWeight: 700, fontSize: '0.82rem' }}>
-                                                        {g.clave === 'resultados' ? 'Ver informes' : 'Revisar preguntas'}
+                                                        style={{ background: g.clave === 'intereses' ? '#e74c3c' : '#1565C0', color: 'white', border: 'none', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontWeight: 700, fontSize: '0.82rem' }}>
+                                                        {g.clave === 'resultados' ? 'Ver informes' : g.clave === 'intereses' ? 'Rellenar ahora' : 'Revisar preguntas'}
                                                     </button>
                                                 )}
-                                                <button onClick={() => marcarVisto(g.clave)}
+                                                {g.clave !== 'intereses' && <button onClick={() => marcarVisto(g.clave)}
                                                     style={{ background: 'white', color: '#1565C0', border: '1.5px solid #cfe0f5', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontWeight: 600, fontSize: '0.82rem' }}>
                                                     Marcar como visto
-                                                </button>
+                                                </button>}
                                             </div>
                                         </div>
                                     </div>
@@ -546,8 +582,12 @@ export default function BuzonNovedades({ usuario, onIr }) {
                                 })
                             )}
                         </div>
+                        </div>
                     </div>
                 </div>
+            )}
+            {chat && usuario?.uid && (
+                <PanelConversaciones usuario={usuario} inicial={chat} onClose={() => setChat(null)} />
             )}
             {esAdmin && verErrores && (
                 <Suspense fallback={null}>

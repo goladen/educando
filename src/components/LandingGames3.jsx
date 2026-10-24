@@ -1438,6 +1438,16 @@ export const MATERIAS_CONFIG = [
         keywords: ['ingles', 'english', 'frances', 'french', 'aleman', 'german', 'idioma', 'lengua extranjera', 'irregular', 'verbo', 'listening', 'speaking', 'grammar'],
         specificIds: ['IRREGULAR_VERBS', 'LISTENING', 'QUIEN_HISTORICO', 'ENIGMIC', 'VANILA'],
     },
+    {
+        id: 'ED_FISICA', label: 'Educación Física', emoji: '🏃', color: '#15803d',
+        keywords: ['educacion fisica', 'deporte', 'deportes', 'futbol', 'baloncesto', 'atletismo', 'escalada', 'climbing', 'juegos motores', 'olimpiadas'],
+        specificIds: ['FUTBOLQUIZZ', 'CLIMBING'],
+    },
+    {
+        id: 'TUTORIA', label: 'Tutoría y aula', emoji: '🍎', color: '#c2410c',
+        keywords: ['tutoria', 'convivencia', 'emociones', 'valores', 'orientacion', 'cohesion de grupo', 'funciones ejecutivas', 'quien es quien'],
+        specificIds: ['FUNCIONES_EJECUTIVAS', 'QUIEN_ES_QUIEN'],
+    },
 ];
 
 // Slug "bonito" por materia para el enlace directo (pikt.es/<slug>) y para reflejarlo en la URL
@@ -1451,6 +1461,8 @@ const MATERIA_ROUTE = {
     TECNOLOGIA: 'tecno',
     PLASTICA: 'plastica',
     IDIOMAS: 'idiomas',
+    ED_FISICA: 'edfisica',
+    TUTORIA: 'tutoria',
 };
 // Mapa inverso (con alias) para reconocer la ruta entrante → id de materia
 const MATERIA_SLUGS = {
@@ -1463,6 +1475,8 @@ const MATERIA_SLUGS = {
     tecno: 'TECNOLOGIA', tecnologia: 'TECNOLOGIA',
     plastica: 'PLASTICA', plastik: 'PLASTICA',
     idiomas: 'IDIOMAS', ingles: 'IDIOMAS',
+    edfisica: 'ED_FISICA', 'educacion-fisica': 'ED_FISICA',
+    tutoria: 'TUTORIA',
 };
 
 const MATH_ONLY_IDS = new Set(['MATHLIVE', 'SIXSEVEN']);
@@ -1485,6 +1499,7 @@ const EXTRA_TOOLS = {
     MINIAPP_CREATOR:    { id: 'MINIAPP_CREATOR',    name: 'Creación App con IA', emoji: '🤖', color: '#0ea5e9' },
     LINEA_TIEMPO:       { id: 'LINEA_TIEMPO',       name: 'Línea del Tiempo', emoji: '🕰️', color: '#2980b9' },
     ROBOTICA_BLOQUES:   { id: 'ROBOTICA_BLOQUES',   name: 'Programación y Robótica', emoji: '🤖', color: '#0EA5E9' },
+    QUIEN_ES_QUIEN:     { id: 'QUIEN_ES_QUIEN',     name: '¿Quién es quién?', emoji: '🕵️', color: '#7c3aed' },
     QUIEN_HISTORICO:    { id: 'QUIEN_HISTORICO',    name: '¿Quién es quién? histórico', emoji: '🧐', color: '#8e44ad' },
 };
 

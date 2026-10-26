@@ -881,10 +881,10 @@ export const GAME_INFO = {
     },
     OVNI: {
         descripcion: 'Juego 3D de clasificar palabras: pilotas un ovni de noche sobre una granja donde pasean vacas, ovejas, cerdos, gallinas y caballos, cada uno con un cartel con una palabra. El enunciado pide una categoría («Abduce: VERBOS») y hay que colocarse encima de los animales correctos y subirlos con el rayo tractor. Si abduces uno equivocado, la nave lo escupe y pierdes una vida. Los animales se asustan y huyen si te acercas (se puede elegir tranquilos, normales o asustadizos).',
-        tipoPreguntas: 'Clasificación en categorías: cada ronda pide una categoría y los animales llevan palabras de esa y de otras. Bancos integrados: categorías gramaticales, agudas/llanas/esdrújulas, clases de vertebrados, pares e impares, vocabulario en inglés y países/capitales/ríos. Además, un bloque de Números que genera rondas nuevas cada vez (Primaria o ESO): primos, compuestos, divisores de un número, múltiplos de un número, fracciones irreducibles, potencias de 2 y de 3, y mayores o menores que un número (en ESO con decimales y negativos); cada número equivocado explica por qué (por ejemplo, 21 = 3 × 7). Al final se muestra qué palabras se confundieron y a qué categoría pertenecían.',
-        biblioteca: 'No necesita recursos: incluye 6 bancos de categorías, un generador de rondas de números y una opción «Mis categorías» para escribir las propias (una categoría por línea).',
-        multiplayer: 'Individual, con teclado (WASD/flechas + espacio) o pantalla táctil (joystick + botón). Se puede proyectar en la pizarra.',
-        materias: ['Lengua y Literatura', 'Inglés', 'Matemáticas', 'Biología', 'Geografía'],
+        tipoPreguntas: 'Clasificación en categorías: cada ronda pide una categoría y los animales llevan palabras de esa y de otras. Bancos integrados por materia, por ejemplo: categorías gramaticales, géneros literarios, países por continentes, etapas de la historia, estados de la materia, fuentes de energía, vertebrados e invertebrados, huesos y músculos, aparatos del cuerpo, familias de instrumentos, materiales, colores y técnicas artísticas, verbos regulares e irregulares, play/go/do con deportes, vocabulario en inglés y francés, tipos de deportes, capacidades físicas, emociones y hábitos saludables. Además, un bloque de Números que genera rondas nuevas cada vez (Primaria o ESO): primos, compuestos, divisores de un número, múltiplos de un número, fracciones irreducibles, potencias de 2 y de 3, y mayores o menores que un número (en ESO con decimales y negativos); cada número equivocado explica por qué (por ejemplo, 21 = 3 × 7). Al final se muestra qué palabras se confundieron y a qué categoría pertenecían.',
+        biblioteca: 'No necesita recursos: 35 bancos de categorías agrupados por las materias de la portada (Matemáticas, Lengua, Geo e Historia, Física y Química, Biología, Música, Tecnología, Plástica, Idiomas, Educación Física y Tutoría), un generador de rondas de números y una opción «Mis categorías» para escribir las propias (una categoría por línea).',
+        multiplayer: 'Individual (3 vidas) o duelo de 2 jugadores en pantalla dividida: dos ovnis en la misma granja con el mismo enunciado, acierto +1 y error −1 (J1 WASD + Espacio, J2 flechas + Enter, o un joystick y un botón por mitad en pantalla táctil). Al acabar se envía el informe al profesor con la configuración y la explicación de cada error. Incluye una ficha en PDF del mismo contenido (con tabla de clasificar y soluciones) para trabajarlo antes de jugar en clase.',
+        materias: ['Universal'],
         etapas: ['Primaria', 'ESO'],
     },
     VANILA: {
@@ -1415,57 +1415,57 @@ export const MATERIAS_CONFIG = [
     {
         id: 'MATEMATICAS', label: 'Matemáticas', emoji: '🔢', color: '#009688',
         keywords: ['matemáticas', 'mates', 'math', 'calculo', 'algebra', 'geometria', 'estadistica', 'probabilidad', 'fraccion', 'ecuacion', 'funcion', 'numero', 'operacion'],
-        specificIds: ['MATH_WORLD_PORTAL', 'GEOMETRIX', 'CALCULO', 'DINERO', 'FRACCIONES', 'ECUACIONES', 'ECUACION_SISTEMAS', 'FUNCIONES', 'GEOMETRÍA_ANALÍTICA', 'POLINOMIOS', 'POTENCIAS_RAICES', 'CALCULADORA', 'ESTADISTICA', 'PROBABILIDAD', 'MATHLE', 'MATHLIVE', 'OLYMPICLIVE', 'SOLAR_SYSTEM'],
+        specificIds: ['MATH_WORLD_PORTAL', 'GEOMETRIX', 'CALCULO', 'DINERO', 'FRACCIONES', 'ECUACIONES', 'ECUACION_SISTEMAS', 'FUNCIONES', 'GEOMETRÍA_ANALÍTICA', 'POLINOMIOS', 'POTENCIAS_RAICES', 'CALCULADORA', 'ESTADISTICA', 'PROBABILIDAD', 'MATHLE', 'MATHLIVE', 'OLYMPICLIVE', 'SOLAR_SYSTEM', 'OVNI'],
     },
     {
         id: 'LENGUA', label: 'Lengua', emoji: '📖', color: '#7B1FA2',
         keywords: ['lengua', 'castellano', 'español', 'literatura', 'gramatica', 'sintaxis', 'vocabulario', 'comprension', 'escritura', 'lectura', 'texto', 'ortografia'],
-        specificIds: ['SINTAXIS', 'STORYCUBES', 'LENGUA_SIGNOS', 'LINEA_TIEMPO', 'VANILA'],
+        specificIds: ['SINTAXIS', 'STORYCUBES', 'LENGUA_SIGNOS', 'LINEA_TIEMPO', 'VANILA', 'OVNI'],
     },
     {
         id: 'GEO_HISTORIA', label: 'Geo e Historia', emoji: '🌍', color: '#F57C00',
         keywords: ['geografia', 'historia', 'sociales', 'ciencias sociales', 'mapa', 'comunidades', 'europa', 'mundo', 'continente', 'pais', 'capital', 'civilizacion', 'cultura', 'prehistoria', 'imperio', 'imperios', 'edad antigua', 'edad media'],
-        specificIds: ['GEOGRAFIA', 'IMPERIOS', 'LINEA_TIEMPO', 'SOLAR_SYSTEM', 'ETIQUETAS'],
+        specificIds: ['GEOGRAFIA', 'IMPERIOS', 'LINEA_TIEMPO', 'SOLAR_SYSTEM', 'ETIQUETAS', 'OVNI'],
     },
     {
         id: 'FISICA_QUIMICA', label: 'Física y Química', emoji: '⚗️', color: '#C62828',
         keywords: ['fisica', 'quimica', 'ciencias', 'energia', 'fuerza', 'reaccion', 'elemento', 'atomo', 'molecula', 'electricidad', 'movimiento', 'calor', 'luz', 'ondas'],
-        specificIds: ['SIMULADORES_FISICA', 'SOLAR_SYSTEM', 'ETIQUETAS'],
+        specificIds: ['SIMULADORES_FISICA', 'SOLAR_SYSTEM', 'ETIQUETAS', 'OVNI'],
     },
     {
         id: 'BIOLOGIA', label: 'Biología', emoji: '🔬', color: '#2E7D32',
         keywords: ['biologia', 'ciencias naturales', 'naturaleza', 'animal', 'planta', 'celula', 'ecosistema', 'anatomia', 'cuerpo', 'organismo', 'evolucion', 'genetica'],
-        specificIds: ['BIOLOGIA', 'SOLAR_SYSTEM', 'ETIQUETAS'],
+        specificIds: ['BIOLOGIA', 'SOLAR_SYSTEM', 'ETIQUETAS', 'OVNI'],
     },
     {
         id: 'MUSICA', label: 'Música', emoji: '🎵', color: '#5E35B1',
         keywords: ['musica', 'music', 'notas', 'instrumento', 'ritmo', 'melodia', 'armonia', 'partitura', 'solfeo', 'cancion'],
-        specificIds: ['MUSICA'],
+        specificIds: ['MUSICA', 'OVNI'],
     },
     {
         id: 'TECNOLOGIA', label: 'Tecnología', emoji: '⚙️', color: '#546E7A',
         keywords: ['tecnologia', 'tecno', 'informatica', 'robotica', 'circuito', 'maquina', 'programacion', 'dibujo tecnico', 'diseño', 'vistas', 'mecanismo'],
-        specificIds: ['VISTAS_DIDRICAS', 'ROBOTICA_BLOQUES'],
+        specificIds: ['VISTAS_DIDRICAS', 'ROBOTICA_BLOQUES', 'OVNI'],
     },
     {
         id: 'PLASTICA', label: 'Plástica', emoji: '🎨', color: '#AD1457',
         keywords: ['plastica', 'arte', 'dibujo', 'visual', 'pintura', 'artistica', 'escultura', 'color', 'forma', 'volumen', 'perspectiva'],
-        specificIds: ['STORYCUBES', 'EAE', 'PUZZLE_IMAGENES', 'VISTAS_DIDRICAS'],
+        specificIds: ['STORYCUBES', 'EAE', 'PUZZLE_IMAGENES', 'VISTAS_DIDRICAS', 'OVNI'],
     },
     {
         id: 'IDIOMAS', label: 'Idiomas', emoji: '🌐', color: '#1565C0',
         keywords: ['ingles', 'english', 'frances', 'french', 'aleman', 'german', 'idioma', 'lengua extranjera', 'irregular', 'verbo', 'listening', 'speaking', 'grammar'],
-        specificIds: ['IRREGULAR_VERBS', 'LISTENING', 'QUIEN_HISTORICO', 'ENIGMIC', 'VANILA'],
+        specificIds: ['IRREGULAR_VERBS', 'LISTENING', 'QUIEN_HISTORICO', 'ENIGMIC', 'VANILA', 'OVNI'],
     },
     {
         id: 'ED_FISICA', label: 'Educación Física', emoji: '🏃', color: '#15803d',
         keywords: ['educacion fisica', 'deporte', 'deportes', 'futbol', 'baloncesto', 'atletismo', 'escalada', 'climbing', 'juegos motores', 'olimpiadas'],
-        specificIds: ['FUTBOLQUIZZ', 'CLIMBING'],
+        specificIds: ['FUTBOLQUIZZ', 'CLIMBING', 'OVNI'],
     },
     {
         id: 'TUTORIA', label: 'Tutoría y aula', emoji: '🍎', color: '#c2410c',
         keywords: ['tutoria', 'convivencia', 'emociones', 'valores', 'orientacion', 'cohesion de grupo', 'funciones ejecutivas', 'quien es quien'],
-        specificIds: ['FUNCIONES_EJECUTIVAS', 'QUIEN_ES_QUIEN'],
+        specificIds: ['FUNCIONES_EJECUTIVAS', 'QUIEN_ES_QUIEN', 'OVNI'],
     },
 ];
 

@@ -96,9 +96,10 @@ export default async function handler(req, res) {
     }
 
     const candidatos = MODELOS.filter(m => !excluir.includes(m));
-    const modelo = candidatos[0];
-    if (!modelo) return res.status(500).json({ error: 'No quedan modelos por probar.', quedan: 0 });
-    const quedan = candidatos.length - 1;
+    if (!candidatos.length) return res.status(500).json({ error: 'No quedan modelos por probar.', quedan: 0 });
+    let indice = 0;
+    let modelo = candidatos[0];
+    let quedan = candidatos.length - 1;
     const fallo = (motivo) => res.status(500).json({ error: motivo, model: modelo, quedan });
     const maxTokens = p.texto ? 6144 : 4096;
 
@@ -116,13 +117,55 @@ export default async function handler(req, res) {
         }
     };
 
-    const cabecerasStream = {
+    const cabecerasStream = () => ({
         'Content-Type': 'text/event-stream; charset=utf-8',
         'Cache-Control': 'no-cache, no-transform',
         'X-Accel-Buffering': 'no',
         'X-Modelo': modelo,
         'X-Quedan': String(quedan),
-    };
+    });
+
+    // --- NVIDIA (streaming) ---
+    // Un modelo retirado o sin acceso («Not found for account», 404, 403) falla al
+    // instante: se pasa al siguiente en esta misma petición en vez de devolver 500.
+    // Los tiempos agotados sí vuelven al navegador (límite de 100 s de Cloudflare).
+    const inicio = Date.now();
+    let upstream, ctrl, timer;
+    while (!modelo.startsWith('gemini:')) {
+        const apiKey = process.env.NVIDIA_API_KEY;
+        if (!apiKey) return fallo('NVIDIA_API_KEY no configurada');
+
+        ctrl = new AbortController();
+        timer = setTimeout(() => ctrl.abort(), TIMEOUT_INICIO_MS);
+        try {
+            upstream = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'text/event-stream',
+                    Authorization: `Bearer ${apiKey}`,
+                },
+                body: JSON.stringify({
+                    model: modelo, messages, temperature: 0.6, max_tokens: maxTokens, stream: true,
+                    ...opcionesModelo(modelo),
+                }),
+                signal: ctrl.signal,
+            });
+        } catch (err) {
+            clearTimeout(timer);
+            return fallo(err.name === 'AbortError' ? 'tiempo agotado esperando respuesta' : err.message);
+        }
+        if (upstream.ok) break;
+
+        clearTimeout(timer);
+        const data = await upstream.json().catch(() => ({}));
+        let motivo = data.detail || data.error?.message || data.error || `HTTP ${upstream.status}`;
+        if (typeof motivo !== 'string') motivo = JSON.stringify(motivo);
+        console.warn(`ia-recurso: ${modelo} → ${motivo}`);
+        if (!quedan || Date.now() - inicio > 20000) return fallo(motivo);
+        modelo = candidatos[++indice];
+        quedan--;
+    }
 
     // --- Gemini ---
     if (modelo.startsWith('gemini:')) {
@@ -130,47 +173,13 @@ export default async function handler(req, res) {
         try { texto = await llamarGemini(modelo.slice(7), messages, maxTokens); }
         catch (e) { return fallo(e.name === 'TimeoutError' ? 'tiempo agotado' : e.message); }
         await registrarUso(texto);
-        res.writeHead(200, cabecerasStream);
+        res.writeHead(200, cabecerasStream());
         res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: texto } }] })}\n\n`);
         res.write('data: [DONE]\n\n');
         return res.end();
     }
 
-    // --- NVIDIA (streaming) ---
-    const apiKey = process.env.NVIDIA_API_KEY;
-    if (!apiKey) return fallo('NVIDIA_API_KEY no configurada');
-
-    const ctrl = new AbortController();
-    let timer = setTimeout(() => ctrl.abort(), TIMEOUT_INICIO_MS);
-
-    let upstream;
-    try {
-        upstream = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Accept: 'text/event-stream',
-                Authorization: `Bearer ${apiKey}`,
-            },
-            body: JSON.stringify({
-                model: modelo, messages, temperature: 0.6, max_tokens: maxTokens, stream: true,
-                ...opcionesModelo(modelo),
-            }),
-            signal: ctrl.signal,
-        });
-    } catch (err) {
-        clearTimeout(timer);
-        return fallo(err.name === 'AbortError' ? 'tiempo agotado esperando respuesta' : err.message);
-    }
-
-    if (!upstream.ok) {
-        clearTimeout(timer);
-        const data = await upstream.json().catch(() => ({}));
-        const motivo = data.detail || data.error?.message || data.error || `HTTP ${upstream.status}`;
-        return fallo(typeof motivo === 'string' ? motivo : JSON.stringify(motivo));
-    }
-
-    res.writeHead(200, cabecerasStream);
+    res.writeHead(200, cabecerasStream());
 
     // Se reenvía el streaming tal cual y a la vez se acumula el texto para validar
     let texto = '';

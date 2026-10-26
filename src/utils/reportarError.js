@@ -124,7 +124,14 @@ export function instalarCapturaErrores() {
             // Leer el motivo de una copia sin bloquear a quien hizo la llamada
             res.clone().text().then((txt) => {
                 let detalle = txt;
-                try { const j = JSON.parse(txt); detalle = j?.error?.message || j?.error || j?.message || txt; } catch { /* no es JSON */ }
+                try {
+                    const j = JSON.parse(txt);
+                    // api/ia-recurso: un modelo que falla con otros por probar no es un
+                    // error para el usuario (el navegador pasa al siguiente modelo)
+                    if (servicio === 'api/ia-recurso' && j?.quedan > 0) return;
+                    detalle = j?.error?.message || j?.error || j?.message || txt;
+                    if (j?.model) detalle = `${j.model}: ${detalle}`;
+                } catch { /* no es JSON */ }
                 reportarError(servicio, `HTTP ${res.status}: ${recortar(detalle, 600)}`, { metodo, estado: res.status });
             }).catch(() => reportarError(servicio, `HTTP ${res.status}`, { metodo, estado: res.status }));
         }

@@ -7,6 +7,7 @@ import useDrivePicker from 'react-google-drive-picker';
 import { procesarArchivoExcel } from './ExcelParser';
 import ModalCrearIA from './components/ModalCrearIA';
 import { JUEGOS_IA } from './iaRecursos';
+import { formatosDisponibles } from './utils/pdfRecurso';
 const GamePlayer = lazy(() => import('./GamePlayer'));
 const ThinkHootGame = lazy(() => import('./ThinkHootGame'));
 const ExpresionArtEscri = lazy(() => import('./ExpresionArtEscri'));
@@ -20,6 +21,7 @@ const MiniAppAdmin = lazy(() => import('./components/MiniAppAdmin'));
 const EditorMathLive = lazy(() => import('./components/EditorMathLive'));
 const MathLive = lazy(() => import('./MathLive'));
 const OlympicLive = lazy(() => import('./OlympicLive'));
+const ModalPdfRecurso = lazy(() => import('./components/ModalPdfRecurso'));
 const CazaBurbujasGame = lazy(() => import('./CazaBurbujasGame'));
 const PikatronRun = lazy(() => import('./PikatronRun'));
 const SopaDeLetrasGame = lazy(() => import('./SopaDeLetrasGame'));
@@ -153,6 +155,7 @@ function ProfesorDashboardInterno({ usuario, googleToken }) {
     const [recursoResultados, setRecursoResultados] = useState(null);
     const [recursoProbando, setRecursoProbando] = useState(null);
     const [recursoInspeccionando, setRecursoInspeccionando] = useState(null);
+    const [recursoPdf, setRecursoPdf] = useState(null); // ficha en papel del recurso
     const [listaResultados, setListaResultados] = useState([]);
     const [hostGameData, setHostGameData] = useState(null);
     const [modalCopiarApp, setModalCopiarApp] = useState(null);
@@ -1511,7 +1514,7 @@ function ProfesorDashboardInterno({ usuario, googleToken }) {
                                         <Gamepad2 size={18} />
                                     </button>
                                 )}
-                            <button onClick={() => mostrarCodigo(r)} style={btnStyle('#FFF3E0', '#FF9800')}><Key size={18} /></button><button onClick={() => abrirEdicion(r)} style={btnStyle('#E3F2FD', '#1565C0')}><Pencil size={18} /></button><button onClick={() => abrirResultados(r)} style={btnStyle('#E8F5E9', '#2E7D32')}><BarChart2 size={18} /></button><button onClick={() => eliminarRecurso(r.id)} style={btnStyle('#FFEBEE', '#C62828')}><Trash2 size={18} /></button></>) : (<><button onClick={() => probarJuego(r)} style={{ ...btnStyle('#E1BEE7', '#8E24AA'), flex: 2 }}>Probar</button><button onClick={() => setRecursoInspeccionando(r)} style={btnStyle('#eee', '#333')}><Eye size={18} /></button><button onClick={() => copiarRecurso(r)} style={{ ...btnStyle('#27ae60', 'white'), flex: 2 }}>Copiar</button></>))}</div></div>))}
+                            {tienePdf(r) && <button onClick={() => setRecursoPdf(r)} style={btnStyle('#EDE7F6', '#6D28D9')} title="Ficha en PDF para los alumnos"><FileText size={18} /></button>}<button onClick={() => mostrarCodigo(r)} style={btnStyle('#FFF3E0', '#FF9800')}><Key size={18} /></button><button onClick={() => abrirEdicion(r)} style={btnStyle('#E3F2FD', '#1565C0')}><Pencil size={18} /></button><button onClick={() => abrirResultados(r)} style={btnStyle('#E8F5E9', '#2E7D32')}><BarChart2 size={18} /></button><button onClick={() => eliminarRecurso(r.id)} style={btnStyle('#FFEBEE', '#C62828')}><Trash2 size={18} /></button></>) : (<><button onClick={() => probarJuego(r)} style={{ ...btnStyle('#E1BEE7', '#8E24AA'), flex: 2 }}>Probar</button><button onClick={() => setRecursoInspeccionando(r)} style={btnStyle('#eee', '#333')}><Eye size={18} /></button>{tienePdf(r) && <button onClick={() => setRecursoPdf(r)} style={btnStyle('#EDE7F6', '#6D28D9')} title="Ficha en PDF para los alumnos"><FileText size={18} /></button>}<button onClick={() => copiarRecurso(r)} style={{ ...btnStyle('#27ae60', 'white'), flex: 2 }}>Copiar</button></>))}</div></div>))}
                         
                         {/* MENSAJE DE VACÍO + INSTRUCCIONES */}
                         {vista === 'MIS_RECURSOS' && recursos.length === 0 && !cargando && (
@@ -1745,6 +1748,7 @@ function ProfesorDashboardInterno({ usuario, googleToken }) {
             )}
 
             {hostGameData?.fase === 'CONFIG_HOST' && (<ModalOverlay onClose={() => setHostGameData(null)}><h2>📡 Lanzar en Vivo</h2><select value={hostGameData.hojaElegida} onChange={e => setHostGameData({ ...hostGameData, hojaElegida: e.target.value })} style={{ width: '100%', padding: '10px', marginBottom: '20px' }}>{hostGameData.hojasDisponibles.map(h => <option key={h} value={h}>{h}</option>)}</select><button onClick={confirmarLanzamientoHost} style={{ width: '100%', padding: '15px', background: '#9C27B0', color: 'white', border: 'none', borderRadius: '5px' }}>🚀 GENERAR CÓDIGO</button></ModalOverlay>)}
+            {recursoPdf && <Suspense fallback={null}><ModalPdfRecurso recurso={recursoPdf} onClose={() => setRecursoPdf(null)} /></Suspense>}
             {recursoInspeccionando && <ModalOverlay onClose={() => setRecursoInspeccionando(null)}><h2>{recursoInspeccionando.titulo}</h2><div style={{ maxHeight: '400px', overflowY: 'auto' }}>{recursoInspeccionando.hojas.map((h, i) => <div key={i}><h4>{h.nombreHoja}</h4><ul>{h.preguntas.map((p, j) => <li key={j}><b>{p.letra ? `Letra ${p.letra}: ` : ''}{p.pregunta}</b> &rarr; {p.respuesta || p.correcta}</li>)}</ul></div>)}</div><button onClick={() => { copiarRecurso(recursoInspeccionando); setRecursoInspeccionando(null) }} style={actionBtnStyle('#27ae60')}>Copiar</button></ModalOverlay>}
             {mostrandoPerfil && (<UserProfile usuario={usuario} perfil={perfilProfesor} onClose={() => setMostrandoPerfil(false)} onUpdate={() => cargarPerfilProfesor()} />)}
             {/* --- MODAL SELECTOR DE JUEGO (PRO-BURBUJAS) --- */}
@@ -1867,6 +1871,8 @@ function ProfesorDashboardInterno({ usuario, googleToken }) {
 }
 
 const ModalOverlay = ({ children, onClose }) => (<div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}><div style={{ background: 'white', padding: '30px', borderRadius: '12px', width: '90%', maxWidth: '500px', position: 'relative' }}><button onClick={onClose} style={{ position: 'absolute', top: '10px', right: '10px', border: 'none', background: 'none', cursor: 'pointer' }}><X /></button>{children}</div></div>);
+// ¿Se puede sacar una ficha en papel de este recurso?
+const tienePdf = (r) => r.tipoJuego === 'LISTENING_RECURSO' || formatosDisponibles(r).length > 0;
 const btnStyle = (bg, color) => ({ flex: 1, padding: '8px', background: bg, color: color, border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center' });
 const actionBtnStyle = (bg) => ({ padding: '10px 20px', background: bg, color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', fontWeight: 'bold' });
 const inputStyle = { width: '100%', padding: '10px', borderRadius: '5px', border: '1px solid #ccc', boxSizing: 'border-box', marginBottom: '10px' };

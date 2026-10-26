@@ -3,6 +3,13 @@ import * as THREE from 'three';
 import { guardarRegistroLocal } from './utils/registrosLocales';
 import { sonidoActivo, setSonidoActivo, sonidoCorrecto, sonidoIncorrecto, sonidoFinal } from './utils/sonidosFeedback';
 import { TIPOS_MATES, crearGeneradorMates } from './ovniMates';
+import { cargarModelosGranja, instanciarModelo, ponerClip } from './ovniModelos';
+import { crearAmbiente, vientoEnHierba } from './ovniAmbiente';
+import { generarFichaOvni } from './ovniFicha';
+import { db } from './firebase';
+import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
+import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
+import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 
 // ─── Ovni Abducción ──────────────────────────────────────────────────────────
 // Granja 3D de noche (three.js): el enunciado pide una categoría («Abduce: VERBOS»)
@@ -12,9 +19,51 @@ import { TIPOS_MATES, crearGeneradorMates } from './ovniMates';
 // caminar/correr/pastar/asustarse), sin modelos externos.
 
 // ─── Bancos de categorías (modo libre) ───────────────────────────────────────
+// Materias de la portada (mismos ids y colores que las áreas de LandingGames3)
+export const AREAS_OVNI = [
+    { id: 'MATEMATICAS', label: 'Matemáticas', emoji: '🔢', color: '#009688' },
+    { id: 'LENGUA', label: 'Lengua', emoji: '📖', color: '#7B1FA2' },
+    { id: 'GEO_HISTORIA', label: 'Geo e Historia', emoji: '🌍', color: '#F57C00' },
+    { id: 'FISICA_QUIMICA', label: 'Física y Química', emoji: '⚗️', color: '#C62828' },
+    { id: 'BIOLOGIA', label: 'Biología', emoji: '🔬', color: '#2E7D32' },
+    { id: 'MUSICA', label: 'Música', emoji: '🎵', color: '#5E35B1' },
+    { id: 'TECNOLOGIA', label: 'Tecnología', emoji: '⚙️', color: '#546E7A' },
+    { id: 'PLASTICA', label: 'Plástica', emoji: '🎨', color: '#AD1457' },
+    { id: 'IDIOMAS', label: 'Idiomas', emoji: '🌐', color: '#1565C0' },
+    { id: 'ED_FISICA', label: 'Educación Física', emoji: '🏃', color: '#15803d' },
+    { id: 'TUTORIA', label: 'Tutoría', emoji: '🍎', color: '#c2410c' },
+];
+
+// Una palabra no puede estar en dos categorías del mismo banco (se corrige por pertenencia).
 export const BANCOS_OVNI = [
+    // ── Matemáticas (además del generador 🔢 Números) ──
     {
-        id: 'gramatica', nombre: 'Categorías gramaticales', emoji: '📝', materia: 'Lengua',
+        id: 'pares', area: 'MATEMATICAS', nombre: 'Pares e impares', emoji: '🔢',
+        categorias: {
+            'Números pares': ['12', '38', '140', '6', '74', '1.000', '256', '90', '18', '2', '532', '48', '316', '64'],
+            'Números impares': ['7', '15', '99', '3', '121', '57', '1', '333', '45', '89', '701', '23', '505', '77'],
+        },
+    },
+    {
+        id: 'figuras', area: 'MATEMATICAS', nombre: 'Polígonos, figuras curvas y cuerpos', emoji: '🔷',
+        categorias: {
+            'Polígonos': ['triángulo', 'cuadrado', 'pentágono', 'hexágono', 'rombo', 'trapecio', 'rectángulo', 'octógono', 'romboide', 'decágono'],
+            'Figuras curvas': ['círculo', 'elipse', 'óvalo', 'semicírculo', 'corona circular', 'sector circular'],
+            'Cuerpos geométricos': ['cubo', 'prisma', 'pirámide', 'cilindro', 'cono', 'esfera', 'tetraedro', 'octaedro', 'ortoedro', 'dodecaedro'],
+        },
+    },
+    {
+        id: 'unidades', area: 'MATEMATICAS', nombre: 'Unidades de medida', emoji: '📏',
+        categorias: {
+            'Longitud': ['metro', 'kilómetro', 'centímetro', 'milímetro', 'decímetro', 'hectómetro', 'milla', 'pulgada'],
+            'Masa': ['gramo', 'kilogramo', 'miligramo', 'tonelada', 'decagramo', 'hectogramo', 'quintal'],
+            'Capacidad': ['litro', 'mililitro', 'centilitro', 'decilitro', 'kilolitro', 'hectolitro', 'decalitro'],
+            'Tiempo': ['segundo', 'minuto', 'hora', 'día', 'semana', 'década', 'siglo', 'milenio'],
+        },
+    },
+    // ── Lengua ──
+    {
+        id: 'gramatica', area: 'LENGUA', nombre: 'Categorías gramaticales', emoji: '📝',
         categorias: {
             'Sustantivos': ['casa', 'perro', 'libro', 'mesa', 'árbol', 'ciudad', 'amigo', 'montaña', 'río', 'ventana', 'lápiz', 'camino', 'flor', 'escuela', 'nube'],
             'Verbos': ['correr', 'saltar', 'comer', 'escribir', 'cantar', 'leer', 'dormir', 'jugar', 'pensar', 'nadar', 'bailar', 'vivir', 'abrir', 'mirar', 'subir'],
@@ -23,7 +72,16 @@ export const BANCOS_OVNI = [
         },
     },
     {
-        id: 'acentuacion', nombre: 'Agudas, llanas y esdrújulas', emoji: '✍️', materia: 'Lengua',
+        id: 'nexos', area: 'LENGUA', nombre: 'Determinantes, pronombres, preposiciones y conjunciones', emoji: '🔗',
+        categorias: {
+            'Determinantes': ['el', 'un', 'una', 'unos', 'mi', 'tu', 'mis', 'sus', 'cada', 'este', 'esa', 'aquellos', 'dos', 'tres'],
+            'Pronombres personales': ['yo', 'tú', 'él', 'nosotros', 'vosotras', 'ellos', 'me', 'te', 'nos', 'os', 'usted', 'conmigo', 'contigo'],
+            'Preposiciones': ['a', 'ante', 'bajo', 'con', 'contra', 'de', 'desde', 'en', 'entre', 'hacia', 'hasta', 'para', 'por', 'según', 'sin', 'sobre', 'tras'],
+            'Conjunciones': ['y', 'e', 'ni', 'o', 'u', 'pero', 'sino', 'aunque', 'porque', 'pues'],
+        },
+    },
+    {
+        id: 'acentuacion', area: 'LENGUA', nombre: 'Agudas, llanas y esdrújulas', emoji: '✍️',
         categorias: {
             'Agudas': ['canción', 'reloj', 'papel', 'café', 'sofá', 'camión', 'pared', 'feliz', 'jabón', 'ratón', 'mamá', 'vivir', 'corazón', 'compás', 'salud'],
             'Llanas': ['árbol', 'mesa', 'lápiz', 'casa', 'fácil', 'libro', 'azúcar', 'cárcel', 'perro', 'útil', 'silla', 'césped', 'zapato', 'móvil', 'ventana'],
@@ -31,7 +89,78 @@ export const BANCOS_OVNI = [
         },
     },
     {
-        id: 'vertebrados', nombre: 'Clases de vertebrados', emoji: '🦎', materia: 'Ciencias',
+        id: 'generos', area: 'LENGUA', nombre: 'Géneros literarios', emoji: '📚',
+        categorias: {
+            'Lírica': ['poema', 'soneto', 'oda', 'elegía', 'haiku', 'copla', 'égloga', 'madrigal'],
+            'Narrativa': ['novela', 'cuento', 'fábula', 'leyenda', 'epopeya', 'mito', 'cantar de gesta'],
+            'Teatro': ['tragedia', 'comedia', 'drama', 'entremés', 'sainete', 'farsa', 'auto sacramental'],
+        },
+    },
+    // ── Geografía e Historia ──
+    {
+        id: 'geografia', area: 'GEO_HISTORIA', nombre: 'Países, capitales y ríos', emoji: '🌍',
+        categorias: {
+            'Países': ['Francia', 'Portugal', 'Italia', 'Alemania', 'Grecia', 'Noruega', 'Polonia', 'Suecia', 'Irlanda', 'Austria'],
+            'Capitales': ['Madrid', 'París', 'Roma', 'Berlín', 'Lisboa', 'Atenas', 'Oslo', 'Varsovia', 'Dublín', 'Viena'],
+            'Ríos': ['Ebro', 'Tajo', 'Duero', 'Guadalquivir', 'Danubio', 'Rin', 'Sena', 'Támesis', 'Loira', 'Volga'],
+        },
+    },
+    {
+        id: 'continentes', area: 'GEO_HISTORIA', nombre: 'Países por continentes', emoji: '🗺️',
+        categorias: {
+            'Europa': ['Francia', 'Italia', 'Alemania', 'Portugal', 'Grecia', 'Suecia', 'Polonia', 'Noruega', 'Irlanda', 'Austria', 'Hungría', 'Bélgica'],
+            'América': ['México', 'Brasil', 'Argentina', 'Perú', 'Chile', 'Colombia', 'Canadá', 'Cuba', 'Venezuela', 'Uruguay', 'Bolivia', 'Ecuador'],
+            'Asia': ['China', 'Japón', 'India', 'Tailandia', 'Vietnam', 'Corea del Sur', 'Indonesia', 'Filipinas', 'Mongolia', 'Nepal', 'Irán', 'Pakistán'],
+            'África': ['Egipto', 'Marruecos', 'Kenia', 'Nigeria', 'Sudáfrica', 'Etiopía', 'Senegal', 'Ghana', 'Argelia', 'Túnez', 'Angola', 'Mali'],
+            'Oceanía': ['Australia', 'Nueva Zelanda', 'Fiyi', 'Papúa Nueva Guinea', 'Samoa', 'Tonga', 'Vanuatu'],
+        },
+    },
+    {
+        id: 'espana', area: 'GEO_HISTORIA', nombre: 'Geografía de España', emoji: '🇪🇸',
+        categorias: {
+            'Cordilleras y sierras': ['Pirineos', 'Sistema Central', 'Sierra Nevada', 'Cordillera Cantábrica', 'Sistema Ibérico', 'Sierra Morena', 'Montes de Toledo', 'Cordillera Bética'],
+            'Ríos de España': ['Ebro', 'Tajo', 'Duero', 'Guadalquivir', 'Guadiana', 'Miño', 'Júcar', 'Segura', 'Turia', 'Nervión'],
+            'Islas': ['Mallorca', 'Menorca', 'Ibiza', 'Tenerife', 'Gran Canaria', 'Lanzarote', 'Fuerteventura', 'La Palma', 'Formentera', 'La Gomera'],
+            'Comunidades autónomas': ['Aragón', 'Cataluña', 'Galicia', 'Andalucía', 'Castilla y León', 'Extremadura', 'Murcia', 'Navarra', 'Asturias', 'Cantabria'],
+        },
+    },
+    {
+        id: 'edades', area: 'GEO_HISTORIA', nombre: 'Etapas de la historia', emoji: '🏺',
+        categorias: {
+            'Prehistoria': ['Paleolítico', 'Neolítico', 'pinturas rupestres', 'dólmenes', 'menhires', 'Edad de los Metales', 'Atapuerca', 'Altamira'],
+            'Edad Antigua': ['pirámides de Egipto', 'Imperio romano', 'Julio César', 'democracia ateniense', 'Cleopatra', 'acueducto de Segovia', 'Alejandro Magno', 'Mesopotamia', 'Coliseo'],
+            'Edad Media': ['castillos', 'feudalismo', 'Al-Ándalus', 'Carlomagno', 'Reconquista', 'catedrales góticas', 'Camino de Santiago', 'monasterios románicos', 'Alhambra'],
+            'Edad Moderna': ['descubrimiento de América', 'Renacimiento', 'Reyes Católicos', 'Felipe II', 'Leonardo da Vinci', 'Barroco', 'Lutero', 'Cervantes'],
+            'Edad Contemporánea': ['Revolución francesa', 'Napoleón', 'Primera Guerra Mundial', 'Segunda Guerra Mundial', 'Constitución de 1978', 'llegada a la Luna', 'internet'],
+        },
+    },
+    // ── Física y Química ──
+    {
+        id: 'estados', area: 'FISICA_QUIMICA', nombre: 'Estados de la materia (a 20 °C)', emoji: '🧊',
+        categorias: {
+            'Sólidos': ['hierro', 'madera', 'hielo', 'sal', 'piedra', 'oro', 'azúcar', 'vidrio', 'cobre', 'diamante'],
+            'Líquidos': ['agua', 'aceite', 'leche', 'mercurio', 'vinagre', 'gasolina', 'alcohol', 'zumo', 'sangre'],
+            'Gases': ['oxígeno', 'nitrógeno', 'helio', 'vapor de agua', 'dióxido de carbono', 'hidrógeno', 'butano', 'neón', 'metano'],
+        },
+    },
+    {
+        id: 'elementos', area: 'FISICA_QUIMICA', nombre: 'Metales, no metales y gases nobles', emoji: '⚛️',
+        categorias: {
+            'Metales': ['hierro', 'cobre', 'oro', 'plata', 'sodio', 'aluminio', 'zinc', 'plomo', 'calcio', 'magnesio', 'potasio', 'níquel'],
+            'No metales': ['carbono', 'oxígeno', 'nitrógeno', 'azufre', 'fósforo', 'cloro', 'flúor', 'yodo', 'hidrógeno', 'bromo'],
+            'Gases nobles': ['helio', 'neón', 'argón', 'kriptón', 'xenón', 'radón'],
+        },
+    },
+    {
+        id: 'energia', area: 'FISICA_QUIMICA', nombre: 'Fuentes de energía', emoji: '⚡',
+        categorias: {
+            'Renovables': ['solar', 'eólica', 'hidráulica', 'geotérmica', 'mareomotriz', 'biomasa', 'undimotriz'],
+            'No renovables': ['petróleo', 'carbón', 'gas natural', 'nuclear', 'gasóleo', 'propano'],
+        },
+    },
+    // ── Biología ──
+    {
+        id: 'vertebrados', area: 'BIOLOGIA', nombre: 'Clases de vertebrados', emoji: '🦎',
         categorias: {
             'Mamíferos': ['delfín', 'murciélago', 'ballena', 'león', 'vaca', 'ornitorrinco', 'canguro', 'lobo', 'conejo', 'elefante', 'foca', 'jirafa'],
             'Aves': ['pingüino', 'avestruz', 'águila', 'gallina', 'loro', 'búho', 'cigüeña', 'paloma', 'flamenco', 'colibrí', 'pato', 'gorrión'],
@@ -41,14 +170,105 @@ export const BANCOS_OVNI = [
         },
     },
     {
-        id: 'pares', nombre: 'Pares e impares', emoji: '🔢', materia: 'Matemáticas',
+        id: 'invertebrados', area: 'BIOLOGIA', nombre: 'Invertebrados', emoji: '🐌',
         categorias: {
-            'Números pares': ['12', '38', '140', '6', '74', '1.000', '256', '90', '18', '2', '532', '48', '316', '64'],
-            'Números impares': ['7', '15', '99', '3', '121', '57', '1', '333', '45', '89', '701', '23', '505', '77'],
+            'Insectos': ['hormiga', 'abeja', 'mariposa', 'escarabajo', 'mosca', 'saltamontes', 'mosquito', 'libélula', 'mariquita'],
+            'Arácnidos': ['araña', 'escorpión', 'garrapata', 'ácaro', 'tarántula'],
+            'Moluscos': ['caracol', 'pulpo', 'calamar', 'mejillón', 'almeja', 'babosa', 'sepia', 'ostra'],
+            'Crustáceos': ['cangrejo', 'gamba', 'langosta', 'percebe', 'cochinilla', 'bogavante', 'langostino'],
         },
     },
     {
-        id: 'english', nombre: 'English vocabulary', emoji: '🇬🇧', materia: 'Inglés',
+        id: 'dieta', area: 'BIOLOGIA', nombre: 'Herbívoros, carnívoros y omnívoros', emoji: '🥕',
+        categorias: {
+            'Herbívoros': ['vaca', 'caballo', 'conejo', 'jirafa', 'elefante', 'cebra', 'oveja', 'koala', 'hipopótamo', 'panda'],
+            'Carnívoros': ['león', 'tigre', 'lobo', 'águila', 'tiburón', 'cocodrilo', 'búho', 'lince', 'foca', 'serpiente'],
+            'Omnívoros': ['cerdo', 'oso', 'gallina', 'ratón', 'mapache', 'jabalí', 'chimpancé', 'cuervo'],
+        },
+    },
+    {
+        id: 'locomotor', area: 'BIOLOGIA', nombre: 'Huesos y músculos', emoji: '🦴',
+        categorias: {
+            'Huesos': ['fémur', 'tibia', 'peroné', 'húmero', 'cúbito', 'radio', 'cráneo', 'costillas', 'esternón', 'clavícula', 'omóplato', 'rótula', 'pelvis', 'vértebras', 'falanges'],
+            'Músculos': ['bíceps', 'tríceps', 'deltoides', 'pectoral', 'abdominales', 'gemelos', 'cuádriceps', 'glúteo', 'diafragma', 'sartorio', 'masetero', 'dorsal ancho'],
+        },
+    },
+    {
+        id: 'aparatos', area: 'BIOLOGIA', nombre: 'Aparatos y sistemas del cuerpo', emoji: '🫀',
+        categorias: {
+            'Sistema circulatorio': ['corazón', 'arterias', 'venas', 'capilares', 'aorta', 'aurícula', 'ventrículo', 'glóbulos rojos', 'plaquetas'],
+            'Aparato respiratorio': ['pulmones', 'tráquea', 'bronquios', 'alvéolos', 'laringe', 'fosas nasales', 'bronquiolos'],
+            'Aparato digestivo': ['estómago', 'esófago', 'intestino delgado', 'intestino grueso', 'hígado', 'páncreas', 'vesícula biliar', 'recto'],
+            'Sistema nervioso': ['cerebro', 'cerebelo', 'neuronas', 'médula espinal', 'nervios', 'bulbo raquídeo'],
+            'Aparato excretor': ['riñones', 'vejiga', 'uréteres', 'uretra', 'nefronas'],
+        },
+    },
+    // ── Música ──
+    {
+        id: 'instrumentos', area: 'MUSICA', nombre: 'Familias de instrumentos', emoji: '🎻',
+        categorias: {
+            'Cuerda': ['violín', 'viola', 'violonchelo', 'contrabajo', 'guitarra', 'arpa', 'laúd', 'bandurria', 'ukelele'],
+            'Viento madera': ['flauta', 'clarinete', 'oboe', 'fagot', 'saxofón', 'flautín', 'corno inglés'],
+            'Viento metal': ['trompeta', 'trombón', 'tuba', 'trompa', 'fliscorno', 'bombardino'],
+            'Percusión': ['tambor', 'timbal', 'platillos', 'xilófono', 'triángulo', 'castañuelas', 'bombo', 'pandereta', 'maracas'],
+        },
+    },
+    {
+        id: 'lenguaje_musical', area: 'MUSICA', nombre: 'Dinámica, tempo y figuras', emoji: '🎼',
+        categorias: {
+            'Dinámica': ['piano', 'forte', 'mezzoforte', 'fortissimo', 'pianissimo', 'crescendo', 'diminuendo'],
+            'Tempo': ['allegro', 'adagio', 'andante', 'presto', 'largo', 'moderato', 'lento', 'vivace'],
+            'Figuras musicales': ['redonda', 'blanca', 'negra', 'corchea', 'semicorchea', 'fusa', 'semifusa'],
+        },
+    },
+    // ── Tecnología ──
+    {
+        id: 'materiales', area: 'TECNOLOGIA', nombre: 'Materiales de uso técnico', emoji: '🔩',
+        categorias: {
+            'Metales': ['hierro', 'acero', 'cobre', 'aluminio', 'bronce', 'latón', 'estaño', 'titanio'],
+            'Plásticos': ['PVC', 'polietileno', 'metacrilato', 'nailon', 'poliestireno', 'PET', 'baquelita', 'teflón'],
+            'Maderas': ['pino', 'roble', 'haya', 'contrachapado', 'aglomerado', 'DM', 'nogal', 'cedro'],
+            'Pétreos y cerámicos': ['mármol', 'granito', 'ladrillo', 'porcelana', 'cerámica', 'pizarra', 'arcilla', 'azulejo'],
+        },
+    },
+    {
+        id: 'perifericos', area: 'TECNOLOGIA', nombre: 'Periféricos del ordenador', emoji: '🖥️',
+        categorias: {
+            'Entrada': ['teclado', 'ratón', 'micrófono', 'escáner', 'webcam', 'joystick', 'lector de huellas'],
+            'Salida': ['monitor', 'impresora', 'altavoces', 'auriculares', 'proyector'],
+            'Almacenamiento': ['disco duro', 'pendrive', 'tarjeta SD', 'DVD', 'SSD', 'disco externo'],
+        },
+    },
+    // ── Plástica ──
+    {
+        id: 'colores', area: 'PLASTICA', nombre: 'Colores cálidos, fríos y neutros', emoji: '🌈',
+        categorias: {
+            'Colores cálidos': ['rojo', 'naranja', 'amarillo', 'ocre', 'granate', 'coral', 'bermellón'],
+            'Colores fríos': ['azul', 'verde', 'violeta', 'turquesa', 'añil', 'cian'],
+            'Colores neutros': ['blanco', 'negro', 'gris', 'gris perla', 'gris marengo'],
+        },
+    },
+    {
+        id: 'tecnicas', area: 'PLASTICA', nombre: 'Técnicas artísticas', emoji: '🖌️',
+        categorias: {
+            'Técnicas secas': ['lápiz de grafito', 'carboncillo', 'ceras', 'pastel', 'lápices de colores', 'sanguina'],
+            'Técnicas húmedas': ['acuarela', 'témpera', 'óleo', 'acrílico', 'tinta china', 'gouache'],
+            'Grabado y estampación': ['linograbado', 'xilografía', 'aguafuerte', 'serigrafía', 'monotipo'],
+        },
+    },
+    {
+        id: 'artistas', area: 'PLASTICA', nombre: 'Artistas y movimientos', emoji: '🖼️',
+        categorias: {
+            'Renacimiento': ['Leonardo da Vinci', 'Miguel Ángel', 'Rafael', 'Botticelli', 'Tiziano'],
+            'Barroco': ['Velázquez', 'Rembrandt', 'Caravaggio', 'Rubens', 'Murillo'],
+            'Impresionismo': ['Monet', 'Renoir', 'Degas', 'Pissarro', 'Sisley'],
+            'Cubismo': ['Picasso', 'Braque', 'Juan Gris'],
+            'Surrealismo': ['Dalí', 'Magritte', 'Miró', 'Max Ernst'],
+        },
+    },
+    // ── Idiomas ──
+    {
+        id: 'english', area: 'IDIOMAS', nombre: 'English vocabulary', emoji: '🇬🇧',
         categorias: {
             'Animals': ['dog', 'horse', 'rabbit', 'tiger', 'sheep', 'monkey', 'duck', 'snake', 'whale', 'mouse'],
             'Colours': ['red', 'yellow', 'purple', 'green', 'orange', 'pink', 'brown', 'grey', 'blue', 'black'],
@@ -57,11 +277,68 @@ export const BANCOS_OVNI = [
         },
     },
     {
-        id: 'geografia', nombre: 'Países, capitales y ríos', emoji: '🌍', materia: 'Geografía',
+        id: 'sports', area: 'IDIOMAS', nombre: 'Sports: play, go or do?', emoji: '⚽',
         categorias: {
-            'Países': ['Francia', 'Portugal', 'Italia', 'Alemania', 'Grecia', 'Noruega', 'Polonia', 'Suecia', 'Irlanda', 'Austria'],
-            'Capitales': ['Madrid', 'París', 'Roma', 'Berlín', 'Lisboa', 'Atenas', 'Oslo', 'Varsovia', 'Dublín', 'Viena'],
-            'Ríos': ['Ebro', 'Tajo', 'Duero', 'Guadalquivir', 'Danubio', 'Rin', 'Sena', 'Támesis', 'Loira', 'Volga'],
+            'Play': ['football', 'basketball', 'tennis', 'volleyball', 'chess', 'golf', 'rugby', 'hockey', 'baseball', 'badminton'],
+            'Go': ['swimming', 'skiing', 'cycling', 'running', 'climbing', 'surfing', 'skating', 'fishing', 'hiking', 'sailing'],
+            'Do': ['karate', 'judo', 'yoga', 'gymnastics', 'athletics', 'aerobics', 'taekwondo', 'ballet', 'pilates'],
+        },
+    },
+    {
+        id: 'regular_irregular', area: 'IDIOMAS', nombre: 'Regular or irregular verbs', emoji: '🔁',
+        categorias: {
+            'Regular verbs': ['play', 'walk', 'watch', 'jump', 'clean', 'listen', 'cook', 'study', 'dance', 'open', 'visit', 'help'],
+            'Irregular verbs': ['go', 'eat', 'swim', 'write', 'buy', 'see', 'drink', 'run', 'take', 'come', 'sing', 'sleep'],
+        },
+    },
+    {
+        id: 'past_forms', area: 'IDIOMAS', nombre: 'Irregular verbs: past simple or participle', emoji: '⏮️',
+        categorias: {
+            'Past simple': ['went', 'ate', 'wrote', 'saw', 'took', 'spoke', 'broke', 'drove', 'gave', 'swam', 'began', 'drank'],
+            'Past participle': ['gone', 'eaten', 'written', 'seen', 'taken', 'spoken', 'broken', 'driven', 'given', 'swum', 'begun', 'drunk'],
+        },
+    },
+    {
+        id: 'francais', area: 'IDIOMAS', nombre: 'Vocabulaire français', emoji: '🇫🇷',
+        categorias: {
+            'Animaux': ['chien', 'chat', 'cheval', 'oiseau', 'vache', 'lapin', 'poisson', 'souris'],
+            'Couleurs': ['rouge', 'bleu', 'vert', 'jaune', 'noir', 'blanc', 'rose', 'violet'],
+            'Nourriture': ['pain', 'fromage', 'pomme', 'lait', 'gâteau', 'riz', 'poulet', 'soupe', 'beurre', 'confiture'],
+            'Vêtements': ['chemise', 'pantalon', 'robe', 'chaussures', 'chapeau', 'jupe', 'écharpe', 'manteau'],
+        },
+    },
+    // ── Educación Física ──
+    {
+        id: 'deportes', area: 'ED_FISICA', nombre: 'Tipos de deportes', emoji: '🏅',
+        categorias: {
+            'Deportes colectivos': ['fútbol', 'baloncesto', 'balonmano', 'voleibol', 'rugby', 'waterpolo', 'hockey', 'béisbol'],
+            'Deportes individuales': ['atletismo', 'natación', 'ciclismo', 'gimnasia rítmica', 'escalada', 'esquí', 'triatlón', 'golf'],
+            'Deportes de raqueta': ['tenis', 'bádminton', 'pádel', 'squash', 'tenis de mesa', 'frontenis'],
+            'Deportes de combate': ['judo', 'kárate', 'boxeo', 'taekwondo', 'esgrima', 'lucha libre'],
+        },
+    },
+    {
+        id: 'capacidades', area: 'ED_FISICA', nombre: 'Capacidades físicas básicas', emoji: '💪',
+        categorias: {
+            'Resistencia': ['carrera continua', 'test de Cooper', 'nadar 1 km', 'correr 20 minutos', 'ciclismo de fondo', 'test de la Course Navette'],
+            'Fuerza': ['flexiones', 'abdominales', 'sentadillas', 'levantar pesas', 'dominadas', 'balón medicinal'],
+            'Velocidad': ['sprint de 30 m', 'salida de tacos', 'reacción a una señal', 'carrera de 60 m', 'relevos'],
+            'Flexibilidad': ['estiramientos', 'yoga', 'test sit and reach', 'tocar las puntas de los pies', 'el puente', 'spagat'],
+        },
+    },
+    // ── Tutoría ──
+    {
+        id: 'emociones', area: 'TUTORIA', nombre: 'Emociones agradables y desagradables', emoji: '😊',
+        categorias: {
+            'Emociones agradables': ['alegría', 'calma', 'gratitud', 'orgullo', 'entusiasmo', 'amor', 'satisfacción', 'ilusión'],
+            'Emociones desagradables': ['tristeza', 'miedo', 'rabia', 'vergüenza', 'culpa', 'envidia', 'frustración', 'asco'],
+        },
+    },
+    {
+        id: 'habitos', area: 'TUTORIA', nombre: 'Hábitos saludables', emoji: '🥗',
+        categorias: {
+            'Hábitos saludables': ['dormir 9 horas', 'beber agua', 'comer fruta', 'hacer deporte', 'lavarse los dientes', 'desayunar bien', 'leer antes de dormir'],
+            'Hábitos poco saludables': ['pantallas hasta tarde', 'saltarse el desayuno', 'bollería a diario', 'pasar el día sentado', 'refrescos azucarados', 'dormir poco', 'comida rápida'],
         },
     },
 ];
@@ -135,6 +412,10 @@ const RADIO_RAYO = 3.4;      // distancia horizontal para poder abducir
 const ESCALA_ANIMAL = 1.3;
 const ANIMALES_POR_RONDA = 8;
 const VIDAS = 3;
+export const COLORES_JUGADOR = [
+    { hex: 0x00ffcc, css: '#00f0ff', nombre: 'cian' },
+    { hex: 0xff4fd8, css: '#ff4fd8', nombre: 'magenta' },
+];
 
 const ANIMO = {
     tranquilos: { alerta: 0, espera: 1 },
@@ -149,8 +430,11 @@ const TIPOS = {
     cerdo: { paseo: 1.0, huida: 5.5, alto: 1.45 },
     pollo: { paseo: 2.2, huida: 6.0, alto: 1.3 },
     caballo: { paseo: 1.6, huida: 8.0, alto: 2.9 },
+    // estos dos solo existen como modelo .glb (no tienen versión procedural)
+    llama: { paseo: 1.0, huida: 6.0, alto: 2.4 },
+    perro: { paseo: 1.8, huida: 7.0, alto: 1.15 },
 };
-const NOMBRES_TIPOS = Object.keys(TIPOS);
+const NOMBRES_TIPOS = ['vaca', 'oveja', 'cerdo', 'pollo', 'caballo'];
 
 const lerpAng = (a, b, t) => {
     const d = ((((b - a + Math.PI) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) - Math.PI;
@@ -412,7 +696,8 @@ const construirAnimal = (F, tipo) => {
 };
 
 // ─── Ovni ────────────────────────────────────────────────────────────────────
-const construirOvni = (F) => {
+const construirOvni = (F, colorHex = 0x00ffcc) => {
+    const tinte = new THREE.Color(colorHex);
     const ovni = new THREE.Group();
     const inclin = new THREE.Group();
     const giro = new THREE.Group();
@@ -434,13 +719,13 @@ const construirOvni = (F) => {
     const luces = [];
     for (let i = 0; i < 14; i++) {
         const a = (i / 14) * Math.PI * 2;
-        const l = new THREE.Mesh(geoLuz, new THREE.MeshBasicMaterial({ color: 0x00ffcc }));
+        const l = new THREE.Mesh(geoLuz, new THREE.MeshBasicMaterial({ color: tinte.clone() }));
         l.position.set(Math.cos(a) * 2.78, 0.06, Math.sin(a) * 2.78);
         giro.add(l); luces.push(l);
     }
 
     const cupula = new THREE.Mesh(new THREE.SphereGeometry(1.3, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2),
-        new THREE.MeshStandardMaterial({ color: 0x67e8f9, transparent: true, opacity: 0.45, emissive: 0x0891b2, emissiveIntensity: 0.5, roughness: 0.1 }));
+        new THREE.MeshStandardMaterial({ color: tinte.clone().lerp(new THREE.Color(0xffffff), 0.4), transparent: true, opacity: 0.45, emissive: tinte.clone().multiplyScalar(0.55), emissiveIntensity: 0.5, roughness: 0.1 }));
     cupula.position.y = 0.45;
     inclin.add(cupula);
 
@@ -455,11 +740,12 @@ const construirOvni = (F) => {
     F.bola(alien, 0xfacc15, 0.07, 0.07, 0.07, -0.16, 1.12, 0, { emissive: 0xfacc15, emissiveIntensity: 1 });
 
     const panza = new THREE.Mesh(new THREE.CircleGeometry(1.0, 24),
-        new THREE.MeshBasicMaterial({ color: 0x5eead4, transparent: true, opacity: 0.9 }));
+        new THREE.MeshBasicMaterial({ color: tinte.clone(), transparent: true, opacity: 0.9 }));
     panza.rotation.x = Math.PI / 2; panza.position.y = -0.56;
     giro.add(panza);
 
-    const foco = new THREE.SpotLight(0x67e8f9, 250, 32, 0.42, 0.6, 2);
+    // luz casi blanca con un toque del color de la nave: ilumina el suelo sin «pintarlo»
+    const foco = new THREE.SpotLight(tinte.clone().lerp(new THREE.Color(0xffffff), 0.6), 110, 32, 0.42, 1, 2);
     foco.position.set(0, -0.6, 0);
     const destinoFoco = new THREE.Object3D(); destinoFoco.position.set(0, -12, 0);
     ovni.add(foco); ovni.add(destinoFoco); foco.target = destinoFoco;
@@ -468,22 +754,24 @@ const construirOvni = (F) => {
 };
 
 // ─── Motor del juego ─────────────────────────────────────────────────────────
-function crearMotor(contenedor, opciones, cb) {
-    const { generarRonda, rondas: totalRondas, animo } = opciones;
+export function crearMotor(contenedor, opciones, cb) {
+    const { generarRonda, rondas: totalRondas, animo, jugadores: nJug = 1, modelos = null } = opciones;
+    // con modelos .glb: los animales cargados + la gallina procedural; si no, todos procedurales
+    const tiposDisponibles = modelos && Object.keys(modelos).length ? [...Object.keys(modelos), 'pollo'] : NOMBRES_TIPOS;
     const animoCfg = ANIMO[animo] || ANIMO.normal;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
+    renderer.shadowMap.autoUpdate = false; // se marca needsUpdate una vez por fotograma (2 vistas)
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1;
+    renderer.toneMappingExposure = 0.95;
     contenedor.appendChild(renderer.domElement);
     renderer.domElement.style.display = 'block';
 
     const escena = new THREE.Scene();
-    escena.fog = new THREE.Fog(0x2b1d50, 60, 175);
-    const camara = new THREE.PerspectiveCamera(55, 1, 0.1, 800);
+    escena.fog = new THREE.Fog(0x2b1d50, 38, 150); // la distancia se funde con el morado del horizonte
 
     const F = crearFabrica();
     const texturas = [];
@@ -512,8 +800,9 @@ function crearMotor(contenedor, opciones, cb) {
     halo.scale.set(90, 90, 1); halo.position.copy(luna.position); cielo.add(halo);
 
     // Luces
-    escena.add(new THREE.HemisphereLight(0x9fb3ff, 0x2d4a1e, 1.15));
-    const lunaLuz = new THREE.DirectionalLight(0xdbe4ff, 1.7);
+    // noche: luz de luna fría y poca luz ambiente, para que destaquen el rayo, las luciérnagas y las ventanas
+    escena.add(new THREE.HemisphereLight(0x7f8fe0, 0x1f3014, 0.85));
+    const lunaLuz = new THREE.DirectionalLight(0xc7d2fe, 1.5);
     lunaLuz.position.set(-30, 60, 25);
     lunaLuz.castShadow = true;
     lunaLuz.shadow.mapSize.set(2048, 2048);
@@ -534,7 +823,7 @@ function crearMotor(contenedor, opciones, cb) {
         if (fuera > 0) y = Math.min(fuera / 30, 1) * (Math.sin(x * 0.05) * 4 + Math.cos(z * 0.045) * 5 + Math.sin((x + z) * 0.11) * 1.5 + 4);
         pos.setY(i, y);
         const v = Math.random() * 0.06;
-        cTmp.setHSL(0.27 + v * 0.3, 0.5, (fuera > 0 ? 0.2 : 0.27) + v);
+        cTmp.setHSL(0.27 + v * 0.3, 0.45, (fuera > 0 ? 0.15 : 0.2) + v);
         colores.push(cTmp.r, cTmp.g, cTmp.b);
     }
     geoSuelo.setAttribute('color', new THREE.Float32BufferAttribute(colores, 3));
@@ -553,7 +842,7 @@ function crearMotor(contenedor, opciones, cb) {
         q.setFromEuler(new THREE.Euler((Math.random() - 0.5) * 0.4, Math.random() * Math.PI, (Math.random() - 0.5) * 0.4));
         const k = 0.6 + Math.random() * 0.9; s.set(k, k * (0.7 + Math.random() * 0.8), k);
         m4.compose(p, q, s); matas.setMatrixAt(i, m4);
-        cTmp.setHSL(0.24 + Math.random() * 0.08, 0.55, 0.25 + Math.random() * 0.12);
+        cTmp.setHSL(0.24 + Math.random() * 0.08, 0.45, 0.21 + Math.random() * 0.1);
         matas.setColorAt(i, cTmp);
     }
     matas.instanceColor.needsUpdate = true;
@@ -596,6 +885,13 @@ function crearMotor(contenedor, opciones, cb) {
     F.caja(casa, 0x6b4423, 1.6, 2.8, 0.2, 0, 1.4, 4.05);
     const farol = new THREE.PointLight(0xfbbf24, 60, 30, 2); farol.position.set(28, 4, -80); escena.add(farol);
 
+    // Ambiente: viento en la hierba, luciérnagas, niebla baja, halos de luz y efectos del rayo
+    const amb = crearAmbiente(escena, {
+        limite: LIMITE, alturaOvni: ALTURA_OVNI, radioRayo: RADIO_RAYO, texturas,
+        halos: [[-22, 9.8, -75.5, 0xffd27a, 7], [25.2, 3.4, -81.9, 0xffc04d, 4.5], [30.8, 3.4, -81.9, 0xffc04d, 4.5], [28, 4, -80, 0xffb02e, 9]],
+    });
+    vientoEnHierba(matas.material, amb.uViento);
+
     // Árboles alrededor
     const geoTronco = new THREE.CylinderGeometry(0.35, 0.5, 2.4, 6); geoTronco.translate(0, 1.2, 0);
     const geoCopa = new THREE.ConeGeometry(2.2, 4.5, 7); geoCopa.translate(0, 4.6, 0);
@@ -621,39 +917,59 @@ function crearMotor(contenedor, opciones, cb) {
         const paca = new THREE.Mesh(geoPaca, F.mat(0xd4a84b)); paca.position.set(x, 1, z); paca.rotation.y = Math.random() * 3; paca.castShadow = true; escena.add(paca);
     });
 
-    // Ovni
-    const O = construirOvni(F);
-    escena.add(O.ovni);
-    const ovni = { x: 0, z: 30, vx: 0, vz: 0 };
-
-    // Rayo tractor
-    const uniformsRayo = { uTiempo: { value: 0 }, uColor: { value: new THREE.Color(0x00ffcc) }, uFuerza: { value: 0 } };
+    // Rayo tractor (uno por nave)
     const geoRayo = new THREE.CylinderGeometry(0.7, RADIO_RAYO * 0.85, 1, 32, 1, true);
     geoRayo.translate(0, 0.5, 0);
-    const rayo = new THREE.Mesh(geoRayo, new THREE.ShaderMaterial({
-        uniforms: uniformsRayo, transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
-        vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
-        fragmentShader: `uniform float uTiempo; uniform vec3 uColor; uniform float uFuerza; varying vec2 vUv;
-            void main(){
-                float bandas = 0.55 + 0.45 * sin(vUv.y * 26.0 + uTiempo * 9.0);
-                float borde = 0.6 + 0.4 * sin(vUv.x * 6.2832 * 6.0 + uTiempo * 2.0);
-                float a = (0.25 + 0.75 * vUv.y) * bandas * borde * uFuerza;
-                gl_FragColor = vec4(uColor * 1.4, a * 0.55);
-            }`,
-    }));
-    rayo.visible = false;
-    escena.add(rayo);
+    const crearRayo = (colorHex) => {
+        const uniforms = { uTiempo: { value: 0 }, uColor: { value: new THREE.Color(colorHex) }, uFuerza: { value: 0 } };
+        const malla = new THREE.Mesh(geoRayo, new THREE.ShaderMaterial({
+            uniforms, transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
+            vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+            fragmentShader: `uniform float uTiempo; uniform vec3 uColor; uniform float uFuerza; varying vec2 vUv;
+                void main(){
+                    float bandas = 0.55 + 0.45 * sin(vUv.y * 26.0 + uTiempo * 9.0);
+                    float borde = 0.6 + 0.4 * sin(vUv.x * 6.2832 * 6.0 + uTiempo * 2.0);
+                    float a = (0.25 + 0.75 * vUv.y) * bandas * borde * uFuerza;
+                    gl_FragColor = vec4(uColor * 1.4, a * 0.55);
+                }`,
+        }));
+        malla.visible = false;
+        escena.add(malla);
+        return { malla, uniforms };
+    };
 
-    // Círculo del rayo en el suelo y marcador del objetivo
-    const circulo = new THREE.Mesh(new THREE.RingGeometry(RADIO_RAYO - 0.25, RADIO_RAYO, 48).rotateX(-Math.PI / 2),
-        new THREE.MeshBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.45, depthWrite: false }));
-    circulo.position.y = 0.06; escena.add(circulo);
-    const marca = new THREE.Mesh(new THREE.RingGeometry(1.5, 1.85, 6, 1).rotateX(-Math.PI / 2),
-        new THREE.MeshBasicMaterial({ color: 0x4ade80, transparent: true, opacity: 0.9, depthWrite: false }));
-    marca.position.y = 0.08; marca.visible = false; escena.add(marca);
+    // ── Jugadores: nave, rayo, círculo, marcador y cámara propios ──
+    const colorRojo = new THREE.Color(0xff3355);
+    const blanco = new THREE.Color(0xffffff);
+    const jugadores = Array.from({ length: nJug }, (_, idx) => {
+        const color = new THREE.Color(COLORES_JUGADOR[idx].hex);
+        const O = construirOvni(F, COLORES_JUGADOR[idx].hex);
+        escena.add(O.ovni);
+        const rayo = crearRayo(COLORES_JUGADOR[idx].hex);
+        const circulo = new THREE.Mesh(new THREE.RingGeometry(RADIO_RAYO - 0.25, RADIO_RAYO, 48).rotateX(-Math.PI / 2),
+            new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.45, depthWrite: false }));
+        circulo.position.y = 0.06; escena.add(circulo);
+        const marca = new THREE.Mesh(new THREE.RingGeometry(1.5, 1.85, 6, 1).rotateX(-Math.PI / 2),
+            new THREE.MeshBasicMaterial({ color: 0x4ade80, transparent: true, opacity: 0.9, depthWrite: false }));
+        marca.position.y = 0.08 + idx * 0.01; marca.visible = false; escena.add(marca);
+        const camara = new THREE.PerspectiveCamera(55, 1, 0.1, 800);
+        const x0 = nJug === 2 ? (idx === 0 ? -14 : 14) : 0;
+        camara.position.set(x0, 17, 44);
+        return {
+            idx, color, O, rayo, circulo, marca, camara,
+            mirar: new THREE.Vector3(x0, 0, 20),
+            ovni: { x: x0, z: 30, vx: 0, vz: 0 },
+            vidas: VIDAS, aciertos: 0, fallos: 0, puntos: 0,
+            aciertosLista: [], fallosLista: [],
+            abduciendo: null, objetivoId: null, objetivoVisible: false,
+            rayoRojoHasta: 0, temblor: 0,
+        };
+    });
+
+    amb.prepararJugadores(jugadores);
 
     // Partículas (explosiones de color)
-    const NP = 500;
+    const NP = 600;
     const pPos = new Float32Array(NP * 3).fill(-999);
     const pCol = new Float32Array(NP * 3);
     const pVel = new Float32Array(NP * 3);
@@ -682,14 +998,11 @@ function crearMotor(contenedor, opciones, cb) {
     texturas.push(texAlerta, texMareo);
 
     // ── Estado de la partida ──
-    const estado = {
-        ronda: 0, objetivo: null, animales: [], vidas: VIDAS,
-        aciertos: 0, fallos: 0, fallosLista: [], aciertosLista: [],
-        abduciendo: null, objetivoId: null, pausaHasta: 0, terminado: false,
-        rayoRojoHasta: 0, temblor: 0, ultimoSusto: 0,
-    };
+    const estado = { ronda: 0, objetivo: null, animales: [], pausaHasta: 0, terminado: false, ultimoSusto: 0 };
+
     const quitarAnimal = (a) => {
         if (a.rig.root.parent) a.rig.root.parent.remove(a.rig.root);
+        if (a.modelo) { a.modelo.mixer.stopAllAction(); a.modelo.mixer.uncacheRoot(a.modelo.obj); }
         a.cartel.material.map.dispose();
         a.cartel.material.dispose();
         a.icono.material.dispose();
@@ -697,11 +1010,21 @@ function crearMotor(contenedor, opciones, cb) {
     };
 
     const crearAnimal = ({ texto: palabra, correcta, explicacion }, id, x, z) => {
-        const tipo = NOMBRES_TIPOS[Math.floor(Math.random() * NOMBRES_TIPOS.length)];
-        const rig = construirAnimal(F, tipo);
+        const tipo = tiposDisponibles[Math.floor(Math.random() * tiposDisponibles.length)];
+        let rig; let modelo = null;
+        if (modelos?.[tipo]) {
+            // modelo animado: el .glb mide 1 de alto, se escala a la altura del tipo
+            modelo = instanciarModelo(modelos[tipo], TIPOS[tipo].alto / ESCALA_ANIMAL);
+            rig = { root: new THREE.Group(), torso: new THREE.Group(), cabeza: new THREE.Group(), patas: [], cola: null, alas: [], baseTorso: 0, bipedo: false };
+            rig.root.add(modelo.obj);
+            rig.root.scale.setScalar(ESCALA_ANIMAL);
+            ponerClip(modelo, 'Idle', 0);
+        } else {
+            rig = construirAnimal(F, tipo);
+        }
         const { tex, aspecto } = texturaCartel(palabra);
         const cartel = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthWrite: false }));
-        const hCartel = 0.62;
+        const hCartel = 0.8;
         cartel.scale.set(aspecto * hCartel, hCartel, 1);
         cartel.position.y = TIPOS[tipo].alto / ESCALA_ANIMAL + 0.45;
         cartel.renderOrder = 10;
@@ -715,19 +1038,20 @@ function crearMotor(contenedor, opciones, cb) {
         rig.root.rotation.y = Math.random() * Math.PI * 2;
         escena.add(rig.root);
         return {
-            id, tipo, palabra, correcta, explicacion, rig, cartel, icono, hCartel, aspecto,
-            x, y: 0, z, vx: 0, vz: 0, vy: 0,
+            id, tipo, palabra, correcta, explicacion, rig, modelo, cartel, icono, hCartel, aspecto,
+            x, y: 0, z, vx: 0, vz: 0, vy: 0, por: null,
             estado: 'PASEO', t: Math.random() * 2, fase: Math.random() * 6, amp: 0, aparicion: 0,
             fuera: false,
         };
     };
 
+    const resumenJugador = (j) => ({
+        vidas: j.vidas, aciertos: j.aciertos, fallos: j.fallos, puntos: j.puntos,
+    });
+
     const emitirHud = () => {
         const quedan = estado.animales.filter(a => !a.fuera && a.correcta).length;
-        cb.onHud({
-            ronda: estado.ronda + 1, totalRondas, objetivo: estado.objetivo, quedan,
-            vidas: estado.vidas, aciertos: estado.aciertos, fallos: estado.fallos,
-        });
+        cb.onHud({ ronda: estado.ronda + 1, totalRondas, objetivo: estado.objetivo, quedan, jugadores: jugadores.map(resumenJugador) });
     };
 
     const empezarRonda = (i) => {
@@ -741,15 +1065,15 @@ function crearMotor(contenedor, opciones, cb) {
             for (let intento = 0; intento < 40; intento++) {
                 x = (Math.random() * 2 - 1) * (LIMITE - 6);
                 z = (Math.random() * 2 - 1) * (LIMITE - 6);
-                const lejosOvni = Math.hypot(x - ovni.x, z - ovni.z) > 12;
-                if (lejosOvni && puestos.every(([px, pz]) => Math.hypot(px - x, pz - z) > 9)) break;
+                const lejos = jugadores.every(j => Math.hypot(x - j.ovni.x, z - j.ovni.z) > 12);
+                if (lejos && puestos.every(([px, pz]) => Math.hypot(px - x, pz - z) > 9)) break;
             }
             puestos.push([x, z]);
             const a = crearAnimal(it, `${i}-${idx}`, x, z);
             a.aparicion = -idx * 0.12; // aparecen escalonados
             return a;
         });
-        estado.abduciendo = null;
+        jugadores.forEach(j => { j.abduciendo = null; });
         cb.onRonda({ ronda: i + 1, totalRondas, objetivo: estado.objetivo });
         emitirHud();
     };
@@ -757,27 +1081,37 @@ function crearMotor(contenedor, opciones, cb) {
     const terminar = (ganado) => {
         if (estado.terminado || destruido) return;
         estado.terminado = true;
+        const j0 = jugadores[0];
         cb.onFin({
-            ganado, aciertos: estado.aciertos, fallos: estado.fallos,
-            fallosLista: estado.fallosLista, aciertosLista: estado.aciertosLista,
-            rondasCompletadas: ganado ? totalRondas : estado.ronda, totalRondas,
+            ganado, totalRondas,
+            rondasCompletadas: ganado ? totalRondas : estado.ronda,
+            aciertos: j0.aciertos, fallos: j0.fallos,
+            fallosLista: j0.fallosLista, aciertosLista: j0.aciertosLista,
+            jugadores: jugadores.map(j => ({ ...resumenJugador(j), aciertosLista: j.aciertosLista, fallosLista: j.fallosLista })),
         });
     };
 
     // ── Controles ──
+    // 1 jugador: WASD o flechas + Espacio/Enter. 2 jugadores: J1 WASD + Espacio, J2 flechas + Enter.
     const teclas = new Set();
-    const joy = { x: 0, y: 0, activo: false };
-    const abducir = () => {
-        if (estado.terminado || estado.abduciendo || estado.objetivoId == null) return;
-        const a = estado.animales.find(an => an.id === estado.objetivoId);
+    const joys = jugadores.map(() => ({ x: 0, y: 0, activo: false }));
+    const abducir = (idx = 0) => {
+        const j = jugadores[idx];
+        if (!j || estado.terminado || j.abduciendo || j.objetivoId == null) return;
+        const a = estado.animales.find(an => an.id === j.objetivoId);
         if (!a || a.fuera || a.estado === 'ABDUCCION' || a.estado === 'CAIDA') return;
-        a.estado = 'ABDUCCION'; a.vy = 0.5; a.icono.visible = false;
-        estado.abduciendo = a;
+        a.estado = 'ABDUCCION'; a.vy = 0.5; a.icono.visible = false; a.por = j;
+        j.abduciendo = a;
+        amb.onda(a.x, a.z, j.color, 4, 0.7);
         sfx.rayo();
     };
     const alPulsar = (e) => {
         const k = e.key.toLowerCase();
-        if (k === ' ' || k === 'enter') { e.preventDefault(); abducir(); return; }
+        if (k === ' ' || k === 'enter') {
+            e.preventDefault();
+            abducir(nJug === 2 && k === 'enter' ? 1 : 0);
+            return;
+        }
         if (k.startsWith('arrow')) e.preventDefault();
         teclas.add(k);
     };
@@ -785,38 +1119,69 @@ function crearMotor(contenedor, opciones, cb) {
     window.addEventListener('keydown', alPulsar);
     window.addEventListener('keyup', alSoltar);
 
-    const entrada = () => {
+    const entrada = (idx) => {
+        const joy = joys[idx];
         if (joy.activo) return { x: joy.x, z: joy.y };
+        const wasd = nJug === 1 || idx === 0;
+        const flechas = nJug === 1 || idx === 1;
         let x = 0, z = 0;
-        if (teclas.has('arrowup') || teclas.has('w')) z -= 1;
-        if (teclas.has('arrowdown') || teclas.has('s')) z += 1;
-        if (teclas.has('arrowleft') || teclas.has('a')) x -= 1;
-        if (teclas.has('arrowright') || teclas.has('d')) x += 1;
+        if ((flechas && teclas.has('arrowup')) || (wasd && teclas.has('w'))) z -= 1;
+        if ((flechas && teclas.has('arrowdown')) || (wasd && teclas.has('s'))) z += 1;
+        if ((flechas && teclas.has('arrowleft')) || (wasd && teclas.has('a'))) x -= 1;
+        if ((flechas && teclas.has('arrowright')) || (wasd && teclas.has('d'))) x += 1;
         const l = Math.hypot(x, z);
         return l > 1 ? { x: x / l, z: z / l } : { x, z };
     };
 
-    // ── Tamaño ──
+    // ── Tamaño y reparto de pantalla ──
+    // Con 2 jugadores: en horizontal, izquierda/derecha; en vertical, arriba/abajo.
+    let vistas = [];
     const redimensionar = () => {
         const w = contenedor.clientWidth || 1, h = contenedor.clientHeight || 1;
         renderer.setSize(w, h);
-        camara.aspect = w / h;
-        // en vertical (móvil) alejamos un poco la cámara
-        camara.fov = w / h < 1 ? 70 : 55;
-        camara.updateProjectionMatrix();
+        let disposicion = 'solo';
+        if (nJug === 1) vistas = [{ x: 0, y: 0, w, h }];
+        else if (w >= h) { disposicion = 'h'; vistas = [{ x: 0, y: 0, w: w / 2, h }, { x: w / 2, y: 0, w: w / 2, h }]; }
+        else { disposicion = 'v'; vistas = [{ x: 0, y: h / 2, w, h: h / 2 }, { x: 0, y: 0, w, h: h / 2 }]; }
+        jugadores.forEach((j, i) => {
+            const v = vistas[i];
+            j.camara.aspect = v.w / v.h;
+            // en vistas estrechas o verticales alejamos un poco la cámara
+            j.camara.fov = v.w / v.h < 1 ? 70 : 55;
+            j.camara.updateProjectionMatrix();
+        });
+        cb.onDisposicion?.(disposicion);
     };
     const ro = new ResizeObserver(redimensionar);
     ro.observe(contenedor);
     redimensionar();
 
-    const mirar = new THREE.Vector3(0, 0, 20);
-    camara.position.set(0, 21, 46);
+    // Elige el clip según el estado y ajusta su velocidad a la del animal
+    const animarModelo = (a, vel, dt) => {
+        const m = a.modelo;
+        const alto = TIPOS[a.tipo].alto;
+        let clip = 'Idle'; let ritmo = 1;
+        if (a.estado === 'ABDUCCION') { clip = 'Run'; ritmo = 1.9; }
+        else if (a.estado === 'CAIDA') clip = 'Jump';
+        else if (a.estado === 'HUIDA') { clip = 'Run'; ritmo = THREE.MathUtils.clamp(vel / (alto * 1.6), 0.6, 1.6); }
+        else if (a.estado === 'PASEO' && vel > 0.05) {
+            clip = vel < alto * 0.45 ? 'WalkSlow' : 'Walk';
+            ritmo = THREE.MathUtils.clamp(vel / (alto * (clip === 'Walk' ? 0.55 : 0.35)), 0.5, 1.8);
+        }
+        ponerClip(m, clip, clip === 'Run' ? 0.15 : 0.3);
+        if (m.accion) m.accion.timeScale = ritmo;
+        m.mixer.update(dt);
+    };
 
     // ── Actualización de cada animal ──
     const actualizarAnimal = (a, dt, t) => {
         const tipoCfg = TIPOS[a.tipo];
-        const dx = a.x - ovni.x, dz = a.z - ovni.z;
-        const dist = Math.hypot(dx, dz);
+        // se asusta de la nave más cercana
+        let cerca = jugadores[0];
+        let dist = Infinity;
+        jugadores.forEach(j => { const d = Math.hypot(a.x - j.ovni.x, a.z - j.ovni.z); if (d < dist) { dist = d; cerca = j; } });
+        const dx = a.x - cerca.ovni.x, dz = a.z - cerca.ovni.z;
+        const algunaAbduce = jugadores.some(j => j.abduciendo);
         let salto = 0;
 
         if (a.aparicion < 1) {
@@ -834,7 +1199,7 @@ function crearMotor(contenedor, opciones, cb) {
                     a.vx = Math.sin(ang) * v; a.vz = Math.cos(ang) * v; a.t = 1.5 + Math.random() * 3;
                 } else { a.vx = 0; a.vz = 0; a.t = 1.5 + Math.random() * 2.5; }
             }
-            if (animoCfg.alerta > 0 && dist < animoCfg.alerta && !estado.abduciendo && a.aparicion >= 1) {
+            if (animoCfg.alerta > 0 && dist < animoCfg.alerta && !(nJug === 1 && algunaAbduce) && a.aparicion >= 1) {
                 a.estado = 'ALERTA'; a.t = animoCfg.espera; a.vx = 0; a.vz = 0;
                 a.icono.material.map = texAlerta; a.icono.visible = true;
             }
@@ -856,13 +1221,14 @@ function crearMotor(contenedor, opciones, cb) {
             if (a.t < 0.6) { a.vx *= 1 - suave(3, dt); a.vz *= 1 - suave(3, dt); }
             if (a.t <= 0 || dist > animoCfg.alerta * 3) { a.estado = 'PASEO'; a.t = 0.5; a.icono.visible = false; }
         } else if (a.estado === 'ABDUCCION') {
+            const nave = a.por.ovni;
             a.vy = Math.min(a.vy + dt * 5, 6);
             a.y += a.vy * dt;
-            a.x += (ovni.x - a.x) * suave(4, dt);
-            a.z += (ovni.z - a.z) * suave(4, dt);
+            a.x += (nave.x - a.x) * suave(4, dt);
+            a.z += (nave.z - a.z) * suave(4, dt);
             a.vx = 0; a.vz = 0;
             a.rig.root.rotation.y += dt * (2 + a.y);
-            if (a.y >= ALTURA_OVNI - 1.4) resolverAbduccion(a);
+            if (a.y >= ALTURA_OVNI - 1.4) resolverAbduccion(a, a.por);
         } else if (a.estado === 'CAIDA') {
             a.vy -= 25 * dt;
             a.y += a.vy * dt;
@@ -890,10 +1256,12 @@ function crearMotor(contenedor, opciones, cb) {
             if (a.z > LIMITE) { a.z = LIMITE; a.vz = -Math.abs(a.vz); }
         }
 
-        // ── Animación del esqueleto ──
+        // ── Animación: clips del .glb o esqueleto procedural ──
         const rig = a.rig;
         const vel = Math.hypot(a.vx, a.vz);
         const forcejeo = a.estado === 'ABDUCCION' || a.estado === 'CAIDA';
+        if (a.modelo) animarModelo(a, vel, dt);
+        else {
         const ampObjetivo = forcejeo ? 0.9 : Math.min(vel * (a.tipo === 'pollo' ? 0.35 : 0.2), 0.75);
         a.amp += (ampObjetivo - a.amp) * suave(8, dt);
         a.fase += dt * (forcejeo ? 18 : (2 + vel * (a.tipo === 'pollo' ? 5 : 2.6)));
@@ -917,6 +1285,7 @@ function crearMotor(contenedor, opciones, cb) {
             const aleteo = vel > 2 || forcejeo ? 0.4 + Math.sin(t * 32) * 0.6 : 0.05;
             ala.rotation.z = aleteo * ala.userData.lado * -1;
         });
+        }
         if (vel > 0.1 && a.estado !== 'ALERTA') {
             rig.root.rotation.y = lerpAng(rig.root.rotation.y, Math.atan2(a.vx, a.vz), suave(a.estado === 'HUIDA' ? 10 : 4, dt));
         }
@@ -932,121 +1301,150 @@ function crearMotor(contenedor, opciones, cb) {
         rig.root.position.set(a.x, a.y + salto, a.z);
 
         // el cartel del objetivo se agranda
-        const kc = estado.objetivoId === a.id ? 1.3 : 1;
+        const kc = jugadores.some(j => j.objetivoId === a.id) ? 1.3 : 1;
         a.cartel.scale.set(a.aspecto * a.hCartel * kc, a.hCartel * kc, 1);
     };
 
-    const resolverAbduccion = (a) => {
-        estado.abduciendo = null;
+    const quedanCorrectas = () => estado.animales.filter(an => !an.fuera && an.correcta).length;
+
+    const resolverAbduccion = (a, j) => {
+        j.abduciendo = null;
+        a.por = null;
+        const { x, z } = j.ovni;
         if (a.correcta) {
-            estado.aciertos++;
-            estado.aciertosLista.push({ palabra: a.palabra, categoria: estado.objetivo });
-            explosion(ovni.x, ALTURA_OVNI - 1, ovni.z, 0x4ade80, 90, 8);
-            explosion(ovni.x, ALTURA_OVNI - 1, ovni.z, 0xfde047, 40, 5);
+            j.aciertos++; j.puntos++;
+            j.aciertosLista.push({ palabra: a.palabra, categoria: estado.objetivo });
+            explosion(x, ALTURA_OVNI - 1, z, 0x4ade80, 90, 8);
+            explosion(x, ALTURA_OVNI - 1, z, 0xfde047, 40, 5);
+            amb.destello(j, 0x4ade80);
+            amb.onda(x, z, 0x4ade80, 8, 1.0);
             quitarAnimal(a);
             sonidoCorrecto();
-            cb.onAviso({ tipo: 'ok', texto: `✅ «${a.palabra}» → ${estado.objetivo}` });
+            cb.onAviso({ tipo: 'ok', jugador: j.idx, texto: `✅ «${a.palabra}» → ${estado.objetivo}${nJug === 2 ? ' · +1' : ''}` });
             emitirHud();
-            const quedan = estado.animales.filter(an => !an.fuera && an.correcta).length;
-            if (quedan === 0) {
+            if (quedanCorrectas() === 0) {
                 if (estado.ronda + 1 >= totalRondas) {
-                    estado.pausaHasta = reloj.elapsedTime + 1.4;
+                    estado.pausaHasta = reloj.getElapsed() + 1.4;
                     setTimeout(() => terminar(true), 1400);
                 } else {
                     cb.onAviso({ tipo: 'ronda', texto: '🌟 ¡Ronda completada!' });
                     const sig = estado.ronda + 1;
-                    estado.pausaHasta = reloj.elapsedTime + 1.6;
+                    estado.pausaHasta = reloj.getElapsed() + 1.6;
                     setTimeout(() => { if (!estado.terminado && !destruido) empezarRonda(sig); }, 1600);
                 }
             }
         } else {
-            estado.fallos++;
-            estado.vidas--;
-            estado.fallosLista.push({ palabra: a.palabra, explicacion: a.explicacion, buscabas: estado.objetivo });
+            j.fallos++;
+            // en solitario se pierde una vida; en duelo se resta un punto
+            if (nJug === 1) j.vidas--; else j.puntos--;
+            j.fallosLista.push({ palabra: a.palabra, explicacion: a.explicacion, buscabas: estado.objetivo });
             a.estado = 'CAIDA'; a.vy = 2;
             const ang = Math.random() * Math.PI * 2;
             a.vx = Math.sin(ang) * 3.5; a.vz = Math.cos(ang) * 3.5;
-            explosion(ovni.x, ALTURA_OVNI - 1, ovni.z, 0xef4444, 60, 6);
-            estado.rayoRojoHasta = reloj.elapsedTime + 0.7;
-            estado.temblor = 0.6;
+            explosion(x, ALTURA_OVNI - 1, z, 0xef4444, 60, 6);
+            amb.destello(j, 0xff3355);
+            amb.onda(x, z, 0xff3355, 6, 0.8);
+            j.rayoRojoHasta = reloj.getElapsed() + 0.7;
+            j.temblor = 0.6;
             sonidoIncorrecto();
-            cb.onAviso({ tipo: 'mal', texto: `❌ ${a.explicacion || `«${a.palabra}» no es de ${estado.objetivo}`}` });
+            cb.onAviso({ tipo: 'mal', jugador: j.idx, texto: `❌ ${a.explicacion || `«${a.palabra}» no es de ${estado.objetivo}`}${nJug === 2 ? ' · −1' : ''}` });
             emitirHud();
-            if (estado.vidas <= 0) {
-                estado.pausaHasta = reloj.elapsedTime + 1.6;
+            if (nJug === 1 && j.vidas <= 0) {
+                estado.pausaHasta = reloj.getElapsed() + 1.6;
                 setTimeout(() => terminar(false), 1600);
             }
         }
     };
 
     // ── Bucle ──
-    const reloj = new THREE.Clock();
+    const reloj = new THREE.Timer();
+    reloj.connect(document); // al volver a la pestaña no da un salto de tiempo
     let raf = 0;
     let destruido = false;
-    const colorRayoNormal = new THREE.Color(0x00ffcc);
-    const colorRayoRojo = new THREE.Color(0xff3355);
-    let objetivoVisible = false;
+    const VMAX = 12;
 
-    const bucle = () => {
-        if (destruido) return;
-        raf = requestAnimationFrame(bucle);
-        const dt = Math.min(reloj.getDelta(), 0.05);
-        const t = reloj.elapsedTime;
-        const enPausa = estado.terminado || t < estado.pausaHasta;
-
-        // nave: aceleración suave, se bloquea mientras abduce
-        const inp = estado.abduciendo || enPausa ? { x: 0, z: 0 } : entrada();
-        const VMAX = 12;
-        ovni.vx += (inp.x * VMAX - ovni.vx) * suave(inp.x ? 3.5 : 2.5, dt);
-        ovni.vz += (inp.z * VMAX - ovni.vz) * suave(inp.z ? 3.5 : 2.5, dt);
-        ovni.x = THREE.MathUtils.clamp(ovni.x + ovni.vx * dt, -LIMITE, LIMITE);
-        ovni.z = THREE.MathUtils.clamp(ovni.z + ovni.vz * dt, -LIMITE, LIMITE);
-        const flotar = Math.sin(t * 2) * 0.25;
-        O.ovni.position.set(ovni.x, ALTURA_OVNI + flotar, ovni.z);
-        O.inclin.rotation.z += (-ovni.vx * 0.035 - O.inclin.rotation.z) * suave(5, dt);
-        O.inclin.rotation.x += (ovni.vz * 0.035 - O.inclin.rotation.x) * suave(5, dt);
-        O.giro.rotation.y += dt * (1.2 + Math.hypot(ovni.vx, ovni.vz) * 0.15);
-        O.alien.rotation.y = Math.sin(t * 0.8) * 0.6;
+    const actualizarJugador = (j, dt, t, enPausa) => {
+        const nave = j.ovni;
+        const inp = j.abduciendo || enPausa ? { x: 0, z: 0 } : entrada(j.idx);
+        nave.vx += (inp.x * VMAX - nave.vx) * suave(inp.x ? 3.5 : 2.5, dt);
+        nave.vz += (inp.z * VMAX - nave.vz) * suave(inp.z ? 3.5 : 2.5, dt);
+        nave.x = THREE.MathUtils.clamp(nave.x + nave.vx * dt, -LIMITE, LIMITE);
+        nave.z = THREE.MathUtils.clamp(nave.z + nave.vz * dt, -LIMITE, LIMITE);
+        // las dos naves se empujan si se acercan demasiado
+        jugadores.forEach(o => {
+            if (o === j) return;
+            const ddx = nave.x - o.ovni.x, ddz = nave.z - o.ovni.z, d = Math.hypot(ddx, ddz);
+            if (d < 6.2 && d > 0.001) { const k = (6.2 - d) / 2; nave.x += ddx / d * k; nave.z += ddz / d * k; }
+        });
+        const O = j.O;
+        const flotar = Math.sin(t * 2 + j.idx * 1.7) * 0.25;
+        O.ovni.position.set(nave.x, ALTURA_OVNI + flotar, nave.z);
+        O.inclin.rotation.z += (-nave.vx * 0.035 - O.inclin.rotation.z) * suave(5, dt);
+        O.inclin.rotation.x += (nave.vz * 0.035 - O.inclin.rotation.x) * suave(5, dt);
+        O.giro.rotation.y += dt * (1.2 + Math.hypot(nave.vx, nave.vz) * 0.15);
+        O.alien.rotation.y = Math.sin(t * 0.8 + j.idx) * 0.6;
         O.luces.forEach((l, i) => {
             const k = (Math.sin(t * 6 - i * 0.9) + 1) / 2;
-            l.material.color.setRGB(0.1 + k * 0.4, 0.6 + k * 0.4, 0.5 + k * 0.3);
+            l.material.color.copy(j.color).multiplyScalar(0.35 + k * 0.75);
         });
 
         // objetivo más cercano bajo la nave
         let mejor = null; let dMin = RADIO_RAYO;
-        if (!estado.abduciendo && !enPausa) {
+        if (!j.abduciendo && !enPausa) {
             estado.animales.forEach(a => {
-                if (a.fuera || a.estado === 'CAIDA' || a.aparicion < 1) return;
-                const d = Math.hypot(a.x - ovni.x, a.z - ovni.z);
+                if (a.fuera || a.estado === 'CAIDA' || a.estado === 'ABDUCCION' || a.aparicion < 1) return;
+                const d = Math.hypot(a.x - nave.x, a.z - nave.z);
                 if (d < dMin) { dMin = d; mejor = a; }
             });
         }
-        estado.objetivoId = mejor ? mejor.id : null;
-        if (!!mejor !== objetivoVisible) { objetivoVisible = !!mejor; cb.onObjetivo(objetivoVisible); }
-
-        estado.animales.forEach(a => { if (!a.fuera) actualizarAnimal(a, dt, t); });
+        j.objetivoId = mejor ? mejor.id : null;
+        if (!!mejor !== j.objetivoVisible) { j.objetivoVisible = !!mejor; cb.onObjetivo(j.idx, j.objetivoVisible); }
 
         // rayo, foco y círculo
-        const rojo = t < estado.rayoRojoHasta;
-        uniformsRayo.uTiempo.value = t;
-        uniformsRayo.uColor.value.copy(rojo ? colorRayoRojo : colorRayoNormal);
-        const fuerzaObj = estado.abduciendo || rojo ? 1 : mejor ? 0.35 : 0;
-        uniformsRayo.uFuerza.value += (fuerzaObj - uniformsRayo.uFuerza.value) * suave(8, dt);
-        rayo.visible = uniformsRayo.uFuerza.value > 0.01;
-        rayo.position.set(ovni.x, 0, ovni.z);
-        rayo.scale.set(1, ALTURA_OVNI + flotar - 0.5, 1);
-        O.foco.intensity = 250 + uniformsRayo.uFuerza.value * 500;
-        O.foco.color.copy(rojo ? colorRayoRojo : colorRayoNormal);
-        O.panza.material.color.copy(rojo ? colorRayoRojo : colorRayoNormal);
-        circulo.position.x = ovni.x; circulo.position.z = ovni.z;
-        circulo.material.color.set(mejor ? 0x4ade80 : 0x00f0ff);
-        circulo.material.opacity = 0.3 + Math.sin(t * 4) * 0.12 + (mejor ? 0.3 : 0);
-        marca.visible = !!mejor;
+        const rojo = t < j.rayoRojoHasta;
+        const u = j.rayo.uniforms;
+        u.uTiempo.value = t;
+        u.uColor.value.copy(rojo ? colorRojo : j.color);
+        const fuerzaObj = j.abduciendo || rojo ? 1 : mejor ? 0.35 : 0;
+        u.uFuerza.value += (fuerzaObj - u.uFuerza.value) * suave(8, dt);
+        j.rayo.malla.visible = u.uFuerza.value > 0.01;
+        j.rayo.malla.position.set(nave.x, 0, nave.z);
+        j.rayo.malla.scale.set(1, ALTURA_OVNI + flotar - 0.5, 1);
+        O.foco.intensity = 110 + u.uFuerza.value * 380;
+        O.foco.color.copy(rojo ? colorRojo : j.color).lerp(blanco, 0.6);
+        O.panza.material.color.copy(rojo ? colorRojo : j.color);
+        j.circulo.position.x = nave.x; j.circulo.position.z = nave.z;
+        j.circulo.material.color.copy(mejor ? new THREE.Color(0x4ade80) : j.color);
+        j.circulo.material.opacity = 0.3 + Math.sin(t * 4) * 0.12 + (mejor ? 0.3 : 0);
+        j.marca.visible = !!mejor;
         if (mejor) {
-            marca.position.x = mejor.x; marca.position.z = mejor.z;
-            marca.rotation.y = t * 1.5;
-            const k = 1 + Math.sin(t * 8) * 0.08; marca.scale.set(k, 1, k);
+            j.marca.position.x = mejor.x; j.marca.position.z = mejor.z;
+            j.marca.rotation.y = t * 1.5 * (j.idx ? -1 : 1);
+            const k = 1 + Math.sin(t * 8) * 0.08; j.marca.scale.set(k, 1, k);
         }
+
+        // cámara que sigue a la nave con inercia
+        const cam = j.camara;
+        cam.position.lerp(new THREE.Vector3(nave.x * 0.85, 17, nave.z + 14), suave(2.5, dt));
+        j.mirar.lerp(new THREE.Vector3(nave.x, 0, nave.z - 3), suave(4, dt));
+        if (j.temblor > 0) {
+            j.temblor = Math.max(0, j.temblor - dt);
+            const k = j.temblor * 0.6;
+            cam.position.x += (Math.random() - 0.5) * k; cam.position.y += (Math.random() - 0.5) * k;
+        }
+        cam.lookAt(j.mirar);
+    };
+
+    const bucle = (marca) => {
+        if (destruido) return;
+        raf = requestAnimationFrame(bucle);
+        reloj.update(marca);
+        const dt = Math.min(reloj.getDelta(), 0.05);
+        const t = reloj.getElapsed();
+        const enPausa = estado.terminado || t < estado.pausaHasta;
+
+        jugadores.forEach(j => actualizarJugador(j, dt, t, enPausa));
+        estado.animales.forEach(a => { if (!a.fuera) actualizarAnimal(a, dt, t); });
 
         // partículas
         for (let i = 0; i < NP; i++) {
@@ -1061,19 +1459,19 @@ function crearMotor(contenedor, opciones, cb) {
         geoPart.attributes.position.needsUpdate = true;
         geoPart.attributes.color.needsUpdate = true;
 
-        // cámara que sigue a la nave con inercia
-        const objCam = new THREE.Vector3(ovni.x * 0.85, 21, ovni.z + 16);
-        camara.position.lerp(objCam, suave(2.5, dt));
-        mirar.lerp(new THREE.Vector3(ovni.x, 0, ovni.z - 4), suave(4, dt));
-        if (estado.temblor > 0) {
-            estado.temblor = Math.max(0, estado.temblor - dt);
-            const k = estado.temblor * 0.6;
-            camara.position.x += (Math.random() - 0.5) * k; camara.position.y += (Math.random() - 0.5) * k;
-        }
-        camara.lookAt(mirar);
-        cielo.position.copy(camara.position);
+        amb.actualizar(dt, t, jugadores);
 
-        renderer.render(escena, camara);
+        // una vista por jugador (las sombras se calculan una sola vez por fotograma)
+        renderer.shadowMap.needsUpdate = true;
+        renderer.setScissorTest(nJug > 1);
+        jugadores.forEach((j, i) => {
+            const v = vistas[i];
+            if (!v) return;
+            renderer.setViewport(v.x, v.y, v.w, v.h);
+            renderer.setScissor(v.x, v.y, v.w, v.h);
+            cielo.position.copy(j.camara.position);
+            renderer.render(escena, j.camara);
+        });
     };
 
     empezarRonda(0);
@@ -1081,15 +1479,18 @@ function crearMotor(contenedor, opciones, cb) {
 
     return {
         abducir,
-        setJoy(x, y, activo) { joy.x = x; joy.y = y; joy.activo = activo; },
+        depurar: () => ({ estado, jugadores }),
+        setJoy(idx, x, y, activo) { const joy = joys[idx]; if (joy) { joy.x = x; joy.y = y; joy.activo = activo; } },
         destruir() {
             destruido = true;
             cancelAnimationFrame(raf);
+            reloj.dispose();
             ro.disconnect();
             window.removeEventListener('keydown', alPulsar);
             window.removeEventListener('keyup', alSoltar);
             estado.animales.forEach(a => { if (!a.fuera) quitarAnimal(a); });
             escena.traverse(o => {
+                if (o.userData.compartido) return; // geometría y material del .glb en caché
                 if (o.geometry) o.geometry.dispose();
                 if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose());
             });
@@ -1100,6 +1501,7 @@ function crearMotor(contenedor, opciones, cb) {
         },
     };
 }
+
 
 // ─── UI ──────────────────────────────────────────────────────────────────────
 const NEON = '#00f0ff';
@@ -1138,101 +1540,163 @@ const Joystick = ({ onMover }) => {
     );
 };
 
-const JuegoOvni = ({ generarRonda, rondas, animo, onFin, onSalir }) => {
+// Zona de cada jugador sobre el canvas (toda la pantalla o su mitad)
+const zonaJugador = (disposicion, i) => {
+    if (disposicion === 'h') return { left: i ? '50%' : 0, top: 0, width: '50%', height: '100%' };
+    if (disposicion === 'v') return { left: 0, top: i ? '50%' : 0, width: '100%', height: '50%' };
+    return { left: 0, top: 0, width: '100%', height: '100%' };
+};
+
+const JuegoOvni = ({ generarRonda, rondas, animo, nombres, onFin, onSalir }) => {
+    const nJug = nombres.length;
+    const duo = nJug === 2;
     const contRef = useRef(null);
     const motorRef = useRef(null);
     const [hud, setHud] = useState(null);
-    const [aviso, setAviso] = useState(null);
+    const [avisos, setAvisos] = useState([null, null]);
+    const [avisoRonda, setAvisoRonda] = useState(null);
     const [cartelRonda, setCartelRonda] = useState(null);
-    const [hayObjetivo, setHayObjetivo] = useState(false);
+    const [objetivos, setObjetivos] = useState([false, false]);
+    const [disposicion, setDisposicion] = useState(duo ? 'h' : 'solo');
     const [tactil] = useState(() => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches);
     const onFinRef = useRef(onFin);
     onFinRef.current = onFin;
 
+    const [cargando, setCargando] = useState(true);
+
     useEffect(() => {
-        let tAviso = 0; let tRonda = 0;
-        const motor = crearMotor(contRef.current, { generarRonda, rondas, animo }, {
+        const tAvisos = [0, 0]; let tRonda = 0; let tAvisoRonda = 0;
+        let cancelado = false; let motor = null;
+        // primero los animales .glb (si fallan, el juego usa los procedurales)
+        cargarModelosGranja().catch(() => null).then(modelos => {
+        if (cancelado) return;
+        motor = crearMotor(contRef.current, { generarRonda, rondas, animo, jugadores: nJug, modelos }, {
             onHud: setHud,
-            onObjetivo: setHayObjetivo,
-            onAviso: (a) => { setAviso({ ...a, k: Date.now() }); clearTimeout(tAviso); tAviso = setTimeout(() => setAviso(null), 2200); },
+            onDisposicion: setDisposicion,
+            onObjetivo: (idx, v) => setObjetivos(o => { const n = [...o]; n[idx] = v; return n; }),
+            onAviso: (a) => {
+                if (a.tipo === 'ronda') {
+                    setAvisoRonda({ ...a, k: Date.now() }); clearTimeout(tAvisoRonda);
+                    tAvisoRonda = setTimeout(() => setAvisoRonda(null), 2200);
+                    return;
+                }
+                const i = a.jugador || 0;
+                setAvisos(av => { const n = [...av]; n[i] = { ...a, k: Date.now() }; return n; });
+                clearTimeout(tAvisos[i]);
+                tAvisos[i] = setTimeout(() => setAvisos(av => { const n = [...av]; n[i] = null; return n; }), 2400);
+            },
             onRonda: (r) => { setCartelRonda(r); clearTimeout(tRonda); tRonda = setTimeout(() => setCartelRonda(null), 2200); },
             onFin: (res) => onFinRef.current(res),
         });
         motorRef.current = motor;
-        return () => { clearTimeout(tAviso); clearTimeout(tRonda); motor.destruir(); motorRef.current = null; };
-    }, [generarRonda, rondas, animo]);
+        setCargando(false);
+        });
+        return () => { cancelado = true; tAvisos.forEach(clearTimeout); clearTimeout(tRonda); clearTimeout(tAvisoRonda); motor?.destruir(); motorRef.current = null; };
+    }, [generarRonda, rondas, animo, nJug]);
+
+    const pista = (i) => {
+        if (!duo) return <><b style={{ color: NEON }}>WASD / flechas</b> mover · <b style={{ color: VERDE }}>Espacio</b> abducir</>;
+        return i === 0
+            ? <><b style={{ color: COLORES_JUGADOR[0].css }}>WASD</b> mover · <b style={{ color: VERDE }}>Espacio</b> abducir</>
+            : <><b style={{ color: COLORES_JUGADOR[1].css }}>Flechas</b> mover · <b style={{ color: VERDE }}>Enter</b> abducir</>;
+    };
 
     return (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#070414', userSelect: 'none', touchAction: 'none', overflow: 'hidden', fontFamily: 'system-ui, "Segoe UI", sans-serif' }}>
             <style>{`@keyframes ovniEntra { from { opacity: 0; transform: translate(-50%, -20px) scale(0.9); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
                 @keyframes ovniRonda { 0% { opacity: 0; transform: translate(-50%,-50%) scale(0.7); } 15% { opacity: 1; transform: translate(-50%,-50%) scale(1.05); } 25% { transform: translate(-50%,-50%) scale(1); } 85% { opacity: 1; } 100% { opacity: 0; } }`}</style>
             <div ref={contRef} style={{ position: 'absolute', inset: 0 }} />
+            {/* viñeteado: bordes más oscuros, la vista se centra en la nave */}
+            <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(5,2,20,0.55) 100%)' }} />
+            {cargando && (
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: NEON, fontWeight: 800, fontSize: '1.2rem', gap: 10, zIndex: 5 }}>
+                    <div style={{ fontSize: 56 }}>🛸</div>Preparando la granja…
+                </div>
+            )}
 
-            {/* Barra superior */}
-            <div style={{ position: 'absolute', top: 10, left: 10, right: 10, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', pointerEvents: 'none' }}>
+            {/* Línea divisoria de la pantalla partida */}
+            {duo && disposicion === 'h' && <div style={{ position: 'absolute', top: 0, bottom: 0, left: 'calc(50% - 2px)', width: 4, background: `linear-gradient(${COLORES_JUGADOR[0].css}, ${COLORES_JUGADOR[1].css})`, boxShadow: '0 0 12px rgba(255,255,255,0.4)', pointerEvents: 'none' }} />}
+            {duo && disposicion === 'v' && <div style={{ position: 'absolute', left: 0, right: 0, top: 'calc(50% - 2px)', height: 4, background: `linear-gradient(90deg, ${COLORES_JUGADOR[0].css}, ${COLORES_JUGADOR[1].css})`, boxShadow: '0 0 12px rgba(255,255,255,0.4)', pointerEvents: 'none' }} />}
+
+            {/* Barra superior: salir + enunciado común */}
+            <div style={{ position: 'absolute', top: 10, left: 10, right: 10, display: 'flex', alignItems: 'flex-start', gap: 10, pointerEvents: 'none', zIndex: 3 }}>
                 <button onClick={onSalir} style={{ pointerEvents: 'auto', background: 'rgba(10,15,36,0.7)', color: '#fff', border: `1px solid ${NEON}66`, borderRadius: 10, padding: '8px 14px', cursor: 'pointer', fontWeight: 700 }}>✕ Salir</button>
                 {hud && (
                     <div style={{ flex: 1, display: 'flex', justifyContent: 'center', minWidth: 0 }}>
-                        <div style={{ background: 'rgba(10,15,36,0.72)', border: `2px solid ${NEON}`, borderRadius: 16, padding: '8px 18px', boxShadow: `0 0 16px ${NEON}55`, color: '#fff', textAlign: 'center', maxWidth: '100%' }}>
+                        <div style={{ background: 'rgba(10,15,36,0.78)', border: `2px solid ${NEON}`, borderRadius: 16, padding: '6px 18px', boxShadow: `0 0 16px ${NEON}55`, color: '#fff', textAlign: 'center', maxWidth: '100%' }}>
                             <div style={{ fontSize: 'clamp(0.7rem, 1.6vw, 0.85rem)', color: '#a5b4fc', letterSpacing: 1 }}>RONDA {hud.ronda}/{hud.totalRondas} · 🛸 ABDUCE</div>
-                            <div style={{ fontSize: 'clamp(1.2rem, 3.4vw, 2rem)', fontWeight: 900, color: NEON, textShadow: `0 0 12px ${NEON}`, lineHeight: 1.15, overflowWrap: 'anywhere' }}>{hud.objetivo.toUpperCase()}</div>
+                            <div style={{ fontSize: 'clamp(1.1rem, 3.2vw, 1.9rem)', fontWeight: 900, color: NEON, textShadow: `0 0 12px ${NEON}`, lineHeight: 1.15, overflowWrap: 'anywhere' }}>{hud.objetivo.toUpperCase()}</div>
                             <div style={{ fontSize: 'clamp(0.75rem, 1.8vw, 0.95rem)', color: '#e2e8f0' }}>Quedan <b style={{ color: VERDE }}>{hud.quedan}</b></div>
                         </div>
                     </div>
                 )}
-                {hud && (
+                {hud && !duo && (
                     <div style={{ background: 'rgba(10,15,36,0.7)', borderRadius: 10, padding: '8px 12px', color: '#fff', fontWeight: 700, fontSize: '1rem', whiteSpace: 'nowrap' }}>
-                        {'❤️'.repeat(Math.max(hud.vidas, 0))}{'🖤'.repeat(Math.max(VIDAS - hud.vidas, 0))}
-                        <span style={{ marginLeft: 10, color: VERDE }}>✓ {hud.aciertos}</span>
+                        {'❤️'.repeat(Math.max(hud.jugadores[0].vidas, 0))}{'🖤'.repeat(Math.max(VIDAS - hud.jugadores[0].vidas, 0))}
+                        <span style={{ marginLeft: 10, color: VERDE }}>✓ {hud.jugadores[0].aciertos}</span>
                     </div>
                 )}
+                {duo && <div style={{ width: 74 }} />}
             </div>
 
-            {/* Aviso de acierto / fallo */}
-            {aviso && aviso.tipo !== 'ronda' && (
-                <div key={aviso.k} style={{ position: 'absolute', top: '24%', left: '50%', transform: 'translateX(-50%)', animation: 'ovniEntra 0.25s ease-out', background: aviso.tipo === 'ok' ? 'rgba(22,101,52,0.9)' : 'rgba(153,27,27,0.92)', color: '#fff', borderRadius: 14, padding: '10px 18px', fontWeight: 800, fontSize: 'clamp(0.95rem, 2.4vw, 1.3rem)', boxShadow: '0 6px 24px rgba(0,0,0,0.4)', maxWidth: '90vw', textAlign: 'center', pointerEvents: 'none' }}>
-                    {aviso.texto}
-                </div>
-            )}
+            {/* Zona de cada jugador: marcador, avisos y controles */}
+            {nombres.map((nombre, i) => {
+                const col = duo ? COLORES_JUGADOR[i].css : NEON;
+                const datos = hud?.jugadores?.[i];
+                const aviso = avisos[i];
+                const arribaLibre = !duo || i === 0 || disposicion === 'h';
+                return (
+                    <div key={i} style={{ position: 'absolute', ...zonaJugador(disposicion, i), pointerEvents: 'none' }}>
+                        {duo && datos && (
+                            <div style={{ position: 'absolute', top: arribaLibre ? 104 : 10, left: '50%', transform: 'translateX(-50%)', background: 'rgba(10,15,36,0.78)', border: `2px solid ${col}`, borderRadius: 12, padding: '4px 14px', color: '#fff', fontWeight: 800, whiteSpace: 'nowrap', boxShadow: `0 0 12px ${col}66` }}>
+                                <span style={{ color: col }}>🛸 {nombre}</span>
+                                <span style={{ marginLeft: 10, fontSize: '1.15rem' }}>{datos.puntos} pts</span>
+                                <span style={{ marginLeft: 8, fontSize: '0.8rem', color: '#94a3b8' }}>✓{datos.aciertos} ✗{datos.fallos}</span>
+                            </div>
+                        )}
+                        {aviso && (
+                            <div key={aviso.k} style={{ position: 'absolute', top: duo ? (arribaLibre ? 150 : 56) : '24%', left: '50%', transform: 'translateX(-50%)', animation: 'ovniEntra 0.25s ease-out', background: aviso.tipo === 'ok' ? 'rgba(22,101,52,0.92)' : 'rgba(153,27,27,0.94)', color: '#fff', borderRadius: 14, padding: '9px 16px', fontWeight: 800, fontSize: duo ? 'clamp(0.8rem, 1.8vw, 1.05rem)' : 'clamp(0.95rem, 2.4vw, 1.3rem)', boxShadow: '0 6px 24px rgba(0,0,0,0.4)', width: 'max-content', maxWidth: '88%', textAlign: 'center' }}>
+                                {aviso.texto}
+                            </div>
+                        )}
+                        <div style={{ position: 'absolute', left: 14, right: 14, bottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                            <div style={{ pointerEvents: 'auto' }}>
+                                {tactil ? <Joystick onMover={(x, y, activo) => motorRef.current?.setJoy(i, x, y, activo)} /> : (
+                                    <div style={{ background: 'rgba(10,15,36,0.6)', color: '#cbd5e1', borderRadius: 10, padding: '8px 12px', fontSize: '0.85rem' }}>{pista(i)}</div>
+                                )}
+                            </div>
+                            <button
+                                onPointerDown={(e) => { e.preventDefault(); motorRef.current?.abducir(i); }}
+                                style={{
+                                    pointerEvents: 'auto', width: duo ? 'min(20vw, 104px)' : 'min(26vw, 130px)', aspectRatio: '1/1', borderRadius: '50%',
+                                    border: `3px solid ${objetivos[i] ? VERDE : col + '88'}`,
+                                    background: objetivos[i] ? 'rgba(34,197,94,0.25)' : 'rgba(10,15,36,0.55)',
+                                    boxShadow: objetivos[i] ? `0 0 30px ${VERDE} inset, 0 0 22px ${VERDE}` : 'none',
+                                    color: '#fff', fontWeight: 900, fontSize: 'clamp(0.7rem, 2vw, 0.95rem)', cursor: 'pointer',
+                                    transform: objetivos[i] ? 'scale(1.06)' : 'scale(1)', transition: 'all 0.15s', touchAction: 'none',
+                                }}
+                            >
+                                <div style={{ fontSize: duo ? 'clamp(1.3rem, 4.5vw, 2rem)' : 'clamp(1.6rem, 6vw, 2.6rem)' }}>🛸</div>
+                                ABDUCIR
+                            </button>
+                        </div>
+                    </div>
+                );
+            })}
 
-            {/* Cartel de inicio de ronda */}
-            {(cartelRonda || aviso?.tipo === 'ronda') && (
-                <div key={cartelRonda ? `r${cartelRonda.ronda}` : aviso.k} style={{ position: 'absolute', top: '50%', left: '50%', animation: 'ovniRonda 2.2s ease-out forwards', textAlign: 'center', pointerEvents: 'none', color: '#fff', textShadow: `0 0 18px ${NEON}, 0 2px 4px #000`, width: '90vw' }}>
+            {/* Cartel de inicio de ronda / ronda completada */}
+            {(cartelRonda || avisoRonda) && (
+                <div key={cartelRonda ? `r${cartelRonda.ronda}` : avisoRonda.k} style={{ position: 'absolute', top: '50%', left: '50%', animation: 'ovniRonda 2.2s ease-out forwards', textAlign: 'center', pointerEvents: 'none', color: '#fff', textShadow: `0 0 18px ${NEON}, 0 2px 4px #000`, width: '90vw', zIndex: 4 }}>
                     {cartelRonda ? (
                         <>
                             <div style={{ fontSize: 'clamp(1rem, 3vw, 1.6rem)', fontWeight: 700, color: '#c7d2fe' }}>Ronda {cartelRonda.ronda} de {cartelRonda.totalRondas}</div>
                             <div style={{ fontSize: 'clamp(1.8rem, 6vw, 3.6rem)', fontWeight: 900 }}>Abduce: <span style={{ color: NEON }}>{cartelRonda.objetivo}</span></div>
                         </>
                     ) : (
-                        <div style={{ fontSize: 'clamp(1.8rem, 6vw, 3.4rem)', fontWeight: 900 }}>{aviso.texto}</div>
+                        <div style={{ fontSize: 'clamp(1.8rem, 6vw, 3.4rem)', fontWeight: 900 }}>{avisoRonda.texto}</div>
                     )}
                 </div>
             )}
-
-            {/* Controles */}
-            <div style={{ position: 'absolute', left: 16, right: 16, bottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', pointerEvents: 'none' }}>
-                <div style={{ pointerEvents: 'auto' }}>
-                    {tactil ? <Joystick onMover={(x, y, activo) => motorRef.current?.setJoy(x, y, activo)} /> : (
-                        <div style={{ background: 'rgba(10,15,36,0.6)', color: '#cbd5e1', borderRadius: 10, padding: '8px 12px', fontSize: '0.85rem' }}>
-                            <b style={{ color: NEON }}>WASD / flechas</b> mover · <b style={{ color: VERDE }}>Espacio</b> abducir
-                        </div>
-                    )}
-                </div>
-                <button
-                    onPointerDown={(e) => { e.preventDefault(); motorRef.current?.abducir(); }}
-                    style={{
-                        pointerEvents: 'auto', width: 'min(26vw, 130px)', aspectRatio: '1/1', borderRadius: '50%',
-                        border: `3px solid ${hayObjetivo ? VERDE : '#475569'}`,
-                        background: hayObjetivo ? 'rgba(34,197,94,0.25)' : 'rgba(10,15,36,0.55)',
-                        boxShadow: hayObjetivo ? `0 0 30px ${VERDE} inset, 0 0 22px ${VERDE}` : 'none',
-                        color: '#fff', fontWeight: 900, fontSize: 'clamp(0.8rem, 2.4vw, 1rem)', cursor: 'pointer',
-                        transform: hayObjetivo ? 'scale(1.06)' : 'scale(1)', transition: 'all 0.15s', touchAction: 'none',
-                    }}
-                >
-                    <div style={{ fontSize: 'clamp(1.6rem, 6vw, 2.6rem)' }}>🛸</div>
-                    ABDUCIR
-                </button>
-            </div>
         </div>
     );
 };
@@ -1243,15 +1707,220 @@ const estiloBtn = (activo, color = NEON) => ({
     cursor: 'pointer', fontWeight: 700, fontSize: '0.95rem', textAlign: 'left',
 });
 
+const estiloInput = {
+    padding: '9px 12px', borderRadius: 9, border: '1.5px solid rgba(255,255,255,0.15)',
+    background: 'rgba(255,255,255,0.08)', color: 'white', fontSize: '0.9rem',
+    outline: 'none', width: '100%', boxSizing: 'border-box', fontFamily: 'inherit',
+};
+
+const ModalBase = ({ titulo, color = NEON, onClose, children }) => (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.78)', zIndex: 10001, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 14 }}>
+        <div style={{ background: '#1a1330', border: `1px solid ${color}55`, borderRadius: 20, width: '100%', maxWidth: 420, maxHeight: '92vh', overflowY: 'auto', padding: '22px 24px', color: 'white', fontFamily: "'Segoe UI', sans-serif", boxShadow: `0 0 30px ${color}33` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', color }}>{titulo}</h3>
+                <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#aaa', fontSize: '1.2rem' }}>✕</button>
+            </div>
+            {children}
+        </div>
+    </div>
+);
+
+const Etiqueta = ({ children }) => <label style={{ fontSize: '0.78rem', color: '#aaa', fontWeight: 600, display: 'block', marginBottom: 4 }}>{children}</label>;
+
+// ─── Enviar al profesor ──────────────────────────────────────────────────────
+// Con enlace de competición (&comp=…) la puntuación va a esa prueba (solo en individual).
+function ModalEnviarProfe(p) {
+    const comp = p.resultado.jugadores.length === 1 ? leerCompeticionUrl() : null;
+    if (comp) {
+        return <ModalEnviarCompeticion compId={comp.compId} catId={comp.catId} puntos={Number(p.resultado.aciertos) || 0}
+            detalle={soloPrimitivos({ aciertos: p.resultado.aciertos, fallos: p.resultado.fallos, contenido: p.config.contenido })}
+            nombreJuego="Ovni Abducción" tituloReto={comp.titulo} onClose={p.onClose} />;
+    }
+    return <ModalEnviarProfeBase {...p} />;
+}
+
+function ModalEnviarProfeBase({ resultado, config, nombres: nombresIniciales, onClose }) {
+    const duo = resultado.jugadores.length === 2;
+    const [codigo, setCodigo] = useState('');
+    const [nombres, setNombres] = useState(() => nombresIniciales.map(n => (/^Jugador \d$/.test(n) ? '' : n)));
+    const [curso, setCurso] = useState('');
+    const [enviando, setEnviando] = useState(false);
+    const [enviado, setEnviado] = useState(false);
+    const [error, setError] = useState('');
+
+    const enviar = async () => {
+        const code = codigo.trim().toUpperCase();
+        if (nombres.some(n => !n.trim())) { setError(duo ? 'Escribid los dos nombres.' : 'Escribe tu nombre.'); return; }
+        if (!code) { setError('Escribe el código del profesor.'); return; }
+        setEnviando(true); setError('');
+        try {
+            const snap = await getDoc(doc(db, 'codigos_profesor', code));
+            if (!snap.exists()) { setError('Código no encontrado.'); setEnviando(false); return; }
+            const puntos = resultado.jugadores.map(j => j.puntos);
+            const jugadores = resultado.jugadores.map((j, i) => {
+                const intentos = j.aciertos + j.fallos;
+                const rival = duo ? puntos[1 - i] : null;
+                return {
+                    nombre: nombres[i].trim(), curso: curso.trim(),
+                    aciertos: j.aciertos, fallos: j.fallos, intentos,
+                    porcentaje: intentos > 0 ? Math.round((j.aciertos / intentos) * 100) : 0,
+                    puntos: j.puntos,
+                    ...(duo
+                        ? { resultadoDuelo: j.puntos > rival ? 'gana' : j.puntos < rival ? 'pierde' : 'empate', rival: nombres[1 - i].trim() }
+                        : { vidas: j.vidas, ganado: !!resultado.ganado }),
+                    rondasCompletadas: resultado.rondasCompletadas, totalRondas: resultado.totalRondas,
+                    aciertosLista: (j.aciertosLista || []).slice(0, 60).map(a => ({ palabra: String(a.palabra).slice(0, 60), categoria: String(a.categoria).slice(0, 80) })),
+                    fallosLista: (j.fallosLista || []).slice(0, 60).map(f => ({ palabra: String(f.palabra).slice(0, 60), explicacion: String(f.explicacion || '').slice(0, 160), buscabas: String(f.buscabas).slice(0, 80) })),
+                };
+            });
+            await addDoc(collection(db, 'informes_juegos'), {
+                tipo: 'OVNI',
+                modalidad: duo ? 'Duelo · pantalla dividida' : 'Individual',
+                fecha: new Date(),
+                codigoProfesor: code,
+                recursoTitulo: config.contenido,
+                config,
+                jugadores,
+            });
+            jugadores.forEach(j => guardarRegistroLocal('OVNI', {
+                titulo: `Ovni · ${config.contenido}`, aciertos: j.aciertos, intentos: j.intentos,
+                porcentaje: j.porcentaje, nombre: j.nombre, curso: j.curso, via: 'profesor',
+            }));
+            setEnviado(true);
+        } catch (e) { setError('Error: ' + e.message); }
+        setEnviando(false);
+    };
+
+    return (
+        <ModalBase titulo="📤 Enviar al profesor" color="#facc15" onClose={onClose}>
+            {enviado ? (
+                <div style={{ textAlign: 'center', padding: '16px 0' }}>
+                    <div style={{ fontSize: '3rem' }}>✅</div>
+                    <div style={{ color: VERDE, fontWeight: 700 }}>¡Informe enviado!</div>
+                    <div style={{ color: '#aaa', fontSize: '0.88rem', marginTop: 8 }}>
+                        {resultado.jugadores.map((j, i) => <div key={i}>{nombres[i]}: {j.aciertos} aciertos · {j.fallos} fallos</div>)}
+                    </div>
+                    <button onClick={onClose} style={{ marginTop: 16, padding: '9px 22px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.1)', cursor: 'pointer', color: 'white' }}>Cerrar</button>
+                </div>
+            ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div style={{ fontSize: '0.8rem', color: '#94a3b8', background: 'rgba(255,255,255,0.05)', borderRadius: 10, padding: '8px 10px' }}>
+                        Se envía: {config.contenido} · {config.rondas} rondas · aciertos, fallos y la explicación de cada error.
+                    </div>
+                    {nombres.map((n, i) => (
+                        <div key={i}>
+                            <Etiqueta>{duo ? <span style={{ color: COLORES_JUGADOR[i].css }}>Jugador {i + 1} (nave {COLORES_JUGADOR[i].nombre})</span> : 'Nombre y apellido'}</Etiqueta>
+                            <input value={n} onChange={e => setNombres(ns => ns.map((x, k) => (k === i ? e.target.value : x)))} placeholder="Nombre completo" style={estiloInput} />
+                        </div>
+                    ))}
+                    <div><Etiqueta>Curso</Etiqueta>
+                        <input value={curso} onChange={e => setCurso(e.target.value)} placeholder="Ej: 5º Primaria A" style={estiloInput} /></div>
+                    <div><Etiqueta>Código del profesor</Etiqueta>
+                        <input value={codigo} onChange={e => setCodigo(e.target.value.toUpperCase())} placeholder="Ej: PROF01" maxLength={10} style={{ ...estiloInput, letterSpacing: 2, fontWeight: 700 }} /></div>
+                    {error && <div style={{ color: '#f87171', fontSize: '0.8rem' }}>⚠ {error}</div>}
+                    <div style={{ display: 'flex', gap: 9, marginTop: 4 }}>
+                        <button onClick={onClose} style={{ flex: 1, padding: 10, borderRadius: 10, border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', cursor: 'pointer', color: 'white' }}>Cancelar</button>
+                        <button onClick={enviar} disabled={enviando} style={{ flex: 2, padding: 10, borderRadius: 10, border: 'none', background: enviando ? '#555' : 'linear-gradient(135deg,#facc15,#f59e0b)', color: '#1a1330', fontWeight: 800, cursor: enviando ? 'default' : 'pointer' }}>
+                            {enviando ? 'Enviando…' : '📤 Enviar'}
+                        </button>
+                    </div>
+                </div>
+            )}
+        </ModalBase>
+    );
+}
+
+// ─── Ficha PDF para preparar el contenido ───────────────────────────────────
+const TAMAÑOS_FICHA = [['auto', '📄 Auto (1 página)', '0.9rem'], [0.75, 'A', '0.75rem'], [1, 'A', '0.95rem'], [1.25, 'A', '1.15rem'], [1.5, 'A', '1.35rem']];
+const ESCALAS_AUTO = [1.6, 1.5, 1.4, 1.3, 1.2, 1.1, 1, 0.9, 0.8, 0.7, 0.6];
+
+function ModalFicha({ contenido, crearGenerador, categorias, onClose }) {
+    const [n, setN] = useState(6);
+    const [soluciones, setSoluciones] = useState(true);
+    const [clasificar, setClasificar] = useState(true);
+    const [tamaño, setTamaño] = useState('auto');
+    const [estado, setEstado] = useState('');
+
+    const generar = async (ver) => {
+        setEstado('Generando…');
+        try {
+            const gen = crearGenerador(n);
+            const rondasFicha = Array.from({ length: n }, (_, i) => gen(i));
+            const base = { titulo: contenido, rondas: rondasFicha, clasificacion: categorias && clasificar ? categorias : null };
+            let escala = tamaño;
+            if (tamaño === 'auto') {
+                // el tamaño más grande con el que la parte del alumno cabe en una página
+                escala = ESCALAS_AUTO[ESCALAS_AUTO.length - 1];
+                for (const e of ESCALAS_AUTO) {
+                    const prueba = await generarFichaOvni({ ...base, soluciones: false, escala: e });
+                    if (prueba.paginasAlumno === 1) { escala = e; break; }
+                }
+            }
+            const pdf = await generarFichaOvni({ ...base, soluciones, escala });
+            const archivo = `ficha-ovni-${contenido.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}.pdf`;
+            if (ver) {
+                const url = pdf.output('bloburl');
+                if (!window.open(url, '_blank')) pdf.save(archivo);
+            } else pdf.save(archivo);
+            setEstado(tamaño === 'auto'
+                ? (pdf.paginasAlumno === 1 ? `Tamaño automático: ${Math.round(escala * 100)} % (cabe en 1 página).` : `Ni con el tamaño mínimo cabe en 1 página: ocupa ${pdf.paginasAlumno}. Prueba con menos ejercicios.`)
+                : `Ficha del alumno: ${pdf.paginasAlumno} página${pdf.paginasAlumno > 1 ? 's' : ''}.`);
+        } catch (e) {
+            console.error(e);
+            setEstado('No se pudo generar el PDF: ' + e.message);
+        }
+    };
+
+    return (
+        <ModalBase titulo="🖨️ Ficha para preparar en clase" onClose={onClose}>
+            <p style={{ margin: '0 0 12px', fontSize: '0.88rem', color: '#cbd5e1' }}>
+                Ficha en PDF con el contenido elegido (<b style={{ color: NEON }}>{contenido}</b>): en cada ejercicio el alumno rodea lo que debe abducir el ovni y explica una de las trampas. Las rondas de la ficha y del juego son distintas pero del mismo tipo, así que la ficha sirve de práctica previa.
+            </p>
+            <Etiqueta>Ejercicios</Etiqueta>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                {[4, 6, 8, 10].map(k => <button key={k} onClick={() => setN(k)} style={{ ...estiloBtn(n === k), textAlign: 'center', minWidth: 48 }}>{k}</button>)}
+            </div>
+            <Etiqueta>Tamaño del texto</Etiqueta>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+                {TAMAÑOS_FICHA.map(([v, txt, fs]) => (
+                    <button key={txt} onClick={() => setTamaño(v)} title={v === 'auto' ? 'El más grande que quepa en una página' : `${Math.round(v * 100)} %`}
+                        style={{ ...estiloBtn(tamaño === v), textAlign: 'center', padding: '8px 10px', fontSize: fs }}>{txt}</button>
+                ))}
+            </div>
+            {categorias && (
+                <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, fontSize: '0.9rem', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={clasificar} onChange={e => setClasificar(e.target.checked)} /> Añadir tabla para clasificar palabras
+                </label>
+            )}
+            <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 14, fontSize: '0.9rem', cursor: 'pointer' }}>
+                <input type="checkbox" checked={soluciones} onChange={e => setSoluciones(e.target.checked)} /> Hoja de soluciones (con la explicación de cada trampa)
+            </label>
+            <div style={{ display: 'flex', gap: 9 }}>
+                <button onClick={() => generar(true)} style={{ flex: 1, padding: 10, borderRadius: 10, border: `1px solid ${NEON}`, background: 'transparent', color: NEON, fontWeight: 800, cursor: 'pointer' }}>👁 Ver</button>
+                <button onClick={() => generar(false)} style={{ flex: 2, padding: 10, borderRadius: 10, border: 'none', background: `linear-gradient(135deg, ${NEON}, #0891b2)`, color: '#05202a', fontWeight: 800, cursor: 'pointer' }}>⬇️ Descargar PDF</button>
+            </div>
+            {estado && <div style={{ marginTop: 10, fontSize: '0.85rem', color: estado.startsWith('No') ? '#f87171' : '#94a3b8' }}>{estado}</div>}
+        </ModalBase>
+    );
+}
+
 export default function OvniAbduccion({ onExit }) {
     const [pantalla, setPantalla] = useState('MENU');
-    const [bancoId, setBancoId] = useState('gramatica');
+    const [area, setArea] = useState('MATEMATICAS');
+    const [bancoId, setBancoId] = useState('numeros');
     const [rondas, setRondas] = useState(5);
     const [animo, setAnimo] = useState('normal');
+    const [modo, setModo] = useState('solo');
+    const [nombresDuo, setNombresDuo] = useState(['Jugador 1', 'Jugador 2']);
     const [textoCustom, setTextoCustom] = useState(() => { try { return localStorage.getItem(KEY_CUSTOM) || EJEMPLO_CUSTOM; } catch { return EJEMPLO_CUSTOM; } });
     const [partida, setPartida] = useState(null);
     const [resultado, setResultado] = useState(null);
     const [sonido, setSonido] = useState(sonidoActivo());
+    const [verEnvio, setVerEnvio] = useState(false);
+    const [verFicha, setVerFicha] = useState(false);
+
+    // los .glb de los animales se van descargando mientras se elige el contenido
+    useEffect(() => { cargarModelosGranja().catch(() => {}); }, []);
 
     const [tiposMates, setTiposMates] = useState(() => TIPOS_MATES.map(t => t.id));
     const [nivelMates, setNivelMates] = useState('primaria');
@@ -1261,68 +1930,109 @@ export default function OvniAbduccion({ onExit }) {
     const catsCustom = custom ? parsearCategorias(textoCustom) : null;
     const banco = BANCOS_OVNI.find(b => b.id === bancoId);
     const puedeEmpezar = custom ? !!catsCustom : numeros ? tiposMates.length > 0 : !!banco;
+    const categoriasPalabras = numeros ? null : custom ? catsCustom : banco?.categorias || null;
+    const contenido = numeros ? `Números (${nivelMates === 'eso' ? 'ESO' : 'Primaria'})` : custom ? 'Mis categorías' : banco?.nombre || '';
+
+    // mismo contenido para el juego y para la ficha
+    const crearGenerador = (n) => (numeros ? crearGeneradorMates(tiposMates, nivelMates) : crearGeneradorPalabras(categoriasPalabras, n));
 
     const empezar = () => {
         if (!puedeEmpezar) return;
-        let generarRonda; let titulo;
-        if (numeros) {
-            generarRonda = crearGeneradorMates(tiposMates, nivelMates);
-            titulo = `Números (${nivelMates === 'eso' ? 'ESO' : 'Primaria'})`;
-        } else {
-            if (custom) { try { localStorage.setItem(KEY_CUSTOM, textoCustom); } catch { /* sin localStorage */ } }
-            generarRonda = crearGeneradorPalabras(custom ? catsCustom : banco.categorias, rondas);
-            titulo = custom ? 'Mis categorías' : banco.nombre;
-        }
-        setPartida({ generarRonda, rondas, animo, titulo, k: Date.now() });
+        if (custom) { try { localStorage.setItem(KEY_CUSTOM, textoCustom); } catch { /* sin localStorage */ } }
+        const nombres = modo === 'duo' ? nombresDuo.map((n, i) => n.trim() || `Jugador ${i + 1}`) : ['Jugador 1'];
+        const config = {
+            contenido, rondas, animo, jugadores: nombres.length,
+            origen: numeros ? 'numeros' : custom ? 'propias' : 'banco',
+            materia: custom ? 'Propias' : (AREAS_OVNI.find(a => a.id === area)?.label || ''),
+            ...(numeros
+                ? { nivel: nivelMates, tipos: TIPOS_MATES.filter(t => tiposMates.includes(t.id)).map(t => t.nombre) }
+                : { categorias: Object.keys(categoriasPalabras || {}) }),
+        };
+        setPartida({ generarRonda: crearGenerador(rondas), rondas, animo, nombres, config, k: Date.now() });
+        setResultado(null);
         setPantalla('JUEGO');
+    };
+    const elegirArea = (id) => {
+        setArea(id);
+        setBancoId(id === 'MATEMATICAS' ? 'numeros' : (BANCOS_OVNI.find(b => b.area === id)?.id || 'custom'));
     };
     const alternarTipo = (id) => setTiposMates(ts => (ts.includes(id) ? ts.filter(t => t !== id) : [...ts, id]));
 
     const alTerminar = (res) => {
         setResultado(res);
         setPantalla('FIN');
-        if (res.ganado) sonidoFinal();
-        guardarRegistroLocal('OVNI', {
-            titulo: `Ovni · ${partida?.titulo || ''}`,
-            aciertos: res.aciertos, intentos: res.aciertos + res.fallos, via: 'juego',
-        });
+        if (res.ganado || res.jugadores.length === 2) sonidoFinal();
+        res.jugadores.forEach((j, i) => guardarRegistroLocal('OVNI', {
+            titulo: `Ovni · ${partida?.config.contenido || ''}${res.jugadores.length === 2 ? ` · ${partida.nombres[i]}` : ''}`,
+            aciertos: j.aciertos, intentos: j.aciertos + j.fallos, via: 'juego',
+        }));
     };
 
     if (pantalla === 'JUEGO' && partida) {
-        return <JuegoOvni key={partida.k} generarRonda={partida.generarRonda} rondas={partida.rondas} animo={partida.animo} onFin={alTerminar} onSalir={() => setPantalla('MENU')} />;
+        return <JuegoOvni key={partida.k} generarRonda={partida.generarRonda} rondas={partida.rondas} animo={partida.animo} nombres={partida.nombres} onFin={alTerminar} onSalir={() => setPantalla('MENU')} />;
     }
 
     const fondo = { position: 'fixed', inset: 0, zIndex: 9999, overflowY: 'auto', background: 'radial-gradient(ellipse at top, #2d1b4e 0%, #110c1c 60%, #070414 100%)', color: '#fff', fontFamily: 'system-ui, "Segoe UI", sans-serif' };
+    const h3 = { color: '#a5b4fc', fontSize: '0.9rem', letterSpacing: 1, textTransform: 'uppercase' };
 
-    if (pantalla === 'FIN' && resultado) {
+    if (pantalla === 'FIN' && resultado && partida) {
+        const duo = resultado.jugadores.length === 2;
+        const [p1, p2] = resultado.jugadores;
+        const ganador = duo ? (p1.puntos === p2.puntos ? -1 : p1.puntos > p2.puntos ? 0 : 1) : null;
+        const repaso = resultado.jugadores.flatMap((j, i) => j.fallosLista.map(f => ({ ...f, jugador: i })));
         return (
             <div style={fondo}>
-                <div style={{ maxWidth: 640, margin: '0 auto', padding: '40px 16px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 64 }}>{resultado.ganado ? '🛸✨' : '🛸💥'}</div>
-                    <h1 style={{ color: resultado.ganado ? VERDE : '#f87171', textShadow: `0 0 18px ${resultado.ganado ? VERDE : '#f87171'}`, margin: '8px 0' }}>
-                        {resultado.ganado ? '¡Misión completada!' : 'Nave averiada'}
-                    </h1>
-                    <p style={{ color: '#c7d2fe' }}>{partida?.titulo} · rondas {resultado.rondasCompletadas}/{resultado.totalRondas}</p>
-                    <div style={{ display: 'flex', gap: 12, justifyContent: 'center', margin: '18px 0' }}>
-                        <div style={{ background: 'rgba(74,222,128,0.12)', border: `2px solid ${VERDE}`, borderRadius: 14, padding: '12px 22px' }}><div style={{ fontSize: 30, fontWeight: 900, color: VERDE }}>{resultado.aciertos}</div>aciertos</div>
-                        <div style={{ background: 'rgba(248,113,113,0.12)', border: '2px solid #f87171', borderRadius: 14, padding: '12px 22px' }}><div style={{ fontSize: 30, fontWeight: 900, color: '#f87171' }}>{resultado.fallos}</div>fallos</div>
+                <div style={{ maxWidth: 680, margin: '0 auto', padding: '36px 16px', textAlign: 'center' }}>
+                    {duo ? (
+                        <>
+                            <div style={{ fontSize: 60 }}>{ganador === -1 ? '🤝' : '🏆'}</div>
+                            <h1 style={{ margin: '8px 0', color: ganador === -1 ? NEON : COLORES_JUGADOR[ganador].css, textShadow: `0 0 18px ${ganador === -1 ? NEON : COLORES_JUGADOR[ganador].css}` }}>
+                                {ganador === -1 ? '¡Empate!' : `¡Gana ${partida.nombres[ganador]}!`}
+                            </h1>
+                        </>
+                    ) : (
+                        <>
+                            <div style={{ fontSize: 64 }}>{resultado.ganado ? '🛸✨' : '🛸💥'}</div>
+                            <h1 style={{ color: resultado.ganado ? VERDE : '#f87171', textShadow: `0 0 18px ${resultado.ganado ? VERDE : '#f87171'}`, margin: '8px 0' }}>
+                                {resultado.ganado ? '¡Misión completada!' : 'Nave averiada'}
+                            </h1>
+                        </>
+                    )}
+                    <p style={{ color: '#c7d2fe' }}>{partida.config.contenido} · rondas {resultado.rondasCompletadas}/{resultado.totalRondas}</p>
+                    <div style={{ display: 'flex', gap: 12, justifyContent: 'center', margin: '18px 0', flexWrap: 'wrap' }}>
+                        {resultado.jugadores.map((j, i) => {
+                            const col = duo ? COLORES_JUGADOR[i].css : NEON;
+                            return (
+                                <div key={i} style={{ background: `${col}14`, border: `2px solid ${col}`, borderRadius: 16, padding: '12px 20px', minWidth: 170 }}>
+                                    {duo && <div style={{ fontWeight: 800, color: col, marginBottom: 4 }}>🛸 {partida.nombres[i]}</div>}
+                                    {duo && <div style={{ fontSize: 34, fontWeight: 900 }}>{j.puntos} <span style={{ fontSize: 14, color: '#94a3b8' }}>pts</span></div>}
+                                    <div style={{ display: 'flex', gap: 14, justifyContent: 'center', fontWeight: 800, fontSize: duo ? '1rem' : '1.6rem' }}>
+                                        <span style={{ color: VERDE }}>✓ {j.aciertos}</span>
+                                        <span style={{ color: '#f87171' }}>✗ {j.fallos}</span>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
-                    {resultado.fallosLista.length > 0 && (
+                    {repaso.length > 0 && (
                         <div style={{ textAlign: 'left', background: 'rgba(255,255,255,0.05)', borderRadius: 14, padding: '12px 16px', margin: '0 0 18px' }}>
                             <div style={{ fontWeight: 800, marginBottom: 8, color: '#fca5a5' }}>Para repasar</div>
-                            {resultado.fallosLista.map((f, i) => (
+                            {repaso.map((f, i) => (
                                 <div key={i} style={{ padding: '4px 0', borderTop: i ? '1px solid rgba(255,255,255,0.08)' : 'none' }}>
+                                    {duo && <span style={{ color: COLORES_JUGADOR[f.jugador].css, fontWeight: 700, marginRight: 6 }}>{partida.nombres[f.jugador]}:</span>}
                                     <b style={{ color: NEON }}>{f.palabra}</b> → {f.explicacion || 'no era de la categoría'} <span style={{ color: '#94a3b8' }}>(buscabas {f.buscabas})</span>
                                 </div>
                             ))}
                         </div>
                     )}
                     <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+                        <button onClick={() => setVerEnvio(true)} style={{ padding: '11px 18px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#facc15,#f59e0b)', color: '#1a1330', fontWeight: 800, cursor: 'pointer', fontSize: '0.95rem' }}>📤 Enviar al profesor</button>
                         <button onClick={empezar} style={{ ...estiloBtn(true, VERDE), textAlign: 'center' }}>🔁 Jugar otra vez</button>
-                        <button onClick={() => setPantalla('MENU')} style={{ ...estiloBtn(true), textAlign: 'center' }}>⚙️ Cambiar categorías</button>
+                        <button onClick={() => setPantalla('MENU')} style={{ ...estiloBtn(true), textAlign: 'center' }}>⚙️ Cambiar contenido</button>
                         <button onClick={onExit} style={{ ...estiloBtn(false), textAlign: 'center' }}>← Salir</button>
                     </div>
                 </div>
+                {verEnvio && <ModalEnviarProfe resultado={resultado} config={partida.config} nombres={partida.nombres} onClose={() => setVerEnvio(false)} />}
             </div>
         );
     }
@@ -1337,26 +2047,42 @@ export default function OvniAbduccion({ onExit }) {
                 <div style={{ textAlign: 'center', margin: '14px 0 20px' }}>
                     <div style={{ fontSize: 56 }}>🛸</div>
                     <h1 style={{ margin: '4px 0', color: NEON, textShadow: `0 0 18px ${NEON}`, fontSize: 'clamp(1.8rem, 5vw, 2.6rem)' }}>Ovni Abducción</h1>
-                    <p style={{ color: '#c7d2fe', margin: 0 }}>Cada animal lleva una palabra. Abduce solo los que pertenecen a la categoría que se pide.</p>
+                    <p style={{ color: '#c7d2fe', margin: 0 }}>Cada animal lleva una palabra o un número. Abduce solo los que encajan con lo que se pide.</p>
                 </div>
 
-                <h3 style={{ color: '#a5b4fc', fontSize: '0.9rem', letterSpacing: 1, textTransform: 'uppercase' }}>Categorías</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
-                    {BANCOS_OVNI.map(b => (
-                        <button key={b.id} onClick={() => setBancoId(b.id)} style={estiloBtn(bancoId === b.id)}>
-                            <span style={{ fontSize: '1.3rem', marginRight: 6 }}>{b.emoji}</span>{b.nombre}
-                            <div style={{ fontSize: '0.75rem', fontWeight: 500, color: '#94a3b8', marginTop: 4 }}>{b.materia} · {Object.keys(b.categorias).join(', ')}</div>
-                        </button>
-                    ))}
-                    <button onClick={() => setBancoId('numeros')} style={estiloBtn(numeros, '#facc15')}>
-                        <span style={{ fontSize: '1.3rem', marginRight: 6 }}>🔢</span>Números
-                        <div style={{ fontSize: '0.75rem', fontWeight: 500, color: '#94a3b8', marginTop: 4 }}>Matemáticas · primos, divisores, múltiplos, fracciones, potencias, mayor/menor</div>
-                    </button>
-                    <button onClick={() => setBancoId('custom')} style={estiloBtn(custom, VERDE)}>
-                        <span style={{ fontSize: '1.3rem', marginRight: 6 }}>✏️</span>Mis categorías
-                        <div style={{ fontSize: '0.75rem', fontWeight: 500, color: '#94a3b8', marginTop: 4 }}>Escribe las tuyas</div>
-                    </button>
+                <h3 style={h3}>Materia</h3>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {AREAS_OVNI.map(a => {
+                        const activa = area === a.id && !custom;
+                        return (
+                            <button key={a.id} onClick={() => elegirArea(a.id)}
+                                style={{ ...estiloBtn(activa, a.color), textAlign: 'center', padding: '7px 12px', fontSize: '0.88rem', ...(activa ? { background: a.color, color: '#fff', borderColor: a.color } : {}) }}>
+                                {a.emoji} {a.label}
+                            </button>
+                        );
+                    })}
+                    <button onClick={() => setBancoId('custom')} style={{ ...estiloBtn(custom, VERDE), textAlign: 'center', padding: '7px 12px', fontSize: '0.88rem' }}>✏️ Mis categorías</button>
                 </div>
+
+                {!custom && (
+                    <>
+                        <h3 style={h3}>Contenido</h3>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
+                            {area === 'MATEMATICAS' && (
+                                <button onClick={() => setBancoId('numeros')} style={estiloBtn(numeros, '#facc15')}>
+                                    <span style={{ fontSize: '1.3rem', marginRight: 6 }}>🔢</span>Números (generador)
+                                    <div style={{ fontSize: '0.75rem', fontWeight: 500, color: '#94a3b8', marginTop: 4 }}>Primos, divisores, múltiplos, fracciones, potencias, mayor/menor</div>
+                                </button>
+                            )}
+                            {BANCOS_OVNI.filter(b => b.area === area).map(b => (
+                                <button key={b.id} onClick={() => setBancoId(b.id)} style={estiloBtn(bancoId === b.id)}>
+                                    <span style={{ fontSize: '1.3rem', marginRight: 6 }}>{b.emoji}</span>{b.nombre}
+                                    <div style={{ fontSize: '0.75rem', fontWeight: 500, color: '#94a3b8', marginTop: 4 }}>{Object.keys(b.categorias).join(' · ')}</div>
+                                </button>
+                            ))}
+                        </div>
+                    </>
+                )}
 
                 {custom && (
                     <div style={{ marginTop: 12 }}>
@@ -1391,13 +2117,20 @@ export default function OvniAbduccion({ onExit }) {
 
                 <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', marginTop: 18 }}>
                     <div>
-                        <h3 style={{ color: '#a5b4fc', fontSize: '0.9rem', letterSpacing: 1, textTransform: 'uppercase' }}>Rondas</h3>
+                        <h3 style={h3}>Jugadores</h3>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            <button onClick={() => setModo('solo')} style={{ ...estiloBtn(modo === 'solo'), textAlign: 'center' }}>🛸 1 jugador</button>
+                            <button onClick={() => setModo('duo')} style={{ ...estiloBtn(modo === 'duo', COLORES_JUGADOR[1].css), textAlign: 'center' }}>🛸🛸 2 · pantalla dividida</button>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 style={h3}>Rondas</h3>
                         <div style={{ display: 'flex', gap: 8 }}>
                             {[3, 5, 8].map(n => <button key={n} onClick={() => setRondas(n)} style={{ ...estiloBtn(rondas === n), textAlign: 'center', minWidth: 52 }}>{n}</button>)}
                         </div>
                     </div>
                     <div>
-                        <h3 style={{ color: '#a5b4fc', fontSize: '0.9rem', letterSpacing: 1, textTransform: 'uppercase' }}>Animales</h3>
+                        <h3 style={h3}>Animales</h3>
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                             {[['tranquilos', '😌 Tranquilos'], ['normal', '🐄 Normales'], ['nerviosos', '😱 Asustadizos']].map(([id, txt]) =>
                                 <button key={id} onClick={() => setAnimo(id)} style={{ ...estiloBtn(animo === id), textAlign: 'center' }}>{txt}</button>)}
@@ -1405,16 +2138,41 @@ export default function OvniAbduccion({ onExit }) {
                     </div>
                 </div>
 
+                {modo === 'duo' && (
+                    <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
+                        {nombresDuo.map((n, i) => (
+                            <div key={i} style={{ border: `2px solid ${COLORES_JUGADOR[i].css}66`, borderRadius: 12, padding: 10, background: `${COLORES_JUGADOR[i].css}0d` }}>
+                                <div style={{ color: COLORES_JUGADOR[i].css, fontWeight: 800, fontSize: '0.85rem', marginBottom: 6 }}>
+                                    🛸 Nave {COLORES_JUGADOR[i].nombre} · {i === 0 ? 'mitad izquierda · WASD + Espacio' : 'mitad derecha · Flechas + Enter'}
+                                </div>
+                                <input value={n} onChange={e => setNombresDuo(ns => ns.map((x, k) => (k === i ? e.target.value : x)))} placeholder={`Jugador ${i + 1}`} style={estiloInput} />
+                            </div>
+                        ))}
+                        <div style={{ gridColumn: '1 / -1', fontSize: '0.8rem', color: '#94a3b8' }}>
+                            Los dos ovnis comparten la granja y el enunciado: acierto +1 punto, error −1. En tablet o pizarra táctil cada mitad tiene su joystick y su botón.
+                        </div>
+                    </div>
+                )}
+
                 <div style={{ textAlign: 'center', marginTop: 28 }}>
                     <button onClick={empezar} disabled={!puedeEmpezar}
                         style={{ background: 'transparent', color: NEON, border: `3px solid ${NEON}`, borderRadius: 14, padding: '14px 42px', fontSize: '1.3rem', fontWeight: 900, cursor: !puedeEmpezar ? 'not-allowed' : 'pointer', opacity: !puedeEmpezar ? 0.5 : 1, boxShadow: `0 0 20px ${NEON}66 inset, 0 0 20px ${NEON}66`, letterSpacing: 2 }}>
                         🚀 DESPEGAR
                     </button>
+                    <div style={{ marginTop: 14 }}>
+                        <button onClick={() => setVerFicha(true)} disabled={!puedeEmpezar}
+                            style={{ background: 'rgba(255,255,255,0.06)', color: '#e2e8f0', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 10, padding: '9px 16px', cursor: puedeEmpezar ? 'pointer' : 'not-allowed', fontWeight: 700 }}>
+                            🖨️ Ficha PDF para preparar el contenido
+                        </button>
+                    </div>
                     <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginTop: 14 }}>
-                        Si abduces un animal equivocado la nave lo escupe y pierdes una vida ({VIDAS} en total).
+                        {modo === 'duo'
+                            ? 'Si un ovni abduce un animal equivocado, la nave lo escupe y ese jugador pierde un punto.'
+                            : `Si abduces un animal equivocado la nave lo escupe y pierdes una vida (${VIDAS} en total).`}
                     </p>
                 </div>
             </div>
+            {verFicha && <ModalFicha contenido={contenido} crearGenerador={crearGenerador} categorias={categoriasPalabras} onClose={() => setVerFicha(false)} />}
         </div>
     );
 }

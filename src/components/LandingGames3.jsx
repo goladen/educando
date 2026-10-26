@@ -29,6 +29,7 @@ const MoneyBoard = lazy(() => import('../MoneyBoard'));
 const EnigmicLogic = lazy(() => import('../EnigmicLogic'));
 const SixSeven = lazy(() => import('../SixSeven'));
 const VaniLa = lazy(() => import('../vanila/VaniLa'));
+const OvniAbduccion = lazy(() => import('../OvniAbduccion'));
 const Visor3D = lazy(() => import('../Visor3D'));
 const Esculpir3D = lazy(() => import('../Esculpir3D'));
 const TextWordleGame = lazy(() => import('../TextWordleGame'));
@@ -575,6 +576,16 @@ export const APPS = [
         shareUrl: `${window.location.origin}/sixseven`
     },
     {
+        id: 'OVNI',
+        name: 'Ovni Abducción',
+        desc: 'Pilota un ovni sobre la granja y abduce los animales cuya palabra es de la categoría pedida.',
+        color: '#22d3ee',
+        emoji: '🛸',
+        isSpecial: true,
+        shareable: true,
+        shareUrl: `${window.location.origin}/ovni`
+    },
+    {
         id: 'VANILA',
         name: 'VaniLa',
         desc: 'Forma palabras con 9 letras, ¡con su tilde! Solo, en duelo escalando la montaña o en tablero con amigos. ES · CA · EN · FR.',
@@ -866,6 +877,14 @@ export const GAME_INFO = {
         biblioteca: 'No necesita recursos: usa los bancos de Geografía, Biología, Historia (¿Quién es quién? histórico), Lengua e Inglés de la plataforma. Los escape rooms se pueden guardar (privados o en la biblioteca pública) y volver a abrir. Además, cualquier sala puede usar las preguntas de un recurso creado por otro profe (opción múltiple, respuesta corta o rellenar hueco).',
         multiplayer: 'Toda la clase a la vez y en el mismo equipo: el profesor crea la sala (código + QR) y la proyecta, y cada alumno juega con su móvil. Se configuran la etapa, las salas, el tiempo, la duración de cada sala y la dificultad del zombi. Si se acaba el tiempo, el zombi despierta antes y con más vida; si gana el zombi, hay revancha. También se puede jugar SIN MÓVILES: modo pizarra con fichas en papel (cuadernillo con preguntas, candados y tarjetas de pistas recortables, y hoja de respuestas de media página), con las mismas preguntas que se proyectan y versiones con soluciones para el profe.',
         materias: ['Matemáticas', 'Geografía', 'Historia', 'Biología', 'Lengua y Literatura', 'Inglés'],
+        etapas: ['Primaria', 'ESO'],
+    },
+    OVNI: {
+        descripcion: 'Juego 3D de clasificar palabras: pilotas un ovni de noche sobre una granja donde pasean vacas, ovejas, cerdos, gallinas y caballos, cada uno con un cartel con una palabra. El enunciado pide una categoría («Abduce: VERBOS») y hay que colocarse encima de los animales correctos y subirlos con el rayo tractor. Si abduces uno equivocado, la nave lo escupe y pierdes una vida. Los animales se asustan y huyen si te acercas (se puede elegir tranquilos, normales o asustadizos).',
+        tipoPreguntas: 'Clasificación en categorías: cada ronda pide una categoría y los animales llevan palabras de esa y de otras. Bancos integrados: categorías gramaticales, agudas/llanas/esdrújulas, clases de vertebrados, pares e impares, vocabulario en inglés y países/capitales/ríos. Además, un bloque de Números que genera rondas nuevas cada vez (Primaria o ESO): primos, compuestos, divisores de un número, múltiplos de un número, fracciones irreducibles, potencias de 2 y de 3, y mayores o menores que un número (en ESO con decimales y negativos); cada número equivocado explica por qué (por ejemplo, 21 = 3 × 7). Al final se muestra qué palabras se confundieron y a qué categoría pertenecían.',
+        biblioteca: 'No necesita recursos: incluye 6 bancos de categorías, un generador de rondas de números y una opción «Mis categorías» para escribir las propias (una categoría por línea).',
+        multiplayer: 'Individual, con teclado (WASD/flechas + espacio) o pantalla táctil (joystick + botón). Se puede proyectar en la pizarra.',
+        materias: ['Lengua y Literatura', 'Inglés', 'Matemáticas', 'Biología', 'Geografía'],
         etapas: ['Primaria', 'ESO'],
     },
     VANILA: {
@@ -1895,6 +1914,8 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
                 setEsculpirApp(true);
             } else if (path === 'moneyboard' || path === 'piktboard') {
                 setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'MONEYBOARD' });
+            } else if (path === 'ovni') {
+                setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'OVNI' });
             } else if (path === 'vanila') {
                 setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'VANILA' });
             } else if (path === 'sixseven') {
@@ -2294,6 +2315,12 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
         if (appId === 'ENIGMIC') {
             window.history.pushState({}, '', '/enigmic');
             setJuegoActivo({ tipoJuego: 'ENIGMIC' });
+            return;
+        }
+
+        if (appId === 'OVNI') {
+            window.history.pushState({}, '', '/ovni');
+            setJuegoActivo({ tipoJuego: 'OVNI' });
             return;
         }
 
@@ -2911,6 +2938,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
         if (juegoActivo.tipoJuego === 'RACING3D') return <RacingGame3D usuario={usuario} alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'MANSION_PITAGORICA') return <MansionPitagoricaGame alTerminar={() => setJuegoActivo(null)} />;
         if (juegoActivo.tipoJuego === 'ENIGMIC') return <EnigmicLogic usuario={usuario} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
+        if (juegoActivo.tipoJuego === 'OVNI') return <OvniAbduccion onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'VANILA') return <VaniLa onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'SIXSEVEN') return <SixSeven usuario={usuario} onExit={() => { window.history.pushState({}, '', juegoActivo.desdeMath ? '/math_world' : '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'BUNKER') return <BunkerDisparo usuario={usuario} recurso={juegoActivo.recurso || null} autoStart={!!juegoActivo.recurso} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;

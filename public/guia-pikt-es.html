@@ -76,6 +76,19 @@ footer { text-align: center; padding: 20px; font-size: 0.85em; color: #999; }
 .mb-tabla td { padding: 8px; border-bottom: 1px solid #ececff; vertical-align: top; }
 .mb-tabla tr:nth-child(even) td { background: #f8f7ff; }
 @media print { .mb-tabla th, .mb-tabla td { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+/* Tutoriales paso a paso */
+.tut-indice { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; margin: 12px 0 6px; }
+.tut-indice a { display: flex; gap: 10px; align-items: center; background: #f8f7ff; border: 2px solid #e8e8ff; border-radius: 12px; padding: 10px 12px; text-decoration: none; color: #333; font-size: 0.88em; font-weight: 600; line-height: 1.35; transition: border-color 0.2s, transform 0.2s; }
+.tut-indice a:hover { border-color: #6c63ff; transform: translateY(-2px); }
+.tut-num { background: #6c63ff; color: white; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; flex-shrink: 0; }
+.tut { border-top: 2px dashed #e8e8ff; margin-top: 22px; padding-top: 18px; scroll-margin-top: 12px; }
+.tut > h3 { display: flex; align-items: center; gap: 10px; color: #6c63ff; font-size: 1.18em; margin-top: 0; }
+.tut h4 { color: #444; font-size: 0.98em; margin: 16px 0 8px; }
+.tut p, .tut li { font-size: 0.92em; line-height: 1.6; }
+.tut code { background: #ede9fe; color: #5b21b6; border-radius: 6px; padding: 1px 6px; font-size: 0.9em; word-break: break-all; }
+.tut-arriba { display: inline-block; margin-top: 10px; font-size: 0.8em; color: #6c63ff; text-decoration: none; font-weight: 600; }
+.mb-tabla td .tag { margin: 2px 2px 0 0; }
+@media print { .tut-arriba { display: none; } .tut { page-break-inside: auto; } }
 /* Evitar desbordes horizontales y permitir que palabras largas/enlaces se partan */
 html, body { max-width: 100%; overflow-x: hidden; }
 .section p, .app-card p, .steps li .step-text, .btn-item, .info-box, .alert { overflow-wrap: break-word; word-break: break-word; }
@@ -199,6 +212,7 @@ html, body { max-width: 100%; overflow-x: hidden; }
   <p>Todo lo que necesitas saber sobre las aplicaciones y cómo crear tus propios recursos</p>
   <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:15px;">
     <a href="https://www.pikt.es" target="_blank" class="link-btn" style="background:white;color:#6c63ff;">Ir a PiKT.es →</a>
+    <a href="#tutoriales" class="link-btn" style="background:rgba(255,255,255,0.15);border:2px solid rgba(255,255,255,0.6);">🎓 Tutoriales paso a paso</a>
     <button onclick="window.print()" class="link-btn" style="background:rgba(255,255,255,0.15);border:2px solid rgba(255,255,255,0.6);cursor:pointer;font-family:inherit;">📥 Descargar PDF</button>
   </div>
 </div>
@@ -782,6 +796,218 @@ html, body { max-width: 100%; overflow-x: hidden; }
       <div class="btn-item"><div class="btn-dot" style="background:#cce5ff;">💬</div><span>Describe la app que quieres y la IA la crea por ti</span></div>
       <div class="btn-item"><div class="btn-dot" style="background:#d4edda;">▶️</div><span>Pruébala al momento y ajústala con nuevas indicaciones</span></div>
       <div class="btn-item"><div class="btn-dot" style="background:#fff3cd;">🔗</div><span>Guárdala y compártela con tus alumnos mediante un enlace</span></div>
+    </div>
+  </div>
+
+  <!-- SECCIÓN: TUTORIALES PASO A PASO -->
+  <div class="section" id="tutoriales">
+    <h2>🎓 Tutoriales paso a paso <span class="new-badge">NUEVO</span></h2>
+    <p style="font-size:0.93em;line-height:1.6;">Cuatro tutoriales cortos para sacar todo el partido a PiKT desde el primer día. Para seguirlos necesitas <strong>iniciar sesión con Google</strong> (botón «Entrar», arriba a la derecha). Tus alumnos no necesitan cuenta.</p>
+    <nav class="tut-indice" aria-label="Índice de tutoriales">
+      <a href="#tut-crear"><span class="tut-num">1</span>Crea tu primer recurso, configúralo y compártelo</a>
+      <a href="#tut-resultados"><span class="tut-num">2</span>Recibe los resultados de tus alumnos</a>
+      <a href="#tut-colaborar"><span class="tut-num">3</span>Deja que tus alumnos escriban las preguntas</a>
+      <a href="#tut-convertir"><span class="tut-num">4</span>Convierte un recurso para usarlo en más juegos</a>
+    </nav>
+
+    <!-- TUTORIAL 1 -->
+    <div class="tut" id="tut-crear">
+      <h3><span class="tut-num">1</span>Crea tu primer recurso a mano, configúralo y compártelo</h3>
+      <p>Un <strong>recurso</strong> es tu banco de preguntas. Lo creas una vez y lo usas en uno o varios juegos. En este ejemplo creamos un recurso de <strong>Burbujas / Pikatron</strong> (preguntas de opción múltiple), que es el que sirve para más juegos (mira la tabla del <a href="#tut-convertir">tutorial 4</a>).</p>
+
+      <h4>A. Crear el recurso</h4>
+      <ol class="steps">
+        <li><span class="step-text">En tu panel de profesor, elige en las pestañas de arriba el <strong>tipo de juego</strong>: por ejemplo, <em>Burbujas y Pikatron</em>.</span></li>
+        <li><span class="step-text">Pulsa el botón verde <strong>«+ Crear nuevo»</strong>, escribe el <strong>título</strong> (ej.: «Capitales de Europa») y elige el método <strong>✏️ Manual</strong>.</span></li>
+        <li><span class="step-text">Pulsa <strong>«+ Añadir pregunta»</strong> y escribe el enunciado, la <strong>respuesta correcta</strong> y hasta <strong>3 respuestas incorrectas</strong>. Repite con cada pregunta.</span></li>
+        <li><span class="step-text">Si quieres separar niveles o temas, crea más <strong>hojas</strong> (Hoja 1, Hoja 2…) y cámbiales el nombre (ej.: «Fácil», «Difícil»). Al compartir podrás elegir una hoja concreta o todas.</span></li>
+        <li><span class="step-text">¿Tienes las preguntas en un documento? Usa <strong>📥 Importar</strong> para pegarlas de golpe en vez de escribirlas una a una.</span></li>
+      </ol>
+
+      <h4>B. Configurarlo (botón ⚙️ arriba a la derecha del editor)</h4>
+      <div class="info-grid">
+        <div class="info-box"><strong>🎮 Ajustes de juego</strong><br>Tiempo por pregunta, nº de preguntas, puntos por acierto y por fallo y, en Burbujas, la velocidad (🐢 lento, 🚶 moderado, 🐇 rápido). En Pasapalabra, el tiempo del rosco.</div>
+        <div class="info-box"><strong>🔀 Orden aleatorio</strong><br>Mezcla las preguntas en cada partida, para que no todos vean lo mismo en el mismo orden.</div>
+        <div class="info-box"><strong>📍 Datos de búsqueda</strong><br>Temas, ciclo educativo, país, región… Ayudan a encontrar el recurso en la Biblioteca y en el buscador de los alumnos.</div>
+        <div class="info-box"><strong>✍️ Autor</strong><br>El nombre que aparece al empezar el juego.</div>
+        <div class="info-box"><strong>✅ Terminado</strong><br><strong>Imprescindible:</strong> actívalo cuando el recurso esté listo. Si no, tus alumnos no lo verán.</div>
+        <div class="info-box"><strong>🔓 Permitir copia</strong><br>Hazlo público para que otros profes lo encuentren en la Biblioteca y lo copien. Opcional.</div>
+      </div>
+      <p style="margin-top:10px;">Cuando acabes, pulsa <strong>💾 Guardar</strong>. El recurso aparecerá en <em>Mis recursos</em> con su <strong>código de acceso</strong> 🔑.</p>
+
+      <h4>C. Obtener el enlace configurado como tú quieras</h4>
+      <p>Hay tres formas de llegar a tus alumnos, de la más rápida a la más controlada:</p>
+      <ol class="steps">
+        <li><span class="step-text"><strong>Código del recurso:</strong> el alumno entra en pikt.es, pulsa «Código» y lo escribe. Elige él el modo de juego.</span></li>
+        <li><span class="step-text"><strong>Enlace normal:</strong> en la tarjeta del recurso, el botón <strong>🔗 Enlace</strong> te deja elegir la hoja (y en Burbujas, el modo) y copia un enlace que abre directamente ese recurso.</span></li>
+        <li><span class="step-text"><strong>Enlace «⚙️ Con configuración» (recomendado):</strong> en la página principal, pulsa el botón <strong>compartir</strong> de la tarjeta del juego (por ejemplo, Burbujas, Pikatron, Bunker o Luz roja · Luz verde) → pestaña <strong>⚙️ Con configuración</strong>.</span></li>
+      </ol>
+      <p>Dentro de <em>Con configuración</em>:</p>
+      <ol class="steps">
+        <li><span class="step-text">Busca tu recurso en <strong>Mis recursos</strong>, en <strong>Públicos</strong> o escribiendo su <strong>Código</strong>. También puedes usar recursos de otros profes.</span></li>
+        <li><span class="step-text">Elige la <strong>hoja</strong> (o «🔀 Todas») y el <strong>modo de juego</strong>. Por ejemplo, el mismo recurso de Burbujas puede salir como 🔵 Cazaburbujas, 📝 Test, ⚡ Pikatron Run o 🕹️ Plataformas.</span></li>
+        <li><span class="step-text">Ponle un <strong>nombre al reto</strong> (ej.: «Repaso tema 3 · 2.º B») y copia el enlace, o envíalo directamente por <strong>🎓 Classroom, 💬 WhatsApp o 📧 correo</strong>. También tienes un <strong>código QR</strong> para proyectarlo en clase.</span></li>
+        <li><span class="step-text">Pulsa <strong>Probar</strong> para comprobar lo que verán tus alumnos antes de mandarlo.</span></li>
+      </ol>
+      <div class="alert blue">💡 Con el enlace configurado, el alumno <strong>no elige nada</strong>: entra, juega con las condiciones que fijaste y al terminar envía el resultado. Es la mejor opción para Classroom, deberes y competiciones. En las herramientas de Math World (Cálculo Mental, Fracciones, Ecuaciones…) funciona igual, solo que en lugar de un recurso eliges la configuración: operaciones, tipo de números, tiempo, nº de ejercicios…</div>
+      <a href="#tutoriales" class="tut-arriba">↑ Volver al índice</a>
+    </div>
+
+    <!-- TUTORIAL 2 -->
+    <div class="tut" id="tut-resultados">
+      <h3><span class="tut-num">2</span>Recibe los resultados de tus alumnos (con tus recursos o con los de otro profe)</h3>
+      <p>Los resultados no van ligados al recurso, sino a <strong>tu código de profesor</strong>. Por eso da igual si el juego usa un recurso tuyo, uno de la Biblioteca hecho por otro profe o una herramienta de Math World: si el alumno escribe <strong>tu código</strong> al terminar, el resultado te llega a ti.</p>
+
+      <h4>A. Crea tu código de profesor (solo una vez)</h4>
+      <ol class="steps">
+        <li><span class="step-text">En tu panel, entra en <strong>🛠️ Herramientas del Profesor → 📈 Informes de Juegos</strong>.</span></li>
+        <li><span class="step-text">Arriba verás el recuadro de tu código. Escribe uno fácil de recordar (ej.: <code>PROFA1</code>) y pulsa <strong>Guardar</strong>.</span></li>
+        <li><span class="step-text">Dáselo a tus alumnos al empezar el curso: apúntalo en la pizarra, en Classroom o en tu página pública.</span></li>
+      </ol>
+
+      <h4>B. Qué hace el alumno</h4>
+      <ol class="steps">
+        <li><span class="step-text">Juega con tu enlace, con el código del recurso o buscando el juego en pikt.es (no necesita cuenta).</span></li>
+        <li><span class="step-text">Al terminar, pulsa <strong>📤 Enviar al profesor</strong>.</span></li>
+        <li><span class="step-text">Escribe su <strong>nombre y apellido</strong>, su <strong>curso</strong> (ej.: «3.º ESO B») y <strong>tu código de profesor</strong>, y pulsa Enviar. Verá un ✅ de confirmación.</span></li>
+      </ol>
+
+      <h4>C. Dónde ves los resultados</h4>
+      <ol class="steps">
+        <li><span class="step-text">En <strong>Informes de Juegos → 📋 Historial</strong> aparece cada partida: alumno, curso, juego, fecha, aciertos, porcentaje y tiempo. Si usaste un enlace configurado, verás también el <strong>🎯 nombre del reto</strong>.</span></li>
+        <li><span class="step-text">Filtra por <strong>tipo de juego</strong> o <strong>fecha</strong>, o pulsa el nombre de un alumno para ver solo sus partidas.</span></li>
+        <li><span class="step-text">Pasa las notas a tus <strong>👥 Grupos</strong> (columnas de calificaciones exportables a Excel) o consulta el <strong>🏆 Ranking</strong>.</span></li>
+        <li><span class="step-text">La <strong>🔔 campana</strong> del panel te avisa cuando llegan resultados nuevos.</span></li>
+      </ol>
+      <div class="alert">⚠️ <strong>Si un resultado no te llega:</strong> casi siempre es porque el código está mal escrito. Si sale «Código no encontrado», el alumno debe revisarlo. Los resultados de los juegos <strong>En Vivo</strong> (PiLive, MathLive) los ves al terminar la sesión, en la pantalla del profesor.</div>
+      <a href="#tutoriales" class="tut-arriba">↑ Volver al índice</a>
+    </div>
+
+    <!-- TUTORIAL 3 -->
+    <div class="tut" id="tut-colaborar">
+      <h3><span class="tut-num">3</span>Abre un recurso para que tus alumnos escriban las preguntas</h3>
+      <p>Que los alumnos inventen las preguntas es una forma estupenda de repasar. PiKT te permite abrir cualquier hoja de un recurso para que te envíen preguntas <strong>en el formato de ese juego</strong>, sin necesidad de cuenta. Tú las revisas antes de que se jueguen.</p>
+
+      <h4>A. Abrir el recurso a los alumnos</h4>
+      <ol class="steps">
+        <li><span class="step-text">Crea (o abre) el recurso y <strong>guárdalo al menos una vez</strong>: el enlace solo funciona con recursos guardados.</span></li>
+        <li><span class="step-text">En el editor, selecciona la <strong>hoja</strong> donde quieres recibir las preguntas. Truco: crea una hoja nueva solo para ellas (ej.: «Preguntas de 2.º B»).</span></li>
+        <li><span class="step-text">Despliega el panel <strong>«🔗 Recibir preguntas de alumnos»</strong> y pulsa <strong>«Activar enlace para esta hoja»</strong>. Verás un <strong>código</strong> y un <strong>enlace</strong> (del tipo <code>pikt.es/?c=CÓDIGO</code>), y la marca <em>Activo</em>.</span></li>
+        <li><span class="step-text">Copia el enlace o el código y compártelo con la clase.</span></li>
+      </ol>
+
+      <h4>B. Qué hace el alumno</h4>
+      <ol class="steps">
+        <li><span class="step-text">Abre el enlace, o entra en pikt.es, pulsa «Código» y escribe el código de la hoja.</span></li>
+        <li><span class="step-text">Le aparece un formulario adaptado al juego: definición y respuesta en Pasapalabra, enunciado con respuesta correcta e incorrectas en Burbujas o PiLive, pareja de términos en AparejaDOS…</span></li>
+        <li><span class="step-text">Escribe sus preguntas y las envía.</span></li>
+      </ol>
+
+      <h4>C. Revisar y publicar</h4>
+      <ol class="steps">
+        <li><span class="step-text">Abre el recurso en el editor: las preguntas recibidas <strong>se añaden solas</strong> a esa hoja.</span></li>
+        <li><span class="step-text">Corrige faltas, borra las repetidas o incorrectas y pulsa <strong>💾 Guardar</strong>. Hasta que no guardes, no se juega con ellas.</span></li>
+        <li><span class="step-text">Cuando quieras cerrar la recogida, pulsa <strong>«Regenerar código»</strong>: el código anterior deja de funcionar.</span></li>
+      </ol>
+      <div class="info-grid">
+        <div class="info-box"><strong>📮 Q-Sender (buzón aparte)</strong><br>Si prefieres recoger preguntas sin crear antes el recurso, crea un recurso de tipo <em>Q-Sender</em>, elige el juego de destino y comparte su código. Después, con el botón <strong>Migrar a juego</strong>, lo conviertes en un recurso jugable (sin los nombres de los alumnos).</div>
+        <div class="info-box"><strong>🎲 Trivial</strong><br>En el editor del Trivial, el panel <strong>👥 Colaborar → «⚡ Activar recepción de preguntas»</strong> genera un enlace. Las preguntas llegan a su categoría marcadas como <strong>PENDIENTE</strong> hasta que las apruebas. Ahí también puedes añadir a otros profes como colaboradores, por su correo.</div>
+      </div>
+      <a href="#tutoriales" class="tut-arriba">↑ Volver al índice</a>
+    </div>
+
+    <!-- TUTORIAL 4 -->
+    <div class="tut" id="tut-convertir">
+      <h3><span class="tut-num">4</span>Convierte un recurso en otro tipo para usarlo en más juegos</h3>
+      <p>Cada juego necesita un tipo de dato: palabras sueltas, preguntas con opciones, parejas… Con el <strong>🔄 Conversor Mágico</strong> transformas un recurso que ya tienes en otro tipo, sin volver a escribir nada. El original <strong>no se modifica</strong>: se crea un recurso nuevo.</p>
+
+      <h4>A. Convertir paso a paso</h4>
+      <ol class="steps">
+        <li><span class="step-text">En tu panel, entra en <strong>🛠️ Herramientas del Profesor → 🔄 Conversor Mágico</strong>.</span></li>
+        <li><span class="step-text">Elige uno de <strong>tus recursos</strong> (puedes buscarlo por título). Si es de otro profe, primero <strong>cópialo</strong> desde la Biblioteca.</span></li>
+        <li><span class="step-text">Elige el <strong>juego de destino</strong>: Pasapalabra, Burbujas / Pikatron, PiLive, AparejaDOS, La Ruleta o Wordle / Sopa de letras. En Burbujas y PiLive te preguntará qué versión prefieres (Pro o Clásica).</span></li>
+        <li><span class="step-text">Pulsa convertir. Aparecerá en <em>Mis recursos</em> del juego de destino como <strong>«[Convertido] Título»</strong>.</span></li>
+        <li><span class="step-text"><strong>Ábrelo y revísalo:</strong> los tiempos y puntos no se copian, así que ajústalos en ⚙️ y activa <strong>✅ Terminado</strong> para que lo vean tus alumnos.</span></li>
+      </ol>
+
+      <h4>B. Qué hace el conversor con tus preguntas</h4>
+      <div class="info-grid">
+        <div class="info-box"><strong>→ Burbujas / PiLive</strong><br>Si tus preguntas no tenían respuestas incorrectas (por ejemplo, en un Pasapalabra), las <strong>inventa mezclando las respuestas correctas</strong> de otras preguntas de la misma hoja. Revísalas.</div>
+        <div class="info-box"><strong>→ Pasapalabra</strong><br>Asigna a cada pregunta la <strong>letra inicial de su respuesta</strong>. Comprueba que el rosco tenga las letras que quieres.</div>
+        <div class="info-box"><strong>→ Wordle / Sopa</strong><br>Solo conserva las respuestas que son <strong>una palabra de 4 letras o más</strong> (sin números ni enlaces).</div>
+        <div class="info-box"><strong>→ AparejaDOS / Ruleta</strong><br>La pregunta pasa a ser el término A (o la pista) y la respuesta, el término B. A La Ruleta tendrás que añadirle la <em>frase a resolver</em>.</div>
+      </div>
+      <p style="margin-top:10px;">No se convierten las preguntas de <em>ordenar</em>, <em>rellenar huecos</em>, <em>matemáticas</em>, <em>dibujo</em> ni las diapositivas. Los recursos de Wordle/Sopa y de Q-Sender no pueden ser el origen (los de Q-Sender se pasan a un juego con «Migrar a juego»).</p>
+
+      <h4>C. ¿Para qué juegos sirve cada tipo de recurso?</h4>
+      <p>Muchos juegos aceptan varios tipos de recurso sin convertir nada. Usa esta tabla para decidir qué tipo crear o a cuál convertir:</p>
+      <div class="mb-tabla-wrap">
+        <table class="mb-tabla">
+          <thead>
+            <tr><th>Tipo de recurso</th><th>Qué contiene</th><th>Juegos en los que funciona</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>🫧 Burbujas / Pikatron</strong></td>
+              <td>Enunciado + respuesta correcta + hasta 3 incorrectas</td>
+              <td><span class="tag">Cazaburbujas</span><span class="tag">Test</span><span class="tag">Pikatron Run</span><span class="tag">Plataformas</span><span class="tag">Bunker</span><span class="tag">Fútbol Quizz</span><span class="tag">Luz roja · Luz verde</span><span class="tag">Duelo de Piratas</span><span class="tag">Money Board*</span></td>
+            </tr>
+            <tr>
+              <td><strong>📡 PiLive</strong></td>
+              <td>Preguntas de opción múltiple para jugar en vivo</td>
+              <td><span class="tag">PiLive (en vivo)</span><span class="tag">Fútbol Quizz</span><span class="tag">Luz roja · Luz verde</span><span class="tag">Duelo de Piratas</span><span class="tag">Money Board*</span></td>
+            </tr>
+            <tr>
+              <td><strong>🔤 Pasapalabra</strong></td>
+              <td>Letra + definición + respuesta</td>
+              <td><span class="tag">Pasapalabra</span><span class="tag">Fútbol Quizz</span><span class="tag">Luz roja · Luz verde</span><span class="tag">Duelo de Piratas</span><span class="tag">Money Board*</span></td>
+            </tr>
+            <tr>
+              <td><strong>🎡 La Ruleta</strong></td>
+              <td>Pregunta + respuesta + frase a resolver</td>
+              <td><span class="tag">La Ruleta</span><span class="tag">Luz roja · Luz verde</span><span class="tag">Duelo de Piratas</span><span class="tag">Money Board*</span></td>
+            </tr>
+            <tr>
+              <td><strong>🃏 AparejaDOS</strong></td>
+              <td>Parejas: término A ↔ término B</td>
+              <td><span class="tag">AparejaDOS</span></td>
+            </tr>
+            <tr>
+              <td><strong>🟩 Wordle / Sopa de letras</strong></td>
+              <td>Lista de palabras</td>
+              <td><span class="tag green">Wordle</span><span class="tag green">Sopa de letras</span><span class="tag green">Ahorcado</span></td>
+            </tr>
+            <tr>
+              <td><strong>🏷️ EtiquetaMe</strong></td>
+              <td>Imagen con etiquetas para colocar</td>
+              <td><span class="tag orange">EtiquetaMe</span></td>
+            </tr>
+            <tr>
+              <td><strong>🕰️ Línea del tiempo</strong></td>
+              <td>Eventos con fecha</td>
+              <td><span class="tag orange">Línea del tiempo</span></td>
+            </tr>
+            <tr>
+              <td><strong>🎬 VideoQuizz</strong></td>
+              <td>Vídeo de YouTube + preguntas en momentos concretos</td>
+              <td><span class="tag orange">VideoQuizz</span></td>
+            </tr>
+            <tr>
+              <td><strong>📚 Omninteractive</strong></td>
+              <td>Bloques de ejercicios de 9 tipos</td>
+              <td><span class="tag orange">Omninteractive</span></td>
+            </tr>
+            <tr>
+              <td><strong>📮 Q-Sender</strong></td>
+              <td>Buzón de preguntas enviadas por alumnos</td>
+              <td><span class="tag blue">No se juega: se migra a Pasapalabra, AparejaDOS, Burbujas…</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:0.82em;color:#666;margin-top:8px;">* <strong>Money Board</strong> usa cada hoja como una categoría del tablero, así que el recurso necesita <strong>al menos 2 hojas</strong> con preguntas. En Luz roja · Luz verde y en el Duelo de Piratas, las preguntas sin respuestas incorrectas se juegan escribiendo la respuesta.</p>
+      <div class="alert green">🧭 <strong>Regla rápida:</strong> si dudas, crea tu recurso como <strong>Burbujas / Pikatron</strong>, porque sirve directamente en 9 juegos. Si después quieres un Wordle, una Sopa de letras o un Pasapalabra con el mismo vocabulario, pásalo por el Conversor Mágico.</div>
+      <a href="#tutoriales" class="tut-arriba">↑ Volver al índice</a>
     </div>
   </div>
 

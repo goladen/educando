@@ -1302,6 +1302,100 @@ const PanelCuerdaFracciones = ({ equipo, aplicar, bloqueado, tipos, nivel, isMob
     );
 };
 
+// ── Tirón de cuerda con problemas: una pregunta de un problema + 4 opciones ──
+const barajarArr = (arr) => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+const opcionesPregunta = (prob, preg) => {
+    if (preg.tipo === 'opcion') {
+        const extra = ['Van igual', 'No se puede saber'].filter(o => !preg.opciones.includes(o));
+        return barajarArr([...preg.opciones, ...extra].slice(0, 4).map(o => ({ txt: o, ok: o === preg.r })));
+    }
+    if (preg.tipo === 'frac') {
+        const [n, d] = preg.r;
+        const usados = new Set([valor(preg.r)]);
+        const cands = [
+            ...prob.preguntas.filter(q => q.tipo === 'frac' && q !== preg).map(q => q.r),
+            [d - n, d], [n, d + 1], [n + 1, d], [d, n + d], [n * 2, d], [n, d * 2], [n + 2, d + 1], [1, d],
+        ];
+        const falsas = [];
+        for (const f of cands) {
+            if (falsas.length >= 3) break;
+            if (f[0] <= 0 || f[1] <= 0) continue;
+            const s = simplificar(f[0], f[1]);
+            if (usados.has(valor(s))) continue;
+            usados.add(valor(s)); falsas.push(s);
+        }
+        return barajarArr([{ frac: preg.r, ok: true }, ...falsas.map(f => ({ frac: f }))]);
+    }
+    // num: primero errores «del propio problema» (otras respuestas y datos del enunciado), luego variaciones
+    const r = preg.r;
+    const delTexto = (prob.texto.replace(/\d+\s*\/\s*\d+/g, ' ').match(/\d+(?:[.,]\d+)?/g) || []).map(x => Number(x.replace(',', '.')));
+    const propios = barajarArr([...prob.preguntas.filter(q => q.tipo === 'num').map(q => q.r), ...delTexto]
+        .filter(x => x > 0 && x !== r && x >= r / 10 && x <= r * 10));
+    const variaciones = barajarArr([r * 2, r / 2, r + 10, r - 10, r * 3, r + Math.max(1, Math.round(r / 5)), r - Math.max(1, Math.round(r / 5))])
+        .filter(x => x > 0 && Number.isInteger(x));
+    const falsas = [];
+    for (const x of [...propios.slice(0, 2), ...variaciones, ...propios.slice(2)]) {
+        if (falsas.length >= 3) break;
+        if (x !== r && !falsas.includes(x)) falsas.push(x);
+    }
+    const u = preg.unidad ? ` ${preg.unidad}` : '';
+    return barajarArr([{ txt: `${r.toLocaleString('es-ES')}${u}`, ok: true }, ...falsas.map(x => ({ txt: `${x.toLocaleString('es-ES')}${u}` }))]);
+};
+
+const PanelCuerdaProblemas = ({ equipo, aplicar, bloqueado, cat, isMobile }) => {
+    const mazo = useRef([]);
+    const sacar = () => {
+        if (!mazo.current.length) {
+            const pool = PROBLEMAS_FRACCIONES.filter(p => cat === 'todos' || p.cat === cat);
+            mazo.current = barajarArr(pool.flatMap(p => p.preguntas.map(q => ({ prob: p, preg: q }))));
+        }
+        const it = mazo.current.pop();
+        return { ...it, opciones: opcionesPregunta(it.prob, it.preg) };
+    };
+    const [item, setItem] = useState(sacar);
+    const [estado, setEstado] = useState(null);
+    const acento = equipo === 1 ? '#42A5F5' : '#EF5350';
+    const { prob, preg, opciones } = item;
+    const correcta = opciones.findIndex(o => o.ok);
+
+    const responder = (i) => {
+        if (estado || bloqueado) return;
+        const ok = !!opciones[i]?.ok;
+        (ok ? sonidoCorrecto : sonidoIncorrecto)();
+        setEstado(ok ? 'ok' : 'err');
+        aplicar(ok);
+        setTimeout(() => { setItem(sacar()); setEstado(null); }, ok ? 900 : 1800);
+    };
+    const { conMandos } = useMandoPregunta({ clave: opciones, n: opciones.length, elegir: responder, activa: !estado && !bloqueado, correcta });
+
+    const pintar = (o) => o.frac
+        ? <FracTexto n={o.frac[0]} d={o.frac[1]} size={isMobile ? '1.2rem' : '1.4rem'} color="#2c3e50" />
+        : <span style={{ fontWeight: 900, fontSize: isMobile ? '0.95rem' : '1.1rem', color: '#2c3e50' }}>{o.txt}</span>;
+    const sol = opciones[correcta];
+    return (
+        <div style={{ border: `3px solid ${estado === 'ok' ? '#27ae60' : estado === 'err' ? '#e74c3c' : `${acento}66`}`, background: estado === 'ok' ? '#f0fff4' : estado === 'err' ? '#fff5f5' : 'white', borderRadius: 16, padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: 10, transition: 'all 0.2s' }}>
+            <div style={{ textAlign: 'center', fontWeight: 900, color: acento, fontSize: '0.85rem' }}>
+                {equipo === 1 ? '🔵 Equipo 1' : '🔴 Equipo 2'} · <span style={{ color: '#7b1fa2' }}>📖 Problema</span>
+            </div>
+            <div style={{ fontSize: isMobile ? '0.82rem' : '0.92rem', color: '#444', lineHeight: 1.4, background: '#faf5fc', borderRadius: 10, padding: '8px 10px' }}>
+                {prob.emoji} {prob.texto}
+            </div>
+            <div style={{ textAlign: 'center', fontWeight: 900, color: '#2c3e50', fontSize: isMobile ? '0.95rem' : '1.05rem' }}>❓ {preg.p}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7 }}>
+                {opciones.map((o, i) => (
+                    <button key={i} onClick={() => responder(i)} disabled={!!estado || bloqueado}
+                        style={{ padding: isMobile ? '10px 4px' : '12px 6px', borderRadius: 12, border: `2px solid ${estado && o.ok ? '#27ae60' : `${acento}55`}`, background: estado && o.ok ? '#e8f8ee' : 'white', cursor: (estado || bloqueado) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: (estado || bloqueado) && !o.ok ? 0.55 : 1, boxShadow: '0 3px 0 rgba(0,0,0,0.12)', touchAction: 'manipulation' }}>
+                        {conMandos && <LetraMando i={i} />}{pintar(o)}
+                    </button>
+                ))}
+            </div>
+            {estado === 'ok' && <div style={{ textAlign: 'center', color: '#27ae60', fontWeight: 800 }}>✅ ¡Tirad fuerte!</div>}
+            {estado === 'err' && <div style={{ textAlign: 'center', color: '#e74c3c', fontWeight: 800, fontSize: '0.85rem', display: 'flex', gap: 6, justifyContent: 'center', alignItems: 'center' }}>❌ Era {pintar(sol)}</div>}
+        </div>
+    );
+};
+
 // ═════════════════════════════════════════════════════════════════════════════
 //  4) PROBLEMAS — fracción de una cantidad (datos en fraccionesProblemas.js)
 // ═════════════════════════════════════════════════════════════════════════════
@@ -1665,6 +1759,8 @@ export default function Fracciones({ usuario, onExit }) {
     // Config del modo competición
     const [tiposComp, setTiposComp] = useState(['suma', 'resta', 'simplificar', 'equivalente']);
     const [nivelComp, setNivelComp] = useState(1);
+    const [modoComp, setModoComp] = useState('ejercicios'); // 'ejercicios' | 'problemas'
+    const [catComp, setCatComp] = useState('todos');
 
     const timerRef = useRef(null);
     const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth <= 700);
@@ -1976,6 +2072,22 @@ export default function Fracciones({ usuario, onExit }) {
                         configExtra={(
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
                                 <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center' }}>
+                                    <span>Jugar con:</span>
+                                    {[['ejercicios', '🍰 Ejercicios'], ['problemas', '📖 Problemas']].map(([m, lab]) => (
+                                        <button key={m} onClick={() => setModoComp(m)}
+                                            style={{ padding: '4px 12px', borderRadius: 20, cursor: 'pointer', fontWeight: 800, fontSize: '0.78rem', border: '2px solid #e67e22', background: modoComp === m ? '#e67e22' : 'white', color: modoComp === m ? 'white' : '#e67e22' }}>{lab}</button>
+                                    ))}
+                                </div>
+                                {modoComp === 'problemas' ? (
+                                <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center' }}>
+                                    <span>Problemas:</span>
+                                    {Object.entries(CATS_PROBLEMAS).map(([k, c]) => (
+                                        <button key={k} onClick={() => setCatComp(k)}
+                                            style={{ padding: '4px 10px', borderRadius: 20, cursor: 'pointer', fontWeight: 800, fontSize: '0.74rem', border: `2px solid ${c.color}`, background: catComp === k ? c.color : 'white', color: catComp === k ? 'white' : c.color }}>{c.label}</button>
+                                    ))}
+                                </div>
+                                ) : (<>
+                                <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center' }}>
                                     <span>Ejercicios:</span>
                                     {Object.entries(TIPOS_EJERCICIO).map(([k, v]) => {
                                         const activo = tiposComp.includes(k);
@@ -1994,9 +2106,13 @@ export default function Fracciones({ usuario, onExit }) {
                                             style={{ padding: '4px 12px', borderRadius: 20, cursor: 'pointer', fontWeight: 800, fontSize: '0.74rem', border: '2px solid #7b1fa2', background: nivelComp === n ? '#7b1fa2' : 'white', color: nivelComp === n ? 'white' : '#7b1fa2' }}>{lab}</button>
                                     ))}
                                 </div>
+                                </>)}
                             </div>
                         )}
-                        renderPanel={(equipo, { key, aplicar, bloqueado }) => (
+                        renderPanel={(equipo, { key, aplicar, bloqueado }) => modoComp === 'problemas' ? (
+                            <PanelCuerdaProblemas key={`${key}-p-${catComp}`} equipo={equipo} aplicar={aplicar} bloqueado={bloqueado}
+                                cat={catComp} isMobile={isMobile} />
+                        ) : (
                             <PanelCuerdaFracciones key={`${key}-${tiposComp.join('')}-${nivelComp}`} equipo={equipo} aplicar={aplicar} bloqueado={bloqueado}
                                 tipos={tiposComp} nivel={nivelComp} isMobile={isMobile} />
                         )}

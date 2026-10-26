@@ -13,7 +13,7 @@ const ExpresionArtEscri = lazy(() => import('./ExpresionArtEscri'));
 const EditorManual = lazy(() => import('./components/EditorManual'));
 const EditorPro = lazy(() => import('./components/EditorPro'));
 import UserProfile from './components/UserProfile';
-import LandingGames from './components/LandingGames3';
+import KofiBoton from './components/KofiBoton';import LandingGames from './components/LandingGames3';
 import GlobalSearch from './components/GlobalSearch';
 const TeacherTools = lazy(() => import('./components/TeacherTools'));
 const MiniAppAdmin = lazy(() => import('./components/MiniAppAdmin'));
@@ -1126,6 +1126,9 @@ function ProfesorDashboardInterno({ usuario, googleToken }) {
                         Más Información
                     </li>
                 </ul>
+                <div style={{ padding: '20px', textAlign: 'center' }}>
+                    <KofiBoton />
+                </div>
                 <div style={styles.menuFooter}>
                     <span
                         onClick={() => { setMenuOpen(false); window.open('https://www.pikt.es/politica.html', '_blank'); }}

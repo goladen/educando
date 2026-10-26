@@ -15,6 +15,7 @@ const ComunidadesPublico = lazy(() => import('./components/ComunidadesPublico'))
 const PaginaProfesor = lazy(() => import('./components/PaginaProfesor'));
 import ContadorVisitantes from './components/ContadorVisitantes';
 import PiTutorial from './components/PiTutorial';
+import KofiBoton from './components/KofiBoton';
 
 // Navegadores dentro de apps (Instagram, Facebook, TikTok, WhatsApp…): Google bloquea ahí el login (disallowed_useragent)
 function navegadorIntegrado() {
@@ -256,6 +257,9 @@ export default function Login({ setGoogleToken }) {
                             <li style={styles.menuItem} onClick={() => handleMenuClick('instagram')}>📸 Síguenos en Instagram</li>
                             <li style={styles.menuItem} onClick={() => handleMenuClick('privacidad')}>🔒 Política de privacidad</li>
                         </ul>
+                        <div style={{ padding: '20px', textAlign: 'center' }}>
+                            <KofiBoton />
+                        </div>
                     </div>
                 </div>
             )}

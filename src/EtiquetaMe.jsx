@@ -11,6 +11,7 @@ import Confetti from 'react-confetti';
 import PartesPlantaGame from './PartesPlanta';
 import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
+import BotonPdfRecurso from './components/BotonPdfRecurso';
 
 // ─────────────────────────────────────────────
 // HELPERS (mismos que LandingGames3)
@@ -403,6 +404,7 @@ function TarjetaRecurso({ r, onClick }) {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={st.codeBadge}><Key size={11} /> {r.accessCode}</span>
+                    <BotonPdfRecurso recurso={r} />
                     <button style={st.btnJugar}><Play size={13} /> Jugar</button>
                 </div>
             </div>

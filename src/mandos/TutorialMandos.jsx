@@ -117,7 +117,16 @@ const PESTANAS = {
     ],
   },
 };
-const ORDEN = ['inicio', 'letras', 'numero', 'abecedario', 'candado', 'calamar', 'mover', 'futbol'];
+PESTANAS.ovni = {
+  t: '🛸 Ovni', color: '#0891b2', usos: 'Ovni Abducción',
+  intro: 'El mando es el volante del ovni. La pantalla del mando enseña una flecha hacia donde vas.',
+  pasos: [
+    { zona: null, gesto: 'izq', led: 'flecha', titulo: 'Inclina para mover', texto: 'Mientras tengas el mando inclinado, el ovni avanza hacia ese lado. Ponlo plano para pararlo.' },
+    { zona: null, gesto: 'delante', led: 'flecha', titulo: 'Delante y atrás', texto: 'Inclínalo hacia delante para subir por la pantalla y hacia ti para bajar. También vale en diagonal.' },
+    { zona: null, gesto: 'agitar', led: 'si', titulo: 'Agita o pulsa A: ¡abducir!', texto: 'Ponte encima del animal que lleva la palabra correcta y agita el mando (o pulsa A).' },
+  ],
+};
+const ORDEN = ['inicio', 'letras', 'numero', 'abecedario', 'candado', 'calamar', 'mover', 'futbol', 'ovni'];
 
 const CSS = `
 @keyframes tmAgitar { 0%,100% { transform: translate(0,0) rotate(0deg); } 15% { transform: translate(-10px,-3px) rotate(-6deg); } 30% { transform: translate(10px,3px) rotate(6deg); } 45% { transform: translate(-9px,2px) rotate(-5deg); } 60% { transform: translate(9px,-2px) rotate(5deg); } 75% { transform: translate(-4px,0) rotate(-2deg); } }

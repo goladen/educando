@@ -7,6 +7,7 @@ import {
     datosSimplificar, problemasCientifica, datosRadPotencia, datosPotRadical, datosExtraer, datosIntroducir,
     datosSimpRaiz, datosSumar, datosIndiceComun, datosComparar, datosRaizRaiz, datosRacionalizar,
 } from '../../utils/potenciasRadicales';
+import { rad as radM, potStr as potM } from '../../utils/MathRender';
 
 const noCero = (a, b) => { let v; do { v = R(a, b); } while (v === 0); return v; };
 
@@ -29,6 +30,16 @@ const terminoTxt = (t) => {
     return potS(t.b, t.e);
 };
 const radNum = (etiqueta, v) => ({ etiqueta, tipo: 'num', v });
+// Versiones en notación matemática (utils/MathRender): raíz extendida y fracción con barra larga
+const terminoM = (t) => {
+    if (t.tipo === 'negbase') return `(−${t.b})^{${t.e}}`;
+    if (t.tipo === 'powpow') return `(${t.b}^{${t.m}})^{${t.e}}`;
+    if (t.tipo === 'frac') return `(FRAC(${t.p},${t.q}))^{${t.e}}`;
+    return potM(t.b, t.e);
+};
+const fracM = (n, d) => { const g = mcd(n, d) || 1, a = Math.abs(n) / g, b = d / g; return `${n < 0 ? '−' : ''}${b === 1 ? a : `FRAC(${a},${b})`}`; };
+const igualM = (a, b) => (a === b ? a : `${a} = ${b}`);
+const coefM = (c) => (c === 1 ? '' : c);
 const potTxt = (b, e) => `${b < 0 ? `(${N(b)})` : b}${sup(e)}`;
 export const POTENCIAS = {
     id: 'potencias', nombre: 'Potencias y raíces', emoji: '🔺', color: '#d35400', etapas: ['primaria', 'eso'],
@@ -59,9 +70,12 @@ export const POTENCIAS = {
                 const num = d.num.map(terminoTxt).join(' · '), den = d.den.map(terminoTxt).join(' · ');
                 const v = (d.neg ? -1 : 1) * d.N / d.D;
                 const agrupado = Object.entries(d.exps).filter(([, e]) => e !== 0).map(([p, e]) => potS(p, e)).join(' · ') || '1';
+                const numM = d.num.map(terminoM).join(' * '), denM = d.den.map(terminoM).join(' * ');
+                const agrupadoM = Object.entries(d.exps).filter(([, e]) => e !== 0).map(([p, e]) => potM(p, e)).join(' * ') || '1';
                 return { e: `${den ? `(${num}) : (${den})` : num} =`, s: frac(d.neg ? -d.N : d.N, d.D),
+                    m: `${denM ? `FRAC(${numM},${denM})` : numM} =`, sm: fracM(d.neg ? -d.N : d.N, d.D),
                     r: [{ tipo: 'frac', v, tol: 1e-9, placeholder: 'a/b' }],
-                    pasos: ['Descompón cada base en factores primos (6 = 2·3, 12 = 2²·3…)', `Agrupa las potencias de la misma base: ${agrupado}`] };
+                    pasos: ['Descompón cada base en factores primos (6 = 2·3, 12 = 2²·3…)', 'Agrupa las potencias de la misma base:', { m: `${agrupadoM} = ${fracM(d.neg ? -d.N : d.N, d.D)}` }] };
             },
         },
         cientifica: {
@@ -87,9 +101,9 @@ export const POTENCIAS = {
         raices: {
             label: 'Raíces exactas', titulo: 'Calcula las siguientes raíces.', cols: 3, alto: 40,
             gen: (nv) => {
-                if (nv === 3 && Math.random() < 0.5) { const r = R(2, 6); return { e: `∛${r ** 3} =`, s: N(r), r: [{ tipo: 'num', v: r }], pasos: [`${r}³ = ${r ** 3}`] }; }
+                if (nv === 3 && Math.random() < 0.5) { const r = R(2, 6); return { e: `∛${r ** 3} =`, m: `ROOT(3,${r ** 3}) =`, s: N(r), r: [{ tipo: 'num', v: r }], pasos: [`${r}³ = ${r ** 3}`] }; }
                 const r = nv === 1 ? R(2, 10) : R(4, 20);
-                return { e: `√${r * r} =`, s: N(r), r: [{ tipo: 'num', v: r }], pasos: [`${r}² = ${r * r}`] };
+                return { e: `√${r * r} =`, m: `SQRT(${r * r}) =`, s: N(r), r: [{ tipo: 'num', v: r }], pasos: [`${r}² = ${r * r}`] };
             },
         },
         extraer: {
@@ -98,8 +112,9 @@ export const POTENCIAS = {
             gen: (nv) => {
                 const d = datosExtraer(nv === 1 ? [2] : nv === 2 ? [2, 2, 3] : [2, 2, 3, 3, 4]);
                 return { e: `${raizTxt(d.idx, d.radicando)} =`, s: `${d.f}${raizTxt(d.idx, d.r)}`,
+                    m: `${radM(d.idx, d.radicando)} =`, sm: `${d.f}${radM(d.idx, d.r)}`,
                     r: [radNum('Fuera', d.f), radNum('Dentro', d.r)],
-                    pasos: [`${d.radicando} = ${potS(d.f, d.idx)} · ${d.r}`, `${raizTxt(d.idx, `${potS(d.f, d.idx)} · ${d.r}`)} = ${d.f}${raizTxt(d.idx, d.r)}`] };
+                    pasos: [`${d.radicando} = ${potS(d.f, d.idx)} · ${d.r}`, { m: `${radM(d.idx, `${potM(d.f, d.idx)} * ${d.r}`)} = ${d.f}${radM(d.idx, d.r)}` }] };
             },
         },
         sumaRadicales: {
@@ -107,7 +122,7 @@ export const POTENCIAS = {
             gen: () => {
                 const b = pick([2, 3, 5, 7]), a = R(1, 9), c = R(1, 9), d = R(1, 9), k = a + c - d;
                 if (k === 0) return null;
-                return { e: `${a}√${b} + ${c}√${b} − ${d}√${b} =`, s: `${N(k)}√${b}`, r: [{ tipo: 'texto', v: [`${k}√${b}`], placeholder: '…√…' }], pasos: [`Son semejantes: ${a} + ${c} − ${d} = ${N(k)}`] };
+                return { e: `${a}√${b} + ${c}√${b} − ${d}√${b} =`, s: `${N(k)}√${b}`, m: `${coefM(a)}SQRT(${b}) + ${coefM(c)}SQRT(${b}) − ${coefM(d)}SQRT(${b}) =`, sm: `${coefM(k)}SQRT(${b})`, r: [{ tipo: 'texto', v: [`${k}√${b}`], placeholder: '…√…' }], pasos: [`Son semejantes: ${a} + ${c} − ${d} = ${N(k)}`] };
             },
         },
         // ── Radicales (4.º ESO): generadores compartidos con la app de Potencias y Raíces ──
@@ -115,7 +130,9 @@ export const POTENCIAS = {
             label: 'Radical → potencia', titulo: 'Escribe en forma de potencia de exponente fraccionario.', cols: 3, alto: 45, niveles: false,
             gen: () => {
                 const d = datosRadPotencia(), r = raizTxt(d.idx, potS(d.a, d.m)), ex = frac(d.inv ? -d.m : d.m, d.idx);
-                return { e: `${d.inv ? `1/${r}` : r} =`, s: `${d.a}^(${ex})`,
+                const g = mcd(d.m, d.idx), mm = d.m / g, nn = d.idx / g, rm = radM(d.idx, potM(d.a, d.m));
+                const expM = `${d.inv ? '−' : ''}${nn === 1 ? mm : `FRAC(${mm},${nn})`}`;
+                return { e: `${d.inv ? `1/${r}` : r} =`, s: `${d.a}^(${ex})`, m: `${d.inv ? `FRAC(1,${rm})` : rm} =`, sm: `${d.a}^{${expM}}`,
                     r: [{ etiqueta: `Exponente de ${d.a}`, tipo: 'frac', v: d.exp, tol: 1e-9, placeholder: 'm/n' }],
                     pasos: [d.inv ? `1/ⁿ√aᵐ = a^(−m/n)` : 'ⁿ√aᵐ = a^(m/n): el exponente arriba y el índice abajo'] };
             },
@@ -125,6 +142,7 @@ export const POTENCIAS = {
             gen: () => {
                 const d = datosPotRadical();
                 return { e: `${d.a}^(${d.m}/${d.idx}) =`, s: igual(raizTxt(d.idx, potS(d.a, d.m)), raizTxt(d.idx, d.rad)),
+                    m: `${d.a}^{FRAC(${d.m},${d.idx})} =`, sm: igualM(radM(d.idx, potM(d.a, d.m)), radM(d.idx, d.rad)),
                     r: [radNum('Índice', d.idx), radNum('Radicando', d.rad)], pasos: ['a^(m/n) = ⁿ√aᵐ: el denominador es el índice'] };
             },
         },
@@ -133,7 +151,8 @@ export const POTENCIAS = {
             gen: () => {
                 const d = datosIntroducir();
                 return { e: `${d.c}${raizTxt(d.idx, d.r)} =`, s: raizTxt(d.idx, d.rad), r: [radNum('Radicando', d.rad)],
-                    pasos: [`El ${d.c} entra elevado al índice: ${potS(d.c, d.idx)}`, `${potS(d.c, d.idx)} · ${d.r} = ${d.rad}`] };
+                    m: `${d.c}${radM(d.idx, d.r)} =`, sm: radM(d.idx, d.rad),
+                    pasos: [`El ${d.c} entra elevado al índice:`, { m: `${radM(d.idx, `${potM(d.c, d.idx)} * ${d.r}`)} = ${radM(d.idx, d.rad)}` }] };
             },
         },
         simpRaiz: {
@@ -141,6 +160,7 @@ export const POTENCIAS = {
             gen: () => {
                 const d = datosSimpRaiz();
                 return { e: `${raizTxt(d.idx * d.k, potS(d.a, d.m * d.k))} =`, s: igual(raizTxt(d.idx, potS(d.a, d.m)), raizTxt(d.idx, d.rad)),
+                    m: `${radM(d.idx * d.k, potM(d.a, d.m * d.k))} =`, sm: igualM(radM(d.idx, potM(d.a, d.m)), radM(d.idx, d.rad)),
                     r: [radNum('Índice', d.idx), radNum('Radicando', d.rad)], pasos: [`Divide índice y exponente entre m.c.d.(${d.idx * d.k}, ${d.m * d.k}) = ${d.k}`] };
             },
         },
@@ -150,8 +170,9 @@ export const POTENCIAS = {
                 const d = datosSumar(), R1 = d.f1 ** d.idx * d.r, R2 = d.f2 ** d.idx * d.r;
                 const t = (c, x) => `${c === 1 ? '' : c}${raizTxt(d.idx, x)}`;
                 return { e: `${t(d.c1, R1)} ${d.minus ? '−' : '+'} ${t(d.c2, R2)} =`, s: `${d.total}${raizTxt(d.idx, d.r)}`,
+                    m: `${coefM(d.c1)}${radM(d.idx, R1)} ${d.minus ? '−' : '+'} ${coefM(d.c2)}${radM(d.idx, R2)} =`, sm: `${coefM(d.total)}${radM(d.idx, d.r)}`,
                     r: [radNum('Coeficiente', d.total), radNum('Radicando', d.r)],
-                    pasos: [`${raizTxt(d.idx, R1)} = ${d.f1}${raizTxt(d.idx, d.r)}`, `${raizTxt(d.idx, R2)} = ${d.f2}${raizTxt(d.idx, d.r)}`, `${d.c1 * d.f1} ${d.minus ? '−' : '+'} ${d.c2 * d.f2} = ${d.total}`] };
+                    pasos: [{ m: `${radM(d.idx, R1)} = ${coefM(d.f1)}${radM(d.idx, d.r)}` }, { m: `${radM(d.idx, R2)} = ${coefM(d.f2)}${radM(d.idx, d.r)}` }, `${d.c1 * d.f1} ${d.minus ? '−' : '+'} ${d.c2 * d.f2} = ${d.total}`] };
             },
         },
         indiceComun: {
@@ -161,7 +182,11 @@ export const POTENCIAS = {
                 const e = d.tipo === 'prod'
                     ? `${raizTxt(d.n1, d.a)} · ${raizTxt(d.n2, d.b)}`
                     : `${raizTxt(d.n1, potS(d.a, d.p1))} : ${raizTxt(d.n2, potS(d.a, d.p2))}`;
+                const m = d.tipo === 'prod'
+                    ? `${radM(d.n1, d.a)} * ${radM(d.n2, d.b)}`
+                    : `FRAC(${radM(d.n1, potM(d.a, d.p1))},${radM(d.n2, potM(d.a, d.p2))})`;
                 return { e: `${e} =`, s: raizTxt(d.ans.idx, d.ans.rad), r: [radNum('Índice', d.ans.idx), radNum('Radicando', d.ans.rad)],
+                    m: `${m} =`, sm: radM(d.ans.idx, d.ans.rad),
                     pasos: [`Índice común: m.c.m.(${d.n1}, ${d.n2}) = ${d.ans.idx}`, 'Eleva cada radicando a (índice común : su índice) y opera'] };
             },
         },
@@ -169,8 +194,10 @@ export const POTENCIAS = {
             label: 'Comparar radicales', titulo: '¿Cuál es mayor? Sin calculadora: reduce a índice común.', cols: 2, alto: 50, niveles: false,
             gen: () => {
                 const d = datosComparar(), r1 = raizTxt(d.n1, d.a), r2 = raizTxt(d.n2, d.b), mayor = d.mayor === 'A' ? r1 : r2;
+                const m1 = radM(d.n1, d.a), m2 = radM(d.n2, d.b);
                 return { e: `${r1}   ó   ${r2}`, s: `${mayor} es mayor`, r: [{ etiqueta: 'Mayor', tipo: 'opcion', v: mayor, opciones: [r1, r2] }],
-                    pasos: [`${r1} = ${raizTxt(d.L, d.A)}`, `${r2} = ${raizTxt(d.L, d.B)}`] };
+                    m: `${m1}    ó    ${m2}`, sm: `${d.mayor === 'A' ? m1 : m2}  es mayor`,
+                    pasos: [{ m: `${m1} = ${radM(d.L, d.A)}` }, { m: `${m2} = ${radM(d.L, d.B)}` }] };
             },
         },
         raizRaiz: {
@@ -180,7 +207,11 @@ export const POTENCIAS = {
                 const e = d.tipo === 'simple' ? raizTxt(d.k1, raizTxt(d.k2, d.a))
                     : d.tipo === 'coef' ? raizTxt(d.k1, `${d.c}${raizTxt(d.k2, d.b)}`)
                         : `√(${d.a}√(${d.a}√${d.a}))`;
+                const m = d.tipo === 'simple' ? radM(d.k1, radM(d.k2, d.a))
+                    : d.tipo === 'coef' ? radM(d.k1, `${d.c}${radM(d.k2, d.b)}`)
+                        : `SQRT(${d.a}SQRT(${d.a}SQRT(${d.a})))`;
                 return { e: `${e} =`, s: raizTxt(d.ans.idx, d.ans.rad), r: [radNum('Índice', d.ans.idx), radNum('Radicando', d.ans.rad)],
+                    m: `${m} =`, sm: radM(d.ans.idx, d.ans.rad),
                     pasos: [d.tipo === 'simple' ? 'Se multiplican los índices' : 'Mete los factores en la raíz interior y multiplica los índices'] };
             },
         },
@@ -191,11 +222,15 @@ export const POTENCIAS = {
                 if (d.tipo === 'mono') {
                     const den = raizTxt(d.idx, potS(d.a, d.m)), mult = raizTxt(d.idx, potS(d.a, d.idx - d.m));
                     const sol = `${d.k === 1 ? '' : d.k}${raizTxt(d.idx, d.radNum)}${d.d === 1 ? '' : `/${d.d}`}`;
+                    const denM = radM(d.idx, potM(d.a, d.m)), multM = radM(d.idx, potM(d.a, d.idx - d.m)), solRad = `${coefM(d.k)}${radM(d.idx, d.radNum)}`;
                     return { e: `${d.c}/${den} =`, s: sol, r: [radNum('Coeficiente', d.k), radNum('Radicando', d.radNum), radNum('Denominador', d.d)],
-                        pasos: [`Multiplica arriba y abajo por ${mult}`, `${den} · ${mult} = ${d.a}`] };
+                        m: `FRAC(${d.c},${denM}) =`, sm: d.d === 1 ? solRad : `FRAC(${solRad},${d.d})`,
+                        pasos: ['Multiplica arriba y abajo por la raíz que falta:', { m: `FRAC(${d.c} * ${multM},${denM} * ${multM})` }] };
                 }
                 const op = d.mas ? '−' : '+';
+                const numC = d.k === 1 ? `SQRT(${d.a}) ${op} SQRT(${d.b})` : `${d.k}(SQRT(${d.a}) ${op} SQRT(${d.b}))`;
                 return { e: `${d.c}/(√${d.a} ${d.mas ? '+' : '−'} √${d.b}) =`, s: `${d.k === 1 ? '' : d.k}(√${d.a} ${op} √${d.b})${d.d === 1 ? '' : `/${d.d}`}`,
+                    m: `FRAC(${d.c},SQRT(${d.a}) ${d.mas ? '+' : '−'} SQRT(${d.b})) =`, sm: d.d === 1 ? numC : `FRAC(${numC},${d.d})`,
                     r: [radNum('Coeficiente', d.k), { etiqueta: 'Signo del paréntesis', tipo: 'opcion', v: op, opciones: ['+', '−'] }, radNum('Denominador', d.d)],
                     pasos: [`Multiplica por el conjugado: √${d.a} ${op} √${d.b}`, `Abajo: ${d.a} − ${d.b} = ${d.a - d.b}`] };
             },

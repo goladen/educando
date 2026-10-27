@@ -16,6 +16,7 @@ import {
 } from './utils/sonidosFeedback';
 import EditorMoneyBoard from './components/EditorMoneyBoard';
 import { useEfectosPuntos, CapaEfectos, ESTILOS_EFECTO } from './components/EfectosPuntos';
+import BotonPdfRecurso from './components/BotonPdfRecurso';
 
 /* =====================================================================
  *  MONEY BOARD  (tablero de categorías, estilo concurso por equipos)
@@ -208,7 +209,10 @@ function BuscadorRecursos({ onBack, onPick }) {
                                     border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)',
                                     color: '#eaf1ff', cursor: 'pointer', fontFamily: 'inherit',
                                 }}>
-                                    <div style={{ fontWeight: 700 }}>{r.titulo || 'Sin título'}</div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                                        <div style={{ fontWeight: 700 }}>{r.titulo || 'Sin título'}</div>
+                                        <BotonPdfRecurso recurso={r} enLinea style={{ padding: '3px 8px', fontSize: '0.7rem' }} />
+                                    </div>
                                     <div style={{ fontSize: 11, color: '#90a4c8', marginTop: 3 }}>
                                         {r.tipoJuego || 'Recurso'}{r.profesorNombre ? ` · ${r.profesorNombre}` : ''} · {cats.length} categorías · {cats.reduce((s, c) => s + c.preguntas.length, 0)} preguntas
                                     </div>

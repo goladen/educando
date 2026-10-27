@@ -1,5 +1,6 @@
 ﻿import React, { useState, useEffect, lazy, Suspense } from 'react';
 import CargandoChunk from './CargandoChunk';
+import BotonPdfRecurso from './BotonPdfRecurso';
 import { TOUR_PLANETAS } from '../Simuladores física/sistemaSolarTour';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, setDoc, onSnapshot, updateDoc } from 'firebase/firestore';
@@ -4199,6 +4200,8 @@ export const ResourceCard = ({ r, onClick }) => {
                     <Key size={12} style={{ verticalAlign: 'middle' }} /> {r.accessCode || '---'}
                 </span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {/* Ficha en papel del recurso */}
+                    <BotonPdfRecurso recurso={r} style={{ padding: '4px 8px', fontSize: '0.72rem' }} />
                     {/* Botón enlace directo */}
                     <div style={{ position: 'relative' }}>
                         <button

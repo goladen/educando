@@ -17,6 +17,7 @@ import {
 } from './mandos/mandosMicrobit.js';
 import ChipAntena from './mandos/ChipAntena.jsx';
 import { BotonTutorialMandos } from './mandos/TutorialMandos.jsx';
+import BotonPdfRecurso from './components/BotonPdfRecurso';
 
 /* =====================================================================
  *  LUZ ROJA · LUZ VERDE  (juego del calamar educativo)
@@ -1983,7 +1984,10 @@ function BuscadorRecursos({ onBack, onPick }) {
                                     border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)',
                                     color: '#e7f3ec', cursor: 'pointer', fontFamily: 'inherit',
                                 }}>
-                                    <div style={{ fontWeight: 700 }}>{r.titulo || 'Sin título'}</div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                                        <div style={{ fontWeight: 700 }}>{r.titulo || 'Sin título'}</div>
+                                        <BotonPdfRecurso recurso={r} enLinea style={{ padding: '3px 8px', fontSize: '0.7rem' }} />
+                                    </div>
                                     <div style={{ fontSize: 11, color: '#8aa0ad', marginTop: 3 }}>
                                         {r.tipoJuego || 'Recurso'}{r.profesorNombre ? ` · ${r.profesorNombre}` : ''} · {n} pregunta(s)
                                     </div>

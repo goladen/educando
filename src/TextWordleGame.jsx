@@ -9,6 +9,7 @@ import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import { cargarPalabrasWordle } from './utils/diccionarios';
 import { despertarAudio, sonidoCorrecto, sonidoIncorrecto } from './utils/sonidosFeedback';
 import { T, FUENTE, ESTILOS_CSS, CapaLetras, lanzarLetras, sonidoFicha, sonidoPalabra, sonidoTic, Boton, Opciones, Reloj, BotonSonido, Pantalla, Cabecera, Tarjeta, useWindowSize } from './vanila/comun';
+import BotonPdfRecurso from './components/BotonPdfRecurso';
 
 // --- CONFIGURACIÓN DE IDIOMAS ---
 const LANGUAGES = {
@@ -755,9 +756,12 @@ export default function TextWordleGame({ usuario, onExit, recurso, modoOlimpico 
                     {bibliotecaWordle.length > 0 && (
                         <div style={{ marginTop: 14, display: 'flex', overflowX: 'auto', gap: 10, paddingBottom: 6 }}>
                             {bibliotecaWordle.map(r => (
-                                <button key={r.id} className="nl-btn" onClick={() => procesarRecurso(r)} style={{ minWidth: 150, padding: '12px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', fontFamily: FUENTE, fontSize: '0.85rem', fontWeight: 700, color: T.texto, background: `${T.lila}18`, border: `1px solid ${T.lila}66` }}>
-                                    {r.titulo}
-                                </button>
+                                <div key={r.id} style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 150 }}>
+                                    <button className="nl-btn" onClick={() => procesarRecurso(r)} style={{ flex: 1, padding: '12px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', fontFamily: FUENTE, fontSize: '0.85rem', fontWeight: 700, color: T.texto, background: `${T.lila}18`, border: `1px solid ${T.lila}66` }}>
+                                        {r.titulo}
+                                    </button>
+                                    <BotonPdfRecurso recurso={r} texto="Ficha PDF" style={{ borderRadius: 10 }} />
+                                </div>
                             ))}
                         </div>
                     )}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import Confetti from 'react-confetti';
 import { db } from '../firebase';
 import { collection, addDoc, doc, getDoc, setDoc, onSnapshot, updateDoc, increment } from 'firebase/firestore';
@@ -10,6 +10,7 @@ import { useMandoPregunta, LetraMando } from './MandosCuerda';
 import ModalEnviarCompeticion from './ModalEnviarCompeticion';
 import { leerRetoUrl } from '../utils/retoLink';
 import BotonFichas from './BotonFichas';
+const VisorCuerpo = lazy(() => import('../anatomia/VisorCuerpo'));
 
 const N_PREGUNTAS = 10;
 const TIEMPO      = 20;
@@ -656,6 +657,13 @@ function BiologiaAppInner({ onBack, onCreateLive, onJoinLive }) {
   if (pantalla === 'imagenes') {
     return <AnatomiaQuiz onBack={() => setPantalla('intro')} />;
   }
+  if (pantalla === 'cuerpo3d') {
+    return (
+      <Suspense fallback={<div style={{ position:'fixed', inset:0, background:'#0f172a', color:'#e2e8f0', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.1rem' }}>🦴 Cargando…</div>}>
+        <VisorCuerpo onExit={() => setPantalla('intro')} />
+      </Suspense>
+    );
+  }
   if (pantalla === 'competicion') {
     return (
       <div style={{ minHeight:'100vh', background:'linear-gradient(135deg,#0f172a,#1e293b)', padding:16, boxSizing:'border-box' }}>
@@ -751,6 +759,20 @@ function BiologiaAppInner({ onBack, onCreateLive, onJoinLive }) {
           <button onClick={onBack} style={{ background:'rgba(255,255,255,0.1)', border:'none', color:'#f1f5f9', borderRadius:8, padding:'8px 14px', cursor:'pointer', fontSize:'0.9rem' }}>← Volver</button>
           <h1 style={{ margin:0, fontSize:'1.5rem', fontWeight:700 }}>🔬 Biología</h1>
         </div>
+
+        {/* Cuerpo humano 3D (esqueleto con Z-Anatomy) */}
+        <button onClick={() => setPantalla('cuerpo3d')} style={{
+          width:'100%', marginBottom:14, padding:'16px 18px', textAlign:'left', cursor:'pointer',
+          background:'linear-gradient(135deg, #0ea5e9, #1e3a8a)', border:'none', borderRadius:14, color:'#fff',
+          display:'flex', alignItems:'center', gap:14,
+        }}>
+          <span style={{ fontSize:'2rem' }}>🦴</span>
+          <span style={{ flex:1 }}>
+            <span style={{ display:'block', fontSize:'1.05rem', fontWeight:800 }}>Cuerpo humano 3D · Huesos, músculos y órganos</span>
+            <span style={{ display:'block', fontSize:'0.8rem', opacity:0.85, marginTop:2 }}>Gira el cuerpo, toca cada hueso, músculo u órgano para ver su ficha, sepáralo y juega a «¿Dónde está?»</span>
+          </span>
+          <span style={{ background:'rgba(255,255,255,0.25)', borderRadius:8, padding:'3px 8px', fontSize:'0.65rem', fontWeight:800, letterSpacing:'0.05em' }}>3D</span>
+        </button>
 
         {/* Modo Anatomía con imágenes (NUEVO) */}
         <button onClick={() => setPantalla('imagenes')} style={{

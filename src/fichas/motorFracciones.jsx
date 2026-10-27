@@ -106,7 +106,7 @@ const Solucion = ({ ap, size = '1.3rem' }) => {
             </div>
         );
     }
-    if (ap.visual?.modo === 'comb') return <PasosCombinada arbol={ap.visual.arbol} size={`calc(${size} * 0.8)`} />;
+    if (ap.visual?.modo === 'comb') return <PasosCombinada arbol={ap.visual.arbol} size={`calc(${size} * 0.8)`} impreso />;
     return <FracTexto n={ap.respuesta[0]} d={ap.respuesta[1]} size={size} color="#c0392b" />;
 };
 

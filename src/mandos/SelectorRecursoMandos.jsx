@@ -6,6 +6,7 @@ import { collection, getDocs, query, where } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { categoriasDeRecurso, limpiar } from '../utils/normalizarPreguntas';
 import { aNumeroMando } from './mandosMicrobit.js';
+import BotonPdfRecurso from '../components/BotonPdfRecurso';
 
 /** Las respuestas numéricas del quiz van de 1 a 19 (fáciles de marcar en el mando). */
 export const MIN_NUM_QUIZ = 1;
@@ -116,7 +117,10 @@ export default function SelectorRecursoMandos({ seleccionado, onPick, numerico =
         ) : (
           resultados.map(({ r, n }) => (
             <button key={r.id} onClick={() => onPick(r)} style={st.item(seleccionado?.id === r.id)}>
-              <div style={{ fontWeight: 700 }}>{r.titulo || 'Sin título'}</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                <div style={{ fontWeight: 700 }}>{r.titulo || 'Sin título'}</div>
+                <BotonPdfRecurso recurso={r} enLinea style={{ padding: '3px 8px', fontSize: '0.7rem' }} />
+              </div>
               <div style={st.meta}>
                 {r.profesorNombre ? `${r.profesorNombre} · ` : ''}
                 {n} pregunta{n === 1 ? '' : 's'} {numerico ? 'con respuesta numérica' : 'de opción múltiple'}

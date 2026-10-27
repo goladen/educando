@@ -15,6 +15,7 @@ import correctSoundSrc from './assets/sonidorespcorrecta.mp3';
 import wrongSoundSrc   from './assets/wrong.mp3';
 import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
+import BotonPdfRecurso from './components/BotonPdfRecurso';
 
 const sa = src => { try { return new Audio(src); } catch(e){ return {play:()=>Promise.resolve(),currentTime:0}; } };
 const SFX = { jump:sa(jumpSoundSrc), correct:sa(correctSoundSrc), wrong:sa(wrongSoundSrc) };
@@ -705,6 +706,7 @@ function BuscadorRecursos({ onSelect }) {
                   <span style={{ fontSize:'0.65rem', background:'rgba(52,152,219,0.3)', padding:'2px 6px', borderRadius:6, whiteSpace:'nowrap', flexShrink:0 }}>
                     {r.tipoJuego==='PIKATRON'?'⚡ Pikatron':'🔵 Burbujas'}
                   </span>
+                  <BotonPdfRecurso recurso={r} enLinea texto="" style={{ padding:'2px 6px', fontSize:'0.7rem' }} />
                 </div>
                 <div style={{ fontSize:'0.72rem', color:'rgba(255,255,255,0.45)', marginTop:3, display:'flex', gap:10 }}>
                   <span>📚 {r.temas||'General'}</span>

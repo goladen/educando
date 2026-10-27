@@ -6,6 +6,8 @@ import { TIPOS_MATES, crearGeneradorMates } from './ovniMates';
 import { cargarModelosGranja, instanciarModelo, ponerClip } from './ovniModelos';
 import { crearAmbiente, vientoEnHierba } from './ovniAmbiente';
 import { generarFichaOvni } from './ovniFicha';
+import ChipAntena from './mandos/ChipAntena.jsx';
+import { useMandosOvni, PanelMandosOvni, PilotoEnJuego } from './ovniMandos.jsx';
 import { db } from './firebase';
 import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
 import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
@@ -344,6 +346,8 @@ export const BANCOS_OVNI = [
 ];
 
 const KEY_CUSTOM = 'pikt_ovni_custom';
+const KEY_JOYSTICK = 'pikt_ovni_joystick';
+const KEY_MANDOS = 'pikt_ovni_mandos'; // { activos, invertir, turnos }
 const EJEMPLO_CUSTOM = 'Frutas: manzana, pera, plátano, uva, naranja, fresa\nVerduras: lechuga, zanahoria, pepino, calabacín, puerro, acelga\nCereales: trigo, arroz, maíz, avena, cebada, centeno';
 
 /** «Categoría: palabra, palabra…» por línea → { categoría: [palabras] } (o null si no hay al menos 2 categorías con 2 palabras). */
@@ -1119,7 +1123,31 @@ export function crearMotor(contenedor, opciones, cb) {
     window.addEventListener('keydown', alPulsar);
     window.addEventListener('keyup', alSoltar);
 
+    // Mandos micro:bit (modo F): cada inclinación envía un aviso, así que da un impulso de ~0,9 s
+    // en esa dirección; inclinar otra vez hacia el mismo lado antes de que acabe lo alarga.
+    const impulsos = jugadores.map(() => null);
+    const DIRS_MANDO = { I: [-1, 0], D: [1, 0], F: [0, -1], T: [0, 1] };
+    const impulso = (idx, dir) => {
+        const v = DIRS_MANDO[dir];
+        if (!v || !jugadores[idx]) return;
+        const ahora = reloj.getElapsed();
+        const imp = impulsos[idx];
+        if (imp && imp.x === v[0] && imp.z === v[1] && imp.hasta > ahora) imp.hasta = Math.min(imp.hasta + 0.9, ahora + 2.4);
+        else impulsos[idx] = { x: v[0], z: v[1], hasta: ahora + 0.9 };
+    };
+    // Modo V (volante, programas v6): dirección mientras el mando sigue inclinado. El mando la
+    // repite cada 300 ms; si deja de llegar (radio perdida) se para sola a los 1,2 s.
+    const inclinaciones = jugadores.map(() => null);
+    const setInclinacion = (idx, x, z) => {
+        if (!jugadores[idx]) return;
+        inclinaciones[idx] = x || z ? { x, z, hasta: reloj.getElapsed() + 1.2 } : null;
+        if (!x && !z) impulsos[idx] = null;
+    };
     const entrada = (idx) => {
+        const inc = inclinaciones[idx];
+        if (inc && reloj.getElapsed() < inc.hasta) { const l = Math.hypot(inc.x, inc.z); return { x: inc.x / l, z: inc.z / l }; }
+        const imp = impulsos[idx];
+        if (imp && reloj.getElapsed() < imp.hasta) return { x: imp.x, z: imp.z };
         const joy = joys[idx];
         if (joy.activo) return { x: joy.x, z: joy.y };
         const wasd = nJug === 1 || idx === 0;
@@ -1481,6 +1509,8 @@ export function crearMotor(contenedor, opciones, cb) {
         abducir,
         depurar: () => ({ estado, jugadores }),
         setJoy(idx, x, y, activo) { const joy = joys[idx]; if (joy) { joy.x = x; joy.y = y; joy.activo = activo; } },
+        impulso,
+        setInclinacion,
         destruir() {
             destruido = true;
             cancelAnimationFrame(raf);
@@ -1547,7 +1577,7 @@ const zonaJugador = (disposicion, i) => {
     return { left: 0, top: 0, width: '100%', height: '100%' };
 };
 
-const JuegoOvni = ({ generarRonda, rondas, animo, nombres, onFin, onSalir }) => {
+const JuegoOvni = ({ generarRonda, rondas, animo, nombres, mandos = null, ctrl = null, onFin, onSalir }) => {
     const nJug = nombres.length;
     const duo = nJug === 2;
     const contRef = useRef(null);
@@ -1558,9 +1588,28 @@ const JuegoOvni = ({ generarRonda, rondas, animo, nombres, onFin, onSalir }) => 
     const [cartelRonda, setCartelRonda] = useState(null);
     const [objetivos, setObjetivos] = useState([false, false]);
     const [disposicion, setDisposicion] = useState(duo ? 'h' : 'solo');
-    const [tactil] = useState(() => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches);
+    // Joystick en pantalla: en tablets, si se elige con el botón 🕹️ (se recuerda) o en cuanto se toca la
+    // pantalla con el dedo (un PC conectado a un monitor táctil «parece» tener teclado y ratón).
+    const [tactil, setTactil] = useState(() => {
+        if (typeof window === 'undefined') return false;
+        try { const g = localStorage.getItem(KEY_JOYSTICK); if (g !== null) return g === '1'; } catch { /* sin localStorage */ }
+        return !!window.matchMedia?.('(pointer: coarse)').matches;
+    });
+    const cambiarTactil = (v) => { setTactil(v); try { localStorage.setItem(KEY_JOYSTICK, v ? '1' : '0'); } catch { /* sin localStorage */ } };
+    useEffect(() => {
+        if (tactil) return undefined;
+        const alTocar = (e) => { if (e.pointerType === 'touch') setTactil(true); };
+        window.addEventListener('pointerdown', alTocar);
+        return () => window.removeEventListener('pointerdown', alTocar);
+    }, [tactil]);
     const onFinRef = useRef(onFin);
     onFinRef.current = onFin;
+    // al empezar cada ronda: con turnos pasa el mando al siguiente; devuelve quién pilota
+    const alRondaRef = useRef(null);
+    alRondaRef.current = (r) => {
+        if (!mandos?.activos || !ctrl) return null;
+        return mandos.turnos && r.ronda > 1 ? ctrl.rotarPilotos() : ctrl.pilotos;
+    };
 
     const [cargando, setCargando] = useState(true);
 
@@ -1585,7 +1634,7 @@ const JuegoOvni = ({ generarRonda, rondas, animo, nombres, onFin, onSalir }) => 
                 clearTimeout(tAvisos[i]);
                 tAvisos[i] = setTimeout(() => setAvisos(av => { const n = [...av]; n[i] = null; return n; }), 2400);
             },
-            onRonda: (r) => { setCartelRonda(r); clearTimeout(tRonda); tRonda = setTimeout(() => setCartelRonda(null), 2200); },
+            onRonda: (r) => { setCartelRonda({ ...r, pilotos: alRondaRef.current(r) }); clearTimeout(tRonda); tRonda = setTimeout(() => setCartelRonda(null), 2600); },
             onFin: (res) => onFinRef.current(res),
         });
         motorRef.current = motor;
@@ -1594,7 +1643,41 @@ const JuegoOvni = ({ generarRonda, rondas, animo, nombres, onFin, onSalir }) => 
         return () => { cancelado = true; tAvisos.forEach(clearTimeout); clearTimeout(tRonda); clearTimeout(tAvisoRonda); motor?.destruir(); motorRef.current = null; };
     }, [generarRonda, rondas, animo, nJug]);
 
+    // ── Mandos micro:bit: inclinar = mover, agitar o A = abducir ──
+    // Quién pilota cada nave lo lleva useMandosOvni (menú); aquí solo se traducen sus eventos.
+    const botonARef = useRef({});
+    const invertir = !!mandos?.invertir;
+    const manejadorRef = ctrl?.manejadorRef;
+    useEffect(() => {
+        if (!mandos?.activos || !manejadorRef) return undefined;
+        manejadorRef.current = (idx, ev) => {
+            const motor = motorRef.current;
+            if (!motor) return;
+            if (ev.accion === 'V') {
+                const d = ev.dir;
+                const x = d.includes('I') ? -1 : d.includes('D') ? 1 : 0;
+                const z = (d.includes('F') ? -1 : d.includes('T') ? 1 : 0) * (invertir ? -1 : 1);
+                motor.setInclinacion(idx, x, z);
+            } else if (ev.accion === 'P') {
+                const inv = { F: 'T', T: 'F' };
+                motor.impulso(idx, invertir && inv[ev.dir] ? inv[ev.dir] : ev.dir);
+            } else if (ev.accion === 'S') {
+                motor.abducir(idx);
+            } else if (ev.accion === 'A') {
+                // el mando repite «A pulsado» cada 400 ms: solo cuenta el momento de pulsar
+                if (ev.on && !botonARef.current[ev.id]) motor.abducir(idx);
+                botonARef.current[ev.id] = ev.on;
+            }
+        };
+        return () => { manejadorRef.current = null; };
+    }, [mandos?.activos, invertir, manejadorRef]);
+    // al cambiar de piloto, la nave se para (no sigue con la inclinación del anterior)
+    const piloto0 = ctrl?.pilotos[0], piloto1 = ctrl?.pilotos[1];
+    useEffect(() => { motorRef.current?.setInclinacion(0, 0, 0); }, [piloto0]);
+    useEffect(() => { motorRef.current?.setInclinacion(1, 0, 0); }, [piloto1]);
+
     const pista = (i) => {
+        if (mandos?.activos) return <>inclina para mover · <b style={{ color: VERDE }}>agita o A</b> abducir</>;
         if (!duo) return <><b style={{ color: NEON }}>WASD / flechas</b> mover · <b style={{ color: VERDE }}>Espacio</b> abducir</>;
         return i === 0
             ? <><b style={{ color: COLORES_JUGADOR[0].css }}>WASD</b> mover · <b style={{ color: VERDE }}>Espacio</b> abducir</>
@@ -1621,6 +1704,10 @@ const JuegoOvni = ({ generarRonda, rondas, animo, nombres, onFin, onSalir }) => 
             {/* Barra superior: salir + enunciado común */}
             <div style={{ position: 'absolute', top: 10, left: 10, right: 10, display: 'flex', alignItems: 'flex-start', gap: 10, pointerEvents: 'none', zIndex: 3 }}>
                 <button onClick={onSalir} style={{ pointerEvents: 'auto', background: 'rgba(10,15,36,0.7)', color: '#fff', border: `1px solid ${NEON}66`, borderRadius: 10, padding: '8px 14px', cursor: 'pointer', fontWeight: 700 }}>✕ Salir</button>
+                <button onClick={() => cambiarTactil(!tactil)} title={tactil ? 'Volver a jugar con el teclado' : 'Mostrar el joystick en pantalla (monitor o pizarra táctil)'}
+                    style={{ pointerEvents: 'auto', background: tactil ? `${NEON}33` : 'rgba(10,15,36,0.7)', color: '#fff', border: `1px solid ${tactil ? NEON : NEON + '66'}`, borderRadius: 10, padding: '8px 10px', cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
+                    {tactil ? '⌨️ Teclado' : '🕹️ Joystick'}
+                </button>
                 {hud && (
                     <div style={{ flex: 1, display: 'flex', justifyContent: 'center', minWidth: 0 }}>
                         <div style={{ background: 'rgba(10,15,36,0.78)', border: `2px solid ${NEON}`, borderRadius: 16, padding: '6px 18px', boxShadow: `0 0 16px ${NEON}55`, color: '#fff', textAlign: 'center', maxWidth: '100%' }}>
@@ -1636,6 +1723,7 @@ const JuegoOvni = ({ generarRonda, rondas, animo, nombres, onFin, onSalir }) => 
                         <span style={{ marginLeft: 10, color: VERDE }}>✓ {hud.jugadores[0].aciertos}</span>
                     </div>
                 )}
+                {mandos?.activos && <span style={{ pointerEvents: 'auto' }}><ChipAntena /></span>}
                 {duo && <div style={{ width: 74 }} />}
             </div>
 
@@ -1661,8 +1749,11 @@ const JuegoOvni = ({ generarRonda, rondas, animo, nombres, onFin, onSalir }) => 
                         )}
                         <div style={{ position: 'absolute', left: 14, right: 14, bottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                             <div style={{ pointerEvents: 'auto' }}>
-                                {tactil ? <Joystick onMover={(x, y, activo) => motorRef.current?.setJoy(i, x, y, activo)} /> : (
-                                    <div style={{ background: 'rgba(10,15,36,0.6)', color: '#cbd5e1', borderRadius: 10, padding: '8px 12px', fontSize: '0.85rem' }}>{pista(i)}</div>
+                                {tactil && !mandos?.activos ? <Joystick onMover={(x, y, activo) => motorRef.current?.setJoy(i, x, y, activo)} /> : (
+                                    <div style={{ background: 'rgba(10,15,36,0.6)', color: '#cbd5e1', borderRadius: 10, padding: '8px 12px', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
+                                        {mandos?.activos && ctrl && <PilotoEnJuego ctrl={ctrl} i={i} color={col} />}
+                                        <div>{pista(i)}</div>
+                                    </div>
                                 )}
                             </div>
                             <button
@@ -1691,6 +1782,13 @@ const JuegoOvni = ({ generarRonda, rondas, animo, nombres, onFin, onSalir }) => 
                         <>
                             <div style={{ fontSize: 'clamp(1rem, 3vw, 1.6rem)', fontWeight: 700, color: '#c7d2fe' }}>Ronda {cartelRonda.ronda} de {cartelRonda.totalRondas}</div>
                             <div style={{ fontSize: 'clamp(1.8rem, 6vw, 3.6rem)', fontWeight: 900 }}>Abduce: <span style={{ color: NEON }}>{cartelRonda.objetivo}</span></div>
+                            {cartelRonda.pilotos && cartelRonda.pilotos.slice(0, nJug).some(p => p != null) && (
+                                <div style={{ fontSize: 'clamp(1rem, 3vw, 1.6rem)', fontWeight: 800, marginTop: 6 }}>
+                                    {cartelRonda.pilotos.slice(0, nJug).map((p, k) => p != null && (
+                                        <span key={k} style={{ color: duo ? COLORES_JUGADOR[k].css : '#fde68a', margin: '0 12px' }}>🎮 Pilota {ctrl.nombreDe(p)}</span>
+                                    ))}
+                                </div>
+                            )}
                         </>
                     ) : (
                         <div style={{ fontSize: 'clamp(1.8rem, 6vw, 3.4rem)', fontWeight: 900 }}>{avisoRonda.texto}</div>
@@ -1911,6 +2009,15 @@ export default function OvniAbduccion({ onExit }) {
     const [rondas, setRondas] = useState(5);
     const [animo, setAnimo] = useState('normal');
     const [modo, setModo] = useState('solo');
+    const [mandos, setMandos] = useState(() => {
+        try { return { activos: false, invertir: false, turnos: false, ...JSON.parse(localStorage.getItem(KEY_MANDOS) || '{}') }; } catch { return { activos: false, invertir: false, turnos: false }; }
+    });
+    const ctrlMandos = useMandosOvni(mandos.activos, modo === 'duo' ? 2 : 1);
+    const cambiarMandos = (cambios) => setMandos(m => {
+        const n = { ...m, ...cambios };
+        try { localStorage.setItem(KEY_MANDOS, JSON.stringify(n)); } catch { /* sin localStorage */ }
+        return n;
+    });
     const [nombresDuo, setNombresDuo] = useState(['Jugador 1', 'Jugador 2']);
     const [textoCustom, setTextoCustom] = useState(() => { try { return localStorage.getItem(KEY_CUSTOM) || EJEMPLO_CUSTOM; } catch { return EJEMPLO_CUSTOM; } });
     const [partida, setPartida] = useState(null);
@@ -1948,7 +2055,7 @@ export default function OvniAbduccion({ onExit }) {
                 ? { nivel: nivelMates, tipos: TIPOS_MATES.filter(t => tiposMates.includes(t.id)).map(t => t.nombre) }
                 : { categorias: Object.keys(categoriasPalabras || {}) }),
         };
-        setPartida({ generarRonda: crearGenerador(rondas), rondas, animo, nombres, config, k: Date.now() });
+        setPartida({ generarRonda: crearGenerador(rondas), rondas, animo, nombres, config, mandos: { ...mandos }, k: Date.now() });
         setResultado(null);
         setPantalla('JUEGO');
     };
@@ -1969,7 +2076,7 @@ export default function OvniAbduccion({ onExit }) {
     };
 
     if (pantalla === 'JUEGO' && partida) {
-        return <JuegoOvni key={partida.k} generarRonda={partida.generarRonda} rondas={partida.rondas} animo={partida.animo} nombres={partida.nombres} onFin={alTerminar} onSalir={() => setPantalla('MENU')} />;
+        return <JuegoOvni key={partida.k} generarRonda={partida.generarRonda} rondas={partida.rondas} animo={partida.animo} nombres={partida.nombres} mandos={partida.mandos} ctrl={ctrlMandos} onFin={alTerminar} onSalir={() => setPantalla('MENU')} />;
     }
 
     const fondo = { position: 'fixed', inset: 0, zIndex: 9999, overflowY: 'auto', background: 'radial-gradient(ellipse at top, #2d1b4e 0%, #110c1c 60%, #070414 100%)', color: '#fff', fontFamily: 'system-ui, "Segoe UI", sans-serif' };
@@ -2124,6 +2231,12 @@ export default function OvniAbduccion({ onExit }) {
                         </div>
                     </div>
                     <div>
+                        <h3 style={h3}>Mandos</h3>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                            <button onClick={() => cambiarMandos({ activos: !mandos.activos })} style={{ ...estiloBtn(mandos.activos, '#facc15'), textAlign: 'center' }}>🎮 Mandos micro:bit</button>
+                        </div>
+                    </div>
+                    <div>
                         <h3 style={h3}>Rondas</h3>
                         <div style={{ display: 'flex', gap: 8 }}>
                             {[3, 5, 8].map(n => <button key={n} onClick={() => setRondas(n)} style={{ ...estiloBtn(rondas === n), textAlign: 'center', minWidth: 52 }}>{n}</button>)}
@@ -2152,6 +2265,12 @@ export default function OvniAbduccion({ onExit }) {
                             Los dos ovnis comparten la granja y el enunciado: acierto +1 punto, error −1. En tablet o pizarra táctil cada mitad tiene su joystick y su botón.
                         </div>
                     </div>
+                )}
+
+                {mandos.activos && (
+                    <PanelMandosOvni ctrl={ctrlMandos} duo={modo === 'duo'} colores={COLORES_JUGADOR.map(c => c.css)}
+                        invertir={mandos.invertir} onInvertir={v => cambiarMandos({ invertir: v })}
+                        turnos={mandos.turnos} onTurnos={v => cambiarMandos({ turnos: v })} />
                 )}
 
                 <div style={{ textAlign: 'center', marginTop: 28 }}>

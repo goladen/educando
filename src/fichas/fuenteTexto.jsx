@@ -1,5 +1,6 @@
 import React from 'react';
 import { leerNumeroEs } from '../generadorProblemasNumeros';
+import { renderMath } from '../utils/MathRender';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  FUENTES DE TEXTO para las fichas de Math World
@@ -11,6 +12,8 @@ import { leerNumeroEs } from '../generadorProblemasNumeros';
 //      tipos: { clave: { label, titulo, cols?, alto?, max?, niveles?: false, gen(nivel) → apartado } } }
 //  Apartado que devuelve gen(nivel):
 //    { e: enunciado, s: solución, pasos?: [..], largo?: bool,
+//      m?: enunciado en notación matemática (FRAC/SQRT/ROOT/^, ver utils/MathRender) en lugar de e,
+//      sm?: solución en notación matemática; un paso puede ser { m: '…' },
 //      r?: [{ etiqueta?, tipo: 'num'|'frac'|'texto'|'opcion', v, unidad?, opciones?, tol? }] }
 //  En la pizarra se revela un paso por clic y, al final, la solución.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -81,6 +84,10 @@ export const comprobador = (q) => (valor) => {
 };
 
 // ── Fuente a partir de la definición ─────────────────────────────────────────
+// Paso de la solución: texto o { m } en notación matemática
+const Paso = ({ p, size }) => (p && typeof p === 'object' ? renderMath(p.m, false, size) : <>{p}</>);
+const PasosLinea = ({ pasos, size }) => pasos.map((p, i) => <React.Fragment key={i}>{i > 0 && ' · '}<Paso p={p} size={size} /></React.Fragment>);
+
 export const crearFuente = (def) => {
     const tipoDe = (x) => def.tipos[x.tipo] || Object.values(def.tipos)[0];
 
@@ -103,7 +110,9 @@ export const crearFuente = (def) => {
     // ap.img: imagen (misma web o con CORS, para que salga en el PDF) · def.Visual: dibujo propio del tema
     const Visual = def.Visual;
     const Enunciado = ({ ap, size = '1.4rem' }) => {
-        const texto = ap.largo
+        const texto = ap.m
+            ? <span style={{ color: '#2c3e50', fontWeight: 600 }}>{renderMath(ap.m, false, `calc(${size} * 0.95)`)}</span>
+            : ap.largo
             ? <p style={{ margin: 0, fontSize: `calc(${size} * 0.62)`, lineHeight: 1.5, color: '#2c3e50', fontWeight: 600, whiteSpace: 'pre-line' }}>{ap.e}</p>
             : <span style={{ fontSize: `calc(${size} * 0.8)`, fontWeight: 800, color: '#2c3e50', whiteSpace: 'pre-line' }}>{ap.e}</span>;
         if (!ap.img && !(Visual && ap.v)) return texto;
@@ -111,15 +120,15 @@ export const crearFuente = (def) => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
                 {ap.img && <img src={ap.img} alt="" crossOrigin="anonymous" style={{ height: `calc(${size} * ${ap.imgAlto || 3.2})`, maxWidth: '100%', objectFit: 'contain', borderRadius: 8, border: '1px solid #eee', background: 'white' }} />}
                 {Visual && ap.v && <Visual ap={ap} size={size} />}
-                {ap.e && texto}
+                {(ap.e || ap.m) && texto}
             </div>
         );
     };
 
     const Solucion = ({ ap }) => (
         <div style={{ color: '#c0392b', fontSize: '0.85rem', fontWeight: 700, lineHeight: 1.5 }}>
-            <div style={{ fontSize: '1.02rem', fontWeight: 900 }}>{ap.s}</div>
-            {ap.pasos?.length > 0 && <div style={{ color: '#7f8c8d', fontWeight: 600 }}>{ap.pasos.join(' · ')}</div>}
+            <div style={{ fontSize: '1.02rem', fontWeight: 900 }}>{ap.sm ? renderMath(ap.sm, false, '1.15rem') : ap.s}</div>
+            {ap.pasos?.length > 0 && <div style={{ color: '#7f8c8d', fontWeight: 600 }}><PasosLinea pasos={ap.pasos} size="1rem" /></div>}
         </div>
     );
 
@@ -134,10 +143,10 @@ export const crearFuente = (def) => {
         return (
             <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6, fontSize: `${1.05 * zoom}rem` }}>
                 {pasos.slice(0, vis).map((p, i) => (
-                    <div key={i} style={{ fontWeight: 700, color: '#2c3e50' }}><span style={{ color: '#95a5a6' }}>→ </span>{p}</div>
+                    <div key={i} style={{ fontWeight: 700, color: '#2c3e50' }}><span style={{ color: '#95a5a6' }}>→ </span><Paso p={p} size={`${1.25 * zoom}rem`} /></div>
                 ))}
                 {final && (
-                    <div style={{ marginTop: 4, background: '#e8f5e9', borderRadius: 12, padding: '8px 12px', fontWeight: 900, color: '#1e8449', fontSize: `${1.2 * zoom}rem` }}>✅ {ap.s}</div>
+                    <div style={{ marginTop: 4, background: '#e8f5e9', borderRadius: 12, padding: '8px 12px', fontWeight: 900, color: '#1e8449', fontSize: `${1.2 * zoom}rem` }}>✅ {ap.sm ? renderMath(ap.sm, false, `${1.4 * zoom}rem`) : ap.s}</div>
                 )}
             </div>
         );

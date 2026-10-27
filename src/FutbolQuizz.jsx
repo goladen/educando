@@ -3,6 +3,7 @@ import { db } from './firebase';
 import { guardarRegistroLocal } from './utils/registrosLocales';
 import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, addDoc } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
+import BotonPdfRecurso from './components/BotonPdfRecurso';
 
 // Partido 3D en tiempo real (three.js): se carga solo al elegir ese modo
 const Futbol3D = lazy(() => import('./futbol3d/Futbol3D'));
@@ -474,6 +475,7 @@ function PantallaInicio({ onJugar, onExit }) {
                                     <button key={r.id} onClick={() => seleccionarRecurso(r)} style={{ display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, padding: '10px 12px', cursor: 'pointer', color: 'white' }}>
                                         <span style={{ ...{ padding: '3px 8px', borderRadius: 8, fontSize: '0.7rem', fontWeight: 700 }, background: tl.color }}>{tl.txt}</span>
                                         <span style={{ flex: 1, fontWeight: 600, fontSize: '0.9rem' }}>{r.titulo || 'Sin título'}</span>
+                                        <BotonPdfRecurso recurso={r} enLinea style={{ padding: '3px 8px', fontSize: '0.7rem' }} />
                                         <span style={{ color: '#94a3b8', fontSize: '1.2rem' }}>▶</span>
                                     </button>
                                 );

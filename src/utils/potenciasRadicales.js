@@ -38,7 +38,8 @@ function terminoSimplificar() {
   const t = pick(['pow', 'pow', 'pow', 'neg', 'frac', 'powpow']);
   const b = pick(BASES_COMP);
   if (t === 'pow') {
-    if (Math.random() < 0.15) { const e = rInt(2, 4); return { tipo: 'negbase', b, e, f: factoriza(b), k: e, neg: e % 2 === 1 }; }
+    // base negativa: (−b)ⁿ, también con exponente negativo; el signo depende de la paridad
+    if (Math.random() < 0.35) { const e = pick([2, 3, 4, 5, -1, -2, -3]); return { tipo: 'negbase', b, e, f: factoriza(b), k: e, neg: Math.abs(e) % 2 === 1 }; }
     const e = rInt(1, 4); return { tipo: 'pow', b, e, f: factoriza(b), k: e };
   }
   if (t === 'neg') { const e = -rInt(1, 3); return { tipo: 'pow', b, e, f: factoriza(b), k: e }; }
@@ -52,7 +53,7 @@ function terminoSimplificar() {
 // → { num: [término], den: [término], neg, N, D, exps } con resultado ±N/D (N/D irreducible)
 export function datosSimplificar(maxValor = 3000) {
   for (;;) {
-    const nNum = rInt(2, 3), nDen = Math.random() < 0.15 ? 0 : rInt(1, 2);
+    const nNum = rInt(2, 3), nDen = rInt(1, 3);
     const exps = {}; const num = [], den = []; let neg = false;
     for (let i = 0; i < nNum + nDen; i++) {
       const t = terminoSimplificar();

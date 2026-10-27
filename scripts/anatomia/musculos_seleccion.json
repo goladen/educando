@@ -1,0 +1,56 @@
+{
+  "_info": "Músculos principales para el visor (nivel escolar). 'partes' = nombres de Z-Anatomy (sin .r/.l) que se unen en una sola pieza por lado. 'tipo': musculo | tendon.",
+  "musculos": [
+    { "id": "frontal", "nombre": "Músculo frontal", "zona": "cabeza", "grupo": "Músculos de la cara", "partes": ["Frontalis muscle"] },
+    { "id": "occipital", "nombre": "Músculo occipital", "zona": "cabeza", "grupo": "Músculos de la cara", "partes": ["Occipitalis muscle"] },
+    { "id": "temporal", "nombre": "Músculo temporal", "zona": "cabeza", "grupo": "Músculos de la masticación", "partes": ["Temporalis muscle"] },
+    { "id": "masetero", "nombre": "Masetero", "zona": "cabeza", "grupo": "Músculos de la masticación", "partes": ["Superficial part of masseter", "Deep part of masseter"] },
+    { "id": "orbicular_ojo", "nombre": "Orbicular de los ojos", "zona": "cabeza", "grupo": "Músculos de la cara", "partes": ["Orbital part of orbicularis oculi", "Palpebral part of orbicularis oculi"] },
+    { "id": "orbicular_boca", "nombre": "Orbicular de los labios", "zona": "cabeza", "grupo": "Músculos de la cara", "partes": ["Orbicularis oris muscle"] },
+    { "id": "cigomatico", "nombre": "Cigomático mayor", "zona": "cabeza", "grupo": "Músculos de la cara", "partes": ["Zygomaticus major muscle"] },
+    { "id": "buccinador", "nombre": "Buccinador", "zona": "cabeza", "grupo": "Músculos de la cara", "partes": ["Bucinator"] },
+    { "id": "esternocleidomastoideo", "nombre": "Esternocleidomastoideo", "zona": "cabeza", "grupo": "Músculos del cuello", "partes": ["Sternocleidomastoid muscle"] },
+
+    { "id": "trapecio", "nombre": "Trapecio", "zona": "espalda", "grupo": "Músculos de la espalda", "partes": ["Ascending part of trapezius muscle", "Descending part of trapezius muscle", "Transverse part of trapezius muscle"] },
+    { "id": "dorsal_ancho", "nombre": "Dorsal ancho", "zona": "espalda", "grupo": "Músculos de la espalda", "partes": ["Latissimus dorsi muscle"] },
+    { "id": "romboides", "nombre": "Romboides", "zona": "espalda", "grupo": "Músculos de la espalda", "partes": ["Rhomboid major muscle", "Rhomboid minor muscle"] },
+
+    { "id": "pectoral_mayor", "nombre": "Pectoral mayor", "zona": "torax", "grupo": "Músculos del tórax", "partes": ["Clavicular head of pectoralis major muscle", "Sternocostal head of pectoralis major muscle", "(Abdominal part of pectoralis major muscle)"] },
+    { "id": "serrato_anterior", "nombre": "Serrato anterior", "zona": "torax", "grupo": "Músculos del tórax", "partes": ["Serratus anterior muscle"] },
+    { "id": "intercostales", "nombre": "Intercostales externos", "zona": "torax", "grupo": "Músculos de la respiración", "partes": ["External intercostal muscles"] },
+    { "id": "diafragma", "nombre": "Diafragma", "zona": "torax", "grupo": "Músculos de la respiración", "partes": ["Diaphragm"] },
+
+    { "id": "recto_abdominal", "nombre": "Recto abdominal", "zona": "abdomen", "grupo": "Músculos del abdomen", "partes": ["Rectus abdominis muscle"] },
+    { "id": "oblicuo_externo", "nombre": "Oblicuo externo", "zona": "abdomen", "grupo": "Músculos del abdomen", "partes": ["External abdominal oblique muscle"] },
+
+    { "id": "deltoides", "nombre": "Deltoides", "zona": "brazo", "grupo": "Músculos del hombro", "partes": ["Acromial part of deltoid muscle", "Clavicular part of deltoid muscle", "Scapular spinal part of deltoid muscle"] },
+    { "id": "supraespinoso", "nombre": "Supraespinoso", "zona": "brazo", "grupo": "Músculos del hombro", "partes": ["Supraspinatus muscle"] },
+    { "id": "infraespinoso", "nombre": "Infraespinoso", "zona": "brazo", "grupo": "Músculos del hombro", "partes": ["Infraspinatus muscle"] },
+    { "id": "redondo_mayor", "nombre": "Redondo mayor", "zona": "brazo", "grupo": "Músculos del hombro", "partes": ["Teres major muscle"] },
+    { "id": "biceps_braquial", "nombre": "Bíceps braquial", "zona": "brazo", "grupo": "Músculos del brazo", "partes": ["Long head of biceps brachii", "Short head of biceps brachii"] },
+    { "id": "braquial", "nombre": "Braquial anterior", "zona": "brazo", "grupo": "Músculos del brazo", "partes": ["Brachialis muscle"] },
+    { "id": "triceps_braquial", "nombre": "Tríceps braquial", "zona": "brazo", "grupo": "Músculos del brazo", "partes": ["Medial head of triceps brachii", "Lateral head of triceps brachii", "Long head of triceps brachii"] },
+    { "id": "braquiorradial", "nombre": "Braquiorradial (supinador largo)", "zona": "brazo", "grupo": "Músculos del antebrazo", "partes": ["Brachioradialis muscle"] },
+    { "id": "flexores_antebrazo", "nombre": "Flexores del antebrazo", "zona": "brazo", "grupo": "Músculos del antebrazo", "partes": ["Flexor carpi radialis", "Palmaris longus muscle", "Humeral head of flexor carpi ulnaris", "Ulnar head of flexor carpi ulnaris", "Humero-ulnar head of flexor digitorum superficialis", "Radial head of flexor digitorum superficialis", "Superficial head of pronator teres", "Deep head of pronator teres"] },
+    { "id": "extensores_antebrazo", "nombre": "Extensores del antebrazo", "zona": "brazo", "grupo": "Músculos del antebrazo", "partes": ["Extensor digitorum", "Extensor carpi radialis longus", "Extensor carpi radialis brevis", "Ulnar head of extensor carpi ulnaris", "Humeral head of extensor carpi ulnaris", "Extensor digiti minimi"] },
+
+    { "id": "gluteo_mayor", "nombre": "Glúteo mayor", "zona": "pierna", "grupo": "Músculos de la cadera", "partes": ["Gluteus maximus muscle"] },
+    { "id": "gluteo_medio", "nombre": "Glúteo medio", "zona": "pierna", "grupo": "Músculos de la cadera", "partes": ["Gluteus medius muscle"] },
+    { "id": "psoas_iliaco", "nombre": "Psoas ilíaco", "zona": "pierna", "grupo": "Músculos de la cadera", "partes": ["Iliacus muscle", "Psoas major"] },
+    { "id": "recto_femoral", "nombre": "Recto femoral (cuádriceps)", "zona": "pierna", "grupo": "Cuádriceps", "partes": ["Rectus femoris muscle"] },
+    { "id": "vasto_lateral", "nombre": "Vasto lateral (cuádriceps)", "zona": "pierna", "grupo": "Cuádriceps", "partes": ["Vastus lateralis muscle"] },
+    { "id": "vasto_medial", "nombre": "Vasto medial (cuádriceps)", "zona": "pierna", "grupo": "Cuádriceps", "partes": ["Vastus medialis muscle"] },
+    { "id": "vasto_intermedio", "nombre": "Vasto intermedio (cuádriceps)", "zona": "pierna", "grupo": "Cuádriceps", "partes": ["Vastus intermedius muscle"] },
+    { "id": "sartorio", "nombre": "Sartorio", "zona": "pierna", "grupo": "Músculos del muslo", "partes": ["Sartorius muscle"] },
+    { "id": "aductores", "nombre": "Aductores", "zona": "pierna", "grupo": "Músculos del muslo", "partes": ["Adductor magnus", "Adductor longus", "Adductor brevis", "(Adductor minimus)"] },
+    { "id": "gracil", "nombre": "Grácil (recto interno)", "zona": "pierna", "grupo": "Músculos del muslo", "partes": ["Gracilis muscle"] },
+    { "id": "biceps_femoral", "nombre": "Bíceps femoral (isquiotibial)", "zona": "pierna", "grupo": "Isquiotibiales", "partes": ["Long head of biceps femoris", "Short head of biceps femoris"] },
+    { "id": "semitendinoso", "nombre": "Semitendinoso (isquiotibial)", "zona": "pierna", "grupo": "Isquiotibiales", "partes": ["Semitendinosus muscle"] },
+    { "id": "semimembranoso", "nombre": "Semimembranoso (isquiotibial)", "zona": "pierna", "grupo": "Isquiotibiales", "partes": ["Semimembranosus muscle"] },
+    { "id": "gemelos", "nombre": "Gemelos (gastrocnemio)", "zona": "pierna", "grupo": "Músculos de la pierna", "partes": ["Lateral head of gastrocnemius", "Medial head of gastrocnemius"] },
+    { "id": "soleo", "nombre": "Sóleo", "zona": "pierna", "grupo": "Músculos de la pierna", "partes": ["Soleus muscle"] },
+    { "id": "tendon_aquiles", "nombre": "Tendón de Aquiles", "zona": "pierna", "grupo": "Músculos de la pierna", "tipo": "tendon", "partes": ["Calcaneal tendon"] },
+    { "id": "tibial_anterior", "nombre": "Tibial anterior", "zona": "pierna", "grupo": "Músculos de la pierna", "partes": ["Tibialis anterior muscle"] },
+    { "id": "peroneo_largo", "nombre": "Peroneo largo", "zona": "pierna", "grupo": "Músculos de la pierna", "partes": ["Fibularis longus muscle"] }
+  ]
+}

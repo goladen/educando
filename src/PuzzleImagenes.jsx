@@ -71,8 +71,27 @@ const mezclar = (n) => {
     return arr;
 };
 
+// Puzzle inicial desde la URL (?puzzle=<id> o ?puzzleimg=<url>): lo usa el QR de la ficha en papel
+const puzzleDeUrl = () => {
+    try {
+        const p = new URLSearchParams(window.location.search);
+        const id = p.get('puzzle'), img = p.get('puzzleimg');
+        if (id) return PUZZLES.find(x => x.id === id) || null;
+        if (img && /^https?:\/\//.test(img)) return { id: 'custom', nombre: p.get('puzzlenombre') || 'Mi imagen', img, custom: true };
+    } catch { /* sin URL */ }
+    return null;
+};
+
+// Enlace para montar este mismo puzzle en pikt.es
+const enlacePuzzle = (puzzle) => {
+    const p = new URLSearchParams({ juego: 'puzzle_imagenes' });
+    if (puzzle.custom) { p.set('puzzleimg', puzzle.img); p.set('puzzlenombre', puzzle.nombre); }
+    else p.set('puzzle', puzzle.id);
+    return `${window.location.origin}/?${p.toString()}`;
+};
+
 export default function PuzzleImagenes({ onExit }) {
-    const [puzzle, setPuzzle]   = useState(null);     // objeto de PUZZLES
+    const [puzzle, setPuzzle]   = useState(puzzleDeUrl);     // objeto de PUZZLES
     const [dif, setDif]         = useState(null);     // clave de DIFICULTADES
     const [order, setOrder]     = useState([]);       // order[celda] = pieza original
     const [selected, setSelected] = useState(null);   // celda seleccionada (tap)
@@ -354,6 +373,7 @@ export default function PuzzleImagenes({ onExit }) {
                         </button>
                     ))}
                 </div>
+                <PuzzlePapel puzzle={puzzle} />
             </Pantalla>
         );
     }
@@ -438,6 +458,46 @@ export default function PuzzleImagenes({ onExit }) {
 }
 
 // ── Layout común (fondo + cabecera + botón salir) ──────────────────────────────
+// Versión en papel: tablero para pegar + piezas desordenadas para recortar (utils/pdfPuzzle.js)
+function PuzzlePapel({ puzzle }) {
+    const [difPapel, setDifPapel] = useState('medio');
+    const [guia, setGuia] = useState(true);
+    const [generando, setGenerando] = useState(false);
+    const generar = async () => {
+        setGenerando(true);
+        try {
+            const { generarPdfPuzzle } = await import('./utils/pdfPuzzle');
+            const d = DIFICULTADES[difPapel];
+            await generarPdfPuzzle({ nombre: puzzle.nombre, img: puzzle.img, cols: d.cols, rows: d.rows, guia, url: enlacePuzzle(puzzle) });
+        } catch (e) {
+            alert(e.message || 'No se pudo generar el PDF.');
+        }
+        setGenerando(false);
+    };
+    return (
+        <div style={{ maxWidth: 520, margin: '26px auto 0', background: '#fff', border: '2px dashed #a29bfe', borderRadius: 14, padding: '14px 16px', boxShadow: '0 3px 10px rgba(0,0,0,0.08)' }}>
+            <div style={{ fontWeight: 800, color: '#2c3e50', fontSize: 15 }}>🖨️ Puzzle en papel</div>
+            <div style={{ color: '#7f8c8d', fontSize: 13, margin: '4px 0 10px' }}>
+                PDF con el tablero para pegar y las piezas desordenadas para recortar. Lleva un QR para montarlo después aquí.
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                {Object.entries(DIFICULTADES).map(([k, d]) => (
+                    <button key={k} onClick={() => setDifPapel(k)}
+                        style={{ padding: '6px 12px', borderRadius: 20, cursor: 'pointer', fontWeight: 700, fontSize: 13, border: `2px solid ${difPapel === k ? '#6c5ce7' : '#dfe6e9'}`, background: difPapel === k ? '#6c5ce7' : '#fff', color: difPapel === k ? '#fff' : '#636e72' }}>
+                        {d.emoji} {d.cols * d.rows} piezas
+                    </button>
+                ))}
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#2d3436', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={guia} onChange={e => setGuia(e.target.checked)} /> Imagen tenue de guía en el tablero
+                </label>
+            </div>
+            <button onClick={generar} disabled={generando} style={{ ...botonAccion('#6c5ce7'), marginTop: 12, width: '100%', opacity: generando ? 0.7 : 1 }}>
+                {generando ? 'Generando…' : '📄 Descargar PDF'}
+            </button>
+        </div>
+    );
+}
+
 function Pantalla({ children, onExit, volverLabel = '← Volver', titulo, subtitulo }) {
     return (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, overflowY: 'auto', background: 'linear-gradient(135deg, #74b9ff, #a29bfe)', fontFamily: "'Segoe UI', Tahoma, sans-serif" }}>

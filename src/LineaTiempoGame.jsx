@@ -6,6 +6,7 @@ import { Clock, ArrowLeft, Search, CheckCircle, RotateCcw, Info, X, Calendar } f
 import { BIBLIOTECA_LINEAS_TIEMPO } from './BibliotecaLineasTiempo';
 import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
+import BotonPdfRecurso from './components/BotonPdfRecurso';
 
 // ── Helpers de fecha (mismos criterios que el editor) ────────
 const MESES = ['', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -168,6 +169,7 @@ function PantallaBusqueda({ onElegir, onExit }) {
                                     {r.profesorNombre ? `${r.profesorNombre} · ` : ''}{(r.hojas?.length || 0)} línea(s) · {(r.hojas || []).reduce((n, h) => n + (h.eventos?.length || 0), 0)} eventos
                                 </div>
                             </div>
+                            <BotonPdfRecurso recurso={r} />
                             <span style={{ color: '#2980b9', fontWeight: 800 }}>▶</span>
                         </div>
                     ))}
@@ -192,7 +194,10 @@ function PantallaBusqueda({ onElegir, onExit }) {
                                     <div style={{ padding: '10px 12px' }}>
                                         <div style={{ fontWeight: 800, color: '#1f2937', fontSize: '0.92rem' }}>{t.titulo}</div>
                                         <div style={{ fontSize: '0.75rem', color: '#6b7280', margin: '3px 0 6px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{t.descripcion}</div>
-                                        <div style={{ fontSize: '0.72rem', color: '#2980b9', fontWeight: 700 }}>{t.hojas[0].eventos.length} eventos · ▶ Jugar</div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
+                                            <div style={{ fontSize: '0.72rem', color: '#2980b9', fontWeight: 700 }}>{t.hojas[0].eventos.length} eventos · ▶ Jugar</div>
+                                            <BotonPdfRecurso recurso={{ ...t, tipoJuego: 'LINEA_TIEMPO', esBiblioteca: true }} style={{ padding: '3px 8px', fontSize: '0.7rem' }} />
+                                        </div>
                                     </div>
                                 </div>
                             ))}

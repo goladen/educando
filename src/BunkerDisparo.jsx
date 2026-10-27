@@ -8,6 +8,7 @@ import { guardarRegistroLocal } from './utils/registrosLocales';
 import { collection, query, where, getDocs, addDoc, orderBy, limit, doc, getDoc } from 'firebase/firestore';
 import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
+import BotonPdfRecurso from './components/BotonPdfRecurso';
 
 // =====================================================================
 //  BANCOS DE PREGUNTAS INTEGRADOS (modo libre, sin recurso de profesor)
@@ -1925,7 +1926,10 @@ function BuscadorRecursos({ onBack, onPick }) {
                         : resultados.map(r => (
                             <button key={r.id} onClick={() => onPick(r)}
                                 style={{ textAlign: 'left', padding: '12px 14px', borderRadius: 10, border: '1px solid #263238', background: 'transparent', color: '#e7f3ec', cursor: 'pointer', fontFamily: 'monospace' }}>
-                                <div style={{ fontWeight: 'bold' }}>{r.titulo}</div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                                    <div style={{ fontWeight: 'bold' }}>{r.titulo}</div>
+                                    <BotonPdfRecurso recurso={r} enLinea style={{ padding: '3px 8px', fontSize: '0.7rem' }} />
+                                </div>
                                 <div style={{ fontSize: 11, color: '#8a9aa0', marginTop: 3 }}>
                                     {r.tipoJuego || 'Recurso'}{r.profesorNombre ? ` · ${r.profesorNombre}` : ''} · {(r.hojas?.length || 1)} hoja(s)
                                 </div>

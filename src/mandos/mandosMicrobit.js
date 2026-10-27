@@ -77,7 +77,10 @@ export async function flashearMicropython(onProgreso) {
 // v3: modo T (abecedario) en los mandos; la antena solo cambia de número de versión.
 // v4: en los modos L, N y T la respuesta se envía agitando el mando (en L también con B).
 // v5: modo F (fútbol, micro:bit V2): botones, logo táctil, agitar e inclinar + duelos de preguntas.
-export const VERSION_PROGRAMAS = 5;
+// v6: modo V (volante): como F, pero la inclinación es continua (dirección + latido mientras se mantiene).
+export const VERSION_PROGRAMAS = 6;
+/** Primera versión de los programas que tiene el modo V (volante). */
+export const VERSION_VOLANTE = 6;
 
 export function programaAntena(grupo = GRUPO_POR_DEFECTO) {
   return `# PiKT - ANTENA receptora de mandos (v${VERSION_PROGRAMAS})
@@ -133,8 +136,10 @@ while True:
 //   F futbol:     A/B/logo pulsados o soltados (con latido cada 400 ms mientras se mantienen)
 //                 -> FA1|FA0|FB1|FB0|FL1|FL0; agitar -> FS; inclinar -> FPI|FPD|FPF|FPT (izq/der/delante/detras).
 //                 Con 'Q:<id>' ese mando entra en duelo: A cambia A-D, B o agitar envia la letra (una vez).
+//   V volante:    igual que F (botones, logo, agitar) pero inclinar es continuo: FV + I|D (lado) y/o F|T
+//                 (delante/detras), p. ej. FVDF; se repite cada 300 ms mientras sigue inclinado; FV0 = plano.
 export function programaMando(id, grupo = GRUPO_POR_DEFECTO) {
-  return `# PiKT - MANDO ${id} (v${VERSION_PROGRAMAS}): modos letras / numero / abecedario / mover / futbol
+  return `# PiKT - MANDO ${id} (v${VERSION_PROGRAMAS}): modos letras / numero / abecedario / mover / futbol / volante
 from microbit import *
 import radio
 import random
@@ -168,6 +173,10 @@ armado = True
 incl_d = ''
 incl_t = 0
 tras_agitar = 0
+vol_d = '0'
+vol_t = 0
+FLECHAS = {'I': Image.ARROW_W, 'D': Image.ARROW_E, 'F': Image.ARROW_N, 'T': Image.ARROW_S,
+    'IF': Image.ARROW_NW, 'DF': Image.ARROW_NE, 'IT': Image.ARROW_SW, 'DT': Image.ARROW_SE}
 
 def pantalla():
     if modo == 'L':
@@ -181,6 +190,8 @@ def pantalla():
         display.show(ALFA[car])
     elif modo == 'F':
         display.show(LETRAS[sel] if duelo else BALON)
+    elif modo == 'V':
+        display.show(FLECHAS.get(vol_d, Image.DIAMOND_SMALL))
     else:
         display.show(Image.ARROW_N)
 
@@ -311,6 +322,9 @@ def paso_futbol():
         return
     if ahora - tras_agitar < 700:
         return
+    if modo == 'V':
+        paso_volante(ahora)
+        return
     x = accelerometer.get_x()
     y = accelerometer.get_y()
     d = ''
@@ -336,11 +350,31 @@ def paso_futbol():
         armado = False
         enviar('FP' + d)
 
+# Modo V: la direccion de la inclinacion (con diagonales) mientras dure; se repite cada 300 ms
+# y al volver a plano se envia FV0. Umbral mas bajo para seguir inclinado que para empezar.
+def paso_volante(ahora):
+    global vol_d, vol_t
+    u = 330 if vol_d == '0' else 230
+    x = accelerometer.get_x()
+    y = accelerometer.get_y()
+    d = ('I' if x < -u else ('D' if x > u else '')) + ('F' if y < -u else ('T' if y > u else ''))
+    if not d:
+        d = '0'
+    if d != vol_d:
+        vol_d = d
+        vol_t = ahora
+        pantalla()
+        enviar('FV' + d)
+    elif d != '0' and ahora - vol_t > 300:
+        vol_t = ahora
+        enviar('FV' + d)
+
 def cambiar_modo(m):
-    global modo, sel, num, car, activo, combo, duelo
-    if m == modo or len(m) != 1 or m not in 'LNTMF':
+    global modo, sel, num, car, activo, combo, duelo, vol_d
+    if m == modo or len(m) != 1 or m not in 'LNTMFV':
         return
     duelo = False
+    vol_d = '0'
     modo = m
     sel = 0
     num = 0
@@ -395,7 +429,7 @@ while True:
         paso_letras()
     elif modo == 'N' or modo == 'T':
         paso_ajuste()
-    elif modo == 'F':
+    elif modo == 'F' or modo == 'V':
         paso_futbol()
     else:
         paso_mover()
@@ -562,10 +596,10 @@ let modoMandos = 'L';
 let lineaPendiente = '';
 const oyentesMandos = new Set();
 const oyentesEstado = new Set();
-const RE_PULSACION = /^P:(\d{1,3}):([ABCD]|N-?\d{1,4}|T[A-Z0-9]|M[ABX]|F(?:[ABL][01]|S|P[IDFT])):(\d{1,3})$/;
+const RE_PULSACION = /^P:(\d{1,3}):([ABCD]|N-?\d{1,4}|T[A-Z0-9]|M[ABX]|F(?:[ABL][01]|S|P[IDFT]|V(?:0|[ID][FT]?|[FT]))):(\d{1,3})$/;
 
 /** Modos de los mandos (los cambia el juego con setModoMandos). */
-export const MODOS = { LETRAS: 'L', NUMERO: 'N', TEXTO: 'T', MOVER: 'M', FUTBOL: 'F' };
+export const MODOS = { LETRAS: 'L', NUMERO: 'N', TEXTO: 'T', MOVER: 'M', FUTBOL: 'F', VOLANTE: 'V' };
 
 /** Texto → entero que se puede marcar en el mando (-999 … 9999), o null. */
 export const aNumeroMando = (txt) => {
@@ -581,6 +615,7 @@ export const aNumeroMando = (txt) => {
  *   número: { tipo: 'numero', numero }
  *   texto:  { tipo: 'texto', caracter: 'A'..'Z' | '0'..'9' }
  *   fútbol: { tipo: 'futbol', accion: 'A'|'B'|'L' (con on: true/false) | 'S' (agitar) | 'P' (con dir: 'I'|'D'|'F'|'T') }
+ *           volante (modo V, mismo tipo): accion 'V' con dir '' (plano) o 'I'|'D' y/o 'F'|'T' (p. ej. 'DF')
  *   mover:  { tipo: 'mover', mov: 'A' (avanza) | 'B' (gira) | 'X' (A+B, acción) }
  */
 function aEvento(id, valor) {
@@ -590,6 +625,7 @@ function aEvento(id, valor) {
   if (valor[0] === 'F') {
     const accion = valor[1];
     if (accion === 'P') return { id, tipo: 'futbol', accion, dir: valor[2] };
+    if (accion === 'V') return { id, tipo: 'futbol', accion, dir: valor.slice(2).replace('0', '') };
     return { id, tipo: 'futbol', accion, on: valor[2] === '1' };
   }
   return { id, tipo: 'mover', mov: valor[1] };

@@ -8,6 +8,7 @@ import Confetti from 'react-confetti';
 import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import SopaDeLetras from './SopaDeLetras'; // <--- Importamos el motor de la sopa que ya creamos
+import BotonPdfRecurso from './components/BotonPdfRecurso';
 
 // --- DICCIONARIOS (Igual que Wordle) ---
 const LANGUAGES = {
@@ -648,6 +649,7 @@ export default function SopaDeLetrasGame({ usuario, onExit, recurso, modoOlimpic
                                 >
                                     <Share2 size={13}/>
                                 </button>
+                                <BotonPdfRecurso recurso={r} texto="" style={{ padding: '5px 8px', borderRadius: 6 }} />
                             </div>
                         </div>
                     ))}

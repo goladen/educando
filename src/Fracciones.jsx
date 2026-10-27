@@ -479,7 +479,9 @@ const generarCombinada = (nivel) => {
 };
 
 // ─── Expresión combinada en formato matemático ───────────────────────────────
-export const ExprMat = ({ nodo, size = '1.6rem', marca = null, ruta = [] }) => {
+// impreso: resaltado compatible con el PDF (html2canvas pinta el fondo + box-shadow ENCIMA
+// de las fracciones anidadas y tapa la operación) → solo un subrayado
+export const ExprMat = ({ nodo, size = '1.6rem', marca = null, ruta = [], impreso = false }) => {
     const esMarca = !!marca && marca.length === ruta.length && marca.every((k, i) => k === ruta[i]);
     const signo = (s) => <span style={{ fontSize: size, fontWeight: 900, color: '#2c3e50', lineHeight: 1 }}>{s}</span>;
     let cont;
@@ -487,22 +489,22 @@ export const ExprMat = ({ nodo, size = '1.6rem', marca = null, ruta = [] }) => {
         cont = <FracTexto n={nodo.v[0]} d={nodo.v[1]} size={size} color={nodo.color || COLORES.A} />;
     } else if (nodo.t === 'pot') {
         cont = (<>
-            {signo('(')}<ExprMat nodo={nodo.x} size={size} marca={marca} ruta={[...ruta, 'x']} />{signo(')')}
+            {signo('(')}<ExprMat nodo={nodo.x} size={size} marca={marca} ruta={[...ruta, 'x']} impreso={impreso} />{signo(')')}
             <span style={{ fontSize: `calc(${size} * 0.6)`, fontWeight: 900, color: '#16a085', alignSelf: 'flex-start' }}>{nodo.e}</span>
         </>);
     } else if (nodo.t === 'raiz') {
-        cont = <RaizFrac size={size}><ExprMat nodo={nodo.x} size={size} marca={marca} ruta={[...ruta, 'x']} /></RaizFrac>;
+        cont = <RaizFrac size={size}><ExprMat nodo={nodo.x} size={size} marca={marca} ruta={[...ruta, 'x']} impreso={impreso} /></RaizFrac>;
     } else {
         const pa = necesitaParen(nodo.a, nodo, false), pb = necesitaParen(nodo.b, nodo, true);
         cont = (<>
-            {pa && signo('(')}<ExprMat nodo={nodo.a} size={size} marca={marca} ruta={[...ruta, 'a']} />{pa && signo(')')}
+            {pa && signo('(')}<ExprMat nodo={nodo.a} size={size} marca={marca} ruta={[...ruta, 'a']} impreso={impreso} />{pa && signo(')')}
             {signo(SIGNO_OP[nodo.op])}
-            {pb && signo('(')}<ExprMat nodo={nodo.b} size={size} marca={marca} ruta={[...ruta, 'b']} />{pb && signo(')')}
+            {pb && signo('(')}<ExprMat nodo={nodo.b} size={size} marca={marca} ruta={[...ruta, 'b']} impreso={impreso} />{pb && signo(')')}
         </>);
     }
     return (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, verticalAlign: 'middle', borderRadius: 8,
-            ...(esMarca ? { background: '#fff3b0', boxShadow: '0 0 0 2px #f1c40f', padding: '2px 4px' } : {}) }}>
+            ...(esMarca ? (impreso ? { borderBottom: '3px solid #f1c40f', paddingBottom: 2 } : { background: '#fff3b0', boxShadow: '0 0 0 2px #f1c40f', padding: '2px 4px' }) : {}) }}>
             {cont}
         </span>
     );
@@ -520,14 +522,17 @@ const JerarquiaGuia = ({ compacto = false }) => (
 );
 
 // Resolución paso a paso (se resalta la operación que toca en cada línea)
-export const PasosCombinada = ({ arbol, size = '1.3rem' }) => {
+// impreso (solucionario en PDF): sin contenedor con scroll (html2canvas lo recorta) y resaltado subrayado
+export const PasosCombinada = ({ arbol, size = '1.3rem', impreso = false }) => {
     const pasos = pasosExpr(arbol);
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
             {pasos.map((p, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'center', maxWidth: '100%' }}>
                     <span style={{ fontSize: size, fontWeight: 900, color: '#95a5a6', minWidth: 16 }}>{i === 0 ? '' : '='}</span>
-                    <span style={{ maxWidth: '100%', overflowX: 'auto' }}><ExprMat nodo={p.expr} marca={p.marca} size={size} /></span>
+                    {impreso
+                        ? <ExprMat nodo={p.expr} marca={p.marca} size={size} impreso />
+                        : <span style={{ maxWidth: '100%', overflowX: 'auto' }}><ExprMat nodo={p.expr} marca={p.marca} size={size} /></span>}
                     {p.marca && !p.error && <span style={{ fontSize: '0.74rem', color: '#b9770f', fontWeight: 800 }}>← {p.motivo}</span>}
                     {p.error && <span style={{ fontSize: '0.8rem', color: '#e74c3c', fontWeight: 800 }}>⚠️ {p.error}</span>}
                 </div>

@@ -1,0 +1,53 @@
+{
+  "_info": "Órganos principales para el visor. 'partes' = nombres exactos de Z-Anatomy (sin .r/.l); 'colecciones' = todas las piezas de esas subcolecciones; 'excluir' = regex sobre el nombre; 'unir_lados' = una sola pieza con los dos lados; 'procedural' = pieza generada en Blender (no se usa la malla del atlas: el riñón de Z-Anatomy puede ser el de L. Cowley, CC BY-NC). 'color' = RGB 0-1.",
+  "piezas": [
+    { "id": "lobulo_frontal", "nombre": "Lóbulo frontal", "zona": "cabeza", "grupo": "Sistema nervioso", "colecciones": ["Frontal lobe"], "color": [0.55, 0.7, 0.95] },
+    { "id": "lobulo_parietal", "nombre": "Lóbulo parietal", "zona": "cabeza", "grupo": "Sistema nervioso", "colecciones": ["Parietal lobe"], "color": [0.97, 0.85, 0.45] },
+    { "id": "lobulo_temporal", "nombre": "Lóbulo temporal", "zona": "cabeza", "grupo": "Sistema nervioso", "colecciones": ["Temporal lobe"], "color": [0.6, 0.86, 0.6] },
+    { "id": "lobulo_occipital", "nombre": "Lóbulo occipital", "zona": "cabeza", "grupo": "Sistema nervioso", "colecciones": ["Occipital lobe"], "color": [0.95, 0.62, 0.75] },
+    { "id": "insula_cisuras", "nombre": "Ínsula y cisuras", "zona": "cabeza", "grupo": "Sistema nervioso", "colecciones": ["Interlobular sulci", "Insula", "Fornicate gyrus", "Limbic lobe"], "color": [0.86, 0.78, 0.8] },
+    { "id": "cuerpo_calloso", "nombre": "Cuerpo calloso", "zona": "cabeza", "grupo": "Sistema nervioso", "partes": ["Corpus callosum"], "color": [0.96, 0.95, 0.9] },
+    { "id": "cerebelo", "nombre": "Cerebelo", "zona": "cabeza", "grupo": "Sistema nervioso", "colecciones": ["Cerebellum"], "excluir": "peduncle", "unir_lados": true, "color": [0.88, 0.58, 0.55] },
+    { "id": "tronco_encefalico", "nombre": "Tronco del encéfalo", "zona": "cabeza", "grupo": "Sistema nervioso", "partes": ["Midbrain", "Pons", "Medulla oblongata", "Base of peduncle", "Olive", "Pyramid of medulla oblongata"], "unir_lados": true, "color": [0.9, 0.76, 0.6] },
+    { "id": "medula_espinal", "nombre": "Médula espinal", "zona": "columna", "grupo": "Sistema nervioso", "partes": ["Spinal dura"], "color": [0.97, 0.9, 0.7] },
+    { "id": "nervio_ciatico", "nombre": "Nervio ciático", "zona": "pierna", "grupo": "Sistema nervioso", "partes": ["Sciatic nerve"], "color": [0.98, 0.88, 0.35] },
+    { "id": "ojo", "nombre": "Globo ocular", "zona": "cabeza", "grupo": "Órganos de los sentidos", "partes": ["Sclera", "Cornea", "Iris"], "color": [0.95, 0.95, 0.95] },
+
+    { "id": "lengua", "nombre": "Lengua", "zona": "cabeza", "grupo": "Aparato digestivo", "partes": ["Tongue"], "color": [0.88, 0.42, 0.47] },
+    { "id": "glandulas_salivales", "nombre": "Glándulas salivales", "zona": "cabeza", "grupo": "Aparato digestivo", "partes": ["Parotid gland", "Submandibular gland", "Sublingual gland"], "color": [0.96, 0.8, 0.58] },
+    { "id": "faringe", "nombre": "Faringe", "zona": "cabeza", "grupo": "Aparato digestivo", "partes": ["Nasopharynx", "Oropharynx", "Laryngopharynx"], "color": [0.88, 0.52, 0.52] },
+    { "id": "esofago", "nombre": "Esófago", "zona": "torax", "grupo": "Aparato digestivo", "partes": ["Oesophagus"], "color": [0.87, 0.56, 0.5] },
+    { "id": "estomago", "nombre": "Estómago", "zona": "abdomen", "grupo": "Aparato digestivo", "partes": ["Stomach"], "color": [0.92, 0.6, 0.55] },
+    { "id": "higado", "nombre": "Hígado", "zona": "abdomen", "grupo": "Aparato digestivo", "partes": ["Liver"], "color": [0.58, 0.22, 0.2] },
+    { "id": "vesicula", "nombre": "Vesícula biliar", "zona": "abdomen", "grupo": "Aparato digestivo", "partes": ["Gallbladder"], "color": [0.38, 0.62, 0.32] },
+    { "id": "pancreas", "nombre": "Páncreas", "zona": "abdomen", "grupo": "Aparato digestivo", "partes": ["Pancreas"], "color": [0.96, 0.8, 0.55] },
+    { "id": "duodeno", "nombre": "Duodeno", "zona": "abdomen", "grupo": "Aparato digestivo", "partes": ["Duodenum"], "color": [0.92, 0.66, 0.56] },
+    { "id": "intestino_delgado", "nombre": "Intestino delgado", "zona": "abdomen", "grupo": "Aparato digestivo", "partes": ["Jejunum"], "color": [0.94, 0.72, 0.62] },
+    { "id": "intestino_grueso", "nombre": "Intestino grueso (colon)", "zona": "abdomen", "grupo": "Aparato digestivo", "partes": ["Ascending colon", "Transverse colon", "Descending colon", "Sigmoid colon"], "color": [0.8, 0.55, 0.45] },
+    { "id": "apendice", "nombre": "Apéndice", "zona": "abdomen", "grupo": "Aparato digestivo", "partes": ["Vermiform appendix"], "color": [0.75, 0.48, 0.4] },
+
+    { "id": "traquea", "nombre": "Tráquea", "zona": "torax", "grupo": "Aparato respiratorio", "partes": ["Trachea"], "color": [0.86, 0.86, 0.92] },
+    { "id": "bronquios", "nombre": "Bronquios", "zona": "torax", "grupo": "Aparato respiratorio", "partes": ["Left main bronchus", "Right main bronchus", "Left superior lobar bronchus", "Left inferior lobar bronchus", "Right superior lobar bronchus", "Right inferior lobar bronchus", "Intermediate bronchus.r", "Middle lobar bronchus.r"], "unir_lados": true, "color": [0.82, 0.84, 0.92] },
+    { "id": "pulmon_derecho", "nombre": "Pulmón derecho", "zona": "torax", "grupo": "Aparato respiratorio", "partes": ["Superior lobe of right lung", "Middle lobe of right lung", "Inferior lobe of right lung"], "color": [0.95, 0.66, 0.72] },
+    { "id": "pulmon_izquierdo", "nombre": "Pulmón izquierdo", "zona": "torax", "grupo": "Aparato respiratorio", "partes": ["Superior lobe of left lung", "Inferior lobe of left lung"], "color": [0.95, 0.66, 0.72] },
+
+    { "id": "auricula_derecha", "nombre": "Aurícula derecha", "zona": "torax", "grupo": "Aparato circulatorio", "partes": ["Right atrium"], "color": [0.45, 0.52, 0.88] },
+    { "id": "ventriculo_derecho", "nombre": "Ventrículo derecho", "zona": "torax", "grupo": "Aparato circulatorio", "partes": ["Right ventricle"], "color": [0.38, 0.45, 0.85] },
+    { "id": "auricula_izquierda", "nombre": "Aurícula izquierda", "zona": "torax", "grupo": "Aparato circulatorio", "partes": ["Left atrium"], "color": [0.9, 0.32, 0.32] },
+    { "id": "ventriculo_izquierdo", "nombre": "Ventrículo izquierdo", "zona": "torax", "grupo": "Aparato circulatorio", "partes": ["Left ventricle"], "color": [0.82, 0.22, 0.22] },
+    { "id": "aorta", "nombre": "Arteria aorta", "zona": "torax", "grupo": "Aparato circulatorio", "partes": ["Ascending aorta", "Aortic arch", "Thoracic aorta", "Abdominal aorta"], "color": [0.86, 0.16, 0.16] },
+    { "id": "arteria_pulmonar", "nombre": "Arteria pulmonar", "zona": "torax", "grupo": "Aparato circulatorio", "partes": ["Pulmonary trunk", "Bifurcation of pulmonary trunk"], "color": [0.35, 0.45, 0.9] },
+    { "id": "vena_cava_superior", "nombre": "Vena cava superior", "zona": "torax", "grupo": "Aparato circulatorio", "partes": ["Superior vena cava"], "color": [0.3, 0.4, 0.86] },
+    { "id": "vena_cava_inferior", "nombre": "Vena cava inferior", "zona": "abdomen", "grupo": "Aparato circulatorio", "partes": ["Inferior vena cava (thoracic part)", "Inferior vena cava (abdominal part)"], "color": [0.3, 0.4, 0.86] },
+
+    { "id": "rinon", "nombre": "Riñón", "zona": "abdomen", "grupo": "Aparato excretor", "procedural": "rinon", "partes": ["Kidney"], "color": [0.62, 0.25, 0.22] },
+    { "id": "ureter", "nombre": "Uréter", "zona": "abdomen", "grupo": "Aparato excretor", "partes": ["Ureter"], "color": [0.96, 0.86, 0.5] },
+    { "id": "vejiga", "nombre": "Vejiga urinaria", "zona": "abdomen", "grupo": "Aparato excretor", "partes": ["Urinary bladder"], "color": [0.96, 0.8, 0.58] },
+    { "id": "uretra", "nombre": "Uretra", "zona": "abdomen", "grupo": "Aparato excretor", "partes": ["Urethra"], "color": [0.96, 0.86, 0.5] },
+
+    { "id": "tiroides", "nombre": "Glándula tiroides", "zona": "cabeza", "grupo": "Sistema endocrino", "partes": ["Thyroid gland"], "color": [0.78, 0.32, 0.42] },
+    { "id": "suprarrenal", "nombre": "Glándula suprarrenal", "zona": "abdomen", "grupo": "Sistema endocrino", "partes": ["Suprarenal gland"], "color": [0.96, 0.75, 0.3] },
+    { "id": "bazo", "nombre": "Bazo", "zona": "abdomen", "grupo": "Sistema linfático", "partes": ["Spleen"], "color": [0.52, 0.2, 0.36] },
+    { "id": "timo", "nombre": "Timo", "zona": "torax", "grupo": "Sistema linfático", "partes": ["Left lobe of thymus", "Right lobe of thymus"], "unir_lados": true, "color": [0.96, 0.8, 0.7] }
+  ]
+}

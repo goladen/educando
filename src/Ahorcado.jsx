@@ -6,6 +6,7 @@ import { guardarRegistroLocal } from './utils/registrosLocales';
 import Confetti from 'react-confetti';
 import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
+import BotonPdfRecurso from './components/BotonPdfRecurso';
 
 // --- CONFIGURACIÓN DE IDIOMAS (igual que Wordle / Sopa) ---
 const LANGUAGES = {
@@ -952,6 +953,7 @@ export default function Ahorcado({ usuario, onExit, recurso }) {
                             <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
                                 <button onClick={() => procesarRecurso(r)} style={{ ...styles.miniPlayBtn, flex: 1 }}>JUGAR</button>
                                 <button onClick={e => { e.stopPropagation(); compartirRecurso(r.id, r.titulo); }} title="Compartir" style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid #81c784', background: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#2e7d32' }}><Share2 size={13} /></button>
+                                <BotonPdfRecurso recurso={r} texto="" style={{ padding: '5px 8px', borderRadius: 6 }} />
                             </div>
                         </div>
                     ))}

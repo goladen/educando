@@ -92,7 +92,7 @@ const GENERADORES_NUM = {
 // Formato: bloques separados por línea en blanco; 1ª línea = pregunta,
 // siguientes = opciones (2-4); la correcta empieza por * (si no, la primera).
 // Con respuesta numérica basta una línea con el número.
-function leerPropias(texto, numerico = false) {
+export function leerPropias(texto, numerico = false) {
   return texto
     .split(/\n\s*\n/)
     .map((bloque) => bloque.split('\n').map((l) => l.trim()).filter(Boolean))
@@ -113,7 +113,7 @@ function leerPropias(texto, numerico = false) {
     .filter((p) => (numerico ? p.valor !== null : p.opciones.length >= 2));
 }
 
-const EJEMPLO_PROPIAS = `¿Cuál es la capital de Francia?
+export const EJEMPLO_PROPIAS = `¿Cuál es la capital de Francia?
 *París
 Roma
 Berlín

@@ -65,6 +65,8 @@ export const JUEGOS_REGISTRO_META = {
     JEOPARDY:            { nombre: 'Money Board',         emoji: '💰', color: '#2563eb' },
     LENGUA:              { nombre: 'Lengua',              emoji: '📖', color: '#3498db' },
     CALCULADORA:         { nombre: 'Calculadora',         emoji: '🧮', color: '#0f766e' },
+    QUIZ_MANOS:          { nombre: 'Quiz con los dedos',  emoji: '✋', color: '#7c3aed' },
+    MBOT_RETOS:          { nombre: 'Retos del mBot2',     emoji: '🚗', color: '#0284c7' },
 };
 
 export const metaDe = (tipo) => JUEGOS_REGISTRO_META[tipo] || { nombre: tipo, emoji: '🎮', color: '#718093' };

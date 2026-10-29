@@ -7,6 +7,7 @@ import QuizMandos from './QuizMandos';
 import PistaRobotsMandos from './PistaRobotsMandos.jsx';
 import DibujoMandos from './DibujoMandos.jsx';
 import { BotonTutorialMandos } from './TutorialMandos.jsx';
+import ChipAntena from './ChipAntena.jsx';
 // El partido de fútbol carga three.js: va aparte (lazy) para no engordar el panel
 const FutbolMandos = lazy(() => import('../futbol3d/FutbolMandos.jsx'));
 import {
@@ -48,6 +49,7 @@ export default function MandosMicrobit({ onExit }) {
   const [mensajes, setMensajes] = useState([]);
   const [vistos, setVistos] = useState({}); // id → { letra, t, simulado }
   const [codigoVisible, setCodigoVisible] = useState(null); // 'antena' | 'mando'
+  const [verConfig, setVerConfig] = useState(false); // instalación y grabado: plegados (se hace una vez para todo el centro)
   const [, setReloj] = useState(0);
 
   const log = (texto, tipo = 'info') =>
@@ -148,11 +150,6 @@ export default function MandosMicrobit({ onExit }) {
 
   const listaVistos = Object.values(vistos).sort((a, b) => a.id - b.id);
   const hace = (t) => Math.max(0, Math.round((Date.now() - t) / 1000));
-  const chip = estado.antenaOk
-    ? { txt: `📡 Antena lista · grupo ${estado.grupo}`, bg: '#16a34a' }
-    : estado.conectada
-      ? { txt: '🟡 Puerto abierto, la antena no responde', bg: '#ca8a04' }
-      : { txt: '⚪ Antena sin conectar', bg: '#475569' };
 
   return (
     <div style={st.wrapper}>
@@ -164,7 +161,7 @@ export default function MandosMicrobit({ onExit }) {
         )}
         <span style={{ fontSize: 24 }}>🎮</span>
         <h2 style={st.title}>Mandos micro:bit</h2>
-        <span style={{ ...st.chip, background: chip.bg }}>{chip.txt}</span>
+        <ChipAntena />
       </header>
 
       <div style={st.scroll}>
@@ -194,8 +191,8 @@ export default function MandosMicrobit({ onExit }) {
         </ul>
         {estado.antenaOk && estado.version < VERSION_PROGRAMAS && (
           <div style={st.aviso}>
-            ⚠️ La antena tiene un programa antiguo. Vuelve a pulsar <b>Grabar y conectar antena</b> y graba de nuevo
-            los mandos para tener todos los modos (número, abecedario y mover).
+            ⚠️ La antena tiene un programa antiguo. En <b>⚙️ Configuración e instalación</b>, vuelve a pulsar{' '}
+            <b>Grabar y conectar antena</b> y graba de nuevo los mandos para tener todos los modos.
           </div>
         )}
 
@@ -205,6 +202,41 @@ export default function MandosMicrobit({ onExit }) {
             ordenador. Mientras tanto puedes probar el juego con los mandos virtuales.
           </div>
         )}
+
+        <p style={st.nota}>
+          🏫 Los mandos se preparan <b>una sola vez para todo el centro</b>: después, cualquier profe solo tiene que
+          enchufar la antena, pulsar <b>🔌 Antena desconectada · conectar</b> (arriba) y jugar.
+        </p>
+
+        <button style={st.btnConfig(verConfig)} onClick={() => setVerConfig((v) => !v)} aria-expanded={verConfig}>
+          <span style={{ fontSize: 22, display: 'inline-block', transition: 'transform .3s', transform: verConfig ? 'rotate(90deg)' : 'none' }}>⚙️</span>
+          <span style={{ flex: 1, textAlign: 'left' }}>
+            Configuración e instalación de los mandos
+            <span style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: '#94a3b8' }}>
+              Solo la primera vez (o al añadir mandos nuevos): MicroPython, antena y numerado de los mandos
+            </span>
+          </span>
+          <span style={{ fontSize: 18 }}>{verConfig ? '▲' : '▼'}</span>
+        </button>
+
+        {verConfig && (<>
+        <div style={st.centro}>
+          <h3 style={{ ...st.h3, color: '#fde68a' }}>🏫 Una configuración para todo el centro</h3>
+          <p style={st.p}>
+            La idea es que los mandos sean un <b>recurso del centro</b>, como un carro de portátiles: se configuran
+            <b> una vez</b> (por ejemplo, la persona coordinadora TIC o de robótica) y después <b>sirven para cualquier
+            profe</b> del centro, en cualquier aula y con cualquiera de los juegos, sin volver a grabarlos.
+          </p>
+          <ul style={{ ...st.modos, margin: '0 0 6px' }}>
+            <li><b>Grabadlos una vez</b> con los pasos de abajo: la antena y cada mando con su número (1, 2, 3…).</li>
+            <li><b>Etiquetadlos</b>: una pegatina con el número en cada mando y otra que diga «ANTENA» en la antena.</li>
+            <li><b>Guardadlos juntos</b> en una caja con portapilas y pilas de repuesto. El profe que los use solo
+              necesita la caja, el cable USB de la antena y abrir el juego.</li>
+            <li><b>Si el centro tiene varios kits</b>, dad a cada uno un <b>grupo de radio</b> distinto (el número de
+              abajo) y escribidlo en su caja: así dos clases pueden jugar a la vez sin mezclar respuestas.</li>
+            <li>Solo hay que volver a grabarlos cuando PiKT lo avise (aparece ⚠️ en la antena) por una mejora de los mandos.</li>
+          </ul>
+        </div>
 
         <div style={st.grid}>
           {/* Paso 0 */}
@@ -318,10 +350,11 @@ export default function MandosMicrobit({ onExit }) {
             ))}
           </div>
         )}
+        </>)}
 
         {/* Paso 3: prueba */}
         <section style={{ ...st.card, marginTop: 18 }}>
-          <h3 style={st.h3}>3 · Prueba los mandos</h3>
+          <h3 style={st.h3}>🧪 Prueba los mandos</h3>
           <div style={{ ...st.fila, marginBottom: 12 }}>
             <span style={{ color: '#94a3b8', fontSize: 13 }}>Modo de los mandos:</span>
             {[
@@ -447,6 +480,13 @@ const st = {
   chip: { color: '#fff', fontSize: 13, fontWeight: 700, padding: '5px 12px', borderRadius: 999 },
   scroll: { flex: 1, overflow: 'auto', padding: '20px 16px 40px', maxWidth: 1100, width: '100%', margin: '0 auto', boxSizing: 'border-box' },
   intro: { color: '#cbd5e1', fontSize: 15, lineHeight: 1.55, margin: '0 0 6px' },
+  nota: { color: '#e2e8f0', fontSize: 14, lineHeight: 1.5, margin: '0 0 12px', padding: '8px 12px', borderRadius: 10, background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.35)' },
+  btnConfig: (abierto) => ({
+    display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '12px 16px', marginBottom: 14,
+    borderRadius: 14, border: `1px solid ${abierto ? '#facc15' : '#334155'}`, background: abierto ? 'rgba(250,204,21,0.08)' : 'rgba(255,255,255,0.05)',
+    color: '#f1f5f9', fontWeight: 800, fontSize: 16, cursor: 'pointer', fontFamily: 'inherit',
+  }),
+  centro: { background: 'rgba(250,204,21,0.07)', border: '1px solid rgba(250,204,21,0.4)', borderRadius: 14, padding: '14px 16px', marginBottom: 16 },
   modos: { color: '#cbd5e1', fontSize: 14, lineHeight: 1.6, margin: '0 0 16px', paddingLeft: 22 },
   modoBtn: (on) => ({
     padding: '6px 12px',

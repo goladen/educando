@@ -17,6 +17,8 @@ import { FONDOS, fondoUrl } from './utils/fondos';
 import MusicStaffPanel from './components/MusicStaffPanel';
 const MiniAppCreator = lazy(() => import('./components/MiniAppCreator'));
 const RecortesExtrem = lazy(() => import('./components/RecortesExtrem'));
+const CursorManos = lazy(() => import('./manos/CursorManos.jsx'));
+const QuizManos = lazy(() => import('./manos/QuizManos.jsx'));
 import { db, auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import PizarraAnalisisIA, { ADMIN_EMAIL_IA } from './components/PizarraAnalisisIA';
@@ -842,6 +844,8 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
     const [caminoSonidoLoop, setCaminoSonidoLoop] = useState(true);
     const [capasOpen,      setCapasOpen]      = useState(false);
     const [bancoOpen,      setBancoOpen]      = useState(false);
+    const [manosOn,        setManosOn]        = useState(false);
+    const [quizManos,      setQuizManos]      = useState(false);
     const [bancoCat,       setBancoCat]       = useState(BANCO_IMAGENES[0]?.id || '');
     const playStartRef   = useRef(0);
     const deltaSuaveRef  = useRef(new Map());
@@ -2539,6 +2543,12 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
                     <ImageIcon size={15}/> Banco
                 </button>
 
+                {/* Control a distancia con la mano (webcam + MediaPipe) */}
+                <button onClick={() => setManosOn(v => !v)} title="Controlar la pizarra a distancia con la mano (webcam)"
+                    style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 10px', background: manosOn ? '#16a34a' : '#7c3aed', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:700, fontSize:'0.8rem', whiteSpace:'nowrap' }}>
+                    ✋ {manosOn ? 'Mano activa' : 'Mano'}
+                </button>
+
                 {/* ── GENERAL MODE ── */}
                 {modoPizarra === 'general' && <>
                     <div style={{ display:'flex', gap:3, borderRight:'2px solid #bdc3c7', paddingRight:8 }}>
@@ -3001,6 +3011,12 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
             {calcVisible && <CalculadoraFlotante onClose={() => setCalcVisible(false)} onCopiar={res => { setTextoPegar(res); setHerramienta('paste'); setCalcVisible(false); }} />}
             {grafVisible  && <GraficadoraFlotante onClose={() => setGrafVisible(false)} onInsertar={cfg => { setGraficaConfig(cfg); setHerramienta('graph'); setGrafVisible(false); }} />}
             {showMusicStaff && <MusicStaffPanel onInsert={handleInsertMusicStaff} onClose={() => setShowMusicStaff(false)} />}
+            {(manosOn || quizManos) && (
+                <Suspense fallback={null}>
+                    {manosOn && <CursorManos onClose={() => setManosOn(false)} onAbrirQuiz={quizManos ? null : () => setQuizManos(true)} />}
+                    {quizManos && <QuizManos onExit={() => setQuizManos(false)} />}
+                </Suspense>
+            )}
             {iaAnalisis && esAdminIA && <PizarraAnalisisIA imagenDataURL={iaAnalisis.src} onClose={cerrarAnalisisIA} onAccion={aplicarAccionIA} />}
             {/* ── Banco de imágenes ──────────────────────────────────────── */}
             {bancoOpen && (

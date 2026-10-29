@@ -8,6 +8,8 @@ import { crearAmbiente, vientoEnHierba } from './ovniAmbiente';
 import { generarFichaOvni } from './ovniFicha';
 import ChipAntena from './mandos/ChipAntena.jsx';
 import { useMandosOvni, PanelMandosOvni, PilotoEnJuego } from './ovniMandos.jsx';
+import { escucharManos } from './manos/manosVision.js';
+import VistaManos from './manos/VistaManos.jsx';
 import { db } from './firebase';
 import { doc, getDoc, addDoc, collection } from 'firebase/firestore';
 import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
@@ -413,6 +415,8 @@ export const crearGeneradorPalabras = (categorias, totalRondas) => {
 const LIMITE = 52;           // medio lado del prado donde se mueven nave y animales
 const ALTURA_OVNI = 8;
 const RADIO_RAYO = 3.4;      // distancia horizontal para poder abducir
+const MANO_ZONA_MUERTA = 0.04; // mano con la webcam: margen en el centro sin moverse
+const MANO_RECORRIDO = 0.18;   // desplazamiento de la palma para ir a tope
 const ESCALA_ANIMAL = 1.3;
 const ANIMALES_POR_RONDA = 8;
 const VIDAS = 3;
@@ -1138,14 +1142,14 @@ export function crearMotor(contenedor, opciones, cb) {
     // Modo V (volante, programas v6): dirección mientras el mando sigue inclinado. El mando la
     // repite cada 300 ms; si deja de llegar (radio perdida) se para sola a los 1,2 s.
     const inclinaciones = jugadores.map(() => null);
-    const setInclinacion = (idx, x, z) => {
+    const setInclinacion = (idx, x, z, analogica = false) => {
         if (!jugadores[idx]) return;
-        inclinaciones[idx] = x || z ? { x, z, hasta: reloj.getElapsed() + 1.2 } : null;
+        inclinaciones[idx] = x || z ? { x, z, analogica, hasta: reloj.getElapsed() + 1.2 } : null;
         if (!x && !z) impulsos[idx] = null;
     };
     const entrada = (idx) => {
         const inc = inclinaciones[idx];
-        if (inc && reloj.getElapsed() < inc.hasta) { const l = Math.hypot(inc.x, inc.z); return { x: inc.x / l, z: inc.z / l }; }
+        if (inc && reloj.getElapsed() < inc.hasta) { const l = Math.hypot(inc.x, inc.z); return inc.analogica && l <= 1 ? { x: inc.x, z: inc.z } : { x: inc.x / l, z: inc.z / l }; }
         const imp = impulsos[idx];
         if (imp && reloj.getElapsed() < imp.hasta) return { x: imp.x, z: imp.z };
         const joy = joys[idx];
@@ -1676,7 +1680,47 @@ const JuegoOvni = ({ generarRonda, rondas, animo, nombres, mandos = null, ctrl =
     useEffect(() => { motorRef.current?.setInclinacion(0, 0, 0); }, [piloto0]);
     useEffect(() => { motorRef.current?.setInclinacion(1, 0, 0); }, [piloto1]);
 
+    // ── Mano con la webcam: la palma mueve la nave (más lejos del centro = más rápido)
+    // y al cerrar el puño abduce. Con 2 jugadores, cada uno en su mitad de la cámara.
+    const conMano = !!mandos?.mano;
+    useEffect(() => {
+        if (!conMano) return undefined;
+        const st = [0, 1].map(() => ({ vista: false, cerrado: false, frames: 0, tAbd: 0 }));
+        const eje = (d) => Math.sign(d) * Math.min(1, Math.max(0, (Math.abs(d) - MANO_ZONA_MUERTA) / MANO_RECORRIDO));
+        const baja = escucharManos((manos) => {
+            const motor = motorRef.current;
+            if (!motor) return;
+            const porJug = nJug === 2
+                ? [manos.find(m => m.centro.x < 0.5) || null, manos.find(m => m.centro.x >= 0.5) || null]
+                : [manos[0] || null];
+            const ahora = performance.now();
+            porJug.forEach((m, i) => {
+                const s = st[i];
+                if (!m) {
+                    if (s.vista) motor.setInclinacion(i, 0, 0);
+                    s.vista = false; s.cerrado = false; s.frames = 0;
+                    return;
+                }
+                s.vista = true;
+                // puño confirmado en 3 fotogramas seguidos (evita abducir por un parpadeo del detector)
+                s.frames = m.dedos === 0 ? s.frames + 1 : 0;
+                const cerrado = s.frames >= 3;
+                if (cerrado) {
+                    motor.setInclinacion(i, 0, 0); // la nave se queda quieta mientras abduce
+                    if (!s.cerrado && ahora - s.tAbd > 600) { motor.abducir(i); s.tAbd = ahora; }
+                } else if (m.dedos > 0) {
+                    const cx = nJug === 2 ? (i === 0 ? 0.25 : 0.75) : 0.5;
+                    const escala = nJug === 2 ? 1.6 : 1;
+                    motor.setInclinacion(i, eje((m.centro.x - cx) * escala), eje((m.centro.y - 0.5) * escala), true);
+                }
+                s.cerrado = cerrado;
+            });
+        });
+        return () => { baja(); motorRef.current?.setInclinacion(0, 0, 0); motorRef.current?.setInclinacion(1, 0, 0); };
+    }, [conMano, nJug]);
+
     const pista = (i) => {
+        if (conMano) return <>✋ mueve la mano · <b style={{ color: VERDE }}>✊ cierra el puño</b> para abducir</>;
         if (mandos?.activos) return <>inclina para mover · <b style={{ color: VERDE }}>agita o A</b> abducir</>;
         if (!duo) return <><b style={{ color: NEON }}>WASD / flechas</b> mover · <b style={{ color: VERDE }}>Espacio</b> abducir</>;
         return i === 0
@@ -1774,6 +1818,15 @@ const JuegoOvni = ({ generarRonda, rondas, animo, nombres, mandos = null, ctrl =
                     </div>
                 );
             })}
+
+            {/* Cámara de la mano (abajo en el centro, entre los botones) */}
+            {conMano && (
+                <div style={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 3, pointerEvents: 'none', opacity: 0.92 }}>
+                    <VistaManos ancho={duo ? 220 : 180} lineaCentral={duo}
+                        colorMano={(m) => (duo ? COLORES_JUGADOR[m.centro.x < 0.5 ? 0 : 1].css : NEON)}
+                        style={{ border: `2px solid ${NEON}88`, borderRadius: 12 }} />
+                </div>
+            )}
 
             {/* Cartel de inicio de ronda / ronda completada */}
             {(cartelRonda || avisoRonda) && (
@@ -2234,6 +2287,7 @@ export default function OvniAbduccion({ onExit }) {
                         <h3 style={h3}>Mandos</h3>
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                             <button onClick={() => cambiarMandos({ activos: !mandos.activos })} style={{ ...estiloBtn(mandos.activos, '#facc15'), textAlign: 'center' }}>🎮 Mandos micro:bit</button>
+                            <button onClick={() => cambiarMandos({ mano: !mandos.mano })} style={{ ...estiloBtn(!!mandos.mano, '#22c55e'), textAlign: 'center' }}>✋ Mano (cámara)</button>
                         </div>
                     </div>
                     <div>
@@ -2271,6 +2325,20 @@ export default function OvniAbduccion({ onExit }) {
                     <PanelMandosOvni ctrl={ctrlMandos} duo={modo === 'duo'} colores={COLORES_JUGADOR.map(c => c.css)}
                         invertir={mandos.invertir} onInvertir={v => cambiarMandos({ invertir: v })}
                         turnos={mandos.turnos} onTurnos={v => cambiarMandos({ turnos: v })} />
+                )}
+
+                {mandos.mano && (
+                    <div style={{ marginTop: 16, display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center', border: '2px solid #22c55e66', borderRadius: 14, padding: 12, background: 'rgba(34,197,94,0.06)' }}>
+                        <VistaManos ancho={240} lineaCentral={modo === 'duo'}
+                            colorMano={(m) => (modo === 'duo' ? COLORES_JUGADOR[m.centro.x < 0.5 ? 0 : 1].css : NEON)} />
+                        <div style={{ flex: '1 1 240px', color: '#cbd5e1', fontSize: '0.9rem', lineHeight: 1.5 }}>
+                            <b style={{ color: '#22c55e' }}>✋ Pilotar con la mano</b><br />
+                            Pon la palma delante de la cámara: en el centro la nave se queda quieta; muévela hacia un lado y la nave va hacia allí (cuanto más lejos, más rápido).
+                            <b style={{ color: VERDE }}> Cierra el puño</b> encima de un animal para abducirlo.
+                            {modo === 'duo' && <><br />Con 2 jugadores, cada uno en su mitad de la cámara (la línea discontinua): izquierda = nave {COLORES_JUGADOR[0].nombre}, derecha = nave {COLORES_JUGADOR[1].nombre}.</>}
+                            <br /><span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>Todo se procesa en este ordenador: no se envía ninguna imagen.</span>
+                        </div>
+                    </div>
                 )}
 
                 <div style={{ textAlign: 'center', marginTop: 28 }}>

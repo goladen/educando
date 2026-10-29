@@ -95,6 +95,7 @@ const QuienEsQuienHistorico = lazy(() => import('../QuienEsQuienHistorico'));
 const BiologiaApp = lazy(() => import('./BiologiaApp'));
 const HerramientasClase = lazy(() => import('../GestionAula'));
 const PizarraApp = lazy(() => import('../GestionAula').then(m => ({ default: m.PizarraApp })));
+const QuizManos = lazy(() => import('../manos/QuizManos.jsx'));
 const AlgebraApp = lazy(() => import('../Algebra'));
 const VistasDidricas = lazy(() => import('../VistasDidricas'));
 const MiniAppCreator = lazy(() => import('./MiniAppCreator'));
@@ -1201,6 +1202,14 @@ export const GAME_INFO = {
         materias: ['Historia', 'Geografía', 'Ciencias Sociales'],
         etapas: ['Primaria', 'ESO', 'Bachillerato'],
     },
+    QUIZ_MANOS: {
+        descripcion: 'Quiz que se responde con la mano delante de la webcam: levantar 1, 2, 3 o 4 dedos (sin el pulgar) y mantenerlos un segundo elige la opción A, B, C o D. El reconocimiento de manos (MediaPipe) se hace en el propio navegador: no se envía ninguna imagen. También se abre desde la Pizarra temática, donde el botón «✋ Mano» permite manejar la pizarra a distancia (mover un cursor y hacer clic o dibujar juntando pulgar e índice).',
+        tipoPreguntas: 'Opción múltiple (2-4 opciones): tablas de multiplicar, sumas y restas generadas al azar, preguntas propias escritas en el momento o cualquier recurso con preguntas de opción múltiple.',
+        biblioteca: 'Sí: generadores de tablas y sumas/restas + recursos públicos y propios.',
+        multiplayer: '1 jugador, o 2 jugadores a la vez (cada uno a un lado de la cámara). Puntos por acierto y rapidez; el resultado se guarda en «Mis registros».',
+        materias: ['Universal', 'Matemáticas'],
+        etapas: ['Primaria', 'ESO'],
+    },
     PIZARRA_TEMATICA: {
         descripcion: 'Pizarra temática con modos General, Música, Geografía y Animación. Dibuja a mano, formas, texto e imágenes en hasta 5 capas, inserta imágenes del banco (vehículos, planetas, anatomía…), y anima cualquier elemento haciéndolo seguir un camino con giro, tiempo, bucle y sonido. Es la misma pizarra que hay dentro de Gestión de Aula. Se puede compartir en tiempo real.',
         tipoPreguntas: 'Herramienta de dibujo y animación por capas; sin preguntas.',
@@ -1812,6 +1821,7 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
                 if (juegoParam.toLowerCase() === 'quienesquien')   { setQuienEsQuienApp(true); return; }
                 if (juegoParam.toLowerCase() === 'quienhistorico') { setQuienHistoricoApp(true); return; }
                 if (juegoParam.toLowerCase() === 'pizarra')        { setPizarraApp(true);     return; }
+                if (juegoParam.toLowerCase() === 'manos')          { setQuizManosApp(true);   return; }
                 if (juegoParam.toLowerCase() === 'biologia')       { setBiologiaApp(true);    return; }
                 if (juegoParam.toLowerCase() === 'sintaxis' || juegoParam.toLowerCase() === 'lengua') { setJuegoActivo({ tipoJuego: 'SINTAXIS' }); return; }
                 if (juegoParam.toLowerCase() === 'vistas_didricas') { setVistasDidricas(true); return; }
@@ -2009,6 +2019,7 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
     const [quienEsQuienApp,     setQuienEsQuienApp]     = useState(false);
     const [quienHistoricoApp,   setQuienHistoricoApp]   = useState(false);
     const [pizarraApp,          setPizarraApp]          = useState(false);
+    const [quizManosApp,        setQuizManosApp]        = useState(false);
     const [biologiaApp,         setBiologiaApp]         = useState(false);
     const [visor3dApp,          setVisor3dApp]          = useState(false);
     const [esculpirApp,         setEsculpirApp]         = useState(false);
@@ -2047,6 +2058,7 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
     useEffect(() => { if (!quienEsQuienApp) refrescarRegistros(); }, [quienEsQuienApp]);
     useEffect(() => { if (!quienHistoricoApp) refrescarRegistros(); }, [quienHistoricoApp]);
     useEffect(() => { if (!esculpirApp) refrescarRegistros(); }, [esculpirApp]);
+    useEffect(() => { if (!quizManosApp) refrescarRegistros(); }, [quizManosApp]);
     const totalRegistros = resumenRegistros.reduce((s, g) => s + g.count, 0);
     const [miAvatar] = useAvatarLocal();
     // Mapeo id-de-tarjeta → tipo-de-registro cuando no coinciden.
@@ -2466,6 +2478,7 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
             QUIEN_ES_QUIEN:     () => setQuienEsQuienApp(true),
             QUIEN_HISTORICO:    () => setQuienHistoricoApp(true),
             PIZARRA_TEMATICA:   () => setPizarraApp(true),
+            QUIZ_MANOS:         () => setQuizManosApp(true),
             BIOLOGIA:           () => setBiologiaApp(true),
             GESTION_AULA:       () => setGestionAula(true),
             VISTAS_DIDRICAS:    () => setVistasDidricas(true),
@@ -2666,6 +2679,7 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
     if (quienHistoricoApp) return (
         <QuienEsQuienHistorico onExit={() => { setQuienHistoricoApp(false); window.history.pushState({}, '', '/'); }} />
     );
+    if (quizManosApp) return <Suspense fallback={null}><QuizManos onExit={() => { setQuizManosApp(false); window.history.pushState({}, '', '/'); }} /></Suspense>;
     if (pizarraApp) return (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#f1f5f9', overflow: 'auto', padding: '54px 12px 20px' }}>
             <button onClick={() => { setPizarraApp(false); window.history.pushState({}, '', '/'); }}
@@ -3915,6 +3929,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                     { id: 'QUIEN_ES_QUIEN',      label: '¿Quién es quién?',     emoji: '🕵️', color: '#7c3aed', action: () => { setQuienEsQuienApp(true); window.history.pushState({}, '', '/quienesquien'); }, shareable: true, shareUrl: `${window.location.origin}/quienesquien` },
                     { id: 'QUIEN_HISTORICO',     label: '¿Quién es quién? histórico', emoji: '🧐', color: '#8e44ad', action: () => { setQuienHistoricoApp(true); window.history.pushState({}, '', '/quienhistorico'); }, shareable: true, shareUrl: `${window.location.origin}/quienhistorico` },
                     { id: 'PIZARRA_TEMATICA',    label: 'Pizarra temática',     emoji: '🎬', color: '#0ea5e9', action: () => { setPizarraApp(true); window.history.pushState({}, '', '/pizarra'); }, shareable: true, shareUrl: `${window.location.origin}/pizarra` },
+                    { id: 'QUIZ_MANOS',          label: 'Quiz con los dedos',   emoji: '✋', color: '#7c3aed', action: () => { setQuizManosApp(true); window.history.pushState({}, '', '/manos'); }, shareable: true, shareUrl: `${window.location.origin}/manos` },
                     { id: 'BIOLOGIA',            label: 'Biología',             emoji: '🔬', color: '#16a34a', action: () => setBiologiaApp(true),  shareable: true },
                     { id: 'GESTION_AULA', label: 'Gestión Aula', emoji: '🏫', color: '#e67e22', action: () => setGestionAula(true), shareable: true, shareUrl: `${window.location.origin}${window.location.pathname}?gestion=menu` },
                     { id: 'VISTAS_DIDRICAS', label: 'Vistas Diédricas', emoji: '📐', color: '#7c3aed', action: () => setVistasDidricas(true), shareable: true },

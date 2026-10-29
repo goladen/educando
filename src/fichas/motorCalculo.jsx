@@ -1,6 +1,8 @@
 import React from 'react';
 import { generarProblema } from '../CalculoMental';
 import { generarProblemasNumeros, textoRespuestaNum, leerNumeroEs } from '../generadorProblemasNumeros';
+import { generarColumna, construirColumna, claveColumna, resultadoColumna } from '../utils/calculoColumna';
+import OperacionColumna from '../components/OperacionColumna';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Motor de CÁLCULO MENTAL para las fichas imprimibles (ver FichasImprimibles.jsx)
@@ -42,6 +44,18 @@ const CAT_PROB = { probNaturales: 'naturales', probEnteros: 'enteros', probDecim
 const esProblema = (tipo) => !!CAT_PROB[tipo];
 const esComb = (ap) => ap.tipo === 'combinadas' || ap.tipo === 'combEnteros';
 
+// Operaciones en columna (método clásico): formato elegido con las categorías del ejercicio (catProb)
+const OP_COLUMNA = { suma: 'suma', resta: 'resta', mult: 'mult', div: 'div' };
+const FORMATOS = {
+    suma: [['linea', '➡️ En línea'], ['columna', '🧱 En columna'], ['columnaDec', '🧱 En columna · decimales']],
+    resta: [['linea', '➡️ En línea'], ['columna', '🧱 En columna'], ['columnaDec', '🧱 En columna · decimales']],
+    mult: [['linea', '➡️ En línea'], ['columna', '🧱 En columna']],
+    div: [['linea', '➡️ En línea (exactas)'], ['columna', '🧱 En columna (con resto)'], ['columnaExacta', '🧱 En columna (exactas)']],
+};
+const enColumna = (ej) => !!OP_COLUMNA[ej.tipo] && String(ej.catProb || '').startsWith('columna');
+const esCol = (ap) => !!ap.columna;
+const celdaDe = (size) => Math.round((parseFloat(size) || 1.3) * 16 * 1.15);
+
 // Configuración de generarProblema (CalculoMental) para cada tipo y nivel
 const OPS_NO = { suma: false, resta: false, multiplicacion: false, division: false, combinadas: false };
 const TODAS = { suma: true, resta: true, multiplicacion: true, division: true, combinadas: false };
@@ -69,6 +83,18 @@ const generarApartados = (ej, n, existentes = []) => {
         return generarProblemasNumeros([CAT_PROB[ej.tipo]], n, ej.nivel, existentes.map(a => a.problema))
             .map(p => ({ tipo: ej.tipo, problema: p }));
     }
+    if (enColumna(ej)) {
+        const opts = { decimales: ej.catProb === 'columnaDec', exacta: ej.catProb === 'columnaExacta' };
+        const vistos = new Set(existentes.map(a => (a.columna ? claveColumna(a.columna) : a.text)));
+        const out = [];
+        for (let i = 0; out.length < n && i < n * 40; i++) {
+            const d = generarColumna(OP_COLUMNA[ej.tipo], ej.nivel, opts);
+            if (vistos.has(claveColumna(d))) continue;
+            vistos.add(claveColumna(d));
+            out.push({ tipo: ej.tipo, columna: d });
+        }
+        return out;
+    }
     const cfg = cfgDe(ej.tipo, ej.nivel);
     const vistos = new Set(existentes.map(a => a.text));
     const out = [];
@@ -82,7 +108,9 @@ const generarApartados = (ej, n, existentes = []) => {
 };
 
 // ─── Enunciado / solución ────────────────────────────────────────────────────
-const Enunciado = ({ ap, size = '1.4rem' }) => {
+const Enunciado = ({ ap, size = '1.4rem', marca }) => {
+    // En la pizarra (marca = { vis }) se van rellenando las casillas paso a paso
+    if (esCol(ap)) return <OperacionColumna lay={construirColumna(ap.columna)} celda={celdaDe(size)} modo={marca ? 'solucion' : 'vacio'} vis={marca?.vis ?? 0} colorSol={ROJO} />;
     if (esProblema(ap.tipo)) {
         return <p style={{ margin: 0, fontSize: `calc(${size} * 0.62)`, lineHeight: 1.5, color: '#2c3e50', fontWeight: 600 }}>{ap.problema?.texto}</p>;
     }
@@ -90,6 +118,15 @@ const Enunciado = ({ ap, size = '1.4rem' }) => {
 };
 
 const Solucion = ({ ap }) => {
+    if (esCol(ap)) {
+        const r = resultadoColumna(ap.columna);
+        return (
+            <div>
+                <OperacionColumna lay={construirColumna(ap.columna)} celda={celdaDe('1.2rem')} modo="solucion" cuadricula={false} />
+                {ap.columna.op === 'div' && <div style={{ color: '#c0392b', fontSize: '0.8rem', fontWeight: 800, marginTop: 2 }}>c = {r.cociente} · r = {r.resto}</div>}
+            </div>
+        );
+    }
     if (esProblema(ap.tipo)) {
         const p = ap.problema;
         return (
@@ -109,19 +146,25 @@ const Solucion = ({ ap }) => {
 
 // ─── Pizarra ─────────────────────────────────────────────────────────────────
 const pasosMax = (ap) => {
+    if (esCol(ap)) return construirColumna(ap.columna).pasos; // una columna / fila / cifra del cociente por clic
     if (esProblema(ap.tipo)) return (ap.problema?.preguntas.length || 0) + 1;
     if (esComb(ap) && ap.pasos) return ap.pasos.length - 1; // una línea por clic
     return 1;
 };
 
 const RespuestaInline = ({ ap, vis, size }) => (
-    !esProblema(ap.tipo) && !(esComb(ap) && ap.pasos) && vis >= 1
+    !esProblema(ap.tipo) && !esCol(ap) && !(esComb(ap) && ap.pasos) && vis >= 1
         ? <span style={{ fontSize: `calc(${size} * 0.85)`, fontWeight: 900, color: ROJO }}>{fmt(ap.displayAnswer)}</span>
         : null
 );
 
 const Revelado = ({ ap, vis, size, zoom }) => {
     if (vis < 1) return null;
+    if (esCol(ap)) {
+        if (ap.columna.op !== 'div' || vis < construirColumna(ap.columna).pasos) return null;
+        const r = resultadoColumna(ap.columna);
+        return <div style={{ marginTop: 8, fontSize: `${1.05 * zoom}rem`, fontWeight: 800, color: '#2c3e50' }}>Cociente <span style={{ color: ROJO }}>{r.cociente}</span> · Resto <span style={{ color: ROJO }}>{r.resto}</span></div>;
+    }
     if (esComb(ap) && ap.pasos) return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10, paddingLeft: 10 }}>
             {ap.pasos.slice(1, vis + 1).map((p, i) => (
@@ -163,6 +206,11 @@ const respuestas = (ap) => {
             comprobar: q.tipo === 'opcion' ? (o) => ({ ok: o === q.r }) : comprobarNumero(q.r),
         }));
     }
+    if (esCol(ap)) {
+        const r = resultadoColumna(ap.columna);
+        if (ap.columna.op === 'div') return [{ etiqueta: 'Cociente', tipo: 'num', comprobar: comprobarNumero(r.cociente) }, { etiqueta: 'Resto', tipo: 'num', comprobar: comprobarNumero(r.resto) }];
+        return [{ tipo: 'num', comprobar: comprobarNumero(r) }];
+    }
     return [{ tipo: 'num', comprobar: comprobarNumero(ap.answer) }];
 };
 
@@ -179,13 +227,20 @@ export const motorCalculo = {
     ejercicioNuevo: { tipo: 'probDecimales', nivel: 2, n: 2 },
     layout: (ej) => {
         if (esProblema(ej.tipo)) return { cols: 1, alto: 190 };
+        if (enColumna(ej)) {
+            if (ej.tipo === 'div') return { cols: ej.nivel === 1 ? 3 : 2, alto: 14 };
+            if (ej.tipo === 'mult') return { cols: 3, alto: 14 };
+            return { cols: ej.nivel === 3 || ej.catProb === 'columnaDec' ? 3 : 4, alto: 14 };
+        }
         if (ej.tipo === 'combinadas' || ej.tipo === 'combEnteros') return ej.nivel === 3 ? { cols: 1, alto: 150 } : { cols: 2, alto: 130 };
         return { cols: 3, alto: 40 };
     },
     generarApartados,
-    maxApartados: (ej) => (esProblema(ej.tipo) ? 8 : 15),
+    maxApartados: (ej) => (esProblema(ej.tipo) ? 8 : enColumna(ej) ? 12 : 15),
     usaNivel: () => true,
-    esTexto: (ap) => esProblema(ap.tipo),
+    esTexto: (ap) => esProblema(ap.tipo) || esCol(ap),
+    categorias: (tipo) => FORMATOS[tipo] || null,
+    marcaEnunciado: (ap, vis) => (esCol(ap) ? { vis } : null),
     sizeHoja: () => '1.3rem',
     Enunciado, Solucion, pasosMax, RespuestaInline, Revelado, respuestas,
 };

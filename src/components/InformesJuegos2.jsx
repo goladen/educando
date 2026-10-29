@@ -2007,7 +2007,7 @@ const CalculoCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, selecc
 
     const opsActivas = cfg.operaciones
         ? Object.entries(cfg.operaciones).filter(([,v]) => v).map(([k]) =>
-            ({ suma: '➕', resta: '➖', multiplicacion: '✖️', division: '➗', combinadas: '🧮 combinadas', problemas: '📖 problemas' }[k] || k))
+            ({ suma: '➕', resta: '➖', multiplicacion: '✖️', division: '➗', combinadas: '🧮 combinadas', problemas: '📖 problemas', columna: '🧱 en columna' }[k] || k))
         : [];
     const tiposActivos = cfg.tipos
         ? Object.entries(cfg.tipos).filter(([,v]) => v).map(([k]) =>
@@ -2095,7 +2095,7 @@ const CalculoCard = ({ inf, onBorrar, borrando, borradoOk, modoSeleccion, selecc
 const TIPOS_FRAC_LABEL = {
     identificar: '👁 Identificar', equivalente: '≡ Equivalentes', simplificar: '✂️ Simplificar',
     suma: '➕ Suma', resta: '➖ Resta', mult: '✖️ Multiplicar', div: '➗ Dividir',
-    pot: 'xⁿ Potencia', raiz: '√ Raíz', combinadas: '🧮 Combinadas', problemas: '📖 Problemas',
+    pot: 'xⁿ Potencia', raiz: '√ Raíz', combinadas: '🧮 Combinadas', problemas: '📖 Problemas', columna: '🧱 En columna',
 };
 const NIVEL_FRAC_LABEL = { 1: '👶 Fácil', 2: '🤓 Medio', 3: '🔥 Difícil' };
 

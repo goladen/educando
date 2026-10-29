@@ -123,6 +123,57 @@ async function bucleLectura() {
   }
 }
 
+/** Espera la respuesta {"ret"…} / {"err"…} de la última trama (acumulado se vacía antes de enviar). */
+async function esperarRespuesta(ms = 1500) {
+  for (let t = 0; t < ms; t += 50) {
+    const m = acumulado.match(/\{"(ret|err)"[^}]*\}/);
+    if (m) return m[0];
+    await dormir(50);
+  }
+  return null;
+}
+
+/**
+ * Guarda un archivo en la placa por trozos. Probado con el firmware 44.01: una trama
+ * con más de ~240 bytes de python se ignora o reinicia el intérprete, así que cada
+ * trama lleva como mucho MAX_TRAMA_PY bytes.
+ */
+const MAX_TRAMA_PY = 220;
+async function subirArchivo(nombre, texto) {
+  let pos = 0;
+  let modoArchivo = 'w';
+  while (pos < texto.length) {
+    let n = Math.min(170, texto.length - pos);
+    let py;
+    for (;;) {
+      py = `f=open('${nombre}','${modoArchivo}')\nf.write(${JSON.stringify(texto.slice(pos, pos + n))})\nf.close()`;
+      if (ENC.encode(py).length <= MAX_TRAMA_PY || n <= 10) break;
+      n -= 10;
+    }
+    acumulado = '';
+    await escribir(tramaCyberpi(py));
+    const r = await esperarRespuesta();
+    if (!r || r.startsWith('{"err"')) throw new Error(r || 'La placa no confirmó la escritura del archivo.');
+    // {"ret"} llega ANTES de que termine de ejecutarse: si la siguiente trama entra
+    // enseguida, interrumpe la escritura (se perdía el último trozo).
+    await dormir(250);
+    pos += n;
+    modoArchivo = 'a';
+  }
+}
+
+/** Tamaño en bytes de un archivo de la placa (lo imprime por serie), o -1. */
+async function tamanoArchivo(nombre) {
+  acumulado = '';
+  await escribir(tramaCyberpi(`import os\ntry:\n    print('TAM=' + str(os.stat('${nombre}')[6]))\nexcept:\n    print('TAM=-1')`));
+  for (let t = 0; t < 2000; t += 50) {
+    const m = acumulado.match(/TAM=(-?\d+)/);
+    if (m) return Number(m[1]);
+    await dormir(50);
+  }
+  return -1;
+}
+
 /** Sondea con una trama vacía hasta que el gestor de tramas responda. */
 async function esperarListo(intentos = 24) {
   const sonda = tramaCyberpi('pass');
@@ -263,10 +314,15 @@ export async function desconectarCyberpi() {
   emitir({ estado: 'desconectado', error: '' });
 }
 
-/** Potencia de cada rueda, -100 … 100. Se envía sola (limitada en frecuencia). */
+/**
+ * Potencia de cada rueda, -100 … 100 (positivo = hacia delante). Se envía sola
+ * (limitada en frecuencia). drive_power es «en bruto» y los motores del mBot2 van en
+ * espejo: para avanzar la derecha va en negativo (comprobado con los encoders:
+ * drive_power(30, 30) gira sobre sí mismo).
+ */
 export function moverMbot(izq, der) {
   const c = (v) => Math.max(-100, Math.min(100, Math.round(v)));
-  deseado = [c(izq), c(der)];
+  deseado = [c(izq), -c(der) || 0];
 }
 
 /** Para el robot YA (sin esperar al siguiente tic). */
@@ -296,22 +352,47 @@ export function setModoCyberpi(m) {
 export const getModoCyberpi = () => modo;
 
 /**
- * Con el CyberPi del ROBOT conectado por USB: le carga PROGRAMA_RECEPTOR y
- * suelta el puerto. El programa sigue funcionando al quitar el cable mientras el
- * mBot2 esté encendido (al apagarlo hay que volver a instalarlo, o subirlo con mBlock).
+ * Con el CyberPi del ROBOT conectado por USB: guarda PROGRAMA_RECEPTOR como
+ * pikt_rx.py (por trozos: el programa entero no cabe en una trama), lo arranca con
+ * `import` en un hilo propio y suelta el puerto. Con `exec` no valdría: en este
+ * firmware las funciones de un exec no ven sus variables globales. Sigue funcionando al quitar el cable
+ * mientras el mBot2 esté encendido (al apagarlo hay que volver a instalarlo).
  */
 export async function instalarReceptor() {
   const ok = await conectarCyberpi(); // siempre pide puerto: el de la antena no vale
   if (!ok) return false;
+  clearInterval(temporizador); // que no se cuelen órdenes de conducción entre los trozos
+  temporizador = 0;
   try {
+    emitir({ estado: 'conectando', error: '' });
+    acumulado = '';
     await escribir(tramaCyberpi('import mbot2\nmbot2.drive_power(0,0)'));
-    await dormir(150);
-    await escribir(tramaCyberpi(PROGRAMA_RECEPTOR));
-    await dormir(400);
-  } catch {
+    await esperarRespuesta();
+    const esperado = ENC.encode(PROGRAMA_RECEPTOR).length;
+    let tam = -1;
+    for (let intento = 0; intento < 3 && tam !== esperado; intento++) {
+      await subirArchivo('pikt_rx.py', PROGRAMA_RECEPTOR);
+      await dormir(300);
+      tam = await tamanoArchivo('pikt_rx.py');
+    }
+    if (tam !== esperado) throw new Error(`el archivo quedó incompleto (${tam} de ${esperado} bytes)`);
+    await dormir(300);
+    acumulado = '';
+    // Las tramas corren en un hilo con poca pila (7 KB): `import pikt_rx` a secas lo
+    // desborda («stack overflow in task mp_thread») y la placa se reinicia. Se lanza
+    // en un hilo propio con 16 KB; la placa sigue atendiendo tramas.
+    await escribir(
+      tramaCyberpi('import _thread\ndef _rx():\n    import pikt_rx\n_thread.stack_size(16384)\n_thread.start_new_thread(_rx, ())')
+    );
+    await dormir(1500);
+    const err = acumulado.match(/\{"err"[^}]*\}|stack overflow|Rebooting|Traceback[^\r\n]*/);
+    if (err) throw new Error(err[0]);
+  } catch (e) {
+    limpiar();
+    emitir({ estado: 'error', error: 'No se pudo instalar el receptor: ' + (e?.message || e) });
     return false;
   }
-  limpiar(); // el bucle del receptor ocupa la placa: ya no atiende más tramas
+  limpiar(); // el receptor ocupa la placa: la soltamos
   emitir({ estado: 'desconectado', error: '' });
   return true;
 }

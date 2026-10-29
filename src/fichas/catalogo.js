@@ -2,13 +2,13 @@
 //  COLECCIONES LISTAS PARA USAR (fichas de Math World)
 //  Fichas recomendadas por etapa, curso y tema. Al abrirlas se generan números
 //  nuevos; el profesor puede proyectarlas, descargar el PDF o personalizarlas.
-//  ej: [fuente, tipo, nivel, nº de apartados]
+//  ej: [fuente, tipo, nivel, nº de apartados, formato/categoría?]
 // ─────────────────────────────────────────────────────────────────────────────
 
 const C = (id, titulo, etapa, cursos, desc, ejs) => ({
     id, titulo, etapa, cursos, desc,
     temas: [...new Set(ejs.map(e => e[0]))],
-    ejercicios: ejs.map(([fuente, tipo, nivel, n]) => ({ fuente, tipo, nivel, n })),
+    ejercicios: ejs.map(([fuente, tipo, nivel, n, catProb]) => ({ fuente, tipo, nivel, n, ...(catProb ? { catProb } : {}) })),
 });
 
 export const CATALOGO_MATES = [
@@ -17,6 +17,12 @@ export const CATALOGO_MATES = [
         [['calculo', 'suma', 1, 9], ['calculo', 'resta', 1, 9], ['calculo', 'probNaturales', 1, 2]]),
     C('p-multdiv', 'Multiplicar y dividir', 'primaria', ['3.º', '4.º'], 'Tablas, divisiones exactas y problemas',
         [['calculo', 'mult', 1, 9], ['calculo', 'div', 1, 9], ['calculo', 'probNaturales', 1, 3]]),
+    C('p-columna1', 'Sumas y restas en columna', 'primaria', ['1.º', '2.º', '3.º'], 'Método clásico: unidades bajo unidades y llevadas',
+        [['calculo', 'suma', 1, 8, 'columna'], ['calculo', 'resta', 1, 8, 'columna'], ['calculo', 'suma', 2, 4, 'columna'], ['calculo', 'resta', 2, 4, 'columna']]),
+    C('p-columna2', 'Las cuatro operaciones en columna', 'primaria', ['4.º', '5.º', '6.º'], 'Sumas, restas, multiplicaciones por 2 cifras y divisiones con resto',
+        [['calculo', 'suma', 2, 4, 'columna'], ['calculo', 'resta', 2, 4, 'columna'], ['calculo', 'mult', 2, 6, 'columna'], ['calculo', 'div', 2, 6, 'columna']]),
+    C('p-columnaDec', 'Sumas y restas de decimales en columna', 'primaria', ['5.º', '6.º'], 'Coma bajo coma',
+        [['calculo', 'suma', 2, 6, 'columnaDec'], ['calculo', 'resta', 2, 6, 'columnaDec']]),
     C('p-numeros', 'Números: valor posicional y redondeo', 'primaria', ['3.º', '4.º', '5.º'], 'Valor de las cifras, descomposición, redondeo y comparación',
         [['numeros', 'valorPosicional', 1, 6], ['numeros', 'descomponer', 1, 4], ['numeros', 'redondear', 1, 6], ['numeros', 'comparar', 1, 6]]),
     C('p-romanos', 'Números romanos', 'primaria', ['4.º', '5.º', '6.º'], 'Pasar de cifras a números romanos y al revés',
@@ -43,6 +49,8 @@ export const CATALOGO_MATES = [
     // ── ESO ──────────────────────────────────────────────────────────────────
     C('e-enteros', 'Números enteros', 'eso', ['1.º'], 'Operaciones, combinadas con enteros y problemas',
         [['calculo', 'enteros', 1, 12], ['calculo', 'combEnteros', 1, 4], ['calculo', 'probEnteros', 1, 3]]),
+    C('e-columna', 'Operaciones en columna con números grandes', 'eso', ['1.º'], 'Repaso del algoritmo: decimales, multiplicaciones por 3 cifras y divisiones por 2 y 3 cifras',
+        [['calculo', 'suma', 3, 3, 'columnaDec'], ['calculo', 'resta', 3, 3, 'columnaDec'], ['calculo', 'mult', 3, 6, 'columna'], ['calculo', 'div', 3, 6, 'columna']]),
     C('e-divisibilidad', 'Divisibilidad: m.c.d. y m.c.m.', 'eso', ['1.º'], 'Descomposición factorial, m.c.d., m.c.m. y problemas',
         [['divisibilidad', 'factorizar', 1, 6], ['divisibilidad', 'mcdMcm', 2, 4], ['divisibilidad', 'problemas', 1, 3]]),
     C('e-fracciones', 'Operaciones con fracciones', 'eso', ['1.º', '2.º'], 'Las cuatro operaciones, combinadas y problemas',

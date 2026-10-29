@@ -15,6 +15,7 @@ import ProblemasNumeros from './ProblemasNumeros';
 
 // Fichas imprimibles (editor + PDF + pizarra + enlace público): se cargan solo al abrirlas
 const FichasCalculo = React.lazy(() => import('./FichasCalculo'));
+const CalculoColumna = React.lazy(() => import('./CalculoColumna'));
 
 // ─── Configuración por defecto ────────────────────────────────────────────────
 export const DEFAULT_CONFIG = {
@@ -622,7 +623,7 @@ function ModalEnviarProfe({ datos, onClose }) {
 export default function CalculoMentalGame({ usuario, onExit }) {
     // Ficha imprimible compartida por enlace: /calculo?ficha=ID abre directamente su vista pública
     const [fichaPublicaId, setFichaPublicaId] = useState(() => (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('ficha') : null));
-    const [gameState, setGameState] = useState(() => (fichaPublicaId ? 'FICHAS' : 'START')); // START | PLAYING | END | PROBLEMAS | FICHAS
+    const [gameState, setGameState] = useState(() => (fichaPublicaId ? 'FICHAS' : 'START')); // START | PLAYING | END | PROBLEMAS | COLUMNA | FICHAS
     const [datosEnvio, setDatosEnvio] = useState(null); // envío al profesor desde el modo Problemas
     const [sonido, setSonido] = useState(() => sonidoActivo());
     const [showOca, setShowOca] = useState(false);
@@ -1031,9 +1032,22 @@ export default function CalculoMentalGame({ usuario, onExit }) {
                         {/* Separador */}
                         <div style={{ display:'flex', alignItems:'center', gap:10, margin:'2px 0' }}>
                             <div style={{ flex:1, height:1, background:'#eee' }} />
-                            <span style={{ color:'#bbb', fontSize:'0.75rem' }}>problemas y fichas</span>
+                            <span style={{ color:'#bbb', fontSize:'0.75rem' }}>en columna, problemas y fichas</span>
                             <div style={{ flex:1, height:1, background:'#eee' }} />
                         </div>
+
+                        {/* Operaciones en columna (método clásico) */}
+                        <button onClick={() => setGameState('COLUMNA')}
+                            style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 18px', background:'white', border:'2px solid #00897b', borderRadius:16, cursor:'pointer', textAlign:'left', transition:'transform 0.15s, box-shadow 0.15s', boxShadow:'0 3px 10px rgba(0,0,0,0.07)', width:'100%' }}
+                            onMouseEnter={e => { e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 8px 20px #00897b33'; }}
+                            onMouseLeave={e => { e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow='0 3px 10px rgba(0,0,0,0.07)'; }}>
+                            <div style={{ background:'#00897b', borderRadius:12, width:46, height:46, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.5rem', flexShrink:0 }}>🧱</div>
+                            <div style={{ flex:1 }}>
+                                <div style={{ fontWeight:'bold', color:'#2c3e50', fontSize:'1rem', marginBottom:3 }}>Operaciones en columna</div>
+                                <div style={{ color:'#888', fontSize:'0.82rem' }}>Sumas, restas, multiplicaciones y divisiones con el método clásico · cifra a cifra, con llevadas</div>
+                            </div>
+                            <span style={{ color:'#00897b', fontSize:'1.3rem' }}>›</span>
+                        </button>
 
                         {/* Problemas de números */}
                         <button onClick={() => setGameState('PROBLEMAS')}
@@ -1133,6 +1147,14 @@ export default function CalculoMentalGame({ usuario, onExit }) {
             {gameState === 'PROBLEMAS' && (
                 <ProblemasNumeros isMobile={isMobile} usuario={usuario} onSalir={() => setGameState('START')}
                     onEnviar={(d) => { setDatosEnvio(d); setMostrarEnvio(true); }} />
+            )}
+
+            {/* OPERACIONES EN COLUMNA */}
+            {gameState === 'COLUMNA' && (
+                <React.Suspense fallback={<div style={{ textAlign: 'center', color: '#E91E63', fontWeight: 800, padding: 40 }}>Cargando…</div>}>
+                    <CalculoColumna isMobile={isMobile} usuario={usuario} onSalir={() => setGameState('START')}
+                        onEnviar={(d) => { setDatosEnvio(d); setMostrarEnvio(true); }} />
+                </React.Suspense>
             )}
 
             {/* FICHAS IMPRIMIBLES */}

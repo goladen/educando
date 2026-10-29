@@ -37,9 +37,9 @@ export const tiposDe = (motor, ej) => (motor.fuentes ? motor.fuentes[ej?.fuente]
 const tituloDe = (motor, fuente, tipo) => (motor.fuentes ? motor.fuentes[fuente]?.titulos?.[tipo] : motor.titulos[tipo]) || '';
 const catPorDefecto = (motor, tipo, ej) => motor.categorias?.(tipo, ej)?.[0]?.[0] || 'todos';
 
-const nuevoEjercicio = (motor, { fuente, tipo, nivel = 1, n = 3 }) => {
+const nuevoEjercicio = (motor, { fuente, tipo, nivel = 1, n = 3, catProb }) => {
     const base = { key: nuevaClave(), ...(fuente ? { fuente } : {}), tipo, nivel, n };
-    const ej = { ...base, titulo: tituloDe(motor, fuente, tipo), tituloAuto: true, catProb: catPorDefecto(motor, tipo, base), apartados: [] };
+    const ej = { ...base, titulo: tituloDe(motor, fuente, tipo), tituloAuto: true, catProb: catProb || catPorDefecto(motor, tipo, base), apartados: [] };
     ej.n = Math.min(n, motor.maxApartados(ej));
     ej.apartados = motor.generarApartados(ej, ej.n);
     return ej;

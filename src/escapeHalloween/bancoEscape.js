@@ -17,7 +17,7 @@ import ANATOMIA from '../anatomia_avanzada_dataset.json';
 import { PERSONAJES_HISTORICOS } from '../personajesHistoricos';
 import { TEMAS } from '../lengua/ejercicios';
 import { bibliotecaIrregularVerbs } from '../BibliotecaIrregularVerbs';
-import { preguntaDeRecurso, candadoRecurso } from './recursosEscape';
+import { preguntaDeRecurso, candadoRecurso, candadoPropio, codigoLimpio } from './recursosEscape';
 
 export const rInt = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
 export const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -553,7 +553,11 @@ export const huellaCodigo = (codigo) => {
 /** Prepara una prueba para guardarla en la sala en vivo (el código va como huella). */
 export function pruebaParaSala(p) {
     if (p.tipo === 'RECURSO') {
-        return { id: p.id, tipo: 'RECURSO', nombre: p.nombre || '', emoji: p.emoji || '📚', recursoTitulo: p.recursoTitulo || '', autor: p.autor || '', preguntas: (p.preguntas || []).slice(0, 80) };
+        const propio = p.candadoModo === 'CIFRAS' || p.candadoModo === 'PISTA';
+        return {
+            id: p.id, tipo: 'RECURSO', nombre: p.nombre || '', emoji: p.emoji || '📚', recursoTitulo: p.recursoTitulo || '', autor: p.autor || '', preguntas: (p.preguntas || []).slice(0, 80),
+            candadoSala: propio ? { ...candadoPropio(p), huellas: [huellaCodigo(codigoLimpio(p.candadoCodigo))], soluciones: [], solucionVisible: '' } : null,
+        };
     }
     if (p.tipo !== 'MANUAL') return { id: p.id, tipo: 'MATERIA', materia: p.materia, tema: p.tema || 'MIX', nombre: p.nombre || '' };
     const codigos = String(p.codigo || '').split('|').map(c => c.trim()).filter(Boolean);
@@ -605,6 +609,6 @@ export function preguntaDePrueba(p, etapa = 'ESO') {
 /** Candado de una prueba en el modo online (la prueba propia debe venir de pruebaParaSala, con huellas). */
 export function candadoDePrueba(p, etapa = 'ESO') {
     if (p?.tipo === 'MANUAL') return candadoManual(p);
-    if (p?.tipo === 'RECURSO') return candadoRecurso(p);
+    if (p?.tipo === 'RECURSO') return p.candadoSala || candadoRecurso(p);
     return generarCandado(p?.materia, etapa, p?.tema);
 }

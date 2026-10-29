@@ -5,7 +5,7 @@
 //  Se guarda dentro de la configuración: config.partida = { firma, creada, pruebas:[{preguntas, candado}], batalla:[…] }
 // ═══════════════════════════════════════════════════════════════════
 import { generarPregunta, generarCandado, materiaDePrueba, temaDePrueba, ORDEN_SALAS, pick, tienePreguntas, preguntaDePrueba } from './bancoEscape';
-import { candadoRecurso } from './recursosEscape';
+import { candadoRecurso, candadoPropio, codigoLimpio } from './recursosEscape';
 
 export const LETRAS = ['A', 'B', 'C', 'D', 'E', 'F'];
 export const PREGUNTAS_POR_SALA = [4, 5, 6, 8, 10];
@@ -14,7 +14,7 @@ export const PREGUNTAS_BATALLA = [6, 8, 10, 12];
 /** Huella de las pruebas: si cambian, la partida fija ya no corresponde. */
 export const firmaPruebas = (config) => JSON.stringify([
     config.etapa,
-    (config.pruebas || []).map(p => [p.id, p.tipo, p.materia, p.tema, p.codigo, p.texto, p.pista, p.imagen, p.materiaRetos, p.temaRetos, p.recursoId, (p.hojas || []).join('|'), p.preguntas?.length || 0]),
+    (config.pruebas || []).map(p => [p.id, p.tipo, p.materia, p.tema, p.codigo, p.texto, p.pista, p.imagen, p.materiaRetos, p.temaRetos, p.recursoId, (p.hojas || []).join('|'), p.preguntas?.length || 0, p.candadoModo, p.candadoCodigo, (p.candadoPistas || []).join('|'), p.candadoPista]),
 ]);
 
 // Instrucciones de los candados para jugar en papel / pizarra (sin repartir pistas entre móviles)
@@ -72,6 +72,10 @@ function candadoFijo(prueba, etapa) {
             pistas: prueba.pista ? [{ texto: prueba.pista }] : [],
             soluciones: codigos, solucionVisible: codigos[0] || '',
         };
+    }
+    if (prueba.tipo === 'RECURSO' && (prueba.candadoModo === 'CIFRAS' || prueba.candadoModo === 'PISTA')) {
+        const cod = codigoLimpio(prueba.candadoCodigo);
+        return { ...candadoPropio(prueba, { papel: true }), soluciones: [cod], solucionVisible: cod };
     }
     const c = candadoParaPapel(prueba.tipo === 'RECURSO' ? candadoRecurso(prueba) : generarCandado(prueba.materia, etapa, prueba.tema));
     return { titulo: c.titulo, instruccion: c.instruccion, tipo: c.tipo, longitud: c.longitud, pistas: c.pistas, soluciones: c.soluciones, solucionVisible: c.solucionVisible };

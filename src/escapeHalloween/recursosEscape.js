@@ -87,3 +87,32 @@ export function candadoRecurso(prueba) {
         solucionVisible: codigo,
     };
 }
+
+// ── Candado de las salas con recurso: 3 modos ────────────────────────
+export const MODOS_CANDADO_RECURSO = [
+    { v: 'RESPUESTAS', l: '🔤 Letras de 4 respuestas', d: '4 preguntas del recurso; la letra de cada respuesta correcta, en orden, forma el código.' },
+    { v: 'CIFRAS', l: '🔢 Una pista por cifra o letra', d: 'Tú escribes el código y una pista para cada cifra o letra.' },
+    { v: 'PISTA', l: '💡 Una pista para todo el candado', d: 'Tú escribes el código y un acertijo o pista que lleve hasta él.' },
+];
+export const codigoLimpio = (c) => String(c || '').replace(/\s+/g, '').toUpperCase();
+
+/** Candado definido por el profe (modos CIFRAS y PISTA). papel = textos para la pizarra y las fichas. Sin la solución. */
+export function candadoPropio(prueba, { papel = false } = {}) {
+    const cod = codigoLimpio(prueba.candadoCodigo);
+    const tipo = /^\d+$/.test(cod) ? 'numero' : 'texto';
+    const unidad = tipo === 'numero' ? 'cifra' : 'letra';
+    if (prueba.candadoModo === 'CIFRAS') {
+        return {
+            titulo: 'El candado de las pistas', tipo, longitud: cod.length, propio: true,
+            instruccion: papel
+                ? `Cada pista esconde una ${unidad} del código. Resolvedlas y escribid el código en orden (${cod.length} ${unidad}s).`
+                : `Cada pista esconde una ${unidad} del código. ¡Las pistas están repartidas entre vuestros móviles: juntadlas en orden!`,
+            pistas: [...cod].map((_, k) => ({ texto: `${k + 1}.ª ${unidad}: ${String(prueba.candadoPistas?.[k] || '').trim()}` })),
+        };
+    }
+    return {
+        titulo: 'El candado secreto', tipo, longitud: cod.length, propio: true, compartidas: true,
+        instruccion: papel ? 'Resolved la pista para descubrir el código.' : 'Resolved la pista para descubrir el código. ¡Todos tenéis la misma pista!',
+        pistas: [{ texto: String(prueba.candadoPista || '').trim() }],
+    };
+}

@@ -313,7 +313,7 @@ function HostEscape({ config, usuario, onSalir }) {
     const url = urlSalaEnVivo(codigo);
     const qr = (tam) => `https://api.qrserver.com/v1/create-qr-code/?size=${tam}x${tam}&data=${encodeURIComponent(url)}&bgcolor=ffffff&color=1a0b2e&margin=8`;
     const abiertas = pruebas.map((p, i) => ((sala.amuletos || []).includes(p.id) ? i : -1)).filter(i => i >= 0);
-    const codigoManual = (i) => String(config.pruebas.find(p => p.id === pruebas[i]?.id)?.codigo || '').split('|')[0].trim();
+    const codigoManual = (i) => String((() => { const p = config.pruebas.find(x => x.id === pruebas[i]?.id); return p?.codigo || p?.candadoCodigo || ''; })()).split('|')[0].trim();
 
     const barraSup = (
         <div style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', flexWrap: 'wrap', background: 'rgba(0,0,0,.35)' }}>
@@ -446,7 +446,7 @@ function HostEscape({ config, usuario, onSalir }) {
             lateral = <>
                 {cabSala}
                 <h2 style={{ fontSize: '2rem', margin: 0, color: '#4ade80' }}>¡Puerta abierta!</h2>
-                {sala.candadoAbierto?.nombre && <p style={{ margin: 0, fontSize: '1.1rem' }}>🗝️ <b>{sala.candadoAbierto.nombre}</b> ha escrito el código: <b style={{ color: '#ffde59' }}>{cand?.manual ? codigoManual(salaIdx) : cand?.solucionVisible}</b></p>}
+                {sala.candadoAbierto?.nombre && <p style={{ margin: 0, fontSize: '1.1rem' }}>🗝️ <b>{sala.candadoAbierto.nombre}</b> ha escrito el código: <b style={{ color: '#ffde59' }}>{cand?.manual || cand?.propio ? codigoManual(salaIdx) : cand?.solucionVisible}</b></p>}
                 <p style={{ margin: 0, fontSize: '1.1rem' }}>Amuleto: <span style={{ fontSize: '1.8rem' }}>{salaInfo.amuleto.emoji}</span> <b>{salaInfo.amuleto.nombre}</b> (+1 vida)</p>
                 <button className="eh-btn" onClick={siguiente} style={{ fontSize: '1.1rem' }}>{esUltima ? '⚔️ ¡Al sótano a por el zombi!' : '🚪 Siguiente sala'}</button>
                 <MapaMansion pruebas={pruebas} salaIdx={salaIdx} amuletos={sala.amuletos} fase={fase} />
@@ -617,7 +617,7 @@ function HostEscape({ config, usuario, onSalir }) {
                                 )}
                                 <h2 style={{ fontSize: '2.1rem', margin: '10px 0 4px', color: '#4ade80' }}>¡Puerta abierta!</h2>
                                 <p style={{ fontSize: '1.2rem' }}>
-                                    {sala.candadoAbierto?.nombre && <>🗝️ <b>{sala.candadoAbierto.nombre}</b> ha escrito el código: <b style={{ color: '#ffde59' }}>{cand?.manual ? codigoManual(salaIdx) : cand?.solucionVisible}</b><br /></>}
+                                    {sala.candadoAbierto?.nombre && <>🗝️ <b>{sala.candadoAbierto.nombre}</b> ha escrito el código: <b style={{ color: '#ffde59' }}>{cand?.manual || cand?.propio ? codigoManual(salaIdx) : cand?.solucionVisible}</b><br /></>}
                                     Amuleto conseguido: <span style={{ fontSize: '2rem' }}>{salaInfo.amuleto.emoji}</span> <b>{salaInfo.amuleto.nombre}</b> (+1 vida en la batalla)
                                 </p>
                                 <button className="eh-btn" onClick={siguiente} style={{ fontSize: '1.15rem' }}>{esUltima ? '⚔️ ¡Bajar al sótano a por el zombi!' : '🚪 Siguiente sala'}</button>
@@ -1043,7 +1043,7 @@ export default function EscapeHalloween({ usuario, onExit, codigoSala = null, pa
     const [config, setConfig] = useState(configPorDefecto);
     const [configPartida, setConfigPartida] = useState(null);
     const [tituloPartida, setTituloPartida] = useState('');
-    const [metaEditor, setMetaEditor] = useState({ titulo: '', publico: false, guardado: null });
+    const [metaEditor, setMetaEditor] = useState({ titulo: '', publico: true, guardado: null });
     const [vueltaPizarra, setVueltaPizarra] = useState('CONFIG');   // a dónde se vuelve al salir de la pizarra
     const [avatar, setAvatar] = useState(() => leerAvatarGuardado() || avatarAleatorio());
     const [semilla, setSemilla] = useState(0);
@@ -1112,7 +1112,7 @@ export default function EscapeHalloween({ usuario, onExit, codigoSala = null, pa
                     onPersonalizar={(c, t) => {
                         // copia editable: mismas pruebas y las mismas preguntas fijas (si no se cambian, las fichas siguen valiendo)
                         setConfig(limpiarConfig(JSON.parse(JSON.stringify(c))));
-                        setMetaEditor({ titulo: `${t} (mi versión)`, publico: false, guardado: null });
+                        setMetaEditor({ titulo: `${t} (mi versión)`, publico: true, guardado: null });
                         setPantalla('CONFIG');
                     }} />
             </div>
@@ -1144,7 +1144,7 @@ export default function EscapeHalloween({ usuario, onExit, codigoSala = null, pa
                         <div style={{ fontSize: '2.6rem' }}>🛠️</div>
                         <h3 style={{ margin: '6px 0' }}>Crear el mío</h3>
                         <p style={{ opacity: .8, fontSize: '.95rem' }}>Elige las pruebas, materias, recursos o retos propios. Online con móviles o con fichas y pizarra.</p>
-                        <button className="eh-btn" style={{ width: '100%' }} onClick={() => { setConfig(c => ({ ...c, modo: undefined })); setMetaEditor({ titulo: '', publico: false, guardado: null }); setPantalla('CONFIG'); }}>🕯️ Crear escape room</button>
+                        <button className="eh-btn" style={{ width: '100%' }} onClick={() => { setConfig(c => ({ ...c, modo: undefined })); setMetaEditor({ titulo: '', publico: true, guardado: null }); setPantalla('CONFIG'); }}>🕯️ Crear escape room</button>
                     </div>
                     <div className="eh-panel" style={{ padding: 22 }}>
                         <div style={{ fontSize: '2.6rem' }}>📱</div>

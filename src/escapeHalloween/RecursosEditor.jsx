@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, getDoc, doc } from 'firebase/firestore';
 import { limpiar } from '../utils/normalizarPreguntas';
-import { hojasDeRecurso, pruebaDeRecurso, MIN_PREGUNTAS_RECURSO } from './recursosEscape';
+import { hojasDeRecurso, pruebaDeRecurso, MIN_PREGUNTAS_RECURSO, MODOS_CANDADO_RECURSO, codigoLimpio } from './recursosEscape';
 
 /**
  *  Editor de pruebas con recursos de profes:
@@ -101,7 +101,7 @@ export function CuerpoPruebaRecurso({ prueba, onCambiar, onCambiarRecurso }) {
             let nueva = actual.includes(nombre) ? actual.filter(h => h !== nombre) : [...actual, nombre];
             if (!nueva.length) return;
             if (nueva.length === todas.length) nueva = null;
-            onCambiar(pruebaDeRecurso(r, nueva, { id: prueba.id, nombre: prueba.nombre, emoji: prueba.emoji }));
+            onCambiar(pruebaDeRecurso(r, nueva, { ...prueba }));
         } catch (e) { setError(e.message); }
     };
     const n = prueba.preguntas?.length || 0;
@@ -135,7 +135,56 @@ export function CuerpoPruebaRecurso({ prueba, onCambiar, onCambiarRecurso }) {
             </div>
             <label style={{ fontWeight: 700, fontSize: '.82rem', opacity: .85, display: 'block', margin: '10px 0 4px' }}>Nombre de la sala (opcional)</label>
             <input style={campo} value={prueba.nombre || ''} maxLength={50} placeholder={prueba.recursoTitulo} onChange={e => onCambiar({ ...prueba, nombre: e.target.value })} />
+            <ConfigCandadoRecurso prueba={prueba} onCambiar={onCambiar} />
         </>
+    );
+}
+
+/** Cómo se abre la puerta de una sala con recurso. */
+function ConfigCandadoRecurso({ prueba, onCambiar }) {
+    const modo = prueba.candadoModo || 'RESPUESTAS';
+    const set = (c) => onCambiar({ ...prueba, ...c });
+    const cod = codigoLimpio(prueba.candadoCodigo);
+    const unidad = /^\d+$/.test(cod) ? 'cifra' : 'letra';
+    const pistas = prueba.candadoPistas || [];
+    const etiqueta = { fontWeight: 700, fontSize: '.82rem', opacity: .85, display: 'block', margin: '10px 0 4px' };
+    return (
+        <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 12, background: 'rgba(250,204,21,.08)', border: '1px solid rgba(250,204,21,.35)' }}>
+            <div style={{ fontWeight: 800 }}>🔒 Candado de esta sala</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                {MODOS_CANDADO_RECURSO.map(m => (
+                    <button key={m.v} className={`eh-chip ${modo === m.v ? 'on' : ''}`} style={{ padding: '6px 10px', fontSize: '.82rem' }} title={m.d} onClick={() => set({ candadoModo: m.v })}>{m.l}</button>
+                ))}
+            </div>
+            <div style={{ fontSize: '.78rem', opacity: .75, marginTop: 4 }}>{MODOS_CANDADO_RECURSO.find(m => m.v === modo)?.d}</div>
+
+            {modo !== 'RESPUESTAS' && <>
+                <label style={etiqueta}>🔐 Código que abre la puerta</label>
+                <input style={{ ...campo, letterSpacing: 3, fontWeight: 800, textTransform: 'uppercase' }} value={prueba.candadoCodigo || ''} maxLength={14}
+                    placeholder="Ej.: 4721 o MOMIA" onChange={e => set({ candadoCodigo: e.target.value })} />
+                <div style={{ fontSize: '.72rem', opacity: .65, marginTop: 3 }}>Máx. 12 cifras o letras. Da igual mayúsculas y tildes.</div>
+            </>}
+
+            {modo === 'CIFRAS' && cod && (
+                <div style={{ display: 'grid', gap: 6, marginTop: 8 }}>
+                    {[...cod].slice(0, 12).map((ch, k) => (
+                        <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ minWidth: 92, fontSize: '.8rem', fontWeight: 700 }}>{k + 1}.ª {unidad} <b style={{ color: '#fde047', fontSize: '1rem' }}>{ch}</b></span>
+                            <input style={{ ...campo, padding: '8px 10px' }} value={pistas[k] || ''} maxLength={180}
+                                placeholder={unidad === 'cifra' ? `Ej.: el número de patas de una araña menos ${Math.max(0, 8 - Number(ch))}` : 'Ej.: la primera letra del animal que aúlla a la luna'}
+                                onChange={e => { const nuevas = [...pistas]; nuevas[k] = e.target.value; set({ candadoPistas: nuevas }); }} />
+                        </div>
+                    ))}
+                    <div style={{ fontSize: '.72rem', opacity: .65 }}>En online, cada pista va a un móvil distinto; en la pizarra y en las fichas salen todas.</div>
+                </div>
+            )}
+
+            {modo === 'PISTA' && <>
+                <label style={etiqueta}>💡 Pista o acertijo para todo el candado</label>
+                <textarea style={{ ...campo, minHeight: 64, resize: 'vertical' }} value={prueba.candadoPista || ''} maxLength={500}
+                    placeholder="Ej.: Soy el año en que Colón llegó a América." onChange={e => set({ candadoPista: e.target.value })} />
+            </>}
+        </div>
     );
 }
 

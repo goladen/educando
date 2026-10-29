@@ -28,6 +28,9 @@ export function limpiarConfig(c = {}) {
         ? {
             id: p.id || nuevaId(), tipo: 'RECURSO', recursoId: p.recursoId || '', recursoTitulo: p.recursoTitulo || 'Recurso', autor: p.autor || '',
             hojas: Array.isArray(p.hojas) ? p.hojas : null, nombre: p.nombre || '', emoji: p.emoji || '📚',
+            candadoModo: ['RESPUESTAS', 'CIFRAS', 'PISTA'].includes(p.candadoModo) ? p.candadoModo : 'RESPUESTAS',
+            candadoCodigo: String(p.candadoCodigo || ''), candadoPista: String(p.candadoPista || ''),
+            candadoPistas: Array.isArray(p.candadoPistas) ? p.candadoPistas.map(x => String(x || '')) : [],
             preguntas: (Array.isArray(p.preguntas) ? p.preguntas : [])
                 .filter(q => q && q.texto && Array.isArray(q.opciones) && q.opciones.length >= 2 && q.correcta >= 0 && q.correcta < q.opciones.length)
                 .slice(0, MAX_PREGUNTAS_RECURSO)
@@ -144,6 +147,13 @@ export function erroresConfig(config) {
         if (p.tipo === 'MANUAL' && !String(p.codigo || '').trim()) errores.push(`La prueba ${i + 1} (propia) necesita un código.`);
         if (p.tipo === 'MANUAL' && !String(p.texto || '').trim()) errores.push(`La prueba ${i + 1} (propia) necesita un texto para los alumnos.`);
         if (p.tipo === 'RECURSO' && (p.preguntas?.length || 0) < MIN_PREGUNTAS_RECURSO) errores.push(`La prueba ${i + 1} (recurso) necesita al menos ${MIN_PREGUNTAS_RECURSO} preguntas.`);
+        if (p.tipo === 'RECURSO' && (p.candadoModo === 'CIFRAS' || p.candadoModo === 'PISTA')) {
+            const cod = String(p.candadoCodigo || '').replace(/\s+/g, '');
+            if (!cod) errores.push(`La prueba ${i + 1} (recurso) necesita el código del candado.`);
+            else if (cod.length > 12) errores.push(`El código del candado de la prueba ${i + 1} es demasiado largo (máx. 12).`);
+            else if (p.candadoModo === 'CIFRAS' && [...cod].some((_, k) => !String(p.candadoPistas?.[k] || '').trim())) errores.push(`En la prueba ${i + 1} falta la pista de alguna cifra o letra del candado.`);
+            if (p.candadoModo === 'PISTA' && !String(p.candadoPista || '').trim()) errores.push(`La prueba ${i + 1} (recurso) necesita la pista del candado.`);
+        }
     });
     return errores;
 }
@@ -312,7 +322,7 @@ function Biblioteca({ usuario, onAbrir, onCerrar, modoActual }) {
 export default function EditorEscape({ config, setConfig, usuario, onCrear, onAtras, onPizarra, meta: metaExt, setMeta: setMetaExt }) {
     const [vista, setVista] = useState('EDITAR');
     // título / público / guardado viven en el padre para no perderlos al ir a la pizarra y volver
-    const [metaLocal, setMetaLocal] = useState({ titulo: '', publico: false, guardado: null });
+    const [metaLocal, setMetaLocal] = useState({ titulo: '', publico: true, guardado: null });
     const meta = metaExt || metaLocal, setMeta = setMetaExt || setMetaLocal;
     const { titulo, publico, guardado } = meta; // guardado: { id, local }
     const setTitulo = (v) => setMeta(m => ({ ...m, titulo: v }));
@@ -324,7 +334,7 @@ export default function EditorEscape({ config, setConfig, usuario, onCrear, onAt
     const elegirRecurso = (r) => {
         const destino = buscador;
         const base = destino && destino !== 'NUEVA' ? config.pruebas.find(p => p.id === destino) : null;
-        const prueba = pruebaDeRecurso(r, null, { id: base?.id || nuevaId(), nombre: base?.nombre || '', emoji: '📚' });
+        const prueba = pruebaDeRecurso(r, null, base ? { ...base } : { id: nuevaId(), nombre: '', emoji: '📚', candadoModo: 'RESPUESTAS' });
         if (prueba.preguntas.length < MIN_PREGUNTAS_RECURSO) { alert('Ese recurso no tiene suficientes preguntas compatibles.'); return; }
         setBuscador(null);
         setConfig(c => ({ ...c, pruebas: base ? c.pruebas.map(p => (p.id === base.id ? prueba : p)) : [...c.pruebas, prueba] }));

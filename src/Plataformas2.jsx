@@ -16,6 +16,9 @@ import wrongSoundSrc   from './assets/wrong.mp3';
 import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 import BotonPdfRecurso from './components/BotonPdfRecurso';
+// Jugar con el cuerpo (webcam): girar la cabeza = andar, saltar = saltar. Se carga al activarlo.
+const PanelControlCuerpo = React.lazy(() => import('./cuerpo/PanelControlCuerpo.jsx'));
+const LS_CUERPO = 'pikt_plataformas_cuerpo';
 
 const sa = src => { try { return new Audio(src); } catch(e){ return {play:()=>Promise.resolve(),currentTime:0}; } };
 const SFX = { jump:sa(jumpSoundSrc), correct:sa(correctSoundSrc), wrong:sa(wrongSoundSrc) };
@@ -855,7 +858,7 @@ function PantallaMenu({ onEligir, onRecurso, onExit }) {
   );
 }
 
-function PantallaIntro({ materia, nivel, total, hasEnemigos, onStart, onBack }) {
+function PantallaIntro({ materia, nivel, total, hasEnemigos, onStart, onBack, cuerpo, onCuerpo }) {
   const m = materia ? MATERIAS[materia] : null;
   return (
     <Scr>
@@ -869,6 +872,14 @@ function PantallaIntro({ materia, nivel, total, hasEnemigos, onStart, onBack }) 
         Golpea los bloques de colores <strong>desde abajo</strong><br/>
         🟡 Recoge monedas{hasEnemigos?' · ☠️ Lee la frase del enemigo antes de tocarlo':''}
       </div>
+      {onCuerpo && (
+        <button onClick={onCuerpo}
+          style={{ marginBottom:16, padding:'8px 16px', borderRadius:14, cursor:'pointer', fontFamily:'inherit', fontWeight:'bold', fontSize:'0.85rem',
+            border:`2px solid ${cuerpo?'#22c55e':'rgba(255,255,255,0.25)'}`, background:cuerpo?'rgba(34,197,94,0.18)':'transparent', color:'white' }}>
+          🕺 Jugar con el cuerpo (webcam): {cuerpo ? 'SÍ' : 'no'}
+          {cuerpo && <div style={{ fontWeight:'normal', fontSize:'0.74rem', opacity:0.8, marginTop:3 }}>Estira el brazo derecho para ir a la derecha, el izquierdo para ir a la izquierda, bájalos para pararte y salta de verdad para saltar</div>}
+        </button>
+      )}
       <div style={{ display:'flex', gap:10 }}>
         <button onClick={onBack} style={{ padding:'8px 18px', borderRadius:20, border:'1.5px solid rgba(255,255,255,0.18)', background:'transparent', color:'rgba(255,255,255,0.45)', cursor:'pointer', fontFamily:'inherit' }}>← Atrás</button>
         <button onClick={onStart} style={{ padding:'11px 32px', borderRadius:28, border:'none', background:'#f1c40f', color:'#1a1a2e', fontWeight:'bold', fontSize:'1rem', cursor:'pointer', fontFamily:'inherit' }}>▶ ¡Empezar!</button>
@@ -1180,6 +1191,11 @@ export default function QuizPlataformas({ onExit, recursoInicial = null, hojaIni
   const [recursoHojaIdx, setRecursoHojaIdx] = useState(0);
   const [recursoTotalNiv,setRecursoTotalNiv]= useState(1);
   const [hasEnemigos,    setHasEnemigos]    = useState(false);
+  const [controlCuerpo,  setControlCuerpo]  = useState(()=>{ try { return localStorage.getItem(LS_CUERPO)==='1'; } catch { return false; } });
+  const alternarCuerpo = useCallback(()=>setControlCuerpo(v=>{
+    try { localStorage.setItem(LS_CUERPO, v?'0':'1'); } catch { /* sin almacenamiento */ }
+    return !v;
+  }),[]);
 
   const canvasRef = useRef(null);
   const rafRef    = useRef(null);
@@ -1864,6 +1880,18 @@ export default function QuizPlataformas({ onExit, recursoInicial = null, hojaIni
     else p.jumpBuffer=JBUF_F;
   },[]);
 
+  // ── Control con el cuerpo (webcam) ──
+  const cuerpoDir = useCallback((d)=>{
+    const k=g.current.keys;
+    k.left = d<0;
+    k.right = d>0;
+  },[]);
+  const cuerpoSalto = useCallback(()=>{
+    const p=g.current.player;
+    if(p.onGround||p.coyote>0){ p.vy=JUMP_POWER; p.onGround=false; p.coyote=0; snd('jump'); }
+    else p.jumpBuffer=JBUF_F;
+  },[]);
+
   // ── Siguiente nivel en modo recurso ──
   const siguienteNivelRecurso = useCallback(()=>{
     if (!recursoActivo) return;
@@ -1898,8 +1926,8 @@ export default function QuizPlataformas({ onExit, recursoInicial = null, hojaIni
     : (recursoActivo ? 1 : 4);
 
   if(fase==='MENU')    return <PantallaMenu onEligir={m=>{ setMateria(m); setNivelIdx(0); setLevelStats([]); setFase('INTRO'); }} onRecurso={iniciarRecurso} onExit={onExit}/>;
-  if(fase==='INTRO')   return <PantallaIntro materia={materia} nivel={nivelIdx+1} total={4} hasEnemigos={nivelIdx>0} onStart={()=>iniciar(materia,nivelIdx)} onBack={()=>setFase('MENU')}/>;
-  if(fase==='INTRO_REC') return <PantallaIntro materia={null} nivel={nivelIdx+1} total={totalNivelesActuales} hasEnemigos={hasEnemigos} onStart={()=>setFase('PLAYING')} onBack={()=>setFase('MENU')}/>;
+  if(fase==='INTRO')   return <PantallaIntro materia={materia} nivel={nivelIdx+1} total={4} hasEnemigos={nivelIdx>0} onStart={()=>iniciar(materia,nivelIdx)} onBack={()=>setFase('MENU')} cuerpo={controlCuerpo} onCuerpo={alternarCuerpo}/>;
+  if(fase==='INTRO_REC') return <PantallaIntro materia={null} nivel={nivelIdx+1} total={totalNivelesActuales} hasEnemigos={hasEnemigos} onStart={()=>setFase('PLAYING')} onBack={()=>setFase('MENU')} cuerpo={controlCuerpo} onCuerpo={alternarCuerpo}/>;
   if(fase==='RESUMEN') return <PantallaResumen materia={materia} recurso={recursoActivo} levelStats={levelStats} onMenu={()=>{ setLevelStats([]); setRecursoActivo(null); setFase('MENU'); }}/>;
   if(fase==='FIN')     return <PantallaFin materia={materia} score={score} aciertos={aciertos} total={totalQ}
     hayMas={nivelIdx+1<totalNivelesActuales}
@@ -1934,6 +1962,10 @@ export default function QuizPlataformas({ onExit, recursoInicial = null, hojaIni
           <div style={{ display:'flex', gap:6, alignItems:'center' }}>
             <span style={{ background:'#2980b9', color:'white', padding:'2px 9px', borderRadius:18, fontWeight:'bold', fontSize:'0.82rem' }}>✔ {aciertos}/{totalQ}</span>
             <span style={{ background:'#f1c40f', color:'#1a1a2e', padding:'2px 9px', borderRadius:18, fontWeight:'bold', fontSize:'0.82rem' }}>⭐ {Math.max(0,score)}</span>
+            <button onClick={alternarCuerpo} title="Jugar con el cuerpo (webcam)"
+              style={{ padding:'3px 9px', borderRadius:8, border:`1.5px solid ${controlCuerpo?'#22c55e':'rgba(255,255,255,0.25)'}`, background:controlCuerpo?'rgba(34,197,94,0.25)':'rgba(255,255,255,0.08)', color:'white', cursor:'pointer', fontSize:'0.9rem', lineHeight:'1.2' }}>
+              🕺
+            </button>
             <button onClick={toggleFullscreen} title="Pantalla completa"
               style={{ padding:'3px 9px', borderRadius:8, border:'1.5px solid rgba(255,255,255,0.25)', background:'rgba(255,255,255,0.08)', color:'white', cursor:'pointer', fontSize:'1rem', lineHeight:'1.2', fontFamily:'Arial' }}>
               ⛶
@@ -1965,6 +1997,15 @@ export default function QuizPlataformas({ onExit, recursoInicial = null, hojaIni
           </div>
         )}
 
+        {/* Jugar con el cuerpo: cámara + gestos */}
+        {controlCuerpo && fase==='PLAYING' && (
+          <React.Suspense fallback={null}>
+            <PanelControlCuerpo onDir={cuerpoDir} onSalto={cuerpoSalto} onCerrar={alternarCuerpo}
+              ancho={fullscreen ? Math.max(160, Math.round(scaledW*0.17)) : 170}
+              style={{ position:'absolute', zIndex:4, right:8, top: fullscreen ? Math.round(scaledH*0.1) : 8, opacity:0.95 }} />
+          </React.Suspense>
+        )}
+
         {/* HUD + mandos en pantalla completa */}
         {fullscreen && (<>
           {/* HUD superior */}
@@ -1980,6 +2021,8 @@ export default function QuizPlataformas({ onExit, recursoInicial = null, hojaIni
             <div style={{ display:'flex', gap:6, alignItems:'center' }}>
               <span style={{ background:'#2980b9', color:'white', padding:'2px 8px', borderRadius:12, fontWeight:'bold', fontSize:`${Math.round(btnSz*0.26)}px` }}>✔ {aciertos}/{totalQ}</span>
               <span style={{ background:'#f1c40f', color:'#1a1a2e', padding:'2px 8px', borderRadius:12, fontWeight:'bold', fontSize:`${Math.round(btnSz*0.26)}px` }}>⭐ {Math.max(0,score)}</span>
+              <button onClick={alternarCuerpo} title="Jugar con el cuerpo (webcam)"
+                style={{ padding:'2px 8px', borderRadius:8, border:`1.5px solid ${controlCuerpo?'#22c55e':'rgba(255,255,255,0.25)'}`, background:controlCuerpo?'rgba(34,197,94,0.25)':'rgba(255,255,255,0.1)', color:'white', cursor:'pointer', fontSize:`${Math.round(btnSz*0.3)}px`, lineHeight:'1.2' }}>🕺</button>
               <button onClick={exitFS}
                 style={{ padding:'2px 8px', borderRadius:8, border:'1.5px solid rgba(255,255,255,0.25)', background:'rgba(255,255,255,0.1)', color:'white', cursor:'pointer', fontSize:`${Math.round(btnSz*0.3)}px`, lineHeight:'1.2', fontFamily:'Arial' }}>✕</button>
             </div>

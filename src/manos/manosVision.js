@@ -14,6 +14,8 @@ const MODELO_URL =
 
 let detector = null;
 let cargandoDetector = null;
+let detectorImagen = null; // modo IMAGE (fotos sueltas), aparte del de vídeo
+let cargandoDetectorImagen = null;
 let video = null;
 let stream = null;
 let raf = 0;
@@ -28,33 +30,49 @@ function emitirEstado(parcial) {
   escuchasEstado.forEach((fn) => fn(estado));
 }
 
+async function crearDetector(runningMode, numHands) {
+  const { FilesetResolver, HandLandmarker } = await import('@mediapipe/tasks-vision');
+  const fileset = await FilesetResolver.forVisionTasks(WASM_URL);
+  const opciones = (delegate) => ({
+    baseOptions: { modelAssetPath: MODELO_URL, delegate },
+    runningMode,
+    numHands,
+    minHandDetectionConfidence: 0.5,
+    minHandPresenceConfidence: 0.5,
+    minTrackingConfidence: 0.5,
+  });
+  try {
+    return await HandLandmarker.createFromOptions(fileset, opciones('GPU'));
+  } catch {
+    // Algunos portátiles del centro no tienen WebGL2 utilizable → CPU.
+    return HandLandmarker.createFromOptions(fileset, opciones('CPU'));
+  }
+}
+
 async function cargarDetector() {
   if (detector) return detector;
   if (!cargandoDetector) {
-    cargandoDetector = (async () => {
-      const { FilesetResolver, HandLandmarker } = await import('@mediapipe/tasks-vision');
-      const fileset = await FilesetResolver.forVisionTasks(WASM_URL);
-      const opciones = (delegate) => ({
-        baseOptions: { modelAssetPath: MODELO_URL, delegate },
-        runningMode: 'VIDEO',
-        numHands: 2,
-        minHandDetectionConfidence: 0.5,
-        minHandPresenceConfidence: 0.5,
-        minTrackingConfidence: 0.5,
+    cargandoDetector = crearDetector('VIDEO', 2)
+      .then((d) => (detector = d))
+      .catch((e) => {
+        cargandoDetector = null;
+        throw e;
       });
-      try {
-        detector = await HandLandmarker.createFromOptions(fileset, opciones('GPU'));
-      } catch {
-        // Algunos portátiles del centro no tienen WebGL2 utilizable → CPU.
-        detector = await HandLandmarker.createFromOptions(fileset, opciones('CPU'));
-      }
-      return detector;
-    })().catch((e) => {
-      cargandoDetector = null;
-      throw e;
-    });
   }
   return cargandoDetector;
+}
+
+async function cargarDetectorImagen() {
+  if (detectorImagen) return detectorImagen;
+  if (!cargandoDetectorImagen) {
+    cargandoDetectorImagen = crearDetector('IMAGE', 1)
+      .then((d) => (detectorImagen = d))
+      .catch((e) => {
+        cargandoDetectorImagen = null;
+        throw e;
+      });
+  }
+  return cargandoDetectorImagen;
 }
 
 // Una sola petición de cámara en curso: en desarrollo React monta los efectos dos
@@ -121,6 +139,9 @@ function analizarMano(lm, aspecto) {
   };
   return {
     puntos: lm.map((q) => ({ x: 1 - q.x, y: q.y })),
+    // En espejo y con la misma escala en los 3 ejes (unidades = alto de la imagen):
+    // lo usa el reconocimiento de letras de la lengua de signos.
+    puntos3d: lm.map((q) => ({ x: (1 - q.x) * aspecto, y: q.y, z: q.z * aspecto })),
     punta: espejo(8),
     centro,
     tamano: tamano / aspecto, // relativo al ancho de la imagen
@@ -210,6 +231,19 @@ export function reintentarManos() {
     emitirEstado({ estado: 'apagado', error: '' });
     if (suscriptores.size) arrancar();
   }
+}
+
+/**
+ * Detecta la mano en una FOTO (File/Blob o imagen ya cargada). Devuelve las manos
+ * analizadas igual que en vídeo (en espejo, como si la foto fuera la cámara).
+ */
+export async function detectarManosEnImagen(fuente) {
+  const det = await cargarDetectorImagen();
+  const img = fuente instanceof Blob ? await createImageBitmap(fuente) : fuente;
+  const res = det.detect(img);
+  const ancho = img.width || img.naturalWidth || 1;
+  const alto = img.height || img.naturalHeight || 1;
+  return (res.landmarks || []).map((lm) => analizarMano(lm, ancho / alto));
 }
 
 /** Elemento <video> de la cámara (para pintar la vista previa) o null. */

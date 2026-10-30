@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { SALAS, ORDEN_SALAS, TEMAS_MATERIA, infoPrueba } from './bancoEscape';
 import {
@@ -319,8 +320,13 @@ function Biblioteca({ usuario, onAbrir, onCerrar, modoActual }) {
     );
 }
 
-export default function EditorEscape({ config, setConfig, usuario, onCrear, onAtras, onPizarra, meta: metaExt, setMeta: setMetaExt }) {
+export default function EditorEscape({ config, setConfig, usuario: usuarioProp, onCrear, onAtras, onPizarra, meta: metaExt, setMeta: setMetaExt }) {
     const [vista, setVista] = useState('EDITAR');
+    const [sesion, setSesion] = useState(null);       // usuario recién logueado desde el aviso de guardar
+    const usuario = usuarioProp?.uid ? usuarioProp : sesion;
+    const [pedirLogin, setPedirLogin] = useState(null); // null | { comoNuevo }
+    const [entrando, setEntrando] = useState(false);
+    const [errorLogin, setErrorLogin] = useState('');
     // título / público / guardado viven en el padre para no perderlos al ir a la pizarra y volver
     const [metaLocal, setMetaLocal] = useState({ titulo: '', publico: true, guardado: null });
     const meta = metaExt || metaLocal, setMeta = setMetaExt || setMetaLocal;
@@ -344,20 +350,24 @@ export default function EditorEscape({ config, setConfig, usuario, onCrear, onAt
     const setPruebas = (fn) => setConfig(c => ({ ...c, pruebas: typeof fn === 'function' ? fn(c.pruebas) : fn }));
     const aviso = (t) => { setMsg(t); setTimeout(() => setMsg(''), 3500); };
 
-    const guardar = async (comoNuevo = false) => {
+    const guardar = async (comoNuevo = false, { yo = usuario, soloNavegador = false } = {}) => {
         const t = titulo.trim();
         if (!t) { aviso('⚠ Ponle un título para guardarlo.'); return; }
         const errs = erroresConfig(config); setErrores(errs);
         if (errs.length) return;
+        // sin sesión se pregunta, salvo si ya eligió guardarlo en este navegador
+        if (!yo?.uid && !soloNavegador && !(guardado?.local && !comoNuevo)) { setErrorLogin(''); setPedirLogin({ comoNuevo }); return; }
         const limpia = limpiarConfig(config);
         try {
-            if (usuario?.uid) {
+            if (yo?.uid) {
                 const datos = {
                     titulo: t, tipoJuego: TIPO_JUEGO, tipo: TIPO_JUEGO, config: limpia, isPrivate: !publico, isFinished: true,
-                    profesorUid: usuario.uid, profesorNombre: usuario.displayName || 'Profesor', fechaModificacion: new Date(),
+                    profesorUid: yo.uid, profesorNombre: yo.displayName || 'Profesor', fechaModificacion: new Date(),
                 };
                 if (guardado && !guardado.local && !comoNuevo) await updateDoc(doc(db, 'resources', guardado.id), datos);
                 else { const r = await addDoc(collection(db, 'resources'), { ...datos, playCount: 0, fechaCreacion: new Date() }); setGuardado({ id: r.id, local: false }); }
+                // ya está en la cuenta: fuera la copia del navegador
+                if (guardado?.local) escribirLocales(leerLocales().filter(l => l.id !== guardado.id));
             } else {
                 const lista = leerLocales();
                 const id = guardado?.local && !comoNuevo ? guardado.id : 'local_' + nuevaId();
@@ -366,6 +376,20 @@ export default function EditorEscape({ config, setConfig, usuario, onCrear, onAt
             }
             aviso('💾 ¡Guardado!');
         } catch (e) { aviso('⚠ No se pudo guardar: ' + e.message); }
+    };
+
+    /** Login con ventana emergente, sin salir del editor, y guardado en la cuenta. */
+    const entrarYGuardar = async (comoNuevo = false) => {
+        setErrorLogin(''); setEntrando(true);
+        try {
+            const { user } = await signInWithPopup(auth, new GoogleAuthProvider());
+            setSesion(user); setPedirLogin(null);
+            await guardar(comoNuevo, { yo: user });
+        } catch (e) {
+            if (e?.code === 'auth/popup-blocked') setErrorLogin('El navegador ha bloqueado la ventana de inicio de sesión. Permítela y vuelve a probar.');
+            else if (!['auth/popup-closed-by-user', 'auth/cancelled-popup-request', 'auth/user-cancelled'].includes(e?.code)) setErrorLogin('No se ha podido iniciar sesión. Tu escape room sigue aquí: prueba otra vez.');
+        }
+        setEntrando(false);
     };
 
     const crear = () => {
@@ -479,8 +503,25 @@ export default function EditorEscape({ config, setConfig, usuario, onCrear, onAt
                     <div style={{ ...fila, marginTop: 10 }}>
                         <button className="eh-btn2" onClick={() => guardar(false)}>💾 {guardado ? 'Guardar cambios' : 'Guardar'}</button>
                         {guardado && <button className="eh-btn2" onClick={() => guardar(true)}>⧉ Guardar como nuevo</button>}
-                        {!usuario?.uid && <span style={{ fontSize: '.78rem', opacity: .65, alignSelf: 'center' }}>Sin sesión: se guarda en este navegador.</span>}
+                        {!usuario?.uid && guardado?.local && !pedirLogin && <button className="eh-btn2" disabled={entrando} onClick={() => { setErrorLogin(''); setPedirLogin({ comoNuevo: false }); }}>🔐 Subirlo a mi cuenta</button>}
                     </div>
+                    {guardado?.local && !usuario?.uid && !pedirLogin && <div style={{ fontSize: '.78rem', opacity: .65, marginTop: 6 }}>Guardado solo en este navegador.</div>}
+                    {pedirLogin && !usuario?.uid && (
+                        <div style={{ marginTop: 12, padding: 12, borderRadius: 12, background: 'rgba(250,204,21,.08)', border: '1px solid rgba(250,204,21,.35)' }}>
+                            <div style={{ fontWeight: 800 }}>🔐 No has iniciado sesión</div>
+                            <div style={{ fontSize: '.85rem', opacity: .85, margin: '4px 0 8px' }}>Inicia sesión para guardarlo en tu cuenta y usarlo desde cualquier ordenador. No perderás nada de lo que has preparado.</div>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, fontSize: '.88rem', cursor: 'pointer' }}>
+                                <input type="checkbox" checked={publico} onChange={e => setPublico(e.target.checked)} />
+                                Compartir en la biblioteca pública {publico && pruebas.some(p => p.tipo === 'MANUAL') && <span style={{ color: '#fcd34d' }}>(otros profes podrán ver tus códigos propios)</span>}
+                            </label>
+                            <div style={fila}>
+                                <button className="eh-btn2" disabled={entrando} onClick={() => entrarYGuardar(pedirLogin.comoNuevo)}>{entrando ? '⏳ Esperando a Google…' : '🔐 Iniciar sesión con Google y guardar'}</button>
+                                {(!guardado?.local || pedirLogin.comoNuevo) && <button className="eh-btn2" disabled={entrando} onClick={() => { const n = pedirLogin.comoNuevo; setPedirLogin(null); guardar(n, { soloNavegador: true }); }}>💻 Guardar solo en este navegador</button>}
+                                <button className="eh-btn2" disabled={entrando} onClick={() => setPedirLogin(null)}>Cancelar</button>
+                            </div>
+                            {errorLogin && <div style={{ marginTop: 8, color: '#fca5a5', fontWeight: 700 }}>⚠ {errorLogin}</div>}
+                        </div>
+                    )}
                     {msg && <div style={{ marginTop: 8, fontWeight: 700 }}>{msg}</div>}
                 </div>
 

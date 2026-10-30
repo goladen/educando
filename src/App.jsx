@@ -16,6 +16,7 @@ const PaginaRegistroEquipos = lazy(() => import('./PaginaRegistroEquipos'));
 const CompeticionPublica = lazy(() => import('./components/CompeticionPublica'));
 const QuienEsQuien = lazy(() => import('./QuienEsQuien'));
 const QuizManos = lazy(() => import('./manos/QuizManos.jsx'));
+const AvatarCuerpo = lazy(() => import('./cuerpo/AvatarCuerpo.jsx'));
 const QuienEsQuienHistorico = lazy(() => import('./QuienEsQuienHistorico'));
 const BunkerDisparo = lazy(() => import('./BunkerDisparo'));
 const JuegoCalamar = lazy(() => import('./JuegoCalamar'));
@@ -153,7 +154,7 @@ function App() {
           || slug === 'arkade' || slug === 'imperios' || slug === 'whoknows'
           || slug === 'quienesquien' || slug === 'quienhistorico' || slug === 'pizarra' || slug === 'bunker'
           || slug === 'enigmic' || slug === 'calamar' || slug === 'visor3d' || slug === 'esculpir' || slug === 'piktboard'
-          || slug === 'moneyboard' || slug === 'videos' || slug === 'sixseven' || slug === 'vanila' || slug === 'escaperoom' || slug === 'ovni' || slug === 'manos') {
+          || slug === 'moneyboard' || slug === 'videos' || slug === 'sixseven' || slug === 'vanila' || slug === 'escaperoom' || slug === 'ovni' || slug === 'manos' || slug === 'avatar') {
         setRutaPublica(slug);
         return;
       }
@@ -180,7 +181,7 @@ function App() {
         'irregular_verbs','sistema_solar',
         'retos','conectapuntos','sudoku',
         'imperios','geografia','quienesquien','quienhistorico','pizarra','bunker','enigmic','calamar',
-        'visor3d','esculpir','piktboard','moneyboard','videos','sixseven','vanila','escaperoom','ovni','manos',
+        'visor3d','esculpir','piktboard','moneyboard','videos','sixseven','vanila','escaperoom','ovni','manos','avatar',
         'comunidades','comunidad','competicion',
         'fisica',
         'math_world','primaria','feria',
@@ -249,6 +250,13 @@ function App() {
             setCargando(false);
         });
         return () => unsubscribe();
+    }, []);
+
+    // Una tarjeta de la landing pide abrirse como ruta pública
+    useEffect(() => {
+        const handler = (e) => setRutaPublica(e.detail);
+        window.addEventListener('pikt-abrir-ruta', handler);
+        return () => window.removeEventListener('pikt-abrir-ruta', handler);
     }, []);
 
     // Escuchar evento de captura de anotación → abrir pizarra
@@ -348,6 +356,7 @@ function App() {
     if (rutaPublica === 'sistema_solar') return <><SolarSystemViewer onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'imperios') return <><ImperiosGame onBack={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'manos') return <><QuizManos onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
+    if (rutaPublica === 'avatar') return <><AvatarCuerpo onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'quienesquien') return <><QuienEsQuien onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'quienhistorico') return <><QuienEsQuienHistorico onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'enigmic') return <><EnigmicLogic onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;

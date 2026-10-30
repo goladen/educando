@@ -96,6 +96,7 @@ const BiologiaApp = lazy(() => import('./BiologiaApp'));
 const HerramientasClase = lazy(() => import('../GestionAula'));
 const PizarraApp = lazy(() => import('../GestionAula').then(m => ({ default: m.PizarraApp })));
 const QuizManos = lazy(() => import('../manos/QuizManos.jsx'));
+const AvatarCuerpo = lazy(() => import('../cuerpo/AvatarCuerpo.jsx'));
 const AlgebraApp = lazy(() => import('../Algebra'));
 const VistasDidricas = lazy(() => import('../VistasDidricas'));
 const MiniAppCreator = lazy(() => import('./MiniAppCreator'));
@@ -1202,6 +1203,14 @@ export const GAME_INFO = {
         materias: ['Historia', 'Geografía', 'Ciencias Sociales'],
         etapas: ['Primaria', 'ESO', 'Bachillerato'],
     },
+    AVATAR_CUERPO: {
+        descripcion: 'Avatares 3D que copian en tiempo real los movimientos del cuerpo que ve la webcam (brazos, codos, piernas, tronco y cabeza), como un espejo. Modos: «Espejo» (libre, 1 o 2 personas), «Imita la postura» (colocarse como una silueta), «Imita a tu compañero» (por turnos, el líder hace una postura y el otro la copia) y «Coreografía» (seguir pasos al ritmo de la música, tipo Just Dance: ¡PERFECTO!, ¡GENIAL!, BIEN o FALLO y rachas). Lateralidad, esquema corporal, expresión corporal y Educación Física. El reconocimiento del cuerpo (MediaPipe) se hace en el propio navegador: no se envía ninguna imagen.',
+        tipoPreguntas: 'Sin preguntas: posturas corporales (brazos en cruz, letra Y, mano derecha/izquierda arriba, robot… y, con el cuerpo entero, estrella, rodilla arriba y sentadilla) y coreografías generadas al azar (tranquila o movida).',
+        biblioteca: '13 posturas incluidas, coreografías nuevas en cada partida con música sintetizada; el avatar se puede personalizar (piel, pelo, ropa).',
+        multiplayer: '1 o 2 jugadores a la vez delante de la cámara (uno a cada lado, a 2-3 m): marcador para cada uno con puntos animados. El resultado se guarda en «Mis registros».',
+        materias: ['Educación Física', 'Universal'],
+        etapas: ['Infantil', 'Primaria', 'ESO'],
+    },
     QUIZ_MANOS: {
         descripcion: 'Quiz que se responde con la mano delante de la webcam: levantar 1, 2, 3 o 4 dedos (sin el pulgar) y mantenerlos un segundo elige la opción A, B, C o D. El reconocimiento de manos (MediaPipe) se hace en el propio navegador: no se envía ninguna imagen. También se abre desde la Pizarra temática, donde el botón «✋ Mano» permite manejar la pizarra a distancia (mover un cursor y hacer clic o dibujar juntando pulgar e índice).',
         tipoPreguntas: 'Opción múltiple (2-4 opciones): tablas de multiplicar, sumas y restas generadas al azar, preguntas propias escritas en el momento o cualquier recurso con preguntas de opción múltiple.',
@@ -1822,6 +1831,7 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
                 if (juegoParam.toLowerCase() === 'quienhistorico') { setQuienHistoricoApp(true); return; }
                 if (juegoParam.toLowerCase() === 'pizarra')        { setPizarraApp(true);     return; }
                 if (juegoParam.toLowerCase() === 'manos')          { setQuizManosApp(true);   return; }
+            if (juegoParam.toLowerCase() === 'avatar')         { setAvatarCuerpoApp(true); return; }
                 if (juegoParam.toLowerCase() === 'biologia')       { setBiologiaApp(true);    return; }
                 if (juegoParam.toLowerCase() === 'sintaxis' || juegoParam.toLowerCase() === 'lengua') { setJuegoActivo({ tipoJuego: 'SINTAXIS' }); return; }
                 if (juegoParam.toLowerCase() === 'vistas_didricas') { setVistasDidricas(true); return; }
@@ -2020,6 +2030,7 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
     const [quienHistoricoApp,   setQuienHistoricoApp]   = useState(false);
     const [pizarraApp,          setPizarraApp]          = useState(false);
     const [quizManosApp,        setQuizManosApp]        = useState(false);
+    const [avatarCuerpoApp,     setAvatarCuerpoApp]     = useState(false);
     const [biologiaApp,         setBiologiaApp]         = useState(false);
     const [visor3dApp,          setVisor3dApp]          = useState(false);
     const [esculpirApp,         setEsculpirApp]         = useState(false);
@@ -2059,6 +2070,7 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
     useEffect(() => { if (!quienHistoricoApp) refrescarRegistros(); }, [quienHistoricoApp]);
     useEffect(() => { if (!esculpirApp) refrescarRegistros(); }, [esculpirApp]);
     useEffect(() => { if (!quizManosApp) refrescarRegistros(); }, [quizManosApp]);
+    useEffect(() => { if (!avatarCuerpoApp) refrescarRegistros(); }, [avatarCuerpoApp]);
     const totalRegistros = resumenRegistros.reduce((s, g) => s + g.count, 0);
     const [miAvatar] = useAvatarLocal();
     // Mapeo id-de-tarjeta → tipo-de-registro cuando no coinciden.
@@ -2369,6 +2381,8 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
 
         if (appId === 'ESCAPE_HALLOWEEN') {
             window.history.pushState({}, '', '/escaperoom');
+            // sin sesión se abre desde App: así iniciar sesión al guardar no desmonta el editor
+            if (!usuario) { window.dispatchEvent(new CustomEvent('pikt-abrir-ruta', { detail: 'escaperoom' })); return; }
             setJuegoActivo({ tipoJuego: 'ESCAPE_HALLOWEEN' });
             return;
         }
@@ -2479,6 +2493,7 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
             QUIEN_HISTORICO:    () => setQuienHistoricoApp(true),
             PIZARRA_TEMATICA:   () => setPizarraApp(true),
             QUIZ_MANOS:         () => setQuizManosApp(true),
+            AVATAR_CUERPO:      () => setAvatarCuerpoApp(true),
             BIOLOGIA:           () => setBiologiaApp(true),
             GESTION_AULA:       () => setGestionAula(true),
             VISTAS_DIDRICAS:    () => setVistasDidricas(true),
@@ -2680,6 +2695,7 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
         <QuienEsQuienHistorico onExit={() => { setQuienHistoricoApp(false); window.history.pushState({}, '', '/'); }} />
     );
     if (quizManosApp) return <Suspense fallback={null}><QuizManos onExit={() => { setQuizManosApp(false); window.history.pushState({}, '', '/'); }} /></Suspense>;
+    if (avatarCuerpoApp) return <Suspense fallback={null}><AvatarCuerpo onExit={() => { setAvatarCuerpoApp(false); window.history.pushState({}, '', '/'); }} /></Suspense>;
     if (pizarraApp) return (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#f1f5f9', overflow: 'auto', padding: '54px 12px 20px' }}>
             <button onClick={() => { setPizarraApp(false); window.history.pushState({}, '', '/'); }}
@@ -3930,6 +3946,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                     { id: 'QUIEN_HISTORICO',     label: '¿Quién es quién? histórico', emoji: '🧐', color: '#8e44ad', action: () => { setQuienHistoricoApp(true); window.history.pushState({}, '', '/quienhistorico'); }, shareable: true, shareUrl: `${window.location.origin}/quienhistorico` },
                     { id: 'PIZARRA_TEMATICA',    label: 'Pizarra temática',     emoji: '🎬', color: '#0ea5e9', action: () => { setPizarraApp(true); window.history.pushState({}, '', '/pizarra'); }, shareable: true, shareUrl: `${window.location.origin}/pizarra` },
                     { id: 'QUIZ_MANOS',          label: 'Quiz con los dedos',   emoji: '✋', color: '#7c3aed', action: () => { setQuizManosApp(true); window.history.pushState({}, '', '/manos'); }, shareable: true, shareUrl: `${window.location.origin}/manos` },
+                    { id: 'AVATAR_CUERPO',       label: 'Avatar en movimiento', emoji: '🕺', color: '#0891b2', action: () => { setAvatarCuerpoApp(true); window.history.pushState({}, '', '/avatar'); }, shareable: true, shareUrl: `${window.location.origin}/avatar` },
                     { id: 'BIOLOGIA',            label: 'Biología',             emoji: '🔬', color: '#16a34a', action: () => setBiologiaApp(true),  shareable: true },
                     { id: 'GESTION_AULA', label: 'Gestión Aula', emoji: '🏫', color: '#e67e22', action: () => setGestionAula(true), shareable: true, shareUrl: `${window.location.origin}${window.location.pathname}?gestion=menu` },
                     { id: 'VISTAS_DIDRICAS', label: 'Vistas Diédricas', emoji: '📐', color: '#7c3aed', action: () => setVistasDidricas(true), shareable: true },

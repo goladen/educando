@@ -279,12 +279,23 @@ export default function Login({ setGoogleToken }) {
                 <LandingGames />
             </div>
 
+            {/* PIE DE PÁGINA */}
+            <footer style={styles.footer}>
+                <KofiBoton />
+                <div>
+                    <a href="https://www.pikt.es/politica.html" target="_blank" rel="noopener noreferrer" style={{ color: 'white' }}>Política de privacidad</a>
+                    <span style={{ margin: '0 8px' }}>·</span>
+                    PiKT © {new Date().getFullYear()}
+                </div>
+            </footer>
+
             {/* Recomendación de Pi al visitante nuevo (una vez por dispositivo) */}
             <PiTutorial
                 usarLocalStorage
                 ocultarMinimizado
                 tutorialId="recomendacion_login"
-                pasos={[{ texto: '¡Hola! Soy Pi 👋 Este sitio es totalmente gratuito y sin publicidad. Si te registras (es gratis y rápido), nos ayudas muchísimo a mantenerlo vivo para todos. 💜' }]}
+                pasos={[{ texto: '¡Hola! Soy Pi 👋 Este sitio es totalmente gratuito y sin publicidad. Si te registras (es gratis y rápido), nos ayudas muchísimo a mantenerlo vivo para todos. Y si te apetece, también puedes invitarnos a un café ☕ 💜' }]}
+                extra={<KofiBoton style={{ width: '100%', justifyContent: 'center', boxSizing: 'border-box' }} />}
                 accion={{ label: 'Entrar con Google', onClick: handleLogin }}
             />
         </div>
@@ -322,6 +333,8 @@ const styles = {
     menuHeader: { display: 'flex', justifyContent: 'space-between', padding: '20px', borderBottom: '1px solid #eee' },
     menuList: { listStyle: 'none', padding: 0, margin: 0 },
     menuItem: { padding: '20px', borderBottom: '1px solid #eee', cursor: 'pointer', fontSize: '1.1rem', color: '#333' },
+
+    footer: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', padding: '40px 20px 30px', color: 'rgba(255,255,255,0.85)', fontSize: '0.9rem' },
 
     homeBtnAbsolute: { position: 'absolute', top: '20px', left: '20px', background: 'rgba(255,255,255,0.9)', border: 'none', padding: '10px 15px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }
 };

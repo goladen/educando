@@ -8,6 +8,9 @@ import KartingJoinRace     from './KartingOnline/KartingJoinRace';
 import { db } from './firebase';
 import { guardarRegistroLocal } from './utils/registrosLocales';
 import { collection, query, where, getDocs, addDoc, doc, getDoc } from 'firebase/firestore';
+// Conducir con las manos (webcam): volante + marchas con los dedos. Se carga al activarlo.
+const VolanteManos = React.lazy(() => import('./manos/VolanteManos.jsx'));
+const LS_MANOS = 'pikt_karting_manos';
 
 import tile01    from './kenney_racing-pack/PNG/Tiles/Asphalt road/road_asphalt01.png';
 import tile02    from './kenney_racing-pack/PNG/Tiles/Asphalt road/road_asphalt02.png';
@@ -521,7 +524,7 @@ function ModalEnviarProfe({ resultado, recurso, hojas, onClose }) {
 // ════════════════════════════════════════════════════════════════════════════
 // MODAL DE PREGUNTA en checkpoint
 // ════════════════════════════════════════════════════════════════════════════
-function ModalPregunta({ datos, onRespuesta }) {
+function ModalPregunta({ datos, onRespuesta, eleccionManos = null, conManos = false }) {
   const [elegida,   setElegida]   = useState(null);
   const [resultado, setResultado] = useState(null);
   const { opciones, correcta, cpIdx, texto } = datos;
@@ -534,6 +537,11 @@ function ModalPregunta({ datos, onRespuesta }) {
     try { const s=new Audio(ok?sndOk:sndFail); s.volume=0.85; s.play().catch(()=>{}); } catch(e){}
     setTimeout(() => onRespuesta(ok), 1200);
   };
+
+  // Respuesta con los dedos (VolanteManos): { idx, n } — n cambia en cada elección
+  useEffect(() => {
+    if (eleccionManos && opciones[eleccionManos.idx] !== undefined) responder(opciones[eleccionManos.idx]);
+  }, [eleccionManos?.n]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const colorBtn = (op) => {
     if (elegida === null) return 'rgba(255,255,255,0.1)';
@@ -572,6 +580,7 @@ function ModalPregunta({ datos, onRespuesta }) {
               fontWeight: op===correcta&&elegida!==null ? 700 : 400,
               transition:'background 0.2s', textAlign:'left',
             }}>
+              {conManos && <span style={{opacity:0.75,marginRight:4}}>{['☝️','✌️','🤟','🖖'][i]}</span>}
               {['A','B','C','D'][i]}. {op}
             </button>
           ))}
@@ -950,6 +959,14 @@ export function KartingGame({ recurso, hojas, circuito=1, onTerminar, onSalir,
   const mountRef    = useRef(null);
   const keysRef     = useRef({});
   const joystickRef = useRef({ x:0, y:0, active:false });
+  // Conducir con las manos: VolanteManos escribe aquí { activo, giro, marcha, hayManos }
+  const manosRef    = useRef({ activo:false, giro:0, marcha:1, hayManos:false });
+  const [manosOn, setManosOn] = useState(() => { try { return localStorage.getItem(LS_MANOS)==='1'; } catch { return false; } });
+  const [eleccionManos, setEleccionManos] = useState(null);
+  const alternarManos = () => setManosOn(v => {
+    try { localStorage.setItem(LS_MANOS, v?'0':'1'); } catch { /* sin almacenamiento */ }
+    return !v;
+  });
 
   const [phase,       setPhase]       = useState('countdown');
   const [countdown,   setCountdown]   = useState(3);
@@ -1047,6 +1064,7 @@ export function KartingGame({ recurso, hojas, circuito=1, onTerminar, onSalir,
     }
     questionActiveRef.current = false;
     setActiveQuestion(null);
+    setEleccionManos(null); // que la siguiente pregunta no se responda sola con la elección anterior
   };
 
   // ── Three.js loop ────────────────────────────────────────────────────────
@@ -1258,7 +1276,11 @@ export function KartingGame({ recurso, hojas, circuito=1, onTerminar, onSalir,
 
       // Jugador
       if (phaseLocal!=='countdown' && !questionActive) {
-        const joy=joystickRef.current;
+        // Con las manos: el volante hace de joystick (marcha D = gas, R = freno/marcha atrás)
+        const mano=manosRef.current;
+        const joy=mano.activo
+          ? { x:mano.giro, y:!mano.hayManos ? 0 : (mano.marcha===1 ? -1 : 1), active:true }
+          : joystickRef.current;
         const gasKey   = k['ArrowUp']  ||k['w']||k['W'];
         const brakeKey = k['ArrowDown']||k['s']||k['S'];
         const leftKey  = k['ArrowLeft']||k['a']||k['A'];
@@ -1511,6 +1533,8 @@ export function KartingGame({ recurso, hojas, circuito=1, onTerminar, onSalir,
       {activeQuestion && (
         <ModalPregunta
           datos={activeQuestion}
+          conManos={manosOn}
+          eleccionManos={eleccionManos}
           onRespuesta={(ok)=>{
             if (cpMeshRef.current[activeQuestion.cpIdx])
               cpMeshRef.current[activeQuestion.cpIdx].color.set(ok?0x27ae60:0xe74c3c);
@@ -1577,13 +1601,30 @@ export function KartingGame({ recurso, hojas, circuito=1, onTerminar, onSalir,
       {toasts.map(t => <FloatingToast key={t.id} type={t.type} seconds={t.seconds} />)}
 
       {/* Joystick — abajo derecha */}
-      {!activeQuestion && phase!=='countdown' && (
+      {!activeQuestion && phase!=='countdown' && !manosOn && (
         <Joystick joyRef={joystickRef} />
+      )}
+
+      {/* Volante con las manos (encima también de la pregunta, para ver los dedos) */}
+      {manosOn && (
+        <React.Suspense fallback={null}>
+          <VolanteManos
+            salidaRef={manosRef}
+            opciones={activeQuestion ? activeQuestion.opciones.length : 0}
+            onElegir={(idx) => setEleccionManos(e => ({ idx, n: (e?.n || 0) + 1 }))}
+            ancho={Math.min(260, Math.round(window.innerWidth * 0.42))}
+            style={{ position:'absolute', left:14, bottom:62, zIndex:120 }}
+          />
+        </React.Suspense>
       )}
 
       {/* Botones — abajo izquierda */}
       <div style={{position:'absolute',bottom:14,left:14,display:'flex',gap:8,zIndex:50}}>
         <button onClick={onSalir} style={hudBtn}>← Volver</button>
+        <button onClick={alternarManos} title="Conducir con las manos (webcam)"
+          style={{...hudBtn, background: manosOn ? 'rgba(39,174,96,0.85)' : hudBtn.background}}>
+          ✋ Manos{manosOn ? ' ✓' : ''}
+        </button>
         <button
           onClick={toggleFullscreen}
           title={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}

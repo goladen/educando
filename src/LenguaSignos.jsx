@@ -2,6 +2,10 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import lenguadesignoImg from './assets/lenguadesigno.jpg';
 import { FRASES_PIC } from './BibliotecaLenguaSignos';
 
+// Reconocimiento con la webcam (MediaPipe): solo se descarga al abrir esas pestañas.
+const ModoEscribirMano = React.lazy(() => import('./manos/SignosMano.jsx').then((m) => ({ default: m.ModoEscribirMano })));
+const ModoEnseniarSignos = React.lazy(() => import('./manos/SignosMano.jsx').then((m) => ({ default: m.ModoEnseniarSignos })));
+
 // ─── Utilidades ARASAAC ───────────────────────────────────────────────────────
 const PIC_API = 'https://api.arasaac.org/v1/pictograms/es/search';
 const picImg  = id => `https://static.arasaac.org/pictograms/${id}/${id}_2500.png`;
@@ -1048,6 +1052,8 @@ export default function LenguaSignos({ onExit }) {
     { id:'transcripcion', label:'✍️ Signos',      desc:'Texto → signos' },
     { id:'deletrear',     label:'🖐️ Deletrear',   desc:'Quiz signos' },
     { id:'referencia',    label:'📖 Referencia',  desc:'Abecedario' },
+    { id:'mano',          label:'✋ Escribir con la mano', desc:'Cámara → texto' },
+    { id:'enseniar',      label:'🎓 Enseñar',     desc:'Grabar ejemplos' },
     { id:'pictogramas',   label:'🖼️ Pictogramas', desc:'Texto → pics' },
     { id:'quizpic',       label:'🎯 Quiz Pics',   desc:'Adivina la frase' },
   ];
@@ -1121,6 +1127,13 @@ export default function LenguaSignos({ onExit }) {
           {modo === 'transcripcion' && <ModoTranscripcion />}
           {modo === 'deletrear'     && <ModoDeletrear />}
           {modo === 'referencia'    && <ModoReferencia />}
+          {(modo === 'mano' || modo === 'enseniar') && (
+            <React.Suspense fallback={<p style={{ textAlign:'center', color:'#64748b' }}>⏳ Cargando…</p>}>
+              {modo === 'mano'
+                ? <ModoEscribirMano Sign={Sign} onIrEnseniar={() => setModo('enseniar')} />
+                : <ModoEnseniarSignos Sign={Sign} />}
+            </React.Suspense>
+          )}
           {modo === 'pictogramas'   && <ModoPictogramas />}
           {modo === 'quizpic'       && <ModoQuizPictogramas />}
         </div>

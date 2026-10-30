@@ -17,10 +17,11 @@ import piContento from '../assets/Pi-contento.png';
  *   usarLocalStorage — true: persiste "visto" en localStorage en vez de Firestore
  *                      (para visitantes SIN loguear). Requiere tutorialId.
  *   accion     — { label, onClick } opcional: botón extra en el último paso (p. ej. "Entrar")
+ *   extra      — nodo React opcional que se muestra bajo el texto del último paso (p. ej. botón Ko-fi)
  *   ocultarMinimizado — true: no muestra el botón/mascota cuando está minimizado
  *                       (para mensajes de una sola vez, p. ej. en la landing)
  */
-export default function PiTutorial({ usuario, tutorialId, pasos = [], inline = false, usarLocalStorage = false, accion = null, ocultarMinimizado = false }) {
+export default function PiTutorial({ usuario, tutorialId, pasos = [], inline = false, usarLocalStorage = false, accion = null, extra = null, ocultarMinimizado = false }) {
     const [estado, setEstado]           = useState('cargando');
     const [paso, setPaso]               = useState(0);
     const [textoMostrado, setTexto]     = useState('');
@@ -194,6 +195,10 @@ export default function PiTutorial({ usuario, tutorialId, pasos = [], inline = f
                                 }} />
                             )}
                         </p>
+
+                        {escrituraDone && extra && paso === pasos.length - 1 && (
+                            <div style={{ marginTop:'10px' }} onClick={e => e.stopPropagation()}>{extra}</div>
+                        )}
 
                         {escrituraDone && (
                             <div style={{ display:'flex', justifyContent:'flex-end', gap:'6px', marginTop:'10px' }}>

@@ -15,6 +15,7 @@ import MandosMicrobit from './mandos/MandosMicrobit.jsx';
 const EscapeHalloween = lazy(() => import('./EscapeHalloween'));
 const FutbolMandos = lazy(() => import('./futbol3d/FutbolMandos.jsx'));
 const ConducirMbot = lazy(() => import('./robot/ConducirMbot.jsx'));
+const CargarTestRobot = lazy(() => import('./robot/CargarTestRobot.jsx'));
 import mbot2Img from './assets/Imagenmbot.avif';
 import microbitImg from './assets/imagenmicrobit.jfif';
 import keystudioImg from './assets/imagenkeystudio.jpg';
@@ -143,6 +144,13 @@ export default function ProgramacionRobotica({ usuario = null, onLoginRequest, o
   if (vista === 'mandos') {
     return <MandosMicrobit onExit={() => setVista('hub')} />;
   }
+  if (vista === 'testRobot') {
+    return (
+      <Suspense fallback={<div style={{ padding: 40, textAlign: 'center' }}>Cargando…</div>}>
+        <CargarTestRobot onExit={() => setVista('hub')} />
+      </Suspense>
+    );
+  }
   if (vista === 'conducir') {
     return (
       <Suspense fallback={<div style={{ padding: 40, textAlign: 'center' }}>Cargando…</div>}>
@@ -228,6 +236,13 @@ export default function ProgramacionRobotica({ usuario = null, onLoginRequest, o
             <span style={styles.editorBtnTitle}>Mandos micro:bit</span>
             <span style={styles.editorBtnDesc}>
               Convierte las micro:bit en mandos de respuesta por radio. Se configuran una vez para todo el centro y sirven a cualquier profe.
+            </span>
+          </button>
+          <button onClick={() => setVista('testRobot')} style={styles.editorBtn('#7c3aed')}>
+            <span style={{ fontSize: 34 }}>🗣️</span>
+            <span style={styles.editorBtnTitle}>Test en el mBot2</span>
+            <span style={styles.editorBtnDesc}>
+              Carga un test en el robot: lee la pregunta en voz alta, muestra las respuestas y se contesta con su joystick.
             </span>
           </button>
           <button onClick={() => setVista('conducir')} style={styles.editorBtn('#0284c7')}>

@@ -68,7 +68,8 @@ function d2(a, b) {
 
 /**
  * muestras = { A: [[63 números], …], … } → clasificador.
- * clasificar(normalizada, clasesPermitidas?) → { clase, confianza (0-1), segunda } o null.
+ * clasificar(normalizada, clasesPermitidas?) → null o { clase, confianza (0-1), segunda,
+ * dudosa (empate con `segunda`), lejana (se parece poco), cercana (si clase = null: nada se parece) }.
  */
 export function crearClasificador(muestras, k = 5) {
   const datos = [];
@@ -78,23 +79,12 @@ export function crearClasificador(muestras, k = 5) {
     })
   );
 
-  // Umbral de rechazo: distancia típica de cada ejemplo a su vecino más cercano de su
-  // misma letra. Lo que quede muy lejos de todo no es ninguna letra grabada.
-  let umbral = Infinity;
-  if (datos.length >= 10) {
-    const paso = Math.max(1, Math.floor(datos.length / 150)); // muestreo para no tardar
-    const cercanas = [];
-    for (let i = 0; i < datos.length; i += paso) {
-      let mejor = Infinity;
-      for (let j = 0; j < datos.length; j++) {
-        if (j !== i && datos[j].clase === datos[i].clase) mejor = Math.min(mejor, d2(datos[i].r, datos[j].r));
-      }
-      if (mejor < Infinity) cercanas.push(Math.sqrt(mejor));
-    }
-    cercanas.sort((a, b) => a - b);
-    const mediana = cercanas[Math.floor(cercanas.length / 2)] || 0.1;
-    umbral = Math.max(0.25, mediana * 4);
-  }
+  // Umbrales FIJOS (error medio por rasgo, en tamaños de palma). No se pueden calcular de
+  // los ejemplos: al grabarse seguidos son casi idénticos entre sí y salían tan estrictos
+  // que rechazaban la misma letra con la mano un poco girada.
+  const raiz = Math.sqrt(datos[0]?.r.length || 78);
+  const umbralLejana = 0.35 * raiz; // más allá: se parece, pero poco (`lejana`)
+  const umbralFuera = 0.7 * raiz; // más allá: no se parece a ninguna
 
   const clases = [...new Set(datos.map((d) => d.clase))];
 
@@ -105,9 +95,11 @@ export function crearClasificador(muestras, k = 5) {
       if (!datos.length || !normalizada) return null;
       const r = rasgos(normalizada);
       const vecinos = [];
+      const mejorPorClase = {}; // los k vecinos suelen ser de una sola letra: el empate se mira aquí
       for (const d of datos) {
         if (permitidas && !permitidas.has(d.clase)) continue;
         const dd = d2(r, d.r);
+        if (!(dd >= mejorPorClase[d.clase])) mejorPorClase[d.clase] = dd;
         if (vecinos.length < k) {
           vecinos.push({ clase: d.clase, dd });
           vecinos.sort((a, b) => a.dd - b.dd);
@@ -117,7 +109,8 @@ export function crearClasificador(muestras, k = 5) {
         }
       }
       if (!vecinos.length) return null;
-      if (Math.sqrt(vecinos[0].dd) > umbral) return { clase: null, confianza: 0, segunda: null };
+      const dist = Math.sqrt(vecinos[0].dd);
+      if (dist > umbralFuera) return { clase: null, confianza: 0, segunda: null, dudosa: false, lejana: true, cercana: vecinos[0].clase };
       const votos = {};
       let suma = 0;
       vecinos.forEach((v) => {
@@ -126,7 +119,14 @@ export function crearClasificador(muestras, k = 5) {
         suma += w;
       });
       const orden = Object.entries(votos).sort((a, b) => b[1] - a[1]);
-      return { clase: orden[0][0], confianza: orden[0][1] / suma, segunda: orden[1]?.[0] || null };
+      const confianza = orden[0][1] / suma;
+      // Segunda letra más cercana (con su mejor ejemplo); empate si está casi a la misma distancia.
+      const clase = orden[0][0];
+      const rival = Object.entries(mejorPorClase)
+        .filter(([c]) => c !== clase)
+        .sort((a, b) => a[1] - b[1])[0];
+      const empate = rival ? dist / Math.sqrt(rival[1]) > 0.88 : false;
+      return { clase, confianza, segunda: rival?.[0] || null, dudosa: empate || confianza < 0.6, lejana: dist > umbralLejana };
     },
   };
 }

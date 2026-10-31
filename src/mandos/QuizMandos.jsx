@@ -2,7 +2,7 @@
 // responde con sus mandos. Primera respuesta de cada mando = la que cuenta.
 // Puntos = 500 por acierto + hasta 500 por rapidez. Sirve de plantilla para
 // llevar los mandos a otros juegos (ver ./mandosMicrobit.js).
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   LETRAS,
   escucharMandos,
@@ -18,6 +18,9 @@ import { despertarAudio, sonidoFinal } from '../utils/sonidosFeedback';
 import { BotonTutorialMandos } from './TutorialMandos.jsx';
 import ChipAntena from './ChipAntena.jsx';
 import SelectorRecursoMandos, { hojasQuiz, numeroQuiz, MIN_NUM_QUIZ, MAX_NUM_QUIZ } from './SelectorRecursoMandos.jsx';
+import { guardarRegistroLocal } from '../utils/registrosLocales';
+// Los generadores de Math World pesan: solo se cargan al elegirlos
+const SelectorMatesMandos = lazy(() => import('./SelectorMatesMandos.jsx'));
 
 const COLORES = ['#ef4444', '#3b82f6', '#f59e0b', '#22c55e'];
 const LS_NOMBRES = 'pikt_mandos_nombres';
@@ -145,11 +148,13 @@ const guardarLS = (clave, valor) => {
   }
 };
 
-export default function QuizMandos({ onExit }) {
+// soloMates: herramienta «Mates con mandos» de Math World (el mismo quiz, solo con sus ejercicios)
+export default function QuizMandos({ onExit, soloMates = false }) {
   const [fase, setFase] = useState('config'); // config | lobby | pregunta | resultado | final
-  const [tipo, setTipo] = useState('tablas');
+  const [tipo, setTipo] = useState(soloMates ? 'mates' : 'tablas');
+  const generarMates = useRef(null);
   const [numPreguntas, setNumPreguntas] = useState(8);
-  const [tiempo, setTiempo] = useState(20);
+  const [tiempo, setTiempo] = useState(soloMates ? 30 : 20);
   const [textoPropias, setTextoPropias] = useState(() => leerLS(LS_PROPIAS, EJEMPLO_PROPIAS));
   const [recurso, setRecurso] = useState(null);
   const [hojaSel, setHojaSel] = useState(-1); // -1 = todas las hojas
@@ -256,7 +261,18 @@ export default function QuizMandos({ onExit }) {
   }, [fase, nJugadores, nRespuestas, corregir]);
 
   useEffect(() => {
-    if (fase === 'final') sonidoFinal();
+    if (fase !== 'final') return;
+    sonidoFinal();
+    if (soloMates) {
+      const lista = Object.values(jugadores);
+      guardarRegistroLocal('MATES_MANDOS', {
+        titulo: `${preguntas.length} preguntas · ${lista.length} mandos`,
+        aciertos: lista.reduce((s, j) => s + j.aciertos, 0),
+        intentos: lista.length * preguntas.length,
+        nombre: 'Clase',
+        via: 'mandos',
+      });
+    }
   }, [fase]);
 
   const ranking = useMemo(
@@ -285,6 +301,12 @@ export default function QuizMandos({ onExit }) {
         return { texto: p.texto, opciones: orden.map((i) => p.opciones[i]), correcta: orden.indexOf(p.correcta) };
       });
       lista = (ordenRecurso ? mezcladas : barajar(mezcladas)).slice(0, numPreguntas);
+    } else if (tipo === 'mates') {
+      lista = generarMates.current?.(numPreguntas) || [];
+      if (!lista.length) {
+        alert('Elige al menos un tema y un tipo de ejercicio que se pueda jugar con estas opciones.');
+        return;
+      }
     } else if (tipo === 'propias') {
       guardarLS(LS_PROPIAS, textoPropias);
       lista = barajar(leerPropias(textoPropias, numerico)).slice(0, numPreguntas);
@@ -326,7 +348,7 @@ export default function QuizMandos({ onExit }) {
         <button onClick={onExit} style={st.backBtn}>
           ← Volver
         </button>
-        <h2 style={st.title}>🏆 Quiz con mandos</h2>
+        <h2 style={st.title}>{soloMates ? '🧮 Mates con mandos' : '🏆 Quiz con mandos'}</h2>
         <ChipAntena />
         {(fase === 'pregunta' || fase === 'resultado') && (
           <span style={st.contador}>
@@ -363,10 +385,11 @@ export default function QuizMandos({ onExit }) {
               )}
             </p>
             <h3 style={{ ...st.h3, marginTop: 14 }}>Preguntas</h3>
-            <div style={st.fila}>
+            {!soloMates && <div style={st.fila}>
               {[
                 ['tablas', '✖️ Tablas'],
                 ['sumas', '➕ Sumas y restas'],
+                ['mates', '🧮 Math World'],
                 ['recurso', '📚 Recurso'],
                 ['propias', '✍️ Mis preguntas'],
               ].map(([k, txt]) => (
@@ -374,7 +397,19 @@ export default function QuizMandos({ onExit }) {
                   {txt}
                 </button>
               ))}
-            </div>
+            </div>}
+            {tipo === 'mates' && (
+              <>
+                <p style={st.ayuda}>
+                  {numerico
+                    ? <>Ejercicios de las apps de Math World cuyo resultado es un <b>número entero</b>. Si el resultado es una fracción, un decimal o una expresión, elige <b>Letras A-D</b>.</>
+                    : <>Ejercicios de todas las apps de Math World: cada uno se convierte en una pregunta con opciones A-D.</>}
+                </p>
+                <Suspense fallback={<p style={st.ayuda}>Cargando ejercicios…</p>}>
+                  <SelectorMatesMandos numerico={numerico} apiRef={generarMates} />
+                </Suspense>
+              </>
+            )}
             {tipo === 'recurso' && (
               <>
                 <p style={st.ayuda}>
@@ -452,7 +487,7 @@ export default function QuizMandos({ onExit }) {
               <label style={st.label}>
                 Segundos por pregunta
                 <select value={tiempo} onChange={(e) => setTiempo(Number(e.target.value))} style={st.select}>
-                  {[10, 15, 20, 30, 45, 60].map((n) => (
+                  {[10, 15, 20, 30, 45, 60, 90, 120].map((n) => (
                     <option key={n}>{n}</option>
                   ))}
                 </select>
@@ -505,7 +540,15 @@ export default function QuizMandos({ onExit }) {
                 <div style={{ ...st.barraRelleno, width: `${(restante / tiempo) * 100}%` }} />
               </div>
             )}
-            <div style={st.pregunta}>{pregunta.texto}</div>
+            {pregunta.Enunciado ? (
+              <div style={st.preguntaMates}>
+                <div style={st.temaMates}>{pregunta.emoji} {pregunta.tema}{pregunta.instruccion ? ` · ${pregunta.instruccion}` : ''}</div>
+                <pregunta.Enunciado ap={pregunta.ap} size="3rem" />
+                {pregunta.etiqueta && <div style={st.etiquetaMates}>{pregunta.etiqueta}</div>}
+              </div>
+            ) : (
+              <div style={st.pregunta}>{pregunta.texto}</div>
+            )}
             {numerico ? (
               fase === 'pregunta' ? (
                 <div style={st.pistaNum}>
@@ -513,7 +556,7 @@ export default function QuizMandos({ onExit }) {
                 </div>
               ) : (
                 <div>
-                  <div style={st.solucionNum}>{pregunta.valor}</div>
+                  <div style={st.solucionNum}>{pregunta.valor}{pregunta.unidad ? ` ${pregunta.unidad}` : ''}</div>
                   <div style={st.chips}>
                     {repartoNum.map(([n, c]) => (
                       <span
@@ -771,6 +814,9 @@ const st = {
     margin: '6px 0 22px',
     lineHeight: 1.2,
   },
+  preguntaMates: { background: '#fff', borderRadius: 16, padding: '16px 22px 22px', margin: '6px auto 22px', maxWidth: 900, overflowX: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, textAlign: 'center' },
+  temaMates: { color: '#64748b', fontSize: 14, fontWeight: 700 },
+  etiquetaMates: { color: '#1e293b', fontSize: 22, fontWeight: 800 },
   opciones: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 },
   opcion: {
     display: 'flex',

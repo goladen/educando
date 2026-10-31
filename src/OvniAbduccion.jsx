@@ -2063,12 +2063,13 @@ export default function OvniAbduccion({ onExit }) {
     const [animo, setAnimo] = useState('normal');
     const [modo, setModo] = useState('solo');
     const [mandos, setMandos] = useState(() => {
-        try { return { activos: false, invertir: false, turnos: false, ...JSON.parse(localStorage.getItem(KEY_MANDOS) || '{}') }; } catch { return { activos: false, invertir: false, turnos: false }; }
+        // «mano» no se recuerda: enciende la cámara y bloquea el menú en equipos lentos
+        try { return { activos: false, invertir: false, turnos: false, ...JSON.parse(localStorage.getItem(KEY_MANDOS) || '{}'), mano: false }; } catch { return { activos: false, invertir: false, turnos: false, mano: false }; }
     });
     const ctrlMandos = useMandosOvni(mandos.activos, modo === 'duo' ? 2 : 1);
     const cambiarMandos = (cambios) => setMandos(m => {
         const n = { ...m, ...cambios };
-        try { localStorage.setItem(KEY_MANDOS, JSON.stringify(n)); } catch { /* sin localStorage */ }
+        try { localStorage.setItem(KEY_MANDOS, JSON.stringify({ ...n, mano: false })); } catch { /* sin localStorage */ }
         return n;
     });
     const [nombresDuo, setNombresDuo] = useState(['Jugador 1', 'Jugador 2']);

@@ -192,11 +192,11 @@ const respuestas = (ap) => {
     if (ap.tipo === 'problemas') {
         const p = probPorId(ap.probId);
         return (p?.preguntas || []).map(q => ({
-            etiqueta: q.p, tipo: q.tipo, unidad: q.unidad, opciones: q.opciones,
+            etiqueta: q.p, tipo: q.tipo, unidad: q.unidad, opciones: q.opciones, v: q.r,
             comprobar: q.tipo === 'frac' ? comprobarFraccion(q.r) : q.tipo === 'num' ? comprobarNumero(q.r) : (o) => ({ ok: o === q.r }),
         }));
     }
-    return [{ tipo: 'frac', comprobar: comprobarFraccion(ap.respuesta, { irreducible: !!ap.exigirIrreducible, lockDen: ap.lockDen || null }) }];
+    return [{ tipo: 'frac', v: ap.respuesta, comprobar: comprobarFraccion(ap.respuesta, { irreducible: !!ap.exigirIrreducible, lockDen: ap.lockDen || null }) }];
 };
 
 export const motorFracciones = {

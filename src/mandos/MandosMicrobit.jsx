@@ -135,6 +135,7 @@ export default function MandosMicrobit({ onExit }) {
   };
 
   if (vista === 'quiz') return <QuizMandos onExit={() => setVista('panel')} />;
+  if (vista === 'mates') return <QuizMandos soloMates onExit={() => setVista('panel')} />;
   if (vista === 'robots') return <PistaRobotsMandos onExit={() => setVista('panel')} />;
   if (vista === 'dibujo') return <DibujoMandos onExit={() => setVista('panel')} />;
   if (vista === 'futbol')
@@ -431,6 +432,9 @@ export default function MandosMicrobit({ onExit }) {
         <div style={{ ...st.fila, justifyContent: 'center', marginTop: 22, gap: 14 }}>
           <button style={{ ...st.btn('#16a34a'), fontSize: 18, padding: '14px 28px' }} onClick={() => setVista('quiz')}>
             🏆 Quiz con mandos (letras o número)
+          </button>
+          <button style={{ ...st.btn('#0d9488'), fontSize: 18, padding: '14px 28px' }} onClick={() => setVista('mates')}>
+            🧮 Mates con mandos
           </button>
           <button style={{ ...st.btn('#0ea5e9'), fontSize: 18, padding: '14px 28px' }} onClick={() => setVista('robots')}>
             🤖 Pista de robots

@@ -202,16 +202,16 @@ const comprobarNumero = (r) => (txt) => {
 const respuestas = (ap) => {
     if (esProblema(ap.tipo)) {
         return (ap.problema?.preguntas || []).map(q => ({
-            etiqueta: q.p, tipo: q.tipo, unidad: q.unidad, opciones: q.opciones,
+            etiqueta: q.p, tipo: q.tipo, unidad: q.unidad, opciones: q.opciones, v: q.r,
             comprobar: q.tipo === 'opcion' ? (o) => ({ ok: o === q.r }) : comprobarNumero(q.r),
         }));
     }
     if (esCol(ap)) {
         const r = resultadoColumna(ap.columna);
-        if (ap.columna.op === 'div') return [{ etiqueta: 'Cociente', tipo: 'num', comprobar: comprobarNumero(r.cociente) }, { etiqueta: 'Resto', tipo: 'num', comprobar: comprobarNumero(r.resto) }];
-        return [{ tipo: 'num', comprobar: comprobarNumero(r) }];
+        if (ap.columna.op === 'div') return [{ etiqueta: 'Cociente', tipo: 'num', v: r.cociente, comprobar: comprobarNumero(r.cociente) }, { etiqueta: 'Resto', tipo: 'num', v: r.resto, comprobar: comprobarNumero(r.resto) }];
+        return [{ tipo: 'num', v: r, comprobar: comprobarNumero(r) }];
     }
-    return [{ tipo: 'num', comprobar: comprobarNumero(ap.answer) }];
+    return [{ tipo: 'num', v: ap.answer, comprobar: comprobarNumero(ap.answer) }];
 };
 
 export const motorCalculo = {

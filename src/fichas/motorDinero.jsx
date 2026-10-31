@@ -150,13 +150,13 @@ const comprobarNumero = (r) => (txt) => {
 const respuestas = (ap) => {
     if (esProblema(ap)) {
         return (ap.problema?.preguntas || []).map(q => ({
-            etiqueta: q.p, tipo: q.tipo, unidad: q.unidad, opciones: q.opciones,
+            etiqueta: q.p, tipo: q.tipo, unidad: q.unidad, opciones: q.opciones, v: q.r,
             comprobar: q.tipo === 'opcion' ? (o) => ({ ok: o === q.r }) : comprobarNumero(q.r),
         }));
     }
     if (ap.tipo === 'pagar') return []; // el desglose en piezas no se escribe como un número
-    if (ap.unidad === '%') return [{ tipo: 'num', unidad: '%', comprobar: comprobarNumero(ap.answerNum) }];
-    return [{ tipo: 'num', unidad: '€', comprobar: comprobarNumero(ap.answerCents / 100) }];
+    if (ap.unidad === '%') return [{ tipo: 'num', unidad: '%', v: ap.answerNum, comprobar: comprobarNumero(ap.answerNum) }];
+    return [{ tipo: 'num', unidad: '€', v: ap.answerCents / 100, comprobar: comprobarNumero(ap.answerCents / 100) }];
 };
 
 const ES_TEXTO = (ap) => ap.tipo !== 'pagar';

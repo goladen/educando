@@ -11,7 +11,9 @@ import {
   moverMbot,
   pararMbot,
   pitarMbot,
+  preguntarRobot,
   soportaSerialCyberpi,
+  soportaBluetoothCyberpi,
   setModoCyberpi,
   instalarReceptor,
   PROGRAMA_RECEPTOR,
@@ -83,14 +85,22 @@ export default function ConducirMbot({ onExit }) {
   const [antena, setAntena] = useState({ conectada: false, version: 0 });
   const [real, setReal] = useState(true);
   const [conexion, setConexion] = useState(() => {
-    const c = leer(LS_AJUSTES, {}).conexion === 'antena' ? 'antena' : 'cable';
+    const g = leer(LS_AJUSTES, {}).conexion;
+    // En el móvil no hay Web Serial: lo único posible es Bluetooth.
+    const c = !soportaSerialCyberpi() && soportaBluetoothCyberpi() ? 'bluetooth' : g === 'antena' || g === 'bluetooth' ? g : 'cable';
     setModoCyberpi(c);
     return c;
   });
   const [instalando, setInstalando] = useState(false);
+  const [avisoPregunta, setAvisoPregunta] = useState(null);
+  const preguntar = async () => {
+    setAvisoPregunta({ ok: true, detalle: 'Enviando…' });
+    setAvisoPregunta(await preguntarRobot());
+  };
   const [avisoReceptor, setAvisoReceptor] = useState('');
   const [copiado, setCopiado] = useState(false);
 
+  const puedeConectar = conexion === 'bluetooth' ? soportaBluetoothCyberpi() : soportaSerialCyberpi();
   const cambiarConexion = async (c) => {
     if (c === conexion) return;
     await desconectarCyberpi();
@@ -117,7 +127,7 @@ export default function ConducirMbot({ onExit }) {
   const cajaRef = useRef(null);
   const mundoRef = useRef(null);
   const robotRef = useRef(null);
-  const ent = useRef({ mano: { v: 0, w: 0, t: 0, puno: false, cx: 0.5, cy: 0.5 }, mando: { dir: '', t: 0, freno: false, tB: 0, a: false, tA: 0, id: null }, teclas: new Set() });
+  const ent = useRef({ joy: { v: 0, w: 0, activo: false }, mano: { v: 0, w: 0, t: 0, puno: false, cx: 0.5, cy: 0.5 }, mando: { dir: '', t: 0, freno: false, tB: 0, a: false, tA: 0, id: null }, teclas: new Set() });
   const vivo = useRef({});
   vivo.current = { fuente, potencia, ajustes, detenido, real, cyber, neutro, retoId };
 
@@ -168,12 +178,17 @@ export default function ConducirMbot({ onExit }) {
       e.id = ev.id;
       if (ev.accion === 'V') {
         e.dir = ev.dir || '';
+        e.x = ev.x;
+        e.y = ev.y;
         e.t = ahora;
       } else if (ev.accion === 'B') {
         e.freno = ev.on;
         e.tB = ahora;
       } else if (ev.accion === 'A') {
-        if (ev.on && (!e.a || ahora - e.tA > CADUCA_MANDO)) bocina();
+        if (ev.on && (!e.a || ahora - e.tA > CADUCA_MANDO)) {
+          if (vivo.current.real && vivo.current.cyber.estado === 'listo') preguntar();
+          else bocina();
+        }
         e.a = ev.on;
         e.tA = ahora;
       }
@@ -231,6 +246,10 @@ export default function ConducirMbot({ onExit }) {
       return { v, w, activa: true, info: '⌨️ Teclado' };
     }
     const f = vivo.current.fuente;
+    if (f === 'joystick') {
+      const { joy } = ent.current;
+      return { v: joy.v, w: joy.w, activa: joy.activo, info: joy.activo ? '🕹️ Joystick' : 'Arrastra el joystick para conducir' };
+    }
     if (f === 'mano') {
       if (ahora - mano.t > CADUCA_MANO) return { v: 0, w: 0, activa: false, info: '🙈 No veo la mano: el robot se para' };
       if (mano.puno) return { v: 0, w: 0, activa: true, info: '✊ Puño: freno' };
@@ -241,8 +260,11 @@ export default function ConducirMbot({ onExit }) {
       const freno = mando.freno && ahora - mando.tB < CADUCA_MANDO;
       if (freno) return { v: 0, w: 0, activa: true, info: `🎮 Mando ${mando.id}: freno (B)` };
       const dir = ahora - mando.t < CADUCA_MANDO ? mando.dir : '';
-      const v = dir.includes('F') ? 1 : dir.includes('T') ? -1 : 0;
-      const w = dir.includes('D') ? 1 : dir.includes('I') ? -1 : 0;
+      const vigente = ahora - mando.t < CADUCA_MANDO;
+      // Mandos v7: cuánto se inclina. Los anteriores solo dicen hacia dónde.
+      const analogico = vigente && mando.x != null && mando.y != null;
+      const v = analogico ? -mando.y / 100 : dir.includes('F') ? 1 : dir.includes('T') ? -1 : 0;
+      const w = analogico ? mando.x / 100 : dir.includes('D') ? 1 : dir.includes('I') ? -1 : 0;
       return { v, w, activa: true, info: `🎮 Mando ${mando.id}` };
     }
     return { v: 0, w: 0, activa: false, info: 'Usa las flechas o W A S D' };
@@ -421,7 +443,8 @@ export default function ConducirMbot({ onExit }) {
             {[
               ['mano', '✋ Mano'],
               ['mando', '🎮 micro:bit'],
-              ['teclado', '⌨️ Teclado'],
+              ['joystick', '🕹️ Joystick'],
+              ['teclado', '⌨️ Teclado / botones'],
             ].map(([id, txt]) => (
               <button key={id} onClick={() => setFuente(id)} style={fuente === id ? st.btnOn : st.btnOff}>
                 {txt}
@@ -468,12 +491,19 @@ export default function ConducirMbot({ onExit }) {
               )}
               <p style={st.ayuda}>
                 <b>Inclina</b> el mando hacia delante para avanzar, hacia atrás para retroceder y a los lados para girar.
-                <b> A</b> = bocina · <b>B</b> (mantener) = freno. Si el mando deja de enviar, el robot se para.
+                <b> A</b> = pregunta en el robot (si no está conectado, bocina) · <b>B</b> (mantener) = freno. Si el mando deja de enviar, el robot se para.
               </p>
+            </div>
+          )}
+          {fuente === 'joystick' && (
+            <div style={st.caja}>
+              <JoystickConducir joy={ent.current.joy} />
+              <p style={st.ayuda}>Cuanto más lejos del centro, más rápido. En las diagonales avanza y gira a la vez. Al soltar, se para.</p>
             </div>
           )}
           {fuente === 'teclado' && (
             <div style={st.caja}>
+              <PadTactil teclas={ent.current.teclas} />
               <p style={st.ayuda}>
                 <b>↑ ↓ ← →</b> o <b>W A S D</b> para conducir · <b>Espacio</b> = bocina. El teclado funciona siempre, aunque elijas
                 la mano o el mando.
@@ -536,12 +566,18 @@ export default function ConducirMbot({ onExit }) {
             {[
               ['cable', '🔌 Por cable'],
               ['antena', '📡 Sin cable (2 CyberPi)'],
+              ['bluetooth', '📶 Bluetooth'],
             ].map(([id, txt]) => (
               <button key={id} onClick={() => cambiarConexion(id)} style={conexion === id ? st.btnOn : st.btnOff}>
                 {txt}
               </button>
             ))}
           </div>
+          {conexion === 'bluetooth' && (
+            <p style={st.ayuda}>
+              Enciende el mBot2, cierra mBlock y la app de Makeblock, y pulsa «Conectar». Funciona con Chrome en Android o en el ordenador; en iPhone no funciona con Safari.
+            </p>
+          )}
           {conexion === 'antena' && (
             <div style={st.caja}>
               <b style={{ fontSize: '0.85rem' }}>Paso 1 · Receptor en el robot</b>
@@ -581,15 +617,23 @@ export default function ConducirMbot({ onExit }) {
                   </button>
                 </span>
               ) : (
-                <button onClick={conectarCyberpi} disabled={cyber.estado === 'conectando' || instalando || !soportaSerialCyberpi()} style={st.btnOn}>
-                  🔌 Conectar {conexion === 'antena' ? 'antena' : 'CyberPi'}
+                <button onClick={conectarCyberpi} disabled={cyber.estado === 'conectando' || instalando || !puedeConectar} style={st.btnOn}>
+                  {conexion === 'bluetooth' ? '📶' : '🔌'} Conectar {conexion === 'antena' ? 'antena' : 'CyberPi'}
                 </button>
               )}
             </div>
             {cyber.error && <p style={{ ...st.ayuda, color: '#f97316' }}>{cyber.error}</p>}
-            {!soportaSerialCyberpi() && <p style={st.ayuda}>Necesitas Chrome o Edge en un ordenador.</p>}
+            {!puedeConectar && <p style={st.ayuda}>{conexion === 'bluetooth' ? 'Este navegador no permite Bluetooth: usa Chrome en Android o en el ordenador.' : 'Necesitas Chrome o Edge en un ordenador.'}</p>}
             {cyber.estado === 'listo' && (
               <>
+                <button type="button" onClick={preguntar} style={{ ...st.btnOn, background: '#7c3aed', borderColor: '#7c3aed', width: '100%', padding: '12px 10px', fontSize: '1rem' }}>
+                  🗣️ Preguntar
+                </button>
+                {avisoPregunta && <p style={{ ...st.ayuda, fontWeight: 700, color: avisoPregunta.ok ? '#22c55e' : '#f97316' }}>{avisoPregunta.detalle}</p>}
+                <p style={st.ayuda}>
+                  Abre antes en el robot el test de la ranura 8 («Test en el mBot2»). Lleva el robot hasta quien deba contestar: oirá la pregunta y responderá con el joystick.
+                  Con el mando micro:bit, el botón A hace lo mismo.
+                </p>
                 <label style={st.check}>
                   <input type="checkbox" checked={real} onChange={(e) => setReal(e.target.checked)} /> Mover también el robot real
                 </label>
@@ -617,6 +661,82 @@ export default function ConducirMbot({ onExit }) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Joystick en pantalla, con ratón o dedo: v y w de -1 a 1. Al soltar vuelve al centro. */
+function JoystickConducir({ joy }) {
+  const baseRef = useRef(null);
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+  const R = 80; // radio de recorrido en px
+  const mover = (e) => {
+    const c = baseRef.current.getBoundingClientRect();
+    let x = (e.clientX - (c.left + c.width / 2)) / R;
+    let y = (e.clientY - (c.top + c.height / 2)) / R;
+    const d = Math.hypot(x, y);
+    if (d > 1) {
+      x /= d;
+      y /= d;
+    }
+    const zona = (a) => (Math.abs(a) < 0.08 ? 0 : a);
+    joy.v = zona(-y);
+    joy.w = zona(x);
+    joy.activo = true;
+    setPos({ x, y });
+  };
+  const soltar = () => {
+    joy.v = 0;
+    joy.w = 0;
+    joy.activo = false;
+    setPos({ x: 0, y: 0 });
+  };
+  useEffect(() => soltar, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div
+      ref={baseRef}
+      onPointerDown={(e) => {
+        e.preventDefault();
+        e.currentTarget.setPointerCapture?.(e.pointerId);
+        mover(e);
+      }}
+      onPointerMove={(e) => {
+        if (joy.activo) mover(e);
+      }}
+      onPointerUp={soltar}
+      onPointerCancel={soltar}
+      onContextMenu={(e) => e.preventDefault()}
+      style={{ width: 220, height: 220, margin: '4px auto 8px', borderRadius: '50%', background: 'radial-gradient(circle, #334155 0%, #1e293b 70%)', border: '3px solid #475569', position: 'relative', touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none', cursor: 'grab' }}
+    >
+      <div style={{ position: 'absolute', left: '50%', top: '50%', width: 76, height: 76, marginLeft: -38, marginTop: -38, borderRadius: '50%', background: '#2563eb', border: '3px solid #93c5fd', transform: `translate(${pos.x * R}px, ${pos.y * R}px)`, pointerEvents: 'none' }} />
+    </div>
+  );
+}
+
+/** Flechas para el móvil: mientras se pulsan, cuentan como las teclas del teclado. */
+function PadTactil({ teclas }) {
+  const boton = (t, txt, area) => (
+    <button
+      key={t}
+      onPointerDown={(e) => {
+        e.preventDefault();
+        e.currentTarget.setPointerCapture?.(e.pointerId);
+        teclas.add(t);
+      }}
+      onPointerUp={() => teclas.delete(t)}
+      onPointerCancel={() => teclas.delete(t)}
+      onContextMenu={(e) => e.preventDefault()}
+      style={{ gridArea: area, height: 64, borderRadius: 14, border: 'none', background: '#2563eb', color: '#fff', fontSize: '1.6rem', fontWeight: 900, touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none', cursor: 'pointer' }}
+    >
+      {txt}
+    </button>
+  );
+  return (
+    <div style={{ display: 'grid', gridTemplateAreas: '". u ." "l d r"', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, maxWidth: 240, margin: '4px auto 10px' }}>
+      {boton('u', '↑', 'u')}
+      {boton('l', '←', 'l')}
+      {boton('d', '↓', 'd')}
+      {boton('r', '→', 'r')}
     </div>
   );
 }

@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import lenguadesignoImg from './assets/lenguadesigno.jpg';
+import alfabetoImg from './assets/alfabeto-dactilologico-sin-letras.jpg';
 import { FRASES_PIC } from './BibliotecaLenguaSignos';
 
 // Reconocimiento con la webcam (MediaPipe): solo se descarga al abrir esas pestañas.
 const ModoEscribirMano = React.lazy(() => import('./manos/SignosMano.jsx').then((m) => ({ default: m.ModoEscribirMano })));
 const ModoEnseniarSignos = React.lazy(() => import('./manos/SignosMano.jsx').then((m) => ({ default: m.ModoEnseniarSignos })));
+const ModoPalabrasSignos = React.lazy(() => import('./manos/PalabrasSignos.jsx'));
 
 // ─── Utilidades ARASAAC ───────────────────────────────────────────────────────
 const PIC_API = 'https://api.arasaac.org/v1/pictograms/es/search';
@@ -130,59 +131,31 @@ function pickRandom(arr, n, exclude = []) {
   return out;
 }
 
-// Carga la imagen una vez y cachea sus dimensiones naturales
-let _naturalW = null;
-let _naturalH = null;
-const _listeners = new Set();
+// Alfabeto dactilológico de APROSOJA (Asociación Provincial de Personas Sordas de Jaén):
+// 6 columnas × 5 filas. Esta copia tiene borradas las letras de cada casilla, porque el quiz
+// no debe enseñarlas; la imagen original es assets/alfabeto-dactilologico.jpg.
+const SPRITE_W = 600;
+const SPRITE_H = 659;
+const CELDA_X0 = 21;
+const CELDA_Y0 = 79;
+const CELDA_W = 91.3;
+const CELDA_H = 103.6;
+const PASO_X = 93.33;
+const PASO_Y = 105.6;
 
-function loadSpriteDims() {
-  if (_naturalW) return;
-  const img = new Image();
-  img.onload = () => {
-    _naturalW = img.naturalWidth;
-    _naturalH = img.naturalHeight;
-    _listeners.forEach(cb => cb());
-    _listeners.clear();
-  };
-  img.src = lenguadesignoImg;
-}
-
-function useSpriteDims() {
-  const [dims, setDims] = useState(_naturalW ? { w: _naturalW, h: _naturalH } : null);
-  useEffect(() => {
-    if (_naturalW) { setDims({ w: _naturalW, h: _naturalH }); return; }
-    const cb = () => setDims({ w: _naturalW, h: _naturalH });
-    _listeners.add(cb);
-    loadSpriteDims();
-    return () => _listeners.delete(cb);
-  }, []);
-  return dims;
-}
-
-// Fracción del ancho de celda que ocupa el margen izquierdo (y derecho) del sprite
-const PAD_RATIO = 0.14;
-
-// Sprite grid: 7 cols × 6 rows
-// Row 0: A B C D E F G
-// Row 1: H I J K L M N
-// Row 2: O P Q R S T U
-// Row 3: V W X Y Z (cols 0-4)
-// Row 4: 1 2 3 4 5 6 7
-// Row 5: 8 9 10 (cols 2-4, centered)
-const COLS = 7;
-const ROWS = 6;
-
+// La imagen no trae los números.
 const SIGN_MAP = {
-  'A':[0,0],'B':[1,0],'C':[2,0],'D':[3,0],'E':[4,0],'F':[5,0],'G':[6,0],
-  'H':[0,1],'I':[1,1],'J':[2,1],'K':[3,1],'L':[4,1],'M':[5,1],'N':[6,1],
-  'O':[0,2],'P':[1,2],'Q':[2,2],'R':[3,2],'S':[4,2],'T':[5,2],'U':[6,2],
-  'V':[1,3],'W':[2,3],'X':[3,3],'Y':[4,3],'Z':[5,3],
-  '1':[0,4],'2':[1,4],'3':[2,4],'4':[3,4],'5':[4,4],'6':[5,4],'7':[6,4],
-  '8':[3,5],'9':[4,5],'10':[5,5],
+  'A':[0,0],'B':[1,0],'C':[2,0],'CH':[3,0],'D':[4,0],'E':[5,0],
+  'F':[0,1],'G':[1,1],'H':[2,1],'I':[3,1],'J':[4,1],'K':[5,1],
+  'L':[0,2],'LL':[1,2],'M':[2,2],'N':[3,2],'Ñ':[4,2],'O':[5,2],
+  'P':[0,3],'Q':[1,3],'R':[2,3],'RR':[3,3],'S':[4,3],'T':[5,3],
+  'U':[0,4],'V':[1,4],'W':[2,4],'X':[3,4],'Y':[4,4],'Z':[5,4],
 };
 
-const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-const NUMBERS = ['1','2','3','4','5','6','7','8','9','10'];
+// Las 30 formas, en el orden del alfabeto.
+const ALFABETO = Object.keys(SIGN_MAP);
+
+const LETTERS = 'ABCDEFGHIJKLMNÑOPQRSTUVWXYZ'.split('');
 
 const PALABRAS = [
   'HOLA','SOL','LUZ','MAR','PAZ','OJO','PIE',
@@ -202,39 +175,21 @@ function shuffle(arr) {
 }
 
 // Renders one sign from the sprite sheet.
-// hideLabel=true crops the bottom 28% to remove the letter label.
-function Sign({ char, size = 80, hideLabel = false }) {
-  const dims = useSpriteDims();
-  const key = char.toUpperCase();
-  const pos = SIGN_MAP[key];
+function Sign({ char, size = 80 }) {
+  const pos = SIGN_MAP[char.toUpperCase()];
   if (!pos) return null;
   const [col, row] = pos;
-
-  // Fallback antes de que cargue la imagen
-  if (!dims) return <div style={{ width: size, height: Math.round(size * 0.82), flexShrink: 0 }} />;
-
-  // Escalar imagen: bgW = COLS * size exacto
-  const scale = (size * COLS) / dims.w;
-  const cellH = (dims.h / ROWS) * scale;
-  const displayH = hideLabel ? Math.round(cellH * 0.82) : cellH;
-
-  // Corrección de margen: celdas reales < size → error acumulado por columna
-  // xPos centra el contenido de cada celda dentro del contenedor de `size` px
-  const leftPad = size * PAD_RATIO;
-  const cellW   = (COLS * size - 2 * leftPad) / COLS;
-  const xPos    = leftPad + (col + 0.6) * cellW - size / 2;
-  const yPos    = row * cellH;
-
+  const scale = size / CELDA_W;
   return (
     <div style={{
       width: size,
-      height: displayH,
+      height: Math.round(CELDA_H * scale),
       overflow: 'hidden',
       flexShrink: 0,
-      backgroundImage: `url(${lenguadesignoImg})`,
+      backgroundImage: `url(${alfabetoImg})`,
       backgroundRepeat: 'no-repeat',
-      backgroundSize: `${COLS * size}px ${dims.h * scale}px`,
-      backgroundPosition: `-${xPos}px -${yPos}px`,
+      backgroundSize: `${SPRITE_W * scale}px ${SPRITE_H * scale}px`,
+      backgroundPosition: `-${(CELDA_X0 + col * PASO_X) * scale}px -${(CELDA_Y0 + row * PASO_Y) * scale}px`,
     }} />
   );
 }
@@ -255,7 +210,7 @@ function SignLabeled({ char, size = 70 }) {
   }
   return (
     <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
-      <Sign char={char} size={size} hideLabel={false} />
+      <Sign char={char} size={size} />
       <span style={{ fontSize:'0.7rem', fontWeight:700, color:'#2563EB' }}>{char.toUpperCase()}</span>
     </div>
   );
@@ -292,7 +247,8 @@ function ModoTranscripcion() {
   const [hablando, setHablando] = useState(false);
   const [escuchando, setEscuchando] = useState(false);
   const recRef = React.useRef(null);
-  const chars = texto.toUpperCase().split('').filter(c => c !== '\n');
+  // CH, LL y RR tienen signo propio.
+  const chars = (texto.toUpperCase().match(/CH|LL|RR|[\s\S]/g) || []).filter(c => c !== '\n');
 
   const escucharTTS = () => {
     if (!window.speechSynthesis || !texto.trim()) return;
@@ -539,7 +495,7 @@ function ModoDeletrear() {
         )}
         {escrito.map((l, i) => (
           <div key={i} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
-            <Sign char={l} size={52} hideLabel />
+            <Sign char={l} size={52} />
             {mostrarPista && <span style={{ fontSize:'0.65rem', fontWeight:700, color:'#F59E0B' }}>{l}</span>}
           </div>
         ))}
@@ -613,7 +569,7 @@ function ModoDeletrear() {
             onMouseEnter={e => { if(estado==='jugando') { e.currentTarget.style.transform='scale(1.12)'; e.currentTarget.style.borderColor='#93C5FD'; e.currentTarget.style.boxShadow='0 4px 12px rgba(37,99,235,0.2)'; }}}
             onMouseLeave={e => { e.currentTarget.style.transform='scale(1)'; e.currentTarget.style.borderColor='#E2E8F0'; e.currentTarget.style.boxShadow='0 2px 4px rgba(0,0,0,0.06)'; }}
           >
-            <Sign char={letra} size={48} hideLabel />
+            <Sign char={letra} size={48} />
           </button>
         ))}
       </div>
@@ -629,41 +585,28 @@ function ModoReferencia() {
   return (
     <div>
       <p style={{ textAlign:'center', color:'#64748B', marginBottom:20, fontSize:'0.9rem' }}>
-        Abecedario completo en lengua de signos española
+        Alfabeto dactilológico
       </p>
       <p style={{ color:'#94A3B8', fontSize:'0.8rem', fontWeight:600, marginBottom:8, marginTop:0 }}>
         Letras
       </p>
       <div style={{ display:'flex', flexWrap:'wrap', gap:'10px 8px', justifyContent:'center', marginBottom:24 }}>
-        {LETTERS.map(l => (
+        {ALFABETO.map(l => (
           <div key={l} style={{
             display:'flex', flexDirection:'column', alignItems:'center', gap:4,
             background:'white', borderRadius:12, padding:'10px 8px',
             boxShadow:'0 2px 8px rgba(0,0,0,0.07)', border:'1.5px solid #E2E8F0',
             minWidth:62,
           }}>
-            <Sign char={l} size={56} hideLabel={false} />
+            <Sign char={l} size={56} />
             <span style={{ fontSize:'0.75rem', fontWeight:800, color:'#2563EB' }}>{l}</span>
           </div>
         ))}
       </div>
 
-      <p style={{ color:'#94A3B8', fontSize:'0.8rem', fontWeight:600, marginBottom:8 }}>
-        Números
+      <p style={{ textAlign:'center', color:'#94A3B8', fontSize:'0.78rem' }}>
+        Alfabeto: APROSOJA, Asociación Provincial de Personas Sordas de Jaén.
       </p>
-      <div style={{ display:'flex', flexWrap:'wrap', gap:'10px 8px', justifyContent:'center' }}>
-        {NUMBERS.map(n => (
-          <div key={n} style={{
-            display:'flex', flexDirection:'column', alignItems:'center', gap:4,
-            background:'white', borderRadius:12, padding:'10px 8px',
-            boxShadow:'0 2px 8px rgba(0,0,0,0.07)', border:'1.5px solid #E2E8F0',
-            minWidth:62,
-          }}>
-            <Sign char={n} size={56} hideLabel={false} />
-            <span style={{ fontSize:'0.75rem', fontWeight:800, color:'#7C3AED' }}>{n}</span>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
@@ -1054,6 +997,7 @@ export default function LenguaSignos({ onExit }) {
     { id:'referencia',    label:'📖 Referencia',  desc:'Abecedario' },
     { id:'mano',          label:'✋ Escribir con la mano', desc:'Cámara → texto' },
     { id:'enseniar',      label:'🎓 Enseñar',     desc:'Grabar ejemplos' },
+    { id:'palabras',      label:'🤟 Palabras',    desc:'Signos con movimiento' },
     { id:'pictogramas',   label:'🖼️ Pictogramas', desc:'Texto → pics' },
     { id:'quizpic',       label:'🎯 Quiz Pics',   desc:'Adivina la frase' },
   ];
@@ -1127,6 +1071,11 @@ export default function LenguaSignos({ onExit }) {
           {modo === 'transcripcion' && <ModoTranscripcion />}
           {modo === 'deletrear'     && <ModoDeletrear />}
           {modo === 'referencia'    && <ModoReferencia />}
+          {modo === 'palabras' && (
+            <React.Suspense fallback={<p style={{ textAlign:'center', color:'#64748b' }}>⏳ Cargando…</p>}>
+              <ModoPalabrasSignos />
+            </React.Suspense>
+          )}
           {(modo === 'mano' || modo === 'enseniar') && (
             <React.Suspense fallback={<p style={{ textAlign:'center', color:'#64748b' }}>⏳ Cargando…</p>}>
               {modo === 'mano'

@@ -78,7 +78,10 @@ export async function flashearMicropython(onProgreso) {
 // v4: en los modos L, N y T la respuesta se envía agitando el mando (en L también con B).
 // v5: modo F (fútbol, micro:bit V2): botones, logo táctil, agitar e inclinar + duelos de preguntas.
 // v6: modo V (volante): como F, pero la inclinación es continua (dirección + latido mientras se mantiene).
-export const VERSION_PROGRAMAS = 6;
+// v7: el modo V envía también cuánto se inclina (FVDF,x,y con x e y de -100 a 100).
+export const VERSION_PROGRAMAS = 7;
+/** Primera versión de los mandos que envía cuánto se inclinan. */
+export const VERSION_ANALOGICO = 7;
 /** Primera versión de los programas que tiene el modo V (volante). */
 export const VERSION_VOLANTE = 6;
 
@@ -137,7 +140,8 @@ while True:
 //                 -> FA1|FA0|FB1|FB0|FL1|FL0; agitar -> FS; inclinar -> FPI|FPD|FPF|FPT (izq/der/delante/detras).
 //                 Con 'Q:<id>' ese mando entra en duelo: A cambia A-D, B o agitar envia la letra (una vez).
 //   V volante:    igual que F (botones, logo, agitar) pero inclinar es continuo: FV + I|D (lado) y/o F|T
-//                 (delante/detras), p. ej. FVDF; se repite cada 300 ms mientras sigue inclinado; FV0 = plano.
+//                 (delante/detras) + cuanto (x,y de -100 a 100), p. ej. FVDF,40,-70; se repite al cambiar
+//                 y cada 300 ms mientras sigue inclinado; FV0,0,0 = plano.
 export function programaMando(id, grupo = GRUPO_POR_DEFECTO) {
   return `# PiKT - MANDO ${id} (v${VERSION_PROGRAMAS}): modos letras / numero / abecedario / mover / futbol / volante
 from microbit import *
@@ -175,6 +179,8 @@ incl_t = 0
 tras_agitar = 0
 vol_d = '0'
 vol_t = 0
+vol_x = 0
+vol_y = 0
 FLECHAS = {'I': Image.ARROW_W, 'D': Image.ARROW_E, 'F': Image.ARROW_N, 'T': Image.ARROW_S,
     'IF': Image.ARROW_NW, 'DF': Image.ARROW_NE, 'IT': Image.ARROW_SW, 'DT': Image.ARROW_SE}
 
@@ -350,31 +356,45 @@ def paso_futbol():
         armado = False
         enviar('FP' + d)
 
-# Modo V: la direccion de la inclinacion (con diagonales) mientras dure; se repite cada 300 ms
-# y al volver a plano se envia FV0. Umbral mas bajo para seguir inclinado que para empezar.
+# Modo V: direccion (con diagonales) y cantidad de la inclinacion; se repite al cambiar y cada
+# 300 ms, y al volver a plano se envia FV0,0,0. Umbral mas bajo para seguir que para empezar.
+def eje_v(a):
+    a = int(a / 6)
+    if a > 100:
+        return 100
+    if a < -100:
+        return -100
+    return 0 if -15 < a < 15 else a
+
 def paso_volante(ahora):
-    global vol_d, vol_t
+    global vol_d, vol_t, vol_x, vol_y
     u = 330 if vol_d == '0' else 230
     x = accelerometer.get_x()
     y = accelerometer.get_y()
     d = ('I' if x < -u else ('D' if x > u else '')) + ('F' if y < -u else ('T' if y > u else ''))
     if not d:
         d = '0'
+    ax = eje_v(x)
+    ay = eje_v(y)
+    cambio = abs(ax - vol_x) > 7 or abs(ay - vol_y) > 7 or ((ax == 0) != (vol_x == 0)) or ((ay == 0) != (vol_y == 0))
     if d != vol_d:
         vol_d = d
-        vol_t = ahora
         pantalla()
-        enviar('FV' + d)
-    elif d != '0' and ahora - vol_t > 300:
-        vol_t = ahora
-        enviar('FV' + d)
+    elif not cambio and (not (ax or ay) or ahora - vol_t <= 300):
+        return
+    vol_t = ahora
+    vol_x = ax
+    vol_y = ay
+    enviar('FV%s,%d,%d' % (d, ax, ay))
 
 def cambiar_modo(m):
-    global modo, sel, num, car, activo, combo, duelo, vol_d
+    global modo, sel, num, car, activo, combo, duelo, vol_d, vol_x, vol_y
     if m == modo or len(m) != 1 or m not in 'LNTMFV':
         return
     duelo = False
     vol_d = '0'
+    vol_x = 0
+    vol_y = 0
     modo = m
     sel = 0
     num = 0
@@ -615,7 +635,7 @@ export const aNumeroMando = (txt) => {
  *   número: { tipo: 'numero', numero }
  *   texto:  { tipo: 'texto', caracter: 'A'..'Z' | '0'..'9' }
  *   fútbol: { tipo: 'futbol', accion: 'A'|'B'|'L' (con on: true/false) | 'S' (agitar) | 'P' (con dir: 'I'|'D'|'F'|'T') }
- *           volante (modo V, mismo tipo): accion 'V' con dir '' (plano) o 'I'|'D' y/o 'F'|'T' (p. ej. 'DF')
+ *           volante (modo V, mismo tipo): accion 'V' con dir '' (plano) o 'I'|'D' y/o 'F'|'T' (p. ej. 'DF') y x, y (-100 a 100, o null)
  *   mover:  { tipo: 'mover', mov: 'A' (avanza) | 'B' (gira) | 'X' (A+B, acción) }
  */
 function aEvento(id, valor) {
@@ -625,7 +645,11 @@ function aEvento(id, valor) {
   if (valor[0] === 'F') {
     const accion = valor[1];
     if (accion === 'P') return { id, tipo: 'futbol', accion, dir: valor[2] };
-    if (accion === 'V') return { id, tipo: 'futbol', accion, dir: valor.slice(2).replace('0', '') };
+    if (accion === 'V') {
+      const [d, x, y] = valor.slice(2).split(',');
+      // x e y (-100 a 100) solo llegan con mandos v7; con los anteriores quedan a null.
+      return { id, tipo: 'futbol', accion, dir: d.replace('0', ''), x: x === undefined ? null : Number(x), y: y === undefined ? null : Number(y) };
+    }
     return { id, tipo: 'futbol', accion, on: valor[2] === '1' };
   }
   return { id, tipo: 'mover', mov: valor[1] };

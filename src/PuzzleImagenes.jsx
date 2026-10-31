@@ -15,7 +15,7 @@ import keystudio    from './assets/imagenkeystudio.jpg';
 import barcoRojo    from './assets/BarcoRojo.png';
 import barcoAzul    from './assets/BarcoAzul.png';
 import bomberman    from './assets/Bomberman.png';
-import lenguaSignos from './assets/lenguadesigno.jpg';
+import lenguaSignos from './assets/alfabeto-dactilologico.jpg';
 import iconoBurbujas from './assets/icono_burbujas.png';
 import iconoOlympic from './assets/icono_olympic.png';
 import iconoPasapal from './assets/icono_pasapal.png';

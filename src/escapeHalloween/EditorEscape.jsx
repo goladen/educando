@@ -57,40 +57,8 @@ export const MODOS = {
     MANDOS: { emoji: '🎮', nombre: 'Con mandos micro:bit', desc: 'Sin móviles: proyectas las preguntas y cada alumno responde A-D con su micro:bit. Su avatar aparece en la mansión.' },
 };
 
-/** Primera pantalla al crear: elegir cómo se va a jugar. */
-function EleccionModo({ onElegir, onAbrir, onAtras }) {
-    const tarjeta = (id, puntos) => {
-        const m = MODOS[id];
-        return (
-            <button key={id} className="eh-panel" onClick={() => onElegir(id)} style={{ padding: 22, cursor: 'pointer', textAlign: 'left', color: '#f5e9ff', fontFamily: 'inherit', borderColor: 'rgba(255,140,26,.6)' }}>
-                <div style={{ fontSize: '3rem' }}>{m.emoji}</div>
-                <div className="eh-titulo" style={{ fontSize: '1.7rem', margin: '4px 0 6px' }}>{m.nombre}</div>
-                <div style={{ fontSize: '.95rem', opacity: .9, lineHeight: 1.45 }}>{m.desc}</div>
-                <ul style={{ margin: '10px 0 0', paddingLeft: 18, fontSize: '.88rem', lineHeight: 1.6, opacity: .85 }}>{puntos.map(p => <li key={p}>{p}</li>)}</ul>
-                <div className="eh-btn" style={{ marginTop: 14, textAlign: 'center' }}>Elegir</div>
-            </button>
-        );
-    };
-    return (
-        <div style={{ maxWidth: 900, margin: '24px auto', padding: '0 14px 40px', position: 'relative', zIndex: 1 }}>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <button className="eh-btn2" onClick={onAtras}>← Atrás</button>
-                <div style={{ flex: 1 }} />
-                <button className="eh-btn2" onClick={onAbrir}>📂 Abrir uno guardado</button>
-            </div>
-            <h2 className="eh-titulo" style={{ fontSize: '2.4rem', textAlign: 'center', margin: '18px 0 4px' }}>¿Cómo vais a jugar?</h2>
-            <p style={{ textAlign: 'center', opacity: .8, marginTop: 0 }}>Podrás cambiarlo después desde el editor.</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 16, marginTop: 10 }}>
-                {tarjeta('ONLINE', ['Avatares disfrazados en la mansión 3D', 'Candados con pistas repartidas entre los móviles', 'Batalla final en tiempo real'])}
-                {tarjeta('PAPEL', ['Cuadernillo y hoja de respuestas en PDF', 'Mismas preguntas en la pizarra y en las fichas', 'Tú llevas el ritmo desde el ordenador'])}
-                {tarjeta('MANDOS', ['Cada alumno responde con su mando (A cambia; B o agitar envía)', 'Se corrige sola cuando han respondido todos', 'En la batalla, si acierta la mitad de la clase, ¡golpe!'])}
-            </div>
-        </div>
-    );
-}
-
 /** Modo pizarra con fichas en papel: congela preguntas y candados y saca los PDF. */
-function SeccionPapel({ config, setConfig, titulo, conPdf = true }) {
+function SeccionPapel({ config, setConfig, titulo }) {
     const nPreg = config.nPreguntas || config.partida?.nPreguntas || 6;
     const nBat = config.nBatalla || config.partida?.nBatalla || 8;
     const setNPreg = (n) => setConfig(c => ({ ...c, nPreguntas: n }));
@@ -111,10 +79,8 @@ function SeccionPapel({ config, setConfig, titulo, conPdf = true }) {
     };
     return (
         <div style={{ marginTop: 20, padding: 14, borderRadius: 14, background: 'rgba(91,33,182,.18)', border: '2px solid rgba(167,139,250,.45)' }}>
-            <h4 style={{ margin: '0 0 4px' }}>{conPdf ? '📄 Preguntas fijas y fichas en PDF' : '❓ Preguntas de la partida'}</h4>
-            <div style={{ fontSize: '.82rem', opacity: .8 }}>{conPdf
-                ? 'Se congelan las preguntas y los candados: lo que se proyecta es exactamente lo que sale en las fichas. Genera, descarga los PDF y guarda el escape room para conservarlo.'
-                : 'Se proyectan una a una y la clase responde con los mandos (A-D). Se generan solas al empezar; guarda el escape room para repetir las mismas.'}</div>
+            <h4 style={{ margin: '0 0 4px' }}>📄 Preguntas fijas y fichas en PDF</h4>
+            <div style={{ fontSize: '.82rem', opacity: .8 }}>Se congelan las preguntas y los candados: lo que se proyecta es exactamente lo que sale en las fichas. Si no las generas, se crean solas al empezar en la pizarra o con mandos. Guarda el escape room para conservarlas.</div>
             <div style={{ ...fila, alignItems: 'center' }}>
                 <span style={{ fontSize: '.85rem' }}>Preguntas por sala:</span>
                 {PREGUNTAS_POR_SALA.map(n => <button key={n} className={`eh-chip ${nPreg === n ? 'on' : ''}`} style={{ padding: '5px 10px' }} onClick={() => setNPreg(n)}>{n}</button>)}
@@ -127,7 +93,7 @@ function SeccionPapel({ config, setConfig, titulo, conPdf = true }) {
                     {vigente ? `✔ ${resumenPartida(config)}` : config.partida ? '⚠ Has cambiado las pruebas o el número de preguntas: vuelve a generarlas' : 'Aún no hay preguntas fijas'}
                 </span>
             </div>
-            {vigente && conPdf && <>
+            {vigente && <>
                 <div style={{ ...fila, marginTop: 10 }}>
                     <button className="eh-btn2" disabled={!!creando} onClick={() => pdf('CUADERNILLO', false)}>{creando === 'CUADERNILLOfalse' ? '⏳ Creando…' : '📘 PDF cuadernillo (preguntas + candados)'}</button>
                     <button className="eh-btn2" disabled={!!creando} onClick={() => pdf('HOJA', false)}>{creando === 'HOJAfalse' ? '⏳ Creando…' : '📝 PDF hoja de respuestas'}</button>
@@ -197,7 +163,7 @@ function TarjetaPruebaEditor({ prueba, idx, pruebas, onCambiar, onMover, onBorra
                 <div style={{ fontSize: '1.5rem' }}>{info.emoji}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{info.nombre}</div>
-                    <div style={{ fontSize: '.78rem', opacity: .75 }}>{manual ? `🗝️ Prueba propia${prueba.materiaRetos ? ` · antes, preguntas de ${SALAS[prueba.materiaRetos]?.materia}` : ' · solo código'}` : recurso ? `📚 ${info.materia} · candado con las letras de 4 respuestas` : info.materia}</div>
+                    <div style={{ fontSize: '.78rem', opacity: .75 }}>{manual ? `🗝️ Prueba propia${prueba.materiaRetos ? ` · antes, preguntas de ${SALAS[prueba.materiaRetos]?.materia}` : ' · solo código'}` : recurso ? `📚 ${info.materia}` : info.materia}</div>
                 </div>
                 <button className="eh-btn2" style={{ padding: '5px 8px' }} disabled={idx === 0} onClick={() => onMover(-1)} title="Subir">↑</button>
                 <button className="eh-btn2" style={{ padding: '5px 8px' }} disabled={idx === pruebas.length - 1} onClick={() => onMover(1)} title="Bajar">↓</button>
@@ -302,7 +268,7 @@ function Biblioteca({ usuario, onAbrir, onCerrar, modoActual }) {
                     const c = limpiarConfig(r.config);
                     return (
                         <div key={(r.local ? 'l' : 'n') + r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 12, borderRadius: 14, background: 'rgba(0,0,0,.3)', border: '1px solid rgba(255,255,255,.12)' }}>
-                            <div style={{ fontSize: '1.6rem' }} title={MODOS[c.modo]?.nombre}>{MODOS[c.modo]?.emoji || '🎃'}</div>
+                            <div style={{ fontSize: '1.6rem' }}>🎃</div>
                             <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ fontWeight: 800 }}>{r.titulo || 'Sin título'} {r.local ? <span style={{ fontSize: '.7rem', opacity: .7 }}>(este navegador)</span> : r.isPrivate === false ? <span style={{ fontSize: '.7rem', opacity: .7 }}>(público)</span> : null}</div>
                                 <div style={{ fontSize: '.8rem', opacity: .75 }}>
@@ -394,25 +360,24 @@ export default function EditorEscape({ config, setConfig, usuario: usuarioProp, 
 
     const crear = () => {
         const errs = erroresConfig(config); setErrores(errs);
-        if (!errs.length) onCrear(limpiarConfig(config));
+        if (errs.length) return;
+        const c = { ...config, modo: 'ONLINE' };
+        setConfig(c);
+        onCrear(limpiarConfig(c));
     };
     // Modo pizarra: si aún no hay preguntas fijas (o han quedado viejas) se generan antes de empezar
-    const jugarPizarra = () => {
+    const jugarPizarra = (m) => {
         const errs = erroresConfig(config); setErrores(errs);
         if (errs.length) return;
-        let c = config;
+        let c = { ...config, modo: m };
         if (!partidaVigente(config)) {
             if (config.partida && !window.confirm('Has cambiado las pruebas o el número de preguntas: se generarán preguntas nuevas y las fichas que hayas impreso dejarán de coincidir. ¿Seguir?')) return;
-            c = { ...config, partida: generarPartidaFija(config, { nPreguntas: config.nPreguntas || 6, nBatalla: config.nBatalla || 8 }) };
-            setConfig(c);
+            c = { ...c, partida: generarPartidaFija(config, { nPreguntas: config.nPreguntas || 6, nBatalla: config.nBatalla || 8 }) };
         }
+        setConfig(c);
         onPizarra(limpiarConfig(c), titulo);
     };
-    const modo = config.modo;
-
-    if (vista === 'EDITAR' && !modo) {
-        return <EleccionModo onAtras={onAtras} onAbrir={() => setVista('ABRIR')} onElegir={(m) => setConfig(c => ({ ...c, modo: m }))} />;
-    }
+    const modo = config.modo;   // el último con el que se jugó: un guardado sigue proponiendo el suyo
 
     if (vista === 'ABRIR') {
         return (
@@ -431,24 +396,11 @@ export default function EditorEscape({ config, setConfig, usuario: usuarioProp, 
         <div style={{ maxWidth: 860, margin: '24px auto', padding: '0 14px 40px', position: 'relative', zIndex: 1 }}>
             <div className="eh-panel eh-aparece" style={{ padding: 22 }}>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <button className="eh-btn2" onClick={() => setConfig(c => ({ ...c, modo: undefined }))}>← Atrás</button>
+                    <button className="eh-btn2" onClick={onAtras}>← Atrás</button>
                     <div style={{ flex: 1 }} />
                     <button className="eh-btn2" onClick={() => setVista('ABRIR')}>📂 Abrir guardado</button>
                 </div>
                 <h2 className="eh-titulo" style={{ fontSize: '2.2rem', marginTop: 10 }}>Preparar la mansión</h2>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 14px', borderRadius: 14, background: 'rgba(255,140,26,.14)', border: '2px solid rgba(255,140,26,.45)', marginTop: 6 }}>
-                    <span style={{ fontSize: '1.8rem' }}>{MODOS[modo].emoji}</span>
-                    <div style={{ flex: 1, minWidth: 200 }}>
-                        <div style={{ fontWeight: 900 }}>Modo: {MODOS[modo].nombre}</div>
-                        <div style={{ fontSize: '.82rem', opacity: .8 }}>{MODOS[modo].desc}</div>
-                    </div>
-                    {Object.keys(MODOS).filter(k => k !== modo).map(k => (
-                        <button key={k} className="eh-btn2" onClick={() => setConfig(c => ({ ...c, modo: k }))}>
-                            🔁 {MODOS[k].emoji} {MODOS[k].nombre}
-                        </button>
-                    ))}
-                </div>
-
                 <h4 style={{ margin: '14px 0 0' }}>🎓 Etapa</h4>
                 <div style={fila}>{ETAPAS.map(e => <button key={e.v} className={`eh-chip ${config.etapa === e.v ? 'on' : ''}`} onClick={() => setConfig(c => ({ ...c, etapa: e.v }))}>{e.l}</button>)}</div>
 
@@ -479,17 +431,21 @@ export default function EditorEscape({ config, setConfig, usuario: usuarioProp, 
                 <h4 style={{ margin: '18px 0 0' }}>⏳ Tiempo para las salas</h4>
                 <div style={fila}>{DURACIONES.map(m => <button key={m} className={`eh-chip ${config.minutos === m ? 'on' : ''}`} onClick={() => setConfig(c => ({ ...c, minutos: m }))}>{m} min</button>)}</div>
 
-                {modo === 'ONLINE' && <>
-                <h4 style={{ margin: '16px 0 0' }}>🕯️ Duración de cada sala</h4>
+                <details style={{ marginTop: 16 }}>
+                <summary style={{ cursor: 'pointer', fontWeight: 800 }}>📱 Ajustes para jugar con móviles</summary>
+                <h4 style={{ margin: '12px 0 0' }}>🕯️ Duración de cada sala</h4>
                 <div style={fila}>{RITMOS.map(r => <button key={r.v} title={r.d} className={`eh-chip ${config.ritmo === r.v ? 'on' : ''}`} onClick={() => setConfig(c => ({ ...c, ritmo: r.v }))}>{r.l}</button>)}</div>
                 <div style={{ fontSize: '.8rem', opacity: .7, marginTop: 4 }}>{RITMOS.find(r => r.v === config.ritmo)?.d} (la meta se calcula con los alumnos conectados).</div>
 
                 <h4 style={{ margin: '16px 0 0' }}>🧟 El zombi final</h4>
                 <div style={fila}>{Object.entries(ZOMBIS).map(([k, z]) => <button key={k} className={`eh-chip ${config.zombi === k ? 'on' : ''}`} onClick={() => setConfig(c => ({ ...c, zombi: k }))}>{z.l}</button>)}</div>
-                </>}
+                </details>
 
-                {modo === 'PAPEL' && <SeccionPapel config={config} setConfig={setConfig} titulo={titulo} />}
-                {modo === 'MANDOS' && <SeccionPapel config={config} setConfig={setConfig} titulo={titulo} conPdf={false} />}
+                {/* abierto si ya hay preguntas fijas (un guardado con fichas las enseña como antes) */}
+                <details open={!!config.partida} style={{ marginTop: 12 }}>
+                    <summary style={{ cursor: 'pointer', fontWeight: 800 }}>📄 Fichas en PDF y preguntas fijas (pizarra y mandos)</summary>
+                    <SeccionPapel config={config} setConfig={setConfig} titulo={titulo} />
+                </details>
 
                 <div style={{ marginTop: 20, padding: 14, borderRadius: 14, background: 'rgba(0,0,0,.28)', border: '1px dashed rgba(255,255,255,.2)' }}>
                     <h4 style={{ margin: '0 0 8px' }}>💾 Guardar este escape room</h4>
@@ -526,9 +482,15 @@ export default function EditorEscape({ config, setConfig, usuario: usuarioProp, 
                 </div>
 
                 {errores.length > 0 && <div style={{ marginTop: 14, color: '#fca5a5', fontWeight: 700 }}>{errores.map((e, i) => <div key={i}>⚠ {e}</div>)}</div>}
-                {modo === 'ONLINE'
-                    ? <button className="eh-btn" style={{ width: '100%', marginTop: 18, fontSize: '1.15rem' }} onClick={crear}>📱 Crear la sala online y mostrar el QR</button>
-                    : <button className="eh-btn" style={{ width: '100%', marginTop: 18, fontSize: '1.15rem' }} onClick={jugarPizarra}>{modo === 'MANDOS' ? '🎮 Empezar con los mandos' : '📽️ Empezar en la pizarra'}</button>}
+                <h4 style={{ margin: '20px 0 0' }}>▶️ ¿Cómo vais a jugar?</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 10, marginTop: 8 }}>
+                    {Object.keys(MODOS).map(k => (
+                        <div key={k} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <button className="eh-btn" style={{ fontSize: '1.02rem' }} onClick={() => (k === 'ONLINE' ? crear() : jugarPizarra(k))}>{MODOS[k].emoji} {MODOS[k].nombre}</button>
+                            <div style={{ fontSize: '.78rem', opacity: .8, lineHeight: 1.35 }}>{MODOS[k].desc}{modo === k && <b style={{ color: '#fcd34d' }}> · El de la última vez</b>}</div>
+                        </div>
+                    ))}
+                </div>
             </div>
         </div>
     );

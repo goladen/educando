@@ -21,7 +21,8 @@ import {
 } from './signos.js';
 
 const LS_PREFS = 'pikt_signos_prefs';
-const MIN_CONFIANZA = 0.6;
+const FACTOR_LEJANA = 1.5; // si se parece poco, hay que mantener la postura más tiempo
+const TOLERANCIA_MS = 150; // un fotograma dudoso no reinicia la barra
 const ESPACIO_SIN_MANO_MS = 1500;
 const OBJETIVO = 30; // ejemplos por letra al grabar
 const GRABAR_MAX_MS = 6000;
@@ -143,10 +144,10 @@ function SelectorConjunto({ valor, onChange }) {
 
 /** Imagen del signo (del abecedario de la herramienta) o la letra si no hay dibujo. */
 function SignoOLetra({ Sign, clase, size = 90 }) {
-  const img = Sign ? <Sign char={clase} size={size} hideLabel /> : null;
+  const img = Sign && !/\d/.test(clase) ? <Sign char={clase} size={size} /> : null; // la imagen no trae números
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-      {img && clase !== 'Ñ' ? img : <div style={{ width: size, height: size * 0.82, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.5, color: '#94a3b8' }}>✋</div>}
+      {img || <div style={{ width: size, height: size * 0.82, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.5, color: '#94a3b8' }}>✋</div>}
       <span style={{ fontWeight: 900, fontSize: size * 0.32, color: AZUL, lineHeight: 1 }}>{clase}</span>
     </div>
   );
@@ -205,10 +206,16 @@ export function ModoEscribirMano({ Sign, onIrEnseniar }) {
         s.ultima = null;
       }
 
-      const clase = r?.clase && r.confianza >= MIN_CONFIANZA ? r.clase : null;
-      if (clase !== s.cand) {
-        s.cand = clase;
-        s.desde = ahora;
+      // Clara o «se parece poco» → candidata; con dos opciones no se escribe nada.
+      const clase = r?.clase && !r.dudosa ? r.clase : null;
+      if (clase === s.cand) s.cambioDesde = 0;
+      else {
+        if (!s.cambioDesde) s.cambioDesde = ahora;
+        if (ahora - s.cambioDesde > TOLERANCIA_MS || !s.cand) {
+          s.cand = clase;
+          s.desde = ahora;
+          s.cambioDesde = 0;
+        }
       }
       // Para repetir la misma letra (LL, RR, 00…) hay que cambiar de postura un momento.
       if (clase !== s.ultima) {
@@ -217,20 +224,28 @@ export function ModoEscribirMano({ Sign, onIrEnseniar }) {
       } else s.distintaDesde = 0;
 
       let progreso = 0;
-      if (clase) {
-        const bloqueada = clase === s.ultima && !s.liberada;
-        progreso = bloqueada ? 1 : Math.min(1, (ahora - s.desde) / hold);
+      if (s.cand) {
+        const bloqueada = s.cand === s.ultima && !s.liberada;
+        progreso = bloqueada ? 1 : Math.min(1, (ahora - s.desde) / (r?.lejana ? hold * FACTOR_LEJANA : hold));
         if (!bloqueada && progreso >= 1) {
-          escribir(textoRef.current + clase);
+          escribir(textoRef.current + s.cand);
           pitido();
-          s.ultima = clase;
+          s.ultima = s.cand;
           s.liberada = false;
           s.distintaDesde = 0;
         }
       }
       if (ahora - s.ui > 80) {
         s.ui = ahora;
-        setVista({ clase, confianza: r?.confianza || 0, progreso, hayMano: !!m, segunda: r?.segunda || null });
+        setVista({
+          clase: s.cand,
+          confianza: r?.confianza || 0,
+          progreso,
+          hayMano: !!m,
+          segunda: r?.segunda || null,
+          lejana: !!r?.lejana,
+          dudaEntre: r?.dudosa && r?.segunda ? [r.clase, r.segunda] : null,
+        });
       }
     });
   }, [hayModelo]);
@@ -269,7 +284,13 @@ export function ModoEscribirMano({ Sign, onIrEnseniar }) {
         <VistaManos ancho={320} colorMano={() => (vista.clase ? '#22c55e' : '#f59e0b')} />
         <div style={{ flex: '1 1 220px', minWidth: 220, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
           <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>
-            {!vista.hayMano ? '🙈 Pon la mano delante de la cámara' : vista.clase ? 'Veo…' : '🤔 No reconozco este signo'}
+            {!vista.hayMano
+              ? '🙈 Pon la mano delante de la cámara'
+              : vista.dudaEntre
+                ? `🤔 ¿${vista.dudaEntre[0]} o ${vista.dudaEntre[1]}? Ajusta la postura`
+                : vista.clase
+                  ? vista.lejana ? `Parece la ${vista.clase}: mantén la postura…` : 'Veo…'
+                  : '🤔 No reconozco este signo'}
           </div>
           <div style={{ minHeight: 130, display: 'flex', alignItems: 'center' }}>
             {vista.clase ? <SignoOLetra Sign={Sign} clase={vista.clase} size={100} /> : <div style={{ fontSize: '3.5rem', opacity: 0.25 }}>✋</div>}
@@ -279,7 +300,6 @@ export function ModoEscribirMano({ Sign, onIrEnseniar }) {
           </div>
           <div style={{ fontSize: '0.75rem', color: '#94a3b8', textAlign: 'center' }}>
             Mantén el signo quieto hasta que se llene la barra.
-            {vista.clase && vista.segunda && vista.confianza < 0.85 ? ` (¿o es la ${vista.segunda}?)` : ''}
           </div>
         </div>
       </div>
@@ -606,12 +626,14 @@ export function ModoEnseniarSignos({ Sign }) {
         🔎 Ahora mismo veo:{' '}
         {!veo ? (
           <span style={{ color: '#94a3b8' }}>ninguna mano</span>
+        ) : veo.dudosa && veo.segunda ? (
+          <span style={{ color: '#b45309' }}>dudo entre {veo.clase} y {veo.segunda}</span>
         ) : veo.clase ? (
           <span style={{ color: veo.clase === sel ? '#16a34a' : '#dc2626', fontSize: '1.2rem' }}>
             {veo.clase} <span style={{ fontSize: '0.75rem', color: '#64748b' }}>({Math.round((veo.confianza || 0) * 100)} %)</span>
           </span>
         ) : (
-          <span style={{ color: '#94a3b8' }}>un signo que no conozco</span>
+          <span style={{ color: '#94a3b8' }}>un signo que no conozco{veo.cercana ? ` (lo más parecido: ${veo.cercana})` : ''}</span>
         )}
       </div>
 

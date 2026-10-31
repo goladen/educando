@@ -24,6 +24,7 @@ const OlympicLive = lazy(() => import('../OlympicLive'));
 const QuestionSenderClient = lazy(() => import('../QuestionSenderClient'));
 const PikatronRun = lazy(() => import('../PikatronRun'));
 const BunkerDisparo = lazy(() => import('../BunkerDisparo'));
+const QuizMandos = lazy(() => import('../mandos/QuizMandos.jsx'));
 const JuegoCalamar = lazy(() => import('../JuegoCalamar'));
 const EscapeHalloween = lazy(() => import('../EscapeHalloween'));
 const MoneyBoard = lazy(() => import('../MoneyBoard'));
@@ -794,6 +795,7 @@ export const APPS = [
     { id: 'POLINOMIOS',   name: 'Álgebra',      desc: 'Operaciones con polinomios.',              color: '#FF9800', emoji: '✖️', isMath: true, shareable: true },
     { id: 'POTENCIAS_RAICES', name: 'Potencias y Raíces', desc: 'Propiedades de potencias y raíces: ejercicios aleatorios.', color: '#0ea5e9', emoji: '⚡', isMath: true, shareable: true },
     { id: 'CALCULADORA', name: 'Calculadora', desc: 'Retos con la Casio fx-82MS: teclas exactas y regularidades por descubrir.', color: '#0f766e', emoji: '🧮', isMath: true, shareable: true, shareUrl: `${typeof window !== 'undefined' ? window.location.origin : ''}/calculadora` },
+    { id: 'MATES_MANDOS', name: 'Mates con mandos', desc: 'Toda la clase responde a los ejercicios de Math World con mandos micro:bit.', color: '#0d9488', emoji: '🎮', isMath: true, shareable: true, shareUrl: `${typeof window !== 'undefined' ? window.location.origin : ''}/matesmandos` },
     { id: 'ESTADISTICA',  name: 'Estadística',  desc: 'Tablas, parámetros y representación gráfica.', color: '#9C27B0', emoji: '📊', isMath: true, shareable: true },
     { id: 'PROBABILIDAD', name: 'Probabilidad', desc: 'Simulador de dados: tipos, múltiples dados y análisis de frecuencias.', color: '#f59e0b', emoji: '🎲', isMath: true, shareable: true },
 
@@ -896,6 +898,14 @@ export const GAME_INFO = {
         biblioteca: 'No necesita recursos: las letras se sortean y se comprueban con el diccionario integrado de cada idioma.',
         multiplayer: 'Individual (con envío al profesor), duelo de 2 jugadores en el mismo dispositivo y tablero de 2 a 6 jugadores en el mismo dispositivo o la pizarra (pasándolo por turnos) u online con sala, código y QR (el profesor puede proyectar el tablero).',
         materias: ['Lengua y Literatura', 'Inglés', 'Francés', 'Catalán'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
+    MATES_MANDOS: {
+        descripcion: 'Quiz para toda la clase con mandos micro:bit y los ejercicios de Math World. El profe elige temas, tipos de ejercicio y nivel; la pregunta se proyecta y cada alumno responde desde su mando. Gana quien acierta más y más rápido.',
+        tipoPreguntas: 'Ejercicios generados al azar de cálculo, números, fracciones, dinero, divisibilidad, potencias, medidas, geometría, estadística, probabilidad, ecuaciones, sistemas, álgebra, funciones y geometría analítica. Se responde con letras A-D (cualquier ejercicio) o marcando el número (solo resultados enteros).',
+        biblioteca: 'No necesita recursos: los ejercicios se generan al azar.',
+        multiplayer: 'Toda la clase a la vez, un mando por alumno, con una micro:bit antena conectada por USB al ordenador (Chrome o Edge). Se puede probar con mandos virtuales.',
+        materias: ['Matemáticas'],
         etapas: ['Primaria', 'ESO', 'Bachillerato'],
     },
     SIXSEVEN: {
@@ -1434,7 +1444,7 @@ export const MATERIAS_CONFIG = [
     {
         id: 'MATEMATICAS', label: 'Matemáticas', emoji: '🔢', color: '#009688',
         keywords: ['matemáticas', 'mates', 'math', 'calculo', 'algebra', 'geometria', 'estadistica', 'probabilidad', 'fraccion', 'ecuacion', 'funcion', 'numero', 'operacion'],
-        specificIds: ['MATH_WORLD_PORTAL', 'GEOMETRIX', 'CALCULO', 'DINERO', 'FRACCIONES', 'ECUACIONES', 'ECUACION_SISTEMAS', 'FUNCIONES', 'GEOMETRÍA_ANALÍTICA', 'POLINOMIOS', 'POTENCIAS_RAICES', 'CALCULADORA', 'ESTADISTICA', 'PROBABILIDAD', 'MATHLE', 'MATHLIVE', 'OLYMPICLIVE', 'SOLAR_SYSTEM', 'OVNI'],
+        specificIds: ['MATH_WORLD_PORTAL', 'GEOMETRIX', 'CALCULO', 'DINERO', 'FRACCIONES', 'ECUACIONES', 'ECUACION_SISTEMAS', 'FUNCIONES', 'GEOMETRÍA_ANALÍTICA', 'POLINOMIOS', 'POTENCIAS_RAICES', 'CALCULADORA', 'MATES_MANDOS', 'ESTADISTICA', 'PROBABILIDAD', 'MATHLE', 'MATHLIVE', 'OLYMPICLIVE', 'SOLAR_SYSTEM', 'OVNI'],
     },
     {
         id: 'LENGUA', label: 'Lengua', emoji: '📖', color: '#7B1FA2',
@@ -1939,6 +1949,8 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
                 setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'OVNI' });
             } else if (path === 'vanila') {
                 setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'VANILA' });
+            } else if (path === 'matesmandos') {
+                setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'MATES_MANDOS' });
             } else if (path === 'sixseven') {
                 setJuegoActivo({ tipoJuego: 'SIXSEVEN' });
             } else if (path === 'calamar') {
@@ -2352,6 +2364,12 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
         if (appId === 'VANILA') {
             window.history.pushState({}, '', '/vanila');
             setJuegoActivo({ tipoJuego: 'VANILA' });
+            return;
+        }
+
+        if (appId === 'MATES_MANDOS') {
+            window.history.pushState({}, '', '/matesmandos');
+            setJuegoActivo({ tipoJuego: 'MATES_MANDOS' });
             return;
         }
 
@@ -2971,6 +2989,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
         if (juegoActivo.tipoJuego === 'ENIGMIC') return <EnigmicLogic usuario={usuario} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'OVNI') return <OvniAbduccion onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'VANILA') return <VaniLa onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
+        if (juegoActivo.tipoJuego === 'MATES_MANDOS') return <QuizMandos soloMates onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'SIXSEVEN') return <SixSeven usuario={usuario} onExit={() => { window.history.pushState({}, '', juegoActivo.desdeMath ? '/math_world' : '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'BUNKER') return <BunkerDisparo usuario={usuario} recurso={juegoActivo.recurso || null} autoStart={!!juegoActivo.recurso} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'MONEYBOARD') return <MoneyBoard usuario={usuario} recurso={juegoActivo.recurso || null} autoStart={!!juegoActivo.recurso} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;

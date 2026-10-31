@@ -98,6 +98,13 @@ export const GAMES = [
     nivel: 'Secundaria', materia: 'Matemáticas',
   },
   {
+    slug: 'matesmandos', emoji: '🎮', color: '#0d9488',
+    h1: 'Mates con mandos micro:bit',
+    title: 'Mates con mandos micro:bit: quiz de matemáticas para la clase | PiKT',
+    desc: 'Toda la clase responde con mandos micro:bit a ejercicios de cálculo, fracciones, ecuaciones, geometría y más. Por letras o marcando el número, sin móviles.',
+    nivel: 'Primaria y Secundaria', materia: 'Matemáticas',
+  },
+  {
     slug: 'sixseven', emoji: '🔢', color: '#FF007F',
     h1: 'Six Seven: cálculo mental con el 67',
     title: 'Six Seven: juego de cálculo mental con el 67 | PiKT',

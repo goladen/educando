@@ -197,9 +197,10 @@ export default async function handler(req, res) {
     catch (e) { return res.status(500).json({ error: e.message }); }
     if (!usuario?.uid) return res.status(401).json({ error: 'Sesión no válida.' });
 
+    const soloAudio = !!req.body?.soloAudio; // devuelve el mp3 sin guardarlo (test del mBot2)
     const creds = credencialesCloudinary();
-    if (!creds) return res.status(500).json({ error: 'Cloudinary no está configurado en el servidor.' });
-    const { cloud, apiKey, secret } = creds;
+    if (!creds && !soloAudio) return res.status(500).json({ error: 'Cloudinary no está configurado en el servidor.' });
+    const { cloud, apiKey, secret } = creds || {};
 
     // ── parámetros ──────────────────────────────────────────────────────────
     const { texto = '', voz = 'en-GB-SoniaNeural', voz2 = null, dialogo = false, rate = '-10%', anterior = null, destino = null } = req.body || {};
@@ -222,6 +223,8 @@ export default async function handler(req, res) {
         return res.status(502).json({ error: 'No se pudo generar la voz (inténtalo de nuevo en un momento): ' + e.message });
     }
     if (audio.length < 2048) return res.status(502).json({ error: 'El servicio de voz devolvió un audio vacío.' });
+
+    if (soloAudio) return res.status(200).json({ audioBase64: audio.toString('base64'), bytes: audio.length });
 
     // ── subida firmada a Cloudinary (el mp3 va como resource_type "video") ───
     // destino "tour": narraciones del tour del Sistema Solar (SimuladorSistemaSolar)

@@ -74,9 +74,9 @@ function PreguntaGrande({ q, etiqueta, revelada, falladas = [], onElegir, conteo
                     const mal = falladas.includes(i);
                     const activa = !!onElegir && !revelada && !mal;
                     return (
-                        <button key={i} disabled={!activa} onClick={() => activa && onElegir(i)} title={activa ? 'Elegir esta respuesta' : undefined} style={{
+                        <button key={i} disabled={!activa} onClick={() => activa && onElegir(i)} title={activa ? 'Elegir esta respuesta' : !onElegir && !revelada ? 'En modo mandos se responde con el micro:bit' : undefined} style={{
                             display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 16, fontWeight: 800, fontSize: 'clamp(1.1rem,2vw,1.7rem)',
-                            fontFamily: 'inherit', color: '#fff', textAlign: 'left', cursor: activa ? 'pointer' : 'default',
+                            fontFamily: 'inherit', color: '#fff', textAlign: 'left', cursor: activa ? 'pointer' : !onElegir && !revelada ? 'not-allowed' : 'default',
                             background: ok ? '#15803d' : mal ? '#7f1d1d' : revelada ? 'rgba(70,30,110,.35)' : 'rgba(70,30,110,.75)',
                             border: `3px solid ${ok ? '#4ade80' : mal ? '#f87171' : 'rgba(255,255,255,.18)'}`,
                             opacity: (revelada && !ok) || mal ? 0.6 : 1, transition: 'background .3s, opacity .3s',

@@ -84,7 +84,7 @@ let enviado = null;
 let ultimoEnvio = 0;
 let escribiendo = false;
 let temporizador = 0;
-let modo = 'cable'; // 'cable' | 'antena'
+let modo = 'cable'; // 'cable' | 'antena' | 'bluetooth'
 let seq = 0;
 let pitidos = 0;
 let pitidosEnviados = 0;
@@ -92,7 +92,9 @@ let pitidosEnviados = 0;
 const ordenDrive = (l, r) =>
   modo === 'antena'
     ? `import cyberpi\ncyberpi.wifi_broadcast.set("pk", "${(seq = (seq + 1) % 10000)},${l},${r},${pitidos}")`
-    : `import mbot2\nmbot2.drive_power(${l},${r})`;
+    : modo === 'bluetooth'
+      ? `import mbot2,time\nmbot2.drive_power(${l},${r})\ntry:\n    import pku\n    pku.t=time.ticks_ms()\nexcept:\n    pass`
+      : `import mbot2\nmbot2.drive_power(${l},${r})`;
 
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 const emitir = (parcial) => {
@@ -101,6 +103,114 @@ const emitir = (parcial) => {
 };
 
 export const soportaSerialCyberpi = () => typeof navigator !== 'undefined' && 'serial' in navigator;
+export const soportaBluetoothCyberpi = () => typeof navigator !== 'undefined' && 'bluetooth' in navigator;
+
+// ── Bluetooth (BLE): el mismo canal que el «modo en vivo» de mBlock, con las mismas tramas.
+// Características ffe2/ffe3 y paquetes de 20 bytes según github.com/DrorSh/mbot_python (MIT).
+const UUID_BLE = (n) => `0000${n.toString(16)}-0000-1000-8000-00805f9b34fb`;
+const SERVICIOS_BLE = [0xffe0, 0xffe1, 0xffe2, 0xffe3, 0xffe4, 0xffe5].map(UUID_BLE); // no consta cuál es: se busca
+const NOMBRES_BLE = ['Makeblock', 'makeblock', 'MAKEBLOCK', 'CyberPi', 'Cyberpi', 'cyberpi', 'CYBERPI', 'mBot', 'MBot', 'mbot', 'MBOT', 'BlueFi', 'Bluefi', 'bluefi'];
+const TROZO_BLE = 20;
+const PAUSA_BLE_MS = 8;
+const TRAMA_MODO_VIVO = new Uint8Array([0xf3, 0xf6, 0x03, 0x00, 0x0d, 0x00, 0x01, 0x0e, 0xf4]);
+
+async function buscarCanalBle(servidor) {
+  const servicios = await servidor.getPrimaryServices();
+  let salida = null;
+  let entrada = null;
+  for (const sv of servicios) {
+    const cars = await sv.getCharacteristics().catch(() => []);
+    for (const c of cars) {
+      if (c.uuid === UUID_BLE(0xffe3)) salida = c;
+      if (c.uuid === UUID_BLE(0xffe2)) entrada = c;
+    }
+  }
+  return salida && entrada ? { salida, entrada } : null;
+}
+
+async function conectarBluetooth() {
+  if (!soportaBluetoothCyberpi()) {
+    emitir({ estado: 'error', error: 'Este navegador no permite Bluetooth: usa Chrome en Android o en el ordenador (en iPhone no funciona con Safari).' });
+    return false;
+  }
+  if (puerto) await desconectarCyberpi();
+  let disp;
+  try {
+    disp = await navigator.bluetooth.requestDevice({
+      filters: NOMBRES_BLE.map((namePrefix) => ({ namePrefix })),
+      optionalServices: SERVICIOS_BLE,
+    });
+  } catch {
+    return false; // cancelado
+  }
+  emitir({ estado: 'conectando', error: '' });
+  let modoVivoUsado = false;
+  try {
+    const servidor = await disp.gatt.connect();
+    const canal = await buscarCanalBle(servidor);
+    if (!canal) throw new Error('Este dispositivo no tiene el canal de datos esperado.');
+    canal.entrada.addEventListener('characteristicvaluechanged', (e) => {
+      const v = e.target.value;
+      acumulado = (acumulado + DEC.decode(new Uint8Array(v.buffer, v.byteOffset, v.byteLength))).slice(-3000);
+    });
+    await canal.entrada.startNotifications();
+    // Cola: dos tramas a la vez se mezclarían y BLE no admite escrituras simultáneas.
+    let cola = Promise.resolve();
+    const escritorBle = {
+      write: (bytes) => {
+        cola = cola.catch(() => {}).then(async () => {
+          for (let i = 0; i < bytes.length; i += TROZO_BLE) {
+            await canal.salida.writeValueWithoutResponse(bytes.slice(i, i + TROZO_BLE));
+            await dormir(PAUSA_BLE_MS);
+          }
+        });
+        return cola;
+      },
+      releaseLock() {},
+    };
+    const puertoBle = { close: async () => disp.gatt.disconnect() };
+    puerto = puertoBle;
+    escritor = escritorBle;
+    disp.addEventListener('gattserverdisconnected', () => {
+      if (puerto !== puertoBle) return;
+      limpiar();
+      emitir({ estado: 'desconectado', error: 'Se ha perdido la conexión Bluetooth con el CyberPi.' });
+    });
+    // El «modo en vivo» cierra el programa abierto en el robot (el test de la ranura 8): solo
+    // se usa si el robot no contesta sin él.
+    let ok = await esperarListo(5);
+    if (!ok && puerto) {
+      await escribir(TRAMA_MODO_VIVO);
+      await dormir(500);
+      ok = await esperarListo(4);
+      modoVivoUsado = true;
+    }
+    if (!puerto) return false;
+    deseado = [0, 0];
+    enviado = null;
+    // Sin confirmación puede aceptar órdenes igualmente: se deja usar y se avisa.
+    emitir({
+      estado: 'listo',
+      error: !ok
+        ? 'El CyberPi no ha confirmado la conexión. Si el robot no se mueve, reinícialo y vuelve a conectar.'
+        : modoVivoUsado
+          ? 'Conectado, pero el robot ha cerrado su programa: «Preguntar» no funcionará.'
+          : '',
+    });
+    temporizador = setInterval(tic, INTERVALO_MS);
+    tic();
+    return true;
+  } catch (e) {
+    limpiar();
+    try {
+      disp.gatt.disconnect();
+    } catch {
+      /* ignorar */
+    }
+    emitir({ estado: 'error', error: e?.message || 'No se ha podido conectar por Bluetooth.' });
+    return false;
+  }
+}
 
 async function escribir(bytes) {
   if (!escritor) return;
@@ -221,7 +331,7 @@ async function tic() {
   if (!escritor || escribiendo || estado.estado !== 'listo') return;
   const ahora = Date.now();
   const igual = enviado && enviado[0] === deseado[0] && enviado[1] === deseado[1] && pitidos === pitidosEnviados;
-  if (igual && ahora - ultimoEnvio < (modo === 'antena' ? LATIDO_ANTENA_MS : REENVIO_MS)) return;
+  if (igual && ahora - ultimoEnvio < (modo === 'cable' ? REENVIO_MS : LATIDO_ANTENA_MS)) return;
   const [l, r] = deseado;
   escribiendo = true;
   try {
@@ -247,6 +357,7 @@ export const getEstadoCyberpi = () => estado;
 
 /** Pide el puerto y deja el CyberPi listo para recibir órdenes. */
 export async function conectarCyberpi() {
+  if (modo === 'bluetooth') return conectarBluetooth();
   if (!soportaSerialCyberpi()) {
     emitir({ estado: 'error', error: 'Este navegador no permite Web Serial: usa Chrome o Edge en el ordenador.' });
     return false;
@@ -342,11 +453,11 @@ export function pitarMbot() {
   else escribir(tramaCyberpi('import cyberpi\ncyberpi.audio.play_tone(660, 0.15)')).catch(() => {});
 }
 
-/** 'cable' (robot por USB) o 'antena' (otro CyberPi por USB reenvía por broadcast LAN). */
+/** 'cable' (robot por USB), 'antena' (otro CyberPi por USB reenvía por broadcast LAN) o 'bluetooth' (directo al robot). */
 export function setModoCyberpi(m) {
   if (m === modo) return;
   pararMbot();
-  modo = m === 'antena' ? 'antena' : 'cable';
+  modo = m === 'antena' || m === 'bluetooth' ? m : 'cable';
   enviado = null;
 }
 export const getModoCyberpi = () => modo;
@@ -393,6 +504,257 @@ export async function instalarReceptor() {
     return false;
   }
   limpiar(); // el receptor ocupa la placa: la soltamos
+  emitir({ estado: 'desconectado', error: '' });
+  return true;
+}
+
+// ── Test guardado en el robot (ranura 8 de «switch program») ────────────────
+// Las tramas no pueden usar la pantalla: el menú de fábrica la tapa. Dentro de una ranura sí.
+
+const MARCA_TEST = '# PIKT TEST';
+const RANURA_TEST = '/flash/main8.py';
+const DATOS_TEST = '/flash/pikt_test.json';
+const TROZO_BIN = 135; // bytes por trama: en base64 + la orden no pasan de MAX_TRAMA_PY
+const AUX_LINEAS = ['import ubinascii as u', 'p=0', 't=0', 'f=None', 'def a(n):', '    global f', '    f=open(n,"wb")', 'def w(s):', '    f.write(u.a2b_base64(s))', 'def c():', '    global f', '    f.close()', '    f=None'];
+
+export const PROGRAMA_TEST = `${MARCA_TEST}
+import cyberpi, time, ujson, random, pku, mbot2
+c = cyberpi.console
+j = cyberpi.controller
+a = cyberpi.audio
+f = open('${DATOS_TEST}')
+T = ujson.load(f)
+f.close()
+a.set_vol(100)
+pku.p = 0
+pku.t = 0
+ok = 0
+hechas = 0
+orden = []
+
+def freno():
+    # Sin órdenes de la web durante 1 s (Bluetooth cortado): el robot se para.
+    if pku.t and time.ticks_diff(time.ticks_ms(), pku.t) > 1000:
+        pku.t = 0
+        mbot2.drive_power(0, 0)
+
+def pulsa(b):
+    if j.is_press(b):
+        while j.is_press(b):
+            freno()
+            time.sleep(0.02)
+        return True
+    return False
+
+def ver(q, s):
+    c.clear()
+    for n in range(len(q['o'])):
+        c.println(('> ' if n == s else '  ') + 'ABCD'[n] + ') ' + q['o'][n])
+
+def reposo():
+    c.clear()
+    c.println('Aciertos: ' + str(ok) + '/' + str(hechas))
+    c.println('A: pregunta')
+
+def pregunta(q):
+    global ok, hechas
+    n = len(q['o'])
+    s = 0
+    ver(q, s)
+    a.play(q['a'])
+    while True:
+        if pulsa('up'):
+            s = (s - 1) % n
+            ver(q, s)
+        elif pulsa('down'):
+            s = (s + 1) % n
+            ver(q, s)
+        elif pulsa('a') or pku.p:
+            pku.p = 0
+            a.stop()
+            a.play(q['a'])
+        elif pulsa('middle'):
+            break
+        freno()
+        time.sleep(0.03)
+    a.stop()
+    hechas += 1
+    c.clear()
+    if s == q['c']:
+        ok += 1
+        cyberpi.led.on(0, 255, 0)
+        c.println('Correcto!')
+        a.play('right')
+    else:
+        cyberpi.led.on(255, 0, 0)
+        c.println('Era la ' + 'ABCD'[q['c']] + ':')
+        c.println(q['o'][q['c']])
+        a.play('wrong')
+    for i in range(40):
+        freno()
+        time.sleep(0.05)
+    cyberpi.led.off()
+
+reposo()
+while True:
+    if pku.p or pulsa('a'):
+        pku.p = 0
+        if not orden:
+            orden = list(range(len(T)))
+            for i in range(len(orden) - 1, 0, -1):
+                k = random.randint(0, i)
+                orden[i], orden[k] = orden[k], orden[i]
+        pregunta(T[orden.pop()])
+        pku.p = 0
+        reposo()
+    freno()
+    time.sleep(0.05)
+`;
+
+/**
+ * Con el test de la ranura 8 abierto: el robot lee la siguiente pregunta (o repite la que está
+ * en curso). Devuelve { ok, detalle } con lo que ha contestado la placa.
+ */
+export async function preguntarRobot() {
+  if (!escritor || estado.estado !== 'listo') return { ok: false, detalle: 'El robot no está conectado.' };
+  try {
+    acumulado = '';
+    await escribir(tramaCyberpi('import pku\npku.p=1\nprint("PREG="+str(pku.p))'));
+    for (let t = 0; t < 2000; t += 50) {
+      const err = errorPlaca();
+      if (err) return { ok: false, detalle: err };
+      if (/PREG=1|\{"ret"/.test(acumulado)) return { ok: true, detalle: 'El robot ha recibido la orden.' };
+      await dormir(50);
+    }
+    return { ok: false, detalle: 'Orden enviada, pero el robot no ha contestado.' };
+  } catch (e) {
+    return { ok: false, detalle: e?.message || 'No se ha podido enviar la orden.' };
+  }
+}
+
+const hayFin = () => /\{"(ret|err)"|eval immediatly err/.test(acumulado);
+const errorPlaca = () => acumulado.match(/eval immediatly err[^\r\n]*|\{"err"[^}]*\}/)?.[0];
+
+/** Envía python y espera a que la placa responda; devuelve lo que ha impreso. */
+async function ejecutar(py, ms = 4000) {
+  acumulado = '';
+  await escribir(tramaCyberpi(py));
+  for (let t = 0; t < ms && !hayFin(); t += 5) await dormir(5);
+  if (!hayFin()) throw new Error('la placa ha dejado de responder');
+  const err = errorPlaca();
+  if (err) throw new Error(err);
+  return acumulado;
+}
+
+const aBase64 = (bytes) => {
+  let s = '';
+  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+  return btoa(s);
+};
+
+async function tamanoEnPlaca(ruta) {
+  const r = await ejecutar('import os\ntry:\n    print("TAM="+str(os.stat("' + ruta + '")[6]))\nexcept:\n    print("TAM=-1")');
+  await dormir(100);
+  return Number((acumulado + r).match(/TAM=(-?\d+)/)?.[1] ?? -1);
+}
+
+/** Guarda bytes en un archivo dejándolo abierto entre tramas: 5 veces más rápido que abrirlo cada vez. */
+async function subirBinario(ruta, bytes, { cancelado, onBytes } = {}) {
+  for (let intento = 0; ; intento++) {
+    await ejecutar('import pku\npku.a("' + ruta + '")');
+    await dormir(100);
+    for (let o = 0; o < bytes.length; o += TROZO_BIN) {
+      if (cancelado?.()) {
+        await ejecutar('import pku\npku.c()');
+        throw new Error('Carga cancelada.');
+      }
+      await ejecutar('import pku\npku.w("' + aBase64(bytes.subarray(o, o + TROZO_BIN)) + '")', 2000);
+      await dormir(40); // {"ret"} llega antes de que termine de escribir
+      onBytes?.(Math.min(TROZO_BIN, bytes.length - o));
+    }
+    await ejecutar('import pku\npku.c()');
+    await dormir(200);
+    const tam = await tamanoEnPlaca(ruta);
+    if (tam === bytes.length) return;
+    if (intento >= 1) throw new Error('el archivo ' + ruta + ' ha quedado incompleto (' + tam + ' de ' + bytes.length + ' bytes)');
+  }
+}
+
+// La pantalla del CyberPi lee peor las tildes: se quitan, conservando la Ñ. La voz no se ve afectada.
+const textoPantalla = (t) =>
+  String(t)
+    .replace(/[¿¡]/g, '')
+    .replace(/ñ/g, '')
+    .replace(/Ñ/g, '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(//g, 'ñ')
+    .replace(//g, 'Ñ');
+
+/**
+ * Pide el puerto para cargar un test. Hay que llamarla directamente desde el clic: pasado un
+ * rato el navegador bloquea la ventana de elegir puerto. Devuelve false si se cancela.
+ */
+export async function prepararCargaTest() {
+  setModoCyberpi('cable');
+  const ok = await conectarCyberpi();
+  if (!ok && (estado.estado === 'sin_respuesta' || estado.estado === 'error')) throw new Error(estado.error);
+  return ok;
+}
+
+/**
+ * Guarda un test en la ranura 8, con el puerto ya abierto por prepararCargaTest.
+ * preguntas = [{ mp3: Uint8Array, opciones: [..], correcta }]. No pisa un programa ajeno.
+ */
+export async function cargarTestEnRobot(preguntas, { onProgreso, cancelado } = {}) {
+  if (!escritor) throw new Error('Se ha perdido la conexión con el robot.');
+  clearInterval(temporizador); // que no se cuelen órdenes de conducción
+  temporizador = 0;
+  let hechos = 0;
+  try {
+    emitir({ estado: 'conectando', error: '' });
+    await ejecutar('import mbot2\nmbot2.drive_power(0,0)');
+    await dormir(200);
+    const enRanura = await tamanoEnPlaca(RANURA_TEST);
+    if (enRanura > 0) {
+      const ini = await ejecutar('f=open("' + RANURA_TEST + '")\nprint("INI="+f.read(' + MARCA_TEST.length + '))\nf.close()');
+      await dormir(100);
+      if (!(acumulado + ini).includes('INI=' + MARCA_TEST)) {
+        throw new Error('La ranura 8 del robot ya tiene otro programa. Para no borrarlo no se ha cargado nada; quítalo con mBlock y vuelve a probar.');
+      }
+    }
+    onProgreso?.(0, 'Preparando el robot');
+    for (let i = 0; i < AUX_LINEAS.length; i++) {
+      await ejecutar('f=open("pku.py","' + (i ? 'a' : 'w') + '")\nf.write(' + JSON.stringify(AUX_LINEAS[i] + '\n') + ')\nf.close()');
+      await dormir(150);
+    }
+    await ejecutar('import os\nfor f in os.listdir("/music"):\n    if f[:5]=="pikt_":\n        os.remove("/music/"+f)', 8000);
+    await dormir(200);
+    const r = await ejecutar('import os\nv=os.statvfs("/")\nprint("LIBRE="+str(v[0]*v[3]))');
+    await dormir(100);
+    const libre = Number((acumulado + r).match(/LIBRE=(\d+)/)?.[1] ?? 0);
+    const total = preguntas.reduce((s, q) => s + q.mp3.length, 0);
+    if (libre && total + 60000 > libre) {
+      throw new Error('No cabe en el robot: ocupa ' + Math.round(total / 1024) + ' KB y hay ' + Math.round(libre / 1024) + ' KB libres. Prueba con menos preguntas.');
+    }
+    for (let i = 0; i < preguntas.length; i++) {
+      await subirBinario('/music/pikt_q' + i + '.mp3', preguntas[i].mp3, {
+        cancelado,
+        onBytes: (n) => {
+          hechos += n;
+          onProgreso?.(hechos, 'Guardando la pregunta ' + (i + 1) + ' de ' + preguntas.length);
+        },
+      });
+    }
+    const datos = preguntas.map((q, i) => ({ a: 'pikt_q' + i, o: q.opciones.map((t) => textoPantalla(t).slice(0, 44)), c: q.correcta }));
+    await subirBinario(DATOS_TEST, ENC.encode(JSON.stringify(datos)));
+    await subirBinario(RANURA_TEST, ENC.encode(PROGRAMA_TEST));
+  } catch (e) {
+    limpiar();
+    emitir({ estado: 'desconectado', error: '' });
+    throw e;
+  }
+  limpiar();
   emitir({ estado: 'desconectado', error: '' });
   return true;
 }

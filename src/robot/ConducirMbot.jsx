@@ -16,6 +16,7 @@ import {
   soportaSerialCyberpi,
   soportaBluetoothCyberpi,
   setModoCyberpi,
+  setAntichoqueMbot,
   instalarReceptor,
   PROGRAMA_RECEPTOR,
 } from './cyberpiMbot.js';
@@ -77,7 +78,7 @@ export default function ConducirMbot({ onExit }) {
   const [retoId, setRetoId] = useState('libre');
   const [fuente, setFuente] = useState(() => leer(LS_AJUSTES, {}).fuente || 'teclado'); // mano | mando | teclado
   const [potencia, setPotencia] = useState(() => leer(LS_AJUSTES, {}).potencia || 50);
-  const [ajustes, setAjustes] = useState(() => ({ invertir: false, cruzar: false, rastro: true, sensor: true, ...leer(LS_AJUSTES, {}) }));
+  const [ajustes, setAjustes] = useState(() => ({ invertir: false, cruzar: false, rastro: true, sensor: true, antichoque: true, distChoque: 15, ...leer(LS_AJUSTES, {}) }));
   const [detenido, setDetenido] = useState(false);
   const [mejores, setMejores] = useState(() => leer(LS_MEJORES, {}));
   const [resultado, setResultado] = useState(null);
@@ -134,6 +135,7 @@ export default function ConducirMbot({ onExit }) {
 
   const reto = RETOS.find((r) => r.id === retoId);
 
+  useEffect(() => setAntichoqueMbot(ajustes.antichoque ? ajustes.distChoque || 15 : 0), [ajustes.antichoque, ajustes.distChoque]);
   useEffect(() => guardar(LS_AJUSTES, { ...ajustes, fuente, potencia, conexion }), [ajustes, fuente, potencia, conexion]);
   useEffect(() => escucharEstadoCyberpi(setCyber), []);
   useEffect(() => escucharEstadoAntena(setAntena), []);
@@ -292,7 +294,11 @@ export default function ConducirMbot({ onExit }) {
       l = (l / mx) * pot;
       d = (d / mx) * pot;
 
-      const ev = paso(r, m, l, d, dt);
+      // Antichoque: hacia delante y con algo delante a menos de distChoque → el simulado no avanza
+      // (el robot real lo comprueba con su propio sensor: aquí solo se le dice si la orden es avanzar)
+      const adelante = l + d > 30;
+      const frenaSim = aj.antichoque && adelante && ultrasonidos(r, m) < (aj.distChoque || 15);
+      const ev = paso(r, m, frenaSim ? 0 : l, frenaSim ? 0 : d, dt);
       if (ev.choque) tono(110, 0.12, 'triangle', 0.2);
       if (ev.cono) tono(220, 0.2, 'sawtooth', 0.08);
       if (ev.estrella || ev.puerta || ev.control) tono(880, 0.1, 'sine', 0.15);
@@ -317,7 +323,7 @@ export default function ConducirMbot({ onExit }) {
         let rl = aj.invertir ? -l : l;
         let rr = aj.invertir ? -d : d;
         if (aj.cruzar) [rl, rr] = [rr, rl];
-        moverMbot(rl, rr);
+        moverMbot(rl, rr, adelante);
       }
 
       const dist = aj.sensor ? ultrasonidos(r, m) : 0;
@@ -329,7 +335,7 @@ export default function ConducirMbot({ onExit }) {
 
       if (ahora - ultimoHud > 100) {
         ultimoHud = ahora;
-        setHud({ v: e.v, w: e.w, l: Math.round(l), r: Math.round(d), ms: tiempoFinal(m), dist, info: e.info, activa: e.activa, sig: m.siguiente, est: m.estrellas.filter((s) => s.cogida).length, fuera: m.fueraMs, pen: m.penalizacion });
+        setHud({ v: e.v, w: e.w, l: Math.round(l), r: Math.round(d), ms: tiempoFinal(m), dist, info: frenaSim ? '🛑 Obstáculo delante: gira o ve marcha atrás' : e.info, activa: e.activa, sig: m.siguiente, est: m.estrellas.filter((s) => s.cogida).length, fuera: m.fueraMs, pen: m.penalizacion });
       }
     };
     raf = requestAnimationFrame(bucle);
@@ -561,6 +567,19 @@ export default function ConducirMbot({ onExit }) {
               <input type="checkbox" checked={ajustes.sensor} onChange={(e) => setAjustes((a) => ({ ...a, sensor: e.target.checked }))} /> Sensor de distancia
             </label>
           </div>
+          <div style={st.fila}>
+            <label style={st.check} title="Con el sensor de ultrasonidos del mBot2: si va hacia delante y hay algo cerca, se para. Girar y marcha atrás siguen funcionando.">
+              <input type="checkbox" checked={!!ajustes.antichoque} onChange={(e) => setAjustes((a) => ({ ...a, antichoque: e.target.checked }))} /> 🛑 Antichoque a
+            </label>
+            <select value={ajustes.distChoque || 15} disabled={!ajustes.antichoque} onChange={(e) => setAjustes((a) => ({ ...a, distChoque: Number(e.target.value) }))}>
+              {[10, 15, 20, 30, 50].map((cm) => <option key={cm} value={cm}>{cm} cm</option>)}
+            </select>
+          </div>
+          {ajustes.antichoque && (
+            <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+              El robot real usa su sensor de ultrasonidos: al encontrar algo se para y su luz se pone roja. Gira o ve marcha atrás para salir. Sin sensor conectado no hace nada.
+            </div>
+          )}
 
           <h3 style={st.h3}>🤖 mBot2 real</h3>
           <div style={st.fila}>

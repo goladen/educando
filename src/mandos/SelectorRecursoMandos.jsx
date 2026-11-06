@@ -35,6 +35,21 @@ export function hojasQuiz(recurso, numerico = false) {
     .filter((h) => h.preguntas.length > 0);
 }
 
+/** Desplegable «Todas las hojas / hoja N (preguntas)» (valor -1 = todas). No se muestra si solo hay una hoja. */
+export function ElegirHoja({ hojas, valor, onChange, style }) {
+  if (!hojas || hojas.length < 2) return null;
+  return (
+    <select value={valor} onChange={(e) => onChange(Number(e.target.value))} aria-label="Hoja del recurso"
+      style={{ padding: '6px 10px', borderRadius: 10, border: '1px solid #475569', background: '#0f172a', color: '#f1f5f9', fontWeight: 700, fontSize: '0.85rem', fontFamily: 'inherit', ...style }}>
+      <option value={-1}>📄 Todas las hojas ({hojas.reduce((s, h) => s + h.preguntas.length, 0)})</option>
+      {hojas.map((h, i) => <option key={i} value={i}>{h.nombre || `Hoja ${i + 1}`} ({h.preguntas.length})</option>)}
+    </select>
+  );
+}
+
+/** Preguntas de la hoja elegida (-1 = todas). */
+export const preguntasDeHoja = (hojas, hoja) => (hoja < 0 ? hojas.flatMap((h) => h.preguntas) : hojas[hoja]?.preguntas || hojas.flatMap((h) => h.preguntas));
+
 const conPreguntas = (docs, numerico) =>
   docs
     .map((r) => ({ r, n: hojasQuiz(r, numerico).reduce((s, h) => s + h.preguntas.length, 0) }))

@@ -19,7 +19,7 @@ import {
 } from './mandosMicrobit.js';
 import { despertarAudio, sonidoCorrecto, sonidoIncorrecto, sonidoFinal } from '../utils/sonidosFeedback';
 import { GENERADORES, barajar } from './QuizMandos.jsx';
-import SelectorRecursoMandos, { hojasQuiz } from './SelectorRecursoMandos.jsx';
+import SelectorRecursoMandos, { hojasQuiz, ElegirHoja, preguntasDeHoja } from './SelectorRecursoMandos.jsx';
 import { BotonTutorialMandos } from './TutorialMandos.jsx';
 import ChipAntena from './ChipAntena.jsx';
 
@@ -110,6 +110,7 @@ export default function PistaRobotsMandos({ onExit }) {
   const [conEstrellas, setConEstrellas] = useState(true);
   const [fuente, setFuente] = useState('tablas'); // tablas | sumas | recurso
   const [recurso, setRecurso] = useState(null);
+  const [hojaSel, setHojaSel] = useState(-1); // -1 = todas las hojas
   const [restante, setRestante] = useState(0);
   const [antena, setAntena] = useState({ antenaOk: false, version: 0 });
   const [simulador, setSimulador] = useState(false);
@@ -263,7 +264,8 @@ export default function PistaRobotsMandos({ onExit }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fase, duracion]);
 
-  const preguntasRecurso = recurso ? hojasQuiz(recurso).flatMap((h) => h.preguntas) : [];
+  const hojasRecurso = recurso ? hojasQuiz(recurso) : [];
+  const preguntasRecurso = preguntasDeHoja(hojasRecurso, hojaSel);
 
   const empezar = () => {
     if (modoJuego === 'preguntas' && fuente === 'recurso') {
@@ -390,12 +392,15 @@ export default function PistaRobotsMandos({ onExit }) {
                 </div>
                 {fuente === 'recurso' && (
                   <>
-                    <SelectorRecursoMandos seleccionado={recurso} onPick={setRecurso} />
+                    <SelectorRecursoMandos seleccionado={recurso} onPick={(r) => { setRecurso(r); setHojaSel(-1); }} />
                     {recurso && (
-                      <p style={{ ...st.ayuda, marginTop: 10 }}>
-                        <b style={{ color: '#facc15' }}>✔ {recurso.titulo || 'Sin título'}</b> · {preguntasRecurso.length}{' '}
-                        preguntas (la partida acaba al terminarlas o al acabar el tiempo)
-                      </p>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginTop: 10 }}>
+                        <b style={{ color: '#facc15' }}>✔ {recurso.titulo || 'Sin título'}</b>
+                        <ElegirHoja hojas={hojasRecurso} valor={hojaSel} onChange={setHojaSel} />
+                        <span style={{ ...st.ayuda, margin: 0 }}>
+                          {preguntasRecurso.length} preguntas (la partida acaba al terminarlas o al acabar el tiempo)
+                        </span>
+                      </div>
                     )}
                   </>
                 )}

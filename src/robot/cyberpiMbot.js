@@ -14,16 +14,26 @@
 //   'cable'  → el CyberPi del robot está por USB y ejecuta drive_power directamente.
 //   'antena' → por USB hay OTRO CyberPi que reenvía las órdenes por «broadcast LAN»
 //              (ESP-NOW, sin router) al CyberPi del robot, que ejecuta PROGRAMA_RECEPTOR.
-//              Mensaje "pk" = "seq,izq,der,pitidos". Si el robot deja de recibir 1 s, se para solo.
+//              Mensaje "pk" = "seq,izq,der,pitidos,antichoque". Si el robot deja de recibir 1 s, se para solo.
+//
+// ANTICHOQUE (sensor de ultrasonidos del mBot2, mbuild.ultrasonic2): si se va hacia delante y hay algo a
+// menos de N cm, el robot se para (girar sobre sí mismo y marcha atrás siguen funcionando). Lo comprueba
+// el propio robot: en 'antena' el receptor mide sin parar; en 'cable' y 'bluetooth' cada orden hacia
+// delante lleva la comprobación y mientras se avanza se repite cada 200 ms. Sin sensor (lectura 0) no hace nada.
 
 const ENC = new TextEncoder();
 const DEC = new TextDecoder();
 const INTERVALO_MS = 110; // ~9 órdenes por segundo como mucho
 const REENVIO_MS = 1500; // repite la orden aunque no cambie (por si se perdió una trama)
 const LATIDO_ANTENA_MS = 350; // en modo antena se repite siempre: el receptor se para sin latido
+const REENVIO_ANTICHOQUE_MS = 200; // cable/bluetooth: al avanzar con antichoque, cada orden vuelve a medir
 
 /** Programa para el CyberPi del ROBOT en modo sin cable (también se puede subir con mBlock). */
 export const PROGRAMA_RECEPTOR = `import cyberpi, mbot2, time
+try:
+    import mbuild
+except ImportError:
+    mbuild = None
 try:
     from time import ticks_ms, ticks_diff
 except ImportError:
@@ -40,6 +50,11 @@ previo = ""
 pitidos = None
 ultimo = ticks_ms()
 parado = True
+dl = 0
+dr = 0
+lim = 0
+bloq = False
+tu = 0
 while True:
     m = cyberpi.wifi_broadcast.get("pk")
     if m and m != previo:
@@ -47,7 +62,11 @@ while True:
         ultimo = ticks_ms()
         p = str(m).split(",")
         if len(p) >= 3:
-            mbot2.drive_power(int(p[1]), int(p[2]))
+            dl = int(p[1])
+            dr = int(p[2])
+            lim = int(p[4]) if len(p) >= 5 else 0
+            if not (bloq and lim):
+                mbot2.drive_power(dl, dr)
             if parado:
                 cyberpi.led.on(0, 255, 0)
                 parado = False
@@ -59,6 +78,26 @@ while True:
         mbot2.drive_power(0, 0)
         cyberpi.led.on(255, 120, 0)
         parado = True
+    # Antichoque: lim > 0 solo mientras la orden es ir hacia delante
+    if lim and not parado and mbuild and ticks_diff(ticks_ms(), tu) > 60:
+        tu = ticks_ms()
+        try:
+            d = mbuild.ultrasonic2.get(1)
+        except Exception:
+            d = 0
+        if d and 2 < d < lim:
+            if not bloq:
+                bloq = True
+                mbot2.drive_power(0, 0)
+                cyberpi.led.on(255, 0, 0)
+                cyberpi.audio.play_tone(220, 0.1)
+        elif bloq:
+            bloq = False
+            mbot2.drive_power(dl, dr)
+            cyberpi.led.on(0, 255, 0)
+    elif bloq and not lim:
+        bloq = False
+        cyberpi.led.on(0, 255, 0)
     time.sleep(0.02)
 `;
 
@@ -88,13 +127,23 @@ let modo = 'cable'; // 'cable' | 'antena' | 'bluetooth'
 let seq = 0;
 let pitidos = 0;
 let pitidosEnviados = 0;
+let antichoque = 0; // cm (0 = apagado)
+let avanza = false; // la orden actual es ir hacia delante (lo dice quien conduce)
+let guardaEnviada = 0;
+const guardaActual = () => (antichoque && avanza ? antichoque : 0);
 
-const ordenDrive = (l, r) =>
-  modo === 'antena'
-    ? `import cyberpi\ncyberpi.wifi_broadcast.set("pk", "${(seq = (seq + 1) % 10000)},${l},${r},${pitidos}")`
-    : modo === 'bluetooth'
-      ? `import mbot2,time\nmbot2.drive_power(${l},${r})\ntry:\n    import pku\n    pku.t=time.ticks_ms()\nexcept:\n    pass`
-      : `import mbot2\nmbot2.drive_power(${l},${r})`;
+// Orden hacia delante con antichoque (cable/bluetooth): mide y, si hay algo cerca, manda (0,0) y luz roja
+// (compacta: una trama con más de ~240 bytes de python se ignora; ver MAX_TRAMA_PY)
+const conGuarda = (l, r, g, mods) =>
+  `import ${mods},mbuild,cyberpi as c\nl=${l};r=${r}\ntry:d=mbuild.ultrasonic2.get(1)\nexcept:d=0\nif 2<d<${g}:l=r=0;c.led.on(255,0,0)\nelse:c.led.off()\nmbot2.drive_power(l,r)`;
+const ordenDrive = (l, r, g = 0) => {
+  if (modo === 'antena') return `import cyberpi\ncyberpi.wifi_broadcast.set("pk", "${(seq = (seq + 1) % 10000)},${l},${r},${pitidos},${g}")`;
+  const bt = modo === 'bluetooth';
+  const mods = bt ? 'mbot2,time' : 'mbot2';
+  // Al dejar de avanzar con la luz roja puesta, se apaga
+  const base = g ? conGuarda(l, r, g, mods) : (guardaEnviada ? 'import cyberpi\ncyberpi.led.off()\n' : '') + `import ${mods}\nmbot2.drive_power(${l},${r})`;
+  return bt ? base + '\ntry:import pku;pku.t=time.ticks_ms()\nexcept:pass' : base;
+};
 
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 const emitir = (parcial) => {
@@ -330,13 +379,16 @@ function limpiar() {
 async function tic() {
   if (!escritor || escribiendo || estado.estado !== 'listo') return;
   const ahora = Date.now();
-  const igual = enviado && enviado[0] === deseado[0] && enviado[1] === deseado[1] && pitidos === pitidosEnviados;
-  if (igual && ahora - ultimoEnvio < (modo === 'cable' ? REENVIO_MS : LATIDO_ANTENA_MS)) return;
+  const g = guardaActual();
+  const igual = enviado && enviado[0] === deseado[0] && enviado[1] === deseado[1] && pitidos === pitidosEnviados && g === guardaEnviada;
+  const espera = modo === 'antena' ? LATIDO_ANTENA_MS : g ? REENVIO_ANTICHOQUE_MS : modo === 'cable' ? REENVIO_MS : LATIDO_ANTENA_MS;
+  if (igual && ahora - ultimoEnvio < espera) return;
   const [l, r] = deseado;
   escribiendo = true;
   try {
-    await escribir(tramaCyberpi(ordenDrive(l, r)));
+    await escribir(tramaCyberpi(ordenDrive(l, r, g)));
     enviado = [l, r];
+    guardaEnviada = g;
     pitidosEnviados = pitidos;
     ultimoEnvio = ahora;
   } catch {
@@ -434,9 +486,16 @@ export async function desconectarCyberpi() {
  * espejo: para avanzar la derecha va en negativo (comprobado con los encoders:
  * drive_power(30, 30) gira sobre sí mismo).
  */
-export function moverMbot(izq, der) {
+export function moverMbot(izq, der, adelante) {
   const c = (v) => Math.max(-100, Math.min(100, Math.round(v)));
   deseado = [c(izq), -c(der) || 0];
+  // «hacia delante» lo decide quien conduce (antes de invertir/cruzar motores); por defecto, la suma
+  avanza = adelante ?? c(izq) + c(der) > 30;
+}
+
+/** Antichoque con el sensor de ultrasonidos: para el robot si al avanzar hay algo a menos de `cm` (0 = apagado). */
+export function setAntichoqueMbot(cm) {
+  antichoque = cm > 0 ? Math.round(cm) : 0;
 }
 
 /** Para el robot YA (sin esperar al siguiente tic). */

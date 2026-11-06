@@ -13,7 +13,7 @@ import {
     simularPulsacion, feedbackMando, dueloMando, finDuelosMandos,
 } from '../mandos/mandosMicrobit.js';
 import { GENERADORES, barajar } from '../mandos/QuizMandos.jsx';
-import SelectorRecursoMandos, { hojasQuiz } from '../mandos/SelectorRecursoMandos.jsx';
+import SelectorRecursoMandos, { hojasQuiz, ElegirHoja, preguntasDeHoja } from '../mandos/SelectorRecursoMandos.jsx';
 import { despertarAudio } from '../utils/sonidosFeedback';
 // Los mismos sonidos y la misma celebración final que la pizarra 2D de Fútbol Quizz
 import { sonidoAcierto, sonidoFallo, sonidoGol, pitido, pitidoTriple, FondoCampeones, VideoCampeones } from './efectosFutbol';
@@ -122,6 +122,7 @@ export default function FutbolMandos({ onExit }) {
     const [minutos, setMinutos] = useState(10);
     const [fuente, setFuente] = useState('tablas');
     const [recurso, setRecurso] = useState(null);
+    const [hojaSel, setHojaSel] = useState(-1); // -1 = todas las hojas
     const [antena, setAntena] = useState({ antenaOk: false, version: 0 });
     const [virtuales, setVirtuales] = useState(false);
 
@@ -158,7 +159,8 @@ export default function FutbolMandos({ onExit }) {
 
 
     // ── Preguntas ──
-    const preguntasRecurso = recurso ? hojasQuiz(recurso).flatMap(h => h.preguntas) : [];
+    const hojasRecurso = recurso ? hojasQuiz(recurso) : [];
+    const preguntasRecurso = preguntasDeHoja(hojasRecurso, hojaSel);
     const siguientePregunta = () => {
         if (fuente === 'recurso' && preguntasRecurso.length) {
             if (!colaRef.current.length) colaRef.current = barajar(preguntasRecurso);
@@ -390,8 +392,12 @@ export default function FutbolMandos({ onExit }) {
                             {[['tablas', '✖️ Tablas'], ['sumas', '➕ Sumas y restas'], ['recurso', '📚 Recurso']].map(([k, t]) => <button key={k} style={st.opcion(fuente === k)} onClick={() => setFuente(k)}>{t}</button>)}
                         </div>
                         {fuente === 'recurso' && <>
-                            <SelectorRecursoMandos seleccionado={recurso} onPick={setRecurso} />
-                            {recurso && <p style={{ margin: '8px 0 0', color: '#facc15', fontWeight: 700 }}>✔ {recurso.titulo || 'Sin título'} · {preguntasRecurso.length} preguntas</p>}
+                            <SelectorRecursoMandos seleccionado={recurso} onPick={(r) => { setRecurso(r); setHojaSel(-1); colaRef.current = []; }} />
+                            {recurso && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginTop: 8 }}>
+                                <b style={{ color: '#facc15' }}>✔ {recurso.titulo || 'Sin título'}</b>
+                                <ElegirHoja hojas={hojasRecurso} valor={hojaSel} onChange={(h) => { setHojaSel(h); colaRef.current = []; }} />
+                                <span style={{ color: '#facc15', fontWeight: 700 }}>{preguntasRecurso.length} preguntas</span>
+                            </div>}
                         </>}
                     </div>
                     <button style={st.btnGrande} onClick={empezar}>⚽ ¡Al campo!</button>

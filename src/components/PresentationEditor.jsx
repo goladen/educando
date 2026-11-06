@@ -2176,62 +2176,125 @@ function SlideCanvas({ slide, onChange, usuario, onElementSelected }) {
   );
 }
 
-// ─── GEMINI AI GENERATION ─────────────────────────────────────────────────────
-async function generateWithGemini(topic, numSlides, theme) {
-  const prompt = `Crea una presentación educativa en español sobre el tema: "${topic}".
-Genera exactamente ${numSlides} diapositivas en formato JSON.
-El array debe tener exactamente ${numSlides} objetos con esta estructura:
-[
-  {
-    "layout": "title" | "content" | "image-right" | "image-left" | "two-col" | "cta" | "map",
-    "heading": "Título impactante",
-    "subheading": "Subtítulo (solo para layout title y cta)",
-    "body": "Texto principal (puntos con •  para content, two-col; URL para cta)",
-    "col2": "Segunda columna (solo para two-col)",
-    "tags": ["etiqueta1", "etiqueta2"],
-    "mapNodes": [
-      {"id": 1, "text": "Concepto central", "x": 50, "y": 50, "isCenter": true},
-      {"id": 2, "text": "Idea 1", "x": 20, "y": 25},
-      {"id": 3, "text": "Idea 2", "x": 80, "y": 25},
-      {"id": 4, "text": "Idea 3", "x": 20, "y": 75},
-      {"id": 5, "text": "Idea 4", "x": 80, "y": 75}
-    ]
-  }
-]
-Reglas:
-- La primera diapositiva debe ser de layout "title" con título impactante y subtítulo
-- La última diapositiva puede ser "cta" o "title" resumiendo lo aprendido
-- Para "content" usa • al inicio de cada línea de body
-- Para "two-col" rellena tanto body como col2 con puntos •
-- Para "map" rellena mapNodes con el concepto central y 4-6 ideas relacionadas
-- Para "image-right" o "image-left" escribe texto descriptivo en body
-- Los tags deben ser palabras clave cortas (2-3 palabras máx)
-- Usa un tono educativo, claro y motivador
-- Responde ÚNICAMENTE con el JSON array, sin markdown ni explicaciones`;
+// ─── GENERACIÓN CON IA (Gemini aquí o prompt para la IA del profe) ─────────────
+const LAYOUTS_IA = ['title', 'content', 'image-right', 'image-left', 'two-col', 'cta', 'map'];
 
+export function construirPromptPresentacion({ tema, numSlides, nivel = '', idioma = 'español', extra = '' }) {
+  return `Actúa como profesor/a experto/a y crea una presentación educativa SENCILLA para la web PiKT.
+
+TEMA: "${tema || '[escribe aquí el tema]'}"
+${nivel ? `NIVEL / CURSO: ${nivel}\n` : ''}IDIOMA: ${idioma}
+NÚMERO DE DIAPOSITIVAS: exactamente ${numSlides}
+${extra ? `INDICACIONES DEL PROFESOR: ${extra}\n` : ''}
+Devuelve SOLO un objeto JSON (sin markdown, sin bloques de código, sin explicaciones) con esta forma:
+{
+  "titulo": "Título de la presentación",
+  "slides": [
+    {
+      "layout": "title" | "content" | "image-right" | "image-left" | "two-col" | "cta" | "map",
+      "heading": "Título de la diapositiva (máx. 8 palabras)",
+      "subheading": "Subtítulo (solo para title y cta)",
+      "body": "Texto principal. En content y two-col: 3-5 líneas que empiecen por • ",
+      "col2": "Segunda columna con líneas • (solo two-col)",
+      "tags": ["palabra clave", "otra"],
+      "mapNodes": [
+        {"id": 1, "text": "Concepto central", "x": 50, "y": 50, "isCenter": true},
+        {"id": 2, "text": "Idea 1", "x": 20, "y": 25},
+        {"id": 3, "text": "Idea 2", "x": 80, "y": 25},
+        {"id": 4, "text": "Idea 3", "x": 20, "y": 75},
+        {"id": 5, "text": "Idea 4", "x": 80, "y": 75}
+      ]
+    }
+  ]
+}
+
+Reglas:
+- La 1.ª diapositiva es "title" (título atractivo + subtítulo).
+- La última es "cta" con un resumen o un reto final para la clase.
+- Mezcla tipos: varias "content", al menos una "two-col" (comparar, ventajas/inconvenientes…) y una "map" (mapa conceptual con 4-6 ideas; x e y entre 10 y 90).
+- "image-right"/"image-left": texto breve en body; la imagen la añadirá el profesor después.
+- Frases cortas y claras, adecuadas al nivel: máximo ~40 palabras por diapositiva.
+- Separa las líneas de body y col2 con \\n.
+- Los campos que no use un layout pueden omitirse.
+- Responde ÚNICAMENTE con el JSON.`;
+}
+
+// Pasa una diapositiva de plantilla a modo libre: cada texto es una caja que se
+// puede mover y redimensionar. El mapa conceptual se convierte en nodos (forma + texto).
+function diapositivaACajas(slide) {
+  const t = THEMES[slide.theme] || THEMES.dark;
+  let elements;
+  if (slide.layout === 'map') {
+    let n = 0;
+    const formas = [], textos = [];
+    const textoCentro = String(t.accent).toLowerCase() === '#ffffff' ? '#1f2937' : '#ffffff';
+    if (slide.heading) textos.push({ id: `el_t${++n}`, type: 'text', x: 5, y: 3, w: 90, h: 12, text: slide.heading, textStyle: 'heading', textAlign: 'center' });
+    (slide.mapNodes || []).forEach(nd => {
+      const w = nd.isCenter ? 28 : 22, h = nd.isCenter ? 14 : 12;
+      const x = Math.min(100 - w, Math.max(0, nd.x - w / 2));
+      const y = Math.min(100 - h, Math.max(14, nd.y - h / 2));
+      formas.push({ id: `el_s${++n}`, type: 'shape', shapeType: 'rect', x, y, w, h, fill: nd.isCenter ? t.accent : `${t.accent}33`, borderRadius: 14, stroke: t.accent, strokeWidth: 2 });
+      textos.push({ id: `el_t${++n}`, type: 'text', x, y: y + h * 0.15, w, h: h * 0.7, text: nd.text, textStyle: nd.isCenter ? 'heading' : 'body', textAlign: 'center', fontSize: nd.isCenter ? 20 : 15, fontWeight: 'bold', ...(nd.isCenter ? { color: textoCentro } : {}) });
+    });
+    elements = [...formas, ...textos];
+  } else {
+    elements = migrateToElements(slide);
+  }
+  if ((slide.layout === 'title' || slide.layout === 'cta') && slide.tags?.length) {
+    elements.push({ id: 'el_tags', type: 'text', x: 10, y: slide.layout === 'cta' ? 80 : 64, w: 80, h: 8, text: slide.tags.map(x => `#${x}`).join('   '), textStyle: 'cta', textAlign: 'center', fontSize: 14 });
+  }
+  return { ...slide, layout: 'free', elements };
+}
+
+// Acepta lo que pegue el profe: {titulo, slides}, un array directo, con ```json``` o texto alrededor
+// opciones.cajas = true → cada diapositiva se crea en modo libre (cajas de texto movibles)
+export function parsearPresentacionIA(raw, theme = 'dark', opciones = {}) {
+  const txt = String(raw || '').replace(/```(?:json)?/gi, '').trim();
+  let data;
+  try { data = JSON.parse(txt); } catch {
+    const ini = txt.search(/[[{]/);
+    const fin = Math.max(txt.lastIndexOf('}'), txt.lastIndexOf(']'));
+    try { data = JSON.parse(ini >= 0 && fin > ini ? txt.slice(ini, fin + 1) : ''); }
+    catch { throw new Error('No se ha encontrado un JSON válido. Copia la respuesta completa de tu IA.'); }
+  }
+  const lista = Array.isArray(data) ? data : (data?.slides || data?.diapositivas);
+  if (!Array.isArray(lista) || !lista.length) throw new Error('El JSON no contiene diapositivas ("slides").');
+  const titulo = (!Array.isArray(data) && (data.titulo || data.title)) || '';
+  const aTexto = v => Array.isArray(v)
+    ? v.map(x => (String(x).trim().startsWith('•') ? String(x) : '• ' + x)).join('\n')
+    : String(v || '');
+  const base = Date.now();
+  const slides = lista.map((s, i) => {
+    const layout = LAYOUTS_IA.includes(s?.layout) ? s.layout : 'content';
+    const nodos = Array.isArray(s?.mapNodes) ? s.mapNodes.map((n, j) => ({
+      id: n.id ?? j + 1, text: String(n.text || ''),
+      x: Math.min(92, Math.max(8, Number(n.x) || 50)),
+      y: Math.min(92, Math.max(8, Number(n.y) || 50)),
+      ...(n.isCenter ? { isCenter: true } : {}),
+    })) : [];
+    return {
+      ...JSON.parse(JSON.stringify(SLIDE_DEFAULTS[layout])),
+      id: base + i, layout, theme, duration: 5000,
+      heading: String(s?.heading || ''),
+      subheading: String(s?.subheading || ''),
+      body: aTexto(s?.body),
+      col2: aTexto(s?.col2),
+      tags: Array.isArray(s?.tags) ? s.tags.map(String).slice(0, 6) : [],
+      imageBase64: null,
+      mapNodes: layout === 'map' && !nodos.length ? SLIDE_DEFAULTS.map.mapNodes : nodos,
+    };
+  });
+  return { titulo, slides: opciones.cajas ? slides.map(diapositivaACajas) : slides };
+}
+
+async function generateWithGemini(topic, numSlides, theme) {
+  const prompt = construirPromptPresentacion({ tema: topic, numSlides });
   const data = await callGeminiProxy({
     model: 'gemini-2.0-flash',
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
     generationConfig: { temperature: 0.7, maxOutputTokens: 4000 },
   });
-
-  const raw = extractText(data);
-  const jsonMatch = raw.match(/\[[\s\S]*\]/);
-  if (!jsonMatch) throw new Error('Gemini no devolvió JSON válido');
-  const slides = JSON.parse(jsonMatch[0]);
-  return slides.map(s => ({
-    id: Date.now() + Math.random(),
-    theme,
-    duration: 5000,
-    heading: s.heading || '',
-    subheading: s.subheading || '',
-    body: s.body || '',
-    col2: s.col2 || '',
-    tags: Array.isArray(s.tags) ? s.tags : [],
-    imageBase64: null,
-    mapNodes: Array.isArray(s.mapNodes) ? s.mapNodes : [],
-    layout: s.layout || 'content',
-  }));
+  return parsearPresentacionIA(extractText(data), theme).slides;
 }
 
 // ─── MAIN EDITOR COMPONENT ────────────────────────────────────────────────────
@@ -2252,6 +2315,12 @@ export default function PresentationEditor({ usuario, presentacionInicial, onClo
   const [aiTheme, setAiTheme] = useState('dark');
   const [generating, setGenerating] = useState(false);
   const [aiError, setAiError] = useState('');
+  const [aiModo, setAiModo] = useState('miIA'); // 'miIA' (copiar prompt/pegar JSON) | 'gemini'
+  const [aiNivel, setAiNivel] = useState('');
+  const [aiExtra, setAiExtra] = useState('');
+  const [aiPegado, setAiPegado] = useState('');
+  const [aiCopiado, setAiCopiado] = useState(false);
+  const [aiCajas, setAiCajas] = useState(true); // importar con cajas de texto movibles (modo libre)
 
   // Right panel
   const [rightTab, setRightTab] = useState('layout'); // 'layout' | 'theme' | 'settings'
@@ -2360,6 +2429,38 @@ export default function PresentationEditor({ usuario, presentacionInicial, onClo
     setGenerating(false);
   };
 
+  const promptMiIA = construirPromptPresentacion({ tema: aiTopic.trim(), numSlides: aiSlides, nivel: aiNivel.trim(), extra: aiExtra.trim() });
+
+  const copiarPrompt = async () => {
+    try { await navigator.clipboard.writeText(promptMiIA); }
+    catch {
+      const ta = document.createElement('textarea'); ta.value = promptMiIA;
+      document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+    }
+    setAiCopiado(true); setTimeout(() => setAiCopiado(false), 2500);
+  };
+
+  // modo: 'reemplazar' | 'anadir'
+  const importarPegado = (modo) => {
+    setAiError('');
+    try {
+      const { titulo: t, slides: nuevas } = parsearPresentacionIA(aiPegado, aiTheme, { cajas: aiCajas });
+      if (modo === 'anadir') {
+        const next = [...slides, ...nuevas];
+        setSlides(next);
+        setActiveIdx(slides.length);
+      } else {
+        setSlides(nuevas);
+        setActiveIdx(0);
+        if (t || aiTopic.trim()) setTitulo(t || aiTopic.trim());
+      }
+      setShowAI(false);
+      setAiPegado('');
+    } catch (e) {
+      setAiError(e.message);
+    }
+  };
+
   const handlePreview = async () => {
     let id = presId;
     if (!id) {
@@ -2377,8 +2478,15 @@ export default function PresentationEditor({ usuario, presentacionInicial, onClo
   };
 
   const convertToFree = () => {
-    const elements = migrateToElements(activeSlide);
-    updateSlide({ ...activeSlide, layout: 'free', elements });
+    updateSlide(diapositivaACajas(activeSlide));
+  };
+  // Solo las de plantilla con texto: juego, vídeo y las ya libres se dejan igual
+  const convertAllToFree = () => {
+    const convertibles = LAYOUTS_IA;
+    const n = slides.filter(s => convertibles.includes(s.layout) && !(s.elements || []).length).length;
+    if (!n) { alert('No hay diapositivas de plantilla que convertir.'); return; }
+    if (!window.confirm(`Se pasarán ${n} diapositiva${n !== 1 ? 's' : ''} a cajas de texto movibles. ¿Continuar?`)) return;
+    setSlides(slides.map(s => (convertibles.includes(s.layout) && !(s.elements || []).length) ? diapositivaACajas(s) : s));
   };
 
   // Reset free-canvas selection when switching slides
@@ -2568,6 +2676,10 @@ export default function PresentationEditor({ usuario, presentacionInicial, onClo
                     <button onClick={convertToFree} style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', marginBottom: 4, background: 'transparent', border: '1px solid #374151', borderRadius: 8, color: '#9ca3af', cursor: 'pointer', fontSize: 12, fontWeight: 600, marginTop: 4 }}>
                       <span>✋</span><span>Convertir a libre</span>
                     </button>
+                    <button onClick={convertAllToFree} title="Pasa todas las diapositivas con plantilla a cajas de texto movibles"
+                      style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', marginBottom: 4, background: 'transparent', border: '1px dashed #6c63ff', borderRadius: 8, color: '#c4b5fd', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                      <span>✋✋</span><span>Convertir todas a libre</span>
+                    </button>
                   </>
                 )}
                 <div style={{ marginTop: 12, fontSize: 11, fontWeight: 700, color: '#9ca3af', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Añadir diapositiva</div>
@@ -2672,17 +2784,26 @@ export default function PresentationEditor({ usuario, presentacionInicial, onClo
       {/* AI MODAL */}
       {showAI && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ background: '#1f2937', borderRadius: 20, padding: 32, width: '90%', maxWidth: 520, border: '1px solid #374151' }}>
-            <h2 style={{ margin: '0 0 20px', fontSize: 22, fontWeight: 900, background: 'linear-gradient(135deg, #6c63ff, #a855f7)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+          <div style={{ background: '#1f2937', borderRadius: 20, padding: 'clamp(18px,4vw,32px)', width: '92%', maxWidth: 580, maxHeight: '92vh', overflowY: 'auto', border: '1px solid #374151', boxSizing: 'border-box' }}>
+            <h2 style={{ margin: '0 0 14px', fontSize: 22, fontWeight: 900, background: 'linear-gradient(135deg, #6c63ff, #a855f7)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
               🤖 Generar presentación con IA
             </h2>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 18, background: '#111827', padding: 4, borderRadius: 12 }}>
+              {[['miIA', '📋 Con mi IA (copiar y pegar)'], ['gemini', '✨ Generar aquí']].map(([id, lab]) => (
+                <button key={id} onClick={() => { setAiModo(id); setAiError(''); }}
+                  style={{ flex: 1, padding: '8px 10px', borderRadius: 9, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13,
+                    background: aiModo === id ? 'linear-gradient(135deg, #6c63ff, #a855f7)' : 'transparent', color: aiModo === id ? '#fff' : '#9ca3af' }}>
+                  {lab}
+                </button>
+              ))}
+            </div>
             <div style={{ marginBottom: 16 }}>
               <label style={{ fontSize: 12, fontWeight: 700, color: '#9ca3af', display: 'block', marginBottom: 6 }}>TEMA DE LA PRESENTACIÓN</label>
               <input
                 value={aiTopic} onChange={e => setAiTopic(e.target.value)}
                 placeholder="Ej: El sistema solar, La Revolución Francesa, Las fracciones..."
                 style={{ width: '100%', background: '#111827', border: '2px solid #374151', borderRadius: 10, padding: '10px 14px', color: '#fff', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
-                onKeyDown={e => e.key === 'Enter' && handleGenerate()}
+                onKeyDown={e => e.key === 'Enter' && aiModo === 'gemini' && handleGenerate()}
               />
             </div>
             <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
@@ -2699,13 +2820,63 @@ export default function PresentationEditor({ usuario, presentacionInicial, onClo
                 </select>
               </div>
             </div>
+            {aiModo === 'miIA' && (
+              <>
+                <div style={{ display: 'flex', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
+                  <div style={{ flex: '1 1 160px' }}>
+                    <label style={{ fontSize: 12, fontWeight: 700, color: '#9ca3af', display: 'block', marginBottom: 6 }}>NIVEL / CURSO (opcional)</label>
+                    <input value={aiNivel} onChange={e => setAiNivel(e.target.value)} placeholder="Ej: 2.º ESO"
+                      style={{ width: '100%', background: '#111827', border: '2px solid #374151', borderRadius: 10, padding: '9px 12px', color: '#fff', fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
+                  </div>
+                  <div style={{ flex: '2 1 220px' }}>
+                    <label style={{ fontSize: 12, fontWeight: 700, color: '#9ca3af', display: 'block', marginBottom: 6 }}>INDICACIONES (opcional)</label>
+                    <input value={aiExtra} onChange={e => setAiExtra(e.target.value)} placeholder="Ej: incluye ejemplos de la vida diaria"
+                      style={{ width: '100%', background: '#111827', border: '2px solid #374151', borderRadius: 10, padding: '9px 12px', color: '#fff', fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
+                  </div>
+                </div>
+                <div style={{ background: '#111827', border: '1px solid #374151', borderRadius: 12, padding: 14, marginBottom: 14 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: '#e5e7eb', marginBottom: 6 }}>1 · Copia el prompt y pégalo en tu IA</div>
+                  <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 10, lineHeight: 1.5 }}>Sirve en ChatGPT, Gemini, Claude, Copilot… Si dejas el tema vacío, escríbelo luego en tu IA.</div>
+                  <button onClick={copiarPrompt}
+                    style={{ width: '100%', background: aiCopiado ? '#10b981' : '#374151', color: '#fff', border: 'none', borderRadius: 10, padding: '10px', cursor: 'pointer', fontWeight: 700, fontSize: 14 }}>
+                    {aiCopiado ? '✓ Prompt copiado' : '📋 Copiar prompt'}
+                  </button>
+                  <details style={{ marginTop: 8 }}>
+                    <summary style={{ fontSize: 11, color: '#9ca3af', cursor: 'pointer' }}>Ver prompt</summary>
+                    <pre style={{ whiteSpace: 'pre-wrap', fontSize: 11, color: '#d1d5db', maxHeight: 180, overflowY: 'auto', margin: '6px 0 0' }}>{promptMiIA}</pre>
+                  </details>
+                </div>
+                <div style={{ background: '#111827', border: '1px solid #374151', borderRadius: 12, padding: 14, marginBottom: 14 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: '#e5e7eb', marginBottom: 8 }}>2 · Pega aquí la respuesta de tu IA</div>
+                  <textarea value={aiPegado} onChange={e => setAiPegado(e.target.value)} placeholder='{ "titulo": "...", "slides": [ ... ] }'
+                    style={{ width: '100%', height: 130, background: '#0b1220', border: '2px solid #374151', borderRadius: 10, padding: '10px 12px', color: '#fff', fontSize: 12, fontFamily: 'monospace', outline: 'none', boxSizing: 'border-box', resize: 'vertical' }} />
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 10, fontSize: 12, color: '#d1d5db', cursor: 'pointer', lineHeight: 1.4 }}>
+                    <input type="checkbox" checked={aiCajas} onChange={e => setAiCajas(e.target.checked)} style={{ marginTop: 2 }} />
+                    <span><b>Textos en cajas movibles</b> (recomendado): podrás arrastrar, agrandar y añadir imágenes en cada diapositiva. Desmárcalo para usar las plantillas fijas.</span>
+                  </label>
+                </div>
+              </>
+            )}
             {aiError && <div style={{ background: '#7f1d1d', color: '#fca5a5', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 13 }}>{aiError}</div>}
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+            {aiModo === 'miIA' && (
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                <button onClick={() => { setShowAI(false); setAiError(''); }} style={{ background: '#374151', color: '#9ca3af', border: 'none', borderRadius: 10, padding: '10px 20px', cursor: 'pointer', fontWeight: 700 }}>Cancelar</button>
+                <button onClick={() => importarPegado('anadir')} disabled={!aiPegado.trim()}
+                  style={{ background: '#374151', color: '#e5e7eb', border: 'none', borderRadius: 10, padding: '10px 18px', cursor: aiPegado.trim() ? 'pointer' : 'not-allowed', fontWeight: 700, opacity: aiPegado.trim() ? 1 : 0.5 }}>
+                  ➕ Añadir al final
+                </button>
+                <button onClick={() => { if (slides.length > 1 && !window.confirm('Se sustituirán las diapositivas actuales. ¿Continuar?')) return; importarPegado('reemplazar'); }} disabled={!aiPegado.trim()}
+                  style={{ background: 'linear-gradient(135deg, #6c63ff, #a855f7)', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 22px', cursor: aiPegado.trim() ? 'pointer' : 'not-allowed', fontWeight: 700, fontSize: 14, opacity: aiPegado.trim() ? 1 : 0.5 }}>
+                  📥 Crear presentación
+                </button>
+              </div>
+            )}
+            {aiModo === 'gemini' && <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <button onClick={() => { setShowAI(false); setAiError(''); }} style={{ background: '#374151', color: '#9ca3af', border: 'none', borderRadius: 10, padding: '10px 20px', cursor: 'pointer', fontWeight: 700 }}>Cancelar</button>
               <button onClick={handleGenerate} disabled={generating || !aiTopic.trim()} style={{ background: generating ? '#374151' : 'linear-gradient(135deg, #6c63ff, #a855f7)', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 24px', cursor: generating ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 14, minWidth: 140 }}>
                 {generating ? '⏳ Generando…' : '✨ Generar ahora'}
               </button>
-            </div>
+            </div>}
           </div>
         </div>
       )}

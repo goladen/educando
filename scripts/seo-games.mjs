@@ -98,6 +98,13 @@ export const GAMES = [
     nivel: 'Secundaria', materia: 'Matemáticas',
   },
   {
+    slug: 'labmicrobit', emoji: '🛰️', color: '#0369a1',
+    h1: 'Laboratorio de mates con micro:bit',
+    title: 'Laboratorio de mates con micro:bit: GPS de clase en 3D | PiKT',
+    desc: 'Crea tu sala en 3D y monta un GPS con micro:bit: trilateración con circunferencias, distancias por sonido, inclinómetro, brújula, sensores y caída libre. Gratis.',
+    nivel: 'Primaria y Secundaria', materia: 'Matemáticas',
+  },
+  {
     slug: 'matesmandos', emoji: '🎮', color: '#0d9488',
     h1: 'Mates con mandos micro:bit',
     title: 'Mates con mandos micro:bit: quiz de matemáticas para la clase | PiKT',

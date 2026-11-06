@@ -1,8 +1,11 @@
 // Motor three.js del «Partido con mandos micro:bit»: cada mando es un jugador de campo
 // (equipo rojo ataca hacia +x, azul hacia -x) y los porteros los lleva el ordenador.
-// Controles (los traduce montarMotorMandos().evento a partir de los eventos del mando, modo F):
-//   A mantenido = corre hacia donde mira · B / logo mantenidos = gira a la derecha / izquierda
-//   agitar = tiro a puerta (sin balón: arrancada) · inclinar = pase (izquierda/derecha/delante/detrás)
+// Controles (los traduce montarMotorMandos().evento a partir de los eventos del mando):
+//   Modo V «volante» (por defecto, mandos v8): inclinar = corre hacia ese lado de la pantalla (más
+//     inclinado, más rápido) · A = pase al compañero más cercano a la izquierda de hacia donde mira
+//     el jugador · B = a la derecha · logo o agitar = tiro a puerta (sin balón, A/B/logo = arrancada)
+//   Modo F (antenas antiguas, setControl('F')): A mantenido = corre hacia donde mira · B / logo
+//     mantenidos = gira a la derecha / izquierda · agitar = tiro · inclinar = pase
 // Cuando un rival alcanza al que lleva el balón se para el partido y se avisa con cb().onDuelo:
 // React plantea una pregunta y llama a resolverDuelo(idGanador | null).
 import * as THREE from 'three';
@@ -99,6 +102,7 @@ export function montarMotorMandos({ host, cb }) {
             stun: 0, kickCd: 0, protect: 0, duelCd: 0, patada: 0, dive: 0, diveDir: 0, hold: 0,
             receptor: 0, ultimoTiro: -1, arrancada: 0, fase: Math.random() * 6,
             botones: { A: false, B: false, L: false, tA: 0, tB: 0, tL: 0 },
+            incl: { x: 0, z: 0, t: 0 },
         };
     }
 
@@ -119,6 +123,7 @@ export function montarMotorMandos({ host, cb }) {
     let pausado = false;
     let tCelebra = 0, equipoGol = null, tiempo = 0, shake = 0;
     let duelo = null;        // { a, b } durante una pregunta
+    let control = 'V';       // 'V' volante (inclinar = moverse) | 'F' botones (antenas antiguas)
 
     // ------------------------------------------------------------------
     // Acciones con el balón
@@ -153,8 +158,28 @@ export function montarMotorMandos({ host, cb }) {
         return best;
     }
 
-    function pase(p, pref) {
-        const m = mejorCompanero(p, pref, true);
+    // Compañero más cercano que está hacia `lado` (vector unitario), o null
+    function companeroMasCercano(p, lado) {
+        let best = null, bd = 1e9;
+        for (const m of campo(p.team)) {
+            if (m === p) continue;
+            const dx = m.x - p.x, dz = m.z - p.z, d = len(dx, dz);
+            if (d < 1 || d > 30 || (dx * lado.x + dz * lado.z) / d < 0.2) continue;
+            if (d < bd) { bd = d; best = m; }
+        }
+        return best;
+    }
+
+    // Pase al compañero más cercano a la izquierda (lado -1) o a la derecha (+1) de hacia donde mira.
+    // La cámara mira hacia -z (z crece hacia abajo en pantalla): izquierda = face − 90°.
+    function paseLateral(p, signo) {
+        const ang = p.face + signo * Math.PI / 2;
+        const lado = { x: Math.cos(ang), z: Math.sin(ang) };
+        pase(p, lado, companeroMasCercano(p, lado));
+    }
+
+    function pase(p, pref, elegido) {
+        const m = elegido === undefined ? mejorCompanero(p, pref, true) : elegido;
         if (!m) { patear(p, pref.x * 12, 0.4, pref.z * 12); return; }
         const tx = m.x + m.vx * 0.45, tz = m.z + m.vz * 0.45;
         const dx = tx - ball.x, dz = tz - ball.z, d = len(dx, dz) || 1;
@@ -203,15 +228,31 @@ export function montarMotorMandos({ host, cb }) {
     // ------------------------------------------------------------------
     // Entrada de los mandos
     // ------------------------------------------------------------------
-    function evento({ id, accion, on, dir }) {
+    function evento({ id, accion, on, dir, x, y }) {
         const p = humanos.get(id);
         if (!p) return;
         audio.asegurar();
         const ahora = performance.now();
+        if (accion === 'V') {
+            // x, y de -100 a 100 (mandos v7+); sin ellos, solo la dirección
+            const d = dir || '';
+            const ix = x != null ? x / 100 : (d.includes('I') ? -0.8 : d.includes('D') ? 0.8 : 0);
+            const iz = y != null ? y / 100 : (d.includes('F') ? -0.8 : d.includes('T') ? 0.8 : 0);
+            p.incl = { x: ix, z: iz, t: ahora };
+            return;
+        }
         if (accion === 'A' || accion === 'B' || accion === 'L') {
             const antes = p.botones[accion];
             p.botones[accion] = !!on;
             p.botones['t' + accion] = ahora;
+            if (control === 'V') {
+                if (!on || antes || estado !== 'JUEGO' || pausado || p.stun > 0) return;
+                if (ball.owner === p) {
+                    if (accion === 'L') tiro(p);
+                    else paseLateral(p, accion === 'A' ? -1 : 1);
+                } else p.arrancada = 1.2;
+                return;
+            }
             if (on && !antes && estado === 'JUEGO' && !pausado && p.stun <= 0) {
                 if (accion === 'B') p.face += TOQUE_GIRO;
                 if (accion === 'L') p.face -= TOQUE_GIRO;
@@ -232,6 +273,19 @@ export function montarMotorMandos({ host, cb }) {
         const b = p.botones, ahora = performance.now();
         for (const k of ['A', 'B', 'L']) if (b[k] && ahora - b['t' + k] > LATIDO_MAX) b[k] = false;
         if (p.stun > 0) { p.tvx = p.tvz = 0; return; }
+        if (control === 'V') {
+            // El mando repite la inclinación cada 300 ms; sin noticias, se da por plano
+            const i = ahora - p.incl.t > LATIDO_MAX ? { x: 0, z: 0 } : p.incl;
+            const m = Math.min(1, len(i.x, i.z));
+            if (m < 0.12) { p.tvx = p.tvz = 0; return; }
+            const objetivo = Math.atan2(i.z, i.x);
+            let dif = objetivo - p.face;
+            dif = Math.atan2(Math.sin(dif), Math.cos(dif));
+            p.face += dif * Math.min(1, 12 * dt);
+            const v = (p.arrancada > 0 ? VEL_SPRINT : VEL_BASE) * clamp((m - 0.12) / 0.5, 0.35, 1) * (ball.owner === p ? 0.9 : 1);
+            p.tvx = Math.cos(objetivo) * v; p.tvz = Math.sin(objetivo) * v;
+            return;
+        }
         if (b.B) p.face += GIRO * dt;
         if (b.L) p.face -= GIRO * dt;
         const tiene = ball.owner === p;
@@ -487,6 +541,7 @@ export function montarMotorMandos({ host, cb }) {
             p.vx = p.vz = p.tvx = p.tvz = 0;
             p.face = p.s > 0 ? 0 : Math.PI;
             p.stun = p.kickCd = p.protect = p.duelCd = p.dive = p.hold = p.patada = p.receptor = p.arrancada = 0;
+            p.incl = { x: 0, z: 0, t: 0 };
         }
         Object.assign(ball, { x: 0, y: BALL_R, z: 0, vx: 0, vy: 0, vz: 0, owner: null, lastKicker: null, dentro: false, receptor: null });
         ball.shotId++;
@@ -630,6 +685,7 @@ export function montarMotorMandos({ host, cb }) {
     return {
         ponerJugadores,
         evento,
+        setControl(m) { control = m === 'F' ? 'F' : 'V'; },
         prepararSaque,
         saque() { estado = 'JUEGO'; },
         pausar(v) { pausado = !!v; },

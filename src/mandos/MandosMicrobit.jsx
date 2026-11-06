@@ -13,6 +13,8 @@ const FutbolMandos = lazy(() => import('../futbol3d/FutbolMandos.jsx'));
 import {
   MODOS,
   VERSION_PROGRAMAS,
+  VERSION_CANAL,
+  cambiarCanalAntena,
   setModoMandos,
   GRUPO_POR_DEFECTO,
   LETRAS,
@@ -21,13 +23,15 @@ import {
   programaMando,
   conectarAntena,
   desconectarAntena,
-  grabarMando,
+  grabarPlaca,
   escucharMandos,
   escucharEstadoAntena,
   simularPulsacion,
   feedbackMando,
   flashearMicropython,
 } from './mandosMicrobit.js';
+// Cada mando se graba como placa multifunción (mando + satélite + instrumento del Laboratorio)
+import { archivosMultifuncion } from '../labMicrobit/programasLab';
 
 const LS_GRUPO = 'pikt_mandos_grupo';
 const leerGrupo = () => {
@@ -107,7 +111,7 @@ export default function MandosMicrobit({ onExit }) {
     tarea(async () => {
       const id = siguienteId;
       log(`Elige la micro:bit que será el MANDO ${id}…`);
-      const bytes = await grabarMando(id, grupo);
+      const bytes = await grabarPlaca(archivosMultifuncion(id, grupo));
       log(`✅ Mando ${id} grabado (${bytes} bytes). Desenchúfalo, ponle pilas y escribe ${id} en una pegatina.`, 'ok');
       setSiguienteId(id + 1);
     });
@@ -196,6 +200,7 @@ export default function MandosMicrobit({ onExit }) {
             <b>Grabar y conectar antena</b> y graba de nuevo los mandos para tener todos los modos.
           </div>
         )}
+        {estado.antenaOk && <CanalAntena estado={estado} />}
 
         {!soportaSerial() && (
           <div style={st.aviso}>
@@ -259,7 +264,7 @@ export default function MandosMicrobit({ onExit }) {
               </button>
             </div>
             <label style={st.label}>
-              Grupo de radio (cambia si hay otra clase cerca)
+              Canal de radio inicial (después se puede cambiar sin cables)
               <input
                 type="number"
                 min={0}
@@ -447,6 +452,44 @@ export default function MandosMicrobit({ onExit }) {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// Canal de radio de la antena conectada: se cambia sin regrabarla (antena v8+).
+// Los mandos tienen que estar en el mismo canal: se cambia en cada mando manteniendo A al encenderlo.
+function CanalAntena({ estado }) {
+  const [canal, setCanal] = useState(estado.grupo ?? GRUPO_POR_DEFECTO);
+  const [msg, setMsg] = useState('');
+  useEffect(() => { if (estado.grupo != null) setCanal(estado.grupo); }, [estado.grupo]);
+  const puede = estado.version >= VERSION_CANAL;
+  const cambiar = async () => {
+    try {
+      await cambiarCanalAntena(canal);
+      setMsg(`✅ Antena en el canal ${canal}. Los mandos tienen que estar en el mismo canal.`);
+    } catch (e) {
+      setMsg('❌ ' + (e?.message || e));
+    }
+  };
+  return (
+    <div style={{ ...st.nota, display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+      <b>📻 Canal de la antena: {estado.grupo}</b>
+      {puede ? (
+        <>
+          <input type="number" min={0} max={255} value={canal}
+            onChange={(e) => setCanal(Math.max(0, Math.min(255, Number(e.target.value) || 0)))}
+            style={{ ...st.input, width: 80, marginTop: 0 }} />
+          <button style={st.btnSec} disabled={canal === estado.grupo} onClick={cambiar}>Cambiar canal</button>
+          <span style={{ flexBasis: '100%', color: '#94a3b8', fontSize: 13 }}>
+            Cada mando enseña su canal al encenderse («C7»). Para cambiarlo: <b>mantén A</b> mientras sale, elige con
+            {' '}<b>A</b> (−) y <b>B</b> (+) y <b>agita</b> para guardarlo. Antena y mandos deben estar en el mismo canal;
+            usa uno distinto si otra clase cercana juega a la vez.
+          </span>
+        </>
+      ) : (
+        <span style={{ color: '#94a3b8', fontSize: 13 }}>Regraba la antena y los mandos para poder cambiar el canal sin cables.</span>
+      )}
+      {msg && <span style={{ flexBasis: '100%' }}>{msg}</span>}
     </div>
   );
 }

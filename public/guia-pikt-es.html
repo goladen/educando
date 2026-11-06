@@ -689,8 +689,8 @@ html, body { max-width: 100%; overflow-x: hidden; }
         <div class="btn-item"><div class="btn-dot" style="background:#e0e7ff;">🅰️</div><span><strong>Botón A</strong>: cambia la respuesta, baja el número o avanza</span></div>
         <div class="btn-item"><div class="btn-dot" style="background:#e0e7ff;">🅱️</div><span><strong>Botón B</strong>: envía la respuesta, sube el número o gira</span></div>
         <div class="btn-item"><div class="btn-dot" style="background:#fef3c7;">〰️</div><span><strong>Agitar</strong>: envía la respuesta (y en fútbol, tira a puerta)</span></div>
-        <div class="btn-item"><div class="btn-dot" style="background:#fef3c7;">↘️</div><span><strong>Inclinar</strong>: pase a un compañero (fútbol)</span></div>
-        <div class="btn-item"><div class="btn-dot" style="background:#fef3c7;">👆</div><span><strong>Tocar el logo</strong>: girar a la izquierda (fútbol)</span></div>
+        <div class="btn-item"><div class="btn-dot" style="background:#fef3c7;">↘️</div><span><strong>Inclinar</strong>: mover el jugador (fútbol) o el ovni</span></div>
+        <div class="btn-item"><div class="btn-dot" style="background:#fef3c7;">👆</div><span><strong>Tocar el logo</strong>: chutar (fútbol)</span></div>
       </div>
     </div>
 
@@ -711,6 +711,14 @@ html, body { max-width: 100%; overflow-x: hidden; }
       <li><span class="step-text">Los demás días basta con <strong>conectar la antena</strong>: en todos los juegos con mandos hay un botón <strong>«🔌 Antena desconectada · conectar»</strong> arriba, sin salir del juego.</span></li>
     </ol>
 
+    <h3>📻 Canal de radio (sin cables)</h3>
+    <p style="margin-bottom:15px;font-size:0.93em;line-height:1.6;">Antena y mandos tienen que estar en el <strong>mismo canal</strong>. Si otra clase cercana juega a la vez, usad canales distintos. Ya no hace falta volver a grabarlos para cambiarlo:</p>
+    <ul style="margin:0 0 15px 20px;font-size:0.93em;line-height:1.6;">
+      <li><strong>Mando:</strong> al encenderlo muestra su canal («C7»). Para cambiarlo, <strong>mantén A</strong> mientras sale, elige el número con <strong>A</strong> (−) y <strong>B</strong> (+) y <strong>agita</strong> para guardarlo. Se queda guardado aunque se apague.</li>
+      <li><strong>Antena:</strong> en el panel de mandos, con la antena conectada, escribe el canal en <strong>📻 Canal de la antena</strong> y pulsa <strong>Cambiar canal</strong>.</li>
+      <li>Si vuelves a grabar una placa desde el panel, recupera el canal que pone allí.</li>
+    </ul>
+
     <h3>Los modos del mando</h3>
     <div class="mb-tabla-wrap">
       <table class="mb-tabla">
@@ -720,7 +728,7 @@ html, body { max-width: 100%; overflow-x: hidden; }
           <tr><td>🔢 <strong>Número</strong></td><td>Baja (mantener: rápido)</td><td>Sube (mantener: rápido)</td><td>Envía</td><td>A+B también envía</td></tr>
           <tr><td>🔡 <strong>Abecedario</strong></td><td>Letra anterior</td><td>Letra siguiente</td><td>Envía</td><td>A-Z y luego 0-9</td></tr>
           <tr><td>🤖 <strong>Mover</strong></td><td>Avanza</td><td>Gira a la derecha</td><td>—</td><td>A+B: subir/bajar el lápiz</td></tr>
-          <tr><td>⚽ <strong>Fútbol</strong></td><td>Mantener: correr</td><td>Girar a la derecha</td><td>Tiro a puerta</td><td>Logo: girar a la izquierda · Inclinar: pase</td></tr>
+          <tr><td>⚽ <strong>Fútbol</strong></td><td>Pase al compañero más cercano a la izquierda del jugador</td><td>Pase al más cercano a la derecha</td><td>Chutar</td><td>Inclinar: correr hacia ese lado · Logo: chutar</td></tr>
           <tr><td>🛸 <strong>Volante</strong></td><td>Acción (abducir)</td><td>—</td><td>Acción (abducir)</td><td>Inclinar: moverse mientras dure (también en diagonal)</td></tr>
         </tbody>
       </table>
@@ -733,6 +741,12 @@ html, body { max-width: 100%; overflow-x: hidden; }
         <h4>Quiz con mandos</h4>
         <p>Preguntas en la pizarra que la clase responde con letras A-D o con un número (respuestas del 1 al 19). Con tablas, sumas, tus preguntas o cualquier recurso de opción múltiple. Puntúa la rapidez.</p>
         <span class="tag">Letras</span><span class="tag">Número</span>
+      </div>
+      <div class="app-card new">
+        <span class="emoji">🛰️</span>
+        <h4>Laboratorio de mates</h4>
+        <p>No usa mandos: 5 micro:bit (la antena, 3 satélites y un instrumento). Cada uno crea su sala en 3D y monta un GPS de clase: los satélites pitan, el receptor mide cuánto tarda el sonido y la posición sale de cortar circunferencias, con el sistema de ecuaciones paso a paso. Además: medidor de distancias, inclinómetro, brújula, sensores y caída libre. Todo funciona también en simulación.</p>
+        <span class="tag">GPS</span><span class="tag">3D</span><span class="tag orange">Simulación</span>
       </div>
       <div class="app-card new">
         <span class="emoji">🧮</span>
@@ -749,7 +763,7 @@ html, body { max-width: 100%; overflow-x: hidden; }
       <div class="app-card new">
         <span class="emoji">⚽</span>
         <h4>Fútbol 3D con mandos</h4>
-        <p>Partido por equipos: cada mando es un jugador. El profe hace los equipos. Si un rival alcanza al que lleva el balón, se para el partido y ambos responden una pregunta: el primero que acierta se queda el balón.</p>
+        <p>Partido por equipos: cada mando es un jugador. Se mueve inclinando el mando, A y B pasan a la izquierda o a la derecha y el logo chuta. El profe hace los equipos. Si un rival alcanza al que lleva el balón, se para el partido y ambos responden una pregunta: el primero que acierta se queda el balón.</p>
         <span class="tag">Fútbol</span><span class="tag orange">Por equipos</span>
       </div>
       <div class="app-card new">
@@ -789,6 +803,86 @@ html, body { max-width: 100%; overflow-x: hidden; }
       🧪 <strong>Sin placas:</strong> todos los juegos tienen <em>mandos virtuales</em> para probarlos antes de clase.<br>
       📶 <strong>Alcance:</strong> la radio llega sin problemas a toda el aula. Pon la antena a la vista y, si en el aula de al lado también usan mandos, cambiad el <strong>grupo de radio</strong> en el panel de mandos.<br>
       🔋 Si un mando muestra ✘ a menudo, acércalo a la antena o cámbiale las pilas.
+    </div>
+  </div>
+
+  <!-- SECCIÓN: PLACAS KEYESTUDIO (DRIVER USB) -->
+  <div class="section" id="keyestudio">
+    <h2>🔌 Placas Keyestudio: instalar el driver USB <span class="new-badge">NUEVO</span></h2>
+    <p style="margin-bottom:15px;font-size:0.93em;line-height:1.6;">Las placas <strong>Keyestudio</strong> (por ejemplo, la <strong>ESP32</strong> del kit <strong>Smart Home</strong> de Innova Didáctica) llevan un chip USB que Windows no reconoce por sí solo. Sin su <strong>driver</strong>, el ordenador no le asigna puerto COM y ni la web (Chrome o Edge) ni Arduino IDE, Thonny o Mind+ pueden ver la placa. Se instala <strong>una sola vez en cada ordenador</strong>.</p>
+
+    <h3>¿Qué driver necesito?</h3>
+    <div class="info-grid">
+      <div class="info-box">🟦 <strong>Placa ESP32 (chip CP2102)</strong>: driver <strong>CP210x</strong> de Silicon Labs.<br><a href="https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers" target="_blank" rel="noopener noreferrer">⬇️ Descargar (CP210x Universal Windows Driver)</a></div>
+      <div class="info-box">🟩 <strong>Placas tipo Arduino UNO/PLUS (chip CH340)</strong>: driver <strong>CH340</strong> de WCH.<br><a href="https://www.wch-ic.com/downloads/CH341SER_EXE.html" target="_blank" rel="noopener noreferrer">⬇️ Descargar (CH341SER.EXE)</a></div>
+    </div>
+    <p style="margin-top:12px;font-size:0.9em;line-height:1.6;">Los enlaces también están en <strong>Programación y robótica → Kit Smart Home → más info</strong>.</p>
+
+    <h3>Instalar el driver CP210x (placa ESP32)</h3>
+    <ol class="steps">
+      <li><span class="step-text">Descarga el archivo <strong>CP210x_Universal_Windows_Driver.zip</strong>. Es un ZIP, no un instalador: hacer doble clic no instala nada.</span></li>
+      <li><span class="step-text">Haz clic derecho sobre el ZIP → <strong>Extraer todo…</strong> → <strong>Extraer</strong>.</span></li>
+      <li><span class="step-text">En la carpeta extraída, haz clic derecho sobre <strong>silabser.inf</strong> → <strong>Instalar</strong>. En Windows 11 puede estar dentro de <strong>Mostrar más opciones</strong>.</span></li>
+      <li><span class="step-text">Acepta el aviso de Windows (<strong>«¿Quieres permitir…?» → Sí</strong>). Debe aparecer «La operación se completó correctamente».</span></li>
+      <li><span class="step-text"><strong>Desenchufa la placa y vuelve a enchufarla.</strong></span></li>
+      <li><span class="step-text">Comprueba que funciona: clic derecho en el botón Inicio → <strong>Administrador de dispositivos</strong> → <strong>Puertos (COM y LPT)</strong>. Tiene que salir <strong>«Silicon Labs CP210x USB to UART Bridge (COMx)»</strong> sin triángulo amarillo.</span></li>
+    </ol>
+
+    <h3>Instalar el driver CH340 (placas tipo Arduino)</h3>
+    <ol class="steps">
+      <li><span class="step-text">Descarga y abre <strong>CH341SER.EXE</strong> (este sí es un instalador).</span></li>
+      <li><span class="step-text">Pulsa <strong>INSTALL</strong> y acepta el aviso de Windows.</span></li>
+      <li><span class="step-text">Desenchufa y vuelve a enchufar la placa: en el Administrador de dispositivos saldrá <strong>«USB-SERIAL CH340 (COMx)»</strong>.</span></li>
+    </ol>
+
+    <div class="alert">
+      🔐 <strong>Hace falta ser administrador del ordenador.</strong> En los equipos gestionados del centro, pide a la persona coordinadora TIC que lo instale. Basta con hacerlo una vez por ordenador.<br>
+      🔌 <strong>¿Sigue sin aparecer el puerto?</strong> Prueba otro cable: muchos cables USB solo cargan y no transmiten datos. Prueba también otro puerto USB del ordenador.<br>
+      🧭 <strong>¿Cómo sé qué chip lleva mi placa?</strong> Enchúfala y abre el Administrador de dispositivos. Si aparece «CP2102 USB to UART Bridge Controller» con un triángulo amarillo, necesitas el CP210x. Si aparece «USB2.0-Serial», necesitas el CH340.
+    </div>
+
+    <h3>🏠 Laboratorio Smart Home en PiKT</h3>
+    <p style="margin-bottom:12px;font-size:0.93em;line-height:1.6;">En <strong>Programación y robótica → 🏠 Laboratorio Smart Home</strong> la placa se conecta a PiKT por USB y sus sensores sirven para hacer mates y ciencia. Funciona con la <strong>Imagina TdR STEAM</strong> (ESP32 STEAMakers: potenciómetro, luz, LM35, DHT11, micrófono, botones, LED, RGB, zumbador y LCD), con la <strong>ESP32 del kit Smart Home</strong> y con una <strong>micro:bit V2 en la Shield</strong>. La primera vez, el botón <strong>⚡ Instalar MicroPython</strong> prepara la placa desde el navegador. Todo funciona también <strong>en simulación</strong>, sin placa.</p>
+    <div class="alert">🎚️ <strong>Imagina TdR STEAM: antes de instalar</strong>, gira el <strong>potenciómetro a cero</strong> (la flecha al punto rojo) y pon el <strong>interruptor de Bluetooth hacia el borde</strong>. El potenciómetro está en el pin IO2, que la ESP32 lee al arrancar: si no está a cero, la placa no entra en modo de programación («Failed to connect»).</div>
+    <div class="app-grid">
+      <div class="app-card"><h4>🟧 Con la Imagina TdR STEAM</h4><p>Pestañas propias de la placa: <strong>Placa 3D</strong> (gemelo de la placa con reglas), <strong>Potenciómetro</strong> (ángulo ↔ voltaje, funciones lineales y reto de estimar ángulos), <strong>Sonómetro</strong> (semáforo del ruido, decibelios con logaritmos, histograma), <strong>Música</strong> (theremin, escala temperada 2^(1/12)), <strong>Reacción</strong> y la comparación de sus <strong>dos termómetros</strong> (LM35 y DHT11).</p><span class="tag blue">Funciones</span><span class="tag green">Estadística</span><span class="tag orange">Logaritmos</span></div>
+      <div class="app-card"><h4>🏠 Gemelo digital 3D</h4><p>La casa en 3D copia a la real: puerta, ventana, ventilador, LED y RGB se mueven a la vez y cada sensor muestra su valor. Reglas de domótica escritas como desigualdades («si T &gt; 26 °C → ventilador»).</p><span class="tag blue">Desigualdades</span></div>
+      <div class="app-card"><h4>🌡️ Estación y gráficas</h4><p>Registro de temperatura, humedad, luz, lluvia, suelo y gas con gráfica, media, desviación típica, tasa de cambio y CSV. Experimento de enfriamiento con y sin ventilador ajustado a la ley de Newton, y contador de movimiento por minutos.</p><span class="tag green">Estadística</span><span class="tag orange">Funciones exponenciales</span></div>
+      <div class="app-card"><h4>🔆 Luz y distancia</h4><p>Sobre una mesa en 3D se pone la lámpara y se mueve el sensor. Con las medidas se comparan los modelos lineal, inverso e inverso del cuadrado (R²). La placa Imagina TdR STEAM ya trae fotorresistencia (A1); en la ESP32 del kit Smart Home hay que conectar una.</p><span class="tag">Proporcionalidad inversa</span></div>
+      <div class="app-card"><h4>🚪 Servo y ángulos</h4><p>La puerta vista desde arriba: hueco = 2·r·sen(θ/2), arco y área del sector, con retos de «ábrela lo justo para que pase la caja». Tiempo de reacción con el botón, medido por la placa al milisegundo.</p><span class="tag blue">Trigonometría</span></div>
+    </div>
+
+    <h3>🧩 Programas visuales para programar el kit</h3>
+    <p style="margin-bottom:12px;font-size:0.93em;line-height:1.6;">Con el driver instalado, el kit se puede programar <strong>por bloques</strong> con cualquiera de estas herramientas. Todas son gratuitas. Empieza por la primera: es la que usan los materiales de CATEDU para el Smart Home ESP32.</p>
+    <div class="app-grid">
+      <div class="app-card">
+        <h4>ArduinoBlocks + Connector <span class="tag green">Recomendado</span></h4>
+        <p>Editor de bloques <strong>en español</strong> que funciona en el navegador. Tiene placas ESP32 y bloques para los sensores del kit (luz, gas, humedad, DHT, PIR, servos, pantalla LCD…). Para enviar el programa a la placa hay que instalar el <strong>ArduinoBlocks Connector</strong> y dejarlo abierto (minimizado) mientras programas. No funciona en Windows 7 o anteriores.</p>
+        <p><a href="https://www.arduinoblocks.com" target="_blank" rel="noopener noreferrer">🌐 Abrir ArduinoBlocks</a> · <a href="http://www.arduinoblocks.com/web/site/abconnector5" target="_blank" rel="noopener noreferrer">⬇️ Descargar el Connector</a> · <a href="https://libros.catedu.es/books/smart-home-esp32/page/connector" target="_blank" rel="noopener noreferrer">📘 Guía CATEDU</a></p>
+        <span class="tag blue">Bloques</span><span class="tag">Navegador</span><span class="tag orange">ESP32 · Arduino</span>
+      </div>
+      <div class="app-card">
+        <h4>KidsBlock (Keyestudio)</h4>
+        <p>El programa oficial de Keyestudio, con aspecto de <strong>Scratch 3</strong>. En <strong>Kit</strong> eliges tu kit (por ejemplo, el Smart Home o el Smart Farm para ESP32) y te aparecen sus bloques ya preparados. Se instala en el ordenador. Conecta la placa antes de abrirlo.</p>
+        <p><a href="https://docs.keyestudio.com/projects/KT0365/en/latest/docs/KidsBlockTutorial/1%20Resources%20Download.html" target="_blank" rel="noopener noreferrer">⬇️ Descarga y tutorial (Keyestudio)</a></p>
+        <span class="tag blue">Bloques tipo Scratch</span><span class="tag">Windows · Mac</span>
+      </div>
+      <div class="app-card">
+        <h4>Mind+ (DFRobot)</h4>
+        <p>Entorno basado en <strong>Scratch 3</strong> que programa Arduino, micro:bit y ESP32. Se puede ver el código que generan los bloques y pasar a <strong>Python</strong> cuando el alumnado está preparado. Sirve también para las micro:bit del centro.</p>
+        <p><a href="https://mindplus.cc/en.html" target="_blank" rel="noopener noreferrer">⬇️ Descargar Mind+</a></p>
+        <span class="tag blue">Bloques → Python</span><span class="tag">Windows · Mac · Linux</span>
+      </div>
+      <div class="app-card">
+        <h4>Para dar el salto al código</h4>
+        <p><strong>Arduino IDE</strong>: el entorno clásico en C++. Para el ESP32 hay que añadir el paquete de placas <em>esp32</em> desde el Gestor de placas. <strong>Thonny</strong>: editor sencillo de <strong>MicroPython</strong>. Instala MicroPython en la placa desde <em>Herramientas → Opciones → Intérprete</em> y muestra las variables mientras el programa se ejecuta.</p>
+        <p><a href="https://www.arduino.cc/en/software" target="_blank" rel="noopener noreferrer">⬇️ Arduino IDE</a> · <a href="https://thonny.org" target="_blank" rel="noopener noreferrer">⬇️ Thonny</a></p>
+        <span class="tag orange">C++</span><span class="tag green">MicroPython</span>
+      </div>
+    </div>
+    <div class="alert blue">
+      ⚠️ <strong>Una herramienta cada vez:</strong> el puerto COM solo puede usarlo un programa a la vez. Cierra el Connector, KidsBlock, Mind+ o la pestaña de PiKT que lo esté usando antes de abrir otro.<br>
+      🔁 <strong>Al cambiar de herramienta se sobrescribe el programa de la placa.</strong> No pasa nada: cada herramienta graba el suyo al subir. Solo Thonny necesita instalar antes MicroPython en la placa (y para volver a ArduinoBlocks basta con subir un programa desde allí).
     </div>
   </div>
 

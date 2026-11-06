@@ -7,6 +7,7 @@ import { BotonTutorialMandos } from '../mandos/TutorialMandos.jsx';
 import ChipAntena from '../mandos/ChipAntena.jsx';
 import { descargarPdfEscape } from './FichasEscape';
 import { crearAudio, Ambiente, Confeti, Zombi, Corazones, BarraVidaZombi, MapaMansion, mmss, useNarrador, idNarracionFase, Subtitulo } from './comunes';
+import { tr } from './i18n';
 import {
     MODOS, setModoMandos, escucharMandos, feedbackMando, nuevaPreguntaMandos, simularPulsacion,
 } from '../mandos/mandosMicrobit.js';
@@ -40,7 +41,7 @@ const guardarNombreMando = (id, nombre) => {
         localStorage.setItem(LS_NOMBRES_MANDOS, JSON.stringify(n));
     } catch { /* sin almacenamiento */ }
 };
-const nombreMando = (id, nombres) => nombres[id] || (id > 900 ? `Virtual ${id - 900}` : `Mando ${id}`);
+const nombreMando = (id, nombres) => nombres[id] || (id > 900 ? tr("Virtual {0}", [id - 900]) : tr("Mando {0}", [id]));
 const jugadorMando = (id, nombres) => ({
     nombre: nombreMando(id, nombres), mando: id, aciertos: 0, puntos: 0,
     avatar: { disfraz: DISFRACES[(id * 5 + 3) % DISFRACES.length].id, color: null, accesorio: ACCESORIOS[1 + (id % (ACCESORIOS.length - 1))].id },
@@ -74,7 +75,7 @@ function PreguntaGrande({ q, etiqueta, revelada, falladas = [], onElegir, conteo
                     const mal = falladas.includes(i);
                     const activa = !!onElegir && !revelada && !mal;
                     return (
-                        <button key={i} disabled={!activa} onClick={() => activa && onElegir(i)} title={activa ? 'Elegir esta respuesta' : !onElegir && !revelada ? 'En modo mandos se responde con el micro:bit' : undefined} style={{
+                        <button key={i} disabled={!activa} onClick={() => activa && onElegir(i)} title={activa ? tr("Elegir esta respuesta") : !onElegir && !revelada ? tr("En modo mandos se responde con el micro:bit") : undefined} style={{
                             display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 16, fontWeight: 800, fontSize: 'clamp(1.1rem,2vw,1.7rem)',
                             fontFamily: 'inherit', color: '#fff', textAlign: 'left', cursor: activa ? 'pointer' : !onElegir && !revelada ? 'not-allowed' : 'default',
                             background: ok ? '#15803d' : mal ? '#7f1d1d' : revelada ? 'rgba(70,30,110,.35)' : 'rgba(70,30,110,.75)',
@@ -83,7 +84,7 @@ function PreguntaGrande({ q, etiqueta, revelada, falladas = [], onElegir, conteo
                         }}>
                             <span style={{ width: 44, height: 44, borderRadius: '50%', background: ok ? '#4ade80' : mal ? '#f87171' : '#ff8c1a', color: '#1a0700', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, flexShrink: 0 }}>{mal ? '✘' : LETRAS[i]}</span>
                             <span style={{ flex: 1 }}>{o}</span>
-                            {revelada && conteo && <span title="Mandos que eligieron esta respuesta" style={{ padding: '2px 12px', borderRadius: 99, background: 'rgba(0,0,0,.35)', fontSize: '1.1rem' }}>🎮 {conteo[i] || 0}</span>}
+                            {revelada && conteo && <span title={tr("Mandos que eligieron esta respuesta")} style={{ padding: '2px 12px', borderRadius: 99, background: 'rgba(0,0,0,.35)', fontSize: '1.1rem' }}>🎮 {conteo[i] || 0}</span>}
                         </button>
                     );
                 })}
@@ -264,7 +265,7 @@ export default function PizarraEscape({ config, titulo = '', onSalir }) {
             delete resto[id];
             intentosRef.current = resto;
             audio.fallo();
-            setMsg(`❌ ${nombre}: ese carácter no es. ¡Vuelve a empezar!`);
+            setMsg(tr("❌ {0}: ese carácter no es. ¡Vuelve a empezar!", [nombre]));
         } else intentosRef.current = { ...intentosRef.current, [id]: intento };
         setIntentos(intentosRef.current);
     };
@@ -272,7 +273,7 @@ export default function PizarraEscape({ config, titulo = '', onSalir }) {
     const probarCodigo = () => {
         if (!codigoTxt.trim() || !cand) return;
         if (compruebaCandado(cand, codigoTxt)) abrirPuerta('');
-        else { audio.fallo(); narrador.decir('candado_error'); setPenal(p => p + PENAL); setMsg(`❌ ¡Código incorrecto! −${PENAL} s`); setCodigoTxt(''); }
+        else { audio.fallo(); narrador.decir('candado_error'); setPenal(p => p + PENAL); setMsg(tr("❌ ¡Código incorrecto! −{0} s", [PENAL])); setCodigoTxt(''); }
     };
 
     // Nueva pregunta → se limpian las respuestas marcadas
@@ -308,8 +309,8 @@ export default function PizarraEscape({ config, titulo = '', onSalir }) {
         setRevelada(true);
         if (total && bien * 2 < total) {
             setPenal(p => p + PENAL_PREGUNTA); audio.fallo(); setFlash('rojo'); setTimeout(() => setFlash(null), 700);
-            avisar(`✘ Solo ${bien} de ${total} aciertos: −${PENAL_PREGUNTA} s`);
-        } else { audio.acierto(); avisar(`✔ ${bien} de ${total} aciertos`); }
+            avisar(tr("✘ Solo {0} de {1} aciertos: −{2} s", [bien, total, PENAL_PREGUNTA]));
+        } else { audio.acierto(); avisar(tr("✔ {0} de {1} aciertos", [bien, total])); }
     };
     const corregirBatallaMandos = () => {
         const q = preguntaActual(); if (!q || resolviendo.current) return;
@@ -317,7 +318,7 @@ export default function PizarraEscape({ config, titulo = '', onSalir }) {
         const { bien, total } = corregirMandos(q);
         const ok = total > 0 && bien * 2 >= total;
         setRevelada(true);
-        avisar(ok ? `✔ ${bien} de ${total}: ¡golpe!` : `✘ Solo ${bien} de ${total}: ¡muerde!`);
+        avisar(ok ? tr("✔ {0} de {1}: ¡golpe!", [bien, total]) : tr("✘ Solo {0} de {1}: ¡muerde!", [bien, total]));
         if (ok) audio.acierto(); else audio.fallo();
         setTimeout(() => resultadoBatalla(ok), 1600);
     };
@@ -333,10 +334,10 @@ export default function PizarraEscape({ config, titulo = '', onSalir }) {
 
     // Clic en una respuesta durante las salas: incorrecta = consume tiempo; correcta = se muestra
     const elegirSala = (i, q) => {
-        if (i === q.correcta) { setRevelada(true); audio.acierto(); avisar('✔ ¡Correcto!'); return; }
+        if (i === q.correcta) { setRevelada(true); audio.acierto(); avisar(tr("✔ ¡Correcto!")); return; }
         setFalladas(f => [...f, i]); setPenal(p => p + PENAL_PREGUNTA); audio.fallo();
         setFlash('rojo'); setTimeout(() => setFlash(null), 700);
-        avisar(`✘ ¡Incorrecto! −${PENAL_PREGUNTA} s`);
+        avisar(tr("✘ ¡Incorrecto! −{0} s", [PENAL_PREGUNTA]));
     };
     // Clic en una respuesta en la batalla: decide directamente golpe o mordisco
     const elegirBatalla = (i, q) => {
@@ -370,7 +371,7 @@ export default function PizarraEscape({ config, titulo = '', onSalir }) {
     const pdf = async (tipo, soluciones) => {
         setDescargando(tipo + soluciones);
         try { await descargarPdfEscape(tipo, { config, titulo, soluciones }); }
-        catch (e) { alert('No se pudo crear el PDF: ' + e.message); }
+        catch (e) { alert(tr("No se pudo crear el PDF: ") + e.message); }
         setDescargando('');
     };
 
@@ -379,38 +380,38 @@ export default function PizarraEscape({ config, titulo = '', onSalir }) {
     const pct = pp?.preguntas.length ? Math.min(100, ((qIdx + (revelada ? 1 : 0)) / pp.preguntas.length) * 100) : 0;
     const cabSala = (
         <div>
-            <div style={{ fontWeight: 800, color: info.color, textTransform: 'uppercase', letterSpacing: 2, fontSize: '.8rem' }}>Sala {salaIdx + 1} de {pruebas.length} · {info.materia}</div>
+            <div style={{ fontWeight: 800, color: info.color, textTransform: 'uppercase', letterSpacing: 2, fontSize: '.8rem' }}>{tr("Sala")} {salaIdx + 1} {tr("de")} {pruebas.length} · {info.materia}</div>
             <div className="eh-titulo" style={{ fontSize: 'clamp(1.4rem,2.6vw,2.2rem)' }}>{info.emoji} {info.nombre}</div>
         </div>
     );
 
     if (fase === 'LOBBY') {
         panel = <>
-            <h1 className="eh-titulo" style={{ fontSize: 'clamp(2rem,4vw,3.2rem)' }}>La mansión del zombi</h1>
+            <h1 className="eh-titulo" style={{ fontSize: 'clamp(2rem,4vw,3.2rem)' }}>{tr("La mansión del zombi")}</h1>
             {!mandos && <>
-            <div style={{ fontWeight: 800, color: '#ffb347' }}>📽️ Modo pizarra · fichas en papel</div>
-            <p style={{ lineHeight: 1.5, margin: 0 }}>Reparte a cada alumno la <b>hoja de respuestas</b> (o el <b>cuadernillo</b>). Las preguntas que salen aquí son las mismas que las de las fichas.</p>
+            <div style={{ fontWeight: 800, color: '#ffb347' }}>{tr("📽️ Modo pizarra · fichas en papel")}</div>
+            <p style={{ lineHeight: 1.5, margin: 0 }}>{tr("Reparte a cada alumno la")} <b>{tr("hoja de respuestas")}</b> {tr("(o el")} <b>{tr("cuadernillo")}</b>{tr("). Las preguntas que salen aquí son las mismas que las de las fichas.")}</p>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {[['CUADERNILLO', false, '📘 Cuadernillo'], ['HOJA', false, '📝 Hoja de respuestas'], ['CUADERNILLO', true, '✅ Cuadernillo con soluciones'], ['HOJA', true, '✅ Plantilla de corrección']].map(([t, s, l]) => (
-                    <button key={t + s} className="eh-btn2" disabled={!!descargando} onClick={() => pdf(t, s)}>{descargando === t + s ? '⏳ Creando PDF…' : l}</button>
+                {[['CUADERNILLO', false, tr("📘 Cuadernillo")], ['HOJA', false, tr("📝 Hoja de respuestas")], ['CUADERNILLO', true, tr("✅ Cuadernillo con soluciones")], ['HOJA', true, tr("✅ Plantilla de corrección")]].map(([t, s, l]) => (
+                    <button key={t + s} className="eh-btn2" disabled={!!descargando} onClick={() => pdf(t, s)}>{descargando === t + s ? tr("⏳ Creando PDF…") : l}</button>
                 ))}
             </div>
             </>}
             {mandos && (
             <div style={{ padding: '10px 12px', borderRadius: 14, background: 'rgba(0,0,0,.3)', border: '2px solid rgba(255,255,255,.12)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        <span style={{ fontWeight: 800, color: '#ffb347' }}>🎮 Modo mandos micro:bit</span>
+                        <span style={{ fontWeight: 800, color: '#ffb347' }}>{tr("🎮 Modo mandos micro:bit")}</span>
                         <BotonTutorialMandos inicial="letras" texto="📖 Tutorial" style={{ background: '#7c3aed', padding: '5px 12px' }} />
                         <BotonTutorialMandos inicial="candado" texto="🔒 Cómo se abre el candado" style={{ background: '#d97706', padding: '5px 12px' }} />
                     </div>
-                    <p style={{ margin: '8px 0', lineHeight: 1.4, opacity: .9 }}>Cada alumno responde con su mando: A cambia la letra y se envía con <b>B</b> o <b>agitando el mando</b>. <b>Pulsad B o agitad el mando para uniros</b>: aparecerá vuestro avatar en la mansión.</p>
+                    <p style={{ margin: '8px 0', lineHeight: 1.4, opacity: .9 }}>{tr("Cada alumno responde con su mando: A cambia la letra y se envía con")} <b>B</b> {tr("o")} <b>{tr("agitando el mando")}</b>. <b>{tr("Pulsad B o agitad el mando para uniros")}</b>{tr(": aparecerá vuestro avatar en la mansión.")}</p>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                         <ChipAntena />
-                        <span style={{ fontWeight: 800 }}>{nJugM} {nJugM === 1 ? 'mando unido' : 'mandos unidos'}</span>
+                        <span style={{ fontWeight: 800 }}>{nJugM} {nJugM === 1 ? tr("mando unido") : tr("mandos unidos")}</span>
                     </div>
                     {nJugM > 0 && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
                         {Object.entries(jugadores).map(([k, j]) => (
-                            <label key={k} title="Escribe el nombre del alumno" style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 4px 3px 10px', borderRadius: 99, background: '#5b21b6', fontWeight: 700, fontSize: '.9rem' }}>
+                            <label key={k} title={tr("Escribe el nombre del alumno")} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 4px 3px 10px', borderRadius: 99, background: '#5b21b6', fontWeight: 700, fontSize: '.9rem' }}>
                                 🎮 {j.mando > 900 ? `V${j.mando - 900}` : j.mando}
                                 <input value={j.nombre} onChange={e => renombrar(k, e.target.value)} onBlur={e => { if (!e.target.value.trim()) renombrar(k, nombreMando(j.mando, {})); }}
                                     style={{ width: 110, border: 'none', borderRadius: 99, padding: '3px 8px', background: 'rgba(0,0,0,.35)', color: '#fff', fontWeight: 700, fontFamily: 'inherit' }} />
@@ -420,14 +421,14 @@ export default function PizarraEscape({ config, titulo = '', onSalir }) {
             </div>
             )}
             <MapaMansion pruebas={pruebas} salaIdx={-1} fase="LOBBY" />
-            <button className="eh-btn" style={{ fontSize: '1.2rem' }} disabled={mandos && nJugM === 0} onClick={() => { audio.desbloquear(); audio.puertaCerrada(); setFase('INTRO'); }}>🕯️ Empezar{mandos && nJugM === 0 ? ' (espera a que se una algún mando)' : ''}</button>
+            <button className="eh-btn" style={{ fontSize: '1.2rem' }} disabled={mandos && nJugM === 0} onClick={() => { audio.desbloquear(); audio.puertaCerrada(); setFase('INTRO'); }}>{tr("🕯️ Empezar")}{mandos && nJugM === 0 ? tr(" (espera a que se una algún mando)") : ''}</button>
         </>;
     } else if (fase === 'INTRO') {
         panel = <>
-            <h1 className="eh-titulo" style={{ fontSize: 'clamp(1.8rem,3.6vw,3rem)' }}>¡La puerta se ha cerrado!</h1>
-            <p style={{ fontSize: 'clamp(1.1rem,1.8vw,1.5rem)', lineHeight: 1.5, margin: 0 }}>Es la noche de Halloween… <b>¡CLAC!</b> En el sótano, un <b>zombi</b> está a punto de despertar.</p>
-            <p style={{ fontSize: 'clamp(1rem,1.6vw,1.3rem)', lineHeight: 1.5, margin: 0, opacity: .9 }}>Superad las <b>{pruebas.length} salas</b>: {mandos ? 'contestad con vuestro mando' : 'contestad en vuestra ficha'} y abrid cada candado. Cada puerta da un <b>amuleto</b> (una vida más). Tenéis <b>{config.minutos} minutos</b>.</p>
-            <button className="eh-btn" style={{ fontSize: '1.2rem' }} onClick={() => irASala(0)}>🚪 Abrir la primera puerta</button>
+            <h1 className="eh-titulo" style={{ fontSize: 'clamp(1.8rem,3.6vw,3rem)' }}>{tr("¡La puerta se ha cerrado!")}</h1>
+            <p style={{ fontSize: 'clamp(1.1rem,1.8vw,1.5rem)', lineHeight: 1.5, margin: 0 }}>{tr("Es la noche de Halloween…")} <b>{tr("¡CLAC!")}</b> {tr("En el sótano, un")} <b>{tr("zombi")}</b> {tr("está a punto de despertar.")}</p>
+            <p style={{ fontSize: 'clamp(1rem,1.6vw,1.3rem)', lineHeight: 1.5, margin: 0, opacity: .9 }}>{tr("Superad las")} <b>{pruebas.length} {tr("salas")}</b>: {mandos ? tr("contestad con vuestro mando") : tr("contestad en vuestra ficha")} {tr("y abrid cada candado. Cada puerta da un")} <b>{tr("amuleto")}</b> {tr("(una vida más). Tenéis")} <b>{config.minutos} {tr("minutos")}</b>.</p>
+            <button className="eh-btn" style={{ fontSize: '1.2rem' }} onClick={() => irASala(0)}>{tr("🚪 Abrir la primera puerta")}</button>
         </>;
     } else if (fase === 'RETOS' && pp) {
         const q = pp.preguntas[qIdx];
@@ -435,23 +436,23 @@ export default function PizarraEscape({ config, titulo = '', onSalir }) {
         panel = <>
             {cabSala}
             <PreguntaGrande q={q} etiqueta={`${salaIdx + 1}.${qIdx + 1}`} revelada={revelada} falladas={falladas} onElegir={mandos ? undefined : (i) => elegirSala(i, q)} conteo={conteoM(q)} />
-            {mandos && !revelada && <div style={{ textAlign: 'center', fontWeight: 800, fontSize: '1.2rem' }}>🎮 {nRespM} de {nJugM} han respondido</div>}
+            {mandos && !revelada && <div style={{ textAlign: 'center', fontWeight: 800, fontSize: '1.2rem' }}>🎮 {nRespM} {tr("de")} {nJugM} {tr("han respondido")}</div>}
             {aviso && <div className="eh-aparece" style={{ textAlign: 'center', fontWeight: 900, fontSize: '1.3rem', color: aviso.startsWith('✔') ? '#4ade80' : '#fca5a5' }}>{aviso}</div>}
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center', marginTop: 'auto' }}>
-                {qIdx > 0 && !mandos && <button className="eh-btn2" onClick={() => { setQIdx(i => i - 1); setRevelada(false); }}>◀ Anterior</button>}
+                {qIdx > 0 && !mandos && <button className="eh-btn2" onClick={() => { setQIdx(i => i - 1); setRevelada(false); }}>{tr("◀ Anterior")}</button>}
                 {!revelada
                     ? mandos
-                        ? <button className="eh-btn" onClick={corregirSalaMandos}>✅ Corregir ({nRespM}/{nJugM})</button>
-                        : <button className="eh-btn" onClick={() => { setRevelada(true); audio.acierto(); }}>👁 Mostrar respuesta</button>
+                        ? <button className="eh-btn" onClick={corregirSalaMandos}>{tr("✅ Corregir (")}{nRespM}/{nJugM})</button>
+                        : <button className="eh-btn" onClick={() => { setRevelada(true); audio.acierto(); }}>{tr("👁 Mostrar respuesta")}</button>
                     : ultima
-                        ? <button className="eh-btn" onClick={() => { setFase('CANDADO'); audio.campana(); if (!mandos) saltan(); }}>🔒 ¡Al candado!</button>
-                        : <button className="eh-btn" onClick={() => { setQIdx(i => i + 1); setRevelada(false); if (!mandos) saltan(); }}>▶ Siguiente pregunta</button>}
+                        ? <button className="eh-btn" onClick={() => { setFase('CANDADO'); audio.campana(); if (!mandos) saltan(); }}>{tr("🔒 ¡Al candado!")}</button>
+                        : <button className="eh-btn" onClick={() => { setQIdx(i => i + 1); setRevelada(false); if (!mandos) saltan(); }}>{tr("▶ Siguiente pregunta")}</button>}
             </div>
         </>;
         banda = (
             <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, fontSize: '1.15rem', marginBottom: 6 }}>
-                    <span>🕯️ Energía de la puerta</span><span>Pregunta {qIdx + 1} de {pp.preguntas.length} · cada fallo −{PENAL_PREGUNTA} s</span>
+                    <span>{tr("🕯️ Energía de la puerta")}</span><span>{tr("Pregunta")} {qIdx + 1} {tr("de")} {pp.preguntas.length} {tr("· cada fallo −")}{PENAL_PREGUNTA} s</span>
                 </div>
                 <div className="eh-barra" style={{ height: 30, borderRadius: 15 }}><div style={{ width: `${pct}%` }} /></div>
             </div>
@@ -475,10 +476,10 @@ export default function PizarraEscape({ config, titulo = '', onSalir }) {
             {mandos && (
                 <div style={{ padding: '10px 12px', borderRadius: 14, background: 'rgba(124,58,237,.22)', border: '2px solid rgba(167,139,250,.6)' }}>
                     <div style={{ fontWeight: 800, fontSize: 'clamp(1rem,1.5vw,1.25rem)', lineHeight: 1.4 }}>
-                        🎮 Con el mando, {candNumerico
-                            ? <>marca cada <b>cifra</b> con A (−) y B (+) y envíala <b>agitando el mando</b>.</>
-                            : <>busca cada <b>letra</b> con A (◀) y B (▶) y envíala <b>agitando el mando</b>.</>}
-                        {' '}Código de <b>{largoCandado}</b> {candNumerico ? 'cifras' : 'caracteres'}. Si un carácter no es, ese mando vuelve a empezar.
+                        {tr("🎮 Con el mando,")} {candNumerico
+                            ? <>{tr("marca cada")} <b>{tr("cifra")}</b> {tr("con A (−) y B (+) y envíala")} <b>{tr("agitando el mando")}</b>.</>
+                            : <>{tr("busca cada")} <b>{tr("letra")}</b> {tr("con A (◀) y B (▶) y envíala")} <b>{tr("agitando el mando")}</b>.</>}
+                        {' '}{tr("Código de")} <b>{largoCandado}</b> {candNumerico ? tr("cifras") : tr("caracteres")}{tr(". Si un carácter no es, ese mando vuelve a empezar.")}
                     </div>
                     <div style={{ marginTop: 8 }}>
                         <BotonTutorialMandos inicial="candado" texto="📖 Ver cómo se escribe el código con el mando" style={{ background: '#d97706', padding: '6px 14px' }} />
@@ -487,7 +488,7 @@ export default function PizarraEscape({ config, titulo = '', onSalir }) {
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
                             {Object.entries(intentos).map(([id, t]) => (
                                 <span key={id} style={{ padding: '3px 10px', borderRadius: 99, background: '#5b21b6', fontWeight: 700, fontSize: '.95rem', letterSpacing: 2 }}>
-                                    {jugadores[`m${id}`]?.nombre || `Mando ${id}`} {'●'.repeat(t.length)}{'○'.repeat(Math.max(0, largoCandado - t.length))}
+                                    {jugadores[`m${id}`]?.nombre || tr("Mando {0}", [id])} {'●'.repeat(t.length)}{'○'.repeat(Math.max(0, largoCandado - t.length))}
                                 </span>
                             ))}
                         </div>
@@ -496,34 +497,34 @@ export default function PizarraEscape({ config, titulo = '', onSalir }) {
             )}
             <div style={{ display: 'flex', gap: 8, marginTop: 'auto' }}>
                 <input className="eh-input" value={codigoTxt} onChange={e => setCodigoTxt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') probarCodigo(); }}
-                    placeholder={cand.longitud ? `${cand.longitud} ${cand.tipo === 'numero' ? 'cifras' : 'caracteres'}` : 'Código que dice la clase'} />
-                <button className="eh-btn" onClick={probarCodigo}>🗝️ Probar</button>
+                    placeholder={cand.longitud ? `${cand.longitud} ${cand.tipo === 'numero' ? 'cifras' : 'caracteres'}` : tr("Código que dice la clase")} />
+                <button className="eh-btn" onClick={probarCodigo}>{tr("🗝️ Probar")}</button>
             </div>
             {msg && <div style={{ color: '#fca5a5', fontWeight: 800, textAlign: 'center' }}>{msg}</div>}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button className="eh-btn2" onClick={() => abrirPuerta('El profe')}>🔓 Abrir sin código</button>
+                <button className="eh-btn2" onClick={() => abrirPuerta(tr("El profe"))}>{tr("🔓 Abrir sin código")}</button>
             </div>
         </>;
-        banda = <div style={{ fontWeight: 900, fontSize: '1.2rem', textAlign: 'center' }}>🔒 {cand.titulo} · cada código incorrecto resta {PENAL} s</div>;
+        banda = <div style={{ fontWeight: 900, fontSize: '1.2rem', textAlign: 'center' }}>🔒 {cand.titulo} {tr("· cada código incorrecto resta")} {PENAL} s</div>;
     } else if (fase === 'ABIERTA') {
         panel = <>
             {cabSala}
-            <h2 style={{ fontSize: 'clamp(1.8rem,3.4vw,2.8rem)', margin: 0, color: '#4ade80' }}>¡Puerta abierta!</h2>
+            <h2 style={{ fontSize: 'clamp(1.8rem,3.4vw,2.8rem)', margin: 0, color: '#4ade80' }}>{tr("¡Puerta abierta!")}</h2>
             {abridor && (
                 <div className="eh-aparece" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 14px', borderRadius: 18, background: 'radial-gradient(circle at 20% 50%, rgba(255,222,89,.35), rgba(91,33,182,.35))', border: '3px solid #ffde59', boxShadow: '0 0 30px rgba(255,222,89,.45)' }}>
                     <div style={{ flexShrink: 0 }}><AvatarPreview3D avatar={abridor.avatar} size={150} /></div>
                     <div>
-                        <div style={{ fontSize: 'clamp(1rem,1.6vw,1.3rem)', fontWeight: 800, color: '#ffde59' }}>🗝️ ¡Ha abierto el candado!</div>
+                        <div style={{ fontSize: 'clamp(1rem,1.6vw,1.3rem)', fontWeight: 800, color: '#ffde59' }}>{tr("🗝️ ¡Ha abierto el candado!")}</div>
                         <div className="eh-titulo" style={{ fontSize: 'clamp(1.8rem,3.4vw,2.8rem)' }}>{abridor.nombre}</div>
                     </div>
                 </div>
             )}
-            {cand?.solucionVisible && <p style={{ fontSize: '1.3rem', margin: 0 }}>🗝️ El código era: <b style={{ color: '#ffde59' }}>{cand.solucionVisible}</b></p>}
-            <p style={{ fontSize: '1.2rem', margin: 0 }}>Amuleto: <span style={{ fontSize: '2rem' }}>{info.amuleto.emoji}</span> <b>{info.amuleto.nombre}</b> (+1 vida)</p>
+            {cand?.solucionVisible && <p style={{ fontSize: '1.3rem', margin: 0 }}>{tr("🗝️ El código era:")} <b style={{ color: '#ffde59' }}>{cand.solucionVisible}</b></p>}
+            <p style={{ fontSize: '1.2rem', margin: 0 }}>{tr("Amuleto:")} <span style={{ fontSize: '2rem' }}>{info.amuleto.emoji}</span> <b>{info.amuleto.nombre}</b> {tr("(+1 vida)")}</p>
             <MapaMansion pruebas={pruebas} salaIdx={salaIdx} amuletos={amuletos} fase={fase} />
-            <button className="eh-btn" style={{ fontSize: '1.15rem', marginTop: 'auto' }} onClick={siguienteSala}>{salaIdx >= pruebas.length - 1 ? '⚔️ ¡Al sótano a por el zombi!' : '🚪 Siguiente sala'}</button>
+            <button className="eh-btn" style={{ fontSize: '1.15rem', marginTop: 'auto' }} onClick={siguienteSala}>{salaIdx >= pruebas.length - 1 ? tr("⚔️ ¡Al sótano a por el zombi!") : tr("🚪 Siguiente sala")}</button>
         </>;
-        banda = <div style={{ fontWeight: 900, fontSize: '1.25rem', textAlign: 'center', color: '#4ade80' }}>🚪 ¡Puerta abierta! {info.amuleto.emoji} {info.amuleto.nombre}</div>;
+        banda = <div style={{ fontWeight: 900, fontSize: '1.25rem', textAlign: 'center', color: '#4ade80' }}>{tr("🚪 ¡Puerta abierta!")} {info.amuleto.emoji} {info.amuleto.nombre}</div>;
     } else if (enPelea && batalla) {
         const lista = partida.batalla;
         const q = lista.length ? lista[batalla.q % lista.length] : null;
@@ -531,33 +532,33 @@ export default function PizarraEscape({ config, titulo = '', onSalir }) {
         const hp = batalla.hpMax - batalla.golpes;
         if (fase === 'BATALLA') {
             panel = <>
-                <h1 className="eh-titulo" style={{ fontSize: 'clamp(1.6rem,3vw,2.6rem)' }}>¡Batalla final!</h1>
-                {batalla.agotado && <div style={{ color: '#fca5a5', fontWeight: 800 }}>⏰ Se acabó el tiempo: el zombi tiene un 50 % más de vida.</div>}
-                <PreguntaGrande q={q} etiqueta={`Z${(batalla.q % Math.max(1, lista.length)) + 1}${repaso ? ' (repaso)' : ''}`} revelada={revelada} falladas={falladas} onElegir={mandos ? undefined : (i) => elegirBatalla(i, q)} conteo={conteoM(q)} />
-                {mandos && !revelada && <div style={{ textAlign: 'center', fontWeight: 800, fontSize: '1.2rem' }}>🎮 {nRespM} de {nJugM} han respondido · si acierta la mitad, ¡golpe!</div>}
+                <h1 className="eh-titulo" style={{ fontSize: 'clamp(1.6rem,3vw,2.6rem)' }}>{tr("¡Batalla final!")}</h1>
+                {batalla.agotado && <div style={{ color: '#fca5a5', fontWeight: 800 }}>{tr("⏰ Se acabó el tiempo: el zombi tiene un 50 % más de vida.")}</div>}
+                <PreguntaGrande q={q} etiqueta={`Z${(batalla.q % Math.max(1, lista.length)) + 1}${repaso ? tr(" (repaso)") : ''}`} revelada={revelada} falladas={falladas} onElegir={mandos ? undefined : (i) => elegirBatalla(i, q)} conteo={conteoM(q)} />
+                {mandos && !revelada && <div style={{ textAlign: 'center', fontWeight: 800, fontSize: '1.2rem' }}>🎮 {nRespM} {tr("de")} {nJugM} {tr("han respondido · si acierta la mitad, ¡golpe!")}</div>}
                 {aviso && <div className="eh-aparece" style={{ textAlign: 'center', fontWeight: 900, fontSize: '1.3rem', color: aviso.startsWith('✔') ? '#4ade80' : '#fca5a5' }}>{aviso}</div>}
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center', marginTop: 'auto' }}>
                     {mandos
-                        ? (!revelada && <button className="eh-btn" onClick={corregirBatallaMandos}>✅ Corregir ({nRespM}/{nJugM})</button>)
+                        ? (!revelada && <button className="eh-btn" onClick={corregirBatallaMandos}>{tr("✅ Corregir (")}{nRespM}/{nJugM})</button>)
                         : !revelada
-                        ? <button className="eh-btn" onClick={() => setRevelada(true)}>👁 Mostrar respuesta</button>
+                        ? <button className="eh-btn" onClick={() => setRevelada(true)}>{tr("👁 Mostrar respuesta")}</button>
                         : resolviendo.current ? null : <>
-                            <button className="eh-btn" style={{ background: 'linear-gradient(180deg,#4ade80,#16a34a)' }} onClick={() => resultadoBatalla(true)}>✔ ¡Acertamos! Golpe</button>
-                            <button className="eh-btn" style={{ background: 'linear-gradient(180deg,#f87171,#b91c1c)', color: '#fff' }} onClick={() => resultadoBatalla(false)}>✘ Fallamos: ¡muerde!</button>
+                            <button className="eh-btn" style={{ background: 'linear-gradient(180deg,#4ade80,#16a34a)' }} onClick={() => resultadoBatalla(true)}>{tr("✔ ¡Acertamos! Golpe")}</button>
+                            <button className="eh-btn" style={{ background: 'linear-gradient(180deg,#f87171,#b91c1c)', color: '#fff' }} onClick={() => resultadoBatalla(false)}>{tr("✘ Fallamos: ¡muerde!")}</button>
                         </>}
                 </div>
             </>;
         } else {
             panel = <>
-                <h1 className="eh-titulo" style={{ fontSize: 'clamp(2rem,4vw,3.4rem)', color: fase === 'VICTORIA' ? '#4ade80' : '#ef4444' }}>{fase === 'VICTORIA' ? '¡Habéis escapado!' : '¡El zombi os ha atrapado!'}</h1>
-                {fase === 'VICTORIA' ? <p style={{ fontSize: '1.4rem' }}>El zombi ha caído y la puerta se abre. ¡Feliz Halloween! 🎃</p>
+                <h1 className="eh-titulo" style={{ fontSize: 'clamp(2rem,4vw,3.4rem)', color: fase === 'VICTORIA' ? '#4ade80' : '#ef4444' }}>{fase === 'VICTORIA' ? tr("¡Habéis escapado!") : tr("¡El zombi os ha atrapado!")}</h1>
+                {fase === 'VICTORIA' ? <p style={{ fontSize: '1.4rem' }}>{tr("El zombi ha caído y la puerta se abre. ¡Feliz Halloween! 🎃")}</p>
                     : <>
-                        <p style={{ fontSize: '1.2rem' }}>Pero está herido… ¡le quedan {hp} puntos de vida!</p>
-                        <button className="eh-btn" onClick={() => { setBatalla(b => ({ ...b, vidas: b.vidasMax })); setRevelada(false); setFase('BATALLA'); setZEstado('idle'); audio.rugido(); }}>🔁 ¡Revancha!</button>
+                        <p style={{ fontSize: '1.2rem' }}>{tr("Pero está herido… ¡le quedan")} {hp} {tr("puntos de vida!")}</p>
+                        <button className="eh-btn" onClick={() => { setBatalla(b => ({ ...b, vidas: b.vidasMax })); setRevelada(false); setFase('BATALLA'); setZEstado('idle'); audio.rugido(); }}>{tr("🔁 ¡Revancha!")}</button>
                     </>}
                 {mandos && rankingM.length > 0 && (
                     <div>
-                        <h3 style={{ margin: '6px 0', color: '#ffde59' }}>🎮 Aciertos con los mandos</h3>
+                        <h3 style={{ margin: '6px 0', color: '#ffde59' }}>{tr("🎮 Aciertos con los mandos")}</h3>
                         {rankingM.map((j, i) => (
                             <div key={j.mando} style={{ display: 'flex', gap: 10, padding: '4px 2px', borderBottom: '1px solid rgba(255,255,255,.12)', fontSize: i < 3 ? '1.2rem' : '1rem', fontWeight: 700 }}>
                                 <span style={{ width: 40 }}>{['🥇', '🥈', '🥉'][i] || `${i + 1}º`}</span>
@@ -584,21 +585,21 @@ export default function PizarraEscape({ config, titulo = '', onSalir }) {
             {(fase === 'VICTORIA' || (fase === 'ABIERTA' && abridor)) && <Confeti />}
             <Subtitulo texto={narrador.subtitulo} />
             <div style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', flexWrap: 'wrap', background: 'rgba(0,0,0,.35)' }}>
-                <button className="eh-btn2" onClick={onSalir}>← Salir</button>
-                <div style={{ fontWeight: 900 }}>📽️ {titulo || 'Escape Room de Halloween'}</div>
+                <button className="eh-btn2" onClick={onSalir}>{tr("← Salir")}</button>
+                <div style={{ fontWeight: 900 }}>📽️ {titulo || tr("Escape Room de Halloween")}</div>
                 <div style={{ flex: 1 }} />
                 {tiempoFin && enSalas && (
                     <>
                         <div style={{ fontWeight: 900, fontSize: '1.7rem', color: restante < 120000 ? '#ef4444' : '#ffde59', fontVariantNumeric: 'tabular-nums' }} className={restante < 60000 && pausa == null ? 'eh-latido' : ''}>⏳ {mmss(restante)}</div>
                         <button className="eh-btn2" onClick={() => { if (pausa == null) setPausa(Date.now()); else { setTiempoFin(t => t + (Date.now() - pausa)); setPausa(null); } }}>{pausa == null ? '⏸' : '▶'}</button>
-                        <button className="eh-btn2" onClick={() => setTiempoFin(t => t + 5 * 60000)}>➕ 5 min</button>
-                        <button className="eh-btn2" onClick={siguienteSala}>⏭ Saltar sala</button>
+                        <button className="eh-btn2" onClick={() => setTiempoFin(t => t + 5 * 60000)}>{tr("➕ 5 min")}</button>
+                        <button className="eh-btn2" onClick={siguienteSala}>{tr("⏭ Saltar sala")}</button>
                     </>
                 )}
-                {mandos && <button className="eh-btn2" onClick={() => setVerVirtuales(v => !v)} title="Mandos virtuales para probar sin placas">🧪</button>}
-                <button className="eh-btn2" onClick={cambiar3D} title="Mostrar u ocultar la mansión 3D">{usar3D ? '🏚️ 3D' : '🖼️ 2D'}</button>
+                {mandos && <button className="eh-btn2" onClick={() => setVerVirtuales(v => !v)} title={tr("Mandos virtuales para probar sin placas")}>🧪</button>}
+                <button className="eh-btn2" onClick={cambiar3D} title={tr("Mostrar u ocultar la mansión 3D")}>{usar3D ? '🏚️ 3D' : '🖼️ 2D'}</button>
                 {mandos && <ChipAntena />}
-                <button className="eh-btn2" onClick={() => setSonido(s => !s)} title={sonido ? 'Silenciar sonido y música' : 'Activar sonido y música'}>{sonido ? '🔊' : '🔇'}</button>
+                <button className="eh-btn2" onClick={() => setSonido(s => !s)} title={sonido ? tr("Silenciar sonido y música") : tr("Activar sonido y música")}>{sonido ? '🔊' : '🔇'}</button>
             </div>
             {mandos && verVirtuales && (
                 <div style={{ position: 'relative', zIndex: 3, display: 'flex', gap: 14, flexWrap: 'wrap', padding: '6px 16px', background: 'rgba(0,0,0,.5)' }}>
@@ -613,7 +614,7 @@ export default function PizarraEscape({ config, titulo = '', onSalir }) {
                                     e.currentTarget.reset();
                                 }}>
                                     <input name="c" className="eh-input" style={{ width: 110, padding: '4px 8px' }} placeholder={candNumerico ? 'cifras' : 'letras'} />
-                                    <button className="eh-btn2" style={{ padding: '4px 10px' }}>Enviar</button>
+                                    <button className="eh-btn2" style={{ padding: '4px 10px' }}>{tr("Enviar")}</button>
                                 </form>
                                 : LETRAS.slice(0, 4).map(l => <button key={l} className="eh-btn2" style={{ padding: '4px 10px' }} onClick={() => simularPulsacion(id, l)}>{l}</button>)}
                         </div>

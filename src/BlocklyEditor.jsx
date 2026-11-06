@@ -15,6 +15,9 @@ import { pythonGenerator, Order } from 'blockly/python';
 import { createWebUSBConnection, createUniversalHexFlashDataSource } from '@microbit/microbit-connection';
 import microPyHexUrl from './assets/micropython-microbit-v2.hex?url';
 import { db } from './firebase';
+import { basePublica } from './utils/urlPublica';
+import { BLOQUES_MANDO_PIKT, definirGeneradoresMandoPikt, CATEGORIA_MANDO_PIKT } from './mandos/mandoPiktBloques';
+import TutorialMandoPikt from './mandos/TutorialMandoPikt.jsx';
 import {
   collection,
   addDoc,
@@ -240,6 +243,9 @@ function generatePython(ws) {
   return gen.finish(starts.join('') + rest.join('') + loops.join(''));
 }
 
+// Exportados para comprobar fuera del navegador los programas de ejemplo (p. ej. el tutorial 🎮 Mando).
+export { generatePython, defineBlocksAndGenerators };
+
 let DEFINED = false;
 
 function defineBlocksAndGenerators() {
@@ -291,6 +297,8 @@ function defineBlocksAndGenerators() {
             ['☹ triste', 'SAD'],
             ['✓ sí', 'YES'],
             ['✗ no', 'NO'],
+            ['⬆ flecha', 'ARROW_N'],
+            ['◆ rombo', 'DIAMOND'],
           ],
         },
       ],
@@ -1422,6 +1430,18 @@ function defineBlocksAndGenerators() {
   /* ───────── GENERADORES PYTHON (Micro:bit + CyberPi) ───────── */
   const P = pythonGenerator;
 
+  // «cambiar variable en …»: el generador estándar usa `from numbers import Number`, que no existe
+  // en MicroPython (micro:bit / CyberPi) y la placa daría ImportError.
+  P.forBlock['math_change'] = function (block, gen) {
+    const delta = gen.valueToCode(block, 'DELTA', Order.ADDITIVE) || '0';
+    const v = gen.getVariableName(block.getFieldValue('VAR'));
+    return `${v} = ${v} + ${delta}\n`;
+  };
+
+  // --- 🎮 Mando Pikt (mandos/mandoPiktBloques.js) ---
+  Blockly.defineBlocksWithJsonArray(BLOQUES_MANDO_PIKT);
+  definirGeneradoresMandoPikt(P, Order);
+
   // --- Micro:bit (MicroPython) ---
   P.forBlock['microbit_on_start'] = function (block, gen) {
     gen.definitions_['import_microbit'] = 'from microbit import *';
@@ -2230,6 +2250,7 @@ const TOOLBOXES = {
           blk('microbit_radio_receive'),
         ],
       },
+      CATEGORIA_MANDO_PIKT,
       {
         kind: 'category', name: 'Control', colour: '120',
         contents: [blk('microbit_if_else'), blk('microbit_running_time'), blk('microbit_pause')],
@@ -3517,6 +3538,22 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
     window.addEventListener('mouseup', onUp);
   }, []);
 
+  // Pone un programa (estado serializado) en el área de bloques: soluciones del tutorial 🎮 Mando.
+  const cargarEstadoBloques = useCallback(
+    (state) => {
+      const ws = workspaceRef.current;
+      if (!ws || !state) return;
+      try {
+        ws.clear();
+        Blockly.serialization.workspaces.load(state, ws);
+        updateCode();
+      } catch (err) {
+        console.error('No se pudo cargar la solución:', err);
+      }
+    },
+    [updateCode]
+  );
+
   /* ── BIBLIOTECA: abrir un proyecto precargado ── */
   const openProject = useCallback(
     (proj) => {
@@ -3734,7 +3771,7 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
         viewerToken = viewerToken || randToken();
         await updateDoc(ref, { editorToken, viewerToken });
       }
-      const base = `${window.location.origin}${window.location.pathname}?juego=robotica_bloques&proj=${loadedDocId}`;
+      const base = `${basePublica()}?juego=robotica_bloques&proj=${loadedDocId}`;
       setShareLinks({
         editor: `${base}&role=editor&key=${editorToken}`,
         viewer: `${base}&role=viewer&key=${viewerToken}`,
@@ -4740,6 +4777,15 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
             >
               📖 Pasos
             </button>
+            {selectedBoard === 'microbit' && (
+              <button
+                onClick={() => setRightTab('mando')}
+                style={styles.tab(rightTab === 'mando')}
+                title="Programa paso a paso un mando para los juegos de Pikt"
+              >
+                🎮 Mando
+              </button>
+            )}
             <button
               onClick={() => setPanelCollapsed(true)}
               style={styles.collapseBtn}
@@ -4810,6 +4856,13 @@ export default function BlocklyEditor({ onExit, usuario = null, onLoginRequest, 
                 </button>
               </div>
             </>
+          ) : rightTab === 'mando' && selectedBoard === 'microbit' ? (
+            <TutorialMandoPikt
+              codigo={generatedCode}
+              cargar={cargarEstadoBloques}
+              conectada={isConnected}
+              onGuardar={uploadToBoard}
+            />
           ) : (
             <div style={styles.stepsPanel}>
               {activeProject ? (

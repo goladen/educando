@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { infoPrueba } from './bancoEscape';
 import { LETRAS, candadoParaPapel } from './partidaFija';
 import { ETAPAS } from './constantes';
+import { tr } from './i18n';
 
 /**
  *  Fichas en papel del escape room (modo pizarra):
@@ -41,7 +42,7 @@ function CajaCodigo({ candado, soluciones }) {
     const n = candado.longitud && candado.longitud <= 14 ? candado.longitud : 0;
     return (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 22 }}>🔐</span><b style={{ color: TINTA }}>Código:</b>
+            <span style={{ fontSize: 22 }}>🔐</span><b style={{ color: TINTA }}>{tr("Código:")}</b>
             {n ? <Casillas n={n} valor={sol.replace(/\s/g, '').toUpperCase()} />
                 : <div style={{ minWidth: 300, borderBottom: `2px solid ${NARANJA}`, height: 26, fontWeight: 900, color: '#15803d', fontSize: 18 }}>{sol}</div>}
         </div>
@@ -86,25 +87,24 @@ function Portada({ config, titulo, partida, soluciones, modo }) {
             <Decoracion />
             <div style={{ textAlign: 'center', marginTop: 4 }}>
                 <div style={{ fontSize: 46 }}>🏚️🧟</div>
-                <Titulo size={50} color={NARANJA}>La mansión del zombi</Titulo>
-                <div style={{ fontWeight: 800, fontSize: 18, color: MORADO, marginTop: 4 }}>{titulo || 'Escape Room de Halloween'} {soluciones && <span style={{ color: '#15803d' }}>· SOLUCIONES</span>}</div>
-                <div style={{ fontSize: 13, opacity: .75 }}>{etapa} · {partida.pruebas.length} salas · {config.minutos} min</div>
+                <Titulo size={50} color={NARANJA}>{tr("La mansión del zombi")}</Titulo>
+                <div style={{ fontWeight: 800, fontSize: 18, color: MORADO, marginTop: 4 }}>{titulo || tr("Escape Room de Halloween")} {soluciones && <span style={{ color: '#15803d' }}>{tr("· SOLUCIONES")}</span>}</div>
+                <div style={{ fontSize: 13, opacity: .75 }}>{etapa} · {partida.pruebas.length} {tr("salas ·")} {config.minutos} {tr("min")}</div>
             </div>
             <div style={{ display: 'flex', gap: 24, justifyContent: 'center', flexWrap: 'wrap', margin: '16px 0 8px' }}>
                 <Linea etiqueta="Nombre:" ancho={250} /><Linea etiqueta="Curso:" ancho={90} /><Linea etiqueta="Equipo:" ancho={110} />
             </div>
             {modo === 'CUADERNILLO' && (
                 <div style={{ marginTop: 10, padding: '10px 14px', borderRadius: 14, background: '#faf5ff', border: '1px solid #e9d5ff', fontSize: 14, lineHeight: 1.45 }}>
-                    <b>🕯️ Cómo escapar:</b> la puerta de la mansión se ha cerrado y en el sótano despierta un zombi. En cada sala, contesta las preguntas que salen en la pizarra
-                    (marca la letra). Después resolved el <b>candado</b> con las pistas y escribid el código. Cada puerta abierta os da un amuleto (una vida más) para la <b>batalla final</b>.
+                    <b>{tr("🕯️ Cómo escapar:")}</b> {tr("la puerta de la mansión se ha cerrado y en el sótano despierta un zombi. En cada sala, contesta las preguntas que salen en la pizarra (marca la letra). Después resolved el")} <b>{tr("candado")}</b> {tr("con las pistas y escribid el código. Cada puerta abierta os da un amuleto (una vida más) para la")} <b>{tr("batalla final")}</b>.
                 </div>
             )}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginTop: 12 }}>
                 {config.pruebas.map((p, i) => {
                     const inf = infoPrueba(p, i, config.pruebas);
-                    return <div key={p.id} style={{ border: `2px solid ${MORADO}`, borderRadius: '18px 18px 6px 6px', padding: '4px 10px', fontSize: 12, fontWeight: 700, textAlign: 'center', minWidth: 70 }}><div style={{ fontSize: 22 }}>{inf.emoji}</div>Sala {i + 1}</div>;
+                    return <div key={p.id} style={{ border: `2px solid ${MORADO}`, borderRadius: '18px 18px 6px 6px', padding: '4px 10px', fontSize: 12, fontWeight: 700, textAlign: 'center', minWidth: 70 }}><div style={{ fontSize: 22 }}>{inf.emoji}</div>{tr("Sala")} {i + 1}</div>;
                 })}
-                <div style={{ border: '2px solid #b91c1c', borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 700, textAlign: 'center', color: '#b91c1c' }}><div style={{ fontSize: 22 }}>🧟</div>Sótano</div>
+                <div style={{ border: '2px solid #b91c1c', borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 700, textAlign: 'center', color: '#b91c1c' }}><div style={{ fontSize: 22 }}>🧟</div>{tr("Sótano")}</div>
             </div>
         </div>
     );
@@ -115,7 +115,7 @@ function CabeceraSala({ inf, idx, prueba }) {
         <div data-bloque data-salto="" style={{ marginTop: 0, padding: '10px 16px', borderRadius: 16, border: `3px solid ${NARANJA}`, background: SUAVE, color: TINTA, display: 'flex', gap: 14, alignItems: 'center' }}>
             <div style={{ fontSize: 40 }}>{inf.emoji}</div>
             <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12, fontWeight: 800, color: NARANJA, textTransform: 'uppercase', letterSpacing: 2 }}>Sala {idx + 1} · {inf.materia}</div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: NARANJA, textTransform: 'uppercase', letterSpacing: 2 }}>{tr("Sala")} {idx + 1} · {inf.materia}</div>
                 <Titulo size={28}>{inf.nombre}</Titulo>
                 {prueba.tipo !== 'MANUAL' && inf.historia && <div style={{ fontSize: 13, opacity: .85, marginTop: 2 }}>{inf.historia}</div>}
             </div>
@@ -131,7 +131,7 @@ function BloqueCandado({ candado: original, soluciones, idx }) {
         <div data-bloque style={{ marginTop: 10, padding: '12px 16px', borderRadius: 16, border: `3px dashed ${MORADO}`, background: '#faf5ff', color: TINTA }}>
             <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                 <span style={{ fontSize: 32 }}>🔒</span>
-                <div><div style={{ fontSize: 12, fontWeight: 800, color: MORADO }}>CANDADO DE LA SALA {idx + 1}</div><div style={{ fontWeight: 900, fontSize: 19 }}>{candado.titulo}</div></div>
+                <div><div style={{ fontSize: 12, fontWeight: 800, color: MORADO }}>{tr("CANDADO DE LA SALA")} {idx + 1}</div><div style={{ fontWeight: 900, fontSize: 19 }}>{candado.titulo}</div></div>
             </div>
             <div style={{ margin: '6px 0', fontSize: 15, lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>{candado.instruccion}</div>
             {candado.imagen && <img src={candado.imagen} alt="" crossOrigin="anonymous" style={{ maxHeight: 160, maxWidth: '100%', borderRadius: 8, margin: '4px 0' }} />}
@@ -171,8 +171,8 @@ export function Cuadernillo({ config, titulo, soluciones }) {
             })}
             <div data-bloque data-salto="" style={{ marginTop: 0, padding: '12px 16px', borderRadius: 16, border: '3px solid #b91c1c', background: '#fef2f2', color: TINTA, display: 'flex', gap: 14, alignItems: 'center' }}>
                 <div style={{ fontSize: 44 }}>🧟</div>
-                <div><Titulo size={30} color="#b91c1c">Batalla final en el sótano</Titulo>
-                    <div style={{ fontSize: 13 }}>Cada acierto es un golpe al zombi. ¡Cada fallo, un mordisco! Tenéis 3 vidas + una por cada amuleto.</div></div>
+                <div><Titulo size={30} color="#b91c1c">{tr("Batalla final en el sótano")}</Titulo>
+                    <div style={{ fontSize: 13 }}>{tr("Cada acierto es un golpe al zombi. ¡Cada fallo, un mordisco! Tenéis 3 vidas + una por cada amuleto.")}</div></div>
             </div>
             {partida.batalla.map((q, k) => <Pregunta key={k} q={q} etiqueta={`Z${k + 1}`} soluciones={soluciones} />)}
         </div>
@@ -188,19 +188,19 @@ export function HojaRespuestas({ config, titulo, soluciones }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{ fontSize: 28 }}>🎃</div>
                 <div style={{ flex: 1 }}>
-                    <Titulo size={28} color={NARANJA}>La mansión del zombi</Titulo>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: MORADO }}>{titulo || 'Hoja de respuestas'} {soluciones && <span style={{ color: '#15803d' }}>· SOLUCIONES</span>}</div>
+                    <Titulo size={28} color={NARANJA}>{tr("La mansión del zombi")}</Titulo>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: MORADO }}>{titulo || tr("Hoja de respuestas")} {soluciones && <span style={{ color: '#15803d' }}>{tr("· SOLUCIONES")}</span>}</div>
                 </div>
                 <div style={{ display: 'grid', gap: 6 }}><Linea etiqueta="Nombre:" ancho={190} /><Linea etiqueta="Curso:" ancho={60} /></div>
                 <div style={{ fontSize: 24 }}>🦇</div>
             </div>
-            <div style={{ fontSize: 11, opacity: .75, margin: '4px 0 2px' }}>Escribe la letra de cada pregunta que salga en la pizarra y el código de cada candado.</div>
+            <div style={{ fontSize: 11, opacity: .75, margin: '4px 0 2px' }}>{tr("Escribe la letra de cada pregunta que salga en la pizarra y el código de cada candado.")}</div>
             {partida.pruebas.map((pp, i) => {
                 const prueba = config.pruebas[i];
                 const inf = infoPrueba(prueba, i, config.pruebas);
                 return (
                     <div key={pp.id} style={fila}>
-                        <div style={{ width: 92, fontWeight: 800, fontSize: 13 }}>{inf.emoji} Sala {i + 1}</div>
+                        <div style={{ width: 92, fontWeight: 800, fontSize: 13 }}>{inf.emoji} {tr("Sala")} {i + 1}</div>
                         <div style={{ display: 'flex', gap: 4, flex: 1, flexWrap: 'wrap' }}>
                             {pp.preguntas.map((q, k) => (
                                 <div key={k} style={{ textAlign: 'center' }}>
@@ -208,7 +208,7 @@ export function HojaRespuestas({ config, titulo, soluciones }) {
                                     <div style={{ width: 24, height: 26, border: `2px solid ${NARANJA}`, borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: '#15803d' }}>{soluciones ? LETRAS[q.correcta] : ''}</div>
                                 </div>
                             ))}
-                            {pp.preguntas.length === 0 && <div style={{ fontSize: 11, opacity: .6, alignSelf: 'center' }}>(sin preguntas: ¡buscad el código!)</div>}
+                            {pp.preguntas.length === 0 && <div style={{ fontSize: 11, opacity: .6, alignSelf: 'center' }}>{tr("(sin preguntas: ¡buscad el código!)")}</div>}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                             <span>🔐</span>
@@ -218,7 +218,7 @@ export function HojaRespuestas({ config, titulo, soluciones }) {
                 );
             })}
             <div style={{ ...fila, borderBottom: 'none' }}>
-                <div style={{ width: 92, fontWeight: 800, fontSize: 13, color: '#b91c1c' }}>🧟 Batalla</div>
+                <div style={{ width: 92, fontWeight: 800, fontSize: 13, color: '#b91c1c' }}>{tr("🧟 Batalla")}</div>
                 <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                     {partida.batalla.map((q, k) => (
                         <div key={k} style={{ textAlign: 'center' }}>
@@ -291,7 +291,7 @@ export async function descargarPdfEscape(tipo, { config, titulo, soluciones = fa
             const total = pdf.getNumberOfPages();
             for (let i = 1; i <= total; i++) {
                 pdf.setPage(i); pdf.setFontSize(8); pdf.setTextColor(150);
-                pdf.text(`La mansión del zombi · ${i} / ${total}`, W / 2, H - 5, { align: 'center' });
+                pdf.text(tr("La mansión del zombi · {0} / {1}", [i, total]), W / 2, H - 5, { align: 'center' });
             }
         }
         const base = `${titulo || 'escape_halloween'}_${tipo === 'HOJA' ? 'hoja_respuestas' : 'cuadernillo'}${soluciones ? '_soluciones' : ''}`;
@@ -304,5 +304,5 @@ export async function descargarPdfEscape(tipo, { config, titulo, soluciones = fa
 export const resumenPartida = (config) => {
     const p = config?.partida; if (!p) return '';
     const n = p.pruebas.reduce((s, x) => s + x.preguntas.length, 0);
-    return `${n} preguntas en ${p.pruebas.length} salas + ${p.batalla.length} de batalla`;
+    return tr("{0} preguntas en {1} salas + {2} de batalla", [n, p.pruebas.length, p.batalla.length]);
 };

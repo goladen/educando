@@ -3,6 +3,8 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { ZONAS_ESCALADA, DOC_LLUVIA_AEMET } from '../../api/_zonasLluvia.js';
+import { lluviaMeteocat } from './meteocatXema';
 
 // ─── Recopilador de precipitaciones (Open-Meteo) ────────────────────────────
 // Datos de Open-Meteo: API JSON gratuita, sin API key y con CORS abierto, así que
@@ -43,32 +45,11 @@ const actualizarCacheLocal = (fecha, clave, valores) => {
 
 // AEMET: proxy propio en Vercel (api/aemet.js) porque la API key no puede ir al navegador.
 const URL_AEMET = '/api/aemet';
-const AEMET_POR_LLAMADA = 15;
 // Subir al cambiar api/aemet.js: las entradas de caché de otra versión se vuelven a pedir.
-const AEMET_VER = 3;
+const AEMET_VER = 4;
 
-// Zonas de escalada de referencia (coordenadas aproximadas del sector principal).
-export const ZONAS_ESCALADA = [
-    { id: 'rodellar',   nombre: 'Rodellar',        region: 'Huesca',     lat: 42.285, lon: -0.083 },
-    { id: 'alquezar',   nombre: 'Alquézar',        region: 'Huesca',     lat: 42.173, lon: 0.026 },
-    { id: 'barasona',   nombre: 'Barasona',        region: 'Huesca',     lat: 42.137, lon: 0.318 },
-    { id: 'baldellou',  nombre: 'Baldellou',       region: 'Huesca',     lat: 41.918, lon: 0.547 },
-    { id: 'avellanes',  nombre: 'Les Avellanes',   region: 'Lleida',     lat: 41.876, lon: 0.757 },
-    { id: 'santalinya', nombre: 'Santa Linya',     region: 'Lleida',     lat: 41.933, lon: 0.800 },
-    { id: 'terradets',  nombre: 'Terradets',       region: 'Lleida',     lat: 42.040, lon: 0.883 },
-    { id: 'oliana',     nombre: 'Oliana',          region: 'Lleida',     lat: 42.070, lon: 1.310 },
-    { id: 'margalef',   nombre: 'Margalef',        region: 'Tarragona',  lat: 41.285, lon: 0.754 },
-    { id: 'siurana',    nombre: 'Siurana',         region: 'Tarragona',  lat: 41.258, lon: 0.932 },
-    { id: 'riglos',     nombre: 'Riglos',          region: 'Huesca',     lat: 42.348, lon: -0.726 },
-    { id: 'montserrat', nombre: 'Montserrat',      region: 'Barcelona',  lat: 41.593, lon: 1.837 },
-    { id: 'albarracin', nombre: 'Albarracín',      region: 'Teruel',     lat: 40.408, lon: -1.444 },
-    { id: 'chulilla',   nombre: 'Chulilla',        region: 'Valencia',   lat: 39.655, lon: -0.890 },
-    { id: 'chorro',     nombre: 'El Chorro',       region: 'Málaga',     lat: 36.906, lon: -4.760 },
-    { id: 'pedriza',    nombre: 'La Pedriza',      region: 'Madrid',     lat: 40.750, lon: -3.880 },
-    { id: 'patones',    nombre: 'Patones',         region: 'Madrid',     lat: 40.870, lon: -3.480 },
-    { id: 'ramales',    nombre: 'Ramales',         region: 'Cantabria',  lat: 43.260, lon: -3.460 },
-    { id: 'ifach',      nombre: 'Peñón de Ifach',  region: 'Alicante',   lat: 38.635, lon: 0.075 },
-];
+// Zonas de escalada: lista compartida con el cron de AEMET (api/aemet.js).
+export { ZONAS_ESCALADA };
 const POR_DEFECTO = ['rodellar', 'alquezar', 'barasona', 'avellanes', 'santalinya', 'baldellou', 'terradets', 'oliana', 'margalef', 'siurana'];
 
 const COLUMNAS = [
@@ -365,6 +346,9 @@ export default function Precipitaciones() {
     const [metricaMapa, setMetricaMapa] = useState('d7');
     const [aemet, setAemet] = useState({});            // id → fila de api/aemet
     const [estadoAemet, setEstadoAemet] = useState('cargando');
+    const [aemetActualizado, setAemetActualizado] = useState(null); // hora del último cron
+    const [meteocat, setMeteocat] = useState({});        // id → fila de Meteocat (XEMA)
+    const [estadoMeteocat, setEstadoMeteocat] = useState('cargando');
     const [fuente, setFuente] = useState('ambas');     // ambas | om | aemet
     const movil = useEsMovil();
 
@@ -428,6 +412,18 @@ export default function Precipitaciones() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [claveSitios, recarga]);
 
+    // Meteocat (XEMA, datos abiertos de la Generalitat): sin clave ni cuota, directo desde el navegador.
+    useEffect(() => {
+        if (!sitios.length) return;
+        let cancel = false;
+        setEstadoMeteocat('cargando');
+        lluviaMeteocat(sitios)
+            .then(r => { if (!cancel) { setMeteocat(r); setEstadoMeteocat('listo'); } })
+            .catch(() => { if (!cancel) setEstadoMeteocat('error'); });
+        return () => { cancel = true; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [claveSitios]);
+
     // AEMET (estaciones reales) en segundo plano: misma caché diaria, clave "aemet".
     useEffect(() => {
         if (!sitios.length) return;
@@ -437,6 +433,20 @@ export default function Precipitaciones() {
             try {
                 const fecha = fechaMadrid();
                 const cache = leerCacheLocal(fecha).aemet;
+
+                // 1) Zonas de escalada: las calcula el cron 2 veces al día en sitio_publico/lluvia_aemet.
+                if (sitios.some(s => ZONAS_ESCALADA.some(z => z.id === s.id))) {
+                    try {
+                        const snap = await getDoc(doc(db, ...DOC_LLUVIA_AEMET.split('/')));
+                        const d = snap.exists() ? snap.data() : null;
+                        if (d?.zonas) {
+                            Object.entries(d.zonas).forEach(([id, v]) => { if (v && !v.error) cache[id] = { ...v, ver: AEMET_VER, cron: true }; });
+                            if (!cancel && d.actualizado) setAemetActualizado(new Date(d.actualizado));
+                        }
+                    } catch { /* sin el documento del cron se consulta al momento */ }
+                }
+
+                // 2) Lugares añadidos por el usuario (o zonas sin dato del cron): caché diaria + consulta al momento.
                 const pendientes = () => sitios.filter(s => cache[s.id]?.ver !== AEMET_VER);
                 if (pendientes().length) {
                     try {
@@ -444,24 +454,31 @@ export default function Precipitaciones() {
                         if (snap.exists()) Object.entries(snap.data().aemet || {}).forEach(([id, v]) => { if (v?.ver === AEMET_VER) cache[id] = v; });
                     } catch { /* sin Firestore se consulta la API */ }
                 }
+                actualizarCacheLocal(fecha, 'aemet', Object.fromEntries(Object.entries(cache).filter(([, v]) => !v.error && v.ver === AEMET_VER && !v.cron)));
+                if (!cancel) setAemet({ ...cache });
+
+                // Lo que falta se pide de uno en uno (llamadas cortas, lejos del límite de tiempo de la
+                // función) y cada resultado se muestra y se guarda en cuanto llega: un fallo no tira el resto.
                 const faltan = pendientes();
-                const nuevos = {};
-                for (let i = 0; i < faltan.length; i += AEMET_POR_LLAMADA) {
-                    const lote = faltan.slice(i, i + AEMET_POR_LLAMADA);
-                    const r = await fetch(`${URL_AEMET}?p=${lote.map(s => `${s.lat},${s.lon}`).join(';')}`);
-                    const j = await r.json().catch(() => null);
-                    if (!r.ok || !Array.isArray(j)) throw new Error(j?.error || `AEMET ${r.status}`);
-                    // Las filas con error (p. ej. límite de peticiones) no se guardan para reintentar otro día/visita.
-                    lote.forEach((s, k) => { if (j[k] && !j[k].error) nuevos[s.id] = JSON.parse(JSON.stringify({ ...j[k], hora: Date.now(), ver: AEMET_VER })); else if (j[k]) cache[s.id] = j[k]; });
+                let fallos = 0;
+                for (const s of faltan) {
+                    if (cancel) return;
+                    let fila = null;
+                    for (let intento = 0; intento < 2 && !fila; intento++) {
+                        try {
+                            const r = await fetch(`${URL_AEMET}?p=${s.lat},${s.lon}`);
+                            const j = await r.json().catch(() => null);
+                            if (r.ok && Array.isArray(j) && j[0] && !j[0].error) fila = j[0];
+                        } catch { /* reintento */ }
+                    }
+                    if (!fila) { fallos++; continue; }  // no se guarda: se reintentará en otra visita
+                    const nuevo = { [s.id]: JSON.parse(JSON.stringify({ ...fila, hora: Date.now(), ver: AEMET_VER })) };
+                    Object.assign(cache, nuevo);
+                    actualizarCacheLocal(fecha, 'aemet', nuevo);
+                    setDoc(doc(db, COL_CACHE, fecha), { aemet: nuevo, actualizado: Date.now() }, { merge: true }).catch(() => { /* la copia local basta */ });
+                    if (!cancel) setAemet({ ...cache });
                 }
-                Object.assign(cache, nuevos);
-                if (Object.keys(nuevos).length) {
-                    actualizarCacheLocal(fecha, 'aemet', nuevos);
-                    setDoc(doc(db, COL_CACHE, fecha), { aemet: nuevos, actualizado: Date.now() }, { merge: true }).catch(() => { /* la copia local basta */ });
-                } else {
-                    actualizarCacheLocal(fecha, 'aemet', Object.fromEntries(Object.entries(cache).filter(([, v]) => !v.error && v.ver === AEMET_VER)));
-                }
-                if (!cancel) { setAemet({ ...cache }); setEstadoAemet('listo'); }
+                if (!cancel) setEstadoAemet(faltan.length && fallos === faltan.length ? 'error' : 'listo');
             } catch {
                 if (!cancel) setEstadoAemet('error');
             }
@@ -474,7 +491,7 @@ export default function Precipitaciones() {
     const quitar = (id) => { setSitios(prev => prev.filter(s => s.id !== id)); if (detalle === id) setDetalle(null); };
 
     // Fuente principal de la tabla y del mapa: Open-Meteo (también en "ambas") o AEMET.
-    const principal = fuente === 'aemet' ? aemet : datos;
+    const principal = fuente === 'aemet' ? aemet : fuente === 'meteocat' ? meteocat : datos;
 
     const maximos = useMemo(() => {
         const m = {};
@@ -483,7 +500,7 @@ export default function Precipitaciones() {
     }, [principal]);
 
     const filas = useMemo(() => {
-        const f = sitios.map(s => ({ s, d: datos[s.id], a: aemet[s.id], p: principal[s.id] }));
+        const f = sitios.map(s => ({ s, d: datos[s.id], a: aemet[s.id], m: meteocat[s.id], p: principal[s.id] }));
         if (!orden) return f;
         return [...f].sort((a, b) => {
             // En Open-Meteo, diasSeco null = más de 92 días sin lluvia (el más seco); sin datos va al final.
@@ -491,13 +508,13 @@ export default function Precipitaciones() {
             const va = valor(a) ?? -1, vb = valor(b) ?? -1;
             return orden.dir * (va - vb);
         });
-    }, [sitios, datos, aemet, principal, orden]);
+    }, [sitios, datos, aemet, meteocat, principal, orden]);
 
     const hoyLocal = fechaMadrid();
     const aemetAtrasado = (a) => a?.hasta && a.hasta < sumarDias(hoyLocal, -1);
     const fechaCorta = (d) => d.split('-').reverse().slice(0, 2).join('/');
 
-    const cargandoP = fuente === 'aemet' ? estadoAemet === 'cargando' : estado === 'cargando';
+    const cargandoP = fuente === 'aemet' ? estadoAemet === 'cargando' : fuente === 'meteocat' ? estadoMeteocat === 'cargando' : estado === 'cargando';
     // Utilidades de presentación de los valores AEMET de una fila (tabla y tarjetas).
     const ayudasAemet = (a) => {
         // Periodos que AEMET cubre con valores diarios (que llegan con unos días de retraso).
@@ -506,7 +523,7 @@ export default function Precipitaciones() {
         const horas24 = a?.est24?.horas && a.est24.horas < 20 ? ` (${a.est24.horas} h)` : '';
         const extra = (k) => (k === 'h24' ? horas24 : parcial(k) ? '*' : '');
         const notaAemet = (k) => (k === 'd7' && a && a.d7 == null && a.hasta ? `AEMET aún no tiene suficientes días de esta semana (datos hasta el ${fechaCorta(a.hasta)})` : parcial(k) ? `Datos AEMET hasta el ${fechaCorta(a.hasta)}` : k === 'h24' && a?.est24 ? `Estación ${a.est24.nombre} (${a.est24.km} km) · ${a.est24.horas} h de datos` : a?.estacion ? `Estación ${a.estacion.nombre} (${a.estacion.km} km)` : '');
-        const textoSeco = (x) => (x?.diasSeco == null ? (x === a ? '—' : `> ${DIAS_PASADOS}`) : x.diasSeco === 0 ? 'hoy' : x.diasSeco);
+        const textoSeco = (x) => (x?.diasSeco == null ? (x?.estacion ? '—' : `> ${DIAS_PASADOS}`) : x.diasSeco === 0 ? 'hoy' : x.diasSeco);
         return { parcial, extra, notaAemet, textoSeco };
     };
     const colorSeco = (x) => (x?.diasSeco == null ? '#4ade80' : x.diasSeco >= 3 ? '#4ade80' : x.diasSeco >= 1 ? '#fbbf24' : '#f87171');
@@ -554,10 +571,10 @@ export default function Precipitaciones() {
         </div>
     );
 
-    // Tarjeta de una ubicación (vista móvil): cuadrícula de periodos con el valor principal y, debajo, AEMET.
+    // Tarjeta de una ubicación (vista móvil): cuadrícula de periodos con el valor principal y, debajo, AEMET y Meteocat.
     const TILES = [...COLUMNAS.map(c => ({ ...c, label: c.key === 'mesAnt' && ejemplo ? `Mes ant. (${ejemplo.nombreMesAnt.slice(0, 3)})` : c.key === 'anio' && ejemplo ? `Año ${ejemplo.anioActual}` : c.label.replace('Últimas ', '').replace('Última ', '').replace('Último ', '') })),
         { key: 'diasSeco', label: 'Días sin lluvia' }, { key: 'prox24', label: 'Próx. 24 h' }];
-    const tarjeta = ({ s, d, a, p }) => {
+    const tarjeta = ({ s, d, a, m, p }) => {
         const { parcial, extra, textoSeco } = ayudasAemet(a);
         const abierta = detalle === s.id;
         return (
@@ -567,8 +584,11 @@ export default function Precipitaciones() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 800, fontSize: '1.05rem' }}>{s.nombre}</div>
                         <div style={{ color: '#64748b', fontSize: '0.75rem' }}>{s.region}{d?.elevacion != null ? ` · ${Math.round(d.elevacion)} m` : ''}</div>
-                        {fuente !== 'om' && a?.estacion && (
-                            <div style={{ color: '#d97706', fontSize: '0.72rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📡 {a.estacion.nombre} · {a.estacion.km} km</div>
+                        {(fuente === 'ambas' || fuente === 'aemet') && a?.estacion && (
+                            <div style={{ color: '#d97706', fontSize: '0.72rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📡 AEMET: {a.estacion.nombre} · {a.estacion.km} km</div>
+                        )}
+                        {(fuente === 'ambas' || fuente === 'meteocat') && m?.estacion && (
+                            <div style={{ color: '#2dd4bf', fontSize: '0.72rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📡 Meteocat: {m.estacion.nombre} · {m.estacion.km} km</div>
                         )}
                     </div>
                     <span style={{ color: '#64748b', fontSize: '0.75rem', paddingTop: 4 }}>{abierta ? '▲' : '▼'}</span>
@@ -592,6 +612,11 @@ export default function Precipitaciones() {
                                 {fuente === 'ambas' && !esProx && (
                                     <div style={{ fontSize: '0.66rem', fontWeight: 600, color: '#fbbf24', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                         {a ? `AEMET ${esSeco ? textoSeco(a) : fmt(a[t.key])}${esSeco ? (parcial('diasSeco') ? '*' : '') : extra(t.key)}` : estadoAemet === 'cargando' ? 'AEMET …' : ''}
+                                    </div>
+                                )}
+                                {fuente === 'ambas' && !esProx && m && (
+                                    <div style={{ fontSize: '0.66rem', fontWeight: 600, color: '#2dd4bf', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        Meteocat {esSeco ? textoSeco(m) : fmt(m[t.key])}
                                     </div>
                                 )}
                             </div>
@@ -618,12 +643,17 @@ export default function Precipitaciones() {
                     <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>
                         {estado === 'cargando' ? 'Cargando datos…' : actualizado ? `Datos de hoy, consultados a las ${actualizado.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} (se actualizan una vez al día) · valores en mm (= litros/m²)` : ''}
                         {estadoAemet === 'cargando' && fuente !== 'om' && <span style={{ color: '#fbbf24' }}> · Cargando estaciones AEMET…</span>}
+                        {estadoAemet !== 'cargando' && fuente !== 'om' && aemetActualizado && (
+                            <span style={{ color: '#fbbf24' }}> · AEMET: {aemetActualizado.toLocaleString('es-ES', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })} (se actualiza 2 veces al día)</span>
+                        )}
                         {estadoAemet === 'error' && fuente !== 'om' && <span style={{ color: '#f87171' }}> · AEMET no disponible ahora</span>}
+                        {estadoMeteocat === 'cargando' && (fuente === 'ambas' || fuente === 'meteocat') && <span style={{ color: '#2dd4bf' }}> · Cargando Meteocat…</span>}
+                        {estadoMeteocat === 'error' && (fuente === 'ambas' || fuente === 'meteocat') && <span style={{ color: '#f87171' }}> · Meteocat no disponible ahora</span>}
                     </span>
                     <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,0.05)', borderRadius: 999, padding: 3, width: movil ? '100%' : 'auto', order: movil ? -1 : 0 }}>
-                        {[['ambas', 'Comparar'], ['om', 'Open-Meteo'], ['aemet', 'AEMET']].map(([k, l]) => (
+                        {[['ambas', 'Comparar'], ['om', 'Open-Meteo'], ['aemet', 'AEMET'], ['meteocat', 'Meteocat']].map(([k, l]) => (
                             <button key={k} onClick={() => setFuente(k)}
-                                style={{ flex: movil ? 1 : 'none', background: fuente === k ? (k === 'aemet' ? '#f59e0b' : '#0ea5e9') : 'transparent', border: 'none', color: 'white', borderRadius: 999, padding: movil ? '8px 6px' : '5px 12px', cursor: 'pointer', fontSize: movil ? '0.82rem' : '0.78rem', fontWeight: 700 }}>
+                                style={{ flex: movil ? 1 : 'none', background: fuente === k ? (k === 'aemet' ? '#f59e0b' : k === 'meteocat' ? '#0d9488' : '#0ea5e9') : 'transparent', border: 'none', color: 'white', borderRadius: 999, padding: movil ? '8px 6px' : '5px 12px', cursor: 'pointer', fontSize: movil ? '0.82rem' : '0.78rem', fontWeight: 700 }}>
                                 {l}
                             </button>
                         ))}
@@ -670,30 +700,37 @@ export default function Precipitaciones() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filas.map(({ s, d, a, p }) => {
+                                {filas.map(({ s, d, a, m, p }) => {
                                     const { parcial, extra, notaAemet, textoSeco } = ayudasAemet(a);
                                     return (
                                     <tr key={s.id} onClick={() => setDetalle(detalle === s.id ? null : s.id)} style={{ cursor: 'pointer', background: detalle === s.id ? 'rgba(14,165,233,0.12)' : 'transparent' }}>
                                         <td style={{ padding: '9px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                                             <div style={{ fontWeight: 800 }}>{s.nombre}</div>
                                             <div style={{ color: '#64748b', fontSize: '0.72rem' }}>{s.region}{d?.elevacion != null ? ` · ${Math.round(d.elevacion)} m` : ''}</div>
-                                            {fuente !== 'om' && a?.estacion && (
-                                                <div style={{ color: '#d97706', fontSize: '0.68rem' }} title={`Estación AEMET ${a.estacion.id}`}>📡 {a.estacion.nombre} · {a.estacion.km} km</div>
+                                            {(fuente === 'ambas' || fuente === 'aemet') && a?.estacion && (
+                                                <div style={{ color: '#d97706', fontSize: '0.68rem' }} title={`Estación AEMET ${a.estacion.id}`}>📡 AEMET: {a.estacion.nombre} · {a.estacion.km} km</div>
+                                            )}
+                                            {(fuente === 'ambas' || fuente === 'meteocat') && m?.estacion && (
+                                                <div style={{ color: '#2dd4bf', fontSize: '0.68rem' }} title={`Estación Meteocat ${m.estacion.id}`}>📡 Meteocat: {m.estacion.nombre} · {m.estacion.km} km</div>
                                             )}
                                         </td>
                                         {COLUMNAS.map(c => (
-                                            <td key={c.key} style={celda(p?.[c.key], maximos[c.key])} title={fuente !== 'om' ? notaAemet(c.key) : undefined}>
+                                            <td key={c.key} style={celda(p?.[c.key], maximos[c.key])} title={fuente === 'ambas' || fuente === 'aemet' ? notaAemet(c.key) : undefined}>
                                                 {p ? `${fmt(p[c.key])}${fuente === 'aemet' ? extra(c.key) : ''}` : cargandoP ? '…' : '—'}
                                                 {fuente === 'ambas' && (
                                                     <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#fbbf24' }}>
                                                         {a ? `AEMET ${fmt(a[c.key])}${extra(c.key)}` : estadoAemet === 'cargando' ? 'AEMET …' : ''}
                                                     </div>
                                                 )}
+                                                {fuente === 'ambas' && m && (
+                                                    <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#2dd4bf' }}>Meteocat {fmt(m[c.key])}</div>
+                                                )}
                                             </td>
                                         ))}
                                         <td style={{ ...celda(0, 1), color: p?.diasSeco == null ? '#4ade80' : p.diasSeco >= 3 ? '#4ade80' : p.diasSeco >= 1 ? '#fbbf24' : '#f87171' }}>
                                             {p ? textoSeco(p) : '—'}
                                             {fuente === 'ambas' && a && <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#fbbf24' }}>AEMET {textoSeco(a)}{parcial('diasSeco') ? '*' : ''}</div>}
+                                            {fuente === 'ambas' && m && <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#2dd4bf' }}>Meteocat {textoSeco(m)}</div>}
                                         </td>
                                         <td style={celda(d?.prox24, maximos.prox24, '167,139,250')}>{d ? fmt(d.prox24) : '—'}</td>
                                         <td style={{ textAlign: 'center', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
@@ -713,6 +750,7 @@ export default function Precipitaciones() {
                 <p style={{ color: '#64748b', fontSize: '0.75rem', marginTop: 8 }}>
                     {movil ? 'Toca una tarjeta (o un punto del mapa) para ver sus gráficos.' : 'Pulsa una fila (o un punto del mapa) para ver el detalle. Pulsa una cabecera para ordenar.'}
                     {fuente !== 'om' && <> AEMET usa la estación más cercana{movil ? '' : ' (pasa el ratón por una cifra para verla)'}; <span style={{ color: '#fbbf24' }}>*</span> = los valores diarios de AEMET llegan con unos días de retraso.</>}
+                    {(fuente === 'ambas' || fuente === 'meteocat') && <> Meteocat solo tiene estaciones en Cataluña (a menos de 20 km de la zona); sus datos son de cada media hora y van al día.</>}
                 </p>
 
                 {sitios.length > 0 && (
@@ -741,7 +779,8 @@ export default function Precipitaciones() {
                     (Riglos, Montserrat) y la arenisca (Albarracín) absorben agua: con la arenisca mojada se rompen presas, espera al menos 2–3 días secos.
                     <br />
                     <span style={{ fontSize: '0.72rem' }}>Datos: <a href="https://open-meteo.com/" target="_blank" rel="noreferrer" style={{ color: '#38bdf8' }}>Open-Meteo</a> (modelos meteorológicos y reanálisis ERA5, CC BY 4.0): estimaciones en una rejilla de 1–25 km, no lecturas de pluviómetro.
-                        {' '}<a href="https://opendata.aemet.es/" target="_blank" rel="noreferrer" style={{ color: '#fbbf24' }}>© AEMET</a>: pluviómetros de la estación más cercana (observación horaria para 24 h y valores climatológicos diarios para el resto).</span>
+                        {' '}<a href="https://opendata.aemet.es/" target="_blank" rel="noreferrer" style={{ color: '#fbbf24' }}>© AEMET</a>: pluviómetros de la estación más cercana (observación horaria para 24 h y valores climatológicos diarios para el resto).
+                        {' '}<a href="https://analisi.transparenciacatalunya.cat/Medi-Ambient/Dades-meteorol-giques-di-ries-de-la-XEMA/7bvh-jvq2" target="_blank" rel="noreferrer" style={{ color: '#2dd4bf' }}>© Meteocat (XEMA)</a>: estaciones automáticas de Cataluña, datos abiertos de la Generalitat.</span>
                 </div>
             </div>
         </div>

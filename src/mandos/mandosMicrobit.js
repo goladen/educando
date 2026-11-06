@@ -79,25 +79,54 @@ export async function flashearMicropython(onProgreso) {
 // v5: modo F (fútbol, micro:bit V2): botones, logo táctil, agitar e inclinar + duelos de preguntas.
 // v6: modo V (volante): como F, pero la inclinación es continua (dirección + latido mientras se mantiene).
 // v7: el modo V envía también cuánto se inclina (FVDF,x,y con x e y de -100 a 100).
-export const VERSION_PROGRAMAS = 7;
+// v8: duelos de preguntas también en el modo V (el fútbol se juega en V).
+//     Canal de radio guardado en la placa (canal.txt). El mando lo enseña al encenderse y, si se
+//     mantiene A, se elige con A/B y se guarda agitando. La antena lo cambia con «G:<n>» por serie.
+export const VERSION_PROGRAMAS = 8;
+/** Primera versión en la que el canal se puede cambiar sin regrabar (cambiarCanalAntena). */
+export const VERSION_CANAL = 8;
 /** Primera versión de los mandos que envía cuánto se inclinan. */
 export const VERSION_ANALOGICO = 7;
 /** Primera versión de los programas que tiene el modo V (volante). */
 export const VERSION_VOLANTE = 6;
 
+// Canal guardado en la placa: «<sello de grabación>:<canal elegido>». Al volver a grabar la placa
+// cambia el sello, así que manda otra vez el canal del panel (el archivo antiguo se ignora).
+// También lo usan los programas del Laboratorio micro:bit (src/labMicrobit/programasLab.js).
+export const PY_CANAL = (grupo) => `GRUPO_BASE = ${grupo}
+SELLO = ${Date.now() % 1000000000}
+def leer_canal():
+    try:
+        with open('canal.txt') as f:
+            p = f.read().split(':')
+        if int(p[0]) == SELLO and 0 <= int(p[1]) <= 255:
+            return int(p[1])
+    except Exception:
+        pass
+    return GRUPO_BASE
+def guardar_canal(g):
+    try:
+        with open('canal.txt', 'w') as f:
+            f.write('%d:%d' % (SELLO, g))
+    except Exception:
+        pass
+`;
+
 export function programaAntena(grupo = GRUPO_POR_DEFECTO) {
   return `# PiKT - ANTENA receptora de mandos (v${VERSION_PROGRAMAS})
 from microbit import *
 import radio
-GRUPO = ${grupo}
+${PY_CANAL(grupo)}GRUPO = leer_canal()
+ICONO = Image('00900:09090:90909:09090:00900')
+display.scroll('C' + str(GRUPO), delay=70)
 radio.config(group=GRUPO, power=7, length=32, queue=10)
 radio.on()
 vistos = {}
 buf = b''
 modo = 'L'
 ultimo = 0
-display.show(Image('00900:09090:90909:09090:00900'))
-print('ANTENA:' + str(GRUPO) + ':v${VERSION_PROGRAMAS}')
+display.show(ICONO)
+print('ANTENA:' + str(GRUPO) + ':v${VERSION_PROGRAMAS}:i')
 while True:
     if running_time() - ultimo > 2000:
         radio.send('MODO:' + modo)
@@ -110,6 +139,8 @@ while True:
             if vistos.get(p[1]) != p[3]:
                 vistos[p[1]] = p[3]
                 print(m)
+    elif m and m.startswith('I:') and len(m) > 3 and m[2] not in 'RQB':
+        print(m)
     if uart.any():
         d = uart.read()
         if d:
@@ -119,7 +150,22 @@ while True:
             linea = str(buf[:i], 'utf-8').strip()
             buf = buf[i + 1:]
             if linea == '?':
-                print('ANTENA:' + str(GRUPO) + ':v${VERSION_PROGRAMAS}')
+                print('ANTENA:' + str(GRUPO) + ':v${VERSION_PROGRAMAS}:i')
+            elif linea.startswith('G:'):
+                try:
+                    g = int(linea[2:])
+                    if 0 <= g <= 255:
+                        GRUPO = g
+                        radio.off()
+                        radio.config(group=GRUPO, power=7, length=32, queue=10)
+                        radio.on()
+                        guardar_canal(g)
+                        vistos = {}
+                        display.scroll('C' + str(g), delay=60)
+                        display.show(ICONO)
+                except Exception:
+                    pass
+                print('ANTENA:' + str(GRUPO) + ':v${VERSION_PROGRAMAS}:i')
             elif linea.startswith('MODO:'):
                 modo = linea[5:6]
                 radio.send('MODO:' + modo)
@@ -138,19 +184,20 @@ while True:
 //   M mover:      A avanza, B gira, A+B accion                       -> P:<id>:MA|MB|MX:<seq>
 //   F futbol:     A/B/logo pulsados o soltados (con latido cada 400 ms mientras se mantienen)
 //                 -> FA1|FA0|FB1|FB0|FL1|FL0; agitar -> FS; inclinar -> FPI|FPD|FPF|FPT (izq/der/delante/detras).
-//                 Con 'Q:<id>' ese mando entra en duelo: A cambia A-D, B o agitar envia la letra (una vez).
+//                 Con 'Q:<id>' ese mando entra en duelo: A cambia A-D, B envia la letra (una vez).
 //   V volante:    igual que F (botones, logo, agitar) pero inclinar es continuo: FV + I|D (lado) y/o F|T
 //                 (delante/detras) + cuanto (x,y de -100 a 100), p. ej. FVDF,40,-70; se repite al cambiar
 //                 y cada 300 ms mientras sigue inclinado; FV0,0,0 = plano.
-export function programaMando(id, grupo = GRUPO_POR_DEFECTO) {
+// multi: módulo f_mando.py de una placa multifunción (programasLab.js → archivosMultifuncion):
+// atiende «ROL:…» (f_rol.mirar) y avisa «I:H:<id>:M» al arrancar.
+export function programaMando(id, grupo = GRUPO_POR_DEFECTO, { multi = false } = {}) {
   return `# PiKT - MANDO ${id} (v${VERSION_PROGRAMAS}): modos letras / numero / abecedario / mover / futbol / volante
 from microbit import *
 import radio
 import random
 import music
-ID = ${id}
-GRUPO = ${grupo}
-LETRAS = 'ABCD'
+${multi ? 'import f_rol\n' : ''}ID = ${id}
+${PY_CANAL(grupo)}LETRAS = 'ABCD'
 ALFA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 GIRO = Image('09990:00009:90909:09909:09990')
 BALON = Image('00900:09990:99999:09990:00900')
@@ -159,18 +206,62 @@ try:
     HAY_LOGO = True
 except Exception:
     HAY_LOGO = False
+
+def ver_canal(g):
+    if 0 <= g <= 9:
+        display.show(g)
+    else:
+        display.scroll(str(g), delay=60, wait=False)
+
+# Elegir canal: A baja, B sube, agitar lo guarda
+def elegir_canal(g):
+    display.scroll('CANAL', delay=55)
+    while button_a.is_pressed():
+        sleep(20)
+    button_a.was_pressed()
+    button_b.was_pressed()
+    accelerometer.was_gesture('shake')
+    ver_canal(g)
+    while True:
+        if button_a.was_pressed():
+            g = max(0, g - 1)
+            ver_canal(g)
+        if button_b.was_pressed():
+            g = min(255, g + 1)
+            ver_canal(g)
+        if accelerometer.was_gesture('shake'):
+            guardar_canal(g)
+            music.pitch(1400, 80, wait=False)
+            display.show(Image.YES)
+            sleep(600)
+            return g
+        sleep(20)
+
+# Al encender: muestra el canal; si se mantiene A, se puede cambiar
+GRUPO = leer_canal()
+display.scroll('C' + str(GRUPO), delay=70, wait=False)
+t0 = running_time()
+while running_time() - t0 < 2500:
+    if button_a.is_pressed():
+        sleep(400)
+        if button_a.is_pressed():
+            GRUPO = elegir_canal(GRUPO)
+            break
+    sleep(20)
 radio.config(group=GRUPO, power=7, length=32, queue=10)
 radio.on()
-modo = 'L'
+${multi ? 'f_rol.hola()\n' : ''}modo = 'L'
 sel = 0
 num = 0
 car = 0
 seq = random.randint(0, 99)
+pend = []
 activo = 0
 inicio = 0
 paso_t = 0
 combo = False
 duelo = False
+duelo_t = 0
 fut = {'A': False, 'B': False, 'L': False}
 fut_t = {'A': 0, 'B': 0, 'L': 0}
 armado = True
@@ -197,7 +288,7 @@ def pantalla():
     elif modo == 'F':
         display.show(LETRAS[sel] if duelo else BALON)
     elif modo == 'V':
-        display.show(FLECHAS.get(vol_d, Image.DIAMOND_SMALL))
+        display.show(LETRAS[sel] if duelo else FLECHAS.get(vol_d, Image.DIAMOND_SMALL))
     else:
         display.show(Image.ARROW_N)
 
@@ -210,8 +301,12 @@ def enviar(valor):
         radio.send(msg)
         t = running_time()
         while running_time() - t < 120:
-            if radio.receive() == ack:
+            m = radio.receive()
+            if m == ack:
                 return True
+            # las ordenes que llegan mientras se espera la confirmacion (MODO, ROL, Q, N, F) se guardan
+            if m and m[0] in 'MRQNF' and len(pend) < 8:
+                pend.append(m)
         sleep(random.randint(0, 60))
     return False
 
@@ -297,14 +392,23 @@ def paso_mover():
         pantalla()
 
 # Modo F: envia los cambios de A, B y el logo (y un latido mientras siguen pulsados),
-# agitar = tiro e inclinar = pase. En duelo, A cambia la letra y B o agitar la envia.
+# agitar = tiro e inclinar = pase. En duelo, A cambia la letra y B la envia.
 def paso_futbol():
     global duelo, sel, armado, incl_d, incl_t, tras_agitar
     if duelo:
+        # El primer momento del duelo no cuenta: se ignoran los toques y sacudidas que venian del juego
+        if running_time() - duelo_t < 800:
+            button_a.was_pressed()
+            button_b.was_pressed()
+            agitado()
+            return
+        # En el duelo solo cuentan los botones: A elige la letra y B la envia (agitar no, para no
+        # enviar sin querer con el mando en movimiento)
+        agitado()
         if button_a.was_pressed():
             sel = (sel + 1) % 4
             pantalla()
-        if button_b.was_pressed() or agitado():
+        if button_b.was_pressed():
             ok = enviar(LETRAS[sel])
             duelo = False
             button_a.was_pressed()
@@ -407,14 +511,17 @@ def cambiar_modo(m):
     pantalla()
 
 def escuchar_radio():
-    global sel, num, car, duelo
-    r = radio.receive()
+    global sel, num, car, duelo, duelo_t
+    r = pend.pop(0) if pend else radio.receive()
     if not r:
         return
-    if r.startswith('MODO:'):
+${multi ? '    f_rol.mirar(r)\n' : ''}    if r.startswith('MODO:'):
         cambiar_modo(r[5:])
-    elif r == 'Q:%d' % ID and modo == 'F':
+    elif r == 'Q:%d' % ID and (modo == 'F' or modo == 'V'):
+        if duelo:
+            return
         duelo = True
+        duelo_t = running_time()
         sel = 0
         button_a.was_pressed()
         button_b.was_pressed()
@@ -548,7 +655,31 @@ class ConexionSerie {
 
 // Escribe `codigo` como main.py (raw REPL) y reinicia la placa para que lo ejecute.
 // Devuelve los bytes escritos o lanza un error legible.
-async function grabarMainPy(con, codigo) {
+const grabarMainPy = (con, codigo) => grabarArchivos(con, { 'main.py': codigo });
+
+// Ejecuta `py` en el raw REPL y espera la línea `marca`. Si la placa contesta con un error de
+// Python (sin espacio, sin memoria…) lo lanza con su texto.
+async function ejecutarRaw(con, py, marca, timeout = 5000) {
+  con.accum = '';
+  for (let i = 0; i < py.length; i += 128) {
+    await con.escribir(py.slice(i, i + 128));
+    await sleep(10);
+  }
+  await con.escribir('\x04'); // Ctrl-D: ejecutar (se sigue en el raw REPL)
+  const m = await con.esperar(new RegExp(`${marca}|(?<err>\\w*Error\\b[^\\r\\n\\x04]*)`), timeout);
+  if (m && !m.groups.err) return m;
+  const e = new Error(m ? m.groups.err.trim() : 'la placa no contesta');
+  e.python = !!m;
+  throw e;
+}
+
+const TROZO = 1500; // caracteres de programa por ejecución: un literal grande agota la memoria al compilarlo
+
+// Escribe varios archivos ({ nombre: texto }, en ese orden: main.py conviene el último) y reinicia
+// la placa. Primero borra los que va a escribir (el main.py antiguo ocupa sitio) y cada archivo se
+// escribe a trozos, con el archivo abierto entre ejecuciones del raw REPL (el sistema de archivos de
+// la micro:bit no admite añadir). Devuelve el total de bytes escritos.
+async function grabarArchivos(con, archivos) {
   for (let i = 0; i < 6; i++) {
     await con.escribir('\x03'); // Ctrl-C: corta el programa que estuviera en marcha
     await sleep(80);
@@ -567,22 +698,33 @@ async function grabarMainPy(con, codigo) {
     e.code = ERROR_SIN_MICROPYTHON;
     throw e;
   }
-  con.accum = '';
-  const py =
-    `f=open('main.py','w')\nf.write(${JSON.stringify(codigo)})\nf.close()\n` +
-    "import os\nprint('MAINPY_LEN='+str(os.stat('main.py')[6]))\n";
-  for (let i = 0; i < py.length; i += 128) {
-    await con.escribir(py.slice(i, i + 128));
-    await sleep(10);
+  let total = 0;
+  let nombre = '';
+  try {
+    const nombres = JSON.stringify(Object.keys(archivos));
+    await ejecutarRaw(con, `import os,gc\nfor n in ${nombres}:\n    try:\n        os.remove(n)\n    except OSError:\n        pass\ngc.collect()\nprint('LIMPIO')\n`, 'LIMPIO');
+    for (const [n, codigo] of Object.entries(archivos)) {
+      nombre = n;
+      await ejecutarRaw(con, `f=open('${n}','w')\nprint('ABIERTO')\n`, 'ABIERTO');
+      for (let i = 0, k = 0; i < codigo.length; i += TROZO, k++) {
+        await ejecutarRaw(con, `f.write(${JSON.stringify(codigo.slice(i, i + TROZO))})\ngc.collect()\nprint('T${k}OK')\n`, `T${k}OK`);
+      }
+      const m = await ejecutarRaw(con, `f.close()\nprint('MAINPY_LEN='+str(os.stat('${n}')[6]))\n`, 'MAINPY_LEN=(\\d+)');
+      total += Number(m[1]);
+    }
+  } catch (e) {
+    await con.escribir('\x02');
+    const espacio = /OSError.*28|ENOSPC/.test(e.message);
+    throw new Error(
+      `No se pudo guardar ${nombre || 'el programa'} en la micro:bit: ` +
+        (espacio ? 'no queda espacio en la placa.' : e.python ? `la placa dice «${e.message}».` : 'la placa no contesta.')
+    );
   }
-  await con.escribir('\x04'); // Ctrl-D: ejecutar
-  const m = await con.esperar(/MAINPY_LEN=(\d+)/, 5000);
   await con.escribir('\x02'); // Ctrl-B: vuelve al REPL normal
   await sleep(150);
-  if (!m) throw new Error('No se pudo guardar el programa en la micro:bit.');
   con.accum = '';
   await con.escribir('\x04'); // Ctrl-D en REPL normal: reinicio suave → ejecuta main.py
-  return Number(m[1]);
+  return total;
 }
 
 async function pedirPuerto() {
@@ -616,10 +758,17 @@ let modoMandos = 'L';
 let lineaPendiente = '';
 const oyentesMandos = new Set();
 const oyentesEstado = new Set();
-const RE_PULSACION = /^P:(\d{1,3}):([ABCD]|N-?\d{1,4}|T[A-Z0-9]|M[ABX]|F(?:[ABL][01]|S|P[IDFT]|V(?:0|[ID][FT]?|[FT]))):(\d{1,3})$/;
+const oyentesInstrumentos = new Set();
+let antenaInstrumentos = false; // la antena reenvía los mensajes «I:…» del laboratorio
+const RE_PULSACION = /^P:(\d{1,3}):([ABCD]|N-?\d{1,4}|T[A-Z0-9]|M[ABX]|F(?:[ABL][01]|S|P[IDFT]|V(?:0|[ID][FT]?|[FT])(?:,-?\d{1,3},-?\d{1,3})?)):(\d{1,3})$/;
 
 /** Modos de los mandos (los cambia el juego con setModoMandos). */
 export const MODOS = { LETRAS: 'L', NUMERO: 'N', TEXTO: 'T', MOVER: 'M', FUTBOL: 'F', VOLANTE: 'V' };
+/**
+ * Laboratorio micro:bit: los mandos lo ignoran y las placas multifunción se quedan como satélite o
+ * instrumento (con cualquier modo de MODOS vuelven solas a mando). Ver programasLab.js.
+ */
+export const MODO_LABORATORIO = 'X';
 
 /** Texto → entero que se puede marcar en el mando (-999 … 9999), o null. */
 export const aNumeroMando = (txt) => {
@@ -656,7 +805,7 @@ function aEvento(id, valor) {
 }
 
 function estadoActual() {
-  return { conectada: !!antena, antenaOk, grupo: grupoAntena, version: versionAntena, modo: modoMandos };
+  return { conectada: !!antena, antenaOk, grupo: grupoAntena, version: versionAntena, modo: modoMandos, instrumentos: antenaInstrumentos };
 }
 function avisarEstado() {
   const e = estadoActual();
@@ -683,11 +832,19 @@ function procesarTexto(txt) {
       emitirPulsacion({ ...aEvento(Number(m[1]), m[2]), t: Date.now() });
       continue;
     }
-    const a = linea.match(/^ANTENA:(\d+)(?::v(\d+))?/);
+    if (linea.startsWith('I:')) {
+      // Laboratorio micro:bit: satélites e instrumentos (los reenvía la antena tal cual)
+      oyentesInstrumentos.forEach((fn) => {
+        try { fn(linea, Date.now()); } catch (e) { console.error('[instrumentos]', e); }
+      });
+      continue;
+    }
+    const a = linea.match(/^ANTENA:(\d+)(?::v(\d+))?(:i)?/);
     if (a) {
       antenaOk = true;
       grupoAntena = Number(a[1]);
       versionAntena = Number(a[2] || 1);
+      antenaInstrumentos = !!a[3];
       avisarEstado();
       if (versionAntena >= 2) enviarAMandos('MODO:' + modoMandos); // la antena arranca en L
     }
@@ -699,7 +856,7 @@ function procesarTexto(txt) {
  * Cada juego lo llama al montarse; la antena lo recuerda y lo repite.
  */
 export function setModoMandos(modo) {
-  if (!Object.values(MODOS).includes(modo)) return;
+  if (!Object.values(MODOS).includes(modo) && modo !== MODO_LABORATORIO) return;
   modoMandos = modo;
   enviarAMandos('MODO:' + modo);
   avisarEstado();
@@ -800,6 +957,54 @@ export async function enviarAMandos(linea) {
     await antena.escribir(linea + '\n');
   } catch {
     /* antena perdida: el lector lo notificará */
+  }
+}
+
+/**
+ * Cambia el canal de radio de la antena conectada (antena v8+) y lo deja guardado en la placa.
+ * Los mandos se cambian en el propio mando (mantener A al encenderlo).
+ */
+export async function cambiarCanalAntena(canal) {
+  const g = Math.round(Number(canal));
+  if (!antena || !antenaOk) throw new Error('Conecta antes la antena.');
+  if (!Number.isInteger(g) || g < 0 || g > 255) throw new Error('El canal va de 0 a 255.');
+  if (versionAntena < VERSION_CANAL) throw new Error('Esta antena tiene un programa antiguo: vuelve a grabarla para poder cambiar el canal.');
+  await antena.escribir(`G:${g}\n`);
+}
+
+/* ── Laboratorio micro:bit (satélites GPS e instrumentos) ── */
+
+/** Suscribe a las líneas «I:…» que llegan por la antena: fn(linea, t). Devuelve la baja. */
+export function escucharInstrumentos(fn) {
+  oyentesInstrumentos.add(fn);
+  return () => oyentesInstrumentos.delete(fn);
+}
+
+/** Envía una orden «I:…» por radio a los satélites e instrumentos. */
+export const enviarAInstrumentos = (linea) => enviarAMandos(linea.startsWith('I:') ? linea : 'I:' + linea);
+
+/** Línea simulada (pruebas sin placas): llega a los oyentes como si viniera de la antena. */
+export function simularInstrumento(linea) {
+  oyentesInstrumentos.forEach((fn) => fn(linea, Date.now()));
+}
+
+/** Graba `codigo` como main.py en otra micro:bit (USB) y la suelta. Devuelve los bytes escritos. */
+export const grabarPrograma = (codigo) => grabarPlaca({ 'main.py': codigo });
+
+/** Graba varios archivos ({ nombre: texto }) en otra micro:bit (USB) y la suelta. Devuelve los bytes. */
+export async function grabarPlaca(archivos) {
+  const port = await pedirPuerto();
+  const con = new ConexionSerie(null);
+  try {
+    await con.abrir(port);
+  } catch (e) {
+    throw errorApertura(e);
+  }
+  try {
+    return await grabarArchivos(con, archivos);
+  } finally {
+    await sleep(200);
+    await con.cerrar();
   }
 }
 

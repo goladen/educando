@@ -6,6 +6,7 @@
 // ═══════════════════════════════════════════════════════════════════
 import { generarPregunta, generarCandado, materiaDePrueba, temaDePrueba, ORDEN_SALAS, pick, tienePreguntas, preguntaDePrueba } from './bancoEscape';
 import { candadoRecurso, candadoPropio, codigoLimpio } from './recursosEscape';
+import { tr, idiomaEscape } from './i18n';
 
 export const LETRAS = ['A', 'B', 'C', 'D', 'E', 'F'];
 export const PREGUNTAS_POR_SALA = [4, 5, 6, 8, 10];
@@ -17,7 +18,10 @@ export const firmaPruebas = (config) => JSON.stringify([
     (config.pruebas || []).map(p => [p.id, p.tipo, p.materia, p.tema, p.codigo, p.texto, p.pista, p.imagen, p.materiaRetos, p.temaRetos, p.recursoId, (p.hojas || []).join('|'), p.preguntas?.length || 0, p.candadoModo, p.candadoCodigo, (p.candadoPistas || []).join('|'), p.candadoPista]),
 ]);
 
-// Instrucciones de los candados para jugar en papel / pizarra (sin repartir pistas entre móviles)
+// Instrucciones de los candados para jugar en papel / pizarra (sin repartir pistas entre móviles).
+// Clave = título en español del candado (c.clave; las partidas antiguas solo tienen el título).
+// Historia y Lengua tienen contenido en español: su instrucción no se traduce.
+const SIN_TRADUCIR = new Set(['El retrato que habla', 'El pergamino desordenado']);
 const INSTRUCCION_PAPEL = {
     'Candado de 4 cifras': 'Cada cifra del código es el resultado de una operación. Resolved las cuatro operaciones de las pistas y escribid las cifras en orden.',
     'La capital secreta': 'El fantasma bibliotecario esconde una ciudad. Con las pistas, descubrid de qué país es la bandera… ¡y escribid su CAPITAL!',
@@ -31,12 +35,13 @@ export function candadoParaPapel(c) {
     if (!c || c.manual) return c;
     return {
         ...c,
-        instruccion: INSTRUCCION_PAPEL[c.titulo] || c.instruccion,
-        pistas: (c.pistas || []).map(p => ({ ...p, texto: String(p.texto || '').replace(/^Tus letras:/, 'Letras:') })),
+        instruccion: INSTRUCCION_PAPEL[c.clave || c.titulo] ? (SIN_TRADUCIR.has(c.clave || c.titulo) ? INSTRUCCION_PAPEL[c.clave || c.titulo] : tr(INSTRUCCION_PAPEL[c.clave || c.titulo])) : c.instruccion,
+        pistas: (c.pistas || []).map(p => ({ ...p, texto: String(p.texto || '').replace(/^Tus letras:/, 'Letras:').replace(/^Your letters:/, 'Letters:') })),
     };
 }
 
 export const partidaVigente = (config) => !!config?.partida && config.partida.firma === firmaPruebas(config)
+    && (config.partida.idioma || 'es') === idiomaEscape()
     && (!config.nPreguntas || config.partida.nPreguntas === config.nPreguntas)
     && (!config.nBatalla || config.partida.nBatalla === config.nBatalla);
 
@@ -66,7 +71,7 @@ function candadoFijo(prueba, etapa) {
     if (prueba.tipo === 'MANUAL') {
         const codigos = String(prueba.codigo || '').split('|').map(c => c.trim()).filter(Boolean);
         return {
-            titulo: prueba.nombre || 'La habitación secreta', instruccion: prueba.texto || '', manual: true,
+            titulo: prueba.nombre || tr('La habitación secreta'), instruccion: prueba.texto || '', manual: true,
             tipo: codigos[0] && /^\d+$/.test(codigos[0].replace(/\s/g, '')) ? 'numero' : 'texto',
             longitud: codigos[0] ? codigos[0].length : null, imagen: prueba.imagen || '',
             pistas: prueba.pista ? [{ texto: prueba.pista }] : [],
@@ -78,7 +83,7 @@ function candadoFijo(prueba, etapa) {
         return { ...candadoPropio(prueba, { papel: true }), soluciones: [cod], solucionVisible: cod };
     }
     const c = candadoParaPapel(prueba.tipo === 'RECURSO' ? candadoRecurso(prueba) : generarCandado(prueba.materia, etapa, prueba.tema));
-    return { titulo: c.titulo, instruccion: c.instruccion, tipo: c.tipo, longitud: c.longitud, pistas: c.pistas, soluciones: c.soluciones, solucionVisible: c.solucionVisible };
+    return { clave: c.clave, titulo: c.titulo, instruccion: c.instruccion, tipo: c.tipo, longitud: c.longitud, pistas: c.pistas, soluciones: c.soluciones, solucionVisible: c.solucionVisible };
 }
 
 /** N preguntas distintas de un recurso (sin repetir mientras haya). */
@@ -109,5 +114,5 @@ export function generarPartidaFija(config, { nPreguntas = 6, nBatalla = 8 } = {}
         if (vistas.has(clave)) continue;
         vistas.add(clave); batalla.push(limpiar(q));
     }
-    return { firma: firmaPruebas(config), creada: Date.now(), nPreguntas, nBatalla, pruebas, batalla };
+    return { firma: firmaPruebas(config), idioma: idiomaEscape(), creada: Date.now(), nPreguntas, nBatalla, pruebas, batalla };
 }

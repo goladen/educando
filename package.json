@@ -21,6 +21,7 @@
     "@microbit/microbit-connection": "^0.1.0",
     "blockly": "^13.0.0",
     "canvas-confetti": "^1.9.4",
+    "esptool-js": "^0.7.1",
     "firebase": "^10.7.1",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",

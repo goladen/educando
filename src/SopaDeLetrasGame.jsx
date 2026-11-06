@@ -3,6 +3,7 @@ import { db } from './firebase';
 import { collection, addDoc, query, where, orderBy, limit, getDocs, doc, getDoc } from 'firebase/firestore';
 import { X, Settings, Trophy, Search, BookOpen, Globe, ArrowLeft, Share2, Check } from 'lucide-react';
 import { guardarRegistroLocal } from './utils/registrosLocales';
+import { basePublica } from './utils/urlPublica';
 
 import Confetti from 'react-confetti';
 import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
@@ -374,7 +375,7 @@ export default function SopaDeLetrasGame({ usuario, onExit, recurso, modoOlimpic
     };
 
     const compartirRecurso = (id, titulo) => {
-        const url = `${window.location.origin}${window.location.pathname}?sopa=${id}`;
+        const url = `${basePublica()}?sopa=${id}`;
         setShareModal({ url, titulo: titulo || 'Sopa de Letras' });
     };
 

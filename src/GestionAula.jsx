@@ -13,12 +13,14 @@ import Confetti from 'react-confetti';
 import GeografiaPanel from './components/GeografiaPanel';
 import { HorarioCurso } from './components/ComunidadesTab';
 import { imprimirElemento } from './utils/exportar';
+import { basePublica } from './utils/urlPublica';
 import { FONDOS, fondoUrl } from './utils/fondos';
 import MusicStaffPanel from './components/MusicStaffPanel';
 const MiniAppCreator = lazy(() => import('./components/MiniAppCreator'));
 const RecortesExtrem = lazy(() => import('./components/RecortesExtrem'));
 const CursorManos = lazy(() => import('./manos/CursorManos.jsx'));
 const QuizManos = lazy(() => import('./manos/QuizManos.jsx'));
+const SonometroAula = lazy(() => import('./keyestudio/SonometroAula.jsx'));
 import { db, auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import PizarraAnalisisIA, { ADMIN_EMAIL_IA } from './components/PizarraAnalisisIA';
@@ -3150,7 +3152,7 @@ export function PizarraApp({ initialModo = 'general' } = {}) {
 
                         {/* ─ Ya hay sesión activa ─ */}
                         {modoCompartir && (() => {
-                            const shareUrl = `${window.location.origin}${window.location.pathname}?pizarra=${codigoCompartir}`;
+                            const shareUrl = `${basePublica()}?pizarra=${codigoCompartir}`;
                             const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(shareUrl)}&bgcolor=ffffff&color=1a1a2e&margin=6`;
                             const copiarLink = () => {
                                 navigator.clipboard.writeText(shareUrl).then(() => {
@@ -4001,12 +4003,12 @@ export default function HerramientasClase({ onExit, initialTool }) {
         const params = new URLSearchParams(window.location.search);
         if (params.get('pizarra')) return 'pizarra';
         const g = params.get('gestion');
-        if (['ruleta', 'pizarra', 'reloj', 'grupos', 'plano', 'horario', 'miniapp', 'recortes', 'control'].includes(g)) return g;
+        if (['ruleta', 'pizarra', 'reloj', 'grupos', 'plano', 'horario', 'miniapp', 'recortes', 'control', 'ruido'].includes(g)) return g;
         return null;
     });
     const [shareModal, setShareModal] = useState(null); // { url, titulo }
 
-    const shareBase = `${window.location.origin}${window.location.pathname}`;
+    const shareBase = `${basePublica()}`;
 
     const HERRAMIENTAS = [
         { id: 'ruleta',   icon: <RotateCcw size={40}/>,   titulo: 'Ruleta de Aula',     desc: 'Selecciona alumnos al azar desde una lista.',              color: '#e67e22' },
@@ -4018,6 +4020,7 @@ export default function HerramientasClase({ onExit, initialTool }) {
         { id: 'miniapp',  icon: <span style={{fontSize:36}}>⚡</span>, titulo: 'App con IA', desc: 'Genera una mini-aplicación interactiva con Claude o Gemini y previsualízala al instante.', color: '#7c3aed' },
         { id: 'recortes', icon: <span style={{fontSize:36}}>✂️</span>, titulo: 'Recortes Extrem', desc: 'Carga una imagen o PDF y haz varios recortes a la vez para crear una matriz de imágenes.', color: '#16a085' },
         { id: 'control',  icon: <Radio size={40}/>,       titulo: 'Control de Aula',    desc: 'Crea una sala, controla la presencia de tus alumnos en tiempo real y lánzales juegos.', color: '#4f46e5' },
+        { id: 'ruido',    icon: <span style={{fontSize:36}}>🚦</span>, titulo: 'Sonómetro de Aula', desc: 'Semáforo del ruido para proyectar, con el micrófono del ordenador, la placa Imagina TdR STEAM o una micro:bit.', color: '#dc2626' },
     ];
 
     return (
@@ -4091,6 +4094,7 @@ export default function HerramientasClase({ onExit, initialTool }) {
                     {activa === 'miniapp'  && <Suspense fallback={<div style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Cargando…</div>}><MiniAppCreator onAbrirViewer={(id) => window.open(`/?miniapp=${id}`, '_blank')} /></Suspense>}
                     {activa === 'recortes' && <Suspense fallback={<div style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Cargando…</div>}><RecortesExtrem /></Suspense>}
                     {activa === 'control'  && <TeacherControlPanel />}
+                    {activa === 'ruido'    && <Suspense fallback={<div style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Cargando…</div>}><SonometroAula /></Suspense>}
                 </div>
             )}
 

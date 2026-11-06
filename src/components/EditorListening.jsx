@@ -76,7 +76,7 @@ export default function EditorListening({ datos, setDatos, onClose, usuario }) {
                 tipo: TIPO_LISTENING_RECURSO,
                 tipoJuego: TIPO_LISTENING_RECURSO,
                 accessCode: code,
-                profesorUid: usuario?.uid || datos.profesorUid || '',
+                profesorUid: datos.profesorUid || usuario?.uid || '', // si es compartido, el dueño no cambia
                 numHuecos: datos.huecos?.length || 0,
                 numPreguntas: datos.preguntas?.length || 0,
                 playCount: datos.playCount || 0,

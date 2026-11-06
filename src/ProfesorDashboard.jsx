@@ -1,8 +1,8 @@
-﻿import { useState, useEffect, lazy, Suspense } from 'react';
+﻿import { useState, useEffect, useLayoutEffect, lazy, Suspense } from 'react';
 import CargandoChunk from './components/CargandoChunk';
 import { db } from './firebase';
-import { collection, query, where, getDocs, deleteDoc, doc, addDoc, updateDoc, getDoc, setDoc, orderBy } from 'firebase/firestore';
-import { Trash2, Plus, FileSpreadsheet, Bot, BarChart2, Save, X, Pencil, Key, Gamepad2, Edit3, Globe, Search, Copy, Eye, Users, RotateCcw, Send, Zap, UserCircle, LogOut, Menu, Shield, Info, FileText, Calculator, Medal, Crosshair } from 'lucide-react';
+import { collection, query, where, getDocs, deleteDoc, doc, addDoc, updateDoc, getDoc, setDoc, orderBy, limit, arrayRemove, deleteField } from 'firebase/firestore';
+import { Trash2, Plus, FileSpreadsheet, Bot, BarChart2, Save, X, Pencil, Key, Gamepad2, Edit3, Globe, Search, Copy, Eye, Users, RotateCcw, Send, Zap, UserCircle, LogOut, Menu, Shield, Info, FileText, Calculator, Medal, Crosshair, Share2 } from 'lucide-react';
 import useDrivePicker from 'react-google-drive-picker';
 import { procesarArchivoExcel } from './ExcelParser';
 import ModalCrearIA from './components/ModalCrearIA';
@@ -14,7 +14,8 @@ const ExpresionArtEscri = lazy(() => import('./ExpresionArtEscri'));
 const EditorManual = lazy(() => import('./components/EditorManual'));
 const EditorPro = lazy(() => import('./components/EditorPro'));
 import UserProfile from './components/UserProfile';
-import KofiBoton from './components/KofiBoton';import LandingGames from './components/LandingGames3';
+import KofiBoton from './components/KofiBoton';import LandingGames, { ResourceCard } from './components/LandingGames3';
+import MenuPublico from './components/MenuPublico';
 import GlobalSearch from './components/GlobalSearch';
 const TeacherTools = lazy(() => import('./components/TeacherTools'));
 const MiniAppAdmin = lazy(() => import('./components/MiniAppAdmin'));
@@ -22,6 +23,7 @@ const EditorMathLive = lazy(() => import('./components/EditorMathLive'));
 const MathLive = lazy(() => import('./MathLive'));
 const OlympicLive = lazy(() => import('./OlympicLive'));
 const ModalPdfRecurso = lazy(() => import('./components/ModalPdfRecurso'));
+const ModalCompartirRecurso = lazy(() => import('./components/ModalCompartirRecurso'));
 const CazaBurbujasGame = lazy(() => import('./CazaBurbujasGame'));
 const PikatronRun = lazy(() => import('./PikatronRun'));
 const SopaDeLetrasGame = lazy(() => import('./SopaDeLetrasGame'));
@@ -55,6 +57,8 @@ import EditorListening, { recursoListeningVacio } from './components/EditorListe
 const EditorOmni = lazy(() => import('./components/EditorOmni'));
 const EditorPaginaProfesor = lazy(() => import('./components/EditorPaginaProfesor'));
 const PaginaProfesor = lazy(() => import('./components/PaginaProfesor'));
+const BuscadorPaginas = lazy(() => import('./components/BuscadorPaginas'));
+const ComunidadesPublico = lazy(() => import('./components/ComunidadesPublico'));
 const EditorVideoQuizz = lazy(() => import('./components/EditorVideoQuizz'));
 const VideoTimelineEditor = lazy(() => import('./VideoTimelineEditor'));
 const EditorSolarSystem = lazy(() => import('./components/EditorSolarSystem'));
@@ -119,6 +123,9 @@ const INSTRUCCIONES_CREACION = {
 
 };
 
+// ¿La URL es la vista alumno del profe (/alumno o /alumno/<app>)?
+const esRutaAlumno = (url = window.location.pathname) => /^\/alumno(?=[/?#]|$)/i.test(url);
+
 function ProfesorDashboardInterno({ usuario, googleToken }) {
     const [juegoSeleccionado, setJuegoSeleccionado] = useState('PASAPALABRA');
     const [vista, setVista] = useState('MIS_RECURSOS'); // 'MIS_RECURSOS', 'BIBLIOTECA'
@@ -156,11 +163,56 @@ function ProfesorDashboardInterno({ usuario, googleToken }) {
     const [recursoProbando, setRecursoProbando] = useState(null);
     const [recursoInspeccionando, setRecursoInspeccionando] = useState(null);
     const [recursoPdf, setRecursoPdf] = useState(null); // ficha en papel del recurso
+    const [recursoCompartir, setRecursoCompartir] = useState(null); // modal Compartir (enlace, código, compañeros)
     const [listaResultados, setListaResultados] = useState([]);
     const [hostGameData, setHostGameData] = useState(null);
     const [modalCopiarApp, setModalCopiarApp] = useState(null);
     const [datosEditor, setDatosEditor] = useState({ id: null, titulo: '', temas: '', profesorNombre: '', pais: '', region: '', poblacion: '', config: {}, hojas: [], isPrivate: false });
-    const [modoVista, setModoVista] = useState('PROFESOR');
+    const [modoVista, setModoVista] = useState(() => esRutaAlumno() ? 'ALUMNO' : 'PROFESOR');
+    // Menú hamburguesa de la portada pública dentro de la Vista Alumno
+    const [vistaMenuAlumno, setVistaMenuAlumno] = useState(null); // null | 'POPULARES' | 'PAGINAS' | 'COMUNIDADES'
+    const [paginaAlumnoSlug, setPaginaAlumnoSlug] = useState(null);
+    const [popularesAlumno, setPopularesAlumno] = useState([]);
+    const navegarMenuAlumno = async (opcion) => {
+        setPaginaAlumnoSlug(null);
+        if (opcion === 'inicio') {
+            setVistaMenuAlumno(null);
+            window.history.pushState({}, '', '/'); // el parche de la vista alumno lo deja en /alumno
+            window.dispatchEvent(new Event('popstate'));
+        } else if (opcion === 'populares') {
+            setVistaMenuAlumno('POPULARES');
+            try {
+                const snap = await getDocs(query(collection(db, 'resources'), orderBy('playCount', 'desc'), limit(15)));
+                setPopularesAlumno(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            } catch (e) { console.error(e); }
+        } else if (opcion === 'paginas-profesores') setVistaMenuAlumno('PAGINAS');
+        else if (opcion === 'comunidades') setVistaMenuAlumno('COMUNIDADES');
+    };
+    useEffect(() => { if (modoVista !== 'ALUMNO') { setVistaMenuAlumno(null); setPaginaAlumnoSlug(null); } }, [modoVista]);
+
+    // Vista alumno con URL propia: pikt.es/alumno y pikt.es/alumno/<app>. Mientras está
+    // activa, las rutas absolutas que empujan los juegos (/sixseven, /math_world…) se
+    // cuelgan de /alumno. Layout effect para parchear antes de los efectos de LandingGames.
+    useLayoutEffect(() => {
+        if (modoVista !== 'ALUMNO') return;
+        const h = window.history;
+        const { pushState, replaceState } = h;
+        const prefijar = (url) => (typeof url === 'string' && url.startsWith('/') && !url.startsWith('//') && !esRutaAlumno(url))
+            ? '/alumno' + url.replace(/^\/(?=[?#]|$)/, '')
+            : url;
+        h.pushState = function (s, t, url) { return pushState.call(this, s, t, prefijar(url)); };
+        h.replaceState = function (s, t, url) { return replaceState.call(this, s, t, prefijar(url)); };
+        if (!esRutaAlumno()) pushState.call(h, {}, '', '/alumno');
+        // Si con «atrás» se sale de /alumno, volvemos a la vista de profesor
+        const alVolver = () => { if (!esRutaAlumno()) setModoVista('PROFESOR'); };
+        window.addEventListener('popstate', alVolver);
+        return () => {
+            window.removeEventListener('popstate', alVolver);
+            h.pushState = pushState;
+            h.replaceState = replaceState;
+            if (esRutaAlumno()) replaceState.call(h, {}, '', '/');
+        };
+    }, [modoVista]);
     const [mostrandoPerfil, setMostrandoPerfil] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
     const [modoDashboard, setModoDashboard] = useState('CLASICO'); // 'CLASICO', 'PRO','LIVE', 'BUSCADOR_GLOBAL', 'HERRAMIENTAS', 'LEGAL', 'INFO', 'PRESENTACIONES'
@@ -188,8 +240,12 @@ function ProfesorDashboardInterno({ usuario, googleToken }) {
         setCargando(true);
         try {
             const q = query(collection(db, "resources"), where("profesorUid", "==", usuario.uid), where("tipoJuego", "==", juegoSeleccionado));
-            const s = await getDocs(q);
-            const docs = s.docs.map(d => ({ ...d.data(), id: d.id })).filter(r => {
+            // Recursos que otros profes han compartido conmigo (solo array-contains: sin índice compuesto)
+            const qCompartidos = query(collection(db, "resources"), where("compartidoCon", "array-contains", usuario.uid));
+            const [s, sComp] = await Promise.all([getDocs(q), getDocs(qCompartidos).catch(() => null)]);
+            const compartidos = (sComp?.docs || []).map(d => ({ ...d.data(), id: d.id, _compartido: true }))
+                .filter(r => r.tipoJuego === juegoSeleccionado && r.profesorUid !== usuario.uid);
+            const docs = [...s.docs.map(d => ({ ...d.data(), id: d.id })), ...compartidos].filter(r => {
                 if (modoDashboard === 'PRO') {
                     return r.tipo === 'PRO' || r.tipo === 'PRO-BURBUJAS' || r.tipo === 'OLYMPIC' || r.tipo === 'SINTAXIS' || r.tipo === 'ETIQUETAS' || r.tipo === 'LINEA_TIEMPO' || r.tipo === 'LISTENING_RECURSO' || r.tipo === 'OMNI' || r.tipo === 'VIDEOQUIZZ' || r.tipo === 'SOLAR_SYSTEM' || r.format === 'VTE';
                 }
@@ -278,9 +334,33 @@ function ProfesorDashboardInterno({ usuario, googleToken }) {
     const limpiarBusqueda = () => { const v = { pais: '', region: '', poblacion: '', tema: '' }; setFiltrosInput(v); setFiltrosActivos(v); };
     const incrementarPopularidad = async (r) => { try { await updateDoc(doc(db, "resources", r.id), { playCount: (r.playCount || 0) + 1 }); } catch (e) { } };
 
+    // Quien recibe un recurso compartido puede quitarlo de su lista (no borra el original)
+    const quitarCompartido = async (r) => {
+        if (!confirm(`¿Quitar «${r.titulo}» de tus recursos compartidos? El original de ${r.compartidoInfo?.[usuario.uid]?.porNombre || r.profesorNombre || 'su autor'} no se borra.`)) return;
+        try {
+            await updateDoc(doc(db, "resources", r.id), { compartidoCon: arrayRemove(usuario.uid), [`compartidoInfo.${usuario.uid}`]: deleteField() });
+            setRecursos(prev => prev.filter(x => x.id !== r.id));
+        } catch (e) { alert(e.message); }
+    };
+
+    // Desde la campana: abre el juego/modo donde aparece el recurso compartido
+    const abrirCompartido = (r) => {
+        const TIPOS_PRO = ['PRO', 'PRO-BURBUJAS', 'OLYMPIC', 'SINTAXIS', 'ETIQUETAS', 'LINEA_TIEMPO', 'LISTENING_RECURSO', 'OMNI', 'VIDEOQUIZZ', 'SOLAR_SYSTEM'];
+        navegar(TIPOS_PRO.includes(r.tipo) || r.format === 'VTE' ? 'PRO' : 'CLASICO');
+        if (r.tipoJuego) setJuegoSeleccionado(r.tipoJuego);
+        setVista('MIS_RECURSOS');
+    };
+
     const copiarRecurso = async (r) => {
         if (!confirm(`¿Copiar "${r.titulo}"?`)) return;
-        try { const c = { ...r, profesorUid: usuario.uid, profesorNombre: perfilProfesor?.nombre || usuario.displayName, titulo: `${r.titulo} (Copia)`, playCount: 0, isPrivate: true, origen: 'biblioteca', fechaCreacion: new Date(), accessCode: generarCodigoAcceso() }; delete c.id; await addDoc(collection(db, "resources"), c); alert("¡Copiado!"); setVista('MIS_RECURSOS'); } catch (e) { alert(e.message); }
+        try {
+            const c = { ...r, profesorUid: usuario.uid, profesorNombre: perfilProfesor?.nombre || usuario.displayName, titulo: `${r.titulo} (Copia)`, playCount: 0, isPrivate: true, origen: r._compartido ? 'compartido' : 'biblioteca', fechaCreacion: new Date(), accessCode: generarCodigoAcceso() };
+            // La copia es solo mía: no hereda con quién estaba compartido el original
+            delete c.id; delete c._compartido; delete c.compartidoCon; delete c.compartidoInfo;
+            await addDoc(collection(db, "resources"), c);
+            alert("¡Copiado en tus recursos!");
+            if (vista === 'MIS_RECURSOS') cargarRecursosPropios(); else setVista('MIS_RECURSOS');
+        } catch (e) { alert(e.message); }
     };
 
     // --- FUNCIÓN PARA EL EDITOR CLÁSICO (NO TOCAR) ---
@@ -573,7 +653,8 @@ function ProfesorDashboardInterno({ usuario, googleToken }) {
             const dataToSave = {
                 ...datosEditor,
                 ...extraData,           // sobrescribe campos concretos (ej: isFinished: true)
-                profesorUid: usuario.uid,
+                // Al editar un recurso compartido conmigo, el dueño sigue siendo su autor
+                profesorUid: (datosEditor.id && datosEditor.profesorUid) || usuario.uid,
                 tipoJuego: juegoSeleccionado, // Aseguramos el tipo seleccionado
                 fechaCreacion: new Date()
             };
@@ -1075,12 +1156,33 @@ function ProfesorDashboardInterno({ usuario, googleToken }) {
             <div style={{ position: 'fixed', top: 20, right: 20, zIndex: 9999 }}>
                 <button onClick={() => setModoVista('PROFESOR')} style={{ background: '#e74c3c', color: 'white', padding: '10px 20px', borderRadius: '30px', border: 'none', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}><LogOut size={20} /> SALIR MODO ALUMNO</button>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 20px', background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(8px)', boxShadow: '0 2px 8px rgba(0,0,0,0.2)', alignItems: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-start', gap: 12, padding: '10px 20px', background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(8px)', boxShadow: '0 2px 8px rgba(0,0,0,0.2)', alignItems: 'center' }}>
+                <MenuPublico onNavegar={navegarMenuAlumno} />
                 <span style={{ color: 'white' }}>Alumno: <b>{usuario.displayName}</b></span>
             </div>
-            <div style={{ width: '90%', maxWidth: '1000px', margin: '0 auto', padding: '0 16px' }}>
-                <LandingGames usuario={usuario} />
-            </div>
+            {vistaMenuAlumno === null && (
+                <div style={{ width: '90%', maxWidth: '1000px', margin: '0 auto', padding: '0 16px' }}>
+                    <LandingGames usuario={usuario} />
+                </div>
+            )}
+            {vistaMenuAlumno === 'POPULARES' && (
+                <div style={{ background: 'rgba(255,255,255,0.95)', padding: '30px', borderRadius: '20px', width: '90%', maxWidth: '1000px', margin: '30px auto', boxSizing: 'border-box' }}>
+                    <button onClick={() => navegarMenuAlumno('inicio')} style={{ background: '#eef2ff', color: '#3730a3', border: 'none', padding: '8px 14px', borderRadius: 10, fontWeight: 700, cursor: 'pointer', marginBottom: 12 }}>← Volver al inicio</button>
+                    <h2 style={{ textAlign: 'center', color: '#2c3e50', margin: '0 0 24px' }}>🔥 Los Juegos Más Populares</h2>
+                    {popularesAlumno.length === 0 && <p style={{ textAlign: 'center', color: '#94a3b8' }}>Cargando…</p>}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '20px' }}>
+                        {popularesAlumno.map(r => <ResourceCard key={r.id} r={r} onClick={() => window.open(`${window.location.origin}/?r=${r.id}`, '_blank')} />)}
+                    </div>
+                </div>
+            )}
+            <Suspense fallback={<CargandoChunk />}>
+                {vistaMenuAlumno === 'PAGINAS' && (paginaAlumnoSlug
+                    ? <PaginaProfesor slug={paginaAlumnoSlug} onBack={() => setPaginaAlumnoSlug(null)} />
+                    : <BuscadorPaginas onSelect={slug => setPaginaAlumnoSlug(slug)} onBack={() => navegarMenuAlumno('inicio')} />)}
+                {vistaMenuAlumno === 'COMUNIDADES' && (
+                    <ComunidadesPublico onExit={() => navegarMenuAlumno('inicio')} />
+                )}
+            </Suspense>
         </div>
     );
 
@@ -1156,7 +1258,7 @@ function ProfesorDashboardInterno({ usuario, googleToken }) {
                     inline={true}
                 />
 
-                <BuzonNovedades usuario={usuario} onIr={navegar} onAbrirPerfil={() => setMostrandoPerfil(true)} />
+                <BuzonNovedades usuario={usuario} onIr={navegar} onAbrirPerfil={() => setMostrandoPerfil(true)} onAbrirCompartido={abrirCompartido} />
 
                 <button onClick={() => setModoVista('ALUMNO')} style={{ background: 'white', color: '#1565C0', border: 'none', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', boxShadow:'0 2px 5px rgba(0,0,0,0.1)' }}><Eye size={18} /> Vista Alumno</button>
                 <button onClick={() => setMostrandoPerfil(true)} style={{ position: 'relative', background: 'white', color: '#8E24AA', border: 'none', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', boxShadow:'0 2px 5px rgba(0,0,0,0.1)' }}><UserCircle size={18} /> Mi Perfil
@@ -1491,8 +1593,33 @@ function ProfesorDashboardInterno({ usuario, googleToken }) {
                             display: 'flex',
                             flexDirection: 'column', borderLeft: `6px solid ${(TIPOS_JUEGOS[juegoSeleccionado] || { color: '#6D28D9' }).color}`
                         }}>{juegoSeleccionado !== 'QUESTION_SENDER' && <div style={{ position: 'absolute', top: '10px', right: '10px', background: '#f1c40f', padding: '2px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: 'bold' }}><Users size={12} /> {r.playCount || 0}</div>}<h3 style={{ margin: '0 0 5px 0' }}>{r.titulo}</h3>
+                            {vista === 'MIS_RECURSOS' && r._compartido && (
+                                <div style={{ alignSelf: 'flex-start', background: '#EDE7F6', color: '#5B21B6', fontSize: '0.75rem', fontWeight: 700, padding: '3px 9px', borderRadius: 10 }} title="Puedes editar el original o hacerte una copia">
+                                    🤝 Compartido por {r.compartidoInfo?.[usuario.uid]?.porNombre || r.profesorNombre || 'un compañero'}
+                                </div>
+                            )}
+                            {vista === 'MIS_RECURSOS' && !r._compartido && (r.compartidoCon || []).length > 0 && (
+                                <div style={{ alignSelf: 'flex-start', background: '#E3F2FD', color: '#1565C0', fontSize: '0.75rem', fontWeight: 700, padding: '3px 9px', borderRadius: 10, cursor: 'pointer' }} onClick={() => setRecursoCompartir(r)}
+                                    title={Object.values(r.compartidoInfo || {}).map(x => x.nombre).filter(Boolean).join(', ')}>
+                                    🤝 Compartido con {r.compartidoCon.length}
+                                </div>
+                            )}
 
-                            <div style={{ display: 'flex', gap: '5px', marginTop: '10px' }}>{juegoSeleccionado === 'QUESTION_SENDER' ? (<><button onClick={() => setQsenderAMigrar(r)} style={btnStyle('#E8F5E9', '#2E7D32')} title="Migrar a Juego"><Send size={18} /></button><button onClick={() => abrirEdicion(r)} style={btnStyle('#E3F2FD', '#1565C0')}><Pencil size={18} /></button><button onClick={() => eliminarRecurso(r.id)} style={btnStyle('#FFEBEE', '#C62828')}><Trash2 size={18} /></button></>) : (vista === 'MIS_RECURSOS' ? (<>
+                            <div style={{ display: 'flex', gap: '5px', marginTop: '10px' }}>{juegoSeleccionado === 'QUESTION_SENDER' ? (<><button onClick={() => setQsenderAMigrar(r)} style={btnStyle('#E8F5E9', '#2E7D32')} title="Migrar a Juego"><Send size={18} /></button><button onClick={() => abrirEdicion(r)} style={btnStyle('#E3F2FD', '#1565C0')}><Pencil size={18} /></button><button onClick={() => eliminarRecurso(r.id)} style={btnStyle('#FFEBEE', '#C62828')}><Trash2 size={18} /></button></>) : (vista === 'MIS_RECURSOS' && r._compartido ? (<>
+                                <button title={['THINKHOOT', 'MATHLIVE', 'OLYMPICLIVE'].includes(juegoSeleccionado) ? 'Lanzar en Vivo' : 'Jugar / Probar'}
+                                    onClick={() => {
+                                        if (['THINKHOOT', 'MATHLIVE', 'OLYMPICLIVE'].includes(juegoSeleccionado)) prepararJuegoEnVivo(r);
+                                        else if (r.tipoJuego === 'CAZABURBUJAS' || r.tipoJuego === 'WORDLE') setRecursoParaElegirModo(r);
+                                        else probarJuego(r);
+                                    }}
+                                    style={btnStyle('#E1BEE7', '#8E24AA')}>
+                                    {['THINKHOOT', 'MATHLIVE', 'OLYMPICLIVE'].includes(juegoSeleccionado) ? <Zap size={18} /> : <Gamepad2 size={18} />}
+                                </button>
+                                {tienePdf(r) && <button onClick={() => setRecursoPdf(r)} style={btnStyle('#EDE7F6', '#6D28D9')} title="Ficha en PDF para los alumnos"><FileText size={18} /></button>}
+                                <button onClick={() => abrirEdicion(r)} style={btnStyle('#E3F2FD', '#1565C0')} title="Editar el original (los cambios los verá también su autor)"><Pencil size={18} /></button>
+                                <button onClick={() => copiarRecurso(r)} style={btnStyle('#E8F5E9', '#2E7D32')} title="Hacerme una copia propia"><Copy size={18} /></button>
+                                <button onClick={() => quitarCompartido(r)} style={btnStyle('#FFEBEE', '#C62828')} title="Quitar de mis compartidos (no borra el original)"><X size={18} /></button>
+                            </>) : vista === 'MIS_RECURSOS' ? (<>
                                 {juegoSeleccionado === 'THINKHOOT' || juegoSeleccionado === 'MATHLIVE' || juegoSeleccionado === 'OLYMPICLIVE' ? (
 
                                     <button title="Lanzar en Vivo" onClick={() => prepararJuegoEnVivo(r)} style={{ ...btnStyle('#9C27B0', 'white'), fontWeight: 'bold' }}>
@@ -1514,7 +1641,7 @@ function ProfesorDashboardInterno({ usuario, googleToken }) {
                                         <Gamepad2 size={18} />
                                     </button>
                                 )}
-                            {tienePdf(r) && <button onClick={() => setRecursoPdf(r)} style={btnStyle('#EDE7F6', '#6D28D9')} title="Ficha en PDF para los alumnos"><FileText size={18} /></button>}<button onClick={() => mostrarCodigo(r)} style={btnStyle('#FFF3E0', '#FF9800')}><Key size={18} /></button><button onClick={() => abrirEdicion(r)} style={btnStyle('#E3F2FD', '#1565C0')}><Pencil size={18} /></button><button onClick={() => abrirResultados(r)} style={btnStyle('#E8F5E9', '#2E7D32')}><BarChart2 size={18} /></button><button onClick={() => eliminarRecurso(r.id)} style={btnStyle('#FFEBEE', '#C62828')}><Trash2 size={18} /></button></>) : (<><button onClick={() => probarJuego(r)} style={{ ...btnStyle('#E1BEE7', '#8E24AA'), flex: 2 }}>Probar</button><button onClick={() => setRecursoInspeccionando(r)} style={btnStyle('#eee', '#333')}><Eye size={18} /></button>{tienePdf(r) && <button onClick={() => setRecursoPdf(r)} style={btnStyle('#EDE7F6', '#6D28D9')} title="Ficha en PDF para los alumnos"><FileText size={18} /></button>}<button onClick={() => copiarRecurso(r)} style={{ ...btnStyle('#27ae60', 'white'), flex: 2 }}>Copiar</button></>))}</div></div>))}
+                            {tienePdf(r) && <button onClick={() => setRecursoPdf(r)} style={btnStyle('#EDE7F6', '#6D28D9')} title="Ficha en PDF para los alumnos"><FileText size={18} /></button>}<button onClick={() => setRecursoCompartir(r)} style={btnStyle('#E0F7FA', '#00838F')} title="Compartir: enlace, código o con un compañero"><Share2 size={18} /></button><button onClick={() => mostrarCodigo(r)} style={btnStyle('#FFF3E0', '#FF9800')} title="Código de acceso"><Key size={18} /></button><button onClick={() => abrirEdicion(r)} style={btnStyle('#E3F2FD', '#1565C0')}><Pencil size={18} /></button><button onClick={() => abrirResultados(r)} style={btnStyle('#E8F5E9', '#2E7D32')}><BarChart2 size={18} /></button><button onClick={() => eliminarRecurso(r.id)} style={btnStyle('#FFEBEE', '#C62828')}><Trash2 size={18} /></button></>) : (<><button onClick={() => probarJuego(r)} style={{ ...btnStyle('#E1BEE7', '#8E24AA'), flex: 2 }}>Probar</button><button onClick={() => setRecursoInspeccionando(r)} style={btnStyle('#eee', '#333')}><Eye size={18} /></button>{tienePdf(r) && <button onClick={() => setRecursoPdf(r)} style={btnStyle('#EDE7F6', '#6D28D9')} title="Ficha en PDF para los alumnos"><FileText size={18} /></button>}<button onClick={() => copiarRecurso(r)} style={{ ...btnStyle('#27ae60', 'white'), flex: 2 }}>Copiar</button></>))}</div></div>))}
                         
                         {/* MENSAJE DE VACÍO + INSTRUCCIONES */}
                         {vista === 'MIS_RECURSOS' && recursos.length === 0 && !cargando && (
@@ -1749,6 +1876,9 @@ function ProfesorDashboardInterno({ usuario, googleToken }) {
 
             {hostGameData?.fase === 'CONFIG_HOST' && (<ModalOverlay onClose={() => setHostGameData(null)}><h2>📡 Lanzar en Vivo</h2><select value={hostGameData.hojaElegida} onChange={e => setHostGameData({ ...hostGameData, hojaElegida: e.target.value })} style={{ width: '100%', padding: '10px', marginBottom: '20px' }}>{hostGameData.hojasDisponibles.map(h => <option key={h} value={h}>{h}</option>)}</select><button onClick={confirmarLanzamientoHost} style={{ width: '100%', padding: '15px', background: '#9C27B0', color: 'white', border: 'none', borderRadius: '5px' }}>🚀 GENERAR CÓDIGO</button></ModalOverlay>)}
             {recursoPdf && <Suspense fallback={null}><ModalPdfRecurso recurso={recursoPdf} onClose={() => setRecursoPdf(null)} /></Suspense>}
+            {recursoCompartir && <Suspense fallback={null}><ModalCompartirRecurso recurso={recursoCompartir} usuario={usuario} perfil={perfilProfesor}
+                onClose={() => setRecursoCompartir(null)}
+                onCambio={(cambios) => setRecursos(prev => prev.map(x => x.id === recursoCompartir.id ? { ...x, ...cambios } : x))} /></Suspense>}
             {recursoInspeccionando && <ModalOverlay onClose={() => setRecursoInspeccionando(null)}><h2>{recursoInspeccionando.titulo}</h2><div style={{ maxHeight: '400px', overflowY: 'auto' }}>{recursoInspeccionando.hojas.map((h, i) => <div key={i}><h4>{h.nombreHoja}</h4><ul>{h.preguntas.map((p, j) => <li key={j}><b>{p.letra ? `Letra ${p.letra}: ` : ''}{p.pregunta}</b> &rarr; {p.respuesta || p.correcta}</li>)}</ul></div>)}</div><button onClick={() => { copiarRecurso(recursoInspeccionando); setRecursoInspeccionando(null) }} style={actionBtnStyle('#27ae60')}>Copiar</button></ModalOverlay>}
             {mostrandoPerfil && (<UserProfile usuario={usuario} perfil={perfilProfesor} onClose={() => setMostrandoPerfil(false)} onUpdate={() => cargarPerfilProfesor()} />)}
             {/* --- MODAL SELECTOR DE JUEGO (PRO-BURBUJAS) --- */}

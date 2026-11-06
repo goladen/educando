@@ -35,6 +35,7 @@ const PESTANAS = {
     intro: 'Cada alumno tiene una micro:bit con pilas. Una micro:bit «antena», enchufada por USB al ordenador del profe, recoge por radio lo que pulsáis. Los mandos cambian de modo solos según el juego.',
     pasos: [
       { zona: 'pantalla', led: 'num', titulo: 'Al encenderlo, muestra su número', texto: 'El número que pasa por la pantalla es el de tu mando (ponle una pegatina). El profe puede escribir tu nombre junto a él.' },
+      { zona: 'A', gesto: 'mantener', led: 'C', titulo: 'Antes sale su canal («C7»)', texto: 'Si el profe os pide otro canal: mantén A mientras sale, cambia el número con A (−) y B (+) y agita para guardarlo. Se queda guardado aunque lo apagues.' },
       { zona: 'B', led: 'A', titulo: 'Para unirte a la partida', texto: 'Pulsa B o agita el mando (en fútbol, robots y dibujo vale cualquier botón). Tu nombre o tu avatar aparecen en la pantalla grande.' },
       { zona: 'pantalla', led: 'si', titulo: '✔ Enviado', texto: 'Cuando envías algo, el mando muestra un ✔ y pita: la antena lo ha recibido. Si sale una ✘, acércate un poco a la antena y vuelve a probar.' },
       { zona: 'pantalla', led: 'feliz', titulo: '🙂 / 🙁 ¿Acertaste?', texto: 'Al corregir, tu mando enseña una carita feliz con música si acertaste, o triste si no.' },
@@ -104,16 +105,15 @@ const PESTANAS = {
   },
   futbol: {
     t: '⚽ Fútbol', color: '#15803d', usos: 'Partido 3D con mandos (micro:bit V2)',
-    intro: 'Cada mando es un jugador. El aro amarillo del campo marca quién lleva el balón. La pantalla del mando muestra un balón.',
+    intro: 'Cada mando es un jugador. El aro amarillo del campo marca quién lleva el balón. Se juega como el ovni: inclinando el mando. Su pantalla muestra una flecha hacia donde corres.',
     pasos: [
-      { zona: 'A', gesto: 'mantener', led: 'balon', titulo: 'Mantén A para correr', texto: 'Tu jugador corre hacia donde mira. Al soltar A, se para.' },
-      { zona: 'B', led: 'giro', titulo: 'B gira a la derecha', texto: 'Mientras lo mantienes, sigue girando. Corre y gira a la vez para hacer curvas.' },
-      { zona: 'logo', led: 'giro', titulo: 'Toca el logo: gira a la izquierda', texto: 'El logo dorado de arriba es táctil. Pon el dedo encima mientras quieras girar.' },
-      { zona: null, gesto: 'agitar', led: 'balon', titulo: 'Agita: ¡tiro a puerta!', texto: 'Si llevas el balón y miras hacia la portería rival, chutas. Sin balón, agitar da una arrancada rápida.' },
-      { zona: null, gesto: 'izq', led: 'balon', titulo: 'Inclina para pasar', texto: 'Inclina el mando hacia un lado: pasas al compañero de ese lado. Vuelve a ponerlo plano antes del siguiente pase.' },
-      { zona: null, gesto: 'delante', led: 'balon', titulo: 'Inclina hacia delante o hacia atrás', texto: 'Delante = pase al compañero que tienes por delante. Atrás = pase hacia atrás.' },
-      { zona: 'A', led: 'B', titulo: '⚔️ ¡Duelo! A cambia la letra', texto: 'Si un rival te alcanza, el partido se para y sale una pregunta. Tu mando enseña una letra: A la cambia (A→B→C→D).' },
-      { zona: 'B', gesto: 'agitarB', led: 'si', titulo: 'B o agitar envía tu respuesta', texto: 'Solo tienes UNA oportunidad. El primero que acierta se queda el balón; el otro se queda aturdido un momento.' },
+      { zona: null, gesto: 'der', led: 'flecha', titulo: 'Inclina para correr', texto: 'Tu jugador corre hacia el lado de la pantalla al que inclinas el mando (también en diagonal). Cuanto más lo inclinas, más rápido. Plano = quieto.' },
+      { zona: null, gesto: 'delante', led: 'flecha', titulo: 'Delante = arriba, atrás = abajo', texto: 'Inclinar hacia delante lo lleva hacia el fondo del campo; hacia ti, hacia abajo de la pantalla.' },
+      { zona: 'A', led: 'balon', titulo: 'A: pase a la izquierda', texto: 'Si llevas el balón, A lo pasa al compañero más cercano que tengas a tu izquierda, según hacia dónde mira tu jugador.' },
+      { zona: 'B', led: 'balon', titulo: 'B: pase a la derecha', texto: 'B lo pasa al compañero más cercano a tu derecha. Si no hay nadie a ese lado, el balón sale hacia ese lado.' },
+      { zona: 'logo', led: 'balon', titulo: 'Toca el logo: ¡chuta!', texto: 'Tira a la portería rival (agitar también chuta). Sin balón, A, B o el logo dan una arrancada rápida.' },
+      { zona: 'A', led: 'B', titulo: '⚔️ ¡Duelo! A cambia la letra', texto: 'Si un rival te alcanza, el partido se para y sale una pregunta. Primero hay unos segundos de «¡Preparados!» para soltar el mando y leer. Al pitido de «¡YA!» tu mando enseña una letra: A la cambia (A→B→C→D).' },
+      { zona: 'B', led: 'si', titulo: 'B envía tu respuesta', texto: 'En el duelo agitar no envía: solo el botón B. Solo tienes UNA oportunidad. El primero que acierta se queda el balón; el otro se queda aturdido un momento.' },
     ],
   },
 };

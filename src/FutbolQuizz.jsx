@@ -2,32 +2,15 @@ import React, { useState, useRef, useEffect, memo, lazy, Suspense } from 'react'
 import { db } from './firebase';
 import { guardarRegistroLocal } from './utils/registrosLocales';
 import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, addDoc } from 'firebase/firestore';
-import confetti from 'canvas-confetti';
 import BotonPdfRecurso from './components/BotonPdfRecurso';
 
 // Partido 3D en tiempo real (three.js): se carga solo al elegir ese modo
 const Futbol3D = lazy(() => import('./futbol3d/Futbol3D'));
 const FutbolMandos = lazy(() => import('./futbol3d/FutbolMandos'));
 
-const CHAMPIONS_VIDEO_ID = '04854XqcfCY'; // We Are The Champions (empieza en seg. 37)
-const CHAMPIONS_START = 37;
-
-// --- AUDIOS ---
-import correctSoundFile from './assets/correct-choice-43861.mp3';
-import wrongSoundFile from './assets/negative_beeps-6008.mp3';
-import goalSoundFile from './assets/gol-cutmp3.mp3';
-import whistleSoundFile from './assets/piarbitro.mp3';
-
-const _mkAudio = src => { let a; return { play() { return (a ??= new Audio(src)).play(); }, reset() { if (a) a.currentTime = 0; } }; };
-const audioCorrect = _mkAudio(correctSoundFile);
-const audioWrong = _mkAudio(wrongSoundFile);
-const audioGoal = _mkAudio(goalSoundFile);
-const safePlay = (audioObj) => { audioObj.reset(); audioObj.play().catch(() => { }); };
-
-// Silbato del árbitro: una instancia nueva por pitido para poder solaparlos
-const playWhistle = () => { try { const a = new Audio(whistleSoundFile); a.play().catch(() => { }); } catch (e) { } };
-// Tres pitidos seguidos (inicio de partido)
-const playWhistleTriple = () => { [0, 600, 1200].forEach(d => setTimeout(playWhistle, d)); };
+// --- AUDIOS --- (compartidos con el partido con mandos)
+import { sonidoAcierto, sonidoFallo, sonidoGol, pitido as playWhistle, pitidoTriple, FondoCampeones, VideoCampeones } from './futbol3d/efectosFutbol';
+const playWhistleTriple = pitidoTriple;
 
 // ============================================================================
 // Helpers de preguntas (compartidos con el motor PiLive)
@@ -625,8 +608,8 @@ function JuegoFutbol({ config, onExit, onVolverInicio, onFin }) {
         return () => ro.disconnect();
     }, []);
 
-    const playSound = (ok) => safePlay(ok ? audioCorrect : audioWrong);
-    const playGoalSound = () => safePlay(audioGoal);
+    const playSound = (ok) => (ok ? sonidoAcierto() : sonidoFallo());
+    const playGoalSound = sonidoGol;
 
     // Pitido triple del árbitro al comenzar el partido
     useEffect(() => { playWhistleTriple(); }, []);
@@ -1227,39 +1210,6 @@ function PantallaCampeones({ resultado, recurso, hojas, onJugarOtra, onExit }) {
     const colorGana = ganador === 'red' ? '#ef4444' : '#3b82f6';
     const nombreGana = nombres[ganador];
 
-    // Confeti + reproductor "We Are The Champions"
-    const ytRef = useRef(null);
-    useEffect(() => {
-        // Confeti repetido
-        const fin = Date.now() + 6000;
-        const lanzar = () => {
-            confetti({ particleCount: 5, angle: 60, spread: 70, origin: { x: 0 }, colors: ['#f1c40f', colorGana, '#ffffff'] });
-            confetti({ particleCount: 5, angle: 120, spread: 70, origin: { x: 1 }, colors: ['#f1c40f', colorGana, '#ffffff'] });
-            if (Date.now() < fin) requestAnimationFrame(lanzar);
-        };
-        lanzar();
-
-        // YouTube
-        let cancelled = false; let initId = null;
-        const create = () => {
-            if (cancelled || !document.getElementById('fq-champ-yt') || !window.YT?.Player) return;
-            ytRef.current = new window.YT.Player('fq-champ-yt', {
-                videoId: CHAMPIONS_VIDEO_ID, height: '180', width: '320',
-                playerVars: { autoplay: 1, start: CHAMPIONS_START, rel: 0, modestbranding: 1, origin: window.location.origin },
-                events: { onReady: (e) => { try { e.target.seekTo(CHAMPIONS_START); e.target.playVideo(); } catch (err) { } } }
-            });
-        };
-        if (window.YT && window.YT.Player) initId = setTimeout(create, 120);
-        else {
-            if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
-                const tag = document.createElement('script'); tag.src = 'https://www.youtube.com/iframe_api'; document.head.appendChild(tag);
-            }
-            const prev = window.onYouTubeIframeAPIReady;
-            window.onYouTubeIframeAPIReady = () => { prev && prev(); initId = setTimeout(create, 120); };
-        }
-        return () => { cancelled = true; if (initId) clearTimeout(initId); if (ytRef.current) { try { ytRef.current.destroy(); } catch (e) { } } };
-    }, []);
-
     const Equipo = ({ team }) => {
         const s = stats[team];
         const col = team === 'red' ? '#ef4444' : '#3b82f6';
@@ -1279,12 +1229,7 @@ function PantallaCampeones({ resultado, recurso, hojas, onJugarOtra, onExit }) {
 
     return (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, overflow: 'hidden', background: 'radial-gradient(circle at 50% 30%, #1e293b 0%, #0b1220 100%)', fontFamily: 'system-ui, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', padding: '20px 16px', boxSizing: 'border-box', overflowY: 'auto' }}>
-            {/* Balones cayendo (en una capa fija que los recorta: si no, al salirse por abajo hacían aparecer el scrollbar a ratos) */}
-            <div style={{ position: 'fixed', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 1 }}>
-                {Array.from({ length: 14 }).map((_, i) => (
-                    <div key={i} style={{ position: 'absolute', top: '-60px', left: `${(i * 7 + 3) % 100}%`, fontSize: `${1.4 + (i % 4) * 0.5}rem`, animation: `fqCaer ${4 + (i % 5)}s linear ${(i % 6) * 0.6}s infinite` }}>⚽</div>
-                ))}
-            </div>
+            <FondoCampeones color={colorGana} />
 
             <div style={{ position: 'relative', zIndex: 2, width: '100%', maxWidth: 460, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
                 <div style={{ fontSize: '3.5rem', animation: 'fqLatido 1s ease infinite' }}>🏆</div>
@@ -1294,9 +1239,7 @@ function PantallaCampeones({ resultado, recurso, hojas, onJugarOtra, onExit }) {
                 <div style={{ color: '#cbd5e1', fontWeight: 600 }}>Primero en marcar {golesParaGanar} {golesParaGanar === 1 ? 'gol' : 'goles'}</div>
 
                 {/* Vídeo We Are The Champions */}
-                <div style={{ width: '100%', maxWidth: 320, borderRadius: 14, overflow: 'hidden', boxShadow: '0 12px 30px rgba(0,0,0,0.6)', background: '#000', aspectRatio: '16/9' }}>
-                    <div id="fq-champ-yt" style={{ width: '100%', height: '100%' }} />
-                </div>
+                <VideoCampeones />
 
                 {/* Estadísticas por equipo */}
                 <div style={{ display: 'flex', gap: 10, width: '100%' }}>
@@ -1316,10 +1259,6 @@ function PantallaCampeones({ resultado, recurso, hojas, onJugarOtra, onExit }) {
 
             {mostrarEnvio && <ModalEnviarProfeFutbol resultado={resultado} recurso={recurso} hojas={hojas} onClose={() => setMostrarEnvio(false)} />}
 
-            <style>{`
-                @keyframes fqCaer { 0% { transform: translateY(0) rotate(0deg); } 100% { transform: translateY(110vh) rotate(360deg); } }
-                @keyframes fqLatido { 0%,100% { transform: scale(1); } 50% { transform: scale(1.15); } }
-            `}</style>
         </div>
     );
 }

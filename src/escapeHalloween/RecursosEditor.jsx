@@ -3,6 +3,7 @@ import { db } from '../firebase';
 import { collection, query, where, getDocs, getDoc, doc } from 'firebase/firestore';
 import { limpiar } from '../utils/normalizarPreguntas';
 import { hojasDeRecurso, pruebaDeRecurso, MIN_PREGUNTAS_RECURSO, MODOS_CANDADO_RECURSO, codigoLimpio } from './recursosEscape';
+import { tr } from './i18n';
 
 /**
  *  Editor de pruebas con recursos de profes:
@@ -43,7 +44,7 @@ export function BuscadorRecursosEscape({ usuario, onElegir, onCerrar }) {
                     .filter(x => x.n >= MIN_PREGUNTAS_RECURSO)
                     .sort((a, b) => (b.r.playCount || 0) - (a.r.playCount || 0));
                 if (vivo) setLista(datos);
-            } catch (e) { if (vivo) { setError('No se pudo cargar: ' + e.message); setLista([]); } }
+            } catch (e) { if (vivo) { setError(tr("No se pudo cargar: ") + e.message); setLista([]); } }
         })();
         return () => { vivo = false; };
     }, [pestana, usuario]);
@@ -57,22 +58,22 @@ export function BuscadorRecursosEscape({ usuario, onElegir, onCerrar }) {
         <div onClick={onCerrar} style={{ position: 'fixed', inset: 0, zIndex: 10050, background: 'rgba(5,0,12,.82)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 14 }}>
             <div onClick={e => e.stopPropagation()} className="eh-panel" style={{ width: 'min(680px, 100%)', maxHeight: '88vh', display: 'flex', flexDirection: 'column', padding: 18, background: '#1a0b2e' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <h3 style={{ margin: 0, flex: 1 }}>📚 Elegir un recurso</h3>
-                    <button className={`eh-chip ${pestana === 'PUBLICOS' ? 'on' : ''}`} onClick={() => setPestana('PUBLICOS')}>🌍 De otros profes</button>
-                    {usuario?.uid && <button className={`eh-chip ${pestana === 'MIOS' ? 'on' : ''}`} onClick={() => setPestana('MIOS')}>📂 Mis recursos</button>}
+                    <h3 style={{ margin: 0, flex: 1 }}>{tr("📚 Elegir un recurso")}</h3>
+                    <button className={`eh-chip ${pestana === 'PUBLICOS' ? 'on' : ''}`} onClick={() => setPestana('PUBLICOS')}>{tr("🌍 De otros profes")}</button>
+                    {usuario?.uid && <button className={`eh-chip ${pestana === 'MIOS' ? 'on' : ''}`} onClick={() => setPestana('MIOS')}>{tr("📂 Mis recursos")}</button>}
                     <button className="eh-btn2" onClick={onCerrar}>✕</button>
                 </div>
-                <input style={{ ...campo, marginTop: 10 }} value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar por título, tema, hoja o autor…" autoFocus />
-                <div style={{ fontSize: '.78rem', opacity: .65, margin: '6px 0' }}>Valen las preguntas de opción múltiple, respuesta corta y rellenar hueco (las de ordenar no).</div>
+                <input style={{ ...campo, marginTop: 10 }} value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder={tr("Buscar por título, tema, hoja o autor…")} autoFocus />
+                <div style={{ fontSize: '.78rem', opacity: .65, margin: '6px 0' }}>{tr("Valen las preguntas de opción múltiple, respuesta corta y rellenar hueco (las de ordenar no).")}</div>
                 <div style={{ overflowY: 'auto', display: 'grid', gap: 8, paddingRight: 4 }}>
                     {error && <div style={{ color: '#fca5a5' }}>{error}</div>}
-                    {lista === null && <div>🕯️ Cargando recursos…</div>}
-                    {lista && filtrados.length === 0 && <div style={{ opacity: .7 }}>No hay recursos compatibles{q ? ' con esa búsqueda' : ''}.</div>}
+                    {lista === null && <div>{tr("🕯️ Cargando recursos…")}</div>}
+                    {lista && filtrados.length === 0 && <div style={{ opacity: .7 }}>{tr("No hay recursos compatibles")}{q ? tr(" con esa búsqueda") : ''}.</div>}
                     {filtrados.map(({ r, hojas, n }) => (
                         <button key={r.id} onClick={() => onElegir(r)} style={{ textAlign: 'left', padding: '10px 12px', borderRadius: 12, border: '1px solid rgba(255,255,255,.14)', background: 'rgba(255,255,255,.05)', color: '#f5e9ff', cursor: 'pointer', fontFamily: 'inherit' }}>
-                            <div style={{ fontWeight: 800 }}>{r.titulo || 'Sin título'}</div>
+                            <div style={{ fontWeight: 800 }}>{r.titulo || tr("Sin título")}</div>
                             <div style={{ fontSize: '.78rem', opacity: .75, marginTop: 2 }}>
-                                {r.profesorNombre ? `👤 ${r.profesorNombre} · ` : ''}{n} preguntas · {hojas.length} hoja{hojas.length === 1 ? '' : 's'}{r.temas ? ` · ${r.temas}` : ''}
+                                {r.profesorNombre ? `👤 ${r.profesorNombre} · ` : ''}{n} {tr("preguntas ·")} {hojas.length} {tr("hoja")}{hojas.length === 1 ? '' : 's'}{r.temas ? ` · ${r.temas}` : ''}
                             </div>
                         </button>
                     ))}
@@ -111,14 +112,14 @@ export function CuerpoPruebaRecurso({ prueba, onCambiar, onCambiarRecurso }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 800 }}>📚 {prueba.recursoTitulo}</div>
-                        <div style={{ fontSize: '.78rem', opacity: .75 }}>{prueba.autor ? `De ${prueba.autor} · ` : ''}{n} preguntas copiadas en el escape room</div>
+                        <div style={{ fontSize: '.78rem', opacity: .75 }}>{prueba.autor ? tr("De {0} · ", [prueba.autor]) : ''}{n} {tr("preguntas copiadas en el escape room")}</div>
                     </div>
-                    <button className="eh-btn2" onClick={onCambiarRecurso}>🔁 Cambiar recurso</button>
+                    <button className="eh-btn2" onClick={onCambiarRecurso}>{tr("🔁 Cambiar recurso")}</button>
                 </div>
-                {error && <div style={{ color: '#fca5a5', fontSize: '.8rem', marginTop: 6 }}>⚠ {error} (se usan las preguntas ya copiadas)</div>}
+                {error && <div style={{ color: '#fca5a5', fontSize: '.8rem', marginTop: 6 }}>⚠ {error} {tr("(se usan las preguntas ya copiadas)")}</div>}
                 {hojas && hojas.length > 1 && (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-                        <span style={{ fontSize: '.8rem', opacity: .8, alignSelf: 'center' }}>Hojas:</span>
+                        <span style={{ fontSize: '.8rem', opacity: .8, alignSelf: 'center' }}>{tr("Hojas:")}</span>
                         {hojas.map(h => (
                             <button key={h.nombre} className={`eh-chip ${!sel || sel.includes(h.nombre) ? 'on' : ''}`} style={{ padding: '4px 9px', fontSize: '.78rem' }} onClick={() => alternar(h.nombre)}>
                                 {h.nombre} ({h.n})
@@ -128,12 +129,12 @@ export function CuerpoPruebaRecurso({ prueba, onCambiar, onCambiarRecurso }) {
                 )}
                 {n > 0 && (
                     <div style={{ marginTop: 8, fontSize: '.8rem', opacity: .8 }}>
-                        Ejemplos: {prueba.preguntas.slice(0, 3).map((q, i) => <div key={i}>· {q.texto}{q.detalle ? ` «${q.detalle}»` : ''} → <b>{q.opciones[q.correcta]}</b></div>)}
+                        {tr("Ejemplos:")} {prueba.preguntas.slice(0, 3).map((q, i) => <div key={i}>· {q.texto}{q.detalle ? ` «${q.detalle}»` : ''} → <b>{q.opciones[q.correcta]}</b></div>)}
                     </div>
                 )}
-                {n < MIN_PREGUNTAS_RECURSO && <div style={{ color: '#fcd34d', fontSize: '.8rem', marginTop: 6 }}>⚠ Hacen falta al menos {MIN_PREGUNTAS_RECURSO} preguntas (elige más hojas).</div>}
+                {n < MIN_PREGUNTAS_RECURSO && <div style={{ color: '#fcd34d', fontSize: '.8rem', marginTop: 6 }}>{tr("⚠ Hacen falta al menos")} {MIN_PREGUNTAS_RECURSO} {tr("preguntas (elige más hojas).")}</div>}
             </div>
-            <label style={{ fontWeight: 700, fontSize: '.82rem', opacity: .85, display: 'block', margin: '10px 0 4px' }}>Nombre de la sala (opcional)</label>
+            <label style={{ fontWeight: 700, fontSize: '.82rem', opacity: .85, display: 'block', margin: '10px 0 4px' }}>{tr("Nombre de la sala (opcional)")}</label>
             <input style={campo} value={prueba.nombre || ''} maxLength={50} placeholder={prueba.recursoTitulo} onChange={e => onCambiar({ ...prueba, nombre: e.target.value })} />
             <ConfigCandadoRecurso prueba={prueba} onCambiar={onCambiar} />
         </>
@@ -150,7 +151,7 @@ function ConfigCandadoRecurso({ prueba, onCambiar }) {
     const etiqueta = { fontWeight: 700, fontSize: '.82rem', opacity: .85, display: 'block', margin: '10px 0 4px' };
     return (
         <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 12, background: 'rgba(250,204,21,.08)', border: '1px solid rgba(250,204,21,.35)' }}>
-            <div style={{ fontWeight: 800 }}>🔒 Candado de esta sala</div>
+            <div style={{ fontWeight: 800 }}>{tr("🔒 Candado de esta sala")}</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
                 {MODOS_CANDADO_RECURSO.map(m => (
                     <button key={m.v} className={`eh-chip ${modo === m.v ? 'on' : ''}`} style={{ padding: '6px 10px', fontSize: '.82rem' }} title={m.d} onClick={() => set({ candadoModo: m.v })}>{m.l}</button>
@@ -159,10 +160,10 @@ function ConfigCandadoRecurso({ prueba, onCambiar }) {
             <div style={{ fontSize: '.78rem', opacity: .75, marginTop: 4 }}>{MODOS_CANDADO_RECURSO.find(m => m.v === modo)?.d}</div>
 
             {modo !== 'RESPUESTAS' && <>
-                <label style={etiqueta}>🔐 Código que abre la puerta</label>
+                <label style={etiqueta}>{tr("🔐 Código que abre la puerta")}</label>
                 <input style={{ ...campo, letterSpacing: 3, fontWeight: 800, textTransform: 'uppercase' }} value={prueba.candadoCodigo || ''} maxLength={14}
-                    placeholder="Ej.: 4721 o MOMIA" onChange={e => set({ candadoCodigo: e.target.value })} />
-                <div style={{ fontSize: '.72rem', opacity: .65, marginTop: 3 }}>Máx. 12 cifras o letras. Da igual mayúsculas y tildes.</div>
+                    placeholder={tr("Ej.: 4721 o MOMIA")} onChange={e => set({ candadoCodigo: e.target.value })} />
+                <div style={{ fontSize: '.72rem', opacity: .65, marginTop: 3 }}>{tr("Máx. 12 cifras o letras. Da igual mayúsculas y tildes.")}</div>
             </>}
 
             {modo === 'CIFRAS' && cod && (
@@ -171,18 +172,18 @@ function ConfigCandadoRecurso({ prueba, onCambiar }) {
                         <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <span style={{ minWidth: 92, fontSize: '.8rem', fontWeight: 700 }}>{k + 1}.ª {unidad} <b style={{ color: '#fde047', fontSize: '1rem' }}>{ch}</b></span>
                             <input style={{ ...campo, padding: '8px 10px' }} value={pistas[k] || ''} maxLength={180}
-                                placeholder={unidad === 'cifra' ? `Ej.: el número de patas de una araña menos ${Math.max(0, 8 - Number(ch))}` : 'Ej.: la primera letra del animal que aúlla a la luna'}
+                                placeholder={unidad === 'cifra' ? tr("Ej.: el número de patas de una araña menos {0}", [Math.max(0, 8 - Number(ch))]) : tr("Ej.: la primera letra del animal que aúlla a la luna")}
                                 onChange={e => { const nuevas = [...pistas]; nuevas[k] = e.target.value; set({ candadoPistas: nuevas }); }} />
                         </div>
                     ))}
-                    <div style={{ fontSize: '.72rem', opacity: .65 }}>En online, cada pista va a un móvil distinto; en la pizarra y en las fichas salen todas.</div>
+                    <div style={{ fontSize: '.72rem', opacity: .65 }}>{tr("En online, cada pista va a un móvil distinto; en la pizarra y en las fichas salen todas.")}</div>
                 </div>
             )}
 
             {modo === 'PISTA' && <>
-                <label style={etiqueta}>💡 Pista o acertijo para todo el candado</label>
+                <label style={etiqueta}>{tr("💡 Pista o acertijo para todo el candado")}</label>
                 <textarea style={{ ...campo, minHeight: 64, resize: 'vertical' }} value={prueba.candadoPista || ''} maxLength={500}
-                    placeholder="Ej.: Soy el año en que Colón llegó a América." onChange={e => set({ candadoPista: e.target.value })} />
+                    placeholder={tr("Ej.: Soy el año en que Colón llegó a América.")} onChange={e => set({ candadoPista: e.target.value })} />
             </>}
         </div>
     );

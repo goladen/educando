@@ -116,7 +116,7 @@ export default function EditorEtiquetas({ datos, setDatos, onClose, usuario }) {
                 ...datosEfectivos,
                 id:            docId,
                 accessCode:    code,
-                profesorUid:   usuario?.uid || '',
+                profesorUid:   datosEfectivos.profesorUid || usuario?.uid || '', // si es compartido, el dueño no cambia
                 hojas,
                 creadoEn:      datosEfectivos.creadoEn || Date.now(),
                 actualizadoEn: Date.now(),

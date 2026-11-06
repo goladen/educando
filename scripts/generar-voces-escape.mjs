@@ -5,6 +5,7 @@
 //   node scripts/generar-voces-escape.mjs --force         (regraba todas)
 //   node scripts/generar-voces-escape.mjs --solo=intro    (solo una)
 //   node scripts/generar-voces-escape.mjs --voz=es-ES-AlvaroNeural --rate=-22% --pitch=-12%
+//   node scripts/generar-voces-escape.mjs --idioma=en         (inglés → public/audio/escape/en/)
 //
 // La voz se graba grave y lenta; el efecto tenebroso (más grave, reverberación de cripta y eco)
 // se añade en el navegador (src/escapeHalloween/comunes.jsx → audio.narrar).
@@ -12,26 +13,35 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts';
-import { NARRACION } from '../src/escapeHalloween/narracion.js';
+import { NARRACION, NARRACION_EN } from '../src/escapeHalloween/narracion.js';
+
+// Desde octubre de 2026 el servidor antiguo de Edge responde 403: se usa el nuevo (mismo token),
+// igual que api/listening-tts.js
+const WSS_ANTIGUO = 'wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=';
+const WSS_NUEVO = 'wss://api.msedgeservices.com/tts/cognitiveservices/websocket/v1?Ocp-Apim-Subscription-Key=';
+const urlOriginal = MsEdgeTTS.getSynthUrl;
+if (urlOriginal) MsEdgeTTS.getSynthUrl = async function () { return (await urlOriginal.call(this)).replace(WSS_ANTIGUO, WSS_NUEVO); };
 
 const args = process.argv.slice(2);
 const flag = (n, def) => { const a = args.find(x => x.startsWith(`--${n}=`)); return a ? a.split('=')[1] : def; };
 const tiene = (n) => args.includes(`--${n}`);
 
-const VOZ = flag('voz', 'es-ES-AlvaroNeural');
+const IDIOMA = flag('idioma', 'es');
+const FRASES = IDIOMA === 'en' ? NARRACION_EN : NARRACION;
+const VOZ = flag('voz', IDIOMA === 'en' ? 'en-GB-RyanNeural' : 'es-ES-AlvaroNeural');
 const RATE = flag('rate', '-22%');
 const PITCH = flag('pitch', '-12%');
 const SOLO = flag('solo', null);
 const FORCE = tiene('force');
-const SALIDA = path.resolve('public/audio/escape');
+const SALIDA = path.resolve(IDIOMA === 'en' ? 'public/audio/escape/en' : 'public/audio/escape');
 
 async function main() {
     fs.mkdirSync(SALIDA, { recursive: true });
-    const ids = SOLO ? [SOLO] : Object.keys(NARRACION);
+    const ids = SOLO ? [SOLO] : Object.keys(FRASES);
     console.log(`🎙  Voz ${VOZ} · velocidad ${RATE} · tono ${PITCH} → ${SALIDA}\n`);
     let fallos = 0;
     for (const id of ids) {
-        const texto = NARRACION[id];
+        const texto = FRASES[id];
         if (!texto) { console.error(`✖ No existe la frase «${id}»`); fallos++; continue; }
         const destino = path.join(SALIDA, `${id}.mp3`);
         if (!FORCE && fs.existsSync(destino)) { console.log(`⏭  ${id} ya existe`); continue; }

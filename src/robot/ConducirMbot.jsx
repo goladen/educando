@@ -5,6 +5,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { RETOS, crearMundo, crearRobot, paso, dibujar, tiempoFinal, ultrasonidos, ANCHO_MUNDO, ALTO_MUNDO } from './simMbot.js';
 import {
   conectarCyberpi,
+  conectarCyberpiTodos,
   desconectarCyberpi,
   reiniciarCyberpi,
   escucharEstadoCyberpi,
@@ -622,6 +623,19 @@ export default function ConducirMbot({ onExit }) {
                 </button>
               )}
             </div>
+            {conexion === 'bluetooth' && cyber.estado !== 'listo' && soportaBluetoothCyberpi() && (
+              <details style={{ marginTop: 6 }}>
+                <summary style={{ ...st.ayuda, cursor: 'pointer' }}>¿No aparece el robot en la lista?</summary>
+                <ul style={{ ...st.ayuda, paddingLeft: 18 }}>
+                  <li>Activa la <b>ubicación</b> del móvil y da a Chrome permiso de <b>dispositivos cercanos</b>.</li>
+                  <li>Si lo emparejaste en los ajustes del móvil, pulsa <b>olvidar dispositivo</b>: conectado ahí, deja de anunciarse.</li>
+                  <li>Cierra mBlock y la app de Makeblock, y acerca el móvil al robot.</li>
+                </ul>
+                <button onClick={conectarCyberpiTodos} disabled={cyber.estado === 'conectando'} style={st.btnSec}>
+                  🔍 Ver todos los dispositivos
+                </button>
+              </details>
+            )}
             {cyber.error && <p style={{ ...st.ayuda, color: '#f97316' }}>{cyber.error}</p>}
             {!puedeConectar && <p style={st.ayuda}>{conexion === 'bluetooth' ? 'Este navegador no permite Bluetooth: usa Chrome en Android o en el ordenador.' : 'Necesitas Chrome o Edge en un ordenador.'}</p>}
             {cyber.estado === 'listo' && (
@@ -631,7 +645,7 @@ export default function ConducirMbot({ onExit }) {
                 </button>
                 {avisoPregunta && <p style={{ ...st.ayuda, fontWeight: 700, color: avisoPregunta.ok ? '#22c55e' : '#f97316' }}>{avisoPregunta.detalle}</p>}
                 <p style={st.ayuda}>
-                  Abre antes en el robot el test de la ranura 8 («Test en el mBot2»). Lleva el robot hasta quien deba contestar: oirá la pregunta y responderá con el joystick.
+                  Abre antes en el robot la ranura con el test («Test en el mBot2»). Lleva el robot hasta quien deba contestar: oirá la pregunta y responderá con el joystick.
                   Con el mando micro:bit, el botón A hace lo mismo.
                 </p>
                 <label style={st.check}>

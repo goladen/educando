@@ -1,7 +1,7 @@
 {
   "functions": {
     "api/listening-tts.js": { "maxDuration": 60 },
-    "api/aemet.js": { "maxDuration": 120 },
+    "api/aemet.js": { "maxDuration": 300 },
     "api/ia-recurso.js": { "maxDuration": 300 }
   },
   "headers": [
@@ -34,6 +34,14 @@
     {
       "path": "/api/instagram",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/aemet",
+      "schedule": "30 5 * * *"
+    },
+    {
+      "path": "/api/aemet",
+      "schedule": "30 17 * * *"
     }
   ]
 }

@@ -25,6 +25,7 @@ const MoneyBoard = lazy(() => import('./MoneyBoard'));
 const EnigmicLogic = lazy(() => import('./EnigmicLogic'));
 const SixSeven = lazy(() => import('./SixSeven'));
 const QuizMandos = lazy(() => import('./mandos/QuizMandos.jsx'));
+const LabMicrobit = lazy(() => import('./labMicrobit/LabMicrobit.jsx'));
 const OvniAbduccion = lazy(() => import('./OvniAbduccion'));
 const VaniLa = lazy(() => import('./vanila/VaniLa'));
 const Visor3D = lazy(() => import('./Visor3D'));
@@ -155,7 +156,7 @@ function App() {
           || slug === 'arkade' || slug === 'imperios' || slug === 'whoknows'
           || slug === 'quienesquien' || slug === 'quienhistorico' || slug === 'pizarra' || slug === 'bunker'
           || slug === 'enigmic' || slug === 'calamar' || slug === 'visor3d' || slug === 'esculpir' || slug === 'piktboard'
-          || slug === 'moneyboard' || slug === 'videos' || slug === 'sixseven' || slug === 'matesmandos' || slug === 'vanila' || slug === 'escaperoom' || slug === 'ovni' || slug === 'manos' || slug === 'avatar') {
+          || slug === 'moneyboard' || slug === 'videos' || slug === 'sixseven' || slug === 'matesmandos' || slug === 'labmicrobit' || slug === 'vanila' || slug === 'escaperoom' || slug === 'ovni' || slug === 'manos' || slug === 'avatar') {
         setRutaPublica(slug);
         return;
       }
@@ -178,11 +179,11 @@ function App() {
         'geometrix','calculo','calculadora','fracciones','dinero','fichas','funciones','funciones2','geometria_analitica','geometriaanalitica',
         'ecuaciones','oca','domino','musica',
         'algebra','polinomios','estadistica','probabilidad',
-        'api','admin','login','app','join',
+        'api','admin','login','app','join','alumno',
         'irregular_verbs','sistema_solar',
         'retos','conectapuntos','sudoku',
         'imperios','geografia','quienesquien','quienhistorico','pizarra','bunker','enigmic','calamar',
-        'visor3d','esculpir','piktboard','moneyboard','videos','sixseven','matesmandos','vanila','escaperoom','ovni','manos','avatar',
+        'visor3d','esculpir','piktboard','moneyboard','videos','sixseven','matesmandos','labmicrobit','vanila','escaperoom','ovni','manos','avatar',
         'comunidades','comunidad','competicion',
         'fisica',
         'math_world','primaria','feria',
@@ -200,7 +201,7 @@ function App() {
         'edfisica','educacion-fisica',
         'tutoria',
       ]);
-      if (slug && !RUTAS_RESERVADAS.has(slug) && !slug.startsWith('fisica/') && !slug.startsWith('primaria/') && !slug.startsWith('fichas/') && !slug.startsWith('calculadora/')) {
+      if (slug && !RUTAS_RESERVADAS.has(slug) && !slug.startsWith('fisica/') && !slug.startsWith('primaria/') && !slug.startsWith('fichas/') && !slug.startsWith('calculadora/') && !slug.startsWith('alumno/')) {
         // Check if it's a professor page slug
         getDocs(query(collection(db,'paginas_profesores'), where('slug','==',slug), where('publicada','==',true)))
           .then(snap => { if (!snap.empty) setPaginaTarget({ slug, uid: snap.docs[0].id }); })
@@ -363,6 +364,7 @@ function App() {
     if (rutaPublica === 'enigmic') return <><EnigmicLogic onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'vanila') return <><VaniLa onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'ovni') return <><OvniAbduccion onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
+    if (rutaPublica === 'labmicrobit') return <><LabMicrobit onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'matesmandos') return <><QuizMandos soloMates onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'sixseven') return <><SixSeven onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;
     if (rutaPublica === 'bunker') return <><BunkerDisparo onExit={() => { setRutaPublica(null); window.history.pushState({}, '', '/'); }} />{anotadorUI}</>;

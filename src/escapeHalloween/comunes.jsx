@@ -1,6 +1,9 @@
 import React, { useMemo, useState, useRef, useCallback, useEffect } from 'react';
 import { infoPrueba, pick } from './bancoEscape';
-import { NARRACION, urlNarracion, narracionSala } from './narracion';
+import { NARRACION, urlNarracion, narracionSala, textoNarracion } from './narracion';
+import { idiomaEscape, IDIOMAS_ESCAPE } from './i18n';
+import { useLanguage } from '../i18n/LanguageContext';
+import { tr } from './i18n';
 
 // Piezas comunes del escape room (modo online y modo pizarra): sonido, estilos, ambiente, zombi 2D, barras, mapa y tarjeta de pregunta.
 
@@ -495,7 +498,7 @@ export function BarraVidaZombi({ hp, hpMax }) {
     return (
         <div style={{ width: '100%' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '.9rem', marginBottom: 4 }}>
-                <span>🧟 Vida del zombi</span><span>{Math.max(0, hp)} / {hpMax}</span>
+                <span>{tr("🧟 Vida del zombi")}</span><span>{Math.max(0, hp)} / {hpMax}</span>
             </div>
             <div className="eh-barra"><div style={{ width: `${pct}%`, background: 'linear-gradient(90deg,#16a34a,#84cc16)', boxShadow: '0 0 16px rgba(132,204,22,.7)' }} /></div>
         </div>
@@ -591,11 +594,12 @@ export function useNarrador(audio, activo) {
     const t = useRef(null);
     const activoRef = useRef(activo);
     activoRef.current = activo;
-    useEffect(() => { audio.precargarVoces(Object.keys(NARRACION).map(urlNarracion)); }, [audio]);
+    const idioma = idiomaEscape();
+    useEffect(() => { audio.precargarVoces(Object.keys(NARRACION).map(urlNarracion)); }, [audio, idioma]);
     useEffect(() => () => clearTimeout(t.current), []);
     useEffect(() => { if (!activo) { audio.callarNarrador(); setSubtitulo(''); } }, [activo, audio]);
     const decir = useCallback((id, retraso = 0) => {
-        const texto = NARRACION[id];
+        const texto = textoNarracion(id);
         if (!texto || !activoRef.current) return;
         clearTimeout(t.current);
         t.current = setTimeout(async () => {
@@ -620,6 +624,21 @@ export function Subtitulo({ texto }) {
             color: '#f5e9ff', fontStyle: 'italic', fontSize: 'clamp(1rem,1.7vw,1.35rem)', lineHeight: 1.4, textAlign: 'center',
             boxShadow: '0 8px 30px rgba(0,0,0,.6)', pointerEvents: 'none',
         }}>🕯️ {texto}</div>
+        </div>
+    );
+}
+
+/** Botones 🇪🇸 / 🇬🇧: el escape room solo está en español e inglés (cambia el idioma de toda la web). */
+export function SelectorIdiomaEscape() {
+    const { setIdioma } = useLanguage();
+    const actual = idiomaEscape();
+    return (
+        <div style={{ display: 'inline-flex', gap: 4 }}>
+            {Object.entries(IDIOMAS_ESCAPE).map(([l, info]) => (
+                <button key={l} className={`eh-chip ${actual === l ? 'on' : ''}`} style={{ padding: '5px 10px', fontSize: '.85rem' }} title={info.etiqueta} onClick={() => setIdioma(l)}>
+                    {info.bandera} {l.toUpperCase()}
+                </button>
+            ))}
         </div>
     );
 }

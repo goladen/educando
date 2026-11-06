@@ -14,8 +14,10 @@ import RetosEditor from './RetosEditor';
 import MandosMicrobit from './mandos/MandosMicrobit.jsx';
 const EscapeHalloween = lazy(() => import('./EscapeHalloween'));
 const FutbolMandos = lazy(() => import('./futbol3d/FutbolMandos.jsx'));
+const LabMicrobit = lazy(() => import('./labMicrobit/LabMicrobit.jsx'));
 const ConducirMbot = lazy(() => import('./robot/ConducirMbot.jsx'));
 const CargarTestRobot = lazy(() => import('./robot/CargarTestRobot.jsx'));
+const LabKeyestudio = lazy(() => import('./keyestudio/LabKeyestudio.jsx'));
 import mbot2Img from './assets/Imagenmbot.avif';
 import microbitImg from './assets/imagenmicrobit.jfif';
 import keystudioImg from './assets/imagenkeystudio.jpg';
@@ -105,6 +107,14 @@ const KITS = [
         { texto: 'Montaje de la casa Smart Home – Conexiones (CATEDU)', url: 'https://libros.catedu.es/books/smart-home-esp32/page/conexiones' },
         { texto: 'Editor MakeCode (añade la extensión "Smart Home Kit")', url: 'https://makecode.microbit.org/#editor' },
         { texto: 'Tibot – Guía Smart Home Domótico (fichas técnicas y conexiones)', url: '' },
+        // Sin driver, Windows no asigna puerto COM y ni Chrome (Web Serial) ni Arduino IDE ven la placa.
+        { texto: '⬇️ Driver USB placa ESP32 Keyestudio (chip CP2102 · Silicon Labs) – Windows/Mac', url: 'https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers' },
+        { texto: '⬇️ Driver USB placas tipo Arduino UNO/PLUS Keyestudio (chip CH340 · WCH)', url: 'https://www.wch-ic.com/downloads/CH341SER_EXE.html' },
+        { texto: '🧩 ArduinoBlocks – bloques en español para ESP32 (recomendado)', url: 'https://www.arduinoblocks.com' },
+        { texto: '⬇️ ArduinoBlocks Connector (necesario para subir el programa a la placa)', url: 'http://www.arduinoblocks.com/web/site/abconnector5' },
+        { texto: '🧩 KidsBlock – programa oficial de Keyestudio tipo Scratch', url: 'https://docs.keyestudio.com/projects/KT0365/en/latest/docs/KidsBlockTutorial/1%20Resources%20Download.html' },
+        { texto: '🧩 Mind+ (DFRobot) – bloques tipo Scratch y Python para ESP32', url: 'https://mindplus.cc/en.html' },
+        { texto: '🐍 Thonny – editor de MicroPython', url: 'https://thonny.org' },
       ],
       proyectos: [
         {
@@ -155,6 +165,20 @@ export default function ProgramacionRobotica({ usuario = null, onLoginRequest, o
     return (
       <Suspense fallback={<div style={{ padding: 40, textAlign: 'center' }}>Cargando…</div>}>
         <ConducirMbot onExit={() => setVista('hub')} />
+      </Suspense>
+    );
+  }
+  if (vista === 'lab') {
+    return (
+      <Suspense fallback={<div style={{ padding: 40, fontFamily: 'system-ui, sans-serif' }}>Cargando…</div>}>
+        <LabMicrobit onExit={() => setVista('hub')} />
+      </Suspense>
+    );
+  }
+  if (vista === 'labKit') {
+    return (
+      <Suspense fallback={<div style={{ padding: 40, fontFamily: 'system-ui, sans-serif' }}>Cargando…</div>}>
+        <LabKeyestudio onExit={() => setVista('hub')} />
       </Suspense>
     );
   }
@@ -275,6 +299,30 @@ export default function ProgramacionRobotica({ usuario = null, onLoginRequest, o
         <p style={{ margin: '8px 0 0', fontSize: 13, color: '#64748b' }}>
           Antes de jugar, conecta la antena y graba los mandos en <b>🎮 Mandos micro:bit</b>.
         </p>
+
+        {/* Instrumentos de mates con micro:bit (no son mandos) */}
+        <h3 style={styles.editoresH3}>📡 Instrumentos de mates con micro:bit</h3>
+        <div style={styles.editoresRow}>
+          <button onClick={() => setVista('lab')} style={styles.editorBtn('#0369a1')}>
+            <span style={{ fontSize: 34 }}>🛰️</span>
+            <span style={styles.editorBtnTitle}>Laboratorio de mates</span>
+            <span style={styles.editorBtnDesc}>
+              Crea tu sala en 3D y monta un GPS de clase con satélites que pitan. Además: medidor de distancias, inclinómetro, brújula, sensores y caída libre.
+            </span>
+          </button>
+        </div>
+
+        {/* Laboratorio con el kit Smart Home de Keyestudio (ESP32 o micro:bit en la Shield): src/keyestudio/ */}
+        <h3 style={styles.editoresH3}>🏠 Laboratorio Smart Home (Keyestudio · Innova Didáctica)</h3>
+        <div style={styles.editoresRow}>
+          <button onClick={() => setVista('labKit')} style={styles.editorBtn('#b45309')}>
+            <span style={{ fontSize: 34 }}>🏠</span>
+            <span style={styles.editorBtnTitle}>Laboratorio Smart Home</span>
+            <span style={styles.editorBtnDesc}>
+              Conecta la casa (ESP32 o micro:bit + Shield) y haz mates con sus sensores: gemelo digital 3D, estación con gráficas y enfriamiento de Newton, luz y distancia (ley inversa del cuadrado), y servo y ángulos. También en simulación.
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* Modal "más info" */}

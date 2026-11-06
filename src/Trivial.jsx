@@ -24,6 +24,7 @@ import correctSound from './assets/correct-choice-43861.mp3';
 import wrongSound from './assets/negative_beeps-6008.mp3';
 import wedgeSound from './assets/sonidorespcorrecta.mp3';
 import Confetti from 'react-confetti';
+import { basePublica } from './utils/urlPublica';
 
 // ─── SONIDOS ──────────────────────────────────────────────────────────────────
 // Preload so the browser doesn't block on first interaction
@@ -1487,7 +1488,7 @@ export default function TrivialGame({ onExit, onBuscar, recursoIdInicial }) {
                                                 <button
                                                     onClick={e => {
                                                         e.stopPropagation();
-                                                        try { navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}?trivial=${r.id}`); } catch(err) {}
+                                                        try { navigator.clipboard.writeText(`${basePublica()}?trivial=${r.id}`); } catch(err) {}
                                                         setLinkCopiadoId(r.id);
                                                         setTimeout(() => setLinkCopiadoId(prev => prev === r.id ? null : prev), 1600);
                                                     }}

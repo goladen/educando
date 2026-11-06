@@ -1,7 +1,7 @@
 // EditorPaginaProfesor.jsx
 import { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
 import { Globe, Plus, Trash2, Eye, Save, Link, Gamepad2, Image, Video, ExternalLink, ChevronDown, ChevronUp, X, Search, BookOpen } from 'lucide-react';
 
 const COLORES_CURSO = ['#6D28D9','#1D4ED8','#047857','#DC2626','#D97706','#0F766E','#BE185D','#374151'];
@@ -67,6 +67,25 @@ function newTarea() {
   return { id:'ta_'+Math.random().toString(36).slice(2,8), titulo:'', descripcion:'', fechaEntrega:'',
     imagenUrl:'', videoUrl:'', enlaceUrl:'', enlaceTitulo:'', pptxUrl:'', juegoId:'', recursoId:'', presentacionId:'' };
 }
+// ─── Acceso a cada curso ──────────────────────────────────────────────────────
+// acceso.modo: 'publico' | 'oculto' | 'correos' | 'comunidad'
+// Los cursos no públicos se guardan en paginas_profesores/{uid}/privado/{cursoId}
+// y en el doc público solo queda un esqueleto (id, nombre, color, modo).
+const MODOS_ACCESO = [
+  { id:'publico',   icon:'🌐', label:'Público',          desc:'Lo ve cualquiera con el enlace' },
+  { id:'oculto',    icon:'🙈', label:'Oculto',           desc:'Solo tú lo ves (borrador)' },
+  { id:'correos',   icon:'✉️', label:'Correos concretos', desc:'Solo quien inicie sesión con uno de estos correos' },
+  { id:'comunidad', icon:'👥', label:'Mi comunidad',     desc:'Solo miembros de una comunidad (con sesión iniciada)' },
+];
+const esRestringido = c => ['oculto','correos','comunidad'].includes(c?.acceso?.modo);
+const RE_CORREO = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/;
+function normalizarCorreos(lista) {
+  return [...new Set((lista||[]).map(e=>String(e).trim().toLowerCase()).filter(e=>RE_CORREO.test(e)))];
+}
+function textoACorreos(txt) {
+  return normalizarCorreos(String(txt||'').split(/[\s,;]+/));
+}
+
 function slugify(text) {
   return text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
     .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40);
@@ -450,6 +469,10 @@ export default function EditorPaginaProfesor({ usuario, onPreview }) {
   const [actividadesPickerAbierto, setActividadesPickerAbierto] = useState(false);
   const [temaPresPickerAbierto, setTemaPresPickerAbierto] = useState(null); // tema.id o null
   const [esNuevaPagina, setEsNuevaPagina] = useState(false);
+  const [misComunidades, setMisComunidades] = useState([]);
+  const [privadosGuardados, setPrivadosGuardados] = useState([]); // ids de docs en /privado
+  const [correosTexto, setCorreosTexto] = useState({}); // cursoId → texto del textarea
+  const [errorPrivados, setErrorPrivados] = useState(false);
 
   const pageUrl = pagina.slug
     ? `${window.location.origin}/${pagina.slug}`
@@ -457,15 +480,39 @@ export default function EditorPaginaProfesor({ usuario, onPreview }) {
 
   useEffect(() => {
     if (!usuario?.uid) return;
-    getDoc(doc(db,'paginas_profesores',usuario.uid)).then(snap => {
-      if (snap.exists()) {
-        const data = snap.data();
-        setPagina(p=>({...p,...data,cursos:(data.cursos||[]).map(migrateCurso)}));
-        if (data.slug) setSlugStatus('ok');
-      } else {
-        setEsNuevaPagina(true);
+    (async () => {
+      const snap = await getDoc(doc(db,'paginas_profesores',usuario.uid));
+      if (!snap.exists()) { setEsNuevaPagina(true); return; }
+      const data = snap.data();
+      // Los cursos restringidos tienen su contenido en la subcolección privado
+      let privados = {};
+      let fallo = false;
+      // Solo se consulta /privado si la página tiene cursos restringidos guardados
+      if ((data.cursos||[]).some(c=>c.privado)) {
+        try {
+          const ps = await getDocs(collection(db,'paginas_profesores',usuario.uid,'privado'));
+          ps.docs.forEach(d=>{ privados[d.id]=d.data(); });
+          setPrivadosGuardados(ps.docs.map(d=>d.id));
+        } catch (e) { console.warn('No se pudieron leer los cursos restringidos', e); fallo = true; }
       }
-    });
+      const cursos = (data.cursos||[]).map(c => {
+        const pv = privados[c.id];
+        if (c.privado && pv?.curso) {
+          return migrateCurso({ ...pv.curso, id:c.id,
+            acceso:{ modo:pv.modo, correos:pv.correos||[], comunidadId:pv.comunidadId||'', comunidadNombre:pv.comunidadNombre||'' } });
+        }
+        if (c.privado) fallo = true; // esqueleto sin contenido: no dejar guardar encima
+
+        const { privado:_p, ...rest } = c;
+        return migrateCurso(rest);
+      });
+      setPagina(p=>({...p,...data,cursos}));
+      setErrorPrivados(fallo);
+      if (data.slug) setSlugStatus('ok');
+    })();
+    getDocs(query(collection(db,'comunidades'), where('miembros','array-contains',usuario.uid)))
+      .then(s=>setMisComunidades(s.docs.map(d=>({ id:d.id, nombre:d.data().nombre||'Comunidad' }))))
+      .catch(()=>{});
     const q = query(collection(db,'resources'), where('profesorUid','==',usuario.uid), where('isFinished','==',true));
     getDocs(q).then(snap=>setMisRecursos(snap.docs.map(d=>({...d.data(),id:d.id}))));
   }, [usuario?.uid]);
@@ -577,12 +624,50 @@ export default function EditorPaginaProfesor({ usuario, onPreview }) {
     if (!pagina.slug) { alert('Elige una dirección (URL) para tu página antes de guardar.'); return; }
     if (slugStatus==='taken') { alert('Esa dirección ya está en uso. Elige otra.'); return; }
     if (slugStatus==='checking') { alert('Espera, verificando disponibilidad…'); return; }
+    if (errorPrivados) { alert('No se pudieron cargar tus cursos restringidos. Recarga la página antes de guardar para no perder su contenido.'); return; }
+    for (const c of pagina.cursos) {
+      const m = c.acceso?.modo;
+      if (m==='correos' && !normalizarCorreos(c.acceso.correos).length) { setTab(c.id); alert(`El curso «${c.nombre}» es solo para correos concretos: añade al menos un correo válido.`); return; }
+      if (m==='comunidad' && !c.acceso.comunidadId) { setTab(c.id); alert(`El curso «${c.nombre}» es solo para una comunidad: elige cuál.`); return; }
+    }
     setSaving(true);
     try {
-      const data={...pagina,publicada:publicar??pagina.publicada,profesorUid:usuario.uid,updatedAt:new Date()};
-      await setDoc(doc(db,'paginas_profesores',usuario.uid),data);
-      setPagina(data); setSaved(true); setTimeout(()=>setSaved(false),2500);
-    } catch(e) { alert('Error: '+e.message); }
+      const uid = usuario.uid;
+      const batch = writeBatch(db);
+      const restringidos = pagina.cursos.filter(esRestringido);
+      // Doc público: los cursos restringidos quedan como esqueleto, sin contenido ni correos
+      const cursosPublicos = pagina.cursos.map(c => {
+        const { acceso, privado:_p, ...rest } = c;
+        if (!esRestringido(c)) return rest;
+        const esq = { id:c.id, nombre:c.nombre, color:c.color, privado:true, acceso:{ modo:acceso.modo } };
+        if (acceso.modo==='comunidad') esq.acceso.comunidadNombre = acceso.comunidadNombre||'';
+        return esq;
+      });
+      restringidos.forEach(c => {
+        const { acceso, privado:_p, ...curso } = c;
+        const correos = normalizarCorreos(acceso.correos);
+        batch.set(doc(db,'paginas_profesores',uid,'privado',c.id), {
+          modo: acceso.modo,
+          correos: acceso.modo==='correos' ? correos : [],
+          comunidadId: acceso.modo==='comunidad' ? acceso.comunidadId : '',
+          comunidadNombre: acceso.modo==='comunidad' ? (acceso.comunidadNombre||'') : '',
+          curso, profesorUid: uid, updatedAt: new Date(),
+        });
+      });
+      const idsRestr = new Set(restringidos.map(c=>c.id));
+      privadosGuardados.filter(id=>!idsRestr.has(id))
+        .forEach(id=>batch.delete(doc(db,'paginas_profesores',uid,'privado',id)));
+      const publicada = publicar??pagina.publicada;
+      const { cursos:_c, ...resto } = pagina;
+      batch.set(doc(db,'paginas_profesores',uid), { ...resto, cursos:cursosPublicos, publicada, profesorUid:uid, updatedAt:new Date() });
+      await batch.commit();
+      setPrivadosGuardados([...idsRestr]);
+      setPagina(p=>({...p,publicada})); setSaved(true); setTimeout(()=>setSaved(false),2500);
+    } catch(e) {
+      if (e?.code==='permission-denied' && pagina.cursos.some(esRestringido))
+        alert('No se pudo guardar: faltan las reglas de Firestore para los cursos restringidos (subcolección «privado»). Publícalas en la consola de Firebase o deja los cursos como públicos.');
+      else alert('Error: '+e.message);
+    }
     setSaving(false);
   };
 
@@ -657,7 +742,9 @@ export default function EditorPaginaProfesor({ usuario, onPreview }) {
           <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:14 }}>
             {pagina.cursos.map(c=>(
               <button key={c.id} onClick={()=>setTab(c.id)} style={{ padding:'6px 14px', borderRadius:20, border:`2px solid ${c.color}`,
-                background:tab===c.id?c.color:'white', color:tab===c.id?'white':c.color, fontWeight:700, fontSize:13, cursor:'pointer' }}>{c.nombre}</button>
+                background:tab===c.id?c.color:'white', color:tab===c.id?'white':c.color, fontWeight:700, fontSize:13, cursor:'pointer' }}
+                title={esRestringido(c) ? MODOS_ACCESO.find(m=>m.id===c.acceso.modo)?.desc : 'Público'}>
+                {esRestringido(c) && <span style={{ marginRight:4 }}>{MODOS_ACCESO.find(m=>m.id===c.acceso.modo)?.icon}</span>}{c.nombre}</button>
             ))}
           </div>
         )}
@@ -683,6 +770,65 @@ export default function EditorPaginaProfesor({ usuario, onPreview }) {
                 <button onClick={()=>{ if(window.confirm('¿Eliminar este curso?')) deleteCurso(cursoActivo.id); }} style={{...btnIcon,color:'#DC2626',borderColor:'#FCA5A5'}} title="Eliminar curso"><Trash2 size={13}/></button>
               </div>
             </div>
+
+            {/* Quién puede ver el curso */}
+            {(()=>{
+              const acc = cursoActivo.acceso || { modo:'publico' };
+              const setAcc = patch => updateCurso(cursoActivo.id,'acceso',{ modo:'publico', ...acc, ...patch });
+              const txt = correosTexto[cursoActivo.id] ?? (acc.correos||[]).join('\n');
+              const validos = textoACorreos(txt);
+              return (
+                <div style={{ marginBottom:14, padding:12, borderRadius:10, background:'#F8FAFC', border:'1px solid #E2E8F0' }}>
+                  <label style={lbl}>🔐 ¿Quién puede ver este curso?</label>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))', gap:6 }}>
+                    {MODOS_ACCESO.map(m=>{
+                      const sel = (acc.modo||'publico')===m.id;
+                      return (
+                        <button key={m.id} type="button" onClick={()=>setAcc({ modo:m.id })} title={m.desc}
+                          style={{ display:'flex', flexDirection:'column', alignItems:'flex-start', gap:2, padding:'8px 10px', borderRadius:9, cursor:'pointer', fontFamily:'inherit', textAlign:'left',
+                            border: sel?`2px solid ${cursoActivo.color}`:'1.5px solid #E2E8F0', background: sel?`${cursoActivo.color}12`:'white' }}>
+                          <span style={{ fontSize:13, fontWeight:700, color:'#0F172A' }}>{m.icon} {m.label}</span>
+                          <span style={{ fontSize:10.5, color:'#64748B', lineHeight:1.3 }}>{m.desc}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {acc.modo==='correos' && (
+                    <div style={{ marginTop:10 }}>
+                      <label style={lbl}>Correos con acceso (uno por línea, o separados por comas)</label>
+                      <textarea style={{...inp,height:90,resize:'vertical',fontSize:13,fontFamily:'monospace'}}
+                        value={txt}
+                        onChange={e=>{ const v=e.target.value; setCorreosTexto(s=>({...s,[cursoActivo.id]:v})); setAcc({ correos:textoACorreos(v) }); }}
+                        placeholder={'alumno1@gmail.com\nalumna2@educa.es'}/>
+                      <div style={{ fontSize:11, color: validos.length?'#059669':'#DC2626', marginTop:3 }}>
+                        {validos.length ? `✓ ${validos.length} correo${validos.length!==1?'s':''} válido${validos.length!==1?'s':''}` : 'Añade al menos un correo válido'}
+                        <span style={{ color:'#94A3B8' }}> · Deberán entrar con su cuenta de Google de ese correo. La lista no es pública.</span>
+                      </div>
+                    </div>
+                  )}
+                  {acc.modo==='comunidad' && (
+                    <div style={{ marginTop:10 }}>
+                      {misComunidades.length===0 ? (
+                        <div style={{ fontSize:12, color:'#DC2626' }}>No perteneces a ninguna comunidad todavía. Crea o únete a una en la pestaña Comunidades.</div>
+                      ) : (
+                        <>
+                          <label style={lbl}>Comunidad</label>
+                          <select style={inp} value={acc.comunidadId||''}
+                            onChange={e=>{ const c=misComunidades.find(x=>x.id===e.target.value); setAcc({ comunidadId:c?.id||'', comunidadNombre:c?.nombre||'' }); }}>
+                            <option value="">— Elige una comunidad —</option>
+                            {misComunidades.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}
+                          </select>
+                          <div style={{ fontSize:11, color:'#94A3B8', marginTop:3 }}>Lo verán los miembros de la comunidad (incluidos los de solo lectura) con la sesión iniciada.</div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  {acc.modo==='oculto' && (
+                    <div style={{ fontSize:11, color:'#92400E', marginTop:8 }}>La pestaña no aparecerá en tu página pública.</div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Mensaje de bienvenida */}
             <div style={{ marginBottom:14 }}>

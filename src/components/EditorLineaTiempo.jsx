@@ -150,7 +150,7 @@ export default function EditorLineaTiempo({ datos, setDatos, onClose, usuario })
                 tipo:          'LINEA_TIEMPO',
                 tipoJuego:     'LINEA_TIEMPO',
                 accessCode:    code,
-                profesorUid:   usuario?.uid || '',
+                profesorUid:   datosEfectivos.profesorUid || usuario?.uid || '', // si es compartido, el dueño no cambia
                 hojas,
                 creadoEn:      datosEfectivos.creadoEn || Date.now(),
                 fechaCreacion: datosEfectivos.fechaCreacion || new Date(),

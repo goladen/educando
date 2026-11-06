@@ -85,7 +85,7 @@ export default function EditorSintaxis({ datos, setDatos, onClose, usuario }) {
                 ...datosEfectivos,
                 id: docId,
                 accessCode: code,
-                profesorUid: usuario?.uid || '',
+                profesorUid: datosEfectivos.profesorUid || usuario?.uid || '', // si es compartido, el dueño no cambia
                 frases: todasFrases,
                 hojas: hojas,
                 creadoEn: datosEfectivos.creadoEn || Date.now(),

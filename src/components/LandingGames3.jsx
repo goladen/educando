@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, lazy, Suspense } from 'react';
+﻿import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import CargandoChunk from './CargandoChunk';
 import BotonPdfRecurso from './BotonPdfRecurso';
 import { TOUR_PLANETAS } from '../Simuladores física/sistemaSolarTour';
@@ -8,6 +8,7 @@ import { Search, Key, Filter, Zap, Play, Home, ChevronDown, ChevronUp, Mail, Lin
 const GamePlayer = lazy(() => import('../GamePlayer'));
 import MisRegistros from './MisRegistros';
 import { getResumenRegistros } from '../utils/registrosLocales';
+import { basePublica } from '../utils/urlPublica';
 import useAvatarLocal from '../hooks/useAvatarLocal';
 import AvatarSVG from './avatar/AvatarSVG';
 import { useT } from '../i18n/LanguageContext';
@@ -25,6 +26,7 @@ const QuestionSenderClient = lazy(() => import('../QuestionSenderClient'));
 const PikatronRun = lazy(() => import('../PikatronRun'));
 const BunkerDisparo = lazy(() => import('../BunkerDisparo'));
 const QuizMandos = lazy(() => import('../mandos/QuizMandos.jsx'));
+const LabMicrobit = lazy(() => import('../labMicrobit/LabMicrobit.jsx'));
 const JuegoCalamar = lazy(() => import('../JuegoCalamar'));
 const EscapeHalloween = lazy(() => import('../EscapeHalloween'));
 const MoneyBoard = lazy(() => import('../MoneyBoard'));
@@ -278,7 +280,7 @@ export function SolarSystemViewer({ onExit, recursoConfig }) {
         const planetas = Object.entries(seleccion).map(([nombre, v]) => ({ nombre, texto: v.texto || '', activo: v.activo ?? true }));
         const config = { planetas, musicaUrl: musica, duracionEscena: duracion, comparativa: { activa: compActiva, texto: compTexto, duracion: compDuracion } };
         const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(config))));
-        const url = `${window.location.origin}${window.location.pathname}?juego=solar_system&tourconfig=${encoded}`;
+        const url = `${basePublica()}?juego=solar_system&tourconfig=${encoded}`;
         abrirShareModal(url);
     };
 
@@ -373,7 +375,7 @@ export function SolarSystemViewer({ onExit, recursoConfig }) {
                                             <button
                                                 onClick={() => {
                                                     const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(r.tourConfig))));
-                                                    const url = `${window.location.origin}${window.location.pathname}?juego=solar_system&tourconfig=${encoded}`;
+                                                    const url = `${basePublica()}?juego=solar_system&tourconfig=${encoded}`;
                                                     abrirShareModal(url);
                                                 }}
                                                 title="Compartir este tour"
@@ -796,6 +798,7 @@ export const APPS = [
     { id: 'POTENCIAS_RAICES', name: 'Potencias y Raíces', desc: 'Propiedades de potencias y raíces: ejercicios aleatorios.', color: '#0ea5e9', emoji: '⚡', isMath: true, shareable: true },
     { id: 'CALCULADORA', name: 'Calculadora', desc: 'Retos con la Casio fx-82MS: teclas exactas y regularidades por descubrir.', color: '#0f766e', emoji: '🧮', isMath: true, shareable: true, shareUrl: `${typeof window !== 'undefined' ? window.location.origin : ''}/calculadora` },
     { id: 'MATES_MANDOS', name: 'Mates con mandos', desc: 'Toda la clase responde a los ejercicios de Math World con mandos micro:bit.', color: '#0d9488', emoji: '🎮', isMath: true, shareable: true, shareUrl: `${typeof window !== 'undefined' ? window.location.origin : ''}/matesmandos` },
+    { id: 'LAB_MICROBIT', name: 'Laboratorio micro:bit', desc: 'Crea tu sala en 3D: GPS de clase, distancias, inclinómetro, brújula y más con micro:bit.', color: '#0369a1', emoji: '🛰️', isMath: true, shareable: true, shareUrl: `${typeof window !== 'undefined' ? window.location.origin : ''}/labmicrobit` },
     { id: 'ESTADISTICA',  name: 'Estadística',  desc: 'Tablas, parámetros y representación gráfica.', color: '#9C27B0', emoji: '📊', isMath: true, shareable: true },
     { id: 'PROBABILIDAD', name: 'Probabilidad', desc: 'Simulador de dados: tipos, múltiples dados y análisis de frecuencias.', color: '#f59e0b', emoji: '🎲', isMath: true, shareable: true },
 
@@ -898,6 +901,14 @@ export const GAME_INFO = {
         biblioteca: 'No necesita recursos: las letras se sortean y se comprueban con el diccionario integrado de cada idioma.',
         multiplayer: 'Individual (con envío al profesor), duelo de 2 jugadores en el mismo dispositivo y tablero de 2 a 6 jugadores en el mismo dispositivo o la pizarra (pasándolo por turnos) u online con sala, código y QR (el profesor puede proyectar el tablero).',
         materias: ['Lengua y Literatura', 'Inglés', 'Francés', 'Catalán'],
+        etapas: ['Primaria', 'ESO', 'Bachillerato'],
+    },
+    LAB_MICROBIT: {
+        descripcion: 'Laboratorio de matemáticas con micro:bit y entorno 3D. Cada usuario crea su sala (medidas, suelo, paredes, muebles y satélites) y la usa con un GPS de clase: tres satélites pitan y el receptor mide cuánto tarda el sonido en llegar; con las distancias se dibujan circunferencias y la posición sale de su intersección, con el sistema de ecuaciones paso a paso. Incluye medidor de distancias, inclinómetro (altura de un árbol con la tangente), brújula (recorridos con rumbos y vectores), registrador de temperatura, luz y sonido con estadística, y cronómetro de caída libre (h = ½gt²).',
+        tipoPreguntas: 'No usa preguntas: son instrumentos de medida y retos (ir a un punto de coordenadas, calcular alturas, rumbos, g…).',
+        biblioteca: 'Plantillas de sala (aula, patio, sala vacía). Las salas se guardan en el navegador y se pueden exportar e importar.',
+        multiplayer: 'Para toda la clase en la pizarra, con 5 micro:bit V2 (antena, 3 satélites e instrumento). Todo funciona también en simulación, sin placas.',
+        materias: ['Matemáticas', 'Física', 'Tecnología'],
         etapas: ['Primaria', 'ESO', 'Bachillerato'],
     },
     MATES_MANDOS: {
@@ -1444,7 +1455,7 @@ export const MATERIAS_CONFIG = [
     {
         id: 'MATEMATICAS', label: 'Matemáticas', emoji: '🔢', color: '#009688',
         keywords: ['matemáticas', 'mates', 'math', 'calculo', 'algebra', 'geometria', 'estadistica', 'probabilidad', 'fraccion', 'ecuacion', 'funcion', 'numero', 'operacion'],
-        specificIds: ['MATH_WORLD_PORTAL', 'GEOMETRIX', 'CALCULO', 'DINERO', 'FRACCIONES', 'ECUACIONES', 'ECUACION_SISTEMAS', 'FUNCIONES', 'GEOMETRÍA_ANALÍTICA', 'POLINOMIOS', 'POTENCIAS_RAICES', 'CALCULADORA', 'MATES_MANDOS', 'ESTADISTICA', 'PROBABILIDAD', 'MATHLE', 'MATHLIVE', 'OLYMPICLIVE', 'SOLAR_SYSTEM', 'OVNI'],
+        specificIds: ['MATH_WORLD_PORTAL', 'GEOMETRIX', 'CALCULO', 'DINERO', 'FRACCIONES', 'ECUACIONES', 'ECUACION_SISTEMAS', 'FUNCIONES', 'GEOMETRÍA_ANALÍTICA', 'POLINOMIOS', 'POTENCIAS_RAICES', 'CALCULADORA', 'MATES_MANDOS', 'LAB_MICROBIT', 'ESTADISTICA', 'PROBABILIDAD', 'MATHLE', 'MATHLIVE', 'OLYMPICLIVE', 'SOLAR_SYSTEM', 'OVNI'],
     },
     {
         id: 'LENGUA', label: 'Lengua', emoji: '📖', color: '#7B1FA2',
@@ -1782,8 +1793,23 @@ function ShareModalJuego({ url, titulo, juegoId, onClose, onVolver = null }) {
     );
 }
 
+// Vista alumno del profe (pikt.es/alumno/…): ver conRutaAlumno en LandingGamesInterno
+const enVistaAlumno = () => /^\/alumno(\/|$)/i.test(window.location.pathname);
+
+// Montado en la portada: al volver de una app abierta sin URL propia, deshace su /alumno/<id>
+function RestaurarRutaAlumno({ rutaRef }) {
+    useEffect(() => {
+        const r = rutaRef.current;
+        if (!r) return;
+        rutaRef.current = null;
+        if (window.location.pathname + window.location.search === r.ruta) window.history.replaceState({}, '', r.anterior);
+    }, [rutaRef]);
+    return null;
+}
+
 function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = null }) {
     const t = useT();
+    const rutaAlumnoRef = useRef(null);
     // --- AÑADE ESTA LÍNEA AQUÍ ---
     const [zonaActiva, setZonaActiva] = useState('MAIN');
     // Página de juego (SpecificGamePage) para usuarios con sesión: el alumno
@@ -1794,7 +1820,8 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
     // --- AÑADE ESTE BLOQUE PARA ESCUCHAR LA URL ---
     useEffect(() => {
         const checkURL = () => {
-            const path = window.location.pathname.toLowerCase().replace('/', '');
+            // /alumno/<app> (vista alumno del profe) se trata igual que /<app>
+            const path = window.location.pathname.toLowerCase().replace('/', '').replace(/^alumno(\/|$)/, '');
             // Detectar recurso compartido de Sopa de Letras (?sopa=ID)
             const params = new URLSearchParams(window.location.search);
             const sopaId = params.get('sopa');
@@ -1949,6 +1976,8 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
                 setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'OVNI' });
             } else if (path === 'vanila') {
                 setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'VANILA' });
+            } else if (path === 'labmicrobit') {
+                setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'LAB_MICROBIT' });
             } else if (path === 'matesmandos') {
                 setZonaActiva('MATH'); setJuegoActivo({ tipoJuego: 'MATES_MANDOS' });
             } else if (path === 'sixseven') {
@@ -1959,6 +1988,11 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
                 setZonaActiva('MAIN'); setJuegoActivo({ tipoJuego: 'ESCAPE_HALLOWEEN' });
             } else if (path === '' || path === 'inicio') {
                 setZonaActiva('MAIN'); setJuegoActivo(null); setSubzonaMath(null);
+            } else if (!path.includes('/') && (enVistaAlumno() || APPS.some(a => a.id.toLowerCase() === path))) {
+                // /alumno/<id> puesto por conRutaAlumno, o enlace compartido pikt.es/<id> abierto
+                // con sesión: se abre la misma app
+                if (enVistaAlumno()) rutaAlumnoRef.current = { ruta: window.location.pathname + window.location.search, anterior: '/alumno' };
+                openById(path.toUpperCase());
             }
         };
         checkURL();
@@ -2302,7 +2336,20 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
         } catch (e) { console.error(e); alert("Error en búsqueda."); }
         setBuscando(false);
     };
-    const abrirJuego = (appId) => {
+    // En vista alumno, las apps que se abren sin cambiar la URL (Pasapalabra, Robótica…)
+    // dejan /alumno/<id>, que checkURL sabe reabrir; al volver a la portada se deshace.
+    const conRutaAlumno = (id, abrir) => {
+        const antes = window.location.pathname + window.location.search;
+        abrir();
+        if (!enVistaAlumno() || window.location.pathname + window.location.search !== antes) return;
+        const ruta = `/alumno/${id.toLowerCase()}`;
+        if (antes === ruta) return; // reapertura desde checkURL tras recargar
+        window.history.pushState({}, '', ruta);
+        rutaAlumnoRef.current = { ruta, anterior: antes };
+    };
+
+    const abrirJuego = (appId) => conRutaAlumno(appId, () => abrirJuegoBase(appId));
+    const abrirJuegoBase = (appId) => {
 
         // Climbing: abre una pestaña nueva con el hub (trivial de escalada + simulador de caída)
         if (appId === 'CLIMBING') {
@@ -2364,6 +2411,12 @@ function LandingGamesInterno({ onLoginRequest, onOpenQuestionSender, usuario = n
         if (appId === 'VANILA') {
             window.history.pushState({}, '', '/vanila');
             setJuegoActivo({ tipoJuego: 'VANILA' });
+            return;
+        }
+
+        if (appId === 'LAB_MICROBIT') {
+            window.history.pushState({}, '', '/labmicrobit');
+            setJuegoActivo({ tipoJuego: 'LAB_MICROBIT' });
             return;
         }
 
@@ -2521,7 +2574,7 @@ LENGUA_SIGNOS:      () => setJuegoActivo({ tipoJuego: 'LENGUA_SIGNOS' }),
             LINEA_TIEMPO:       () => setJuegoActivo({ tipoJuego: 'LINEA_TIEMPO' }),
             ROBOTICA_BLOQUES:   () => setJuegoActivo({ tipoJuego: 'ROBOTICA_BLOQUES' }),
         };
-        if (TOOL_ACTIONS[id]) TOOL_ACTIONS[id]();
+        if (TOOL_ACTIONS[id]) conRutaAlumno(id, TOOL_ACTIONS[id]);
         else abrirJuego(id);
     };
 
@@ -2989,6 +3042,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
         if (juegoActivo.tipoJuego === 'ENIGMIC') return <EnigmicLogic usuario={usuario} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'OVNI') return <OvniAbduccion onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'VANILA') return <VaniLa onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
+        if (juegoActivo.tipoJuego === 'LAB_MICROBIT') return <LabMicrobit onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'MATES_MANDOS') return <QuizMandos soloMates onExit={() => { window.history.pushState({}, '', '/math_world'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'SIXSEVEN') return <SixSeven usuario={usuario} onExit={() => { window.history.pushState({}, '', juegoActivo.desdeMath ? '/math_world' : '/'); setJuegoActivo(null); }} />;
         if (juegoActivo.tipoJuego === 'BUNKER') return <BunkerDisparo usuario={usuario} recurso={juegoActivo.recurso || null} autoStart={!!juegoActivo.recurso} onExit={() => { window.history.pushState({}, '', '/'); setJuegoActivo(null); }} />;
@@ -3371,6 +3425,7 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
 
     return (
         <div style={{ width: '100%', marginTop: '20px' }}>
+            <RestaurarRutaAlumno rutaRef={rutaAlumnoRef} />
 
             {/* MODAL ELEGIR MODO BURBUJAS/PIKATRON */}
             {recursoParaElegir && (
@@ -3911,7 +3966,8 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                             <button
                                 onClick={e => {
                                     e.stopPropagation();
-                                    const url = app.shareUrl || `${window.location.origin}${window.location.pathname}?juego=${app.id.toLowerCase()}`;
+                                    // pikt.es/<id>: sin sesión, Login abre directamente la página del juego
+                                    const url = app.shareUrl || `${window.location.origin}/${app.id.toLowerCase()}`;
                                     setShareModal({ url, titulo: app.name, juegoId: app.id });
                                 }}
                                 title="Compartir"
@@ -3967,23 +4023,23 @@ if (juegoActivo.tipoJuego === 'ROBOTICA_BLOQUES') {
                     { id: 'QUIZ_MANOS',          label: 'Quiz con los dedos',   emoji: '✋', color: '#7c3aed', action: () => { setQuizManosApp(true); window.history.pushState({}, '', '/manos'); }, shareable: true, shareUrl: `${window.location.origin}/manos` },
                     { id: 'AVATAR_CUERPO',       label: 'Avatar en movimiento', emoji: '🕺', color: '#0891b2', action: () => { setAvatarCuerpoApp(true); window.history.pushState({}, '', '/avatar'); }, shareable: true, shareUrl: `${window.location.origin}/avatar` },
                     { id: 'BIOLOGIA',            label: 'Biología',             emoji: '🔬', color: '#16a34a', action: () => setBiologiaApp(true),  shareable: true },
-                    { id: 'GESTION_AULA', label: 'Gestión Aula', emoji: '🏫', color: '#e67e22', action: () => setGestionAula(true), shareable: true, shareUrl: `${window.location.origin}${window.location.pathname}?gestion=menu` },
+                    { id: 'GESTION_AULA', label: 'Gestión Aula', emoji: '🏫', color: '#e67e22', action: () => setGestionAula(true), shareable: true, shareUrl: `${basePublica()}?gestion=menu` },
                     { id: 'VISTAS_DIDRICAS', label: 'Vistas Diédricas', emoji: '📐', color: '#7c3aed', action: () => setVistasDidricas(true), shareable: true },
-                    { id: 'LINEA_TIEMPO', label: 'Línea del Tiempo', emoji: '🕰️', color: '#2980b9', action: () => setJuegoActivo({ tipoJuego: 'LINEA_TIEMPO' }), shareable: true, shareUrl: `${window.location.origin}${window.location.pathname}?juego=linea_tiempo` },
+                    { id: 'LINEA_TIEMPO', label: 'Línea del Tiempo', emoji: '🕰️', color: '#2980b9', action: () => setJuegoActivo({ tipoJuego: 'LINEA_TIEMPO' }), shareable: true, shareUrl: `${basePublica()}?juego=linea_tiempo` },
                     { id: 'SIMULADORES_FISICA', label: 'Física y Química', emoji: '🔭', color: '#e74c3c', action: () => { setSimuladoresFisica(true); window.history.pushState({}, '', '/fisica'); }, shareable: true, shareUrl: `${window.location.origin}/fisica` },
-                    { id: 'ROBOTICA_BLOQUES', label: 'Programación y robótica', emoji: '🤖', color: '#0EA5E9', action: () => setJuegoActivo({ tipoJuego: 'ROBOTICA_BLOQUES' }), shareable: true, shareUrl: `${window.location.origin}${window.location.pathname}?juego=robotica_bloques` },
-                    { id: 'SITUACIONES_APRENDIZAJE', label: 'Situaciones de Aprendizaje', emoji: '🌱', color: '#15803d', action: () => setSituacionesAprendizaje(true), shareable: true, shareUrl: `${window.location.origin}${window.location.pathname}?juego=situaciones_aprendizaje` },
+                    { id: 'ROBOTICA_BLOQUES', label: 'Programación y robótica', emoji: '🤖', color: '#0EA5E9', action: () => setJuegoActivo({ tipoJuego: 'ROBOTICA_BLOQUES' }), shareable: true, shareUrl: `${basePublica()}?juego=robotica_bloques` },
+                    { id: 'SITUACIONES_APRENDIZAJE', label: 'Situaciones de Aprendizaje', emoji: '🌱', color: '#15803d', action: () => setSituacionesAprendizaje(true), shareable: true, shareUrl: `${basePublica()}?juego=situaciones_aprendizaje` },
                     { id: 'VISOR_3D', label: 'Visor 3D', emoji: '🧊', color: '#0d9488', action: () => { setVisor3dApp(true); window.history.pushState({}, '', '/visor3d'); }, shareable: true, shareUrl: `${window.location.origin}/visor3d` },
                     { id: 'ESCULPIR_3D', label: 'Taller de escultura', emoji: '🗿', color: '#b45309', action: () => { setEsculpirApp(true); window.history.pushState({}, '', '/esculpir'); }, shareable: true, shareUrl: `${window.location.origin}/esculpir` },
                 ].map(tool => (
-                    <div key={tool.id} onClick={tool.action} style={{ background: '#ffffbf', borderRadius: '15px', padding: '15px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transition: 'transform 0.2s', border: `2px solid ${tool.color}20`, position: 'relative' }}
+                    <div key={tool.id} onClick={() => conRutaAlumno(tool.id, tool.action)} style={{ background: '#ffffbf', borderRadius: '15px', padding: '15px', textAlign: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transition: 'transform 0.2s', border: `2px solid ${tool.color}20`, position: 'relative' }}
                         onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-3px)'}
                         onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
                         {tool.shareable && (
                             <button
                                 onClick={e => {
                                     e.stopPropagation();
-                                    const url = tool.shareUrl || `${window.location.origin}${window.location.pathname}?juego=${tool.id.toLowerCase()}`;
+                                    const url = tool.shareUrl || `${basePublica()}?juego=${tool.id.toLowerCase()}`;
                                     setShareModal({ url, titulo: tool.label, juegoId: tool.id });
                                 }}
                                 title="Compartir"

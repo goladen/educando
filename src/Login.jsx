@@ -5,7 +5,7 @@ const TextWordleGame = lazy(() => import('./TextWordleGame'));
 import { auth } from './firebase';
 import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from "firebase/auth";
 import { reportarError } from './utils/reportarError';
-import { Menu, X } from 'lucide-react';
+import MenuPublico from './components/MenuPublico';
 import logoPikt from './assets/icono2.png';
 import LandingGames, { APPS, SpecificGamePage, ResourceCard } from './components/LandingGames3';
 import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
@@ -48,7 +48,6 @@ function mensajeErrorLogin(e) {
 export default function Login({ setGoogleToken }) {
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(false);
-    const [menuOpen, setMenuOpen] = useState(false);
 
     // VISTAS: 'MAIN', 'POPULARES', o el ID del juego (ej: 'PASAPALABRA', 'WORDLE', etc.)
     const [vistaActual, setVistaActual] = useState('MAIN');
@@ -58,7 +57,8 @@ export default function Login({ setGoogleToken }) {
     // --- DETECTOR DE RUTAS (ESTO HACE QUE SE ABRA LA PANTALLA COMPLETA) ---
     useEffect(() => {
         const handleRoute = () => {
-            const path = window.location.pathname.toLowerCase().replace('/', '');
+            // Un enlace /alumno/<app> abierto sin sesión se trata como /<app>
+            const path = window.location.pathname.toLowerCase().replace('/', '').replace(/^alumno(\/|$)/, '');
 
             if (!path || path === 'inicio') {
                 setVistaActual('MAIN');
@@ -131,7 +131,6 @@ export default function Login({ setGoogleToken }) {
     };
 
     const handleMenuClick = (opcion) => {
-        setMenuOpen(false);
         if (opcion === 'inicio') {
             window.history.pushState({}, '', '/');
             window.dispatchEvent(new Event('popstate'));
@@ -217,7 +216,7 @@ export default function Login({ setGoogleToken }) {
             {/* CABECERA */}
             <header style={styles.header}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <button onClick={() => setMenuOpen(true)} style={styles.menuButton}><Menu size={28} color="white" /></button>
+                    <MenuPublico onNavegar={handleMenuClick} />
                 </div>
 
                 {/* LOGIN PEQUEÑO SUPERIOR DERECHO */}
@@ -239,30 +238,6 @@ export default function Login({ setGoogleToken }) {
            
 
 
-
-            {/* MENÚ LATERAL */}
-            {menuOpen && (
-                <div style={styles.menuOverlay} onClick={() => setMenuOpen(false)}>
-                    <div style={styles.menuPanel} onClick={(e) => e.stopPropagation()}>
-                        <div style={styles.menuHeader}>
-                            <h2 style={{ margin: 0 }}>Menú</h2>
-                            <button onClick={() => setMenuOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={28} /></button>
-                        </div>
-                        <ul style={styles.menuList}>
-                            <li style={styles.menuItem} onClick={() => handleMenuClick('inicio')}>🏠 Inicio</li>
-                            <li style={styles.menuItem} onClick={() => handleMenuClick('populares')}>🔥 Los juegos más populares</li>
-                            <li style={styles.menuItem} onClick={() => handleMenuClick('paginas-profesores')}>👨‍🏫 Páginas de profesores</li>
-                            <li style={styles.menuItem} onClick={() => handleMenuClick('comunidades')}>👥 Comunidades</li>
-                            <li style={styles.menuItem} onClick={() => handleMenuClick('que-hacer')}>❓ ¿Qué puedo hacer?</li>
-                            <li style={styles.menuItem} onClick={() => handleMenuClick('instagram')}>📸 Síguenos en Instagram</li>
-                            <li style={styles.menuItem} onClick={() => handleMenuClick('privacidad')}>🔒 Política de privacidad</li>
-                        </ul>
-                        <div style={{ padding: '20px', textAlign: 'center' }}>
-                            <KofiBoton />
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* CONTENIDO PRINCIPAL */}
             <div style={{ width: '80%', maxWidth: '1000px', margin: '80px auto 0 auto', padding: '0 20px', zIndex: 10 }}>

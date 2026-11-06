@@ -3,6 +3,7 @@ import { db } from './firebase';
 import { collection, addDoc, query, where, limit, getDocs, doc, getDoc } from 'firebase/firestore';
 import { X, Trophy, Search, BookOpen, Globe, ArrowLeft, Zap, Clock, Share2 } from 'lucide-react';
 import { guardarRegistroLocal } from './utils/registrosLocales';
+import { basePublica } from './utils/urlPublica';
 import Confetti from 'react-confetti';
 import { leerCompeticionUrl, soloPrimitivos } from './utils/retoLink';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
@@ -560,7 +561,7 @@ export default function Ahorcado({ usuario, onExit, recurso }) {
     };
 
     const compartirRecurso = (id, titulo) => {
-        const url = `${window.location.origin}${window.location.pathname}?ahorcado=${id}`;
+        const url = `${basePublica()}?ahorcado=${id}`;
         setShareModal({ url, titulo: titulo || 'Ahorcado' });
     };
 

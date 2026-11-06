@@ -5,29 +5,30 @@
 //  crearZombiJefe() → el zombi de la batalla final.
 // ═══════════════════════════════════════════════════════════════════
 import * as THREE from 'three';
+import { tr } from './i18n';
 
 export const DISFRACES = [
-    { id: 'FANTASMA', nombre: 'Fantasma', emoji: '👻', color: '#f8fafc' },
-    { id: 'VAMPIRO', nombre: 'Vampiro', emoji: '🧛', color: '#b91c1c' },
-    { id: 'BRUJA', nombre: 'Bruja', emoji: '🧙‍♀️', color: '#7c3aed' },
-    { id: 'CALABAZA', nombre: 'Calabaza', emoji: '🎃', color: '#16a34a' },
-    { id: 'ESQUELETO', nombre: 'Esqueleto', emoji: '💀', color: '#111827' },
-    { id: 'MOMIA', nombre: 'Momia', emoji: '🧻', color: '#e7dcc0' },
-    { id: 'LOBO', nombre: 'Hombre lobo', emoji: '🐺', color: '#7c4a24' },
-    { id: 'DIABLO', nombre: 'Diablillo', emoji: '😈', color: '#dc2626' },
-    { id: 'FRANKENSTEIN', nombre: 'Frankenstein', emoji: '🧟‍♂️', color: '#334155' },
-    { id: 'GATO', nombre: 'Gato negro', emoji: '🐈‍⬛', color: '#18181b' },
-    { id: 'ZOMBI', nombre: 'Zombi', emoji: '🧟', color: '#4f6b3a' },
-    { id: 'MAGO', nombre: 'Mago', emoji: '🧙‍♂️', color: '#1d4ed8' },
+    { id: 'FANTASMA', get nombre() { return tr("Fantasma"); }, emoji: '👻', color: '#f8fafc' },
+    { id: 'VAMPIRO', get nombre() { return tr("Vampiro"); }, emoji: '🧛', color: '#b91c1c' },
+    { id: 'BRUJA', get nombre() { return tr("Bruja"); }, emoji: '🧙‍♀️', color: '#7c3aed' },
+    { id: 'CALABAZA', get nombre() { return tr("Calabaza"); }, emoji: '🎃', color: '#16a34a' },
+    { id: 'ESQUELETO', get nombre() { return tr("Esqueleto"); }, emoji: '💀', color: '#111827' },
+    { id: 'MOMIA', get nombre() { return tr("Momia"); }, emoji: '🧻', color: '#e7dcc0' },
+    { id: 'LOBO', get nombre() { return tr("Hombre lobo"); }, emoji: '🐺', color: '#7c4a24' },
+    { id: 'DIABLO', get nombre() { return tr("Diablillo"); }, emoji: '😈', color: '#dc2626' },
+    { id: 'FRANKENSTEIN', get nombre() { return tr("Frankenstein"); }, emoji: '🧟‍♂️', color: '#334155' },
+    { id: 'GATO', get nombre() { return tr("Gato negro"); }, emoji: '🐈‍⬛', color: '#18181b' },
+    { id: 'ZOMBI', get nombre() { return tr("Zombi"); }, emoji: '🧟', color: '#4f6b3a' },
+    { id: 'MAGO', get nombre() { return tr("Mago"); }, emoji: '🧙‍♂️', color: '#1d4ed8' },
 ];
 export const COLORES_DISFRAZ = ['#f8fafc', '#b91c1c', '#7c3aed', '#16a34a', '#ea580c', '#1d4ed8', '#db2777', '#111827', '#ca8a04', '#0d9488'];
 export const ACCESORIOS = [
-    { id: 'NINGUNO', nombre: 'Nada', emoji: '✋' },
-    { id: 'CUBO', nombre: 'Cubo de caramelos', emoji: '🎃' },
-    { id: 'ESCOBA', nombre: 'Escoba', emoji: '🧹' },
-    { id: 'FAROL', nombre: 'Farol', emoji: '🏮' },
-    { id: 'VARITA', nombre: 'Varita', emoji: '🪄' },
-    { id: 'PIRULETA', nombre: 'Piruleta', emoji: '🍭' },
+    { id: 'NINGUNO', get nombre() { return tr("Nada"); }, emoji: '✋' },
+    { id: 'CUBO', get nombre() { return tr("Cubo de caramelos"); }, emoji: '🎃' },
+    { id: 'ESCOBA', get nombre() { return tr("Escoba"); }, emoji: '🧹' },
+    { id: 'FAROL', get nombre() { return tr("Farol"); }, emoji: '🏮' },
+    { id: 'VARITA', get nombre() { return tr("Varita"); }, emoji: '🪄' },
+    { id: 'PIRULETA', get nombre() { return tr("Piruleta"); }, emoji: '🍭' },
 ];
 export const AVATAR_POR_DEFECTO = { disfraz: 'FANTASMA', color: null, accesorio: 'CUBO' };
 export const disfrazDe = (id) => DISFRACES.find(d => d.id === id) || DISFRACES[0];

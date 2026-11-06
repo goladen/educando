@@ -18,6 +18,8 @@ import { PERSONAJES_HISTORICOS } from '../personajesHistoricos';
 import { TEMAS } from '../lengua/ejercicios';
 import { bibliotecaIrregularVerbs } from '../BibliotecaIrregularVerbs';
 import { preguntaDeRecurso, candadoRecurso, candadoPropio, codigoLimpio } from './recursosEscape';
+import { tr, esIngles } from './i18n';
+import { CAPITALES_EN, PAISES_EN, CONTINENTES_EN, SISTEMAS_EN, CATEGORIAS_EN, ANATOMIA_EN, ADIVINANZAS_EN } from './contenidoEn';
 
 export const rInt = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
 export const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -36,34 +38,34 @@ function opcionMultiple(base, correcta, incorrectas) {
 // ─── Salas (una por materia) ─────────────────────────────────────────
 export const SALAS = {
     MATES: {
-        id: 'MATES', materia: 'Matemáticas', nombre: 'El laboratorio del Dr. Calavera', emoji: '🧪', color: '#7CFC00',
-        historia: 'Las pociones del doctor burbujean en sus frascos. Solo los cálculos exactos las mantienen estables… y la puerta tiene un candado numérico.',
-        amuleto: { emoji: '⚗️', nombre: 'Poción de luz' },
+        id: 'MATES', get materia() { return tr('Matemáticas'); }, get nombre() { return tr('El laboratorio del Dr. Calavera'); }, emoji: '🧪', color: '#7CFC00',
+        get historia() { return tr('Las pociones del doctor burbujean en sus frascos. Solo los cálculos exactos las mantienen estables… y la puerta tiene un candado numérico.'); },
+        amuleto: { emoji: '⚗️', get nombre() { return tr('Poción de luz'); } },
     },
     GEOGRAFIA: {
-        id: 'GEOGRAFIA', materia: 'Geografía', nombre: 'La biblioteca de los mapas malditos', emoji: '🗺️', color: '#38bdf8',
-        historia: 'Cientos de mapas viejos flotan entre las estanterías. El fantasma bibliotecario solo os dejará pasar si demostráis que conocéis el mundo.',
-        amuleto: { emoji: '🧭', nombre: 'Brújula espectral' },
+        id: 'GEOGRAFIA', get materia() { return tr('Geografía'); }, get nombre() { return tr('La biblioteca de los mapas malditos'); }, emoji: '🗺️', color: '#38bdf8',
+        get historia() { return tr('Cientos de mapas viejos flotan entre las estanterías. El fantasma bibliotecario solo os dejará pasar si demostráis que conocéis el mundo.'); },
+        amuleto: { emoji: '🧭', get nombre() { return tr('Brújula espectral'); } },
     },
     BIOLOGIA: {
-        id: 'BIOLOGIA', materia: 'Biología', nombre: 'La sala de los huesos', emoji: '🦴', color: '#f8fafc',
-        historia: 'Un esqueleto gigante custodia la sala. Le faltan piezas y solo quien sepa de anatomía podrá devolvérselas.',
-        amuleto: { emoji: '💀', nombre: 'Cráneo de cristal' },
+        id: 'BIOLOGIA', get materia() { return tr('Biología'); }, get nombre() { return tr('La sala de los huesos'); }, emoji: '🦴', color: '#f8fafc',
+        get historia() { return tr('Un esqueleto gigante custodia la sala. Le faltan piezas y solo quien sepa de anatomía podrá devolvérselas.'); },
+        amuleto: { emoji: '💀', get nombre() { return tr('Cráneo de cristal'); } },
     },
     HISTORIA: {
-        id: 'HISTORIA', materia: 'Historia', nombre: 'La galería de retratos embrujados', emoji: '🖼️', color: '#fbbf24',
-        historia: 'Los ojos de los retratos os siguen al pasar. Cada personaje histórico guarda un secreto… y uno de ellos tiene la llave.',
-        amuleto: { emoji: '🗝️', nombre: 'Llave del tiempo' },
+        id: 'HISTORIA', get materia() { return tr('Historia'); }, get nombre() { return tr('La galería de retratos embrujados'); }, emoji: '🖼️', color: '#fbbf24',
+        get historia() { return tr('Los ojos de los retratos os siguen al pasar. Cada personaje histórico guarda un secreto… y uno de ellos tiene la llave.'); },
+        amuleto: { emoji: '🗝️', get nombre() { return tr('Llave del tiempo'); } },
     },
     LENGUA: {
-        id: 'LENGUA', materia: 'Lengua', nombre: 'La cripta de los pergaminos', emoji: '📜', color: '#f472b6',
-        historia: 'Los pergaminos están llenos de faltas de ortografía y las palabras se han desordenado. Arreglad el texto para romper el hechizo.',
-        amuleto: { emoji: '🪶', nombre: 'Pluma encantada' },
+        id: 'LENGUA', get materia() { return tr('Lengua'); }, get nombre() { return tr('La cripta de los pergaminos'); }, emoji: '📜', color: '#f472b6',
+        get historia() { return tr('Los pergaminos están llenos de faltas de ortografía y las palabras se han desordenado. Arreglad el texto para romper el hechizo.'); },
+        amuleto: { emoji: '🪶', get nombre() { return tr('Pluma encantada'); } },
     },
     INGLES: {
-        id: 'INGLES', materia: 'Inglés', nombre: 'El desván de la bruja inglesa', emoji: '🕸️', color: '#a78bfa',
-        historia: 'Una bruja llegada de Londres ha encantado el desván. Sus conjuros solo funcionan en inglés… ¡y los verbos irregulares son su punto débil!',
-        amuleto: { emoji: '🧹', nombre: 'Escoba voladora' },
+        id: 'INGLES', get materia() { return tr('Inglés'); }, get nombre() { return tr('El desván de la bruja inglesa'); }, emoji: '🕸️', color: '#a78bfa',
+        get historia() { return tr('Una bruja llegada de Londres ha encantado el desván. Sus conjuros solo funcionan en inglés… ¡y los verbos irregulares son su punto débil!'); },
+        amuleto: { emoji: '🧹', get nombre() { return tr('Escoba voladora'); } },
     },
 };
 export const ORDEN_SALAS = ['MATES', 'GEOGRAFIA', 'BIOLOGIA', 'HISTORIA', 'LENGUA', 'INGLES'];
@@ -71,15 +73,15 @@ export const ORDEN_SALAS = ['MATES', 'GEOGRAFIA', 'BIOLOGIA', 'HISTORIA', 'LENGU
 /** Temas de cada materia (permite montar un escape room entero de una sola materia). */
 export const TEMAS_MATERIA = {
     MATES: [
-        { v: 'MIX', l: '🎲 Variado' }, { v: 'OPERACIONES', l: '➕ Sumas y restas' }, { v: 'TABLAS', l: '✖️ Multiplicar y dividir' },
-        { v: 'ENTEROS', l: '➖ Números enteros' }, { v: 'FRACCIONES', l: '🍕 Fracciones' }, { v: 'POTENCIAS', l: '²√ Potencias y raíces' },
-        { v: 'ECUACIONES', l: '🟰 Ecuaciones' }, { v: 'PORCENTAJES', l: '💯 Porcentajes' },
+        { v: 'MIX', get l() { return tr('🎲 Variado'); } }, { v: 'OPERACIONES', get l() { return tr('➕ Sumas y restas'); } }, { v: 'TABLAS', get l() { return tr('✖️ Multiplicar y dividir'); } },
+        { v: 'ENTEROS', get l() { return tr('➖ Números enteros'); } }, { v: 'FRACCIONES', get l() { return tr('🍕 Fracciones'); } }, { v: 'POTENCIAS', get l() { return tr('²√ Potencias y raíces'); } },
+        { v: 'ECUACIONES', get l() { return tr('🟰 Ecuaciones'); } }, { v: 'PORCENTAJES', get l() { return tr('💯 Porcentajes'); } },
     ],
-    GEOGRAFIA: [{ v: 'MIX', l: '🎲 Variado' }, { v: 'BANDERAS', l: '🏳️ Banderas' }, { v: 'CAPITALES', l: '🏛️ Capitales' }],
-    BIOLOGIA: [{ v: 'MIX', l: '🎲 Variado' }, { v: 'HUESOS', l: '🦴 Huesos' }, { v: 'MUSCULOS', l: '💪 Músculos' }, { v: 'ORGANOS', l: '🫀 Órganos' }],
-    HISTORIA: [{ v: 'MIX', l: '🎲 Variado' }, { v: 'mandatario', l: '👑 Mandatarios' }, { v: 'artista', l: '🎨 Artistas' }, { v: 'cientifico', l: '🔬 Científicos' }],
-    LENGUA: [{ v: 'MIX', l: '🎲 Variado' }, { v: 'ORTOGRAFIA', l: '✍️ Ortografía' }, { v: 'LEXICO', l: '📚 Léxico' }],
-    INGLES: [{ v: 'MIX', l: '🎲 Variado' }, { v: 'PAST', l: '⏪ Past simple' }, { v: 'PARTICIPLE', l: '✅ Past participle' }, { v: 'VOCAB', l: '🔤 Significado' }],
+    GEOGRAFIA: [{ v: 'MIX', get l() { return tr('🎲 Variado'); } }, { v: 'BANDERAS', get l() { return tr('🏳️ Banderas'); } }, { v: 'CAPITALES', get l() { return tr('🏛️ Capitales'); } }],
+    BIOLOGIA: [{ v: 'MIX', get l() { return tr('🎲 Variado'); } }, { v: 'HUESOS', get l() { return tr('🦴 Huesos'); } }, { v: 'MUSCULOS', get l() { return tr('💪 Músculos'); } }, { v: 'ORGANOS', get l() { return tr('🫀 Órganos'); } }],
+    HISTORIA: [{ v: 'MIX', get l() { return tr('🎲 Variado'); } }, { v: 'mandatario', get l() { return tr('👑 Mandatarios'); } }, { v: 'artista', get l() { return tr('🎨 Artistas'); } }, { v: 'cientifico', get l() { return tr('🔬 Científicos'); } }],
+    LENGUA: [{ v: 'MIX', get l() { return tr('🎲 Variado'); } }, { v: 'ORTOGRAFIA', get l() { return tr('✍️ Ortografía'); } }, { v: 'LEXICO', get l() { return tr('📚 Léxico'); } }],
+    INGLES: [{ v: 'MIX', get l() { return tr('🎲 Variado'); } }, { v: 'PAST', get l() { return tr('⏪ Past simple'); } }, { v: 'PARTICIPLE', get l() { return tr('✅ Past participle'); } }, { v: 'VOCAB', get l() { return tr('🔤 Significado'); } }],
 };
 
 /** Nombres alternativos para cuando se repite una materia. */
@@ -89,12 +91,12 @@ const NOMBRES_EXTRA = {
     BIOLOGIA: ['El laboratorio de Frankenstein', 'El invernadero carnívoro', 'La enfermería abandonada'],
     HISTORIA: ['El salón del baile de los siglos', 'La armería del caballero sin cabeza', 'La biblioteca de las crónicas'],
     LENGUA: ['La sala de los espejos de palabras', 'El confesionario de las letras', 'El estudio del poeta fantasma'],
-    INGLES: ['The haunted kitchen', 'The spooky bathroom', 'The vampire’s bedroom'],
+    INGLES: ['La cocina encantada', 'El baño tenebroso', 'El dormitorio del vampiro'],
 };
 const AMULETOS_EXTRA = [
-    { emoji: '🔮', nombre: 'Bola de cristal' }, { emoji: '🕯️', nombre: 'Vela eterna' }, { emoji: '🪄', nombre: 'Varita mágica' },
-    { emoji: '📿', nombre: 'Collar protector' }, { emoji: '🧄', nombre: 'Ristra de ajos' }, { emoji: '🗡️', nombre: 'Daga de plata' },
-    { emoji: '🍬', nombre: 'Caramelo mágico' }, { emoji: '🧿', nombre: 'Ojo protector' },
+    { emoji: '🔮', get nombre() { return tr('Bola de cristal'); } }, { emoji: '🕯️', get nombre() { return tr('Vela eterna'); } }, { emoji: '🪄', get nombre() { return tr('Varita mágica'); } },
+    { emoji: '📿', get nombre() { return tr('Collar protector'); } }, { emoji: '🧄', get nombre() { return tr('Ristra de ajos'); } }, { emoji: '🗡️', get nombre() { return tr('Daga de plata'); } },
+    { emoji: '🍬', get nombre() { return tr('Caramelo mágico'); } }, { emoji: '🧿', get nombre() { return tr('Ojo protector'); } },
 ];
 
 /** Datos de presentación de una prueba (sala) del escape room. */
@@ -102,8 +104,8 @@ export function infoPrueba(prueba, idx = 0, pruebas = []) {
     if (!prueba) return SALAS.MATES;
     if (prueba.tipo === 'MANUAL') {
         return {
-            id: prueba.id, materia: 'Prueba propia', emoji: prueba.emoji || '🗝️', color: '#fb923c',
-            nombre: prueba.nombre || 'La habitación secreta',
+            id: prueba.id, materia: tr('Prueba propia'), emoji: prueba.emoji || '🗝️', color: '#fb923c',
+            nombre: prueba.nombre || tr('La habitación secreta'),
             historia: prueba.texto || '',
             amuleto: AMULETOS_EXTRA[idx % AMULETOS_EXTRA.length],
             decor: 'MANUAL',
@@ -111,16 +113,18 @@ export function infoPrueba(prueba, idx = 0, pruebas = []) {
     }
     if (prueba.tipo === 'RECURSO') {
         return {
-            id: prueba.id, materia: `Recurso${prueba.autor ? ` de ${prueba.autor}` : ''}`, emoji: prueba.emoji || '📚', color: '#22d3ee',
-            nombre: prueba.nombre || prueba.recursoTitulo || 'La biblioteca prohibida',
-            historia: `Un libro polvoriento se abre solo: son las preguntas de «${prueba.recursoTitulo || 'un recurso'}»${prueba.autor ? `, escritas por ${prueba.autor}` : ''}. Solo quien las responda podrá seguir.`,
+            id: prueba.id, materia: prueba.autor ? tr('Recurso de {0}', [prueba.autor]) : tr('Recurso'), emoji: prueba.emoji || '📚', color: '#22d3ee',
+            nombre: prueba.nombre || prueba.recursoTitulo || tr('La biblioteca prohibida'),
+            historia: prueba.autor
+                ? tr('Un libro polvoriento se abre solo: son las preguntas de «{0}», escritas por {1}. Solo quien las responda podrá seguir.', [prueba.recursoTitulo || tr('un recurso'), prueba.autor])
+                : tr('Un libro polvoriento se abre solo: son las preguntas de «{0}». Solo quien las responda podrá seguir.', [prueba.recursoTitulo || tr('un recurso')]),
             amuleto: AMULETOS_EXTRA[idx % AMULETOS_EXTRA.length],
             decor: 'LENGUA',
         };
     }
     const base = SALAS[prueba.materia] || SALAS.MATES;
     const repeticion = pruebas.slice(0, idx).filter(p => p.tipo !== 'MANUAL' && p.materia === prueba.materia).length;
-    const nombre = prueba.nombre || (repeticion === 0 ? base.nombre : (NOMBRES_EXTRA[base.id] || [])[(repeticion - 1) % 3] || base.nombre);
+    const nombre = prueba.nombre || (repeticion === 0 ? base.nombre : tr((NOMBRES_EXTRA[base.id] || [])[(repeticion - 1) % 3] || '') || base.nombre);
     const tema = (TEMAS_MATERIA[base.id] || []).find(t => t.v === prueba.tema && t.v !== 'MIX');
     return {
         ...base, id: prueba.id, nombre, decor: base.id,
@@ -177,7 +181,7 @@ function operacionTema(tema, etapa) {
         }
         case 'PORCENTAJES': {
             const p = pick(prim ? [10, 50, 25] : [5, 10, 15, 20, 25, 30, 50, 75]), n = pick([20, 40, 60, 80, 100, 120, 200, 400]);
-            return { texto: `${p} % de ${n}`, v: (p * n) / 100 };
+            return { texto: tr('{0} % de {1}', [p, n]), v: (p * n) / 100 };
         }
         default: return null;
     }
@@ -187,25 +191,25 @@ function preguntaFracciones(etapa) {
     const t = pick(etapa === 'PRIMARIA' ? ['cantidad', 'equivalente', 'misma'] : ['cantidad', 'equivalente', 'misma', 'simplificar', 'producto']);
     if (t === 'cantidad') {
         const d = pick([2, 3, 4, 5, 10]), n = rInt(1, d - 1), k = rInt(2, 10);
-        return opcionMultiple({ texto: '¿Cuánto es?', detalle: `${FR(n, d)} de ${d * k}`, grande: true }, n * k, distractoresNum(n * k).filter(x => x > 0));
+        return opcionMultiple({ texto: tr('¿Cuánto es?'), detalle: tr('{0} de {1}', [FR(n, d), d * k]), grande: true }, n * k, distractoresNum(n * k).filter(x => x > 0));
     }
     if (t === 'equivalente') {
         const d = rInt(2, 6), n = rInt(1, d - 1), k = rInt(2, 5);
-        return opcionMultiple({ texto: 'Completa la fracción equivalente', detalle: `${FR(n, d)} = ?/${d * k}`, grande: true }, n * k, distractoresNum(n * k).filter(x => x > 0));
+        return opcionMultiple({ texto: tr('Completa la fracción equivalente'), detalle: `${FR(n, d)} = ?/${d * k}`, grande: true }, n * k, distractoresNum(n * k).filter(x => x > 0));
     }
     if (t === 'misma') {
         const d = rInt(3, 12), a = rInt(1, d - 2), b = rInt(1, d - a - 1);
         const ok = FR(a + b, d);
-        return opcionMultiple({ texto: '¿Cuánto vale?', detalle: `${FR(a, d)} + ${FR(b, d)}`, grande: true }, ok, [FR(a + b, d + d), FR(a + b + 1, d), FR(Math.max(1, a + b - 1) === a + b ? a + b + 2 : Math.max(1, a + b - 1), d)].filter(x => x !== ok));
+        return opcionMultiple({ texto: tr('¿Cuánto vale?'), detalle: `${FR(a, d)} + ${FR(b, d)}`, grande: true }, ok, [FR(a + b, d + d), FR(a + b + 1, d), FR(Math.max(1, a + b - 1) === a + b ? a + b + 2 : Math.max(1, a + b - 1), d)].filter(x => x !== ok));
     }
     if (t === 'simplificar') {
         const g = rInt(2, 6), d0 = rInt(2, 9), n0 = rInt(1, d0 - 1), m = mcd(n0, d0), n = n0 / m, d = d0 / m;
         const ok = FR(n, d);
-        return opcionMultiple({ texto: 'Simplifica al máximo', detalle: FR(n * g, d * g), grande: true }, ok, [FR(n + 1, d), FR(n, d + 1), FR(n * 2, d * 3)].filter(x => x !== ok));
+        return opcionMultiple({ texto: tr('Simplifica al máximo'), detalle: FR(n * g, d * g), grande: true }, ok, [FR(n + 1, d), FR(n, d + 1), FR(n * 2, d * 3)].filter(x => x !== ok));
     }
     const a = rInt(1, 5), b = rInt(2, 6), c = rInt(1, 5), d = rInt(2, 6);
     const ok = FR(a * c, b * d);
-    return opcionMultiple({ texto: '¿Cuánto vale? (sin simplificar)', detalle: `${FR(a, b)} · ${FR(c, d)}`, grande: true }, ok, [...new Set([FR(a + c, b + d), FR(a * d, b * c), FR(a * c, b + d), FR(a + c, b * d)])].filter(x => x !== ok));
+    return opcionMultiple({ texto: tr('¿Cuánto vale? (sin simplificar)'), detalle: `${FR(a, b)} · ${FR(c, d)}`, grande: true }, ok, [...new Set([FR(a + c, b + d), FR(a * d, b * c), FR(a * c, b + d), FR(a + c, b * d)])].filter(x => x !== ok));
 }
 
 function operacionMates(etapa) {
@@ -222,13 +226,13 @@ function operacionMates(etapa) {
     if (t === 'combinada') { const a = rInt(2, 9), b = rInt(2, 9), c = rInt(1, 20); return { texto: `${c} + ${a} · ${b}`, v: c + a * b }; }
     if (t === 'potencia') { const b = rInt(2, 6), e = b <= 3 ? rInt(2, 4) : 2; return { texto: `${b}${['', '', '²', '³', '⁴'][e]}`, v: b ** e }; }
     if (t === 'ecuacion') { const x = rInt(-6, 9), a = rInt(2, 6), b = rInt(-10, 10); return { texto: `${a}x ${b < 0 ? '−' : '+'} ${Math.abs(b)} = ${a * x + b}   →   x = ?`, v: x }; }
-    const p = pick([10, 20, 25, 50, 75]), n = pick([20, 40, 60, 80, 120, 200]); return { texto: `${p} % de ${n}`, v: (p * n) / 100 };
+    const p = pick([10, 20, 25, 50, 75]), n = pick([20, 40, 60, 80, 120, 200]); return { texto: tr('{0} % de {1}', [p, n]), v: (p * n) / 100 };
 }
 
 function preguntaMates(etapa, tema = 'MIX') {
     if (tema === 'FRACCIONES') return preguntaFracciones(etapa);
     const { texto, v } = operacionTema(tema, etapa) || operacionMates(etapa);
-    return opcionMultiple({ texto: '¿Cuánto vale?', detalle: texto, grande: true }, v, distractoresNum(v));
+    return opcionMultiple({ texto: tr('¿Cuánto vale?'), detalle: texto, grande: true }, v, distractoresNum(v));
 }
 
 /** Expresión cuyo resultado es la cifra d (0-9). */
@@ -250,12 +254,12 @@ function expresionCifra(d, etapa) {
 
 function candadoMates(etapa) {
     const cifras = Array.from({ length: 4 }, () => rInt(0, 9));
-    const ordinal = ['primera', 'segunda', 'tercera', 'cuarta'];
+    const ordinal = [tr('primera'), tr('segunda'), tr('tercera'), tr('cuarta')];
     return {
-        titulo: 'Candado de 4 cifras',
-        instruccion: 'Cada cifra del código es el resultado de una operación. Las operaciones están repartidas entre vuestros móviles: ¡juntadlas!',
+        clave: 'Candado de 4 cifras', titulo: tr('Candado de 4 cifras'),
+        instruccion: tr('Cada cifra del código es el resultado de una operación. Las operaciones están repartidas entre vuestros móviles: ¡juntadlas!'),
         tipo: 'numero', longitud: 4,
-        pistas: cifras.map((d, i) => ({ texto: `La ${ordinal[i]} cifra es: ${expresionCifra(d, etapa)}` })),
+        pistas: cifras.map((d, i) => ({ texto: tr('La {0} cifra es: {1}', [ordinal[i], expresionCifra(d, etapa)]) })),
         soluciones: [cifras.join('')],
         solucionVisible: cifras.join(''),
     };
@@ -266,33 +270,40 @@ function candadoMates(etapa) {
 // ═══════════════════════════════════════════════════════════════════
 const poolPaises = (etapa) => (etapa === 'PRIMARIA' ? PAISES_BANDERAS.filter(p => ['Europa', 'América'].includes(p.continente)) : PAISES_BANDERAS);
 
+// En inglés, los nombres de países, capitales y continentes salen de contenidoEn.js
+const nombrePais = (p) => (esIngles() ? PAISES_EN[p.iso2] || p.nombre : p.nombre);
+const capitalPais = (p) => (esIngles() ? CAPITALES_EN[p.iso2] || p.capital : p.capital);
+const continentePais = (p) => (esIngles() ? CONTINENTES_EN[p.continente] || p.continente : p.continente);
+
 function preguntaGeografia(etapa, tema = 'MIX') {
     const pool = poolPaises(etapa);
     const p = pick(pool);
     const t = tema === 'BANDERAS' ? 'bandera' : tema === 'CAPITALES' ? pick(['capital', 'pais']) : pick(['bandera', 'capital', 'pais']);
+    const nombres = pool.map(nombrePais), capitales = pool.map(capitalPais);
     if (t === 'bandera') {
-        return opcionMultiple({ texto: '¿De qué país es esta bandera?', img: FLAG_URL(p.iso2) }, p.nombre, tomar(pool.map(x => x.nombre), 3, [p.nombre]));
+        return opcionMultiple({ texto: tr('¿De qué país es esta bandera?'), img: FLAG_URL(p.iso2) }, nombrePais(p), tomar(nombres, 3, [nombrePais(p)]));
     }
     if (t === 'capital') {
-        return opcionMultiple({ texto: `¿Cuál es la capital de ${p.nombre}?` }, p.capital, tomar(pool.map(x => x.capital), 3, [p.capital]));
+        return opcionMultiple({ texto: tr('¿Cuál es la capital de {0}?', [nombrePais(p)]) }, capitalPais(p), tomar(capitales, 3, [capitalPais(p)]));
     }
-    return opcionMultiple({ texto: `¿De qué país es capital ${p.capital}?` }, p.nombre, tomar(pool.map(x => x.nombre), 3, [p.nombre]));
+    return opcionMultiple({ texto: tr('¿De qué país es capital {0}?', [capitalPais(p)]) }, nombrePais(p), tomar(nombres, 3, [nombrePais(p)]));
 }
 
 function candadoGeografia(etapa) {
-    const p = pick(poolPaises(etapa).filter(x => x.capital.length >= 4 && x.capital.length <= 12));
+    const p = pick(poolPaises(etapa).filter(x => capitalPais(x).length >= 4 && capitalPais(x).length <= 12));
+    const capital = capitalPais(p);
     return {
-        titulo: 'La capital secreta',
-        instruccion: 'El fantasma bibliotecario esconde una ciudad. Uno de vosotros tiene la bandera del país… ¡averiguad su CAPITAL!',
-        tipo: 'texto', longitud: p.capital.length,
+        clave: 'La capital secreta', titulo: tr('La capital secreta'),
+        instruccion: tr('El fantasma bibliotecario esconde una ciudad. Uno de vosotros tiene la bandera del país… ¡averiguad su CAPITAL!'),
+        tipo: 'texto', longitud: capital.length,
         pistas: [
-            { texto: 'Esta es la bandera del país:', img: FLAG_URL(p.iso2) },
-            { texto: `El país está en ${p.continente}.` },
-            { texto: `La capital empieza por «${p.capital[0]}».` },
-            { texto: `El nombre de la capital tiene ${p.capital.replace(/\s/g, '').length} letras.` },
+            { texto: tr('Esta es la bandera del país:'), img: FLAG_URL(p.iso2) },
+            { texto: tr('El país está en {0}.', [continentePais(p)]) },
+            { texto: tr('La capital empieza por «{0}».', [capital[0]]) },
+            { texto: tr('El nombre de la capital tiene {0} letras.', [capital.replace(/\s/g, '').length]) },
         ],
-        soluciones: [p.capital],
-        solucionVisible: `${p.capital} (${p.nombre})`,
+        soluciones: [capital, p.capital],
+        solucionVisible: `${capital} (${nombrePais(p)})`,
     };
 }
 
@@ -312,34 +323,39 @@ const poolBio = (etapa, tema) => {
     return p.length >= 6 ? p : ANATOMIA.filter(filtro);
 };
 
+/** Pieza en el idioma activo; cat = categoría en minúsculas («órgano» / «organ»), catUn = con artículo («un órgano» / «an organ»). */
+const bio = (a) => (esIngles() && ANATOMIA_EN[a.id]
+    ? { ...a, nombre: ANATOMIA_EN[a.id][0], descripcion: ANATOMIA_EN[a.id][1], sistema: SISTEMAS_EN[a.sistema] || a.sistema, cat: CATEGORIAS_EN[a.categoria] || a.categoria, catUn: a.categoria === 'Órgano' ? 'an organ' : `a ${CATEGORIAS_EN[a.categoria] || a.categoria}` }
+    : { ...a, cat: a.categoria.toLowerCase(), catUn: `un ${a.categoria.toLowerCase()}` });
+
 function preguntaBiologia(etapa, tema = 'MIX') {
-    const pool = poolBio(etapa, tema);
+    const pool = poolBio(etapa, tema).map(bio);
     const item = pick(pool);
     const t = pick(['descripcion', 'descripcion', 'sistema', 'foto']);
     if (t === 'sistema') {
-        const sistemas = [...new Set(ANATOMIA.map(a => a.sistema))];
-        return opcionMultiple({ texto: `¿A qué sistema o aparato pertenece: ${item.nombre}?` }, item.sistema, tomar(sistemas, 3, [item.sistema]));
+        const sistemas = [...new Set(ANATOMIA.map(a => bio(a).sistema))];
+        return opcionMultiple({ texto: tr('¿A qué sistema o aparato pertenece: {0}?', [item.nombre]) }, item.sistema, tomar(sistemas, 3, [item.sistema]));
     }
     const mismos = pool.filter(a => a.categoria === item.categoria).map(a => a.nombre);
     if (t === 'foto' && item.imagenUrl) {
-        return opcionMultiple({ texto: `¿Qué ${item.categoria.toLowerCase()} es este?`, img: item.imagenUrl }, item.nombre, tomar(mismos, 3, [item.nombre]));
+        return opcionMultiple({ texto: tr('¿Qué {0} es este?', [item.cat]), img: item.imagenUrl }, item.nombre, tomar(mismos, 3, [item.nombre]));
     }
-    return opcionMultiple({ texto: `¿Qué ${item.categoria.toLowerCase()} es?`, detalle: censurar(item.descripcion, item.nombre) }, item.nombre, tomar(mismos, 3, [item.nombre]));
+    return opcionMultiple({ texto: tr('¿Qué {0} es?', [item.cat]), detalle: censurar(item.descripcion, item.nombre) }, item.nombre, tomar(mismos, 3, [item.nombre]));
 }
 
 function candadoBiologia(etapa, tema = 'MIX') {
-    const pool = poolBio(etapa, tema);
+    const pool = poolBio(etapa, tema).map(bio);
     const cortos = pool.filter(a => a.nombre.length <= 14);
     const item = pick(cortos.length ? cortos : pool);
     return {
-        titulo: 'La pieza perdida del esqueleto',
-        instruccion: `Al guardián le falta una pieza: es un ${item.categoria.toLowerCase()}. Juntad las pistas y escribid su nombre.`,
+        clave: 'La pieza perdida del esqueleto', titulo: tr('La pieza perdida del esqueleto'),
+        instruccion: tr('Al guardián le falta una pieza: es {0}. Juntad las pistas y escribid su nombre.', [item.catUn]),
         tipo: 'texto', longitud: item.nombre.length,
         pistas: [
-            { texto: `Pertenece al ${item.sistema}.` },
-            { texto: `Lo que sé: «${censurar(item.descripcion, item.nombre)}»` },
-            { texto: `Empieza por «${item.nombre[0]}» y tiene ${item.nombre.replace(/\s/g, '').length} letras.` },
-            { texto: `Es un ${item.categoria.toLowerCase()}. Termina en «${item.nombre.slice(-2)}».` },
+            { texto: tr('Pertenece al {0}.', [item.sistema]) },
+            { texto: tr('Lo que sé: «{0}»', [censurar(item.descripcion, item.nombre)]) },
+            { texto: tr('Empieza por «{0}» y tiene {1} letras.', [item.nombre[0], item.nombre.replace(/\s/g, '').length]) },
+            { texto: tr('Es {0}. Termina en «{1}».', [item.catUn, item.nombre.slice(-2)]) },
         ],
         soluciones: [item.nombre],
         solucionVisible: item.nombre,
@@ -379,7 +395,7 @@ function candadoHistoria(etapa, tema = 'MIX') {
     const p = pick(poolHistoria(tema));
     const tokens = p.nombre.split(/\s+/).filter(t => t.length >= 4 && !PALABRAS_VACIAS.has(normalizar(t)));
     return {
-        titulo: 'El retrato que habla',
+        clave: 'El retrato que habla', titulo: 'El retrato que habla',
         instruccion: 'Un retrato ha perdido su placa con el nombre. Cada uno tiene un recuerdo del personaje: ¡poned en común quién es!',
         tipo: 'texto', longitud: null,
         pistas: [
@@ -454,7 +470,7 @@ function candadoLengua() {
     const w = pick(PALABRAS_HALLOWEEN);
     const grupos = trocearLetras(w.p, 3);
     return {
-        titulo: 'El pergamino desordenado',
+        clave: 'El pergamino desordenado', titulo: 'El pergamino desordenado',
         instruccion: 'Las letras de una palabra mágica se han desperdigado por la cripta. Reunid todas las letras y ordenadlas.',
         tipo: 'texto', longitud: w.p.length,
         pistas: [
@@ -476,7 +492,7 @@ function preguntaIngles(etapa, tema = 'MIX') {
     const v = pick(pool);
     const t = { PAST: 'past', PARTICIPLE: 'participle', VOCAB: 'traduccion' }[tema] || pick(['past', 'participle', 'traduccion']);
     if (t === 'traduccion') {
-        return opcionMultiple({ texto: `What does «${v.baseForm}» mean?` }, v.translation, tomar([...new Set(pool.map(x => x.translation))], 3, [v.translation]));
+        return opcionMultiple({ texto: tr('What does «{0}» mean?', [v.baseForm]) }, v.translation, tomar([...new Set(pool.map(x => x.translation))], 3, [v.translation]));
     }
     const campo = t === 'past' ? 'pastSimple' : 'pastParticiple';
     const otros = pool.filter(x => x !== v).map(x => x[campo]);
@@ -501,17 +517,17 @@ const PALABRAS_EN = [
 function candadoIngles() {
     const w = pick(PALABRAS_EN);
     return {
-        titulo: 'The witch’s password',
-        instruccion: 'La bruja solo abre la puerta con una contraseña EN INGLÉS. Juntad las pistas para adivinarla.',
+        clave: 'The witch’s password', titulo: 'The witch’s password',
+        instruccion: tr('La bruja solo abre la puerta con una contraseña EN INGLÉS. Juntad las pistas para adivinarla.'),
         tipo: 'texto', longitud: w.p.length,
         pistas: [
-            { texto: `Adivinanza: ${w.def}` },
+            { texto: tr('Adivinanza: {0}', [esIngles() ? ADIVINANZAS_EN[w.p] || w.def : w.def]) },
             { texto: `In English it has ${w.p.length} letters.` },
             { texto: `It starts with «${w.p[0]}» and ends with «${w.p.slice(-1)}».` },
-            { texto: `Letras desordenadas: ${barajar(w.p.split('')).join(' ')}` },
+            { texto: tr('Letras desordenadas: {0}', [barajar(w.p.split('')).join(' ')]) },
         ],
         soluciones: [w.p],
-        solucionVisible: `${w.p} (${w.es})`,
+        solucionVisible: esIngles() ? w.p : `${w.p} (${w.es})`,
     };
 }
 
@@ -565,15 +581,15 @@ export function pruebaParaSala(p) {
         id: p.id, tipo: 'MANUAL', nombre: p.nombre || '', emoji: p.emoji || '🗝️', texto: p.texto || '', pista: p.pista || '',
         imagen: p.imagen || '', materiaRetos: p.materiaRetos || null, temaRetos: p.temaRetos || 'MIX',
         huellas: codigos.map(huellaCodigo), longitud: codigos[0] ? normalizar(codigos[0]).length : null,
-        tipoCodigo: codigos[0] && /^d+$/.test(codigos[0].replace(/s/g, '')) ? 'numero' : 'texto',
+        tipoCodigo: codigos[0] && /^\d+$/.test(codigos[0].replace(/\s/g, '')) ? 'numero' : 'texto',
     };
 }
 
 /** Candado de una prueba propia: el texto del profe + el código que los alumnos buscan en el aula. */
 export function candadoManual(p) {
     return {
-        titulo: p.nombre || 'La habitación secreta',
-        instruccion: p.texto || 'Buscad el código escondido en el aula.',
+        titulo: p.nombre || tr('La habitación secreta'),
+        instruccion: p.texto || tr('Buscad el código escondido en el aula.'),
         tipo: p.tipoCodigo || 'texto', longitud: p.longitud || null, manual: true,
         imagen: p.imagen || '',
         pistas: p.pista ? [{ texto: p.pista }] : [],

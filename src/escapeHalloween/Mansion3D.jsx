@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { crearAvatar3D, crearZombiJefe, liberar, etiquetaNombre } from './avatares3d';
+import { tr } from './i18n';
 
 /**
  *  Mansión 3D del escape room («casa de muñecas» abierta por delante):
@@ -39,7 +40,7 @@ function texturaCartel(emoji, nombre, color, numero) {
     g.font = '110px serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillText(emoji, 95, 128);
     g.fillStyle = color; g.font = 'bold 34px system-ui, sans-serif'; g.textAlign = 'left';
-    g.fillText(`Sala ${numero}`, 180, 60);
+    g.fillText(tr("Sala {0}", [numero]), 180, 60);
     g.fillStyle = '#f5e9ff'; g.font = 'bold 30px system-ui, sans-serif';
     const palabras = String(nombre).split(' '); let linea = '', y = 115;
     for (const p of palabras) {

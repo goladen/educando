@@ -118,7 +118,7 @@ export default function BuscadorPaginas({ onSelect, onBack }) {
               {p.descripcion && <p style={{ margin:'0 0 12px', fontSize:13, color:'#475569', lineHeight:1.5 }}>{p.descripcion.slice(0,120)}{p.descripcion.length>120?'…':''}</p>}
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                 <span style={{ fontSize:11, color:'#94A3B8' }}>
-                  {(p.cursos||[]).length} curso{(p.cursos||[]).length!==1?'s':''}
+                  {(p.cursos||[]).filter(c=>c.acceso?.modo!=='oculto').length} curso{(p.cursos||[]).filter(c=>c.acceso?.modo!=='oculto').length!==1?'s':''}
                 </span>
                 <span style={{ fontSize:12, color:'#6D28D9', fontWeight:700 }}>
                   pikt.es/{p.slug||'…'} →

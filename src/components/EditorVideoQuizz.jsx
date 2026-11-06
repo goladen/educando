@@ -411,8 +411,9 @@ export default function EditorVideoQuizz({ recursoInicial = null, usuario, onBac
         tipoJuego: 'VIDEOQUIZZ',
         tipo: 'VIDEOQUIZZ',
         isFinished: !!recursoEfectivo.isFinished,
-        profesorUid: usuario?.uid||'anon',
-        profesorNombre: usuario?.displayName||'Anon',
+        // Editando un recurso existente (p. ej. compartido conmigo) el autor no cambia
+        profesorUid: (recursoEfectivo.id && recursoEfectivo.profesorUid) || usuario?.uid||'anon',
+        profesorNombre: (recursoEfectivo.id && recursoEfectivo.profesorNombre) || usuario?.displayName||'Anon',
         pais: recursoEfectivo.pais||usuario?.pais||'',
         region: recursoEfectivo.region||usuario?.region||'',
         poblacion: recursoEfectivo.poblacion||usuario?.poblacion||'',

@@ -1,11 +1,11 @@
 // Cargar un test en el mBot2: la pregunta se oye por el altavoz del CyberPi, las respuestas se
-// ven en su pantalla y se responde con su joystick. Todo queda guardado en la placa, en la
-// ranura 8: después funciona sin cable, sin ordenador y sin Wi-Fi.
-import React, { useMemo, useRef, useState } from 'react';
+// ven en su pantalla y se responde con su joystick. Se guarda en la ranura que se elija (1-8), con
+// un nombre: un test por materia. Después funciona sin cable, sin ordenador y sin Wi-Fi.
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { auth } from '../firebase';
 import SelectorRecursoMandos, { hojasQuiz } from '../mandos/SelectorRecursoMandos.jsx';
 import { barajar } from '../mandos/QuizMandos.jsx';
-import { cargarTestEnRobot, desconectarCyberpi, prepararCargaTest, soportaSerialCyberpi } from './cyberpiMbot.js';
+import { cargarTestEnRobot, desconectarCyberpi, leerRanurasRobot, prepararCargaTest, soportaSerialCyberpi } from './cyberpiMbot.js';
 
 const VOCES = [
   ['es-ES-ElviraNeural', '🇪🇸 Español'],
@@ -41,7 +41,10 @@ export default function CargarTestRobot({ onExit }) {
   const [hoja, setHoja] = useState(-1);
   const [cuantas, setCuantas] = useState(10);
   const [voz, setVoz] = useState(VOCES[0][0]);
-  const [fase, setFase] = useState('elegir'); // elegir | cargando | hecho
+  const [fase, setFase] = useState('elegir'); // elegir | leyendo | ranura | cargando | hecho
+  const [info, setInfo] = useState(null); // { ranuras, libre }
+  const [ranura, setRanura] = useState(null);
+  const [nombre, setNombre] = useState('');
   const [prog, setProg] = useState({ txt: '', p: 0 });
   const [error, setError] = useState('');
   const [resumen, setResumen] = useState(null);
@@ -53,15 +56,42 @@ export default function CargarTestRobot({ onExit }) {
     return lista.filter((q) => q.opciones.length >= 2 && q.opciones.length <= 4 && q.correcta >= 0);
   }, [hojas, hoja]);
 
+  // Si se sale a medias, el puerto no se queda abierto.
+  useEffect(() => () => { desconectarCyberpi().catch(() => {}); }, []);
+
+  const conectar = async () => {
+    setError('');
+    if (!auth.currentUser) return setError('Inicia sesión para generar la voz de las preguntas.');
+    try {
+      // Lo primero, el puerto: el navegador solo abre esa ventana justo después del clic.
+      if (!(await prepararCargaTest())) return undefined;
+      setFase('leyendo');
+      const datos = await leerRanurasRobot();
+      setInfo(datos);
+      const libre = datos.ranuras.find((r) => r.estado === 'vacia') || datos.ranuras.find((r) => r.estado === 'test');
+      setRanura(libre?.n ?? null);
+      setNombre((n) => n || String(recurso?.titulo || '').slice(0, 24));
+      setFase('ranura');
+    } catch (e) {
+      await desconectarCyberpi().catch(() => {});
+      setError(e?.message || String(e));
+      setFase('elegir');
+    }
+    return undefined;
+  };
+
+  const volver = async () => {
+    await desconectarCyberpi().catch(() => {});
+    setFase('elegir');
+  };
+
   const empezar = async () => {
     setError('');
     const user = auth.currentUser;
     if (!user) return setError('Inicia sesión para generar la voz de las preguntas.');
     cancelar.current = false;
+    setFase('cargando');
     try {
-      // Lo primero, el puerto: el navegador solo abre esa ventana justo después del clic.
-      if (!(await prepararCargaTest())) return undefined;
-      setFase('cargando');
       const token = await user.getIdToken();
       const elegidas = barajar(preguntas).slice(0, cuantas);
       const listas = [];
@@ -76,13 +106,15 @@ export default function CargarTestRobot({ onExit }) {
       const total = listas.reduce((s, q) => s + q.mp3.length, 0);
       const inicio = Date.now();
       await cargarTestEnRobot(listas, {
+        ranura,
+        nombre,
         cancelado: () => cancelar.current,
         onProgreso: (hechos, txt) => {
           const seg = hechos > 0 ? ((Date.now() - inicio) / hechos) * (total - hechos) / 1000 : total / BYTES_POR_SEGUNDO;
           setProg({ txt: `${txt} · faltan unos ${minutos(seg)}`, p: 0.1 + (hechos / total) * 0.9 });
         },
       });
-      setResumen({ n: listas.length, kb: Math.round(total / 1024) });
+      setResumen({ n: listas.length, kb: Math.round(total / 1024), ranura, nombre });
       setFase('hecho');
     } catch (e) {
       await desconectarCyberpi().catch(() => {});
@@ -97,7 +129,7 @@ export default function CargarTestRobot({ onExit }) {
   return (
     <div style={st.wrap}>
       <div style={st.cabecera}>
-        <button onClick={onExit} disabled={fase === 'cargando'} style={st.btnSec}>← Salir</button>
+        <button onClick={onExit} disabled={fase === 'cargando' || fase === 'leyendo'} style={st.btnSec}>← Salir</button>
         <b style={{ fontSize: '1.05rem' }}>🗣️ Cargar un test en el mBot2</b>
       </div>
       <div style={st.cuerpo}>
@@ -108,11 +140,54 @@ export default function CargarTestRobot({ onExit }) {
             <p style={{ textAlign: 'center', color: '#94a3b8', margin: '0 0 10px' }}>{resumen?.n} preguntas · {resumen?.kb} KB</p>
             <ol style={st.lista}>
               <li>Quita el cable USB.</li>
-              <li>En el menú del CyberPi entra en <b>switch program</b> y elige el <b>8</b>.</li>
+              <li>En el menú del CyberPi entra en <b>switch program</b> y elige el <b>{resumen?.ranura}</b>. Saldrá el nombre «{resumen?.nombre}».</li>
               <li>Pulsa el <b>botón A</b> o <b>🗣️ Preguntar</b> en «Conducir el mBot2»: <b>se oye la pregunta</b> y salen las respuestas en la pantalla.</li>
               <li><b>Joystick arriba y abajo</b> para elegir · <b>púlsalo</b> para responder · <b>botón A</b> para repetirla.</li>
             </ol>
             <button onClick={() => setFase('elegir')} style={st.btn}>Cargar otro test</button>
+          </div>
+        )}
+
+        {fase === 'leyendo' && (
+          <div style={st.caja}>
+            <h3 style={{ margin: 0 }}>⏳ Mirando qué hay en el robot…</h3>
+          </div>
+        )}
+
+        {fase === 'ranura' && info && (
+          <div style={st.caja}>
+            <h3 style={{ margin: 0 }}>¿Dónde lo guardo?</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8 }}>
+              {info.ranuras.map((r) => (
+                <button
+                  key={r.n}
+                  disabled={r.estado === 'ajena'}
+                  onClick={() => setRanura(r.n)}
+                  style={{ padding: 10, borderRadius: 10, textAlign: 'left', cursor: r.estado === 'ajena' ? 'not-allowed' : 'pointer', opacity: r.estado === 'ajena' ? 0.5 : 1, border: `2px solid ${ranura === r.n ? '#22c55e' : '#475569'}`, background: ranura === r.n ? '#14532d' : '#0f172a', color: '#e2e8f0' }}
+                >
+                  <b>Ranura {r.n}</b>
+                  <div style={{ fontSize: '0.78rem', color: '#cbd5e1' }}>
+                    {r.estado === 'vacia' ? 'Vacía' : r.estado === 'ajena' ? 'Otro programa (protegida)' : `${r.nombre || 'Test'} · ${r.preguntas} preg.`}
+                  </div>
+                </button>
+              ))}
+            </div>
+            <label style={st.etq}>
+              Nombre del test (sale en la pantalla del robot)
+              <input value={nombre} maxLength={24} onChange={(e) => setNombre(e.target.value)} placeholder="Matemáticas" style={st.select} />
+            </label>
+            <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: 0 }}>
+              Libres en el robot: {Math.round(info.libre / 1024)} KB · cada pregunta ocupa unos 30 KB.
+            </p>
+            {info.ranuras.find((r) => r.n === ranura)?.estado === 'test' && (
+              <p style={{ fontSize: '0.85rem', color: '#fb923c', fontWeight: 700, margin: 0 }}>
+                ⚠️ Sustituirá «{info.ranuras.find((r) => r.n === ranura)?.nombre || 'el test'}» de la ranura {ranura}.
+              </p>
+            )}
+            <div style={st.fila}>
+              <button onClick={empezar} disabled={!ranura || !nombre.trim()} style={st.btn}>💾 Guardar en la ranura {ranura ?? '–'}</button>
+              <button onClick={volver} style={st.btnSec}>Cancelar</button>
+            </div>
           </div>
         )}
 
@@ -132,7 +207,7 @@ export default function CargarTestRobot({ onExit }) {
             <div style={st.caja}>
               <p style={{ margin: 0, fontSize: '0.9rem', color: '#cbd5e1', lineHeight: 1.5 }}>
                 El robot <b>lee la pregunta en voz alta</b>, muestra las respuestas en su pantalla y se contesta con su <b>joystick</b>.
-                Queda guardado en la placa: después funciona sin cable ni internet. Se usa la <b>ranura 8</b> de «switch program».
+                Queda guardado en la placa: después funciona sin cable ni internet. Puedes tener un test distinto en cada ranura de «switch program».
               </p>
             </div>
             <div style={{ background: '#fff', color: '#0f172a', borderRadius: 14, padding: 10 }}>
@@ -163,9 +238,8 @@ export default function CargarTestRobot({ onExit }) {
                 </div>
                 <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
                   {preguntas.length} preguntas de 2 a 4 opciones disponibles. Se eligen al azar. La carga tarda unos {minutos(seg)} (depende de lo largas que sean).
-                  Sustituye el test anterior guardado en el robot.
                 </p>
-                <button onClick={empezar} disabled={!preguntas.length || !soportaSerialCyberpi()} style={st.btn}>🔌 Conectar por USB y cargar</button>
+                <button onClick={conectar} disabled={!preguntas.length || !soportaSerialCyberpi()} style={st.btn}>🔌 Conectar el robot por USB</button>
                 {!soportaSerialCyberpi() && <p style={{ color: '#f97316', fontSize: '0.85rem' }}>Necesitas Chrome o Edge en un ordenador.</p>}
               </div>
             )}

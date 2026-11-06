@@ -128,7 +128,7 @@ async function buscarCanalBle(servidor) {
   return salida && entrada ? { salida, entrada } : null;
 }
 
-async function conectarBluetooth() {
+async function conectarBluetooth(todos = false) {
   if (!soportaBluetoothCyberpi()) {
     emitir({ estado: 'error', error: 'Este navegador no permite Bluetooth: usa Chrome en Android o en el ordenador (en iPhone no funciona con Safari).' });
     return false;
@@ -137,7 +137,7 @@ async function conectarBluetooth() {
   let disp;
   try {
     disp = await navigator.bluetooth.requestDevice({
-      filters: NOMBRES_BLE.map((namePrefix) => ({ namePrefix })),
+      ...(todos ? { acceptAllDevices: true } : { filters: NOMBRES_BLE.map((namePrefix) => ({ namePrefix })) }),
       optionalServices: SERVICIOS_BLE,
     });
   } catch {
@@ -355,6 +355,9 @@ export function escucharEstadoCyberpi(fn) {
 
 export const getEstadoCyberpi = () => estado;
 
+/** Bluetooth sin filtrar por nombre, por si el robot se anuncia con otro. */
+export const conectarCyberpiTodos = () => conectarBluetooth(true);
+
 /** Pide el puerto y deja el CyberPi listo para recibir órdenes. */
 export async function conectarCyberpi() {
   if (modo === 'bluetooth') return conectarBluetooth();
@@ -512,19 +515,22 @@ export async function instalarReceptor() {
 // Las tramas no pueden usar la pantalla: el menú de fábrica la tapa. Dentro de una ranura sí.
 
 const MARCA_TEST = '# PIKT TEST';
-const RANURA_TEST = '/flash/main8.py';
-const DATOS_TEST = '/flash/pikt_test.json';
+const rutaRanura = (n) => '/flash/main' + n + '.py';
+const rutaDatos = (n) => '/flash/pikt_test' + n + '.json';
+// Audio de cada pregunta: /music/pikt_<ranura>q<i>.mp3 (audio.play recibe el nombre sin extensión).
+const prefijoAudio = (n) => 'pikt_' + n + 'q';
 const TROZO_BIN = 135; // bytes por trama: en base64 + la orden no pasan de MAX_TRAMA_PY
 const AUX_LINEAS = ['import ubinascii as u', 'p=0', 't=0', 'f=None', 'def a(n):', '    global f', '    f=open(n,"wb")', 'def w(s):', '    f.write(u.a2b_base64(s))', 'def c():', '    global f', '    f.close()', '    f=None'];
 
-export const PROGRAMA_TEST = `${MARCA_TEST}
+export const programaTest = (ranura) => `${MARCA_TEST}
 import cyberpi, time, ujson, random, pku, mbot2
 c = cyberpi.console
 j = cyberpi.controller
 a = cyberpi.audio
-f = open('${DATOS_TEST}')
-T = ujson.load(f)
+f = open('${rutaDatos(ranura)}')
+D = ujson.load(f)
 f.close()
+T = D['q']
 a.set_vol(100)
 pku.p = 0
 pku.t = 0
@@ -553,6 +559,7 @@ def ver(q, s):
 
 def reposo():
     c.clear()
+    c.println(D['n'])
     c.println('Aciertos: ' + str(ok) + '/' + str(hechas))
     c.println('A: pregunta')
 
@@ -699,28 +706,59 @@ export async function prepararCargaTest() {
   setModoCyberpi('cable');
   const ok = await conectarCyberpi();
   if (!ok && (estado.estado === 'sin_respuesta' || estado.estado === 'error')) throw new Error(estado.error);
+  if (ok) {
+    clearInterval(temporizador); // que no se cuelen órdenes de conducción
+    temporizador = 0;
+  }
   return ok;
 }
 
+/** Con el puerto abierto: qué hay en cada ranura → { ranuras: [{ n, estado: 'vacia'|'test'|'ajena', nombre, preguntas }], libre }. */
+export async function leerRanurasRobot() {
+  const ranuras = [];
+  for (let n = 1; n <= 8; n++) {
+    const tam = await tamanoEnPlaca(rutaRanura(n));
+    await dormir(50);
+    const r = { n, estado: tam > 0 ? 'ajena' : 'vacia', nombre: '', preguntas: 0 };
+    if (tam > 0) {
+      const ini = await ejecutar('f=open("' + rutaRanura(n) + '")\nprint("INI="+f.read(' + MARCA_TEST.length + '))\nf.close()');
+      await dormir(100);
+      if ((acumulado + ini).includes('INI=' + MARCA_TEST)) {
+        r.estado = 'test';
+        const d = await ejecutar('import ujson\ntry:\n    f=open("' + rutaDatos(n) + '")\n    d=ujson.load(f)\n    f.close()\n    print("NOM="+d["n"]+"|"+str(len(d["q"]))+"|")\nexcept:\n    print("NOM=|0|")', 5000);
+        await dormir(150);
+        const m = (acumulado + d).match(/NOM=([^|]*)\|(\d+)\|/);
+        if (m) {
+          r.nombre = m[1];
+          r.preguntas = Number(m[2]);
+        }
+      }
+    }
+    ranuras.push(r);
+  }
+  const l = await ejecutar('import os\nv=os.statvfs("/")\nprint("LIBRE="+str(v[0]*v[3]))');
+  await dormir(100);
+  return { ranuras, libre: Number((acumulado + l).match(/LIBRE=(\d+)/)?.[1] ?? 0) };
+}
+
 /**
- * Guarda un test en la ranura 8, con el puerto ya abierto por prepararCargaTest.
+ * Guarda un test en una ranura, con el puerto ya abierto por prepararCargaTest.
  * preguntas = [{ mp3: Uint8Array, opciones: [..], correcta }]. No pisa un programa ajeno.
  */
-export async function cargarTestEnRobot(preguntas, { onProgreso, cancelado } = {}) {
+export async function cargarTestEnRobot(preguntas, { ranura, nombre, onProgreso, cancelado } = {}) {
   if (!escritor) throw new Error('Se ha perdido la conexión con el robot.');
-  clearInterval(temporizador); // que no se cuelen órdenes de conducción
-  temporizador = 0;
+  if (!(ranura >= 1 && ranura <= 8)) throw new Error('Elige una ranura del 1 al 8.');
   let hechos = 0;
   try {
     emitir({ estado: 'conectando', error: '' });
     await ejecutar('import mbot2\nmbot2.drive_power(0,0)');
     await dormir(200);
-    const enRanura = await tamanoEnPlaca(RANURA_TEST);
+    const enRanura = await tamanoEnPlaca(rutaRanura(ranura));
     if (enRanura > 0) {
-      const ini = await ejecutar('f=open("' + RANURA_TEST + '")\nprint("INI="+f.read(' + MARCA_TEST.length + '))\nf.close()');
+      const ini = await ejecutar('f=open("' + rutaRanura(ranura) + '")\nprint("INI="+f.read(' + MARCA_TEST.length + '))\nf.close()');
       await dormir(100);
       if (!(acumulado + ini).includes('INI=' + MARCA_TEST)) {
-        throw new Error('La ranura 8 del robot ya tiene otro programa. Para no borrarlo no se ha cargado nada; quítalo con mBlock y vuelve a probar.');
+        throw new Error('La ranura ' + ranura + ' del robot ya tiene otro programa. Para no borrarlo no se ha cargado nada; quítalo con mBlock y vuelve a probar.');
       }
     }
     onProgreso?.(0, 'Preparando el robot');
@@ -728,17 +766,20 @@ export async function cargarTestEnRobot(preguntas, { onProgreso, cancelado } = {
       await ejecutar('f=open("pku.py","' + (i ? 'a' : 'w') + '")\nf.write(' + JSON.stringify(AUX_LINEAS[i] + '\n') + ')\nf.close()');
       await dormir(150);
     }
-    await ejecutar('import os\nfor f in os.listdir("/music"):\n    if f[:5]=="pikt_":\n        os.remove("/music/"+f)', 8000);
-    await dormir(200);
-    const r = await ejecutar('import os\nv=os.statvfs("/")\nprint("LIBRE="+str(v[0]*v[3]))');
+    // Lo que ocupa ahora esta ranura se recupera al sustituirla: se mira antes de borrar nada.
+    // Los audios de prueba y los de la primera versión (pikt_q, pikt_t, pikt_v) se van con la ranura 8.
+    const prefijos = ranura === 8 ? '("' + prefijoAudio(8) + '","pikt_q","pikt_t","pikt_v")' : '("' + prefijoAudio(ranura) + '",)';
+    const r = await ejecutar('import os\nv=os.statvfs("/")\nb=v[0]*v[3]\nfor f in os.listdir("/music"):\n    for p in ' + prefijos + ':\n        if f[:len(p)]==p:\n            b+=os.stat("/music/"+f)[6]\n            break\nprint("LIBRE="+str(b))', 8000);
     await dormir(100);
     const libre = Number((acumulado + r).match(/LIBRE=(\d+)/)?.[1] ?? 0);
     const total = preguntas.reduce((s, q) => s + q.mp3.length, 0);
     if (libre && total + 60000 > libre) {
       throw new Error('No cabe en el robot: ocupa ' + Math.round(total / 1024) + ' KB y hay ' + Math.round(libre / 1024) + ' KB libres. Prueba con menos preguntas.');
     }
+    await ejecutar('import os\nfor f in os.listdir("/music"):\n    for p in ' + prefijos + ':\n        if f[:len(p)]==p:\n            os.remove("/music/"+f)\n            break', 8000);
+    await dormir(200);
     for (let i = 0; i < preguntas.length; i++) {
-      await subirBinario('/music/pikt_q' + i + '.mp3', preguntas[i].mp3, {
+      await subirBinario('/music/' + prefijoAudio(ranura) + i + '.mp3', preguntas[i].mp3, {
         cancelado,
         onBytes: (n) => {
           hechos += n;
@@ -746,9 +787,10 @@ export async function cargarTestEnRobot(preguntas, { onProgreso, cancelado } = {
         },
       });
     }
-    const datos = preguntas.map((q, i) => ({ a: 'pikt_q' + i, o: q.opciones.map((t) => textoPantalla(t).slice(0, 44)), c: q.correcta }));
-    await subirBinario(DATOS_TEST, ENC.encode(JSON.stringify(datos)));
-    await subirBinario(RANURA_TEST, ENC.encode(PROGRAMA_TEST));
+    const q = preguntas.map((p, i) => ({ a: prefijoAudio(ranura) + i, o: p.opciones.map((t) => textoPantalla(t).slice(0, 44)), c: p.correcta }));
+    const titulo = textoPantalla(nombre || 'Test ' + ranura).replace(/\|/g, ' ').slice(0, 24);
+    await subirBinario(rutaDatos(ranura), ENC.encode(JSON.stringify({ n: titulo, q })));
+    await subirBinario(rutaRanura(ranura), ENC.encode(programaTest(ranura)));
   } catch (e) {
     limpiar();
     emitir({ estado: 'desconectado', error: '' });

@@ -1,0 +1,1241 @@
+[
+ {
+  "id": "PRIMARIA",
+  "titulo": "The zombie’s mansion · Primary",
+  "config": {
+   "modo": "PAPEL",
+   "etapa": "PRIMARIA",
+   "minutos": 30,
+   "ritmo": 5,
+   "zombi": "NORMAL",
+   "nPreguntas": 5,
+   "nBatalla": 8,
+   "pruebas": [
+    {
+     "id": "listo_primaria_1",
+     "tipo": "MATERIA",
+     "materia": "MATES",
+     "tema": "OPERACIONES",
+     "nombre": ""
+    },
+    {
+     "id": "listo_primaria_2",
+     "tipo": "MATERIA",
+     "materia": "GEOGRAFIA",
+     "tema": "BANDERAS",
+     "nombre": ""
+    },
+    {
+     "id": "listo_primaria_3",
+     "tipo": "MATERIA",
+     "materia": "BIOLOGIA",
+     "tema": "ORGANOS",
+     "nombre": ""
+    },
+    {
+     "id": "listo_primaria_4",
+     "tipo": "MATERIA",
+     "materia": "INGLES",
+     "tema": "VOCAB",
+     "nombre": ""
+    },
+    {
+     "id": "listo_primaria_5",
+     "tipo": "MATERIA",
+     "materia": "MATES",
+     "tema": "TABLAS",
+     "nombre": ""
+    }
+   ],
+   "partida": {
+    "firma": "[\"PRIMARIA\",[[\"listo_primaria_1\",\"MATERIA\",\"MATES\",\"OPERACIONES\",null,null,null,null,null,null,null,\"\",0,null,null,\"\",null],[\"listo_primaria_2\",\"MATERIA\",\"GEOGRAFIA\",\"BANDERAS\",null,null,null,null,null,null,null,\"\",0,null,null,\"\",null],[\"listo_primaria_3\",\"MATERIA\",\"BIOLOGIA\",\"ORGANOS\",null,null,null,null,null,null,null,\"\",0,null,null,\"\",null],[\"listo_primaria_4\",\"MATERIA\",\"INGLES\",\"VOCAB\",null,null,null,null,null,null,null,\"\",0,null,null,\"\",null],[\"listo_primaria_5\",\"MATERIA\",\"MATES\",\"TABLAS\",null,null,null,null,null,null,null,\"\",0,null,null,\"\",null]]]",
+    "idioma": "en",
+    "creada": 1793944342435,
+    "nPreguntas": 5,
+    "nBatalla": 8,
+    "pruebas": [
+     {
+      "id": "listo_primaria_1",
+      "preguntas": [
+       {
+        "texto": "What is the result?",
+        "opciones": [
+         "127",
+         "124",
+         "117",
+         "128"
+        ],
+        "correcta": 0,
+        "materia": "MATES",
+        "detalle": "80 + 47",
+        "grande": true
+       },
+       {
+        "texto": "What is the result?",
+        "opciones": [
+         "127",
+         "128",
+         "130",
+         "133"
+        ],
+        "correcta": 1,
+        "materia": "MATES",
+        "detalle": "93 + 35",
+        "grande": true
+       },
+       {
+        "texto": "What is the result?",
+        "opciones": [
+         "152",
+         "141",
+         "151",
+         "161"
+        ],
+        "correcta": 2,
+        "materia": "MATES",
+        "detalle": "75 + 76",
+        "grande": true
+       },
+       {
+        "texto": "What is the result?",
+        "opciones": [
+         "2",
+         "4",
+         "5",
+         "3"
+        ],
+        "correcta": 2,
+        "materia": "MATES",
+        "detalle": "140 − 135",
+        "grande": true
+       },
+       {
+        "texto": "What is the result?",
+        "opciones": [
+         "129",
+         "126",
+         "124",
+         "127"
+        ],
+        "correcta": 2,
+        "materia": "MATES",
+        "detalle": "145 − 21",
+        "grande": true
+       }
+      ],
+      "candado": {
+       "clave": "Candado de 4 cifras",
+       "titulo": "4-digit lock",
+       "instruccion": "Each digit of the code is the result of a calculation. Solve the four calculations in the clues and write the digits in order.",
+       "tipo": "numero",
+       "longitud": 4,
+       "pistas": [
+        {
+         "texto": "The first digit is: 7 − 4"
+        },
+        {
+         "texto": "The second digit is: 0 + 4"
+        },
+        {
+         "texto": "The third digit is: 0 + 0"
+        },
+        {
+         "texto": "The fourth digit is: 17 − 8"
+        }
+       ],
+       "soluciones": [
+        "3409"
+       ],
+       "solucionVisible": "3409"
+      }
+     },
+     {
+      "id": "listo_primaria_2",
+      "preguntas": [
+       {
+        "texto": "Which country does this flag belong to?",
+        "opciones": [
+         "Peru",
+         "Spain",
+         "Belgium",
+         "Italy"
+        ],
+        "correcta": 0,
+        "materia": "GEOGRAFIA",
+        "img": "https://flagcdn.com/w320/pe.png"
+       },
+       {
+        "texto": "Which country does this flag belong to?",
+        "opciones": [
+         "United States",
+         "Peru",
+         "Netherlands",
+         "Denmark"
+        ],
+        "correcta": 2,
+        "materia": "GEOGRAFIA",
+        "img": "https://flagcdn.com/w320/nl.png"
+       },
+       {
+        "texto": "Which country does this flag belong to?",
+        "opciones": [
+         "Ecuador",
+         "France",
+         "Hungary",
+         "Estonia"
+        ],
+        "correcta": 2,
+        "materia": "GEOGRAFIA",
+        "img": "https://flagcdn.com/w320/hu.png"
+       },
+       {
+        "texto": "Which country does this flag belong to?",
+        "opciones": [
+         "Slovenia",
+         "Spain",
+         "Brazil",
+         "Finland"
+        ],
+        "correcta": 0,
+        "materia": "GEOGRAFIA",
+        "img": "https://flagcdn.com/w320/si.png"
+       },
+       {
+        "texto": "Which country does this flag belong to?",
+        "opciones": [
+         "Italy",
+         "Germany",
+         "Peru",
+         "Uruguay"
+        ],
+        "correcta": 3,
+        "materia": "GEOGRAFIA",
+        "img": "https://flagcdn.com/w320/uy.png"
+       }
+      ],
+      "candado": {
+       "clave": "La capital secreta",
+       "titulo": "The secret capital",
+       "instruccion": "The ghost librarian is hiding a city. Use the clues to find out which country the flag belongs to… and write its CAPITAL!",
+       "tipo": "texto",
+       "longitud": 6,
+       "pistas": [
+        {
+         "texto": "This is the country’s flag:",
+         "img": "https://flagcdn.com/w320/ru.png"
+        },
+        {
+         "texto": "The country is in Europe."
+        },
+        {
+         "texto": "The capital starts with “M”."
+        },
+        {
+         "texto": "The capital’s name has 6 letters."
+        }
+       ],
+       "soluciones": [
+        "Moscow",
+        "Moscú"
+       ],
+       "solucionVisible": "Moscow (Russia)"
+      }
+     },
+     {
+      "id": "listo_primaria_3",
+      "preguntas": [
+       {
+        "texto": "Which organ is it?",
+        "opciones": [
+         "Thymus",
+         "Liver",
+         "Lungs",
+         "Stomach"
+        ],
+        "correcta": 2,
+        "materia": "BIOLOGIA",
+        "detalle": "A pair of organs in charge of breathing and of exchanging oxygen and carbon dioxide."
+       },
+       {
+        "texto": "Which organ is it?",
+        "opciones": [
+         "Brain",
+         "Thymus",
+         "Adrenal glands",
+         "Thyroid"
+        ],
+        "correcta": 0,
+        "materia": "BIOLOGIA",
+        "detalle": "The body’s control centre, in charge of thinking, memory and controlling the other organs."
+       },
+       {
+        "texto": "Which organ is this?",
+        "opciones": [
+         "Adrenal glands",
+         "Pancreas",
+         "Large intestine",
+         "Spinal cord"
+        ],
+        "correcta": 0,
+        "materia": "BIOLOGIA",
+        "img": "/assets/anatomia/suprarrenales.jpg"
+       },
+       {
+        "texto": "Which body system does it belong to: Pancreas?",
+        "opciones": [
+         "skeletal system",
+         "endocrine and digestive systems",
+         "digestive system",
+         "excretory system"
+        ],
+        "correcta": 1,
+        "materia": "BIOLOGIA"
+       },
+       {
+        "texto": "Which organ is it?",
+        "opciones": [
+         "Thymus",
+         "Pituitary gland",
+         "Thyroid",
+         "Heart"
+        ],
+        "correcta": 2,
+        "materia": "BIOLOGIA",
+        "detalle": "A gland in the neck that controls the body’s metabolism."
+       }
+      ],
+      "candado": {
+       "clave": "La pieza perdida del esqueleto",
+       "titulo": "The skeleton’s missing piece",
+       "instruccion": "The guardian is missing a piece: it is an organ. Put the clues together and write its name.",
+       "tipo": "texto",
+       "longitud": 5,
+       "pistas": [
+        {
+         "texto": "It belongs to the digestive system."
+        },
+        {
+         "texto": "What I know: “The largest internal organ. It makes bile, cleans the blood and stores energy.”"
+        },
+        {
+         "texto": "It starts with “L” and has 5 letters."
+        },
+        {
+         "texto": "It is an organ. It ends in “er”."
+        }
+       ],
+       "soluciones": [
+        "Liver"
+       ],
+       "solucionVisible": "Liver"
+      }
+     },
+     {
+      "id": "listo_primaria_4",
+      "preguntas": [
+       {
+        "texto": "What does “choose” mean?",
+        "opciones": [
+         "escribir",
+         "correr",
+         "tener",
+         "elegir"
+        ],
+        "correcta": 3,
+        "materia": "INGLES"
+       },
+       {
+        "texto": "What does “drink” mean?",
+        "opciones": [
+         "beber",
+         "ir",
+         "obtener",
+         "escribir"
+        ],
+        "correcta": 0,
+        "materia": "INGLES"
+       },
+       {
+        "texto": "What does “run” mean?",
+        "opciones": [
+         "ir",
+         "beber",
+         "tomar",
+         "correr"
+        ],
+        "correcta": 3,
+        "materia": "INGLES"
+       },
+       {
+        "texto": "What does “come” mean?",
+        "opciones": [
+         "romper",
+         "correr",
+         "ser/estar",
+         "venir"
+        ],
+        "correcta": 3,
+        "materia": "INGLES"
+       },
+       {
+        "texto": "What does “be” mean?",
+        "opciones": [
+         "saber",
+         "ser/estar",
+         "hacer",
+         "tomar"
+        ],
+        "correcta": 1,
+        "materia": "INGLES"
+       }
+      ],
+      "candado": {
+       "clave": "The witch’s password",
+       "titulo": "The witch’s password",
+       "instruccion": "The witch only opens the door with a password IN ENGLISH. Put the clues together to guess it.",
+       "tipo": "texto",
+       "longitud": 7,
+       "pistas": [
+        {
+         "texto": "Riddle: It is orange and you carve a face on it."
+        },
+        {
+         "texto": "In English it has 7 letters."
+        },
+        {
+         "texto": "It starts with «P» and ends with «N»."
+        },
+        {
+         "texto": "Scrambled letters: K M P N I P U"
+        }
+       ],
+       "soluciones": [
+        "PUMPKIN"
+       ],
+       "solucionVisible": "PUMPKIN"
+      }
+     },
+     {
+      "id": "listo_primaria_5",
+      "preguntas": [
+       {
+        "texto": "What is the result?",
+        "opciones": [
+         "7",
+         "15",
+         "10",
+         "20"
+        ],
+        "correcta": 2,
+        "materia": "MATES",
+        "detalle": "5 × 2",
+        "grande": true
+       },
+       {
+        "texto": "What is the result?",
+        "opciones": [
+         "7",
+         "9",
+         "8",
+         "6"
+        ],
+        "correcta": 0,
+        "materia": "MATES",
+        "detalle": "28 ÷ 4",
+        "grande": true
+       },
+       {
+        "texto": "What is the result?",
+        "opciones": [
+         "3",
+         "4",
+         "13",
+         "2"
+        ],
+        "correcta": 0,
+        "materia": "MATES",
+        "detalle": "9 ÷ 3",
+        "grande": true
+       },
+       {
+        "texto": "What is the result?",
+        "opciones": [
+         "7",
+         "4",
+         "5",
+         "17"
+        ],
+        "correcta": 0,
+        "materia": "MATES",
+        "detalle": "49 ÷ 7",
+        "grande": true
+       },
+       {
+        "texto": "What is the result?",
+        "opciones": [
+         "2",
+         "1",
+         "4",
+         "3"
+        ],
+        "correcta": 0,
+        "materia": "MATES",
+        "detalle": "14 ÷ 7",
+        "grande": true
+       }
+      ],
+      "candado": {
+       "clave": "Candado de 4 cifras",
+       "titulo": "4-digit lock",
+       "instruccion": "Each digit of the code is the result of a calculation. Solve the four calculations in the clues and write the digits in order.",
+       "tipo": "numero",
+       "longitud": 4,
+       "pistas": [
+        {
+         "texto": "The first digit is: 8 ÷ 4"
+        },
+        {
+         "texto": "The second digit is: 9 − 6"
+        },
+        {
+         "texto": "The third digit is: 5 + 0"
+        },
+        {
+         "texto": "The fourth digit is: 18 ÷ 2"
+        }
+       ],
+       "soluciones": [
+        "2359"
+       ],
+       "solucionVisible": "2359"
+      }
+     }
+    ],
+    "batalla": [
+     {
+      "texto": "Which body system does it belong to: Stomach?",
+      "opciones": [
+       "digestive system",
+       "respiratory system",
+       "lymphatic system",
+       "cardiovascular system"
+      ],
+      "correcta": 0,
+      "materia": "BIOLOGIA"
+     },
+     {
+      "texto": "What is the result?",
+      "opciones": [
+       "64",
+       "63",
+       "61",
+       "54"
+      ],
+      "correcta": 0,
+      "materia": "MATES",
+      "detalle": "8 × 8",
+      "grande": true
+     },
+     {
+      "texto": "What does “make” mean?",
+      "opciones": [
+       "hacer",
+       "ver",
+       "tomar",
+       "comer"
+      ],
+      "correcta": 0,
+      "materia": "INGLES"
+     },
+     {
+      "texto": "Which country does this flag belong to?",
+      "opciones": [
+       "Serbia",
+       "Peru",
+       "Guatemala",
+       "Poland"
+      ],
+      "correcta": 0,
+      "materia": "GEOGRAFIA",
+      "img": "https://flagcdn.com/w320/rs.png"
+     },
+     {
+      "texto": "What is the result?",
+      "opciones": [
+       "116",
+       "115",
+       "113",
+       "117"
+      ],
+      "correcta": 0,
+      "materia": "MATES",
+      "detalle": "36 + 80",
+      "grande": true
+     },
+     {
+      "texto": "Which country does this flag belong to?",
+      "opciones": [
+       "Venezuela",
+       "Poland",
+       "France",
+       "Colombia"
+      ],
+      "correcta": 3,
+      "materia": "GEOGRAFIA",
+      "img": "https://flagcdn.com/w320/co.png"
+     },
+     {
+      "texto": "What is the result?",
+      "opciones": [
+       "27",
+       "24",
+       "28",
+       "26"
+      ],
+      "correcta": 0,
+      "materia": "MATES",
+      "detalle": "9 × 3",
+      "grande": true
+     },
+     {
+      "texto": "What is the result?",
+      "opciones": [
+       "14",
+       "3",
+       "4",
+       "5"
+      ],
+      "correcta": 2,
+      "materia": "MATES",
+      "detalle": "16 ÷ 4",
+      "grande": true
+     }
+    ]
+   }
+  }
+ },
+ {
+  "id": "ESO",
+  "titulo": "The zombie’s mansion · Secondary",
+  "config": {
+   "modo": "PAPEL",
+   "etapa": "ESO",
+   "minutos": 30,
+   "ritmo": 5,
+   "zombi": "NORMAL",
+   "nPreguntas": 5,
+   "nBatalla": 8,
+   "pruebas": [
+    {
+     "id": "listo_eso_1",
+     "tipo": "MATERIA",
+     "materia": "MATES",
+     "tema": "MIX",
+     "nombre": ""
+    },
+    {
+     "id": "listo_eso_2",
+     "tipo": "MATERIA",
+     "materia": "GEOGRAFIA",
+     "tema": "MIX",
+     "nombre": ""
+    },
+    {
+     "id": "listo_eso_3",
+     "tipo": "MATERIA",
+     "materia": "BIOLOGIA",
+     "tema": "MIX",
+     "nombre": ""
+    },
+    {
+     "id": "listo_eso_4",
+     "tipo": "MATERIA",
+     "materia": "INGLES",
+     "tema": "PAST",
+     "nombre": ""
+    },
+    {
+     "id": "listo_eso_5",
+     "tipo": "MATERIA",
+     "materia": "INGLES",
+     "tema": "PARTICIPLE",
+     "nombre": ""
+    }
+   ],
+   "partida": {
+    "firma": "[\"ESO\",[[\"listo_eso_1\",\"MATERIA\",\"MATES\",\"MIX\",null,null,null,null,null,null,null,\"\",0,null,null,\"\",null],[\"listo_eso_2\",\"MATERIA\",\"GEOGRAFIA\",\"MIX\",null,null,null,null,null,null,null,\"\",0,null,null,\"\",null],[\"listo_eso_3\",\"MATERIA\",\"BIOLOGIA\",\"MIX\",null,null,null,null,null,null,null,\"\",0,null,null,\"\",null],[\"listo_eso_4\",\"MATERIA\",\"INGLES\",\"PAST\",null,null,null,null,null,null,null,\"\",0,null,null,\"\",null],[\"listo_eso_5\",\"MATERIA\",\"INGLES\",\"PARTICIPLE\",null,null,null,null,null,null,null,\"\",0,null,null,\"\",null]]]",
+    "idioma": "en",
+    "creada": 1793944342436,
+    "nPreguntas": 5,
+    "nBatalla": 8,
+    "pruebas": [
+     {
+      "id": "listo_eso_1",
+      "preguntas": [
+       {
+        "texto": "What is the result?",
+        "opciones": [
+         "81",
+         "79",
+         "83",
+         "82"
+        ],
+        "correcta": 3,
+        "materia": "MATES",
+        "detalle": "1 + 9 · 9",
+        "grande": true
+       },
+       {
+        "texto": "What is the result?",
+        "opciones": [
+         "32",
+         "30",
+         "27",
+         "37"
+        ],
+        "correcta": 2,
+        "materia": "MATES",
+        "detalle": "3³",
+        "grande": true
+       },
+       {
+        "texto": "What is the result?",
+        "opciones": [
+         "78",
+         "81",
+         "71",
+         "80"
+        ],
+        "correcta": 1,
+        "materia": "MATES",
+        "detalle": "3⁴",
+        "grande": true
+       },
+       {
+        "texto": "What is the result?",
+        "opciones": [
+         "4",
+         "7",
+         "9",
+         "6"
+        ],
+        "correcta": 1,
+        "materia": "MATES",
+        "detalle": "2x + 4 = 18   →   x = ?",
+        "grande": true
+       },
+       {
+        "texto": "What is the result?",
+        "opciones": [
+         "46",
+         "44",
+         "41",
+         "42"
+        ],
+        "correcta": 1,
+        "materia": "MATES",
+        "detalle": "2 + 6 · 7",
+        "grande": true
+       }
+      ],
+      "candado": {
+       "clave": "Candado de 4 cifras",
+       "titulo": "4-digit lock",
+       "instruccion": "Each digit of the code is the result of a calculation. Solve the four calculations in the clues and write the digits in order.",
+       "tipo": "numero",
+       "longitud": 4,
+       "pistas": [
+        {
+         "texto": "The first digit is: (17 − 8) ÷ 3"
+        },
+        {
+         "texto": "The second digit is: 2·2 + 3 − 5"
+        },
+        {
+         "texto": "The third digit is: (7 − 2) ÷ 5"
+        },
+        {
+         "texto": "The fourth digit is: (32 − 2) ÷ 6"
+        }
+       ],
+       "soluciones": [
+        "3215"
+       ],
+       "solucionVisible": "3215"
+      }
+     },
+     {
+      "id": "listo_eso_2",
+      "preguntas": [
+       {
+        "texto": "New Delhi is the capital of which country?",
+        "opciones": [
+         "Tanzania",
+         "India",
+         "Albania",
+         "Ecuador"
+        ],
+        "correcta": 1,
+        "materia": "GEOGRAFIA"
+       },
+       {
+        "texto": "What is the capital of Afghanistan?",
+        "opciones": [
+         "Seoul",
+         "Abuja",
+         "Dublin",
+         "Kabul"
+        ],
+        "correcta": 3,
+        "materia": "GEOGRAFIA"
+       },
+       {
+        "texto": "Which country does this flag belong to?",
+        "opciones": [
+         "United States",
+         "New Zealand",
+         "Sweden",
+         "Slovenia"
+        ],
+        "correcta": 1,
+        "materia": "GEOGRAFIA",
+        "img": "https://flagcdn.com/w320/nz.png"
+       },
+       {
+        "texto": "Which country does this flag belong to?",
+        "opciones": [
+         "Cuba",
+         "Slovenia",
+         "Japan",
+         "Kazakhstan"
+        ],
+        "correcta": 0,
+        "materia": "GEOGRAFIA",
+        "img": "https://flagcdn.com/w320/cu.png"
+       },
+       {
+        "texto": "Santiago is the capital of which country?",
+        "opciones": [
+         "China",
+         "Angola",
+         "Chile",
+         "Ghana"
+        ],
+        "correcta": 2,
+        "materia": "GEOGRAFIA"
+       }
+      ],
+      "candado": {
+       "clave": "La capital secreta",
+       "titulo": "The secret capital",
+       "instruccion": "The ghost librarian is hiding a city. Use the clues to find out which country the flag belongs to… and write its CAPITAL!",
+       "tipo": "texto",
+       "longitud": 5,
+       "pistas": [
+        {
+         "texto": "This is the country’s flag:",
+         "img": "https://flagcdn.com/w320/tn.png"
+        },
+        {
+         "texto": "The country is in Africa."
+        },
+        {
+         "texto": "The capital starts with “T”."
+        },
+        {
+         "texto": "The capital’s name has 5 letters."
+        }
+       ],
+       "soluciones": [
+        "Tunis",
+        "Túnez"
+       ],
+       "solucionVisible": "Tunis (Tunisia)"
+      }
+     },
+     {
+      "id": "listo_eso_3",
+      "preguntas": [
+       {
+        "texto": "Which muscle is this?",
+        "opciones": [
+         "Sternocleidomastoid",
+         "Trapezius",
+         "Triceps",
+         "Masseter"
+        ],
+        "correcta": 2,
+        "materia": "BIOLOGIA",
+        "img": "/assets/anatomia/triceps.jpg"
+       },
+       {
+        "texto": "Which bone is this?",
+        "opciones": [
+         "Upper jaw",
+         "Skull",
+         "Sphenoid bone",
+         "Heel bone"
+        ],
+        "correcta": 0,
+        "materia": "BIOLOGIA",
+        "img": "/assets/anatomia/maxilar.jpg"
+       },
+       {
+        "texto": "Which bone is it?",
+        "opciones": [
+         "Humerus",
+         "Skull",
+         "Occipital bone",
+         "Collarbone"
+        ],
+        "correcta": 3,
+        "materia": "BIOLOGIA",
+        "detalle": "It connects the breastbone to the shoulder blade."
+       },
+       {
+        "texto": "Which muscle is it?",
+        "opciones": [
+         "Quadriceps",
+         "Intercostals",
+         "Gluteus maximus",
+         "Masseter"
+        ],
+        "correcta": 1,
+        "materia": "BIOLOGIA",
+        "detalle": "Muscles between the ribs that help with breathing."
+       },
+       {
+        "texto": "Which muscle is it?",
+        "opciones": [
+         "Sternocleidomastoid",
+         "Diaphragm",
+         "Iliopsoas",
+         "Deltoid"
+        ],
+        "correcta": 0,
+        "materia": "BIOLOGIA",
+        "detalle": "A neck muscle that lets you turn and tilt your head."
+       }
+      ],
+      "candado": {
+       "clave": "La pieza perdida del esqueleto",
+       "titulo": "The skeleton’s missing piece",
+       "instruccion": "The guardian is missing a piece: it is a bone. Put the clues together and write its name.",
+       "tipo": "texto",
+       "longitud": 7,
+       "pistas": [
+        {
+         "texto": "It belongs to the skeletal system."
+        },
+        {
+         "texto": "What I know: “The longest bone in the arm.”"
+        },
+        {
+         "texto": "It starts with “H” and has 7 letters."
+        },
+        {
+         "texto": "It is a bone. It ends in “us”."
+        }
+       ],
+       "soluciones": [
+        "Humerus"
+       ],
+       "solucionVisible": "Humerus"
+      }
+     },
+     {
+      "id": "listo_eso_4",
+      "preguntas": [
+       {
+        "texto": "Past simple of…",
+        "opciones": [
+         "sayed",
+         "taught",
+         "drew",
+         "said"
+        ],
+        "correcta": 3,
+        "materia": "INGLES",
+        "detalle": "say",
+        "grande": true
+       },
+       {
+        "texto": "Past simple of…",
+        "opciones": [
+         "knew",
+         "shot",
+         "shuted",
+         "shut"
+        ],
+        "correcta": 3,
+        "materia": "INGLES",
+        "detalle": "shut",
+        "grande": true
+       },
+       {
+        "texto": "Past simple of…",
+        "opciones": [
+         "sang",
+         "rang",
+         "took",
+         "ringed"
+        ],
+        "correcta": 1,
+        "materia": "INGLES",
+        "detalle": "ring",
+        "grande": true
+       },
+       {
+        "texto": "Past simple of…",
+        "opciones": [
+         "caught",
+         "leaved",
+         "heard",
+         "left"
+        ],
+        "correcta": 3,
+        "materia": "INGLES",
+        "detalle": "leave",
+        "grande": true
+       },
+       {
+        "texto": "Past simple of…",
+        "opciones": [
+         "fought",
+         "spoke",
+         "fighted",
+         "chose"
+        ],
+        "correcta": 0,
+        "materia": "INGLES",
+        "detalle": "fight",
+        "grande": true
+       }
+      ],
+      "candado": {
+       "clave": "The witch’s password",
+       "titulo": "The witch’s password",
+       "instruccion": "The witch only opens the door with a password IN ENGLISH. Put the clues together to guess it.",
+       "tipo": "texto",
+       "longitud": 6,
+       "pistas": [
+        {
+         "texto": "Riddle: It walks slowly with its arms stretched out… and it is coming for you!"
+        },
+        {
+         "texto": "In English it has 6 letters."
+        },
+        {
+         "texto": "It starts with «Z» and ends with «E»."
+        },
+        {
+         "texto": "Scrambled letters: I M B O Z E"
+        }
+       ],
+       "soluciones": [
+        "ZOMBIE"
+       ],
+       "solucionVisible": "ZOMBIE"
+      }
+     },
+     {
+      "id": "listo_eso_5",
+      "preguntas": [
+       {
+        "texto": "Past participle of…",
+        "opciones": [
+         "eated",
+         "eaten",
+         "sent",
+         "hidden"
+        ],
+        "correcta": 1,
+        "materia": "INGLES",
+        "detalle": "eat",
+        "grande": true
+       },
+       {
+        "texto": "Past participle of…",
+        "opciones": [
+         "doed",
+         "done",
+         "read",
+         "built"
+        ],
+        "correcta": 1,
+        "materia": "INGLES",
+        "detalle": "do",
+        "grande": true
+       },
+       {
+        "texto": "Past participle of…",
+        "opciones": [
+         "forgotten",
+         "slept",
+         "thought",
+         "forgeted"
+        ],
+        "correcta": 0,
+        "materia": "INGLES",
+        "detalle": "forget",
+        "grande": true
+       },
+       {
+        "texto": "Past participle of…",
+        "opciones": [
+         "told",
+         "swimed",
+         "broken",
+         "swum"
+        ],
+        "correcta": 3,
+        "materia": "INGLES",
+        "detalle": "swim",
+        "grande": true
+       },
+       {
+        "texto": "Past participle of…",
+        "opciones": [
+         "standed",
+         "stood",
+         "put",
+         "begun"
+        ],
+        "correcta": 1,
+        "materia": "INGLES",
+        "detalle": "stand",
+        "grande": true
+       }
+      ],
+      "candado": {
+       "clave": "The witch’s password",
+       "titulo": "The witch’s password",
+       "instruccion": "The witch only opens the door with a password IN ENGLISH. Put the clues together to guess it.",
+       "tipo": "texto",
+       "longitud": 6,
+       "pistas": [
+        {
+         "texto": "Riddle: It has eight legs and spins webs."
+        },
+        {
+         "texto": "In English it has 6 letters."
+        },
+        {
+         "texto": "It starts with «S» and ends with «R»."
+        },
+        {
+         "texto": "Scrambled letters: R E P I D S"
+        }
+       ],
+       "soluciones": [
+        "SPIDER"
+       ],
+       "solucionVisible": "SPIDER"
+      }
+     }
+    ],
+    "batalla": [
+     {
+      "texto": "What is the result?",
+      "opciones": [
+       "23",
+       "28",
+       "26",
+       "25"
+      ],
+      "correcta": 3,
+      "materia": "MATES",
+      "detalle": "5²",
+      "grande": true
+     },
+     {
+      "texto": "Algiers is the capital of which country?",
+      "opciones": [
+       "Latvia",
+       "Algeria",
+       "Estonia",
+       "Sweden"
+      ],
+      "correcta": 1,
+      "materia": "GEOGRAFIA"
+     },
+     {
+      "texto": "Past simple of…",
+      "opciones": [
+       "ate",
+       "buyed",
+       "bought",
+       "rose"
+      ],
+      "correcta": 2,
+      "materia": "INGLES",
+      "detalle": "buy",
+      "grande": true
+     },
+     {
+      "texto": "Past participle of…",
+      "opciones": [
+       "thrown",
+       "falled",
+       "known",
+       "fallen"
+      ],
+      "correcta": 3,
+      "materia": "INGLES",
+      "detalle": "fall",
+      "grande": true
+     },
+     {
+      "texto": "Past participle of…",
+      "opciones": [
+       "shone",
+       "shined",
+       "lent",
+       "lost"
+      ],
+      "correcta": 0,
+      "materia": "INGLES",
+      "detalle": "shine",
+      "grande": true
+     },
+     {
+      "texto": "Which organ is this?",
+      "opciones": [
+       "Gallbladder",
+       "Large intestine",
+       "Thyroid",
+       "Spinal cord"
+      ],
+      "correcta": 1,
+      "materia": "BIOLOGIA",
+      "img": "/assets/anatomia/intestino_grueso.jpg"
+     },
+     {
+      "texto": "Seoul is the capital of which country?",
+      "opciones": [
+       "Canada",
+       "Iraq",
+       "Egypt",
+       "South Korea"
+      ],
+      "correcta": 3,
+      "materia": "GEOGRAFIA"
+     },
+     {
+      "texto": "What is the result?",
+      "opciones": [
+       "2",
+       "3",
+       "1",
+       "0"
+      ],
+      "correcta": 1,
+      "materia": "MATES",
+      "detalle": "5x − 4 = 11   →   x = ?",
+      "grande": true
+     }
+    ]
+   }
+  }
+ }
+]

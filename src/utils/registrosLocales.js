@@ -56,6 +56,7 @@ export const JUEGOS_REGISTRO_META = {
     ENIGMIC:             { nombre: 'Enigmic',             emoji: '🕵️', color: '#7c3aed' },
     SIXSEVEN:            { nombre: 'Six Seven',           emoji: '🔢', color: '#FF007F' },
     MATES_MANDOS:        { nombre: 'Mates con mandos',    emoji: '🎮', color: '#0d9488' },
+    LAB_MICROBIT:        { nombre: 'Laboratorio micro:bit', emoji: '🛰️', color: '#0369a1' },
     CUERPO_HUMANO:       { nombre: 'Cuerpo humano 3D',    emoji: '🦴', color: '#38bdf8' },
     OVNI:                { nombre: 'Ovni Abducción',      emoji: '🛸', color: '#22d3ee' },
     VANILA:              { nombre: 'VaniLa',              emoji: '🔤', color: '#A78BFA' },

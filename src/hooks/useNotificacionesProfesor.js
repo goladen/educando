@@ -4,6 +4,8 @@
 //  notificación aunque haya muchos elementos nuevos:
 //    · resultados  → informes_juegos con mi codigoProfesor
 //    · preguntas   → preguntas_pendientes del trivial enviadas por alumnos
+//    · compartidos → recursos que otro profe ha compartido conmigo
+//                    (resources.compartidoCon array-contains mi uid)
 //    · apps        → novedades marcadas como app/actualización, filtradas por
 //                    los intereses del profesor (users/{uid}.intereses)
 //
@@ -17,7 +19,7 @@ import {
     collection, query, where, orderBy, limit, onSnapshot, doc, setDoc,
 } from 'firebase/firestore';
 
-export const CLAVES_NOTIF = ['resultados', 'preguntas', 'apps'];
+export const CLAVES_NOTIF = ['resultados', 'preguntas', 'apps', 'compartidos'];
 
 // Intereses disponibles (los mismos que usa el admin al publicar una novedad).
 // Son las materias de la vista «Por Materia» de la página principal
@@ -70,6 +72,7 @@ export default function useNotificacionesProfesor(usuario) {
     const [informes,  setInformes]  = useState([]);
     const [preguntas, setPreguntas] = useState([]);
     const [novedades, setNovedades] = useState([]);
+    const [compartidos, setCompartidos] = useState([]);
 
     // ── Perfil del profesor (código, vistos, intereses) ──────────────────────
     useEffect(() => {
@@ -153,6 +156,25 @@ export default function useNotificacionesProfesor(usuario) {
         return () => unsubs.forEach(u => u());
     }, [trivialsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
+    // ── 2b. Recursos compartidos conmigo por otros profes ────────────────────
+    useEffect(() => {
+        if (!uid) { setCompartidos([]); return; }
+        const q = query(collection(db, 'resources'), where('compartidoCon', 'array-contains', uid));
+        return onSnapshot(q, snap => setCompartidos(snap.docs.map(d => {
+            const x = d.data();
+            const inf = x.compartidoInfo?.[uid] || {};
+            return {
+                id: d.id,
+                fecha: ms(inf.fecha),
+                titulo: x.titulo || 'Recurso',
+                autor: inf.porNombre || x.profesorNombre || '',
+                tipo: x.tipo || '',
+                tipoJuego: x.tipoJuego || '',
+                format: x.format || '',
+            };
+        }).filter(r => r.fecha)), () => setCompartidos([]));
+    }, [uid]);
+
     // ── 3. Apps nuevas / actualizadas según intereses ────────────────────────
     useEffect(() => {
         const q = query(collection(db, 'novedades'), orderBy('fecha', 'desc'), limit(40));
@@ -173,6 +195,7 @@ export default function useNotificacionesProfesor(usuario) {
     const nuevosInformes  = informes.filter(i => i.fecha > desde('resultados'));
     const nuevasPreguntas = preguntas.filter(p => p.fecha > desde('preguntas'));
     const nuevasApps      = novedades.filter(n => n._ms > desde('apps') && encajaIntereses(n));
+    const nuevosCompart   = compartidos.filter(r => r.fecha > desde('compartidos')).sort((a, b) => b.fecha - a.fecha);
 
     const marcarVisto = async (clave) => {
         if (!uid) return;
@@ -211,6 +234,16 @@ export default function useNotificacionesProfesor(usuario) {
             || [...new Set(nuevasPreguntas.map(p => p.recursoTitulo))].join(', '),
         fecha: Math.max(...nuevasPreguntas.map(p => p.fecha)),
         items: nuevasPreguntas,
+    });
+    if (nuevosCompart.length) grupos.push({
+        clave: 'compartidos',
+        emoji: '🤝',
+        titulo: nuevosCompart.length === 1
+            ? 'Te han compartido 1 recurso'
+            : `Te han compartido ${nuevosCompart.length} recursos`,
+        detalle: nuevosCompart.slice(0, 3).map(r => r.autor ? `«${r.titulo}» de ${r.autor}` : `«${r.titulo}»`).join(' · '),
+        fecha: Math.max(...nuevosCompart.map(r => r.fecha)),
+        items: nuevosCompart,
     });
     if (nuevasApps.length) grupos.push({
         clave: 'apps',

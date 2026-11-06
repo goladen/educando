@@ -1,7 +1,26 @@
 // PaginaProfesor.jsx — Página pública del profesor
 import { useState, useEffect } from 'react';
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
+
+const ACCESO_INFO = {
+  oculto:    { icon:'🙈', texto:'Curso oculto (solo lo ves tú)' },
+  correos:   { icon:'🔒', texto:'Este curso solo está disponible para algunos correos.' },
+  comunidad: { icon:'👥', texto:'Este curso solo está disponible para los miembros de una comunidad.' },
+};
+
+async function cargarRecursosPorIds(ids) {
+  const limpios = [...new Set(ids)].filter(id=>typeof id==='string'&&id.length>0);
+  const found = {};
+  const chunks = [];
+  for (let i=0;i<limpios.length;i+=10) chunks.push(limpios.slice(i,i+10));
+  await Promise.all(chunks.map(async chunk=>{
+    const s = await getDocs(query(collection(db,'resources'), where('__name__','in',chunk)));
+    s.docs.forEach(d=>{ found[d.id]={...d.data(),id:d.id}; });
+  }));
+  return found;
+}
 import { BookOpen, ClipboardList, Calendar, Globe, ArrowLeft, Gamepad2, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
 
 const TIPO_EMOJI = {
@@ -285,6 +304,37 @@ export default function PaginaProfesor({ uid, slug, onBack }) {
   const [recursos, setRecursos] = useState({});
   const [loading,  setLoading]  = useState(true);
   const [tabActivo,setTabActivo]= useState(null);
+  const [profeUid, setProfeUid] = useState(uid || null);
+  const [usuario,  setUsuario]  = useState(undefined); // undefined = comprobando sesión
+  const [privados, setPrivados] = useState({}); // cursoId → { estado:'cargando'|'ok'|'denegado', curso }
+
+  useEffect(() => onAuthStateChanged(auth, u => { setUsuario(u||null); setPrivados({}); }), []);
+
+  // Al abrir un curso restringido con sesión iniciada, intenta leer su contenido
+  // (las reglas de Firestore deciden si este usuario puede verlo)
+  useEffect(() => {
+    const lista = pagina?.cursos||[];
+    const c = lista.find(x=>x.id===tabActivo) || lista.find(x=>x.acceso?.modo!=='oculto');
+    if (!c?.privado || !usuario || !profeUid || privados[c.id]) return;
+    setPrivados(p=>({...p,[c.id]:{ estado:'cargando' }}));
+    (async () => {
+      try {
+        const s = await getDoc(doc(db,'paginas_profesores',profeUid,'privado',c.id));
+        if (!s.exists()) throw new Error('no existe');
+        const curso = { ...s.data().curso, id:c.id, nombre:c.nombre, color:c.color, acceso:c.acceso };
+        const nuevos = await cargarRecursosPorIds(curso.recursos||[]).catch(()=>({}));
+        setRecursos(r=>({...r,...nuevos}));
+        setPrivados(p=>({...p,[c.id]:{ estado:'ok', curso }}));
+      } catch {
+        setPrivados(p=>({...p,[c.id]:{ estado:'denegado' }}));
+      }
+    })();
+  }, [tabActivo, usuario, profeUid, pagina, privados]);
+
+  const entrarConGoogle = async () => {
+    try { await signInWithPopup(auth, new GoogleAuthProvider()); }
+    catch (e) { if (e?.code !== 'auth/popup-closed-by-user') alert('No se pudo iniciar sesión: '+(e?.message||e)); }
+  };
 
   useEffect(() => {
     if (!uid && !slug) return;
@@ -301,23 +351,17 @@ export default function PaginaProfesor({ uid, slug, onBack }) {
       }
       const data = snap.data();
       setPagina(data);
-      setTabActivo(data.cursos?.[0]?.id||null);
+      setProfeUid(snap.id);
+      const primero = (data.cursos||[]).find(c=>c.acceso?.modo!=='oculto') || null;
+      setTabActivo(primero?.id||null);
 
-      const allIds = [...new Set((data.cursos||[]).flatMap(c=>c.recursos||[]))].filter(id=>typeof id==='string'&&id.length>0);
+      const allIds = (data.cursos||[]).filter(c=>!c.privado).flatMap(c=>c.recursos||[]);
       if (allIds.length>0) {
-        const chunks = [];
-        for (let i=0;i<allIds.length;i+=10) chunks.push(allIds.slice(i,i+10));
-        const found = {};
-        await Promise.all(chunks.map(async chunk=>{
-          const q = query(collection(db,'resources'), where('__name__','in',chunk));
-          const s = await getDocs(q);
-          s.docs.forEach(d=>{ found[d.id]={...d.data(),id:d.id}; });
-        }));
-        setRecursos(found);
+        try { setRecursos(await cargarRecursosPorIds(allIds)); } catch (e) { console.warn(e); }
       }
       setLoading(false);
     })();
-  }, [uid]);
+  }, [uid, slug]);
 
   if (loading) return (
     <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#F8FAFC' }}>
@@ -334,7 +378,12 @@ export default function PaginaProfesor({ uid, slug, onBack }) {
     </div>
   );
 
-  const cursoActivo      = (pagina.cursos||[]).find(c=>c.id===tabActivo);
+  const esDueno          = !!usuario && usuario.uid === profeUid;
+  const cursosVisibles   = (pagina.cursos||[]).filter(c=>c.acceso?.modo!=='oculto' || esDueno);
+  const tabSel           = cursosVisibles.find(c=>c.id===tabActivo) || cursosVisibles[0];
+  const estadoPriv       = tabSel?.privado ? privados[tabSel.id] : null;
+  // Curso restringido: solo se muestra el contenido si las reglas nos dejaron leerlo
+  const cursoActivo      = tabSel?.privado ? (estadoPriv?.estado==='ok' ? estadoPriv.curso : null) : tabSel;
   const recursosDelCurso = (cursoActivo?.recursos||[]).map(id=>recursos[id]).filter(Boolean);
   const juegosDelCurso   = cursoActivo?.juegos||[];
   const temasDelCurso    = cursoActivo?.temas||[];
@@ -364,12 +413,16 @@ export default function PaginaProfesor({ uid, slug, onBack }) {
       </div>
 
       {/* Tabs */}
-      {(pagina.cursos||[]).length>0 && (
+      {cursosVisibles.length>0 && (
         <div style={{ background:'white', borderBottom:'1px solid #E2E8F0', padding:'0 20px' }}>
           <div style={{ maxWidth:960, margin:'0 auto', display:'flex', gap:2, overflowX:'auto' }}>
-            {(pagina.cursos||[]).map(c=>(
-              <button key={c.id} onClick={()=>setTabActivo(c.id)} style={{ padding:'14px 20px', border:'none', background:'none', cursor:'pointer', fontWeight:700, fontSize:14, fontFamily:'inherit',
-                color:tabActivo===c.id?c.color:'#94A3B8', borderBottom:tabActivo===c.id?`3px solid ${c.color}`:'3px solid transparent', whiteSpace:'nowrap', transition:'all 0.15s' }}>{c.nombre}</button>
+            {cursosVisibles.map(c=>(
+              <button key={c.id} onClick={()=>setTabActivo(c.id)} title={c.privado ? ACCESO_INFO[c.acceso?.modo]?.texto : undefined}
+                style={{ padding:'14px 20px', border:'none', background:'none', cursor:'pointer', fontWeight:700, fontSize:14, fontFamily:'inherit',
+                color:tabSel?.id===c.id?c.color:'#94A3B8', borderBottom:tabSel?.id===c.id?`3px solid ${c.color}`:'3px solid transparent', whiteSpace:'nowrap', transition:'all 0.15s' }}>
+                {c.privado && <span style={{ marginRight:5, fontSize:12 }}>{privados[c.id]?.estado==='ok' ? '🔓' : (ACCESO_INFO[c.acceso?.modo]?.icon||'🔒')}</span>}
+                {c.nombre}
+              </button>
             ))}
           </div>
         </div>
@@ -377,7 +430,36 @@ export default function PaginaProfesor({ uid, slug, onBack }) {
 
       {/* Contenido */}
       <div style={{ maxWidth:720, margin:'0 auto', padding:'28px 16px' }}>
-        {!cursoActivo && <p style={{ textAlign:'center', color:'#94A3B8', fontSize:15 }}>Esta página no tiene cursos todavía.</p>}
+        {!tabSel && <p style={{ textAlign:'center', color:'#94A3B8', fontSize:15 }}>Esta página no tiene cursos todavía.</p>}
+
+        {tabSel?.privado && !cursoActivo && (
+          <div style={{ background:'white', borderRadius:16, padding:'32px 24px', border:'1px solid #E2E8F0', textAlign:'center', boxShadow:'0 2px 8px rgba(0,0,0,0.04)', borderTop:`4px solid ${tabSel.color||'#6D28D9'}` }}>
+            <div style={{ fontSize:44, marginBottom:8 }}>{ACCESO_INFO[tabSel.acceso?.modo]?.icon||'🔒'}</div>
+            <h2 style={{ margin:'0 0 8px', fontSize:19, color:'#0F172A' }}>{tabSel.nombre}</h2>
+            <p style={{ margin:'0 0 16px', color:'#64748B', fontSize:14, lineHeight:1.6 }}>
+              {ACCESO_INFO[tabSel.acceso?.modo]?.texto || 'Este curso es privado.'}
+              {tabSel.acceso?.modo==='comunidad' && tabSel.acceso?.comunidadNombre ? <> <b>({tabSel.acceso.comunidadNombre})</b></> : null}
+            </p>
+            {usuario===undefined || estadoPriv?.estado==='cargando' ? (
+              <div style={{ color:'#94A3B8', fontSize:14 }}>⏳ Comprobando acceso…</div>
+            ) : !usuario ? (
+              <button onClick={entrarConGoogle}
+                style={{ padding:'11px 22px', borderRadius:10, border:'none', background:tabSel.color||'#6D28D9', color:'white', fontWeight:700, fontSize:14, cursor:'pointer', fontFamily:'inherit' }}>
+                Iniciar sesión con Google para entrar
+              </button>
+            ) : estadoPriv?.estado==='denegado' ? (
+              <div>
+                <p style={{ margin:'0 0 12px', color:'#DC2626', fontSize:13 }}>
+                  Has entrado como <b>{usuario.email}</b> y esta cuenta no tiene acceso. Si crees que es un error, pídeselo a tu profesor/a.
+                </p>
+                <button onClick={async()=>{ await signOut(auth); entrarConGoogle(); }}
+                  style={{ padding:'9px 18px', borderRadius:10, border:'1px solid #CBD5E1', background:'white', color:'#374151', fontWeight:600, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>
+                  Entrar con otra cuenta
+                </button>
+              </div>
+            ) : null}
+          </div>
+        )}
 
         {cursoActivo && (
           <div style={{ display:'flex', flexDirection:'column', gap:28 }}>

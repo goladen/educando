@@ -358,59 +358,162 @@ function montarMotor({ root, preguntasInput, onEnd, onScore, xrSession = null })
         g.fillStyle = '#ffb84d'; for (let i = -s; i < s * 2; i += 48) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i + 24, 0); g.lineTo(i + 24 - s, s); g.lineTo(i - s, s); g.fill(); }
     }, 128, 1);
 
-    // ===== Arena =====
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(ARENA * 2, ARENA * 2), new THREE.MeshStandardMaterial({ map: floorTex, roughness: .85, metalness: .15 }));
-    floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+    // ===== Salas =====
+    // Una sala por pregunta, en fila hacia -Z. La sala k tiene su centro en z = salaZ(k) y una puerta
+    // en el muro norte (compartido con la sala k+1) que solo se abre al acertar la pregunta.
+    // Solo existen a la vez la sala anterior (cerrada a tu espalda), la actual y la siguiente.
+    const PUERTA_W = 3.2, PUERTA_H = 4;
+    const salaZ = k => -k * ARENA * 2;
+    const ACENTOS = [0x7fffb0, 0x5b8bff, 0xffb84d, 0xff6bd6, 0x6be4ff];
+    const DISTRIBUCIONES = [
+        { cajas: [[-7, -5, 2, 2], [7, -5, 2, 2], [-7, 6, 2, 2], [7, 6, 2, 2], [0, -12, 5, 1.5], [0, 12, 5, 1.5], [-12, 0, 1.5, 5], [12, 0, 1.5, 5]], barriles: [[-3, -16], [-2.4, -16.8], [3, 15.5], [17, 3], [-17, -4], [-17, -3.2]] },
+        { cajas: [[-9, -8, 3, 3], [9, -8, 3, 3], [0, 0, 6, 1.5], [-9, 8, 3, 3], [9, 8, 3, 3], [-15, 0, 1.5, 6], [15, 0, 1.5, 6]], barriles: [[-4, -15], [4, -15], [-17, 10], [17, -10], [-3, 4], [3, -4]] },
+        { cajas: [[-5, -10, 1.5, 6], [5, -10, 1.5, 6], [-12, 4, 6, 1.5], [12, 4, 6, 1.5], [0, 8, 4, 1.5], [-4, -2, 2, 2], [4, -2, 2, 2]], barriles: [[-16, -12], [-15.2, -12.6], [16, 12], [10, -16], [-10, 15], [0, -6]] },
+    ];
 
-    const ceil = new THREE.Mesh(new THREE.PlaneGeometry(ARENA * 2, ARENA * 2), new THREE.MeshStandardMaterial({ color: 0x090d10, roughness: 1, side: THREE.DoubleSide }));
-    ceil.rotation.x = Math.PI / 2; ceil.position.y = 6; scene.add(ceil);
+    const floorMat = new THREE.MeshStandardMaterial({ map: floorTex, roughness: .85, metalness: .15 });
+    const ceilMat = new THREE.MeshStandardMaterial({ color: 0x090d10, roughness: 1, side: THREE.DoubleSide });
     const beamMat = new THREE.MeshStandardMaterial({ color: 0x1a2328, roughness: .7, metalness: .3 });
-    for (let i = -ARENA + 4; i < ARENA; i += 8) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.5, ARENA * 2), beamMat); b.position.set(i, 5.75, 0); scene.add(b); const b2 = new THREE.Mesh(new THREE.BoxGeometry(ARENA * 2, 0.5, 0.4), beamMat); b2.position.set(0, 5.75, i); scene.add(b2); }
-    const lampLights = [];
-    for (let x = -14; x <= 14; x += 14) for (let z = -14; z <= 14; z += 14) {
-        const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.1, 0.5), new THREE.MeshBasicMaterial({ color: 0xd8fff0 })); lamp.position.set(x, 5.45, z); scene.add(lamp);
-        const pl = new THREE.PointLight(0xa8ffd0, 0.6, 22); pl.position.set(x, 5.2, z); scene.add(pl); lampLights.push(pl);
-    }
-
-    const wallMat = new THREE.MeshStandardMaterial({ map: wallTex, roughness: .85 });
-    const wallMeshes = [];
-    [[0, -ARENA, ARENA * 2, 1], [0, ARENA, ARENA * 2, 1], [-ARENA, 0, 1, ARENA * 2], [ARENA, 0, 1, ARENA * 2]].forEach(([x, z, w, d]) => {
-        const m = new THREE.Mesh(new THREE.BoxGeometry(w, 6, d), wallMat); m.position.set(x, 3, z);
-        m.material = wallMat.clone(); m.material.map = wallTex.clone(); m.material.map.repeat.set(Math.max(w, d) / 4, 1.5); m.material.map.needsUpdate = true; scene.add(m); wallMeshes.push(m);
-    });
-    const stripMat = new THREE.MeshBasicMaterial({ color: 0x7fffb0 });
-    [[0, -ARENA + 0.55, ARENA * 2, 0.05], [0, ARENA - 0.55, ARENA * 2, 0.05], [-ARENA + 0.55, 0, 0.05, ARENA * 2], [ARENA - 0.55, 0, 0.05, ARENA * 2]].forEach(([x, z, w, d]) => {
-        const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.08, d), stripMat); m.position.set(x, 2.2, z); scene.add(m);
-    });
-
+    const lampMat = new THREE.MeshBasicMaterial({ color: 0xd8fff0 });
     const pillarMat = new THREE.MeshStandardMaterial({ color: 0x1f2b31, roughness: .6, metalness: .5 });
-    const covers = [];
-    function addPillar(x, z) {
-        const p = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.7, 6, 8), pillarMat); p.position.set(x, 3, z); p.castShadow = true; scene.add(p);
-        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.75, 0.06, 6, 16), new THREE.MeshBasicMaterial({ color: 0x5b8bff })); ring.rotation.x = Math.PI / 2; ring.position.set(x, 1.2, z); scene.add(ring);
-        covers.push({ mesh: p, hw: 1.1, hd: 1.1 });
-    }
-    [[-16, -16], [16, 16], [16, -16], [-16, 16]].forEach(([x, z]) => addPillar(x, z));
-
     const coverMat = new THREE.MeshStandardMaterial({ color: 0x1c2a2f, roughness: .8, metalness: .2 });
     const hazardMat = new THREE.MeshStandardMaterial({ map: hazardTex, roughness: .8 });
-    [[-7, -5, 2, 2], [7, -5, 2, 2], [-7, 6, 2, 2], [7, 6, 2, 2], [0, -12, 5, 1.5], [0, 12, 5, 1.5], [-12, 0, 1.5, 5], [12, 0, 1.5, 5]].forEach(([x, z, w, d]) => {
-        const c = new THREE.Mesh(new THREE.BoxGeometry(w, 2.2, d), [coverMat, coverMat, hazardMat, coverMat, coverMat, coverMat]); c.position.set(x, 1.1, z); c.castShadow = c.receiveShadow = true; scene.add(c);
-        const edge = new THREE.LineSegments(new THREE.EdgesGeometry(c.geometry), new THREE.LineBasicMaterial({ color: 0x2e4a52 })); c.add(edge);
-        covers.push({ mesh: c, hw: w / 2 + 0.5, hd: d / 2 + 0.5 });
-    });
-
     const barrelMat = new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: .7, metalness: .3 });
-    [[-3, -16], [-2.4, -16.8], [3, 15.5], [17, 3], [-17, -4], [-17, -3.2]].forEach(([x, z]) => {
-        const b = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1.1, 10), barrelMat); b.position.set(x, 0.55, z); scene.add(b);
-        const band = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.1, 10), new THREE.MeshBasicMaterial({ color: 0xffb84d })); band.position.set(x, 0.55, z); scene.add(band);
-        covers.push({ mesh: b, hw: 0.8, hd: 0.8 });
-    });
+    const bandMat = new THREE.MeshBasicMaterial({ color: 0xffb84d });
+    const edgeMat = new THREE.LineBasicMaterial({ color: 0x2e4a52 });
+    const doorMat = new THREE.MeshStandardMaterial({ map: hazardTex, roughness: .6, metalness: .5 });
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0x2a353b, roughness: .5, metalness: .6 });
+    // Materiales de muro compartidos por todas las salas (la textura se repite según el largo del tramo)
+    function wallMatDe(largo, alto) { const m = new THREE.MeshStandardMaterial({ map: wallTex.clone(), roughness: .85 }); m.map.repeat.set(largo / 4, 1.5 * alto / 6); m.map.needsUpdate = true; return m; }
+    const TRAMO = ARENA - PUERTA_W / 2;
+    const wallMatLargo = wallMatDe(ARENA * 2, 6), wallMatTramo = wallMatDe(TRAMO, 6), wallMatDintel = wallMatDe(PUERTA_W, 6 - PUERTA_H);
+
+    // Colisionadores: { x, z, hw, hd, meshes, sala, activo?, muro? }. Muros y puerta también paran balas.
+    const covers = [];
+    const salas = new Map();
+    let salaActual = 0;
+    const TOTAL_SALAS = Math.max(1, Math.min(20, preguntasInput.length));
+
+    function cartel(texto, color) {
+        const c = document.createElement('canvas'); c.width = 512; c.height = 96; const g = c.getContext('2d');
+        g.fillStyle = 'rgba(5,7,10,.92)'; g.fillRect(0, 0, 512, 96);
+        g.strokeStyle = '#' + color.toString(16).padStart(6, '0'); g.lineWidth = 6; g.strokeRect(3, 3, 506, 90);
+        g.font = 'bold 50px Courier New, monospace'; g.fillStyle = '#e7f3ec'; g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText(texto, 256, 50);
+        const tex = new THREE.CanvasTexture(c); if ('colorSpace' in tex) tex.colorSpace = THREE.SRGBColorSpace;
+        return tex;
+    }
+
+    function construirSala(k) {
+        const cz = salaZ(k), g = new THREE.Group(), propios = [];
+        const acento = ACENTOS[k % ACENTOS.length];
+        const acentoMat = new THREE.MeshBasicMaterial({ color: acento }); propios.push(acentoMat);
+        const add = (m, x, y, z) => { m.position.set(x, y, cz + z); g.add(m); return m; };
+        const solido = (meshes, x, z, hw, hd, extra = {}) => { const c = { x, z: cz + z, hw, hd, meshes, sala: k, ...extra }; covers.push(c); return c; };
+
+        const floor = add(new THREE.Mesh(new THREE.PlaneGeometry(ARENA * 2, ARENA * 2), floorMat), 0, 0, 0);
+        floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true;
+        const ceil = add(new THREE.Mesh(new THREE.PlaneGeometry(ARENA * 2, ARENA * 2), ceilMat), 0, 6, 0); ceil.rotation.x = Math.PI / 2;
+        for (let i = -ARENA + 4; i < ARENA; i += 8) {
+            add(new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.5, ARENA * 2), beamMat), i, 5.75, 0);
+            add(new THREE.Mesh(new THREE.BoxGeometry(ARENA * 2, 0.5, 0.4), beamMat), 0, 5.75, i);
+        }
+        for (let x = -14; x <= 14; x += 14) for (let z = -14; z <= 14; z += 14) add(new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.1, 0.5), lampMat), x, 5.45, z);
+
+        // Muros este/oeste (y el sur solo en la primera sala: en las demás es el muro norte de la anterior)
+        const muros = [[-ARENA, 0, 1, ARENA * 2], [ARENA, 0, 1, ARENA * 2]];
+        if (k === 0) muros.push([0, ARENA, ARENA * 2, 1]);
+        muros.forEach(([x, z, w, d]) => { const m = add(new THREE.Mesh(new THREE.BoxGeometry(w, 6, d), wallMatLargo), x, 3, z); solido([m], x, z, w / 2 + 0.5, d / 2 + 0.5, { muro: true }); });
+        // Muro norte en dos tramos + dintel, con la puerta en medio
+        [-1, 1].forEach(s => {
+            const x = s * (PUERTA_W / 2 + TRAMO / 2);
+            const m = add(new THREE.Mesh(new THREE.BoxGeometry(TRAMO, 6, 1), wallMatTramo), x, 3, -ARENA);
+            solido([m], x, -ARENA, TRAMO / 2 + 0.5, 1, { muro: true });
+            add(new THREE.Mesh(new THREE.BoxGeometry(0.35, PUERTA_H + 0.2, 1.3), frameMat), s * (PUERTA_W / 2 + 0.1), (PUERTA_H + 0.2) / 2, -ARENA);
+        });
+        add(new THREE.Mesh(new THREE.BoxGeometry(PUERTA_W, 6 - PUERTA_H, 1), wallMatDintel), 0, PUERTA_H + (6 - PUERTA_H) / 2, -ARENA);
+        add(new THREE.Mesh(new THREE.BoxGeometry(PUERTA_W + 0.6, 0.3, 1.3), frameMat), 0, PUERTA_H + 0.1, -ARENA);
+        // Hojas correderas de la puerta
+        const hojas = [-1, 1].map(s => { const h = add(new THREE.Mesh(new THREE.BoxGeometry(PUERTA_W / 2, PUERTA_H, 0.3), doorMat), s * PUERTA_W / 4, PUERTA_H / 2, -ARENA); h.castShadow = true; return h; });
+        const puerta = solido(hojas, 0, -ARENA, PUERTA_W / 2 + 0.5, 1, { activo: true, puerta: true });
+        puerta.abrir = 0; puerta.abierta = false;
+        // Piloto rojo/verde encima de la puerta (a los dos lados del muro) + cartel
+        const pilotoMat = new THREE.MeshBasicMaterial({ color: 0xff3c3c }); propios.push(pilotoMat);
+        [-1, 1].forEach(s => add(new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.18, 0.1), pilotoMat), 0, PUERTA_H + 0.45, -ARENA + s * 0.56));
+        const ultima = k >= TOTAL_SALAS - 1;
+        const texCartel = cartel(ultima ? 'SALIDA' : `SALA ${k + 2} →`, acento); propios.push(texCartel);
+        const cartelMat = new THREE.MeshBasicMaterial({ map: texCartel, toneMapped: false }); propios.push(cartelMat);
+        add(new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.49), cartelMat), 0, PUERTA_H + 1, -ARENA + 0.56);
+        // Franja luminosa del color de la sala
+        [[0, ARENA - 0.55, ARENA * 2, 0.05], [-ARENA + 0.55, 0, 0.05, ARENA * 2], [ARENA - 0.55, 0, 0.05, ARENA * 2], [-(PUERTA_W / 2 + TRAMO / 2), -ARENA + 0.55, TRAMO, 0.05], [PUERTA_W / 2 + TRAMO / 2, -ARENA + 0.55, TRAMO, 0.05]].forEach(([x, z, w, d]) => {
+            add(new THREE.Mesh(new THREE.BoxGeometry(w, 0.08, d), acentoMat), x, 2.2, z);
+        });
+
+        // Coberturas: pilares en las esquinas + una distribución de cajas y barriles que cambia por sala
+        [[-16, -16], [16, 16], [16, -16], [-16, 16]].forEach(([x, z]) => {
+            const p = add(new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.7, 6, 8), pillarMat), x, 3, z); p.castShadow = true;
+            const ring = add(new THREE.Mesh(new THREE.TorusGeometry(0.75, 0.06, 6, 16), acentoMat), x, 1.2, z); ring.rotation.x = Math.PI / 2;
+            solido([p], x, z, 1.1, 1.1);
+        });
+        const dist = DISTRIBUCIONES[k % DISTRIBUCIONES.length];
+        dist.cajas.forEach(([x, z, w, d]) => {
+            const c = add(new THREE.Mesh(new THREE.BoxGeometry(w, 2.2, d), [coverMat, coverMat, hazardMat, coverMat, coverMat, coverMat]), x, 1.1, z);
+            c.castShadow = c.receiveShadow = true;
+            c.add(new THREE.LineSegments(new THREE.EdgesGeometry(c.geometry), edgeMat));
+            solido([c], x, z, w / 2 + 0.5, d / 2 + 0.5);
+        });
+        dist.barriles.forEach(([x, z]) => {
+            const b = add(new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1.1, 10), barrelMat), x, 0.55, z);
+            add(new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.1, 10), bandMat), x, 0.55, z);
+            solido([b], x, z, 0.8, 0.8);
+        });
+
+        scene.add(g);
+        salas.set(k, { g, propios, puerta, pilotoMat, cz });
+    }
+    function quitarSala(k) {
+        const s = salas.get(k); if (!s) return;
+        scene.remove(s.g);
+        s.g.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+        s.propios.forEach(m => m.dispose());
+        for (let i = covers.length - 1; i >= 0; i--) if (covers[i].sala === k) covers.splice(i, 1);
+        salas.delete(k);
+    }
+    function moverPuerta(k, abrir) {
+        const s = salas.get(k); if (!s) return;
+        s.puerta.abierta = abrir; s.puerta.activo = !abrir;
+        s.pilotoMat.color.setHex(abrir ? 0x7fffb0 : 0xff3c3c);
+    }
+    function animarPuertas(dt) {
+        salas.forEach(s => {
+            const p = s.puerta, obj = p.abierta ? 1 : 0;
+            if (p.abrir === obj) return;
+            p.abrir = obj > p.abrir ? Math.min(1, p.abrir + dt * 1.6) : Math.max(0, p.abrir - dt * 2.4);
+            p.meshes.forEach((h, i) => { h.position.x = (i ? 1 : -1) * (PUERTA_W / 4 + p.abrir * (PUERTA_W / 2 - 0.05)); });
+        });
+    }
+
+    // Luces fijas en número (añadir/quitar luces recompila los shaders): se trasladan a la sala activa
+    const lampLights = [];
+    for (let x = -14; x <= 14; x += 14) for (let z = -14; z <= 14; z += 14) {
+        const pl = new THREE.PointLight(0xa8ffd0, 0.6, 22); pl.position.set(x, 5.2, z); pl.userData.z = z; scene.add(pl); lampLights.push(pl);
+    }
+    scene.add(sun.target);
+    function iluminarSala(k) {
+        const cz = salaZ(k);
+        lampLights.forEach(l => { l.position.z = cz + l.userData.z; });
+        key.position.z = cz; rim.position.z = cz - 12; rim2.position.z = cz + 12;
+        sun.position.z = cz + 6; sun.target.position.set(0, 0, cz);
+        dust.position.z = cz;
+    }
 
     const dustGeo = new THREE.BufferGeometry(); const dustPos = [];
     for (let i = 0; i < 300; i++) dustPos.push((Math.random() * 2 - 1) * ARENA, Math.random() * 5.5, (Math.random() * 2 - 1) * ARENA);
     dustGeo.setAttribute('position', new THREE.Float32BufferAttribute(dustPos, 3));
     const dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({ color: 0x9fd8c0, size: 0.06, transparent: true, opacity: .5 })); scene.add(dust);
+
+    construirSala(0); if (TOTAL_SALAS > 1) construirSala(1);
+    iluminarSala(0);
 
     // ===== Arma =====
     const gun = new THREE.Group();
@@ -425,7 +528,8 @@ function montarMotor({ root, preguntasInput, onEnd, onScore, xrSession = null })
     // "rig" = el jugador. La cámara va dentro: en VR las gafas la mueven dentro del rig.
     const rig = new THREE.Group();
     rig.add(camera); camera.add(gun); scene.add(rig);
-    const playerPos = new THREE.Vector3(0, 1.7, 0); // posición real de la cabeza (se actualiza cada frame)
+    rig.position.z = ARENA - 5; // se empieza junto al muro sur, mirando hacia la puerta
+    const playerPos = new THREE.Vector3(0, 1.7, ARENA - 5); // posición real de la cabeza (se actualiza cada frame)
     const muzzleLight = new THREE.PointLight(0xffe08a, 0, 8); scene.add(muzzleLight);
     let gunKick = 0, bob = 0;
 
@@ -563,8 +667,16 @@ function montarMotor({ root, preguntasInput, onEnd, onScore, xrSession = null })
     function spawnEnemy(answer, isCorrect, angle) {
         const T = GRUNT;
         const b = buildEnemy(T);
-        const d = 15 + Math.random() * 3;
-        b.g.position.set(Math.cos(angle) * d, 0, Math.sin(angle) * d);
+        // Aparecen en la mitad norte de la sala (lejos de la entrada), sin caer encima de una cobertura
+        const cz = salaZ(salaActual);
+        let x = 0, z = cz;
+        for (let i = 0; i < 8; i++) {
+            const d = 9 + Math.random() * 7;
+            x = Math.cos(angle) * d; z = cz + Math.sin(angle) * d;
+            if (!collides(x, z)) break;
+            angle += (Math.random() - .5) * 0.3;
+        }
+        b.g.position.set(x, 0, z);
         const label = makeLabel(answer); label.position.y = b.height + 0.5; b.g.add(label);
         scene.add(b.g);
         const e = { mesh: b.g, answer, isCorrect, hp: T.hp, speed: T.speed * VEL_ENEMIGO * (0.9 + Math.random() * 0.2), cd: Math.random() * 1.5, dmg: T.dmg, pts: T.pts, w: 0.7, limbs: b.limbs, flashable: b.flashable, glowM: b.glowM, color: T.glow, phase: Math.random() * 6, h: b.height };
@@ -577,19 +689,41 @@ function montarMotor({ root, preguntasInput, onEnd, onScore, xrSession = null })
     let orden = PREGUNTAS.map((_, i) => i);
     for (let i = orden.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [orden[i], orden[j]] = [orden[j], orden[i]]; }
     $('wave-total').textContent = '/' + orden.length;
-    let preguntaActual = null;
+    let preguntaActual = null, textoPregunta = '';
+    function ponerTexto(t) { textoPregunta = t; qEl.textContent = t; panelSucio = true; }
 
     function spawnWave() {
         if (wave > orden.length) { winGame(); return; }
         preguntaActual = PREGUNTAS[orden[wave - 1]];
-        qEl.textContent = preguntaActual.q; panelSucio = true;
+        ponerTexto(preguntaActual.q);
         falloEnPregunta = false;
         let respuestas = [{ t: preguntaActual.ok, ok: true }, ...preguntaActual.mal.slice(0, 3).map(t => ({ t, ok: false }))];
         for (let i = respuestas.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [respuestas[i], respuestas[j]] = [respuestas[j], respuestas[i]]; }
         const n = respuestas.length;
-        const base = Math.random() * Math.PI * 2;
-        respuestas.forEach((r, i) => setTimeout(() => { if (!killed && running) spawnEnemy(r.t, r.ok, base + i * (Math.PI * 2 / n) + (Math.random() - .5) * 0.4); }, i * 300));
-        toast('PREGUNTA ' + wave); SFX.wave();
+        // Repartidos en un arco por el lado norte (z negativo) de la sala
+        const A0 = Math.PI + 0.35, A1 = Math.PI * 2 - 0.35;
+        respuestas.forEach((r, i) => setTimeout(() => { if (!killed && running) spawnEnemy(r.t, r.ok, A0 + (A1 - A0) * (n > 1 ? i / (n - 1) : 0.5) + (Math.random() - .5) * 0.25); }, i * 300));
+        toast(`SALA ${wave}`); SFX.wave();
+    }
+
+    // Pregunta resuelta: se abre la puerta de la sala. Al cruzarla se cierra detrás y empieza la siguiente.
+    let puertaAbierta = false;
+    function abrirPuerta() {
+        puertaAbierta = true; moverPuerta(salaActual, true);
+        ponerTexto('🚪 ¡Puerta abierta! Cruza a la siguiente sala');
+        toast('¡PUERTA ABIERTA!');
+        noise(0.6, 0.15); beep({ f: 160, f2: 420, t: 0.5, type: 'sawtooth', vol: 0.08 });
+    }
+    function entrarSala(k) {
+        puertaAbierta = false;
+        moverPuerta(k - 1, false); // se cierra a tu espalda
+        beep({ f: 420, f2: 140, t: 0.35, type: 'sawtooth', vol: 0.07 });
+        salaActual = k;
+        iluminarSala(k);
+        quitarSala(k - 2);
+        if (k + 1 < TOTAL_SALAS) construirSala(k + 1);
+        packs.forEach(p => scene.remove(p)); packs.length = 0;
+        wave++; spawnWave();
     }
     function wrongLeft() { return enemies.filter(e => !e.isCorrect).length; }
 
@@ -597,7 +731,7 @@ function montarMotor({ root, preguntasInput, onEnd, onScore, xrSession = null })
     const packs = [];
     function spawnPack() {
         const m = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshStandardMaterial({ color: 0x7fffb0, emissive: 0x2a8f5a, emissiveIntensity: .8 }));
-        m.position.set((Math.random() * 2 - 1) * (ARENA - 4), 0.5, (Math.random() * 2 - 1) * (ARENA - 4));
+        m.position.set((Math.random() * 2 - 1) * (ARENA - 4), 0.5, salaZ(salaActual) + (Math.random() * 2 - 1) * (ARENA - 4));
         scene.add(m); packs.push(m);
     }
 
@@ -641,7 +775,7 @@ function montarMotor({ root, preguntasInput, onEnd, onScore, xrSession = null })
         } else raycaster.setFromCamera({ x: 0, y: 0 }, camera);
         const ray = raycaster.ray;
         const hits = raycaster.intersectObjects(enemies.map(e => e.mesh), true).filter(h => h.object.userData.enemy);
-        const wallHits = raycaster.intersectObjects(covers.map(c => c.mesh).concat(wallMeshes), false);
+        const wallHits = raycaster.intersectObjects(solidos(), false);
         const wallDist = wallHits.length ? wallHits[0].distance : Infinity;
 
         let hitEnemy = null, hitPoint = null, hitDist = Infinity;
@@ -708,7 +842,11 @@ function montarMotor({ root, preguntasInput, onEnd, onScore, xrSession = null })
             if (falloEnPregunta) falladas++; else acertadas++;
             enemies.forEach(c => { c.flashable.forEach(m => { m.emissive.setHex(0x7fffb0); m.emissiveIntensity = 1.2; }); c.leaving = true; });
             toast('¡CORRECTO: ' + preguntaActual.ok.toUpperCase() + '!');
-            setTimeout(() => { if (killed) return; enemies.forEach(c => scene.remove(c.mesh)); enemies.length = 0; wave++; spawnWave(); }, 1600);
+            setTimeout(() => {
+                if (killed) return;
+                enemies.forEach(c => scene.remove(c.mesh)); enemies.length = 0;
+                if (wave >= orden.length) winGame(); else abrirPuerta();
+            }, 1600);
         }
     }
     function damagePlayer(n) {
@@ -747,7 +885,7 @@ function montarMotor({ root, preguntasInput, onEnd, onScore, xrSession = null })
         g.textAlign = 'center'; g.textBaseline = 'middle';
         // Pregunta: hasta 3 líneas, reduciendo la letra si no cabe
         let fs = 64, ls;
-        for (; ;) { g.font = `bold ${fs}px Courier New, monospace`; ls = lineasTexto(g, preguntaActual ? preguntaActual.q : '', W - 80); if (ls.length <= 3 || fs <= 32) break; fs -= 6; }
+        for (; ;) { g.font = `bold ${fs}px Courier New, monospace`; ls = lineasTexto(g, textoPregunta, W - 80); if (ls.length <= 3 || fs <= 32) break; fs -= 6; }
         ls = ls.slice(0, 3);
         const lh = fs * 1.15, y0 = 145 - (ls.length - 1) * lh / 2;
         g.fillStyle = '#e7f3ec'; ls.forEach((l, i) => g.fillText(l, W / 2, y0 + i * lh));
@@ -857,7 +995,7 @@ function montarMotor({ root, preguntasInput, onEnd, onScore, xrSession = null })
         const der = tmpV2.set(-tmpV.z, 0, tmpV.x);
         const k = SPEED_VR * dt;
         const nx = Math.max(-ARENA + 1.2, Math.min(ARENA - 1.2, playerPos.x + (tmpV.x * -my + der.x * mx) * k));
-        const nz = Math.max(-ARENA + 1.2, Math.min(ARENA - 1.2, playerPos.z + (tmpV.z * -my + der.z * mx) * k));
+        const nz = Math.min(ARENA - 1.2, playerPos.z + (tmpV.z * -my + der.z * mx) * k); // muros norte/sur = colisionadores
         if (!collides(nx, playerPos.z)) rig.position.x += nx - playerPos.x;
         if (!collides(playerPos.x, nz)) rig.position.z += nz - playerPos.z;
     }
@@ -912,19 +1050,29 @@ function montarMotor({ root, preguntasInput, onEnd, onScore, xrSession = null })
     const timer = new THREE.Timer(); const SPEED = 5.5;
     disposeFns.push(() => timer.dispose());
     function collides(x, z) {
-        for (const c of covers) if (Math.abs(x - c.mesh.position.x) < c.hw && Math.abs(z - c.mesh.position.z) < c.hd) return true;
+        for (const c of covers) if (c.activo !== false && Math.abs(x - c.x) < c.hw && Math.abs(z - c.z) < c.hd) return true;
         return false;
+    }
+    // Lo que para las balas: muros, coberturas y puertas cerradas
+    function solidos() {
+        const out = [];
+        covers.forEach(c => { if (c.activo !== false || (c.puerta && c.abrir < 0.9)) out.push(...c.meshes); });
+        return out;
     }
     let killed = false;
     const mmC = $('minimap'), mm = mmC.getContext('2d');
     function drawMinimap() {
-        const S = mmC.width, k = S / (ARENA * 2);
+        // Centrado en la sala actual (z relativo a su centro)
+        const S = mmC.width, k = S / (ARENA * 2), oz = ARENA - salaZ(salaActual);
         mm.clearRect(0, 0, S, S);
         mm.fillStyle = 'rgba(28,42,47,.9)';
-        covers.forEach(c => mm.fillRect((c.mesh.position.x - c.hw + 0.5 + ARENA) * k, (c.mesh.position.z - c.hd + 0.5 + ARENA) * k, (c.hw - 0.5) * 2 * k, (c.hd - 0.5) * 2 * k));
-        packs.forEach(p => { mm.fillStyle = '#7fffb0'; mm.fillRect((p.position.x + ARENA) * k - 2, (p.position.z + ARENA) * k - 2, 4, 4); });
-        enemies.forEach(e => { mm.fillStyle = '#' + e.color.toString(16).padStart(6, '0'); mm.beginPath(); mm.arc((e.mesh.position.x + ARENA) * k, (e.mesh.position.z + ARENA) * k, 2.6, 0, 7); mm.fill(); });
-        const px = (playerPos.x + ARENA) * k, pz = (playerPos.z + ARENA) * k;
+        covers.forEach(c => { if (c.sala === salaActual && !c.muro && !c.puerta) mm.fillRect((c.x - c.hw + 0.5 + ARENA) * k, (c.z - c.hd + 0.5 + oz) * k, (c.hw - 0.5) * 2 * k, (c.hd - 0.5) * 2 * k); });
+        // Puerta de salida: roja cerrada, verde abierta
+        mm.fillStyle = puertaAbierta ? '#7fffb0' : '#ff5b5b';
+        mm.fillRect((ARENA - PUERTA_W / 2) * k, 0, PUERTA_W * k, 4);
+        packs.forEach(p => { mm.fillStyle = '#7fffb0'; mm.fillRect((p.position.x + ARENA) * k - 2, (p.position.z + oz) * k - 2, 4, 4); });
+        enemies.forEach(e => { mm.fillStyle = '#' + e.color.toString(16).padStart(6, '0'); mm.beginPath(); mm.arc((e.mesh.position.x + ARENA) * k, (e.mesh.position.z + oz) * k, 2.6, 0, 7); mm.fill(); });
+        const px = (playerPos.x + ARENA) * k, pz = Math.max(0, (playerPos.z + oz) * k);
         mm.save(); mm.translate(px, pz); mm.rotate(-yaw);
         mm.fillStyle = '#e7f3ec'; mm.beginPath(); mm.moveTo(0, -7); mm.lineTo(5, 5); mm.lineTo(0, 2); mm.lineTo(-5, 5); mm.closePath(); mm.fill();
         mm.strokeStyle = 'rgba(231,243,236,.25)'; mm.beginPath(); mm.moveTo(0, 0); mm.lineTo(-14, -28); mm.lineTo(14, -28); mm.closePath(); mm.stroke();
@@ -969,7 +1117,7 @@ function montarMotor({ root, preguntasInput, onEnd, onScore, xrSession = null })
                 if (dir.lengthSq() > 1) dir.normalize();
                 const step = dir.multiplyScalar(SPEED * dt);
                 let nx = Math.max(-ARENA + 1.2, Math.min(ARENA - 1.2, rig.position.x + step.x));
-                let nz = Math.max(-ARENA + 1.2, Math.min(ARENA - 1.2, rig.position.z + step.z));
+                let nz = Math.min(ARENA - 1.2, rig.position.z + step.z); // muros norte/sur = colisionadores
                 if (!collides(nx, rig.position.z)) rig.position.x = nx;
                 if (!collides(rig.position.x, nz)) rig.position.z = nz;
 
@@ -1032,6 +1180,9 @@ function montarMotor({ root, preguntasInput, onEnd, onScore, xrSession = null })
             p.mesh.position.addScaledVector(p.v, dt); p.mesh.scale.setScalar(Math.max(0.01, p.life / 0.7));
             if (p.life <= 0) { scene.remove(p.mesh); parts.splice(i, 1); }
         }
+        animarPuertas(dt);
+        // Cruzar la puerta abierta = entrar en la siguiente sala
+        if (puertaAbierta && running && !gameOver && playerPos.z < salaZ(salaActual) - ARENA - 1.5) entrarSala(salaActual + 1);
         dust.rotation.y += dt * 0.01;
         if (running && !gameOver) actualizarMira();
         if (vr) actualizarPanelVR(dt); else drawMinimap();

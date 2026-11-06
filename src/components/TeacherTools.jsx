@@ -1,5 +1,5 @@
 import { useState, lazy, Suspense } from 'react';
-import { Wrench, Table, FileQuestion, RefreshCw, Camera, BarChart2, BookOpen, Tv2, Shield, Code2, Film, Presentation } from 'lucide-react';
+import { Wrench, Table, FileQuestion, RefreshCw, Camera, BarChart2, BookOpen, Tv2, Shield, Code2, Film, Presentation, Monitor } from 'lucide-react';
 import VideoTimelineEditor from '../VideoTimelineEditor';
 
 import ToolExportarGoogleSheets from './ToolExportarGoogleSheets';
@@ -13,6 +13,7 @@ import AdminRecursosUploader from './AdminRecursosUploader';
 import PresentationList from './PresentationList';
 const MiniAppCreator = lazy(() => import('./MiniAppCreator'));
 const PresentationEditor = lazy(() => import('./PresentationEditor'));
+const GestionInformatica = lazy(() => import('./GestionInformatica'));
 
 const ADMIN_EMAIL = 'goladen@gmail.com';
 
@@ -65,6 +66,12 @@ export default function TeacherTools({ usuario, googleToken, perfilProfesor, onO
             </div>
         );
     }
+
+    if (herramientaActiva === 'GESTION_INFORMATICA') return (
+        <Suspense fallback={<div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>Cargando…</div>}>
+            <GestionInformatica onBack={() => setHerramientaActiva(null)} />
+        </Suspense>
+    );
 
     if (herramientaActiva === 'VIDEO_EDITOR') return (
         <VideoTimelineEditor onBack={() => setHerramientaActiva(null)} />
@@ -212,6 +219,17 @@ export default function TeacherTools({ usuario, googleToken, perfilProfesor, onO
                     <h3 style={{ margin: '0 0 10px 0', color: '#0891b2' }}>Editor de Vídeo</h3>
                     <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>
                         Crea tramos de reproducción, añade preguntas y pausas en una línea de tiempo visual.
+                    </p>
+                </div>
+
+                {/* ── Gestión informática (mantenimiento de ordenadores del centro) ── */}
+                <div onClick={() => setHerramientaActiva('GESTION_INFORMATICA')} style={{ ...cardStyle, borderLeft: '4px solid #475569' }}>
+                    <div style={{ background: '#e2e8f0', padding: '15px', borderRadius: '50%', marginBottom: '15px' }}>
+                        <Monitor size={32} color="#475569" />
+                    </div>
+                    <h3 style={{ margin: '0 0 10px 0', color: '#334155' }}>Gestión informática</h3>
+                    <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>
+                        Para el mantenimiento de los ordenadores: bloqueo de fondos de pantalla y registro de quién usa cada puesto.
                     </p>
                 </div>
 

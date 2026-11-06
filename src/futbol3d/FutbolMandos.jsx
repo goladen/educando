@@ -1,23 +1,43 @@
 // «Partido con mandos micro:bit» (Fútbol Quizz 3D): cada mando es un jugador de campo.
 // Vestíbulo: los mandos se unen pulsando cualquier botón y el profe los reparte en dos equipos
 // (clic en un jugador: sin equipo → rojo → azul) y les pone nombre.
-// En el partido: A mantenido corre, B / logo giran, agitar tira e inclinar pasa (motorFutbolMandos).
+// En el partido (modo V, como el ovni): inclinar mueve al jugador, A pasa al compañero más cercano
+// a su izquierda (según hacia dónde mira), B al de su derecha y el logo (o agitar) chuta. Con antenas anteriores a la v8 se juega con
+// los controles antiguos del modo F (A corre, B / logo giran, agitar tira, inclinar pasa).
 // Si un rival alcanza al que lleva el balón, se para el partido y ambos responden una pregunta
-// con su mando (A cambia la letra, B o agitar la envía): el primero que acierta se queda el balón.
+// con su mando (A cambia la letra, B la envía; agitar no cuenta en el duelo): el primero que acierta se queda el balón.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { montarMotorMandos } from './motorFutbolMandos';
 import {
-    MODOS, LETRAS, VERSION_PROGRAMAS, setModoMandos, escucharMandos, escucharEstadoAntena,
+    MODOS, LETRAS, VERSION_PROGRAMAS, VERSION_CANAL, setModoMandos, escucharMandos, escucharEstadoAntena,
     simularPulsacion, feedbackMando, dueloMando, finDuelosMandos,
 } from '../mandos/mandosMicrobit.js';
 import { GENERADORES, barajar } from '../mandos/QuizMandos.jsx';
 import SelectorRecursoMandos, { hojasQuiz } from '../mandos/SelectorRecursoMandos.jsx';
-import { despertarAudio, sonidoCorrecto, sonidoIncorrecto, sonidoFinal } from '../utils/sonidosFeedback';
+import { despertarAudio } from '../utils/sonidosFeedback';
+// Los mismos sonidos y la misma celebración final que la pizarra 2D de Fútbol Quizz
+import { sonidoAcierto, sonidoFallo, sonidoGol, pitido, pitidoTriple, FondoCampeones, VideoCampeones } from './efectosFutbol';
 import { BotonTutorialMandos } from '../mandos/TutorialMandos.jsx';
 import ChipAntena from '../mandos/ChipAntena.jsx';
 
 const LS_NOMBRES = 'pikt_mandos_nombres';
 const SEG_DUELO = 15;
+const SEG_PREPARA = 4; // «¡Preparados!»: se lee la pregunta y aún no se puede responder
+// Pitido de «¡ya!» al abrir las respuestas del duelo
+const sonidoAbrir = () => {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        [0, 0.12].forEach((t, i) => {
+            const o = ctx.createOscillator(), g = ctx.createGain();
+            o.frequency.value = i ? 1320 : 880;
+            g.gain.setValueAtTime(0.25, ctx.currentTime + t);
+            g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.15);
+            o.connect(g).connect(ctx.destination);
+            o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + 0.16);
+        });
+        setTimeout(() => ctx.close(), 600);
+    } catch { /* sin audio */ }
+};
 const PAUSA_RESULTADO = 1800;
 const EQUIPOS = { red: { l: 'Rojo', c: '#dc2626' }, blue: { l: 'Azul', c: '#2563eb' } };
 
@@ -45,7 +65,37 @@ function BotonVirtual({ id, accion, children }) {
     );
 }
 
-function MandosVirtuales({ ids }) {
+// Inclinación virtual (modo V): mientras se mantiene, repite la inclinación como el mando real
+function InclinarVirtual({ id, d, x, y, children }) {
+    const t = useRef(null);
+    const soltar = () => { if (t.current) { clearInterval(t.current); t.current = null; simularPulsacion(id, 'FV0,0,0'); } };
+    useEffect(() => () => soltar(), []); // eslint-disable-line react-hooks/exhaustive-deps
+    const enviar = () => simularPulsacion(id, `FV${d},${x},${y}`);
+    return (
+        <button style={{ ...st.mini, background: '#1d4ed8' }} title="Inclinar: moverse"
+            onPointerDown={(e) => { e.preventDefault(); enviar(); t.current = setInterval(enviar, 300); }}
+            onPointerUp={soltar} onPointerLeave={soltar} onPointerCancel={soltar}>
+            {children}
+        </button>
+    );
+}
+
+function MandosVirtuales({ ids, volante }) {
+    if (volante) return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {ids.map(id => (
+                <div key={id} style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <span style={{ width: 34, fontSize: 12, color: '#94a3b8' }}>V{id - 900}</span>
+                    {[['I', -80, 0, '◀'], ['F', 0, -80, '▲'], ['T', 0, 80, '▼'], ['D', 80, 0, '▶']].map(([d, x, y, f]) => (
+                        <InclinarVirtual key={d} id={id} d={d} x={x} y={y}>{f}</InclinarVirtual>
+                    ))}
+                    <BotonVirtual id={id} accion="A">A ⇠</BotonVirtual>
+                    <BotonVirtual id={id} accion="B">⇢ B</BotonVirtual>
+                    <BotonVirtual id={id} accion="L">⚽ logo</BotonVirtual>
+                </div>
+            ))}
+        </div>
+    );
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {ids.map(id => (
@@ -92,12 +142,19 @@ export default function FutbolMandos({ onExit }) {
     const finRef = useRef(0);
     const timers = useRef([]);
     const luego = (fn, ms) => timers.current.push(setTimeout(fn, ms));
+    // Las órdenes de duelo van por radio sin confirmación: «fin de duelo» se manda 3 veces por si se pierde una
+    const cerrarDuelosMandos = () => { finDuelosMandos(); luego(finDuelosMandos, 400); luego(finDuelosMandos, 900); };
+
+    // Volante (inclinar = moverse) con antena v8+ o sin antena (mandos virtuales); si no, controles antiguos
+    const volante = !antena.antenaOk || antena.version >= VERSION_CANAL;
+    const volanteRef = useRef(volante); volanteRef.current = volante;
 
     useEffect(() => escucharEstadoAntena(setAntena), []);
+    useEffect(() => () => { finDuelosMandos(); setModoMandos(MODOS.LETRAS); timers.current.forEach(clearTimeout); }, []);
     useEffect(() => {
-        setModoMandos(MODOS.FUTBOL);
-        return () => { finDuelosMandos(); setModoMandos(MODOS.LETRAS); timers.current.forEach(clearTimeout); };
-    }, []);
+        setModoMandos(volante ? MODOS.VOLANTE : MODOS.FUTBOL);
+        motorRef.current?.setControl(volante ? 'V' : 'F');
+    }, [volante]);
 
 
     // ── Preguntas ──
@@ -117,10 +174,10 @@ export default function FutbolMandos({ onExit }) {
         const d = dueloRef.current;
         if (!d || d.cerrado) return;
         Object.entries(d.resp).forEach(([id, l]) => { if (Number(id) < 900) feedbackMando(Number(id), LETRAS.indexOf(l) === d.q.correcta); });
-        if (ganador) { sonidoCorrecto(); setStats(s => ({ ...s, [ganador]: { ...(s[ganador] || {}), duelos: (s[ganador]?.duelos || 0) + 1 } })); }
-        else sonidoIncorrecto();
+        if (ganador) { sonidoAcierto(); setStats(s => ({ ...s, [ganador]: { ...(s[ganador] || {}), duelos: (s[ganador]?.duelos || 0) + 1 } })); }
+        else sonidoFallo();
         setDuelo({ ...d, ganador, cerrado: true });
-        finDuelosMandos();
+        cerrarDuelosMandos();
         luego(() => {
             setDuelo(null);
             motorRef.current?.resolverDuelo(ganador);
@@ -133,15 +190,28 @@ export default function FutbolMandos({ onExit }) {
         const t = setInterval(() => {
             const d = dueloRef.current;
             if (!d || d.cerrado) return;
-            if (Date.now() >= d.fin) cerrarDuelo(null);
-            else setDuelo(x => (x ? { ...x } : x));
-        }, 500);
+            const ahora = Date.now();
+            if (ahora >= d.fin) { cerrarDuelo(null); return; }
+            // Pasado el «¡Preparados!», los mandos entran en modo pregunta (antes no se puede responder)
+            if (!d.abierto && ahora >= d.abre) {
+                d.abierto = true;
+                d.ultQ = ahora;
+                [d.a, d.b].forEach(id => { if (id < 900) dueloMando(id); });
+                sonidoAbrir();
+            } else if (d.abierto && ahora - (d.ultQ || 0) >= 1000) {
+                // Se repite cada segundo al que aún no ha respondido: si un mensaje se pierde, su mando se
+                // quedaría en modo juego sin poder responder (el mando ignora la orden si ya está en duelo)
+                d.ultQ = ahora;
+                [d.a, d.b].forEach(id => { if (id < 900 && !d.resp[id]) dueloMando(id); });
+            }
+            setDuelo(x => (x ? { ...x } : x));
+        }, 250);
         return () => clearInterval(t);
     }, [duelo?.a, duelo?.cerrado, cerrarDuelo]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const responderDuelo = (id, letra) => {
         const d = dueloRef.current;
-        if (!d || d.cerrado || (id !== d.a && id !== d.b) || d.resp[id]) return;
+        if (!d || d.cerrado || !d.abierto || (id !== d.a && id !== d.b) || d.resp[id]) return;
         const resp = { ...d.resp, [id]: letra };
         const nuevo = { ...d, resp };
         dueloRef.current = nuevo;
@@ -167,12 +237,15 @@ export default function FutbolMandos({ onExit }) {
     const callbacks = useRef({});
     callbacks.current = {
         onDuelo: ({ conBalon, rival }) => {
-            const d = { a: conBalon, b: rival, q: siguientePregunta(), fin: Date.now() + SEG_DUELO * 1000, resp: {}, ganador: null, cerrado: false };
+            // Primero SEG_PREPARA s para leer la pregunta y soltar el mando; los mandos aún no responden
+            const abre = Date.now() + SEG_PREPARA * 1000;
+            const d = { a: conBalon, b: rival, q: siguientePregunta(), abre, abierto: false, fin: abre + SEG_DUELO * 1000, resp: {}, ganador: null, cerrado: false };
             dueloRef.current = d;
             setDuelo(d);
-            [conBalon, rival].forEach(id => { if (id < 900) dueloMando(id); });
+            pitido(); // el árbitro para el partido
         },
         onGol: (team, goleador) => {
+            sonidoGol();
             setMarcador(m => ({ ...m, [team]: m[team] + 1 }));
             if (goleador != null) setStats(s => ({ ...s, [goleador]: { ...(s[goleador] || {}), goles: (s[goleador]?.goles || 0) + 1 } }));
             setAviso(`⚽ ¡GOOOL del ${nombreEquipo[team]}!${goleador != null ? ` (${jugRef.current[goleador]?.nombre || ''})` : ''}`);
@@ -188,14 +261,14 @@ export default function FutbolMandos({ onExit }) {
         const m = motorRef.current; if (!m) return;
         m.prepararSaque(equipo);
         setAviso(`Saca el ${nombreEquipo[equipo]}… ¡preparados!`);
-        luego(() => { if (faseRef.current === 'JUEGO') { setAviso(''); m.saque(); } }, 2200);
+        luego(() => { if (faseRef.current === 'JUEGO') { setAviso(''); pitido(); m.saque(); } }, 2200);
     };
 
     const terminar = () => {
-        finDuelosMandos();
+        cerrarDuelosMandos();
         setDuelo(null);
         setFase('FIN');
-        sonidoFinal();
+        pitidoTriple(); // final del partido
     };
 
     // Montar el motor al entrar en el partido
@@ -203,7 +276,9 @@ export default function FutbolMandos({ onExit }) {
         if (fase !== 'JUEGO' || !hostRef.current) return undefined;
         const m = montarMotorMandos({ host: hostRef.current, cb: () => callbacks.current });
         motorRef.current = m;
+        m.setControl(volanteRef.current ? 'V' : 'F');
         m.ponerJugadores(Object.values(jugRef.current).filter(j => j.team));
+        pitidoTriple(); // empieza el partido
         saqueCon('red');
         return () => { m.destroy(); motorRef.current = null; };
     }, [fase]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -266,11 +341,17 @@ export default function FutbolMandos({ onExit }) {
                     <ChipAntena />
                 </header>
                 <div style={st.scroll}>
-                    {antena.antenaOk && antena.version < VERSION_PROGRAMAS && <p style={st.aviso}>⚠️ La antena tiene un programa antiguo: graba de nuevo la antena y los mandos (Programación y robótica → Mandos micro:bit) para tener el modo fútbol.</p>}
+                    {antena.antenaOk && antena.version < VERSION_PROGRAMAS && <p style={st.aviso}>⚠️ La antena tiene un programa antiguo: graba de nuevo la antena y los mandos (Programación y robótica → Mandos micro:bit) para jugar con los controles nuevos (inclinar para moverse). Mientras tanto se juega con los antiguos.</p>}
                     <div style={st.panel}>
                         <p style={{ margin: '0 0 8px', lineHeight: 1.5 }}>
-                            Cada mando es un jugador: <b>A</b> (mantener) corre · <b>B</b> gira a la derecha · <b>tocar el logo</b> gira a la izquierda ·
-                            {' '}<b>agitar</b> tira a puerta (sin balón, arrancada) · <b>inclinar</b> pasa a un compañero de ese lado.
+                            {volante ? (
+                                <>Cada mando es un jugador: <b>inclina el mando</b> para correr hacia ese lado de la pantalla (más inclinado, más rápido) ·
+                                {' '}<b>A</b> pasa al compañero más cercano a la <b>izquierda</b> de hacia donde mira tu jugador · <b>B</b>, al de la <b>derecha</b> · <b>toca el logo</b> (o agita) para <b>chutar</b>.
+                                {' '}Sin balón, A, B o el logo dan una arrancada.</>
+                            ) : (
+                                <>Cada mando es un jugador: <b>A</b> (mantener) corre · <b>B</b> gira a la derecha · <b>tocar el logo</b> gira a la izquierda ·
+                                {' '}<b>agitar</b> tira a puerta (sin balón, arrancada) · <b>inclinar</b> pasa a un compañero de ese lado.</>
+                            )}
                             Si un rival alcanza al que lleva el balón, ¡duelo de preguntas! El primero que acierta se queda el balón.
                         </p>
                         <p style={{ margin: 0, color: '#fde68a', fontWeight: 700 }}>🎮 Pulsad cualquier botón del mando para uniros. Pulsa el número de cada jugador para cambiarlo de equipo.</p>
@@ -295,7 +376,7 @@ export default function FutbolMandos({ onExit }) {
                         <button style={st.btnSec} onClick={() => setJugadores({})} disabled={!lista.length}>🧹 Vaciar</button>
                         <button style={st.btnSec} onClick={() => setVirtuales(v => !v)}>🧪 Mandos virtuales</button>
                     </div>
-                    {virtuales && <div style={{ ...st.panel, marginTop: 10 }}><MandosVirtuales ids={[901, 902, 903, 904]} /></div>}
+                    {virtuales && <div style={{ ...st.panel, marginTop: 10 }}><MandosVirtuales ids={[901, 902, 903, 904]} volante={volante} /></div>}
 
                     <div style={{ ...st.panel, marginTop: 14 }}>
                         <div style={st.fila}>
@@ -323,14 +404,26 @@ export default function FutbolMandos({ onExit }) {
         const ganador = marcador.red === marcador.blue ? null : marcador.red > marcador.blue ? 'red' : 'blue';
         const filas = Object.values(jugadores).filter(j => j.team).map(j => ({ ...j, goles: stats[j.id]?.goles || 0, duelos: stats[j.id]?.duelos || 0 }))
             .sort((a, b) => b.goles - a.goles || b.duelos - a.duelos);
+        const color = ganador ? EQUIPOS[ganador].c : '#f1c40f';
+        const totalEquipo = (team) => filas.filter(j => j.team === team).reduce((s, j) => s + j.duelos, 0);
         return (
-            <div style={st.raiz}>
-                <div style={st.scroll}>
-                    <div style={{ ...st.panel, textAlign: 'center' }}>
-                        <div style={{ fontSize: 56 }}>🏆</div>
-                        <h2 style={{ margin: '4px 0', fontSize: 32 }}>{ganador ? `¡Gana el ${nombreEquipo[ganador]}!` : '¡Empate!'}</h2>
-                        <div style={{ fontSize: 40, fontWeight: 900 }}>
-                            <span style={{ color: EQUIPOS.red.c }}>{marcador.red}</span> – <span style={{ color: EQUIPOS.blue.c }}>{marcador.blue}</span>
+            <div style={{ ...st.raiz, background: 'radial-gradient(circle at 50% 30%, #1e293b 0%, #0b1220 100%)' }}>
+                <FondoCampeones color={color} />
+                <div style={{ ...st.scroll, position: 'relative', zIndex: 2, maxWidth: 640 }}>
+                    <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+                        <div style={{ fontSize: '3.5rem', animation: 'fqLatido 1s ease infinite' }}>{ganador ? '🏆' : '🤝'}</div>
+                        <h1 style={{ margin: 0, color, fontSize: 'clamp(1.6rem, 6vw, 2.6rem)', fontWeight: 900, textShadow: '0 2px 14px rgba(0,0,0,0.6)' }}>
+                            {ganador ? `¡${nombreEquipo[ganador]} CAMPEÓN!` : '¡Empate!'}
+                        </h1>
+                        {ganador && <VideoCampeones id="fm-champ-yt" />}
+                        <div style={{ display: 'flex', gap: 10, width: '100%' }}>
+                            {['red', 'blue'].map(team => (
+                                <div key={team} style={{ flex: 1, minWidth: 130, background: team === ganador ? `${EQUIPOS[team].c}22` : 'rgba(255,255,255,0.05)', border: `2px solid ${team === ganador ? EQUIPOS[team].c : 'rgba(255,255,255,0.12)'}`, borderRadius: 14, padding: '12px 14px' }}>
+                                    <div style={{ fontWeight: 800, color: EQUIPOS[team].c, marginBottom: 4 }}>{team === ganador ? '🏆 ' : ''}{nombreEquipo[team]}</div>
+                                    <div style={{ fontSize: '2.2rem', fontWeight: 900, lineHeight: 1 }}>{marcador[team]}</div>
+                                    <div style={{ fontSize: '0.8rem', color: '#cbd5e1', marginTop: 6 }}>⚽ goles · 🧠 {totalEquipo(team)} duelos ganados</div>
+                                </div>
+                            ))}
                         </div>
                     </div>
                     <div style={{ ...st.panel, marginTop: 14 }}>
@@ -356,9 +449,12 @@ export default function FutbolMandos({ onExit }) {
     // ── Partido ──
     const dA = duelo && jugadores[duelo.a], dB = duelo && jugadores[duelo.b];
     const quedaDuelo = duelo && !duelo.cerrado ? Math.max(0, Math.ceil((duelo.fin - Date.now()) / 1000)) : 0;
+    const preparando = duelo && !duelo.cerrado && !duelo.abierto;
+    const quedaPrepara = preparando ? Math.max(1, Math.ceil((duelo.abre - Date.now()) / 1000)) : 0;
     const estadoDuelista = (id) => {
         if (!duelo) return '';
         if (duelo.cerrado && duelo.ganador === id) return '🏆 ¡Se queda el balón!';
+        if (preparando) return '✋ suelta el mando y lee';
         const r = duelo.resp[id];
         if (!r) return duelo.cerrado ? '—' : '⏳ pensando…';
         if (!duelo.cerrado) return '✅ ha respondido';
@@ -385,13 +481,21 @@ export default function FutbolMandos({ onExit }) {
                 {pausa && <div style={st.aviso3d}>⏸ Pausa</div>}
                 {duelo && (
                     <div style={st.duelo}>
-                        <div style={{ textAlign: 'center', fontWeight: 900, color: '#fde68a', fontSize: 'clamp(16px,2vw,22px)' }}>⚔️ ¡DUELO! {!duelo.cerrado && `· ⏱ ${quedaDuelo}`}</div>
+                        <div style={{ textAlign: 'center', fontWeight: 900, color: '#fde68a', fontSize: 'clamp(16px,2vw,22px)' }}>⚔️ ¡DUELO! {!duelo.cerrado && !preparando && `· ⏱ ${quedaDuelo}`}</div>
+                        {preparando && (
+                            <div style={st.preparados}>
+                                ✋ ¡Preparados! Soltad el mando y leed la pregunta… <b style={{ fontSize: '1.4em', color: '#fff' }}>{quedaPrepara}</b>
+                            </div>
+                        )}
+                        {duelo.abierto && !duelo.cerrado && Date.now() - duelo.abre < 1500 && (
+                            <div style={{ ...st.preparados, background: '#16a34a', color: '#fff' }}>🟢 ¡YA! Elegid la letra con A y enviadla con B</div>
+                        )}
                         <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap', margin: '6px 0' }}>
                             {[[duelo.a, dA], [duelo.b, dB]].map(([id, j]) => (
                                 <div key={id} style={{ ...st.duelista, borderColor: j?.team ? EQUIPOS[j.team].c : '#fff', background: duelo.ganador === id ? 'rgba(34,197,94,.35)' : 'rgba(15,23,42,.8)' }}>
                                     <b>{j?.nombre || nombrePorDefecto(id)}</b>
                                     <span style={{ fontSize: 14 }}>{estadoDuelista(id)}</span>
-                                    {id > 900 && !duelo.cerrado && !duelo.resp[id] && (
+                                    {id > 900 && duelo.abierto && !duelo.cerrado && !duelo.resp[id] && (
                                         <span style={{ display: 'flex', gap: 3 }}>{duelo.q.opciones.map((_, i) => <button key={i} style={st.mini} onClick={() => responderDuelo(id, LETRAS[i])}>{LETRAS[i]}</button>)}</span>
                                     )}
                                 </div>
@@ -405,12 +509,12 @@ export default function FutbolMandos({ onExit }) {
                                 </div>
                             ))}
                         </div>
-                        <div style={{ textAlign: 'center', fontSize: 13, color: '#cbd5e1', marginTop: 6 }}>Con el mando: A cambia la letra · B o agitar la envía · el primero que acierta se queda el balón</div>
+                        <div style={{ textAlign: 'center', fontSize: 13, color: '#cbd5e1', marginTop: 6 }}>Con el mando: A cambia la letra · B la envía · el primero que acierta se queda el balón</div>
                     </div>
                 )}
                 {virtuales && (
                     <div style={st.virtualesJuego}>
-                        <MandosVirtuales ids={Object.values(jugadores).filter(j => j.team && j.id > 900).map(j => j.id)} />
+                        <MandosVirtuales ids={Object.values(jugadores).filter(j => j.team && j.id > 900).map(j => j.id)} volante={volante} />
                         {!Object.values(jugadores).some(j => j.team && j.id > 900) && <span style={{ fontSize: 12 }}>No hay mandos virtuales en ningún equipo.</span>}
                     </div>
                 )}
@@ -441,6 +545,7 @@ const st = {
     marcador: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, fontWeight: 800, fontSize: 'clamp(14px,1.8vw,20px)' },
     goles: { minWidth: 44, textAlign: 'center', padding: '2px 10px', borderRadius: 10, fontSize: 'clamp(20px,2.6vw,30px)', color: '#fff' },
     aviso3d: { position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 3, background: 'rgba(0,0,0,.7)', padding: '10px 22px', borderRadius: 14, fontSize: 'clamp(18px,2.6vw,32px)', fontWeight: 900, pointerEvents: 'none', textAlign: 'center' },
+    preparados: { textAlign: 'center', fontWeight: 900, fontSize: 'clamp(15px,1.8vw,20px)', color: '#1e293b', background: '#facc15', borderRadius: 10, padding: '6px 10px', margin: '6px auto 0', maxWidth: 620 },
     duelo: { position: 'absolute', left: '50%', bottom: 16, transform: 'translateX(-50%)', width: 'min(900px, calc(100% - 24px))', zIndex: 4, background: 'rgba(15,23,42,.92)', border: '2px solid #facc15', borderRadius: 18, padding: '12px 16px', boxSizing: 'border-box' },
     duelista: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, border: '3px solid', borderRadius: 14, padding: '6px 14px', minWidth: 170 },
     preguntaDuelo: { textAlign: 'center', fontSize: 'clamp(22px,3vw,38px)', fontWeight: 900, margin: '4px 0 8px' },

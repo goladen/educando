@@ -8,6 +8,7 @@ import PantallaReto, { textoBotonEnvio } from './components/retos/PantallaReto';
 import ModalEnviarCompeticion from './components/ModalEnviarCompeticion';
 
 const ExploradorINE = React.lazy(() => import('./estadistica/ExploradorINE'));
+const ReaccionJugadores = React.lazy(() => import('./estadistica/ReaccionJugadores'));
 
 const D = {
     bg:'#0d1117', card:'#161b22', border:'#30363d',
@@ -149,6 +150,7 @@ export default function EstadisticaApp({ onExit, usuario }) {
     const [errorEnv,setErrorEnv]=useState('');
     const [isFullscreen,setIsFullscreen]=useState(false);
     const [modoClase,setModoClase]=useState(false);
+    const [reaccion,setReaccion]=useState(false);
     // ?ine=… (enlace compartido desde el Explorador INE) abre directamente los datos del INE
     const [explorador,setExplorador]=useState(()=>(p=>p.has('ine')||p.has('inemapa'))(new URLSearchParams(window.location.search)));
     const appRef=useRef(null);
@@ -257,6 +259,16 @@ export default function EstadisticaApp({ onExit, usuario }) {
                                 <span style={{display:'block',fontSize:'0.83rem',color:D.muted,lineHeight:1.5}}>Población, superficie y densidad, edades, renta y desigualdad de cualquier municipio, provincia o comunidad autónoma. Compara dos lugares, crea mapas de España con leyenda (ficha PDF y juego de pintar) y comparte el enlace.</span>
                             </span>
                         </button>
+                        <button onClick={()=>setReaccion(true)}
+                            style={{...CARD,marginTop:14,width:'100%',cursor:'pointer',textAlign:'left',color:D.text,border:`2px solid ${D.gold}`,display:'flex',alignItems:'center',gap:14}}
+                            onMouseEnter={e=>e.currentTarget.style.background='#1c2230'}
+                            onMouseLeave={e=>e.currentTarget.style.background=D.card}>
+                            <span style={{fontSize:34}}>⏱️</span>
+                            <span>
+                                <span style={{display:'block',fontWeight:700,fontSize:'1rem',color:D.gold,marginBottom:4}}>Tiempo de reacción — competición</span>
+                                <span style={{display:'block',fontSize:'0.83rem',color:D.muted,lineHeight:1.5}}>Varios jugadores, 5 intentos cada uno con el ordenador. Comparad media, desviación típica y rango: ¿quién es el más rápido y quién el más regular?</span>
+                            </span>
+                        </button>
                     </div>
                 )}
 
@@ -315,6 +327,13 @@ export default function EstadisticaApp({ onExit, usuario }) {
                 <React.Suspense fallback={<div style={{position:'fixed',inset:0,zIndex:9000,background:D.bg,color:D.muted,display:'flex',alignItems:'center',justifyContent:'center'}}>Cargando…</div>}>
                     <ExploradorINE onClose={()=>setExplorador(false)} rutaCompartir={q=>`${window.location.origin}${RUTA_ESTADISTICA}?${q}`}/>
                 </React.Suspense>
+            )}
+            {reaccion&&(
+                <div style={{position:'fixed',inset:0,zIndex:9000,background:D.bg,overflowY:'auto',padding:16,boxSizing:'border-box'}}>
+                    <React.Suspense fallback={<div style={{color:D.muted,textAlign:'center',padding:40}}>Cargando…</div>}>
+                        <ReaccionJugadores onClose={()=>setReaccion(false)}/>
+                    </React.Suspense>
+                </div>
             )}
 
             {/* Send modal */}

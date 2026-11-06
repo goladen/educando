@@ -30,8 +30,9 @@ function Semaforo({ zona, tam = 26 }) {
 
 export default function SonometroRadio({ cabecera = null }) {
   const guardado = useRef(leer()).current;
-  const [u1, setU1] = useState(guardado.u1 ?? 25);
-  const [u2, setU2] = useState(guardado.u2 ?? 50);
+  const [u1, setU1] = useState(guardado.v === 2 ? guardado.u1 ?? 25 : 25);
+  // v2: el rojo por defecto pasa de 50 a 70 %; los umbrales guardados antes (sin v) se ignoran
+  const [u2, setU2] = useState(guardado.v === 2 ? guardado.u2 ?? 70 : 70);
   const [pitar, setPitar] = useState(guardado.pitar ?? true);
   const [burbujas, setBurbujas] = useState(guardado.burbujas ?? true);
   const [nombres, setNombres] = useState(guardado.nombres || {});
@@ -42,7 +43,7 @@ export default function SonometroRadio({ cabecera = null }) {
   const zonas = useRef({}); // id → { zona, rojoDesde, enviado }
   const radio = antena.antenaOk && antena.instrumentos;
 
-  useEffect(() => guardar({ u1, u2, pitar, burbujas, nombres }), [u1, u2, pitar, burbujas, nombres]);
+  useEffect(() => guardar({ v: 2, u1, u2, pitar, burbujas, nombres }), [u1, u2, pitar, burbujas, nombres]);
   useEffect(() => escucharEstadoAntena(setAntena), []);
   useEffect(() => { const t = setInterval(() => tic((n) => n + 1), 1000); return () => clearInterval(t); }, []);
 

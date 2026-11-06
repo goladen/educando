@@ -44,7 +44,7 @@ function Semaforo({ zona, tam = 36 }) {
 export default function Sonometro({ suscribir = micDeLaPlaca, actuar = true, simulacion = true, cabecera = null, sinSensor = null }) {
   const [v, setV] = useState(null);
   const [u1, setU1] = useState(30);
-  const [u2, setU2] = useState(60);
+  const [u2, setU2] = useState(70);
   const [semaforo, setSemaforo] = useState(false);
   const [pitar, setPitar] = useState(true);
   const [proyectar, setProyectar] = useState(false);
